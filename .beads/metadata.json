@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "inventory_tng",
+  "project_id": "64ccbfb3-2813-4824-bb0e-041a990c3f3c"
+}
