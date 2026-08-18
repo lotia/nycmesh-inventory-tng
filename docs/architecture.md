@@ -100,6 +100,10 @@ and monitor, which matters for a volunteer-operated system.
 MUI supplies the component library so that contributors are assembling
 well-documented components rather than writing CSS.
 
+QR decoding belongs here too, in the browser. It is designed but not built —
+see below — and the approach, the library and the constraints that follow from
+it are in [decision 0011](decisions/0011-qr-batch-scanning.md).
+
 ## Not yet built
 
 Named here so the gaps are visible rather than surprising:
@@ -108,7 +112,9 @@ Named here so the gaps are visible rather than surprising:
   only the endpoint index and the health check exist.
 - **The QR multi-scan flow.** The reason this project exists: scanning several
   codes into one transaction. The model supports it — one transaction, many
-  movements — but the endpoint and the client-side scanning approach are open.
+  movements — and the flow, the endpoints and the scanning approach are now
+  designed in
+  [decision 0011](decisions/0011-qr-batch-scanning.md). None of it is built.
 - **Migration from the existing Google Sheet** (52 items, 3,439 submissions).
 - **Authentication** beyond Django's session authentication.
 - **Background jobs.** MeshDB uses Celery with Redis. Nothing here needs

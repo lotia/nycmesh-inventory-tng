@@ -70,6 +70,27 @@ helm upgrade --install inventory-tng infra/helm/inventory-tng \
   --set django.allowedHosts=inventory.nycmesh.net
 ```
 
+**TLS is not optional.** The chart enables it by default (`ingress.tls.enabled`)
+and it must stay on: QR scanning stops working over plain HTTP, including on a
+LAN address, and it fails silently rather than warning. Why is in
+[decision 0011](decisions/0011-qr-batch-scanning.md#consequences).
+
+The chart issues no certificate of its own; it references one by name
+(`ingress.tls.secretName`, default `inventory-tng-tls`), so supply it before
+installing — either create the Secret:
+
+```bash
+kubectl create secret tls inventory-tng-tls \
+  --namespace inventory-tng --cert=fullchain.pem --key=privkey.pem
+```
+
+or, where cert-manager runs in the cluster, let it fill the same Secret in:
+
+```bash
+helm upgrade --install inventory-tng infra/helm/inventory-tng ... \
+  --set ingress.annotations."cert-manager\.io/cluster-issuer"=letsencrypt-prod
+```
+
 Verify before and after:
 
 ```bash

@@ -35,9 +35,10 @@ build-time-injected URL breaks that. See
 
 ## State
 
-There is no state management library, because nothing yet needs one. If the
-multi-scan QR flow turns out to need shared state beyond React's own hooks, that
-is a decision worth recording in
+There is no state management library. The multi-scan cart is the one piece of
+genuinely shared state and deliberately does not add one; its design is settled
+in [decision 0011](../../../docs/decisions/0011-qr-batch-scanning.md). Anything
+needing more than that is a decision worth recording in
 [docs/decisions/](../../../docs/decisions/) rather than adding quietly.
 
 ## Tests
@@ -57,6 +58,8 @@ and it catches accessibility regressions for free.
 
 ## Not yet built
 
-The QR scanning flow — the feature this project exists for — is still being
-designed, including which browser scanning library to use. Check `bd ready`
-before starting on it.
+The QR scanning flow — the feature this project exists for — is designed but not
+built. Read
+[decision 0011](../../../docs/decisions/0011-qr-batch-scanning.md) before
+touching it: it settles the scanning library, what the cart is, and what the
+endpoints look like. Check `bd ready` for the current state.

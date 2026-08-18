@@ -53,8 +53,13 @@ back to something insecure. `DJANGO_SECRET_KEY` is the pattern to copy.
 
 ## Models and migrations
 
-No domain models exist yet — this is deliberate, so the first schema is designed
-rather than accreted. Check `bd ready` for the design issues before adding any.
+The catalogue and the stock ledger are implemented in `inventory/models.py`. The
+entity model is documented in
+[docs/data-model.md](../../../docs/data-model.md) and its rationale in
+[decision 0008](../../../docs/decisions/0008-stock-ledger-transfer-graph.md);
+read both before changing a model, and update the first in the same change. The
+ledger tables are append-only, enforced by database triggers — do not write code
+that expects to update or delete one.
 
 Generate migrations with `makemigrations` and commit them with the model change.
 `uv run pytest` fails if a model and its migrations disagree.

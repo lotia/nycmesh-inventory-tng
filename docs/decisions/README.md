@@ -20,3 +20,4 @@ to ask "why is it like this?". Number them sequentially.
 | [0008](0008-stock-ledger-transfer-graph.md) | Stock as a double-entry transfer graph |
 | [0009](0009-type-annotations-required.md) | Type annotations required, `Any` permitted |
 | [0010](0010-openapi-version.md) | OpenAPI 3.1.1, kept current by a test |
+| [0011](0011-qr-batch-scanning.md) | One cart, one transaction: QR scanning and the batch endpoint |
