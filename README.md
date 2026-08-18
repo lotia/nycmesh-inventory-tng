@@ -5,24 +5,35 @@ replacement for the Google Forms + Google Sheets system currently in use.
 
 ## Why this exists
 
-The current system is a Google Form writing into a Google Sheet, searched with
-full-text search and regular expressions. It has passed 15,000 rows and is now
-very slow. Its QR-code entry point — scan a code, act on that item — is genuinely
-good and heavily used, so **QR scanning is a requirement here, not a nice-to-have**.
+The current system is a Google Form writing into a Google Sheet. Its QR-code
+entry point — scan a code, act on that item — is genuinely good and heavily
+used, so **QR scanning is a requirement here, not a nice-to-have**.
 
-This project keeps everything the current system does and adds what a spreadsheet
-cannot give us:
+What fails is not its size — the sheet is small. The problems are structural:
 
-- **Scanning several QR codes into a single transaction.** The current system
-  handles one item per scan; batching is the most-requested missing feature.
-- **Room to grow.** A real relational schema instead of columns in a sheet.
-- **Scale.** Indexed queries rather than a linear scan over 15,000+ rows.
+- **It breaks on typing.** Items are matched by their display name, so typos and
+  informal names silently match nothing, and those movements never reach a count.
+- **One item per scan.** Most entries were part of a burst by one person filling
+  the same form over and over. **Batching is the most-requested missing
+  feature.**
+- **Nobody can correct it properly.** A large share of entries are people faking
+  check-ins and check-outs to fix a number, because there is no other way to say
+  "the shelf disagrees with the sheet".
+- **It lives in a personal Google account**, so it cannot be edited by the
+  people who depend on it and could be lost.
+
+Each of these is measured rather than assumed. The figures live once, in
+[docs/decisions/0008](docs/decisions/0008-stock-ledger-transfer-graph.md#context).
 
 ## Status
 
-**Early setup.** The repository skeleton, tooling, and deployment path are in
-place. The inventory data model and the QR flow are still being designed, so
-there are no inventory features to use yet.
+**Early.** The repository skeleton, tooling, and deployment path are in place,
+and the inventory data model is implemented
+([docs/data-model.md](docs/data-model.md)). No endpoint exposes it yet, and the
+QR flow is designed
+([decision 0011](docs/decisions/0011-qr-batch-scanning.md)) but not built, so
+there are no inventory features to use yet. What is missing is listed in
+[architecture.md](docs/architecture.md#not-yet-built).
 
 ## Documentation
 
