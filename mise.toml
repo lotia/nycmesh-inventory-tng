@@ -1,4 +1,10 @@
+# Pinned toolchain for every contributor and CI runner.
+# `mise install` in the repo root installs all of it.
+# See DEVELOPERS.md for the full setup walkthrough.
+
 [tools]
+python = "3.14"        # backend runtime
+uv = "latest"          # backend package manager
+node = "24"            # frontend runtime (current LTS)
+helm = "latest"        # renders/validates the deployment chart in infra/helm/
 devcontainer-cli = "latest"
-python = "3.14"
-uv = "latest"

@@ -1,0 +1,55 @@
+[project]
+name = "inventory-tng-backend"
+version = "0.1.0"
+description = "Django REST backend for the NYC Mesh inventory system"
+requires-python = ">=3.14"
+
+# Pinned to minor: this is a deployed application, not a library, so
+# reproducibility beats flexibility. See docs/decisions/ for version rationale.
+dependencies = [
+    "django==6.1.*",
+    "djangorestframework==3.18.*",
+    "django-environ==0.12.*",
+    "psycopg[binary]==3.3.*",
+    "gunicorn==26.1.*",
+    "drf-spectacular==0.30.*",
+    "django-cors-headers==4.9.*",
+    "django-filter==25.*",
+    "whitenoise==6.11.*",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==8.*",
+    "pytest-django==4.*",
+    "ruff==0.14.*",
+    "mypy==1.*",
+    "django-stubs[compatible-mypy]==5.*",
+    "djangorestframework-stubs[compatible-mypy]==3.*",
+    "coverage==7.*",
+]
+
+[tool.ruff]
+# One tool replacing black + isort + flake8. See docs/decisions/0004-ruff.md
+line-length = 120
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "DJ"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "inventory_tng.settings"
+pythonpath = ["src"]
+python_files = ["test_*.py", "tests.py"]
+
+[tool.mypy]
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+mypy_path = "src"
+
+# django-environ ships no type stubs.
+[[tool.mypy.overrides]]
+module = "environ.*"
+ignore_missing_imports = true
+
+[tool.django-stubs]
+django_settings_module = "inventory_tng.settings"

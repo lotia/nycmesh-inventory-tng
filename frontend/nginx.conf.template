@@ -1,0 +1,42 @@
+# Rendered at container start by envsubst so that a SINGLE frontend image
+# works in every environment -- nothing environment-specific is baked into
+# the JavaScript bundle. See docs/deployment.md.
+
+server {
+    listen       8080;
+    server_name  _;
+    root         /usr/share/nginx/html;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    # The browser only ever talks to this origin; nginx forwards API calls to
+    # Django. No CORS in production, and no build-time API URL.
+    location /api/ {
+        proxy_pass         ${BACKEND_ORIGIN};
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+
+    location /admin/ {
+        proxy_pass         ${BACKEND_ORIGIN};
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+
+    # Hashed asset filenames are safe to cache indefinitely.
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Single-page app: unknown paths are client-side routes, not 404s.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

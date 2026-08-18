@@ -1,0 +1,56 @@
+# Local development stack: `docker compose up`.
+# Setup walkthrough lives in DEVELOPERS.md; this file is not used in
+# production, where the Helm chart in infra/helm/ deploys the same images.
+
+name: inventory-tng
+
+services:
+  postgres:
+    image: docker.io/library/postgres:18-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-inventory_tng}
+      POSTGRES_USER: ${POSTGRES_USER:-inventory}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-inventory}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-inventory}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  backend:
+    build:
+      context: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-only-not-for-deployment-change-me}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:8080
+      DATABASE_URL: postgres://${POSTGRES_USER:-inventory}:${POSTGRES_PASSWORD:-inventory}@postgres:5432/${POSTGRES_DB:-inventory_tng}
+    ports:
+      - "8000:8000"
+    # Migrations run here for convenience in local dev only. In Kubernetes they
+    # run as a separate Job so replicas cannot race -- see docs/deployment.md.
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             gunicorn inventory_tng.wsgi:application --bind 0.0.0.0:8000 --access-logfile -"
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      - backend
+    environment:
+      BACKEND_ORIGIN: http://backend:8000
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres_data:

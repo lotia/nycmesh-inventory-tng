@@ -1,0 +1,54 @@
+# Values for the inventory-tng chart.
+# Deployment procedure and the meaning of each production value are documented
+# once, in docs/deployment.md. This file documents only the knobs themselves.
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  registry: ghcr.io
+  repository: lotia/nycmesh-inventory-tng
+  # Overridden per release; never rely on :latest in a real environment.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+backend:
+  replicaCount: 2
+  port: 8000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+frontend:
+  replicaCount: 2
+  port: 8080
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
+django:
+  debug: false
+  allowedHosts: "inventory.nycmesh.net"
+  # Name of a pre-existing Secret holding DJANGO_SECRET_KEY and DATABASE_URL.
+  # Never put these in values.yaml.
+  existingSecret: inventory-tng-secrets
+
+# Runs `manage.py migrate` as a pre-upgrade Job so that scaling the backend to
+# multiple replicas can never race on schema changes.
+migrations:
+  enabled: true
+
+ingress:
+  enabled: true
+  className: nginx
+  host: inventory.nycmesh.net
+  tls:
+    enabled: true
+    secretName: inventory-tng-tls
+  annotations: {}

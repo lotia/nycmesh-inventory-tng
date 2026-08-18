@@ -1,3 +1,15 @@
+# Local environment configuration (copy .env.sample to .env)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+staticfiles/
+
+# Node
+node_modules/
+dist/
 
 # Beads / Dolt files (added by bd init)
 .dolt/

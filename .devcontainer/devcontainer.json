@@ -1,0 +1,22 @@
+{
+  "name": "inventory-tng",
+  "image": "mcr.microsoft.com/devcontainers/base:bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/jsburckhardt/devcontainer-features/mise:1": {}
+  },
+  // mise reads mise.toml, so the pinned python/uv/node versions are the
+  // single source of truth for the toolchain in the container too.
+  "postCreateCommand": "mise trust && mise install && cp -n .env.sample .env || true",
+  "forwardPorts": [5173, 8000, 8080, 5432],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  }
+}
