@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
@@ -17,5 +18,38 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: true,
+  },
+  // Coverage runs on every `npm test`, so a local run and a CI run enforce the
+  // same rules. See DEVELOPERS.md "Testing and coverage".
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/test-setup.ts"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov"],
+      // Show every file, including fully covered ones, so the report is a
+      // complete picture rather than only a list of failures.
+      skipFull: false,
+      reportOnFailure: true,
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        // Bootstrap: mounts React onto the DOM, no behaviour of its own.
+        "src/main.tsx",
+        // Declarative configuration, not behaviour.
+        "src/theme.ts",
+        "src/**/*.test.{ts,tsx}",
+        "src/test-setup.ts",
+      ],
+      // Applies to the code left after the exclusions above -- that is, code
+      // that actually implements behaviour. Raising this is welcome; lowering
+      // it needs a reason in the pull request.
+      thresholds: {
+        lines: 90,
+        functions: 90,
+        branches: 90,
+        statements: 90,
+      },
+    },
   },
 });

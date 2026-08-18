@@ -30,6 +30,18 @@ Use the checklist in
 contributors are held to. Nothing in this repository should be workable only by
 an agent.
 
+Two parts of it are enforced by tooling and will fail the build, so write the
+code to satisfy them rather than discovering them in CI:
+
+- **Every change that adds code adds tests.** Coverage thresholds are part of
+  the ordinary test command — see
+  [Testing and coverage](DEVELOPERS.md#testing-and-coverage). Do not add a
+  coverage exclusion to make a build pass; excluding a file is a decision that
+  needs justifying.
+- **Style is enforced, not advisory.** See
+  [Code style](DEVELOPERS.md#code-style) for the one command per language that
+  fixes what can be fixed.
+
 ## Task tracking
 
 Use `bd` (beads) for all task tracking — not TodoWrite, TaskCreate, or Markdown

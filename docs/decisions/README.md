@@ -13,5 +13,7 @@ to ask "why is it like this?". Number them sequentially.
 | [0001](0001-monorepo.md) | Backend and frontend in one repository |
 | [0002](0002-frontend-stack.md) | Vite + React SPA instead of meshforms |
 | [0003](0003-django-version.md) | Django 6.1 rather than 5.2 LTS |
-| [0004](0004-ruff.md) | ruff instead of black + isort + flake8 |
+| [0004](0004-python-tooling.md) | Astral toolchain: uv, ruff, ty |
 | [0005](0005-psycopg3.md) | psycopg 3 instead of psycopg2 |
+| [0006](0006-frontend-tooling.md) | Biome instead of ESLint + Prettier |
+| [0007](0007-test-coverage.md) | Coverage thresholds enforced in the test command |

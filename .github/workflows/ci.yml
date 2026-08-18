@@ -38,13 +38,16 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --locked
+      # Commands mirror DEVELOPERS.md "Code style" and "Testing and coverage".
+      # Thresholds and rules live in backend/pyproject.toml, not here, so a
+      # local run and this job enforce identical rules.
       - name: Lint
         run: uv run ruff check .
       - name: Format check
         run: uv run ruff format --check .
       - name: Type check
-        run: uv run mypy src
-      - name: Test
+        run: uv run ty check src
+      - name: Test and coverage
         run: uv run pytest
 
   frontend:
@@ -61,10 +64,15 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
-      - name: Lint
+      # Commands mirror DEVELOPERS.md "Code style" and "Testing and coverage".
+      # Rules and thresholds live in frontend/biome.json and
+      # frontend/vite.config.ts, not here.
+      - name: Lint and format check
         run: npm run lint
-      - name: Format check
-        run: npm run format:check
+      - name: Type check
+        run: npm run typecheck
+      - name: Test and coverage
+        run: npm test
       - name: Build
         run: npm run build
 

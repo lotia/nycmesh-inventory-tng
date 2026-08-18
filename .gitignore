@@ -11,6 +11,11 @@ staticfiles/
 node_modules/
 dist/
 
+# Coverage output
+coverage/
+.coverage
+htmlcov/
+
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db

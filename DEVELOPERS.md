@@ -110,6 +110,9 @@ backend/                Django REST Framework API
     inventory_tng/      Project package: settings, URLs, WSGI/ASGI
     inventory/          Domain app (models, views, tests)
 frontend/               Vite + React + MUI single-page app
+  package.json          Dependencies and scripts
+  biome.json            Lint and format configuration
+  vite.config.ts        Build, dev server, and test/coverage configuration
   Dockerfile            Frontend image (nginx serving static files)
   nginx.conf.template   Runtime API proxy configuration
 infra/helm/             Kubernetes deployment chart
@@ -134,9 +137,9 @@ All backend commands run from `backend/`, all frontend commands from `frontend/`
 | Task | Command |
 | --- | --- |
 | Run the dev server | `uv run python src/manage.py runserver` |
-| Run tests | `uv run pytest` |
+| Run tests (with coverage) | `uv run pytest` |
 | Lint and format | `uv run ruff check --fix . && uv run ruff format .` |
-| Type check | `uv run mypy src` |
+| Type check | `uv run ty check src` |
 | Make migrations | `uv run python src/manage.py makemigrations` |
 | Apply migrations | `uv run python src/manage.py migrate` |
 | Open a Django shell | `uv run python src/manage.py shell` |
@@ -151,9 +154,10 @@ All backend commands run from `backend/`, all frontend commands from `frontend/`
 | --- | --- |
 | Run the dev server | `npm run dev` |
 | Build for production | `npm run build` |
-| Lint | `npm run lint` |
-| Format | `npm run format` |
-| Run tests | `npm test` |
+| Lint and format check | `npm run lint` |
+| Fix lint and formatting | `npm run lint:fix` |
+| Type check | `npm run typecheck` |
+| Run tests (with coverage) | `npm test` |
 | Add a dependency | `npm install <package>` |
 
 `npm install` updates `package-lock.json`. **Commit it.**
@@ -185,6 +189,100 @@ running web pod — see [docs/deployment.md](docs/deployment.md).
 
 ---
 
+## Code style
+
+Style is not a matter of taste here — it is enforced, and CI fails on it. Both
+languages use one fast tool that covers linting *and* formatting, so there is a
+single configuration file per language and nothing to argue about in review.
+
+| | Backend (Python) | Frontend (TypeScript) |
+| --- | --- | --- |
+| Lint + format | [ruff](https://docs.astral.sh/ruff/) | [Biome](https://biomejs.dev/) |
+| Type check | [ty](https://github.com/astral-sh/ty) | `tsc --noEmit` |
+| Configuration | `backend/pyproject.toml` | `frontend/biome.json`, `frontend/tsconfig.json` |
+| Check everything | `uv run ruff check . && uv run ruff format --check . && uv run ty check src` | `npm run lint && npm run typecheck` |
+| Fix what can be fixed | `uv run ruff check --fix . && uv run ruff format .` | `npm run lint:fix` |
+
+Run the fixer before you open a pull request and the check will pass.
+
+Both toolchains follow the same principle: one binary replacing what used to be
+three or four. On the Python side ruff does the work of black, isort, and
+flake8, and `ty` type checks; both come from [Astral](https://astral.sh/),
+alongside `uv`, which manages the environment. On the TypeScript side Biome does
+the work of ESLint and Prettier. Rationale is in
+[docs/decisions/0004-python-tooling.md](docs/decisions/0004-python-tooling.md)
+and
+[docs/decisions/0006-frontend-tooling.md](docs/decisions/0006-frontend-tooling.md).
+
+Notable rules that are deliberate rather than default: Python targets a
+120-character line and enables the bugbear, pyupgrade, and Django rule sets;
+TypeScript forbids `any` and non-null assertions, so a type error has to be
+solved rather than silenced.
+
+---
+
+## Testing and coverage
+
+**Every change that adds code adds tests for it, and CI fails if it does not.**
+
+### How to run them
+
+```bash
+cd backend  && uv run pytest    # pytest + coverage
+cd frontend && npm test         # vitest + coverage
+```
+
+Coverage is built into both commands rather than being a separate CI-only step.
+A local run and a CI run enforce exactly the same rules, so the build cannot
+fail on something you had no way to see.
+
+### What breaks the build
+
+Both of these fail the command with a non-zero exit code, and therefore fail CI:
+
+1. **Any failing test.**
+2. **Coverage below the threshold** — currently **90%** on both sides, applied
+   to lines, and additionally to branches, functions, and statements on the
+   frontend.
+
+### Why 90% and not 100%
+
+Chasing 100% pushes people into writing tests for code that cannot
+meaningfully break, which wastes effort and produces tests nobody maintains. The
+number is not the point.
+
+The real work is done by the **exclusion lists**, which decide what counts as
+code worth covering. Everything not excluded is expected to be tested, and 90%
+leaves only a little room for the genuinely awkward case.
+
+| Excluded | Where | Why |
+| --- | --- | --- |
+| `manage.py`, `wsgi.py`, `asgi.py` | `backend/pyproject.toml` → `[tool.coverage.run] omit` | Entry points run by Django or the server, never by tests |
+| `settings.py` | same | Declarative configuration. Every test imports it, so counting it would inflate the percentage without testing any behaviour |
+| `migrations/` | same | Generated by `makemigrations` |
+| `src/main.tsx` | `frontend/vite.config.ts` → `test.coverage.exclude` | Bootstrap that mounts React onto the DOM; no behaviour of its own |
+| `src/theme.ts` | same | Declarative configuration, as with `settings.py` |
+
+If you are tempted to add an exclusion, say why in the pull request. Excluding a
+file is a decision about what does not need testing, and it deserves the same
+scrutiny as the code itself. Lowering a threshold needs a reason too; raising
+one needs nothing but a green build.
+
+### Writing tests
+
+| | Backend | Frontend |
+| --- | --- | --- |
+| Framework | [pytest](https://docs.pytest.org/) with `pytest-django` | [Vitest](https://vitest.dev/) |
+| Location | `backend/src/inventory/tests/` | next to the code, as `*.test.tsx` |
+| Component testing | — | [Testing Library](https://testing-library.com/docs/react-testing-library/intro/) |
+| Database access | needs `@pytest.mark.django_db` | — |
+
+Test behaviour through the public surface — an API endpoint's response, what a
+user sees rendered — rather than asserting on internals. Tests written that way
+survive refactoring, which is the only reason they are worth having.
+
+---
+
 ## Documentation rules
 
 Two rules govern documentation in this repository. They exist because NYC Mesh
@@ -206,6 +304,8 @@ Where each topic lives:
 | --- | --- |
 | What the project is, quickstart | [README.md](README.md) |
 | Development setup and workflow | This file |
+| Code style and linting | [Code style](#code-style) |
+| Testing and coverage requirements | [Testing and coverage](#testing-and-coverage) |
 | How to contribute | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Architecture and technology choices | [docs/architecture.md](docs/architecture.md) |
 | Deployment | [docs/deployment.md](docs/deployment.md) |
@@ -229,9 +329,12 @@ This is part of [Definition of Done](#definition-of-done) below.
 A change is not finished — and an issue must not be closed — until all of these
 hold:
 
-- [ ] Tests pass (`uv run pytest`, `npm test`)
-- [ ] Linting and formatting pass (`ruff`, `eslint`, `prettier`)
-- [ ] New behaviour has a test
+- [ ] Tests and coverage thresholds pass (`uv run pytest`, `npm test`) —
+      see [Testing and coverage](#testing-and-coverage)
+- [ ] Lint, format, and type checks pass — see [Code style](#code-style)
+- [ ] New behaviour has a test. If you added code that coverage counts, it is
+      covered; if you excluded something, the exclusion is justified in the
+      pull request
 - [ ] **Documentation is consistent with the change.** If the change alters
       setup steps, commands, environment variables, architecture, the API
       surface, or the deployment procedure, the canonical document for that

@@ -5,8 +5,11 @@ description: Use when working in backend/ on the inventory-tng Django REST Frame
 
 # Backend conventions
 
-Commands (runserver, pytest, ruff, mypy, migrations, `uv add`) are documented in
-[DEVELOPERS.md](../../../DEVELOPERS.md#backend). The overall design is in
+Commands (runserver, pytest, ruff, ty, migrations, `uv add`) are documented in
+[DEVELOPERS.md](../../../DEVELOPERS.md#backend), style rules in
+[Code style](../../../DEVELOPERS.md#code-style), and test and coverage
+requirements in
+[Testing and coverage](../../../DEVELOPERS.md#testing-and-coverage). The overall design is in
 [docs/architecture.md](../../../docs/architecture.md). This file covers only
 conventions you cannot infer from those.
 
@@ -58,5 +61,19 @@ works against the new schema, because rollback does not revert them
 ## Tests
 
 pytest with `pytest-django`, in `inventory/tests/`. Database access needs
-`@pytest.mark.django_db`. New behaviour needs a test — see the
-[Definition of Done](../../../DEVELOPERS.md#definition-of-done).
+`@pytest.mark.django_db`.
+
+`uv run pytest` runs coverage and **fails below the threshold**, so code you add
+must be tested in the same change. The thresholds and the exclusion list live in
+`backend/pyproject.toml` and are explained in
+[Testing and coverage](../../../DEVELOPERS.md#testing-and-coverage). Do not widen
+the exclusion list to get a build passing.
+
+Test through the API — request in, response out — rather than calling view
+methods directly, so the tests survive refactoring.
+
+## Views
+
+Use class-based DRF views (`APIView`, viewsets), not `@api_view` functions.
+Decorated functions do not match Django's `path()` overloads and `ty` rejects
+them; the class-based form is the more idiomatic DRF style regardless.
