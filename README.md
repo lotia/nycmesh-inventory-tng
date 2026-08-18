@@ -82,3 +82,8 @@ Full procedure, environment variables, and secrets:
 Day-to-day work is tracked with [beads](https://github.com/steveyegge/beads)
 (`bd ready` to see what is available). Volunteers are welcome to use GitHub
 issues instead — see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+[MIT](LICENSE). NYC Mesh is a volunteer community network; this is meant to be
+reusable by other community networks with the same problem.
