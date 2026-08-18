@@ -43,11 +43,18 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # Enables the PostgreSQL-specific index and field support the inventory
+    # models rely on -- see docs/data-model.md.
+    "django.contrib.postgres",
     # Third party
     "rest_framework",
     "corsheaders",
     "django_filters",
     "drf_spectacular",
+    # Edit history for catalogue records. Deliberately not applied to the stock
+    # ledger, which is append-only and is its own history
+    # (docs/decisions/0008-stock-ledger-transfer-graph.md).
+    "simple_history",
     # Project
     "inventory",
 ]
@@ -61,6 +68,11 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Without this, simple_history records *that* a catalogue record changed but
+    # never *who* changed it: history_user is read from the request and is NULL
+    # unless this middleware puts the request where the model can see it. Must
+    # come after AuthenticationMiddleware, which is what sets request.user.
+    "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
 # WhiteNoise serves the Django admin's own static files in the built image.
@@ -142,6 +154,9 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Inventory tracking for NYC Mesh. See docs/architecture.md.",
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    # OpenAPI 3.1 aligns the schema dialect with JSON Schema 2020-12. See
+    # docs/decisions/0010-openapi-version.md for why not 3.0 and not yet 3.2.
+    "OAS_VERSION": "3.1.1",
 }
 
 # The frontend is served from a different origin during development (the Vite
