@@ -1,0 +1,70 @@
+openapi: 3.1.1
+info:
+  title: NYC Mesh Inventory API
+  version: 0.1.0
+  description: Inventory tracking for NYC Mesh. See docs/architecture.md.
+paths:
+  /api:
+    get:
+      operationId: root_retrieve
+      description: |-
+        The list of endpoints this API offers.
+
+        Exists so the API is discoverable without reading the source or knowing the
+        URL layout in advance: fetch this, follow the links.
+      summary: List the available endpoints
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiRoot'
+          description: ''
+  /api/healthz:
+    get:
+      operationId: healthz_retrieve
+      description: |-
+        Liveness and readiness probe used by Kubernetes.
+
+        Issues a trivial query so the check fails when the database is
+        unreachable, rather than reporting healthy while unable to serve.
+        See docs/deployment.md.
+      summary: Liveness and readiness probe
+      tags:
+      - healthz
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheck'
+          description: ''
+components:
+  schemas:
+    ApiRoot:
+      type: object
+      properties:
+        docs:
+          type: string
+          format: uri
+          title: Health
+      required:
+      - docs
+    HealthCheck:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+      - status
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid

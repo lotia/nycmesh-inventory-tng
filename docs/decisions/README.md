@@ -17,3 +17,6 @@ to ask "why is it like this?". Number them sequentially.
 | [0005](0005-psycopg3.md) | psycopg 3 instead of psycopg2 |
 | [0006](0006-frontend-tooling.md) | Biome instead of ESLint + Prettier |
 | [0007](0007-test-coverage.md) | Coverage thresholds enforced in the test command |
+| [0008](0008-stock-ledger-transfer-graph.md) | Stock as a double-entry transfer graph |
+| [0009](0009-type-annotations-required.md) | Type annotations required, `Any` permitted |
+| [0010](0010-openapi-version.md) | OpenAPI 3.1.1, kept current by a test |

@@ -63,6 +63,13 @@ docker compose logs -f backend                                 # tail logs
 docker compose down -v                                         # stop, wipe database
 ```
 
+> **If you had this stack running before August 2026**, run `docker compose down
+> -v` once. The database volume now mounts `/var/lib/postgresql` rather than
+> `/var/lib/postgresql/data`, because postgres 18 keeps its data in a
+> major-version subdirectory. An older volume is not migrated: postgres would
+> silently start an empty cluster beside it, and you would wonder where your
+> local data went.
+
 ### Option B — native, with only PostgreSQL in Docker
 
 Best for day-to-day development: both servers hot-reload.
@@ -221,6 +228,148 @@ solved rather than silenced.
 
 ---
 
+## The API schema
+
+The API describes itself. `/api` lists the available endpoints, `/api/docs`
+renders them, and `/api/schema` serves an OpenAPI 3.1.1 document. The same
+document is committed at [`backend/openapi.yaml`](backend/openapi.yaml) so it
+can be read, diffed and consumed without running anything.
+
+**If you change an endpoint or a payload, regenerate it in the same change:**
+
+```
+cd backend && uv run python src/manage.py spectacular --file openapi.yaml
+```
+
+You do not have to remember this. `uv run pytest` generates the schema afresh
+and fails if it differs from the committed file, so drift is caught locally and
+in CI identically — the same approach as the coverage threshold. The failure
+message contains the command above.
+
+A second test requires every operation to document a response body, so the
+schema cannot quietly decay into a list of paths with no payloads. Use
+`@extend_schema` on any view whose response `drf-spectacular` cannot infer.
+
+Why 3.1.1 rather than 3.0 or 3.2 is in
+[decision 0010](docs/decisions/0010-openapi-version.md).
+
+---
+
+## Typing
+
+**Every function you write is annotated.** Arguments and return types, in both
+languages. This is not advisory: `ruff` enforces it on the Python side through
+the `ANN` rule set, and CI fails on it, exactly as it does for tests and
+formatting. TypeScript gets this from the compiler already.
+
+### The bar is "a type is present", not "the best possible type"
+
+*This latitude is Python-only.* TypeScript infers return types reliably and
+`any` stays forbidden there, as [Code style](#code-style) says — on the frontend
+`any` is an escape from the type system, whereas in Python `Any` is the on-ramp
+onto it.
+
+Types here exist to make the code readable and to let editors help you. They are
+not a puzzle you have to solve before your contribution counts.
+
+```python
+from typing import Any
+
+def summarise(rows: Any) -> Any:      # fine. passes. ship it.
+    ...
+
+def summarise(rows: list[dict[str, Any]]) -> dict[str, int]:   # better, later
+    ...
+```
+
+`Any` is deliberately allowed — the `ANN401` rule that would forbid it is
+switched off on purpose. If you cannot work out the right type, write `Any`,
+open the pull request, and someone will suggest something tighter. That is a
+review conversation, not a blocker. Reviewers: asking for a more specific type
+is a suggestion, never a rejection.
+
+The reasoning behind requiring annotations at all is in
+[decision 0009](docs/decisions/0009-type-annotations-required.md).
+
+### Getting help from the machinery
+
+Three commands, in the order you will want them.
+
+| I want to… | Run |
+| --- | --- |
+| See everything that is missing a type | `uv run ruff check --select ANN .` |
+| Add the obvious ones automatically | `uv run ruff check --select ANN --fix --unsafe-fixes .` |
+| Ask what type something actually is | put `reveal_type(x)` on a line, then `uv run ty check src` |
+
+The second adds return annotations such as `-> None` where it can prove them.
+It is "unsafe" only in ruff's sense that it edits annotations rather than
+whitespace; the scoping to `--select ANN` keeps it from touching anything else.
+Run `uv run ruff format .` afterwards.
+
+The third is the one worth remembering. `reveal_type()` needs no import and is
+understood by the type checker directly:
+
+```python
+def get(self, request: Request) -> Response:
+    with connection.cursor() as cursor:
+        reveal_type(cursor)        # ty prints: `CursorWrapper`
+```
+
+```
+info[revealed-type]: Revealed type
+ --> src/inventory/views.py:22:21
+  |
+  |         reveal_type(cursor)
+  |                     ^^^^^^ `CursorWrapper`
+```
+
+Copy the answer into the annotation and delete the `reveal_type` line. This
+works for any expression, and it is the fastest way to type a Django or DRF
+object whose type you would otherwise have to go looking for.
+
+### What the checker cannot see
+
+Django generates some attributes at runtime. `django-stubs` describes them
+through a mypy plugin, and `ty` does not run plugins yet, so it reports them as
+missing even though the code is correct:
+
+| Pattern | Use instead |
+| --- | --- |
+| `obj.get_kind_display()` | `obj.Kind(obj.kind).label` — explicit and typed |
+| `item.identifiers`, `item.history` (reverse accessors, history managers) | Nothing better exists. Add `# ty: ignore[unresolved-attribute]` |
+
+Suppress with `# ty: ignore[unresolved-attribute]` on the line, and only for
+this. A suppression is a statement that the checker is wrong, so if you are not
+sure it is, it is a bug worth looking at instead. This is the cost of `ty` being
+pre-1.0 and is expected to shrink — tracked as `inventory-tng-61b`.
+
+### Editor setup
+
+`ty` ships a language server, so your editor can show inferred types as you
+type rather than at check time. `.vscode/settings.json` in this repository
+configures it, and the devcontainer installs the extensions
+(`astral-sh.ty`, `charliermarsh.ruff`). Outside VS Code, point your editor's
+LSP client at `uv run ty server`.
+
+Coding agents should use the same three commands above — they are deterministic
+and their output is stable enough to act on directly.
+
+### Learning Python typing
+
+If annotations are new to you, these are the ones worth having open. The first
+is the most useful by a distance:
+
+- [mypy type-system cheat sheet](https://mypy.readthedocs.io/en/stable/cheat_sheet_py3.html)
+  — one page, practical, and applies to `ty` just as well despite the name
+- [Python typing guides](https://typing.python.org/en/latest/guides/index.html)
+  — the official introduction, longer form
+- [`typing` module reference](https://docs.python.org/3/library/typing.html)
+  — what is available to import
+- [django-stubs](https://github.com/typeddjango/django-stubs) — how Django's own
+  types are described, when you need to know what a queryset or a request is
+
+---
+
 ## Testing and coverage
 
 **Every change that adds code adds tests for it, and CI fails if it does not.**
@@ -305,9 +454,12 @@ Where each topic lives:
 | What the project is, quickstart | [README.md](README.md) |
 | Development setup and workflow | This file |
 | Code style and linting | [Code style](#code-style) |
+| API schema and how it stays current | [The API schema](#the-api-schema) |
+| Typing requirements | [Typing](#typing) |
 | Testing and coverage requirements | [Testing and coverage](#testing-and-coverage) |
 | How to contribute | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Architecture and technology choices | [docs/architecture.md](docs/architecture.md) |
+| Inventory data model | [docs/data-model.md](docs/data-model.md) |
 | Deployment | [docs/deployment.md](docs/deployment.md) |
 | Why a decision was made | [docs/decisions/](docs/decisions/) |
 | Rules for AI coding agents | [AGENTS.md](AGENTS.md) |
@@ -332,6 +484,7 @@ hold:
 - [ ] Tests and coverage thresholds pass (`uv run pytest`, `npm test`) —
       see [Testing and coverage](#testing-and-coverage)
 - [ ] Lint, format, and type checks pass — see [Code style](#code-style)
+- [ ] Every function you added or changed is annotated — see [Typing](#typing)
 - [ ] New behaviour has a test. If you added code that coverage counts, it is
       covered; if you excluded something, the exclusion is justified in the
       pull request
