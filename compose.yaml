@@ -14,7 +14,10 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # postgres:18+ keeps data in major-version subdirectories under
+      # /var/lib/postgresql and refuses to start if it finds a mount at the
+      # older /var/lib/postgresql/data path. Mount the parent.
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-inventory}"]
       interval: 5s
