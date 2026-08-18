@@ -21,3 +21,13 @@ htmlcov/
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# Local scratch space: source material for the migration (exports of the
+# existing Google Sheet, reference screenshots) that is not ours to publish.
+ignored/
+
+# Claude Code local-only configuration (personal; must not burn other
+# contributors' tokens). See .claude/settings.local.json.
+.claude/settings.local.json
+.claude/hooks/
+.claude/.landing-receipt.json
