@@ -30,7 +30,7 @@ Use the checklist in
 contributors are held to. Nothing in this repository should be workable only by
 an agent.
 
-Two parts of it are enforced by tooling and will fail the build, so write the
+Three parts of it are enforced by tooling and will fail the build, so write the
 code to satisfy them rather than discovering them in CI:
 
 - **Every change that adds code adds tests.** Coverage thresholds are part of
@@ -41,6 +41,11 @@ code to satisfy them rather than discovering them in CI:
 - **Style is enforced, not advisory.** See
   [Code style](DEVELOPERS.md#code-style) for the one command per language that
   fixes what can be fixed.
+- **Every function is annotated.** `ruff`'s `ANN` rules fail the build on a
+  missing argument or return type. `Any` is a permitted annotation in Python, so
+  there is always a way to satisfy this — see
+  [Typing](DEVELOPERS.md#typing) for the commands that tell you what is missing
+  and what a type actually is. Do not reach for `# noqa` to silence it.
 
 ## Task tracking
 

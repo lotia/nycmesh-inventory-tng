@@ -1,0 +1,40 @@
+{
+  // Editor defaults for this repository. The devcontainer installs the matching
+  // extensions; see .devcontainer/devcontainer.json for that list.
+  // Typing requirements and the commands behind them: DEVELOPERS.md#typing
+
+  // ty is the type checker (docs/decisions/0004-python-tooling.md). Its
+  // language server surfaces inferred types while you type, which is the point
+  // of installing it -- annotations are required here, so the editor should be
+  // the thing that tells you what to write.
+  "ty.importStrategy": "fromEnvironment",
+
+  // Pylance would type check alongside ty and disagree with it at the margins.
+  // One checker, one answer.
+  "python.analysis.typeCheckingMode": "off",
+  "python.defaultInterpreterPath": "backend/.venv/bin/python",
+
+  // ruff lints and formats Python; it is also what enforces the annotation
+  // rules, so its diagnostics are the ones that will fail CI.
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      // Import sorting only. Annotation fixes are deliberately NOT run on save:
+      // they are an explicit command you invoke when you want them, so nothing
+      // rewrites your signatures behind your back.
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+
+  "[typescript]": { "editor.defaultFormatter": "biomejs.biome" },
+  "[typescriptreact]": { "editor.defaultFormatter": "biomejs.biome" },
+  "[json]": { "editor.defaultFormatter": "biomejs.biome" },
+
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.ruff_cache": true,
+    "**/.pytest_cache": true,
+    "**/.mypy_cache": true
+  }
+}
