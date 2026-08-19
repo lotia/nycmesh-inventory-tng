@@ -1,0 +1,288 @@
+"""Tests for the read API: the catalogue, and resolving a scanned label.
+
+These are what the scanning client fetches before a volunteer ever presses
+anything -- the item list it draws, and the label map it caches so a scan in a
+basement resolves without a round trip. See decision 0011.
+"""
+
+import datetime
+from decimal import Decimal
+from typing import Any
+
+import pytest
+from django.contrib.auth.models import User
+from django.test import Client
+from django.urls import reverse
+
+from inventory.models import (
+    Category,
+    Item,
+    Label,
+    Location,
+    StockTransaction,
+    Volunteer,
+)
+
+pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture
+def client(client: Client) -> Client:
+    client.force_login(User.objects.create_user(username="reader", password="not-a-real-password"))
+    return client
+
+
+def results(response: Any) -> list[dict[str, Any]]:
+    body = response.json()
+    return body["results"] if isinstance(body, dict) else body
+
+
+def stock(client: Client, volunteer: Volunteer, item: Item, location: Location, quantity: str) -> None:
+    """Put stock somewhere through the API, so balances are real ledger rows."""
+    response = client.post(
+        reverse("stock-transactions"),
+        data={
+            "kind": StockTransaction.Kind.RECEIPT,
+            "actor": volunteer.pk,
+            "movements": [{"item": item.pk, "quantity": quantity, "to_location": location.pk}],
+        },
+        content_type="application/json",
+    )
+    assert response.status_code == 201, response.content
+
+
+# --------------------------------------------------------------------------
+# The item list
+# --------------------------------------------------------------------------
+
+
+def test_items_carry_the_stock_behind_them(
+    client: Client,
+    volunteer: Volunteer,
+    item: Item,
+    warehouse: Location,
+) -> None:
+    """A count beside every item is most of what the mockup asks for."""
+    stock(client, volunteer, item, warehouse, "12")
+
+    listed = results(client.get(reverse("items")))
+
+    assert [entry["name"] for entry in listed] == ["LiteBeam"]
+    assert listed[0]["balances"] == [{"location": warehouse.pk, "quantity": "12.000"}]
+    assert listed[0]["unit_of_measure"] == Item.UnitOfMeasure.EACH
+
+
+def test_an_item_with_no_stock_anywhere_still_appears(client: Client, item: Item) -> None:
+    """Zero is a count, and an item you cannot see is one you cannot receive."""
+    listed = results(client.get(reverse("items")))
+    assert listed[0]["balances"] == []
+
+
+def test_balances_are_ordered_by_location_id(
+    client: Client,
+    volunteer: Volunteer,
+    item: Item,
+    warehouse: Location,
+) -> None:
+    """By the id column, not the relation.
+
+    Ordering on ``location`` would follow the foreign key to Location's own
+    Meta.ordering, joining that table to sort by a name the response does not
+    carry. This annexe is named so that the two orders disagree.
+    """
+    annexe = Location.objects.create(name="0 Annexe", kind=Location.Kind.WAREHOUSE)
+    stock(client, volunteer, item, warehouse, "5")
+    stock(client, volunteer, item, annexe, "2")
+
+    balances = results(client.get(reverse("items")))[0]["balances"]
+
+    assert [entry["location"] for entry in balances] == [warehouse.pk, annexe.pk]
+
+
+def test_an_items_labels_are_its_packaging(client: Client, item: Item) -> None:
+    """The packaging chips, in quantity order."""
+    Label.objects.create(code="PACKET", item=item, quantity=Decimal("100"))
+    Label.objects.create(code="S1NG13", item=item)
+
+    labels = results(client.get(reverse("items")))[0]["labels"]
+
+    assert labels == [
+        {"code": "S1NG13", "quantity": "1.000"},
+        {"code": "PACKET", "quantity": "100.000"},
+    ]
+
+
+def test_a_revoked_label_is_not_offered_as_packaging(client: Client, item: Item) -> None:
+    Label.objects.create(
+        code="FADED",
+        item=item,
+        quantity=Decimal("100"),
+        revoked_at=datetime.datetime(2026, 8, 19, tzinfo=datetime.UTC),
+    )
+    assert results(client.get(reverse("items")))[0]["labels"] == []
+
+
+def test_items_can_be_searched_by_name(client: Client, item: Item, category: Category) -> None:
+    Item.objects.create(name="Zip Ties", category=category)
+    assert [entry["name"] for entry in results(client.get(reverse("items"), {"search": "beam"}))] == ["LiteBeam"]
+
+
+def test_items_can_be_narrowed_to_a_category(client: Client, item: Item, category: Category) -> None:
+    fibre = Category.objects.create(name="Fibre")
+    Item.objects.create(name="Pigtail", category=fibre)
+
+    listed = results(client.get(reverse("items"), {"category": fibre.pk}))
+
+    assert [entry["name"] for entry in listed] == ["Pigtail"]
+
+
+def test_a_retired_item_is_not_offered(client: Client, item: Item, category: Category) -> None:
+    """A retired item is not something to add to a cart; see inventory-tng-6c7."""
+    Item.objects.create(name="Discontinued Radio", category=category, active=False)
+    assert [entry["name"] for entry in results(client.get(reverse("items")))] == ["LiteBeam"]
+
+
+def test_the_item_list_requires_authentication(client: Client) -> None:
+    client.logout()
+    assert client.get(reverse("items")).status_code in (401, 403)
+
+
+# --------------------------------------------------------------------------
+# Locations and categories
+# --------------------------------------------------------------------------
+
+
+def test_locations_are_listed(client: Client, warehouse: Location, custody: Location) -> None:
+    listed = results(client.get(reverse("locations")))
+    assert {entry["name"] for entry in listed} == {"131 Broome", "Sean"}
+
+
+def test_a_retired_location_is_not_offered(client: Client, warehouse: Location) -> None:
+    Location.objects.create(name="Old Hub", kind=Location.Kind.HUB, active=False)
+    assert [entry["name"] for entry in results(client.get(reverse("locations")))] == ["131 Broome"]
+
+
+def test_locations_can_be_narrowed_to_a_kind(client: Client, warehouse: Location, custody: Location) -> None:
+    listed = results(client.get(reverse("locations"), {"kind": Location.Kind.VOLUNTEER_CUSTODY}))
+    assert [entry["name"] for entry in listed] == ["Sean"]
+
+
+def test_categories_are_listed(client: Client, category: Category) -> None:
+    assert [entry["name"] for entry in results(client.get(reverse("categories")))] == ["Radios"]
+
+
+# --------------------------------------------------------------------------
+# Resolving a scanned code
+# --------------------------------------------------------------------------
+
+
+def resolve(client: Client, code: str) -> Any:
+    return client.get(reverse("label-resolve", args=[code]))
+
+
+def test_a_scanned_code_resolves_to_its_item(client: Client, item: Item) -> None:
+    Label.objects.create(code="7QK2P9", item=item, quantity=Decimal("100"))
+
+    body = resolve(client, "7QK2P9").json()
+
+    assert body == {
+        "code": "7QK2P9",
+        "kind": "item",
+        "quantity": "100.000",
+        "revoked_at": None,
+        "item": item.pk,
+        "location": None,
+    }
+
+
+def test_a_wall_code_resolves_to_its_location(client: Client, warehouse: Location) -> None:
+    """The wall code: where is this stock moving from?"""
+    Label.objects.create(code="WA1132", location=warehouse)
+
+    body = resolve(client, "WA1132").json()
+
+    assert body["kind"] == "location"
+    assert body["location"] == warehouse.pk
+    assert body["item"] is None
+
+
+@pytest.mark.parametrize("typed", ["7qk2p9", "  7QK2P9  ", "  7Qk2P9  "])
+def test_a_code_resolves_however_it_was_typed(client: Client, item: Item, typed: str) -> None:
+    Label.objects.create(code="7QK2P9", item=item)
+    assert resolve(client, typed).status_code == 200
+
+
+@pytest.mark.parametrize(("typed", "stored"), [("I23", "123"), ("L23", "123"), ("O23", "023")])
+def test_letters_people_get_wrong_are_folded(client: Client, item: Item, typed: str, stored: str) -> None:
+    """The letters a Crockford code never contains, so the fold is safe."""
+    Label.objects.create(code=stored, item=item)
+    assert resolve(client, typed).status_code == 200
+
+
+def test_an_unknown_code_is_a_typed_404(client: Client) -> None:
+    """The client offers item search rather than treating it as a dead end."""
+    response = resolve(client, "NOSUCH")
+    assert response.status_code == 404
+    assert response.json()["detail"]
+
+
+def test_a_revoked_label_still_says_what_it_pointed_at(client: Client, item: Item) -> None:
+    """A superseded sticker still resolves; the client is told it is retired."""
+    Label.objects.create(
+        code="FADED",
+        item=item,
+        revoked_at=datetime.datetime(2026, 8, 19, tzinfo=datetime.UTC),
+    )
+
+    response = resolve(client, "FADED")
+
+    assert response.status_code == 200
+    assert response.json()["revoked_at"] is not None
+    assert response.json()["item"] == item.pk
+
+
+# --------------------------------------------------------------------------
+# The label map the client caches
+# --------------------------------------------------------------------------
+
+
+def test_every_live_label_is_listed_for_caching(client: Client, item: Item, warehouse: Location) -> None:
+    Label.objects.create(code="AAA111", item=item, quantity=Decimal("100"))
+    Label.objects.create(code="BBB222", location=warehouse)
+
+    listed = results(client.get(reverse("labels")))
+
+    assert [entry["code"] for entry in listed] == ["AAA111", "BBB222"]
+    assert listed[0]["quantity"] == "100.000"
+
+
+def test_the_label_map_is_not_paginated(client: Client, item: Item) -> None:
+    """A bare list, not a page envelope."""
+    for number in range(3):
+        Label.objects.create(code=f"CODE{number}", item=item)
+    assert isinstance(client.get(reverse("labels")).json(), list)
+
+
+def test_a_revoked_label_is_not_in_the_map(client: Client, item: Item) -> None:
+    Label.objects.create(
+        code="FADED",
+        item=item,
+        revoked_at=datetime.datetime(2026, 8, 19, tzinfo=datetime.UTC),
+    )
+    assert results(client.get(reverse("labels"))) == []
+
+
+def test_a_code_stored_in_any_other_form_is_canonicalised(client: Client, item: Item) -> None:
+    """Why the alphabet excludes I, L, O and U in the first place.
+
+    A code carrying one of them would be unresolvable for the life of the
+    physical object, because the resolver folds the very characters it holds.
+    Normalising on write closes that: whatever the admin or the planned import
+    stores, the code and the scan agree. What stops such a code being minted
+    at all is inventory-tng-n2o.
+    """
+    label = Label.objects.create(code="wall01", item=item)
+
+    assert label.code == "WA1101"
+    assert resolve(client, "wall01").status_code == 200
+    assert resolve(client, "WA1101").status_code == 200

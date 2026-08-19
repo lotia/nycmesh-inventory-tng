@@ -46,10 +46,15 @@ class Command(BaseCommand):
         if volunteer is None:
             volunteer = Volunteer.objects.create(display_name=VOLUNTEER)
 
-        category, _ = Category.objects.get_or_create(name="Radios")
+        # parent=None is part of the lookup, not decoration: a category or
+        # location name is unique only *within* its parent, so matching on the
+        # name alone would raise MultipleObjectsReturned against a developer's
+        # database that happens to nest one of these names under something.
+        category, _ = Category.objects.get_or_create(name="Radios", parent=None)
         item, _ = Item.objects.get_or_create(name="LiteBeam", defaults={"category": category})
         warehouse, _ = Location.objects.get_or_create(
             name="131 Broome",
+            parent=None,
             defaults={"kind": Location.Kind.WAREHOUSE},
         )
 

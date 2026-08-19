@@ -113,14 +113,17 @@ it are in [decision 0011](decisions/0011-qr-batch-scanning.md).
 
 Named here so the gaps are visible rather than surprising:
 
-- **The read API.** Nothing yet exposes the catalogue, the balances or a
-  scanned label. What exists is the index, the health check, the volunteer
-  pick-list and the batch write below.
 - **The QR multi-scan flow.** The reason this project exists: scanning several
   codes into one transaction. It is designed in
-  [decision 0011](decisions/0011-qr-batch-scanning.md), and the endpoint that
-  records a batch — `POST /api/stock/transactions` — is built. The scanning
-  client, the label resolver and the label generator are not.
+  [decision 0011](decisions/0011-qr-batch-scanning.md), and every endpoint it
+  needs is built — the catalogue and its balances, the pick-lists, the label
+  map the client caches, the resolver for one scanned code, and the batch
+  write. They are listed once, in the generated schema; fetch `/api` or read
+  [`/api/docs`](../DEVELOPERS.md#the-api-schema). The scanning client and the
+  label generator are not built.
+- **A write API for the catalogue.** Items, locations, categories and labels
+  are created through the Django admin; only volunteers and stock
+  transactions can be posted.
 - **Migration from the existing Google Sheet** (52 items, 3,439 submissions).
 - **Authentication** beyond Django's session authentication.
 - **Background jobs.** MeshDB uses Celery with Redis. Nothing here needs

@@ -21,10 +21,19 @@ import datetime
 from typing import Any
 
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
 
-from inventory.models import StockMovement, StockTransaction, Volunteer
+from inventory.models import (
+    Category,
+    Item,
+    Label,
+    Location,
+    StockMovement,
+    StockTransaction,
+    Volunteer,
+)
 
 # Far above a real cart of a couple of dozen scans. It exists only so that one
 # request cannot open an unbounded write transaction against an append-only
@@ -221,3 +230,90 @@ class VolunteerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Volunteer
         fields = ["id", "display_name", "email", "slack_id"]
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    """A grouping of items, nestable."""
+
+    class Meta:
+        model = Category
+        fields = ["id", "name", "parent"]
+
+
+class LocationSerializer(serializers.ModelSerializer):
+    """Somewhere stock can be, including a volunteer holding it."""
+
+    class Meta:
+        model = Location
+        fields = ["id", "name", "kind", "parent", "held_by", "active"]
+
+
+class ItemBalanceSerializer(serializers.Serializer):
+    """How much of one item is at one location, derived from the ledger."""
+
+    # The id column rather than the relation: typed in the schema without a
+    # model to derive it from, and no row fetched to render a number the
+    # balance already carries.
+    location = serializers.IntegerField(source="location_id")
+    quantity = serializers.DecimalField(max_digits=14, decimal_places=3)
+
+
+class ItemLabelSerializer(serializers.Serializer):
+    """An active label on this item, and what one scan of it means.
+
+    The distinct quantities across an item's labels *are* its packaging, and
+    are what the list offers as one-tap chips. See decision 0011 section 5.
+    """
+
+    code = serializers.CharField()
+    quantity = serializers.DecimalField(max_digits=12, decimal_places=3)
+
+
+class ItemSerializer(serializers.ModelSerializer):
+    """A catalogue entry with the stock behind it.
+
+    Balances and labels are attached by the view in bulk. Reading them per
+    item would be two queries per row on the screen the volunteer looks at
+    most.
+    """
+
+    balances = ItemBalanceSerializer(many=True, read_only=True)
+    labels = ItemLabelSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Item
+        fields = [
+            "id",
+            "name",
+            "category",
+            "unit_of_measure",
+            "minimum_stock",
+            "reorder_quantity",
+            "active",
+            "balances",
+            "labels",
+        ]
+
+
+class LabelResolveSerializer(serializers.ModelSerializer):
+    """What a scanned code points at.
+
+    ``quantity`` is part of the contract because the client cannot spell out
+    the cart line without it. See decision 0011 section 5.
+    """
+
+    kind = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Label
+        fields = ["code", "kind", "quantity", "revoked_at", "item", "location"]
+
+    @extend_schema_field(serializers.ChoiceField(choices=["item", "location"]))
+    def get_kind(self, label: Label) -> str:
+        return "item" if label.item_id is not None else "location"  # ty: ignore[unresolved-attribute]
+
+
+class NotFoundSerializer(serializers.Serializer):
+    """Nothing here. Said in a typed body so a client can render it."""
+
+    detail = serializers.CharField()

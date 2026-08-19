@@ -30,6 +30,32 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiRoot'
           description: ''
+  /api/categories:
+    get:
+      operationId: categories_list
+      description: The item groupings, for narrowing the catalogue.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: parent
+        schema:
+          type: integer
+      tags:
+      - categories
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCategoryList'
+          description: ''
   /api/healthz:
     get:
       operationId: healthz_retrieve
@@ -51,6 +77,148 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthCheck'
+          description: ''
+  /api/items:
+    get:
+      operationId: items_list
+      description: |-
+        The catalogue, with the stock behind it.
+
+        This is the screen the volunteer mockup is almost entirely made of: every
+        item, its count, and a way to add some to the cart. See decision 0011.
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: integer
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Name contains
+      tags:
+      - items
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedItemList'
+          description: ''
+  /api/labels:
+    get:
+      operationId: labels_list
+      description: |-
+        Every label that still points at something.
+
+        Unpaginated, deliberately. This exists to be fetched once and cached, so
+        that a scan resolves without a round trip from a basement (decision 0011);
+        handing it back in pages would make the client stitch them together for no
+        benefit at a few hundred rows.
+      tags:
+      - labels
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LabelResolve'
+          description: ''
+  /api/labels/{code}:
+    get:
+      operationId: labels_retrieve
+      description: |-
+        Resolve one scanned or typed code.
+
+        A revoked label resolves rather than 404s: the sticker is superseded, but
+        it still says what it pointed at, and refusing the scan would block a
+        volunteer over bookkeeping. The client is told, through ``revoked_at``,
+        and can say so.
+      summary: Resolve a scanned label code
+      parameters:
+      - in: path
+        name: code
+        schema:
+          type: string
+        required: true
+      tags:
+      - labels
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabelResolve'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+          description: ''
+  /api/locations:
+    get:
+      operationId: locations_list
+      description: |-
+        Everywhere stock can be. A pick-list, like volunteers.
+
+        Retired locations are not offered, and `active` is deliberately not a
+        filter: the queryset already fixes it, so the parameter could only ever
+        return nothing. Same shape as the volunteer pick-list, which narrows on a
+        queryset rather than advertising `active` either.
+      parameters:
+      - in: query
+        name: kind
+        schema:
+          type: string
+          enum:
+          - hub
+          - room
+          - shelf
+          - vehicle
+          - volunteer_custody
+          - warehouse
+        description: |-
+          * `warehouse` - Warehouse
+          * `hub` - Hub
+          * `room` - Room
+          * `shelf` - Shelf
+          * `volunteer_custody` - Volunteer custody
+          * `vehicle` - Vehicle
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: parent
+        schema:
+          type: integer
+      tags:
+      - locations
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedLocationList'
           description: ''
   /api/stock/transactions:
     post:
@@ -192,6 +360,18 @@ components:
         volunteers:
           type: string
           format: uri
+        items:
+          type: string
+          format: uri
+        locations:
+          type: string
+          format: uri
+        categories:
+          type: string
+          format: uri
+        labels:
+          type: string
+          format: uri
         schema:
           type: string
           format: uri
@@ -199,8 +379,12 @@ components:
           type: string
           format: uri
       required:
+      - categories
       - docs
       - health
+      - items
+      - labels
+      - locations
       - schema
       - volunteers
     BatchInconsistency:
@@ -245,6 +429,23 @@ components:
       required:
       - detail
       - errors
+    Category:
+      type: object
+      description: A grouping of items, nestable.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        parent:
+          type:
+          - integer
+          - 'null'
+      required:
+      - id
+      - name
     HealthCheck:
       type: object
       properties:
@@ -252,24 +453,245 @@ components:
           type: string
       required:
       - status
-    KindEnum:
+    Item:
+      type: object
+      description: |-
+        A catalogue entry with the stock behind it.
+
+        Balances and labels are attached by the view in bulk. Reading them per
+        item would be two queries per row on the screen the volunteer looks at
+        most.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 150
+        category:
+          type: integer
+        unit_of_measure:
+          $ref: '#/components/schemas/UnitOfMeasureEnum'
+        minimum_stock:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        reorder_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        active:
+          type: boolean
+        balances:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemBalance'
+          readOnly: true
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemLabel'
+          readOnly: true
+      required:
+      - balances
+      - category
+      - id
+      - labels
+      - name
+    ItemBalance:
+      type: object
+      description: How much of one item is at one location, derived from the ledger.
+      properties:
+        location:
+          type: integer
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,11}(?:\.\d{0,3})?$
+      required:
+      - location
+      - quantity
+    ItemLabel:
+      type: object
+      description: |-
+        An active label on this item, and what one scan of it means.
+
+        The distinct quantities across an item's labels *are* its packaging, and
+        are what the list offers as one-tap chips. See decision 0011 section 5.
+      properties:
+        code:
+          type: string
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+      required:
+      - code
+      - quantity
+    LabelKindEnum:
       enum:
-      - checkout
-      - checkin
-      - receipt
-      - consumption
-      - transfer
-      - adjustment
-      - count
+      - item
+      - location
       type: string
       description: |-
-        * `checkout` - Check out
-        * `checkin` - Check in
-        * `receipt` - Receipt
-        * `consumption` - Used at a job
-        * `transfer` - Transfer
-        * `adjustment` - Adjustment
-        * `count` - Stock count
+        * `item` - item
+        * `location` - location
+    LabelResolve:
+      type: object
+      description: |-
+        What a scanned code points at.
+
+        ``quantity`` is part of the contract because the client cannot spell out
+        the cart line without it. See decision 0011 section 5.
+      properties:
+        code:
+          type: string
+          maxLength: 32
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/LabelKindEnum'
+          readOnly: true
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+          description: 'How much of the item one scan of this label stands for: a
+            packet of 100 zip ties is 100.'
+        revoked_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        item:
+          type:
+          - integer
+          - 'null'
+        location:
+          type:
+          - integer
+          - 'null'
+      required:
+      - code
+      - kind
+    Location:
+      type: object
+      description: Somewhere stock can be, including a volunteer holding it.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 150
+        kind:
+          $ref: '#/components/schemas/LocationKindEnum'
+        parent:
+          type:
+          - integer
+          - 'null'
+        held_by:
+          type:
+          - integer
+          - 'null'
+        active:
+          type: boolean
+      required:
+      - id
+      - kind
+      - name
+    LocationKindEnum:
+      enum:
+      - warehouse
+      - hub
+      - room
+      - shelf
+      - volunteer_custody
+      - vehicle
+      type: string
+      description: |-
+        * `warehouse` - Warehouse
+        * `hub` - Hub
+        * `room` - Room
+        * `shelf` - Shelf
+        * `volunteer_custody` - Volunteer custody
+        * `vehicle` - Vehicle
+    NotFound:
+      type: object
+      description: Nothing here. Said in a typed body so a client can render it.
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    PaginatedCategoryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Category'
+    PaginatedItemList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Item'
+    PaginatedLocationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Location'
     PaginatedVolunteerList:
       type: object
       required:
@@ -357,7 +779,7 @@ components:
           - 'null'
           maxLength: 64
         kind:
-          $ref: '#/components/schemas/KindEnum'
+          $ref: '#/components/schemas/TransactionKindEnum'
         actor:
           type: integer
         occurred_at:
@@ -408,7 +830,7 @@ components:
           - 'null'
           maxLength: 64
         kind:
-          $ref: '#/components/schemas/KindEnum'
+          $ref: '#/components/schemas/TransactionKindEnum'
         actor:
           type: integer
         occurred_at:
@@ -452,6 +874,34 @@ components:
       - detail
       - item
       - location
+    TransactionKindEnum:
+      enum:
+      - checkout
+      - checkin
+      - receipt
+      - consumption
+      - transfer
+      - adjustment
+      - count
+      type: string
+      description: |-
+        * `checkout` - Check out
+        * `checkin` - Check in
+        * `receipt` - Receipt
+        * `consumption` - Used at a job
+        * `transfer` - Transfer
+        * `adjustment` - Adjustment
+        * `count` - Stock count
+    UnitOfMeasureEnum:
+      enum:
+      - each
+      - metre
+      - foot
+      type: string
+      description: |-
+        * `each` - Each
+        * `metre` - Metre
+        * `foot` - Foot
     Volunteer:
       type: object
       description: |-

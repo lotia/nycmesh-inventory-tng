@@ -34,7 +34,9 @@ class Category(models.Model):
 
     class Meta:
         verbose_name_plural = "categories"
-        ordering = ["name"]
+        # pk breaks the tie: a name is unique only within its parent. Same
+        # reasoning as Volunteer.Meta.
+        ordering = ["name", "pk"]
         constraints = [
             # nulls_distinct=False: see docs/data-model.md, "Where PostgreSQL-
             # specific features are used".
@@ -197,7 +199,10 @@ class Location(models.Model):
     history = HistoricalRecords()
 
     class Meta:
-        ordering = ["name"]
+        # pk breaks the tie, for the reason given on Category.Meta: the
+        # constraint below scopes a name to its parent, so two shelves may both
+        # be "Shelf 1" and a paginated pick-list needs a total order.
+        ordering = ["name", "pk"]
         constraints = [
             models.UniqueConstraint(
                 fields=["parent", "name"],
@@ -228,6 +233,12 @@ class Location(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+# An importable alias for the choices above, derived rather than restated so
+# the two cannot drift. Why it exists at all is with the setting that consumes
+# it: SPECTACULAR_SETTINGS["ENUM_NAME_OVERRIDES"] in inventory_tng/settings.py.
+LOCATION_KIND_CHOICES = Location.Kind.choices
 
 
 class Item(models.Model):
@@ -373,6 +384,19 @@ class VendorOffer(models.Model):
         return f"{self.item} from {self.vendor}"
 
 
+class LabelManager(models.Manager["Label"]):
+    """Queries over labels that more than one caller needs."""
+
+    def live(self) -> models.QuerySet[Label]:
+        """Labels that still point at something.
+
+        Stated once because two callers must agree: the map the client caches
+        and the packaging chips on the item list are the same set seen twice,
+        and a revoked sticker must be missing from both.
+        """
+        return self.filter(revoked_at__isnull=True)
+
+
 class Label(models.Model):
     """A printed QR label, identified by an opaque token.
 
@@ -380,6 +404,12 @@ class Label(models.Model):
     label, and a faded label -- the complaint that started this project -- is
     revoked and reprinted without touching the thing it points at.
     """
+
+    # What a human typing a code off a faded label gets wrong. The alphabet is
+    # Crockford's, which excludes I, L, O and U precisely so that these folds
+    # are unambiguous: no minted code contains the letters being folded away.
+    # See decision 0011.
+    TYPO_FOLDS = str.maketrans({"I": "1", "L": "1", "O": "0"})
 
     code = models.CharField(max_length=32, unique=True)
     item = models.ForeignKey(Item, null=True, blank=True, on_delete=models.CASCADE, related_name="labels")
@@ -393,6 +423,8 @@ class Label(models.Model):
     printed_at = models.DateTimeField(auto_now_add=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
     history = HistoricalRecords()
+
+    objects = LabelManager()
 
     class Meta:
         ordering = ["-printed_at"]
@@ -422,9 +454,24 @@ class Label(models.Model):
     def __str__(self) -> str:
         return self.code
 
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        # Applied on the way in, not only when resolving: a code stored in any
+        # other form would be unreachable for the life of the object carrying
+        # it, because the resolver folds the very characters it holds. The
+        # admin and the planned sheet import are held to this too. What stops
+        # a code being minted outside the alphabet in the first place is the
+        # check constraint in inventory-tng-n2o.
+        self.code = self.normalise_code(self.code)
+        super().save(*args, **kwargs)
+
     @property
     def is_active(self) -> bool:
         return self.revoked_at is None
+
+    @classmethod
+    def normalise_code(cls, raw: str) -> str:
+        """The canonical form of a code, however it arrived."""
+        return raw.strip().upper().translate(cls.TYPO_FOLDS)
 
 
 # ---------------------------------------------------------------------------
@@ -488,6 +535,10 @@ class StockTransaction(models.Model):
 
     def __str__(self) -> str:
         return f"{self.Kind(self.kind).label} by {self.actor} at {self.occurred_at:%Y-%m-%d %H:%M}"
+
+
+# The counterpart of LOCATION_KIND_CHOICES above, for the same consumer.
+TRANSACTION_KIND_CHOICES = StockTransaction.Kind.choices
 
 
 class StockMovement(models.Model):

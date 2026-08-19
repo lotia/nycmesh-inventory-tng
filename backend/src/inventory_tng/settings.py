@@ -157,6 +157,18 @@ SPECTACULAR_SETTINGS = {
     # OpenAPI 3.1 aligns the schema dialect with JSON Schema 2020-12. See
     # docs/decisions/0010-openapi-version.md for why not 3.0 and not yet 3.2.
     "OAS_VERSION": "3.1.1",
+    # Three different things the API exposes are called "kind". drf-spectacular
+    # names a schema component after the field, so left alone it resolves the
+    # collision with a hashed name like `Kind946Enum`, which is both
+    # meaningless to a client author and liable to change as the schema grows,
+    # churning the committed document for no reason. The hint is taken as an
+    # import path, which cannot reach a class nested inside a model, hence the
+    # module-level aliases in inventory.models.
+    "ENUM_NAME_OVERRIDES": {
+        "LocationKindEnum": "inventory.models.LOCATION_KIND_CHOICES",
+        "TransactionKindEnum": "inventory.models.TRANSACTION_KIND_CHOICES",
+        "LabelKindEnum": ["item", "location"],
+    },
 }
 
 # Cross-origin reads only, and normally unused: both the dev server and nginx

@@ -60,6 +60,17 @@ def test_category_cannot_be_its_own_parent(category: Category) -> None:
         category.save()
 
 
+def test_categories_sharing_a_name_have_a_total_order(category: Category) -> None:
+    """A name is unique only within a parent, so the list needs a tie-break.
+
+    Without one PostgreSQL may return tied rows in any order, and a paginated
+    list can then show one category twice and never show another -- the same
+    reasoning as Volunteer's ordering.
+    """
+    nested = Category.objects.create(name="Radios", parent=category)
+    assert list(Category.objects.filter(name="Radios")) == sorted([category, nested], key=lambda row: row.pk)
+
+
 # --------------------------------------------------------------------------
 # Volunteer
 # --------------------------------------------------------------------------
@@ -183,6 +194,15 @@ def test_location_cycles_are_rejected_at_any_depth(warehouse: Location) -> None:
         warehouse.parent = ancestor
         with pytest.raises(IntegrityError), transaction.atomic():
             warehouse.save()
+
+
+def test_locations_sharing_a_name_have_a_total_order(warehouse: Location) -> None:
+    """Two rooms really can both be "Shelf 1", so the pick-list needs a
+    tie-break for the same reason Category and Volunteer do.
+    """
+    first = Location.objects.create(name="Shelf 1", kind=Location.Kind.SHELF, parent=warehouse)
+    second = Location.objects.create(name="Shelf 1", kind=Location.Kind.SHELF)
+    assert list(Location.objects.filter(name="Shelf 1")) == sorted([first, second], key=lambda row: row.pk)
 
 
 # --------------------------------------------------------------------------

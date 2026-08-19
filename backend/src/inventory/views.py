@@ -2,14 +2,14 @@ from typing import Any, NamedTuple
 
 from django.contrib.postgres.search import TrigramSimilarity
 from django.db import IntegrityError, connection
-from django.db.models import Q, QuerySet
+from django.db.models import Prefetch, Q, QuerySet
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django_filters.rest_framework import CharFilter, FilterSet
-from drf_spectacular.utils import extend_schema, inline_serializer
+from drf_spectacular.utils import extend_schema, extend_schema_view, inline_serializer
 from rest_framework import serializers, status
-from rest_framework.generics import ListCreateAPIView
+from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveAPIView
 from rest_framework.parsers import JSONParser
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -17,10 +17,24 @@ from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
-from inventory.models import StockBalance, StockMovement, StockTransaction, Volunteer
+from inventory.models import (
+    Category,
+    Item,
+    Label,
+    Location,
+    StockBalance,
+    StockMovement,
+    StockTransaction,
+    Volunteer,
+)
 from inventory.serializers import (
     BatchInconsistentSerializer,
     BatchRejectedSerializer,
+    CategorySerializer,
+    ItemSerializer,
+    LabelResolveSerializer,
+    LocationSerializer,
+    NotFoundSerializer,
     StockTransactionCreateSerializer,
     StockTransactionSerializer,
     VolunteerSerializer,
@@ -36,6 +50,10 @@ from inventory.serializers import (
 ENDPOINTS = {
     "health": "healthz",
     "volunteers": "volunteers",
+    "items": "items",
+    "locations": "locations",
+    "categories": "categories",
+    "labels": "labels",
     "schema": "schema",
     "docs": "docs",
 }
@@ -424,3 +442,109 @@ class VolunteerListCreateView(ListCreateAPIView):
     filterset_class = VolunteerFilter
     # Ordering comes from the model, tie-break included.
     queryset = Volunteer.objects.selectable()
+
+
+class ItemFilter(FilterSet):
+    """What the item list can be narrowed by."""
+
+    search = CharFilter(field_name="name", lookup_expr="icontains", label="Name contains")
+
+    class Meta:
+        model = Item
+        fields = ["category"]
+
+
+class ItemListView(ListAPIView):
+    """The catalogue, with the stock behind it.
+
+    This is the screen the volunteer mockup is almost entirely made of: every
+    item, its count, and a way to add some to the cart. See decision 0011.
+    """
+
+    serializer_class = ItemSerializer
+    filterset_class = ItemFilter
+    # Retired items are not offered, the same way retired locations and merged
+    # volunteers are not: this is a pick-list, and a retired item is not
+    # something to add to a cart. What `active=False` should mean for stock
+    # that is still physically on a shelf is inventory-tng-6c7, and until that
+    # is settled an `active` parameter would be guessing at the answer.
+    #
+    # Prefetched, not walked per row: a hundred items on a phone would
+    # otherwise be two hundred queries behind one screen. No select_related on
+    # the category: it is rendered as its id, which the item row already
+    # carries, so joining it would fetch a row nothing reads.
+    #
+    # Ordered by the id columns, not the relations. Ordering by `location`
+    # would follow the foreign key to Location's own Meta.ordering, joining
+    # that table to sort balances by a name the response does not even carry.
+    queryset = Item.objects.filter(active=True).prefetch_related(
+        Prefetch("balances", queryset=StockBalance.objects.order_by("location_id")),
+        Prefetch(
+            "labels",
+            queryset=Label.objects.live().order_by("quantity", "id"),
+        ),
+    )
+
+
+class LocationListView(ListAPIView):
+    """Everywhere stock can be. A pick-list, like volunteers.
+
+    Retired locations are not offered, and `active` is deliberately not a
+    filter: the queryset already fixes it, so the parameter could only ever
+    return nothing. Same shape as the volunteer pick-list, which narrows on a
+    queryset rather than advertising `active` either.
+    """
+
+    serializer_class = LocationSerializer
+    filterset_fields = ["kind", "parent"]
+    # Ordering comes from the model, tie-break included.
+    queryset = Location.objects.filter(active=True)
+
+
+class CategoryListView(ListAPIView):
+    """The item groupings, for narrowing the catalogue."""
+
+    serializer_class = CategorySerializer
+    filterset_fields = ["parent"]
+    queryset = Category.objects.all()
+
+
+class LabelListView(ListAPIView):
+    """Every label that still points at something.
+
+    Unpaginated, deliberately. This exists to be fetched once and cached, so
+    that a scan resolves without a round trip from a basement (decision 0011);
+    handing it back in pages would make the client stitch them together for no
+    benefit at a few hundred rows.
+    """
+
+    serializer_class = LabelResolveSerializer
+    pagination_class = None
+    queryset = Label.objects.live().order_by("code")
+
+
+@extend_schema_view(
+    get=extend_schema(
+        summary="Resolve a scanned label code",
+        responses={200: LabelResolveSerializer, 404: NotFoundSerializer},
+    ),
+)
+class LabelResolveView(RetrieveAPIView):
+    """Resolve one scanned or typed code.
+
+    A revoked label resolves rather than 404s: the sticker is superseded, but
+    it still says what it pointed at, and refusing the scan would block a
+    volunteer over bookkeeping. The client is told, through ``revoked_at``,
+    and can say so.
+    """
+
+    serializer_class = LabelResolveSerializer
+    queryset = Label.objects.all()
+    lookup_field = "code"
+
+    def get_object(self) -> Label:
+        # Normalised before the lookup, so a code copied by hand off a dying
+        # label resolves; see Label.normalise_code. Everything else -- the
+        # 404, object permissions, filter backends -- is the base class's.
+        self.kwargs["code"] = Label.normalise_code(self.kwargs["code"])
+        return super().get_object()
