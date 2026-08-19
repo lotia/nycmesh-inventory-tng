@@ -418,9 +418,10 @@ cd frontend && npx playwright install chromium
 Servers, migrations and the fixed test scene are all handled by the suite
 itself, so there is no separate setup step, and a server you already have
 running is reused without changing that. The scene comes from
-`manage.py seed_integration_data`, which refuses to run unless `DJANGO_DEBUG`
-is on because it creates a login whose password is written down in this
-repository.
+`manage.py seed_integration_data`, which creates a login whose password is
+written down in this repository and so refuses to run unless `DJANGO_DEBUG` is
+on *and* it is passed the flag that acknowledges that. Running it by hand means
+typing that flag; the command says why.
 
 They write to your development database rather than a throwaway one, because
 the point is to exercise the servers you actually run.
