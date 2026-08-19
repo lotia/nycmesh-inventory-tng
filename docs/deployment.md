@@ -33,6 +33,16 @@ chart and from a Secret.
 | `DJANGO_DEBUG` | no | chart (`django.debug`) | Must be `false` outside development |
 | `DJANGO_ALLOWED_HOSTS` | yes | chart (`django.allowedHosts`) | Comma-separated hostnames |
 | `CORS_ALLOWED_ORIGINS` | no | chart (`django.corsAllowedOrigins`) | Normally empty: nginx proxies Django's paths, so the browser sees one origin. Setting it grants cross-origin *reads* to an unauthenticated client and nothing more — the session cookie is not sent cross-origin and writes have no trusted-origin list, so it does not make a frontend on a second hostname work |
+| `APPEND_BURST_RATE` | no | chart (`django.appendBurstRate`) | How fast one client may append. What each rate is for, and why the defaults are what they are, is in [`.env.sample`](../.env.sample) |
+| `APPEND_SUSTAINED_RATE` | no | chart (`django.appendSustainedRate`) | The same limit over an hour, for a flood paced to stay under the burst rate |
+
+Both rates are counted **per backend process**, because the counters live in
+Django's default in-memory cache. Three gunicorn workers per pod means a client
+can append three times the configured rate, multiplied again by the replica
+count, so set the rate for one process and expect the deployment to allow more.
+Making it exact would take a cache shared between processes, which is not
+configured today — a bound that is loose is still a bound, and what it defends
+is [decision 0012](decisions/0012-two-populations.md).
 
 The frontend image takes one variable, `BACKEND_ORIGIN`, which the chart sets to
 the backend Service. Nothing environment-specific is compiled into the

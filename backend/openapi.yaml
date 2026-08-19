@@ -266,6 +266,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/BatchInconsistent'
           description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Throttled'
+          description: ''
   /api/volunteers:
     get:
       operationId: volunteers_list
@@ -328,6 +334,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Volunteer'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Throttled'
           description: ''
 components:
   schemas:
@@ -907,6 +919,25 @@ components:
       - detail
       - item
       - location
+    Throttled:
+      type: object
+      description: |-
+        Too many submissions, too fast. Nothing was recorded; send it again later.
+
+        ``code`` is constant, so a client branches on it instead of on the prose,
+        and ``retry_after_seconds`` is the same number as the Retry-After header,
+        so a countdown can be rendered rather than a sentence read.
+      properties:
+        detail:
+          type: string
+        code:
+          type: string
+        retry_after_seconds:
+          type: integer
+      required:
+      - code
+      - detail
+      - retry_after_seconds
     TransactionKindEnum:
       enum:
       - checkout

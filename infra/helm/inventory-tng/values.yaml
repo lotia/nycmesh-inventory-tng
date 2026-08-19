@@ -38,6 +38,10 @@ django:
   # Empty, and expected to stay empty; see docs/deployment.md for what it does
   # and does not buy. Comma-separated.
   corsAllowedOrigins: ""
+  # How fast one client may append to the ledger or the volunteer list, which
+  # take no credential. Counted per backend process; see docs/deployment.md.
+  appendBurstRate: "20/min"
+  appendSustainedRate: "300/hour"
   # Name of a pre-existing Secret holding DJANGO_SECRET_KEY and DATABASE_URL.
   # Never put these in values.yaml.
   existingSecret: inventory-tng-secrets

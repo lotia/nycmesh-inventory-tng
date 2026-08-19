@@ -6,8 +6,19 @@ rather than about test data.
 """
 
 import pytest
+from django.core.cache import cache
 
 from inventory.models import Category, Item, Location, Volunteer
+
+
+@pytest.fixture(autouse=True)
+def _forget_throttle_history() -> None:
+    """Rate-limit counters live in the cache, which no transaction rolls back.
+
+    Without this, one test's writes are counted against the next one's limit
+    and whether a test sees a 429 depends on what ran before it.
+    """
+    cache.clear()
 
 
 @pytest.fixture
