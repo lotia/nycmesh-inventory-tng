@@ -95,7 +95,8 @@ npm install
 npm run dev                                # http://localhost:5173
 ```
 
-The Vite dev server proxies `/api` to Django, so the browser talks to a single
+The Vite dev server proxies Django's paths
+([which ones](docs/architecture.md#shape)), so the browser talks to a single
 origin and you will not hit CORS locally.
 
 ### Option C — devcontainer
@@ -115,11 +116,13 @@ backend/                Django REST Framework API
   src/
     manage.py
     inventory_tng/      Project package: settings, URLs, WSGI/ASGI
-    inventory/          Domain app (models, views, tests)
+    inventory/          Domain app (models, views, management commands, tests)
 frontend/               Vite + React + MUI single-page app
   package.json          Dependencies and scripts
   biome.json            Lint and format configuration
   vite.config.ts        Build, dev server, and test/coverage configuration
+  playwright.config.ts  Integration test configuration (servers, browser)
+  integration/          Integration tests and the scene they run against
   Dockerfile            Frontend image (nginx serving static files)
   nginx.conf.template   Runtime API proxy configuration
 infra/helm/             Kubernetes deployment chart
@@ -393,7 +396,11 @@ cd frontend && npm run test:integration    # Playwright, a real browser
 
 Separate from the commands above on purpose, and not part of the coverage
 threshold. They start a real Django, a real Vite dev server and a real browser,
-and assert through the path a volunteer's phone takes.
+and assert through a real browser's cookie jar and origin checks.
+
+They are not a production rehearsal: they run the dev server rather than the
+nginx image, with `DJANGO_DEBUG` on, so the secure-cookie and HSTS behaviour
+that only appears with `DEBUG` off is still untested.
 
 They exist because the unit tests cannot see a whole class of bug. Django's
 test client exempts itself from CSRF and jsdom is not a browser, so both suites

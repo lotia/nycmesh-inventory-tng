@@ -7,9 +7,14 @@ import { type BrowserContext, expect, type Page, test } from "@playwright/test";
  * these tests need, are in DEVELOPERS.md "Integration tests".
  */
 
-const ADMIN_LOGIN = "http://localhost:8000/admin/login/";
-const USERNAME = "integration";
-const PASSWORD = "integration-only-not-a-real-password";
+/** One value global setup published. Unset means it did not run. */
+function seeded(name: string): string {
+  const value = process.env[`SEEDED_${name.toUpperCase()}`];
+  if (!value) {
+    throw new Error(`SEEDED_${name.toUpperCase()} is unset: global setup did not run.`);
+  }
+  return value;
+}
 
 /** Read a cookie the browser is holding for this origin. */
 async function cookie(context: BrowserContext, name: string) {
@@ -22,14 +27,17 @@ async function cookie(context: BrowserContext, name: string) {
  * posture it takes is inventory-tng-0pj. What these tests prove is the write
  * path, not the way in.
  *
+ * Through this server's own origin, not the backend's port, because that is
+ * the path a deployment takes and the only one that exercises the proxy.
+ *
  * Waits for the session to actually exist. Without that, a test asserting a
  * refusal cannot tell "rejected for a missing CSRF token" from "rejected for
  * not being logged in yet".
  */
 async function login(page: Page) {
-  await page.goto(ADMIN_LOGIN);
-  await page.getByLabel(/username/i).fill(USERNAME);
-  await page.getByLabel(/password/i).fill(PASSWORD);
+  await page.goto("/admin/login/");
+  await page.getByLabel(/username/i).fill(seeded("username"));
+  await page.getByLabel(/password/i).fill(seeded("password"));
   await page.getByRole("button", { name: /log in/i }).click();
   await expect(page).toHaveURL(/\/admin\/$/);
 }
@@ -60,24 +68,35 @@ test("an authenticated browser can record a batch", async ({ page, context }) =>
   const token = await cookie(context, "csrftoken");
   expect(token).toBeTruthy();
 
-  // The item and location are the first rows `seed_integration_data` creates,
-  // so this assumes the freshly migrated database CI gives it. Nothing reads
-  // them back by name yet -- there is no catalogue endpoint (inventory-tng-vr8
-  // and the read API in docs/architecture.md).
-  const result = await page.evaluate(async (csrf) => {
-    const volunteers = await (await fetch("/api/volunteers")).json();
-    const response = await fetch("/api/stock/transactions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf as string },
-      body: JSON.stringify({
-        kind: "count",
-        actor: volunteers.results[0].id,
-        movements: [{ item: 1, quantity: "1", to_location: 1 }],
-      }),
-    });
-    return { status: response.status, body: await response.json() };
-  }, token);
+  const scene = {
+    volunteer: Number(seeded("volunteer")),
+    item: Number(seeded("item")),
+    location: Number(seeded("location")),
+  };
+  const result = await page.evaluate(
+    async ({ csrf, volunteer, item, location }) => {
+      const volunteers = await (await fetch("/api/volunteers")).json();
+      const response = await fetch("/api/stock/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf as string },
+        body: JSON.stringify({
+          kind: "count",
+          actor: volunteer,
+          movements: [{ item, quantity: "1", to_location: location }],
+        }),
+      });
+      return {
+        offered: volunteers.results.some((v: { id: number }) => v.id === volunteer),
+        status: response.status,
+        body: await response.json(),
+      };
+    },
+    { csrf: token, ...scene },
+  );
 
+  // The pick-list and the batch endpoint must agree about who may be recorded
+  // against; that they share one queryset is the point of Volunteer.selectable.
+  expect(result.offered).toBe(true);
   expect(result.status, JSON.stringify(result.body)).toBe(201);
   expect(result.body.movements).toHaveLength(1);
 });

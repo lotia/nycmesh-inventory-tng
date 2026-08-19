@@ -35,13 +35,9 @@ frontend:
 django:
   debug: false
   allowedHosts: "inventory.nycmesh.net"
-  # Both are normally empty: nginx serves the frontend and proxies the backend,
-  # so a deployed browser only ever sees one origin. Set them only if the
-  # frontend is ever served from a different hostname -- corsAllowedOrigins is
-  # who may read, csrfTrustedOrigins who may write, and a cross-origin frontend
-  # needs both. Comma-separated.
+  # Empty, and expected to stay empty; see docs/deployment.md for what it does
+  # and does not buy. Comma-separated.
   corsAllowedOrigins: ""
-  csrfTrustedOrigins: ""
   # Name of a pre-existing Secret holding DJANGO_SECRET_KEY and DATABASE_URL.
   # Never put these in values.yaml.
   existingSecret: inventory-tng-secrets

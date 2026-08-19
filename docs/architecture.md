@@ -26,10 +26,15 @@ Three pieces, two of which we build as container images:
 | Database | PostgreSQL 18 | Storage |
 
 The browser only ever talks to one origin. nginx serves the built frontend
-assets and forwards `/api` and `/admin` to Django. Two consequences worth
-knowing: there is no CORS configuration in production, and **no API URL is baked
-into the JavaScript bundle**, so the exact same frontend image runs in every
-environment.
+assets and forwards three path prefixes to Django: `/api`, `/admin`, and
+`/static`, which is the admin's own CSS and JavaScript — the app's bundle is
+served from `/assets`. That set is stated here and nowhere else; the Vite dev
+server proxies the same three so that a path which works in development works
+deployed, and both configurations point back to this paragraph.
+
+Two consequences worth knowing: there is no CORS configuration in production,
+and **no API URL is baked into the JavaScript bundle**, so the exact same
+frontend image runs in every environment.
 
 ## Relationship to MeshDB
 

@@ -197,6 +197,10 @@ def _negative_balances(drained: set[tuple[int, int]]) -> list[dict[str, object]]
     with the system", so they faked corrections instead; see
     docs/decisions/0008-stock-ledger-transfer-graph.md. The shelf is the
     authority, and the answer is a stock count rather than a blocked volunteer.
+
+    Ordered, because a set has no order and the warnings are a list the client
+    renders: without this a replay could show the same warnings rearranged,
+    reading as a change when nothing changed.
     """
     if not drained:
         return []
@@ -207,10 +211,9 @@ def _negative_balances(drained: set[tuple[int, int]]) -> list[dict[str, object]]
             "balance": balance.quantity,
             "detail": f"{balance.item} at {balance.location} is now {balance.quantity}. Count it when you can.",
         }
-        for balance in StockBalance.objects.filter(pk__in=list(drained), quantity__lt=0).select_related(
-            "item",
-            "location",
-        )
+        for balance in StockBalance.objects.filter(pk__in=sorted(drained), quantity__lt=0)
+        .select_related("item", "location")
+        .order_by("item", "location")
     ]
 
 

@@ -86,8 +86,6 @@ class StockTransactionSerializer(serializers.ModelSerializer):
     are read once and the balances behind the warnings once.
     """
 
-    # Both read from attributes the view attaches, so the rows are fetched
-    # once and the balances that produced the warnings are read once.
     movements = StockMovementSerializer(many=True, read_only=True, source="lines")
     warnings = StockTransactionWarningSerializer(many=True, read_only=True)
 

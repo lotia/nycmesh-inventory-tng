@@ -11,8 +11,16 @@ import { defineConfig, devices } from "@playwright/test";
 const FRONTEND = "http://localhost:5173";
 const BACKEND_PORT = 8000;
 
+// A cold `uv run` and Vite's first pass over the MUI dependency tree are both
+// slower than Playwright's 60s default, and overrunning it reports only
+// "server failed to start".
+const SERVER_BOOT_TIMEOUT = 120_000;
+
 export default defineConfig({
   testDir: "./integration",
+  // A committed `test.only` would otherwise leave this job green having run a
+  // single test -- on the one suite that can see this class of bug at all.
+  forbidOnly: !!process.env.CI,
   // Migrating and seeding happen here rather than in the backend's start
   // command below, which a reused server would skip. See the file itself.
   globalSetup: "./integration/global-setup.ts",
@@ -30,8 +38,11 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [
     {
-      command: `cd ../backend && uv run python src/manage.py runserver ${BACKEND_PORT}`,
+      // --noreload: the autoreloader would restart the server underneath an
+      // in-flight request whenever a file changed, which reads as a flake.
+      command: `cd ../backend && uv run python src/manage.py runserver --noreload ${BACKEND_PORT}`,
       port: BACKEND_PORT,
+      timeout: SERVER_BOOT_TIMEOUT,
       reuseExistingServer: !process.env.CI,
       stdout: "pipe",
       stderr: "pipe",
@@ -39,6 +50,7 @@ export default defineConfig({
     {
       command: "npm run dev",
       url: FRONTEND,
+      timeout: SERVER_BOOT_TIMEOUT,
       reuseExistingServer: !process.env.CI,
     },
   ],

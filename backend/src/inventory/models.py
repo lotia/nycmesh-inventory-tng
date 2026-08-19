@@ -102,8 +102,9 @@ class Volunteer(models.Model):
     # Absence is NULL, never "". The unique indexes below are partial so that
     # every volunteer who supplied nothing can coexist; a stored "" is a value,
     # so the second one would collide and get an error naming a constraint they
-    # cannot act on. Normalised here rather than at the API, so the admin and
-    # the planned sheet import are held to it too.
+    # cannot act on. Normalised in save() rather than at the API, which covers
+    # the admin as well -- but not bulk_create() or queryset update(), so the
+    # sheet import will have to normalise its own rows or go through save().
     NULL_WHEN_BLANK = ("email", "slack_id")
 
     class Meta:

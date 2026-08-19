@@ -11,6 +11,7 @@ It refuses to run unless DEBUG is on, because it creates a login with a
 published password.
 """
 
+import json
 from typing import Any
 
 from django.conf import settings
@@ -43,8 +44,15 @@ class Command(BaseCommand):
             defaults={"kind": Location.Kind.WAREHOUSE},
         )
 
+        # JSON on stdout; frontend/integration/global-setup.ts republishes it.
         self.stdout.write(
-            self.style.SUCCESS(
-                f"Seeded: user={USERNAME} volunteer={volunteer.pk} item={item.pk} location={warehouse.pk}",
+            json.dumps(
+                {
+                    "username": USERNAME,
+                    "password": PASSWORD,
+                    "volunteer": volunteer.pk,
+                    "item": item.pk,
+                    "location": warehouse.pk,
+                },
             ),
         )

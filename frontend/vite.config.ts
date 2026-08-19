@@ -2,18 +2,27 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+// Where Django is listening. Everything below proxies to it; nothing is
+// compiled into the bundle, so the browser only ever sees this server.
+const BACKEND = process.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+
+// The paths that belong to Django rather than to the app. Which paths, and
+// why, is in docs/architecture.md; nginx.conf.template proxies the same set in
+// production and must be edited with this.
+const DJANGO_PATHS = ["/api", "/admin", "/static"];
+
 export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    // Proxy API calls to Django in development so the browser sees a single
-    // origin and no CORS preflight is involved locally.
-    proxy: {
-      "/api": {
-        target: process.env.VITE_API_BASE_URL ?? "http://localhost:8000",
-        changeOrigin: true,
-      },
-    },
+    // Proxy Django's paths in development so the browser sees a single origin
+    // and no CORS preflight is involved locally.
+    //
+    // No changeOrigin: the Host header must stay this server, because Django
+    // compares it against the browser's Origin on every write and refuses the
+    // write if they disagree. Django must therefore accept whatever host you
+    // reach this server on -- see DJANGO_ALLOWED_HOSTS in .env.sample.
+    proxy: Object.fromEntries(DJANGO_PATHS.map((path) => [path, { target: BACKEND }])),
   },
   build: {
     outDir: "dist",

@@ -32,8 +32,7 @@ chart and from a Secret.
 | `DATABASE_URL` | yes | Secret | `postgres://user:password@host:5432/dbname` |
 | `DJANGO_DEBUG` | no | chart (`django.debug`) | Must be `false` outside development |
 | `DJANGO_ALLOWED_HOSTS` | yes | chart (`django.allowedHosts`) | Comma-separated hostnames |
-| `CORS_ALLOWED_ORIGINS` | no | chart (`django.corsAllowedOrigins`) | Normally empty: the frontend proxies to the backend, so production makes no cross-origin calls |
-| `CSRF_TRUSTED_ORIGINS` | no | chart (`django.csrfTrustedOrigins`) | Which origins may write. Normally empty for the same reason; defaults to `CORS_ALLOWED_ORIGINS`. A cross-origin frontend needs both |
+| `CORS_ALLOWED_ORIGINS` | no | chart (`django.corsAllowedOrigins`) | Normally empty: nginx proxies Django's paths, so the browser sees one origin. Setting it grants cross-origin *reads* to an unauthenticated client and nothing more — the session cookie is not sent cross-origin and writes have no trusted-origin list, so it does not make a frontend on a second hostname work |
 
 The frontend image takes one variable, `BACKEND_ORIGIN`, which the chart sets to
 the backend Service. Nothing environment-specific is compiled into the
@@ -75,6 +74,17 @@ helm upgrade --install inventory-tng infra/helm/inventory-tng \
 and it must stay on: QR scanning stops working over plain HTTP, including on a
 LAN address, and it fails silently rather than warning. Why is in
 [decision 0011](decisions/0011-qr-batch-scanning.md#consequences).
+
+**The ingress must be the only route to the frontend pod.** TLS terminates
+there, so it is the ingress that tells Django which scheme the browser used,
+via `X-Forwarded-Proto`; nginx in the frontend image forwards that header on
+and Django trusts it (`SECURE_PROXY_SSL_HEADER`). That single header decides
+whether HSTS is sent, whether session and CSRF cookies are marked secure, and
+whether a write passes the CSRF origin check. Anything that can reach the pod
+without passing through the ingress — an in-cluster client, a
+`kubectl port-forward` — can therefore claim `https` and be believed. Keep the
+frontend Service internal and let the ingress overwrite the header, which
+ingress-nginx does by default.
 
 The chart issues no certificate of its own; it references one by name
 (`ingress.tls.secretName`, default `inventory-tng-tls`), so supply it before
