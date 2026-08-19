@@ -97,6 +97,21 @@ def test_volunteers_may_share_an_absent_email() -> None:
     assert Volunteer.objects.filter(email__isnull=True).count() == 2
 
 
+def test_a_blank_identifier_is_stored_as_absent(volunteer: Volunteer) -> None:
+    """Absence is NULL, never "".
+
+    Normalised on the model so the admin and the planned sheet import are held
+    to it too, not just the API. Two volunteers who each left the field alone
+    would otherwise collide on the partial unique index.
+    """
+    first = Volunteer.objects.create(display_name="Olivia", email="", slack_id="")
+    second = Volunteer.objects.create(display_name="Priya", email="", slack_id="")
+    first.refresh_from_db()
+    second.refresh_from_db()
+    assert (first.email, first.slack_id) == (None, None)
+    assert (second.email, second.slack_id) == (None, None)
+
+
 def test_volunteer_email_unique_when_supplied() -> None:
     Volunteer.objects.create(display_name="Alice", email="a@example.com")
     with pytest.raises(IntegrityError):

@@ -1,9 +1,13 @@
 from typing import Any
 
+from django.contrib.postgres.search import TrigramSimilarity
 from django.db import IntegrityError, connection
+from django.db.models import Q, QuerySet
 from django.db.transaction import atomic
+from django_filters.rest_framework import CharFilter, FilterSet
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers, status
+from rest_framework.generics import ListCreateAPIView
 from rest_framework.parsers import JSONParser
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -11,12 +15,13 @@ from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
-from inventory.models import StockBalance, StockMovement, StockTransaction
+from inventory.models import StockBalance, StockMovement, StockTransaction, Volunteer
 from inventory.serializers import (
     BatchInconsistentSerializer,
     BatchRejectedSerializer,
     StockTransactionCreateSerializer,
     StockTransactionSerializer,
+    VolunteerSerializer,
 )
 
 # The one place the endpoint index is declared. The response body, the schema
@@ -28,6 +33,7 @@ from inventory.serializers import (
 # place to appear, which is inventory-tng-vr8.
 ENDPOINTS = {
     "health": "healthz",
+    "volunteers": "volunteers",
     "schema": "schema",
     "docs": "docs",
 }
@@ -48,7 +54,11 @@ class ApiRootView(APIView):
         summary="List the available endpoints",
         responses=inline_serializer(
             name="ApiRoot",
-            fields=dict.fromkeys(ENDPOINTS, serializers.URLField()),
+            # One field instance per entry, not dict.fromkeys: a serializer
+            # field is bound to its name, so a single instance shared across
+            # the keys keeps whichever name bound it first and the schema
+            # describes one property instead of all of them.
+            fields={key: serializers.URLField() for key in ENDPOINTS},
         ),
     )
     def get(self, request: Request) -> Response:
@@ -329,3 +339,45 @@ class StockTransactionCreateView(APIView):
         recorded.lines = lines  # ty: ignore[unresolved-attribute]
         recorded.warnings = _negative_balances(_drained_by(lines))  # ty: ignore[unresolved-attribute]
         return StockTransactionSerializer(recorded).data
+
+
+class VolunteerFilter(FilterSet):
+    """Fuzzy name search over the pick-list.
+
+    Two lookups, not one. ``icontains`` is what makes typing the first few
+    letters work at all -- trigram similarity to a two-letter fragment is near
+    zero -- while the similarity match is what finds Shaun when the ledger
+    says Sean.
+
+    Only the similarity half uses the GIN trigram index: ``icontains``
+    compiles to ``UPPER(display_name) LIKE ...``, which an index on the bare
+    column cannot serve, and the two are ORed, so the plan scans the table and
+    sorts. That is the right trade at this size -- 65 volunteers -- and the
+    alternative, a case-sensitive ``contains``, would stop "sean" finding
+    "Sean", which is how the picker is actually used.
+    """
+
+    search = CharFilter(method="by_name", label="Fuzzy name search")
+
+    def by_name(self, queryset: QuerySet[Volunteer], name: str, value: str) -> QuerySet[Volunteer]:
+        return (
+            queryset.filter(Q(display_name__icontains=value) | Q(display_name__trigram_similar=value))
+            .annotate(similarity=TrigramSimilarity("display_name", value))
+            # Closest first; the rest is the model's ordering, tie-break and
+            # all, because a search result is paginated like any other list.
+            .order_by("-similarity", "display_name", "pk")
+        )
+
+
+class VolunteerListCreateView(ListCreateAPIView):
+    """The volunteer pick-list, and the way onto it.
+
+    Volunteers are a pick-list with no password (decision 0008 point 5). The
+    client searches this before offering to add anyone, which is what stops a
+    second generation of the duplicate spellings that decision counts.
+    """
+
+    serializer_class = VolunteerSerializer
+    filterset_class = VolunteerFilter
+    # Ordering comes from the model, tie-break included.
+    queryset = Volunteer.objects.selectable()

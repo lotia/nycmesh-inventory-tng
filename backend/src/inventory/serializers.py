@@ -135,12 +135,9 @@ class StockTransactionCreateSerializer(serializers.ModelSerializer):
         allow_null=True,
         validators=[],
     )
-    # Merged and inactive volunteers are not choices. Merging duplicates is a
-    # first-class operation here (docs/data-model.md), and recording new work
-    # against a retired record would start the next generation of them.
-    actor = serializers.PrimaryKeyRelatedField(
-        queryset=Volunteer.objects.filter(merged_into__isnull=True, active=True),
-    )
+    # Merged and inactive volunteers are not choices; the rule and the reason
+    # live once, on the queryset the pick-list uses too.
+    actor = serializers.PrimaryKeyRelatedField(queryset=Volunteer.objects.selectable())
 
     def validate_occurred_at(self, value: Any) -> Any:
         # The ledger is append-only, so a wrong timestamp can never be
@@ -199,3 +196,16 @@ class BatchInconsistentSerializer(serializers.Serializer):
     detail = serializers.CharField()
     kind = serializers.CharField()
     inconsistent = BatchInconsistencySerializer(many=True)
+
+
+class VolunteerSerializer(serializers.ModelSerializer):
+    """A volunteer as the pick-list shows them.
+
+    ``email`` and ``slack_id`` are here because two people called Sean are the
+    whole reason this list is searched before anyone adds themselves; without
+    something to tell them apart the picker cannot help.
+    """
+
+    class Meta:
+        model = Volunteer
+        fields = ["id", "display_name", "email", "slack_id"]

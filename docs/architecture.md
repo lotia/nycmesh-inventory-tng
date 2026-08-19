@@ -109,8 +109,8 @@ it are in [decision 0011](decisions/0011-qr-batch-scanning.md).
 Named here so the gaps are visible rather than surprising:
 
 - **The read API.** Nothing yet exposes the catalogue, the balances or a
-  scanned label; the only endpoints are the index, the health check and the
-  batch write below.
+  scanned label. What exists is the index, the health check, the volunteer
+  pick-list and the batch write below.
 - **The QR multi-scan flow.** The reason this project exists: scanning several
   codes into one transaction. It is designed in
   [decision 0011](decisions/0011-qr-batch-scanning.md), and the endpoint that

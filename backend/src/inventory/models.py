@@ -5,6 +5,8 @@ docs/data-model.md and docs/decisions/0008-stock-ledger-transfer-graph.md.
 This module implements it; it does not re-explain it.
 """
 
+from typing import Any
+
 from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.db.models.functions import Lower, Trim
@@ -47,6 +49,25 @@ class Category(models.Model):
         return self.name
 
 
+class VolunteerManager(models.Manager["Volunteer"]):
+    """Queries over volunteers that more than one caller needs."""
+
+    def selectable(self) -> models.QuerySet[Volunteer]:
+        """Volunteers who may be offered as a choice, or recorded against.
+
+        Stated once because two callers must agree: the pick-list offers these
+        and the batch endpoint accepts these as the actor. If the two drifted
+        apart, the API would offer somebody it then refuses to record work for.
+
+        A merge sets ``merged_into`` and leaves the ledger untouched, so past
+        work stays attributed while the duplicate stops being offered; merging
+        duplicates is a first-class operation here (docs/data-model.md), and
+        recording new work against a retired record would start the next
+        generation of them.
+        """
+        return self.filter(merged_into__isnull=True, active=True)
+
+
 class Volunteer(models.Model):
     """Someone who moves stock.
 
@@ -76,8 +97,22 @@ class Volunteer(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     history = HistoricalRecords()
 
+    objects = VolunteerManager()
+
+    # Absence is NULL, never "". The unique indexes below are partial so that
+    # every volunteer who supplied nothing can coexist; a stored "" is a value,
+    # so the second one would collide and get an error naming a constraint they
+    # cannot act on. Normalised here rather than at the API, so the admin and
+    # the planned sheet import are held to it too.
+    NULL_WHEN_BLANK = ("email", "slack_id")
+
     class Meta:
-        ordering = ["display_name"]
+        # pk breaks the tie, and is not decoration: display names are
+        # deliberately not unique -- two volunteers really are both called
+        # Sean -- and PostgreSQL is free to return tied rows in any order, so
+        # a paginated list without a tie-break can show one volunteer twice
+        # and never show another at all.
+        ordering = ["display_name", "pk"]
         constraints = [
             # Partial: uniqueness applies only to volunteers who supplied the
             # identifier. Most will not, and 45% of the historical rows did not.
@@ -105,8 +140,9 @@ class Volunteer(models.Model):
             # lowercases when it builds trigrams, so the index is case-
             # insensitive either way, and an expression index is only usable by
             # queries that repeat the expression. Wrapping it would leave
-            # `display_name__icontains` and `TrigramSimilarity("display_name")`
-            # -- the queries this index exists for -- unable to use it.
+            # `display_name__trigram_similar` -- the query this index exists
+            # for -- unable to use it. The `icontains` half of the search runs
+            # unindexed whatever is done here; see VolunteerFilter.
             GinIndex(
                 fields=["display_name"],
                 opclasses=["gin_trgm_ops"],
@@ -116,6 +152,12 @@ class Volunteer(models.Model):
 
     def __str__(self) -> str:
         return self.display_name
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        for field in self.NULL_WHEN_BLANK:
+            if getattr(self, field) == "":
+                setattr(self, field, None)
+        super().save(*args, **kwargs)
 
 
 class Location(models.Model):

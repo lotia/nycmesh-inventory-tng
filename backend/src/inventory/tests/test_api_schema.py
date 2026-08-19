@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 import yaml
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test import Client
 from django.urls import reverse
@@ -70,6 +71,19 @@ def test_every_endpoint_documents_its_response() -> None:
                 assert "schema" in content["application/json"], f"{where} -> {code} has an untyped response"
 
 
+def test_the_schema_describes_every_endpoint_the_index_advertises() -> None:
+    """The index and its schema are generated from one dict; they must agree.
+
+    They can still come apart: the fields are built per name, and one shared
+    field instance would bind to the first name only, leaving the schema
+    describing a single property while the endpoint returns all of them.
+    """
+    schema = yaml.safe_load(SCHEMA_PATH.read_text())
+    described = schema["components"]["schemas"]["ApiRoot"]
+    assert set(described["properties"]) == set(ENDPOINTS)
+    assert set(described["required"]) == set(ENDPOINTS)
+
+
 @pytest.mark.django_db
 def test_api_root_lists_the_endpoints(client: Client) -> None:
     response = client.get(reverse("api-root"))
@@ -79,10 +93,24 @@ def test_api_root_lists_the_endpoints(client: Client) -> None:
 
 @pytest.mark.django_db
 def test_api_root_links_actually_resolve(client: Client) -> None:
-    """Discovery is only useful if the links work."""
+    """Discovery is only useful if the links work.
+
+    Logged in, because most of what the index advertises is not public. The
+    index itself and the health check are; the volunteer pick-list is not.
+    """
+    client.force_login(User.objects.create_user(username="reader", password="not-a-real-password"))
     body = client.get(reverse("api-root")).json()
     for name, url in body.items():
         assert client.get(url).status_code == 200, f"{name} -> {url} does not resolve"
+
+
+@pytest.mark.django_db
+def test_the_public_links_resolve_without_logging_in(client: Client) -> None:
+    """Probes run before authentication exists, and a client that cannot reach
+    the index cannot discover the login route either.
+    """
+    for name in ("api-root", "healthz"):
+        assert client.get(reverse(name)).status_code == 200
 
 
 @pytest.mark.django_db

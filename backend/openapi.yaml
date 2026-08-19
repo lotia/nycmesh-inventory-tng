@@ -91,6 +91,69 @@ paths:
               schema:
                 $ref: '#/components/schemas/BatchInconsistent'
           description: ''
+  /api/volunteers:
+    get:
+      operationId: volunteers_list
+      description: |-
+        The volunteer pick-list, and the way onto it.
+
+        Volunteers are a pick-list with no password (decision 0008 point 5). The
+        client searches this before offering to add anyone, which is what stops a
+        second generation of the duplicate spellings that decision counts.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Fuzzy name search
+      tags:
+      - volunteers
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedVolunteerList'
+          description: ''
+    post:
+      operationId: volunteers_create
+      description: |-
+        The volunteer pick-list, and the way onto it.
+
+        Volunteers are a pick-list with no password (decision 0008 point 5). The
+        client searches this before offering to add anyone, which is what stops a
+        second generation of the duplicate spellings that decision counts.
+      tags:
+      - volunteers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Volunteer'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Volunteer'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Volunteer'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Volunteer'
+          description: ''
 components:
   schemas:
     ApiError:
@@ -116,12 +179,23 @@ components:
     ApiRoot:
       type: object
       properties:
+        health:
+          type: string
+          format: uri
+        volunteers:
+          type: string
+          format: uri
+        schema:
+          type: string
+          format: uri
         docs:
           type: string
           format: uri
-          title: Health
       required:
       - docs
+      - health
+      - schema
+      - volunteers
     BatchInconsistency:
       type: object
       description: One line that disagrees with the batch's declared kind.
@@ -189,6 +263,29 @@ components:
         * `transfer` - Transfer
         * `adjustment` - Adjustment
         * `count` - Stock count
+    PaginatedVolunteerList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Volunteer'
     StockMovement:
       type: object
       description: One recorded line, as it is read back.
@@ -348,6 +445,38 @@ components:
       - detail
       - item
       - location
+    Volunteer:
+      type: object
+      description: |-
+        A volunteer as the pick-list shows them.
+
+        ``email`` and ``slack_id`` are here because two people called Sean are the
+        whole reason this list is searched before anyone adds themselves; without
+        something to tell them apart the picker cannot help.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        display_name:
+          type: string
+          maxLength: 100
+        email:
+          oneOf:
+          - type:
+            - string
+            - 'null'
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        slack_id:
+          type:
+          - string
+          - 'null'
+          maxLength: 50
+      required:
+      - display_name
+      - id
   securitySchemes:
     cookieAuth:
       type: apiKey

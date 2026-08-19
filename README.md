@@ -29,11 +29,11 @@ Each of these is measured rather than assumed. The figures live once, in
 
 **Early.** The repository skeleton, tooling, and deployment path are in place,
 and the inventory data model is implemented
-([docs/data-model.md](docs/data-model.md)). The endpoint that records a batch
-of stock movements is built; the QR flow around it is designed
-([decision 0011](docs/decisions/0011-qr-batch-scanning.md)) but has no user
-interface yet, so there is nothing a volunteer can use. What is missing is
-listed in [architecture.md](docs/architecture.md#not-yet-built).
+([docs/data-model.md](docs/data-model.md)). The first API endpoints are built,
+but the QR flow over them is designed
+([decision 0011](docs/decisions/0011-qr-batch-scanning.md)) and has no user
+interface yet, so there is nothing a volunteer can use. What exists and what is
+missing are listed in [architecture.md](docs/architecture.md#not-yet-built).
 
 ## Documentation
 
