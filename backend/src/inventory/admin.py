@@ -1,12 +1,19 @@
-"""Admin registration for the catalogue models.
+"""Admin registration for every model in the app.
 
-Registered through ``SimpleHistoryAdmin`` so an editor can see who changed a
-catalogue record and when. The stock ledger is not administered here: it is
-append-only and corrections are new entries, not edits
-(docs/decisions/0008-stock-ledger-transfer-graph.md).
+The admin is the fallback interface and is kept complete for the reasons in
+docs/decisions/0014-one-interface.md (point 4). ``tests/test_admin.py`` fails
+the build when a model is added without being registered here, so this module
+is where that obligation is discharged.
+
+Catalogue models are registered through ``SimpleHistoryAdmin`` so an editor can
+see who changed a record and when. The ledger models are registered too, but
+append-only: see ``AppendOnlyAdmin`` below.
 """
 
+from typing import Any
+
 from django.contrib import admin
+from django.http import HttpRequest
 from simple_history.admin import SimpleHistoryAdmin
 
 from inventory.models import (
@@ -15,6 +22,8 @@ from inventory.models import (
     ItemIdentifier,
     Label,
     Location,
+    StockMovement,
+    StockTransaction,
     Vendor,
     VendorOffer,
     Volunteer,
@@ -56,6 +65,21 @@ class ItemAdmin(SimpleHistoryAdmin):
     inlines = [ItemIdentifierInline]
 
 
+@admin.register(ItemIdentifier)
+class ItemIdentifierAdmin(SimpleHistoryAdmin):
+    """Editable on its own as well as inline on the item.
+
+    An identifier that resolves to the wrong item is found by searching for the
+    string somebody scanned, not by already knowing which item it was mistyped
+    onto.
+    """
+
+    list_display = ["value", "kind", "item"]
+    list_filter = ["kind"]
+    search_fields = ["value", "item__name"]
+    readonly_fields = ["value_normalised"]
+
+
 @admin.register(Vendor)
 class VendorAdmin(SimpleHistoryAdmin):
     list_display = ["name", "website"]
@@ -72,3 +96,60 @@ class VendorOfferAdmin(SimpleHistoryAdmin):
 class LabelAdmin(SimpleHistoryAdmin):
     list_display = ["code", "item", "location", "quantity", "printed_at", "revoked_at"]
     search_fields = ["code"]
+
+
+# ---------------------------------------------------------------------------
+# The stock ledger.
+#
+# Registered so the fallback is complete, but not editable. A database trigger
+# rejects any UPDATE or DELETE on these tables
+# (docs/decisions/0008-stock-ledger-transfer-graph.md), so an admin offering a
+# save button would only be offering an error page.
+# ---------------------------------------------------------------------------
+
+
+class AppendOnlyAdmin(admin.ModelAdmin):
+    """Rows may be added and read here, never changed or removed."""
+
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+
+class StockMovementInline(admin.TabularInline):
+    model = StockMovement
+    extra = 1
+
+
+@admin.register(StockTransaction)
+class StockTransactionAdmin(AppendOnlyAdmin):
+    """The unit an administrator records: one act, with its movements.
+
+    Adding is allowed because a correction *is* a new transaction, and this is
+    the interface that still works when the single-page app does not.
+    """
+
+    list_display = ["occurred_at", "kind", "actor", "job_reference", "reason"]
+    list_filter = ["kind"]
+    search_fields = ["job_reference", "reason", "note", "actor__display_name"]
+    date_hierarchy = "occurred_at"
+    inlines = [StockMovementInline]
+
+
+@admin.register(StockMovement)
+class StockMovementAdmin(AppendOnlyAdmin):
+    """Readable, and deliberately not addable on its own.
+
+    A movement is only meaningful as part of the act that produced it, so it is
+    added through the transaction above. On its own it answers "where did this
+    item go?", which is what the list is for.
+    """
+
+    list_display = ["item", "quantity", "from_location", "to_location", "transaction"]
+    list_filter = ["item"]
+    search_fields = ["item__name", "transaction__job_reference"]
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
