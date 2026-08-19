@@ -23,23 +23,32 @@ others, and CI will not catch a mismatch:
 
 ## Constraints that are load-bearing
 
-- **Migrations run only in the Helm pre-upgrade Job**, never from a web
-  container. Multiple backend replicas would otherwise race on schema changes.
-- **Nothing environment-specific is baked into the frontend bundle.** nginx
-  resolves `BACKEND_ORIGIN` at container start. Preserve this.
-- **Both images run as non-root**, and the backend runs with a read-only root
-  filesystem. Anything needing to write needs an explicit volume.
-- **The chart does not deploy PostgreSQL.** The database is managed outside the
-  application's release cycle, on purpose.
+These properties of the deployment are deliberate, and a change to the chart or
+the images has to preserve them. Each is explained once, where it belongs:
+
+- **The ingress is the only route to the frontend pod**, and the administrative
+  routes are reachable only from a network volunteers do not need —
+  [deployment.md](../../../docs/deployment.md#administrative-access). Neither is
+  something the application can check, so the chart is where they hold or fail.
+
+- **Migrations run only in the Helm pre-install/pre-upgrade Job**, never from a
+  web container —
+  [deployment.md](../../../docs/deployment.md#migrations).
+- **Nothing environment-specific is baked into the frontend bundle**; nginx
+  resolves `BACKEND_ORIGIN` at container start —
+  [architecture.md](../../../docs/architecture.md#shape),
+  [deployment.md](../../../docs/deployment.md#environment-variables).
+- **Both images run as non-root** and the backend's root filesystem is read-only
+  ([deployment.md](../../../docs/deployment.md#artifacts)), so anything needing
+  to write needs an explicit volume.
+- **The chart does not deploy PostgreSQL** —
+  [deployment.md](../../../docs/deployment.md#database).
 
 ## Verifying
 
-`helm lint` and `helm template` both run without a cluster — use them:
-
-```bash
-helm lint infra/helm/inventory-tng
-helm template test infra/helm/inventory-tng --set image.tag=v0.1.0
-```
-
-CodeNOW consumes the same Dockerfiles and the same chart, so there is no
-separate deployment path to test.
+`helm lint` and `helm template` both run without a cluster, so run them on every
+chart change — the commands are in
+[DEVELOPERS.md](../../../DEVELOPERS.md#deployment-chart). They are the whole
+test: CodeNOW builds the same Dockerfiles and applies the same chart, so there
+is no second deployment path to exercise
+([deployment.md](../../../docs/deployment.md#deploying-to-codenow)).
