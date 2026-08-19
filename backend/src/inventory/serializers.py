@@ -44,8 +44,51 @@ MAX_MOVEMENTS = 500
 CLOCK_SKEW = datetime.timedelta(minutes=5)
 
 
+class CachedPrimaryKeyRelatedField(serializers.PrimaryKeyRelatedField):
+    """A related field that looks each distinct id up once per request.
+
+    Cached in the serializer context, which DRF builds fresh for every
+    serializer and shares across its whole field tree. Keyed by field, so two
+    fields over the same table do not share an entry -- worth at most one
+    extra query, against having to reason about whether they mean the same
+    thing. Only successful lookups are cached: an unknown id rejects the whole
+    batch anyway.
+
+    Lines naming the same id therefore hold the *same* instance, so nothing
+    per-line may mutate a resolved object.
+    """
+
+    def to_internal_value(self, data: Any) -> Any:
+        cache = self.context.setdefault("resolved_related", {})
+        key = (self.field_name, data)
+        try:
+            hit = key in cache
+        except TypeError:
+            # An id that cannot be hashed is not a pk at all -- a client sent
+            # an object or a list. Let the base class reject it by index.
+            return super().to_internal_value(data)
+        if not hit:
+            cache[key] = super().to_internal_value(data)
+        return cache[key]
+
+
 class StockMovementInputSerializer(serializers.ModelSerializer):
     """One line of a submitted batch."""
+
+    # Any item or location, including retired ones the read API no longer
+    # offers. That asymmetry is deliberate only in the sense that nobody has
+    # decided it yet: inventory-tng-6c7.
+    item = CachedPrimaryKeyRelatedField(queryset=Item.objects.all())
+    from_location = CachedPrimaryKeyRelatedField(
+        queryset=Location.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    to_location = CachedPrimaryKeyRelatedField(
+        queryset=Location.objects.all(),
+        required=False,
+        allow_null=True,
+    )
 
     class Meta:
         model = StockMovement
@@ -165,11 +208,16 @@ class StockTransactionCreateSerializer(serializers.ModelSerializer):
         be rejected here. The index stays the arbiter, and the view answers a
         collision with the transaction the first attempt created.
 
-        Overridden rather than blanking ``Meta.validators``, which would drop
-        every model-derived validator: a constraint added to StockTransaction
-        later should still be reported as a 400 rather than escaping as a 500.
+        Only that one is dropped, not the whole set. Blanking ``Meta.validators``
+        would discard every model-derived validator, and so would returning an
+        empty list here: a constraint added to StockTransaction later should
+        still be reported as a 400 rather than escaping as a 500.
         """
-        return []
+        return [
+            validator
+            for validator in super().get_unique_together_validators()
+            if "idempotency_key" not in validator.fields
+        ]
 
     class Meta:
         model = StockTransaction
@@ -311,6 +359,18 @@ class LabelResolveSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.ChoiceField(choices=["item", "location"]))
     def get_kind(self, label: Label) -> str:
         return "item" if label.item_id is not None else "location"  # ty: ignore[unresolved-attribute]
+
+
+class LabelMapSerializer(LabelResolveSerializer):
+    """One label in the map the client caches.
+
+    Drops ``revoked_at``, which this queryset guarantees is null, a few
+    hundred times over. See LabelListView for why this response's size is
+    worth caring about.
+    """
+
+    class Meta(LabelResolveSerializer.Meta):
+        fields = ["code", "kind", "quantity", "item", "location"]
 
 
 class NotFoundSerializer(serializers.Serializer):

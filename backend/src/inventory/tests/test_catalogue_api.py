@@ -112,6 +112,30 @@ def test_an_items_labels_are_its_packaging(client: Client, item: Item) -> None:
     ]
 
 
+def test_packaging_is_the_distinct_quantities_not_the_sticker_count(
+    client: Client,
+    item: Item,
+    category: Category,
+) -> None:
+    """Two hundred packets carry two hundred labels and offer two chips.
+
+    The chips are the *packaging* (decision 0011 section 5), so a repeated
+    quantity is one choice however many stickers are printed -- and the
+    deduplication is per item, which is what a single prefetch across the whole
+    page could otherwise get wrong.
+    """
+    other = Item.objects.create(name="Zip Ties", category=category)
+    for number in range(3):
+        Label.objects.create(code=f"S{number}", item=item)
+        Label.objects.create(code=f"P{number}", item=item, quantity=Decimal("100"))
+    Label.objects.create(code="Z0", item=other)
+
+    listed = {entry["name"]: entry["labels"] for entry in results(client.get(reverse("items")))}
+
+    assert [entry["quantity"] for entry in listed["LiteBeam"]] == ["1.000", "100.000"]
+    assert [entry["quantity"] for entry in listed["Zip Ties"]] == ["1.000"]
+
+
 def test_a_revoked_label_is_not_offered_as_packaging(client: Client, item: Item) -> None:
     Label.objects.create(
         code="FADED",
@@ -286,3 +310,13 @@ def test_a_code_stored_in_any_other_form_is_canonicalised(client: Client, item: 
     assert label.code == "WA1101"
     assert resolve(client, "wall01").status_code == 200
     assert resolve(client, "WA1101").status_code == 200
+
+
+def test_the_cached_map_omits_a_field_it_would_always_repeat(client: Client, item: Item) -> None:
+    """The map holds only live labels, so revoked_at could only say null."""
+    Label.objects.create(code="AAA111", item=item)
+
+    entry = results(client.get(reverse("labels")))[0]
+
+    assert "revoked_at" not in entry
+    assert set(entry) == {"code", "kind", "quantity", "item", "location"}

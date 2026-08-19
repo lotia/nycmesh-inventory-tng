@@ -134,7 +134,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/LabelResolve'
+                  $ref: '#/components/schemas/LabelMap'
           description: ''
   /api/labels/{code}:
     get:
@@ -536,6 +536,39 @@ components:
       description: |-
         * `item` - item
         * `location` - location
+    LabelMap:
+      type: object
+      description: |-
+        One label in the map the client caches.
+
+        Drops ``revoked_at``, which this queryset guarantees is null, a few
+        hundred times over. See LabelListView for why this response's size is
+        worth caring about.
+      properties:
+        code:
+          type: string
+          maxLength: 32
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/LabelKindEnum'
+          readOnly: true
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+          description: 'How much of the item one scan of this label stands for: a
+            packet of 100 zip ties is 100.'
+        item:
+          type:
+          - integer
+          - 'null'
+        location:
+          type:
+          - integer
+          - 'null'
+      required:
+      - code
+      - kind
     LabelResolve:
       type: object
       description: |-

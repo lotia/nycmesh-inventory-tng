@@ -11,11 +11,14 @@ metadata:
   {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
-  {{- if .Values.ingress.tls.enabled }}
+  {{- /* Defaulted so that clearing the whole tls map reaches the message
+         below rather than a nil pointer. */}}
+  {{- $tls := .Values.ingress.tls | default dict }}
+  {{- if not $tls.terminatedElsewhere }}
   tls:
     - hosts:
         - {{ .Values.ingress.host }}
-      secretName: {{ .Values.ingress.tls.secretName }}
+      secretName: {{ required "ingress.tls.secretName is required: the app is unusable over plain HTTP, because a camera needs a secure context. Set it, or set ingress.tls.terminatedElsewhere=true if a proxy in front of this ingress terminates TLS. See docs/deployment.md." $tls.secretName }}
   {{- end }}
   rules:
     # Everything enters through the frontend, which proxies /api and /admin to

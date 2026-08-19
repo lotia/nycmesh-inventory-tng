@@ -52,6 +52,11 @@ ingress:
   className: nginx
   host: inventory.nycmesh.net
   tls:
-    enabled: true
+    # No switch to turn TLS off: it is a functional requirement, not only a
+    # security one. See docs/deployment.md.
     secretName: inventory-tng-tls
+    # Set this only when something in front of this ingress terminates TLS --
+    # a load balancer, a service mesh. It stops the Ingress asking for a
+    # certificate; it does not make plain HTTP to the browser supported.
+    terminatedElsewhere: false
   annotations: {}

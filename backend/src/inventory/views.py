@@ -32,6 +32,7 @@ from inventory.serializers import (
     BatchRejectedSerializer,
     CategorySerializer,
     ItemSerializer,
+    LabelMapSerializer,
     LabelResolveSerializer,
     LocationSerializer,
     NotFoundSerializer,
@@ -242,7 +243,8 @@ def _negative_balances(drained: set[tuple[int, int]]) -> list[dict[str, object]]
 
     Ordered, because a set has no order and the warnings are a list the client
     renders: without this a replay could show the same warnings rearranged,
-    reading as a change when nothing changed.
+    reading as a change when nothing changed. By the id columns rather than
+    the relations, for the reason on ItemListView.
     """
     if not drained:
         return []
@@ -255,7 +257,7 @@ def _negative_balances(drained: set[tuple[int, int]]) -> list[dict[str, object]]
         }
         for balance in StockBalance.objects.filter(pk__in=sorted(drained), quantity__lt=0)
         .select_related("item", "location")
-        .order_by("item", "location")
+        .order_by("item_id", "location_id")
     ]
 
 
@@ -479,9 +481,13 @@ class ItemListView(ListAPIView):
     # that table to sort balances by a name the response does not even carry.
     queryset = Item.objects.filter(active=True).prefetch_related(
         Prefetch("balances", queryset=StockBalance.objects.order_by("location_id")),
+        # One row per distinct quantity, not per printed sticker -- see
+        # ItemLabelSerializer. DISTINCT ON is scoped to item_id as well,
+        # because this one query carries every listed item's labels and
+        # deduping on quantity alone would strip most of the page.
         Prefetch(
             "labels",
-            queryset=Label.objects.live().order_by("quantity", "id"),
+            queryset=Label.objects.live().order_by("item_id", "quantity", "id").distinct("item_id", "quantity"),
         ),
     )
 
@@ -518,7 +524,7 @@ class LabelListView(ListAPIView):
     benefit at a few hundred rows.
     """
 
-    serializer_class = LabelResolveSerializer
+    serializer_class = LabelMapSerializer
     pagination_class = None
     queryset = Label.objects.live().order_by("code")
 

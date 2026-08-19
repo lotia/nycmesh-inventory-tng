@@ -70,10 +70,17 @@ helm upgrade --install inventory-tng infra/helm/inventory-tng \
   --set django.allowedHosts=inventory.nycmesh.net
 ```
 
-**TLS is not optional.** The chart enables it by default (`ingress.tls.enabled`)
-and it must stay on: QR scanning stops working over plain HTTP, including on a
-LAN address, and it fails silently rather than warning. Why is in
-[decision 0011](decisions/0011-qr-batch-scanning.md#consequences).
+**TLS is not optional**, and the chart offers no switch to turn it off. QR
+scanning stops working over plain HTTP, including on a LAN address, and it
+fails silently rather than warning — why is in
+[decision 0011](decisions/0011-qr-batch-scanning.md#consequences). Rendering
+the chart without a certificate fails rather than quietly producing an ingress
+nobody can scan from — see below for supplying one.
+
+If something in front of the ingress terminates TLS — a load balancer, a
+service mesh — set `ingress.tls.terminatedElsewhere=true`. That stops the
+Ingress asking for a certificate; it does not make plain HTTP to the browser
+supported, because the camera still needs a secure context.
 
 **The ingress must be the only route to the frontend pod.** TLS terminates
 there, so it is the ingress that tells Django which scheme the browser used,

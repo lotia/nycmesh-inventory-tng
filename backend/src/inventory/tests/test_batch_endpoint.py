@@ -918,3 +918,45 @@ def test_a_body_that_is_not_an_object_is_a_readable_rejection(client: Client) ->
     response = client.post(URL, data=[], content_type="application/json")
     assert response.status_code == 400
     assert response.json()["errors"]
+
+
+def test_a_cart_costs_a_query_per_relation_not_per_line(
+    client: Client,
+    volunteer: Volunteer,
+    item: Item,
+    warehouse: Location,
+    custody: Location,
+    django_assert_max_num_queries: Any,
+) -> None:
+    """The query count must not grow with the number of lines.
+
+    Why that matters is on CachedPrimaryKeyRelatedField.
+    """
+    line = {
+        "item": item.pk,
+        "quantity": "1",
+        "from_location": warehouse.pk,
+        "to_location": custody.pk,
+    }
+    # The fixed cost of a batch: the session, the transaction, the inserts and
+    # the balances read back. Unresolved, 24 lines cost over eighty.
+    with django_assert_max_num_queries(20):
+        assert post(client, batch(volunteer, [line] * 24)).status_code == 201
+
+
+def test_an_id_that_is_not_an_id_is_rejected_by_line(
+    client: Client,
+    volunteer: Volunteer,
+    warehouse: Location,
+) -> None:
+    """An object where a pk belongs cannot be cached, or hashed; it has to
+    reach the base field to be reported against its own line.
+    """
+    response = post(
+        client,
+        batch(volunteer, [{"item": {"nope": 1}, "quantity": "1", "from_location": warehouse.pk}]),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["errors"][0]["index"] == 0
+    assert response.json()["errors"][0]["field"] == "item"
