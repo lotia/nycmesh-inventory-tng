@@ -158,8 +158,12 @@ class Volunteer(models.Model):
         return self.display_name
 
     def save(self, *args: Any, **kwargs: Any) -> None:
+        # Only fields this save will actually write. A partial save that
+        # normalised in memory without persisting would leave the object
+        # describing a row that does not exist.
+        writing = kwargs.get("update_fields")
         for field in self.NULL_WHEN_BLANK:
-            if getattr(self, field) == "":
+            if (writing is None or field in writing) and getattr(self, field) == "":
                 setattr(self, field, None)
         super().save(*args, **kwargs)
 
@@ -461,8 +465,11 @@ class Label(models.Model):
         # it, because the resolver folds the very characters it holds. The
         # admin and the planned sheet import are held to this too. What stops
         # a code being minted outside the alphabet in the first place is the
-        # check constraint in inventory-tng-n2o.
-        self.code = self.normalise_code(self.code)
+        # check constraint in inventory-tng-n2o. Skipped when a partial save is
+        # not writing the code, for the reason on Volunteer.save.
+        writing = kwargs.get("update_fields")
+        if writing is None or "code" in writing:
+            self.code = self.normalise_code(self.code)
         super().save(*args, **kwargs)
 
     @property

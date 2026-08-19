@@ -38,6 +38,10 @@ django:
   # Empty, and expected to stay empty; see docs/deployment.md for what it does
   # and does not buy. Comma-separated.
   corsAllowedOrigins: ""
+  # Proxies between the browser and Django: the ingress, then the frontend's
+  # nginx. This decides whose request a rate limit counts against, so it must
+  # match the real chain; see docs/deployment.md.
+  numProxies: 2
   # How fast one client may append to the ledger or the volunteer list, which
   # take no credential. Counted per backend process; see docs/deployment.md.
   appendBurstRate: "20/min"

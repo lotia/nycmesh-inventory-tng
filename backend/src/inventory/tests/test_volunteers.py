@@ -9,7 +9,6 @@ about what search finds, and who is offered as a choice at all.
 from typing import Any
 
 import pytest
-from django.contrib.auth.models import User
 from django.test import Client
 from django.urls import reverse
 
@@ -18,12 +17,6 @@ from inventory.models import Volunteer
 pytestmark = pytest.mark.django_db
 
 URL = reverse("volunteers")
-
-
-@pytest.fixture
-def client(client: Client) -> Client:
-    client.force_login(User.objects.create_user(username="picker", password="not-a-real-password"))
-    return client
 
 
 def names(response: Any) -> list[str]:

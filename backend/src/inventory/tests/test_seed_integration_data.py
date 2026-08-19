@@ -18,7 +18,7 @@ from django.core.management.base import CommandError
 from django.test import override_settings
 
 from inventory.management.commands.seed_integration_data import ACKNOWLEDGEMENT
-from inventory.models import Item, Location, Volunteer
+from inventory.models import Category, Item, Location, Volunteer
 
 pytestmark = pytest.mark.django_db
 
@@ -113,3 +113,27 @@ def test_a_failed_seed_leaves_the_previous_login_alone() -> None:
     after = User.objects.get(username="integration")
     assert after.pk == before.pk
     assert after.password == before.password
+
+
+@override_settings(DEBUG=True)
+def test_a_retired_item_or_location_is_revived_rather_than_published_retired() -> None:
+    """An item name is unique outright, so a retired row IS the row.
+
+    Left retired it would be published as a scene the read API refuses to
+    offer, and the first test to read a pick-list would fail for a reason that
+    is not a bug.
+    """
+    category = Category.objects.create(name="Radios")
+    retired_item = Item.objects.create(name="LiteBeam", category=category, active=False)
+    retired_place = Location.objects.create(
+        name="131 Broome",
+        kind=Location.Kind.WAREHOUSE,
+        active=False,
+    )
+
+    scene = seed()
+
+    assert scene["item"] == retired_item.pk
+    assert scene["location"] == retired_place.pk
+    assert Item.objects.get(pk=scene["item"]).active is True
+    assert Location.objects.get(pk=scene["location"]).active is True

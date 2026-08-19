@@ -105,9 +105,14 @@ and monitor, which matters for a volunteer-operated system.
 MUI supplies the component library so that contributors are assembling
 well-documented components rather than writing CSS.
 
-QR decoding belongs here too, in the browser. It is designed but not built —
-see below — and the approach, the library and the constraints that follow from
-it are in [decision 0011](decisions/0011-qr-batch-scanning.md).
+Shared client state is one `useReducer` behind a React context, in
+`frontend/src/cart/` — no state management library, because one array and a few
+scalars do not need one. That is the multi-scan cart, and it is the only such
+state; anything needing more is a decision worth recording.
+
+QR decoding belongs here too, in the browser. The approach, the library and the
+constraints that follow from it are in
+[decision 0011](decisions/0011-qr-batch-scanning.md).
 
 ## Not yet built
 
@@ -119,8 +124,9 @@ Named here so the gaps are visible rather than surprising:
   needs is built — the catalogue and its balances, the pick-lists, the label
   map the client caches, the resolver for one scanned code, and the batch
   write. They are listed once, in the generated schema; fetch `/api` or read
-  [`/api/docs`](../DEVELOPERS.md#the-api-schema). The scanning client and the
-  label generator are not built.
+  [`/api/docs`](../DEVELOPERS.md#the-api-schema). The cart that holds a batch
+  in the browser is built; the scanner that fills it, the screens around it and
+  the label generator are not.
 - **Administrator sign-in and the administrative interface.** Items, locations,
   categories and labels are created through the Django admin today, and every
   API endpoint but the index and the health check requires a session —

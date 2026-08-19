@@ -3,7 +3,15 @@
  * the submit bar, so it is one `useReducer` behind a context and no state
  * library. See docs/decisions/0011-qr-batch-scanning.md section 6.
  */
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useReducer } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+} from "react";
 import { type CartAction, type CartState, cartReducer, mintIdempotencyKey } from "./cartState";
 import { loadCart, saveCart } from "./cartStorage";
 
@@ -42,7 +50,15 @@ function toAction(intent: CartIntent): CartAction {
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cart, dispatchAction] = useReducer(cartReducer, undefined, loadCart);
 
+  // Skipped on mount: the first value of `cart` is the one just read back from
+  // storage, so writing it again is a whole-cart stringify and a synchronous
+  // write on the load path, before the volunteer has touched anything.
+  const restored = useRef(true);
   useEffect(() => {
+    if (restored.current) {
+      restored.current = false;
+      return;
+    }
     saveCart(cart);
   }, [cart]);
 

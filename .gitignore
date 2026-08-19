@@ -36,3 +36,6 @@ ignored/
 .claude/settings.local.json
 .claude/hooks/
 .claude/.landing-receipt.json
+
+# Agent worktrees: separate checkouts, never part of a commit.
+.claude/worktrees/

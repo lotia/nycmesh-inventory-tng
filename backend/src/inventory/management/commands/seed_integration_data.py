@@ -94,6 +94,17 @@ class Command(BaseCommand):
                 parent=None,
                 defaults={"kind": Location.Kind.WAREHOUSE},
             )
+            # Reactivated rather than stepped over, unlike the volunteer above:
+            # an item name is unique outright and a location name is unique
+            # within its parent, so a retired row carrying this name IS this
+            # row and no second one can be made. Left retired it would be
+            # published as a scene the read API refuses to offer, and the first
+            # test to read a pick-list would fail for a reason that is not a
+            # bug.
+            for row in (item, warehouse):
+                if not row.active:
+                    row.active = True
+                    row.save(update_fields=["active"])
 
             scene = {
                 "username": USERNAME,

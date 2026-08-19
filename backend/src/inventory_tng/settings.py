@@ -21,6 +21,7 @@ env = environ.Env(
     # Defaults are the ones a volunteer night needs; .env.sample says why.
     APPEND_BURST_RATE=(str, "20/min"),
     APPEND_SUSTAINED_RATE=(str, "300/hour"),
+    NUM_PROXIES=(int, 2),
 )
 
 # Read the repository-root .env when present -- the same file docker compose
@@ -149,14 +150,17 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
-    # drf-spectacular's, plus the throttled response. See inventory/throttling.py.
-    "DEFAULT_SCHEMA_CLASS": "inventory.throttling.ThrottleAwareAutoSchema",
-    "EXCEPTION_HANDLER": "inventory.throttling.exception_handler",
+    # drf-spectacular's, plus the throttled response. See inventory/api.py.
+    "DEFAULT_SCHEMA_CLASS": "inventory.api.ThrottleAwareAutoSchema",
+    "EXCEPTION_HANDLER": "inventory.api.exception_handler",
     # Deliberately no DEFAULT_THROTTLE_CLASSES: the endpoints that carry these
     # limits name them, because which endpoints take no credential is the
     # argument decision 0012 makes and not a default to be inherited quietly.
     # The keys are the throttles' scopes; a name that matches nothing raises at
     # the first request rather than skipping the limit.
+    # Whose request a rate limit counts. .env.sample says why the number
+    # matters and which way it is dangerous to get wrong.
+    "NUM_PROXIES": env.int("NUM_PROXIES"),
     "DEFAULT_THROTTLE_RATES": {
         "append-burst": env("APPEND_BURST_RATE"),
         "append-sustained": env("APPEND_SUSTAINED_RATE"),

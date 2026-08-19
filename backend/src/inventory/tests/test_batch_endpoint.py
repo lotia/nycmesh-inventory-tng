@@ -12,7 +12,6 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
-from django.contrib.auth.models import User
 from django.db import IntegrityError
 from django.test import Client
 from django.urls import reverse
@@ -32,17 +31,6 @@ from inventory.views import StockTransactionCreateView, _line_errors
 pytestmark = pytest.mark.django_db
 
 URL = reverse("stock-transactions")
-
-
-@pytest.fixture
-def client(client: Client) -> Client:
-    """Authenticated, because the endpoint uses the project default.
-
-    Which posture the deployed app actually takes is inventory-tng-0pj, and
-    relaxing this is one line on the view.
-    """
-    client.force_login(User.objects.create_user(username="scanner", password="not-a-real-password"))
-    return client
 
 
 @pytest.fixture
@@ -275,6 +263,31 @@ def test_a_problem_with_the_batch_itself_carries_a_null_index(
     assert response.status_code == 400
     assert response.json()["errors"] == [
         {"index": None, "field": "actor", "detail": 'Invalid pk "9999" - object does not exist.'},
+    ]
+
+
+def test_a_line_that_is_not_a_line_at_all_still_names_its_position(
+    client: Client,
+    volunteer: Volunteer,
+    item: Item,
+    warehouse: Location,
+) -> None:
+    """DRF reports a null line as a bare message rather than a field map, and
+    the position is the whole promise of this response: a volunteer with 24
+    scans has to be told which one to fix, not that "movements" is wrong.
+    """
+    response = post(
+        client,
+        {
+            "kind": StockTransaction.Kind.CHECKOUT,
+            "actor": volunteer.pk,
+            "movements": [{"item": item.pk, "quantity": "1", "from_location": warehouse.pk}, None],
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["errors"] == [
+        {"index": 1, "field": "movements", "detail": "This field may not be null."},
     ]
 
 
@@ -960,3 +973,31 @@ def test_an_id_that_is_not_an_id_is_rejected_by_line(
     assert response.status_code == 400
     assert response.json()["errors"][0]["index"] == 0
     assert response.json()["errors"][0]["field"] == "item"
+
+
+def test_a_boolean_where_an_id_belongs_is_rejected_even_after_the_same_number(
+    client: Client,
+    volunteer: Volunteer,
+    category: Category,
+    warehouse: Location,
+) -> None:
+    """Python hashes True and 1 alike, so the resolved-id cache must not treat
+    them as the same key: a line sending `true` would otherwise be recorded
+    against item 1 rather than refused, silently, into a ledger nobody can edit.
+    """
+    one = Item.objects.filter(pk=1).first() or Item.objects.create(pk=1, name="Item One", category=category)
+    response = post(
+        client,
+        batch(
+            volunteer,
+            [
+                {"item": one.pk, "quantity": "1", "from_location": warehouse.pk},
+                {"item": True, "quantity": "1", "from_location": warehouse.pk},
+            ],
+        ),
+    )
+
+    assert response.status_code == 400, response.content
+    assert response.json()["errors"][0]["index"] == 1
+    assert response.json()["errors"][0]["field"] == "item"
+    assert StockTransaction.objects.count() == 0

@@ -1,9 +1,8 @@
 """Tests for the rate limit on the two endpoints that take no credential.
 
-With nothing to authenticate, the rate is the only thing between the ledger and
-a script -- a requirement of decision 0012 rather than a later hardening. So
-what these assert is the whole of that promise: appending stops, reading does
-not, the refusal says when to come back, and the schema says so too.
+Why the limit exists is on inventory/throttling.py. What these assert is the
+whole of its promise: appending stops, reading does not, the refusal says when
+to come back, and the schema says so too.
 
 The limits are moved around here rather than exercised at their real values: a
 test that made twenty requests would assert the arithmetic of the default
@@ -14,10 +13,10 @@ from typing import Any
 
 import pytest
 from django.conf import settings
-from django.contrib.auth.models import User
 from django.test import Client
 from django.urls import reverse
 from drf_spectacular.generators import SchemaGenerator
+from rest_framework.test import APIRequestFactory
 
 from inventory.models import Volunteer
 from inventory.throttling import AppendBurstThrottle, AppendSustainedThrottle, AppendThrottle
@@ -26,18 +25,6 @@ pytestmark = pytest.mark.django_db
 
 URL = reverse("volunteers")
 BATCH_URL = reverse("stock-transactions")
-
-
-@pytest.fixture
-def client(client: Client) -> Client:
-    """Signed in, because these endpoints still ask for a session today.
-
-    The limit does not care either way: it counts per account when there is
-    one and per client address when there is not, so it means the same thing
-    once the credential goes away.
-    """
-    client.force_login(User.objects.create_user(username="scanner", password="not-a-real-password"))
-    return client
 
 
 @pytest.fixture
@@ -156,3 +143,25 @@ def test_reads_do_not_claim_they_can_be_throttled() -> None:
 
     assert "429" not in paths["/api/volunteers"]["get"]["responses"]
     assert "429" not in paths["/api/items"]["get"]["responses"]
+
+
+@pytest.mark.parametrize(
+    "forged",
+    ["10.9.9.1", "10.9.9.1, 10.9.9.2", "evil, 10.9.9.1, 10.9.9.2, 10.9.9.3"],
+)
+def test_a_forged_forwarded_for_prefix_does_not_change_who_you_are(forged: str) -> None:
+    """A forged prefix must not buy a fresh bucket; see .env.sample.
+
+    Asserted against the throttle rather than through an endpoint because the
+    address only identifies a caller once nobody is signed in, and the
+    endpoints still require a session until decision 0012 is built.
+    """
+    real_client = "203.0.113.7"
+    ingress = "10.42.0.1"
+    request = APIRequestFactory().post(
+        "/api/volunteers",
+        headers={"x-forwarded-for": f"{forged}, {real_client}, {ingress}"},
+        REMOTE_ADDR="10.42.0.9",
+    )
+
+    assert AppendBurstThrottle().get_ident(request) == real_client

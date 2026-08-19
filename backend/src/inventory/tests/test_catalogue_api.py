@@ -10,7 +10,6 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
-from django.contrib.auth.models import User
 from django.test import Client
 from django.urls import reverse
 
@@ -24,12 +23,6 @@ from inventory.models import (
 )
 
 pytestmark = pytest.mark.django_db
-
-
-@pytest.fixture
-def client(client: Client) -> Client:
-    client.force_login(User.objects.create_user(username="reader", password="not-a-real-password"))
-    return client
 
 
 def results(response: Any) -> list[dict[str, Any]]:

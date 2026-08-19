@@ -60,7 +60,13 @@ class CachedPrimaryKeyRelatedField(serializers.PrimaryKeyRelatedField):
 
     def to_internal_value(self, data: Any) -> Any:
         cache = self.context.setdefault("resolved_related", {})
-        key = (self.field_name, data)
+        # The type is part of the key, not decoration. Python hashes True and 1
+        # alike and calls them equal, so without it a line sending `true` where
+        # an id belongs would hit the entry an earlier line made for `1` and be
+        # recorded against that item -- silently, into a ledger that cannot be
+        # edited -- instead of being rejected the way the base class rejects a
+        # bool.
+        key = (self.field_name, type(data), data)
         try:
             hit = key in cache
         except TypeError:

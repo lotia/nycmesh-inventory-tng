@@ -102,9 +102,9 @@ class LabelAdmin(SimpleHistoryAdmin):
 # The stock ledger.
 #
 # Registered so the fallback is complete, but not editable. A database trigger
-# rejects any UPDATE or DELETE on these tables
-# (docs/decisions/0008-stock-ledger-transfer-graph.md), so an admin offering a
-# save button would only be offering an error page.
+# rejects any UPDATE or DELETE on these tables -- see
+# docs/data-model.md, "Where PostgreSQL-specific features are used" -- so an
+# admin offering a save button would only be offering an error page.
 # ---------------------------------------------------------------------------
 
 

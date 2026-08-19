@@ -139,7 +139,13 @@ export function cartReducer(state: CartState, action: CartAction): CartState {
     case "scan": {
       const { label, at } = action;
       const lastScan = state.lines.find((line) => line.itemId === label.item.id)?.lastScan;
-      if (lastScan?.code === label.code && at - lastScan.at < SCAN_DEBOUNCE_MS) {
+      // `elapsed >= 0` guards a clock that steps backwards -- NTP correcting
+      // it, or the volunteer changing it. A negative difference is smaller
+      // than the window, so without this every further scan of the code would
+      // be swallowed until real time caught up, and silently: a debounced
+      // scan returns unchanged state and shows the volunteer nothing.
+      const elapsed = lastScan ? at - lastScan.at : Number.POSITIVE_INFINITY;
+      if (lastScan?.code === label.code && elapsed >= 0 && elapsed < SCAN_DEBOUNCE_MS) {
         return state;
       }
       // The quantity override is the measured-item keypad: where the unit is

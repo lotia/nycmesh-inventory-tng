@@ -472,3 +472,34 @@ def test_constraint_violations_do_not_poison_the_transaction(category: Category)
     with transaction.atomic(), pytest.raises(IntegrityError):
         Item.objects.create(name="Bad", category=category, minimum_stock=Decimal("-1"))
     assert Item.objects.filter(name="Bad").count() == 0
+
+
+def test_a_partial_save_does_not_normalise_what_it_will_not_write(volunteer: Volunteer) -> None:
+    """Otherwise the instance describes a row that does not exist.
+
+    Normalising in memory while writing only another column leaves the object
+    claiming an email the database never received.
+    """
+    Volunteer.objects.filter(pk=volunteer.pk).update(email="sean@example.org")
+    volunteer.refresh_from_db()
+    volunteer.email = ""
+    volunteer.active = False
+
+    volunteer.save(update_fields=["active"])
+    volunteer.refresh_from_db()
+
+    assert volunteer.email == "sean@example.org"
+    assert volunteer.active is False
+
+
+def test_a_partial_save_does_not_normalise_a_code_it_will_not_write(item: Item) -> None:
+    """The same rule as Volunteer.save, for the same reason."""
+    label = Label.objects.create(code="7QK2P9", item=item)
+    label.code = "wall01"
+
+    label.revoked_at = datetime.datetime(2026, 8, 19, tzinfo=datetime.UTC)
+    label.save(update_fields=["revoked_at"])
+    label.refresh_from_db()
+
+    assert label.code == "7QK2P9"
+    assert label.revoked_at is not None

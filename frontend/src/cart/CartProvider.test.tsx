@@ -1,13 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CartProvider, useCart } from "./CartProvider";
-import { SCAN_DEBOUNCE_MS, type ScannedLabel } from "./cartState";
-
-const packet: ScannedLabel = {
-  code: "7QK3M2XV9A",
-  item: { id: 1, name: "Zip Ties Reusable", unitOfMeasure: "each" },
-  quantity: 100,
-};
+import { packet } from "./testFixtures";
 
 function Harness() {
   const { cart, dispatch } = useCart();
@@ -48,6 +42,13 @@ function scanZipTies(): void {
 
 beforeEach(() => {
   window.localStorage.clear();
+});
+
+// Restored here rather than at the end of the test that installs a spy: a
+// failed assertion would otherwise skip the restore and leave the stub in
+// place for everything that runs after it.
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("CartProvider", () => {
@@ -99,26 +100,26 @@ describe("CartProvider", () => {
   });
 
   it("starts the next batch under its own key once the cart is cleared", () => {
+    // The provider's own job, not the reducer's: clearing mints a fresh key
+    // and a fresh creation time, which a pure reducer cannot invent.
     render(
       <CartProvider>
         <Harness />
       </CartProvider>,
     );
     scanZipTies();
-    const submitted = key();
+    const first = key();
 
     fireEvent.click(screen.getByRole("button", { name: "Start a new cart" }));
 
+    expect(key()).not.toBe(first);
     expect(lines()).toBe("");
-    expect(key()).not.toBe(submitted);
   });
 
   it("is unusable outside a provider rather than silently starting a second cart", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
 
     expect(() => render(<Harness />)).toThrow(/CartProvider/);
-
-    vi.restoreAllMocks();
   });
 });
 
@@ -143,19 +144,5 @@ describe("CartProvider scan debounce", () => {
     scanZipTies();
 
     expect(lines()).toBe("Zip Ties Reusable x 100");
-  });
-
-  it("counts a second look at the same packet once the window has passed", () => {
-    render(
-      <CartProvider>
-        <Harness />
-      </CartProvider>,
-    );
-
-    scanZipTies();
-    vi.advanceTimersByTime(SCAN_DEBOUNCE_MS);
-    scanZipTies();
-
-    expect(lines()).toBe("Zip Ties Reusable x 200");
   });
 });

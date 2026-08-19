@@ -6,7 +6,9 @@ rather than about test data.
 """
 
 import pytest
+from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.test import Client
 
 from inventory.models import Category, Item, Location, Volunteer
 
@@ -48,3 +50,22 @@ def custody(volunteer: Volunteer) -> Location:
         kind=Location.Kind.VOLUNTEER_CUSTODY,
         held_by=volunteer,
     )
+
+
+@pytest.fixture
+def client(client: Client) -> Client:
+    """The Django test client, signed in.
+
+    Every endpoint but the index and the health check requires a session
+    today, so almost every API test needs this. Overriding the built-in
+    ``client`` fixture rather than adding a name means a test reads as
+    ordinary unless it deliberately calls ``logout()``.
+    """
+    client.force_login(User.objects.create_user(username="tester", password="not-a-real-password"))
+    return client
+
+
+@pytest.fixture
+def administrator() -> User:
+    """Somebody who may reach the Django admin."""
+    return User.objects.create_superuser(username="editor", password="not-a-real-password")

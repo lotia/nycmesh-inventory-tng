@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  type CartItem,
   type CartState,
   cartReducer,
   createCart,
@@ -8,13 +7,7 @@ import {
   SCAN_DEBOUNCE_MS,
   type ScannedLabel,
 } from "./cartState";
-
-const zipTies: CartItem = { id: 1, name: "Zip Ties Reusable", unitOfMeasure: "each" };
-const cable: CartItem = { id: 2, name: "Cat6 Outdoor", unitOfMeasure: "metre" };
-
-const packet: ScannedLabel = { code: "7QK3M2XV9A", item: zipTies, quantity: 100 };
-const single: ScannedLabel = { code: "ZZZ111ABCD", item: zipTies, quantity: 1 };
-const box: ScannedLabel = { code: "4NP8R7T2WQ", item: cable, quantity: 305 };
+import { box, cable, packet, single, zipTies } from "./testFixtures";
 
 function cart(): CartState {
   return createCart("key-1", "2026-08-19T10:00:00.000Z");
@@ -187,5 +180,16 @@ describe("createCart", () => {
 
   it("mints a different key every time", () => {
     expect(mintIdempotencyKey()).not.toBe(mintIdempotencyKey());
+  });
+});
+
+describe("a clock that steps backwards", () => {
+  it("does not swallow every later scan of the same code", () => {
+    const scanned = scan(cart(), packet, 5000);
+
+    // NTP corrects the clock backwards between two scans of the same label.
+    const afterStep = scan(scanned, packet, 1000);
+
+    expect(afterStep.lines[0].quantity).toBe(200);
   });
 });

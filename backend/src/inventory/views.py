@@ -182,19 +182,25 @@ def _line_errors(detail: object) -> list[dict[str, object]]:
 
     DRF keys a nested list's failures by position and includes only the lines
     that failed, so a string key is a complaint about the list itself -- that
-    it was empty, say. Anything else is reported against the batch, which
-    turns a shape we did not expect into a 400 the volunteer can read rather
-    than a 500 they cannot.
+    it was empty, say -- and is reported against the batch. A position always
+    keeps its index, because pointing at the line is the whole promise of this
+    response; a line whose failure is a bare message rather than a field map
+    (``null`` in the array, say) is reported against ``movements`` at that
+    index. Anything else falls back to the batch, which turns a shape we did
+    not expect into a 400 the volunteer can read rather than a 500 they
+    cannot.
     """
     if not isinstance(detail, dict):
         return _errors("movements", detail)
     errors: list[dict[str, object]] = []
     for index, line in detail.items():
-        if isinstance(index, int) and isinstance(line, dict):
+        if not isinstance(index, int):
+            errors.extend(_errors("movements", line))
+        elif isinstance(line, dict):
             for field, value in line.items():
                 errors.extend(_errors(field, value, index))
         else:
-            errors.extend(_errors("movements", line))
+            errors.extend(_errors("movements", line, index))
     return errors
 
 
@@ -259,6 +265,10 @@ def _negative_balances(drained: set[tuple[int, int]]) -> list[dict[str, object]]
             "balance": balance.quantity,
             "detail": f"{balance.item} at {balance.location} is now {balance.quantity}. Count it when you can.",
         }
+        # sorted(), not list(): `pk__in` on a composite primary key rejects a
+        # set outright, so the conversion is required, and sorting it costs
+        # nothing while making the emitted SQL stable. The row order the
+        # response needs comes from the order_by below, not from here.
         for balance in StockBalance.objects.filter(pk__in=sorted(drained), quantity__lt=0)
         .select_related("item", "location")
         .order_by("item_id", "location_id")
@@ -290,7 +300,7 @@ class StockTransactionCreateView(APIView):
     # request shape that is guaranteed to fail.
     parser_classes = [JSONParser]
 
-    # This endpoint takes no credential, so a rate is what stands in for one.
+    # Rate limited; see inventory/throttling.py.
     throttle_classes = APPEND_THROTTLES
 
     @extend_schema(
@@ -452,8 +462,8 @@ class VolunteerListCreateView(ListCreateAPIView):
     # Ordering comes from the model, tie-break included.
     queryset = Volunteer.objects.selectable()
 
-    # Adding a name takes no credential, so a rate stands in for one. Searching
-    # the list is not counted -- the client does that as somebody types.
+    # Rate limited; see inventory/throttling.py. Searching is not counted --
+    # the client does that as somebody types.
     throttle_classes = APPEND_THROTTLES
 
 

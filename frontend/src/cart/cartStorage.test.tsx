@@ -7,16 +7,18 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
+/** A cart as this version writes one, so a case can damage exactly one part. */
+const whole = cartReducer(createCart("key-1", "2026-08-19T10:00:00.000Z"), {
+  type: "add",
+  item: { id: 1, name: "Zip Ties Reusable", unitOfMeasure: "each" },
+  quantity: 100,
+});
+
 describe("loadCart", () => {
   it("restores a saved cart", () => {
-    const saved = cartReducer(createCart("key-1", "2026-08-19T10:00:00.000Z"), {
-      type: "add",
-      item: { id: 1, name: "Zip Ties Reusable", unitOfMeasure: "each" },
-      quantity: 100,
-    });
-    saveCart(saved);
+    saveCart(whole);
 
-    expect(loadCart()).toEqual(saved);
+    expect(loadCart()).toEqual(whole);
   });
 
   it("starts a new cart when nothing is stored", () => {
@@ -30,10 +32,12 @@ describe("loadCart", () => {
   });
 
   it.each([
-    ["a cart without a key", { lines: [] }],
-    ["a cart whose lines are not a list", { idempotencyKey: "k", lines: "one" }],
-    ["a line that is not an object", { idempotencyKey: "k", lines: [null] }],
-    ["a line from an older shape", { idempotencyKey: "k", lines: [{ itemId: 1 }] }],
+    ["a cart without a key", { ...whole, idempotencyKey: undefined }],
+    ["a cart written before it carried a kind", { ...whole, kind: undefined }],
+    ["a volunteer id that is not an id", { ...whole, actorId: "4" }],
+    ["a cart whose lines are not a list", { ...whole, lines: "one" }],
+    ["a line that is not an object", { ...whole, lines: [null] }],
+    ["a line from an older shape", { ...whole, lines: [{ itemId: 1, quantity: 100 }] }],
     ["a value that is not an object", 42],
   ])("starts a new cart when storage holds %s", (_case, stored) => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
