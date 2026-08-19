@@ -46,6 +46,10 @@ django:
   # take no credential. Counted per backend process; see docs/deployment.md.
   appendBurstRate: "20/min"
   appendSustainedRate: "300/hour"
+  # How long a sign-in counts as recent enough to make an administrative
+  # change. Decision 0014 point 5 asks again inside a valid session; this is
+  # how often. See docs/deployment.md.
+  reauthenticationTimeoutSeconds: 900
   # The origin printed inside every QR code. Changing it does not change the
   # stickers already on the shelves; see docs/deployment.md.
   labelBaseUrl: "https://inventory.nycmesh.net"
@@ -80,3 +84,40 @@ ingress:
     # certificate; it does not make plain HTTP to the browser supported.
     terminatedElsewhere: false
   annotations: {}
+  # Decision 0013 point 6: the routes only an administrator uses are also
+  # restricted to a network volunteers do not need. Rendered as a second
+  # Ingress, because an allow-list is an annotation and annotations apply to
+  # every path of the Ingress carrying them.
+  #
+  # OFF by default, and that is not a recommendation: an empty allow-list on a
+  # first install would lock out the very administrator who has not created the
+  # first superuser yet. What is true while it is off, and what a deployer has
+  # to set, are in docs/deployment.md#administrative-access.
+  administrative:
+    enabled: false
+    # Prefixes, matched per path segment. Everything not listed here stays
+    # reachable from anywhere, because a volunteer on a phone needs it -- which
+    # paths those are, and why the administrative operations of /api are not on
+    # this list, is in docs/deployment.md#administrative-access.
+    paths:
+      - /admin
+      - /accounts
+      - /api/labels/sheet
+      - /api/schema
+      - /api/docs
+    # The networks permitted to reach them: the mesh, an office, the pool a VPN
+    # hands out. Empty with `enabled: true` is refused at render time rather
+    # than producing an Ingress that restricts nothing.
+    allowedSourceRanges: []
+    # Which annotation carries that list, because every controller spells it
+    # differently. The default is ingress-nginx's. HAProxy's is
+    # `haproxy.org/whitelist`; Traefik has no equivalent annotation and wants a
+    # middleware named in `annotations` below instead.
+    sourceRangeAnnotation: nginx.ingress.kubernetes.io/whitelist-source-range
+    # Annotations added to the administrative Ingress and to nothing else. This
+    # is the same switch for the other two shapes of the restriction: an
+    # identity-aware proxy (`nginx.ingress.kubernetes.io/auth-url` and
+    # `auth-signin`), or a mesh or Traefik middleware
+    # (`traefik.ingress.kubernetes.io/router.middlewares`). Setting these alone,
+    # with no CIDRs, is a complete configuration.
+    annotations: {}

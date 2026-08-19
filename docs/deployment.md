@@ -36,6 +36,7 @@ chart and from a Secret.
 | `NUM_PROXIES` | no | chart (`django.numProxies`) | Proxies between the browser and Django; the default `2` matches the deployed chain of ingress then the frontend's nginx. It decides whose request a rate limit counts against, so it must match reality — see [`.env.sample`](../.env.sample) for which direction is dangerous |
 | `APPEND_BURST_RATE` | no | chart (`django.appendBurstRate`) | How fast one client may append. What each rate is for, and why the defaults are what they are, is in [`.env.sample`](../.env.sample) |
 | `APPEND_SUSTAINED_RATE` | no | chart (`django.appendSustainedRate`) | The same limit over an hour, for a flood paced to stay under the burst rate |
+| `REAUTHENTICATION_TIMEOUT_SECONDS` | no | chart (`django.reauthenticationTimeoutSeconds`) | How long a sign-in counts as recent enough to make an administrative change; after it, the API answers those writes with `reauthentication_required` and the app offers the sign-in form again. Default `900`. Why there is a second prompt inside a valid session at all is [decision 0014](decisions/0014-one-interface.md) point 5 |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | provider Secret | Offers Google sign-in. Absent, or half set, means it is not offered |
 | `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` | no | provider Secret | Offers Slack sign-in, the strongest signal that somebody is actually involved in NYC Mesh |
 | `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_SERVER_URL` | no | provider Secret | Offers a generic OpenID Connect provider. `OIDC_SERVER_URL` is the issuer, the URL whose `/.well-known/openid-configuration` describes the rest. All three are needed |
@@ -131,17 +132,145 @@ supported, because the camera still needs a secure context.
 
 ### Administrative access
 
-[Decision 0013](decisions/0013-administrator-sign-in.md) restricts the
-administrative routes — `/admin`, `/accounts`, and the administrative
-operations of the API — to a network volunteers do not need: the mesh, a VPN,
-or an identity-aware proxy. Administrators are few and their locations
+[Decision 0013](decisions/0013-administrator-sign-in.md) point 6 restricts the
+routes only an administrator uses to a network volunteers do not need: the mesh,
+a VPN, or an identity-aware proxy. Administrators are few and their locations
 predictable, so this costs them very little, and it is the one place a network
 boundary fits without excluding a volunteer on a phone wherever the stock
 happens to be.
 
-Express it at the ingress or in front of it. Nothing in the application can
-detect its absence, so it is a precondition somebody has to honour rather than
-a check that fires — the same shape as the requirement below.
+**It is off unless a deployer turns it on, and nothing in the application can
+tell.** The restriction decides whose packets arrive, not what a request says,
+so a deployment that skips it behaves exactly like one that honoured it —
+right up until somebody who should not have reached `/admin` does. That is why
+it is stated here as a precondition rather than checked in code, the same shape
+as the requirement below.
+
+While it is off, `/admin` and `/accounts` are reachable from anywhere the
+ingress is, and the only thing between an anonymous request and the
+administrative surface is a password plus the second factor
+[decision 0013](decisions/0013-administrator-sign-in.md) point 3 requires.
+That is a real defence and it is not this one. Turning it on is the difference
+between one credential and one credential that can only be offered from a
+network you control.
+
+#### Which paths are restricted
+
+| Path | Restricted | Why |
+| --- | --- | --- |
+| `/admin` | yes | Django admin: everything that edits, merges, revokes or corrects |
+| `/accounts` | yes | Every way in — the local password form, the providers, the second factors |
+| `/api/labels/sheet` | yes | A print run of stickers; a volunteer scans labels and never prints them |
+| `/api/schema`, `/api/docs` | yes | The description of the whole surface, both halves, and no volunteer flow fetches either |
+| `/api`, `/api/me`, `/api/healthz` | no | The index that hands the browser its CSRF token, who-am-I, and the probe |
+| `/api/stock/transactions`, `/api/volunteers` | no | The two appends [decision 0012](decisions/0012-two-populations.md) exists to keep open |
+| `/api/items`, `/api/locations`, `/api/categories`, `/api/labels`, `/api/labels/{code}` | no | A volunteer reads all of these; the cached label map is what makes a scan resolve from a basement |
+| `/`, `/assets`, `/S/{code}` | no | The volunteer app and the URL printed on every sticker |
+
+**The administrative operations of `/api` are deliberately not on that list, and
+cannot be.** They are not separate paths: `POST /api/items` and
+`GET /api/items` are the same path, as are the `PATCH` that merges volunteers
+and the `GET` that lists them for a pick-list. A Kubernetes `Ingress` matches on
+host and path and has no way to say "this method only", so restricting the
+administrative half by path would take the volunteer half with it — the reads
+the app makes on load, and the label map a phone needs before it can resolve a
+scan. Those operations stay reachable at the network and remain gated where
+they already are: a session, plus the staff flag, in
+`backend/src/inventory/permissions.py`. Anything that wants a network boundary
+around them too needs a method-aware proxy in front of this ingress, which this
+chart does not attempt.
+
+Two things follow from the list that are worth saying out loud. Restricting
+`/accounts` means an administrator must be on the permitted network **to sign in
+at all**, which is the intent rather than a side effect; the provider round trip
+still works, because the redirect back to `/accounts/<provider>/login/callback/`
+is made by that administrator's own browser. And path prefixes are matched per
+segment, so a controller that over-matches would restrict more than this list,
+never less — it fails closed.
+
+#### Turning it on
+
+The chart renders a second Ingress for those paths, carrying whichever
+restriction the deployer names. A second resource rather than a second rule,
+because an allow-list is an annotation and annotations apply to every path of
+the Ingress carrying them.
+
+```bash
+helm upgrade --install inventory-tng infra/helm/inventory-tng ... \
+  --set ingress.administrative.enabled=true \
+  --set 'ingress.administrative.allowedSourceRanges={10.69.0.0/16,199.170.132.0/24}'
+```
+
+The same switch takes the other two shapes of the boundary, in
+`ingress.administrative.annotations`, which land on that Ingress and on nothing
+else:
+
+- **A VPN** is not a separate case — put the pool it hands out in
+  `allowedSourceRanges`.
+- **An identity-aware proxy**, with ingress-nginx and oauth2-proxy or
+  equivalent:
+
+  ```yaml
+  ingress:
+    administrative:
+      enabled: true
+      annotations:
+        nginx.ingress.kubernetes.io/auth-url: https://auth.example.net/oauth2/auth
+        nginx.ingress.kubernetes.io/auth-signin: https://auth.example.net/oauth2/start?rd=$escaped_request_uri
+  ```
+
+- **A mesh or Traefik middleware**, named the same way —
+  `traefik.ingress.kubernetes.io/router.middlewares: admin-ipallowlist@kubernetescrd`,
+  with the middleware itself owned outside this chart.
+
+Either the ranges or the annotations must be set; `enabled: true` with neither
+fails at render time rather than producing an Ingress that carries no
+restriction and looks as though it does. `ingress.administrative.paths` is the
+list in the table above, and
+`ingress.administrative.sourceRangeAnnotation` is which annotation carries the
+CIDRs — ingress-nginx's by default, since every controller spells it
+differently.
+
+Four things this cannot do for you:
+
+- **The allow-list is only as true as the client IP the controller sees.**
+  Behind a cloud load balancer that does not preserve it, every request appears
+  to come from the load balancer and the allow-list either admits everybody or
+  nobody. Configure the controller for the chain in front of it
+  (`use-forwarded-headers`, or PROXY protocol) before trusting this.
+- **Do the first superuser first.** Creating it needs `kubectl exec`, which is
+  unaffected, but signing that account in needs `/accounts` — so either turn
+  this on from a machine already inside the permitted range, or bootstrap the
+  account and its second factor before you switch it on. It is off by default
+  for exactly this reason: a default-on with an empty allow-list would lock a
+  first-time deployer out of the admin they need.
+- **Annotations are not copied from `ingress.annotations`.** The administrative
+  Ingress names the same TLS Secret but carries none of the other Ingress's
+  annotations, because a cert-manager issuer on both would leave two
+  Certificates contending for one Secret. Repeat anything else you need in
+  `ingress.administrative.annotations`.
+- **It is not a substitute for the requirement below.** An in-cluster client or
+  a `kubectl port-forward` reaches the frontend pod without passing any
+  ingress, administrative or not.
+
+Confirm what was rendered before applying it:
+
+```bash
+helm lint infra/helm/inventory-tng
+helm template test infra/helm/inventory-tng --set image.tag=v0.1.0 \
+  --set ingress.administrative.enabled=true \
+  --set 'ingress.administrative.allowedSourceRanges={10.69.0.0/16}' \
+  | grep -E 'name:.*-admin|whitelist|^ +- path:'
+```
+
+and afterwards, that a request from outside the range is refused:
+
+```bash
+curl -o /dev/null -w '%{http_code}\n' https://inventory.nycmesh.net/admin/   # expect 403
+curl -o /dev/null -w '%{http_code}\n' https://inventory.nycmesh.net/api      # expect 200
+```
+
+#### The only route to the frontend pod
 
 **The ingress must be the only route to the frontend pod.** TLS terminates
 there, so it is the ingress that tells Django which scheme the browser used,

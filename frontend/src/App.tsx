@@ -1,6 +1,8 @@
 import Container from "@mui/material/Container";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { SessionProvider } from "./admin/SessionProvider";
+import { StaleSession } from "./admin/StepUp";
 import { SubmitBar } from "./batch/SubmitBar";
 import { CartProvider } from "./cart/CartProvider";
 import { ItemList } from "./items/ItemList";
@@ -18,24 +20,32 @@ import { VolunteerPicker } from "./volunteers/VolunteerPicker";
  * label -- and the Save that sends it. What is built and what is not is listed
  * in docs/architecture.md.
  *
- * The cart provider is here rather than at the root so that a test renders the
- * app and gets the app, batch state included.
+ * Both providers are here rather than at the root so that a test renders the
+ * app and gets the app -- the batch in hand, and who is signed in, which is
+ * what decides whether the administrative controls are drawn at all.
  */
 export default function App() {
   return (
-    <CartProvider>
-      <Container maxWidth="sm" sx={{ py: 4 }}>
-        <Stack spacing={3}>
-          <Typography variant="h4" component="h1">
-            NYC Mesh Inventory
-          </Typography>
-          <DeepLink />
-          <VolunteerPicker />
-          <Scanner />
-          <ItemList />
-          <SubmitBar />
-        </Stack>
-      </Container>
-    </CartProvider>
+    <SessionProvider>
+      <CartProvider>
+        <Container maxWidth="sm" sx={{ py: 4 }}>
+          <Stack spacing={3}>
+            <Typography variant="h4" component="h1">
+              NYC Mesh Inventory
+            </Typography>
+            {/* Once, at the top, rather than in place of each control it
+                removed: a stale session takes every administrative control
+                away at the same moment, and one prompt is what fixes all of
+                them. Nothing is drawn for a volunteer. */}
+            <StaleSession />
+            <DeepLink />
+            <VolunteerPicker />
+            <Scanner />
+            <ItemList />
+            <SubmitBar />
+          </Stack>
+        </Container>
+      </CartProvider>
+    </SessionProvider>
   );
 }

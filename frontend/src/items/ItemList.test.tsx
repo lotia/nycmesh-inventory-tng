@@ -4,11 +4,11 @@
  * Everything is found by role and accessible name, so what these assert is
  * what somebody standing at a shelf can actually perceive.
  */
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "../api/testFixtures";
 import type { Item } from "../api/types";
-import { CartProvider } from "../cart/CartProvider";
+import { renderScreen } from "../testHarness";
 import { ItemList } from "./ItemList";
 import { cable, zipTies } from "./testFixtures";
 
@@ -26,11 +26,7 @@ function serving(...items: Item[]): void {
 }
 
 function show() {
-  return render(
-    <CartProvider>
-      <ItemList />
-    </CartProvider>,
-  );
+  return renderScreen(<ItemList />);
 }
 
 /** The row for one item, so an assertion cannot match the other one's control. */

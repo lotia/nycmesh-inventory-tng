@@ -8,11 +8,12 @@
  * catalogue, that the box empties itself for the next code -- is asserted for
  * the camera too, up to the decode itself.
  */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CartProvider, useCart } from "../cart/CartProvider";
+import { useCart } from "../cart/CartProvider";
 import { STORAGE_KEY } from "../cart/cartStorage";
 import { cable, zipTies } from "../items/testFixtures";
+import { callsTo, renderScreen } from "../testHarness";
 import { Scanner } from "./Scanner";
 import { clearMediaDevices, stubMediaDevices, videoInput } from "./testFixtures";
 
@@ -61,11 +62,7 @@ function servingSlowly(label: unknown): () => void {
 }
 
 function show() {
-  return render(
-    <CartProvider>
-      <Scanner />
-    </CartProvider>,
-  );
+  return renderScreen(<Scanner />);
 }
 
 /** Somewhere else in the app writing to the cart: the item list's stepper. */
@@ -165,11 +162,11 @@ describe("a code typed or sent by a scanner gun", () => {
     // waiting for whatever the volunteer does next.
     const vibrate = vibration();
     const release = servingSlowly(PACKET);
-    render(
-      <CartProvider>
+    renderScreen(
+      <>
         <Scanner />
         <Stepper />
-      </CartProvider>,
+      </>,
     );
 
     wedge("7QK3M2XV9A");
@@ -183,12 +180,13 @@ describe("a code typed or sent by a scanner gun", () => {
   });
 
   it("does nothing at all with an empty box", () => {
-    const fetching = vi.fn();
-    vi.stubGlobal("fetch", fetching);
+    serving(PACKET);
     show();
     wedge("   ");
 
-    expect(fetching).not.toHaveBeenCalled();
+    // The app reads who is signed in on load; what an empty box must not do is
+    // resolve a code.
+    expect(callsTo("/api/labels/")).toHaveLength(0);
   });
 });
 

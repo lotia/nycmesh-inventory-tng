@@ -26,6 +26,11 @@ dependencies = [
     # version, mode and error correction level of what it produced -- which is
     # what makes the decisions in inventory/labels.py assertable.
     "segno==1.6.*",
+    # The Content-Security-Policy header. Pinned like everything else here: the
+    # setting it reads is named CONTENT_SECURITY_POLICY only from 4.0, and a
+    # major that renamed it again would silently serve no policy at all.
+    "django-csp==4.0.*",
+    "drf-spectacular-sidecar>=2026.8.1",
 ]
 
 [dependency-groups]

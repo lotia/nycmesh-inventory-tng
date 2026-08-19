@@ -145,6 +145,7 @@ def test_the_local_path_signs_in_with_the_password_and_the_code(local: User) -> 
         "authenticated": True,
         "username": local.username,
         "administrator": True,
+        "recently_authenticated": True,
         "capabilities": {
             "append_stock": True,
             "add_volunteer": True,

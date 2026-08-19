@@ -1281,12 +1281,15 @@ components:
           - 'null'
         administrator:
           type: boolean
+        recently_authenticated:
+          type: boolean
         capabilities:
           $ref: '#/components/schemas/Capabilities'
       required:
       - administrator
       - authenticated
       - capabilities
+      - recently_authenticated
       - username
     Detail:
       type: object
@@ -1301,9 +1304,20 @@ components:
         A volunteer reaching an administrator's operation is told so rather than
         shown nothing (decision 0014 point 2), so the refusal is part of the
         contract and is described like any other response.
+
+        ``code`` is the branch a client actually takes, and it is optional because
+        only the 403 carries one: two refusals share that status and mean opposite
+        things -- ``forbidden`` is a control to hide, ``reauthentication_required``
+        is a prompt to show somebody who is entitled to the thing (decision 0014
+        point 5). Nothing here is missing on a 404, where the sentence is the whole
+        answer. The values are attached by ``exception_handler`` in inventory/api.py.
       properties:
         detail:
           type: string
+        code:
+          type: string
+          description: '`forbidden`, or `reauthentication_required` when signing in
+            again is what fixes it.'
       required:
       - detail
     FieldEnum:

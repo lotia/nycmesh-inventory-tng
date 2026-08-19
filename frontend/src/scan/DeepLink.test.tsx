@@ -2,11 +2,11 @@
  * Arriving by label, which is how a volunteer meets this app for the first
  * time: they point their phone's own camera at a sticker on a shelf.
  */
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CartProvider } from "../cart/CartProvider";
 import { STORAGE_KEY } from "../cart/cartStorage";
 import { zipTies } from "../items/testFixtures";
+import { callsTo, renderScreen } from "../testHarness";
 import { DeepLink } from "./DeepLink";
 
 const PACKET = {
@@ -42,11 +42,7 @@ function serving(label: unknown, status = 200): void {
 
 function arriveAt(path: string) {
   window.history.replaceState(null, "", path);
-  return render(
-    <CartProvider>
-      <DeepLink />
-    </CartProvider>,
-  );
+  return renderScreen(<DeepLink />);
 }
 
 /** What the cart holds, read back out of the store the provider writes to. */
@@ -111,6 +107,8 @@ describe("arriving by label", () => {
     serving(PACKET);
     arriveAt("/");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(fetch).not.toHaveBeenCalled();
+    // The session read is the app asking who is signed in; what must not
+    // have happened is a label being resolved.
+    expect(callsTo("/api/labels/")).toHaveLength(0);
   });
 });

@@ -25,3 +25,4 @@ to ask "why is it like this?". Number them sequentially.
 | [0013](0013-administrator-sign-in.md) | Several ways for an administrator to sign in, one way to become one |
 | [0014](0014-one-interface.md) | Administrator powers appear in the volunteer app, not a second one |
 | [0015](0015-merged-identifier-conflict.md) | A taken identifier that nobody can see is a 409 naming who holds it |
+| [0016](0016-invariants-for-every-writer.md) | Invariants belong to every writer; affordances belong to the API |

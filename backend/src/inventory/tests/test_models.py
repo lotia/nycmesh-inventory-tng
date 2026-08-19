@@ -1,9 +1,11 @@
 """Tests for the catalogue models.
 
-These lean deliberately on the *database* constraints rather than on model
-validation. docs/data-model.md states the invariants as constraints so they
-hold regardless of which client writes the row, and a test that only exercised
-``full_clean()`` would not prove that.
+These lean deliberately on the *database* constraints and triggers rather than
+on model validation. docs/data-model.md states the invariants where they hold
+regardless of which client writes the row, and a test that only exercised
+``full_clean()`` would not prove that. Which rules are down there and which
+stayed above the API is
+docs/decisions/0016-invariants-for-every-writer.md.
 
 For the ``ty: ignore[unresolved-attribute]`` comments below, see
 DEVELOPERS.md#typing.
@@ -17,6 +19,7 @@ from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from inventory.models import (
     Category,
@@ -148,6 +151,49 @@ def test_merging_preserves_the_duplicate_record(volunteer: Volunteer) -> None:
     assert volunteer.merged_from.get() == duplicate  # ty: ignore[unresolved-attribute]
 
 
+@pytest.mark.parametrize("withdrawn", ["merged", "retired"])
+def test_a_merge_points_at_somebody_the_list_still_offers(volunteer: Volunteer, withdrawn: str) -> None:
+    """Otherwise a chain forms, and -- pointing at a record that has itself
+    been merged -- a cycle can be built out of two ordinary merges.
+    """
+    survivor = Volunteer.objects.create(display_name="Sean B")
+    if withdrawn == "merged":
+        survivor.merged_into = volunteer
+    else:
+        survivor.active = False
+    survivor.save()
+
+    with pytest.raises(IntegrityError, match="merged or retired"):
+        Volunteer.objects.create(display_name="sean", merged_into=survivor)
+
+
+def test_a_chain_forms_when_the_survivor_is_merged_later(volunteer: Volunteer) -> None:
+    """Which is allowed, and is why decision 0015 follows the pointer forward
+    rather than reading it once. The rule is about the moment of choosing, so
+    merging the record somebody was already merged into is an ordinary merge.
+    """
+    middle = Volunteer.objects.create(display_name="Sean M")
+    Volunteer.objects.create(display_name="sean", merged_into=middle)
+    middle.merged_into = volunteer
+    middle.save()
+    assert Volunteer.objects.selectable().count() == 1
+
+
+def test_retiring_somebody_who_still_holds_stock_is_allowed(volunteer: Volunteer, custody: Location) -> None:
+    """The rule is checked where the naming happens, so the reverse is not
+    refused -- it leaves a custody location pointing at a record the pick-list
+    no longer offers, and whether that should move the stock to the survivor
+    is a decision nobody has taken. Stated once in serializers.py.
+    """
+    volunteer.active = False
+    volunteer.save()
+
+    custody.name = "Sean's flat"
+    custody.save()
+    custody.refresh_from_db()
+    assert custody.held_by == volunteer
+
+
 # --------------------------------------------------------------------------
 # Location
 # --------------------------------------------------------------------------
@@ -165,6 +211,22 @@ def test_custody_location_requires_a_holder() -> None:
 def test_non_custody_location_must_not_have_a_holder(volunteer: Volunteer) -> None:
     with pytest.raises(IntegrityError):
         Location.objects.create(name="Basement", kind=Location.Kind.SHELF, held_by=volunteer)
+
+
+@pytest.mark.parametrize("withdrawn", ["merged", "retired"])
+def test_custody_is_recorded_against_somebody_the_list_still_offers(volunteer: Volunteer, withdrawn: str) -> None:
+    """A custody location attached to a merged duplicate is the second
+    generation of the duplicate the merge existed to remove.
+    """
+    holder = Volunteer.objects.create(display_name="Sean B")
+    if withdrawn == "merged":
+        holder.merged_into = volunteer
+    else:
+        holder.active = False
+    holder.save()
+
+    with pytest.raises(IntegrityError, match="merged or retired"):
+        Location.objects.create(name="Sean B", kind=Location.Kind.VOLUNTEER_CUSTODY, held_by=holder)
 
 
 def test_one_custody_location_per_volunteer(volunteer: Volunteer) -> None:
@@ -390,6 +452,41 @@ def test_reprinting_replaces_the_token_not_the_item(item: Item) -> None:
     assert item.labels.count() == 2  # ty: ignore[unresolved-attribute]
 
 
+def test_a_printed_code_cannot_be_changed(item: Item) -> None:
+    """The code is on a sticker on a shelf. Changing it 404s that sticker for
+    the life of the object carrying it, and no database write can go and
+    reprint it. A reprint is a new label and a revocation of this one.
+    """
+    label = Label.objects.create(code="7QK3M2XV9A", item=item)
+    label.code = "N3WC0DE001"
+    with pytest.raises(IntegrityError, match="printed on it"):
+        label.save()
+
+
+def test_everything_else_about_a_label_stays_editable(item: Item, warehouse: Location) -> None:
+    """Only the code is frozen. Correcting what a label points at, or how much
+    one scan of it means, is what makes a correction cheaper than a reprint.
+    """
+    label = Label.objects.create(code="7QK3M2XV9A", item=item, quantity=Decimal("100"))
+    label.item = None
+    label.location = warehouse
+    label.quantity = Decimal("1")
+    label.save()
+    label.refresh_from_db()
+    assert (label.code, label.location) == ("7QK3M2XV9A", warehouse)
+
+
+def test_a_label_cannot_be_revoked_in_the_future(item: Item) -> None:
+    """A sticker is either honoured or it is not, and the map a client caches
+    is built from ``revoked_at IS NULL`` -- so a date in the future revokes it
+    now and misdates why.
+    """
+    label = Label.objects.create(code="7QK3M2XV9A", item=item)
+    label.revoked_at = timezone.now() + datetime.timedelta(days=1)
+    with pytest.raises(IntegrityError, match="in the future"):
+        label.save()
+
+
 def test_label_codes_are_unique(item: Item) -> None:
     Label.objects.create(code="DVP0000000", item=item)
     with pytest.raises(IntegrityError):
@@ -446,17 +543,22 @@ def test_renaming_an_item_does_not_break_its_identifiers(item: Item) -> None:
     assert resolved == item
 
 
-def test_history_records_who_made_the_change(client: Client, category: Category) -> None:
+def test_history_records_who_made_the_change(
+    editor: Client,
+    administrator: User,
+    category: Category,
+) -> None:
     """ "Who changed this?" is the reason history is here, and it needs the request.
 
     ``history_user`` is populated from the request by
     ``simple_history.middleware.HistoryRequestMiddleware``. Without that
     middleware every edit records a NULL user and history answers only "what".
-    """
-    editor = User.objects.create_superuser(username="editor", password="not-a-real-password")
-    client.force_login(editor)
 
-    response = client.post(
+    Signed in through the app's own door, because changing anything in the
+    admin now asks when this session last proved who it was -- decision 0014
+    point 5, RequireSecondLookInTheAdmin.
+    """
+    response = editor.post(
         reverse("admin:inventory_category_change", args=[category.pk]),
         {"name": "Radios and antennas", "parent": ""},
     )
@@ -464,7 +566,7 @@ def test_history_records_who_made_the_change(client: Client, category: Category)
 
     latest = Category.history.first()  # ty: ignore[unresolved-attribute]
     assert latest.name == "Radios and antennas"
-    assert latest.history_user == editor
+    assert latest.history_user == administrator
 
 
 def test_constraint_violations_do_not_poison_the_transaction(category: Category) -> None:

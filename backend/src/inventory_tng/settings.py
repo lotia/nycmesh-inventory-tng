@@ -88,6 +88,9 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # See CONTENT_SECURITY_POLICY below. After the auth middleware, because a
+    # header is added to whatever response the rest of the stack produced.
+    "csp.middleware.CSPMiddleware",
     # Without this, simple_history records *that* a catalogue record changed but
     # never *who* changed it: history_user is read from the request and is NULL
     # unless this middleware puts the request where the model can see it. Must
@@ -101,6 +104,8 @@ MIDDLEWARE = [
     # allauth's, because it reads the record allauth writes of how this
     # session authenticated. See inventory/middleware.py.
     "inventory.middleware.RequireSecondFactor",
+    # The same rule in the interface DRF cannot reach; see the class.
+    "inventory.middleware.RequireSecondLookInTheAdmin",
 ]
 
 # WhiteNoise serves the Django admin's own static files in the built image.
@@ -189,9 +194,13 @@ ACCOUNT_AUTHENTICATED_LOGIN_REDIRECTS = False
 # password an administrator issued, not one a stranger chose.
 ACCOUNT_ADAPTER = "inventory.adapters.AccountAdapter"
 
-# Decision 0013 point 5. Automatic sign-up is off, so arriving from a provider
-# for the first time is a step somebody takes rather than something that
-# happens to them, and the account it makes carries nothing.
+# How long a sign-in counts as recent enough to change something. Decision
+# 0014 point 5's "prompt again, even inside a valid session" is this number
+# being far shorter than a session: long enough that an administrator working
+# through a list of corrections is asked once, short enough that a tab left
+# open on a bench is not a standing authority. allauth's own default is 300.
+ACCOUNT_REAUTHENTICATION_TIMEOUT = env.int("REAUTHENTICATION_TIMEOUT_SECONDS", default=900)
+
 # Whose request a sign-in rate limit counts, and the same decision the API's
 # throttles make: allauth reads X-Forwarded-For back this many hops, exactly as
 # DRF does for NUM_PROXIES. Fed from the one variable so the two cannot answer
@@ -201,6 +210,9 @@ ACCOUNT_ADAPTER = "inventory.adapters.AccountAdapter"
 # failed sign-ins from anywhere would lock all of them out.
 ALLAUTH_TRUSTED_PROXY_COUNT = env.int("NUM_PROXIES")
 
+# Decision 0013 point 5. Automatic sign-up is off, so arriving from a provider
+# for the first time is a step somebody takes rather than something that
+# happens to them, and the account it makes carries nothing.
 SOCIALACCOUNT_AUTO_SIGNUP = False
 SOCIALACCOUNT_ADAPTER = "inventory.adapters.SocialAccountAdapter"
 # Both deliberately off, and they are the same decision twice: an address a
@@ -308,8 +320,9 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
     ],
-    # Closed by default in both directions: a session to read anything, and
-    # the staff flag to change anything. Decision 0012 makes opening an
+    # Closed by default in three directions: a session to read anything, the
+    # staff flag to change anything, and a recent sign-in to change anything
+    # destructive. Decision 0012 makes opening an
     # endpoint up a deliberate act, and a write is the half that cannot be
     # taken back -- so the two endpoints a volunteer needs name their own
     # permissions and everything else is reserved without anybody remembering.
@@ -317,6 +330,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
         "inventory.permissions.StaffWrites",
+        "inventory.permissions.RecentlyAuthenticated",
     ],
     # JSON only, in both directions, on every endpoint. A form encoding cannot
     # carry the shapes this API uses -- an array of objects on the batch
@@ -352,11 +366,81 @@ REST_FRAMEWORK = {
     },
 }
 
+# What the browser is allowed to load and execute.
+#
+# A requirement of decision 0014, not general good practice. That decision puts
+# administrative capability in the same application a volunteer uses, and
+# records the cost: script injected into that application reaches the
+# destructive operations too, from the browser of somebody who holds them.
+# Re-authentication (inventory/permissions.py, RecentlyAuthenticated) narrows
+# what such a script can reach; this narrows how it gets there in the first
+# place.
+#
+# Everything is this origin's own, which the single-origin arrangement in
+# docs/architecture.md makes possible: no API on another host to connect to,
+# and nothing loaded from a CDN -- Swagger UI's assets are served from here
+# (SPECTACULAR_SETTINGS above) for exactly this reason.
+#
+# No page is an exception. /api/docs came close -- Swagger UI is normally
+# booted from an inline block -- and is served by the split view instead, which
+# puts that block in a file. See inventory_tng/urls.py.
+#
+# This covers what Django serves: /api, /admin, /accounts and /static. The
+# single-page app's own document is served by nginx and carries the same policy
+# from frontend/nginx.conf.template, which is where the volunteer app -- the
+# thing decision 0014 is actually worried about -- gets it. The two are written
+# out separately because neither server can read the other's configuration;
+# they have to agree, and a change to one is a change to both.
+CONTENT_SECURITY_POLICY = {
+    "DIRECTIVES": {
+        "default-src": ["'self'"],
+        # No inline script and no eval. This is the directive that matters, and
+        # the reason nothing here needs 'unsafe-inline' for it: the app is a
+        # bundle, and the Django admin's own scripts are files too.
+        #
+        # 'wasm-unsafe-eval' is not an eval: it is the one permission
+        # WebAssembly compilation needs, and Chromium refuses
+        # `WebAssembly.instantiate` without it however the binary was fetched.
+        # The label decoder is WebAssembly (decision 0011 section 2), so
+        # omitting this would leave the camera reading nothing on half the
+        # browsers a volunteer opens this on.
+        "script-src": ["'self'", "'wasm-unsafe-eval'"],
+        # 'unsafe-inline' only here, and only because emotion -- which MUI
+        # renders through -- injects style elements at runtime. A nonce is the
+        # alternative and needs emotion's cache configured with one; worth
+        # doing, and not worth blocking this on. Inline style cannot execute.
+        "style-src": ["'self'", "'unsafe-inline'"],
+        # data: for the label sheet's inline symbols and the admin's own icons.
+        "img-src": ["'self'", "data:"],
+        "font-src": ["'self'"],
+        # The API is this origin. A signed-in administrator's browser posting
+        # to anywhere else is the exfiltration half of the risk above.
+        "connect-src": ["'self'"],
+        # Workers, if the decoder ever spawns one -- served from here (decision
+        # 0011 section 2 makes self-hosting it non-optional), so 'self' is
+        # enough. What lets the decoder's WebAssembly *compile* is
+        # 'wasm-unsafe-eval' on script-src above, not this.
+        "worker-src": ["'self'"],
+        "object-src": ["'none'"],
+        "base-uri": ["'self'"],
+        "form-action": ["'self'"],
+        "frame-ancestors": ["'none'"],
+    },
+}
+
 SPECTACULAR_SETTINGS = {
     "TITLE": "NYC Mesh Inventory API",
     "DESCRIPTION": "Inventory tracking for NYC Mesh. See docs/architecture.md.",
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    # Swagger UI's own assets, served from this origin rather than from
+    # jsdelivr, which is drf-spectacular's default. Two reasons, and the second
+    # is the load-bearing one: the same self-contained-image argument decision
+    # 0011 section 2 makes for the label decoder, and the Content-Security-
+    # Policy below, under which a page fetching script from a CDN renders
+    # blank. `drf-spectacular-sidecar` is where the files come from.
+    "SWAGGER_UI_DIST": "SIDECAR",
+    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
     # OpenAPI 3.1 aligns the schema dialect with JSON Schema 2020-12. See
     # docs/decisions/0010-openapi-version.md for why not 3.0 and not yet 3.2.
     "OAS_VERSION": "3.1.1",

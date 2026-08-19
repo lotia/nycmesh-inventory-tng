@@ -1,0 +1,74 @@
+{{- /*
+The administrative routes, on their own Ingress.
+
+Decision 0013 point 6 restricts the routes only an administrator uses to a
+network volunteers do not need. Which paths those are, what a deployer has to
+set, and what is true while this is off are documented once, in
+docs/deployment.md#administrative-access.
+
+A second Ingress rather than a second rule on the one beside this: an
+allow-list, an identity-aware proxy and a service-mesh policy are all
+expressed as annotations, and annotations apply to every path of the Ingress
+carrying them. Restricting only some paths therefore needs a resource of its
+own. Both resources name the same host; the controller merges them and the
+longer, more specific path here wins over the catch-all `/` next door.
+
+Nothing here can be checked by the application: it decides whose packets
+arrive, not what the request says. That is why its absence is a stated
+precondition in docs/deployment.md rather than a check that fires.
+*/}}
+{{- $admin := .Values.ingress.administrative | default dict }}
+{{- if and .Values.ingress.enabled $admin.enabled }}
+{{- if not $admin.paths }}
+  {{- fail "ingress.administrative.enabled is true but ingress.administrative.paths is empty: the Ingress would restrict nothing while looking as though it did. See docs/deployment.md#administrative-access." }}
+{{- end }}
+{{- if and (not $admin.allowedSourceRanges) (not $admin.annotations) }}
+  {{- fail "ingress.administrative.enabled is true but neither ingress.administrative.allowedSourceRanges nor ingress.administrative.annotations is set: that renders an Ingress carrying no restriction at all, which is worse than the switch being off, because it looks like enforcement. Set the permitted CIDRs, or the annotations of an identity-aware proxy or mesh policy. See docs/deployment.md#administrative-access." }}
+{{- end }}
+{{- if and $admin.allowedSourceRanges (not $admin.sourceRangeAnnotation) }}
+  {{- fail "ingress.administrative.allowedSourceRanges is set but ingress.administrative.sourceRangeAnnotation is empty, so the ranges would be rendered nowhere and the routes would stay open. Name the annotation your ingress controller reads. See docs/deployment.md#administrative-access." }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "inventory-tng.fullname" . }}-admin
+  labels:
+    {{- include "inventory-tng.labels" . | nindent 4 }}
+  annotations:
+    {{- /* Deliberately not the ingress.annotations of the Ingress beside this
+           one. Those commonly include a cert-manager issuer, and a second
+           Ingress asking the same issuer for the same secretName produces two
+           Certificates contending for one Secret. Anything this Ingress needs
+           as well goes in ingress.administrative.annotations. */}}
+    {{- with $admin.allowedSourceRanges }}
+    {{ $admin.sourceRangeAnnotation }}: {{ join "," . | quote }}
+    {{- end }}
+    {{- with $admin.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- $tls := .Values.ingress.tls | default dict }}
+  {{- if not $tls.terminatedElsewhere }}
+  {{- /* The same certificate the other Ingress names, referenced and never
+         issued here, so that a controller which decides TLS per Ingress does
+         not serve these paths in the clear. */}}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ required "ingress.tls.secretName is required: the app is unusable over plain HTTP, because a camera needs a secure context. Set it, or set ingress.tls.terminatedElsewhere=true if a proxy in front of this ingress terminates TLS. See docs/deployment.md." $tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          {{- range $admin.paths }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "inventory-tng.fullname" $ }}-frontend
+                port:
+                  number: {{ $.Values.frontend.port }}
+          {{- end }}
+{{- end }}

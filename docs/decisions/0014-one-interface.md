@@ -81,9 +81,10 @@ Django admin is retained as a fallback and stays complete.**
   the bulk of the work this decision creates.
 
 - **Two interfaces over one model must not disagree.** Rules enforced only in
-  the single-page app would be absent from the Django admin, which is exactly
-  the gap `inventory-tng-fi5` already tracks for the API's own rules. Anything
-  this work adds belongs in the model or the database, not in a view.
+  the single-page app would be absent from the Django admin, which is the gap
+  [decision 0016](0016-invariants-for-every-writer.md) closed for the API's own
+  rules — and which draws the line this point needs: anything that is an
+  invariant belongs in the model or the database, not in a view.
 
 - **The single-page app's currency is a standing cost.** Point 4's test keeps
   the Django admin complete automatically; nothing equivalent exists for the

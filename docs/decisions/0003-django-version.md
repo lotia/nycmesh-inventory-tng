@@ -22,6 +22,8 @@ Use Django 6.1, the current stable release.
   contributors who will search for answers online.
 - Security support ends sooner than an LTS. The next LTS is expected to be
   Django 6.2 in April 2027, and the upgrade is tracked as an issue rather than
-  left to be discovered at end of life.
+  left to be discovered at end of life. The dates, the packages that gate the
+  move and the order to do it in are in
+  [Getting off Django 6.1 in time](../briefs/django-6.2-upgrade.md).
 - The project is greenfield, so there is no migration cost to being on a newer
   release now.

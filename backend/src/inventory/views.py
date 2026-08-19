@@ -30,7 +30,7 @@ from inventory.models import (
     StockTransaction,
     Volunteer,
 )
-from inventory.permissions import VOLUNTEER_APPEND, is_administrator
+from inventory.permissions import VOLUNTEER_APPEND, is_administrator, recently_authenticated
 from inventory.serializers import (
     BatchInconsistentSerializer,
     BatchRejectedSerializer,
@@ -151,7 +151,10 @@ class KindSides(NamedTuple):
 # mapping is a domain fact -- a check-out that takes stock from nowhere is not
 # a check-out -- and reading it should not require reconstructing an argument.
 # The rules, and why adjustments and counts are absent, are in decision 0011
-# section 6. No database counterpart: inventory-tng-fi5.
+# section 6. The database holds this too, in stock_movement_matches_kind
+# (migration 0008, decision 0016), so what is here reports the rule per line
+# and what is there enforces it for every writer. The two are written twice
+# and a test walks this mapping against the triggers to stop them drifting.
 #
 # Named arguments, not positional: `required` and `forbidden` are two tuples of
 # the same type sitting next to each other, and transposing them would invert a
@@ -1009,9 +1012,6 @@ class LabelSheetView(APIView):
     # DRF's stubs narrow this to a Response, but `dispatch` only ever hands the
     # result to `finalize_response`, which takes any HttpResponseBase and passes
     # a non-Response straight through -- which is the whole point here.
-    # DRF's stubs narrow this to a Response, but `dispatch` only ever hands the
-    # result to `finalize_response`, which takes any HttpResponseBase and passes
-    # a non-Response straight through -- which is the whole point here.
     def handle_exception(self, exc: Exception) -> HttpResponse:  # ty: ignore[invalid-method-override]
         """The refusal as a page, because a browser is this endpoint's only client.
 
@@ -1155,6 +1155,13 @@ class CurrentUserView(APIView):
                 # there is nobody to name until somebody has signed in.
                 "username": serializers.CharField(allow_null=True),
                 "administrator": serializers.BooleanField(),
+                # Whether this session has proved who it is recently enough to
+                # change something. A capability below is what the caller may
+                # do *now*, so a false one can mean either "not you" or "not
+                # until you sign in again"; this is what tells them apart, and
+                # it is why the interface can offer to re-authenticate rather
+                # than hide a control the person is entitled to.
+                "recently_authenticated": serializers.BooleanField(),
                 "capabilities": inline_serializer(
                     name="Capabilities",
                     # One field instance per entry, for the reason spelled out
@@ -1171,6 +1178,7 @@ class CurrentUserView(APIView):
                 "authenticated": user.is_authenticated,
                 "username": user.get_username() if user.is_authenticated else None,
                 "administrator": is_administrator(user),
+                "recently_authenticated": recently_authenticated(request),
                 "capabilities": {
                     name: all(self._permitted(request, operation) for operation in operations)
                     for name, operations in CAPABILITIES.items()

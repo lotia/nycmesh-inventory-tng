@@ -36,6 +36,15 @@ server {
     # `/assets/` below, and without it those pages and the admin load with no
     # CSS or JavaScript.
     #
+    # Two of these prefixes -- `/admin` and `/accounts` -- are also the ones a
+    # deployment restricts to a network volunteers do not need, which happens
+    # at the ingress and not here: this container is behind it and sees the
+    # client only through a header. Which paths those are, and what the chart
+    # does with them, is in docs/deployment.md#administrative-access. Forward
+    # them regardless; narrowing the surface is that boundary's job, and
+    # dropping one here would only break the local and compose setups, which
+    # have no ingress at all.
+    #
     # A regex rather than one prefix per path. `/api/` does not match `/api`
     # itself, and that is the endpoint index -- the first thing a client
     # fetches and the request that hands the browser its CSRF token -- so with
@@ -72,7 +81,19 @@ server {
     # frontend/src/scan/deepLink.ts and docs/decisions/0011-qr-batch-scanning.md.
     # This rule is load-bearing, not incidental; a batch of labels already
     # stuck to shelves depends on it.
+    #
+    # The policy is on this location because it is the one that answers with a
+    # *document*: a policy is enforced against the page that carries it, and
+    # the page the volunteer app runs in is index.html, which is served from
+    # here and never reaches Django. Django sets the same policy on what it
+    # serves (CONTENT_SECURITY_POLICY in backend/src/inventory_tng/settings.py,
+    # which is where the argument for each directive is written down). The two
+    # have to agree and neither server can read the other's configuration, so a
+    # change to one is a change to both.
+    #
+    # `always` so it is set on the 404 and 5xx bodies too, and not only on 200s.
     location / {
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
         try_files $uri $uri/ /index.html;
     }
 }

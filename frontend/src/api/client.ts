@@ -120,8 +120,24 @@ export function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
  * and cannot carry an array of objects.
  */
 export function apiPost<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+  return written<T>("POST", path, body, signal);
+}
+
+/**
+ * Change one resource.
+ *
+ * PATCH rather than PUT because the API offers no PUT on a detail endpoint: a
+ * row is corrected, never replaced, since a replacement omitting `active`,
+ * `merged_into` or `revoked` would withdraw it without saying so. See
+ * DetailView in backend/src/inventory/views.py.
+ */
+export function apiPatch<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+  return written<T>("PATCH", path, body, signal);
+}
+
+function written<T>(method: string, path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   return request<T>(path, {
-    method: "POST",
+    method,
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",

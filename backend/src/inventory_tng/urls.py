@@ -3,7 +3,7 @@
 from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
-from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerSplitView
 
 from inventory.views import (
     ApiRootView,
@@ -70,5 +70,13 @@ urlpatterns = [
         name="stock-transactions",
     ),
     path("api/schema", SpectacularAPIView.as_view(), name="schema"),
-    path("api/docs", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
+    # Split, so the page carries no inline script at all: the standard view
+    # boots Swagger UI from an inline block, which no directive short of
+    # 'unsafe-inline' admits. This one answers the same URL with that block as
+    # a script when asked for it, which `script-src 'self'` allows -- so the
+    # policy is the same everywhere and this page needs no exception. Its
+    # assets come from the sidecar package rather than a CDN; see
+    # SPECTACULAR_SETTINGS.
+    path("api/docs", SpectacularSwaggerSplitView.as_view(url_name="schema"), name="docs"),
+    path("api/schema", SpectacularAPIView.as_view(), name="schema"),
 ]

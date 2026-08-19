@@ -22,7 +22,13 @@ export function ItemList() {
   // Read on every keystroke, deliberately: the list is one page of a small
   // catalogue on a local network, and a debounce would put a delay between a
   // volunteer typing and the shelf they are standing at appearing.
-  const { data, error, loading } = useResource<Page<Item>>(searchPath("/api/items", search));
+  // Bumped when a row is edited, which is what asks the hook to read the same
+  // path again -- the count that was on screen is the one the edit changed.
+  const [changed, setChanged] = useState(0);
+  const { data, error, loading } = useResource<Page<Item>>(
+    searchPath("/api/items", search),
+    changed,
+  );
   const items = data?.results ?? [];
 
   return (
@@ -51,7 +57,7 @@ export function ItemList() {
 
       <List aria-label="Items" disablePadding>
         {items.map((item) => (
-          <ItemRow key={item.id} item={item} />
+          <ItemRow key={item.id} item={item} onChanged={() => setChanged((count) => count + 1)} />
         ))}
       </List>
     </Stack>

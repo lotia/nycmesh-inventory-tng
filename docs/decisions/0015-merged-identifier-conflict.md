@@ -45,8 +45,11 @@ holds the identifier, answer 409 with a body naming the volunteer to act on.**
 1. **The merge is followed forward.** A merge points the duplicate at the
    survivor and changes nothing else, so the record worth offering is the end of
    that chain, not the row that literally holds the address. Chains occur, and
-   a cycle — which no constraint forbids — terminates the walk rather than
-   hanging the request.
+   a cycle terminates the walk rather than hanging the request. Nothing can
+   build a cycle any more — a trigger now refuses a merge into a record that
+   has itself been merged
+   ([0016](0016-invariants-for-every-writer.md)) — but the walk stays bounded:
+   a database written to before that trigger existed can still hold one.
 2. **A retired record names itself.** Nothing survived it, so the useful answer
    is that this record exists and an administrator has to restore it. Silently
    reactivating it is not an option: retiring a volunteer is an administrator's
@@ -85,6 +88,6 @@ hide the field the volunteer still has to fix.
   [decision 0012](0012-two-populations.md) point 3 is implemented and this
   endpoint stops asking for a session: it requires one today, so the disclosure
   is currently to somebody who has signed in.
-- Nothing about it is enforced below the API. The admin can still merge a
-  volunteer into a record that is itself merged; this only decides what a client
-  is told about the result.
+- What a client is *told* is this endpoint's alone; which merges are possible at
+  all is now the database's, and the admin is held to the same rule
+  ([0016](0016-invariants-for-every-writer.md)).

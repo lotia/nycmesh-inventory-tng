@@ -12,12 +12,12 @@ from typing import Any
 from drf_spectacular.openapi import AutoSchema
 from drf_spectacular.plumbing import ResolvedComponent
 from drf_spectacular.utils import Direction
-from rest_framework.exceptions import Throttled
+from rest_framework.exceptions import NotAuthenticated, PermissionDenied, Throttled
 from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
-from inventory.permissions import administrators_only, open_to_anybody
+from inventory.permissions import RecentlyAuthenticated, administrators_only, open_to_anybody
 from inventory.serializers import DetailSerializer, ThrottledSerializer
 from inventory.throttling import AppendThrottle
 
@@ -44,7 +44,32 @@ def exception_handler(exc: Exception, context: Any) -> Response | None:
         # it again keeps the header and the field the same number, so a client
         # obeying either one waits long enough.
         response["Retry-After"] = str(seconds)
+    if isinstance(exc, PermissionDenied | NotAuthenticated) and response is not None:
+        # Two refusals share a status code and mean opposite things to a
+        # client: "this is not yours" is a control to hide, and "sign in again"
+        # is a prompt to show somebody who is entitled to the thing. DRF's body
+        # carries only the sentence, so the code is added here -- the same
+        # move, and the same reason, as the throttled body above.
+        #
+        # NotAuthenticated as well as PermissionDenied, because it is the same
+        # 403 to a client: session authentication offers no challenge header,
+        # so DRF renders "you did not say who you are" with this status too. A
+        # code on some 403s and not others is a field a client cannot branch on.
+        response.data = {
+            **response.data,
+            "code": "reauthentication_required" if _needs_a_second_look(exc) else "forbidden",
+        }
     return response
+
+
+def _needs_a_second_look(exc: Exception) -> bool:
+    """Whether this refusal is RecentlyAuthenticated's rather than anybody else's.
+
+    Read off the code DRF carries: it passes a permission's ``code`` attribute
+    into the exception it raises, so the class names itself without anybody
+    comparing a sentence that a translation could change.
+    """
+    return getattr(getattr(exc, "detail", None), "code", None) == RecentlyAuthenticated.code
 
 
 # What marks an operation as one decision 0012 reserves for somebody signed

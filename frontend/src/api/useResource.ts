@@ -17,9 +17,20 @@ export interface Resource<T> {
   loading: boolean;
 }
 
-export function useResource<T>(path: string): Resource<T> {
+/**
+ * @param path what to read.
+ * @param reload a number a caller changes to ask for the same path again --
+ * after an edit it has just saved, say. It is a dependency of the effect and
+ * nothing else, so it never reaches the server: a counter smuggled into the
+ * query string would be a cache-buster the API has to ignore and an operator
+ * has to read in the logs.
+ */
+export function useResource<T>(path: string, reload = 0): Resource<T> {
   const [state, setState] = useState<Resource<T>>({ data: null, error: null, loading: true });
 
+  // `reload` is a dependency the body deliberately does not read: changing it
+  // is how a caller asks for the same request again.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: see above
   useEffect(() => {
     const controller = new AbortController();
     // The previous answer is kept while the next one is in flight, so typing
@@ -36,7 +47,7 @@ export function useResource<T>(path: string): Resource<T> {
         setState({ data: null, error: asApiError(error), loading: false });
       });
     return () => controller.abort();
-  }, [path]);
+  }, [path, reload]);
 
   return state;
 }

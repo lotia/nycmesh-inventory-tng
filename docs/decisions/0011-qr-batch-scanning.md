@@ -251,8 +251,9 @@ carry a `from_location`, and consumption must not carry a `to_location`: those
 are the two kinds that cross the system's boundary, so naming the far side
 claims a shelf was involved that was not. Requiring without forbidding was the
 first version of this rule, and it let a receipt drain a warehouse —
-permanently, the ledger being append-only. The API refuses it; nothing in the
-database does yet, which is `inventory-tng-fi5`. Check-outs and check-ins forbid
+permanently, the ledger being append-only. The API refuses it by line and index,
+and a trigger refuses it whoever wrote it
+([0016](0016-invariants-for-every-writer.md)). Check-outs and check-ins forbid
 nothing, because naming where stock went or came from is the ordinary case.
 
 Adjustments and counts constrain nothing, deliberately: those are how a

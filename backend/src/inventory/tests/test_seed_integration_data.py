@@ -164,6 +164,7 @@ def test_the_seeded_login_can_complete_the_second_factor_it_publishes() -> None:
         "authenticated": True,
         "username": scene["username"],
         "administrator": True,
+        "recently_authenticated": True,
         "capabilities": ANY,
     }
 

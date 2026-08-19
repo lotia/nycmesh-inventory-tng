@@ -4,11 +4,11 @@
  * What is asserted throughout is the order — matches before the create option
  * — because that order is the whole reason this endpoint exists.
  */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "../api/testFixtures";
 import type { Volunteer } from "../api/types";
-import { CartProvider } from "../cart/CartProvider";
+import { renderScreen } from "../testHarness";
 import { olivia, sean } from "./testFixtures";
 import { VolunteerPicker } from "./VolunteerPicker";
 
@@ -30,11 +30,7 @@ function api(known: Volunteer[], onCreate?: () => Response): void {
 }
 
 function show() {
-  return render(
-    <CartProvider>
-      <VolunteerPicker />
-    </CartProvider>,
-  );
+  return renderScreen(<VolunteerPicker />);
 }
 
 function type(value: string): void {

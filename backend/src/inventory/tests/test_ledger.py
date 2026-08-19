@@ -1,17 +1,22 @@
 """Tests for the stock ledger.
 
-The ledger is append-only and its invariants are database constraints, so
-these tests go through the database rather than through model validation. See
-docs/data-model.md and docs/decisions/0008-stock-ledger-transfer-graph.md.
+The ledger is append-only and its invariants are check constraints and
+triggers, so these tests go through the ORM rather than through a serializer:
+what they are asserting is that a writer who never passes the API -- the
+admin, a fixture, the planned sheet importer -- is held to them too. See
+docs/data-model.md, docs/decisions/0008-stock-ledger-transfer-graph.md and
+docs/decisions/0016-invariants-for-every-writer.md.
 
 For the ``# ty: ignore[unresolved-attribute]`` comment below, see
 DEVELOPERS.md#typing.
 """
 
+import datetime
 from decimal import Decimal
 
 import pytest
-from django.db import IntegrityError, connection
+from django.db import IntegrityError, connection, transaction
+from django.utils import timezone
 
 from inventory.models import (
     Category,
@@ -22,6 +27,8 @@ from inventory.models import (
     StockTransaction,
     Volunteer,
 )
+from inventory.serializers import CLOCK_SKEW
+from inventory.views import KIND_SIDES
 
 pytestmark = pytest.mark.django_db
 
@@ -52,8 +59,16 @@ def test_quantity_must_be_positive(volunteer: Volunteer, item: Item, warehouse: 
 
 
 def test_a_movement_needs_at_least_one_side(volunteer: Volunteer, item: Item) -> None:
+    # An adjustment, which is one of the two kinds that ask nothing of the two
+    # sides (see stock_movement_matches_kind): under any other kind this row
+    # would be refused for disagreeing with its kind, and would prove nothing
+    # about stock_movement_has_a_side.
     with pytest.raises(IntegrityError):
-        StockMovement.objects.create(transaction=transaction_for(volunteer), item=item, quantity=Decimal("1"))
+        StockMovement.objects.create(
+            transaction=transaction_for(volunteer, kind=StockTransaction.Kind.ADJUSTMENT),
+            item=item,
+            quantity=Decimal("1"),
+        )
 
 
 def test_a_movement_cannot_start_and_end_in_the_same_place(
@@ -80,6 +95,207 @@ def test_transactions_without_an_idempotency_key_do_not_collide(volunteer: Volun
     transaction_for(volunteer)
     transaction_for(volunteer)
     assert StockTransaction.objects.count() == 2
+
+
+# --------------------------------------------------------------------------
+# A movement has the shape its kind says it has
+#
+# Recorded here rather than only through the batch endpoint because that is
+# the whole point of migration 0008: the rule used to live in views.py alone,
+# so the admin, a fixture and the planned sheet importer could write a receipt
+# that drained a warehouse. These go through the ORM, past every serializer.
+# --------------------------------------------------------------------------
+
+
+def test_a_receipt_cannot_drain_a_warehouse(
+    volunteer: Volunteer, item: Item, warehouse: Location, custody: Location
+) -> None:
+    """Stock arriving from outside leaves nowhere. Anything else is a transfer
+    misfiled as a delivery, and the ledger cannot be edited to say so later.
+    """
+    with pytest.raises(IntegrityError, match="receipt"):
+        StockMovement.objects.create(
+            transaction=transaction_for(volunteer, kind=StockTransaction.Kind.RECEIPT),
+            item=item,
+            quantity=Decimal("25"),
+            from_location=warehouse,
+            to_location=custody,
+        )
+
+
+def test_stock_used_at_a_job_arrives_nowhere(
+    volunteer: Volunteer, item: Item, warehouse: Location, custody: Location
+) -> None:
+    with pytest.raises(IntegrityError, match="does not arrive anywhere"):
+        StockMovement.objects.create(
+            transaction=transaction_for(volunteer, kind=StockTransaction.Kind.CONSUMPTION),
+            item=item,
+            quantity=Decimal("2"),
+            from_location=custody,
+            to_location=warehouse,
+        )
+
+
+def test_a_check_out_comes_out_of_somewhere(volunteer: Volunteer, item: Item, custody: Location) -> None:
+    with pytest.raises(IntegrityError, match="from_location"):
+        StockMovement.objects.create(
+            transaction=transaction_for(volunteer, kind=StockTransaction.Kind.CHECKOUT),
+            item=item,
+            quantity=Decimal("1"),
+            to_location=custody,
+        )
+
+
+def test_a_transfer_names_both_ends(volunteer: Volunteer, item: Item, warehouse: Location) -> None:
+    with pytest.raises(IntegrityError, match="to_location"):
+        StockMovement.objects.create(
+            transaction=transaction_for(volunteer, kind=StockTransaction.Kind.TRANSFER),
+            item=item,
+            quantity=Decimal("1"),
+            from_location=warehouse,
+        )
+
+
+@pytest.mark.parametrize("kind", [StockTransaction.Kind.ADJUSTMENT, StockTransaction.Kind.COUNT])
+def test_an_adjustment_and_a_count_may_go_either_way(
+    volunteer: Volunteer, item: Item, warehouse: Location, kind: str
+) -> None:
+    """Reconciling the shelf against the system pushes stock in whichever
+    direction the shelf says, so neither side is required and neither is
+    forbidden. Decision 0011 section 6.
+    """
+    entry = transaction_for(volunteer, kind=kind)
+    StockMovement.objects.create(transaction=entry, item=item, quantity=Decimal("3"), to_location=warehouse)
+    StockMovement.objects.create(transaction=entry, item=item, quantity=Decimal("1"), from_location=warehouse)
+    assert balance(item, warehouse) == Decimal("2")
+
+
+@pytest.mark.parametrize("kind", [kind for kind, _ in StockTransaction.Kind.choices])
+@pytest.mark.parametrize(
+    "sides",
+    [("from_location",), ("to_location",), ("from_location", "to_location")],
+)
+def test_the_database_permits_exactly_the_shapes_the_api_does(
+    volunteer: Volunteer,
+    item: Item,
+    warehouse: Location,
+    custody: Location,
+    kind: str,
+    sides: tuple[str, ...],
+) -> None:
+    """The trigger and ``KIND_SIDES`` are the same table written twice.
+
+    They have to be: the endpoint reports a bad line by index before anything
+    is written, and the database refuses the write whoever attempted it. This
+    walks every kind against every shape and asserts the two agree, so a rule
+    changed in one place fails here rather than in a ledger nobody can edit.
+
+    Every shape but one: a movement with neither side is refused for every
+    kind by ``stock_movement_has_a_side``, which is a check constraint and a
+    different rule, so KIND_SIDES has nothing to say about it.
+    """
+    places = {"from_location": warehouse, "to_location": custody}
+    rule = KIND_SIDES.get(kind)
+    api_accepts = rule is None or (
+        all(side in sides for side in rule.required) and not any(side in sides for side in rule.forbidden)
+    )
+
+    try:
+        with transaction.atomic():
+            StockMovement.objects.create(
+                transaction=transaction_for(volunteer, kind=kind),
+                item=item,
+                quantity=Decimal("1"),
+                **{side: places[side] for side in sides},
+            )
+    except IntegrityError:
+        database_accepts = False
+    else:
+        database_accepts = True
+
+    assert database_accepts is api_accepts
+
+
+def test_a_movement_whose_transaction_is_not_there_yet_is_refused(item: Item, warehouse: Location) -> None:
+    """The kind decides the shape, so no kind cannot mean no rule.
+
+    The foreign key is deferrable and ``loaddata`` defers constraint checks for
+    a whole load, so a writer that never passes the API can offer a movement
+    before its transaction exists. Reading no kind and accepting the row would
+    let exactly the writers migration 0008 exists for past the one rule that
+    cannot be re-checked afterwards, the ledger being append-only.
+    """
+    with (
+        pytest.raises(IntegrityError, match="must exist before it does"),
+        transaction.atomic(),
+        connection.cursor() as cursor,
+    ):
+        # Deferring the foreign key is what a fixture load does for a whole
+        # file, and is the only way to offer the row at all.
+        cursor.execute("SET CONSTRAINTS ALL DEFERRED")
+        cursor.execute(
+            """
+            INSERT INTO inventory_stockmovement
+                (transaction_id, item_id, quantity, from_location_id, to_location_id)
+            VALUES (%s, %s, %s, NULL, %s)
+            """,
+            [2147483647, item.pk, Decimal("1"), warehouse.pk],
+        )
+
+
+# --------------------------------------------------------------------------
+# Who and when
+# --------------------------------------------------------------------------
+
+
+def test_a_batch_cannot_be_dated_in_the_future(volunteer: Volunteer) -> None:
+    """Append-only means a wrong timestamp is never corrected, only
+    compensated -- and it is the key every recent-activity view sorts by.
+    """
+    with pytest.raises(IntegrityError, match="in the future"):
+        transaction_for(volunteer, occurred_at=timezone.now() + datetime.timedelta(days=1))
+
+
+def test_a_batch_written_up_afterwards_is_ordinary(volunteer: Volunteer) -> None:
+    """Coming back from an install and recording yesterday is the normal case."""
+    entry = transaction_for(volunteer, occurred_at=timezone.now() - datetime.timedelta(days=1))
+    assert entry.pk is not None
+
+
+def test_a_batch_dated_a_moment_ahead_is_believed(volunteer: Volunteer) -> None:
+    """A phone's clock is its own. The API allows it a few minutes of drift
+    (CLOCK_SKEW), so the database has to allow at least as much or it would
+    refuse a batch the API had just accepted.
+    """
+    entry = transaction_for(volunteer, occurred_at=timezone.now() + datetime.timedelta(minutes=1))
+    assert entry.pk is not None
+
+
+def test_the_database_allows_every_moment_the_api_does(volunteer: Volunteer) -> None:
+    """The allowance is written twice -- CLOCK_SKEW here and an interval in the
+    trigger -- and the pair only works one way round.
+
+    A serializer that accepted more drift than the trigger allows would answer
+    201 to a batch the INSERT then refuses, which reaches a volunteer with 24
+    scans as a 500 naming nothing. Widening CLOCK_SKEW without widening the
+    trigger fails here instead.
+    """
+    entry = transaction_for(volunteer, occurred_at=timezone.now() + CLOCK_SKEW)
+    assert entry.pk is not None
+
+
+@pytest.mark.parametrize("withdrawn", ["merged", "retired"])
+def test_a_volunteer_the_list_no_longer_offers_cannot_be_the_actor(volunteer: Volunteer, withdrawn: str) -> None:
+    """Recording new work against a duplicate starts the next generation of it."""
+    actor = Volunteer.objects.create(display_name="Sean B")
+    if withdrawn == "merged":
+        actor.merged_into = volunteer
+    else:
+        actor.active = False
+    actor.save()
+
+    with pytest.raises(IntegrityError, match="merged or retired"):
+        transaction_for(actor)
 
 
 # --------------------------------------------------------------------------

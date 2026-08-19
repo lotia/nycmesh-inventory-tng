@@ -12,7 +12,7 @@ from django.test import Client
 from django.urls import reverse
 from rest_framework.permissions import SAFE_METHODS
 
-from inventory.permissions import administrators_only
+from inventory.permissions import RecentlyAuthenticated, StaffWrites, administrators_only
 from inventory.tests.helpers import post
 from inventory.views import CAPABILITIES
 from inventory_tng import urls
@@ -61,13 +61,12 @@ def test_every_capability_is_reported_every_time(client: Client) -> None:
 
 def test_editing_the_catalogue_is_offered_only_to_an_administrator(
     client: Client,
-    administrator: User,
+    editor: Client,
 ) -> None:
     assert me(client)["capabilities"]["edit_catalogue"] is False
     assert me(client)["capabilities"]["revoke_label"] is False
-    client.force_login(administrator)
-    assert me(client)["capabilities"]["edit_catalogue"] is True
-    assert me(client)["capabilities"]["revoke_label"] is True
+    assert me(editor)["capabilities"]["edit_catalogue"] is True
+    assert me(editor)["capabilities"]["revoke_label"] is True
 
 
 def test_a_volunteers_own_operations_are_offered_to_an_ordinary_session(client: Client) -> None:
@@ -141,3 +140,54 @@ def test_nothing_but_the_two_volunteer_writes_is_open_to_a_volunteer() -> None:
         ("VolunteerListCreateView", "POST"),
         ("StockTransactionCreateView", "POST"),
     }, "a write was opened to volunteers; argue it against decision 0012 before widening this"
+
+
+def test_a_session_that_must_sign_in_again_is_told_which_no_it_is(stale: Client) -> None:
+    """A capability says what the caller may do *now*, so a false one is ambiguous.
+
+    The interface has to tell "this is not yours" from "not until you sign in
+    again": the first is a control to hide and the second is a prompt to show
+    somebody who is entitled to it. Decision 0014 points 3 and 5 together.
+    """
+    answer = me(stale)
+
+    assert answer["administrator"] is True
+    assert answer["recently_authenticated"] is False
+    assert answer["capabilities"]["edit_catalogue"] is False
+    # Appending is deliberately not affected, so it stays true.
+    assert answer["capabilities"]["append_stock"] is True
+
+
+def test_a_session_that_just_signed_in_is_recent_enough(editor: Client) -> None:
+    answer = me(editor)
+
+    assert answer["recently_authenticated"] is True
+    assert answer["capabilities"]["edit_catalogue"] is True
+
+
+def test_the_staff_flag_and_a_recent_sign_in_guard_exactly_the_same_operations() -> None:
+    """The client infers "entitled but stale" from two fields, and that only works
+    while the two permissions are co-extensive.
+
+    StaleSession offers to restore *every* hidden control when the session is
+    an administrator's and no longer recent. A view guarded by StaffWrites but
+    not RecentlyAuthenticated would make that offer a lie -- signing in again
+    would not bring the control back -- and every existing test would pass.
+    """
+    for pattern in urls.urlpatterns:
+        view = getattr(pattern.callback, "cls", None)
+        if view is None:
+            continue
+        guards = {type(permission) for permission in view().get_permissions()}
+        assert (StaffWrites in guards) == (RecentlyAuthenticated in guards), (
+            f"{view.__name__} is guarded by one of the pair and not the other"
+        )
+
+
+def test_the_prompt_points_at_a_route_that_exists() -> None:
+    """frontend/src/admin/StepUp.tsx builds this path by hand.
+
+    Nothing else ties the two together, so moving allauth's mount would 404 an
+    administrator in the middle of an edit rather than failing a build.
+    """
+    assert reverse("account_reauthenticate") == "/accounts/reauthenticate/"

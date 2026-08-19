@@ -2,34 +2,46 @@
 
 Two different kinds of rule live here, and the difference matters.
 
-Most are *reporting*. The ledger's invariants are database constraints
-(docs/data-model.md) and they stay that way; a constraint violation surfaces
-as a 500 naming no line, and a volunteer holding a phone in a basement needs
-to be told which of their 24 scans to fix. So the per-line movement rules are
+Most are *reporting*. The invariants are the database's -- check constraints
+and triggers, listed in docs/data-model.md -- and they stay that way; a
+violation surfaces as a 500 naming no line, and a volunteer holding a phone in
+a basement needs to be told which of their 24 scans to fix. So those rules are
 stated here as well, and the database remains the thing that enforces them.
+Every rule below that names a row's own columns is one of these, including the
+four that reach across tables or across time and so are triggers rather than
+constraints (migration 0008):
 
-The rest are the API's own, with no database counterpart, and anything writing
-past this module -- the admin, a fixture load, the planned sheet importer -- is
-not held to them:
+- a batch may not be dated in the future
+  (``StockTransactionCreateSerializer.validate_occurred_at``);
+- a merged or retired volunteer may not be the actor, may not be named as
+  holding custody of stock, and may not be the survivor a merge points at
+  (``VolunteerDetailSerializer.validate_merged_into``,
+  ``LocationSerializer.validate_held_by``, and the ``actor`` field's queryset).
+  Each is checked where the naming happens, so the reverse -- retiring or
+  merging somebody who already holds a custody location -- is still allowed
+  and leaves that location pointing at a record the pick-list no longer
+  offers. Whether that should be refused or should move the custody to the
+  survivor is a decision nobody has taken;
+- a label's code may not change once it is printed
+  (``LabelSerializer.validate``);
+- and, in views.py, a movement carries the sides its transaction's kind calls
+  for.
 
-1. A batch may not be dated in the future.
-2. A merged or inactive volunteer may not be the actor.
-3. A merged or inactive volunteer may not be *named* as holding custody of
-   stock, and may not be the survivor a merge points at. Each is checked
-   where the naming happens, so the reverse -- retiring or merging somebody
-   who already holds a custody location -- is still allowed and leaves that
-   location pointing at a record the pick-list no longer offers. Whether that
-   should be refused or should move the custody to the survivor is a decision
-   nobody has taken.
-4. A label's code is the server's. A client neither chooses one when printing
-   nor changes one afterwards; the code is minted here and is immutable once
-   it is on a sticker.
-5. A revocation is timed by the server, never by the client.
+The rest are the API's own, and are about *who may supply a value* rather than
+about which values are allowed. The database cannot hold either, because the
+admin is an authorised writer that legitimately does what a client may not,
+and there is no column recording which writer a value came from. Decision 0016
+records them as client contracts:
 
-The kind-to-sides rule in views.py is a sixth. None is expressible as a check
-constraint -- they need the current time, or another table, or the row's own
-previous value -- so each would need a trigger. Closing the gap, for all of
-them, is inventory-tng-fi5.
+1. A client does not choose a label's code. It is minted here, by
+   ``Label.mint_unique_code``, and a submitted one is refused rather than
+   ignored.
+2. A client does not time a revocation. It sends the boolean ``revoked`` and
+   the server reads its own clock.
+
+Anything writing past this module -- the admin, a fixture load, the planned
+sheet importer -- is held to everything in the first list and to neither of
+these two.
 """
 
 import datetime
@@ -215,6 +227,10 @@ class StockTransactionCreateSerializer(serializers.ModelSerializer):
         # recent-activity view for as long as the row exists. Backdating is
         # ordinary (a volunteer records yesterday's install); postdating is a
         # broken clock or a typo.
+        #
+        # Mirrors `stock_transaction_occurred_at_not_in_the_future`, which
+        # allows the same CLOCK_SKEW so that the database cannot refuse a batch
+        # this method has just accepted.
         if value > timezone.now() + CLOCK_SKEW:
             raise serializers.ValidationError("A batch cannot have happened in the future.")
         return value
@@ -344,6 +360,10 @@ class VolunteerDetailSerializer(VolunteerSerializer):
     def validate_merged_into(self, value: Volunteer | None) -> Volunteer | None:
         """A merge points at somebody the pick-list will actually offer.
 
+        Mirrors `volunteer_merged_into_selectable`, so a client sees a 400
+        rather than a 500; the trigger is what holds it against the admin and
+        the planned sheet importer.
+
         This does not stop a chain: merging A into B and later B into C is two
         valid merges, which is why decision 0015 follows ``merged_into``
         forward rather than reading it once. What it does stop is a cycle --
@@ -435,6 +455,9 @@ class LocationSerializer(TreeSerializer):
 
     def validate_held_by(self, value: Volunteer | None) -> Volunteer | None:
         """Custody is recorded against somebody the pick-list will still offer.
+
+        Mirrors `location_held_by_selectable`, the same trigger that holds the
+        rule for a merge and for the actor of a batch.
 
         The field is a plain relation over every volunteer row, and
         ``Volunteer.is_selectable`` is the row-level half of the one rule
@@ -569,6 +592,12 @@ class LabelSerializer(LabelResolveSerializer):
     rather than worked around with a reprint.
     """
 
+    # This docstring is the schema's description of the component, so what is
+    # true of the database rather than of the request belongs here instead: a
+    # date ahead of the clock is refused below the API too, by
+    # `label_revoked_at_not_in_the_future`. What no trigger can tell is whose
+    # clock a plausible date came from, which is why the boolean above is the
+    # contract -- decision 0016.
     revoked = serializers.BooleanField(
         write_only=True,
         required=False,
@@ -592,13 +621,16 @@ class LabelSerializer(LabelResolveSerializer):
         mirror here and needs none: no client input reaches that column, so
         the refusal below is the whole of what a client can be told about it.
 
-        The first two rules are not constraints either. A code is neither
-        chosen by a client nor changed by one, and nothing below the API says
-        so -- they are item 4 of the list in this module's docstring. The
-        minting between them is not a rule at all, and neither is the last
-        step: one fills in the column DRF left out because it is read-only,
-        the other turns the boolean a client sends into the column the model
-        stores.
+        The first two rules are the two halves of a code, and they are not the
+        same kind of rule. Refusing a *changed* code mirrors the
+        `label_code_is_printed` trigger, which holds it against every writer.
+        Refusing a code at all on a create is this API's own contract: the
+        admin supplies codes legitimately, so the database cannot tell a
+        client's choice from an authorised one, and decision 0016 records why
+        that stays here. The minting between them is not a rule at all, and
+        neither is the last step: one fills in the column DRF left out because
+        it is read-only, the other turns the boolean a client sends into the
+        column the model stores.
         """
         submitted = self._submitted()
         if self.instance is None:
@@ -673,9 +705,20 @@ class DetailSerializer(serializers.Serializer):
     A volunteer reaching an administrator's operation is told so rather than
     shown nothing (decision 0014 point 2), so the refusal is part of the
     contract and is described like any other response.
+
+    ``code`` is the branch a client actually takes, and it is optional because
+    only the 403 carries one: two refusals share that status and mean opposite
+    things -- ``forbidden`` is a control to hide, ``reauthentication_required``
+    is a prompt to show somebody who is entitled to the thing (decision 0014
+    point 5). Nothing here is missing on a 404, where the sentence is the whole
+    answer. The values are attached by ``exception_handler`` in inventory/api.py.
     """
 
     detail = serializers.CharField()
+    code = serializers.CharField(
+        required=False,
+        help_text="`forbidden`, or `reauthentication_required` when signing in again is what fixes it.",
+    )
 
 
 class ThrottledSerializer(serializers.Serializer):

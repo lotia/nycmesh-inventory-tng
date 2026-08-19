@@ -362,6 +362,19 @@ wheels = [
 ]
 
 [[package]]
+name = "django-csp"
+version = "4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/52/db/23567744dff2169aadb095f726088074476b24dfff5a759ffcf6389cf401/django_csp-4.0.tar.gz", hash = "sha256:b27010bb702eb20a3dad329178df2b61a2b82d338b70fbdc13c3a3bd28712833", size = 20028, upload-time = "2025-04-02T16:41:46.721Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e1/a4/736ab90ee527a23e194d1ce7358c6bcced66381ced83c28268b4aea236f7/django_csp-4.0-py3-none-any.whl", hash = "sha256:d5a0a05463a6b75a4f1fc1828c58c89af8db9364d09fc6e12f122b4d7f3d00dc", size = 25689, upload-time = "2025-04-02T16:41:45.689Z" },
+]
+
+[[package]]
 name = "django-environ"
 version = "0.12.1"
 source = { registry = "https://pypi.org/simple" }
@@ -466,6 +479,18 @@ wheels = [
 ]
 
 [[package]]
+name = "drf-spectacular-sidecar"
+version = "2026.8.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/28/82/eb18e2108b8ceaa50a01d2cdb35ab5ce198c18f062448b2d29d6e89aabeb/drf_spectacular_sidecar-2026.8.1.tar.gz", hash = "sha256:9d9ee678e5ec70cdda2c7ed95cafcdb6141664dc3e11def8a8599c8ad36cf6f5", size = 2603635, upload-time = "2026-08-01T12:09:03.088Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3e/5b/5ea443b8c24b4a4815a6467a158c4511dfe8bed83f8861a27bdb29c4fc47/drf_spectacular_sidecar-2026.8.1-py3-none-any.whl", hash = "sha256:6b8784d3e8c6bd9aa740b14e874640697ab1bc67f5232d74fdd9ef84eaea6bc3", size = 2626283, upload-time = "2026-08-01T12:09:01.705Z" },
+]
+
+[[package]]
 name = "fido2"
 version = "2.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -521,11 +546,13 @@ dependencies = [
     { name = "django" },
     { name = "django-allauth", extra = ["mfa", "socialaccount"] },
     { name = "django-cors-headers" },
+    { name = "django-csp" },
     { name = "django-environ" },
     { name = "django-filter" },
     { name = "django-simple-history" },
     { name = "djangorestframework" },
     { name = "drf-spectacular" },
+    { name = "drf-spectacular-sidecar" },
     { name = "gunicorn" },
     { name = "psycopg", extra = ["binary"] },
     { name = "segno" },
@@ -551,11 +578,13 @@ requires-dist = [
     { name = "django", specifier = "==6.1.*" },
     { name = "django-allauth", extras = ["mfa", "socialaccount"], specifier = ">=65.19.1" },
     { name = "django-cors-headers", specifier = "==4.9.*" },
+    { name = "django-csp", specifier = "==4.0.*" },
     { name = "django-environ", specifier = "==0.12.*" },
     { name = "django-filter", specifier = "==25.*" },
     { name = "django-simple-history", specifier = "==3.*" },
     { name = "djangorestframework", specifier = "==3.18.*" },
     { name = "drf-spectacular", specifier = "==0.30.*" },
+    { name = "drf-spectacular-sidecar", specifier = ">=2026.8.1" },
     { name = "gunicorn", specifier = "==26.1.*" },
     { name = "psycopg", extras = ["binary"], specifier = "==3.3.*" },
     { name = "segno", specifier = "==1.6.*" },

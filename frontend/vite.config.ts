@@ -72,6 +72,10 @@ export default defineConfig(({ mode }) => ({
         "src/theme.ts",
         "src/**/*.test.{ts,tsx}",
         "src/test-setup.ts",
+        // Scaffolding the tests render through, and never shipped: it imports
+        // vitest, so nothing outside a test can reach it. Excluded for the
+        // same reason as test-setup.ts, which its filename does not say.
+        "src/testHarness.tsx",
       ],
       // Applies to the code left after the exclusions above -- that is, code
       // that actually implements behaviour. Raising this is welcome; lowering

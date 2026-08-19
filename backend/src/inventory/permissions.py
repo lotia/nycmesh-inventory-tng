@@ -8,12 +8,15 @@ read by one population and written by the other, and the split has to be
 expressible on the view itself.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from allauth.account.internal.flows.reauthentication import did_recently_authenticate
 from rest_framework.permissions import SAFE_METHODS, AllowAny, BasePermission, IsAuthenticated
 from rest_framework.request import Request
 
 if TYPE_CHECKING:
+    from django.http import HttpRequest
+
     # Not imported at runtime. Django resolves DEFAULT_PERMISSION_CLASSES by
     # importing this module, and it does so while rest_framework.views is
     # still initialising, so naming that module here at import time is a
@@ -55,12 +58,70 @@ class StaffWrites(BasePermission):
 
 # The two endpoints decision 0012 point 3 opens to a volunteer, and the only
 # things in this API that may be written without the staff flag. Named once so
-# that they are one list rather than two identical literals, so that a later
-# addition to the default -- the step-up of decision 0014 point 5, on
-# inventory-tng-oji -- reaches them, and so that a test can assert nothing else
-# is on it. What stands in for the credential they do not ask for is the rate
+# that they are one list rather than two identical literals, so that what these
+# two opt out of is decided in one place -- both StaffWrites and the step-up of
+# decision 0014 point 5 below -- and so that a test can assert nothing else is
+# on it. What stands in for the credential they do not ask for is the rate
 # limiting in inventory/throttling.py.
 VOLUNTEER_APPEND = [IsAuthenticated]
+
+
+def recently_authenticated(request: Request | HttpRequest) -> bool:
+    """Whether this session proved who it was recently enough to change things.
+
+    Memoised on the underlying request, which is what makes ``/api/me``
+    affordable: allauth answers by asking, per authenticator type, whether the
+    user has one -- three queries -- and that endpoint asks the question once
+    per capability it reports. Nine capabilities plus its own answer was
+    thirty-one identical selects for one page load.
+
+    Takes either request: allauth reads only the session and the user, which
+    both carry, and the admin middleware has only Django's.
+
+    Stashed on the Django request rather than the DRF one because the
+    capability probe wraps the DRF request in its own object per operation
+    (``CapabilityProbe``), and they all share the one underneath.
+    """
+    underneath: Any = getattr(request, "_request", request)
+    answer = getattr(underneath, "_recently_authenticated", None)
+    if answer is None:
+        answer = did_recently_authenticate(request)
+        underneath._recently_authenticated = answer
+    return bool(answer)
+
+
+class RecentlyAuthenticated(BasePermission):
+    """A destructive operation asks who you are again, inside a valid session.
+
+    Decision 0014 point 5. Putting administrative capability in the volunteer
+    app means script injected into that app reaches the destructive operations
+    too, from the browser of somebody who legitimately holds them -- so the
+    decision makes this a requirement of that work rather than general good
+    practice. Every write reserved to an administrator prompts again -- editing
+    the catalogue, merging volunteers, revoking labels, and minting the codes a
+    sheet of stickers is printed from; appending to the ledger, which is what an
+    administrator does most often, deliberately does not.
+
+    Paired with StaffWrites in the project default, so the set that needs a
+    second look is exactly the set that needs the staff flag, and the two
+    endpoints a volunteer writes to opt out of both at once -- see
+    VOLUNTEER_APPEND.
+
+    One limit, stated because it is not obvious: allauth answers "yes" for an
+    account that has neither a usable password nor a second factor -- one that
+    only ever arrives through a provider -- because there is nothing here to
+    ask it. Such an account inherits whatever its provider enforces, which is
+    the position decision 0013 point 3 already takes.
+    """
+
+    message = "Sign in again to make this change."
+    # DRF passes this into the PermissionDenied it raises, so the refusal
+    # carries it without anybody having to read the sentence back. See
+    # inventory/api.py.
+    code = "reauthentication_required"
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        return request.method in SAFE_METHODS or recently_authenticated(request)
 
 
 def administrators_only(view: APIView, method: str) -> bool:
@@ -74,8 +135,14 @@ def administrators_only(view: APIView, method: str) -> bool:
     walks every route looking for operations no capability names; and the
     audit's own assertion -- and asking it three ways is how one of them comes
     to disagree. Written as a predicate over the permissions the view actually
-    builds, so a second staff-gating class (the step-up of decision 0014 point
-    5, on inventory-tng-oji) is added here and is seen everywhere at once.
+    builds, so a second staff-gating class would be added here and be seen
+    everywhere at once.
+
+    RecentlyAuthenticated is deliberately not one: it asks *when* this session
+    last proved who it was, not who they are, and an administrator whose
+    session went stale is refused an operation that is still theirs. Adding it
+    here would put "requires an administrator" on the description of an
+    operation for a different reason than the sentence gives.
     """
     if method.upper() in SAFE_METHODS:
         return False

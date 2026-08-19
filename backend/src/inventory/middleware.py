@@ -46,6 +46,7 @@ single-page app with nothing to render but an error.
 """
 
 from collections.abc import Callable
+from urllib.parse import quote
 
 from allauth.account.authentication import get_authentication_records
 from allauth.mfa.models import Authenticator
@@ -53,9 +54,10 @@ from allauth.mfa.utils import is_mfa_enabled
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect
-from django.urls import Resolver404, resolve
+from django.urls import Resolver404, resolve, reverse
+from rest_framework.permissions import SAFE_METHODS
 
-from inventory.permissions import open_to_anybody
+from inventory.permissions import open_to_anybody, recently_authenticated
 
 # The value allauth records for a username-and-password sign-in. Its social,
 # MFA and login-by-code steps record their own names, so this identifies the
@@ -117,3 +119,41 @@ class RequireSecondFactor:
         # it. See inventory/permissions.py.
         view = getattr(match.func, "cls", None)
         return view is not None and open_to_anybody(view())
+
+
+class RequireSecondLookInTheAdmin:
+    """The step-up, applied to the interface DRF's permissions cannot reach.
+
+    Decision 0014 point 5 covers merging volunteers, revoking labels and
+    editing the catalogue. `RecentlyAuthenticated` holds those in the API, but
+    decision 0014 point 4 keeps the Django admin complete on purpose -- so the
+    same operations are reachable there, on the same origin, by the same
+    session. The threat that decision records is script injected into the
+    volunteer app acting from an administrator's own browser; that script can
+    read the CSRF token and post to /admin exactly as easily as to /api, and
+    the network restriction of decision 0013 point 6 does not help because it
+    is that administrator's browser doing the posting.
+
+    Only writes, and only under the admin. A GET is the admin being read, which
+    is what somebody does before deciding to change anything.
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        if self._is_a_change_in_the_admin(request):
+            # Where allauth asks again, told to come back here afterwards.
+            return redirect(f"{reverse('account_reauthenticate')}?next={quote(request.get_full_path())}")
+        return self.get_response(request)
+
+    @staticmethod
+    def _is_a_change_in_the_admin(request: HttpRequest) -> bool:
+        if request.method in SAFE_METHODS or not request.path.startswith(reverse("admin:index")):
+            return False
+        user = getattr(request, "user", None)
+        if user is None or not user.is_authenticated:
+            # Not signed in at all is the admin's own problem, and it has a
+            # better answer for it than a redirect from here.
+            return False
+        return not recently_authenticated(request)

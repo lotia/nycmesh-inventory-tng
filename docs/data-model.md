@@ -47,7 +47,7 @@ by one is [decision 0013](decisions/0013-administrator-sign-in.md)) and a
 | `display_name` | Required. Trigram-indexed for search-first deduplication |
 | `email`, `slack_id` | Optional, unique where present (partial unique index) |
 | `active` | Retires a volunteer without deleting their ledger history |
-| `merged_into` | Self-FK. Set when an administrator merges a duplicate |
+| `merged_into` | Self-FK. Set when an administrator merges a duplicate, and must point at a record the list still offers |
 
 Volunteers may add themselves from the UI, and the form searches existing
 records before offering to create one.
@@ -66,7 +66,11 @@ a room contains shelves. `kind` is one of `warehouse`, `hub`, `room`, `shelf`,
 
 A volunteer holding stock **is** a location, with `held_by` pointing at them. A
 check constraint enforces that `held_by` is set if and only if
-`kind = volunteer_custody`. External sources and sinks — a vendor shipment
+`kind = volunteer_custody`, and a trigger enforces that whoever it names is
+still offered by the pick-list — a custody location attached to a merged
+duplicate is the second generation of the duplicate the merge removed. Retiring
+somebody who *already* holds one is still allowed; the rule is checked where the
+naming happens. External sources and sinks — a vendor shipment
 arriving, hardware fitted at an install — are represented by a `NULL` location
 on one side of a movement, not by a row.
 
@@ -95,8 +99,11 @@ Crockford's Base32 — the digits and the uppercase letters less `I`, `L`, `O` a
 `U` — drawn from `secrets`. The alphabet and the length are a check constraint
 rather than a rule the minter is trusted to keep, because a code containing one
 of the excluded letters folds to a string matching nothing and would be
-unresolvable for the life of the object carrying it. Why that alphabet, and what
-is printed around the code on the sticker, is in
+unresolvable for the life of the object carrying it. It cannot change once the
+row exists either — the code is on a sticker on a shelf, and no write can go and
+reprint it — while everything else about a label stays editable, so a correction
+is cheaper than a reprint. `revoked_at` cannot be dated in the future. Why that
+alphabet, and what is printed around the code on the sticker, is in
 [decision 0011](decisions/0011-qr-batch-scanning.md#3-the-printed-label-an-uppercase-url-wrapping-an-opaque-code).
 
 `quantity` is what one scan of that token means, in the unit of the thing the
@@ -144,6 +151,20 @@ Invariants, enforced by check constraints rather than application code:
 - `quantity` is greater than zero — direction is expressed by which side the
   location sits on, never by the sign of the number.
 
+Three more are triggers rather than check constraints, because each needs
+something a constraint cannot see — the parent row, or the current time:
+
+- a movement carries the sides its transaction's `kind` calls for, and not the
+  ones it forbids (the rule is
+  [decision 0011](decisions/0011-qr-batch-scanning.md#6-the-batch-endpoint-and-what-the-client-keeps)
+  section 6);
+- `occurred_at` is not in the future;
+- `actor` is a volunteer the pick-list still offers — neither merged nor
+  retired.
+
+Why these live in the database at all, and which related rules deliberately do
+not, is [decision 0016](decisions/0016-invariants-for-every-writer.md).
+
 ### Balances
 
     balance(item, location) = SUM(quantity WHERE to_location = location)
@@ -181,6 +202,7 @@ for its own sake.
 | Partial unique indexes | `email`, `slack_id`, custody locations | Uniqueness that only applies to non-`NULL` rows, and one custody location per volunteer |
 | Check constraints | Movement invariants, `held_by`, self-parent | Invariants that must hold regardless of which client wrote the row |
 | `BEFORE UPDATE OR DELETE` and `BEFORE TRUNCATE` triggers | Ledger tables | Makes append-only a property of the database, not a rule contributors must remember. Both are needed: a row trigger cannot see `TRUNCATE`. Why a trigger rather than `REVOKE` is in [decision 0008](decisions/0008-stock-ledger-transfer-graph.md) |
+| `BEFORE INSERT` and `BEFORE UPDATE` triggers | Movement shape and a batch's actor and date (insert only, the ledger being append-only); a label's code (update only, since a code is chosen once); selectable volunteers and future revocations elsewhere (both) | Invariants that need another table, the current time, or the row's previous value, so a `CheckConstraint` cannot express them. Which rules are here and which stayed at the API is [decision 0016](decisions/0016-invariants-for-every-writer.md) |
 | `GENERATED ... STORED` | `ItemIdentifier.value_normalised` | Normalisation cannot drift between the write path, the importer and the scan endpoint if the database computes it |
 | `NULLS NOT DISTINCT` | Category and Location names | A unique constraint on `(parent, name)` otherwise does nothing at the top level, where `parent` is NULL |
 

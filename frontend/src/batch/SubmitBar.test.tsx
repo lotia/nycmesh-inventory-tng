@@ -2,11 +2,12 @@
  * Saving a batch, and the three things that must not happen when it fails:
  * losing the scans, double-posting them, or calling a warning an error.
  */
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CartProvider, useCart } from "../cart/CartProvider";
+import { useCart } from "../cart/CartProvider";
 import { createCart } from "../cart/cartState";
 import { STORAGE_KEY } from "../cart/cartStorage";
+import { renderScreen } from "../testHarness";
 import { SubmitBar } from "./SubmitBar";
 
 /** A batch ready to send, put where the provider restores it from. */
@@ -51,11 +52,7 @@ function answering(
 }
 
 function show() {
-  return render(
-    <CartProvider>
-      <SubmitBar />
-    </CartProvider>,
-  );
+  return renderScreen(<SubmitBar />);
 }
 
 /** Somewhere else in the app editing the batch: the item list's stepper. */
@@ -207,11 +204,11 @@ describe("a batch that does not save", () => {
       },
       400,
     );
-    render(
-      <CartProvider>
+    renderScreen(
+      <>
         <SubmitBar />
         <Dropper />
-      </CartProvider>,
+      </>,
     );
     fireEvent.click(save());
     expect(await screen.findByText("Quantity must be greater than zero.")).toBeInTheDocument();

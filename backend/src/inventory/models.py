@@ -91,6 +91,12 @@ class Volunteer(models.Model):
     email = models.EmailField(null=True, blank=True)  # noqa: DJ001
     slack_id = models.CharField(max_length=50, null=True, blank=True)  # noqa: DJ001
     active = models.BooleanField(default=True)
+    # Points at somebody selectable(), and the database says so: the
+    # `volunteer_merged_into_selectable` trigger in migration 0008 refuses a
+    # merge into a record that has itself been merged or been retired. Without
+    # it a chain forms in the wrong direction and a cycle can be built out of
+    # two ordinary merges. Checked when the column is written, so merging or
+    # retiring the survivor afterwards stays an ordinary edit.
     merged_into = models.ForeignKey(
         "self",
         null=True,
@@ -210,6 +216,9 @@ class Location(models.Model):
         on_delete=models.PROTECT,
         related_name="children",
     )
+    # A volunteer the pick-list still offers, enforced by the trigger named on
+    # Volunteer.merged_into: custody attached to a merged duplicate is the
+    # second generation of the duplicate the merge existed to remove.
     held_by = models.ForeignKey(
         Volunteer,
         null=True,
@@ -465,6 +474,12 @@ class Label(models.Model):
     # The column is wider than a code, and the constraint below is what says
     # how long a code is. Both would have to change together to change the
     # format, and only one of them rewrites the table.
+    #
+    # Immutable once the row exists: the `label_code_is_printed` trigger in
+    # migration 0008 refuses to change it, because it is on a sticker on a
+    # shelf and no database write can go and reprint that. Who *supplies* a
+    # code is a different question, and one the database cannot answer -- see
+    # decision 0016.
     code = models.CharField(max_length=32, unique=True)
     item = models.ForeignKey(Item, null=True, blank=True, on_delete=models.CASCADE, related_name="labels")
     location = models.ForeignKey(Location, null=True, blank=True, on_delete=models.CASCADE, related_name="labels")
@@ -475,6 +490,10 @@ class Label(models.Model):
         help_text="How much of the item one scan of this label stands for: a packet of 100 zip ties is 100.",
     )
     printed_at = models.DateTimeField(auto_now_add=True)
+    # Never in the future, by the same function as StockTransaction.occurred_at:
+    # LabelManager.live() asks only whether this is set, so a date ahead of the
+    # clock revokes the sticker now and misdates why. Whose clock supplied it
+    # is the API's to decide -- decision 0016.
     revoked_at = models.DateTimeField(null=True, blank=True)
     history = HistoricalRecords()
 
@@ -597,8 +616,18 @@ class StockTransaction(models.Model):
         ADJUSTMENT = "adjustment", "Adjustment"
         COUNT = "count", "Stock count"
 
+    # Selectable, and the database says so -- the same function as
+    # Location.held_by and Volunteer.merged_into. Recording new work against a
+    # merged duplicate is how the next generation of duplicates starts.
     actor = models.ForeignKey(Volunteer, on_delete=models.PROTECT, related_name="transactions")
+    # The kind decides the shape of every movement below it, and the
+    # `stock_movement_matches_kind` trigger in migration 0008 holds the two
+    # together: see StockMovement.
     kind = models.CharField(max_length=20, choices=Kind)
+    # Never in the future. A trigger, not a check constraint, because
+    # timezone.now() is not immutable -- and worth enforcing at all because
+    # the ledger is append-only, so a wrong timestamp is never corrected, only
+    # compensated, and it is the key this model is ordered by.
     occurred_at = models.DateTimeField(default=timezone.now)
     recorded_at = models.DateTimeField(auto_now_add=True)
     reason = models.CharField(max_length=100, blank=True)
@@ -643,6 +672,12 @@ class StockMovement(models.Model):
     Either side may be NULL, meaning somewhere outside the system: a vendor
     shipment arriving, or hardware fitted at an install. Direction is expressed
     by which side the location sits on, never by the sign of the quantity.
+
+    Which sides each kind of transaction requires and which it forbids is a
+    cross-table rule -- these two columns against the parent's ``kind`` -- so a
+    check constraint cannot see it. The `stock_movement_matches_kind` trigger
+    in migration 0008 enforces it and KIND_SIDES in views.py reports it per
+    line; decision 0011 section 6 is the rule itself.
     """
 
     transaction = models.ForeignKey(StockTransaction, on_delete=models.PROTECT, related_name="movements")

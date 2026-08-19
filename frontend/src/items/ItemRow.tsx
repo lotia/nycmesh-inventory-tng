@@ -7,6 +7,7 @@
  * section 5.
  */
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import IconButton from "@mui/material/IconButton";
 import ListItem from "@mui/material/ListItem";
@@ -14,6 +15,8 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useState } from "react";
+import { EditItem } from "../admin/EditItem";
+import { useCan } from "../admin/SessionProvider";
 import type { Item } from "../api/types";
 import { useCart } from "../cart/CartProvider";
 import { describeQuantity, formatQuantity, toNumber } from "./quantity";
@@ -85,8 +88,11 @@ function QuantityField({
   );
 }
 
-export function ItemRow({ item }: { item: Item }) {
+export function ItemRow({ item, onChanged }: { item: Item; onChanged: () => void }) {
   const { cart, dispatch } = useCart();
+  // Drawn from the server's answer, never guessed: decision 0014 point 3.
+  const mayEdit = useCan("edit_catalogue");
+  const [editing, setEditing] = useState(false);
   const line = cart.lines.find((candidate) => candidate.itemId === item.id);
   const inCart = line?.quantity ?? 0;
   const packets = packetSizes(item);
@@ -111,9 +117,16 @@ export function ItemRow({ item }: { item: Item }) {
         <Typography variant="subtitle1" component="h3">
           {item.name}
         </Typography>
-        <Typography variant="body2" color="text.secondary" noWrap>
-          {formatQuantity(onHand(item))} on hand
-        </Typography>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "baseline" }}>
+          <Typography variant="body2" color="text.secondary" noWrap>
+            {formatQuantity(onHand(item))} on hand
+          </Typography>
+          {mayEdit ? (
+            <Button size="small" aria-label={`Edit ${item.name}`} onClick={() => setEditing(true)}>
+              Edit
+            </Button>
+          ) : null}
+        </Stack>
       </Stack>
 
       <Stack direction="row" spacing={1} sx={{ mt: 1, alignItems: "center", flexWrap: "wrap" }}>
@@ -150,6 +163,9 @@ export function ItemRow({ item }: { item: Item }) {
             {describeQuantity(line.quantity, item.unit_of_measure, packets)}
           </Typography>
         </Stack>
+      ) : null}
+      {editing ? (
+        <EditItem item={item} onClose={() => setEditing(false)} onSaved={onChanged} />
       ) : null}
     </ListItem>
   );

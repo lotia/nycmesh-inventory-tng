@@ -5,6 +5,7 @@ and a radio -- so tests in either module read as statements about NYC Mesh
 rather than about test data.
 """
 
+import time
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
@@ -12,12 +13,18 @@ from typing import Any
 
 import pytest
 import yaml
+from allauth.account.authentication import AUTHENTICATION_METHODS_SESSION_KEY
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.test import Client
 
 from inventory.models import Category, Item, Location, Volunteer
+from inventory.tests.helpers import sign_in_locally
+
+# The one this suite signs in with. Not a secret and never one: the account is
+# made and destroyed inside a test database.
+ADMINISTRATOR_PASSWORD = "not-a-real-password"
 
 # The generated schema, committed so it can be read without running anything.
 # See DEVELOPERS.md#the-api-schema.
@@ -79,7 +86,7 @@ def client(client: Client) -> Client:
 @pytest.fixture
 def administrator() -> User:
     """Somebody who may reach the Django admin."""
-    return User.objects.create_superuser(username="editor", password="not-a-real-password")
+    return User.objects.create_superuser(username="editor", password=ADMINISTRATOR_PASSWORD)
 
 
 @pytest.fixture
@@ -89,10 +96,35 @@ def editor(administrator: User) -> Client:
     Its own ``Client`` rather than the one above logged in again: that one is
     the ordinary volunteer every refusal is asserted against, and a test
     needing both sessions needs them at the same time.
+
+    Signed in through the app's own door rather than with ``force_login``,
+    because a destructive operation asks when this session last proved who it
+    was (decision 0014 point 5, ``RecentlyAuthenticated``) and ``force_login``
+    leaves no answer to that. A test that wants the other case -- a session
+    old enough to be asked again -- has ``stale`` below.
     """
-    signed_in = Client()
-    signed_in.force_login(administrator)
-    return signed_in
+    return sign_in_locally(administrator, ADMINISTRATOR_PASSWORD)
+
+
+@pytest.fixture
+def stale(editor: Client) -> Client:
+    """The same administrator, whose sign-in is no longer recent enough.
+
+    Wound back rather than waited out: the window is fifteen minutes and a
+    test suite is not going to sit through one. What is moved is the timestamp
+    allauth itself records and reads, so this is the same state a session
+    reaches by being left open.
+    """
+    # Held rather than re-read: `Client.session` builds a store from the cookie
+    # each time it is asked, so writing through the property and saving through
+    # it again saves a different object than the one that was changed.
+    session = editor.session
+    stale_at = time.time() - settings.ACCOUNT_REAUTHENTICATION_TIMEOUT - 1
+    session[AUTHENTICATION_METHODS_SESSION_KEY] = [
+        {**record, "at": stale_at} for record in session[AUTHENTICATION_METHODS_SESSION_KEY]
+    ]
+    session.save()
+    return editor
 
 
 @pytest.fixture(scope="session")

@@ -24,6 +24,11 @@ spec:
     # Everything enters through the frontend, which proxies Django's paths to
     # the backend -- which ones is stated once, in docs/architecture.md. One
     # hostname, one origin, no CORS in production.
+    #
+    # This rule is the volunteer surface and stays reachable from anywhere,
+    # which is the whole point of it: a phone, wherever the stock happens to
+    # be. The administrative paths are carved out of it by ingress-admin.yaml
+    # when ingress.administrative.enabled is set.
     - host: {{ .Values.ingress.host }}
       http:
         paths:

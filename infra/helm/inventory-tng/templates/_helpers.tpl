@@ -40,6 +40,8 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
   value: {{ .Values.django.appendBurstRate | quote }}
 - name: APPEND_SUSTAINED_RATE
   value: {{ .Values.django.appendSustainedRate | quote }}
+- name: REAUTHENTICATION_TIMEOUT_SECONDS
+  value: {{ .Values.django.reauthenticationTimeoutSeconds | quote }}
 - name: LABEL_BASE_URL
   value: {{ .Values.django.labelBaseUrl | quote }}
 - name: DJANGO_SECRET_KEY

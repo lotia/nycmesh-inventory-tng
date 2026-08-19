@@ -9,6 +9,7 @@ about what search finds, and who is offered as a choice at all.
 from typing import Any
 
 import pytest
+from django.db import connection
 from django.test import Client
 from django.urls import reverse
 
@@ -235,8 +236,13 @@ def test_a_chain_of_merges_offers_the_end_of_it(client: Client, volunteer: Volun
     """A duplicate merged into a record that was itself merged later. Only the
     record left standing is worth offering.
     """
-    middle = Volunteer.objects.create(display_name="Sean M", merged_into=volunteer)
+    # Built in the order it happens, which is the only order the database
+    # allows: each merge points at somebody the list still offered at the time,
+    # and the chain forms when the middle record is merged later.
+    middle = Volunteer.objects.create(display_name="Sean M")
     Volunteer.objects.create(display_name="Sean B", email="sean@example.org", merged_into=middle)
+    middle.merged_into = volunteer
+    middle.save()
     body = post(
         client,
         "volunteers",
@@ -247,8 +253,14 @@ def test_a_chain_of_merges_offers_the_end_of_it(client: Client, volunteer: Volun
 
 def test_a_merge_into_a_retired_record_says_so_rather_than_offering_it(client: Client) -> None:
     """Nothing here is pickable, so the client must not present it as a choice."""
-    survivor = Volunteer.objects.create(display_name="Sean McGinnis", active=False)
+    # Merged first and retired afterwards, which is the order this arises in:
+    # ``volunteer_merged_into_selectable`` refuses a merge that points at a
+    # record already withdrawn, and retiring the survivor of an old merge is
+    # what leaves a chain ending nowhere.
+    survivor = Volunteer.objects.create(display_name="Sean McGinnis")
     Volunteer.objects.create(display_name="Sean B", email="sean@example.org", merged_into=survivor)
+    survivor.active = False
+    survivor.save()
     response = post(
         client,
         "volunteers",
@@ -315,13 +327,29 @@ def test_a_body_that_is_not_a_volunteer_at_all_is_still_a_plain_rejection(client
 
 
 def test_a_merge_cycle_is_answered_rather_than_followed_forever(client: Client) -> None:
-    """The model forbids merging a record into itself and nothing forbids a
-    longer loop, so the walk has to end on its own.
+    """The walk has to end on its own, even now that nothing can build a loop.
+
+    ``volunteer_merged_into_selectable`` (migration 0008) refuses the edge that
+    closes one: it points at a record that has itself been merged. The walk
+    stays defensive anyway, because a database written to before that trigger
+    existed can still hold a loop, and a request must answer rather than hang.
+    Forging one here means turning the trigger off, which is the only way left
+    to make one -- and is itself the assertion that the trigger is what stops
+    it.
     """
     first = Volunteer.objects.create(display_name="Sean One", email="sean@example.org")
     second = Volunteer.objects.create(display_name="Sean Two", merged_into=first)
     first.merged_into = second
-    first.save()
+    with connection.cursor() as cursor:
+        # The foreign keys are deferred inside a test's transaction, and a
+        # table with trigger events still queued cannot be altered. Firing them
+        # now empties that queue; they would all pass anyway.
+        cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
+        cursor.execute("ALTER TABLE inventory_volunteer DISABLE TRIGGER volunteer_merged_into_selectable")
+        try:
+            first.save()
+        finally:
+            cursor.execute("ALTER TABLE inventory_volunteer ENABLE TRIGGER volunteer_merged_into_selectable")
     response = post(
         client,
         "volunteers",
