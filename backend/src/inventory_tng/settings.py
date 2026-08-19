@@ -8,6 +8,7 @@ docs/deployment.md for how those values are supplied in each environment.
 """
 
 from pathlib import Path
+from typing import Any
 
 import environ
 
@@ -22,6 +23,7 @@ env = environ.Env(
     APPEND_BURST_RATE=(str, "20/min"),
     APPEND_SUSTAINED_RATE=(str, "300/hour"),
     NUM_PROXIES=(int, 2),
+    LABEL_BASE_URL=(str, "https://inventory.nycmesh.net"),
 )
 
 # Read the repository-root .env when present -- the same file docker compose
@@ -55,6 +57,20 @@ INSTALLED_APPS = [
     "corsheaders",
     "django_filters",
     "drf_spectacular",
+    # Administrator sign-in: several ways to prove who you are, none of which
+    # grants authority. See docs/decisions/0013-administrator-sign-in.md and
+    # the settings block near the end of this file.
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.mfa",
+    # Installed whether or not credentials are configured: a provider with no
+    # client id is simply not offered (SOCIALACCOUNT_PROVIDERS below is built
+    # from what the environment supplies), so adding one to a deployment is a
+    # secret rather than a release.
+    "allauth.socialaccount.providers.google",
+    "allauth.socialaccount.providers.slack",
+    "allauth.socialaccount.providers.openid_connect",
     # Edit history for catalogue records. Deliberately not applied to the stock
     # ledger, which is append-only and is its own history
     # (docs/decisions/0008-stock-ledger-transfer-graph.md).
@@ -77,6 +93,14 @@ MIDDLEWARE = [
     # unless this middleware puts the request where the model can see it. Must
     # come after AuthenticationMiddleware, which is what sets request.user.
     "simple_history.middleware.HistoryRequestMiddleware",
+    # allauth requires this and refuses to start without it. Must come after
+    # AuthenticationMiddleware: it publishes the request allauth's adapters
+    # read, and closes a session whose user has gone away.
+    "allauth.account.middleware.AccountMiddleware",
+    # Decision 0013 point 3, enforced rather than documented. Must come after
+    # allauth's, because it reads the record allauth writes of how this
+    # session authenticated. See inventory/middleware.py.
+    "inventory.middleware.RequireSecondFactor",
 ]
 
 # WhiteNoise serves the Django admin's own static files in the built image.
@@ -116,6 +140,143 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+# --------------------------------------------------------------------------
+# Administrator sign-in. Decision 0013 is the argument; this is the wiring.
+#
+# The shape to hold on to while reading it: signing in establishes identity and
+# never authority. Every path below ends at an ordinary Django ``User`` with no
+# flags set, and the staff flag is granted afterwards by somebody who already
+# has it. Nothing here can promote anyone.
+# --------------------------------------------------------------------------
+
+AUTHENTICATION_BACKENDS = [
+    # Kept, and kept first: it is what the Django admin's own machinery and
+    # every existing session already use.
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
+
+# Where anything asking for a login sends people. One sign-in surface, so the
+# Django admin's login is redirected here too -- see inventory_tng/urls.py.
+LOGIN_URL = "account_login"
+LOGIN_REDIRECT_URL = "/"
+
+# Username and password, not email. Volunteers are a pick-list and are never
+# accounts (decision 0012 point 5), and a provider's email address is not
+# identity (decision 0013's last consequence), so an email address is
+# something an account may have rather than the name it answers to.
+ACCOUNT_LOGIN_METHODS = {"username"}
+# Email is on the list but not starred, so it is offered and never demanded:
+# a provider that hands one over fills it in, one that hands over a relay
+# address or nothing at all still gets somebody an account, and the account is
+# the identity either way. Listing it is not optional even so -- allauth's
+# social signup form raises at import if the field it may prefill is missing.
+ACCOUNT_SIGNUP_FIELDS = ["username*", "email", "password1*", "password2*"]
+# Nothing in this deployment sends mail, and nothing here needs it to: there
+# is no self-service signup to confirm, and an address that arrives from a
+# provider is decoration on a record whose identity is the ``User`` row.
+ACCOUNT_EMAIL_VERIFICATION = "none"
+SOCIALACCOUNT_EMAIL_VERIFICATION = "none"
+# A signed-in visitor who lands on the login page is shown it rather than
+# bounced onwards. Without this, a signed-in non-administrator following the
+# admin's "please log in" redirect is sent straight back to the admin, which
+# redirects to the login again -- a loop the browser, not the server, ends.
+ACCOUNT_AUTHENTICATED_LOGIN_REDIRECTS = False
+
+# Local accounts are made by an administrator, in the admin. Self-service
+# registration would only manufacture accounts with no permissions, which is
+# spam with extra steps; the way in that decision 0013 point 2 guarantees is a
+# password an administrator issued, not one a stranger chose.
+ACCOUNT_ADAPTER = "inventory.adapters.AccountAdapter"
+
+# Decision 0013 point 5. Automatic sign-up is off, so arriving from a provider
+# for the first time is a step somebody takes rather than something that
+# happens to them, and the account it makes carries nothing.
+# Whose request a sign-in rate limit counts, and the same decision the API's
+# throttles make: allauth reads X-Forwarded-For back this many hops, exactly as
+# DRF does for NUM_PROXIES. Fed from the one variable so the two cannot answer
+# differently -- and .env.sample is where the trust argument is written down.
+# Without it allauth falls back to REMOTE_ADDR, which behind the deployment's
+# proxies is the ingress: every administrator would share one bucket, and ten
+# failed sign-ins from anywhere would lock all of them out.
+ALLAUTH_TRUSTED_PROXY_COUNT = env.int("NUM_PROXIES")
+
+SOCIALACCOUNT_AUTO_SIGNUP = False
+SOCIALACCOUNT_ADAPTER = "inventory.adapters.SocialAccountAdapter"
+# Both deliberately off, and they are the same decision twice: an address a
+# provider hands over must not be enough to sign in as, or attach to, an
+# account that already exists. Apple returns a relay address and Slack one the
+# workspace controls, so treating either as proof of who somebody is would let
+# whoever controls the address inherit an administrator's account.
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = False
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = False
+
+# Decision 0013 point 3. TOTP and recovery codes are required on the local
+# path -- inventory/middleware.py is what makes "required" true -- and a
+# passkey is offered as an extra key rather than as a way round the first two.
+MFA_SUPPORTED_TYPES = ["totp", "recovery_codes", "webauthn"]
+MFA_TOTP_ISSUER = "NYC Mesh Inventory"
+# One step of tolerance either side, which is thirty seconds. A phone's clock
+# drifts and a code typed as the period turns over is the commonest reason a
+# correct one is refused; RFC 6238 puts one step as the most that should be
+# allowed, and refusing an administrator their own key is its own kind of
+# lockout.
+MFA_TOTP_TOLERANCE = 1
+
+# Provider credentials, all optional. A provider whose client id or secret is
+# absent is not offered, so this application boots with nothing configured and
+# decision 0013 point 2's local password path available -- which is also what
+# every test and every fresh checkout runs as.
+#
+# The empty defaults are not defaults for a secret in the sense
+# DJANGO_SECRET_KEY means: absent here says "this deployment does not offer
+# this provider", which is a legitimate configuration rather than a value
+# nobody chose. A half-configured provider is simply not offered either, so a
+# typo in one of a pair cannot start a deployment that half works.
+GOOGLE_CLIENT_ID = env.str("GOOGLE_CLIENT_ID", default="")
+GOOGLE_CLIENT_SECRET = env.str("GOOGLE_CLIENT_SECRET", default="")
+SLACK_CLIENT_ID = env.str("SLACK_CLIENT_ID", default="")
+SLACK_CLIENT_SECRET = env.str("SLACK_CLIENT_SECRET", default="")
+OIDC_CLIENT_ID = env.str("OIDC_CLIENT_ID", default="")
+OIDC_CLIENT_SECRET = env.str("OIDC_CLIENT_SECRET", default="")
+OIDC_SERVER_URL = env.str("OIDC_SERVER_URL", default="")
+# What the button says and what the callback URL contains. Both are named
+# rather than derived because a deployment's identity provider has a name its
+# administrators recognise, and because the provider id is baked into the
+# redirect URI registered with that provider and so must not drift.
+OIDC_NAME = env.str("OIDC_NAME", default="Single sign-on")
+OIDC_PROVIDER_ID = env.str("OIDC_PROVIDER_ID", default="oidc")
+
+SOCIALACCOUNT_PROVIDERS: dict[str, Any] = {}
+
+if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
+    SOCIALACCOUNT_PROVIDERS["google"] = {
+        "APPS": [{"client_id": GOOGLE_CLIENT_ID, "secret": GOOGLE_CLIENT_SECRET}],
+        "SCOPE": ["profile", "email"],
+        # Offline access would have this server hold a refresh token it has no
+        # use for: nothing here calls Google on anybody's behalf after the
+        # sign-in that identified them.
+        "AUTH_PARAMS": {"access_type": "online"},
+    }
+
+if SLACK_CLIENT_ID and SLACK_CLIENT_SECRET:
+    SOCIALACCOUNT_PROVIDERS["slack"] = {
+        "APPS": [{"client_id": SLACK_CLIENT_ID, "secret": SLACK_CLIENT_SECRET}],
+    }
+
+if OIDC_CLIENT_ID and OIDC_CLIENT_SECRET and OIDC_SERVER_URL:
+    SOCIALACCOUNT_PROVIDERS["openid_connect"] = {
+        "APPS": [
+            {
+                "provider_id": OIDC_PROVIDER_ID,
+                "name": OIDC_NAME,
+                "client_id": OIDC_CLIENT_ID,
+                "secret": OIDC_CLIENT_SECRET,
+                "settings": {"server_url": OIDC_SERVER_URL},
+            }
+        ],
+    }
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LANGUAGE_CODE = "en-us"
@@ -137,6 +298,11 @@ STORAGES = {
         )
     },
 }
+
+# Where a scanned label sends the phone. .env.sample says why this is the one
+# setting whose old value is stuck to a shelf, and what it may contain;
+# inventory/labels.py is what builds the payload from it.
+LABEL_BASE_URL = env("LABEL_BASE_URL")
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

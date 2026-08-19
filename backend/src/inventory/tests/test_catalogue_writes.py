@@ -32,7 +32,7 @@ pytestmark = pytest.mark.django_db
         ("items", {"name": "Cable tie", "category": None}),
         ("locations", {"name": "Shelf 3", "kind": Location.Kind.SHELF}),
         ("categories", {"name": "Fibre"}),
-        ("labels", {"code": "NEW1", "quantity": "1"}),
+        ("labels", {"quantity": "1"}),
     ],
 )
 def test_a_volunteer_is_refused_every_catalogue_create(
@@ -75,14 +75,13 @@ def test_a_catalogue_write_is_json_and_not_a_form(editor: Client, category: Cate
 
 
 def test_a_label_write_is_json_and_not_a_form(editor: Client, item: Item) -> None:
-    """The same refusal, on the one endpoint that rewrote its own payload.
+    """The same refusal, on the one endpoint that reads the raw body itself.
 
-    ``LabelSerializer`` normalises the code before validation by copying the
-    submitted body, and a form body is a ``QueryDict`` whose copy holds a list
-    per key -- so this used to be a 400 complaining about fields the caller
-    had sent perfectly well.
+    ``LabelSerializer`` asks the submitted body whether it carries a code, and
+    a form body is a ``QueryDict`` holding a list per key -- so a form-encoded
+    write reaches that check as a shape nothing else here ever sees.
     """
-    response = editor.post(reverse("labels"), data={"code": "form1", "item": item.pk, "quantity": "5"})
+    response = editor.post(reverse("labels"), data={"item": item.pk, "quantity": "5"})
 
     assert response.status_code == 415, response.content
 
@@ -260,9 +259,9 @@ def test_the_detail_endpoint_shows_the_same_packaging_as_the_list(editor: Client
     The chips a client renders come from either, and a revoked sticker must be
     missing from both -- LabelManager.live() says so for exactly this reason.
     """
-    Label.objects.create(code="LIVE11", item=item, quantity=1)
-    Label.objects.create(code="DEAD11", item=item, quantity=5, revoked_at=timezone.now())
-    Label.objects.create(code="SAME11", item=item, quantity=1)
+    Label.objects.create(code="KEPT110000", item=item, quantity=1)
+    Label.objects.create(code="DEAD110000", item=item, quantity=5, revoked_at=timezone.now())
+    Label.objects.create(code="SAME110000", item=item, quantity=1)
     listed = editor.get(reverse("items")).json()["results"][0]["labels"]
     alone = editor.get(reverse("item-detail", args=[item.pk])).json()["labels"]
     assert alone == listed
@@ -276,8 +275,8 @@ def test_editing_an_item_answers_with_the_packaging_the_list_shows(editor: Clien
     without DetailView.update this comes back through the plain related
     managers -- every sticker, revoked ones included.
     """
-    Label.objects.create(code="LIVE11", item=item, quantity=1)
-    Label.objects.create(code="DEAD11", item=item, quantity=5, revoked_at=timezone.now())
+    Label.objects.create(code="KEPT110000", item=item, quantity=1)
+    Label.objects.create(code="DEAD110000", item=item, quantity=5, revoked_at=timezone.now())
     written = patch(editor, "item-detail", {"minimum_stock": "3"}, item.pk).json()
     assert written["labels"] == editor.get(reverse("item-detail", args=[item.pk])).json()["labels"]
     assert [label["quantity"] for label in written["labels"]] == ["1.000"]
@@ -309,71 +308,57 @@ def test_an_administrator_renames_a_category(editor: Client, category: Category)
 
 
 def test_an_administrator_prints_a_label_for_an_item(editor: Client, item: Item) -> None:
-    response = post(editor, "labels", {"code": "AB12CD", "item": item.pk, "quantity": "100"})
+    """No code in the request: printing a label is asking the server to mint one."""
+    response = post(editor, "labels", {"item": item.pk, "quantity": "100"})
     assert response.status_code == 201, response.content
     assert response.json()["kind"] == "item"
 
 
-def test_a_code_is_normalised_before_it_is_stored(editor: Client, item: Item) -> None:
-    """Otherwise the resolver folds the very characters the stored code holds."""
-    assert post(editor, "labels", {"code": " lite1o ", "item": item.pk}).status_code == 201
-    # L and O are folded to 1 and 0 -- see Label.TYPO_FOLDS -- so the stored
-    # code is the one the resolver will arrive at, not the one that was typed.
-    assert Label.objects.get(item=item).code == "11TE10"
-    assert editor.get(reverse("label-resolve", args=["lite1o"])).status_code == 200
-
-
-def test_a_code_that_only_differs_by_folding_is_a_400_not_a_500(editor: Client, item: Item) -> None:
-    """DRF checks uniqueness against what arrived, so it has to arrive canonical."""
-    assert post(editor, "labels", {"code": "AB12CD", "item": item.pk}).status_code == 201
-    response = post(editor, "labels", {"code": "ab12cd", "item": item.pk})
-    assert response.status_code == 400, response.content
-
-
 def test_a_label_pointing_at_both_or_neither_is_a_400(editor: Client, item: Item, warehouse: Location) -> None:
-    assert post(editor, "labels", {"code": "NEITHER"}).status_code == 400
-    both = post(editor, "labels", {"code": "BOTH", "item": item.pk, "location": warehouse.pk})
+    assert post(editor, "labels", {}).status_code == 400
+    both = post(editor, "labels", {"item": item.pk, "location": warehouse.pk})
     assert both.status_code == 400, both.content
 
 
 def test_a_location_label_may_not_stand_for_more_than_one(editor: Client, warehouse: Location) -> None:
-    response = post(editor, "labels", {"code": "WALL1", "location": warehouse.pk, "quantity": "5"})
+    response = post(editor, "labels", {"location": warehouse.pk, "quantity": "5"})
     assert response.status_code == 400, response.content
 
 
 @pytest.mark.parametrize("quantity", ["0", "-5"])
 def test_a_label_standing_for_nothing_is_a_400(editor: Client, item: Item, quantity: str) -> None:
     """The third of Label's check constraints; the other two were mirrored first."""
-    response = post(editor, "labels", {"code": "ZERO11", "item": item.pk, "quantity": quantity})
+    response = post(editor, "labels", {"item": item.pk, "quantity": quantity})
     assert response.status_code == 400, response.content
 
 
 def test_a_printed_code_cannot_be_changed_out_from_under_the_sticker(editor: Client, item: Item) -> None:
     """The code is the label's identity, and the sticker is already on a shelf.
 
-    Refused rather than quietly ignored: a client told 200 by a change that did
-    not happen has no way to find out, and the schema says `code` is writable.
+    Refused rather than quietly ignored: `code` is read-only in the schema, so
+    DRF would drop it, and a client told 200 by a change that did not happen
+    has no way to find out.
     """
-    label = Label.objects.create(code="AB1234", item=item)
-    response = patch(editor, "label-resolve", {"code": "CD5678"}, label.code)
+    label = Label.objects.create(code="AB12340000", item=item)
+    response = patch(editor, "label-resolve", {"code": "CD56780000"}, label.code)
     assert response.status_code == 400, response.content
     assert "code" in response.json()
     label.refresh_from_db()
-    assert label.code == "AB1234"
-    assert editor.get(reverse("label-resolve", args=["CD5678"])).status_code == 404
+    assert label.code == "AB12340000"
+    assert editor.get(reverse("label-resolve", args=["CD56780000"])).status_code == 404
 
 
 def test_a_correction_may_repeat_the_code_it_is_not_changing(editor: Client, item: Item) -> None:
     """A client sending the whole row back is correcting it, not renaming it."""
-    label = Label.objects.create(code="AB1234", item=item)
-    assert patch(editor, "label-resolve", {"code": "ab1234", "quantity": "4"}, label.code).status_code == 200
+    label = Label.objects.create(code="AB12340000", item=item)
+    assert patch(editor, "label-resolve", {"code": "ab12340000", "quantity": "4"}, label.code).status_code == 200
     label.refresh_from_db()
     assert label.quantity == 4
 
 
 def test_a_label_is_corrected_rather_than_replaced(editor: Client, item: Item) -> None:
     """PUT is not offered: a replacement omitting `revoked` would silently keep it."""
-    label = Label.objects.create(code="EF9012", item=item)
+    label = Label.objects.create(code="EF90120000", item=item)
     response = editor.put(
         reverse("label-resolve", args=[label.code]),
         data={"code": label.code, "item": item.pk, "quantity": "1"},
@@ -383,7 +368,7 @@ def test_a_label_is_corrected_rather_than_replaced(editor: Client, item: Item) -
 
 
 def test_revoking_a_label_takes_it_out_of_the_cached_map(editor: Client, item: Item) -> None:
-    label = Label.objects.create(code="FADED1", item=item)
+    label = Label.objects.create(code="FADED10000", item=item)
     response = patch(editor, "label-resolve", {"revoked": True}, label.code)
     assert response.status_code == 200, response.content
     label.refresh_from_db()
@@ -393,7 +378,7 @@ def test_revoking_a_label_takes_it_out_of_the_cached_map(editor: Client, item: I
 
 def test_a_revoked_label_still_resolves(editor: Client, item: Item) -> None:
     """The sticker is superseded; refusing the scan would block a volunteer."""
-    label = Label.objects.create(code="FADED2", item=item)
+    label = Label.objects.create(code="FADED20000", item=item)
     patch(editor, "label-resolve", {"revoked": True}, label.code)
     resolved = editor.get(reverse("label-resolve", args=[label.code]))
     assert resolved.status_code == 200
@@ -401,7 +386,7 @@ def test_a_revoked_label_still_resolves(editor: Client, item: Item) -> None:
 
 
 def test_revoking_the_wrong_label_is_undone_rather_than_reprinted(editor: Client, item: Item) -> None:
-    label = Label.objects.create(code="OOPS1", item=item)
+    label = Label.objects.create(code="00PS100000", item=item)
     patch(editor, "label-resolve", {"revoked": True}, label.code)
     assert patch(editor, "label-resolve", {"revoked": False}, label.code).status_code == 200
     label.refresh_from_db()
@@ -409,13 +394,13 @@ def test_revoking_the_wrong_label_is_undone_rather_than_reprinted(editor: Client
 
 
 def test_a_volunteer_may_not_revoke_a_label(client: Client, item: Item) -> None:
-    label = Label.objects.create(code="MINE1", item=item)
+    label = Label.objects.create(code="M1NE100000", item=item)
     assert patch(client, "label-resolve", {"revoked": True}, label.code).status_code == 403
 
 
 def test_the_revocation_timestamp_is_the_servers(editor: Client, item: Item) -> None:
     """A client that could name the moment could revoke a sticker in the future."""
-    label = Label.objects.create(code="CLOCK1", item=item)
+    label = Label.objects.create(code="C10CK10000", item=item)
     patch(editor, "label-resolve", {"revoked": True, "revoked_at": "2099-01-01T00:00:00Z"}, label.code)
     label.refresh_from_db()
     assert label.revoked_at is not None

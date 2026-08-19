@@ -94,14 +94,14 @@ def test_balances_are_ordered_by_location_id(
 
 def test_an_items_labels_are_its_packaging(client: Client, item: Item) -> None:
     """The packaging chips, in quantity order."""
-    Label.objects.create(code="PACKET", item=item, quantity=Decimal("100"))
-    Label.objects.create(code="S1NG13", item=item)
+    Label.objects.create(code="PACKET0000", item=item, quantity=Decimal("100"))
+    Label.objects.create(code="S1NG130000", item=item)
 
     labels = results(client.get(reverse("items")))[0]["labels"]
 
     assert labels == [
-        {"code": "S1NG13", "quantity": "1.000"},
-        {"code": "PACKET", "quantity": "100.000"},
+        {"code": "S1NG130000", "quantity": "1.000"},
+        {"code": "PACKET0000", "quantity": "100.000"},
     ]
 
 
@@ -119,9 +119,9 @@ def test_packaging_is_the_distinct_quantities_not_the_sticker_count(
     """
     other = Item.objects.create(name="Zip Ties", category=category)
     for number in range(3):
-        Label.objects.create(code=f"S{number}", item=item)
-        Label.objects.create(code=f"P{number}", item=item, quantity=Decimal("100"))
-    Label.objects.create(code="Z0", item=other)
+        Label.objects.create(code=f"S00000000{number}", item=item)
+        Label.objects.create(code=f"P00000000{number}", item=item, quantity=Decimal("100"))
+    Label.objects.create(code="Z000000000", item=other)
 
     listed = {entry["name"]: entry["labels"] for entry in results(client.get(reverse("items")))}
 
@@ -131,7 +131,7 @@ def test_packaging_is_the_distinct_quantities_not_the_sticker_count(
 
 def test_a_revoked_label_is_not_offered_as_packaging(client: Client, item: Item) -> None:
     Label.objects.create(
-        code="FADED",
+        code="FADED00000",
         item=item,
         quantity=Decimal("100"),
         revoked_at=datetime.datetime(2026, 8, 19, tzinfo=datetime.UTC),
@@ -198,12 +198,12 @@ def resolve(client: Client, code: str) -> Any:
 
 
 def test_a_scanned_code_resolves_to_its_item(client: Client, item: Item) -> None:
-    Label.objects.create(code="7QK2P9", item=item, quantity=Decimal("100"))
+    Label.objects.create(code="7QK3M2XV9A", item=item, quantity=Decimal("100"))
 
-    body = resolve(client, "7QK2P9").json()
+    body = resolve(client, "7QK3M2XV9A").json()
 
     assert body == {
-        "code": "7QK2P9",
+        "code": "7QK3M2XV9A",
         "kind": "item",
         "quantity": "100.000",
         "revoked_at": None,
@@ -214,22 +214,24 @@ def test_a_scanned_code_resolves_to_its_item(client: Client, item: Item) -> None
 
 def test_a_wall_code_resolves_to_its_location(client: Client, warehouse: Location) -> None:
     """The wall code: where is this stock moving from?"""
-    Label.objects.create(code="WA1132", location=warehouse)
+    Label.objects.create(code="WA1132XKTZ", location=warehouse)
 
-    body = resolve(client, "WA1132").json()
+    body = resolve(client, "WA1132XKTZ").json()
 
     assert body["kind"] == "location"
     assert body["location"] == warehouse.pk
     assert body["item"] is None
 
 
-@pytest.mark.parametrize("typed", ["7qk2p9", "  7QK2P9  ", "  7Qk2P9  "])
+@pytest.mark.parametrize("typed", ["7qk3m2xv9a", "  7QK3M2XV9A  ", "  7Qk3M2Xv9A  "])
 def test_a_code_resolves_however_it_was_typed(client: Client, item: Item, typed: str) -> None:
-    Label.objects.create(code="7QK2P9", item=item)
+    Label.objects.create(code="7QK3M2XV9A", item=item)
     assert resolve(client, typed).status_code == 200
 
 
-@pytest.mark.parametrize(("typed", "stored"), [("I23", "123"), ("L23", "123"), ("O23", "023")])
+@pytest.mark.parametrize(
+    ("typed", "stored"), [("I234567890", "1234567890"), ("L234567890", "1234567890"), ("O234567890", "0234567890")]
+)
 def test_letters_people_get_wrong_are_folded(client: Client, item: Item, typed: str, stored: str) -> None:
     """The letters a Crockford code never contains, so the fold is safe."""
     Label.objects.create(code=stored, item=item)
@@ -238,7 +240,7 @@ def test_letters_people_get_wrong_are_folded(client: Client, item: Item, typed: 
 
 def test_an_unknown_code_is_a_typed_404(client: Client) -> None:
     """The client offers item search rather than treating it as a dead end."""
-    response = resolve(client, "NOSUCH")
+    response = resolve(client, "ZZZZZZZZZZ")
     assert response.status_code == 404
     assert response.json()["detail"]
 
@@ -246,12 +248,12 @@ def test_an_unknown_code_is_a_typed_404(client: Client) -> None:
 def test_a_revoked_label_still_says_what_it_pointed_at(client: Client, item: Item) -> None:
     """A superseded sticker still resolves; the client is told it is retired."""
     Label.objects.create(
-        code="FADED",
+        code="FADED00000",
         item=item,
         revoked_at=datetime.datetime(2026, 8, 19, tzinfo=datetime.UTC),
     )
 
-    response = resolve(client, "FADED")
+    response = resolve(client, "FADED00000")
 
     assert response.status_code == 200
     assert response.json()["revoked_at"] is not None
@@ -264,25 +266,25 @@ def test_a_revoked_label_still_says_what_it_pointed_at(client: Client, item: Ite
 
 
 def test_every_live_label_is_listed_for_caching(client: Client, item: Item, warehouse: Location) -> None:
-    Label.objects.create(code="AAA111", item=item, quantity=Decimal("100"))
-    Label.objects.create(code="BBB222", location=warehouse)
+    Label.objects.create(code="AAA1110000", item=item, quantity=Decimal("100"))
+    Label.objects.create(code="BBB2220000", location=warehouse)
 
     listed = results(client.get(reverse("labels")))
 
-    assert [entry["code"] for entry in listed] == ["AAA111", "BBB222"]
+    assert [entry["code"] for entry in listed] == ["AAA1110000", "BBB2220000"]
     assert listed[0]["quantity"] == "100.000"
 
 
 def test_the_label_map_is_not_paginated(client: Client, item: Item) -> None:
     """A bare list, not a page envelope."""
     for number in range(3):
-        Label.objects.create(code=f"CODE{number}", item=item)
+        Label.objects.create(code=f"C0DE00000{number}", item=item)
     assert isinstance(client.get(reverse("labels")).json(), list)
 
 
 def test_a_revoked_label_is_not_in_the_map(client: Client, item: Item) -> None:
     Label.objects.create(
-        code="FADED",
+        code="FADED00000",
         item=item,
         revoked_at=datetime.datetime(2026, 8, 19, tzinfo=datetime.UTC),
     )
@@ -295,19 +297,20 @@ def test_a_code_stored_in_any_other_form_is_canonicalised(client: Client, item: 
     A code carrying one of them would be unresolvable for the life of the
     physical object, because the resolver folds the very characters it holds.
     Normalising on write closes that: whatever the admin or the planned import
-    stores, the code and the scan agree. What stops such a code being minted
-    at all is inventory-tng-n2o.
+    stores, the code and the scan agree. What stops such a code reaching the
+    column at all is `label_code_is_crockford_base32` -- so this writes one
+    that folds to a well-formed code, which is the case normalisation is for.
     """
-    label = Label.objects.create(code="wall01", item=item)
+    label = Label.objects.create(code="wall01lo23", item=item)
 
-    assert label.code == "WA1101"
-    assert resolve(client, "wall01").status_code == 200
-    assert resolve(client, "WA1101").status_code == 200
+    assert label.code == "WA11011023"
+    assert resolve(client, "wall01lo23").status_code == 200
+    assert resolve(client, "WA11011023").status_code == 200
 
 
 def test_the_cached_map_omits_a_field_it_would_always_repeat(client: Client, item: Item) -> None:
     """The map holds only live labels, so revoked_at could only say null."""
-    Label.objects.create(code="AAA111", item=item)
+    Label.objects.create(code="AAA1110000", item=item)
 
     entry = results(client.get(reverse("labels")))[0]
 

@@ -46,9 +46,21 @@ django:
   # take no credential. Counted per backend process; see docs/deployment.md.
   appendBurstRate: "20/min"
   appendSustainedRate: "300/hour"
+  # The origin printed inside every QR code. Changing it does not change the
+  # stickers already on the shelves; see docs/deployment.md.
+  labelBaseUrl: "https://inventory.nycmesh.net"
   # Name of a pre-existing Secret holding DJANGO_SECRET_KEY and DATABASE_URL.
   # Never put these in values.yaml.
   existingSecret: inventory-tng-secrets
+  # Name of a second, OPTIONAL Secret holding the sign-in providers' client
+  # ids and secrets. Every key in it becomes a backend environment variable,
+  # so configuring Google, Slack or an OpenID Connect provider
+  # (docs/decisions/0013-administrator-sign-in.md) is a Secret rather than a
+  # release. A Secret that does not exist is not an error: the deployment
+  # simply offers the local password path, which decision 0013 point 2 keeps
+  # available whatever else is configured. Which keys go in it, and what each
+  # one is, are in docs/deployment.md.
+  providerSecret: inventory-tng-providers
 
 # Runs `manage.py migrate` as a pre-upgrade Job so that scaling the backend to
 # multiple replicas can never race on schema changes.

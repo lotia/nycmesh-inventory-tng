@@ -1,0 +1,69 @@
+{% comment %}
+A page of printable labels. Rendered by inventory.labels.sheet, which is where
+the sizes and the error correction level are decided and explained; nothing
+here chooses any of them.
+
+Self-contained on purpose: one document, no external stylesheet and no external
+font, so printing it works from a laptop that has lost the network on the way
+to the shelf.
+{% endcomment %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NYC Mesh inventory labels</title>
+<style>
+  /* Millimetres throughout. A label that comes out of the printer a different
+     size from the one asked for is the failure this whole page exists to
+     avoid. */
+  @page { size: auto; margin: 10mm; }
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    margin: 0;
+    color: #000;
+    background: #fff;
+  }
+  .sheet { display: flex; flex-wrap: wrap; gap: 4mm; align-items: flex-start; }
+  .label {
+    width: {{ label_width_mm }}mm;
+    /* Never split a sticker across two sheets of paper. */
+    break-inside: avoid;
+    page-break-inside: avoid;
+    text-align: center;
+  }
+  .label svg { display: block; }
+  /* The code as text, because a dead QR is still a working label if it can be
+     read and typed. Monospaced and spaced out so 8 and B are told apart at
+     arm's length. */
+  .code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 2.6mm;
+    letter-spacing: 0.35mm;
+    margin: 0.8mm 0 0;
+  }
+  /* The print date, so an aged batch can be found and replaced as a set. */
+  .printed { font-size: 2mm; margin: 0.4mm 0 0; color: #333; }
+  .header { font-size: 3mm; margin: 0 0 4mm; color: #333; }
+  .empty { font-size: 3mm; }
+  @media print { .header { display: none; } }
+</style>
+</head>
+<body>
+<p class="header">
+  {{ labels|length }} label{{ labels|length|pluralize }}, error correction level
+  {{ error_correction }}, generated {{ generated_on|date:"Y-m-d" }}. Print at 100% scale.
+</p>
+{% if labels %}
+<div class="sheet">
+  {% for label in labels %}
+  <div class="label">
+    {{ label.symbol }}
+    <p class="code">{{ label.code }}</p>
+    <p class="printed">{{ label.printed_on|date:"Y-m-d" }}</p>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="empty">No labels to print.</p>
+{% endif %}
+</body>
+</html>

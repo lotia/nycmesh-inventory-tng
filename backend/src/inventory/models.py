@@ -5,6 +5,7 @@ docs/data-model.md and docs/decisions/0008-stock-ledger-transfer-graph.md.
 This module implements it; it does not re-explain it.
 """
 
+import secrets
 from typing import Any
 
 from django.contrib.postgres.indexes import GinIndex
@@ -405,6 +406,35 @@ class VendorOffer(models.Model):
         return f"{self.item} from {self.vendor}"
 
 
+# Crockford's Base32: the digits and the uppercase letters, less I, L, O and U.
+# Module level rather than an attribute of Label, because Label.Meta needs it
+# and a class body is not in scope inside its own Meta.
+#
+# The exclusions are the whole point of the choice, and they are two different
+# arguments. I, L and O are excluded so that the folds in Label.TYPO_FOLDS are
+# unambiguous -- nothing minted contains a character those folds rewrite. U is
+# excluded so that no minted code can spell an English obscenity, which matters
+# for a token printed on a sticker and read aloud across a room.
+CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+# Ten characters of that alphabet is fifty bits, which is unguessable in any
+# sense that matters for a token printed on a wall, and still short enough to
+# read back off a dying label. See decision 0011 section 3.
+CODE_LENGTH = 10
+
+# What the check constraint and the minter both mean by "a code". Built from
+# the alphabet rather than written out, so there is one definition of it; the
+# alphabet contains no regular-expression metacharacter, so it is a character
+# class as it stands.
+CODE_PATTERN = rf"^[{CODE_ALPHABET}]{{{CODE_LENGTH}}}$"
+
+# How many times minting will draw again before giving up. A collision needs
+# two of fifty bits to match, so one retry is already generous; the loop exists
+# so that the day the alphabet or the length is shortened, the failure is an
+# error naming the cause rather than an IntegrityError from the unique index.
+MINT_ATTEMPTS = 5
+
+
 class LabelManager(models.Manager["Label"]):
     """Queries over labels that more than one caller needs."""
 
@@ -432,6 +462,9 @@ class Label(models.Model):
     # See decision 0011.
     TYPO_FOLDS = str.maketrans({"I": "1", "L": "1", "O": "0"})
 
+    # The column is wider than a code, and the constraint below is what says
+    # how long a code is. Both would have to change together to change the
+    # format, and only one of them rewrites the table.
     code = models.CharField(max_length=32, unique=True)
     item = models.ForeignKey(Item, null=True, blank=True, on_delete=models.CASCADE, related_name="labels")
     location = models.ForeignKey(Location, null=True, blank=True, on_delete=models.CASCADE, related_name="labels")
@@ -470,6 +503,17 @@ class Label(models.Model):
                 condition=models.Q(location__isnull=True) | models.Q(quantity=1),
                 name="label_quantity_is_one_for_a_location",
             ),
+            # The folding in TYPO_FOLDS only works while every stored code is
+            # Crockford: a code containing I, L or O folds to a string matching
+            # nothing and is unresolvable for the life of the physical object
+            # carrying it. So the alphabet and the length are the database's to
+            # enforce, not a rule the minter is trusted to follow -- the minter
+            # is one write path, and the admin, the fixtures and the planned
+            # sheet importer are others. Decision 0011 section 3.
+            models.CheckConstraint(
+                condition=models.Q(code__regex=CODE_PATTERN),
+                name="label_code_is_crockford_base32",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -480,8 +524,8 @@ class Label(models.Model):
         # other form would be unreachable for the life of the object carrying
         # it, because the resolver folds the very characters it holds. The
         # admin and the planned sheet import are held to this too. What stops
-        # a code being minted outside the alphabet in the first place is the
-        # check constraint in inventory-tng-n2o. Skipped when a partial save is
+        # a code outside the alphabet being stored at all is
+        # `label_code_is_crockford_base32` above. Skipped when a partial save is
         # not writing the code, for the reason on Volunteer.save.
         writing = kwargs.get("update_fields")
         if writing is None or "code" in writing:
@@ -496,6 +540,34 @@ class Label(models.Model):
     def normalise_code(cls, raw: str) -> str:
         """The canonical form of a code, however it arrived."""
         return raw.strip().upper().translate(cls.TYPO_FOLDS)
+
+    @classmethod
+    def mint_code(cls) -> str:
+        """One code drawn from the alphabet, without asking whether it is free.
+
+        ``secrets`` rather than ``random``: this is a bearer token printed on a
+        sticker, and ``random`` is a Mersenne twister whose next draw is
+        recoverable from a few previous ones -- which, for codes minted in a
+        batch and stuck on a shelf, is exactly the situation.
+        """
+        return "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
+
+    @classmethod
+    def mint_unique_code(cls) -> str:
+        """A code no label holds yet.
+
+        The unique index is still what guarantees it -- two requests can draw
+        the same code between this query and their inserts -- and this is what
+        keeps that from ever being how a volunteer finds out.
+        """
+        for _ in range(MINT_ATTEMPTS):
+            code = cls.mint_code()
+            if not cls.objects.filter(code=code).exists():
+                return code
+        raise RuntimeError(
+            f"Minted {MINT_ATTEMPTS} codes and every one was already taken. "
+            f"{CODE_LENGTH} characters of this alphabet is no longer enough for the number of labels printed."
+        )
 
 
 # ---------------------------------------------------------------------------

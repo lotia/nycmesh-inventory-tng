@@ -23,11 +23,14 @@ server {
     gzip_types text/css application/javascript application/json image/svg+xml;
     gzip_min_length 1024;
 
-    # The browser only ever talks to this origin; nginx forwards API, admin
-    # and Django's own static files to Django. No CORS in production, and no
-    # build-time API URL. `/static/` is Django's, not the app's: the bundle is
-    # served from `/assets/` below, and without this the admin -- today the
-    # only way into a session -- loads with no CSS or JavaScript.
+    # The browser only ever talks to this origin; nginx forwards the API, the
+    # admin, the sign-in pages and Django's own static files to Django. No
+    # CORS in production, and no build-time API URL. `/accounts/` is where
+    # every way in lives (docs/decisions/0013-administrator-sign-in.md), so a
+    # deployment that does not forward it has no way to sign in at all.
+    # `/static/` is Django's, not the app's: the bundle is served from
+    # `/assets/` below, and without it those pages and the admin load with no
+    # CSS or JavaScript.
     #
     # A regex rather than one prefix per path. `/api/` does not match `/api`
     # itself, and that is the endpoint index -- the first thing a client
@@ -43,7 +46,7 @@ server {
     # also states the condition that makes trusting the header sound at all.
     # The `map` at the top falls back to $scheme when the header is absent, so
     # running this image without an ingress in front of it still works.
-    location ~ ^/(api|admin|static)(/|$) {
+    location ~ ^/(api|admin|accounts|static)(/|$) {
         proxy_pass         ${BACKEND_ORIGIN};
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;

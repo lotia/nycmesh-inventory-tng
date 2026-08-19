@@ -21,6 +21,11 @@ dependencies = [
     "django-filter==25.*",
     "whitenoise==6.11.*",
     "django-simple-history==3.*",
+    "django-allauth[mfa,socialaccount]>=65.19.1",
+    # The QR encoder. Pure Python, no image library, and it exposes the
+    # version, mode and error correction level of what it produced -- which is
+    # what makes the decisions in inventory/labels.py assertable.
+    "segno==1.6.*",
 ]
 
 [dependency-groups]
@@ -36,6 +41,11 @@ dev = [
     # Imported directly by the OpenAPI schema tests. It arrives transitively via
     # drf-spectacular anyway, but a test that imports it should declare it.
     "pyyaml==6.*",
+    # A decoder, and deliberately not the encoder above: decision 0011 asks
+    # for the generator's output to be decoded and checked, and an encoder
+    # agreeing with itself would prove nothing. Tests only.
+    "zxing-cpp==3.1.*",
+    "pyotp>=2.10.0",
 ]
 
 # --------------------------------------------------------------------------

@@ -1,45 +1,28 @@
-import { type BrowserContext, expect, type Page, test } from "@playwright/test";
+import { type BrowserContext, expect, test } from "@playwright/test";
+import { seeded, signIn } from "./sign-in";
 
 /**
  * Can a browser actually use this API?
  *
  * Nothing else in the project can answer that; the reasoning, and the setup
  * these tests need, are in DEVELOPERS.md "Integration tests".
+ *
+ * The session these tests need comes from the application's own sign-in now
+ * that it has one -- see sign-in.ts and
+ * docs/decisions/0013-administrator-sign-in.md. It used to come from the
+ * Django admin's login form, which was a stand-in for a door the app did not
+ * yet have; that form no longer signs anybody in.
+ *
+ * What is being proved here is still the write path rather than the way in.
+ * These two tests sign in because the batch endpoint asks for a session
+ * today; under decision 0012 point 3 a volunteer appends without one, and
+ * when that lands this file loses the sign-in rather than changing it.
  */
-
-/** One value global setup published. Unset means it did not run. */
-function seeded(name: string): string {
-  const value = process.env[`SEEDED_${name.toUpperCase()}`];
-  if (!value) {
-    throw new Error(`SEEDED_${name.toUpperCase()} is unset: global setup did not run.`);
-  }
-  return value;
-}
 
 /** Read a cookie the browser is holding for this origin. */
 async function cookie(context: BrowserContext, name: string) {
   const cookies = await context.cookies();
   return cookies.find((c) => c.name === name)?.value;
-}
-
-/**
- * Log in through the admin, because the app has no login of its own yet: which
- * posture it takes is inventory-tng-0pj. What these tests prove is the write
- * path, not the way in.
- *
- * Through this server's own origin, not the backend's port, because that is
- * the path a deployment takes and the only one that exercises the proxy.
- *
- * Waits for the session to actually exist. Without that, a test asserting a
- * refusal cannot tell "rejected for a missing CSRF token" from "rejected for
- * not being logged in yet".
- */
-async function login(page: Page) {
-  await page.goto("/admin/login/");
-  await page.getByLabel(/username/i).fill(seeded("username"));
-  await page.getByLabel(/password/i).fill(seeded("password"));
-  await page.getByRole("button", { name: /log in/i }).click();
-  await expect(page).toHaveURL(/\/admin\/$/);
 }
 
 test("the app loads", async ({ page }) => {
@@ -61,7 +44,7 @@ test("the browser reaches the API through the dev proxy on its own origin", asyn
 });
 
 test("an authenticated browser can record a batch", async ({ page, context }) => {
-  await login(page);
+  await signIn(page);
 
   await page.goto("/");
   await page.evaluate(() => fetch("/api"));
@@ -111,7 +94,7 @@ test("an authenticated browser can record a batch", async ({ page, context }) =>
 test("a write without the CSRF token is refused", async ({ page }) => {
   // The protection is real and must stay real: this is what stops another
   // site posting to the ledger using a volunteer's session.
-  await login(page);
+  await signIn(page);
 
   await page.goto("/");
   const result = await page.evaluate(async () => {

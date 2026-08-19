@@ -21,7 +21,9 @@ not held to them:
    location pointing at a record the pick-list no longer offers. Whether that
    should be refused or should move the custody to the survivor is a decision
    nobody has taken.
-4. A label's code may not change once it is printed.
+4. A label's code is the server's. A client neither chooses one when printing
+   nor changes one afterwards; the code is minted here and is immutable once
+   it is on a sticker.
 5. A revocation is timed by the server, never by the client.
 
 The kind-to-sides rule in views.py is a sixth. None is expressible as a check
@@ -553,6 +555,13 @@ class LabelMapSerializer(LabelResolveSerializer):
 class LabelSerializer(LabelResolveSerializer):
     """A label as an administrator prints and revokes it.
 
+    ``code`` is read-only in both directions of a write: it is minted here,
+    from ``Label.mint_unique_code``, and printing is the one moment it is
+    decided. A client that could choose one could choose a code outside the
+    alphabet the resolver's folding depends on, or one already on a sticker
+    somewhere -- and a client that could change one would 404 a sticker
+    already out on a shelf.
+
     ``revoked`` is a boolean rather than a writable ``revoked_at`` because the
     server owns the clock: a client that could name the moment could revoke a
     sticker in the future, and a sticker is either honoured or it is not.
@@ -568,16 +577,7 @@ class LabelSerializer(LabelResolveSerializer):
 
     class Meta(LabelResolveSerializer.Meta):
         fields = [*LabelResolveSerializer.Meta.fields, "revoked"]
-        read_only_fields = ["revoked_at"]
-
-    def to_internal_value(self, data: Any) -> Any:
-        # Normalised before validation, not only in Label.save: DRF checks
-        # uniqueness against whatever arrived, so "abc" would pass the check
-        # and then collide with the stored "ABC" on the unique index.
-        # Label.normalise_code stays the one definition of the canonical form.
-        if isinstance(data, dict) and isinstance(data.get("code"), str):
-            data = {**data, "code": Label.normalise_code(data["code"])}
-        return super().to_internal_value(data)
+        read_only_fields = ["revoked_at", "code"]
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """Everything that decides whether this label may be written as asked.
@@ -588,17 +588,36 @@ class LabelSerializer(LabelResolveSerializer):
         thing that enforces those; this only decides what a client is told,
         which is the distinction this module's docstring draws.
 
-        The first rule is not one of them. A code is immutable once printed,
-        and nothing below the API says so -- it is item 4 of the list in that
-        same docstring. The last step is not a rule at all: it turns the
-        boolean a client sends into the column the model stores.
+        The fourth constraint, ``label_code_is_crockford_base32``, has no
+        mirror here and needs none: no client input reaches that column, so
+        the refusal below is the whole of what a client can be told about it.
+
+        The first two rules are not constraints either. A code is neither
+        chosen by a client nor changed by one, and nothing below the API says
+        so -- they are item 4 of the list in this module's docstring. The
+        minting between them is not a rule at all, and neither is the last
+        step: one fills in the column DRF left out because it is read-only,
+        the other turns the boolean a client sends into the column the model
+        stores.
         """
-        if self.instance is not None and "code" in attrs and attrs["code"] != self.instance.code:
-            # The code is the label's identity, and it is printed on a sticker
-            # already out on a shelf: changing it would 404 that sticker for
-            # good. Refused rather than quietly ignored, because a client told
-            # 200 to a change that did not happen has no way to find out.
-            # A reprint is a new label and a revocation of this one.
+        submitted = self._submitted()
+        if self.instance is None:
+            if "code" in submitted:
+                # Refused rather than quietly dropped, which is what a
+                # read-only field does on its own: a client that chose a code,
+                # got a 201 and printed what it asked for would be printing a
+                # sticker this API cannot resolve.
+                raise serializers.ValidationError(
+                    {"code": "A label's code is minted when it is printed, and is not the client's to choose."}
+                )
+            attrs["code"] = Label.mint_unique_code()
+        elif "code" in submitted and Label.normalise_code(str(submitted["code"])) != self.instance.code:
+            # Sending the code back unchanged is a client returning the whole
+            # row it read, which is a correction and not a rename -- so only a
+            # different one is refused. Refused, again, rather than ignored:
+            # the code is printed on a sticker already out on a shelf, and
+            # changing it would 404 that sticker for good. A reprint is a new
+            # label and a revocation of this one.
             raise serializers.ValidationError(
                 {"code": "A label's code is printed on it and cannot be changed. Revoke it and print another."}
             )
@@ -621,6 +640,15 @@ class LabelSerializer(LabelResolveSerializer):
         if revoked is not None:
             attrs["revoked_at"] = timezone.now() if revoked else None
         return attrs
+
+    def _submitted(self) -> dict[str, Any]:
+        """What the client actually sent, before DRF dropped its read-only keys.
+
+        The only way to refuse a field rather than ignore it: ``code`` never
+        reaches ``attrs``, so the submission itself is what has to be asked.
+        """
+        submitted = getattr(self, "initial_data", None)
+        return submitted if isinstance(submitted, dict) else {}
 
     def _points_at(self, attrs: dict[str, Any], field: str) -> bool:
         """Whether the label points at ``field`` once this change is applied.

@@ -12,11 +12,11 @@ from typing import Any
 from drf_spectacular.openapi import AutoSchema
 from drf_spectacular.utils import Direction
 from rest_framework.exceptions import Throttled
-from rest_framework.permissions import SAFE_METHODS, AllowAny
+from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
-from inventory.permissions import administrators_only
+from inventory.permissions import administrators_only, open_to_anybody
 from inventory.serializers import DetailSerializer, ThrottledSerializer
 from inventory.throttling import AppendThrottle
 
@@ -99,7 +99,7 @@ class PolicyAwareAutoSchema(AutoSchema):
         IsAuthenticated, so a read refuses an anonymous caller just as a write
         refuses a volunteer. Both are a 403 and a client has to handle it.
         """
-        return any(not isinstance(permission, AllowAny) for permission in self.view.get_permissions())
+        return not open_to_anybody(self.view)
 
     def _is_administrators_only(self) -> bool:
         return administrators_only(self.view, self.method)

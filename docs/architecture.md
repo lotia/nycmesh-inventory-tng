@@ -11,7 +11,7 @@ trade-offs, are recorded in [decisions/](decisions/).
 Browser
    │
    ▼
-frontend  (nginx)  ── /api, /admin, /static ──►  backend  (gunicorn + Django)
+frontend  (nginx) ─ /api, /admin, /accounts, /static ─►  backend  (Django)
   static SPA assets                                   │
                                                       ▼
                                                PostgreSQL 18
@@ -26,11 +26,14 @@ Three pieces, two of which we build as container images:
 | Database | PostgreSQL 18 | Storage |
 
 The browser only ever talks to one origin. nginx serves the built frontend
-assets and forwards three path prefixes to Django: `/api`, `/admin`, and
-`/static`, which is the admin's own CSS and JavaScript — the app's bundle is
-served from `/assets`. That set is stated here and nowhere else; the Vite dev
-server proxies the same three so that a path which works in development works
-deployed, and both configurations point back to this paragraph.
+assets and forwards four path prefixes to Django: `/api`; `/admin`;
+`/accounts`, which is every way of signing in
+([decision 0013](decisions/0013-administrator-sign-in.md)); and `/static`,
+which is the CSS and JavaScript those two sets of pages are built from — the
+app's bundle is served from `/assets`. That set is stated here and nowhere
+else; the Vite dev server proxies the same four so that a path which works in
+development works deployed, and both configurations point back to this
+paragraph.
 
 Two consequences worth knowing: there is no CORS configuration in production,
 and **no API URL is baked into the JavaScript bundle**, so the exact same
@@ -97,6 +100,22 @@ endpoint refuses a caller with no session at all — which is why
 [decision 0012](decisions/0012-two-populations.md)'s "an endpoint's audience is
 part of its contract" is met with a sentence and not a status code.
 
+## Signing in
+
+Under `/accounts`, and it is `django-allauth`'s rather than this project's:
+a local username and password, a second factor, and whichever of Google,
+Slack and a generic OpenID Connect provider a deployment has configured. Why
+those, and why signing in never grants anybody anything, is
+[decision 0013](decisions/0013-administrator-sign-in.md); which environment
+variables configure a provider is in
+[deployment](deployment.md#environment-variables).
+
+Two pieces of this project sit alongside it, both in `backend/src/inventory/`:
+`adapters.py`, which is where the "identity, never authority" rule is applied
+to an account a provider has just introduced, and `middleware.py`, which is
+what makes the second factor required rather than available on the local
+path. Each says why in its own docstring.
+
 Static files are collected at image build time and served by
 [whitenoise](https://whitenoise.readthedocs.io/) from the backend process. This
 is only for the Django admin's own CSS and JavaScript; application assets are
@@ -131,19 +150,22 @@ Named here so the gaps are visible rather than surprising:
   map the client caches, the resolver for one scanned code, and the batch
   write. They are listed once, in the generated schema; fetch `/api` or read
   [`/api/docs`](../DEVELOPERS.md#the-api-schema). The cart that holds a batch
-  in the browser is built; the scanner that fills it, the screens around it and
-  the label generator are not.
-- **Administrator sign-in and the administrative interface.** The catalogue
-  write API is built: items, locations, categories and labels are created and
-  edited through the API by somebody holding the staff flag, and a caller
-  without it is refused rather than shown a control that will not work. What is
-  missing is the sign-in that sets that flag on a session, and the screens that
-  use it. Who may write what is settled in
-  [decision 0012](decisions/0012-two-populations.md), the sign-in paths in
-  [0013](decisions/0013-administrator-sign-in.md), and where administrators
-  work in [0014](decisions/0014-one-interface.md). Every API endpoint but the
-  index, the health check and `/api/me` still requires a session, including the
-  two a volunteer needs.
+  in the browser is built, and so is the label generator: codes are minted
+  server-side and `/api/labels/sheet` renders a printable page of stickers.
+  Two of the screens around the cart are built as well — the volunteer picker
+  that says who a batch is attributed to, and the item list with its steppers
+  and packaging chips, which is the path that works with no camera and no
+  readable label. What is missing is the scanner itself and the submit bar
+  that sends a batch.
+- **The administrative interface.** The catalogue write API is built: items,
+  locations, categories and labels are created and edited through the API by
+  somebody holding the staff flag, and a caller without it is refused rather
+  than shown a control that will not work. Signing in is built too — see
+  below — so what is missing is the screens that use it. Who may write what is
+  settled in [decision 0012](decisions/0012-two-populations.md) and where
+  administrators work in [0014](decisions/0014-one-interface.md). Every API
+  endpoint but the index, the health check and `/api/me` still requires a
+  session, including the two a volunteer needs.
 - **Migration from the existing Google Sheet** (52 items, 3,439 submissions).
 - **Background jobs.** MeshDB uses Celery with Redis. Nothing here needs
   asynchronous work yet, so neither is deployed; the shape is known if that

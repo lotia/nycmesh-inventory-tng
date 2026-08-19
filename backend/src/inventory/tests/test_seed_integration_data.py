@@ -10,12 +10,16 @@ is left behind if creating it fails half way.
 import io
 import json
 from typing import Any, NoReturn
+from unittest.mock import ANY
 
+import pyotp
 import pytest
+from allauth.mfa.models import Authenticator
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import override_settings
+from django.test import Client, override_settings
+from django.urls import reverse
 
 from inventory.management.commands.seed_integration_data import ACKNOWLEDGEMENT
 from inventory.models import Category, Item, Location, Volunteer
@@ -137,3 +141,55 @@ def test_a_retired_item_or_location_is_revived_rather_than_published_retired() -
     assert scene["location"] == retired_place.pk
     assert Item.objects.get(pk=scene["item"]).active is True
     assert Location.objects.get(pk=scene["location"]).active is True
+
+
+@override_settings(DEBUG=True)
+def test_the_seeded_login_can_complete_the_second_factor_it_publishes() -> None:
+    """The published secret has to be a working one, not a plausible string.
+
+    Decision 0013 point 3 puts a second factor in front of the local password
+    path, and the browser suite takes that path because it is the only one it
+    can complete. So this scene is only a usable scene if the code computed
+    from what it prints actually gets a session -- which is the whole of the
+    integration suite's ability to sign in, asserted here where the failure
+    says why rather than minutes later at a login form.
+    """
+    scene = seed()
+
+    client = Client()
+    client.post(reverse("account_login"), {"login": scene["username"], "password": scene["password"]})
+    client.post(reverse("mfa_authenticate"), {"code": pyotp.TOTP(scene["totp_secret"]).now()})
+
+    assert client.get(reverse("me")).json() == {
+        "authenticated": True,
+        "username": scene["username"],
+        "administrator": True,
+        "capabilities": ANY,
+    }
+
+
+@override_settings(DEBUG=True)
+def test_the_seeded_login_has_recovery_codes_too() -> None:
+    """Point 3 asks for both, and a login with only one of them is a login
+    that cannot be recovered when the phone holding the other is lost.
+    """
+    run()
+
+    login = User.objects.get(username="integration")
+    assert Authenticator.objects.filter(user=login, type=Authenticator.Type.TOTP).exists()
+    assert Authenticator.objects.filter(user=login, type=Authenticator.Type.RECOVERY_CODES).exists()
+
+
+@override_settings(DEBUG=True)
+def test_reseeding_replaces_the_second_factor_along_with_the_password() -> None:
+    """The login is replaced outright so its credentials are the published ones.
+
+    Its authenticators have to go with it: a stale key left behind by an
+    earlier run would be a second one the suite has no secret for, and
+    allauth would happily accept a code from either.
+    """
+    run()
+    run()
+
+    login = User.objects.get(username="integration")
+    assert Authenticator.objects.filter(user=login, type=Authenticator.Type.TOTP).count() == 1

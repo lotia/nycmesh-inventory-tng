@@ -9,7 +9,7 @@ const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 // The paths that belong to Django rather than to the app. Which paths, and
 // why, is in docs/architecture.md; nginx.conf.template proxies the same set in
 // production and must be edited with this.
-const DJANGO_PATHS = ["api", "admin", "static"];
+const DJANGO_PATHS = ["api", "admin", "accounts", "static"];
 
 // Anchored, and for the reason nginx.conf.template gives for anchoring the
 // same set. Vite treats a key starting with `^` as a regular expression and

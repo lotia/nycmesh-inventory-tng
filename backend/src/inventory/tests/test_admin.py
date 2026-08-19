@@ -8,6 +8,7 @@ exists to replace.
 """
 
 import datetime
+import re
 from decimal import Decimal
 
 import pytest
@@ -22,6 +23,7 @@ from pytest_django.fixtures import Settings
 from simple_history.models import HistoricalChanges
 
 from inventory.models import (
+    CODE_PATTERN,
     Category,
     Item,
     ItemIdentifier,
@@ -106,7 +108,7 @@ def one_of_each_model(
             kind=ItemIdentifier.Kind.MFG_PART,
             value="LBE-5AC-GEN2",
         ),
-        Label: Label.objects.create(code="ABC23456", item=item),
+        Label: Label.objects.create(code="ABC2345678", item=item),
         Location: warehouse,
         StockMovement: StockMovement.objects.create(
             transaction=transaction,
@@ -217,3 +219,58 @@ def test_a_correction_is_appended_as_a_transaction_not_as_a_loose_movement(
 ) -> None:
     assert admin.site.get_model_admin(StockTransaction).has_add_permission(administrator_request)
     assert not admin.site.get_model_admin(StockMovement).has_add_permission(administrator_request)
+
+
+# --------------------------------------------------------------------------
+# Labels. The admin is a write path like any other, and the check constraint
+# `label_code_is_crockford_base32` holds it to the same format the API mints
+# to -- so the form has to be able to satisfy that and to say so when it
+# cannot. See LabelAdmin in inventory/admin.py.
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.usefixtures("_static_files_are_not_collected")
+def test_the_label_add_form_arrives_holding_a_minted_code(editor: Client) -> None:
+    """Nobody can invent one: the constraint refuses everything but the format."""
+    page = editor.get(reverse("admin:inventory_label_add"))
+
+    minted = page.context["adminform"].form.initial["code"]
+    assert re.fullmatch(CODE_PATTERN, minted), minted
+
+
+@pytest.mark.usefixtures("_static_files_are_not_collected")
+def test_the_admin_prints_a_label_with_the_code_it_offered(editor: Client, item: Item) -> None:
+    minted = editor.get(reverse("admin:inventory_label_add")).context["adminform"].form.initial["code"]
+
+    response = editor.post(
+        reverse("admin:inventory_label_add"),
+        {"code": minted, "item": item.pk, "quantity": "100"},
+    )
+
+    assert response.status_code == 302, response.content
+    assert Label.objects.get().code == minted
+
+
+@pytest.mark.usefixtures("_static_files_are_not_collected")
+def test_a_code_outside_the_format_is_a_form_error_and_not_an_error_page(editor: Client, item: Item) -> None:
+    """The constraint would otherwise surface as an IntegrityError and a 500."""
+    response = editor.post(
+        reverse("admin:inventory_label_add"),
+        {"code": "SHORT", "item": item.pk, "quantity": "1"},
+    )
+
+    assert response.status_code == 200
+    assert response.context["adminform"].form.errors["code"]
+    assert not Label.objects.exists()
+
+
+@pytest.mark.usefixtures("_static_files_are_not_collected")
+def test_a_printed_code_cannot_be_retyped_in_the_admin_either(editor: Client, item: Item) -> None:
+    """The sticker is already on a shelf; renaming it would 404 that sticker."""
+    label = Label.objects.create(code="ABC2345678", item=item)
+    url = reverse("admin:inventory_label_change", args=[label.pk])
+
+    editor.post(url, {"code": "ZZZZZZZZZZ", "item": item.pk, "quantity": "1"})
+
+    label.refresh_from_db()
+    assert label.code == "ABC2345678"

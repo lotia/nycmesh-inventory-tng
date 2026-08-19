@@ -32,6 +32,8 @@ spec:
           command: ["python", "manage.py", "migrate", "--noinput"]
           env:
             {{- include "inventory-tng.backendEnv" . | nindent 12 }}
+          envFrom:
+            {{- include "inventory-tng.backendEnvFrom" . | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

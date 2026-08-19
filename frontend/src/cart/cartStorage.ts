@@ -3,15 +3,12 @@
  * reloads does not lose the scans in it. See
  * docs/decisions/0011-qr-batch-scanning.md section 6.
  */
+import { isNumber, isText, matches, read, type Shape, write } from "../storage";
 import { type CartState, createCart } from "./cartState";
 
 /** Versioned: a cart written by an older shape is ignored, never migrated. */
 export const STORAGE_KEY = "nycmesh-inventory.cart.v1";
 
-type Shape = Record<string, (value: unknown) => boolean>;
-
-const isText = (value: unknown): boolean => typeof value === "string";
-const isNumber = (value: unknown): boolean => typeof value === "number";
 const isIdOrNobody = (value: unknown): boolean => value === null || typeof value === "number";
 
 /**
@@ -38,12 +35,6 @@ const LINE_SHAPE: Shape = {
   unitOfMeasure: isText,
 };
 
-function matches(value: unknown, shape: Shape): boolean {
-  if (typeof value !== "object" || value === null) return false;
-  const fields = value as Record<string, unknown>;
-  return Object.entries(shape).every(([field, holds]) => holds(fields[field]));
-}
-
 function isCartState(value: unknown): value is CartState {
   if (!matches(value, CART_SHAPE)) return false;
   const { lines } = value as Record<string, unknown>;
@@ -52,21 +43,9 @@ function isCartState(value: unknown): value is CartState {
 
 /** The stored cart, or a new one if there is nothing usable to restore. */
 export function loadCart(): CartState {
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    const parsed: unknown = stored === null ? null : JSON.parse(stored);
-    if (isCartState(parsed)) return parsed;
-  } catch {
-    // Unparseable, or storage denied outright -- Safari's private mode throws
-    // on access rather than returning null. An in-memory cart still works.
-  }
-  return createCart();
+  return read(STORAGE_KEY, isCartState) ?? createCart();
 }
 
 export function saveCart(cart: CartState): void {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cart));
-  } catch {
-    // Full or denied. Losing persistence must not lose the scan in hand.
-  }
+  write(STORAGE_KEY, cart);
 }

@@ -10,13 +10,18 @@ see who changed a record and when. The ledger models are registered too, but
 append-only: see ``AppendOnlyAdmin`` below.
 """
 
+import re
 from typing import Any
 
+from django import forms
 from django.contrib import admin
 from django.http import HttpRequest
 from simple_history.admin import SimpleHistoryAdmin
 
 from inventory.models import (
+    CODE_ALPHABET,
+    CODE_LENGTH,
+    CODE_PATTERN,
     Category,
     Item,
     ItemIdentifier,
@@ -92,10 +97,60 @@ class VendorOfferAdmin(SimpleHistoryAdmin):
     list_filter = ["vendor", "is_preferred"]
 
 
+class LabelForm(forms.ModelForm):
+    """A label as the admin edits one.
+
+    ``label_code_is_crockford_base32`` is the thing that enforces the format;
+    this only decides what an administrator is told, which is the same
+    distinction ``inventory/serializers.py`` draws. Without it the constraint
+    is reached as an ``IntegrityError`` and an error page, on a form that had
+    no way to say what was wrong. The pattern is imported rather than restated
+    so there is still one definition of it.
+    """
+
+    class Meta:
+        model = Label
+        # Named rather than `__all__`, so a field added to Label is a decision
+        # about whether an administrator edits it rather than an assumption.
+        # `printed_at` is the database's and is not on the list for that
+        # reason -- it is the label's age, not a date somebody chooses.
+        fields = ["code", "item", "location", "quantity", "revoked_at"]
+
+    def clean_code(self) -> str:
+        code = Label.normalise_code(self.cleaned_data["code"])
+        if not re.match(CODE_PATTERN, code):
+            raise forms.ValidationError(
+                f"A code is {CODE_LENGTH} characters of {CODE_ALPHABET}. "
+                "Leave the minted one alone unless you are recording a sticker printed elsewhere."
+            )
+        return code
+
+
 @admin.register(Label)
 class LabelAdmin(SimpleHistoryAdmin):
+    """Printing and revoking a label, from the fallback interface.
+
+    The code is minted by default and frozen once printed, which is
+    ``LabelSerializer``'s rule arriving at the other write path: ``label_code_is_crockford_base32`` refuses anything
+    else, and a code typed by hand would reach that constraint as an
+    ``IntegrityError`` rather than as something the form could say; and a code
+    changed after printing would 404 a sticker already out on a shelf.
+    """
+
+    form = LabelForm
     list_display = ["code", "item", "location", "quantity", "printed_at", "revoked_at"]
     search_fields = ["code"]
+
+    def get_changeform_initial_data(self, request: HttpRequest) -> dict[str, Any]:
+        """Mint the code the add form arrives holding.
+
+        Offered rather than imposed, so an administrator recovering a label
+        from a batch printed elsewhere can still type the code on the sticker.
+        """
+        return {**super().get_changeform_initial_data(request), "code": Label.mint_unique_code()}
+
+    def get_readonly_fields(self, request: HttpRequest, obj: Any = None) -> list[str]:
+        return ["code"] if obj is not None else []
 
 
 # ---------------------------------------------------------------------------

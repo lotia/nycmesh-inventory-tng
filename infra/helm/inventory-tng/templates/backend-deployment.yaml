@@ -31,6 +31,8 @@ spec:
               containerPort: {{ .Values.backend.port }}
           env:
             {{- include "inventory-tng.backendEnv" . | nindent 12 }}
+          envFrom:
+            {{- include "inventory-tng.backendEnvFrom" . | nindent 12 }}
           livenessProbe:
             httpGet:
               path: /api/healthz

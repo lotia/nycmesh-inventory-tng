@@ -72,7 +72,11 @@ def test_every_endpoint_documents_its_response(schema: Mapping[str, Any]) -> Non
                     continue
                 content = response.get("content")
                 assert content, f"{where} -> {code} documents no response body"
-                assert "schema" in content["application/json"], f"{where} -> {code} has an untyped response"
+                # Every media type it offers, not application/json alone: the
+                # label sheet is a printable HTML document and is the one
+                # endpoint here that answers with anything else.
+                for media_type, body in content.items():
+                    assert "schema" in body, f"{where} -> {code} has an untyped {media_type} response"
 
 
 def test_the_schema_describes_every_endpoint_the_index_advertises(schema: Mapping[str, Any]) -> None:

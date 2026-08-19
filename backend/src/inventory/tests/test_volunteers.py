@@ -57,6 +57,52 @@ def test_search_puts_the_closest_match_first(client: Client) -> None:
     assert names(client.get(URL, {"search": "Sean"}))[0] == "Sean"
 
 
+def test_search_finds_a_volunteer_by_the_email_address_they_typed(client: Client) -> None:
+    """The field that exists to tell two Seans apart has to be searchable.
+
+    A volunteer who types their own address and is shown nobody adds a
+    duplicate -- the one outcome this endpoint exists to prevent, reached
+    through the field added to prevent it.
+    """
+    Volunteer.objects.create(display_name="Sean McGinnis", email="sean@example.org")
+    Volunteer.objects.create(display_name="Olivia")
+    assert names(client.get(URL, {"search": "sean@example.org"})) == ["Sean McGinnis"]
+
+
+def test_search_finds_a_volunteer_by_their_slack_id(client: Client) -> None:
+    Volunteer.objects.create(display_name="Sean McGinnis", slack_id="U024BE7LH")
+    assert names(client.get(URL, {"search": "U024BE7LH"})) == ["Sean McGinnis"]
+
+
+def test_an_identifier_is_matched_however_it_was_capitalised(client: Client) -> None:
+    """An address copied off a phone keyboard arrives however it arrives."""
+    Volunteer.objects.create(display_name="Sean McGinnis", email="sean@example.org")
+    assert names(client.get(URL, {"search": "Sean@Example.ORG"})) == ["Sean McGinnis"]
+
+
+def test_part_of_an_address_finds_nobody(client: Client) -> None:
+    """Matching an identifier is a deliberate act and a whole one.
+
+    A substring search over identifiers would turn the pick-list into a
+    directory anybody could walk a letter at a time -- and nobody types half
+    an address looking for themselves.
+    """
+    Volunteer.objects.create(display_name="Sean McGinnis", email="sean@example.org")
+    assert names(client.get(URL, {"search": "@example.org"})) == []
+
+
+def test_an_identifier_on_somebody_the_list_will_not_show_finds_nobody(client: Client) -> None:
+    """Widening the search does not widen who is offered.
+
+    A merged duplicate keeps its address, and this is the search that comes
+    back empty and sends the volunteer to self-registration -- where the 409
+    of decision 0015 names the survivor.
+    """
+    survivor = Volunteer.objects.create(display_name="Sean McGinnis")
+    Volunteer.objects.create(display_name="sean", email="sean@example.org", merged_into=survivor)
+    assert names(client.get(URL, {"search": "sean@example.org"})) == []
+
+
 def test_search_that_matches_nobody_is_an_empty_list_not_an_error(client: Client, volunteer: Volunteer) -> None:
     """An empty result is what tells the client to offer self-registration."""
     response = client.get(URL, {"search": "Zzyzx"})

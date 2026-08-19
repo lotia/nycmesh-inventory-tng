@@ -10,7 +10,7 @@ expressible on the view itself.
 
 from typing import TYPE_CHECKING
 
-from rest_framework.permissions import SAFE_METHODS, BasePermission, IsAuthenticated
+from rest_framework.permissions import SAFE_METHODS, AllowAny, BasePermission, IsAuthenticated
 from rest_framework.request import Request
 
 if TYPE_CHECKING:
@@ -80,3 +80,20 @@ def administrators_only(view: APIView, method: str) -> bool:
     if method.upper() in SAFE_METHODS:
         return False
     return any(isinstance(permission, StaffWrites) for permission in view.get_permissions())
+
+
+def open_to_anybody(view: APIView) -> bool:
+    """Whether this view asks nothing at all of the caller.
+
+    True of the three endpoints that have to answer before anybody has signed
+    in, or finished signing in: the index that hands out the CSRF cookie, the
+    health check the cluster probes, and ``/api/me``, whose whole job is to say
+    what the caller is. Everything else is guarded by something.
+
+    One predicate rather than an ``AllowAny`` check repeated wherever the
+    question comes up -- the schema asks it to decide whether an operation can
+    answer 403, and RequireSecondFactor asks it to decide what an unfinished
+    session may still reach. Those two must agree: an endpoint that documents
+    no refusal and then refuses is a lie in the contract.
+    """
+    return all(isinstance(permission, AllowAny) for permission in view.get_permissions())

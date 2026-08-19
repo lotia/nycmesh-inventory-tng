@@ -36,6 +36,12 @@ chart and from a Secret.
 | `NUM_PROXIES` | no | chart (`django.numProxies`) | Proxies between the browser and Django; the default `2` matches the deployed chain of ingress then the frontend's nginx. It decides whose request a rate limit counts against, so it must match reality — see [`.env.sample`](../.env.sample) for which direction is dangerous |
 | `APPEND_BURST_RATE` | no | chart (`django.appendBurstRate`) | How fast one client may append. What each rate is for, and why the defaults are what they are, is in [`.env.sample`](../.env.sample) |
 | `APPEND_SUSTAINED_RATE` | no | chart (`django.appendSustainedRate`) | The same limit over an hour, for a flood paced to stay under the burst rate |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | provider Secret | Offers Google sign-in. Absent, or half set, means it is not offered |
+| `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` | no | provider Secret | Offers Slack sign-in, the strongest signal that somebody is actually involved in NYC Mesh |
+| `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_SERVER_URL` | no | provider Secret | Offers a generic OpenID Connect provider. `OIDC_SERVER_URL` is the issuer, the URL whose `/.well-known/openid-configuration` describes the rest. All three are needed |
+| `OIDC_NAME` | no | provider Secret | What the button for that provider says. Default `Single sign-on` |
+| `OIDC_PROVIDER_ID` | no | provider Secret | Appears in that provider's callback URL, so it must match what was registered with it. Default `oidc` |
+| `LABEL_BASE_URL` | no | chart (`django.labelBaseUrl`) | The origin encoded into every printed QR code. It is on the stickers, not in the database, so changing it does not change the labels already on the shelves: move the app and keep a permanent redirect from the old host rather than reprinting. It must stay within what QR alphanumeric mode can carry and short enough to print at the module size the generator insists on — both are refused loudly rather than printed, see [`.env.sample`](../.env.sample) |
 
 Both rates are counted **per backend process**, because the counters live in
 Django's default in-memory cache. Three gunicorn workers per pod means a client
@@ -44,6 +50,14 @@ count, so set the rate for one process and expect the deployment to allow more.
 Making it exact would take a cache shared between processes, which is not
 configured today — a bound that is loose is still a bound, and what it defends
 is [decision 0012](decisions/0012-two-populations.md).
+
+None of the provider variables grants anybody anything.
+[Decision 0013](decisions/0013-administrator-sign-in.md) point 5 is the rule:
+a new account arriving from any provider holds no permissions until an existing
+administrator grants it the staff flag, in the admin. Configuring a provider
+adds a way to prove who you are and nothing else — and the local username and
+password path is retained whatever else is set, because it is the way in when
+a provider is unreachable or an account is lost.
 
 The frontend image takes one variable, `BACKEND_ORIGIN`, which the chart sets to
 the backend Service. Nothing environment-specific is compiled into the
@@ -61,6 +75,28 @@ kubectl create secret generic inventory-tng-secrets \
   --from-literal=DJANGO_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(64))')" \
   --from-literal=DATABASE_URL='postgres://inventory:CHANGEME@postgres:5432/inventory_tng'
 ```
+
+### The provider Secret
+
+A second Secret, named by `django.providerSecret` and **optional**. Every key
+in it becomes a backend environment variable, so which sign-in providers a
+deployment offers is what is in this Secret rather than anything in the chart
+or the image. Create it only if you are configuring one:
+
+```bash
+kubectl create secret generic inventory-tng-providers \
+  --namespace inventory-tng \
+  --from-literal=GOOGLE_CLIENT_ID='...' \
+  --from-literal=GOOGLE_CLIENT_SECRET='...'
+```
+
+If it does not exist the deployment starts anyway and offers the local
+username-and-password path. Adding a provider later is `kubectl create secret`
+and a restart of the backend pods, not a release.
+
+Register the redirect URI with each provider as this deployment's origin
+followed by `/accounts/<provider>/login/callback/` — for the generic OpenID
+Connect one, `/accounts/oidc/<OIDC_PROVIDER_ID>/login/callback/`.
 
 ## Database
 
@@ -96,11 +132,12 @@ supported, because the camera still needs a secure context.
 ### Administrative access
 
 [Decision 0013](decisions/0013-administrator-sign-in.md) restricts the
-administrative routes — `/admin`, and the administrative operations of the API
-— to a network volunteers do not need: the mesh, a VPN, or an identity-aware
-proxy. Administrators are few and their locations predictable, so this costs
-them very little, and it is the one place a network boundary fits without
-excluding a volunteer on a phone wherever the stock happens to be.
+administrative routes — `/admin`, `/accounts`, and the administrative
+operations of the API — to a network volunteers do not need: the mesh, a VPN,
+or an identity-aware proxy. Administrators are few and their locations
+predictable, so this costs them very little, and it is the one place a network
+boundary fits without excluding a volunteer on a phone wherever the stock
+happens to be.
 
 Express it at the ingress or in front of it. Nothing in the application can
 detect its absence, so it is a precondition somebody has to honour rather than
@@ -156,6 +193,27 @@ the old pods keep serving.
 kubectl -n inventory-tng exec -it deploy/inventory-tng-backend -- \
   python manage.py createsuperuser
 ```
+
+That account signs in at `/accounts/login/` — the Django admin's own login form
+redirects there — and is asked to set up an authenticator app before it can
+reach anything else, which is
+[decision 0013](decisions/0013-administrator-sign-in.md) point 3. Everybody
+after them signs in however they like and is granted the staff flag by this
+account, in the admin under **Users**; that grant is the only thing that makes
+an administrator, and no provider can do it.
+
+**Flush the sessions on the release that first brings sign-in in.** The second
+factor is required of sessions allauth itself created — see `RequireSecondFactor`
+in `backend/src/inventory/middleware.py` — so anybody already signed in through
+the Django admin's old login form keeps a password-only session for as long as
+it lives. Once, against the deployed database:
+
+```bash
+python manage.py clearsessions --all 2>/dev/null || \
+  python -c "import django;django.setup();from django.contrib.sessions.models import Session;Session.objects.all().delete()"
+```
+
+Everybody signs in again, this time through the door that asks for a code.
 
 ## Deploying to CodeNOW
 

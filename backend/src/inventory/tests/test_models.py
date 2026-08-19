@@ -353,12 +353,12 @@ def test_offer_units_per_order_must_be_positive(item: Item, vendor: Vendor) -> N
 
 
 def test_label_str(item: Item) -> None:
-    label = Label.objects.create(code="7QK2P9", item=item)
-    assert str(label) == "7QK2P9"
+    label = Label.objects.create(code="7QK3M2XV9A", item=item)
+    assert str(label) == "7QK3M2XV9A"
 
 
 def test_label_is_active_until_revoked(item: Item) -> None:
-    label = Label.objects.create(code="7QK2P9", item=item)
+    label = Label.objects.create(code="7QK3M2XV9A", item=item)
     assert label.is_active is True
     label.revoked_at = datetime.datetime(2026, 8, 18, tzinfo=datetime.UTC)
     label.save()
@@ -367,33 +367,33 @@ def test_label_is_active_until_revoked(item: Item) -> None:
 
 def test_label_must_target_something(item: Item) -> None:
     with pytest.raises(IntegrityError):
-        Label.objects.create(code="ORPHAN")
+        Label.objects.create(code="0RPHAN0000")
 
 
 def test_label_cannot_target_both(item: Item, warehouse: Location) -> None:
     with pytest.raises(IntegrityError):
-        Label.objects.create(code="BOTH", item=item, location=warehouse)
+        Label.objects.create(code="B0TH000000", item=item, location=warehouse)
 
 
 def test_label_may_target_a_location(warehouse: Location) -> None:
-    label = Label.objects.create(code="LOC1", location=warehouse)
+    label = Label.objects.create(code="10CAT10N01", location=warehouse)
     assert label.location == warehouse
 
 
 def test_reprinting_replaces_the_token_not_the_item(item: Item) -> None:
     """The faded-label complaint. Revoke and reprint without touching the item."""
-    old = Label.objects.create(code="FADED", item=item)
+    old = Label.objects.create(code="FADED00000", item=item)
     old.revoked_at = datetime.datetime(2026, 8, 18, tzinfo=datetime.UTC)
     old.save()
-    new = Label.objects.create(code="FRESH", item=item)
+    new = Label.objects.create(code="FRESH00000", item=item)
     assert new.item == item
     assert item.labels.count() == 2  # ty: ignore[unresolved-attribute]
 
 
 def test_label_codes_are_unique(item: Item) -> None:
-    Label.objects.create(code="DUP", item=item)
+    Label.objects.create(code="DVP0000000", item=item)
     with pytest.raises(IntegrityError):
-        Label.objects.create(code="DUP", item=item)
+        Label.objects.create(code="DVP0000000", item=item)
 
 
 def test_label_carries_the_quantity_one_scan_means(item: Item) -> None:
@@ -401,9 +401,9 @@ def test_label_carries_the_quantity_one_scan_means(item: Item) -> None:
 
     Read back from the database, so what is proved is the stored column.
     """
-    packet = Label.objects.create(code="PACKET", item=item, quantity=Decimal("100"))
-    single = Label.objects.create(code="SINGLE", item=item)
-    offcut = Label.objects.create(code="OFFCUT", item=item, quantity=Decimal("30.500"))
+    packet = Label.objects.create(code="PACKET0000", item=item, quantity=Decimal("100"))
+    single = Label.objects.create(code="S1NG1E0000", item=item)
+    offcut = Label.objects.create(code="0FFCVT0000", item=item, quantity=Decimal("30.500"))
     for label in (packet, single, offcut):
         label.refresh_from_db()
     assert packet.quantity == Decimal("100")
@@ -414,14 +414,14 @@ def test_label_carries_the_quantity_one_scan_means(item: Item) -> None:
 
 def test_label_quantity_must_be_positive(item: Item) -> None:
     with pytest.raises(IntegrityError):
-        Label.objects.create(code="ZERO", item=item, quantity=Decimal("0"))
+        Label.objects.create(code="ZER0000000", item=item, quantity=Decimal("0"))
 
 
 def test_label_quantity_is_one_for_a_location(warehouse: Location) -> None:
-    pinned = Label.objects.create(code="LOCONE", location=warehouse, quantity=Decimal("1"))
+    pinned = Label.objects.create(code="10C0NE0000", location=warehouse, quantity=Decimal("1"))
     assert pinned.quantity == Decimal("1")
     with pytest.raises(IntegrityError):
-        Label.objects.create(code="LOCQTY", location=warehouse, quantity=Decimal("100"))
+        Label.objects.create(code="10CQTY0000", location=warehouse, quantity=Decimal("100"))
 
 
 # --------------------------------------------------------------------------
@@ -494,12 +494,12 @@ def test_a_partial_save_does_not_normalise_what_it_will_not_write(volunteer: Vol
 
 def test_a_partial_save_does_not_normalise_a_code_it_will_not_write(item: Item) -> None:
     """The same rule as Volunteer.save, for the same reason."""
-    label = Label.objects.create(code="7QK2P9", item=item)
-    label.code = "wall01"
+    label = Label.objects.create(code="7QK3M2XV9A", item=item)
+    label.code = "wall01lo23"
 
     label.revoked_at = datetime.datetime(2026, 8, 19, tzinfo=datetime.UTC)
     label.save(update_fields=["revoked_at"])
     label.refresh_from_db()
 
-    assert label.code == "7QK2P9"
+    assert label.code == "7QK3M2XV9A"
     assert label.revoked_at is not None

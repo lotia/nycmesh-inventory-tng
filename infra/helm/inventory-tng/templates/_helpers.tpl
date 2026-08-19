@@ -40,6 +40,8 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
   value: {{ .Values.django.appendBurstRate | quote }}
 - name: APPEND_SUSTAINED_RATE
   value: {{ .Values.django.appendSustainedRate | quote }}
+- name: LABEL_BASE_URL
+  value: {{ .Values.django.labelBaseUrl | quote }}
 - name: DJANGO_SECRET_KEY
   valueFrom:
     secretKeyRef:
@@ -50,4 +52,19 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
     secretKeyRef:
       name: {{ .Values.django.existingSecret }}
       key: DATABASE_URL
+{{- end -}}
+
+{{/*
+Sign-in provider credentials, from an optional Secret.
+
+envFrom rather than a named list: which providers a deployment offers is a
+property of what is in that Secret (docs/decisions/0013-administrator-sign-in.md
+point 1), so adding one should not need a chart change. `optional: true` is
+what makes a deployment with no providers configured -- the ordinary case --
+start rather than wait forever for a Secret nobody meant to create.
+*/}}
+{{- define "inventory-tng.backendEnvFrom" -}}
+- secretRef:
+    name: {{ .Values.django.providerSecret }}
+    optional: true
 {{- end -}}

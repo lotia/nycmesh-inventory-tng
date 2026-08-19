@@ -41,7 +41,22 @@ services:
       NUM_PROXIES: ${NUM_PROXIES:-1}
       APPEND_BURST_RATE: ${APPEND_BURST_RATE:-20/min}
       APPEND_SUSTAINED_RATE: ${APPEND_SUSTAINED_RATE:-300/hour}
+      LABEL_BASE_URL: ${LABEL_BASE_URL:-https://inventory.nycmesh.net}
       DATABASE_URL: postgres://${POSTGRES_USER:-inventory}:${POSTGRES_PASSWORD:-inventory}@postgres:5432/${POSTGRES_DB:-inventory_tng}
+      # Sign-in providers, all optional and all empty by default: a provider
+      # whose pair is absent is simply not offered, so this stack comes up
+      # with the local password path of
+      # docs/decisions/0013-administrator-sign-in.md and nothing else. Fill
+      # any of them in .env to try one against a real provider locally.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      SLACK_CLIENT_ID: ${SLACK_CLIENT_ID:-}
+      SLACK_CLIENT_SECRET: ${SLACK_CLIENT_SECRET:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_SERVER_URL: ${OIDC_SERVER_URL:-}
+      OIDC_NAME: ${OIDC_NAME:-Single sign-on}
+      OIDC_PROVIDER_ID: ${OIDC_PROVIDER_ID:-oidc}
     ports:
       - "8000:8000"
     # Migrations run here for convenience in local dev only. In Kubernetes they

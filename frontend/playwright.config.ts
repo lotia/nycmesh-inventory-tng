@@ -16,8 +16,15 @@ const BACKEND_PORT = 8000;
 // "server failed to start".
 const SERVER_BOOT_TIMEOUT = 120_000;
 
+// A sign-in here completes a real one-time password, and the server accepts
+// each code once for the thirty seconds it is valid -- so a test that signs in
+// straight after another one waits for the next code. See integration/sign-in.ts.
+// Playwright's 30s default would report that wait as a timeout.
+const SIGN_IN_MAY_WAIT_FOR_A_FRESH_CODE = 90_000;
+
 export default defineConfig({
   testDir: "./integration",
+  timeout: SIGN_IN_MAY_WAIT_FOR_A_FRESH_CODE,
   // A committed `test.only` would otherwise leave this job green having run a
   // single test -- on the one suite that can see this class of bug at all.
   forbidOnly: !!process.env.CI,

@@ -67,6 +67,7 @@ That brings up PostgreSQL, the Django API, and the frontend together:
 | Frontend | <http://localhost:8080> |
 | API health check | <http://localhost:8000/api/healthz> |
 | API docs (OpenAPI) | <http://localhost:8000/api/docs> |
+| Sign in | <http://localhost:8000/accounts/login/> |
 | Django admin | <http://localhost:8000/admin/> |
 
 To create an admin login:
@@ -74,6 +75,11 @@ To create an admin login:
 ```bash
 docker compose exec backend python manage.py createsuperuser
 ```
+
+Signing in with it the first time asks you to set up an authenticator app: a
+password on its own is not a way into this system, and how administrators sign
+in is
+[decision 0013](docs/decisions/0013-administrator-sign-in.md).
 
 For the full development environment — running the services outside Docker, tests,
 linting, and day-to-day commands — see [DEVELOPERS.md](DEVELOPERS.md).

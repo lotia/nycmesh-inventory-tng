@@ -58,10 +58,17 @@ Frontend on <http://localhost:8080>, API on <http://localhost:8000>. Migrations
 run automatically on start.
 
 ```bash
-docker compose exec backend python manage.py createsuperuser   # admin login
+docker compose exec backend python manage.py createsuperuser   # an administrator
 docker compose logs -f backend                                 # tail logs
 docker compose down -v                                         # stop, wipe database
 ```
+
+Sign in at <http://localhost:8080/accounts/login/>. The first sign-in asks that
+account to set up an authenticator app before it can reach anything, because
+[decision 0013](docs/decisions/0013-administrator-sign-in.md) requires a second
+factor of a local password. Which providers a deployment offers besides that
+one is configuration; the variables are in
+[deployment](docs/deployment.md#environment-variables).
 
 > **If you had this stack running before August 2026**, run `docker compose down
 > -v` once. The database volume now mounts `/var/lib/postgresql` rather than
@@ -426,10 +433,17 @@ cd frontend && npx playwright install chromium
 Servers, migrations and the fixed test scene are all handled by the suite
 itself, so there is no separate setup step, and a server you already have
 running is reused without changing that. The scene comes from
-`manage.py seed_integration_data`, which creates a login whose password is
-written down in this repository and so refuses to run unless `DJANGO_DEBUG` is
-on *and* it is passed the flag that acknowledges that. Running it by hand means
-typing that flag; the command says why.
+`manage.py seed_integration_data`, which creates a login whose password *and*
+whose TOTP secret are written down in this repository and so refuses to run
+unless `DJANGO_DEBUG` is on *and* it is passed the flag that acknowledges that.
+Running it by hand means typing that flag; the command says why.
+
+The suite signs in through the local password path of
+[decision 0013](docs/decisions/0013-administrator-sign-in.md) and completes the
+real second factor, computing the code from that published secret with `pyotp`.
+An OAuth round trip to Google or Slack cannot be completed from CI, so the
+provider paths are covered in the backend suite instead, where a callback can
+be finished without dialling anybody.
 
 They write to your development database rather than a throwaway one, because
 the point is to exercise the servers you actually run.

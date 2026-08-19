@@ -90,6 +90,15 @@ Maps an opaque printed token to the thing it names, so that a faded or damaged
 label can be revoked and reprinted without touching item identity. Fields:
 `code`, `item`, `location`, `quantity`, `printed_at`, `revoked_at`.
 
+`code` is minted by the server, never supplied by a client: ten characters of
+Crockford's Base32 — the digits and the uppercase letters less `I`, `L`, `O` and
+`U` — drawn from `secrets`. The alphabet and the length are a check constraint
+rather than a rule the minter is trusted to keep, because a code containing one
+of the excluded letters folds to a string matching nothing and would be
+unresolvable for the life of the object carrying it. Why that alphabet, and what
+is printed around the code on the sticker, is in
+[decision 0011](decisions/0011-qr-batch-scanning.md#3-the-printed-label-an-uppercase-url-wrapping-an-opaque-code).
+
 `quantity` is what one scan of that token means, in the unit of the thing the
 label names. It defaults to `1`, must be positive, and is constrained to `1` on
 a location label. Why the multiplier belongs on the label rather than on the

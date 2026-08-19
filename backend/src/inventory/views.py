@@ -6,16 +6,19 @@ from django.db.models import Prefetch, Q, QuerySet
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django_filters.rest_framework import CharFilter, FilterSet
-from drf_spectacular.utils import extend_schema, extend_schema_view, inline_serializer
+from django_filters.rest_framework import BaseInFilter, CharFilter, FilterSet
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view, inline_serializer
 from rest_framework import serializers, status
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateAPIView
+from rest_framework.exceptions import ValidationError
+from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateAPIView
 from rest_framework.permissions import SAFE_METHODS, AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
+from inventory.labels import LabelSheetRenderer, sheet
 from inventory.models import (
     Category,
     Item,
@@ -509,29 +512,54 @@ OFFERED_VOLUNTEERS = Volunteer.objects.selectable()
 
 
 class VolunteerFilter(FilterSet):
-    """Fuzzy name search over the pick-list.
+    """Fuzzy search over the pick-list, by name or by identifier.
 
-    Two lookups, not one. ``icontains`` is what makes typing the first few
-    letters work at all -- trigram similarity to a two-letter fragment is near
-    zero -- while the similarity match is what finds Shaun when the ledger
-    says Sean.
+    Two lookups over the name, not one. ``icontains`` is what makes typing the
+    first few letters work at all -- trigram similarity to a two-letter
+    fragment is near zero -- while the similarity match is what finds Shaun
+    when the ledger says Sean.
+
+    The identifiers are searched as well, and exactly. VolunteerSerializer
+    carries ``email`` and ``slack_id`` because two people called Sean are why
+    the list is searched before anybody adds themselves; a volunteer who types
+    their own address and is shown nobody adds a duplicate, which is the one
+    outcome this endpoint exists to prevent, arrived at through the fields
+    added to prevent it. Substring is not offered on them. Typing an identifier
+    is a deliberate identification and a whole one, and half an address is
+    nobody's: matching a fragment would let a near-miss read as a hit, on
+    exactly the field that is there to tell two people apart. Not a privacy
+    measure -- the pick-list already shows every volunteer's identifiers to
+    anybody who may read it.
 
     Only the similarity half uses the GIN trigram index: ``icontains``
     compiles to ``UPPER(display_name) LIKE ...``, which an index on the bare
-    column cannot serve, and the two are ORed, so the plan scans the table and
-    sorts. That is the right trade at this size -- 65 volunteers -- and the
+    column cannot serve, and the lookups are ORed, so the plan scans the table
+    and sorts. That is the right trade at this size -- 65 volunteers -- and the
     alternative, a case-sensitive ``contains``, would stop "sean" finding
     "Sean", which is how the picker is actually used.
     """
 
-    search = CharFilter(method="by_name", label="Fuzzy name search")
+    search = CharFilter(method="by_name_or_identifier", label="Fuzzy name search, or an exact identifier")
 
-    def by_name(self, queryset: QuerySet[Volunteer], name: str, value: str) -> QuerySet[Volunteer]:
+    def by_name_or_identifier(
+        self,
+        queryset: QuerySet[Volunteer],
+        name: str,
+        value: str,
+    ) -> QuerySet[Volunteer]:
         return (
-            queryset.filter(Q(display_name__icontains=value) | Q(display_name__trigram_similar=value))
+            queryset.filter(
+                Q(display_name__icontains=value)
+                | Q(display_name__trigram_similar=value)
+                | Q(email__iexact=value)
+                | Q(slack_id__iexact=value)
+            )
             .annotate(similarity=TrigramSimilarity("display_name", value))
             # Closest first; the rest is the model's ordering, tie-break and
             # all, because a search result is paginated like any other list.
+            # An identifier match sorts to a similarity of near zero, which is
+            # right: it is either the only row or the odd one out among names
+            # that actually look like what was typed.
             .order_by("-similarity", "display_name", "pk")
         )
 
@@ -874,6 +902,116 @@ class LabelListView(ReadsAndWritesDiffer, ListCreateAPIView):
     # The cached map drops what it can (see LabelMapSerializer); printing a
     # label needs the whole row back.
     write_serializer_class = LabelSerializer
+
+
+# Far above a real print run, which is a page or two of stickers somebody is
+# about to stand up and apply. It exists so one request cannot hold a worker
+# encoding symbols for as long as a query string can be made long. Same shape
+# of limit, and the same reasoning, as MAX_MOVEMENTS in serializers.py.
+MAX_SHEET_LABELS = 200
+
+
+class LabelSheetFilter(FilterSet):
+    """Which labels a sheet is asked for.
+
+    A filter rather than a lookup, so a code that names nothing is simply not
+    printed. The alternative -- refusing the whole sheet and naming the bad
+    code -- would fail a print run of forty stickers over one typo in a query
+    string nobody typed by hand.
+
+    Normalised on the way in, because every other way of naming a code here
+    is: ``LabelResolveView`` folds and uppercases a scanned or typed one, and
+    a sheet that answered a lowercase code with a blank page would be the one
+    place in this API where the canonical form is the caller's problem.
+    """
+
+    code = BaseInFilter(field_name="code", method="by_code", label="Codes to print, comma separated")
+
+    class Meta:
+        model = Label
+        fields = ["code"]
+
+    def by_code(self, queryset: QuerySet[Label], name: str, value: list[str]) -> QuerySet[Label]:
+        return queryset.filter(code__in=[Label.normalise_code(code) for code in value])
+
+
+@extend_schema(
+    summary="Render labels as a printable sheet",
+    # Named here rather than derived from LabelSheetFilter: drf-spectacular
+    # reads a filter backend's parameters only for an operation it recognises
+    # as a list, and this one answers with a document instead of an array.
+    parameters=[
+        OpenApiParameter(
+            name="code",
+            description="Codes to print, comma separated. Required: a sheet is a batch, not the estate.",
+            required=True,
+            type=OpenApiTypes.STR,
+        ),
+    ],
+    # Both bodies are the document, refusals included: this endpoint renders
+    # its own 403 rather than answering a browser with JSON. See
+    # LabelSheetRenderer.
+    responses={
+        (200, LabelSheetRenderer.media_type): OpenApiTypes.STR,
+        (400, LabelSheetRenderer.media_type): OpenApiTypes.STR,
+        (403, LabelSheetRenderer.media_type): OpenApiTypes.STR,
+    },
+)
+class LabelSheetView(ListAPIView):
+    """A page of stickers, ready to print.
+
+    Unreadable labels are a printing failure, not a decoding one, so what a
+    label carries -- error correction level Q, a quiet zone, a module size with
+    a floor under it, the code in text under the symbol and the date it was
+    printed -- is fixed in ``inventory.labels`` and asserted by tests there.
+    This view only decides which labels are on the page.
+
+    Live labels only. A revoked sticker is superseded, and reprinting one would
+    put back the very thing revoking it was meant to withdraw; the whole point
+    of an opaque code is that the replacement is a new label rather than a
+    correction to this one.
+
+    The codes have to be named. A sheet is a batch somebody is about to stick
+    on things -- the ones just minted, or the faded ones being replaced -- and
+    "every label there has ever been" is not a print run: it is already stuck
+    to the shelves, and asking for it lays out one symbol per live label for
+    nobody.
+
+    Bounded, and not only by what was asked for. Every code costs a QR encode
+    and a symbol on the page -- about two milliseconds each -- so a query
+    string full of them is a synchronous worker held for as long as it takes.
+    MAX_SHEET_LABELS is far above a real sheet, for the same reason
+    MAX_MOVEMENTS is far above a real cart.
+
+    HTML, and the only endpoint here that is. It is a page to be printed rather
+    than data to be parsed, and the alternative -- a JSON body of SVG strings
+    for a client to lay out -- would put the sizes that decide whether a label
+    scans on the far side of the API from the tests that assert them.
+    """
+
+    queryset = LIVE_LABELS
+    # One document, not a page of one: an administrator printing a batch wants
+    # the batch, and a sheet split across three fetches is three print runs.
+    pagination_class = None
+    filterset_class = LabelSheetFilter
+    renderer_classes = [LabelSheetRenderer]
+    # Never renders anything: ``list`` below answers with a document, not with
+    # serialised rows, and the schema's parameters and responses are both
+    # spelled out above. It is here because ListAPIView asks for one, and
+    # dropping the base class is inventory-tng-s0m.
+    serializer_class = LabelMapSerializer
+
+    def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        asked = [code for code in request.query_params.get("code", "").split(",") if code.strip()]
+        if not asked:
+            raise ValidationError(
+                {"detail": "Name the codes to print, comma separated: /api/labels/sheet?code=7QK3M2XV9A,4NP8R7T2WQ"}
+            )
+        if len(asked) > MAX_SHEET_LABELS:
+            raise ValidationError(
+                {"detail": f"A sheet carries at most {MAX_SHEET_LABELS} labels; this asked for {len(asked)}."}
+            )
+        return Response(sheet(self.filter_queryset(self.get_queryset())))
 
 
 @extend_schema_view(
