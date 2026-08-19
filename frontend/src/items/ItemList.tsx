@@ -11,13 +11,15 @@ import List from "@mui/material/List";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { searchPath } from "../api/client";
 import type { Item, Page } from "../api/types";
 import { useResource } from "../api/useResource";
+import { useCart } from "../cart/CartProvider";
 import { ItemRow } from "./ItemRow";
 
 export function ItemList() {
+  const { cart, dispatch } = useCart();
   const [search, setSearch] = useState("");
   // Read on every keystroke, deliberately: the list is one page of a small
   // catalogue on a local network, and a debounce would put a delay between a
@@ -30,6 +32,13 @@ export function ItemList() {
     changed,
   );
   const items = data?.results ?? [];
+  // One lookup for the page rather than one scan of the batch per row, and
+  // one stable callback, so `ItemRow`'s memo has something to compare.
+  const inBatch = useMemo(
+    () => new Map(cart.lines.map((line) => [line.itemId, line.quantity])),
+    [cart.lines],
+  );
+  const reread = useCallback(() => setChanged((count) => count + 1), []);
 
   return (
     <Stack spacing={2}>
@@ -57,7 +66,13 @@ export function ItemList() {
 
       <List aria-label="Items" disablePadding>
         {items.map((item) => (
-          <ItemRow key={item.id} item={item} onChanged={() => setChanged((count) => count + 1)} />
+          <ItemRow
+            key={item.id}
+            item={item}
+            inCart={inBatch.get(item.id) ?? 0}
+            dispatch={dispatch}
+            onChanged={reread}
+          />
         ))}
       </List>
     </Stack>

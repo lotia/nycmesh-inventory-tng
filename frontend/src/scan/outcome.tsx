@@ -10,7 +10,7 @@ import Alert from "@mui/material/Alert";
 import type { Outcome } from "./applyCode";
 
 /** The sentence for each outcome, and how loudly to say it. */
-export function announcement(outcome: Outcome): {
+function announcement(outcome: Outcome): {
   severity: "success" | "warning" | "error";
   text: string;
 } {

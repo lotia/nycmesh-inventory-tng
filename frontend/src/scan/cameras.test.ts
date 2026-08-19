@@ -12,6 +12,7 @@ import {
   cameraSupported,
   constraints,
   forgetCamera,
+  IDEAL_WIDTH,
   listCameras,
   loadCamera,
   saveCamera,
@@ -59,11 +60,24 @@ describe("the cameras on offer", () => {
 
 describe("what getUserMedia is asked for", () => {
   it("asks for the back camera when nobody has chosen one", () => {
-    expect(constraints(null)).toEqual({ video: { facingMode: "environment" } });
+    expect(constraints(null)).toEqual({
+      video: { width: { ideal: IDEAL_WIDTH }, facingMode: "environment" },
+    });
   });
 
   it("asks for a chosen camera exactly, so nothing can substitute another lens", () => {
-    expect(constraints("back")).toEqual({ video: { deviceId: { exact: "back" } } });
+    expect(constraints("back")).toEqual({
+      video: { width: { ideal: IDEAL_WIDTH }, deviceId: { exact: "back" } },
+    });
+  });
+
+  it("asks for the resolution as a preference and not a requirement", () => {
+    // Whichever lens is being asked for. A camera that cannot produce this
+    // must still open, because the alternative is no scanner at all -- so the
+    // width carries `ideal` and nothing else.
+    for (const asked of [constraints(null), constraints("back")]) {
+      expect((asked.video as MediaTrackConstraints).width).toEqual({ ideal: IDEAL_WIDTH });
+    }
   });
 });
 

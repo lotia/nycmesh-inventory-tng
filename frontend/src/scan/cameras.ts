@@ -9,7 +9,7 @@
  * is remembered -- a phone that answers badly should cost somebody one tap
  * ever, not one tap per batch.
  */
-import { read, write } from "../storage";
+import { isText, read, write } from "../storage";
 
 /** Versioned, for the reason cartStorage's key is. */
 export const STORAGE_KEY = "nycmesh-inventory.camera.v1";
@@ -25,8 +25,9 @@ export interface Camera {
  * `navigator.mediaDevices` is *undefined* on an insecure origin rather than
  * restricted, so a page served over plain HTTP looks like a bug rather than a
  * misconfiguration -- see the consequences in decision 0011. A desktop with no
- * camera answers the same way. Either way the answer is the item list, so the
- * camera is not offered rather than offered and broken.
+ * camera answers the same way. Asked in one place only, and not to decide
+ * whether to offer the camera: what a "no" is worth saying about is
+ * CameraScanner.tsx's, and its header says why.
  */
 export function cameraSupported(): boolean {
   return typeof navigator.mediaDevices?.getUserMedia === "function";
@@ -50,6 +51,22 @@ export async function listCameras(): Promise<Camera[]> {
 }
 
 /**
+ * The resolution asked for, so that the cost of a frame is knowable.
+ *
+ * `ideal`, never `exact`: a camera that cannot produce this must still open,
+ * because the alternative is a volunteer with no scanner at all. Without it a
+ * phone is free to answer with 1920x1080 or better, and every frame the
+ * decoder is handed then costs whatever that device felt like -- the browser
+ * decodes it, the compositor carries it, and the battery pays for it, all
+ * before scan/frame.ts has scaled it down to something bounded.
+ *
+ * 1280 rather than the 640 frame.ts decodes at: this is what the volunteer
+ * sees in the preview while lining a label up, and phone autofocus behaves
+ * better in a mode the sensor actually has than in one it has to synthesise.
+ */
+export const IDEAL_WIDTH = 1280;
+
+/**
  * What to ask `getUserMedia` for.
  *
  * With nothing remembered this asks for the back camera, which is right on
@@ -59,7 +76,10 @@ export async function listCameras(): Promise<Camera[]> {
  */
 export function constraints(deviceId: string | null): MediaStreamConstraints {
   return {
-    video: deviceId === null ? { facingMode: "environment" } : { deviceId: { exact: deviceId } },
+    video: {
+      width: { ideal: IDEAL_WIDTH },
+      ...(deviceId === null ? { facingMode: "environment" } : { deviceId: { exact: deviceId } }),
+    },
   };
 }
 
@@ -77,7 +97,7 @@ export function cameraIsGone(error: unknown): boolean {
 }
 
 export function loadCamera(): string | null {
-  return read(STORAGE_KEY, (value: unknown): value is string => typeof value === "string");
+  return read(STORAGE_KEY, isText);
 }
 
 export function saveCamera(deviceId: string): void {

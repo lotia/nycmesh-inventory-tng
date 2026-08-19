@@ -15,29 +15,15 @@ import { STORAGE_KEY } from "../cart/cartStorage";
 import { cable, zipTies } from "../items/testFixtures";
 import { callsTo, renderScreen } from "../testHarness";
 import { Scanner } from "./Scanner";
-import { clearMediaDevices, stubMediaDevices, videoInput } from "./testFixtures";
-
-const PACKET = {
-  code: "7QK3M2XV9A",
-  kind: "item" as const,
-  quantity: "100.000",
-  revoked_at: null,
-  item: 1,
-  location: null,
-};
-
-/** The two reads a code costs: the label, then the item it points at. */
-function serving(label: unknown, item: unknown = zipTies, status = 200): void {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (path: string) => {
-      if (path.startsWith("/api/labels/")) {
-        return new Response(JSON.stringify(label), { status });
-      }
-      return new Response(JSON.stringify(item), { status: 200 });
-    }),
-  );
-}
+import {
+  CABLE_LABEL,
+  clearMediaDevices,
+  PACKET,
+  refusing,
+  serving,
+  stubMediaDevices,
+  videoInput,
+} from "./testFixtures";
 
 /**
  * The label read held open, so a test can put something else in the cart while
@@ -142,7 +128,7 @@ describe("a code typed or sent by a scanner gun", () => {
   });
 
   it("offers the catalogue for a code this system does not know", async () => {
-    serving({ detail: "Not found." }, zipTies, 404);
+    refusing({ detail: "Not found." }, 404);
     const vibrate = vibration();
     show();
     wedge("NOTACODE01");
@@ -191,10 +177,16 @@ describe("a code typed or sent by a scanner gun", () => {
 });
 
 describe("the camera", () => {
-  it("is not offered where the browser has no camera API to offer", () => {
+  it("says why rather than hiding itself where the browser has no camera API", async () => {
+    // The commonest cause is a phone reaching this over plain HTTP at a LAN
+    // address, and that is exactly the setup where a button that is simply
+    // absent leaves somebody with nothing to read and nothing to try. The
+    // button is always offered; CameraScanner alone decides what it opens.
     serving(PACKET);
     show();
-    expect(screen.queryByRole("button", { name: /camera/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Camera" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/served over HTTPS/);
   });
 
   it("opens and closes on the one button, so the lens is not left running", async () => {
@@ -217,17 +209,7 @@ describe("the camera", () => {
   it("asks how much before a measured item goes in the batch", async () => {
     // Decision 0011 section 5. The label says a full box is 305 m; what the
     // volunteer is holding is whatever is left of one.
-    serving(
-      {
-        code: "4NP8R7T2WQ",
-        kind: "item",
-        quantity: "305.000",
-        revoked_at: null,
-        item: 2,
-        location: null,
-      },
-      cable,
-    );
+    serving(CABLE_LABEL, cable);
     show();
     fireEvent.change(screen.getByRole("textbox", { name: /code/i }), {
       target: { value: "4NP8R7T2WQ" },
@@ -250,17 +232,7 @@ describe("a camera holding one label in frame", () => {
     // The reducer debounces repeat decodes, but a measured item deliberately
     // never reaches it -- it is being asked about first. Without the same
     // window ahead of resolution the keypad reopens under the finger.
-    serving(
-      {
-        code: "4NP8R7T2WQ",
-        kind: "item",
-        quantity: "305.000",
-        revoked_at: null,
-        item: 2,
-        location: null,
-      },
-      cable,
-    );
+    serving(CABLE_LABEL, cable);
     show();
     const field = screen.getByRole("textbox", { name: /code/i });
 

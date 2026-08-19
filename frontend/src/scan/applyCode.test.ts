@@ -7,46 +7,13 @@
  * request is in flight.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cable, zipTies } from "../items/testFixtures";
+import { cable } from "../items/testFixtures";
 import { applyCode, countsItself, recordMeasured } from "./applyCode";
-
-const CABLE_LABEL = {
-  code: "4NP8R7T2WQ",
-  kind: "item" as const,
-  quantity: "305.000",
-  revoked_at: null,
-  item: 2,
-  location: null,
-};
-
-const PACKET = {
-  code: "7QK3M2XV9A",
-  kind: "item" as const,
-  quantity: "100.000",
-  revoked_at: null,
-  item: 1,
-  location: null,
-};
+import { CABLE_LABEL, PACKET, serving } from "./testFixtures";
 
 /** How `fetch` rejects a request whose signal was aborted. */
 function aborted(): never {
   throw new DOMException("aborted", "AbortError");
-}
-
-/** The two reads a code costs: the label, then the item it points at. */
-function serving(label: unknown, item: unknown = zipTies, itemStatus = 200): void {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (path: string, init: RequestInit) => {
-      if (init.signal?.aborted) {
-        aborted();
-      }
-      if (path.startsWith("/api/labels/")) {
-        return new Response(JSON.stringify(label), { status: 200 });
-      }
-      return new Response(JSON.stringify(item), { status: itemStatus });
-    }),
-  );
 }
 
 afterEach(() => {

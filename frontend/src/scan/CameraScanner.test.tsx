@@ -10,7 +10,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CameraScanner, refusal } from "./CameraScanner";
-import { STORAGE_KEY } from "./cameras";
+import { constraints, STORAGE_KEY } from "./cameras";
 import { clearMediaDevices, stubMediaDevices, videoInput } from "./testFixtures";
 
 /** A device with cameras that will not open, which is every device in jsdom. */
@@ -42,8 +42,14 @@ afterEach(() => {
 
 describe("opening the camera", () => {
   it("says what to do instead where there is no camera API at all", async () => {
+    // jsdom, unstubbed, is an insecure origin as far as this code can tell --
+    // which is the same shape as the phone on plain HTTP this message is for.
+    // Scanner.tsx offers the button anyway so that somebody arrives here; what
+    // they get is the sentence and not a preview that will never show a thing.
     open();
     expect(await screen.findByRole("alert")).toHaveTextContent(/served over HTTPS/);
+    expect(screen.queryByLabelText("Camera preview")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /camera/i })).not.toBeInTheDocument();
   });
 
   it("says what to do instead when permission is refused", async () => {
@@ -77,10 +83,13 @@ describe("opening the camera", () => {
   });
 
   it("asks for the back camera when nobody has chosen one", async () => {
+    // Against `constraints` rather than a literal: what the constraint object
+    // contains is settled once, in cameras.test.ts. What is asserted here is
+    // that this component asks for the one belonging to the chosen lens.
     const getUserMedia = refusing(videoInput("back", "Back Camera"));
     open();
     await waitFor(() => expect(getUserMedia).toHaveBeenCalled());
-    expect(getUserMedia).toHaveBeenCalledWith({ video: { facingMode: "environment" } });
+    expect(getUserMedia).toHaveBeenCalledWith(constraints(null));
   });
 });
 
@@ -113,9 +122,7 @@ describe("choosing the lens", () => {
     await screen.findByRole("combobox", { name: /camera/i });
 
     pick("Back Camera");
-    await waitFor(() =>
-      expect(getUserMedia).toHaveBeenLastCalledWith({ video: { deviceId: { exact: "back" } } }),
-    );
+    await waitFor(() => expect(getUserMedia).toHaveBeenLastCalledWith(constraints("back")));
   });
 
   it("remembers it, so a phone that answers badly costs one tap ever", async () => {
@@ -131,9 +138,7 @@ describe("choosing the lens", () => {
     window.localStorage.setItem(STORAGE_KEY, '"back"');
     const getUserMedia = refusing(videoInput("back", "Back Camera"));
     open();
-    await waitFor(() =>
-      expect(getUserMedia).toHaveBeenCalledWith({ video: { deviceId: { exact: "back" } } }),
-    );
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledWith(constraints("back")));
   });
 
   it("forgets a remembered camera the device no longer has", async () => {
@@ -148,9 +153,7 @@ describe("choosing the lens", () => {
     open();
 
     await waitFor(() => expect(window.localStorage.getItem(STORAGE_KEY)).toBe("null"));
-    await waitFor(() =>
-      expect(getUserMedia).toHaveBeenLastCalledWith({ video: { facingMode: "environment" } }),
-    );
+    await waitFor(() => expect(getUserMedia).toHaveBeenLastCalledWith(constraints(null)));
   });
 
   it("carries on without a picker if the device will not say what it has", async () => {

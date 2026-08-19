@@ -14,8 +14,8 @@
 /** What a stored object's fields have to be for it to be worth restoring. */
 export type Shape = Record<string, (value: unknown) => boolean>;
 
-export const isText = (value: unknown): boolean => typeof value === "string";
-export const isNumber = (value: unknown): boolean => typeof value === "number";
+export const isText = (value: unknown): value is string => typeof value === "string";
+export const isNumber = (value: unknown): value is number => typeof value === "number";
 
 export function matches(value: unknown, shape: Shape): boolean {
   if (typeof value !== "object" || value === null) {

@@ -102,6 +102,11 @@ export function useScannedCode(): ScannedCode {
   // than the decode: no second debounce here, and no beep at an edit no scan
   // caused. See CONFIRM_WINDOW_MS.
   const { lines, locationId } = cart;
+  // Both dependencies are triggers rather than values: neither is read below,
+  // and the rule counts that as surplus -- but dropping them is what would be
+  // wrong, because "the cart changed" is the entire condition this effect
+  // exists to notice.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: named to re-run on a cart change, not read
   useEffect(() => {
     // Runs only when one of these actually changed -- which for `lines` means
     // the reducer built a new array, and a debounced repeat does not. On mount

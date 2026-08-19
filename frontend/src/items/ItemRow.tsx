@@ -14,11 +14,11 @@ import ListItem from "@mui/material/ListItem";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { useState } from "react";
+import { memo, useState } from "react";
 import { EditItem } from "../admin/EditItem";
 import { useCan } from "../admin/SessionProvider";
 import type { Item } from "../api/types";
-import { useCart } from "../cart/CartProvider";
+import type { CartIntent } from "../cart/CartProvider";
 import { describeQuantity, formatQuantity, toNumber } from "./quantity";
 
 /**
@@ -88,14 +88,34 @@ function QuantityField({
   );
 }
 
-export function ItemRow({ item, onChanged }: { item: Item; onChanged: () => void }) {
-  const { cart, dispatch } = useCart();
+/**
+ * One row.
+ *
+ * Told how much of this item is in the batch rather than reading the batch:
+ * a row that read the cart context would re-render on every scan, and there
+ * are fifty of them on a page. `memo` then skips the forty-nine whose own
+ * number did not change. See ItemList, which does the one lookup.
+ */
+export const ItemRow = memo(function ItemRow({
+  item,
+  inCart,
+  dispatch,
+  onChanged,
+}: {
+  item: Item;
+  inCart: number;
+  dispatch: (intent: CartIntent) => void;
+  onChanged: () => void;
+}) {
   // Drawn from the server's answer, never guessed: decision 0014 point 3.
   const mayEdit = useCan("edit_catalogue");
   const [editing, setEditing] = useState(false);
-  const line = cart.lines.find((candidate) => candidate.itemId === item.id);
-  const inCart = line?.quantity ?? 0;
+  // Recomputed rather than memoised: `memo` above already means this row does
+  // not render at all for a scan of something else, so the only render either
+  // of these runs in is one where the item or this row's own number changed --
+  // and both are a pass over the handful of labels and balances on one item.
   const packets = packetSizes(item);
+  const stock = onHand(item);
 
   const add = (quantity: number) =>
     dispatch({
@@ -119,7 +139,7 @@ export function ItemRow({ item, onChanged }: { item: Item; onChanged: () => void
         </Typography>
         <Stack direction="row" spacing={1} sx={{ alignItems: "baseline" }}>
           <Typography variant="body2" color="text.secondary" noWrap>
-            {formatQuantity(onHand(item))} on hand
+            {formatQuantity(stock)} on hand
           </Typography>
           {mayEdit ? (
             <Button size="small" aria-label={`Edit ${item.name}`} onClick={() => setEditing(true)}>
@@ -156,11 +176,11 @@ export function ItemRow({ item, onChanged }: { item: Item; onChanged: () => void
         ))}
       </Stack>
 
-      {line ? (
+      {inCart > 0 ? (
         <Stack direction="row" spacing={2} sx={{ mt: 1.5, alignItems: "center" }}>
-          <QuantityField item={item} quantity={line.quantity} onChange={setQuantity} />
+          <QuantityField item={item} quantity={inCart} onChange={setQuantity} />
           <Typography variant="body2">
-            {describeQuantity(line.quantity, item.unit_of_measure, packets)}
+            {describeQuantity(inCart, item.unit_of_measure, packets)}
           </Typography>
         </Stack>
       ) : null}
@@ -169,4 +189,4 @@ export function ItemRow({ item, onChanged }: { item: Item; onChanged: () => void
       ) : null}
     </ListItem>
   );
-}
+});

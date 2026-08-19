@@ -50,12 +50,14 @@ export function whatIsMissing(cart: CartState): string | null {
   return null;
 }
 
-/** One line, as a movement. */
-function movementFor(line: CartLine, cart: CartState): Record<string, number> {
-  const side = sideFor(cart.kind);
+/** One line, as a movement. The side is the batch's, so it is decided once. */
+function movementFor(
+  line: CartLine,
+  at: { side: Side; locationId: number } | null,
+): Record<string, number> {
   const movement: Record<string, number> = { item: line.itemId, quantity: line.quantity };
-  if (side !== null && cart.locationId !== null) {
-    movement[side] = cart.locationId;
+  if (at !== null) {
+    movement[at.side] = at.locationId;
   }
   return movement;
 }
@@ -68,11 +70,14 @@ function movementFor(line: CartLine, cart: CartState): Record<string, number> {
  * nobody can see the far side of. See cartState.ts.
  */
 export function batchBody(cart: CartState): Record<string, unknown> {
+  const side = sideFor(cart.kind);
+  const at =
+    side !== null && cart.locationId !== null ? { side, locationId: cart.locationId } : null;
   return {
     idempotency_key: cart.idempotencyKey,
     kind: cart.kind,
     actor: cart.actorId,
     ...(cart.jobReference === "" ? {} : { job_reference: cart.jobReference }),
-    movements: cart.lines.map((line) => movementFor(line, cart)),
+    movements: cart.lines.map((line) => movementFor(line, at)),
   };
 }

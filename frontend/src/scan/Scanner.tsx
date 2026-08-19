@@ -11,14 +11,18 @@
  *
  * The camera is the only part of this that is not always here: it costs a
  * permission, a secure context and a megabyte of decoder, so it is behind a
- * button and is not offered at all where it cannot work.
+ * button. The button is offered whether or not a camera can be opened, and
+ * whether one can is CameraScanner's question alone -- asking it here too
+ * would hide the button on exactly the setup whose explanation the volunteer
+ * needs, which is a page reached over plain HTTP at a LAN address. A tap that
+ * answers "here is why, and here is what to do instead" is worth more than a
+ * control that silently is not there.
  */
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import { useState } from "react";
 import { CameraScanner } from "./CameraScanner";
-import { cameraSupported } from "./cameras";
 import { MeasuredAmount } from "./MeasuredAmount";
 import { OutcomeAlert } from "./outcome";
 import { useScannedCode } from "./useScannedCode";
@@ -51,11 +55,9 @@ export function Scanner() {
             fullWidth
             size="small"
           />
-          {cameraSupported() ? (
-            <Button type="button" variant="outlined" onClick={() => setCamera(!camera)}>
-              {camera ? "Stop camera" : "Camera"}
-            </Button>
-          ) : null}
+          <Button type="button" variant="outlined" onClick={() => setCamera(!camera)}>
+            {camera ? "Stop camera" : "Camera"}
+          </Button>
         </Stack>
       </form>
 

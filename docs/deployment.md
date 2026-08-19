@@ -119,8 +119,8 @@ helm upgrade --install inventory-tng infra/helm/inventory-tng \
 ```
 
 **TLS is not optional**, and the chart offers no switch to turn it off. QR
-scanning stops working over plain HTTP, including on a LAN address, and it
-fails silently rather than warning — why is in
+scanning stops working over plain HTTP, including on a LAN address; why, and
+what the app says to whoever hits it, is in
 [decision 0011](decisions/0011-qr-batch-scanning.md#consequences). Rendering
 the chart without a certificate fails rather than quietly producing an ingress
 nobody can scan from — see below for supplying one.

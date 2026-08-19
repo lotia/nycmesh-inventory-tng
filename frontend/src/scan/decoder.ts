@@ -33,9 +33,14 @@ import wasmUrl from "zxing-wasm/reader/zxing_reader.wasm?url";
  * Narrow on purpose: adopting the native API later should be a change of
  * import here and nothing else, so nothing outside this file names the
  * ponyfill's types.
+ *
+ * `ImageData` is named alongside `CanvasImageSource` because it is what the
+ * camera actually hands over -- see frame.ts for why, and note that the native
+ * `BarcodeDetector` takes it too: both accept an `ImageBitmapSource`, which
+ * `CanvasImageSource` alone does not cover.
  */
 export interface CodeDetector {
-  detect(source: CanvasImageSource): Promise<{ rawValue: string }[]>;
+  detect(source: CanvasImageSource | ImageData): Promise<{ rawValue: string }[]>;
 }
 
 /**

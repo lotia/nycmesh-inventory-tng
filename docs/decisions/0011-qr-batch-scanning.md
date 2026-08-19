@@ -319,7 +319,11 @@ ordinary catalogue reads specified with the read API rather than here.
   **private and LAN addresses are not**, so the app must never be served over
   plain HTTP at `http://10.0.0.5:8080`, which is otherwise the natural way to
   try it from a phone on the mesh. This is the reasoning behind the TLS
-  requirement in [deployment](../deployment.md).
+  requirement in [deployment](../deployment.md). The invisibility is the
+  browser's, not the app's: the Camera button is offered whatever the origin,
+  and one place — `CameraScanner` — decides what it can open and says why when
+  the answer is nothing. Gating the button on the same check would hide the
+  explanation from the only people who need it.
 - **iOS is the platform to test on.** Third-party iOS browsers have had
   `getUserMedia` since iOS 14.3
   ([WebKit 208667](https://bugs.webkit.org/show_bug.cgi?id=208667)); this design

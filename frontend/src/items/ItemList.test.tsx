@@ -10,7 +10,22 @@ import { page } from "../api/testFixtures";
 import type { Item } from "../api/types";
 import { renderScreen } from "../testHarness";
 import { ItemList } from "./ItemList";
+import { formatQuantity } from "./quantity";
 import { cable, zipTies } from "./testFixtures";
+
+/**
+ * Count what each row draws, without asking a row to count itself.
+ *
+ * `formatQuantity` is called at least once by every `ItemRow` that renders --
+ * the "on hand" line -- and the real implementation is kept, so nothing else
+ * in this file behaves differently for it. It is the only handle a test has on
+ * how many rows React actually drew, which is the thing "does not redraw the
+ * other forty-nine" is about.
+ */
+vi.mock("./quantity", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./quantity")>();
+  return { ...actual, formatQuantity: vi.fn(actual.formatQuantity) };
+});
 
 function serving(...items: Item[]): void {
   vi.stubGlobal(
@@ -216,5 +231,41 @@ describe("adding to the batch", () => {
     show();
     await screen.findByRole("heading", { name: "Zip Ties Reusable" });
     expect(screen.getByRole("button", { name: "Remove one Zip Ties Reusable" })).toBeDisabled();
+  });
+});
+
+describe("a page of fifty rows", () => {
+  it("does not redraw the other forty-nine when one line changes", async () => {
+    // A row that read the cart context re-rendered on every scan, rebuilding
+    // its packaging chips and re-summing its balances fifty times over. It is
+    // told its own quantity instead, so `memo` skips the rest.
+    const many = Array.from({ length: 50 }, (_, index) => ({
+      ...zipTies,
+      id: index + 1,
+      name: `Item ${index + 1}`,
+    }));
+    serving(...many);
+    show();
+    await screen.findByRole("heading", { name: "Item 1" });
+    expect(screen.getAllByRole("heading", { name: /^Item / })).toHaveLength(many.length);
+
+    const drawn = () => vi.mocked(formatQuantity).mock.calls.length;
+    const before = drawn();
+    fireEvent.click(screen.getByRole("button", { name: "Add one Item 1" }));
+
+    // Fewer calls than there are rows, and every row that renders costs at
+    // least one: so this cannot pass with every row redrawn, which is what it
+    // did before `ItemRow` was told its own number instead of reading the
+    // cart. Without `memo` this is fifty rows' worth rather than one's.
+    expect(drawn() - before).toBeLessThan(many.length);
+
+    // And the row that did change is the one that changed.
+    expect(screen.getByRole("textbox", { name: /quantity of item 1 in the batch/i })).toHaveValue(
+      "1",
+    );
+    expect(
+      screen.queryAllByRole("textbox", { name: /quantity of item .* in the batch/i }),
+    ).toHaveLength(1);
+    expect(screen.getAllByRole("heading", { name: /^Item / })).toHaveLength(many.length);
   });
 });

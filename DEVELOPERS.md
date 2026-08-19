@@ -429,6 +429,15 @@ nothing set a CSRF cookie, and the dev server's origin was not trusted. Only
 this suite can fail on the second, and it is the only one that exercises either
 through a real browser.
 
+The scanner is here for the same reason. Self-hosting the decoder's `.wasm` is
+a non-optional constraint of
+[decision 0011](docs/decisions/0011-qr-batch-scanning.md), and whether it holds
+is a question about a request a browser makes — jsdom has no camera to open and
+the CDN's URL is still in the built JavaScript as a default nothing reaches, so
+neither the unit suite nor a look at the bundle can answer it. The camera is
+opened against Chromium's fake device, which needs no flag of yours: the spec
+asks for it.
+
 They need Docker (for PostgreSQL) and a one-off browser download:
 
 ```bash

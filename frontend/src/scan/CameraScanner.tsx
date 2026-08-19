@@ -30,6 +30,7 @@ import {
   saveCamera,
 } from "./cameras";
 import { loadDetector } from "./decoder";
+import { frameGrabber } from "./frame";
 
 /** Fast enough to feel instant, slow enough to leave the phone some battery. */
 const DECODE_INTERVAL_MS = 200;
@@ -41,6 +42,11 @@ const DECODE_INTERVAL_MS = 200;
  * restricted, so the commonest cause of this message is the app being reached
  * over plain HTTP at a LAN address -- which is the natural way to try it from
  * a phone, and the reason decision 0011 lists TLS as a consequence.
+ *
+ * This component is the only place that asks whether a camera can be opened:
+ * Scanner.tsx offers the button whatever the answer, precisely so that this
+ * sentence reaches the person it was written for instead of their being shown
+ * nothing at all.
  */
 const NO_CAMERA =
   "No camera is available here. A camera needs the page to be served over HTTPS, so if you reached this app by its address on the network, that is why. Type the code printed under the QR instead, or find the item in the list.";
@@ -64,6 +70,7 @@ export function refusal(error: unknown): string {
 }
 
 export function CameraScanner({ onCode }: { onCode: (code: string) => void }) {
+  const supported = cameraSupported();
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [deviceId, setDeviceId] = useState<string | null>(loadCamera);
   const [failure, setFailure] = useState<string | null>(null);
@@ -81,16 +88,18 @@ export function CameraScanner({ onCode }: { onCode: (code: string) => void }) {
   // is asked for twice: once to know how many there are, and again once a
   // stream has been granted and they have names.
   useEffect(() => {
+    if (!supported) {
+      return;
+    }
     // A device that will not enumerate is not a dead end: the picker is a way
     // past a phone that hands back the wrong lens, not a way in.
     listCameras()
       .then(setCameras)
       .catch(() => setCameras([]));
-  }, []);
+  }, [supported]);
 
   useEffect(() => {
-    if (!cameraSupported()) {
-      setFailure(NO_CAMERA);
+    if (!supported) {
       return;
     }
     const media = navigator.mediaDevices;
@@ -137,13 +146,24 @@ export function CameraScanner({ onCode }: { onCode: (code: string) => void }) {
         return;
       }
       let busy = false;
+      // One canvas for this stream, and a frame bounded before it is handed
+      // over. Passing the video element straight to `detect` takes
+      // barcode-detector's other path, which builds a fresh canvas and 2D
+      // context per call at whatever resolution the camera answered with --
+      // measured at 640x480 and this interval as ~7.7 MB/s of garbage, and
+      // three times that from a 720p phone. A frame still has to reach the CPU
+      // once a tick; what goes away is the canvas and context built per call,
+      // and the growth with the lens. What is left is the ImageData
+      // `getImageData` must return and the grayscale copy zxing-wasm makes of
+      // it: at 640x360 that is 0.9 MB plus 0.2 MB, ~5.8 MB/s. See frame.ts.
+      const grab = frameGrabber();
       timer = setInterval(async () => {
         if (busy || !live) {
           return;
         }
         busy = true;
         try {
-          const found = await detector.detect(element);
+          const found = await detector.detect(grab(element) ?? element);
           // Rechecked after the await as well: a decode that lands after the
           // volunteer closed the scanner must not add a line to the batch.
           if (!live) {
@@ -188,12 +208,19 @@ export function CameraScanner({ onCode }: { onCode: (code: string) => void }) {
       live = false;
       release();
     };
-  }, [deviceId]);
+  }, [deviceId, supported]);
 
   function choose(chosen: string): void {
     saveCamera(chosen);
     setFailure(null);
     setDeviceId(chosen);
+  }
+
+  // Nothing else is drawn: a preview that will never show anything, and a
+  // picker over a list that will always be empty, are furniture around a
+  // sentence that is the whole content of this screen here.
+  if (!supported) {
+    return <Alert severity="warning">{NO_CAMERA}</Alert>;
   }
 
   return (
