@@ -93,7 +93,7 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
   } catch (cause) {
     // An abort is the caller's own doing -- a search moving on, a screen
     // closing -- so it is re-thrown rather than dressed up as a failure.
-    if (cause instanceof DOMException && cause.name === "AbortError") {
+    if (isAbort(cause)) {
       throw cause;
     }
     throw new ApiError(0, UNREACHABLE);
@@ -130,6 +130,36 @@ export function apiPost<T>(path: string, body: unknown, signal?: AbortSignal): P
     body: JSON.stringify(body),
     signal,
   });
+}
+
+/**
+ * Whether this is the caller's own cancellation rather than a failure.
+ *
+ * Stated here because this module is what decides an abort stays an abort:
+ * `apiGet`/`apiPost` re-throw it untouched so a caller that gave up is never
+ * told something went wrong.
+ */
+export function isAbort(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+/**
+ * A refused body, if it is the typed shape this caller expects.
+ *
+ * The API refuses in typed bodies -- a 409 naming a merged volunteer, a 400
+ * listing a batch's bad lines -- and each caller has to decide whether what
+ * came back is the one it can render. The narrowing of `ApiError.body` belongs
+ * here rather than in each screen.
+ */
+export function refusalBody<T>(
+  error: ApiError,
+  looksRight: (body: Partial<T>) => boolean,
+): T | null {
+  if (typeof error.body !== "object" || error.body === null) {
+    return null;
+  }
+  const body = error.body as Partial<T>;
+  return looksRight(body) ? (body as T) : null;
 }
 
 /** Whatever was thrown, as the error a screen can render. */

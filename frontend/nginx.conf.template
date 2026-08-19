@@ -20,7 +20,11 @@ server {
     root         /usr/share/nginx/html;
 
     gzip on;
-    gzip_types text/css application/javascript application/json image/svg+xml;
+    # application/wasm is the QR decoder, and it is roughly a megabyte
+    # uncompressed on a page that has to work in a basement. See
+    # docs/decisions/0011-qr-batch-scanning.md section 2 and
+    # frontend/src/scan/decoder.ts, which is what makes it ours to serve.
+    gzip_types text/css application/javascript application/json image/svg+xml application/wasm;
     gzip_min_length 1024;
 
     # The browser only ever talks to this origin; nginx forwards the API, the
@@ -61,6 +65,13 @@ server {
     }
 
     # Single-page app: unknown paths are client-side routes, not 404s.
+    # Every other path is the app's, index.html included -- which is what makes
+    # a label's own URL work. A sticker encodes /S/{code}, a phone's camera app
+    # opens it directly, and there is no server-side route for it by design:
+    # the code is read out of the path by the app itself. See
+    # frontend/src/scan/deepLink.ts and docs/decisions/0011-qr-batch-scanning.md.
+    # This rule is load-bearing, not incidental; a batch of labels already
+    # stuck to shelves depends on it.
     location / {
         try_files $uri $uri/ /index.html;
     }

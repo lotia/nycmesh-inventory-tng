@@ -356,10 +356,15 @@ missing even though the code is correct:
 | `obj.get_kind_display()` | `obj.Kind(obj.kind).label` — explicit and typed |
 | `item.identifiers`, `item.history` (reverse accessors, history managers) | Nothing better exists. Add `# ty: ignore[unresolved-attribute]` |
 
-Suppress with `# ty: ignore[unresolved-attribute]` on the line, and only for
-this. A suppression is a statement that the checker is wrong, so if you are not
-sure it is, it is a bug worth looking at instead. This is the cost of `ty` being
-pre-1.0 and is expected to shrink — tracked as `inventory-tng-61b`.
+Suppress with `# ty: ignore[<rule>]` on the line, naming the rule rather than
+silencing everything. Most are `unresolved-attribute`, from the table above;
+the rest are places a third-party stub is narrower than the function it
+describes, and each one carries a comment saying which stub and why.
+
+A suppression is a statement that the checker is wrong, so if you are not sure
+it is, it is a bug worth looking at instead — and the comment beside it is what
+lets the next reader tell the two apart. This is the cost of `ty` being pre-1.0
+and is expected to shrink — tracked as `inventory-tng-61b`.
 
 ### Editor setup
 

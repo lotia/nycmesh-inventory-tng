@@ -4,21 +4,22 @@ from django.contrib.postgres.search import TrigramSimilarity
 from django.db import IntegrityError, connection
 from django.db.models import Prefetch, Q, QuerySet
 from django.db.transaction import atomic
+from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django_filters.rest_framework import BaseInFilter, CharFilter, FilterSet
+from django_filters.rest_framework import CharFilter, FilterSet
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view, inline_serializer
 from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateAPIView
+from rest_framework.generics import ListCreateAPIView, RetrieveUpdateAPIView
 from rest_framework.permissions import SAFE_METHODS, AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
-from inventory.labels import LabelSheetRenderer, sheet
+from inventory.labels import refusal_page, sheet
 from inventory.models import (
     Category,
     Item,
@@ -911,35 +912,16 @@ class LabelListView(ReadsAndWritesDiffer, ListCreateAPIView):
 MAX_SHEET_LABELS = 200
 
 
-class LabelSheetFilter(FilterSet):
-    """Which labels a sheet is asked for.
-
-    A filter rather than a lookup, so a code that names nothing is simply not
-    printed. The alternative -- refusing the whole sheet and naming the bad
-    code -- would fail a print run of forty stickers over one typo in a query
-    string nobody typed by hand.
-
-    Normalised on the way in, because every other way of naming a code here
-    is: ``LabelResolveView`` folds and uppercases a scanned or typed one, and
-    a sheet that answered a lowercase code with a blank page would be the one
-    place in this API where the canonical form is the caller's problem.
-    """
-
-    code = BaseInFilter(field_name="code", method="by_code", label="Codes to print, comma separated")
-
-    class Meta:
-        model = Label
-        fields = ["code"]
-
-    def by_code(self, queryset: QuerySet[Label], name: str, value: list[str]) -> QuerySet[Label]:
-        return queryset.filter(code__in=[Label.normalise_code(code) for code in value])
+# The one media type in this API that is not JSON, named once because the
+# response, the refusal and the schema all have to agree on it. The encoding
+# travels with it on the wire -- the sheet says so in a meta tag as well, but a
+# refusal is built here and has only the header to say it in.
+SHEET_MEDIA_TYPE = "text/html"
+SHEET_CONTENT_TYPE = f"{SHEET_MEDIA_TYPE}; charset=utf-8"
 
 
 @extend_schema(
     summary="Render labels as a printable sheet",
-    # Named here rather than derived from LabelSheetFilter: drf-spectacular
-    # reads a filter backend's parameters only for an operation it recognises
-    # as a list, and this one answers with a document instead of an array.
     parameters=[
         OpenApiParameter(
             name="code",
@@ -950,14 +932,14 @@ class LabelSheetFilter(FilterSet):
     ],
     # Both bodies are the document, refusals included: this endpoint renders
     # its own 403 rather than answering a browser with JSON. See
-    # LabelSheetRenderer.
+    # handle_exception below.
     responses={
-        (200, LabelSheetRenderer.media_type): OpenApiTypes.STR,
-        (400, LabelSheetRenderer.media_type): OpenApiTypes.STR,
-        (403, LabelSheetRenderer.media_type): OpenApiTypes.STR,
+        (200, SHEET_MEDIA_TYPE): OpenApiTypes.STR,
+        (400, SHEET_MEDIA_TYPE): OpenApiTypes.STR,
+        (403, SHEET_MEDIA_TYPE): OpenApiTypes.STR,
     },
 )
-class LabelSheetView(ListAPIView):
+class LabelSheetView(APIView):
     """A page of stickers, ready to print.
 
     Unreadable labels are a printing failure, not a decoding one, so what a
@@ -977,6 +959,15 @@ class LabelSheetView(ListAPIView):
     to the shelves, and asking for it lays out one symbol per live label for
     nobody.
 
+    A code that names nothing is simply not printed, rather than failing the
+    sheet: refusing the whole batch and naming the bad code would lose a print
+    run of forty stickers over one typo in a query string nobody typed by hand.
+    Codes are normalised on the way in, because every other way of naming one
+    here is -- ``LabelResolveView`` folds and uppercases a scanned or typed
+    code -- and a sheet that answered a lowercase code with a blank page would
+    be the one place in this API where the canonical form is the caller's
+    problem.
+
     Bounded, and not only by what was asked for. Every code costs a QR encode
     and a symbol on the page -- about two milliseconds each -- so a query
     string full of them is a synchronous worker held for as long as it takes.
@@ -989,19 +980,17 @@ class LabelSheetView(ListAPIView):
     scans on the far side of the API from the tests that assert them.
     """
 
-    queryset = LIVE_LABELS
-    # One document, not a page of one: an administrator printing a batch wants
-    # the batch, and a sheet split across three fetches is three print runs.
-    pagination_class = None
-    filterset_class = LabelSheetFilter
-    renderer_classes = [LabelSheetRenderer]
-    # Never renders anything: ``list`` below answers with a document, not with
-    # serialised rows, and the schema's parameters and responses are both
-    # spelled out above. It is here because ListAPIView asks for one, and
-    # dropping the base class is inventory-tng-s0m.
-    serializer_class = LabelMapSerializer
-
-    def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+    # An APIView, not a ListAPIView. What comes back is one document and not a
+    # page of rows, so there is no serializer to name, no paginator to switch
+    # off and no filter backend whose parameters the schema then cannot read --
+    # while everything DRF is being kept for is still inherited: permissions,
+    # throttles, the exception handler, and get_permissions, which
+    # RequireSecondFactor asks of this class. Was inventory-tng-s0m.
+    #
+    # No docstring on the handler: drf-spectacular describes an operation with
+    # the handler's docstring where there is one and the view's only otherwise,
+    # and it is the class docstring above that is written for a schema reader.
+    def get(self, request: Request) -> HttpResponse:
         asked = [code for code in request.query_params.get("code", "").split(",") if code.strip()]
         if not asked:
             raise ValidationError(
@@ -1011,7 +1000,31 @@ class LabelSheetView(ListAPIView):
             raise ValidationError(
                 {"detail": f"A sheet carries at most {MAX_SHEET_LABELS} labels; this asked for {len(asked)}."}
             )
-        return Response(sheet(self.filter_queryset(self.get_queryset())))
+        codes = [Label.normalise_code(code) for code in asked]
+        # An HttpResponse rather than a Response: DRF's finalize_response passes
+        # anything that is not a Response through untouched, so the document
+        # reaches the browser as written and no renderer is involved.
+        return HttpResponse(sheet(LIVE_LABELS.filter(code__in=codes)), content_type=SHEET_CONTENT_TYPE)
+
+    # DRF's stubs narrow this to a Response, but `dispatch` only ever hands the
+    # result to `finalize_response`, which takes any HttpResponseBase and passes
+    # a non-Response straight through -- which is the whole point here.
+    # DRF's stubs narrow this to a Response, but `dispatch` only ever hands the
+    # result to `finalize_response`, which takes any HttpResponseBase and passes
+    # a non-Response straight through -- which is the whole point here.
+    def handle_exception(self, exc: Exception) -> HttpResponse:  # ty: ignore[invalid-method-override]
+        """The refusal as a page, because a browser is this endpoint's only client.
+
+        DRF builds the body, the status and the headers; this keeps all three
+        and swaps the JSON for the document. The page itself is in
+        inventory.labels, beside the sheet it is standing in for.
+        """
+        refused = super().handle_exception(exc)
+        detail = refused.data.get("detail", "") if isinstance(refused.data, dict) else refused.data
+        page = HttpResponse(refusal_page(str(detail)), status=refused.status_code, content_type=SHEET_CONTENT_TYPE)
+        for header, value in refused.items():
+            page[header] = value
+        return page
 
 
 @extend_schema_view(

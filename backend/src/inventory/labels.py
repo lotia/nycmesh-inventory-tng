@@ -31,7 +31,6 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.safestring import SafeString, mark_safe
-from rest_framework.renderers import BaseRenderer
 
 from inventory.models import Label
 
@@ -221,31 +220,16 @@ def sheet(labels: QuerySet[Label]) -> str:
     )
 
 
-class LabelSheetRenderer(BaseRenderer):
-    """Hands the sheet back as the HTML document it is.
+def refusal_page(detail: str) -> SafeString:
+    """A refusal, as the page this endpoint answers everything else with.
 
-    The API is JSON everywhere else, and deliberately so; this one endpoint is
-    the exception because its output is a page to be printed, not data to be
-    parsed. Declaring the renderer on the view rather than adding HTML to the
-    defaults keeps that exception to the one endpoint that earns it.
+    Here rather than in the view because this module owns what a label sheet
+    looks like, and a refusal is the sheet not being there. One sentence and
+    nothing else: a browser is the only client this endpoint has, and the
+    sentence is DRF's own.
     """
-
-    media_type = "text/html"
-    format = "html"
-    charset = "utf-8"
-
-    def render(self, data: object, accepted_media_type: str | None = None, renderer_context: object = None) -> str:
-        """The sheet, or the refusal DRF built instead of one.
-
-        A refusal reaches here as the same ``detail`` body every other endpoint
-        answers with. It is rendered as a sentence rather than as JSON with an
-        HTML content type, because a browser is the only client this endpoint
-        has and it is the browser that has to show it.
-        """
-        if isinstance(data, str):
-            return data
-        detail = data.get("detail", "") if isinstance(data, dict) else data
-        return format_html(
-            '<!doctype html><html lang="en"><head><title>Label sheet</title></head><body><p>{}</p></body></html>',
-            detail,
-        )
+    return format_html(
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        "<title>Label sheet</title></head><body><p>{}</p></body></html>",
+        detail,
+    )

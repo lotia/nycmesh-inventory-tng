@@ -23,8 +23,10 @@ from django.core.management import call_command
 from django.test import Client
 from django.urls import reverse
 
-from inventory.api import ADMINISTRATORS_ONLY
+from inventory.api import ADMINISTRATORS_ONLY, VALIDATION_ERROR
+from inventory.models import Category, Location
 from inventory.tests.conftest import SCHEMA_PATH
+from inventory.tests.helpers import post
 from inventory.views import ENDPOINTS
 
 
@@ -208,3 +210,102 @@ def test_every_endpoint_addressing_one_row_declares_its_404(schema: Mapping[str,
             if method not in HTTP_METHODS:
                 continue
             assert "404" in operation["responses"], f"{method.upper()} {path} cannot say the row is not there"
+
+
+# The two operations that answer 400 with something other than the field map,
+# and why. The batch endpoint's body carries the position of the offending
+# line, which a map keyed by field name cannot; the label sheet's is the
+# printable document itself, because it renders its own refusals rather than
+# answering a browser with JSON.
+BESPOKE_400 = {("/api/stock/transactions", "post"): "#/components/schemas/BatchRejected"}
+DOCUMENT_400 = ("/api/labels/sheet", "get")
+
+
+def test_every_operation_with_a_body_declares_the_400_refusing_it_answers_with(schema: Mapping[str, Any]) -> None:
+    """A serializer that names the bad field is only useful if a client can type the answer.
+
+    Keyed on the request body rather than on the method: a write is a write
+    because it submits something, and the something is what gets refused.
+    """
+    for path, operations in schema["paths"].items():
+        for method, operation in operations.items():
+            if method not in HTTP_METHODS or "requestBody" not in operation:
+                continue
+            where = f"{method.upper()} {path}"
+            assert "400" in operation["responses"], f"{where} does not say what a refused body answers with"
+            body = operation["responses"]["400"]["content"]["application/json"]["schema"]
+            expected = BESPOKE_400.get((path, method), f"#/components/schemas/{VALIDATION_ERROR}")
+            assert body == {"$ref": expected}, f"{where} answers 400 with an unexpected shape"
+
+
+def test_an_operation_with_nothing_to_validate_claims_no_400(schema: Mapping[str, Any]) -> None:
+    """A promise the operation cannot keep is worse than no promise.
+
+    Nothing to validate means no request body *and* no filter: a filtered list
+    refuses a query parameter it cannot parse, with the same field map, so it
+    earns its 400 without carrying a body.
+
+    The label sheet is the single exception among those and declares its own:
+    what it refuses is a query string, and it refuses it with the document.
+    """
+    filtered = {urlparse(reverse(name)).path for name in ("items", "locations", "categories", "volunteers")}
+    for path, operations in schema["paths"].items():
+        for method, operation in operations.items():
+            if method not in HTTP_METHODS or "requestBody" in operation:
+                continue
+            where = f"{method.upper()} {path}"
+            if (path, method) == DOCUMENT_400:
+                assert set(operation["responses"]["400"]["content"]) == {"text/html"}, (
+                    f"{where} refuses with the document, not with JSON"
+                )
+                continue
+            if path in filtered:
+                assert "400" in operation["responses"], f"{where} can refuse a query parameter and does not say so"
+                continue
+            assert "400" not in operation["responses"], f"{where} claims a refusal it cannot produce"
+
+
+def test_the_published_400_is_the_map_of_field_to_messages_drf_renders(schema: Mapping[str, Any]) -> None:
+    """The shape is not a serializer's fields, so nothing else would catch it changing."""
+    published = schema["components"]["schemas"][VALIDATION_ERROR]
+    assert published["type"] == "object"
+    assert published["additionalProperties"] == {"type": "array", "items": {"type": "string"}}
+
+
+@pytest.mark.django_db
+def test_a_refused_write_answers_with_the_shape_the_schema_publishes(editor: Client, category: Category) -> None:
+    """The schema describes what DRF already does; this is what keeps that true.
+
+    Both halves of the shape, from two rules that fail in different ways: a
+    field the item serializer rejects on its own, and a location whose fields
+    are each fine and whose combination is not.
+    """
+    refusals = [
+        post(editor, "items", {"name": "Broken", "category": category.pk, "reorder_quantity": "0"}),
+        post(editor, "locations", {"name": "Nobody", "kind": Location.Kind.VOLUNTEER_CUSTODY}),
+    ]
+    for response in refusals:
+        assert response.status_code == 400, response.content
+        body = response.json()
+        assert isinstance(body, dict) and body
+        for field, messages in body.items():
+            assert isinstance(messages, list) and messages, f"{field} carries no messages"
+            assert all(isinstance(message, str) for message in messages), f"{field} carries something unreadable"
+    assert "reorder_quantity" in refusals[0].json()
+    assert "non_field_errors" in refusals[1].json()
+
+
+@pytest.mark.django_db
+def test_a_filtered_list_really_refuses_a_query_parameter_it_cannot_parse(client: Client) -> None:
+    """The half of the promise above that only a live request can keep.
+
+    django-filter is configured to raise rather than to ignore, so this is a
+    400 with the same field map a refused write answers with -- which is why
+    the schema declares one on a list that carries no body.
+    """
+    response = client.get(reverse("items"), {"category": "not-a-number"})
+
+    assert response.status_code == 400, response.content
+    body = response.json()
+    assert "category" in body
+    assert all(isinstance(message, str) for message in body["category"])

@@ -100,6 +100,12 @@ endpoint refuses a caller with no session at all — which is why
 [decision 0012](decisions/0012-two-populations.md)'s "an endpoint's audience is
 part of its contract" is met with a sentence and not a status code.
 
+The refusals are derived the same way, and from the view rather than from a
+list kept beside it: a throttle gives an operation its 429, a permission its
+403, a path addressing one row its 404, and a request body its 400. An
+operation that names its own — the batch endpoint, whose 400 lists the position
+of each bad line — keeps it. `inventory/api.py` is where both derivations live.
+
 ## Signing in
 
 Under `/accounts`, and it is `django-allauth`'s rather than this project's:
@@ -152,11 +158,17 @@ Named here so the gaps are visible rather than surprising:
   [`/api/docs`](../DEVELOPERS.md#the-api-schema). The cart that holds a batch
   in the browser is built, and so is the label generator: codes are minted
   server-side and `/api/labels/sheet` renders a printable page of stickers.
-  Two of the screens around the cart are built as well — the volunteer picker
-  that says who a batch is attributed to, and the item list with its steppers
-  and packaging chips, which is the path that works with no camera and no
-  readable label. What is missing is the scanner itself and the submit bar
-  that sends a batch.
+  The screens around the cart are built as well — the volunteer picker that
+  says who a batch is attributed to, the item list with its steppers and
+  packaging chips, which is the path that works with no camera and no readable
+  label, and the scanner: a camera decoding in WebAssembly served from this
+  origin, beside the one box a scanner gun types into and a person types the
+  code under a dead QR into — and the Save that sends the batch. Scanning an
+  item measured in anything but `each` asks how much before anything goes in,
+  which is [decision 0011](decisions/0011-qr-batch-scanning.md) section 5. What
+  is missing is the one thing the client is meant to do for itself: the label
+  map is not prefetched, so a scan resolves against the API rather than against
+  a cache (section 6), which is `inventory-tng-4t0`.
 - **The administrative interface.** The catalogue write API is built: items,
   locations, categories and labels are created and edited through the API by
   somebody holding the staff flag, and a caller without it is refused rather

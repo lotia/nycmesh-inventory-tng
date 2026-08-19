@@ -64,6 +64,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+          description: ''
     post:
       operationId: categories_create
       description: |-
@@ -92,6 +98,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Detail'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
           description: ''
   /api/categories/{id}:
     get:
@@ -179,6 +191,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+          description: ''
   /api/healthz:
     get:
       operationId: healthz_retrieve
@@ -246,6 +264,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+          description: ''
     post:
       operationId: items_create
       description: |-
@@ -281,6 +305,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Detail'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
           description: ''
   /api/items/{id}:
     get:
@@ -366,6 +396,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+          description: ''
   /api/labels:
     get:
       operationId: labels_list
@@ -427,6 +463,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Detail'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
           description: ''
   /api/labels/{code}:
     get:
@@ -526,6 +568,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+          description: ''
   /api/labels/sheet:
     get:
       operationId: labels_sheet_retrieve
@@ -548,6 +596,15 @@ paths:
         "every label there has ever been" is not a print run: it is already stuck
         to the shelves, and asking for it lays out one symbol per live label for
         nobody.
+
+        A code that names nothing is simply not printed, rather than failing the
+        sheet: refusing the whole batch and naming the bad code would lose a print
+        run of forty stickers over one typo in a query string nobody typed by hand.
+        Codes are normalised on the way in, because every other way of naming one
+        here is -- ``LabelResolveView`` folds and uppercases a scanned or typed
+        code -- and a sheet that answered a lowercase code with a blank page would
+        be the one place in this API where the canonical form is the caller's
+        problem.
 
         Bounded, and not only by what was asked for. Every code costs a QR encode
         and a symbol on the page -- about two milliseconds each -- so a query
@@ -647,6 +704,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+          description: ''
     post:
       operationId: locations_create
       description: |-
@@ -680,6 +743,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Detail'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
           description: ''
   /api/locations/{id}:
     get:
@@ -760,6 +829,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Detail'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
           description: ''
   /api/me:
     get:
@@ -888,6 +963,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+          description: ''
     post:
       operationId: volunteers_create
       description: |-
@@ -935,6 +1016,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Detail'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
           description: ''
   /api/volunteers/{id}:
     get:
@@ -1021,6 +1108,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Detail'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
           description: ''
 components:
   schemas:
@@ -1996,6 +2089,18 @@ components:
         * `each` - Each
         * `metre` - Metre
         * `foot` - Foot
+    ValidationError:
+      type: object
+      description: |-
+        A request refused for what it said -- a body a serializer would not take, or a query parameter a filter could not parse.
+
+        Each key is a field of the submission and each value is every complaint about that field; `non_field_errors` carries the complaints about the request as a whole.
+
+        A few operations refuse in a shape of their own, where a field name cannot carry what they have to say; each of those says so in its own description.
+      additionalProperties:
+        type: array
+        items:
+          type: string
     Volunteer:
       type: object
       description: |-

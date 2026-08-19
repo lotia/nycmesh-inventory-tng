@@ -20,6 +20,7 @@ from django.db import IntegrityError
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
+from rest_framework.exceptions import Throttled
 
 from inventory.labels import (
     ERROR_CORRECTION,
@@ -32,7 +33,7 @@ from inventory.labels import (
 )
 from inventory.models import CODE_ALPHABET, CODE_LENGTH, MINT_ATTEMPTS, Item, Label, Location
 from inventory.tests.helpers import patch, post
-from inventory.views import MAX_SHEET_LABELS
+from inventory.views import MAX_SHEET_LABELS, LabelSheetView
 
 # One well-formed code, used wherever the test is about something other than
 # minting. It is the example in decision 0011.
@@ -451,3 +452,19 @@ def test_a_sheet_nobody_may_have_is_refused_as_a_page(client: Client) -> None:
     assert response.status_code == 403
     assert response["Content-Type"].startswith("text/html")
     assert "<p>" in response.content.decode()
+
+
+def test_a_refusal_keeps_the_headers_that_say_what_to_do_about_it() -> None:
+    """Only the body is this view's; what DRF put in the headers is part of the refusal.
+
+    Asked of the handler directly because nothing reaching this endpoint sets
+    one today -- session authentication offers no ``WWW-Authenticate`` and the
+    sheet carries no throttle -- and the point of the loop is that attaching
+    either later does not silently lose it.
+    """
+    response = LabelSheetView().handle_exception(Throttled(wait=30))
+
+    assert response.status_code == 429
+    assert response["Retry-After"] == "30"
+    assert response["Content-Type"] == "text/html; charset=utf-8"
+    assert "Too many submissions" in response.content.decode()

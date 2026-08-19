@@ -51,11 +51,12 @@ and it catches accessibility regressions for free.
 
 ## Not yet built
 
-The scanner and the submit bar are not built, though the endpoints they need
-are and the screens beside them — `src/items/` and `src/volunteers/` — show the
-shape to follow: `src/api/` is the only place this app fetches, and every
-component reads its data through `useResource`. That gap and the others are
-listed in
+The scanning flow is built end to end, cart and Save included; one thing
+decision 0011 says the client does for itself is still missing from it. The
+screens around them — `src/items/`, `src/volunteers/`, `src/scan/` and
+`src/batch/` — show the shape to follow: `src/api/` is the only place this app
+fetches, and every component reads its data through `useResource`. Those gaps
+and the others are listed in
 [docs/architecture.md](../../../docs/architecture.md#not-yet-built). Read
 [decision 0011](../../../docs/decisions/0011-qr-batch-scanning.md) before
 touching it: it settles the scanning library, what the cart is, and what the

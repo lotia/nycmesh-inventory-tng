@@ -17,7 +17,7 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useState } from "react";
-import { type ApiError, apiPost, asApiError, searchPath } from "../api/client";
+import { type ApiError, apiPost, asApiError, refusalBody, searchPath } from "../api/client";
 import type { Page, Volunteer, VolunteerConflict } from "../api/types";
 import { useResource } from "../api/useResource";
 import { useCart } from "../cart/CartProvider";
@@ -45,13 +45,12 @@ export function identifierField(typed: string): "email" | "slack_id" | null {
   return /^[UW][A-Z0-9]{6,}$/.test(typed) ? "slack_id" : null;
 }
 
-/** The 409 body, if this refusal is one. See VolunteerConflict. */
+/** The 409 body, if this refusal is one. See VolunteerConflict and refusalBody. */
 function conflictIn(error: ApiError): VolunteerConflict | null {
-  if (error.status !== 409 || typeof error.body !== "object" || error.body === null) {
+  if (error.status !== 409) {
     return null;
   }
-  const body = error.body as Partial<VolunteerConflict>;
-  return body.volunteer && body.code ? (body as VolunteerConflict) : null;
+  return refusalBody<VolunteerConflict>(error, (body) => Boolean(body.volunteer && body.code));
 }
 
 export function VolunteerPicker() {

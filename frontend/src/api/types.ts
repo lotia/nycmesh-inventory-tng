@@ -73,3 +73,57 @@ export interface VolunteerConflict {
   /** Whether the named volunteer can be picked as they stand. */
   selectable: boolean;
 }
+
+/**
+ * What a scanned or typed code points at, as `GET /api/labels/{code}` answers.
+ *
+ * A revoked label resolves rather than 404s: the sticker is superseded, but it
+ * still says what it pointed at, and refusing the scan would block a volunteer
+ * over bookkeeping. `revoked_at` is how the client is told.
+ */
+export interface ResolvedLabel {
+  code: string;
+  kind: "item" | "location";
+  quantity: string;
+  revoked_at: string | null;
+  item: number | null;
+  location: number | null;
+}
+
+/** One thing wrong with a submitted batch, and where. */
+export interface BatchError {
+  /** The position in the submitted movements, or null for the batch itself. */
+  index: number | null;
+  field: string;
+  detail: string;
+}
+
+/** Nothing was saved. Every bad line is listed, so one pass fixes them all. */
+export interface BatchRejected {
+  detail: string;
+  errors: BatchError[];
+}
+
+/** Stock went negative. The movement was recorded anyway. */
+export interface BatchWarning {
+  item: number;
+  location: number;
+  balance: string;
+  detail: string;
+}
+
+/** A recorded batch, as it is read back. */
+export interface RecordedBatch {
+  id: number;
+  warnings: BatchWarning[];
+}
+
+/** Somewhere stock can be, as the pick-list shows it. */
+export interface Location {
+  id: number;
+  name: string;
+  kind: string;
+  parent: number | null;
+  held_by: number | null;
+  active: boolean;
+}

@@ -65,3 +65,19 @@ export function describeQuantity(
   const packets = quantity / packet;
   return `${spelled} (${formatQuantity(packets)} ${packets === 1 ? "packet" : "packets"} of ${formatQuantity(packet)})`;
 }
+
+/**
+ * What somebody typed into a quantity box, or null if it is not one yet.
+ *
+ * Null covers the half-typed as well as the nonsense -- an empty box, a lone
+ * minus sign, "1." on the way to "1.5" -- because the two are the same thing
+ * to a caller: there is no number here to write down. Callers decide what to
+ * do about zero and about negatives; this only says whether it parsed.
+ */
+export function parseQuantity(typed: string): number | null {
+  if (typed.trim() === "") {
+    return null;
+  }
+  const quantity = Number(typed);
+  return Number.isFinite(quantity) ? quantity : null;
+}

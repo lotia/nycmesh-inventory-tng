@@ -1,0 +1,96 @@
+/**
+ * Which camera, and whether there is one at all.
+ *
+ * The third non-optional constraint of
+ * docs/decisions/0011-qr-batch-scanning.md section 2: `facingMode:
+ * "environment"` is a request, not a guarantee, and iOS has answered it with
+ * the ultra-wide lens (WebKit 253186), which cannot focus close enough to read
+ * a small label. So the volunteer gets a list and picks, and what they picked
+ * is remembered -- a phone that answers badly should cost somebody one tap
+ * ever, not one tap per batch.
+ */
+import { read, write } from "../storage";
+
+/** Versioned, for the reason cartStorage's key is. */
+export const STORAGE_KEY = "nycmesh-inventory.camera.v1";
+
+export interface Camera {
+  deviceId: string;
+  label: string;
+}
+
+/**
+ * Whether a camera can be opened here at all.
+ *
+ * `navigator.mediaDevices` is *undefined* on an insecure origin rather than
+ * restricted, so a page served over plain HTTP looks like a bug rather than a
+ * misconfiguration -- see the consequences in decision 0011. A desktop with no
+ * camera answers the same way. Either way the answer is the item list, so the
+ * camera is not offered rather than offered and broken.
+ */
+export function cameraSupported(): boolean {
+  return typeof navigator.mediaDevices?.getUserMedia === "function";
+}
+
+/**
+ * Every video input, named.
+ *
+ * A device's `label` is empty until the user has granted permission at least
+ * once, so the fallback is positional: "Camera 2" is still something a person
+ * can pick by trying it.
+ */
+export async function listCameras(): Promise<Camera[]> {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  return devices
+    .filter((device) => device.kind === "videoinput")
+    .map((device, index) => ({
+      deviceId: device.deviceId,
+      label: device.label === "" ? `Camera ${index + 1}` : device.label,
+    }));
+}
+
+/**
+ * What to ask `getUserMedia` for.
+ *
+ * With nothing remembered this asks for the back camera, which is right on
+ * every phone that honours it and is the reason the picker exists for the ones
+ * that do not. A remembered choice is `exact`: falling back to another lens
+ * would silently undo the pick.
+ */
+export function constraints(deviceId: string | null): MediaStreamConstraints {
+  return {
+    video: deviceId === null ? { facingMode: "environment" } : { deviceId: { exact: deviceId } },
+  };
+}
+
+/**
+ * Whether this is the browser saying the camera asked for is not there.
+ *
+ * Read by duck typing for the reason ``refusal`` is: `getUserMedia` rejects
+ * with a `DOMException`, which is not an `Error` subclass in the browsers this
+ * runs in. `OverconstrainedError` is the answer to a remembered device id that
+ * no longer exists, which is ordinary -- Safari mints new ones per session.
+ */
+export function cameraIsGone(error: unknown): boolean {
+  const name = (error as Partial<Error> | null | undefined)?.name ?? "";
+  return name === "NotFoundError" || name === "OverconstrainedError";
+}
+
+export function loadCamera(): string | null {
+  return read(STORAGE_KEY, (value: unknown): value is string => typeof value === "string");
+}
+
+export function saveCamera(deviceId: string): void {
+  write(STORAGE_KEY, deviceId);
+}
+
+/**
+ * Forget the remembered camera, so the next open asks for the back one again.
+ *
+ * Stored as null rather than removed: ``loadCamera`` already ignores anything
+ * that is not a device id, so nothing is gained by a second way of storing
+ * nothing.
+ */
+export function forgetCamera(): void {
+  write(STORAGE_KEY, null);
+}

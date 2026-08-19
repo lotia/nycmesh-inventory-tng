@@ -6,6 +6,7 @@
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -62,10 +63,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     saveCart(cart);
   }, [cart]);
 
-  const value = useMemo<CartContextValue>(
-    () => ({ cart, dispatch: (intent) => dispatchAction(toAction(intent)) }),
-    [cart],
-  );
+  // Stable for the life of the provider: it closes over nothing but
+  // `dispatchAction`, which React guarantees. A `dispatch` that changed with
+  // the cart would make every effect that depends on it re-run once per scan,
+  // and the components that must not restart -- the camera, the deep link --
+  // would each need a ref to hide it behind.
+  const dispatch = useCallback((intent: CartIntent) => dispatchAction(toAction(intent)), []);
+
+  const value = useMemo<CartContextValue>(() => ({ cart, dispatch }), [cart, dispatch]);
 
   return <CartContext value={value}>{children}</CartContext>;
 }

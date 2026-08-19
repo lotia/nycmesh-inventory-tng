@@ -10,6 +10,7 @@ import math
 from typing import Any
 
 from drf_spectacular.openapi import AutoSchema
+from drf_spectacular.plumbing import ResolvedComponent
 from drf_spectacular.utils import Direction
 from rest_framework.exceptions import Throttled
 from rest_framework.permissions import SAFE_METHODS
@@ -54,27 +55,80 @@ def exception_handler(exc: Exception, context: Any) -> Response | None:
 # cannot be attached to an operation that is not actually reserved.
 ADMINISTRATORS_ONLY = "Requires an administrator. See docs/decisions/0012-two-populations.md for who that is and why."
 
+# The name the field map is published under, referenced by every write.
+VALIDATION_ERROR = "ValidationError"
+
+# What DRF already answers with when a serializer refuses a body: the name of
+# every field it complained about, mapped to the complaints about that field,
+# with `non_field_errors` for complaints about the body as a whole. This
+# describes that; it does not change it.
+#
+# A map whose keys are not known in advance is not expressible as a
+# Serializer's own fields, so this is the one error shape in the API written as
+# a schema rather than declared as a member of the family in serializers.py.
+#
+# Written out rather than assembled from drf-spectacular's build_object_type
+# and friends: three keys is smaller and reads as the YAML it becomes, and the
+# builders would need unwrapping anyway because build_basic_type is typed as
+# returning None for a type it cannot resolve. There is no OpenApiResponse
+# around it either, for the same reason the siblings do without one -- it
+# carries a description for the *response*, and the prose belongs on the
+# component, where `Detail` and `Throttled` keep theirs.
+VALIDATION_ERROR_SCHEMA = {
+    "type": "object",
+    "description": (
+        "A request refused for what it said -- a body a serializer would not take, or a query "
+        "parameter a filter could not parse.\n\n"
+        "Each key is a field of the submission and each value is every complaint about that "
+        "field; `non_field_errors` carries the complaints about the request as a whole.\n\n"
+        "A few operations refuse in a shape of their own, where a field name cannot carry what "
+        "they have to say; each of those says so in its own description."
+    ),
+    "additionalProperties": {"type": "array", "items": {"type": "string"}},
+}
+
 
 class PolicyAwareAutoSchema(AutoSchema):
     """Documents the refusals a view's own policy can produce.
 
-    Three of them: 429 where a throttle is attached, 403 where anything at all
-    guards the endpoint, and 404 where the path addresses one row. The
-    alternative is naming each response on each view, which is the same promise
-    written in as many places as there are endpoints. Here the schema follows
-    the view -- attach a throttle, a permission or a lookup and the response is
-    documented; take it away and the promise goes with it.
+    Four of them: 429 where a throttle is attached, 403 where anything at all
+    guards the endpoint, 404 where the path addresses one row, and 400 where
+    there is a body to be refused. The alternative is naming each response on
+    each view, which is the same promise written in as many places as there are
+    endpoints. Here the schema follows the view -- attach a throttle, a
+    permission, a lookup or a request body and the response is documented; take
+    it away and the promise goes with it.
 
     Which operations an administrator has to make is a separate question from
     which can answer 403, and it is answered in the description; see
     ADMINISTRATORS_ONLY above.
     """
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._request_bodies: dict[tuple[str, str, str], Any] = {}
+
     def get_description(self) -> str:
         description = super().get_description()
         if not self._is_administrators_only():
             return description
         return f"{description}\n\n{ADMINISTRATORS_ONLY}".strip()
+
+    def _get_request_body(self, direction: Direction = "request") -> Any:
+        """The request body, built once however many times it is asked for.
+
+        drf-spectacular builds it for the operation and
+        ``_carries_a_body_to_refuse`` below asks for it again, and building it
+        resolves every nested serializer and emits every warning that resolving
+        them produces -- so without this each write's body is assembled twice
+        and each of its warnings is reported twice. Keyed by the operation
+        rather than kept in a bare attribute, because a schema instance is only
+        promised to a view, not to one path and method of it.
+        """
+        key = (self.path, self.method, direction)
+        if key not in self._request_bodies:
+            self._request_bodies[key] = super()._get_request_body(direction)
+        return self._request_bodies[key]
 
     def _get_response_bodies(self, direction: Direction = "response") -> dict[str, Any]:
         responses = super()._get_response_bodies(direction)
@@ -85,6 +139,9 @@ class PolicyAwareAutoSchema(AutoSchema):
                 responses.setdefault("403", self._get_response_for_code(DetailSerializer, "403", direction=direction))
             if self._addresses_one_row():
                 responses.setdefault("404", self._get_response_for_code(DetailSerializer, "404", direction=direction))
+            if self._can_refuse_what_it_was_given():
+                schema = self._validation_error_component().ref
+                responses.setdefault("400", self._get_response_for_code(schema, "400", direction=direction))
         return responses
 
     def _is_throttled_write(self) -> bool:
@@ -103,6 +160,46 @@ class PolicyAwareAutoSchema(AutoSchema):
 
     def _is_administrators_only(self) -> bool:
         return administrators_only(self.view, self.method)
+
+    def _can_refuse_what_it_was_given(self) -> bool:
+        """Whether anything about this operation's input can be refused as a 400.
+
+        Two ways in. A request body, asked of the schema's own build rather
+        than of the method alone, so a write that stops taking one stops
+        advertising the refusal. And a filter: `django_filters`' DRF backend
+        is configured to raise, so `?category=abc` on the item list is refused
+        with exactly the field map this component describes -- on the endpoint
+        a phone hits most, which is precisely where a generated client should
+        have a type for it.
+        """
+        return bool(self._get_request_body()) or self._is_filtered()
+
+    def _is_filtered(self) -> bool:
+        """Whether django-filter has anything to parse for this view.
+
+        Either spelling counts: a view declares a `filterset_class` or names
+        `filterset_fields` and lets the backend build one, and both end in the
+        same refusal for a value that will not parse.
+        """
+        return any(getattr(self.view, named, None) for named in ("filterset_class", "filterset_fields"))
+
+    def _validation_error_component(self) -> ResolvedComponent:
+        """The field map, registered once and referenced by every write.
+
+        A raw schema handed to `_get_response_for_code` is used as it stands,
+        which would inline this object into every write operation and give a
+        generated client one anonymous type per endpoint for a single body.
+        Registering it costs one call and buys the `$ref` the serializer-backed
+        siblings get for free.
+        """
+        component = ResolvedComponent(
+            name=VALIDATION_ERROR,
+            type=ResolvedComponent.SCHEMA,
+            schema=VALIDATION_ERROR_SCHEMA,
+            object=VALIDATION_ERROR,
+        )
+        self.registry.register_on_missing(component)
+        return component
 
     def _addresses_one_row(self) -> bool:
         """A path with a parameter in it can be asked for a row that is not there.

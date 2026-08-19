@@ -62,4 +62,17 @@ describe("saveCart", () => {
 
     expect(() => saveCart(createCart())).not.toThrow();
   });
+
+  it("ignores a stored kind this app cannot express", () => {
+    // A transfer needs a location on both sides and the cart carries one, so
+    // KINDS does not offer it -- but a cart written before that was true, or
+    // by hand, would restore, be sent, and be refused with a 409 nothing here
+    // renders, under a Retry that cannot succeed.
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...createCart("k", "2026-08-19T00:00:00Z"), kind: "transfer" }),
+    );
+
+    expect(loadCart().kind).toBe("checkout");
+  });
 });
