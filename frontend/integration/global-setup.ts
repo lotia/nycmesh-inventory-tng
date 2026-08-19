@@ -27,7 +27,11 @@ function manage(...args: string[]) {
 
 export default function globalSetup() {
   manage("migrate", "--noinput");
-  const seeded: Record<string, string | number> = JSON.parse(manage("seed_integration_data"));
+  // The flag is the seed's own guard against being run somewhere it should
+  // not be; the command explains what passing it acknowledges.
+  const seeded: Record<string, string | number> = JSON.parse(
+    manage("seed_integration_data", "--i-know-this-creates-a-published-login"),
+  );
   for (const [key, value] of Object.entries(seeded)) {
     process.env[`SEEDED_${key.toUpperCase()}`] = String(value);
   }
