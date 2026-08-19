@@ -236,6 +236,18 @@ which is only tolerable if one submission reports everything wrong at once, so
 the `400` body lists each failure by its `index` in the submitted array and the
 client highlights those cart lines in place.
 
+**A batch that does not add up to the kind it claims is a `409`.** Every line
+can be valid on its own while the batch is not the act it says it is: a
+check-out whose second line takes stock from nowhere, a transfer with only one
+side. That is a different failure from a malformed line — nothing needs
+correcting field by field, the volunteer picked the wrong kind or scanned in
+the wrong direction — so it answers `409` with the offending lines by index
+rather than folding into the `400`. Check-outs and consumption need a
+`from_location`, check-ins and receipts a `to_location`, transfers both.
+Adjustments and counts constrain nothing, deliberately: those are how a
+volunteer says the shelf disagrees with the system, which is the one claim this
+API must never argue with.
+
 **Insufficient stock is a warning, not a rejection.** A check-out that drives a
 balance negative is recorded, with a warning in the response. Refusing it is the
 mistake the sheet makes: corrections are a large share of that ledger

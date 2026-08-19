@@ -7,7 +7,11 @@ carries one open question about how much custody tracking to ask volunteers for.
 That reasoning is not repeated here.
 
 Status: implemented in `backend/src/inventory/models.py`, including the stock
-ledger and the derived balance view. No API endpoints expose them yet.
+ledger and the derived balance view. `POST /api/stock/transactions` is the one
+endpoint over them so far, designed in
+[decision 0011](decisions/0011-qr-batch-scanning.md#6-the-batch-endpoint-and-what-the-client-keeps);
+its request and response shapes are in the generated schema, see
+[The API schema](../DEVELOPERS.md#the-api-schema).
 
 ## Shape
 

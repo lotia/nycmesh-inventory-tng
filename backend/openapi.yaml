@@ -45,8 +45,74 @@ paths:
               schema:
                 $ref: '#/components/schemas/HealthCheck'
           description: ''
+  /api/stock/transactions:
+    post:
+      operationId: stock_transactions_create
+      description: |-
+        Record one batch: one transaction, one movement per line, one commit.
+
+        This is the endpoint the project exists for. The system it replaces could
+        carry one item per form submission, so people submitted the same form over
+        and over; here that is one request. See
+        docs/decisions/0011-qr-batch-scanning.md.
+      summary: Record a batch of stock movements
+      tags:
+      - stock
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StockTransactionCreate'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockTransaction'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockTransaction'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchRejected'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchInconsistent'
+          description: ''
 components:
   schemas:
+    ApiError:
+      type: object
+      description: |-
+        One thing wrong, and where.
+
+        ``index`` is the position in the submitted ``movements`` array, or null
+        when the problem is with the batch itself rather than one of its lines.
+      properties:
+        index:
+          type:
+          - integer
+          - 'null'
+        field:
+          type: string
+        detail:
+          type: string
+      required:
+      - detail
+      - field
+      - index
     ApiRoot:
       type: object
       properties:
@@ -56,6 +122,48 @@ components:
           title: Health
       required:
       - docs
+    BatchInconsistency:
+      type: object
+      description: One line that disagrees with the batch's declared kind.
+      properties:
+        index:
+          type: integer
+        detail:
+          type: string
+      required:
+      - detail
+      - index
+    BatchInconsistent:
+      type: object
+      description: Every line is valid on its own, but they do not add up to the kind
+        claimed.
+      properties:
+        detail:
+          type: string
+        kind:
+          type: string
+        inconsistent:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchInconsistency'
+      required:
+      - detail
+      - inconsistent
+      - kind
+    BatchRejected:
+      type: object
+      description: Nothing was saved. Every bad line is listed, so one pass fixes
+        them all.
+      properties:
+        detail:
+          type: string
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApiError'
+      required:
+      - detail
+      - errors
     HealthCheck:
       type: object
       properties:
@@ -63,6 +171,183 @@ components:
           type: string
       required:
       - status
+    KindEnum:
+      enum:
+      - checkout
+      - checkin
+      - receipt
+      - consumption
+      - transfer
+      - adjustment
+      - count
+      type: string
+      description: |-
+        * `checkout` - Check out
+        * `checkin` - Check in
+        * `receipt` - Receipt
+        * `consumption` - Used at a job
+        * `transfer` - Transfer
+        * `adjustment` - Adjustment
+        * `count` - Stock count
+    StockMovement:
+      type: object
+      description: One recorded line, as it is read back.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        item:
+          type: integer
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        from_location:
+          type:
+          - integer
+          - 'null'
+        to_location:
+          type:
+          - integer
+          - 'null'
+      required:
+      - id
+      - item
+      - quantity
+    StockMovementInput:
+      type: object
+      description: One line of a submitted batch.
+      properties:
+        item:
+          type: integer
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        from_location:
+          type:
+          - integer
+          - 'null'
+        to_location:
+          type:
+          - integer
+          - 'null'
+      required:
+      - item
+      - quantity
+    StockTransaction:
+      type: object
+      description: |-
+        A recorded batch, as it is read back.
+
+        Renders a response the view has assembled rather than a bare model: both
+        ``lines`` and ``warnings`` are attributes the view attaches, so the rows
+        are read once and the balances behind the warnings once.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        idempotency_key:
+          type:
+          - string
+          - 'null'
+          maxLength: 64
+        kind:
+          $ref: '#/components/schemas/KindEnum'
+        actor:
+          type: integer
+        occurred_at:
+          type: string
+          format: date-time
+        recorded_at:
+          type: string
+          format: date-time
+          readOnly: true
+        reason:
+          type: string
+          maxLength: 100
+        job_reference:
+          type: string
+          description: Install or node this relates to, e.g. NN217.
+          maxLength: 50
+        note:
+          type: string
+        movements:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockMovement'
+          readOnly: true
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockTransactionWarning'
+          readOnly: true
+      required:
+      - actor
+      - id
+      - kind
+      - movements
+      - recorded_at
+      - warnings
+    StockTransactionCreate:
+      type: object
+      description: |-
+        A batch as it is submitted: one act, many lines.
+
+        Movements name items by id, never by label code. The client has already
+        resolved every code it scanned, and accepting codes here would add a second
+        resolution path that fails after the volunteer thinks they are done.
+      properties:
+        idempotency_key:
+          type:
+          - string
+          - 'null'
+          maxLength: 64
+        kind:
+          $ref: '#/components/schemas/KindEnum'
+        actor:
+          type: integer
+        occurred_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          maxLength: 100
+        job_reference:
+          type: string
+          description: Install or node this relates to, e.g. NN217.
+          maxLength: 50
+        note:
+          type: string
+        movements:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockMovementInput'
+      required:
+      - actor
+      - kind
+      - movements
+    StockTransactionWarning:
+      type: object
+      description: |-
+        Stock went negative. The movement was recorded anyway; see decision
+        0011, "Insufficient stock is a warning, not a rejection".
+      properties:
+        item:
+          type: integer
+        location:
+          type: integer
+        balance:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,11}(?:\.\d{0,3})?$
+        detail:
+          type: string
+      required:
+      - balance
+      - detail
+      - item
+      - location
   securitySchemes:
     cookieAuth:
       type: apiKey
