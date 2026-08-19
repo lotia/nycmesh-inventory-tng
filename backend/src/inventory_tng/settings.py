@@ -18,6 +18,7 @@ env = environ.Env(
     DJANGO_DEBUG=(bool, False),
     DJANGO_ALLOWED_HOSTS=(list, []),
     CORS_ALLOWED_ORIGINS=(list, []),
+    CSRF_TRUSTED_ORIGINS=(list, []),
 )
 
 # Read the repository-root .env when present -- the same file docker compose
@@ -162,6 +163,15 @@ SPECTACULAR_SETTINGS = {
 # The frontend is served from a different origin during development (the Vite
 # dev server). In production nginx proxies to the backend, so this is empty.
 CORS_ALLOWED_ORIGINS: list[str] = env("CORS_ALLOWED_ORIGINS")
+
+# Which origins may *write*. Django compares the browser's Origin header
+# against this on every unsafe request, and the dev server is a different
+# origin from the backend it proxies to, so without it no write from the Vite
+# server is accepted. It is a separate question from
+# CORS (who may read), but the answer here is the same list, so it defaults to
+# it rather than being a second thing to remember to keep in step. Setting it
+# explicitly replaces that list rather than adding to it.
+CSRF_TRUSTED_ORIGINS: list[str] = env("CSRF_TRUSTED_ORIGINS") or CORS_ALLOWED_ORIGINS
 
 # Behind an ingress or proxy that terminates TLS.
 USE_X_FORWARDED_HOST = True

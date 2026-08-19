@@ -105,6 +105,18 @@ def test_api_root_links_actually_resolve(client: Client) -> None:
 
 
 @pytest.mark.django_db
+def test_fetching_the_index_sets_the_csrf_cookie(client: Client) -> None:
+    """A single-page app never renders a Django template, so nothing else would
+    ever set it and no browser could write to the API.
+
+    The test client receives cookies even though it does not enforce CSRF, so
+    this regression is catchable here in a second rather than only in the
+    browser suite.
+    """
+    assert "csrftoken" in client.get(reverse("api-root")).cookies
+
+
+@pytest.mark.django_db
 def test_the_public_links_resolve_without_logging_in(client: Client) -> None:
     """Probes run before authentication exists, and a client that cannot reach
     the index cannot discover the login route either.

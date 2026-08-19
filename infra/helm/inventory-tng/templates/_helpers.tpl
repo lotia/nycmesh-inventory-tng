@@ -32,6 +32,10 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
   value: {{ .Values.django.debug | quote }}
 - name: DJANGO_ALLOWED_HOSTS
   value: {{ .Values.django.allowedHosts | quote }}
+- name: CORS_ALLOWED_ORIGINS
+  value: {{ .Values.django.corsAllowedOrigins | quote }}
+- name: CSRF_TRUSTED_ORIGINS
+  value: {{ .Values.django.csrfTrustedOrigins | quote }}
 - name: DJANGO_SECRET_KEY
   valueFrom:
     secretKeyRef:

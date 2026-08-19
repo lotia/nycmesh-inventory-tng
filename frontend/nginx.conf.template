@@ -11,22 +11,31 @@ server {
     gzip_types text/css application/javascript application/json image/svg+xml;
     gzip_min_length 1024;
 
-    # The browser only ever talks to this origin; nginx forwards API calls to
-    # Django. No CORS in production, and no build-time API URL.
-    location /api/ {
+    # The browser only ever talks to this origin; nginx forwards API and
+    # admin calls to Django. No CORS in production, and no build-time API URL.
+    #
+    # A regex rather than two `/api/` and `/admin/` prefixes. `/api/` does not
+    # match `/api` itself, and that is the endpoint index -- the first thing a
+    # client fetches and the request that hands the browser its CSRF token --
+    # so with a trailing slash it fell through to the single-page app below
+    # and was answered with index.html, in production only. `(/|$)` is what
+    # keeps the fix from over-matching: `/api` and everything beneath `/api/`
+    # are proxied, while a client-side route like `/apiary` still reaches the
+    # app.
+    #
+    # X-Forwarded-Proto is passed through rather than set to $scheme: TLS is
+    # terminated at the ingress, so $scheme here is always `http`. Overwriting
+    # the header told Django every request was insecure, which makes the CSRF
+    # origin check compare `https://host` against `http://host` and reject
+    # every write, suppresses HSTS, and makes the index advertise `http://`
+    # URLs. When there is no ingress the header is absent, nginx then sends
+    # none, and Django falls back to the scheme it was reached on.
+    location ~ ^/(api|admin)(/|$) {
         proxy_pass         ${BACKEND_ORIGIN};
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-    }
-
-    location /admin/ {
-        proxy_pass         ${BACKEND_ORIGIN};
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   X-Forwarded-Proto $http_x_forwarded_proto;
     }
 
     # Hashed asset filenames are safe to cache indefinitely.

@@ -16,6 +16,11 @@ coverage/
 .coverage
 htmlcov/
 
+# Playwright: traces and failure screenshots. Browser binaries live outside
+# the repository, in the shared Playwright cache.
+test-results/
+playwright-report/
+
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db

@@ -25,6 +25,10 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test-setup.ts"],
+    // Unit tests only, and only where they live: next to the code. Vitest's
+    // default glob would otherwise collect the Playwright suite, which has its
+    // own runner and command -- see DEVELOPERS.md "Integration tests".
+    include: ["src/**/*.test.{ts,tsx}"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],

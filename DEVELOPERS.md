@@ -385,6 +385,39 @@ Coverage is built into both commands rather than being a separate CI-only step.
 A local run and a CI run enforce exactly the same rules, so the build cannot
 fail on something you had no way to see.
 
+### Integration tests
+
+```bash
+cd frontend && npm run test:integration    # Playwright, a real browser
+```
+
+Separate from the commands above on purpose, and not part of the coverage
+threshold. They start a real Django, a real Vite dev server and a real browser,
+and assert through the path a volunteer's phone takes.
+
+They exist because the unit tests cannot see a whole class of bug. Django's
+test client exempts itself from CSRF and jsdom is not a browser, so both suites
+were once green against an API no browser could write to — twice over, in fact:
+nothing set a CSRF cookie, and the dev server's origin was not trusted. Only
+this suite can fail on the second, and it is the only one that exercises either
+through a real browser.
+
+They need Docker (for PostgreSQL) and a one-off browser download:
+
+```bash
+cd frontend && npx playwright install chromium
+```
+
+Servers, migrations and the fixed test scene are all handled by the suite
+itself, so there is no separate setup step, and a server you already have
+running is reused without changing that. The scene comes from
+`manage.py seed_integration_data`, which refuses to run unless `DJANGO_DEBUG`
+is on because it creates a login whose password is written down in this
+repository.
+
+They write to your development database rather than a throwaway one, because
+the point is to exercise the servers you actually run.
+
 ### What breaks the build
 
 Both of these fail the command with a non-zero exit code, and therefore fail CI:

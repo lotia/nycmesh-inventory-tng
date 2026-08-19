@@ -4,6 +4,8 @@ from django.contrib.postgres.search import TrigramSimilarity
 from django.db import IntegrityError, connection
 from django.db.models import Q, QuerySet
 from django.db.transaction import atomic
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django_filters.rest_framework import CharFilter, FilterSet
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers, status
@@ -39,11 +41,21 @@ ENDPOINTS = {
 }
 
 
+# ty reads django-stubs' signature for method_decorator, which does not
+# describe a decorator this generic. See DEVELOPERS.md#typing.
+@method_decorator(ensure_csrf_cookie, name="get")  # ty: ignore[invalid-argument-type]
 class ApiRootView(APIView):
     """The list of endpoints this API offers.
 
     Exists so the API is discoverable without reading the source or knowing the
     URL layout in advance: fetch this, follow the links.
+
+    Fetching it also hands the browser a CSRF token. Session authentication
+    enforces CSRF on every write, and a single-page app never renders a Django
+    template, so without this nothing would set the cookie and no browser
+    could post anything. The index is the right place for it: it is what a
+    client fetches first, and it is public, so the token is available before
+    anyone has logged in.
     """
 
     # Deliberately public: an index of endpoint names is not sensitive, and a

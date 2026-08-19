@@ -76,6 +76,78 @@ jobs:
       - name: Build
         run: npm run build
 
+  integration:
+    name: Integration (browser)
+    runs-on: ubuntu-latest
+    # Cannot be run by either job above; see DEVELOPERS.md "Integration tests".
+    services:
+      postgres:
+        image: docker.io/library/postgres:18
+        env:
+          POSTGRES_DB: inventory_tng
+          POSTGRES_USER: inventory
+          POSTGRES_PASSWORD: inventory
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    env:
+      DJANGO_SECRET_KEY: ci-only-not-a-real-secret
+      DATABASE_URL: postgres://inventory:inventory@localhost:5432/inventory_tng
+      # The seed command refuses to run without this, deliberately: it creates
+      # a login whose password is in the repository.
+      DJANGO_DEBUG: "true"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      # CSRF_TRUSTED_ORIGINS defaults to this, which is the whole point of the
+      # fallback: one origin to set, not two to keep in step.
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+        working-directory: backend
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      # The browser is a 115MB download, so it is cached on the resolved
+      # version rather than fetched on every run.
+      - name: Resolve browser version
+        id: playwright
+        working-directory: frontend
+        run: echo "version=$(npm ls @playwright/test --json | jq -r '.dependencies["@playwright/test"].version')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Install browser dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+        working-directory: frontend
+      # Playwright starts Django and Vite itself, migrates and seeds. See
+      # frontend/playwright.config.ts.
+      - name: Integration tests
+        run: npm run test:integration
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: frontend/test-results/
+          retention-days: 7
+
   chart:
     name: Helm chart
     runs-on: ubuntu-latest

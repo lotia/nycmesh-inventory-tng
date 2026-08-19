@@ -32,7 +32,8 @@ chart and from a Secret.
 | `DATABASE_URL` | yes | Secret | `postgres://user:password@host:5432/dbname` |
 | `DJANGO_DEBUG` | no | chart (`django.debug`) | Must be `false` outside development |
 | `DJANGO_ALLOWED_HOSTS` | yes | chart (`django.allowedHosts`) | Comma-separated hostnames |
-| `CORS_ALLOWED_ORIGINS` | no | chart | Normally empty: the frontend proxies to the backend, so production makes no cross-origin calls |
+| `CORS_ALLOWED_ORIGINS` | no | chart (`django.corsAllowedOrigins`) | Normally empty: the frontend proxies to the backend, so production makes no cross-origin calls |
+| `CSRF_TRUSTED_ORIGINS` | no | chart (`django.csrfTrustedOrigins`) | Which origins may write. Normally empty for the same reason; defaults to `CORS_ALLOWED_ORIGINS`. A cross-origin frontend needs both |
 
 The frontend image takes one variable, `BACKEND_ORIGIN`, which the chart sets to
 the backend Service. Nothing environment-specific is compiled into the

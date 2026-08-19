@@ -12,6 +12,13 @@ paths:
 
         Exists so the API is discoverable without reading the source or knowing the
         URL layout in advance: fetch this, follow the links.
+
+        Fetching it also hands the browser a CSRF token. Session authentication
+        enforces CSRF on every write, and a single-page app never renders a Django
+        template, so without this nothing would set the cookie and no browser
+        could post anything. The index is the right place for it: it is what a
+        client fetches first, and it is public, so the token is available before
+        anyone has logged in.
       summary: List the available endpoints
       security:
       - cookieAuth: []
