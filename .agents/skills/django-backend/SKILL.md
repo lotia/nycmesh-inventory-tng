@@ -40,12 +40,25 @@ then update everything that has to move with it — the full list is in
   API documentation anywhere. How it is kept current, and when a view needs
   `@extend_schema`, is in
   [The API schema](../../../DEVELOPERS.md#the-api-schema).
-- `DEFAULT_PERMISSION_CLASSES` is `IsAuthenticated`, so opening an endpoint up
-  is a deliberate act. Which endpoints may be open, and to whom, is settled in
+- `DEFAULT_PERMISSION_CLASSES` is `IsAuthenticated` **and** `StaffWrites`, so a
+  new endpoint needs a session to read and the staff flag to write, and opening
+  either up is a deliberate act. Which endpoints may be open, and to whom, is
+  settled in
   [decision 0012](../../../docs/decisions/0012-two-populations.md) — read it
-  before adding a permission class rather than arguing the case again in a pull
-  request.
+  before naming a permission class rather than arguing the case again in a pull
+  request. `inventory/permissions.py` is where the classes live, and where
+  `administrators_only` answers "is this operation reserved?" for the schema
+  and for `GET /api/me` alike.
+- A detail endpoint over a row the list can withdraw subclasses
+  `DetailView` in `inventory/views.py` rather than `RetrieveUpdateAPIView`: it
+  carries the administrator-sees-retired rule, the no-`PUT` rule, and the
+  re-read that keeps a written row the same shape as a read one.
 - Filtering goes through `django-filter`, not ad-hoc query-parameter parsing.
+- `DEFAULT_PARSER_CLASSES` is `JSONParser` alone, so a form-encoded body is a
+  415 rather than a payload nobody checked. Do not add a form parser back to a
+  view: DRF reads a key missing from a form body as `false` for a boolean, so a
+  form-encoded create silently arrives with `active=false` and retires the row
+  it just added. The reasoning is on the setting in `inventory_tng/settings.py`.
 
 ## Models and migrations
 

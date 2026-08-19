@@ -66,6 +66,10 @@ class VolunteerManager(models.Manager["Volunteer"]):
         duplicates is a first-class operation here (docs/data-model.md), and
         recording new work against a retired record would start the next
         generation of them.
+
+        ``Volunteer.is_selectable`` answers the same question about one row
+        already in memory. The two are deliberately adjacent: a third condition
+        has to be added to both, and they are the only two places it lives.
         """
         return self.filter(merged_into__isnull=True, active=True)
 
@@ -166,6 +170,18 @@ class Volunteer(models.Model):
             if (writing is None or field in writing) and getattr(self, field) == "":
                 setattr(self, field, None)
         super().save(*args, **kwargs)
+
+    @property
+    def is_selectable(self) -> bool:
+        """Whether the list would still offer this volunteer.
+
+        The row-level half of VolunteerManager.selectable(), for callers
+        holding the object rather than building a query -- a validator whose
+        related field has already fetched it, or the conflict body in views.py.
+        Asking the queryset again would be a round trip to re-read two columns
+        that are on the row in hand.
+        """
+        return self.merged_into_id is None and self.active  # ty: ignore[unresolved-attribute]
 
 
 class Location(models.Model):

@@ -8,10 +8,12 @@ paths:
     get:
       operationId: root_retrieve
       description: |-
-        The list of endpoints this API offers.
+        Where this API starts.
 
-        Exists so the API is discoverable without reading the source or knowing the
-        URL layout in advance: fetch this, follow the links.
+        Exists so a client does not have to know the URL layout in advance: fetch
+        this, and every collection is a link. What each one accepts, and the
+        endpoints addressed per row, are in the schema this also links to --
+        the index says where things are, the schema says what they take.
 
         Fetching it also hands the browser a CSRF token. Session authentication
         enforces CSRF on every write, and a single-page app never renders a Django
@@ -19,7 +21,7 @@ paths:
         could post anything. The index is the right place for it: it is what a
         client fetches first, and it is public, so the token is available before
         anyone has logged in.
-      summary: List the available endpoints
+      summary: List the API's entry points
       security:
       - cookieAuth: []
       - {}
@@ -56,6 +58,127 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedCategoryList'
           description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+    post:
+      operationId: categories_create
+      description: |-
+        The item groupings, for narrowing the catalogue.
+
+        Requires an administrator. See docs/decisions/0012-two-populations.md for who that is and why.
+      tags:
+      - categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Category'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+  /api/categories/{id}:
+    get:
+      operationId: categories_retrieve
+      description: |-
+        One grouping, read by anyone and renamed or re-parented by an administrator.
+
+        A category carries no ``active`` column, so nothing here is withdrawn from
+        the list and both querysets are the same one. Adding such a column would
+        be guessing at inventory-tng-6c7's answer, and an unwanted grouping with
+        no items in it is already reachable through the Django admin, which
+        decision 0014 point 4 keeps for exactly this.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - categories
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+    patch:
+      operationId: categories_partial_update
+      description: |-
+        One grouping, read by anyone and renamed or re-parented by an administrator.
+
+        A category carries no ``active`` column, so nothing here is withdrawn from
+        the list and both querysets are the same one. Adding such a column would
+        be guessing at inventory-tng-6c7's answer, and an unwanted grouping with
+        no items in it is already reachable through the Django admin, which
+        decision 0014 point 4 keeps for exactly this.
+
+        Requires an administrator. See docs/decisions/0012-two-populations.md for who that is and why.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCategory'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
   /api/healthz:
     get:
       operationId: healthz_retrieve
@@ -82,10 +205,14 @@ paths:
     get:
       operationId: items_list
       description: |-
-        The catalogue, with the stock behind it.
+        The catalogue, with the stock behind it. Administrators add to it.
 
         This is the screen the volunteer mockup is almost entirely made of: every
         item, its count, and a way to add some to the cart. See decision 0011.
+
+        Creating one is an administrator's operation (decision 0014 point 2), so
+        the two audiences meet on one endpoint and ``StaffWrites`` is what
+        separates them.
       parameters:
       - in: query
         name: category
@@ -113,6 +240,132 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedItemList'
           description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+    post:
+      operationId: items_create
+      description: |-
+        The catalogue, with the stock behind it. Administrators add to it.
+
+        This is the screen the volunteer mockup is almost entirely made of: every
+        item, its count, and a way to add some to the cart. See decision 0011.
+
+        Creating one is an administrator's operation (decision 0014 point 2), so
+        the two audiences meet on one endpoint and ``StaffWrites`` is what
+        separates them.
+
+        Requires an administrator. See docs/decisions/0012-two-populations.md for who that is and why.
+      tags:
+      - items
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemDetail'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemDetail'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+  /api/items/{id}:
+    get:
+      operationId: items_retrieve
+      description: |-
+        One item, read by anyone and edited by an administrator.
+
+        Retiring an item is a PATCH setting ``active`` to false, not a delete: the
+        ledger refers to it for as long as the ledger exists, and what
+        ``active=False`` should mean for stock still physically on a shelf is
+        inventory-tng-6c7.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - items
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemDetail'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+    patch:
+      operationId: items_partial_update
+      description: |-
+        One item, read by anyone and edited by an administrator.
+
+        Retiring an item is a PATCH setting ``active`` to false, not a delete: the
+        ledger refers to it for as long as the ledger exists, and what
+        ``active=False`` should mean for stock still physically on a shelf is
+        inventory-tng-6c7.
+
+        Requires an administrator. See docs/decisions/0012-two-populations.md for who that is and why.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - items
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedItemDetail'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemDetail'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
   /api/labels:
     get:
       operationId: labels_list
@@ -136,16 +389,62 @@ paths:
                 items:
                   $ref: '#/components/schemas/LabelMap'
           description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+    post:
+      operationId: labels_create
+      description: |-
+        Every label that still points at something.
+
+        Unpaginated, deliberately. This exists to be fetched once and cached, so
+        that a scan resolves without a round trip from a basement (decision 0011);
+        handing it back in pages would make the client stitch them together for no
+        benefit at a few hundred rows.
+
+        Requires an administrator. See docs/decisions/0012-two-populations.md for who that is and why.
+      tags:
+      - labels
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Label'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Label'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
   /api/labels/{code}:
     get:
       operationId: labels_retrieve
       description: |-
-        Resolve one scanned or typed code.
+        One label, found by the code printed on it.
 
         A revoked label resolves rather than 404s: the sticker is superseded, but
         it still says what it pointed at, and refusing the scan would block a
         volunteer over bookkeeping. The client is told, through ``revoked_at``,
         and can say so.
+
+        Revoking is an administrator's operation (decision 0012) and happens here
+        rather than at a URL of its own, because the code is the label's identity
+        and a faded sticker is the complaint this project started with. It is a
+        PATCH of ``revoked``, never a delete: the ledger's history refers to what
+        the sticker pointed at.
       summary: Resolve a scanned label code
       parameters:
       - in: path
@@ -164,11 +463,69 @@ paths:
               schema:
                 $ref: '#/components/schemas/LabelResolve'
           description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
         '404':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NotFound'
+                $ref: '#/components/schemas/Detail'
+          description: ''
+    patch:
+      operationId: labels_partial_update
+      description: |-
+        One label, found by the code printed on it.
+
+        A revoked label resolves rather than 404s: the sticker is superseded, but
+        it still says what it pointed at, and refusing the scan would block a
+        volunteer over bookkeeping. The client is told, through ``revoked_at``,
+        and can say so.
+
+        Revoking is an administrator's operation (decision 0012) and happens here
+        rather than at a URL of its own, because the code is the label's identity
+        and a faded sticker is the complaint this project started with. It is a
+        PATCH of ``revoked``, never a delete: the ledger's history refers to what
+        the sticker pointed at.
+
+        Requires an administrator. See docs/decisions/0012-two-populations.md for who that is and why.
+      summary: Revoke, restore or correct a label
+      parameters:
+      - in: path
+        name: code
+        schema:
+          type: string
+        required: true
+      tags:
+      - labels
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedLabel'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Label'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
           description: ''
   /api/locations:
     get:
@@ -219,6 +576,153 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedLocationList'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+    post:
+      operationId: locations_create
+      description: |-
+        Everywhere stock can be. A pick-list, like volunteers.
+
+        Retired locations are not offered, and `active` is deliberately not a
+        filter: the queryset already fixes it, so the parameter could only ever
+        return nothing. Same shape as the volunteer pick-list, which narrows on a
+        queryset rather than advertising `active` either.
+
+        Requires an administrator. See docs/decisions/0012-two-populations.md for who that is and why.
+      tags:
+      - locations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Location'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+  /api/locations/{id}:
+    get:
+      operationId: locations_retrieve
+      description: |-
+        One location, read by anyone and edited by an administrator.
+
+        Retiring one is a PATCH setting ``active`` to false, for the reason given
+        on ItemDetailView: the ledger refers to it forever.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - locations
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+    patch:
+      operationId: locations_partial_update
+      description: |-
+        One location, read by anyone and edited by an administrator.
+
+        Retiring one is a PATCH setting ``active`` to false, for the reason given
+        on ItemDetailView: the ledger refers to it forever.
+
+        Requires an administrator. See docs/decisions/0012-two-populations.md for who that is and why.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - locations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedLocation'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+  /api/me:
+    get:
+      operationId: me_retrieve
+      description: |-
+        Who the caller is, and what this server will let them do.
+
+        Decision 0014 point 3: the interface renders administrative controls from
+        this answer rather than guessing at them.
+
+        Deliberately public, and deliberately not a 403 for a caller with no
+        session. The volunteer app fetches this on load, and decision 0012 says a
+        volunteer never signs in -- so "you are nobody, and here is what nobody may
+        do" is the ordinary case, not an error to be handled on the way to the
+        real one.
+      summary: What the caller is and what they may do
+      tags:
+      - me
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUser'
           description: ''
   /api/stock/transactions:
     post:
@@ -272,6 +776,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Throttled'
           description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
   /api/volunteers:
     get:
       operationId: volunteers_list
@@ -281,6 +791,10 @@ paths:
         Volunteers are a pick-list with no password (decision 0008 point 5). The
         client searches this before offering to add anyone, which is what stops a
         second generation of the duplicate spellings that decision counts.
+
+        The one place the two halves disagree is an identifier held by somebody the
+        list does not offer, which is answered with a 409 naming them rather than a
+        400 the volunteer cannot act on. See decision 0015.
       parameters:
       - name: page
         required: false
@@ -304,6 +818,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedVolunteerList'
           description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
     post:
       operationId: volunteers_create
       description: |-
@@ -312,17 +832,16 @@ paths:
         Volunteers are a pick-list with no password (decision 0008 point 5). The
         client searches this before offering to add anyone, which is what stops a
         second generation of the duplicate spellings that decision counts.
+
+        The one place the two halves disagree is an identifier held by somebody the
+        list does not offer, which is answered with a 409 naming them rather than a
+        400 the volunteer cannot act on. See decision 0015.
+      summary: Add a volunteer to the pick-list
       tags:
       - volunteers
       requestBody:
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/Volunteer'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/Volunteer'
-          multipart/form-data:
             schema:
               $ref: '#/components/schemas/Volunteer'
         required: true
@@ -335,11 +854,109 @@ paths:
               schema:
                 $ref: '#/components/schemas/Volunteer'
           description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolunteerConflict'
+          description: ''
         '429':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Throttled'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+  /api/volunteers/{id}:
+    get:
+      operationId: volunteers_retrieve
+      description: |-
+        One volunteer, read by anyone and repaired by an administrator.
+
+        Merging duplicates and retiring a record are the operations decision 0012
+        reserves for somebody signed in, and they happen here rather than at a URL
+        of their own: a merge is an edit to the duplicate, saying who it turned out
+        to be. There is no delete, because the ledger attributes work to this row
+        for as long as the ledger exists.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - volunteers
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolunteerDetail'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+    patch:
+      operationId: volunteers_partial_update
+      description: |-
+        One volunteer, read by anyone and repaired by an administrator.
+
+        Merging duplicates and retiring a record are the operations decision 0012
+        reserves for somebody signed in, and they happen here rather than at a URL
+        of their own: a merge is an edit to the duplicate, saying who it turned out
+        to be. There is no delete, because the ledger attributes work to this row
+        for as long as the ledger exists.
+
+        Requires an administrator. See docs/decisions/0012-two-populations.md for who that is and why.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - volunteers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedVolunteerDetail'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolunteerDetail'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
           description: ''
 components:
   schemas:
@@ -384,6 +1001,12 @@ components:
         labels:
           type: string
           format: uri
+        stock:
+          type: string
+          format: uri
+        me:
+          type: string
+          format: uri
         schema:
           type: string
           format: uri
@@ -397,7 +1020,9 @@ components:
       - items
       - labels
       - locations
+      - me
       - schema
+      - stock
       - volunteers
     BatchInconsistency:
       type: object
@@ -441,6 +1066,28 @@ components:
       required:
       - detail
       - errors
+    Capabilities:
+      type: object
+      properties:
+        append_stock:
+          type: boolean
+        add_volunteer:
+          type: boolean
+        edit_catalogue:
+          type: boolean
+        print_label:
+          type: boolean
+        revoke_label:
+          type: boolean
+        merge_volunteers:
+          type: boolean
+      required:
+      - add_volunteer
+      - append_stock
+      - edit_catalogue
+      - merge_volunteers
+      - print_label
+      - revoke_label
     Category:
       type: object
       description: A grouping of items, nestable.
@@ -458,6 +1105,58 @@ components:
       required:
       - id
       - name
+    CodeEnum:
+      enum:
+      - volunteer_merged
+      - volunteer_inactive
+      type: string
+      description: |-
+        * `volunteer_merged` - volunteer_merged
+        * `volunteer_inactive` - volunteer_inactive
+    CurrentUser:
+      type: object
+      properties:
+        authenticated:
+          type: boolean
+        username:
+          type:
+          - string
+          - 'null'
+        administrator:
+          type: boolean
+        capabilities:
+          $ref: '#/components/schemas/Capabilities'
+      required:
+      - administrator
+      - authenticated
+      - capabilities
+      - username
+    Detail:
+      type: object
+      description: |-
+        A refusal, said in a typed body so a client can render it.
+
+        One shape for every refusal DRF renders as a bare sentence -- nothing here,
+        and not for you. Two identical components would drift the moment either
+        grew a machine-readable ``code``, which is the shape ThrottledSerializer
+        already uses and decision 0015 argues for.
+
+        A volunteer reaching an administrator's operation is told so rather than
+        shown nothing (decision 0014 point 2), so the refusal is part of the
+        contract and is described like any other response.
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    FieldEnum:
+      enum:
+      - email
+      - slack_id
+      type: string
+      description: |-
+        * `email` - email
+        * `slack_id` - slack_id
     HealthCheck:
       type: object
       properties:
@@ -523,6 +1222,58 @@ components:
       required:
       - location
       - quantity
+    ItemDetail:
+      type: object
+      description: |-
+        One catalogue entry, as an administrator reads and edits it.
+
+        Adds the two fields the list deliberately leaves out. ``description`` is
+        free text and ``attributes`` is a specification blob; the item list is a
+        hundred rows fetched over a phone connection (see ItemListView), so
+        carrying either there would pay for them a hundred times over to render
+        neither.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 150
+        category:
+          type: integer
+        unit_of_measure:
+          $ref: '#/components/schemas/UnitOfMeasureEnum'
+        minimum_stock:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        reorder_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        active:
+          type: boolean
+        balances:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemBalance'
+          readOnly: true
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemLabel'
+          readOnly: true
+        description:
+          type: string
+        attributes:
+          description: Type-specific specifications. Radios, cable and hand tools
+            have little in common.
+      required:
+      - balances
+      - category
+      - id
+      - labels
+      - name
     ItemLabel:
       type: object
       description: |-
@@ -540,6 +1291,53 @@ components:
       required:
       - code
       - quantity
+    Label:
+      type: object
+      description: |-
+        A label as an administrator prints and revokes it.
+
+        ``revoked`` is a boolean rather than a writable ``revoked_at`` because the
+        server owns the clock: a client that could name the moment could revoke a
+        sticker in the future, and a sticker is either honoured or it is not.
+        Setting it back to false un-revokes, so revoking the wrong label is undone
+        rather than worked around with a reprint.
+      properties:
+        code:
+          type: string
+          maxLength: 32
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/LabelKindEnum'
+          readOnly: true
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+          description: 'How much of the item one scan of this label stands for: a
+            packet of 100 zip ties is 100.'
+        revoked_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          readOnly: true
+        item:
+          type:
+          - integer
+          - 'null'
+        location:
+          type:
+          - integer
+          - 'null'
+        revoked:
+          type: boolean
+          writeOnly: true
+          description: True revokes this label, false restores it. The timestamp is
+            the server's.
+      required:
+      - code
+      - kind
+      - revoked_at
     LabelKindEnum:
       enum:
       - item
@@ -660,14 +1458,6 @@ components:
         * `shelf` - Shelf
         * `volunteer_custody` - Volunteer custody
         * `vehicle` - Vehicle
-    NotFound:
-      type: object
-      description: Nothing here. Said in a typed body so a client can render it.
-      properties:
-        detail:
-          type: string
-      required:
-      - detail
     PaginatedCategoryList:
       type: object
       required:
@@ -760,6 +1550,168 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Volunteer'
+    PatchedCategory:
+      type: object
+      description: A grouping of items, nestable.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        parent:
+          type:
+          - integer
+          - 'null'
+    PatchedItemDetail:
+      type: object
+      description: |-
+        One catalogue entry, as an administrator reads and edits it.
+
+        Adds the two fields the list deliberately leaves out. ``description`` is
+        free text and ``attributes`` is a specification blob; the item list is a
+        hundred rows fetched over a phone connection (see ItemListView), so
+        carrying either there would pay for them a hundred times over to render
+        neither.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 150
+        category:
+          type: integer
+        unit_of_measure:
+          $ref: '#/components/schemas/UnitOfMeasureEnum'
+        minimum_stock:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        reorder_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        active:
+          type: boolean
+        balances:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemBalance'
+          readOnly: true
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemLabel'
+          readOnly: true
+        description:
+          type: string
+        attributes:
+          description: Type-specific specifications. Radios, cable and hand tools
+            have little in common.
+    PatchedLabel:
+      type: object
+      description: |-
+        A label as an administrator prints and revokes it.
+
+        ``revoked`` is a boolean rather than a writable ``revoked_at`` because the
+        server owns the clock: a client that could name the moment could revoke a
+        sticker in the future, and a sticker is either honoured or it is not.
+        Setting it back to false un-revokes, so revoking the wrong label is undone
+        rather than worked around with a reprint.
+      properties:
+        code:
+          type: string
+          maxLength: 32
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/LabelKindEnum'
+          readOnly: true
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+          description: 'How much of the item one scan of this label stands for: a
+            packet of 100 zip ties is 100.'
+        revoked_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          readOnly: true
+        item:
+          type:
+          - integer
+          - 'null'
+        location:
+          type:
+          - integer
+          - 'null'
+        revoked:
+          type: boolean
+          writeOnly: true
+          description: True revokes this label, false restores it. The timestamp is
+            the server's.
+    PatchedLocation:
+      type: object
+      description: Somewhere stock can be, including a volunteer holding it.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 150
+        kind:
+          $ref: '#/components/schemas/LocationKindEnum'
+        parent:
+          type:
+          - integer
+          - 'null'
+        held_by:
+          type:
+          - integer
+          - 'null'
+        active:
+          type: boolean
+    PatchedVolunteerDetail:
+      type: object
+      description: |-
+        A volunteer as an administrator reads and repairs them.
+
+        Adds the two fields that decide whether the pick-list offers somebody.
+        Merging is a first-class operation rather than a cleanup script
+        (docs/data-model.md), and this is where it happens: ``merged_into`` points
+        a duplicate at whoever survived, and the ledger is left exactly as it was.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        display_name:
+          type: string
+          maxLength: 100
+        email:
+          oneOf:
+          - type:
+            - string
+            - 'null'
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        slack_id:
+          type:
+          - string
+          - 'null'
+          maxLength: 50
+        active:
+          type: boolean
+        merged_into:
+          type:
+          - integer
+          - 'null'
+          description: Set when this record is a duplicate of another volunteer.
     StockMovement:
       type: object
       description: One recorded line, as it is read back.
@@ -995,6 +1947,80 @@ components:
           - string
           - 'null'
           maxLength: 50
+      required:
+      - display_name
+      - id
+    VolunteerConflict:
+      type: object
+      description: |-
+        The identifier is taken, by a record the pick-list will not show.
+
+        A plain 400 is the right answer when the holder is somebody the searcher
+        could have found for themselves. When the holder is a merged duplicate or a
+        retired record it is a dead end -- the endpoint exists to serve
+        self-registration *after* a search found nothing, and the search does not
+        offer either. So the holder is named here instead, resolved forward through
+        the merge to whoever survived it, and ``code`` and ``selectable`` are
+        constants a client branches on rather than prose it has to read. See
+        decision 0015.
+
+        ``volunteer`` is the record to act on, not the one that holds the
+        identifier: the survivor of the merge, or -- for a retired record, which
+        nothing survived -- the record itself.
+      properties:
+        detail:
+          type: string
+        code:
+          $ref: '#/components/schemas/CodeEnum'
+        field:
+          $ref: '#/components/schemas/FieldEnum'
+        volunteer:
+          $ref: '#/components/schemas/Volunteer'
+        selectable:
+          type: boolean
+      required:
+      - code
+      - detail
+      - field
+      - selectable
+      - volunteer
+    VolunteerDetail:
+      type: object
+      description: |-
+        A volunteer as an administrator reads and repairs them.
+
+        Adds the two fields that decide whether the pick-list offers somebody.
+        Merging is a first-class operation rather than a cleanup script
+        (docs/data-model.md), and this is where it happens: ``merged_into`` points
+        a duplicate at whoever survived, and the ledger is left exactly as it was.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        display_name:
+          type: string
+          maxLength: 100
+        email:
+          oneOf:
+          - type:
+            - string
+            - 'null'
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        slack_id:
+          type:
+          - string
+          - 'null'
+          maxLength: 50
+        active:
+          type: boolean
+        merged_into:
+          type:
+          - integer
+          - 'null'
+          description: Set when this record is a duplicate of another volunteer.
       required:
       - display_name
       - id

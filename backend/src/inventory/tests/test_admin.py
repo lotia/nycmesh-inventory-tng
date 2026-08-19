@@ -7,16 +7,32 @@ because a list written down in this file would be the same promise the test
 exists to replace.
 """
 
+import datetime
+from decimal import Decimal
+
 import pytest
 from django.apps import apps
 from django.contrib import admin
 from django.contrib.auth.models import User
 from django.db import models
 from django.http import HttpRequest
-from django.test import RequestFactory
+from django.test import Client, RequestFactory
+from django.urls import reverse
+from pytest_django.fixtures import Settings
 from simple_history.models import HistoricalChanges
 
-from inventory.models import StockMovement, StockTransaction
+from inventory.models import (
+    Category,
+    Item,
+    ItemIdentifier,
+    Label,
+    Location,
+    StockMovement,
+    StockTransaction,
+    Vendor,
+    VendorOffer,
+    Volunteer,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -48,6 +64,68 @@ def administrator_request(rf: RequestFactory, administrator: User) -> HttpReques
     return request
 
 
+@pytest.fixture
+def _static_files_are_not_collected(settings: Settings) -> None:
+    """Serve static files straight from the apps, as a development checkout does.
+
+    Outside DEBUG the project hashes static files through WhiteNoise's manifest
+    storage, which is right for the built image -- the image runs collectstatic
+    -- and impossible under test, where nothing has. Every admin template opens
+    with ``{% static 'admin/css/base.css' %}``, so without this a rendering test
+    fails on the manifest rather than on the page. Overridden here rather than in
+    settings.py so the deployed behaviour is exactly what it was.
+    """
+    settings.STORAGES = {
+        **settings.STORAGES,
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
+
+
+@pytest.fixture
+def one_of_each_model(
+    category: Category,
+    item: Item,
+    volunteer: Volunteer,
+    warehouse: Location,
+) -> dict[type[models.Model], models.Model]:
+    """One saved row of every model the admin registers, to render a page against.
+
+    A changelist renders its columns only when there is a row to render them
+    for, and a change form needs something to change, so an empty database
+    would let a stale ``list_display`` or a broken ``__str__`` through. The map
+    is checked against the app registry below, so a new model fails the tests
+    until it has an example here.
+    """
+    vendor = Vendor.objects.create(name="Ubiquiti")
+    transaction = StockTransaction.objects.create(actor=volunteer, kind=StockTransaction.Kind.RECEIPT)
+    return {
+        Category: category,
+        Item: item,
+        ItemIdentifier: ItemIdentifier.objects.create(
+            item=item,
+            kind=ItemIdentifier.Kind.MFG_PART,
+            value="LBE-5AC-GEN2",
+        ),
+        Label: Label.objects.create(code="ABC23456", item=item),
+        Location: warehouse,
+        StockMovement: StockMovement.objects.create(
+            transaction=transaction,
+            item=item,
+            quantity=Decimal("3"),
+            to_location=warehouse,
+        ),
+        StockTransaction: transaction,
+        Vendor: vendor,
+        VendorOffer: VendorOffer.objects.create(
+            item=item,
+            vendor=vendor,
+            unit_price=Decimal("89.99"),
+            observed_at=datetime.date(2026, 1, 6),
+        ),
+        Volunteer: volunteer,
+    }
+
+
 def test_every_model_is_registered_in_the_admin() -> None:
     unregistered = sorted(model.__name__ for model in _models_needing_admin() if not admin.site.is_registered(model))
 
@@ -68,10 +146,60 @@ def test_the_exemptions_are_a_policy_and_not_a_pass() -> None:
     set while proving nothing. Excusing no model at all would mean the
     opposite: two conditions that are dead code claiming to be a policy.
     """
-    exempt = [model for model in apps.get_app_config("inventory").get_models() if _needs_admin(model) is not None]
+    exempt = [model for model in apps.get_app_config("inventory").get_models() if not _needs_admin(model)]
 
     assert _models_needing_admin()
     assert exempt
+
+
+def test_every_registered_model_has_a_row_to_render_its_pages_with(
+    one_of_each_model: dict[type[models.Model], models.Model],
+) -> None:
+    """Guards the two tests below against silently skipping a model."""
+    missing = sorted(model.__name__ for model in _models_needing_admin() if model not in one_of_each_model)
+
+    assert not missing, (
+        f"No example row in the one_of_each_model fixture for: {', '.join(missing)}. "
+        f"Add one, or the admin pages for those models are never rendered by any test."
+    )
+
+
+@pytest.mark.usefixtures("_static_files_are_not_collected")
+def test_every_changelist_renders(
+    editor: Client,
+    one_of_each_model: dict[type[models.Model], models.Model],
+) -> None:
+    """A stale ``list_display`` or a broken ``__str__`` only shows up here.
+
+    Django's admin checks catch a column naming nothing at all; they cannot
+    catch a ``ModelAdmin`` method or a ``__str__`` that raises on real data.
+    """
+    for model in _models_needing_admin():
+        url = reverse(f"admin:{model._meta.app_label}_{model._meta.model_name}_changelist")
+
+        response = editor.get(url)
+
+        assert response.status_code == 200, f"{model.__name__} changelist: {url} returned {response.status_code}"
+
+
+@pytest.mark.usefixtures("_static_files_are_not_collected")
+def test_every_change_form_renders(
+    editor: Client,
+    one_of_each_model: dict[type[models.Model], models.Model],
+) -> None:
+    """Including the ledger's, which renders read-only rather than editable."""
+    for model in _models_needing_admin():
+        instance = one_of_each_model.get(model)
+        # Skipped rather than a KeyError: whether every model has a row is
+        # test_every_registered_model_has_a_row_to_render_its_pages_with's to
+        # report, and failing here too would bury its message.
+        if instance is None:
+            continue
+        url = reverse(f"admin:{model._meta.app_label}_{model._meta.model_name}_change", args=[instance.pk])
+
+        response = editor.get(url)
+
+        assert response.status_code == 200, f"{model.__name__} change form: {url} returned {response.status_code}"
 
 
 def test_the_ledger_is_readable_in_the_admin_but_not_editable(administrator_request: HttpRequest) -> None:

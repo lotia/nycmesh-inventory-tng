@@ -8,16 +8,30 @@ as a 500 naming no line, and a volunteer holding a phone in a basement needs
 to be told which of their 24 scans to fix. So the per-line movement rules are
 stated here as well, and the database remains the thing that enforces them.
 
-Two are the API's own, with no database counterpart: the refusal of a batch
-dated in the future, and the exclusion of merged and inactive volunteers as
-the actor. Neither is expressible as a check constraint -- one needs the
-current time, the other another table -- so anything writing past this module,
-including the admin and the planned sheet importer, is not protected by them.
-The kind-to-sides rule in views.py is a third of the same kind. Closing that
-gap, for all three, is inventory-tng-fi5.
+The rest are the API's own, with no database counterpart, and anything writing
+past this module -- the admin, a fixture load, the planned sheet importer -- is
+not held to them:
+
+1. A batch may not be dated in the future.
+2. A merged or inactive volunteer may not be the actor.
+3. A merged or inactive volunteer may not be *named* as holding custody of
+   stock, and may not be the survivor a merge points at. Each is checked
+   where the naming happens, so the reverse -- retiring or merging somebody
+   who already holds a custody location -- is still allowed and leaves that
+   location pointing at a record the pick-list no longer offers. Whether that
+   should be refused or should move the custody to the survivor is a decision
+   nobody has taken.
+4. A label's code may not change once it is printed.
+5. A revocation is timed by the server, never by the client.
+
+The kind-to-sides rule in views.py is a sixth. None is expressible as a check
+constraint -- they need the current time, or another table, or the row's own
+previous value -- so each would need a trigger. Closing the gap, for all of
+them, is inventory-tng-fi5.
 """
 
 import datetime
+import decimal
 from typing import Any
 
 from django.utils import timezone
@@ -286,7 +300,102 @@ class VolunteerSerializer(serializers.ModelSerializer):
         fields = ["id", "display_name", "email", "slack_id"]
 
 
-class CategorySerializer(serializers.ModelSerializer):
+class VolunteerConflictSerializer(serializers.Serializer):
+    """The identifier is taken, by a record the pick-list will not show.
+
+    A plain 400 is the right answer when the holder is somebody the searcher
+    could have found for themselves. When the holder is a merged duplicate or a
+    retired record it is a dead end -- the endpoint exists to serve
+    self-registration *after* a search found nothing, and the search does not
+    offer either. So the holder is named here instead, resolved forward through
+    the merge to whoever survived it, and ``code`` and ``selectable`` are
+    constants a client branches on rather than prose it has to read. See
+    decision 0015.
+
+    ``volunteer`` is the record to act on, not the one that holds the
+    identifier: the survivor of the merge, or -- for a retired record, which
+    nothing survived -- the record itself.
+    """
+
+    detail = serializers.CharField()
+    code = serializers.ChoiceField(choices=["volunteer_merged", "volunteer_inactive"])
+    field = serializers.ChoiceField(choices=["email", "slack_id"])
+    volunteer = VolunteerSerializer()
+    # Whether the named volunteer can be picked as they stand. False whenever
+    # an administrator has to act first, which is every retired record and the
+    # occasional merge whose survivor was later retired too.
+    selectable = serializers.BooleanField()
+
+
+class VolunteerDetailSerializer(VolunteerSerializer):
+    """A volunteer as an administrator reads and repairs them.
+
+    Adds the two fields that decide whether the pick-list offers somebody.
+    Merging is a first-class operation rather than a cleanup script
+    (docs/data-model.md), and this is where it happens: ``merged_into`` points
+    a duplicate at whoever survived, and the ledger is left exactly as it was.
+    """
+
+    class Meta(VolunteerSerializer.Meta):
+        fields = [*VolunteerSerializer.Meta.fields, "active", "merged_into"]
+
+    def validate_merged_into(self, value: Volunteer | None) -> Volunteer | None:
+        """A merge points at somebody the pick-list will actually offer.
+
+        This does not stop a chain: merging A into B and later B into C is two
+        valid merges, which is why decision 0015 follows ``merged_into``
+        forward rather than reading it once. What it does stop is a cycle --
+        every target has no merge of its own at the moment it is chosen, so no
+        edge can ever point backwards along the chain, and the model forbids
+        only the single-record case.
+        """
+        if value is None:
+            return value
+        if self.instance is not None and value.pk == self.instance.pk:
+            raise serializers.ValidationError("A volunteer cannot be merged into themselves.")
+        if not value.is_selectable:
+            raise serializers.ValidationError(
+                "Merge into whoever is left: this record has itself been merged, or has been retired."
+            )
+        return value
+
+
+def _would_cycle(parent: Any, instance: Any) -> bool:
+    """Whether making ``parent`` the parent of ``instance`` closes a loop.
+
+    Mirrors the ``inventory_reject_tree_cycle`` trigger that Category and
+    Location share (migration 0001). Walked upwards from the proposed parent,
+    which is the direction the trigger walks, and bounded by a visited set:
+    the trigger stops a cycle being created, but a request must not hang if
+    one is somehow already there.
+    """
+    if instance is None or instance.pk is None:
+        return False
+    seen: set[Any] = set()
+    node = parent
+    while node is not None and node.pk not in seen:
+        if node.pk == instance.pk:
+            return True
+        seen.add(node.pk)
+        node = node.parent
+    return False
+
+
+class TreeSerializer(serializers.ModelSerializer):
+    """The half Category and Location share: both are nestable trees.
+
+    Stated once because the rule is one rule -- the database enforces both
+    with a single trigger function.
+    """
+
+    def validate_parent(self, value: Any) -> Any:
+        """Refuse what the trigger would refuse, as a 400 rather than a 500."""
+        if _would_cycle(value, self.instance):
+            raise serializers.ValidationError("That parent sits below this one, so it would make a loop.")
+        return value
+
+
+class CategorySerializer(TreeSerializer):
     """A grouping of items, nestable."""
 
     class Meta:
@@ -294,12 +403,48 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ["id", "name", "parent"]
 
 
-class LocationSerializer(serializers.ModelSerializer):
+class LocationSerializer(TreeSerializer):
     """Somewhere stock can be, including a volunteer holding it."""
 
     class Meta:
         model = Location
         fields = ["id", "name", "kind", "parent", "held_by", "active"]
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        """Mirrors ``location_held_by_iff_custody``, so a client sees a 400.
+
+        The constraint remains what enforces it; this only decides what the
+        caller is told, which is the distinction this module's docstring draws.
+        """
+        kind = attrs.get("kind", getattr(self.instance, "kind", None))
+        # Falls back to the id column, not the relation: this asks only
+        # whether there is a holder, and following it would fetch a volunteer
+        # to find out. `.get` rather than a membership test, because an
+        # explicit null and an absent key mean the same thing here.
+        held_by = attrs.get("held_by", getattr(self.instance, "held_by_id", None))
+        custody = kind == Location.Kind.VOLUNTEER_CUSTODY
+        if custody and held_by is None:
+            raise serializers.ValidationError(
+                "A custody location is somewhere a volunteer is holding stock, so it has to say who."
+            )
+        if not custody and held_by is not None:
+            raise serializers.ValidationError("Only a custody location names a volunteer.")
+        return attrs
+
+    def validate_held_by(self, value: Volunteer | None) -> Volunteer | None:
+        """Custody is recorded against somebody the pick-list will still offer.
+
+        The field is a plain relation over every volunteer row, and
+        ``Volunteer.is_selectable`` is the row-level half of the one rule
+        about who may be recorded against; see VolunteerManager.selectable().
+        A custody location attached to a merged duplicate is the second
+        generation of the duplicate the merge existed to remove.
+        """
+        if value is not None and not value.is_selectable:
+            raise serializers.ValidationError(
+                "Stock is held by somebody the list still offers, not by a merged or retired record."
+            )
+        return value
 
 
 class ItemBalanceSerializer(serializers.Serializer):
@@ -348,6 +493,32 @@ class ItemSerializer(serializers.ModelSerializer):
             "labels",
         ]
 
+    def validate_minimum_stock(self, value: decimal.Decimal) -> decimal.Decimal:
+        """Mirrors ``item_minimum_stock_not_negative``; see LocationSerializer.validate."""
+        if value < 0:
+            raise serializers.ValidationError("A minimum stock level is how little may be left, so it is not negative.")
+        return value
+
+    def validate_reorder_quantity(self, value: decimal.Decimal) -> decimal.Decimal:
+        """Mirrors ``item_reorder_quantity_positive``; see LocationSerializer.validate."""
+        if value <= 0:
+            raise serializers.ValidationError("Reordering none of something is not an order.")
+        return value
+
+
+class ItemDetailSerializer(ItemSerializer):
+    """One catalogue entry, as an administrator reads and edits it.
+
+    Adds the two fields the list deliberately leaves out. ``description`` is
+    free text and ``attributes`` is a specification blob; the item list is a
+    hundred rows fetched over a phone connection (see ItemListView), so
+    carrying either there would pay for them a hundred times over to render
+    neither.
+    """
+
+    class Meta(ItemSerializer.Meta):
+        fields = [*ItemSerializer.Meta.fields, "description", "attributes"]
+
 
 class LabelResolveSerializer(serializers.ModelSerializer):
     """What a scanned code points at.
@@ -379,8 +550,102 @@ class LabelMapSerializer(LabelResolveSerializer):
         fields = ["code", "kind", "quantity", "item", "location"]
 
 
-class NotFoundSerializer(serializers.Serializer):
-    """Nothing here. Said in a typed body so a client can render it."""
+class LabelSerializer(LabelResolveSerializer):
+    """A label as an administrator prints and revokes it.
+
+    ``revoked`` is a boolean rather than a writable ``revoked_at`` because the
+    server owns the clock: a client that could name the moment could revoke a
+    sticker in the future, and a sticker is either honoured or it is not.
+    Setting it back to false un-revokes, so revoking the wrong label is undone
+    rather than worked around with a reprint.
+    """
+
+    revoked = serializers.BooleanField(
+        write_only=True,
+        required=False,
+        help_text="True revokes this label, false restores it. The timestamp is the server's.",
+    )
+
+    class Meta(LabelResolveSerializer.Meta):
+        fields = [*LabelResolveSerializer.Meta.fields, "revoked"]
+        read_only_fields = ["revoked_at"]
+
+    def to_internal_value(self, data: Any) -> Any:
+        # Normalised before validation, not only in Label.save: DRF checks
+        # uniqueness against whatever arrived, so "abc" would pass the check
+        # and then collide with the stored "ABC" on the unique index.
+        # Label.normalise_code stays the one definition of the canonical form.
+        if isinstance(data, dict) and isinstance(data.get("code"), str):
+            data = {**data, "code": Label.normalise_code(data["code"])}
+        return super().to_internal_value(data)
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        """Everything that decides whether this label may be written as asked.
+
+        Three of the rules mirror Label's check constraints --
+        ``label_targets_exactly_one``, ``label_quantity_positive`` and
+        ``label_quantity_is_one_for_a_location``. The constraints remain the
+        thing that enforces those; this only decides what a client is told,
+        which is the distinction this module's docstring draws.
+
+        The first rule is not one of them. A code is immutable once printed,
+        and nothing below the API says so -- it is item 4 of the list in that
+        same docstring. The last step is not a rule at all: it turns the
+        boolean a client sends into the column the model stores.
+        """
+        if self.instance is not None and "code" in attrs and attrs["code"] != self.instance.code:
+            # The code is the label's identity, and it is printed on a sticker
+            # already out on a shelf: changing it would 404 that sticker for
+            # good. Refused rather than quietly ignored, because a client told
+            # 200 to a change that did not happen has no way to find out.
+            # A reprint is a new label and a revocation of this one.
+            raise serializers.ValidationError(
+                {"code": "A label's code is printed on it and cannot be changed. Revoke it and print another."}
+            )
+        on_item = self._points_at(attrs, "item")
+        on_location = self._points_at(attrs, "location")
+        if on_item == on_location:
+            raise serializers.ValidationError("A label points at exactly one item or one location.")
+        quantity = attrs.get("quantity", getattr(self.instance, "quantity", None))
+        if quantity is not None and quantity <= 0:
+            raise serializers.ValidationError(
+                "A scan of a label stands for some of something, so its quantity is positive."
+            )
+        if on_location and quantity is not None and quantity != 1:
+            raise serializers.ValidationError("A location label stands for the location itself, so its quantity is 1.")
+        # Turned into the column the model stores here rather than in create()
+        # and update(): `revoked` is not a field of Label, so it has to leave
+        # the validated data before it reaches the model either way, and doing
+        # it once is two methods fewer than doing it on both paths.
+        revoked = attrs.pop("revoked", None)
+        if revoked is not None:
+            attrs["revoked_at"] = timezone.now() if revoked else None
+        return attrs
+
+    def _points_at(self, attrs: dict[str, Any], field: str) -> bool:
+        """Whether the label points at ``field`` once this change is applied.
+
+        Read off the id column when the submission does not carry the field:
+        following the relation would fetch a whole item or location to ask
+        whether there is one.
+        """
+        if field in attrs:
+            return attrs[field] is not None
+        return getattr(self.instance, f"{field}_id", None) is not None
+
+
+class DetailSerializer(serializers.Serializer):
+    """A refusal, said in a typed body so a client can render it.
+
+    One shape for every refusal DRF renders as a bare sentence -- nothing here,
+    and not for you. Two identical components would drift the moment either
+    grew a machine-readable ``code``, which is the shape ThrottledSerializer
+    already uses and decision 0015 argues for.
+
+    A volunteer reaching an administrator's operation is told so rather than
+    shown nothing (decision 0014 point 2), so the refusal is part of the
+    contract and is described like any other response.
+    """
 
     detail = serializers.CharField()
 

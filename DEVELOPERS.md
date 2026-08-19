@@ -233,10 +233,18 @@ solved rather than silenced.
 
 ## The API schema
 
-The API describes itself. `/api` lists the available endpoints, `/api/docs`
-renders them, and `/api/schema` serves an OpenAPI 3.1.1 document. The same
-document is committed at [`backend/openapi.yaml`](backend/openapi.yaml) so it
-can be read, diffed and consumed without running anything.
+The API describes itself. `/api` lists its entry points, `/api/docs` renders
+the full description for humans, and `/api/schema` serves that description as
+an OpenAPI 3.1.1 document. The same document is committed at
+[`backend/openapi.yaml`](backend/openapi.yaml) so it can be read, diffed and
+consumed without running anything.
+
+The two are not the same list, and the division is deliberate. The index says
+where the collections are, so a client does not need the URL layout in
+advance; the schema says what each one accepts, and covers what a list of
+links cannot — the endpoints addressed per row, and the methods other than
+`GET`. Start at `/api`, follow `schema`, and everything is reachable from
+there.
 
 **If you change an endpoint or a payload, regenerate it in the same change:**
 

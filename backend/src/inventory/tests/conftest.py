@@ -5,12 +5,23 @@ and a radio -- so tests in either module read as statements about NYC Mesh
 rather than about test data.
 """
 
+from collections.abc import Mapping
+from pathlib import Path
+from types import MappingProxyType
+from typing import Any
+
 import pytest
+import yaml
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.test import Client
 
 from inventory.models import Category, Item, Location, Volunteer
+
+# The generated schema, committed so it can be read without running anything.
+# See DEVELOPERS.md#the-api-schema.
+SCHEMA_PATH = Path(settings.BASE_DIR).parent / "openapi.yaml"
 
 
 @pytest.fixture(autouse=True)
@@ -69,3 +80,28 @@ def client(client: Client) -> Client:
 def administrator() -> User:
     """Somebody who may reach the Django admin."""
     return User.objects.create_superuser(username="editor", password="not-a-real-password")
+
+
+@pytest.fixture
+def editor(administrator: User) -> Client:
+    """A second client, signed in as somebody who may change things.
+
+    Its own ``Client`` rather than the one above logged in again: that one is
+    the ordinary volunteer every refusal is asserted against, and a test
+    needing both sessions needs them at the same time.
+    """
+    signed_in = Client()
+    signed_in.force_login(administrator)
+    return signed_in
+
+
+@pytest.fixture(scope="session")
+def schema() -> Mapping[str, Any]:
+    """The committed OpenAPI document, parsed once for the whole run.
+
+    The contract clients are generated from, so several modules assert against
+    it; at 66KB, parsing it per test is most of a second of the suite.
+    """
+    # Read-only: one parsed document is shared by the whole run, and a test
+    # that reassigned a key in it would fail an unrelated module later.
+    return MappingProxyType(yaml.safe_load(SCHEMA_PATH.read_text()))

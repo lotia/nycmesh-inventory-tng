@@ -142,16 +142,35 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
     ],
+    # Closed by default in both directions: a session to read anything, and
+    # the staff flag to change anything. Decision 0012 makes opening an
+    # endpoint up a deliberate act, and a write is the half that cannot be
+    # taken back -- so the two endpoints a volunteer needs name their own
+    # permissions and everything else is reserved without anybody remembering.
+    # See inventory/permissions.py.
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
+        "inventory.permissions.StaffWrites",
+    ],
+    # JSON only, in both directions, on every endpoint. A form encoding cannot
+    # carry the shapes this API uses -- an array of objects on the batch
+    # endpoint, a specification blob on an item -- and where it can carry one it
+    # misreads it: DRF reads a key missing from a form body as `false` for a
+    # boolean, so a form-encoded create arrives with `active=false` and retires
+    # the row an administrator has just added. Advertising a request shape that
+    # either fails or lies is worse than refusing it with a 415, which is the
+    # call StockTransactionCreateView already made for itself.
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
     ],
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
-    # drf-spectacular's, plus the throttled response. See inventory/api.py.
-    "DEFAULT_SCHEMA_CLASS": "inventory.api.ThrottleAwareAutoSchema",
+    # drf-spectacular's, plus the refusals a view's own policy can produce.
+    # See inventory/api.py.
+    "DEFAULT_SCHEMA_CLASS": "inventory.api.PolicyAwareAutoSchema",
     "EXCEPTION_HANDLER": "inventory.api.exception_handler",
     # Deliberately no DEFAULT_THROTTLE_CLASSES: the endpoints that carry these
     # limits name them, because which endpoints take no credential is the
