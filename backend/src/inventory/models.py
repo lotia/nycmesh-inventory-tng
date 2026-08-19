@@ -341,6 +341,12 @@ class Label(models.Model):
     code = models.CharField(max_length=32, unique=True)
     item = models.ForeignKey(Item, null=True, blank=True, on_delete=models.CASCADE, related_name="labels")
     location = models.ForeignKey(Location, null=True, blank=True, on_delete=models.CASCADE, related_name="labels")
+    quantity = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        default=1,
+        help_text="How much of the item one scan of this label stands for: a packet of 100 zip ties is 100.",
+    )
     printed_at = models.DateTimeField(auto_now_add=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
     history = HistoricalRecords()
@@ -357,6 +363,16 @@ class Label(models.Model):
                     | models.Q(item__isnull=True, location__isnull=False)
                 ),
                 name="label_targets_exactly_one",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(quantity__gt=0),
+                name="label_quantity_positive",
+            ),
+            # Stated in terms of location rather than item so that it holds
+            # on its own, without leaning on the exactly-one constraint above.
+            models.CheckConstraint(
+                condition=models.Q(location__isnull=True) | models.Q(quantity=1),
+                name="label_quantity_is_one_for_a_location",
             ),
         ]
 

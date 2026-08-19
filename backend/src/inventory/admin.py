@@ -70,5 +70,5 @@ class VendorOfferAdmin(SimpleHistoryAdmin):
 
 @admin.register(Label)
 class LabelAdmin(SimpleHistoryAdmin):
-    list_display = ["code", "item", "location", "printed_at", "revoked_at"]
+    list_display = ["code", "item", "location", "quantity", "printed_at", "revoked_at"]
     search_fields = ["code"]

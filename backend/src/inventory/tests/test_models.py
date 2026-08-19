@@ -361,6 +361,34 @@ def test_label_codes_are_unique(item: Item) -> None:
         Label.objects.create(code="DUP", item=item)
 
 
+def test_label_carries_the_quantity_one_scan_means(item: Item) -> None:
+    """One item, three labels, three multipliers -- see decision 0011 section 5.
+
+    Read back from the database, so what is proved is the stored column.
+    """
+    packet = Label.objects.create(code="PACKET", item=item, quantity=Decimal("100"))
+    single = Label.objects.create(code="SINGLE", item=item)
+    offcut = Label.objects.create(code="OFFCUT", item=item, quantity=Decimal("30.500"))
+    for label in (packet, single, offcut):
+        label.refresh_from_db()
+    assert packet.quantity == Decimal("100")
+    assert single.quantity == Decimal("1")
+    # Cable is cut, not counted -- see docs/data-model.md, "Units of measure".
+    assert offcut.quantity == Decimal("30.5")
+
+
+def test_label_quantity_must_be_positive(item: Item) -> None:
+    with pytest.raises(IntegrityError):
+        Label.objects.create(code="ZERO", item=item, quantity=Decimal("0"))
+
+
+def test_label_quantity_is_one_for_a_location(warehouse: Location) -> None:
+    pinned = Label.objects.create(code="LOCONE", location=warehouse, quantity=Decimal("1"))
+    assert pinned.quantity == Decimal("1")
+    with pytest.raises(IntegrityError):
+        Label.objects.create(code="LOCQTY", location=warehouse, quantity=Decimal("100"))
+
+
 # --------------------------------------------------------------------------
 # History
 # --------------------------------------------------------------------------

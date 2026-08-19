@@ -13,7 +13,7 @@ ledger and the derived balance view. No API endpoints expose them yet.
 
     Volunteer ─────────┐                Category ──< Item ──< ItemIdentifier
       display_name     │                              │
-      email?           │                              ├──< Label
+      email?           │                              ├──< Label (quantity)
       slack_id?        │                              │
       merged_into? ────┘ (self)                       └──< VendorOffer >── Vendor
                                                             url, unit_price
@@ -82,7 +82,13 @@ one item, and renaming an item cannot break a count.
 
 Maps an opaque printed token to the thing it names, so that a faded or damaged
 label can be revoked and reprinted without touching item identity. Fields:
-`code`, `item`, `location`, `printed_at`, `revoked_at`.
+`code`, `item`, `location`, `quantity`, `printed_at`, `revoked_at`.
+
+`quantity` is what one scan of that token means, in the unit of the thing the
+label names. It defaults to `1`, must be positive, and is constrained to `1` on
+a location label. Why the multiplier belongs on the label rather than on the
+item is in
+[decision 0011](decisions/0011-qr-batch-scanning.md#5-one-scan-is-not-one-unit-label-carries-the-quantity-it-represents).
 
 A label points at an item *or* a location, held as two nullable foreign keys
 with a check constraint requiring exactly one. A generic relation would express
