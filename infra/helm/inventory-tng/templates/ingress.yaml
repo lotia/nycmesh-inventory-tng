@@ -21,8 +21,9 @@ spec:
       secretName: {{ required "ingress.tls.secretName is required: the app is unusable over plain HTTP, because a camera needs a secure context. Set it, or set ingress.tls.terminatedElsewhere=true if a proxy in front of this ingress terminates TLS. See docs/deployment.md." $tls.secretName }}
   {{- end }}
   rules:
-    # Everything enters through the frontend, which proxies /api and /admin to
-    # the backend. One hostname, one origin, no CORS in production.
+    # Everything enters through the frontend, which proxies Django's paths to
+    # the backend -- which ones is stated once, in docs/architecture.md. One
+    # hostname, one origin, no CORS in production.
     - host: {{ .Values.ingress.host }}
       http:
         paths:

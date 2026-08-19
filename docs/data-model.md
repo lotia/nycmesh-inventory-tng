@@ -38,8 +38,9 @@ ledger is designed in
 
 A person who moves stock. Deliberately **not** `django.contrib.auth.User`:
 around 65 people transact, of whom a handful need administrative access. There
-is no link between the two models; administrators have a `User` for the Django
-admin and a `Volunteer` row if they also move stock.
+is no link between the two models; administrators have a `User` (how they come
+by one is [decision 0013](decisions/0013-administrator-sign-in.md)) and a
+`Volunteer` row if they also move stock.
 
 | Field | Notes |
 | --- | --- |

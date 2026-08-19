@@ -18,7 +18,8 @@ FROM docker.io/nginxinc/nginx-unprivileged:1-alpine AS runtime
 # Runs as uid 101 (non-root) by default, so it satisfies a restricted
 # PodSecurity policy without extra securityContext wrangling.
 
-# Origin nginx forwards /api and /admin to. Overridden per environment.
+# Origin nginx forwards Django's paths to; which paths, and why, is in
+# docs/architecture.md. Overridden per environment.
 ENV BACKEND_ORIGIN=http://backend:8000
 
 COPY --from=builder /app/dist /usr/share/nginx/html

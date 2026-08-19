@@ -65,6 +65,11 @@ class Command(BaseCommand):
                     "username": USERNAME,
                     "password": PASSWORD,
                     "volunteer": volunteer.pk,
+                    # The name as well as the id: the pick-list is paginated,
+                    # so a test that wants this volunteer back out of it has to
+                    # search for them, and the name belongs here rather than
+                    # copied into the browser suite.
+                    "volunteer_name": volunteer.display_name,
                     "item": item.pk,
                     "location": warehouse.pk,
                 },

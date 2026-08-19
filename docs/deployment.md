@@ -82,6 +82,19 @@ service mesh — set `ingress.tls.terminatedElsewhere=true`. That stops the
 Ingress asking for a certificate; it does not make plain HTTP to the browser
 supported, because the camera still needs a secure context.
 
+### Administrative access
+
+[Decision 0013](decisions/0013-administrator-sign-in.md) restricts the
+administrative routes — `/admin`, and the administrative operations of the API
+— to a network volunteers do not need: the mesh, a VPN, or an identity-aware
+proxy. Administrators are few and their locations predictable, so this costs
+them very little, and it is the one place a network boundary fits without
+excluding a volunteer on a phone wherever the stock happens to be.
+
+Express it at the ingress or in front of it. Nothing in the application can
+detect its absence, so it is a precondition somebody has to honour rather than
+a check that fires — the same shape as the requirement below.
+
 **The ingress must be the only route to the frontend pod.** TLS terminates
 there, so it is the ingress that tells Django which scheme the browser used,
 via `X-Forwarded-Proto`; nginx in the frontend image forwards that header on

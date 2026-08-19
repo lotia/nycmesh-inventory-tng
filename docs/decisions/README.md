@@ -21,3 +21,6 @@ to ask "why is it like this?". Number them sequentially.
 | [0009](0009-type-annotations-required.md) | Type annotations required, `Any` permitted |
 | [0010](0010-openapi-version.md) | OpenAPI 3.1.1, kept current by a test |
 | [0011](0011-qr-batch-scanning.md) | One cart, one transaction: QR scanning and the batch endpoint |
+| [0012](0012-two-populations.md) | Volunteers append without signing in; administrators sign in |
+| [0013](0013-administrator-sign-in.md) | Several ways for an administrator to sign in, one way to become one |
+| [0014](0014-one-interface.md) | Administrator powers appear in the volunteer app, not a second one |

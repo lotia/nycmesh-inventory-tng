@@ -11,17 +11,17 @@ trade-offs, are recorded in [decisions/](decisions/).
 Browser
    │
    ▼
-frontend  (nginx)  ──── /api, /admin ────►  backend  (gunicorn + Django)
-  static SPA assets                              │
-                                                 ▼
-                                          PostgreSQL 18
+frontend  (nginx)  ── /api, /admin, /static ──►  backend  (gunicorn + Django)
+  static SPA assets                                   │
+                                                      ▼
+                                               PostgreSQL 18
 ```
 
 Three pieces, two of which we build as container images:
 
 | Component | Technology | Responsibility |
 | --- | --- | --- |
-| Backend | Django 6.1 + Django REST Framework | Data model, API, admin interface, authorisation |
+| Backend | Django 6.1 + Django REST Framework | Data model, API, authorisation, fallback admin |
 | Frontend | React 19 + MUI, built by Vite | Everything the user sees, including QR scanning |
 | Database | PostgreSQL 18 | Storage |
 
@@ -121,11 +121,15 @@ Named here so the gaps are visible rather than surprising:
   write. They are listed once, in the generated schema; fetch `/api` or read
   [`/api/docs`](../DEVELOPERS.md#the-api-schema). The scanning client and the
   label generator are not built.
-- **A write API for the catalogue.** Items, locations, categories and labels
-  are created through the Django admin; only volunteers and stock
-  transactions can be posted.
+- **Administrator sign-in and the administrative interface.** Items, locations,
+  categories and labels are created through the Django admin today, and every
+  API endpoint but the index and the health check requires a session —
+  including the two a volunteer needs. Who may write what is settled in
+  [decision 0012](decisions/0012-two-populations.md), the sign-in paths in
+  [0013](decisions/0013-administrator-sign-in.md), and where administrators
+  work in [0014](decisions/0014-one-interface.md). None of it is built; the
+  catalogue write API is the largest part.
 - **Migration from the existing Google Sheet** (52 items, 3,439 submissions).
-- **Authentication** beyond Django's session authentication.
 - **Background jobs.** MeshDB uses Celery with Redis. Nothing here needs
   asynchronous work yet, so neither is deployed; the shape is known if that
   changes.

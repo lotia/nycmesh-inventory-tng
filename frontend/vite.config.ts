@@ -1,36 +1,47 @@
 /// <reference types="vitest/config" />
+import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
-// Where Django is listening. Everything below proxies to it; nothing is
-// compiled into the bundle, so the browser only ever sees this server.
-const BACKEND = process.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+// The repository root, where the one .env this project has lives.
+const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 // The paths that belong to Django rather than to the app. Which paths, and
 // why, is in docs/architecture.md; nginx.conf.template proxies the same set in
 // production and must be edited with this.
 const DJANGO_PATHS = ["api", "admin", "static"];
 
-// Anchored, the way nginx anchors the same set. A bare `/api` prefix also
-// matches `/apiary`, so a client-side route beginning with one of these words
-// would be proxied to Django and answered 404 here while reaching the app when
-// deployed -- the one difference this proxy exists to avoid. Vite treats a key
-// starting with `^` as a regular expression and tests it against the URL
-// including its query string, which is why `?` ends the match as well as `/`.
+// Anchored, and for the reason nginx.conf.template gives for anchoring the
+// same set. Vite treats a key starting with `^` as a regular expression and
+// tests it against the URL including its query string, which is why `?` ends
+// the match as well as `/`.
 const DJANGO_PROXY = `^/(${DJANGO_PATHS.join("|")})($|[/?])`;
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
   server: {
     port: 5173,
     // Proxy Django's paths in development so the browser sees a single origin
     // and no CORS preflight is involved locally.
     //
+    // Where Django is listening is read from the repository-root .env, which
+    // Vite would not otherwise look at: its own env loading covers
+    // frontend/ and feeds the bundle, not this file. A shell variable still
+    // wins, so a one-off override needs no edit. Nothing here is compiled
+    // into the bundle, so the browser only ever sees this server.
+    //
     // No changeOrigin: the Host header must stay this server, because Django
     // compares it against the browser's Origin on every write and refuses the
     // write if they disagree. Django must therefore accept whatever host you
     // reach this server on -- see DJANGO_ALLOWED_HOSTS in .env.sample.
-    proxy: { [DJANGO_PROXY]: { target: BACKEND } },
+    proxy: {
+      [DJANGO_PROXY]: {
+        target:
+          process.env.VITE_API_BASE_URL ??
+          loadEnv(mode, REPO_ROOT, "VITE_").VITE_API_BASE_URL ??
+          "http://localhost:8000",
+      },
+    },
   },
   build: {
     outDir: "dist",
@@ -73,4 +84,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

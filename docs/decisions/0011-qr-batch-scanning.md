@@ -332,12 +332,8 @@ ordinary catalogue reads specified with the read API rather than here.
 
 ## Questions for the project owner
 
-**1. How is the app itself authorised?** The thread asks for "no user accounts",
-volunteers are a pick-list with no password
-([0008](0008-stock-ledger-transfer-graph.md#decision), point 5), and the
-backend's `DEFAULT_PERMISSION_CLASSES` is `IsAuthenticated`. Those cannot all
-hold. This design works under any answer; the decision is about who NYC Mesh is
-willing to let write to its ledger, which is not an implementer's call.
+**1. How is the app itself authorised?** Answered by
+[decision 0012](0012-two-populations.md); this design needed no change.
 
 **2. Which unit did the historical zip tie rows mean?** Decision 5 fixes this
 going forward but cannot repair the past: a recorded `1` is either one tie or

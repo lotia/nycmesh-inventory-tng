@@ -502,6 +502,7 @@ Where each topic lives:
 | Inventory data model | [docs/data-model.md](docs/data-model.md) |
 | Deployment | [docs/deployment.md](docs/deployment.md) |
 | Why a decision was made | [docs/decisions/](docs/decisions/) |
+| The investigation behind a decision | [docs/briefs/](docs/briefs/) |
 | Rules for AI coding agents | [AGENTS.md](AGENTS.md) |
 | Configuration variables | [.env.sample](.env.sample) |
 | Toolchain versions | [mise.toml](mise.toml) |

@@ -30,8 +30,9 @@ spec:
             - name: http
               containerPort: {{ .Values.frontend.port }}
           env:
-            # nginx forwards /api and /admin here, so the browser only ever
-            # sees one origin and no API URL is baked into the bundle.
+            # nginx forwards Django's paths here -- which ones is stated once,
+            # in docs/architecture.md -- so the browser only ever sees one
+            # origin and no API URL is baked into the bundle.
             - name: BACKEND_ORIGIN
               value: http://{{ include "inventory-tng.fullname" . }}-backend:{{ .Values.backend.port }}
           readinessProbe:

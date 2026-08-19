@@ -250,8 +250,11 @@ def _negative_balances(drained: set[tuple[int, int]]) -> list[dict[str, object]]
         return []
     return [
         {
-            "item": balance.item.pk,
-            "location": balance.location.pk,
+            # The id columns, not the relations, for the reason in _drained_by:
+            # the rows are joined for the sentence below, not for these two
+            # numbers, which the balance already carries.
+            "item": balance.item_id,  # ty: ignore[unresolved-attribute]
+            "location": balance.location_id,  # ty: ignore[unresolved-attribute]
             "balance": balance.quantity,
             "detail": f"{balance.item} at {balance.location} is now {balance.quantity}. Count it when you can.",
         }

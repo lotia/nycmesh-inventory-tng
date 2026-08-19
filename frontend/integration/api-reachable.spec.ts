@@ -70,12 +70,19 @@ test("an authenticated browser can record a batch", async ({ page, context }) =>
 
   const scene = {
     volunteer: Number(seeded("volunteer")),
+    volunteerName: seeded("volunteer_name"),
     item: Number(seeded("item")),
     location: Number(seeded("location")),
   };
   const result = await page.evaluate(
-    async ({ csrf, volunteer, item, location }) => {
-      const volunteers = await (await fetch("/api/volunteers")).json();
+    async ({ csrf, volunteer, volunteerName, item, location }) => {
+      // Searched, not listed: the pick-list is paginated at 50, and this suite
+      // runs against a development database that already holds other people.
+      // An unfiltered first page would drop the seeded volunteer off the end
+      // and the assertion below would fail for a reason that is not a bug.
+      const volunteers = await (
+        await fetch(`/api/volunteers?search=${encodeURIComponent(volunteerName)}`)
+      ).json();
       const response = await fetch("/api/stock/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf as string },

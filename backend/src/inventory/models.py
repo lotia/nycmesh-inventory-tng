@@ -81,10 +81,8 @@ class Volunteer(models.Model):
 
     display_name = models.CharField(max_length=100)
     # NULL rather than "" is deliberate, and is why DJ001 is suppressed on these
-    # two fields only. The unique constraints below are partial: they apply to
-    # volunteers who supplied the identifier. PostgreSQL treats NULLs as
-    # distinct, so absent values do not collide -- whereas a shared "" would
-    # make the second volunteer without an email a constraint violation.
+    # two fields only. What that buys, and what keeps it true, is stated once on
+    # NULL_WHEN_BLANK below.
     email = models.EmailField(null=True, blank=True)  # noqa: DJ001
     slack_id = models.CharField(max_length=50, null=True, blank=True)  # noqa: DJ001
     active = models.BooleanField(default=True)
@@ -101,12 +99,16 @@ class Volunteer(models.Model):
 
     objects = VolunteerManager()
 
-    # Absence is NULL, never "". The unique indexes below are partial so that
-    # every volunteer who supplied nothing can coexist; a stored "" is a value,
-    # so the second one would collide and get an error naming a constraint they
-    # cannot act on. Normalised in save() rather than at the API, which covers
-    # the admin as well -- but not bulk_create() or queryset update(), so the
-    # sheet import will have to normalise its own rows or go through save().
+    # Absence is NULL, never "". The unique constraints below are partial, so
+    # they cover volunteers who supplied an identifier and nobody else:
+    # PostgreSQL treats NULLs as distinct, so every volunteer who supplied
+    # nothing can coexist -- and most will not supply one, as 45% of the
+    # historical rows did not. A stored "" is a value, so the second such
+    # volunteer would collide and get an error naming a constraint they cannot
+    # act on, for the most ordinary submission there is. Normalised in save()
+    # rather than at the API, which covers the admin as well -- but not
+    # bulk_create() or queryset update(), so the sheet import will have to
+    # normalise its own rows or go through save().
     NULL_WHEN_BLANK = ("email", "slack_id")
 
     class Meta:
@@ -117,8 +119,7 @@ class Volunteer(models.Model):
         # and never show another at all.
         ordering = ["display_name", "pk"]
         constraints = [
-            # Partial: uniqueness applies only to volunteers who supplied the
-            # identifier. Most will not, and 45% of the historical rows did not.
+            # Partial, for the reason given on NULL_WHEN_BLANK above.
             models.UniqueConstraint(
                 fields=["email"],
                 condition=models.Q(email__isnull=False),
