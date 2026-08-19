@@ -40,6 +40,7 @@ from inventory.serializers import (
     StockTransactionSerializer,
     VolunteerSerializer,
 )
+from inventory.throttling import APPEND_THROTTLES
 
 # The one place the endpoint index is declared. The response body, the schema
 # and the discovery test are all derived from it, so an endpoint cannot be
@@ -289,6 +290,9 @@ class StockTransactionCreateView(APIView):
     # request shape that is guaranteed to fail.
     parser_classes = [JSONParser]
 
+    # This endpoint takes no credential, so a rate is what stands in for one.
+    throttle_classes = APPEND_THROTTLES
+
     @extend_schema(
         summary="Record a batch of stock movements",
         request=StockTransactionCreateSerializer,
@@ -447,6 +451,10 @@ class VolunteerListCreateView(ListCreateAPIView):
     filterset_class = VolunteerFilter
     # Ordering comes from the model, tie-break included.
     queryset = Volunteer.objects.selectable()
+
+    # Adding a name takes no credential, so a rate stands in for one. Searching
+    # the list is not counted -- the client does that as somebody types.
+    throttle_classes = APPEND_THROTTLES
 
 
 class ItemFilter(FilterSet):

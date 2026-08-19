@@ -18,6 +18,9 @@ env = environ.Env(
     DJANGO_DEBUG=(bool, False),
     DJANGO_ALLOWED_HOSTS=(list, []),
     CORS_ALLOWED_ORIGINS=(list, []),
+    # Defaults are the ones a volunteer night needs; .env.sample says why.
+    APPEND_BURST_RATE=(str, "20/min"),
+    APPEND_SUSTAINED_RATE=(str, "300/hour"),
 )
 
 # Read the repository-root .env when present -- the same file docker compose
@@ -146,7 +149,18 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # drf-spectacular's, plus the throttled response. See inventory/throttling.py.
+    "DEFAULT_SCHEMA_CLASS": "inventory.throttling.ThrottleAwareAutoSchema",
+    "EXCEPTION_HANDLER": "inventory.throttling.exception_handler",
+    # Deliberately no DEFAULT_THROTTLE_CLASSES: the endpoints that carry these
+    # limits name them, because which endpoints take no credential is the
+    # argument decision 0012 makes and not a default to be inherited quietly.
+    # The keys are the throttles' scopes; a name that matches nothing raises at
+    # the first request rather than skipping the limit.
+    "DEFAULT_THROTTLE_RATES": {
+        "append-burst": env("APPEND_BURST_RATE"),
+        "append-sustained": env("APPEND_SUSTAINED_RATE"),
+    },
 }
 
 SPECTACULAR_SETTINGS = {

@@ -377,3 +377,16 @@ class NotFoundSerializer(serializers.Serializer):
     """Nothing here. Said in a typed body so a client can render it."""
 
     detail = serializers.CharField()
+
+
+class ThrottledSerializer(serializers.Serializer):
+    """Too many submissions, too fast. Nothing was recorded; send it again later.
+
+    ``code`` is constant, so a client branches on it instead of on the prose,
+    and ``retry_after_seconds`` is the same number as the Retry-After header,
+    so a countdown can be rendered rather than a sentence read.
+    """
+
+    detail = serializers.CharField()
+    code = serializers.CharField()
+    retry_after_seconds = serializers.IntegerField()
