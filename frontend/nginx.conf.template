@@ -2,10 +2,16 @@
 # works in every environment -- nothing environment-specific is baked into
 # the JavaScript bundle. See docs/deployment.md.
 
-# Absent means there is no proxy in front of us, so believe our own scheme.
+# Absent, or anything that is not a scheme, means there is no proxy in front of
+# us worth believing, so fall back to our own. Only the two recognised values
+# pass through: the header is whatever the client sent unless the ingress
+# overwrote it, and Django decides cookie security and the CSRF origin check
+# from it -- see docs/deployment.md for the condition that makes trusting it
+# sound at all.
 map $http_x_forwarded_proto $forwarded_proto {
-    default $http_x_forwarded_proto;
-    ""      $scheme;
+    default $scheme;
+    https   https;
+    http    http;
 }
 
 server {

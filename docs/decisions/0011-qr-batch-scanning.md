@@ -242,8 +242,19 @@ check-out whose second line takes stock from nowhere, a transfer with only one
 side. That is a different failure from a malformed line — nothing needs
 correcting field by field, the volunteer picked the wrong kind or scanned in
 the wrong direction — so it answers `409` with the offending lines by index
-rather than folding into the `400`. Check-outs and consumption need a
-`from_location`, check-ins and receipts a `to_location`, transfers both.
+rather than folding into the `400`.
+
+A kind says which sides a movement must carry **and which it must not**, and
+both halves are checked. Check-outs and consumption need a `from_location`,
+check-ins and receipts a `to_location`, transfers both. A receipt must *not*
+carry a `from_location`, and consumption must not carry a `to_location`: those
+are the two kinds that cross the system's boundary, so naming the far side
+claims a shelf was involved that was not. Requiring without forbidding was the
+first version of this rule, and it let a receipt drain a warehouse —
+permanently, the ledger being append-only. The API refuses it; nothing in the
+database does yet, which is `inventory-tng-fi5`. Check-outs and check-ins forbid
+nothing, because naming where stock went or came from is the ordinary case.
+
 Adjustments and counts constrain nothing, deliberately: those are how a
 volunteer says the shelf disagrees with the system, which is the one claim this
 API must never argue with.
@@ -258,9 +269,23 @@ the authority; the answer is a stock count, not a blocked volunteer.
 **The idempotency key is minted when the cart opens**, not at submit, so every
 retry of the same cart carries the same key. It travels in the request body,
 where the model already has a column for it, and the server matches on the key
-alone: hashing bodies to detect two carts under one key would need a column that
-does not exist and would turn an invisible client bug into an error the
-volunteer cannot act on.
+without hashing the body: hashing to detect two carts under one key would need a
+column that does not exist and would turn an invisible client bug into an error
+the volunteer cannot act on.
+
+**The key is scoped to the volunteer who sent it.** It is minted on the client,
+so it is unique only to the phone that minted it, and two volunteers can produce
+the same string. Matching across everybody would answer the second one with the
+first one's transaction and discard their scans without saying so — a volunteer
+told their work was recorded when it was not, which is the worst thing this
+endpoint could do. The partial unique index is on `(actor, idempotency_key)` for
+the same reason, so the lookup and the constraint agree.
+
+The cost is that the actor is part of what a retry has to repeat. A cart
+resubmitted under a different volunteer is a batch the server has not seen, and
+it records a second transaction — so **the client mints a fresh key whenever
+the actor changes**, rather than treating the key as belonging to the cart
+alone.
 
 **The cart is local.** It lives in the browser and is written to `localStorage`
 on every change, so a phone that locks or reloads does not lose 24 scans. The

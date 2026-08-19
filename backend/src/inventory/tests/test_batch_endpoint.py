@@ -155,7 +155,7 @@ def test_replaying_a_key_returns_the_first_transaction_and_writes_nothing(
     assert StockMovement.objects.count() == 1
 
 
-def test_a_replay_is_matched_on_the_key_alone(
+def test_a_replay_is_matched_without_looking_at_the_body(
     client: Client,
     volunteer: Volunteer,
     item: Item,
@@ -164,6 +164,9 @@ def test_a_replay_is_matched_on_the_key_alone(
 ) -> None:
     """No hash of the body. Two carts under one key is an invisible client bug,
     and turning it into an error the volunteer cannot act on helps nobody.
+
+    The actor is still part of the match -- see the tests below -- so "the key
+    alone" means the key and who sent it, never the scans it carried.
     """
     first = post(
         client,
@@ -393,6 +396,121 @@ def test_a_count_constrains_no_side(
     assert response.status_code == 201
 
 
+def test_a_receipt_cannot_also_drain_a_location(
+    client: Client,
+    volunteer: Volunteer,
+    item: Item,
+    warehouse: Location,
+    custody: Location,
+) -> None:
+    """A receipt is stock arriving from outside the system.
+
+    Naming a source as well drains a shelf that was never involved, and the
+    ledger is append-only, so it stands until somebody notices.
+    """
+    response = post(
+        client,
+        batch(
+            volunteer,
+            [
+                {
+                    "item": item.pk,
+                    "quantity": "100",
+                    "from_location": warehouse.pk,
+                    "to_location": custody.pk,
+                },
+            ],
+            kind=StockTransaction.Kind.RECEIPT,
+        ),
+    )
+
+    assert response.status_code == 409
+    assert response.json()["inconsistent"] == [{"index": 0, "detail": "has a from_location"}]
+    assert StockTransaction.objects.count() == 0
+
+
+def test_consumption_cannot_arrive_anywhere(
+    client: Client,
+    volunteer: Volunteer,
+    item: Item,
+    warehouse: Location,
+    custody: Location,
+) -> None:
+    """Hardware fitted at an install has left the system."""
+    response = post(
+        client,
+        batch(
+            volunteer,
+            [
+                {
+                    "item": item.pk,
+                    "quantity": "1",
+                    "from_location": warehouse.pk,
+                    "to_location": custody.pk,
+                },
+            ],
+            kind=StockTransaction.Kind.CONSUMPTION,
+        ),
+    )
+    assert response.status_code == 409
+    assert response.json()["inconsistent"] == [{"index": 0, "detail": "has a to_location"}]
+
+
+def test_one_line_can_be_wrong_in_both_directions_at_once(
+    client: Client,
+    volunteer: Volunteer,
+    item: Item,
+    warehouse: Location,
+) -> None:
+    """A receipt with a source and no destination fails both halves, and the
+    volunteer is told both rather than made to fix one and post again.
+    """
+    response = post(
+        client,
+        batch(
+            volunteer,
+            [{"item": item.pk, "quantity": "1", "from_location": warehouse.pk}],
+            kind=StockTransaction.Kind.RECEIPT,
+        ),
+    )
+    assert response.status_code == 409
+    assert response.json()["inconsistent"] == [
+        {"index": 0, "detail": "has no to_location"},
+        {"index": 0, "detail": "has a from_location"},
+    ]
+
+
+@pytest.mark.parametrize(
+    ("kind", "sides"),
+    [
+        (StockTransaction.Kind.CHECKOUT, ("from_location", "to_location")),
+        (StockTransaction.Kind.CHECKIN, ("from_location", "to_location")),
+        (StockTransaction.Kind.CONSUMPTION, ("from_location",)),
+        (StockTransaction.Kind.RECEIPT, ("to_location",)),
+        (StockTransaction.Kind.TRANSFER, ("from_location", "to_location")),
+    ],
+)
+def test_each_kind_accepts_the_shape_it_is_for(
+    client: Client,
+    volunteer: Volunteer,
+    item: Item,
+    warehouse: Location,
+    custody: Location,
+    kind: str,
+    sides: tuple[str, ...],
+) -> None:
+    """The permitted shape of every kind, pinned.
+
+    Forbidding a side is not the default: a check out into somebody's custody
+    names both, and that is the ordinary case. Adding a side to the wrong
+    tuple would break one of these while every rejection test stayed green.
+    """
+    places = {"from_location": warehouse.pk, "to_location": custody.pk}
+    movement = {"item": item.pk, "quantity": "1"} | {side: places[side] for side in sides}
+    response = post(client, batch(volunteer, [movement], kind=kind))
+    assert response.status_code == 201, response.content
+
+
 # --------------------------------------------------------------------------
 # Going negative
 # --------------------------------------------------------------------------
@@ -530,8 +648,9 @@ def test_a_key_alone_does_not_fetch_somebody_elses_batch(
     item: Item,
     warehouse: Location,
 ) -> None:
-    """Matching on the key alone means not comparing bodies, not accepting
-    anything at all that carries one. A bare key is not a retry of a cart.
+    """Matching without hashing the body means not comparing bodies, not
+    accepting anything at all that carries a key. A bare key is not a retry of
+    a cart -- it does not even say who is retrying.
     """
     post(
         client,
@@ -577,8 +696,8 @@ def test_a_racing_retry_returns_the_transaction_the_winner_recorded(
     honest = StockTransactionCreateView._already_recorded
     blinded = iter([True])
 
-    def blind_once(key: str | None) -> StockTransaction | None:
-        return None if next(blinded, False) else honest(key)
+    def blind_once(actor: Volunteer, key: str | None) -> StockTransaction | None:
+        return None if next(blinded, False) else honest(actor, key)
 
     monkeypatch.setattr(StockTransactionCreateView, "_already_recorded", staticmethod(blind_once))
     loser = post(client, body)
@@ -586,6 +705,48 @@ def test_a_racing_retry_returns_the_transaction_the_winner_recorded(
     assert loser.status_code == 200
     assert loser.json()["id"] == winner.json()["id"]
     assert StockTransaction.objects.count() == 1
+
+
+def test_one_volunteers_key_cannot_swallow_anothers_batch(
+    client: Client,
+    volunteer: Volunteer,
+    item: Item,
+    second_item: Item,
+    warehouse: Location,
+) -> None:
+    """The key is minted by the client, so two people can mint the same one.
+
+    Matching across everybody would answer the second volunteer with the
+    first's transaction and drop their scans on the floor -- silently, since
+    a 200 carrying somebody else's batch looks exactly like a successful
+    retry.
+    """
+    olivia = Volunteer.objects.create(display_name="Olivia")
+    shared = "cart-7QK2P9"
+    first = post(
+        client,
+        batch(
+            volunteer,
+            [{"item": item.pk, "quantity": "1", "from_location": warehouse.pk}],
+            idempotency_key=shared,
+            note="private note",
+        ),
+    )
+    second = post(
+        client,
+        batch(
+            olivia,
+            [{"item": second_item.pk, "quantity": "9", "from_location": warehouse.pk}],
+            idempotency_key=shared,
+        ),
+    )
+
+    assert second.status_code == 201
+    assert second.json()["id"] != first.json()["id"]
+    assert second.json()["actor"] == olivia.pk
+    assert "private note" not in second.content.decode()
+    assert StockTransaction.objects.count() == 2
+    assert StockMovement.objects.count() == 2
 
 
 def test_an_integrity_error_that_is_not_the_key_is_not_swallowed(

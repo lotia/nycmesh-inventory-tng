@@ -22,6 +22,7 @@ from inventory.models import Category, Item, Location, Volunteer
 
 USERNAME = "integration"
 PASSWORD = "integration-only-not-a-real-password"
+VOLUNTEER = "Integration Tester"
 
 
 class Command(BaseCommand):
@@ -36,7 +37,15 @@ class Command(BaseCommand):
         # session that exists today; the app's own is inventory-tng-0pj.
         User.objects.create_superuser(username=USERNAME, password=PASSWORD)
 
-        volunteer, _ = Volunteer.objects.get_or_create(display_name="Integration Tester")
+        # Not get_or_create: display names are not unique (see Volunteer), so a
+        # second row carrying this one would make it raise. It must also come
+        # back selectable, because this runs against a developer's own
+        # database where the record may since have been merged or deactivated,
+        # and the batch endpoint refuses a retired actor.
+        volunteer = Volunteer.objects.selectable().filter(display_name=VOLUNTEER).first()
+        if volunteer is None:
+            volunteer = Volunteer.objects.create(display_name=VOLUNTEER)
+
         category, _ = Category.objects.get_or_create(name="Radios")
         item, _ = Item.objects.get_or_create(name="LiteBeam", defaults={"category": category})
         warehouse, _ = Location.objects.get_or_create(

@@ -13,7 +13,8 @@ dated in the future, and the exclusion of merged and inactive volunteers as
 the actor. Neither is expressible as a check constraint -- one needs the
 current time, the other another table -- so anything writing past this module,
 including the admin and the planned sheet importer, is not protected by them.
-Closing that gap is inventory-tng-fi5.
+The kind-to-sides rule in views.py is a third of the same kind. Closing that
+gap, for all three, is inventory-tng-fi5.
 """
 
 import datetime
@@ -21,6 +22,7 @@ from typing import Any
 
 from django.utils import timezone
 from rest_framework import serializers
+from rest_framework.validators import UniqueTogetherValidator
 
 from inventory.models import StockMovement, StockTransaction, Volunteer
 
@@ -121,17 +123,12 @@ class StockTransactionCreateSerializer(serializers.ModelSerializer):
         allow_empty=False,
         max_length=MAX_MOVEMENTS,  # ty: ignore[unknown-argument]
     )
-    # No uniqueness validator, deliberately. The key is *meant* to arrive
-    # twice -- that is what makes a retry safe -- and the view answers a
-    # replay with the transaction the first attempt created. Left to DRF, a
-    # duplicate key would be a 400 instead, and two genuinely concurrent
-    # retries would race past the view's lookup only to be rejected here. The
-    # partial unique index stays the arbiter; see the view's recovery path.
+    # Why the key carries no uniqueness validator is stated once, in
+    # get_unique_together_validators below.
     idempotency_key = serializers.CharField(
         max_length=64,
         required=False,
         allow_null=True,
-        validators=[],
     )
     # Merged and inactive volunteers are not choices; the rule and the reason
     # live once, on the queryset the pick-list uses too.
@@ -147,6 +144,23 @@ class StockTransactionCreateSerializer(serializers.ModelSerializer):
         if value > timezone.now() + CLOCK_SKEW:
             raise serializers.ValidationError("A batch cannot have happened in the future.")
         return value
+
+    def get_unique_together_validators(self) -> list[UniqueTogetherValidator]:
+        """No uniqueness validator for the idempotency key.
+
+        DRF builds one from the partial unique index on
+        ``(actor, idempotency_key)``, which makes the key a required field and
+        so rejects the ordinary batch that carries none. The key is also
+        *meant* to arrive twice -- that is what makes a retry safe -- and two
+        genuinely concurrent retries would race past the view's lookup only to
+        be rejected here. The index stays the arbiter, and the view answers a
+        collision with the transaction the first attempt created.
+
+        Overridden rather than blanking ``Meta.validators``, which would drop
+        every model-derived validator: a constraint added to StockTransaction
+        later should still be reported as a 400 rather than escaping as a 500.
+        """
+        return []
 
     class Meta:
         model = StockTransaction

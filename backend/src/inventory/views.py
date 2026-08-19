@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, NamedTuple
 
 from django.contrib.postgres.search import TrigramSimilarity
 from django.db import IntegrityError, connection
@@ -98,31 +98,49 @@ class HealthCheckView(APIView):
         return Response({"status": "ok"})
 
 
-# Which sides a movement must carry for the batch to mean what its kind says.
-# Stated per kind rather than derived, because the mapping is a domain fact --
-# a check-out that takes stock from nowhere is not a check-out -- and reading
-# it should not require reconstructing an argument. The rules, and why
-# adjustments and counts are absent, are in decision 0011 section 6.
-KIND_REQUIRES: dict[str, tuple[tuple[str, ...], str]] = {
-    StockTransaction.Kind.CHECKOUT: (
-        ("from_location",),
-        "A check out moves stock out of somewhere.",
+class KindSides(NamedTuple):
+    """What a kind means for the two sides of each of its movements."""
+
+    required: tuple[str, ...]
+    forbidden: tuple[str, ...]
+    detail: str
+
+
+# Which sides a movement must carry, and which it must not, for the batch to
+# mean what its kind says. Stated per kind rather than derived, because the
+# mapping is a domain fact -- a check-out that takes stock from nowhere is not
+# a check-out -- and reading it should not require reconstructing an argument.
+# The rules, and why adjustments and counts are absent, are in decision 0011
+# section 6. No database counterpart: inventory-tng-fi5.
+#
+# Named arguments, not positional: `required` and `forbidden` are two tuples of
+# the same type sitting next to each other, and transposing them would invert a
+# domain rule silently -- a receipt that must not land anywhere.
+KIND_SIDES: dict[str, KindSides] = {
+    StockTransaction.Kind.CHECKOUT: KindSides(
+        required=("from_location",),
+        forbidden=(),
+        detail="A check out moves stock out of somewhere.",
     ),
-    StockTransaction.Kind.CONSUMPTION: (
-        ("from_location",),
-        "Stock used at a job comes out of somewhere.",
+    StockTransaction.Kind.CONSUMPTION: KindSides(
+        required=("from_location",),
+        forbidden=("to_location",),
+        detail="Stock used at a job comes out of somewhere and does not arrive anywhere.",
     ),
-    StockTransaction.Kind.CHECKIN: (
-        ("to_location",),
-        "A check in brings stock back to somewhere.",
+    StockTransaction.Kind.CHECKIN: KindSides(
+        required=("to_location",),
+        forbidden=(),
+        detail="A check in brings stock back to somewhere.",
     ),
-    StockTransaction.Kind.RECEIPT: (
-        ("to_location",),
-        "A receipt brings stock in from outside, so it must land somewhere.",
+    StockTransaction.Kind.RECEIPT: KindSides(
+        required=("to_location",),
+        forbidden=("from_location",),
+        detail="A receipt brings stock in from outside, so it lands somewhere and leaves nowhere.",
     ),
-    StockTransaction.Kind.TRANSFER: (
-        ("from_location", "to_location"),
-        "A transfer moves stock between two places.",
+    StockTransaction.Kind.TRANSFER: KindSides(
+        required=("from_location", "to_location"),
+        forbidden=(),
+        detail="A transfer moves stock between two places.",
     ),
 }
 
@@ -169,13 +187,19 @@ def _rejected(errors: dict[str, object]) -> list[dict[str, object]]:
 
 
 def _inconsistent_lines(kind: str, movements: list[dict[str, object]]) -> list[dict[str, object]]:
-    """Lines that are valid on their own but disagree with the batch's kind."""
-    required, _ = KIND_REQUIRES.get(kind, ((), ""))
+    """Lines that are valid on their own but disagree with the batch's kind,
+    in either direction: a missing side it needs, or a side it must not have.
+    """
+    sides = KIND_SIDES.get(kind)
+    if sides is None:
+        return []
     return [
-        {"index": index, "detail": f"has no {side}"}
+        {"index": index, "detail": detail}
         for index, movement in enumerate(movements)
-        for side in required
-        if movement.get(side) is None
+        for detail in (
+            *(f"has no {side}" for side in sides.required if movement.get(side) is None),
+            *(f"has a {side}" for side in sides.forbidden if movement.get(side) is not None),
+        )
     ]
 
 
@@ -266,11 +290,15 @@ class StockTransactionCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # The replay is matched on the key alone, with no hash of the body.
-        # Two carts under one key is an invisible client bug; turning it into
-        # an error the volunteer cannot act on helps nobody. See decision 0011.
+        # The replay is matched on the key and the actor, with no hash of the
+        # body. Two carts under one key is an invisible client bug; turning it
+        # into an error the volunteer cannot act on helps nobody. But the key
+        # is minted by the client, so it is only unique to the person who
+        # minted it -- matching across everybody would answer one volunteer's
+        # batch with another's. See decision 0011.
         key = serializer.validated_data.get("idempotency_key")
-        replayed = self._already_recorded(key)
+        actor = serializer.validated_data["actor"]
+        replayed = self._already_recorded(actor, key)
         if replayed is not None:
             return Response(self._body(replayed), status=status.HTTP_200_OK)
 
@@ -280,7 +308,7 @@ class StockTransactionCreateView(APIView):
         if inconsistent:
             return Response(
                 {
-                    "detail": KIND_REQUIRES[kind][1],
+                    "detail": KIND_SIDES[kind].detail,
                     "kind": kind,
                     "inconsistent": inconsistent,
                 },
@@ -295,7 +323,7 @@ class StockTransactionCreateView(APIView):
             # Checked against the constraint that actually fired, because
             # answering any other integrity failure with somebody's earlier
             # transaction would report success for a batch that wrote nothing.
-            raced = self._already_recorded(key) if _is_duplicate_key(error) else None
+            raced = self._already_recorded(actor, key) if _is_duplicate_key(error) else None
             if raced is None:
                 raise
             return Response(self._body(raced), status=status.HTTP_200_OK)
@@ -303,8 +331,8 @@ class StockTransactionCreateView(APIView):
         return Response(self._body(recorded), status=status.HTTP_201_CREATED)
 
     @staticmethod
-    def _already_recorded(key: str | None) -> StockTransaction | None:
-        """Find the transaction a key already recorded, if there is one.
+    def _already_recorded(actor: Volunteer, key: str | None) -> StockTransaction | None:
+        """Find the transaction this actor already recorded under this key.
 
         The key arrives here already validated, so it is the value the write
         path would store rather than the raw request value -- a lookup on the
@@ -316,7 +344,7 @@ class StockTransactionCreateView(APIView):
         """
         if not key:
             return None
-        return StockTransaction.objects.filter(idempotency_key=key).order_by().first()
+        return StockTransaction.objects.filter(actor=actor, idempotency_key=key).order_by().first()
 
     @staticmethod
     @atomic

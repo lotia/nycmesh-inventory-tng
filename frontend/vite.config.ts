@@ -9,7 +9,15 @@ const BACKEND = process.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 // The paths that belong to Django rather than to the app. Which paths, and
 // why, is in docs/architecture.md; nginx.conf.template proxies the same set in
 // production and must be edited with this.
-const DJANGO_PATHS = ["/api", "/admin", "/static"];
+const DJANGO_PATHS = ["api", "admin", "static"];
+
+// Anchored, the way nginx anchors the same set. A bare `/api` prefix also
+// matches `/apiary`, so a client-side route beginning with one of these words
+// would be proxied to Django and answered 404 here while reaching the app when
+// deployed -- the one difference this proxy exists to avoid. Vite treats a key
+// starting with `^` as a regular expression and tests it against the URL
+// including its query string, which is why `?` ends the match as well as `/`.
+const DJANGO_PROXY = `^/(${DJANGO_PATHS.join("|")})($|[/?])`;
 
 export default defineConfig({
   plugins: [react()],
@@ -22,7 +30,7 @@ export default defineConfig({
     // compares it against the browser's Origin on every write and refuses the
     // write if they disagree. Django must therefore accept whatever host you
     // reach this server on -- see DJANGO_ALLOWED_HOSTS in .env.sample.
-    proxy: Object.fromEntries(DJANGO_PATHS.map((path) => [path, { target: BACKEND }])),
+    proxy: { [DJANGO_PROXY]: { target: BACKEND } },
   },
   build: {
     outDir: "dist",

@@ -467,7 +467,8 @@ class StockTransaction(models.Model):
     )
     note = models.TextField(blank=True)
     # A phone in a basement will retry. Replaying the same batch must not
-    # double-post it.
+    # double-post it. Scoped to the actor by the constraint below; decision
+    # 0011 says why.
     idempotency_key = models.CharField(max_length=64, null=True, blank=True)  # noqa: DJ001
 
     class Meta:
@@ -479,7 +480,7 @@ class StockTransaction(models.Model):
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=["idempotency_key"],
+                fields=["actor", "idempotency_key"],
                 condition=models.Q(idempotency_key__isnull=False),
                 name="stock_transaction_unique_idempotency_key",
             ),
