@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+    # ready_for_review is not one of the defaults, and the history job below
+    # reads draft state. See DEVELOPERS.md#merging.
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -205,9 +208,11 @@ jobs:
       # The membership check needs the beads tracker and simply sits out when
       # there is none, so a contributor working from GitHub issues is held to
       # the structural rules and nothing else. See DEVELOPERS.md#issue-tracking
+      # --draft while the pull request is one. See DEVELOPERS.md#merging.
       - name: Check the commits in this pull request
         run: |
           scripts/check-batch.sh \
+            ${{ github.event.pull_request.draft && '--draft' || '' }} \
             "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
 
   docs:

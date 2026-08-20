@@ -8,21 +8,29 @@
 #
 # The rules are in DEVELOPERS.md "Pull requests" and "Commits".
 #
-# Usage: check-batch.sh [<range>] [--epic <id>]
+# Usage: check-batch.sh [<range>] [--epic <id>] [--draft]
 #
 # <range> defaults to origin/main..HEAD. --epic names the batch's epic in the
 # tracker; without it the epic is inferred from the issues the range closes,
-# and if they do not agree on one, membership is simply not checked.
+# and if they do not agree on one, membership is simply not checked. --draft
+# says the branch is still under review, where commits waiting to be folded in
+# are expected rather than a fault.
 
 set -uo pipefail
 
 RANGE="origin/main..HEAD"
 EPIC=""
+DRAFT=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --epic)
       EPIC=${2:?--epic needs an id}
       shift 2
+      ;;
+    # See DEVELOPERS.md#merging on why a branch under review is different.
+    --draft)
+      DRAFT=1
+      shift
       ;;
     *)
       RANGE=$1
@@ -84,30 +92,28 @@ while IFS= read -r -d $'\x1e' record; do
   body_of[$sha_part]=${rest#*$'\x1f'}
 done < <(git log --reverse --no-merges --format="%H%x1f%s%x1f%B%x1e" "$RANGE")
 
+# What `rebase --autosquash` would leave.
+#
+# A fixup, a squash and an amend all name the commit they belong to in the same
+# place, so one predicate covers the three and amend! stops being a case this
+# cannot read. What they name is not needed: a commit waiting to be folded in
+# is not work, whichever commit absorbs it.
+absorbed() {
+  local subject=$1
+  case "$subject" in
+    fixup!\ * | squash!\ * | amend!\ *) ;;
+    *) return 1 ;;
+  esac
+  # A prefix with nothing after it names nothing, and is a commit like any
+  # other rather than one waiting to be folded in.
+  [[ -n "${subject#* }" ]]
+}
+
 for sha in "${commits[@]}"; do
   subject=${subject_of[$sha]:-}
 
-  # A branch under review is full of these, and they carry no trailer because
-  # they are not commits yet -- they are corrections waiting to be folded into
-  # one. They are not read as work belonging to nothing, but they are still
-  # refused: nothing autosquashes them on the way in. GitHub's rebase merge
-  # replays them exactly as they are, and squash merge, which would at least
-  # have absorbed them, is disabled. So a branch is not mergeable until they
-  # are gone, and this is what says so.
-  #
-  # amend! is not in this list. It carries the original message, trailers and
-  # all, so skipping it would lose a commit's issue and counting it would find
-  # that issue closed twice; it needs handling of its own before it can be
-  # used here.
-  if [[ "$subject" == fixup!* || "$subject" == squash!* ]]; then
+  if absorbed "$subject"; then
     pending=$((pending + 1))
-    continue
-  fi
-
-  if [[ "$subject" == amend!* ]]; then
-    fail "${sha:0:8} is an amend! commit, which this cannot read: $subject"
-    note "  use --fixup, or collapse it before asking"
-    order+=("")
     continue
   fi
 
@@ -207,7 +213,9 @@ fi
 if [[ -x "$CHECK" ]]; then
   for sha in "${commits[@]}"; do
     subject=${subject_of[$sha]:-}
-    [[ "$subject" == fixup!* || "$subject" == squash!* ]] && continue
+    # An amend! read as a standalone commit is charged seven characters of
+    # prefix against a fifty-column limit.
+    absorbed "$subject" && continue
     if ! output=$("$CHECK" --message-only <(printf '%s\n' "${body_of[$sha]:-}") 2>&1); then
       while IFS= read -r line; do
         [[ "$line" == *"$MARK_FAIL"* ]] || continue
@@ -218,7 +226,11 @@ if [[ -x "$CHECK" ]]; then
 fi
 
 if [[ "$pending" -gt 0 ]]; then
-  fail "$pending fixup commits have not been folded in. Nothing does it on the way in:"
+  if [[ "$DRAFT" -eq 1 ]]; then
+    note "$pending commits are waiting to be folded in, which is fine while reviewing:"
+  else
+    fail "$pending commits are waiting to be folded in. Nothing does it on the way in:"
+  fi
   note "  git rebase -i --autosquash origin/main"
 fi
 

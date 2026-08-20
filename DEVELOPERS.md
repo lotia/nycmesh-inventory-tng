@@ -802,6 +802,11 @@ git rebase -i --autosquash origin/main     # once, at the end
 git push --force-with-lease
 ```
 
+Nothing folds those in on the way to `main` — rebase merge replays them as they
+stand — so the branch is not mergeable until you have. While the pull request
+is a draft they are the expected state and the check says so; marking it ready
+is what claims the branch is meant to merge.
+
 That rebase also brings the branch up to date with `main`, which is required:
 `main` accepts nothing that is behind it or that has a check outstanding, so the
 suite runs again on what will actually land. The merge stays blocked until it is

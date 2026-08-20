@@ -138,8 +138,10 @@ land a 'aaa: Extract the decode loop
 
 Closes: inventory-tng-aaa'
 land b 'fixup! aaa: Extract the decode loop'
-expect 1 "have not been folded in" "an unfolded fixup is refused"
+expect 1 "waiting to be folded in" "an unfolded fixup is refused"
 
+# amend! carries the original message, trailers and all. Resolved to its target
+# like a fixup, it neither loses the commit's issue nor closes it twice.
 scene
 land a 'aaa: Extract the decode loop
 
@@ -147,7 +149,9 @@ Closes: inventory-tng-aaa'
 land b 'amend! aaa: Extract the decode loop
 
 Closes: inventory-tng-aaa'
-expect 1 "is an amend! commit" "an amend! commit is refused rather than miscounted"
+output=$("$CHECK" base..HEAD 2>&1)
+assert "$output" $? 1 "waiting to be folded in" "an amend! is a commit waiting to be folded in"
+refute "$output" 1 1 "closed by 2 commits" "and its issue is not counted twice"
 
 scene
 land a 'aaa: Extract the decode loop
@@ -205,5 +209,38 @@ expect 0 "One commit, one issue" "a malformed tracker line is stepped over"
 
 scene
 expect 0 "Nothing to check" "an empty range is not a failure"
+
+# See check-batch.sh on --draft.
+scene
+land a 'aaa: Extract the decode loop
+
+Closes: inventory-tng-aaa'
+land b 'fixup! aaa: Extract the decode loop'
+expect --draft -- 0 "which is fine while reviewing" "a draft may carry commits waiting to be folded in"
+
+# But a structural fault still fails, draft or not.
+scene
+land a 'aaa: Extract the decode loop
+
+Closes: inventory-tng-aaa
+Refs: inventory-tng-bbb'
+expect --draft -- 1 "belongs to one issue" "a draft does not excuse a commit holding two issues"
+
+# See check-batch.sh on why the delegation loop must skip what was absorbed.
+scene
+land a 'aaa: Extract the decode loop into its own new module
+
+Closes: inventory-tng-aaa'
+land b 'amend! aaa: Extract the decode loop into its own new module
+
+Closes: inventory-tng-aaa'
+output=$("$CHECK" --draft base..HEAD 2>&1)
+refute "$output" $? 0 "over 50" "an amend! subject is not charged its own prefix"
+
+# See absorbed in check-batch.sh on a prefix that names nothing.
+scene
+land a 'fixup! '
+output=$("$CHECK" base..HEAD 2>&1)
+refute "$output" $? 1 "waiting to be folded in" "a bare prefix is not a commit waiting for anything"
 
 verdict
