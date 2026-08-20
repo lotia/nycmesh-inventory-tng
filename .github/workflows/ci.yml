@@ -177,13 +177,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      # The checker is a guardrail somebody runs by hand or wires in as a hook,
-      # so nothing else would notice it breaking. This runs its own tests; it
-      # deliberately does not check the commits in a pull request, because the
-      # closure it reads lives in the beads tracker a contributor need not use,
-      # and because a squash merge composes its message after this has run.
+      # The checkers are guardrails somebody runs by hand or wires in as a
+      # hook, so nothing else would notice them breaking.
       - name: Check the commit checker
         run: scripts/check-commit.test.sh
+      - name: Check the batch checker
+        run: scripts/check-batch.test.sh
+      - name: Check the duplication checker
+        run: scripts/check-docs.test.sh
+      - name: Check the settings checker
+        run: scripts/repo-settings.test.sh
+
+  history:
+    name: One issue per commit
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The whole range, not the tip: this reads every commit the pull
+          # request adds.
+          fetch-depth: 0
+      # No commit may hold work from two issues -- the rule this repository is
+      # arranged around, and the one a tidy-looking branch breaks most easily.
+      # See DEVELOPERS.md#pull-requests
+      #
+      # The membership check needs the beads tracker and simply sits out when
+      # there is none, so a contributor working from GitHub issues is held to
+      # the structural rules and nothing else. See DEVELOPERS.md#issue-tracking
+      - name: Check the commits in this pull request
+        run: |
+          scripts/check-batch.sh \
+            "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
 
   docs:
     name: Documentation links
@@ -191,11 +216,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       # Documentation here is heavily cross-linked by design -- one topic lives
-      # in one file and everything else links to it. This job is what stops
-      # those links rotting silently when a file moves or is renamed.
-      # See DEVELOPERS.md#documentation-rules
+      # in one file and everything else links to it. These two jobs are what
+      # stop that arrangement rotting: the first when a link's target moves,
+      # the second when an explanation is pasted into a second file instead of
+      # being linked to. See DEVELOPERS.md#documentation-rules
       - name: Check Markdown links
         uses: lycheeverse/lychee-action@v2
         with:
           args: --no-progress --offline --include-fragments '**/*.md'
           fail: true
+      - name: Check for duplicated prose
+        run: scripts/check-docs.sh
