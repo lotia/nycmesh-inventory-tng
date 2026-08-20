@@ -98,8 +98,54 @@ if [[ -z "$summary" ]]; then
   fail "the summary line is empty"
 fi
 
-if [[ ${#summary} -gt $SUMMARY_LIMIT ]]; then
-  fail "the summary line is ${#summary} characters, over $SUMMARY_LIMIT"
+# The summary names its issue and then describes the change. The limit is on
+# the description: the identifier is addressing, not prose, and charging the
+# line for it would shorten every summary in the repository to pay for
+# something the reader gains nothing from reading.
+#
+# Only the distinguishing part appears here -- "c6j.6", not
+# "inventory-tng-c6j.6" -- because the repository prefix is the same on every
+# bead and would spend 14 of the 50 characters saying so. The trailer carries
+# the full identifier, which is what a machine reads.
+#
+# What makes it an identifier is that the trailer agrees: a prefix is only
+# waved through if the issue this commit belongs to actually ends with it.
+# Anything else -- a "Fix:" habit, a colon that happens to fall early -- is
+# prose and is charged for. Guessing from the shape of the token instead does
+# not work, because a bead identifier is arbitrary and need not contain a
+# digit: this repository has swr and jro as well as c6j and 2dg.
+# Read once, here, and used by both the summary check and the trailer rules
+# below. Three greps over the same array was three definitions of what a
+# trailer is, and they could disagree on a malformed one.
+trailers=()
+closing=()
+for line in "${lines[@]}"; do
+  case "$line" in
+    Closes\ *)
+      trailers+=("$line")
+      closing+=("$line")
+      ;;
+    Refs\ *) trailers+=("$line") ;;
+  esac
+done
+
+issue_of() {
+  local t=${1#* }
+  printf '%s' "${t%%[[:space:]]*}"
+}
+
+trailer_issue=""
+[[ ${#trailers[@]} -gt 0 ]] && trailer_issue=$(issue_of "${trailers[0]}")
+
+prose=$summary
+if [[ "$summary" =~ ^([^[:space:]]+):[[:space:]](.*)$ ]]; then
+  # *"$marker" covers the exact match too: [[ abc == *abc ]] is true.
+  [[ -n "$trailer_issue" && "$trailer_issue" == *"${BASH_REMATCH[1]}" ]] &&
+    prose=${BASH_REMATCH[2]}
+fi
+
+if [[ ${#prose} -gt $SUMMARY_LIMIT ]]; then
+  fail "the summary is ${#prose} characters, over $SUMMARY_LIMIT"
   note "  usually the issue was too big rather than the line too short"
 fi
 
@@ -110,7 +156,7 @@ fi
 # Imperative mood, as far as a machine can tell: the past tense and the gerund
 # are what gets written instead. The exceptions are imperatives that simply end
 # that way; extend the list when a real commit trips it.
-first=${summary%% *}
+first=${prose%% *}
 shopt -s nocasematch
 if [[ "$first" =~ (ed|ing)$ ]] &&
   [[ ! "$first" =~ ^(Bring|Embed|Exceed|Feed|Proceed|Read|Seed|Shed|Speed|Spread|Succeed)$ ]]; then
@@ -133,16 +179,34 @@ for line in "${lines[@]:1}"; do
   fi
 done
 
-mapfile -t trailers < <(printf '%s\n' "${lines[@]}" | grep '^Closes ')
-
-if [[ ${#trailers[@]} -ne 1 ]]; then
-  fail "expected exactly one 'Closes <issue>' trailer, found ${#trailers[@]}"
+# Every trailer names an issue, and they all name the same one. That is what
+# "one issue per commit" reduces to in a message: an issue may take more than
+# one commit, so `Refs` exists for the ones that advance it without finishing
+# it, but no commit may name two issues whatever the verb.
+if [[ ${#trailers[@]} -eq 0 ]]; then
+  fail "expected a 'Closes <issue>' or 'Refs <issue>' trailer, found none"
+elif [[ ${#closing[@]} -gt 1 ]]; then
+  fail "${#closing[@]} 'Closes' trailers. One issue, one commit."
 else
-  named=${trailers[0]#Closes }
-  named=${named%%[[:space:]]*}
+  named=$trailer_issue
+  for trailer in "${trailers[@]:1}"; do
+    other=$(issue_of "$trailer")
+    if [[ "$other" != "$named" ]]; then
+      fail "the trailers name $named and $other. A commit belongs to one issue."
+      break
+    fi
+  done
+
+  # A commit that only advances an issue closes nothing, so there is no
+  # closure to cross-check and none to object to.
+  if [[ ${#closing[@]} -eq 0 ]]; then
+    note "names $named without closing it"
+    if [[ ${#closed[@]} -gt 0 ]]; then
+      fail "the message closes nothing but the staged tracker closes ${closed[0]}"
+    fi
   # A contributor who does not use beads names a GitHub issue instead, and
   # there is no tracker file to compare it against. See DEVELOPERS.md.
-  if [[ "$named" == \#* ]]; then
+  elif [[ "$named" == \#* ]]; then
     note "names $named, which is not a bead: nothing here to cross-check"
   elif [[ ${#closed[@]} -eq 1 && "$named" != "${closed[0]}" ]]; then
     fail "the message closes $named but the staged tracker closes ${closed[0]}"

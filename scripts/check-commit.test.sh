@@ -199,7 +199,121 @@ Extract the decode loop into its own module
 
 No trailer at all.
 MSG
-expect 1 "found 0" "a message naming no issue is refused"
+expect 1 "found none" "a message naming no issue is refused"
+
+# --- the identifier in the summary, and issues that take more than one commit
+
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+message <<'MSG'
+aaa: Extract the decode loop into its own module
+
+Closes inventory-tng-aaa
+MSG
+expect 0 "Nothing to object to" "an identifier is not charged against the 50"
+
+scene
+message <<'MSG'
+Fix: the decode loop, out where it can be tested, and then some more
+MSG
+expect 1 "over 50" "a prefix no trailer confirms is prose, and is charged for"
+
+# What makes a prefix an identifier is that the trailer agrees. The same line
+# is under the limit when it names the issue it belongs to and over it when it
+# names something else, which is the whole distinction in one pair of cases.
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+message <<'MSG'
+aaa: Extract the decode loop into its own new module
+
+Closes inventory-tng-aaa
+MSG
+expect 0 "Nothing to object to" "a prefix its trailer confirms is not charged for"
+
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+message <<'MSG'
+bbb: Extract the decode loop into its own new module
+
+Closes inventory-tng-aaa
+MSG
+expect 1 "over 50" "a prefix naming another issue is prose, and is charged for"
+
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+message <<'MSG'
+aaa: Extract the decode loop into a module that is far too long to fit
+
+Closes inventory-tng-aaa
+MSG
+expect 1 "over 50" "an over-long summary is still refused with an identifier"
+
+# An issue may take more than one commit, so a message that only advances one
+# closes nothing and has nothing to cross-check.
+scene
+message <<'MSG'
+aaa: Move the loop before rewriting it
+
+Refs inventory-tng-aaa
+MSG
+expect 0 "names inventory-tng-aaa without closing it" "Refs advances an issue without closing it"
+
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+message <<'MSG'
+aaa: Move the loop before rewriting it
+
+Refs inventory-tng-aaa
+MSG
+expect 1 "closes nothing but the staged tracker closes" "Refs while the tracker closes something is refused"
+
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+message <<'MSG'
+aaa: Extract the decode loop
+
+Closes inventory-tng-aaa
+Refs inventory-tng-bbb
+MSG
+expect 1 "A commit belongs to one issue" "trailers naming two issues are refused"
+
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"closed"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+message <<'MSG'
+aaa: Extract the decode loop
+
+Closes inventory-tng-aaa
+Closes inventory-tng-bbb
+MSG
+expect 1 "2 'Closes' trailers" "two closing trailers are refused"
 
 echo
 if [[ "$failed" -eq 0 ]]; then
