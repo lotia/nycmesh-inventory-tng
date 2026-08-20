@@ -46,6 +46,16 @@ import { frameGrabber } from "./frame";
  * sentence reaches the person it was written for instead of their being shown
  * nothing at all.
  */
+/**
+ * The scanner stopped reading, in the same terms NO_CAMERA uses.
+ *
+ * Here rather than in decodeLoop.ts, which decides *that* the loop has
+ * stopped: turning a cause into a sentence naming a way out is this file's
+ * job, and refusal() below already does it for a camera that would not open.
+ */
+export const SCANNER_STOPPED =
+  "The scanner has stopped reading. Close and reopen the camera, or type the code printed under the QR.";
+
 const NO_CAMERA =
   "No camera is available here. A camera needs the page to be served over HTTPS, so if you reached this app by its address on the network, that is why. Type the code printed under the QR instead, or find the item in the list.";
 
@@ -172,6 +182,14 @@ export function CameraScanner({ onCode }: { onCode: (code: string) => void }) {
         detect: (source) => detector.detect(source),
         frame: () => grab(element),
         onCode: (code) => latest.current(code),
+        // The loop has stopped itself; the lens has not, and the stream is
+        // this component's to let go of. See Decoding.onFailure.
+        onFailure: () => {
+          release();
+          if (live) {
+            setFailure(SCANNER_STOPPED);
+          }
+        },
       });
     }
 

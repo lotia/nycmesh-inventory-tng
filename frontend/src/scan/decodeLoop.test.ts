@@ -7,7 +7,7 @@
  * and where the question is answered instead.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DECODE_INTERVAL_MS, type Decoding, decodeLoop } from "./decodeLoop";
+import { DECODE_FAILURE_LIMIT, DECODE_INTERVAL_MS, type Decoding, decodeLoop } from "./decodeLoop";
 import type { Decoded } from "./decoder";
 import { deferred } from "./testFixtures";
 
@@ -22,16 +22,23 @@ function found(...codes: string[]): Decoded[] {
 interface Running {
   detect: ReturnType<typeof vi.fn>;
   onCode: ReturnType<typeof vi.fn>;
+  /** What the volunteer would be told, if anything. */
+  onFailure: ReturnType<typeof vi.fn>;
   /** Close the scanner, which is the one thing the component's cleanup does. */
   stop: () => void;
 }
 
 /** Start a loop over a detector under this test's control. */
-function running(detect: Decoding["detect"], frame: Decoding["frame"] = () => FRAME): Running {
+function running(
+  detect: Decoding["detect"],
+  frame: Decoding["frame"] = () => FRAME,
+  onCode: Decoding["onCode"] = () => {},
+): Running {
   const detecting = vi.fn(detect);
-  const onCode = vi.fn();
-  const stop = decodeLoop({ detect: detecting, frame, onCode });
-  return { detect: detecting, onCode, stop };
+  const coded = vi.fn(onCode);
+  const onFailure = vi.fn();
+  const stop = decodeLoop({ detect: detecting, frame, onCode: coded, onFailure });
+  return { detect: detecting, onCode: coded, onFailure, stop };
 }
 
 /** Let the interval fire `ticks` times, and every decode it started settle. */
@@ -132,5 +139,73 @@ describe("the decode loop", () => {
 
     expect(vi.getTimerCount()).toBe(0);
     expect(scan.detect).not.toHaveBeenCalled();
+  });
+
+  it("reads a handful of refusals as frames, not as a dead scanner", async () => {
+    // Most frames are a shelf or a label mid-focus. A run shorter than the
+    // limit is the ordinary case and must stay silent.
+    const { onFailure } = running(() => Promise.reject(new Error("no")));
+
+    await tick(DECODE_FAILURE_LIMIT - 1);
+
+    expect(onFailure).not.toHaveBeenCalled();
+  });
+
+  it("says the scanner has stopped once refusals stop looking like luck", async () => {
+    const { onFailure, detect } = running(() => Promise.reject(new Error("no")));
+
+    await tick(DECODE_FAILURE_LIMIT);
+
+    expect(onFailure).toHaveBeenCalled();
+    // Stopped, not merely reported: a lens kept powered for a decoder that
+    // cannot read costs battery for nothing.
+    const calls = detect.mock.calls.length;
+    await tick(5);
+    expect(detect.mock.calls).toHaveLength(calls);
+  });
+
+  it("forgets the run of refusals as soon as a frame decodes", async () => {
+    let refuse = true;
+    const { onFailure } = running(() =>
+      refuse ? Promise.reject(new Error("no")) : Promise.resolve(found("NM-1")),
+    );
+
+    await tick(DECODE_FAILURE_LIMIT - 1);
+    refuse = false;
+    await tick(1);
+    refuse = true;
+    await tick(DECODE_FAILURE_LIMIT - 1);
+
+    expect(onFailure).not.toHaveBeenCalled();
+  });
+
+  it("says so when the frame source throws, rather than rejecting into nothing", async () => {
+    // Deliberately outside the swallow, because it is a bug rather than a bad
+    // frame -- but the interval callback is async, so it used to leave as an
+    // unhandled rejection five times a second that no error boundary saw.
+    const { onFailure } = running(
+      () => Promise.resolve(found("NM-1")),
+      () => {
+        throw new Error("the canvas is tainted");
+      },
+    );
+
+    await tick(1);
+
+    expect(onFailure).toHaveBeenCalled();
+  });
+
+  it("says so when onCode throws", async () => {
+    const { onFailure } = running(
+      () => Promise.resolve(found("NM-1")),
+      () => FRAME,
+      () => {
+        throw new Error("the cart blew up");
+      },
+    );
+
+    await tick(1);
+
+    expect(onFailure).toHaveBeenCalled();
   });
 });
