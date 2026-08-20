@@ -56,10 +56,25 @@ here; run `bd prime` if you need it and it is missing.
 
 ## Git
 
-Do not commit, push, or run `bd dolt push` unless explicitly asked. When you are
-asked to, load `.agents/skills/commits/SKILL.md` first and follow it. When
-finishing, report changed files, what you validated, and the commands you would
-run next.
+Work reaches `main` the way [Pull requests](DEVELOPERS.md#pull-requests)
+describes. Read it before starting a batch; do not reconstruct it from here.
+
+What you may do on your own, and what you must ask for first:
+
+| | |
+| --- | --- |
+| On a `batch/*` branch, without asking | Commit, push, open and update the pull request, post findings to it, reply to and resolve its threads, `push --force-with-lease` when collapsing an issue's own commits |
+| Ask first, every time | Merging, anything touching `main` directly, a bare `push --force`, `bd dolt push`, and any change to repository or branch settings |
+
+The line is what a mistake costs. A batch branch is proposed work: it can be
+rewritten or thrown away and the repository is untouched, and every step of it
+is visible in the pull request as it happens. `--force-with-lease` is on the
+free side because the lease is the guard — it refuses if anything arrived since
+you last fetched, so it cannot overwrite work you have not seen. A bare
+`--force` has no such guard and so it asks.
+
+When finishing, report changed files, what you validated, and the commands you
+would run next.
 
 ## Shell
 
@@ -77,6 +92,7 @@ Read these only when the task needs them. Do not load them pre-emptively.
 | Images, Helm chart, Kubernetes, CodeNOW | `.agents/skills/deploy/SKILL.md` |
 | beads workflow detail | `.agents/skills/beads/SKILL.md` |
 | Landing work — what one commit holds, and its message | `.agents/skills/commits/SKILL.md` |
+| Running a batch through review, and merging it | `.agents/skills/pull-requests/SKILL.md` |
 | Why something is built a certain way | [docs/decisions/](docs/decisions/) |
 
 `CLAUDE.md`, `CODEX.md`, and `GEMINI.md` are symlinks to this file. Edit this

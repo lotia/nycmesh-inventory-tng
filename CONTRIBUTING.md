@@ -37,6 +37,10 @@ You are not required to use beads. Nothing in this project should be workable
    [Commits](DEVELOPERS.md#commits) describes.
 5. Open a pull request describing what changed and why.
 
+Review happens on the pull request, and everything reaches `main` through one.
+Read [Pull requests](DEVELOPERS.md#pull-requests) before you start — it changes
+how you will want to arrange your commits.
+
 Small pull requests get reviewed faster than large ones. A change that only
 fixes a confusing sentence in the docs is a genuinely useful contribution.
 
