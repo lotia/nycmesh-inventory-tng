@@ -93,7 +93,7 @@ expect 0 "No prose repeated" "a symlink is not a second copy of its target"
 scene
 printf '# One\n\n%s\n' "$PASSAGE" > one.md
 printf '# Two\n\n%s\n' "$PASSAGE" > two.md
-printf '# allowed on purpose\n%s\n' "$PASSAGE" > scripts/check-docs.allow
+printf 'one.md\ntwo.md\n%s\n' "$PASSAGE" > scripts/check-docs.allow
 expect 0 "No prose repeated" "an allowed passage is allowed"
 
 # The window that finds a repeated stretch can reach past either end of the
@@ -101,9 +101,59 @@ expect 0 "No prose repeated" "an allowed passage is allowed"
 scene
 printf '# One\n\nBefore it. %s Also after it.\n' "$PASSAGE" > one.md
 printf '# Two\n\nBefore it. %s Also after it.\n' "$PASSAGE" > two.md
-printf '%s\n' "Before it. $PASSAGE Also after it." > scripts/check-docs.allow
+printf 'one.md\ntwo.md\n%s\n' "Before it. $PASSAGE Also after it." > scripts/check-docs.allow
 expect 0 "No prose repeated" "an allowance covers the words either side of it"
 
+# See scripts/check-docs.allow on what an allowance covers.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+printf '# Two\n\n%s\n' "$PASSAGE" > two.md
+printf '# Three\n\n%s\n' "$PASSAGE" > three.md
+printf 'one.md\ntwo.md\n%s\n' "$PASSAGE" > scripts/check-docs.allow
+expect 1 "three.md" "a third copy is refused though the first two are allowed"
+
+# And an allowance nothing matches is a baseline that has outlived its debt.
+scene
+printf '# One\n\nSomething entirely its own, at length, about a subject.\n' > one.md
+printf '# Two\n\nA different thing altogether, said differently, at length.\n' > two.md
+printf 'one.md\ntwo.md\n%s\n' "$PASSAGE" > scripts/check-docs.allow
+expect 0 "no longer repeat each other" "an allowance that matches nothing is reported"
+
+# The case that made the old report wrong -- see check-docs.sh on why a third
+# copy is what breaks reading staleness off the collisions.
+scene
+printf '# a\n\n%s\n' "$PASSAGE" > a.md
+printf '# b\n\n%s\n' "$PASSAGE" > b.md
+printf '# c\n\n%s\n' "$PASSAGE" > c.md
+printf 'b.md\nc.md\n%s\n' "$PASSAGE" > scripts/check-docs.allow
+output=$(staged_check)
+status=$?
+if [[ "$output" != *"no longer repeat"* ]]; then
+  pass "an allowance is not called stale while its files still repeat"
+else
+  fail_case "an allowance is not called stale while its files still repeat" "$output"
+fi
+assert "$output" "$status" 1 "a.md" "and the third copy is still reported"
+
+# An unrelated duplication between the same two files used to hide a genuinely
+# spent allowance.
+scene
+printf '# One\n\n%s\n\n%s\n' "$SECOND" "Filler that is entirely its own and says nothing twice." > one.md
+printf '# Two\n\n%s\n\n%s\n' "$SECOND" "Different filler, also its own, also saying nothing twice." > two.md
+printf 'one.md\ntwo.md\n%s\n' "$PASSAGE" > scripts/check-docs.allow
+expect 1 "no longer repeat each other" "a spent allowance is reported even when the pair collides otherwise"
+
+# An entry in the old one-paragraph form parses as two paths and no passage.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+printf '# Two\n\n%s\n' "$PASSAGE" > two.md
+printf '%s\n' "$PASSAGE" > scripts/check-docs.allow
+expect 1 "not in the documented form" "an allowance in the old form is said, not swallowed"
+
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+printf 'one.md\nnowhere.md\n%s\n' "$PASSAGE" > scripts/check-docs.allow
+expect 0 "which is not read here" "an allowance naming a file nothing reads is said"
 # --words, which no case could express until `expect` learned to carry a value.
 # A shorter window finds what twelve would step over.
 scene

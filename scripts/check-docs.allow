@@ -2,10 +2,16 @@
 # DEVELOPERS.md#1-one-topic-one-place for when an entry here is the right
 # answer, which is seldom.
 #
-# Passages are separated by a blank line, so one may be wrapped across several
-# lines. A comment line is ignored.
+# One paragraph per allowance: the two files it covers, one per line, then the
+# passage. The pair is what makes it deliberate -- a third copy is news
+# whatever those two agreed -- and an allowance nothing matches is reported, so
+# the baseline cannot outlive the repetition it recorded.
 
 # inventory-tng-enh -- two passages that predate this checker.
+README.md
+docs/decisions/0008-stock-ledger-transfer-graph.md
 because there is no other way to say the shelf disagrees with the sheet
 
+docs/briefs/authorisation.md
+docs/decisions/0014-one-interface.md
 the same application, with Django's admin kept as a fallback. Signing in does not navigate anywhere else; it changes what the interface offers. The item list gains editing

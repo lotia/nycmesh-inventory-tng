@@ -82,27 +82,47 @@ def runs(words: list[str]):
 # a repeated stretch of text is found through whichever window happens to
 # straddle it, and that window can reach a word or two past either end of the
 # line written here.
-def allowances(text: str) -> list[str]:
-    """Blank-line-separated paragraphs, so a passage may be wrapped."""
+def allowances(text: str) -> tuple[list[tuple[frozenset[str], str]], list[str]]:
+    """The pairs of files each allowed passage was granted for, and its prose.
+
+    See scripts/check-docs.allow for how an entry is written.
+    """
     body = "\n".join(
         line for line in text.splitlines() if not line.lstrip().startswith("#")
     )
-    return [prose(p) for p in re.split(r"\n\s*\n", body) if p.strip()]
+    out: list[tuple[frozenset[str], str]] = []
+    bad: list[str] = []
+    for paragraph in re.split(r"\n\s*\n", body):
+        lines = [ln for ln in paragraph.splitlines() if ln.strip()]
+        if not lines:
+            continue
+        paths = [ln.strip() for ln in lines[:2]]
+        passage = " ".join(lines[2:])
+        # Said rather than skipped: a mistyped entry that does nothing leaves
+        # the run failing and still telling you to add one.
+        if len(paths) < 2 or not passage.strip():
+            bad.append(lines[0])
+            continue
+        out.append((frozenset(paths), prose(passage)))
+    return out, bad
 
 
-# Shingled with the same window as everything else, so an allowance is a set
-# lookup rather than a scan of every passage. It is also the more exact test:
-# plain containment would let a window match across a word boundary, allowing
-# "man example of" because some passage contains "human example of".
-allowed = {
-    run
-    for passage in (allowances(ALLOW.read_text()) if ALLOW.exists() else [])
-    for run in runs(passage.split())
-}
+# Shingled with the same window as everything else, so an allowance is a
+# dictionary lookup rather than a scan of every passage. It is also the more
+# exact test: plain containment would let a window match across a word
+# boundary, allowing "man example of" because a passage contains "human
+# example of".
+granted, malformed = allowances(ALLOW.read_text()) if ALLOW.exists() else ([], [])
+
+allowed: dict[str, list[frozenset[str]]] = {}
+for pair, passage in granted:
+    for run in runs(passage.split()):
+        allowed.setdefault(run, []).append(pair)
 
 seen: dict[str, tuple[str, int]] = {}
 hits: dict[tuple[str, str], list[tuple[int, int]]] = {}
 where: dict[str, list[str]] = {}
+shingles: dict[str, set[str]] = {}
 
 for name in sys.argv[1:]:
     path = pathlib.Path(name)
@@ -116,13 +136,17 @@ for name in sys.argv[1:]:
     where[name] = words
     # A file only duplicates another file. A phrase repeated inside one
     # document is a writing problem, not a single-source-of-truth problem.
-    local = set()
+    local: set[str] = set()
+    shingles[name] = local
     for i, run in enumerate(runs(words)):
-        if run in local or run in allowed:
+        if run in local:
             continue
         local.add(run)
         if run in seen:
-            hits.setdefault((seen[run][0], name), []).append((seen[run][1], i))
+            first = seen[run][0]
+            if frozenset((first, name)) in allowed.get(run, ()):
+                continue
+            hits.setdefault((first, name), []).append((seen[run][1], i))
         else:
             seen[run] = (name, i)
 
@@ -141,6 +165,25 @@ def passages(marks: list[tuple[int, int]]) -> list[list[int]]:
         else:
             out.append([first, second, 1])
     return out
+
+# An allowance whose repetition is gone is a baseline outliving its debt, and
+# saying so is what stops it. Asked of the allowance itself rather than of what
+# collided: with a third copy in play the two allowed files never collide with
+# each other -- both collide with the third -- and reading that as "they no
+# longer repeat" is exactly backwards.
+for line in malformed:
+    print("note an allowance is not in the documented form: " + line[:60])
+    print("note   two paths, one per line, then the passage they share")
+
+for pair, passage in granted:
+    absent = [name for name in sorted(pair) if name not in where]
+    if absent:
+        print("note an allowance names " + ", ".join(absent) + ", which is not read here")
+        continue
+    shared = set(runs(passage.split()))
+    if not all(shared & shingles[name] for name in pair):
+        print("note " + " and ".join(sorted(pair)) + " no longer repeat each other:")
+        print("note   the allowance for them can go, with the issue that named it")
 
 if not hits:
     raise SystemExit(0)
