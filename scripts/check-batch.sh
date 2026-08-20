@@ -203,17 +203,19 @@ fi
 #
 # Delegated rather than reimplemented: the summary and trailer rules have one
 # home, and it is the script a contributor runs before committing.
+#
+# --message-only because the tracker cross-check reads a staged diff, and a
+# commit that has already landed has none. Asking for the rules that apply is
+# the whole of it; reading everything and then discarding objections whose
+# wording looked like staging would discard real ones too.
 
 if [[ -x "$CHECK" ]]; then
   for sha in "${commits[@]}"; do
     subject=${subject_of[$sha]:-}
     [[ "$subject" == fixup!* || "$subject" == squash!* ]] && continue
-    if ! output=$("$CHECK" <(printf '%s\n' "${body_of[$sha]:-}") 2>&1); then
-      # The tracker cross-check needs a staged diff, which a landed commit does
-      # not have; only the message rules are meaningful here.
+    if ! output=$("$CHECK" --message-only <(printf '%s\n' "${body_of[$sha]:-}") 2>&1); then
       while IFS= read -r line; do
         [[ "$line" == *"✗"* ]] || continue
-        [[ "$line" == *"staged"* || "$line" == *"tracker"* || "$line" == *"nothing staged"* ]] && continue
         fail "${sha:0:8} ${line#*✗ }"
       done <<<"$output"
     fi
