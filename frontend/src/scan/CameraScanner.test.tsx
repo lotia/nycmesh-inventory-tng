@@ -24,6 +24,7 @@ import { DECODE_INTERVAL_MS } from "./decodeLoop";
 import type { CodeDetector, Decoded } from "./decoder";
 import {
   clearMediaDevices,
+  type Deferred,
   deferred,
   type FakeStream,
   fakeStream,
@@ -51,14 +52,12 @@ const decoder = vi.hoisted(() => {
     loading: Promise.resolve(detector),
     /**
      * Keep the megabyte in flight, the way a phone on a basement connection
-     * does, and answer with the way to let it land.
+     * does, and answer with the two ways it can end.
      */
-    holdDownload(): () => void {
+    holdDownload(): Deferred<typeof detector> {
       const download = deferred<typeof detector>();
       state.loading = download.promise;
-      return () => {
-        download.resolve(detector);
-      };
+      return download;
     },
   };
   return state;
@@ -326,6 +325,21 @@ describe("with a stream granted", () => {
     cameraIsOff(camera.stops);
   });
 
+  it("says so, and lets the lens go, when the decoder never arrives", async () => {
+    // Why the download is handed a handler where it starts rather than where
+    // it is awaited: CameraScanner.tsx. What that must not cost is this -- the
+    // failure still reaches the volunteer, and the lens is still let go.
+    const camera = granting(ONE_CAMERA);
+    const download = decoder.holdDownload();
+    open();
+    await waitFor(() => expect(camera.played).toHaveBeenCalled());
+
+    download.reject(new Error("The scanner could not be downloaded."));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not be downloaded/);
+    cameraIsOff(camera.stops);
+  });
+
   it("names the cameras once permission has let it read them", async () => {
     // Why there are two enumerations is in CameraScanner.tsx. What it buys the
     // volunteer is this: "Camera 2" is something they can pick by trying it,
@@ -347,6 +361,54 @@ describe("with a stream granted", () => {
         "Back Ultra Wide Camera",
       ]);
     });
+  });
+
+  it("ignores a camera list that lands after the volunteer switched lens", async () => {
+    // The second enumeration is not awaited, so the one belonging to the lens
+    // being left is free to land after the one they picked. A browser that
+    // names devices only for the stream it granted answers the older call
+    // without names, and landing late that would put "Camera 1" back in the
+    // picker under their finger.
+    const { stream } = fakeStream();
+    const left = deferred<MediaDeviceInfo[]>();
+    const NAMELESS = [videoInput("wide"), videoInput("back")];
+    const NAMED = [videoInput("wide", "Back Ultra Wide Camera"), videoInput("back", "Back Camera")];
+    let asked = 0;
+    const enumerateDevices = vi.fn(async () => {
+      asked += 1;
+      // One before permission, one for the lens being left -- held open -- and
+      // one for the lens they picked.
+      if (asked === 1) {
+        return NAMELESS;
+      }
+      return asked === 2 ? left.promise : NAMED;
+    });
+    const played = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    stubMediaDevices({ getUserMedia: vi.fn(async () => stream), enumerateDevices });
+
+    open();
+    await screen.findByRole("combobox", { name: /camera/i });
+    await waitFor(() => expect(played).toHaveBeenCalled());
+    // By its positional name, because the enumeration that would have put the
+    // real ones there is the one being held open.
+    pick("Camera 2");
+    await waitFor(() => expect(asked).toBeGreaterThanOrEqual(3));
+    left.resolve(NAMELESS);
+    // A turn of the event loop rather than a `waitFor`: what is being asserted
+    // is that nothing happens, and a `waitFor` that polls until something is
+    // true passes on its first look, before the thing it is watching for has
+    // had a chance to. Everything the stale enumeration would do is a
+    // microtask, and a macrotask is after all of them.
+    await act(async () => {
+      await new Promise((settled) => setTimeout(settled, 0));
+    });
+
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: /camera/i }));
+    const options = within(screen.getByRole("listbox")).getAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual([
+      "Back Ultra Wide Camera",
+      "Back Camera",
+    ]);
   });
 
   it("scans on when the device will not say what cameras it has", async () => {
@@ -378,7 +440,7 @@ describe("with a stream granted", () => {
     // tab -- so the stream is let go of instead and no loop is started at all.
     vi.useFakeTimers();
     const camera = granting(ONE_CAMERA);
-    const landed = decoder.holdDownload();
+    const download = decoder.holdDownload();
     const { unmount } = open();
     await settle();
     // Pinned, or this passes for the reason the late-stream test above already
@@ -388,7 +450,7 @@ describe("with a stream granted", () => {
     unmount();
     const [stop] = camera.stops;
     const stoppedByCleanup = stop.mock.calls.length;
-    landed();
+    download.resolve(decoder.detector);
     await settle();
 
     expect(vi.getTimerCount()).toBe(0);

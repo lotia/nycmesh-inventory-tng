@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { FAKE_CAMERA } from "./camera";
 
 /**
  * Where the label decoder's WebAssembly actually comes from.
@@ -39,9 +40,7 @@ import { expect, test } from "@playwright/test";
 const CDN = /jsdelivr|unpkg|cdnjs|jspm|esm\.sh/i;
 
 test.use({
-  launchOptions: {
-    args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
-  },
+  launchOptions: { args: FAKE_CAMERA },
   permissions: ["camera"],
 });
 

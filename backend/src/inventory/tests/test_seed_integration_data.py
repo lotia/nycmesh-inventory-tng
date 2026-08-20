@@ -67,6 +67,19 @@ def test_the_seeded_volunteer_is_one_the_api_will_accept() -> None:
 
 
 @override_settings(DEBUG=True)
+def test_every_published_name_belongs_to_the_row_published_beside_it() -> None:
+    """The browser suite asserts on what a volunteer reads on screen, so the
+    names come from here rather than being written down a second time there. A
+    name that drifted from its own row would reach that suite as a timeout with
+    nothing to say why.
+    """
+    scene = seed()
+
+    assert scene["item_name"] == Item.objects.get(pk=scene["item"]).name
+    assert scene["volunteer_name"] == Volunteer.objects.get(pk=scene["volunteer"]).display_name
+
+
+@override_settings(DEBUG=True)
 def test_a_duplicate_name_does_not_stop_the_seed() -> None:
     """More than one row can carry this name; the lookup must not assume one."""
     Volunteer.objects.create(display_name="Integration Tester")

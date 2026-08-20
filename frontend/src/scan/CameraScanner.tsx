@@ -10,8 +10,8 @@
  *
  * What no test of this file can reach is the pixels: jsdom has no video
  * pipeline and no WebAssembly runtime, so whether a real frame decodes is
- * verified by pointing a phone at a sticker and by nothing automated -- see
- * the header of testFixtures.ts, which is where that is written down.
+ * answered in a real browser instead -- see the header of testFixtures.ts,
+ * which is where that is written down.
  */
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -138,13 +138,26 @@ export function CameraScanner({ onCode }: { onCode: (code: string) => void }) {
       // permission rather than afterwards, in front of a picture that decodes
       // nothing.
       const detecting = loadDetector();
+      // Given a handler now rather than only at the `await` below. `play()` can
+      // outlive the download, and a promise that rejects while nothing is
+      // watching it is reported to the page as an unhandled rejection before
+      // this function has had its chance to deal with it. The `await` still
+      // throws: this observes the rejection, it does not swallow it.
+      detecting.catch(() => undefined);
       await element.play();
       // The second of the two enumerations described above, for the names
       // permission has now put on the devices. Neither awaited nor allowed to
       // fail the open: the names are a convenience and the decode loop below
-      // is the point.
+      // is the point. Answered only while this open is still the current one,
+      // for the same reason every other await here is: a list enumerated
+      // before the volunteer switched lens is a list without the names the
+      // switch was granted, and landing late it would replace them.
       listCameras()
-        .then(setCameras)
+        .then((found) => {
+          if (live) {
+            setCameras(found);
+          }
+        })
         .catch(() => undefined);
       const detector = await detecting;
       if (!live) {

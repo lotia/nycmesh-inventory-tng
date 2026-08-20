@@ -139,6 +139,11 @@ class Command(BaseCommand):
                 # the browser suite.
                 "volunteer_name": volunteer.display_name,
                 "item": item.pk,
+                # The name as well, for the same reason the volunteer's is
+                # here: the browser suite asserts on what a volunteer reads on
+                # screen, and a name it kept its own copy of would survive a
+                # rename here as a decode timeout with nothing to say why.
+                "item_name": item.name,
                 "location": warehouse.pk,
             }
 

@@ -20,6 +20,7 @@ import { useCart } from "../cart/CartProvider";
 import { SCAN_DEBOUNCE_MS } from "../cart/cartState";
 import { applyCode, type Measured, type Outcome, recordMeasured } from "./applyCode";
 import { confirmScan } from "./confirm";
+import { codeFromScan } from "./deepLink";
 
 /**
  * How long after a code reaches the batch the confirmation is still owed.
@@ -55,7 +56,10 @@ export function useScannedCode(): ScannedCode {
 
   const scan = useCallback(
     (code: string, signal?: AbortSignal) => {
-      const trimmed = code.trim();
+      // Unwrapped here, at the funnel, rather than in the camera: a scanner
+      // gun reads the same symbol and types the same URL, and the debounce
+      // below has to compare codes rather than two spellings of one.
+      const trimmed = codeFromScan(code.trim());
       const now = Date.now();
       // The same window the reducer applies, applied before resolution so it
       // covers the measured item too -- and so a camera holding one label in

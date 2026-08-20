@@ -11,11 +11,12 @@
  *
  * WHAT NO TEST IN THIS DIRECTORY CLAIMS: that a QR code can be read. A fake
  * stream carries no pixels and a canned `rawValue` is a label reading "the
- * decoder said something", not evidence that it would. Nor does any other
- * suite claim it, which is a gap rather than a division of labour and is
- * recorded as one in DEVELOPERS.md "Integration tests".
+ * decoder said something", not evidence that it would. That question is
+ * answered in a real browser, against a real symbol, by
+ * integration/decodes.spec.ts -- and it is worth knowing that when it was
+ * first asked the answer was no.
  */
-import { vi } from "vitest";
+import { type Mock, vi } from "vitest";
 import type { ResolvedLabel } from "../api/types";
 import { zipTies } from "../items/testFixtures";
 
@@ -138,21 +139,30 @@ export const CABLE_LABEL: ResolvedLabel = {
  * defaults to zip ties, which is what PACKET points at; `itemStatus` is for
  * the case where the label resolves and the item behind it does not.
  */
-export function serving(label: unknown, item: unknown = zipTies, itemStatus = 200): void {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (path: string, init?: RequestInit) => {
-      // Honoured, because a caller that gave up is the case applyCode has to
-      // re-throw rather than answer.
-      if (init?.signal?.aborted) {
-        throw new DOMException("aborted", "AbortError");
-      }
-      if (path.startsWith("/api/labels/")) {
-        return new Response(JSON.stringify(label), { status: 200 });
-      }
-      return new Response(JSON.stringify(item), { status: itemStatus });
-    }),
-  );
+export function serving(
+  label: unknown,
+  item: unknown = zipTies,
+  itemStatus = 200,
+  // The signature and not `ReturnType<typeof vi.fn>`: what a test reads off
+  // this is `mock.calls`, and the bare mock type makes every call an `any`
+  // array -- so a path assertion written against the wrong shape would type
+  // -check and then never match.
+): Mock<(path: string, init?: RequestInit) => Promise<Response>> {
+  const fetching = vi.fn(async (path: string, init?: RequestInit) => {
+    // Honoured, because a caller that gave up is the case applyCode has to
+    // re-throw rather than answer.
+    if (init?.signal?.aborted) {
+      throw new DOMException("aborted", "AbortError");
+    }
+    if (path.startsWith("/api/labels/")) {
+      return new Response(JSON.stringify(label), { status: 200 });
+    }
+    return new Response(JSON.stringify(item), { status: itemStatus });
+  });
+  vi.stubGlobal("fetch", fetching);
+  // Answered as well as installed, so a test can say *what* was asked for --
+  // which is how a code arriving wrapped in its own deep link was caught.
+  return fetching;
 }
 
 /** The same, with the label read itself refused. */

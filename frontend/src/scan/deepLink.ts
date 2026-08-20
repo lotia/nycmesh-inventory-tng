@@ -1,15 +1,20 @@
 /**
- * The code a label's QR brought somebody here with.
+ * The label URL grammar: taking a code out of one, however it reached us.
  *
  * Labels encode a URL rather than a bare token, so a phone's own camera app --
  * which is how volunteers scan today, before this app has been opened at all --
  * deep-links into the app instead of showing a meaningless string. The path
  * shape is `/S/{code}` and it is minted in backend/src/inventory/labels.py;
- * see docs/decisions/0011-qr-batch-scanning.md sections 4 and 5.
+ * see docs/decisions/0011-qr-batch-scanning.md sections 3 to 5.
  *
- * One path, read once, with no router. A routing library for a single entry
- * point would be a dependency where three lines will do, and
- * docs/architecture.md makes adding one a decision to record rather than a
+ * That URL reaches this app two ways, which is why both readers live here
+ * rather than one of them beside whatever consumes it: in the address bar, on
+ * arrival, and mid-session as the payload the in-app camera or a scanner gun
+ * just decoded off a sticker.
+ *
+ * The first of those is one path, read once, with no router. A routing library
+ * for a single entry point would be a dependency where three lines will do,
+ * and docs/architecture.md makes adding one a decision to record rather than a
  * thing to do quietly.
  */
 
@@ -36,6 +41,35 @@ export function codeFromPath(pathname: string): string | null {
     // which is what a mistyped address should look like.
     return match[1];
   }
+}
+
+/**
+ * The code in something a scanner read, whatever shape it arrived in.
+ *
+ * The symbol on a label encodes the whole deep link, so a camera or a scanner
+ * gun reading one hands over `HTTPS://INVENTORY.NYCMESH.NET/S/7QK3M2XV9A`
+ * where a person reading the characters printed under it types
+ * `7QK3M2XV9A`. Both are the same sticker and must mean the same thing --
+ * decision 0011 section 3 chose a URL precisely so that a phone's own camera
+ * app could follow it, and this is the other half of that choice.
+ *
+ * Only the path shape is matched, never the host. The client cannot know what
+ * `LABEL_BASE_URL` this deployment prints, and a label printed against one
+ * host and scanned by an app served from another is the ordinary case rather
+ * than an attack -- the server decides whether the code exists, as it does for
+ * a typed one. Anything that is not this shape is handed on untouched, so a QR
+ * belonging to somebody else resolves to nothing and is reported as a code
+ * this system does not know.
+ */
+export function codeFromScan(scanned: string): string {
+  let address: URL;
+  try {
+    address = new URL(scanned);
+  } catch {
+    // Not a URL at all, which is what a typed or wedged code looks like.
+    return scanned;
+  }
+  return codeFromPath(address.pathname) ?? scanned;
 }
 
 /**

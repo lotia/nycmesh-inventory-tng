@@ -43,7 +43,13 @@ needing more than that is a decision worth recording in
 Framework, file location, and the coverage threshold `npm test` enforces are in
 [Testing and coverage](../../../DEVELOPERS.md#testing-and-coverage); the
 frontend thresholds and exclusions themselves live in
-`frontend/vite.config.ts`. One convention that is not written down there:
+`frontend/vite.config.ts`. Two things that are not written down there:
+
+`npm test` does not run everything. The scanner is additionally covered by a
+Playwright suite in `frontend/integration/`, under its own command — see
+[Integration tests](../../../DEVELOPERS.md#integration-tests). It is the only
+thing that can see a camera which decodes nothing, and it has already caught
+one.
 
 Query by role and accessible name (`getByRole("button", { name: /save/i })`)
 rather than by test id or class. It asserts what a user can actually perceive,

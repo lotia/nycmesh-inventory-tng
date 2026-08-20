@@ -1,5 +1,4 @@
-import { execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { manage } from "./django";
 
 /**
  * Migrate and seed before any test runs, and publish what was seeded.
@@ -15,15 +14,6 @@ import { fileURLToPath } from "node:url";
  * values rather than assuming a fresh database hands out 1, or keeping their
  * own copy of a credential the command wrote.
  */
-
-const BACKEND = fileURLToPath(new URL("../../backend", import.meta.url));
-
-function manage(...args: string[]) {
-  return execFileSync("uv", ["run", "python", "src/manage.py", ...args], {
-    cwd: BACKEND,
-    encoding: "utf8",
-  });
-}
 
 export default function globalSetup() {
   manage("migrate", "--noinput");

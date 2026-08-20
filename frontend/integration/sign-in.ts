@@ -1,6 +1,5 @@
-import { execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import { expect, type Page } from "@playwright/test";
+import { uv } from "./django";
 
 /**
  * Signing in, for the tests that need somebody signed in.
@@ -17,7 +16,18 @@ import { expect, type Page } from "@playwright/test";
  * rather than a test account exempted from it.
  */
 
-const BACKEND = fileURLToPath(new URL("../../backend", import.meta.url));
+/**
+ * How long signing in may take, worst case.
+ *
+ * The server accepts each code once for the thirty seconds it is valid, so a
+ * test that signs in straight after another one waits for the next code -- see
+ * `enterCode` below. Playwright's 30s default would report that wait as a
+ * timeout naming the wrong thing.
+ *
+ * Both the suite's timeout and any test that waits for something after signing
+ * in take theirs from here.
+ */
+export const SIGN_IN_MAY_WAIT_FOR_A_FRESH_CODE = 90_000;
 
 /** One value global setup published. Unset means it did not run. */
 export function seeded(name: string): string {
@@ -37,11 +47,7 @@ export function seeded(name: string): string {
  * a subprocess per sign-in, which is cheap next to starting a browser.
  */
 export function authenticatorCode(secret: string): string {
-  return execFileSync(
-    "uv",
-    ["run", "python", "-c", "import sys, pyotp; print(pyotp.TOTP(sys.argv[1]).now())", secret],
-    { cwd: BACKEND, encoding: "utf8" },
-  ).trim();
+  return uv("-c", "import sys, pyotp; print(pyotp.TOTP(sys.argv[1]).now())", secret).trim();
 }
 
 /** The form fields, which allauth renders unlabelled, so by name. */

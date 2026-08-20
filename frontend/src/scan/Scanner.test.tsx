@@ -108,6 +108,20 @@ describe("a code typed or sent by a scanner gun", () => {
     expect(stored().lines[0]).toMatchObject({ name: "Zip Ties Reusable", quantity: 100 });
   });
 
+  it("resolves the deep link a gun reads off the label, not the URL around it", async () => {
+    // Through the typed path deliberately: a gun reads the same symbol as the
+    // camera and types the same URL, so the unwrap belongs to the funnel both
+    // arrive at rather than to the camera. Why the symbol carries a URL at all
+    // is on `codeFromScan`.
+    const fetched = serving(PACKET);
+    show();
+    wedge(`HTTPS://INVENTORY.NYCMESH.NET/S/${PACKET.code}`);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Added 100 × Zip Ties Reusable");
+    // The code alone reached the resolver, not the URL it was printed inside.
+    expect(fetched.mock.calls.map(([path]) => path)).toContain(`/api/labels/${PACKET.code}`);
+  });
+
   it("empties the box, because the gun sends the next code straight after", async () => {
     serving(PACKET);
     show();

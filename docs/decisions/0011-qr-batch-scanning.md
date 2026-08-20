@@ -124,7 +124,13 @@ dependency whose maintainer has publicly stopped.
 
 **A URL, not a bare token**, because pointing a phone's built-in camera at a
 bare token produces a meaningless string; the URL deep-links into the app
-instead. **Uppercase**, because URL schemes and hostnames are case-insensitive
+instead. Every other reader of the symbol is handed that URL too, so the
+obligation is the app's: the in-app camera and a wedge scanner both receive
+`HTTPS://…/S/{code}` where a person types `{code}`, and both must take the code
+out of it before resolving. The client owns that unwrapping and not the
+resolver, because `Label.normalise_code` runs on write as well as on read — a
+resolver taught to accept a URL would be a resolver that could store one.
+**Uppercase**, because URL schemes and hostnames are case-insensitive
 and QR alphanumeric mode packs two characters into 11 bits where byte mode
 spends 8 per character. **A one-letter path**, because every character shrinks
 the modules at a fixed label size and small modules are what faded ink destroys
@@ -330,6 +336,9 @@ ordinary catalogue reads specified with the read API rather than here.
   assumes an ordinary browser tab and does not depend on being installed.
 - **`/S/{code}` becomes a client-side route** nginx must serve `index.html` for.
   The existing `try_files` does this, but it is now load-bearing.
+- **Every in-app reader of a symbol unwraps the URL first**, per section 3 —
+  the camera and the scanner gun alike, at the one point every scanned code
+  passes through.
 - **A label generator, with its own tests, is in scope**, or none of the
   printing decisions happen.
 - **Adding to the cart can never be a silent action**, since the quantity is

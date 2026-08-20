@@ -438,13 +438,15 @@ neither the unit suite nor a look at the bundle can answer it. The camera is
 opened against Chromium's fake device, which needs no flag of yours: the spec
 asks for it.
 
-**Nothing anywhere decodes a QR code.** That fake device is opened to watch
-where the binary is fetched from and for nothing else, and no suite feeds it a
-frame carrying a real symbol — so whether a printed sticker actually reads is
-still established by pointing a phone at one. Closing that gap means handing
-Chromium a generated video clip, which is `inventory-tng-qsu`. The unit tests
-say the same thing where somebody writing one would look, in
-`frontend/src/scan/testFixtures.ts`.
+One of them decodes a symbol through a browser, which no other test can. That
+the printed sticker is readable at all is settled in the backend suite, which
+decodes what the label generator drew with a different implementation from the
+one that drew it; what nothing could reach until now is the handoff between a
+camera frame and the decoder, where a scanner can decode nothing while every
+other suite stays green. `integration/decodes.spec.ts` closes that, and its
+header says what it found when it first ran. The clip it films is generated
+during the run rather than committed, and needs no ffmpeg and no container;
+how, and why, is in `frontend/integration/qrVideo.ts`.
 
 They need Docker (for PostgreSQL) and a one-off browser download:
 
