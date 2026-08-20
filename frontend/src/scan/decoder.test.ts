@@ -11,7 +11,18 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 /** Set when the ponyfill module is first evaluated, which is the whole point. */
-const imported = vi.hoisted(() => ({ count: 0, overrides: null as unknown }));
+const imported = vi.hoisted(() => ({
+  count: 0,
+  overrides: null as unknown,
+  /** How many times the decoder has actually been built. */
+  attempts: 0,
+  /**
+   * Set by the tests that want a build to fail. The module factory itself runs
+   * once however many times it is imported, so the failure has to come from
+   * inside it -- which is also where a real one comes from.
+   */
+  failWith: null as Error | null,
+}));
 
 vi.mock("barcode-detector/pure", () => {
   imported.count += 1;
@@ -21,6 +32,10 @@ vi.mock("barcode-detector/pure", () => {
       detect = async () => [];
     },
     prepareZXingModule: (options: unknown) => {
+      imported.attempts += 1;
+      if (imported.failWith) {
+        throw imported.failWith;
+      }
       imported.overrides = options;
     },
   };
@@ -90,5 +105,35 @@ describe("the decoder", () => {
     const second = await loadDetector();
 
     expect(second).toBe(first);
+  });
+
+  it("forgets a download that failed, so the next scan tries again", async () => {
+    // A promise that rejected was kept as firmly as one that resolved, so a
+    // single flaky moment made the scanner permanently useless: every later
+    // scan replayed the same rejection without asking the network, and only a
+    // reload nobody would think of cured it.
+    const { forgetDetector, loadDetector } = await import("./decoder");
+    forgetDetector();
+
+    imported.failWith = new Error("the chunk is no longer served");
+    await expect(loadDetector()).rejects.toThrow("the chunk is no longer served");
+
+    const before = imported.attempts;
+    imported.failWith = null;
+    const recovered = await loadDetector();
+
+    expect(recovered).toBeDefined();
+    expect(imported.attempts).toBeGreaterThan(before);
+  });
+
+  it("does not start a second download while the first is still in flight", async () => {
+    const { forgetDetector, loadDetector } = await import("./decoder");
+    forgetDetector();
+
+    const before = imported.attempts;
+    const [first, second] = await Promise.all([loadDetector(), loadDetector()]);
+
+    expect(second).toBe(first);
+    expect(imported.attempts).toBe(before + 1);
   });
 });
