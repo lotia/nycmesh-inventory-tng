@@ -748,7 +748,9 @@ passed its own checks:
    so CI runs per issue rather than once at the end.
 3. Repeat for the next issue in the batch.
 
-Mark the pull request ready when the batch is complete and CI is green.
+Mark the pull request ready when the batch is complete and CI is green. What
+the batch holds is posted there as a comment, read off the commits rather than
+typed, so the list is the one that was checked.
 
 ### One review pass, findings filed per issue
 
