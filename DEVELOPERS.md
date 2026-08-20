@@ -790,8 +790,10 @@ left to discipline is
 That setting, and what `main` accepts, are GitHub's rather than the
 repository's, so they are written down as `scripts/repo-settings.sh` rather than
 left as something somebody once clicked. `--check` reports what has drifted;
-running it without puts it back. Run it after adding a job to CI that ought to
-be required.
+running it without puts it back, which is what to do after adding or renaming a
+job in CI that ought to be required. A weekly job runs `--check` and reports,
+so drift is found rather than remembered — and it runs on any pull request that
+touches CI's job names, because those decide what `main` requires.
 
 Within a *single* issue, collapsing is fine and often better. Do it on the
 branch before merging, and only once every review thread is resolved:

@@ -31,6 +31,7 @@ case "$*" in
     fi
     ;;
   *"repo view"*) echo "someone/somewhere" ;;
+  *".permissions.admin"*) cat "$STUBS/admin" ;;
   *)
     # repos/<x> with a --jq that selects the four merge flags as TSV
     cat "$STUBS/merge.tsv"
@@ -42,6 +43,7 @@ export PATH="$WORK/bin:$PATH"
 export STUBS="$WORK"
 
 merge() { printf '%s\n' "$1" > "$WORK/merge.tsv"; }
+admin() { printf '%s\n' "$1" > "$WORK/admin"; }
 RIGHT=$'false\tfalse\ttrue\ttrue'
 protection() { cat > "$WORK/protection.json"; }
 unprotected() { : > "$WORK/protection.json"; }
@@ -64,15 +66,30 @@ check "$CHECK" --check someone/somewhere
 
 echo "repo-settings.sh"
 
+admin true
 merge "$RIGHT"
 protection <<<"$GOOD"
 expect 0 "Settings are as this repository expects" "settings that match are accepted"
 
+# See repo-settings.sh on a field the API omits. This is what the scheduled
+# job did on its first real run: reported all four as wrong.
+admin false
+merge "$(printf '\t\t\t')"
+protection <<<"$GOOD"
+expect 0 "cannot read the merge methods" "merge flags that could not be read are said, not called wrong"
+
 # gh writes the 404 body to stdout, so this is only reachable by reading its
 # exit status. Getting it wrong produced six "-- is null" lines and a jq error.
+admin true
 merge "$RIGHT"
 unprotected
 expect 1 "main is not protected" "an unprotected main is said plainly, once"
+
+# See repo-settings.sh: the same 404 reaches a token that simply may not look.
+admin false
+merge "$RIGHT"
+unprotected
+expect 0 "cannot read branch protection" "a token that cannot look is told so, not alarmed"
 
 merge $'true\tfalse\ttrue\ttrue'
 protection <<<"$GOOD"

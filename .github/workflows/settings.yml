@@ -1,0 +1,44 @@
+name: Settings
+
+# scripts/repo-settings.sh exists because settings left as something somebody
+# once clicked drift unnoticed. Shipping it as a script somebody remembers to
+# run leaves that failure mode intact one level up, so this runs it.
+#
+# --check only: it reports and changes nothing. Putting settings back is a
+# deliberate act, and one that wants a person to have read what drifted first.
+#
+# The settings that cannot be enforced from inside the repository at all --
+# enforce_admins, allow_force_pushes, required_linear_history -- are the ones
+# whose silent loss costs the most, which is the whole reason for the schedule.
+# See DEVELOPERS.md#pull-requests
+
+on:
+  schedule:
+    # Monday morning, so a week's drift is found before the week's work.
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+  pull_request:
+    # A job renamed or added in CI changes what main should require, and
+    # repo-settings.sh reads those names out of the workflow. This catches the
+    # rename that would otherwise un-require a check silently.
+    paths:
+      - .github/workflows/ci.yml
+      - scripts/repo-settings.sh
+      - scripts/ci-check-names.py
+
+permissions:
+  contents: read
+
+jobs:
+  settings:
+    name: Repository settings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # GITHUB_TOKEN cannot read branch protection. Set SETTINGS_READ_TOKEN to
+      # one with Administration: read; without it the script says it could not
+      # look rather than that nothing had drifted.
+      - name: Check the settings against the repository
+        env:
+          GH_TOKEN: ${{ secrets.SETTINGS_READ_TOKEN || github.token }}
+        run: scripts/repo-settings.sh --check
