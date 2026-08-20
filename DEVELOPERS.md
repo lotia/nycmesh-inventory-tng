@@ -657,7 +657,7 @@ What changed, what was added, what was removed — in enough detail that
 somebody reading the history a year from now knows what this did to the
 repository, and no more.
 
-Closes inventory-tng-abc
+Closes: inventory-tng-abc
 ```
 
 - **The summary line names its issue, then says what changed in at most 50
@@ -674,9 +674,12 @@ Closes inventory-tng-abc
   [pull request](#pull-requests). *Why* something is built the way it is
   belongs in [docs/decisions/](docs/decisions/), and is linked rather than
   retold.
-- **A trailer naming that same issue in full** — `Closes inventory-tng-abc` on
-  the commit that completes it, `Refs inventory-tng-abc` on one that only
-  advances it. A GitHub issue is named the same way, `Closes #123`, because
+- **A trailer naming that same issue in full** — `Closes: inventory-tng-abc` on
+  the commit that completes it, `Refs: inventory-tng-abc` on one that only
+  advances it. The colon is not decoration: git parses `Key: value` and nothing
+  else, so without it `git log --format='%(trailers)'` finds nothing and only a
+  bespoke script can answer "what did this issue do?". GitHub accepts the colon
+  for its own closing keywords, so `Closes: #123` names a GitHub issue, because
   [beads is not required to contribute](#issue-tracking). Every trailer on a
   message names the *same* issue, and at most one closes it; that is what makes
   "one issue per commit" something a machine can check. Follow-up issues raised
