@@ -35,7 +35,11 @@ ignored/
 # contributors' tokens). See .claude/settings.local.json.
 .claude/settings.local.json
 .claude/hooks/
-.claude/.landing-receipt.json
+# Whatever the local gate is calling its receipt. It was .landing-receipt.json
+# until the gate moved onto the merge and started keying them by pull request,
+# and a name that changes is a name to match rather than to list.
+.claude/*receipt*
+.claude/**/*receipt*
 
 # Agent worktrees: separate checkouts, never part of a commit.
 .claude/worktrees/
