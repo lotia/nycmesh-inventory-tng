@@ -90,6 +90,26 @@ export interface ResolvedLabel {
   location: number | null;
 }
 
+/**
+ * One label as the cached map carries it.
+ *
+ * Not `ResolvedLabel`. `LabelMapSerializer` drops `revoked_at`, because the
+ * map is live labels only and the field would say null a few hundred times --
+ * so a row from here is *not revoked by construction*, and reading the missing
+ * field off one would warn about every good sticker in the building. It
+ * carries the item's name and unit instead, which is what a cart line needs
+ * and what saves the client holding the whole catalogue as well.
+ */
+export interface MappedLabel {
+  code: string;
+  kind: "item" | "location";
+  quantity: string;
+  item: number | null;
+  location: number | null;
+  item_name: string | null;
+  unit_of_measure: string | null;
+}
+
 /** One thing wrong with a submitted batch, and where. */
 export interface BatchError {
   /** The position in the submitted movements, or null for the batch itself. */

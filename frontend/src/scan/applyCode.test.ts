@@ -6,15 +6,23 @@
  * a label that resolves to nothing at all, and a caller that gives up while the
  * request is in flight.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cable } from "../items/testFixtures";
 import { applyCode, countsItself, recordMeasured } from "./applyCode";
+import { forgetLabelCache, refreshLabelCache } from "./labelCache";
 import { CABLE_LABEL, PACKET, serving } from "./testFixtures";
 
 /** How `fetch` rejects a request whose signal was aborted. */
 function aborted(): never {
   throw new DOMException("aborted", "AbortError");
 }
+
+beforeEach(() => {
+  // Every case below asserts what reaches the network, so none of them may
+  // start with a cache left behind by another.
+  localStorage.clear();
+  forgetLabelCache();
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -126,5 +134,47 @@ describe("a measured item", () => {
     expect(countsItself("each")).toBe(true);
     expect(countsItself("metre")).toBe(false);
     expect(countsItself("foot")).toBe(false);
+  });
+});
+
+describe("a code the client has already seen", () => {
+  it("becomes a cart line with no request at all", async () => {
+    // Decision 0011 section 6, and the reason /api/labels is unpaginated:
+    // twenty-four scans in a basement were forty-eight requests.
+    const fetching = serving(PACKET);
+    await refreshLabelCache();
+    const filling = fetching.mock.calls.length;
+    const dispatch = vi.fn();
+
+    const outcome = await applyCode(PACKET.code, dispatch);
+
+    expect(outcome).toMatchObject({ applied: "item" });
+    expect(dispatch).toHaveBeenCalled();
+    expect(fetching.mock.calls).toHaveLength(filling);
+  });
+
+  it("does not tell the volunteer a good sticker needs reprinting", async () => {
+    // The map is live labels only and LabelMapSerializer drops revoked_at, so
+    // reading it off a cached row made `undefined !== null` true and warned
+    // about every sticker in the building.
+    serving(PACKET);
+    await refreshLabelCache();
+
+    const outcome = await applyCode(PACKET.code, vi.fn());
+
+    expect(outcome).toMatchObject({ applied: "item", revoked: false });
+  });
+
+  it("still resolves a code minted since the cache was filled", async () => {
+    const fetching = serving(PACKET);
+    await refreshLabelCache();
+    const filling = fetching.mock.calls.length;
+
+    const outcome = await applyCode("NEVER-SEEN-BEFORE", vi.fn());
+
+    // Not in the cache, so it went and asked -- which is the fallback that
+    // keeps a fresh label scannable.
+    expect(fetching.mock.calls.length).toBeGreaterThan(filling);
+    expect(outcome).toMatchObject({ applied: "item" });
   });
 });

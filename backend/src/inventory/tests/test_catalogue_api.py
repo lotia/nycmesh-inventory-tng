@@ -315,4 +315,49 @@ def test_the_cached_map_omits_a_field_it_would_always_repeat(client: Client, ite
     entry = results(client.get(reverse("labels")))[0]
 
     assert "revoked_at" not in entry
-    assert set(entry) == {"code", "kind", "quantity", "item", "location"}
+    assert set(entry) == {
+        "code",
+        "kind",
+        "quantity",
+        "item",
+        "location",
+        "item_name",
+        "unit_of_measure",
+    }
+
+
+def test_the_cached_map_carries_what_a_cart_line_needs(client: Client, item: Item) -> None:
+    """Otherwise the client holds the whole catalogue too, which is paginated.
+
+    Forty bytes a row here against four round trips and eighty kilobytes of
+    balances and labels for three fields per item.
+    """
+    Label.objects.create(code="AAA1110000", item=item)
+
+    entry = results(client.get(reverse("labels")))[0]
+
+    assert entry["item_name"] == item.name
+    assert entry["unit_of_measure"] == item.unit_of_measure
+
+
+def test_a_location_label_in_the_map_names_no_item(client: Client, warehouse: Location) -> None:
+    """A wall code sets where the batch is; there is no item to name."""
+    Label.objects.create(code="WA11110000", location=warehouse)
+
+    entry = next(row for row in results(client.get(reverse("labels"))) if row["code"] == "WA11110000")
+
+    assert entry["item_name"] is None
+    assert entry["unit_of_measure"] is None
+
+
+def test_the_map_does_not_query_once_per_label(
+    client: Client,
+    item: Item,
+    django_assert_max_num_queries: Any,
+) -> None:
+    """The item is joined, not walked: a few hundred rows is one response."""
+    for index in range(5):
+        Label.objects.create(code=f"AAA111000{index}", item=item)
+
+    with django_assert_max_num_queries(6):
+        client.get(reverse("labels"))

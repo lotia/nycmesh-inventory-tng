@@ -887,7 +887,9 @@ class CategoryDetailView(DetailView):
 # caches is the second; resolving a scanned code reads the first, because a
 # revoked sticker still says what it pointed at.
 LABELS = Label.objects.all()
-LIVE_LABELS = Label.objects.live().order_by("code")
+# select_related, because the map now carries the item's name and unit: a few
+# hundred rows would otherwise be a few hundred queries behind one response.
+LIVE_LABELS = Label.objects.live().select_related("item").order_by("code")
 
 
 class LabelListView(ReadsAndWritesDiffer, ListCreateAPIView):

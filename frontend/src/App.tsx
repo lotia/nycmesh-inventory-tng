@@ -1,12 +1,14 @@
 import Container from "@mui/material/Container";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { useEffect } from "react";
 import { SessionProvider } from "./admin/SessionProvider";
 import { StaleSession } from "./admin/StepUp";
 import { SubmitBar } from "./batch/SubmitBar";
 import { CartProvider } from "./cart/CartProvider";
 import { ItemList } from "./items/ItemList";
 import { DeepLink } from "./scan/DeepLink";
+import { refreshLabelCache } from "./scan/labelCache";
 import { Scanner } from "./scan/Scanner";
 import { VolunteerPicker } from "./volunteers/VolunteerPicker";
 
@@ -25,6 +27,17 @@ import { VolunteerPicker } from "./volunteers/VolunteerPicker";
  * what decides whether the administrative controls are drawn at all.
  */
 export default function App() {
+  // The label map and the catalogue, once, so a scan resolves without a round
+  // trip from a basement -- which is what decision 0011 section 6 asks for and
+  // what the unpaginated endpoints exist to serve. Deliberately not awaited
+  // and deliberately not shown: a volunteer can scan before it lands, and a
+  // failure only means the scanner is slower. See scan/labelCache.ts.
+  useEffect(() => {
+    const stop = new AbortController();
+    void refreshLabelCache(stop.signal);
+    return () => stop.abort();
+  }, []);
+
   return (
     <SessionProvider>
       <CartProvider>

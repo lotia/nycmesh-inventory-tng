@@ -17,7 +17,7 @@
  * first asked the answer was no.
  */
 import { type Mock, vi } from "vitest";
-import type { ResolvedLabel } from "../api/types";
+import type { Item, ResolvedLabel } from "../api/types";
 import { zipTies } from "../items/testFixtures";
 
 /** One video input, as `enumerateDevices` reports it. */
@@ -154,6 +154,15 @@ export function serving(
     if (init?.signal?.aborted) {
       throw new DOMException("aborted", "AbortError");
     }
+    // The unpaginated lists the client caches, before the detail paths: the
+    // detail check below matches a prefix and would otherwise swallow them.
+    // Serving both here means any test can fill the cache from the same
+    // fixture it already reads a single label out of.
+    // The map, in the shape the server sends it. Serving it as a plain
+    // ResolvedLabel let a revoked flag read off a missing field pass here.
+    if (path === "/api/labels") {
+      return new Response(JSON.stringify([mapped(label, item)]), { status: 200 });
+    }
     if (path.startsWith("/api/labels/")) {
       return new Response(JSON.stringify(label), { status: 200 });
     }
@@ -163,6 +172,23 @@ export function serving(
   // Answered as well as installed, so a test can say *what* was asked for --
   // which is how a code arriving wrapped in its own deep link was caught.
   return fetching;
+}
+
+/**
+ * One row of the cached map, as LabelMapSerializer sends it.
+ *
+ * Not a ResolvedLabel: `revoked_at` is dropped, and the item's name and unit
+ * ride along so the client need not hold the catalogue too. Exported so a test
+ * can build a map without restating that shape.
+ */
+export function mapped(label: unknown, item: unknown = zipTies): Record<string, unknown> {
+  const { revoked_at: _dropped, ...rest } = label as Record<string, unknown>;
+  const behind = item as Partial<Item> | null;
+  return {
+    ...rest,
+    item_name: behind?.name ?? null,
+    unit_of_measure: behind?.unit_of_measure ?? null,
+  };
 }
 
 /** The same, with the label read itself refused. */
