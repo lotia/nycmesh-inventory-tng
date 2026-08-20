@@ -154,6 +154,34 @@ scene
 printf '# One\n\n%s\n' "$PASSAGE" > one.md
 printf 'one.md\nnowhere.md\n%s\n' "$PASSAGE" > scripts/check-docs.allow
 expect 0 "which is not read here" "an allowance naming a file nothing reads is said"
+# A script header restating a document is the failure this rule exists for, and
+# the one that used to be invisible.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+mkdir -p scripts
+printf '#!/usr/bin/env bash\n# %s\n' "$PASSAGE" > scripts/thing.sh
+expect 1 "scripts/thing.sh" "a script header restating a document is found"
+
+# A docstring is a comment too.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+mkdir -p scripts
+printf '"""%s"""\n' "$PASSAGE" > scripts/thing.py
+expect 1 "scripts/thing.py" "a docstring restating a document is found"
+
+# Code is not prose, any more than a fenced block is.
+scene
+printf '# One\n\nledger append only row wrong stands somebody works out happened writes compensating\n' > one.md
+mkdir -p scripts
+printf '#!/usr/bin/env bash\nledger append only row wrong stands somebody works out happened writes compensating\n' > scripts/thing.sh
+expect 0 "No prose repeated" "code that reads like the prose is not compared"
+
+# A shebang and a shellcheck directive look like comments and are not.
+scene
+mkdir -p scripts
+printf '#!/usr/bin/env bash\n# shellcheck disable=SC2064\n' > scripts/a.sh
+printf '#!/usr/bin/env bash\n# shellcheck disable=SC2064\n' > scripts/b.sh
+expect 0 "No prose repeated" "directives that only look like comments are skipped"
 # --words, which no case could express until `expect` learned to carry a value.
 # A shorter window finds what twelve would step over.
 scene
