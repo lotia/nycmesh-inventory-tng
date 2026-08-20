@@ -545,6 +545,7 @@ Where each topic lives:
 | Typing requirements | [Typing](#typing) |
 | Testing and coverage requirements | [Testing and coverage](#testing-and-coverage) |
 | What one commit contains, and its message | [Commits](#commits) |
+| How work is reviewed and reaches `main` | [Pull requests](#pull-requests) |
 | How to contribute | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Architecture and technology choices | [docs/architecture.md](docs/architecture.md) |
 | Inventory data model | [docs/data-model.md](docs/data-model.md) |
@@ -609,9 +610,10 @@ fine — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Commits
 
-**One issue, one commit.** A commit contains everything that issue needed and
+**One issue per commit.** A commit contains work from exactly one issue and
 nothing else, so that it can be read, reviewed, reverted and bisected as the
-unit of work it claims to be.
+unit of work it claims to be. An issue may take more than one commit where that
+genuinely reads better; no commit may ever take more than one issue.
 
 That rule settles the awkward cases too:
 
@@ -626,7 +628,7 @@ That rule settles the awkward cases too:
 ### The message
 
 ```
-Summarise the change in the imperative
+abc: Summarise the change in the imperative
 
 What changed, what was added, what was removed — in enough detail that
 somebody reading the history a year from now knows what this did to the
@@ -635,28 +637,34 @@ repository, and no more.
 Closes inventory-tng-abc
 ```
 
-- **The summary line is at most 50 characters**, in the imperative mood
-  ("Extract the decode loop", not "Extracted" or "Extracting"), with no full
-  stop. It is a size check as much as a title: work that cannot be summarised
-  in 50 characters is usually more than one issue, and the answer is to split
-  the issue rather than to lengthen the line.
+- **The summary line names its issue, then says what changed in at most 50
+  characters**, in the imperative mood ("Extract the decode loop", not
+  "Extracted" or "Extracting"), with no full stop. The 50 is measured on the
+  prose after the `abc: ` prefix, because it is a size check as much as a
+  title: work that cannot be summarised in 50 characters is usually more than
+  one issue, and the answer is to split the issue rather than to lengthen the
+  line. Only the distinguishing part of a bead ID is used, for the reason
+  [0017](docs/decisions/0017-review-through-pull-requests.md) gives.
 - **The body says what changed**, wrapped at 72 columns. It is not a diary:
   how the work was done, what was tried first and what a review said are not
-  what a reader of the history needs. *Why* something is built the way it is
+  what a reader of the history needs. A review's findings belong in the
+  [pull request](#pull-requests). *Why* something is built the way it is
   belongs in [docs/decisions/](docs/decisions/), and is linked rather than
   retold.
-- **One trailer naming the issue this commit closes** — `Closes
-  inventory-tng-abc` for a bead, `Closes #123` for a GitHub issue, because
-  [beads is not required to contribute](#issue-tracking). Follow-up issues
-  raised along the way may be created in the same commit — noticing work is
-  honest work — but only one issue may be *closed* by it.
+- **A trailer naming that same issue in full** — `Closes inventory-tng-abc` on
+  the commit that completes it, `Refs inventory-tng-abc` on one that only
+  advances it. A GitHub issue is named the same way, `Closes #123`, because
+  [beads is not required to contribute](#issue-tracking). Every trailer on a
+  message names the *same* issue, and at most one closes it; that is what makes
+  "one issue per commit" something a machine can check. Follow-up issues raised
+  along the way may be created in the same commit — noticing work is honest
+  work — but only one issue may be *closed* by it.
 
 ### Several issues at once
 
-Work them one at a time on a branch, land each as it is finished, and push the
-branch. The branch is the unit of review; the commit stays the unit of work.
-Holding finished issues back to land them together gains nothing and loses the
-ability to revert one of them.
+Work them one at a time on a batch branch and land each as it is finished. The
+pull request is the unit of review; the commit stays the unit of work. See
+[Pull requests](#pull-requests).
 
 ### Checking it
 
@@ -680,6 +688,92 @@ ln -s ../../scripts/check-commit.sh .beads/hooks/commit-msg
 
 History before this section predates it, and is not the example to follow:
 several commits close five issues each.
+
+---
+
+## Pull requests
+
+Nothing reaches `main` except through a pull request, and `main` is protected so
+that there is no other way in.
+
+**One batch, one branch, one pull request.** A batch is the set of issues you
+mean to ship together. Branch from `main` as `batch/<name>`; if the batch is
+more than one issue, group them under an epic in the tracker so that what
+belongs to it is recorded rather than remembered:
+
+```bash
+bd create --type=epic --title="Batch: <name>"   # only when batching
+bd update <issue> --parent=<epic>
+```
+
+A single issue shipping on its own needs no epic. The epic carries one fact —
+which issues are in this pull request — and `bd epic close-eligible` disposes of
+it once they land. `--parent` means batch membership and nothing else; what a
+piece of work is *about* is a label.
+
+### Finish, then publish, then review
+
+Each issue is finished to the [Definition of Done](#definition-of-done) and
+published before anything is reviewed. Nothing is reviewed that has not already
+passed its own checks:
+
+1. Land the issue as its own commit — see [Commits](#commits).
+2. Push to the batch branch. The first push opens the pull request as a draft,
+   so CI runs per issue rather than once at the end.
+3. Repeat for the next issue in the batch.
+
+Mark the pull request ready when the batch is complete and CI is green.
+
+### One review pass, findings filed per issue
+
+The batch is reviewed **once**, against the pull request, and the commentary
+stays there. A commit message says what changed; what a review said is not what
+a reader of the history needs, and putting it in both places would leave two
+records to disagree.
+
+Every finding is attributed to exactly one issue before any of it is fixed,
+because a fix spanning two issues would produce a commit that does:
+
+| The finding | Where the fix belongs |
+| --- | --- |
+| Lands inside the lines one issue introduced | That issue |
+| Touches another issue's code, but one commit is to blame — it was correct until this one arrived | The **later** issue |
+| Exists only as the composition of two or more, and cannot be fixed within either | A **new issue** in the same batch |
+
+The third row is the honest case rather than a workaround: integration work is
+work, and giving it its own issue keeps it revertible on its own. Fixes are then
+applied one issue at a time, each checked and published before the next is
+started, and each recorded against the finding it answers by replying to the
+review comment and resolving it.
+
+If a batch produces that third case twice, the issues were one issue. Merge them
+in the tracker and rewrite the branch rather than fighting it.
+
+Simplification runs afterwards, over the same pull request, under the same
+rules. Its findings are posted to the pull request before they are applied —
+"these three issues each grew the same helper" is the third row by construction.
+
+### Merging
+
+Squash merge and merge commits are disabled on this repository, so the merge
+button cannot collapse a batch into a single commit. **Rebase merge** replays
+each commit onto `main` individually. Why it is arranged that way rather than
+left to discipline is
+[0017](docs/decisions/0017-review-through-pull-requests.md).
+
+Within a *single* issue, collapsing is fine and often better. Do it on the
+branch before merging, and only once every review thread is resolved:
+
+```bash
+git commit --fixup=<that issue's commit>   # while fixing
+git rebase -i --autosquash origin/main     # once, at the end
+git push --force-with-lease
+```
+
+That rebase also brings the branch up to date with `main`, which is required:
+`main` accepts nothing that is behind it or that has a check outstanding, so the
+suite runs again on what will actually land. The merge stays blocked until it is
+green and every conversation is resolved.
 
 ---
 
