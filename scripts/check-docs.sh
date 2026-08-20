@@ -23,6 +23,9 @@ set -uo pipefail
 REPO_ROOT=$(git rev-parse --show-toplevel) || exit 1
 cd "$REPO_ROOT" || exit 1
 
+HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+. "$HERE/report.sh"
+
 WORDS=12
 paths=()
 while [[ $# -gt 0 ]]; do
@@ -44,7 +47,7 @@ fi
 
 ALLOW="$REPO_ROOT/scripts/check-docs.allow"
 
-WORDS="$WORDS" ALLOW="$ALLOW" python3 - "${paths[@]}" <<'PY'
+findings=$(WORDS="$WORDS" ALLOW="$ALLOW" python3 - "${paths[@]}" <<'PY'
 import os, pathlib, re, sys
 
 WORDS = int(os.environ["WORDS"])
@@ -140,24 +143,27 @@ def passages(marks: list[tuple[int, int]]) -> list[list[int]]:
     return out
 
 if not hits:
-    print(f"No prose repeated across files in runs of {WORDS} words or more.")
     raise SystemExit(0)
 
-problems = 0
 for (first, second), marks in sorted(hits.items()):
     for start, _, length in passages(marks):
         # The whole repeated stretch, not the window that happened to find it.
         text = " ".join(where[first][start:start + length + WORDS - 1])
         if len(text) > 160:
             text = text[:157] + "..."
-        print(f"  ✗ {first} and {second} say the same thing:")
-        print(f"      \"{text}\"")
-        problems += 1
+        print(f"fail {first} and {second} say the same thing:")
+        print(f'note     "{text}"')
 
-print()
-print(f"{problems} passage{'s' if problems > 1 else ''} "
-      f"{'live' if problems > 1 else 'lives'} in more than one file.")
-print("Delete one and link to the other -- DEVELOPERS.md#documentation-rules.")
-print("If the repetition is deliberate, add it to scripts/check-docs.allow.")
-raise SystemExit(1)
 PY
+)
+
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  case "$line" in
+    fail\ *) fail "${line#fail }" ;;
+    note\ *) note "${line#note }" ;;
+  esac
+done <<<"$findings"
+
+verdict "No prose repeated across files in runs of $WORDS words or more." \
+  "one of each pair is a link"

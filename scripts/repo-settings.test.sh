@@ -10,13 +10,11 @@
 
 set -uo pipefail
 
-CHECK=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/repo-settings.sh
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
+HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+CHECK="$HERE/repo-settings.sh"
+. "$HERE/testlib.sh"
+workspace
 mkdir -p "$WORK/bin"
-
-passed=0
-failed=0
 
 # The stub answers out of two files the cases below write, and reports the
 # protection call as failing when there is no file for it -- which is what gh
@@ -51,8 +49,7 @@ unprotected() { : > "$WORK/protection.json"; }
 # From the workflow, not typed out again: a fixture that agreed with a copy
 # would pass while the copy and the workflow disagreed, which is the drift this
 # is here to catch.
-CONTEXTS=$(python3 "$(dirname "$CHECK")/ci-check-names.py" \
-  "$(dirname "$CHECK")/../.github/workflows/ci.yml" | jq -Rnc '[inputs]')
+CONTEXTS=$(python3 "$HERE/ci-check-names.py" "$HERE/../.github/workflows/ci.yml" | jq -Rnc '[inputs]')
 
 GOOD='{
   "required_status_checks": {"strict": true, "contexts": '"$CONTEXTS"'},
@@ -63,21 +60,7 @@ GOOD='{
   "allow_force_pushes": {"enabled": false}
 }'
 
-# expect <exit status> <substring> <what this case is called>
-expect() {
-  local want_status=$1 want_text=$2 name=$3 output status
-  output=$("$CHECK" --check someone/somewhere 2>&1)
-  status=$?
-  if [[ "$status" -eq "$want_status" && "$output" == *"$want_text"* ]]; then
-    printf '  ok   %s\n' "$name"
-    passed=$((passed + 1))
-  else
-    printf '  FAIL %s\n' "$name"
-    printf '       wanted exit %s and %q\n' "$want_status" "$want_text"
-    printf '       got exit %s:\n%s\n' "$status" "$output"
-    failed=$((failed + 1))
-  fi
-}
+check "$CHECK" --check someone/somewhere
 
 echo "repo-settings.sh"
 
@@ -111,21 +94,11 @@ expect 1 "the required checks are not the jobs in ci.yml" "a required check that
 # The claim in that message is only true because the names are read out of the
 # workflow. A job added to CI is required from the next run, with nothing to
 # remember.
-scene_names=$(python3 "$(dirname "$CHECK")/ci-check-names.py" \
-  "$(dirname "$CHECK")/../.github/workflows/ci.yml")
-if [[ "$scene_names" == *"One issue per commit"* && "$scene_names" == *"Container images (backend)"* ]]; then
-  printf '  ok   %s\n' "the checks are read from ci.yml, matrix jobs expanded"
-  passed=$((passed + 1))
+names=$(python3 "$HERE/ci-check-names.py" "$HERE/../.github/workflows/ci.yml")
+if [[ "$names" == *"One issue per commit"* && "$names" == *"Container images (backend)"* ]]; then
+  pass "the checks are read from ci.yml, matrix jobs expanded"
 else
-  printf '  FAIL %s\n' "the checks are read from ci.yml, matrix jobs expanded"
-  printf '       got:\n%s\n' "$scene_names"
-  failed=$((failed + 1))
+  fail_case "the checks are read from ci.yml, matrix jobs expanded" "$names"
 fi
 
-echo
-if [[ "$failed" -eq 0 ]]; then
-  echo "$passed passed."
-  exit 0
-fi
-echo "$failed failed, $passed passed."
-exit 1
+verdict

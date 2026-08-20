@@ -13,21 +13,14 @@
 
 set -uo pipefail
 
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 CHECK="$HERE/check-batch.sh"
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
-
-passed=0
-failed=0
+. "$HERE/testlib.sh"
+workspace
 
 scene() {
-  rm -rf "$WORK/repo"
-  mkdir -p "$WORK/repo"
+  new_repo "$WORK/repo"
   cd "$WORK/repo" || exit 1
-  git init -q -b main .
-  git config user.email test@example.invalid
-  git config user.name Test
   echo base > file
   git add -A
   git commit -q -m "base"
@@ -42,26 +35,12 @@ land() {
   git commit -q -F - <<<"$message"
 }
 
-# expect <exit status> <substring> <what this case is called>
-expect() {
-  local want_status=$1 want_text=$2 name=$3 output status
-  output=$("$CHECK" base..HEAD 2>&1)
-  status=$?
-  if [[ "$status" -eq "$want_status" && "$output" == *"$want_text"* ]]; then
-    printf '  ok   %s\n' "$name"
-    passed=$((passed + 1))
-  else
-    printf '  FAIL %s\n' "$name"
-    printf '       wanted exit %s and %q\n' "$want_status" "$want_text"
-    printf '       got exit %s:\n%s\n' "$status" "$output"
-    failed=$((failed + 1))
-  fi
-}
-
 tracker() {
   mkdir -p "$WORK/repo/.beads"
   cat > "$WORK/repo/.beads/issues.jsonl"
 }
+
+check "$CHECK" base..HEAD
 
 echo "check-batch.sh"
 
@@ -101,15 +80,24 @@ land a 'aaa: Extract the decode loop
 
 Closes inventory-tng-aaa
 Refs inventory-tng-bbb'
-output=$(cd "$WORK/repo" && "$CHECK" base..HEAD 2>&1)
+output=$("$CHECK" base..HEAD 2>&1)
 if [[ "$(grep -c 'belongs to one issue' <<<"$output")" -eq 1 ]]; then
-  printf '  ok   %s\n' "one violation is one objection"
-  passed=$((passed + 1))
+  pass "one violation is one objection"
 else
-  printf '  FAIL %s\n' "one violation is one objection"
-  printf '       got:\n%s\n' "$output"
-  failed=$((failed + 1))
+  fail_case "one violation is one objection" "$output"
 fi
+
+# --epic, which no case could express until `expect` learned to carry a value.
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-epic","status":"open"}
+{"_type":"issue","id":"inventory-tng-aaa","status":"closed","dependencies":[{"issue_id":"inventory-tng-aaa","depends_on_id":"inventory-tng-epic","type":"parent-child"}]}
+{"_type":"issue","id":"inventory-tng-bbb","status":"open","dependencies":[{"issue_id":"inventory-tng-bbb","depends_on_id":"inventory-tng-epic","type":"parent-child"}]}
+JSONL
+land a 'aaa: Extract the decode loop
+
+Closes inventory-tng-aaa'
+expect --epic inventory-tng-epic -- 1 "in the batch but not landed here" "the batch can be named rather than inferred"
 
 scene
 land a 'aaa: Extract the decode loop
@@ -165,15 +153,8 @@ scene
 land a 'aaa: Extract the decode loop
 
 Closes inventory-tng-aaa'
-output=$(cd "$WORK/repo" && "$CHECK" deadbeef..HEAD 2>&1)
-if [[ $? -ne 0 && "$output" == *"Cannot read"* ]]; then
-  printf '  ok   %s\n' "an unresolvable range is refused, not called empty"
-  passed=$((passed + 1))
-else
-  printf '  FAIL %s\n' "an unresolvable range is refused, not called empty"
-  printf '       got: %s\n' "$output"
-  failed=$((failed + 1))
-fi
+output=$("$CHECK" deadbeef..HEAD 2>&1)
+assert "$output" $? 1 "Cannot read" "an unresolvable range is refused, not called empty"
 
 scene
 tracker <<'JSONL'
@@ -225,10 +206,4 @@ expect 0 "One commit, one issue" "a malformed tracker line is stepped over"
 scene
 expect 0 "Nothing to check" "an empty range is not a failure"
 
-echo
-if [[ "$failed" -eq 0 ]]; then
-  echo "$passed passed."
-  exit 0
-fi
-echo "$failed failed, $passed passed."
-exit 1
+verdict

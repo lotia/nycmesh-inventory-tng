@@ -9,42 +9,30 @@
 
 set -uo pipefail
 
-CHECK=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-docs.sh
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
-
-passed=0
-failed=0
+HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+CHECK="$HERE/check-docs.sh"
+. "$HERE/testlib.sh"
+workspace
 
 # No commits are made here -- check-docs.sh reads `git ls-files`, so staging is
 # enough -- and it finds the repository from the working directory, so it can be
 # run where it lives.
 scene() {
-  rm -rf "$WORK/repo"
+  new_repo "$WORK/repo"
   mkdir -p "$WORK/repo/scripts"
   cd "$WORK/repo" || exit 1
-  git init -q .
-}
-
-# expect <exit status> <substring> <what this case is called>
-expect() {
-  local want_status=$1 want_text=$2 name=$3 output status
-  git -C "$WORK/repo" add -A >/dev/null 2>&1
-  output=$(cd "$WORK/repo" && "$CHECK" 2>&1)
-  status=$?
-  if [[ "$status" -eq "$want_status" && "$output" == *"$want_text"* ]]; then
-    printf '  ok   %s\n' "$name"
-    passed=$((passed + 1))
-  else
-    printf '  FAIL %s\n' "$name"
-    printf '       wanted exit %s and %q\n' "$want_status" "$want_text"
-    printf '       got exit %s:\n%s\n' "$status" "$output"
-    failed=$((failed + 1))
-  fi
 }
 
 PASSAGE="The ledger is append-only, so a row that is wrong stands until somebody
 works out what happened and writes a compensating one against it."
+
+# What is written has to be staged first: check-docs.sh reads `git ls-files`,
+# which is also why no case here ever commits.
+staged_check() {
+  git -C "$WORK/repo" add -A >/dev/null 2>&1
+  (cd "$WORK/repo" && "$CHECK" "$@")
+}
+check staged_check
 
 echo "check-docs.sh"
 
@@ -89,7 +77,7 @@ shelf outlives the row and somebody will scan it again next winter."
 scene
 printf '# One\n\n%s\n\nUnrelated filler in between.\n\n%s\n' "$PASSAGE" "$SECOND" > one.md
 printf '# Two\n\n%s\n\nDifferent filler entirely.\n\n%s\n' "$PASSAGE" "$SECOND" > two.md
-expect 1 "2 passages live" "both duplications between one pair of files are reported"
+expect 1 "2 things to fix" "both duplications between one pair of files are reported"
 
 # The excerpt is the repeated stretch, not the twelve-word window that found it.
 scene
@@ -116,10 +104,11 @@ printf '# Two\n\nBefore it. %s Also after it.\n' "$PASSAGE" > two.md
 printf '%s\n' "Before it. $PASSAGE Also after it." > scripts/check-docs.allow
 expect 0 "No prose repeated" "an allowance covers the words either side of it"
 
-echo
-if [[ "$failed" -eq 0 ]]; then
-  echo "$passed passed."
-  exit 0
-fi
-echo "$failed failed, $passed passed."
-exit 1
+# --words, which no case could express until `expect` learned to carry a value.
+# A shorter window finds what twelve would step over.
+scene
+printf '# One\n\nA sentence of its own that says a modest number of words here.\n' > one.md
+printf '# Two\n\nA sentence of its own that says a modest number of words here.\n' > two.md
+expect --words 8 -- 1 "say the same thing" "the window can be narrowed"
+
+verdict
