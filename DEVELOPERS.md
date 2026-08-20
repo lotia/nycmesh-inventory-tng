@@ -571,9 +571,10 @@ repeated command or a repeated citation is not reported.
 
 When it objects, the fix is almost always to delete one copy and link to the
 other. `scripts/check-docs.allow` exists for the rare passage that is genuinely
-meant to appear twice, and for repetition that predates the check — an entry
-there names the issue that will delete it, and is removed along with the
-repetition.
+meant to appear twice; its own header says how an entry is written and when one
+is warranted. An allowance covers a named pair of files, so a third copy is
+still reported, and one that stops matching anything is reported too — a
+baseline cannot outlive the repetition it recorded.
 
 ### 2. Docs change with the code that invalidates them
 
