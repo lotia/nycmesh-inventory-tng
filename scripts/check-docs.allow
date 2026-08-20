@@ -1,0 +1,11 @@
+# Prose that is allowed to appear in two files. See
+# DEVELOPERS.md#1-one-topic-one-place for when an entry here is the right
+# answer, which is seldom.
+#
+# Passages are separated by a blank line, so one may be wrapped across several
+# lines. A comment line is ignored.
+
+# inventory-tng-enh -- two passages that predate this checker.
+because there is no other way to say the shelf disagrees with the sheet
+
+the same application, with Django's admin kept as a fallback. Signing in does not navigate anywhere else; it changes what the interface offers. The item list gains editing

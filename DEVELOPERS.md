@@ -556,8 +556,24 @@ Where each topic lives:
 | Configuration variables | [.env.sample](.env.sample) |
 | Toolchain versions | [mise.toml](mise.toml) |
 
-CI runs a link checker, so a link to a file you renamed will fail the build
-rather than rot silently.
+Two jobs in CI keep that arrangement from rotting, and both can be run by hand:
+
+```bash
+scripts/check-docs.sh          # the same passage in two files
+scripts/check-docs.sh --words 8   # stricter, if you are hunting one down
+```
+
+A link checker catches a link whose target you renamed. `check-docs.sh` catches
+the other half — an explanation pasted into a second file rather than linked to
+— by comparing the prose of every Markdown file in runs of twelve words. Code
+blocks, tables, headings and link text are not prose and are left out, so a
+repeated command or a repeated citation is not reported.
+
+When it objects, the fix is almost always to delete one copy and link to the
+other. `scripts/check-docs.allow` exists for the rare passage that is genuinely
+meant to appear twice, and for repetition that predates the check — an entry
+there names the issue that will delete it, and is removed along with the
+repetition.
 
 ### 2. Docs change with the code that invalidates them
 
