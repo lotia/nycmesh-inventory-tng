@@ -274,4 +274,31 @@ Closes: inventory-tng-aaa'
 output=$("$CHECK" --list --draft base..HEAD 2>&1)
 assert "$output" $? 2 "do not apply" "--list refuses a flag that cannot matter"
 
+# The squash tripwire: one question of landed history, readable whatever
+# convention a message was written under. See check-batch.sh on --squashed.
+scene
+land a 'aaa: Extract the decode loop
+
+Closes: inventory-tng-aaa'
+land b 'bbb: Read the label map
+
+Closes: inventory-tng-bbb'
+expect --squashed 0 "No commit here closes more than one issue" "one issue each passes the tripwire"
+
+# What a squash merge composes: every squashed message in one commit.
+scene
+land a 'A batch, flattened
+
+Closes: inventory-tng-aaa
+Closes: inventory-tng-bbb'
+expect --squashed 1 "closes 2 issues" "a squashed batch is caught"
+
+# It asks nothing else, so history written before today's message rules -- a
+# trailer with no colon -- does not fail it forever.
+scene
+land a 'Extracted the decode loop.
+
+Closes inventory-tng-aaa'
+expect --squashed 0 "No commit here closes more than one issue" "older conventions are not re-litigated"
+
 verdict

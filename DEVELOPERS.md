@@ -804,6 +804,14 @@ job in CI that ought to be required. A weekly job runs `--check` and reports,
 so drift is found rather than remembered — and it runs on any pull request that
 touches CI's job names, because those decide what `main` requires.
 
+One setting is not checked and cannot be: GitHub answers with the merge methods
+only for a token holding `contents:write`, which is not a thing to hand a
+scheduled job in order to detect a settings change. Merge commits are covered
+anyway, because linear history is required and *that* is readable. Squash merge
+is watched for by its effect instead — the same job asks whether any recent
+commit on `main` closes more than one issue, which is what a squashed batch
+looks like once it has landed.
+
 Within a *single* issue, collapsing is fine and often better. Do it on the
 branch before merging, and only once every review thread is resolved:
 
