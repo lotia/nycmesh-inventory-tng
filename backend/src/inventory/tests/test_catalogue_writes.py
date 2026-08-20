@@ -133,6 +133,73 @@ def test_retiring_an_item_takes_it_out_of_the_pick_list(editor: Client, item: It
     assert editor.get(reverse("items")).json()["results"] == []
 
 
+def test_an_administrator_can_list_what_they_withdrew(editor: Client, item: Item) -> None:
+    """The way to arrive at a retired row without already knowing its id.
+
+    Editing one was reachable only through the Django admin otherwise, which
+    decision 0014 point 4 keeps for a broken deployment rather than for repair.
+    """
+    patch(editor, "item-detail", {"active": False}, item.pk)
+
+    withdrawn = editor.get(reverse("items"), {"withdrawn": "true"}).json()["results"]
+
+    assert [row["id"] for row in withdrawn] == [item.pk]
+
+
+def test_listing_the_withdrawn_leaves_the_pick_list_alone(editor: Client, item: Item) -> None:
+    """An administrator filling a batch must see what a volunteer sees.
+
+    Widening the default would offer them stock nobody else can pick, which is
+    why this is a question asked on purpose rather than a wider answer.
+    """
+    patch(editor, "item-detail", {"active": False}, item.pk)
+
+    assert editor.get(reverse("items")).json()["results"] == []
+
+
+def test_a_volunteer_may_not_ask_what_was_withdrawn(client: Client, item: Item) -> None:
+    """Refused rather than quietly answered with the offered rows."""
+    assert client.get(reverse("items"), {"withdrawn": "true"}).status_code == 403
+
+
+def test_withdrawn_false_is_the_ordinary_list(editor: Client, item: Item) -> None:
+    """The schema says boolean, so a generated client sends false for default."""
+    listed = editor.get(reverse("items"), {"withdrawn": "false"}).json()["results"]
+
+    assert [row["id"] for row in listed] == [item.pk]
+
+
+def test_withdrawn_takes_a_boolean_or_nothing(editor: Client) -> None:
+    """A value nobody meant is a mistake worth naming, not a silent full list."""
+    refused = editor.get(reverse("items"), {"withdrawn": "maybe"})
+
+    assert refused.status_code == 400
+    assert "withdrawn" in str(refused.json())
+
+
+def test_a_volunteer_asking_nonsense_is_told_it_is_nonsense(client: Client) -> None:
+    """A typo is not an occasion to explain an administrators-only parameter."""
+    assert client.get(reverse("items"), {"withdrawn": "maybe"}).status_code == 400
+
+
+def test_a_merged_volunteer_can_be_listed_the_same_way(editor: Client, volunteer: Volunteer) -> None:
+    """Same question of the pick-list that decision 0015 hands out pks from."""
+    keeper = Volunteer.objects.create(display_name="The one to keep")
+    patch(editor, "volunteer-detail", {"merged_into": keeper.pk}, volunteer.pk)
+
+    withdrawn = editor.get(reverse("volunteers"), {"withdrawn": "true"}).json()["results"]
+
+    assert [row["id"] for row in withdrawn] == [volunteer.pk]
+
+
+def test_a_retired_location_can_be_listed_the_same_way(editor: Client, warehouse: Location) -> None:
+    patch(editor, "location-detail", {"active": False}, warehouse.pk)
+
+    withdrawn = editor.get(reverse("locations"), {"withdrawn": "true"}).json()["results"]
+
+    assert warehouse.pk in [row["id"] for row in withdrawn]
+
+
 def test_a_retired_item_is_still_editable_by_an_administrator(editor: Client, item: Item) -> None:
     """Putting one back is the reason the retired row stays reachable."""
     patch(editor, "item-detail", {"active": False}, item.pk)

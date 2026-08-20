@@ -247,6 +247,12 @@ paths:
         schema:
           type: string
         description: Name contains
+      - in: query
+        name: withdrawn
+        schema:
+          type: boolean
+        description: List the rows this collection has withdrawn -- retired, or merged
+          away -- instead of the ones it offers. Administrators only.
       tags:
       - items
       security:
@@ -687,6 +693,12 @@ paths:
         name: parent
         schema:
           type: integer
+      - in: query
+        name: withdrawn
+        schema:
+          type: boolean
+        description: List the rows this collection has withdrawn -- retired, or merged
+          away -- instead of the ones it offers. Administrators only.
       tags:
       - locations
       security:
@@ -946,6 +958,12 @@ paths:
         schema:
           type: string
         description: Fuzzy name search, or an exact identifier
+      - in: query
+        name: withdrawn
+        schema:
+          type: boolean
+        description: List the rows this collection has withdrawn -- retired, or merged
+          away -- instead of the ones it offers. Administrators only.
       tags:
       - volunteers
       security:
