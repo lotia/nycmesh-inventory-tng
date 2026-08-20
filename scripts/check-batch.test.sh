@@ -242,5 +242,36 @@ scene
 land a 'fixup! '
 output=$("$CHECK" base..HEAD 2>&1)
 refute "$output" $? 1 "waiting to be folded in" "a bare prefix is not a commit waiting for anything"
+# --list, which is what says the batch's contents on the pull request.
+scene
+land a 'aaa: Extract the decode loop
+
+Closes: inventory-tng-aaa'
+land b 'bbb: Read the label map from the cache
+
+Closes: inventory-tng-bbb'
+output=$("$CHECK" --list base..HEAD 2>&1)
+if [[ "$(wc -l <<<"$output")" -eq 2 && "$output" == *$'\t'"inventory-tng-aaa"$'\t'* ]]; then
+  pass "--list gives one tab-separated row per commit"
+else
+  fail_case "--list gives one tab-separated row per commit" "$output"
+fi
+refute "$output" 0 0 "Nothing to object to" "and says nothing else"
+
+# Nothing on stdout for an empty range in --list mode: say-batch.sh reads rows.
+scene
+output=$("$CHECK" --list HEAD..HEAD 2>/dev/null)
+if [[ -z "$output" ]]; then
+  pass "--list says nothing at all about an empty range"
+else
+  fail_case "--list says nothing at all about an empty range" "$output"
+fi
+
+scene
+land a 'aaa: Extract the decode loop
+
+Closes: inventory-tng-aaa'
+output=$("$CHECK" --list --draft base..HEAD 2>&1)
+assert "$output" $? 2 "do not apply" "--list refuses a flag that cannot matter"
 
 verdict

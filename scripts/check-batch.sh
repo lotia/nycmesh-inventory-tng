@@ -8,7 +8,7 @@
 #
 # The rules are in DEVELOPERS.md "Pull requests" and "Commits".
 #
-# Usage: check-batch.sh [<range>] [--epic <id>] [--draft]
+# Usage: check-batch.sh [<range>] [--epic <id>] [--draft] [--list]
 #
 # <range> defaults to origin/main..HEAD. --epic names the batch's epic in the
 # tracker; without it the epic is inferred from the issues the range closes,
@@ -21,6 +21,7 @@ set -uo pipefail
 RANGE="origin/main..HEAD"
 EPIC=""
 DRAFT=0
+LIST=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --epic)
@@ -32,12 +33,22 @@ while [[ $# -gt 0 ]]; do
       DRAFT=1
       shift
       ;;
+    # The membership, for something that wants to say it rather than check it.
+    --list)
+      LIST=1
+      shift
+      ;;
     *)
       RANGE=$1
       shift
       ;;
   esac
 done
+
+if [[ "$LIST" -eq 1 && ( -n "$EPIC" || "$DRAFT" -eq 1 ) ]]; then
+  echo "--list says what the range holds and checks nothing, so --epic and --draft do not apply." >&2
+  exit 2
+fi
 
 REPO_ROOT=$(git rev-parse --show-toplevel) || exit 1
 # Beside this script rather than under the repository being read: the range may
@@ -62,7 +73,9 @@ mapfile -t commits <<<"$listing"
 [[ ${#commits[@]} -eq 1 && -z "${commits[0]}" ]] && commits=()
 
 if [[ ${#commits[@]} -eq 0 ]]; then
-  echo "No commits in $RANGE. Nothing to check."
+  # Nothing on stdout in --list mode: a caller reading rows would take the
+  # sentence for one.
+  [[ "$LIST" -eq 0 ]] && echo "No commits in $RANGE. Nothing to check."
   exit 0
 fi
 
@@ -75,7 +88,7 @@ fi
 declare -a order=()   # the issue each commit names, in order
 declare -A closes=()  # issue -> how many commits in the range close it
 
-echo "Commits in $RANGE:"
+rows=()
 
 pending=0
 
@@ -135,8 +148,20 @@ for sha in "${commits[@]}"; do
     [[ "$trailer" == Closes* ]] && closes[$issue]=$((${closes[$issue]:-0} + 1))
   done
 
-  note "${sha:0:8}  $named  $subject"
+  rows+=("$(printf '%s\t%s\t%s' "${sha:0:8}" "$named" "$subject")")
   order+=("$named")
+done
+
+# One branch, at the end: either the rows are the output or they are the
+# preamble to everything below.
+if [[ "$LIST" -eq 1 ]]; then
+  [[ ${#rows[@]} -gt 0 ]] && printf '%s\n' "${rows[@]}"
+  exit 0
+fi
+
+echo "Commits in $RANGE:"
+for row in ${rows+"${rows[@]}"}; do
+  note "${row//$'\t'/  }"
 done
 
 # --- an issue is closed once, and its commits sit together -----------------

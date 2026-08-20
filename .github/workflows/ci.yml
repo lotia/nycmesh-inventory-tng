@@ -190,11 +190,17 @@ jobs:
         run: scripts/check-docs.test.sh
       - name: Check the settings checker
         run: scripts/repo-settings.test.sh
+      - name: Check the batch-contents comment
+        run: scripts/say-batch.test.sh
 
   history:
     name: One issue per commit
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    # Only this job says anything back; the rest read.
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v5
         with:
@@ -214,6 +220,17 @@ jobs:
           scripts/check-batch.sh \
             ${{ github.event.pull_request.draft && '--draft' || '' }} \
             "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+
+      # Said here rather than typed into the description, so the list is the one
+      # that was checked. A fork's token cannot comment, and that is not a
+      # reason to fail the check that matters.
+      - name: Say what the batch holds
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RANGE: "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          PR: ${{ github.event.pull_request.number }}
+        run: scripts/say-batch.sh || echo "::warning::Could not post the batch list."
 
   docs:
     name: Documentation

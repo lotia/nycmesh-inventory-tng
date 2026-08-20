@@ -2,21 +2,7 @@
 
 <!-- What does this do, and why? Link the issue if there is one. -->
 
-## Issues in this batch
-
-<!--
-One row per issue, in the order they were landed. A single issue on its own is
-one row and needs no epic; more than one belongs to an epic that records the
-batch. See ../DEVELOPERS.md#pull-requests.
--->
-
-| Issue | |
-| --- | --- |
-|  |  |
-
-- [ ] **Every commit holds work from exactly one issue**, and names it. Review
-      fixes go back to the commit that caused them; a finding that belongs to no
-      single issue became a new one rather than widening a commit.
+<!-- CI posts the issues in this batch as a comment; nothing to list here. -->
 
 ## Definition of Done
 
