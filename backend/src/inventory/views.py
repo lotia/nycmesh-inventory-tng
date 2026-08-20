@@ -11,7 +11,7 @@ from django_filters.rest_framework import CharFilter, FilterSet
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view, inline_serializer
 from rest_framework import serializers, status
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateAPIView
 from rest_framework.permissions import SAFE_METHODS, AllowAny
 from rest_framework.request import Request
@@ -465,6 +465,84 @@ class ReadsAndWritesDiffer:
         return self.write_serializer_class
 
 
+class WithdrawnRows:
+    """``?withdrawn=true`` lists what the collection has taken out of the list.
+
+    DetailView lets an administrator read and repair a row the list beside it
+    has withdrawn -- a retired item or location, a merged volunteer -- but only
+    if they already know its id, and nothing offered a way to arrive at one.
+    Undoing a retirement was therefore reachable only through the Django admin,
+    which decision 0014 point 4 keeps for "a broken deployment, three in the
+    morning" rather than for routine repair, and that undercuts point 1 of the
+    same decision: editing happens in place, where the thing already is.
+
+    A parameter rather than widening what an administrator's list returns. The
+    pick-list is the cart's, and an administrator filling a batch must see the
+    same rows a volunteer does or they will scan something nobody else can.
+    So the default is unchanged for everybody, and this asks a different
+    question: not "what may I pick" but "what did I withdraw".
+
+    Refused rather than ignored for anybody else. Quietly serving the offered
+    rows to a volunteer who asked for the withdrawn ones would answer a
+    question they did not ask.
+    """
+
+    #: Every row, including the withdrawn ones. The collection's own queryset.
+    every_row: QuerySet[Any]
+    #: DRF's own, declared for the same reason ReadsAndWritesDiffer declares it.
+    request: Request
+
+    #: For the schema, since nothing generates a parameter a view reads by hand
+    #: -- and an undocumented parameter is a contract no client can discover.
+    #: Applied as @WITHDRAWN_SCHEMA below. See DEVELOPERS.md#the-api-schema.
+    WITHDRAWN_PARAMETER = OpenApiParameter(
+        name="withdrawn",
+        type=OpenApiTypes.BOOL,
+        location=OpenApiParameter.QUERY,
+        description=(
+            "List the rows this collection has withdrawn -- retired, or merged "
+            "away -- instead of the ones it offers. Administrators only."
+        ),
+    )
+
+    def get_queryset(self) -> QuerySet[Any]:
+        # The collection's own, whatever the view beside this decided it is.
+        # Reached through the MRO rather than by naming a base: this is a mixin
+        # in front of whichever generic view the collection uses, and it has no
+        # base of its own to declare.
+        offered = cast("QuerySet[Any]", super().get_queryset())  # ty: ignore[unresolved-attribute]
+        asked = self.request.query_params.get("withdrawn")
+        if asked is None:
+            return offered
+        # The schema says boolean, so a generated client will send `false` for
+        # the default and must get the default rather than a 400. The values
+        # are DRF's own BooleanField vocabulary, so what the parameter accepts
+        # is what every other boolean in this API accepts.
+        try:
+            wanted = serializers.BooleanField().to_internal_value(asked)
+        except ValidationError as refused:
+            # Re-keyed, so the body names the parameter rather than answering
+            # with a bare sentence the caller has to guess the subject of.
+            raise ValidationError({"withdrawn": refused.detail}) from refused
+        if not wanted:
+            return offered
+        # Asked after the value is understood: a volunteer who sends nonsense
+        # is told it is nonsense, and one who asks properly is told they may
+        # not. The other order explains an administrators-only parameter to
+        # somebody whose real problem was a typo.
+        if not is_administrator(self.request.user):
+            raise PermissionDenied("Only an administrator may list withdrawn rows.")
+        # The difference, rather than a second statement of what withdrawal
+        # means. `active=False`, `merged_into`, `revoked_at` are each defined
+        # once, on the offered queryset, and asking for everything-except-those
+        # cannot drift from them.
+        return self.every_row.exclude(pk__in=offered.values("pk"))
+
+
+#: One decorator rather than the same line on three views.
+WITHDRAWN_SCHEMA = extend_schema_view(get=extend_schema(parameters=[WithdrawnRows.WITHDRAWN_PARAMETER]))
+
+
 class DetailView(RetrieveUpdateAPIView):
     """One row of a collection, read by anyone and edited by an administrator.
 
@@ -581,7 +659,8 @@ IDENTIFIER_NOUNS = {"email": "email address", "slack_id": "Slack ID"}
         },
     ),
 )
-class VolunteerListCreateView(ListCreateAPIView):
+@WITHDRAWN_SCHEMA
+class VolunteerListCreateView(WithdrawnRows, ListCreateAPIView):
     """The volunteer pick-list, and the way onto it.
 
     Volunteers are a pick-list with no password (decision 0008 point 5). The
@@ -596,6 +675,7 @@ class VolunteerListCreateView(ListCreateAPIView):
     serializer_class = VolunteerSerializer
     filterset_class = VolunteerFilter
     queryset = OFFERED_VOLUNTEERS
+    every_row = VOLUNTEERS
 
     # The other; see VOLUNTEER_APPEND.
     permission_classes = VOLUNTEER_APPEND
@@ -789,7 +869,8 @@ ITEMS = Item.objects.prefetch_related(
 OFFERED_ITEMS = ITEMS.filter(active=True)
 
 
-class ItemListView(ReadsAndWritesDiffer, ListCreateAPIView):
+@WITHDRAWN_SCHEMA
+class ItemListView(WithdrawnRows, ReadsAndWritesDiffer, ListCreateAPIView):
     """The catalogue, with the stock behind it. Administrators add to it.
 
     This is the screen the volunteer mockup is almost entirely made of: every
@@ -802,6 +883,7 @@ class ItemListView(ReadsAndWritesDiffer, ListCreateAPIView):
 
     filterset_class = ItemFilter
     queryset = OFFERED_ITEMS
+    every_row = ITEMS
 
     serializer_class = ItemSerializer
     # A create carries every field an item has; a list carries the ones a
@@ -829,7 +911,8 @@ LOCATIONS = Location.objects.all()
 OFFERED_LOCATIONS = LOCATIONS.filter(active=True)
 
 
-class LocationListView(ListCreateAPIView):
+@WITHDRAWN_SCHEMA
+class LocationListView(WithdrawnRows, ListCreateAPIView):
     """Everywhere stock can be. A pick-list, like volunteers.
 
     Retired locations are not offered, and `active` is deliberately not a
@@ -840,6 +923,7 @@ class LocationListView(ListCreateAPIView):
 
     serializer_class = LocationSerializer
     filterset_fields = ["kind", "parent"]
+    every_row = LOCATIONS
     queryset = OFFERED_LOCATIONS
 
 
