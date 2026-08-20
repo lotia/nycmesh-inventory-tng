@@ -65,10 +65,23 @@ echo "Merge methods:"
 current=$(gh api "repos/$REPO" --jq '[.allow_squash_merge, .allow_merge_commit, .allow_rebase_merge, .delete_branch_on_merge] | @tsv')
 IFS=$'\t' read -r squash merge rebase delete <<<"$current"
 
-compare "$squash" false "squash merge is off" "squash merge is ON"
-compare "$merge" false "merge commits are off" "merge commits are ON"
-compare "$rebase" true "rebase merge is on" "rebase merge is OFF"
-compare "$delete" true "branches are deleted on merge" "branches are kept on merge"
+# The API omits these for a token without push access, and a missing field
+# arrives here as an empty string -- which compares unequal to "false" and
+# reports all four as wrong. "Nobody could look" is not "everything is broken";
+# the scheduled job runs with exactly such a token unless a secret is set.
+readable=1
+[[ -n "$squash" && -n "$merge" && -n "$rebase" && -n "$delete" ]] || readable=0
+
+if [[ "$readable" -eq 0 ]]; then
+  note "this token cannot read the merge methods, so they were not checked"
+  note "  a token with push access can"
+else
+
+  compare "$squash" false "squash merge is off" "squash merge is ON"
+  compare "$merge" false "merge commits are off" "merge commits are ON"
+  compare "$rebase" true "rebase merge is on" "rebase merge is OFF"
+  compare "$delete" true "branches are deleted on merge" "branches are kept on merge"
+fi
 
 if [[ "$CHECK" -eq 0 ]]; then
   gh api -X PATCH "repos/$REPO" \
@@ -89,7 +102,15 @@ echo "Protection on main:"
 # stdout, so an unprotected branch arrives here as a perfectly non-empty JSON
 # object that every comparison below then reads as null.
 if ! protection=$(gh api "repos/$REPO/branches/main/protection" 2>/dev/null); then
-  fail "main is not protected"
+  # "Nobody could look" is not "nothing is there". Only a token with
+  # Administration can read protection, and reporting an unprotected main to
+  # somebody holding a read-only one is a false alarm they cannot act on.
+  if [[ "$(gh api "repos/$REPO" --jq '.permissions.admin // false' 2>/dev/null)" == "true" ]]; then
+    fail "main is not protected"
+  else
+    note "this token cannot read branch protection, so it was not checked"
+    note "  a token with Administration: read can"
+  fi
 else
   IFS=$'\t' read -r strict admins conversations linear forced reviews < <(
     printf '%s' "$protection" | jq -r '[
