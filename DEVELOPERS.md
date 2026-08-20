@@ -777,6 +777,12 @@ each commit onto `main` individually. Why it is arranged that way rather than
 left to discipline is
 [0017](docs/decisions/0017-review-through-pull-requests.md).
 
+That setting, and what `main` accepts, are GitHub's rather than the
+repository's, so they are written down as `scripts/repo-settings.sh` rather than
+left as something somebody once clicked. `--check` reports what has drifted;
+running it without puts it back. Run it after adding a job to CI that ought to
+be required.
+
 Within a *single* issue, collapsing is fine and often better. Do it on the
 branch before merging, and only once every review thread is resolved:
 
