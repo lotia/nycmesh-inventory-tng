@@ -564,15 +564,33 @@ class LabelResolveSerializer(serializers.ModelSerializer):
 
 
 class LabelMapSerializer(LabelResolveSerializer):
-    """One label in the map the client caches.
+    """One label in the map the client caches, and what a scan needs of it.
 
     Drops ``revoked_at``, which this queryset guarantees is null, a few
     hundred times over. See LabelListView for why this response's size is
     worth caring about.
+
+    Carries the item's name and unit instead. A cart line needs both, and
+    without them the client had to hold the whole catalogue as well -- which
+    is paginated, so the prefetch became four round trips fetching eighty
+    kilobytes of balances and labels to keep three fields per item, on the
+    connection decision 0011 section 1 exists for. Forty bytes a row here
+    replaces all of it with the one unpaginated GET this endpoint is for.
     """
 
+    item_name = serializers.CharField(source="item.name", read_only=True, default=None)
+    unit_of_measure = serializers.CharField(source="item.unit_of_measure", read_only=True, default=None)
+
     class Meta(LabelResolveSerializer.Meta):
-        fields = ["code", "kind", "quantity", "item", "location"]
+        fields = [
+            "code",
+            "kind",
+            "quantity",
+            "item",
+            "location",
+            "item_name",
+            "unit_of_measure",
+        ]
 
 
 class LabelSerializer(LabelResolveSerializer):

@@ -8,9 +8,10 @@
  * docs/decisions/0011-qr-batch-scanning.md sections 3 and 5.
  */
 import { apiGet, asApiError, isAbort } from "../api/client";
-import type { Item, ResolvedLabel } from "../api/types";
+import type { Item, MappedLabel, ResolvedLabel } from "../api/types";
 import type { CartIntent } from "../cart/CartProvider";
 import type { ScannedLabel } from "../cart/cartState";
+import { cachedLabel } from "./labelCache";
 
 /**
  * A scanned label whose amount the volunteer still has to say.
@@ -58,9 +59,26 @@ export async function applyCode(
   dispatch: (intent: CartIntent) => void,
   signal?: AbortSignal,
 ): Promise<Outcome> {
-  let label: ResolvedLabel;
+  // The cache first, and the network only for what it does not hold -- a code
+  // minted since it was filled, or a cache too old to trust. See labelCache.ts
+  // for how stale it is allowed to get.
+  const cached = cachedLabel(code);
+
+  // See MappedLabel: a cache hit is not revoked by construction.
+  let label: MappedLabel | ResolvedLabel;
+  let revoked: boolean;
   try {
-    label = await apiGet<ResolvedLabel>(`/api/labels/${encodeURIComponent(code)}`, signal);
+    if (cached !== null) {
+      label = cached;
+      revoked = false;
+    } else {
+      const resolved = await apiGet<ResolvedLabel>(
+        `/api/labels/${encodeURIComponent(code)}`,
+        signal,
+      );
+      label = resolved;
+      revoked = resolved.revoked_at !== null;
+    }
   } catch (error: unknown) {
     if (isAbort(error)) {
       throw error;
@@ -74,8 +92,6 @@ export async function applyCode(
     }
     return { applied: "failed", detail: refused.message };
   }
-
-  const revoked = label.revoked_at !== null;
 
   if (label.kind === "location" && label.location !== null) {
     // Scanning a wall code says where this batch is moving stock from or to.
@@ -91,14 +107,24 @@ export async function applyCode(
 
   // The label says how much one scan of it means; the item says what to call
   // it and what it is counted in. The cart line needs both.
-  let item: Item;
-  try {
-    item = await apiGet<Item>(`/api/items/${label.item}`, signal);
-  } catch (error: unknown) {
-    if (isAbort(error)) {
-      throw error;
+  // The map carries the item's name and unit, so a cache hit costs no request
+  // at all rather than halving the two.
+  let item: Pick<Item, "id" | "name" | "unit_of_measure">;
+  if (cached !== null && cached.item_name !== null && cached.unit_of_measure !== null) {
+    item = {
+      id: label.item,
+      name: cached.item_name,
+      unit_of_measure: cached.unit_of_measure,
+    };
+  } else {
+    try {
+      item = await apiGet<Item>(`/api/items/${label.item}`, signal);
+    } catch (error: unknown) {
+      if (isAbort(error)) {
+        throw error;
+      }
+      return { applied: "failed", detail: asApiError(error).message };
     }
-    return { applied: "failed", detail: asApiError(error).message };
   }
 
   const scanned: ScannedLabel = {

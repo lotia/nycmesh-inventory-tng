@@ -165,10 +165,11 @@ Named here so the gaps are visible rather than surprising:
   origin, beside the one box a scanner gun types into and a person types the
   code under a dead QR into — and the Save that sends the batch. Scanning an
   item measured in anything but `each` asks how much before anything goes in,
-  which is [decision 0011](decisions/0011-qr-batch-scanning.md) section 5. What
-  is missing is the one thing the client is meant to do for itself: the label
-  map is not prefetched, so a scan resolves against the API rather than against
-  a cache (section 6), which is `inventory-tng-4t0`.
+  which is [decision 0011](decisions/0011-qr-batch-scanning.md) section 5. The
+  label map and the catalogue are prefetched when the app opens and a scan
+  resolves against them, which is section 6; a code the cache does not hold
+  still falls back to the live read, and how stale it is allowed to get is in
+  `frontend/src/scan/labelCache.ts`.
 - **The administrative interface.** The catalogue write API is built: items,
   locations, categories and labels are created and edited through the API by
   somebody holding the staff flag, and a caller without it is refused rather
