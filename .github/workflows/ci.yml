@@ -176,7 +176,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   commit-check:
-    name: Commit checker
+    name: Guardrail checkers
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -216,7 +216,7 @@ jobs:
             "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
 
   docs:
-    name: Documentation links
+    name: Documentation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
