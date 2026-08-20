@@ -439,4 +439,31 @@ JSONL
 good_message
 expect 1 "2 issues are closed here" "an epic does not excuse two issues"
 
+# One run, every long line. Stopping at the first meant three runs for three
+# lines, and the later fixes were written against a report naming neither.
+scene
+message <<'MSG'
+aaa: Extract the decode loop
+
+This first body line is deliberately far too long to fit inside the limit.
+
+And this second one is as well, which the old checker would never mention.
+
+Closes: inventory-tng-aaa
+MSG
+output=$("$CHECK" --message-only "$WORK/repo/message" 2>&1)
+assert "$output" $? 1 "2 body lines are over 72" "every over-long line is counted, not just the first"
+assert "$output" 1 1 "This first body line" "the first long line is named"
+assert "$output" 1 1 "And this second one" "and so is the second"
+
+scene
+message <<'MSG'
+aaa: Extract the decode loop
+
+Only this one body line is far too long to fit inside the limit that is set.
+
+Closes: inventory-tng-aaa
+MSG
+expect --message-only 1 "one body line is over 72" "one is singular"
+
 verdict
