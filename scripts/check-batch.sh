@@ -8,9 +8,10 @@
 #
 # The rules are in DEVELOPERS.md "Pull requests" and "Commits".
 #
-# Usage: check-batch.sh [<range>] [--epic <id>] [--draft] [--list]
+# Usage: check-batch.sh [<range>] [--epic <id>] [--draft] [--list] [--squashed]
 #
-# <range> defaults to origin/main..HEAD. --epic names the batch's epic in the
+# <range> defaults to origin/main..HEAD, or with --squashed to the last fifty
+# commits -- see TRIPWIRE_DEPTH. --epic names the batch's epic in the
 # tracker; without it the epic is inferred from the issues the range closes,
 # and if they do not agree on one, membership is simply not checked. --draft
 # says the branch is still under review, where commits waiting to be folded in
@@ -18,10 +19,14 @@
 
 set -uo pipefail
 
-RANGE="origin/main..HEAD"
+RANGE=""
+# How far back --squashed looks with no range given. A tripwire, not an audit:
+# history older than the conventions it reads would fail it forever.
+TRIPWIRE_DEPTH=50
 EPIC=""
 DRAFT=0
 LIST=0
+SQUASHED=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --epic)
@@ -31,6 +36,11 @@ while [[ $# -gt 0 ]]; do
     # See DEVELOPERS.md#merging on why a branch under review is different.
     --draft)
       DRAFT=1
+      shift
+      ;;
+    # A tripwire over landed history; see below.
+    --squashed)
+      SQUASHED=1
       shift
       ;;
     # The membership, for something that wants to say it rather than check it.
@@ -45,9 +55,31 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ "$SQUASHED" -eq 1 && ( "$LIST" -eq 1 || -n "$EPIC" || "$DRAFT" -eq 1 ) ]]; then
+  echo "--squashed asks one question of landed history; the other flags do not apply." >&2
+  exit 2
+fi
+
 if [[ "$LIST" -eq 1 && ( -n "$EPIC" || "$DRAFT" -eq 1 ) ]]; then
   echo "--list says what the range holds and checks nothing, so --epic and --draft do not apply." >&2
   exit 2
+fi
+
+if [[ -z "$RANGE" ]]; then
+  if [[ "$SQUASHED" -eq 1 ]]; then
+    # The last TRIPWIRE_DEPTH commits, or all of them where there are fewer --
+    # a young repository is watched too. Resolved here rather than by a caller:
+    # `git rev-parse` prints the literal argument when it cannot resolve one,
+    # and a caller writing "$(git rev-parse HEAD~50)..HEAD" gets a range that
+    # looks fine and reads nothing.
+    if base=$(git rev-parse --verify "HEAD~${TRIPWIRE_DEPTH}" 2>/dev/null); then
+      RANGE="${base}..HEAD"
+    else
+      RANGE="$(git rev-list --max-parents=0 HEAD | tail -1)..HEAD"
+    fi
+  else
+    RANGE="origin/main..HEAD"
+  fi
 fi
 
 REPO_ROOT=$(git rev-parse --show-toplevel) || exit 1
@@ -104,6 +136,22 @@ while IFS= read -r -d $'\x1e' record; do
   subject_of[$sha_part]=${rest%%$'\x1f'*}
   body_of[$sha_part]=${rest#*$'\x1f'}
 done < <(git log --reverse --no-merges --format="%H%x1f%s%x1f%B%x1e" "$RANGE")
+
+# One question of landed history: does any commit close more than one issue?
+# That is what a squash merge composes, and it is readable whatever convention
+# the message was written under -- which is why this asks nothing else.
+if [[ "$SQUASHED" -eq 1 ]]; then
+  for sha in "${commits[@]}"; do
+    closes_here=0
+    while IFS= read -r trailer; do
+      [[ "$trailer" == Closes* ]] && closes_here=$((closes_here + 1))
+    done < <(trailers_of "${body_of[$sha]:-}")
+    if [[ "$closes_here" -gt 1 ]]; then
+      fail "${sha:0:8} closes $closes_here issues: ${subject_of[$sha]:-}"
+    fi
+  done
+  verdict "No commit here closes more than one issue." "one of them is split"
+fi
 
 # What `rebase --autosquash` would leave.
 #

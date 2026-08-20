@@ -7,6 +7,9 @@ name: Settings
 # --check only: it reports and changes nothing. Putting settings back is a
 # deliberate act, and one that wants a person to have read what drifted first.
 #
+# One setting cannot be read at all, so squash merge is watched for by its
+# effect on main instead. See DEVELOPERS.md#pull-requests.
+#
 # The settings that cannot be enforced from inside the repository at all --
 # enforce_admins, allow_force_pushes, required_linear_history -- are the ones
 # whose silent loss costs the most, which is the whole reason for the schedule.
@@ -17,14 +20,21 @@ on:
     # Monday morning, so a week's drift is found before the week's work.
     - cron: "0 9 * * 1"
   workflow_dispatch:
+  # The merge that just happened, asked once, when it happens. A weekly sweep
+  # would find a squash the following Monday and then again every Monday for
+  # fifty commits, because a rolling window has no way to say it has been seen.
+  push:
+    branches: [main]
   pull_request:
     # A job renamed or added in CI changes what main should require, and
     # repo-settings.sh reads those names out of the workflow. This catches the
     # rename that would otherwise un-require a check silently.
     paths:
       - .github/workflows/ci.yml
+      - .github/workflows/settings.yml
       - scripts/repo-settings.sh
       - scripts/ci-check-names.py
+      - scripts/check-batch.sh
 
 permissions:
   contents: read
@@ -35,6 +45,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Enough for check-batch.sh to read a range; the default is one
+          # commit. How far back it looks is the script's own business.
+          fetch-depth: 0
       # GITHUB_TOKEN cannot read branch protection. Set SETTINGS_READ_TOKEN to
       # one with Administration: read; without it the script says it could not
       # look rather than that nothing had drifted.
@@ -42,3 +56,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.SETTINGS_READ_TOKEN || github.token }}
         run: scripts/repo-settings.sh --check
+
+      # always(), because this and the check above are independent alarms: real
+      # drift exits 1, and the week that happens is the week you want both
+      # answers rather than only the first.
+      - name: Look for a batch that was squashed
+        if: always()
+        run: scripts/check-batch.sh --squashed
