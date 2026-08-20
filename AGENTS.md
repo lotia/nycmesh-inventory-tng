@@ -56,7 +56,8 @@ here; run `bd prime` if you need it and it is missing.
 
 ## Git
 
-Do not commit, push, or run `bd dolt push` unless explicitly asked. When
+Do not commit, push, or run `bd dolt push` unless explicitly asked. When you are
+asked to, load `.agents/skills/commits/SKILL.md` first and follow it. When
 finishing, report changed files, what you validated, and the commands you would
 run next.
 
@@ -75,6 +76,7 @@ Read these only when the task needs them. Do not load them pre-emptively.
 | `frontend/` — React, MUI, Vite | `.agents/skills/react-frontend/SKILL.md` |
 | Images, Helm chart, Kubernetes, CodeNOW | `.agents/skills/deploy/SKILL.md` |
 | beads workflow detail | `.agents/skills/beads/SKILL.md` |
+| Landing work — what one commit holds, and its message | `.agents/skills/commits/SKILL.md` |
 | Why something is built a certain way | [docs/decisions/](docs/decisions/) |
 
 `CLAUDE.md`, `CODEX.md`, and `GEMINI.md` are symlinks to this file. Edit this

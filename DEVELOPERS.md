@@ -544,6 +544,7 @@ Where each topic lives:
 | API schema and how it stays current | [The API schema](#the-api-schema) |
 | Typing requirements | [Typing](#typing) |
 | Testing and coverage requirements | [Testing and coverage](#testing-and-coverage) |
+| What one commit contains, and its message | [Commits](#commits) |
 | How to contribute | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Architecture and technology choices | [docs/architecture.md](docs/architecture.md) |
 | Inventory data model | [docs/data-model.md](docs/data-model.md) |
@@ -603,6 +604,82 @@ bd close <id>            # done (see Definition of Done first)
 
 You do not have to use beads to contribute. GitHub issues and pull requests work
 fine — see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+## Commits
+
+**One issue, one commit.** A commit contains everything that issue needed and
+nothing else, so that it can be read, reviewed, reverted and bisected as the
+unit of work it claims to be.
+
+That rule settles the awkward cases too:
+
+- Documentation the change itself made wrong is part of the change — that is
+  the [Definition of Done](#definition-of-done), not a separate concern.
+- A fault you noticed on the way but did not cause is its own issue and its own
+  commit, however small and however tempting. A one-line fix riding along is
+  the commonest way a commit stops being one thing.
+- A defect a review finds in the change is part of the change. A defect it
+  finds in code the change did not touch is not.
+
+### The message
+
+```
+Summarise the change in the imperative
+
+What changed, what was added, what was removed — in enough detail that
+somebody reading the history a year from now knows what this did to the
+repository, and no more.
+
+Closes inventory-tng-abc
+```
+
+- **The summary line is at most 50 characters**, in the imperative mood
+  ("Extract the decode loop", not "Extracted" or "Extracting"), with no full
+  stop. It is a size check as much as a title: work that cannot be summarised
+  in 50 characters is usually more than one issue, and the answer is to split
+  the issue rather than to lengthen the line.
+- **The body says what changed**, wrapped at 72 columns. It is not a diary:
+  how the work was done, what was tried first and what a review said are not
+  what a reader of the history needs. *Why* something is built the way it is
+  belongs in [docs/decisions/](docs/decisions/), and is linked rather than
+  retold.
+- **One trailer naming the issue this commit closes** — `Closes
+  inventory-tng-abc` for a bead, `Closes #123` for a GitHub issue, because
+  [beads is not required to contribute](#issue-tracking). Follow-up issues
+  raised along the way may be created in the same commit — noticing work is
+  honest work — but only one issue may be *closed* by it.
+
+### Several issues at once
+
+Work them one at a time on a branch, land each as it is finished, and push the
+branch. The branch is the unit of review; the commit stays the unit of work.
+Holding finished issues back to land them together gains nothing and loses the
+ability to revert one of them.
+
+### Checking it
+
+Write the message to a file and hand it over, so that what is checked is what
+will land:
+
+```bash
+scripts/check-commit.sh <message-file>
+scripts/check-commit.sh --amend <message-file>   # replacing the last one
+```
+
+It objects if more than one issue is closed by what is staged, if the message
+and the tracker disagree about which, or if the summary line breaks the rules
+above. A guardrail rather than a gate. To have it run every time, add it to the
+hooks beads already installs — `core.hooksPath` is taken, so a second hooks
+directory would turn beads' own git integration off:
+
+```bash
+ln -s ../../scripts/check-commit.sh .beads/hooks/commit-msg
+```
+
+History before this section predates it, and is not the example to follow:
+several commits close five issues each.
 
 ---
 

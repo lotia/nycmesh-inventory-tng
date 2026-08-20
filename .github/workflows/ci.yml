@@ -172,6 +172,19 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  commit-check:
+    name: Commit checker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # The checker is a guardrail somebody runs by hand or wires in as a hook,
+      # so nothing else would notice it breaking. This runs its own tests; it
+      # deliberately does not check the commits in a pull request, because the
+      # closure it reads lives in the beads tracker a contributor need not use,
+      # and because a squash merge composes its message after this has run.
+      - name: Check the commit checker
+        run: scripts/check-commit.test.sh
+
   docs:
     name: Documentation links
     runs-on: ubuntu-latest

@@ -33,7 +33,9 @@ You are not required to use beads. Nothing in this project should be workable
 3. Work through the [Definition of Done](DEVELOPERS.md#definition-of-done).
    The documentation item is not optional — if your change makes any instruction
    in this repository wrong, fix that instruction in the same pull request.
-4. Open a pull request describing what changed and why.
+4. Land it as one issue's worth of work, with a message written the way
+   [Commits](DEVELOPERS.md#commits) describes.
+5. Open a pull request describing what changed and why.
 
 Small pull requests get reviewed faster than large ones. A change that only
 fixes a confusing sentence in the docs is a genuinely useful contribution.
