@@ -67,15 +67,39 @@ const OVERRIDES = {
     path.endsWith(".wasm") ? wasmUrl : `${prefix}${path}`,
 };
 
-/** The decoder, fetched and instantiated on first use and kept after that. */
+/**
+ * The decoder, fetched and instantiated on first use and kept after that.
+ *
+ * The promise is held, not the result, because two frames may ask before the
+ * first answer arrives and one download is the point. But a promise that
+ * rejected is held just as firmly as one that resolved, and a rejection here
+ * is the ordinary case rather than the strange one: a basement connection that
+ * dropped, or an `index.html` that outlived the chunk it names after a deploy.
+ * Kept, it makes the first failure permanent -- every later scan replays the
+ * same rejection without asking the network again, and the only cure is a
+ * reload the volunteer has no reason to think of.
+ *
+ * So the promise is forgotten on rejection, and the next call starts over.
+ */
 let detector: Promise<CodeDetector> | null = null;
 
 export function loadDetector(): Promise<CodeDetector> {
-  detector ??= (async () => {
-    const { BarcodeDetector, prepareZXingModule } = await import("barcode-detector/pure");
-    prepareZXingModule({ overrides: OVERRIDES });
-    return new BarcodeDetector({ formats: ["qr_code"] });
-  })();
+  if (detector === null) {
+    const attempt: Promise<CodeDetector> = (async () => {
+      const { BarcodeDetector, prepareZXingModule } = await import("barcode-detector/pure");
+      prepareZXingModule({ overrides: OVERRIDES });
+      return new BarcodeDetector({ formats: ["qr_code"] });
+    })().catch((reason: unknown) => {
+      // Forgotten before rethrowing, so this call still fails and the next one
+      // starts over. Only if it is still the current attempt: a later call may
+      // have begun a fresh one, and dropping that would download twice.
+      if (detector === attempt) {
+        detector = null;
+      }
+      throw reason;
+    });
+    detector = attempt;
+  }
   return detector;
 }
 
