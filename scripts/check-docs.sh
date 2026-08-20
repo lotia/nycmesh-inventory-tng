@@ -1,22 +1,14 @@
 #!/usr/bin/env bash
 # One topic, one place -- the part of it a machine can see.
 #
-# The rule is in DEVELOPERS.md "Documentation rules": every topic lives in one
-# file and everything else links to it. The link checker already catches a link
-# that rots. Nothing catches the failure that matters more, which is an
-# explanation quietly pasted into a second file, where it stays right until the
-# first one changes and then silently disagrees with it.
-#
-# So: normalise every Markdown file, cut it into overlapping runs of words, and
-# report any run that appears in two files. Prose is what is compared. Code
-# fences, link targets, headings and tables are dropped, because a repeated
-# command or a repeated column header is not a duplicated explanation and
-# flagging it would train everybody to ignore this.
+# What this reads and why is DEVELOPERS.md#1-one-topic-one-place. How it does
+# it: cut each file's prose into overlapping runs of words and report any run
+# that turns up in two of them.
 #
 # Usage: check-docs.sh [--words N] [<path>...]
 #
-# An allowlist of runs that are meant to be repeated lives in
-# scripts/check-docs.allow, one per line, matched after the same normalising.
+# scripts/check-docs.allow holds the repetitions that are meant to be there.
+# Its own header says how an entry is written.
 
 set -uo pipefail
 
@@ -42,7 +34,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ ${#paths[@]} -eq 0 ]]; then
-  mapfile -t paths < <(git ls-files '*.md')
+  # What is read, and what is deliberately not, is
+  # DEVELOPERS.md#1-one-topic-one-place. Widening it to application code is
+  # inventory-tng-lwe.
+  mapfile -t paths < <(git ls-files '*.md' 'scripts/*.sh' 'scripts/*.py')
 fi
 
 ALLOW="$REPO_ROOT/scripts/check-docs.allow"
@@ -52,6 +47,25 @@ import os, pathlib, re, sys
 
 WORDS = int(os.environ["WORDS"])
 ALLOW = pathlib.Path(os.environ["ALLOW"])
+
+
+def commentary(text: str) -> str:
+    """The prose out of a script: its docstrings and its comment blocks.
+
+    A script explains itself in comments, and those comments are where an
+    explanation gets copied out of a document -- so they are read the same way
+    a page is. Code is not prose and is dropped, as a fenced block is in
+    Markdown; so are the directives that only look like comments.
+    """
+    out = list(re.findall(r'"""(.*?)"""', text, re.S))
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("#"):
+            continue
+        if stripped.startswith(("#!", "# shellcheck", "# type:", "# noqa")):
+            continue
+        out.append(stripped.lstrip("#").strip())
+    return " ".join(out)
 
 
 def prose(text: str) -> str:
@@ -132,7 +146,13 @@ for name in sys.argv[1:]:
     # not a second copy of itself.
     if path.is_symlink():
         continue
-    words = prose(path.read_text()).split()
+    text = path.read_text()
+    if name.endswith(".md"):
+        words = prose(text).split()
+    else:
+        # A Python file's comments are hash-prefixed too; a shell file has no
+        # docstrings, and finding none costs nothing.
+        words = prose(commentary(text)).split()
     where[name] = words
     # A file only duplicates another file. A phrase repeated inside one
     # document is a writing problem, not a single-source-of-truth problem.

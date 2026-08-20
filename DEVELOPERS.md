@@ -565,9 +565,15 @@ scripts/check-docs.sh --words 8   # stricter, if you are hunting one down
 
 A link checker catches a link whose target you renamed. `check-docs.sh` catches
 the other half — an explanation pasted into a second file rather than linked to
-— by comparing the prose of every Markdown file in runs of twelve words. Code
-blocks, tables, headings and link text are not prose and are left out, so a
-repeated command or a repeated citation is not reported.
+— by comparing prose in runs of twelve words. Code blocks, tables, headings and
+link text are not prose and are left out, so a repeated command or a repeated
+citation is not reported.
+
+It reads every Markdown file **and the comments of the scripts in `scripts/`**,
+because a script's header is documentation of that script and is the easiest
+place to re-derive something this guide already says. It does not read
+application code: a docstring beside the invariant it enforces is the code
+explaining itself, which is a different thing from a topic having two homes.
 
 When it objects, the fix is almost always to delete one copy and link to the
 other. `scripts/check-docs.allow` exists for the rare passage that is genuinely

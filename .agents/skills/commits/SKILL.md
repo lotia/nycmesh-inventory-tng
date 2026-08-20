@@ -43,9 +43,8 @@ rather than the last message you wrote:
 scripts/check-commit.sh <message-file>
 ```
 
-Pass `--amend` when you are replacing the last commit rather than adding one:
-what lands is then the staged changes and that commit's together, and the issue
-it closes is usually already in it.
+Pass `--amend` when you are replacing the last commit rather than adding one;
+`check-commit.sh` says at the top of itself what that changes.
 
 ## When work has already bled across two issues
 

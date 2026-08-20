@@ -181,7 +181,7 @@ land a 'aaa: Extract the decode loop
 Closes inventory-tng-aaa'
 expect 1 "in the batch but not landed here: inventory-tng-bbb" "a batch half landed is refused"
 
-# An issue shipping on its own belongs to no batch and needs no epic.
+# See batch-membership.py on why no epic is not a disagreement.
 scene
 tracker <<'JSONL'
 {"_type":"issue","id":"inventory-tng-aaa","status":"closed"}
