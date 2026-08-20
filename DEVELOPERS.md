@@ -684,7 +684,9 @@ Closes: inventory-tng-abc
   message names the *same* issue, and at most one closes it; that is what makes
   "one issue per commit" something a machine can check. Follow-up issues raised
   along the way may be created in the same commit — noticing work is honest
-  work — but only one issue may be *closed* by it.
+  work — but only one issue may be *closed* by it. An epic does not count: it
+  groups a batch and does no work of its own, so it finishes when its children
+  do and its closure rides with the last of them.
 
 ### Several issues at once
 
