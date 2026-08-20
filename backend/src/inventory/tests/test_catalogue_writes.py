@@ -320,6 +320,129 @@ def test_custody_is_recorded_against_somebody_the_list_still_offers(
     assert response.status_code == 400, response.content
 
 
+def _holding(volunteer: Volunteer, name: str = "The blue van") -> Location:
+    """A volunteer with an active custody location, which is the whole case."""
+    return Location.objects.create(
+        name=name,
+        kind=Location.Kind.VOLUNTEER_CUSTODY,
+        held_by=volunteer,
+    )
+
+
+def test_merging_somebody_who_holds_custody_is_refused(
+    editor: Client,
+    volunteer: Volunteer,
+) -> None:
+    """The guard was on naming a holder, not on the record leaving the list."""
+    survivor = Volunteer.objects.create(display_name="The one to keep")
+    held = _holding(volunteer)
+
+    refused = patch(editor, "volunteer-detail", {"merged_into": survivor.pk}, volunteer.pk)
+
+    assert refused.status_code == 400, refused.content
+    # Named, so the answer is actionable rather than a rule the caller has to
+    # go and read.
+    assert held.name in str(refused.json())
+
+
+def test_retiring_somebody_who_holds_custody_is_refused(
+    editor: Client,
+    volunteer: Volunteer,
+) -> None:
+    """The other route to the same state, which is why the guard is here."""
+    _holding(volunteer)
+
+    refused = patch(editor, "volunteer-detail", {"active": False}, volunteer.pk)
+
+    assert refused.status_code == 400, refused.content
+
+
+def test_the_survivor_already_holding_one_makes_no_difference(
+    editor: Client,
+    volunteer: Volunteer,
+) -> None:
+    """The case that rules out repointing; the serializer says why."""
+    survivor = Volunteer.objects.create(display_name="The one to keep")
+    _holding(survivor, "The white van")
+    _holding(volunteer)
+
+    refused = patch(editor, "volunteer-detail", {"merged_into": survivor.pk}, volunteer.pk)
+
+    assert refused.status_code == 400, refused.content
+
+
+def test_a_volunteer_holding_nothing_still_merges(editor: Client, volunteer: Volunteer) -> None:
+    """The guard is about custody, not about merging."""
+    survivor = Volunteer.objects.create(display_name="The one to keep")
+
+    merged = patch(editor, "volunteer-detail", {"merged_into": survivor.pk}, volunteer.pk)
+
+    assert merged.status_code == 200, merged.content
+
+
+def test_retiring_the_custody_location_first_unblocks_the_merge(
+    editor: Client,
+    volunteer: Volunteer,
+) -> None:
+    """What the refusal tells them to do, and that doing it works."""
+    survivor = Volunteer.objects.create(display_name="The one to keep")
+    held = _holding(volunteer)
+
+    patch(editor, "location-detail", {"active": False}, held.pk)
+    merged = patch(editor, "volunteer-detail", {"merged_into": survivor.pk}, volunteer.pk)
+
+    assert merged.status_code == 200, merged.content
+
+
+def test_a_retired_custody_location_cannot_be_revived_for_a_merged_holder(
+    editor: Client,
+    volunteer: Volunteer,
+) -> None:
+    """The three steps the refusal's own advice would otherwise open.
+
+    Retire the location, merge the volunteer -- now allowed, since only active
+    ones are checked -- then put the location back. The last step names no
+    holder, so the field validator never sees one, and the trigger returns
+    early because held_by is unchanged.
+    """
+    survivor = Volunteer.objects.create(display_name="The one to keep")
+    held = _holding(volunteer)
+    patch(editor, "location-detail", {"active": False}, held.pk)
+    patch(editor, "volunteer-detail", {"merged_into": survivor.pk}, volunteer.pk)
+
+    revived = patch(editor, "location-detail", {"active": True}, held.pk)
+
+    assert revived.status_code == 400, revived.content
+
+
+def test_a_retired_custody_location_comes_back_when_somebody_holds_it(
+    editor: Client,
+    volunteer: Volunteer,
+) -> None:
+    """The way out the refusal names: say who holds the stock now."""
+    survivor = Volunteer.objects.create(display_name="The one to keep")
+    held = _holding(volunteer)
+    patch(editor, "location-detail", {"active": False}, held.pk)
+    patch(editor, "volunteer-detail", {"merged_into": survivor.pk}, volunteer.pk)
+
+    revived = patch(editor, "location-detail", {"active": True, "held_by": survivor.pk}, held.pk)
+
+    assert revived.status_code == 200, revived.content
+
+
+def test_a_retired_custody_location_comes_back_for_a_holder_still_offered(
+    editor: Client,
+    volunteer: Volunteer,
+) -> None:
+    """The guard is about a withdrawn holder, not about reviving."""
+    held = _holding(volunteer)
+    patch(editor, "location-detail", {"active": False}, held.pk)
+
+    revived = patch(editor, "location-detail", {"active": True}, held.pk)
+
+    assert revived.status_code == 200, revived.content
+
+
 def test_the_detail_endpoint_shows_the_same_packaging_as_the_list(editor: Client, item: Item) -> None:
     """One item read alone is the same shape as the same item read in a page.
 
