@@ -69,7 +69,12 @@ fi
 # its row rewritten whenever anything about it changes, and counting that as a
 # closure would refuse an honest commit for touching history. So both sides of
 # the diff are read and the ones already closed are taken back out.
+#
+# An epic is not counted at all; DEVELOPERS.md#the-message says why. Without
+# that, the only ways out were to leave an epic open after its batch merged, or
+# to give its closure a commit whose trailer named something nobody built.
 closed=()
+epics_closed=()
 staged_tracker=""
 
 if [[ "$MESSAGE_ONLY" -eq 0 ]]; then
@@ -78,7 +83,7 @@ if [[ "$MESSAGE_ONLY" -eq 0 ]]; then
   # against a tracker of a hundred-odd rows on every local commit.
   staged_tracker=$(git diff --cached "$BASE" -- "$ISSUES")
 
-  mapfile -t closed < <(printf '%s\n' "$staged_tracker" | python3 -c '
+  mapfile -t moved < <(printf '%s\n' "$staged_tracker" | python3 -c '
 import json, sys
 
 was, now = set(), set()
@@ -90,11 +95,26 @@ for line in sys.stdin:
     except ValueError:
         continue          # a diff header, or a line that is not one issue
     if issue.get("status") == "closed":
-        (now if line[0] == "+" else was).add(issue["id"])
+        # Tagged rather than dropped: an epic is not work, but a commit may
+        # still be the one that closes one left open after its batch merged.
+        kind = "epic" if issue.get("issue_type") == "epic" else "work"
+        (now if line[0] == "+" else was).add((kind, issue["id"]))
 
-for issue_id in sorted(now - was):
-    print(issue_id)
+for kind, issue_id in sorted(now - was):
+    print(kind, issue_id)
 ')
+
+  # Partitioned here rather than filtered there, so one read answers both
+  # questions: what work this closes, and which epics it tidies up after.
+  closed=()
+  epics_closed=()
+  for entry in ${moved+"${moved[@]}"}; do
+    [[ -z "$entry" ]] && continue
+    case "$entry" in
+      epic\ *) epics_closed+=("${entry#epic }") ;;
+      work\ *) closed+=("${entry#work }") ;;
+    esac
+  done
 
   echo "Staged:"
   if [[ ${#closed[@]} -eq 0 ]]; then
@@ -230,6 +250,11 @@ else
       note "names $named, which is not a bead: nothing here to cross-check"
     elif [[ ${#closed[@]} -eq 1 && "$named" != "${closed[0]}" ]]; then
       fail "the message closes $named but the staged tracker closes ${closed[0]}"
+    elif [[ ${#closed[@]} -eq 0 ]] && closes_the_epic "$named"; then
+      # An epic is not counted as work, so it never reaches `closed` -- but a
+      # commit may still be the one closing it, when it was left open after its
+      # batch merged. Saying the tracker does not close it would be false.
+      note "closes the epic $named, which is bookkeeping rather than work"
     elif [[ ${#closed[@]} -eq 0 ]]; then
       if [[ -z "$staged_tracker" ]]; then
         # beads exports the tracker on its own schedule, so the close may be

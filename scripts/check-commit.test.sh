@@ -404,4 +404,39 @@ expect --message-only 1 "not the last paragraph" "a trailer with prose after it 
 refute "$(git interpret-trailers --parse < "$WORK/repo/message")" 0 0 "Closes" \
   "and git agrees it finds no trailer there"
 
+# An epic groups a batch and does no work of its own, so its closure riding
+# with the last issue of that batch is bookkeeping rather than a second unit.
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+{"_type":"issue","id":"inventory-tng-epic","title":"the batch","issue_type":"epic","status":"closed"}
+JSONL
+good_message
+expect 0 "Nothing to object to" "an epic closing alongside its last issue is one commit"
+
+# Two epics is still not two units of work.
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+{"_type":"issue","id":"inventory-tng-e1","title":"a batch","issue_type":"epic","status":"closed"}
+{"_type":"issue","id":"inventory-tng-e2","title":"another","issue_type":"epic","status":"closed"}
+JSONL
+good_message
+expect 0 "Nothing to object to" "several epics are still not work"
+
+# And two real issues still are.
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"closed"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+{"_type":"issue","id":"inventory-tng-epic","title":"the batch","issue_type":"epic","status":"closed"}
+JSONL
+good_message
+expect 1 "2 issues are closed here" "an epic does not excuse two issues"
+
 verdict
