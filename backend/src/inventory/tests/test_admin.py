@@ -19,7 +19,6 @@ from django.db import models
 from django.http import HttpRequest
 from django.test import Client, RequestFactory
 from django.urls import reverse
-from pytest_django.fixtures import Settings
 from simple_history.models import HistoricalChanges
 
 from inventory.models import (
@@ -64,23 +63,6 @@ def administrator_request(rf: RequestFactory, administrator: User) -> HttpReques
     request = rf.get("/admin/")
     request.user = administrator
     return request
-
-
-@pytest.fixture
-def _static_files_are_not_collected(settings: Settings) -> None:
-    """Serve static files straight from the apps, as a development checkout does.
-
-    Outside DEBUG the project hashes static files through WhiteNoise's manifest
-    storage, which is right for the built image -- the image runs collectstatic
-    -- and impossible under test, where nothing has. Every admin template opens
-    with ``{% static 'admin/css/base.css' %}``, so without this a rendering test
-    fails on the manifest rather than on the page. Overridden here rather than in
-    settings.py so the deployed behaviour is exactly what it was.
-    """
-    settings.STORAGES = {
-        **settings.STORAGES,
-        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
-    }
 
 
 @pytest.fixture

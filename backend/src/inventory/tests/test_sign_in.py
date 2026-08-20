@@ -157,6 +157,7 @@ def test_the_local_path_signs_in_with_the_password_and_the_code(local: User) -> 
     }
 
 
+@pytest.mark.usefixtures("_static_files_are_not_collected")
 def test_the_wrong_code_leaves_the_session_unauthenticated(local: User) -> None:
     activate_totp(local)
     client = start_local_sign_in(local, PASSWORD)
@@ -410,6 +411,7 @@ def test_a_provider_email_does_not_reach_an_account_that_already_exists(administ
 # --------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("_static_files_are_not_collected")
 @pytest.mark.usefixtures("_providers")
 def test_only_an_existing_administrator_can_reach_the_grant(local: User) -> None:
     """Point 5's "an existing administrator grants the staff flag", as a boundary.

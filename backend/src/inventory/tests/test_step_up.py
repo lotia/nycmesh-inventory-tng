@@ -230,6 +230,7 @@ def test_the_app_itself_is_served_with_the_same_policy() -> None:
     assert served == declared
 
 
+@pytest.mark.usefixtures("_static_files_are_not_collected")
 def test_the_documentation_page_loads_nothing_from_a_cdn(editor: Client) -> None:
     """A page that fetched its script from jsdelivr would render blank here.
 
@@ -243,6 +244,7 @@ def test_the_documentation_page_loads_nothing_from_a_cdn(editor: Client) -> None
     assert "/static/drf_spectacular_sidecar/" in page
 
 
+@pytest.mark.usefixtures("_static_files_are_not_collected")
 def test_the_documentation_page_needs_no_exception_from_the_policy(editor: Client) -> None:
     """Swagger UI normally boots from an inline block; the split view does not.
 
@@ -280,6 +282,7 @@ def test_the_admin_asks_again_before_a_change(stale: Client, category: Category)
     assert category.name != "Something else"
 
 
+@pytest.mark.usefixtures("_static_files_are_not_collected")
 def test_the_admin_can_still_be_read(stale: Client, category: Category) -> None:
     """Reading is what somebody does before deciding to change anything."""
     assert stale.get(reverse("admin:inventory_category_changelist")).status_code == 200
