@@ -200,13 +200,28 @@ fi
 # Everything after the summary, rather than everything after the blank line:
 # a message that forgot the blank line still has a body, and it is still too
 # wide.
+# Every one of them, not the first. Stopping at one meant a message with three
+# long lines took three runs to fix, and the second and third were written
+# against a report that named neither -- which is how a line over the limit
+# reached this repository's history more than once.
+wide=()
 for line in "${lines[@]:1}"; do
   # A line with nowhere to break -- a long URL, pasted output -- is left alone.
   if [[ ${#line} -gt $BODY_LIMIT && "$line" == *" "* ]]; then
-    fail "a body line is ${#line} characters, over $BODY_LIMIT: ${line:0:40}..."
-    break
+    wide+=("${#line}: ${line:0:44}...")
   fi
 done
+
+if [[ ${#wide[@]} -gt 0 ]]; then
+  if [[ ${#wide[@]} -eq 1 ]]; then
+    fail "one body line is over $BODY_LIMIT characters:"
+  else
+    fail "${#wide[@]} body lines are over $BODY_LIMIT characters:"
+  fi
+  for line in "${wide[@]}"; do
+    note "  $line"
+  done
+fi
 
 # Every trailer names an issue, and they all name the same one. That is what
 # "one issue per commit" reduces to in a message: an issue may take more than
@@ -250,7 +265,7 @@ else
       note "names $named, which is not a bead: nothing here to cross-check"
     elif [[ ${#closed[@]} -eq 1 && "$named" != "${closed[0]}" ]]; then
       fail "the message closes $named but the staged tracker closes ${closed[0]}"
-    elif [[ ${#closed[@]} -eq 0 ]] && closes_the_epic "$named"; then
+    elif [[ ${#closed[@]} -eq 0 && " ${epics_closed[*]-} " == *" $named "* ]]; then
       # An epic is not counted as work, so it never reaches `closed` -- but a
       # commit may still be the one closing it, when it was left open after its
       # batch merged. Saying the tracker does not close it would be false.

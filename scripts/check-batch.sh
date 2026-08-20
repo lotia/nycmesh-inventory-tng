@@ -242,9 +242,19 @@ if [[ -x "$CHECK" ]]; then
     # prefix against a fifty-column limit.
     absorbed "$subject" && continue
     if ! output=$("$CHECK" --message-only <(printf '%s\n' "${body_of[$sha]:-}") 2>&1); then
+      # The notes after a failure belong to it -- an objection that names two
+      # long lines puts them there -- so they are carried rather than dropped,
+      # which left "2 body lines over 72 characters:" and nothing after it.
+      keeping=0
       while IFS= read -r line; do
-        [[ "$line" == *"$MARK_FAIL"* ]] || continue
-        fail "${sha:0:8} ${line#*"$MARK_FAIL" }"
+        if [[ "$line" == *"$MARK_FAIL"* ]]; then
+          keeping=1
+          fail "${sha:0:8} ${line#*"$MARK_FAIL" }"
+        elif [[ "$keeping" -eq 1 && "$line" == *"$MARK_NOTE"* ]]; then
+          note "${line#*"$MARK_NOTE" }"
+        else
+          keeping=0
+        fi
       done <<<"$output"
     fi
   done
