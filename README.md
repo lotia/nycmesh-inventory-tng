@@ -16,9 +16,9 @@ What fails is not its size — the sheet is small. The problems are structural:
 - **One item per scan.** Most entries were part of a burst by one person filling
   the same form over and over. **Batching is the most-requested missing
   feature.**
-- **Nobody can correct it properly.** A large share of entries are people faking
-  check-ins and check-outs to fix a number, because there is no other way to say
-  "the shelf disagrees with the sheet".
+- **Nobody can correct it properly.** A large share of entries are corrections
+  dressed as movements — [decision 0008](docs/decisions/0008-stock-ledger-transfer-graph.md)
+  counts them, and says what the sheet gives volunteers instead.
 - **It lives in a personal Google account**, so it cannot be edited by the
   people who depend on it and could be lost.
 

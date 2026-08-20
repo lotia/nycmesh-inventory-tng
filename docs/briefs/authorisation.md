@@ -104,8 +104,8 @@ list of items with `−1 / count / +1` beside each.
 ## Q6. Where do administrators actually work?
 
 **Decided: the same application, with Django's admin kept as a fallback.**
-Signing in does not navigate anywhere else; it changes what the interface
-offers.
+What that means in the interface is
+[decision 0014](../decisions/0014-one-interface.md); what it cost is below.
 
 The cost, stated plainly: this re-couples what Q2 separated. Putting
 administrative capability into the volunteer app means script injected into that
