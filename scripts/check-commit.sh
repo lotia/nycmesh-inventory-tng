@@ -77,7 +77,12 @@ closed=()
 staged_tracker=""
 
 if [[ "$MESSAGE_ONLY" -eq 0 ]]; then
-  mapfile -t closed < <(git diff --cached "$BASE" -- "$ISSUES" | python3 -c '
+  # Read once and used twice: whether the path was staged at all is the same
+  # question as whether this diff is empty, and it runs as a commit-msg hook
+  # against a tracker of a hundred-odd rows on every local commit.
+  staged_tracker=$(git diff --cached "$BASE" -- "$ISSUES")
+
+  mapfile -t closed < <(printf '%s\n' "$staged_tracker" | python3 -c '
 import json, sys
 
 was, now = set(), set()
@@ -94,8 +99,6 @@ for line in sys.stdin:
 for issue_id in sorted(now - was):
     print(issue_id)
 ')
-
-  staged_tracker=$(git diff --cached --name-only "$BASE" -- "$ISSUES")
 
   echo "Staged:"
   if [[ ${#closed[@]} -eq 0 ]]; then
