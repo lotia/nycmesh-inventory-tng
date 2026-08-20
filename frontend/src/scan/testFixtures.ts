@@ -1,11 +1,19 @@
 /**
- * Standing in for the camera hardware jsdom does not have.
+ * What the scan tests are built out of: fake hardware, fake timing, fixed data.
  *
- * Only the enumeration half is worth simulating: what cameras a device says it
- * has is a plain list this app has to render and remember, and that is testable
- * without pretending to decode anything. Opening a stream is deliberately left
- * refusing, because a fake stream would only prove the fake works -- see the
- * header of CameraScanner.tsx.
+ * The hardware half stands in for what jsdom has none of. What cameras a
+ * device says it has is a plain list this app renders and remembers; a granted
+ * stream is a bag of tracks somebody has to let go of, and letting go of them
+ * -- on teardown, and when the stream arrives after it -- is a rule of this app
+ * that two bugs were found in. The timing half (`deferred`) is here because
+ * half of what these tests assert is about *when* something arrives, and the
+ * moment has to be the test's to choose.
+ *
+ * WHAT NO TEST IN THIS DIRECTORY CLAIMS: that a QR code can be read. A fake
+ * stream carries no pixels and a canned `rawValue` is a label reading "the
+ * decoder said something", not evidence that it would. Nor does any other
+ * suite claim it, which is a gap rather than a division of labour and is
+ * recorded as one in DEVELOPERS.md "Integration tests".
  */
 import { vi } from "vitest";
 import type { ResolvedLabel } from "../api/types";
@@ -33,6 +41,54 @@ export function stubMediaDevices(devices: Partial<MediaDevices>): void {
 
 export function clearMediaDevices(): void {
   Reflect.deleteProperty(navigator, "mediaDevices");
+}
+
+/** A promise, and the two ways a test settles it when it chooses to. */
+export interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (error: unknown) => void;
+}
+
+/**
+ * A promise held open until the test says otherwise: a stream granted after
+ * the scanner closed, a decoder that lands too late, a lens already left.
+ *
+ * `Promise.withResolvers` is exactly this in one line and is ES2024;
+ * tsconfig.json targets ES2022 on purpose, and a test helper is not a reason
+ * to move what the app is compiled against.
+ */
+export function deferred<T>(): Deferred<T> {
+  // Assigned before `new Promise` answers -- the executor runs there and then
+  // -- which TypeScript cannot see, and a placeholder pair of no-ops would be
+  // two functions no test ever calls.
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((settle, fail) => {
+    resolve = settle;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+
+/** A granted stream, and the tracks a test has to watch being stopped. */
+export interface FakeStream {
+  stream: MediaStream;
+  /** One spy per track. The camera is only really off when every one is called. */
+  stops: ReturnType<typeof vi.fn>[];
+}
+
+/**
+ * A stream of two tracks, neither of which carries a single pixel.
+ *
+ * Two, because "every track is stopped" is the rule and one track cannot tell
+ * it apart from "a track is stopped" -- and a spy each rather than one between
+ * them, because a shared spy cannot tell it apart from one track stopped twice.
+ */
+export function fakeStream(): FakeStream {
+  const stops = [vi.fn(), vi.fn()];
+  const tracks = stops.map((stop) => ({ stop }));
+  return { stream: { getTracks: () => tracks } as unknown as MediaStream, stops };
 }
 
 /**

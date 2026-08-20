@@ -15,6 +15,16 @@
  * per frame is the `ImageData` `getImageData` has to allocate and the
  * grayscale copy `zxing-wasm` makes of it on the way into the WASM heap; both
  * are now bounded by `WORKING_EDGE` instead of growing with the lens.
+ *
+ * What that is worth, at `DECODE_INTERVAL_MS` (decodeLoop.ts): the discarded
+ * path measured ~7.7 MB/s of garbage from a 640x480 camera and three times
+ * that from a 720p phone, because the canvas and context were per call and
+ * grew with the lens. What is left is the `ImageData` plus the grayscale copy
+ * -- 0.9 MB and 0.2 MB per frame at 640x360, ~5.8 MB/s -- and it no longer
+ * grows with the lens: a 1080p phone now pays what a 360p one of the same
+ * shape does. Not one number for every camera, though, because only the
+ * longest edge is bounded and the other is still the camera's aspect ratio:
+ * 4:3 decodes at 640x480 and 16:9 at 640x360.
  */
 
 /**
@@ -61,19 +71,22 @@ export function workingSize(width: number, height: number): Size {
  * holds it by holding the function and lets go of it by letting go -- which is
  * what the effect that opens the camera does, one grabber per stream.
  *
- * Answers `null` rather than throwing when there is nothing to draw yet or no
- * 2D context to draw with; the caller passes the video element on instead and
- * lets the decoder decide, which is what happened before this file existed.
+ * Where there is nothing to draw yet or no 2D context to draw with, it answers
+ * with the video element itself and lets the decoder do its own drawing --
+ * which is what happened everywhere before this file existed, and costs what
+ * the header says. Handing that decision back to the caller would put the rule
+ * in one file and its reason in another; it is not a failure, it is the other
+ * way to get a frame.
  */
-export function frameGrabber(): (video: HTMLVideoElement) => ImageData | null {
+export function frameGrabber(): (video: HTMLVideoElement) => CanvasImageSource | ImageData {
   let canvas: HTMLCanvasElement | null = null;
   let context: CanvasRenderingContext2D | null = null;
-  return (video: HTMLVideoElement): ImageData | null => {
+  return (video: HTMLVideoElement): CanvasImageSource | ImageData => {
     const { width, height } = workingSize(video.videoWidth, video.videoHeight);
     // A stream that has not produced a frame yet reports 0x0, and a canvas
     // cannot be that size.
     if (width === 0 || height === 0) {
-      return null;
+      return video;
     }
     canvas ??= document.createElement("canvas");
     // `willReadFrequently` asks for a CPU-backed canvas. Every frame drawn
@@ -84,7 +97,7 @@ export function frameGrabber(): (video: HTMLVideoElement) => ImageData | null {
     // this runs five times a second for as long as the camera is open.
     context ??= canvas.getContext("2d", { willReadFrequently: true });
     if (context === null) {
-      return null;
+      return video;
     }
     // Assigning either dimension clears the canvas, so it is done only when
     // the camera's shape actually changed -- once per stream, in practice.

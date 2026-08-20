@@ -29,11 +29,13 @@ Each of these is measured rather than assumed. The figures live once, in
 
 **Early.** The repository skeleton, tooling, and deployment path are in place,
 and the inventory data model is implemented
-([docs/data-model.md](docs/data-model.md)). The first API endpoints are built,
-but the QR flow over them is designed
-([decision 0011](docs/decisions/0011-qr-batch-scanning.md)) and has no user
-interface yet, so there is nothing a volunteer can use. What exists and what is
-missing are listed in [architecture.md](docs/architecture.md#not-yet-built).
+([docs/data-model.md](docs/data-model.md)). The QR flow
+([decision 0011](docs/decisions/0011-qr-batch-scanning.md)) is built end to
+end — printable labels, a camera that decodes them, the cart that holds a
+batch, and the Save that writes it — behind a sign-in. The screens an
+administrator needs, and the one thing the scanner still does over the network
+rather than from a cache, are what is missing. What exists and what does not
+are listed in [architecture.md](docs/architecture.md#not-yet-built).
 
 ## Documentation
 

@@ -8,8 +8,8 @@
  * "only one canvas is ever made" be asserted rather than assumed.
  *
  * Nothing here pretends to decode anything: what a QR looks like to zxing is
- * not this file's business, and the header of CameraScanner.tsx says why no
- * test in this directory tries.
+ * not this file's business, and the header of testFixtures.ts says why no test
+ * in this directory tries.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { frameGrabber, WORKING_EDGE, workingSize } from "./frame";
@@ -117,16 +117,20 @@ describe("grabbing a frame", () => {
     expect(canvases).toHaveLength(2);
   });
 
-  it("answers nothing, and makes no canvas, before the stream has a frame", () => {
+  it("hands back the element, and makes no canvas, before the stream has a frame", () => {
     const { canvases } = recording();
+    const video = playing(0, 0);
 
-    expect(frameGrabber()(playing(0, 0))).toBeNull();
+    expect(frameGrabber()(video)).toBe(video);
     expect(canvases).toHaveLength(0);
   });
 
-  it("answers nothing where the browser has no 2D context to draw with", () => {
+  it("hands back the element where the browser has no 2D context to draw with", () => {
     // jsdom, unstubbed, which is also the shape of a browser that refuses a
-    // context. The caller hands the video element to the decoder instead.
-    expect(frameGrabber()(playing(640, 480))).toBeNull();
+    // context. The decoder does its own drawing from there, at whatever the
+    // camera answered with, which is what the header measures.
+    const video = playing(640, 480);
+
+    expect(frameGrabber()(video)).toBe(video);
   });
 });

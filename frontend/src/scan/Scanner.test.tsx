@@ -18,6 +18,7 @@ import { Scanner } from "./Scanner";
 import {
   CABLE_LABEL,
   clearMediaDevices,
+  deferred,
   PACKET,
   refusing,
   serving,
@@ -30,21 +31,20 @@ import {
  * a code is still resolving.
  */
 function servingSlowly(label: unknown): () => void {
-  let release: () => void = () => undefined;
-  const held = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+  const held = deferred<void>();
   vi.stubGlobal(
     "fetch",
     vi.fn(async (path: string) => {
       if (path.startsWith("/api/labels/")) {
-        await held;
+        await held.promise;
         return new Response(JSON.stringify(label), { status: 200 });
       }
       return new Response(JSON.stringify(zipTies), { status: 200 });
     }),
   );
-  return release;
+  return () => {
+    held.resolve();
+  };
 }
 
 function show() {

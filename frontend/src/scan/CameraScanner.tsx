@@ -1,17 +1,17 @@
 /**
  * The camera, open and decoding.
  *
- * Deliberately thin, because almost none of it can be tested honestly: jsdom
- * has no camera, no video pipeline and no WebAssembly decoder, so everything
- * from a granted permission onwards is verified by pointing a phone at a
- * sticker and not by a test that pretends to. What *is* testable lives beside
- * this file in cameras.ts and decoder.ts and is tested there -- which is the
- * reason this component holds wiring and nothing else.
+ * Deliberately thin: everything decidable lives beside this file in
+ * cameras.ts, frame.ts, decodeLoop.ts and decoder.ts and is tested there, so
+ * what is left here is the order things happen in. That order is itself a rule
+ * -- the stream reaches the preview before it is played, and everything taken
+ * is let go of however the open ends -- and CameraScanner.test.tsx asserts it
+ * against a stream jsdom can be handed.
  *
- * Every decode is handed on, including the same code five times a second. The
- * cart's reducer decides what is a new scan (`SCAN_DEBOUNCE_MS` in
- * cart/cartState.ts); a second opinion here would be a second thing to get
- * wrong.
+ * What no test of this file can reach is the pixels: jsdom has no video
+ * pipeline and no WebAssembly runtime, so whether a real frame decodes is
+ * verified by pointing a phone at a sticker and by nothing automated -- see
+ * the header of testFixtures.ts, which is where that is written down.
  */
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -29,11 +29,9 @@ import {
   loadCamera,
   saveCamera,
 } from "./cameras";
+import { decodeLoop } from "./decodeLoop";
 import { loadDetector } from "./decoder";
 import { frameGrabber } from "./frame";
-
-/** Fast enough to feel instant, slow enough to leave the phone some battery. */
-const DECODE_INTERVAL_MS = 200;
 
 /**
  * What is said when there is no camera API at all.
@@ -104,7 +102,7 @@ export function CameraScanner({ onCode }: { onCode: (code: string) => void }) {
     }
     const media = navigator.mediaDevices;
     let stream: MediaStream | undefined;
-    let timer: ReturnType<typeof setInterval> | undefined;
+    let stopDecoding: (() => void) | undefined;
     let live = true;
 
     /**
@@ -113,13 +111,15 @@ export function CameraScanner({ onCode }: { onCode: (code: string) => void }) {
      * The cleanup below can only stop what exists when it runs, and the
      * volunteer taps "Stop camera" or switches lens while the permission
      * prompt is still up or the decoder is still downloading -- so the stream
-     * and the timer arrive after it. `open` therefore checks `live` after each
-     * await it holds something across and calls this when the answer is no.
-     * Without it the phone keeps the lens powered and the tab keeps its
-     * recording indicator lit, which is what the button was pressed to stop.
+     * arrives after it. `open` therefore checks `live` after each await it
+     * holds something across and calls this when the answer is no, and the
+     * catch below calls it too -- an open that failed has taken a stream just
+     * as surely as one that succeeded. Without it the phone keeps the lens
+     * powered and the tab keeps its recording indicator lit, which is what the
+     * button was pressed to stop.
      */
     function release(): void {
-      clearInterval(timer);
+      stopDecoding?.();
       for (const track of stream?.getTracks() ?? []) {
         track.stop();
       }
@@ -139,51 +139,36 @@ export function CameraScanner({ onCode }: { onCode: (code: string) => void }) {
       // nothing.
       const detecting = loadDetector();
       await element.play();
-      setCameras(await listCameras());
+      // The second of the two enumerations described above, for the names
+      // permission has now put on the devices. Neither awaited nor allowed to
+      // fail the open: the names are a convenience and the decode loop below
+      // is the point.
+      listCameras()
+        .then(setCameras)
+        .catch(() => undefined);
       const detector = await detecting;
       if (!live) {
         release();
         return;
       }
-      let busy = false;
       // One canvas for this stream, and a frame bounded before it is handed
-      // over. Passing the video element straight to `detect` takes
-      // barcode-detector's other path, which builds a fresh canvas and 2D
-      // context per call at whatever resolution the camera answered with --
-      // measured at 640x480 and this interval as ~7.7 MB/s of garbage, and
-      // three times that from a 720p phone. A frame still has to reach the CPU
-      // once a tick; what goes away is the canvas and context built per call,
-      // and the growth with the lens. What is left is the ImageData
-      // `getImageData` must return and the grayscale copy zxing-wasm makes of
-      // it: at 640x360 that is 0.9 MB plus 0.2 MB, ~5.8 MB/s. See frame.ts.
+      // over rather than the element handed straight to `detect`. What that
+      // costs either way is measured in frame.ts.
       const grab = frameGrabber();
-      timer = setInterval(async () => {
-        if (busy || !live) {
-          return;
-        }
-        busy = true;
-        try {
-          const found = await detector.detect(grab(element) ?? element);
-          // Rechecked after the await as well: a decode that lands after the
-          // volunteer closed the scanner must not add a line to the batch.
-          if (!live) {
-            return;
-          }
-          for (const code of found) {
-            latest.current(code.rawValue);
-          }
-        } catch {
-          // A frame that will not decode is the ordinary case, not an error:
-          // most frames are a shelf, or a label mid-focus.
-        }
-        busy = false;
-      }, DECODE_INTERVAL_MS);
-      if (!live) {
-        release();
-      }
+      stopDecoding = decodeLoop({
+        detect: (source) => detector.detect(source),
+        frame: () => grab(element),
+        onCode: (code) => latest.current(code),
+      });
     }
 
     open().catch((error: unknown) => {
+      // Whatever went wrong, the lens is not being used any more. A failure
+      // after the stream was granted -- `play` refused, the decoder's
+      // megabyte lost on a basement connection -- would otherwise leave the
+      // tracks live for the life of the mount, because `failure` is not a
+      // dependency of this effect and nothing runs the cleanup below.
+      release();
       // A camera torn down while it was opening rejects as a matter of course:
       // `play()` answers a stream that has just been stopped with an
       // AbortError. Saying so would put a warning on the screen about the lens

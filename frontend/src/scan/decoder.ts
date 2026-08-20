@@ -40,7 +40,12 @@ import wasmUrl from "zxing-wasm/reader/zxing_reader.wasm?url";
  * `CanvasImageSource` alone does not cover.
  */
 export interface CodeDetector {
-  detect(source: CanvasImageSource | ImageData): Promise<{ rawValue: string }[]>;
+  detect(source: CanvasImageSource | ImageData): Promise<Decoded[]>;
+}
+
+/** One code, as a detector reports it. Everything else it offers is unused. */
+export interface Decoded {
+  rawValue: string;
 }
 
 /**
