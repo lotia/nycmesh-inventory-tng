@@ -119,6 +119,7 @@ def test_every_advertised_link_is_described_in_the_schema(client: Client, schema
         assert path in schema["paths"], f"{name} -> {path} is advertised but not described"
 
 
+@pytest.mark.usefixtures("_static_files_are_not_collected")
 @pytest.mark.django_db
 def test_every_advertised_link_that_answers_a_get_answers_it(client: Client, schema: Mapping[str, Any]) -> None:
     """The half of the old assertion that is still true, kept.
