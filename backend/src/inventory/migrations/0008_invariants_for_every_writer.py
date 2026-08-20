@@ -30,11 +30,16 @@ class Migration(migrations.Migration):
         # inventory_reject_tree_cycle is generic over the table, because three
         # copies of it would be three chances to fix two of them.
         #
-        # Checked when the column is written, not continuously: retiring or
-        # merging somebody who already holds a custody location stays allowed,
-        # which is what the API does today. So an ordinary UPDATE that leaves
-        # the column alone -- renaming a shelf, retiring an item -- is not an
-        # occasion to re-litigate a choice made earlier.
+        # Checked when the column is written, not continuously, so an ordinary
+        # UPDATE that leaves the column alone -- renaming a shelf, retiring an
+        # item -- is not an occasion to re-litigate a choice made earlier.
+        #
+        # That leaves two gaps the API closes rather than the database:
+        # withdrawing somebody who already holds a custody location, and
+        # bringing such a location back once its holder has been withdrawn.
+        # Both are in VolunteerDetailSerializer.validate and
+        # LocationSerializer.validate; neither is a value this can see from
+        # the row being written.
         # ------------------------------------------------------------------
         migrations.RunSQL(
             sql="""

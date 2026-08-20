@@ -68,9 +68,10 @@ A volunteer holding stock **is** a location, with `held_by` pointing at them. A
 check constraint enforces that `held_by` is set if and only if
 `kind = volunteer_custody`, and a trigger enforces that whoever it names is
 still offered by the pick-list — a custody location attached to a merged
-duplicate is the second generation of the duplicate the merge removed. Retiring
-somebody who *already* holds one is still allowed; the rule is checked where the
-naming happens. External sources and sinks — a vendor shipment
+duplicate is the second generation of the duplicate the merge removed. Merging
+or retiring somebody who *already* holds one is refused, naming the location,
+and so is bringing such a location back once its holder is gone —
+`VolunteerDetailSerializer.validate` says why neither is repaired instead. External sources and sinks — a vendor shipment
 arriving, hardware fitted at an install — are represented by a `NULL` location
 on one side of a movement, not by a row.
 

@@ -17,11 +17,10 @@ constraints (migration 0008):
   holding custody of stock, and may not be the survivor a merge points at
   (``VolunteerDetailSerializer.validate_merged_into``,
   ``LocationSerializer.validate_held_by``, and the ``actor`` field's queryset).
-  Each is checked where the naming happens, so the reverse -- retiring or
-  merging somebody who already holds a custody location -- is still allowed
-  and leaves that location pointing at a record the pick-list no longer
-  offers. Whether that should be refused or should move the custody to the
-  survivor is a decision nobody has taken;
+  The reverse is checked too, in ``VolunteerDetailSerializer.validate``:
+  merging or retiring somebody who already holds an active custody location is
+  refused, naming the location, rather than leaving it pointing at a record
+  the pick-list no longer offers;
 - a label's code may not change once it is printed
   (``LabelSerializer.validate``);
 - and, in views.py, a movement carries the sides its transaction's kind calls
@@ -357,6 +356,43 @@ class VolunteerDetailSerializer(VolunteerSerializer):
     class Meta(VolunteerSerializer.Meta):
         fields = [*VolunteerSerializer.Meta.fields, "active", "merged_into"]
 
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        """Neither route out of the pick-list leaves a custody location behind.
+
+        ``LocationSerializer.validate_held_by`` refuses a *new* custody
+        location for somebody merged or retired, on the grounds that it would
+        be the second generation of the duplicate a merge existed to remove.
+        The reverse was allowed: merging or retiring somebody who already held
+        one left that location active, named after them, and still offered in
+        the pick-list. Both routes reached it -- ``merged_into`` and
+        ``active`` -- because the guard was placed where the naming happens
+        rather than where the state is created.
+
+        Refused rather than repaired, and deliberately. Repointing the location
+        at the survivor is the obvious move and fails exactly when it matters:
+        ``location_one_custody_per_volunteer`` stops it the moment the survivor
+        already holds one, which is the ordinary shape of a real duplicate.
+        Retiring the location instead has no answer for the stock still
+        recorded there, which is the open question in inventory-tng-6c7. So
+        this says what to do first and lets a person decide, which is what the
+        409 in decision 0015 does with a name that is already taken.
+        """
+        if self.instance is None:
+            return attrs
+
+        leaving = attrs.get("merged_into") is not None or attrs.get("active") is False
+        if not leaving:
+            return attrs
+
+        held = self.instance.custody_locations.filter(active=True).first()
+        if held is not None:
+            raise serializers.ValidationError(
+                f"{self.instance.display_name} still holds the custody location "
+                f"{held.name!r}. Move the stock recorded there and retire it, or "
+                f"hand it to somebody else, before merging or retiring them."
+            )
+        return attrs
+
     def validate_merged_into(self, value: Volunteer | None) -> Volunteer | None:
         """A merge points at somebody the pick-list will actually offer.
 
@@ -451,6 +487,21 @@ class LocationSerializer(TreeSerializer):
             )
         if not custody and held_by is not None:
             raise serializers.ValidationError("Only a custody location names a volunteer.")
+
+        # Bringing one back is naming a holder again, whatever the request
+        # says. validate_held_by only sees a holder the request supplies, and
+        # `location_held_by_selectable` returns early when held_by is
+        # unchanged -- so retire the location, merge its holder, then set
+        # active back to true, and the rule is gone in three legal steps. The
+        # revival is where that is caught.
+        reviving = attrs.get("active") is True and self.instance is not None
+        if reviving and custody and "held_by" not in attrs:
+            holder = self.instance.held_by
+            if holder is not None and not holder.is_selectable:
+                raise serializers.ValidationError(
+                    f"{holder.display_name} has since been merged or retired, so this "
+                    f"cannot be brought back as theirs. Name whoever holds the stock now."
+                )
         return attrs
 
     def validate_held_by(self, value: Volunteer | None) -> Volunteer | None:
