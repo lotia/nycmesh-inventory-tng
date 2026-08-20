@@ -40,11 +40,11 @@ message() {
 
 good_message() {
   message <<'MSG'
-Extract the decode loop into its own module
+aaa: Extract the decode loop into its own module
 
 Moves the 5 Hz loop out of the component and into decodeLoop.ts.
 
-Closes inventory-tng-aaa
+Closes: inventory-tng-aaa
 MSG
 }
 
@@ -89,7 +89,7 @@ JSONL
 message <<'MSG'
 Extract the decode loop into its own module
 
-Closes inventory-tng-bbb
+Closes: inventory-tng-bbb
 MSG
 expect 1 "closes inventory-tng-bbb but the staged tracker closes inventory-tng-aaa" \
   "a trailer naming another issue is refused"
@@ -108,7 +108,7 @@ message <<'MSG'
 Refactored the decode loop so that it could be tested properly.
 The body starts here with no blank line, and runs on well past seventy-two columns.
 
-Closes inventory-tng-aaa
+Closes: inventory-tng-aaa
 MSG
 expect 1 "is not the imperative" "the past tense is refused"
 expect 1 "over 50" "an over-long summary is refused"
@@ -120,7 +120,7 @@ scene
 message <<'MSG'
 Read the label map from the cache
 
-Closes inventory-tng-aaa
+Closes: inventory-tng-aaa
 MSG
 expect 1 "nothing staged closes" "an imperative that ends in -ed is not mistaken for a tense"
 output=$("$CHECK" "$WORK/repo/message" 2>&1)
@@ -152,7 +152,7 @@ scene
 message <<'MSG'
 Extracted the decode loop
 
-Closes inventory-tng-aaa
+Closes: inventory-tng-aaa
 MSG
 expect --message-only 1 "not the imperative" "and the message rules still apply"
 
@@ -162,8 +162,8 @@ scene
 message <<'MSG'
 aaa: Note what the tracker says about staged work here
 
-Closes inventory-tng-aaa
-Closes inventory-tng-bbb
+Closes: inventory-tng-aaa
+Closes: inventory-tng-bbb
 MSG
 expect --message-only 1 "2 'Closes' trailers" "an objection whose wording mentions staging survives"
 
@@ -182,7 +182,7 @@ JSONL
 message <<'MSG'
 Extract the decode loop into its own module
 
-Closes #123
+Closes: #123
 MSG
 expect 0 "not a bead" "a GitHub issue is accepted without a tracker to check"
 
@@ -210,7 +210,7 @@ JSONL
 message <<'MSG'
 aaa: Extract the decode loop into its own module
 
-Closes inventory-tng-aaa
+Closes: inventory-tng-aaa
 MSG
 expect 0 "Nothing to object to" "an identifier is not charged against the 50"
 
@@ -232,7 +232,7 @@ JSONL
 message <<'MSG'
 aaa: Extract the decode loop into its own new module
 
-Closes inventory-tng-aaa
+Closes: inventory-tng-aaa
 MSG
 expect 0 "Nothing to object to" "a prefix its trailer confirms is not charged for"
 
@@ -245,7 +245,7 @@ JSONL
 message <<'MSG'
 bbb: Extract the decode loop into its own new module
 
-Closes inventory-tng-aaa
+Closes: inventory-tng-aaa
 MSG
 expect 1 "over 50" "a prefix naming another issue is prose, and is charged for"
 
@@ -258,7 +258,7 @@ JSONL
 message <<'MSG'
 aaa: Extract the decode loop into a module that is far too long to fit
 
-Closes inventory-tng-aaa
+Closes: inventory-tng-aaa
 MSG
 expect 1 "over 50" "an over-long summary is still refused with an identifier"
 
@@ -268,7 +268,7 @@ scene
 message <<'MSG'
 aaa: Move the loop before rewriting it
 
-Refs inventory-tng-aaa
+Refs: inventory-tng-aaa
 MSG
 expect 0 "names inventory-tng-aaa without closing it" "Refs advances an issue without closing it"
 
@@ -281,7 +281,7 @@ JSONL
 message <<'MSG'
 aaa: Move the loop before rewriting it
 
-Refs inventory-tng-aaa
+Refs: inventory-tng-aaa
 MSG
 expect 1 "closes nothing but the staged tracker closes" "Refs while the tracker closes something is refused"
 
@@ -294,8 +294,8 @@ JSONL
 message <<'MSG'
 aaa: Extract the decode loop
 
-Closes inventory-tng-aaa
-Refs inventory-tng-bbb
+Closes: inventory-tng-aaa
+Refs: inventory-tng-bbb
 MSG
 expect 1 "A commit belongs to one issue" "trailers naming two issues are refused"
 
@@ -308,8 +308,8 @@ JSONL
 message <<'MSG'
 aaa: Extract the decode loop
 
-Closes inventory-tng-aaa
-Closes inventory-tng-bbb
+Closes: inventory-tng-aaa
+Closes: inventory-tng-bbb
 MSG
 expect 1 "2 'Closes' trailers" "two closing trailers are refused"
 
@@ -345,5 +345,63 @@ tracker <<'JSONL'
 JSONL
 output=$("$WORK/repo/hooked" "$WORK/repo/message" 2>&1)
 assert "$output" $? 0 "Nothing to object to" "it works through a symlink, as the hook install makes it"
+
+# --- a trailer git can read ------------------------------------------------
+#
+# See trailers.sh for what git requires and DEVELOPERS.md#commits for why.
+
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+message <<'MSG'
+aaa: Extract the decode loop
+
+Closes inventory-tng-aaa
+MSG
+expect 1 "is not a trailer git can read" "a trailer without the colon is refused"
+
+# It is still read, so a range of history written before the convention is not
+# invisible to check-batch.sh.
+scene
+message <<'MSG'
+aaa: Extract the decode loop
+
+Closes inventory-tng-aaa
+MSG
+output=$("$CHECK" --message-only "$WORK/repo/message" 2>&1)
+assert "$output" $? 1 "not a trailer git can read" "the colonless form is still recognised as naming an issue"
+refute "$output" 1 1 "found none" "and is not mistaken for no trailer at all"
+
+# What the rule is for: git itself must agree that it is a trailer.
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+good_message
+if [[ "$(git interpret-trailers --parse < "$WORK/repo/message")" == "Closes: inventory-tng-aaa" ]]; then
+  pass "git interpret-trailers agrees the message carries the trailer"
+else
+  fail_case "git interpret-trailers agrees the message carries the trailer" \
+    "$(git interpret-trailers --parse < "$WORK/repo/message")"
+fi
+
+# See trailers.sh: the colon is only half of it, and a message that says more
+# after the trailers yields nothing from git either.
+scene
+message <<'MSG'
+aaa: Extract the decode loop
+
+Closes: inventory-tng-aaa
+
+And then a closing thought that pushes the trailer up the message.
+MSG
+expect --message-only 1 "not the last paragraph" "a trailer with prose after it is refused"
+refute "$(git interpret-trailers --parse < "$WORK/repo/message")" 0 0 "Closes" \
+  "and git agrees it finds no trailer there"
 
 verdict

@@ -137,8 +137,10 @@ fi
 # Read once and used by both the summary check and the trailer rules below.
 mapfile -t trailers < <(trailers_of "$(printf '%s\n' "${lines[@]}")")
 closing=()
+uncolonned=""
 for line in ${trailers+"${trailers[@]}"}; do
-  [[ "$line" == Closes\ * ]] && closing+=("$line")
+  [[ "$line" == Closes* ]] && closing+=("$line")
+  parses_as_trailer "$line" || [[ -n "$uncolonned" ]] || uncolonned=$line
 done
 
 trailer_issue=""
@@ -190,8 +192,18 @@ done
 # "one issue per commit" reduces to in a message: an issue may take more than
 # one commit, so `Refs` exists for the ones that advance it without finishing
 # it, but no commit may name two issues whatever the verb.
+if [[ ${#trailers[@]} -gt 0 ]] && ! trailers_are_last "$(printf '%s\n' "${lines[@]}")"; then
+  fail "the trailers are not the last paragraph, so git reads them as prose"
+  note "  put them alone at the end, after a blank line"
+fi
+
+if [[ -n "$uncolonned" ]]; then
+  fail "\"$uncolonned\" is not a trailer git can read: write \"${uncolonned%% *}: ${uncolonned#* }\""
+  note "  git parses Key: value, so without the colon %(trailers) finds nothing"
+fi
+
 if [[ ${#trailers[@]} -eq 0 ]]; then
-  fail "expected a 'Closes <issue>' or 'Refs <issue>' trailer, found none"
+  fail "expected a 'Closes: <issue>' or 'Refs: <issue>' trailer, found none"
 elif [[ ${#closing[@]} -gt 1 ]]; then
   fail "${#closing[@]} 'Closes' trailers. One issue, one commit."
 else

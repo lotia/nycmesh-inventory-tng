@@ -77,7 +77,7 @@ it takes an injected detector and frame source and owns its own stop. The
 component keeps the wiring. Adds decodeLoop.test.ts; removes the
 unreachable release() after the loop was started.
 
-Closes inventory-tng-w1e
+Closes: inventory-tng-w1e
 ```
 
 ```
