@@ -26,3 +26,4 @@ to ask "why is it like this?". Number them sequentially.
 | [0014](0014-one-interface.md) | Administrator powers appear in the volunteer app, not a second one |
 | [0015](0015-merged-identifier-conflict.md) | A taken identifier that nobody can see is a 409 naming who holds it |
 | [0016](0016-invariants-for-every-writer.md) | Invariants belong to every writer; affordances belong to the API |
+| [0017](0017-review-through-pull-requests.md) | Review happens in the pull request, not in the history |
