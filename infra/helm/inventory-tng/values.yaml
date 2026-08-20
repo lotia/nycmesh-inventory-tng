@@ -79,15 +79,13 @@ ingress:
     # No switch to turn TLS off: it is a functional requirement, not only a
     # security one. See docs/deployment.md.
     secretName: inventory-tng-tls
-    # Set this only when something in front of this ingress terminates TLS --
-    # a load balancer, a service mesh. It stops the Ingress asking for a
-    # certificate; it does not make plain HTTP to the browser supported.
+    # Set this only when TLS is terminated in front of this ingress;
+    # docs/deployment.md says when that applies and what it does not mean.
     terminatedElsewhere: false
   annotations: {}
   # Decision 0013 point 6: the routes only an administrator uses are also
   # restricted to a network volunteers do not need. Rendered as a second
-  # Ingress, because an allow-list is an annotation and annotations apply to
-  # every path of the Ingress carrying them.
+  # Ingress; docs/deployment.md#administrative-access says why it has to be.
   #
   # OFF by default, and that is not a recommendation: an empty allow-list on a
   # first install would lock out the very administrator who has not created the
