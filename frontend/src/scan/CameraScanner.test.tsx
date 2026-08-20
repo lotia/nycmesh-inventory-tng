@@ -18,9 +18,9 @@
  */
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CameraScanner, refusal } from "./CameraScanner";
+import { CameraScanner, refusal, SCANNER_STOPPED } from "./CameraScanner";
 import { constraints, STORAGE_KEY } from "./cameras";
-import { DECODE_INTERVAL_MS } from "./decodeLoop";
+import { DECODE_FAILURE_LIMIT, DECODE_INTERVAL_MS } from "./decodeLoop";
 import type { CodeDetector, Decoded } from "./decoder";
 import {
   clearMediaDevices,
@@ -517,5 +517,21 @@ describe("why the camera did not open", () => {
 
   it("still says something when what was thrown is not an error at all", () => {
     expect(refusal("nope")).toBe("The camera could not be opened.");
+  });
+
+  it("lets the camera go when the decoder stops reading", async () => {
+    vi.useFakeTimers();
+    const camera = granting(ONE_CAMERA);
+    decoder.detect.mockRejectedValue(new Error("the heap will not grow"));
+    open();
+    await settle();
+
+    // Long enough for the loop to give up. DECODE_FAILURE_LIMIT ticks at
+    // DECODE_INTERVAL_MS, with room to spare.
+    await settle(DECODE_INTERVAL_MS * (DECODE_FAILURE_LIMIT + 2));
+
+    expect(screen.getByText(SCANNER_STOPPED)).toBeInTheDocument();
+    cameraIsOff(camera.stops);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
