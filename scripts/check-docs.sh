@@ -34,10 +34,17 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ ${#paths[@]} -eq 0 ]]; then
-  # What is read, and what is deliberately not, is
-  # DEVELOPERS.md#1-one-topic-one-place. Widening it to application code is
-  # inventory-tng-lwe.
-  mapfile -t paths < <(git ls-files '*.md' 'scripts/*.sh' 'scripts/*.py')
+  # Stated as what is *not* read, so a file added or moved is read by default.
+  # Listing the places to look meant a helper leaving scripts/ stopped being
+  # checked with no signal, and ci.yml -- whose comments repo-settings.sh's
+  # whole design rests on -- was never read at all.
+  #
+  # What the exclusion means is DEVELOPERS.md#1-one-topic-one-place; widening
+  # it to application code is inventory-tng-lwe.
+  mapfile -t paths < <(
+    git ls-files '*.md' '*.sh' '*.py' '*.yml' '*.yaml' |
+      grep -vE '^(backend|frontend)/src/'
+  )
 fi
 
 ALLOW="$REPO_ROOT/scripts/check-docs.allow"

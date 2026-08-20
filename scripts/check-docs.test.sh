@@ -189,4 +189,26 @@ printf '# One\n\nA sentence of its own that says a modest number of words here.\
 printf '# Two\n\nA sentence of its own that says a modest number of words here.\n' > two.md
 expect --words 8 -- 1 "say the same thing" "the window can be narrowed"
 
+# A file added anywhere is read; only application source is left out. Listing
+# the places to look meant a helper moving out of scripts/ stopped being
+# checked, and nothing said so.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+mkdir -p .github/workflows
+printf '# %s\n' "$PASSAGE" > .github/workflows/thing.yml
+expect 1 ".github/workflows/thing.yml" "a workflow's comments are read"
+
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+mkdir -p tools
+printf '#!/usr/bin/env bash\n# %s\n' "$PASSAGE" > tools/moved.sh
+expect 1 "tools/moved.sh" "a helper outside scripts/ is read too"
+
+# Application source is inventory-tng-lwe, and is deliberately not read.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+mkdir -p backend/src/inventory
+printf '"""%s"""\n' "$PASSAGE" > backend/src/inventory/models.py
+expect 0 "No prose repeated" "a docstring beside the code it enforces is left alone"
+
 verdict
