@@ -46,10 +46,10 @@ message() {
 # expect [--amend] <exit status> <substring> <what this case is called>
 expect() {
   local flag=()
-  if [[ "$1" == "--amend" ]]; then
-    flag=(--amend)
+  while [[ "$1" == --* ]]; do
+    flag+=("$1")
     shift
-  fi
+  done
   local want_status=$1 want_text=$2 name=$3 output status
   output=$("$CHECK" "${flag[@]}" "$WORK/repo/message" 2>&1)
   status=$?
@@ -168,6 +168,34 @@ git -C "$WORK/repo" commit -q -m landed
 good_message
 expect 1 "nothing staged closes inventory-tng-aaa" "an amend without the flag cannot see the closure"
 expect --amend 0 "closes inventory-tng-aaa" "an amend sees the closure its commit already carries"
+
+# --- reading a commit that has already landed ------------------------------
+#
+# check-batch.sh asks for this over history, where there is no staged diff for
+# the tracker half to read. It must be the message rules and nothing else.
+
+scene
+good_message
+expect --message-only 0 "Nothing to object to" "the message rules pass with nothing staged"
+
+scene
+message <<'MSG'
+Extracted the decode loop
+
+Closes inventory-tng-aaa
+MSG
+expect --message-only 1 "not the imperative" "and the message rules still apply"
+
+# The filter this replaced discarded any objection whose wording mentioned
+# staging, so an objection that happens to use the word must survive.
+scene
+message <<'MSG'
+aaa: Note what the tracker says about staged work here
+
+Closes inventory-tng-aaa
+Closes inventory-tng-bbb
+MSG
+expect --message-only 1 "2 'Closes' trailers" "an objection whose wording mentions staging survives"
 
 scene
 message <<'MSG'
@@ -314,6 +342,27 @@ Closes inventory-tng-aaa
 Closes inventory-tng-bbb
 MSG
 expect 1 "2 'Closes' trailers" "two closing trailers are refused"
+
+# The inline program is passed to `python3 -c`, where a leading indent is an
+# IndentationError on every version before 3.14 -- and 3.14 accepts it, so a
+# developer on a current Python cannot see the breakage their CI will. Indenting
+# it is what a tidy-up of the surrounding bash does by accident.
+if python3 - "$CHECK" <<'GUARD'; then
+import ast, pathlib, re, sys
+
+source = pathlib.Path(sys.argv[1]).read_text()
+for program in re.findall(r"python3 -c '(.*?)'\)", source, re.S):
+    first = program.lstrip("\n").split("\n")[0]
+    if first.startswith((" ", "\t")):
+        raise SystemExit("an embedded program is indented: " + repr(first[:40]))
+    ast.parse(program)
+GUARD
+  printf '  ok   %s\n' "the embedded program is not indented, and parses"
+  passed=$((passed + 1))
+else
+  printf '  FAIL %s\n' "the embedded program is not indented, and parses"
+  failed=$((failed + 1))
+fi
 
 echo
 if [[ "$failed" -eq 0 ]]; then

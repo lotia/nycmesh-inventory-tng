@@ -4,20 +4,36 @@
 # The rules are in DEVELOPERS.md "Commits", which also says how to run this and
 # how to have it run every time. This only enforces the parts a machine can see.
 #
-# Usage: check-commit.sh [--amend] <message-file>
+# Usage: check-commit.sh [--amend] [--message-only] <message-file>
 #
 # --amend when you are replacing the last commit rather than adding one: what
 # lands is then the staged changes *and* that commit's, and the issue it closes
 # is usually already in it.
+#
+# --message-only for a caller reading a commit that has already landed, which
+# has no staged diff for the tracker half to read. check-batch.sh asks for it.
 
 set -uo pipefail
 
 BASE=HEAD
-if [[ "${1:-}" == "--amend" ]]; then
-  BASE=HEAD~1
-  shift
-fi
-MESSAGE=${1:?usage: check-commit.sh [--amend] <message-file>}
+MESSAGE_ONLY=0
+while [[ "${1:-}" == --* ]]; do
+  case "$1" in
+    --amend)
+      BASE=HEAD~1
+      shift
+      ;;
+    --message-only)
+      MESSAGE_ONLY=1
+      shift
+      ;;
+    *)
+      echo "unknown option: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+MESSAGE=${1:?usage: check-commit.sh [--amend] [--message-only] <message-file>}
 REPO_ROOT=$(git rev-parse --show-toplevel) || exit 1
 ISSUES=".beads/issues.jsonl"
 
@@ -57,7 +73,11 @@ fi
 # its row rewritten whenever anything about it changes, and counting that as a
 # closure would refuse an honest commit for touching history. So both sides of
 # the diff are read and the ones already closed are taken back out.
-mapfile -t closed < <(git diff --cached "$BASE" -- "$ISSUES" | python3 -c '
+closed=()
+staged_tracker=""
+
+if [[ "$MESSAGE_ONLY" -eq 0 ]]; then
+  mapfile -t closed < <(git diff --cached "$BASE" -- "$ISSUES" | python3 -c '
 import json, sys
 
 was, now = set(), set()
@@ -75,18 +95,19 @@ for issue_id in sorted(now - was):
     print(issue_id)
 ')
 
-staged_tracker=$(git diff --cached --name-only "$BASE" -- "$ISSUES")
+  staged_tracker=$(git diff --cached --name-only "$BASE" -- "$ISSUES")
 
-echo "Staged:"
-if [[ ${#closed[@]} -eq 0 ]]; then
-  note "no issue is closed here"
-else
-  for id in "${closed[@]}"; do note "closes $id"; done
-fi
+  echo "Staged:"
+  if [[ ${#closed[@]} -eq 0 ]]; then
+    note "no issue is closed here"
+  else
+    for id in "${closed[@]}"; do note "closes $id"; done
+  fi
 
-if [[ ${#closed[@]} -gt 1 ]]; then
-  fail "${#closed[@]} issues are closed here. One issue, one commit."
-  note "  DEVELOPERS.md 'Commits' has the rule; .agents/skills/commits has the split."
+  if [[ ${#closed[@]} -gt 1 ]]; then
+    fail "${#closed[@]} issues are closed here. One issue, one commit."
+    note "  DEVELOPERS.md 'Commits' has the rule; .agents/skills/commits has the split."
+  fi
 fi
 
 # --- the message -----------------------------------------------------------
@@ -199,24 +220,26 @@ else
 
   # A commit that only advances an issue closes nothing, so there is no
   # closure to cross-check and none to object to.
-  if [[ ${#closing[@]} -eq 0 ]]; then
-    note "names $named without closing it"
-    if [[ ${#closed[@]} -gt 0 ]]; then
-      fail "the message closes nothing but the staged tracker closes ${closed[0]}"
-    fi
-  # A contributor who does not use beads names a GitHub issue instead, and
-  # there is no tracker file to compare it against. See DEVELOPERS.md.
-  elif [[ "$named" == \#* ]]; then
-    note "names $named, which is not a bead: nothing here to cross-check"
-  elif [[ ${#closed[@]} -eq 1 && "$named" != "${closed[0]}" ]]; then
-    fail "the message closes $named but the staged tracker closes ${closed[0]}"
-  elif [[ ${#closed[@]} -eq 0 ]]; then
-    if [[ -z "$staged_tracker" ]]; then
-      # beads exports the tracker on its own schedule, so the close may be
-      # recorded and simply not written out yet.
-      fail "nothing staged closes $named -- run 'bd close $named', then stage $ISSUES"
-    else
-      fail "$ISSUES is staged but does not close $named"
+  if [[ "$MESSAGE_ONLY" -eq 0 ]]; then
+    if [[ ${#closing[@]} -eq 0 ]]; then
+      note "names $named without closing it"
+      if [[ ${#closed[@]} -gt 0 ]]; then
+        fail "the message closes nothing but the staged tracker closes ${closed[0]}"
+      fi
+    # A contributor who does not use beads names a GitHub issue instead, and
+    # there is no tracker file to compare it against. See DEVELOPERS.md.
+    elif [[ "$named" == \#* ]]; then
+      note "names $named, which is not a bead: nothing here to cross-check"
+    elif [[ ${#closed[@]} -eq 1 && "$named" != "${closed[0]}" ]]; then
+      fail "the message closes $named but the staged tracker closes ${closed[0]}"
+    elif [[ ${#closed[@]} -eq 0 ]]; then
+      if [[ -z "$staged_tracker" ]]; then
+        # beads exports the tracker on its own schedule, so the close may be
+        # recorded and simply not written out yet.
+        fail "nothing staged closes $named -- run 'bd close $named', then stage $ISSUES"
+      else
+        fail "$ISSUES is staged but does not close $named"
+      fi
     fi
   fi
 fi
