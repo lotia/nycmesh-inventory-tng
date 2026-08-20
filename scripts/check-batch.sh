@@ -34,16 +34,12 @@ done
 REPO_ROOT=$(git rev-parse --show-toplevel) || exit 1
 # Beside this script rather than under the repository being read: the range may
 # belong to a checkout that has no scripts/ of its own, and the two are a pair.
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 CHECK="$HERE/check-commit.sh"
 MEMBERSHIP="$HERE/batch-membership.py"
 
-problems=0
-fail() {
-  printf '  ✗ %s\n' "$1"
-  problems=$((problems + 1))
-}
-note() { printf '  · %s\n' "$1"; }
+. "$HERE/report.sh"
+. "$HERE/trailers.sh"
 
 # A range git cannot resolve is not an empty range. Swallowing the difference
 # would let a typo, a shallow checkout or a missing base commit report that
@@ -62,7 +58,7 @@ if [[ ${#commits[@]} -eq 0 ]]; then
   exit 0
 fi
 
-# --- what each commit says it belongs to -----------------------------------
+# --- reading the range -----------------------------------------------------
 #
 # The trailer rather than the summary prefix: the prefix is the short form, for
 # a reader, and the trailer is the whole identifier. check-commit.sh is what
@@ -115,7 +111,7 @@ for sha in "${commits[@]}"; do
     continue
   fi
 
-  mapfile -t trailers < <(printf '%s\n' "${body_of[$sha]:-}" | grep -E '^(Closes|Refs) ')
+  mapfile -t trailers < <(trailers_of "${body_of[$sha]:-}")
 
   # A commit naming no issue, or naming two, is check-commit.sh's objection to
   # make -- it is delegated below and would say it again. What is collected
@@ -128,8 +124,7 @@ for sha in "${commits[@]}"; do
 
   named=""
   for trailer in "${trailers[@]}"; do
-    issue=${trailer#* }
-    issue=${issue%%[[:space:]]*}
+    issue=$(issue_of "$trailer")
     [[ -z "$named" ]] && named=$issue
     [[ "$trailer" == Closes* ]] && closes[$issue]=$((${closes[$issue]:-0} + 1))
   done
@@ -215,32 +210,21 @@ if [[ -x "$CHECK" ]]; then
     [[ "$subject" == fixup!* || "$subject" == squash!* ]] && continue
     if ! output=$("$CHECK" --message-only <(printf '%s\n' "${body_of[$sha]:-}") 2>&1); then
       while IFS= read -r line; do
-        [[ "$line" == *"✗"* ]] || continue
-        fail "${sha:0:8} ${line#*✗ }"
+        [[ "$line" == *"$MARK_FAIL"* ]] || continue
+        fail "${sha:0:8} ${line#*"$MARK_FAIL" }"
       done <<<"$output"
     fi
   done
 fi
 
-echo
 if [[ "$pending" -gt 0 ]]; then
   fail "$pending fixup commits have not been folded in. Nothing does it on the way in:"
   note "  git rebase -i --autosquash origin/main"
 fi
 
-if [[ "$problems" -eq 0 ]]; then
-  kept=$(( ${#commits[@]} - pending ))
-  if [[ "$kept" -eq 1 ]]; then
-    echo "One commit, one issue. Nothing to object to."
-  else
-    echo "$kept commits, one issue each. Nothing to object to."
-  fi
-  exit 0
-fi
-
-if [[ "$problems" -eq 1 ]]; then
-  echo "One thing to fix before merging."
+kept=$(( ${#commits[@]} - pending ))
+if [[ "$kept" -eq 1 ]]; then
+  verdict "One commit, one issue. Nothing to object to." merging
 else
-  echo "$problems things to fix before merging."
+  verdict "$kept commits, one issue each. Nothing to object to." merging
 fi
-exit 1

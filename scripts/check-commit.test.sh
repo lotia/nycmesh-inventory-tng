@@ -9,22 +9,17 @@
 
 set -uo pipefail
 
-CHECK=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-commit.sh
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
-
-passed=0
-failed=0
+HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+CHECK="$HERE/check-commit.sh"
+. "$HERE/testlib.sh"
+workspace
 
 # A repository holding two issues in progress and one closed long ago, so that
 # a rewritten closed row has something to be distinguished from.
 scene() {
-  rm -rf "$WORK/repo"
+  new_repo "$WORK/repo"
   mkdir -p "$WORK/repo/.beads"
   cd "$WORK/repo" || exit 1
-  git init -q .
-  git config user.email test@example.invalid
-  git config user.name Test
   cat > .beads/issues.jsonl <<'JSONL'
 {"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"in_progress"}
 {"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
@@ -43,27 +38,6 @@ message() {
   cat > "$WORK/repo/message"
 }
 
-# expect [--amend] <exit status> <substring> <what this case is called>
-expect() {
-  local flag=()
-  while [[ "$1" == --* ]]; do
-    flag+=("$1")
-    shift
-  done
-  local want_status=$1 want_text=$2 name=$3 output status
-  output=$("$CHECK" "${flag[@]}" "$WORK/repo/message" 2>&1)
-  status=$?
-  if [[ "$status" -eq "$want_status" && "$output" == *"$want_text"* ]]; then
-    printf '  ok   %s\n' "$name"
-    passed=$((passed + 1))
-  else
-    printf '  FAIL %s\n' "$name"
-    printf '       wanted exit %s and %q\n' "$want_status" "$want_text"
-    printf '       got exit %s:\n%s\n' "$status" "$output"
-    failed=$((failed + 1))
-  fi
-}
-
 good_message() {
   message <<'MSG'
 Extract the decode loop into its own module
@@ -73,6 +47,8 @@ Moves the 5 Hz loop out of the component and into decodeLoop.ts.
 Closes inventory-tng-aaa
 MSG
 }
+
+check "$CHECK" "$WORK/repo/message"
 
 echo "check-commit.sh"
 
@@ -148,13 +124,7 @@ Closes inventory-tng-aaa
 MSG
 expect 1 "nothing staged closes" "an imperative that ends in -ed is not mistaken for a tense"
 output=$("$CHECK" "$WORK/repo/message" 2>&1)
-if [[ "$output" == *"not the imperative"* ]]; then
-  printf '  FAIL %s\n' "\"Read\" was flagged as a tense"
-  failed=$((failed + 1))
-else
-  printf '  ok   %s\n' "\"Read\" is left alone"
-  passed=$((passed + 1))
-fi
+refute "$output" $? 1 "not the imperative" "\"Read\" is left alone"
 
 # Replacing the last commit: what lands is the staged changes and that one's,
 # so a closure it already carries still counts, exactly once.
@@ -357,17 +327,23 @@ for program in re.findall(r"python3 -c '(.*?)'\)", source, re.S):
         raise SystemExit("an embedded program is indented: " + repr(first[:40]))
     ast.parse(program)
 GUARD
-  printf '  ok   %s\n' "the embedded program is not indented, and parses"
-  passed=$((passed + 1))
+  pass "the embedded program is not indented, and parses"
 else
-  printf '  FAIL %s\n' "the embedded program is not indented, and parses"
-  failed=$((failed + 1))
+  fail_case "the embedded program is not indented, and parses"
 fi
 
-echo
-if [[ "$failed" -eq 0 ]]; then
-  echo "$passed passed."
-  exit 0
-fi
-echo "$failed failed, $passed passed."
-exit 1
+# Every case above runs the script where it lives, so none of them can see what
+# breaks when it is installed as a hook instead. See check-commit.sh on why the
+# path is resolved before anything is sourced from beside it.
+scene
+ln -sfn "$CHECK" "$WORK/repo/hooked"
+good_message
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+output=$("$WORK/repo/hooked" "$WORK/repo/message" 2>&1)
+assert "$output" $? 0 "Nothing to object to" "it works through a symlink, as the hook install makes it"
+
+verdict

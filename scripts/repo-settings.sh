@@ -33,7 +33,7 @@ done
   exit 1
 }
 
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 WORKFLOW="$HERE/../.github/workflows/ci.yml"
 
 # Read out of .github/workflows/ci.yml rather than listed here, because the
@@ -50,10 +50,11 @@ if [[ ${#CHECKS[@]} -eq 0 ]]; then
   exit 1
 fi
 
-differs=0
-report() {
-  printf '  %s %s\n' "$1" "$2"
-  if [[ "$1" == "✗" ]]; then differs=1; fi
+. "$HERE/report.sh"
+
+# compare <got> <want> <what to say when it matches> [<what to say when it does not>]
+compare() {
+  if [[ "$1" == "$2" ]]; then note "$3"; else fail "${4:-$3 -- is $1}"; fi
 }
 
 # --- how a pull request may be merged --------------------------------------
@@ -64,10 +65,10 @@ echo "Merge methods:"
 current=$(gh api "repos/$REPO" --jq '[.allow_squash_merge, .allow_merge_commit, .allow_rebase_merge, .delete_branch_on_merge] | @tsv')
 IFS=$'\t' read -r squash merge rebase delete <<<"$current"
 
-[[ "$squash" == "false" ]] && report "·" "squash merge is off" || report "✗" "squash merge is ON"
-[[ "$merge" == "false" ]] && report "·" "merge commits are off" || report "✗" "merge commits are ON"
-[[ "$rebase" == "true" ]] && report "·" "rebase merge is on" || report "✗" "rebase merge is OFF"
-[[ "$delete" == "true" ]] && report "·" "branches are deleted on merge" || report "✗" "branches are kept on merge"
+compare "$squash" false "squash merge is off" "squash merge is ON"
+compare "$merge" false "merge commits are off" "merge commits are ON"
+compare "$rebase" true "rebase merge is on" "rebase merge is OFF"
+compare "$delete" true "branches are deleted on merge" "branches are kept on merge"
 
 if [[ "$CHECK" -eq 0 ]]; then
   gh api -X PATCH "repos/$REPO" \
@@ -86,9 +87,9 @@ fi
 echo "Protection on main:"
 # Its exit status, not the emptiness of its output: gh writes the 404 body to
 # stdout, so an unprotected branch arrives here as a perfectly non-empty JSON
-# object that every probe below then reads as null.
+# object that every comparison below then reads as null.
 if ! protection=$(gh api "repos/$REPO/branches/main/protection" 2>/dev/null); then
-  report "✗" "main is not protected"
+  fail "main is not protected"
 else
   IFS=$'\t' read -r strict admins conversations linear forced reviews < <(
     printf '%s' "$protection" | jq -r '[
@@ -101,27 +102,19 @@ else
     ] | @tsv'
   )
 
-  probe() {
-    local got=$1 want=$2 text=$3
-    if [[ "$got" == "$want" ]]; then
-      report "·" "$text"
-    else
-      report "✗" "$text -- is $got"
-    fi
-  }
-  probe "$strict" true "a branch must be current"
-  probe "$admins" true "administrators are bound too"
-  probe "$conversations" true "conversations must be resolved"
-  probe "$linear" true "history must stay linear"
-  probe "$forced" false "force pushes are refused"
-  probe "$reviews" true "a pull request is required"
+  compare "$strict" true "a branch must be current"
+  compare "$admins" true "administrators are bound too"
+  compare "$conversations" true "conversations must be resolved"
+  compare "$linear" true "history must stay linear"
+  compare "$forced" false "force pushes are refused"
+  compare "$reviews" true "a pull request is required"
 
   have=$(printf '%s' "$protection" | jq -r '.required_status_checks.contexts | sort | join("\n")')
   want=$(printf '%s\n' "${CHECKS[@]}" | sort)
   if [[ "$have" == "$want" ]]; then
-    report "·" "${#CHECKS[@]} checks are required"
+    note "${#CHECKS[@]} checks are required"
   else
-    report "✗" "the required checks are not the jobs in ci.yml"
+    fail "the required checks are not the jobs in ci.yml"
     diff <(echo "$have") <(echo "$want") | sed 's/^/      /'
   fi
 fi
@@ -151,10 +144,7 @@ JSON
   exit 0
 fi
 
-echo
-if [[ "$differs" -eq 0 ]]; then
-  echo "Settings are as this repository expects."
-  exit 0
-fi
-echo "Something differs. Rerun without --check to put it back."
-exit 1
+# The remedy for this one is rerunning the tool, not editing the tree, and
+# verdict has no slot for a next step.
+[[ "$problems" -gt 0 ]] && echo && echo "Rerun without --check to put it back."
+verdict "Settings are as this repository expects." "these match again"

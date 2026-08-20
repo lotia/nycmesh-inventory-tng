@@ -40,16 +40,12 @@ ISSUES=".beads/issues.jsonl"
 SUMMARY_LIMIT=50
 BODY_LIMIT=72
 
-problems=0
-
-fail() {
-  printf '  ✗ %s\n' "$1"
-  problems=$((problems + 1))
-}
-
-note() {
-  printf '  · %s\n' "$1"
-}
+# readlink -f first: DEVELOPERS.md has you install this as a symlink into
+# .beads/hooks, and bash reports the link's own path here rather than the
+# file's, so "beside me" would be the hooks directory.
+_here=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+. "$_here/report.sh"
+. "$_here/trailers.sh"
 
 # Comments are git's own and never reach the stored message.
 mapfile -t lines < <(grep -v '^#' "$MESSAGE")
@@ -138,25 +134,12 @@ fi
 # prose and is charged for. Guessing from the shape of the token instead does
 # not work, because a bead identifier is arbitrary and need not contain a
 # digit: this repository has swr and jro as well as c6j and 2dg.
-# Read once, here, and used by both the summary check and the trailer rules
-# below. Three greps over the same array was three definitions of what a
-# trailer is, and they could disagree on a malformed one.
-trailers=()
+# Read once and used by both the summary check and the trailer rules below.
+mapfile -t trailers < <(trailers_of "$(printf '%s\n' "${lines[@]}")")
 closing=()
-for line in "${lines[@]}"; do
-  case "$line" in
-    Closes\ *)
-      trailers+=("$line")
-      closing+=("$line")
-      ;;
-    Refs\ *) trailers+=("$line") ;;
-  esac
+for line in ${trailers+"${trailers[@]}"}; do
+  [[ "$line" == Closes\ * ]] && closing+=("$line")
 done
-
-issue_of() {
-  local t=${1#* }
-  printf '%s' "${t%%[[:space:]]*}"
-}
 
 trailer_issue=""
 [[ ${#trailers[@]} -gt 0 ]] && trailer_issue=$(issue_of "${trailers[0]}")
@@ -247,15 +230,4 @@ else
   fi
 fi
 
-echo
-if [[ "$problems" -eq 0 ]]; then
-  echo "One issue, one commit. Nothing to object to."
-  exit 0
-fi
-
-if [[ "$problems" -eq 1 ]]; then
-  echo "One thing to fix before landing."
-else
-  echo "$problems things to fix before landing."
-fi
-exit 1
+verdict "One issue, one commit. Nothing to object to." landing
