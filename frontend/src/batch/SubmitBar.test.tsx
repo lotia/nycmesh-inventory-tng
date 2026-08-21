@@ -15,7 +15,7 @@ function readyBatch(): void {
   window.localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({
-      ...createCart("key-1", "2026-08-19T00:00:00Z"),
+      ...createCart("key-1"),
       actorId: 7,
       locationId: 3,
       lines: [
@@ -240,7 +240,7 @@ describe("saying where the stock is without a camera", () => {
     window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        ...createCart("key-2", "2026-08-19T00:00:00Z"),
+        ...createCart("key-2"),
         actorId: 7,
         lines: [
           { itemId: 1, name: "LiteBeam", unitOfMeasure: "each", quantity: 2, lastScan: null },

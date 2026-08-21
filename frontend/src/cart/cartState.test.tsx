@@ -10,7 +10,7 @@ import {
 import { box, cable, packet, single, zipTies } from "./testFixtures";
 
 function cart(): CartState {
-  return createCart("key-1", "2026-08-19T10:00:00.000Z");
+  return createCart("key-1");
 }
 
 function scan(state: CartState, label: ScannedLabel, at: number, quantity?: number): CartState {
@@ -155,12 +155,10 @@ describe("cartReducer batch fields", () => {
     const state = cartReducer(filled, {
       type: "clear",
       idempotencyKey: "key-9",
-      createdAt: "2026-08-19T11:00:00.000Z",
     });
 
     expect(state).toEqual({
       idempotencyKey: "key-9",
-      createdAt: "2026-08-19T11:00:00.000Z",
       actorId: 4,
       kind: "checkout",
       locationId: null,
@@ -171,11 +169,10 @@ describe("cartReducer batch fields", () => {
 });
 
 describe("createCart", () => {
-  it("mints its own key and creation time", () => {
+  it("mints its own key", () => {
     const state = createCart();
 
     expect(state.idempotencyKey).toMatch(/^[0-9a-f]{32}$/);
-    expect(Date.parse(state.createdAt)).not.toBeNaN();
   });
 
   it("mints a different key every time", () => {

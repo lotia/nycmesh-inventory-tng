@@ -22,7 +22,7 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
  * What a component dispatches: an action without the clock reading or the
  * fresh key, which the provider fills in so the reducer stays pure.
  */
-export type CartIntent = DistributiveOmit<CartAction, "at" | "idempotencyKey" | "createdAt">;
+export type CartIntent = DistributiveOmit<CartAction, "at" | "idempotencyKey">;
 
 export interface CartContextValue {
   cart: CartState;
@@ -41,7 +41,6 @@ function toAction(intent: CartIntent): CartAction {
       return {
         ...intent,
         idempotencyKey: mintIdempotencyKey(),
-        createdAt: new Date().toISOString(),
       };
     default:
       return intent;

@@ -8,7 +8,7 @@ afterEach(() => {
 });
 
 /** A cart as this version writes one, so a case can damage exactly one part. */
-const whole = cartReducer(createCart("key-1", "2026-08-19T10:00:00.000Z"), {
+const whole = cartReducer(createCart("key-1"), {
   type: "add",
   item: { id: 1, name: "Zip Ties Reusable", unitOfMeasure: "each" },
   quantity: 100,
@@ -70,7 +70,7 @@ describe("saveCart", () => {
     // renders, under a Retry that cannot succeed.
     window.localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ ...createCart("k", "2026-08-19T00:00:00Z"), kind: "transfer" }),
+      JSON.stringify({ ...createCart("k"), kind: "transfer" }),
     );
 
     expect(loadCart().kind).toBe("checkout");
