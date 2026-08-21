@@ -31,6 +31,14 @@ playwright-report/
 # existing Google Sheet, reference screenshots) that is not ours to publish.
 ignored/
 
+# The same material wherever it lands. A sheet export carries volunteer names
+# and email addresses, so the directory rule above is not enough on its own:
+# anyone told to "supply your own copy" will put it somewhere else eventually,
+# and one `git add -A` would publish it.
+*.xlsx
+*.ods
+*.csv
+
 # Claude Code local-only configuration (personal; must not burn other
 # contributors' tokens). See .claude/settings.local.json.
 .claude/settings.local.json
