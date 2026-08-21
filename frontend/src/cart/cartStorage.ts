@@ -7,8 +7,17 @@ import { KINDS } from "../batch/movements";
 import { isNumber, isText, matches, read, type Shape, write } from "../storage";
 import { type CartState, createCart } from "./cartState";
 
-/** Versioned: a cart written by an older shape is ignored, never migrated. */
-export const STORAGE_KEY = "nycmesh-inventory.cart.v1";
+/**
+ * Versioned: a cart written by an older shape is ignored, never migrated.
+ *
+ * v2 dropped `createdAt` (decision 0018). Forward, v1 would have survived by
+ * accident -- `matches` reads the shape's keys and ignores extras -- but the
+ * loss is backwards: a tab still running the previous bundle reads a cart this
+ * one wrote, fails its own `createdAt: isText`, and silently starts empty.
+ * Bumping means each bundle reads only its own carts, so neither loses the
+ * other's, which is the whole of what this module's header asks for.
+ */
+export const STORAGE_KEY = "nycmesh-inventory.cart.v2";
 
 const isIdOrNobody = (value: unknown): boolean => value === null || typeof value === "number";
 

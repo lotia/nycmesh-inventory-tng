@@ -371,7 +371,7 @@ def test_the_sheet_carries_the_date_the_label_was_printed(editor: Client, item: 
 def test_the_sheets_symbols_decode(editor: Client, item: Item, warehouse: Location) -> None:
     """Everything on the page, not just one drawn in isolation."""
     Label.objects.create(code=CODE, item=item, quantity=100)
-    Label.objects.create(code="ZZZZZZZZZZ", location=warehouse)
+    Label.objects.create(code="ZZZZZZZZZZ", location=warehouse, quantity=None)
 
     body = editor.get(reverse("label-sheet"), {"code": f"{CODE},ZZZZZZZZZZ"}).content.decode()
 

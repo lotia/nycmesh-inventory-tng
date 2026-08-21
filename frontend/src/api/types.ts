@@ -84,7 +84,8 @@ export interface VolunteerConflict {
 export interface ResolvedLabel {
   code: string;
   kind: "item" | "location";
-  quantity: string;
+  /** Null on a location label, which stands for no quantity of anything. */
+  quantity: string | null;
   revoked_at: string | null;
   item: number | null;
   location: number | null;
@@ -103,7 +104,8 @@ export interface ResolvedLabel {
 export interface MappedLabel {
   code: string;
   kind: "item" | "location";
-  quantity: string;
+  /** Null on a location label, which stands for no quantity of anything. */
+  quantity: string | null;
   item: number | null;
   location: number | null;
   item_name: string | null;

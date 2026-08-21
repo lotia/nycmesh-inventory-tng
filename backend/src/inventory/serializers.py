@@ -682,7 +682,7 @@ class LabelSerializer(LabelResolveSerializer):
 
         Three of the rules mirror Label's check constraints --
         ``label_targets_exactly_one``, ``label_quantity_positive`` and
-        ``label_quantity_is_one_for_a_location``. The constraints remain the
+        ``label_quantity_iff_item``. The constraints remain the
         thing that enforces those; this only decides what a client is told,
         which is the distinction this module's docstring draws.
 
@@ -731,8 +731,27 @@ class LabelSerializer(LabelResolveSerializer):
             raise serializers.ValidationError(
                 "A scan of a label stands for some of something, so its quantity is positive."
             )
-        if on_location and quantity is not None and quantity != 1:
-            raise serializers.ValidationError("A location label stands for the location itself, so its quantity is 1.")
+        if on_item and "quantity" in submitted and submitted["quantity"] is None:
+            # The other half of `label_quantity_iff_item`. Before that
+            # constraint the column was NOT NULL, so DRF refused this itself;
+            # widening it for location labels took that refusal away and left
+            # an item label with an explicit null reaching the database.
+            raise serializers.ValidationError(
+                {"quantity": "An item label says how much of its item one scan stands for, so it carries a quantity."}
+            )
+        if on_location:
+            if "quantity" in submitted and submitted["quantity"] is not None:
+                raise serializers.ValidationError(
+                    "A location label stands for no quantity of anything, so it carries none."
+                )
+            # Emptied rather than left absent. DRF does not supply a default
+            # here -- a model default makes the field `required=False` and
+            # nothing more, so `quantity` is simply missing from attrs and
+            # Django applies `default=1` when it instantiates the model. That
+            # default serves the common case, an item label standing for one of
+            # its item, and is exactly what `label_quantity_iff_item` refuses on
+            # the other. Setting it to None is what stops the default arriving.
+            attrs["quantity"] = None
         # Turned into the column the model stores here rather than in create()
         # and update(): `revoked` is not a field of Label, so it has to leave
         # the validated data before it reaches the model either way, and doing

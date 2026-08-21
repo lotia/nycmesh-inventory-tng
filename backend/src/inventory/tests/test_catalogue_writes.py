@@ -595,3 +595,34 @@ def test_the_revocation_timestamp_is_the_servers(editor: Client, item: Item) -> 
     label.refresh_from_db()
     assert label.revoked_at is not None
     assert label.revoked_at.year != 2099
+
+
+def test_an_item_label_may_not_be_printed_without_a_quantity(editor: Client, item: Item) -> None:
+    """The other half of ``label_quantity_iff_item``, mirrored as a 400.
+
+    The column was NOT NULL before that constraint, so DRF refused an explicit
+    null on its own; widening it for location labels took that refusal away
+    and left the request reaching the database as a 500.
+    """
+    response = post(editor, "labels", {"item": item.pk, "quantity": None})
+
+    assert response.status_code == 400
+    assert "quantity" in str(response.json())
+
+
+def test_a_wall_label_is_printed_without_a_quantity(editor: Client, warehouse: Location) -> None:
+    """And the ordinary case it exists to leave alone: a bare location label."""
+    response = post(editor, "labels", {"location": warehouse.pk})
+
+    assert response.status_code == 201
+    assert response.json()["quantity"] is None
+
+
+def test_repointing_a_wall_label_at_an_item_carries_a_quantity(editor: Client, item: Item, warehouse: Location) -> None:
+    """Repointing is a correction rather than a reprint, so it has to work."""
+    label = Label.objects.create(code="RE90INT000", location=warehouse, quantity=None)
+
+    response = patch(editor, "label-resolve", {"item": item.pk, "location": None, "quantity": "5"}, label.code)
+
+    assert response.status_code == 200
+    assert response.json()["quantity"] == "5.000"

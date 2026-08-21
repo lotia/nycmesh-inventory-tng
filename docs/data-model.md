@@ -112,10 +112,12 @@ is cheaper than a reprint. `revoked_at` cannot be dated in the future. Why that
 alphabet, and what is printed around the code on the sticker, is in
 [decision 0011](decisions/0011-qr-batch-scanning.md#3-the-printed-label-an-uppercase-url-wrapping-an-opaque-code).
 
-`quantity` is what one scan of that token means, in the unit of the thing the
-label names. It defaults to `1`, must be positive, and is constrained to `1` on
-a location label. Why the multiplier belongs on the label rather than on the
-item is in
+`quantity` is what one scan of that token means, in the unit of the item the
+label names. It defaults to `1` and must be positive where it is present, and
+`label_quantity_iff_item` requires it exactly when the label names an item: a
+wall code stands for no quantity of anything, so it carries `NULL` rather than
+a sentinel every reader has to interpret. Why the multiplier belongs on the
+label rather than on the item is in
 [decision 0011](decisions/0011-qr-batch-scanning.md#5-one-scan-is-not-one-unit-label-carries-the-quantity-it-represents).
 
 A label points at an item *or* a location, held as two nullable foreign keys
