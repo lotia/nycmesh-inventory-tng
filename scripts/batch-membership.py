@@ -20,14 +20,26 @@ import sys
 def main() -> None:
     path, landed = sys.argv[1], set(sys.argv[2:])
     epic = os.environ.get("EPIC", "")
+    # How many commits closed something, which is not how many issues they
+    # closed. Absent when a caller has not counted, and then the batch rule
+    # below cannot fire -- a rule that guesses is worse than one that waits.
+    try:
+        landed_commits = int(os.environ.get("LANDED_COMMITS", "0"))
+    except ValueError:
+        landed_commits = 0
 
     parent: dict[str, str] = {}
     children: dict[str, set[str]] = {}
+    epics: set[str] = set()
     for line in open(path):
         try:
             issue = json.loads(line)
         except ValueError:
             continue  # a blank line, or an export half-written
+        # DEVELOPERS.md#the-message: an epic does no work of its own, so it is
+        # not one of the issues a batch holds and never needs an epic above it.
+        if issue.get("issue_type") == "epic" and issue.get("id"):
+            epics.add(issue["id"])
         for dep in issue.get("dependencies") or []:
             if dep.get("type") != "parent-child":
                 continue
@@ -40,6 +52,8 @@ def main() -> None:
                 continue
             parent[child] = epic_id
             children.setdefault(epic_id, set()).add(child)
+
+    landed -= epics
 
     if not epic:
         batches = {parent[i] for i in landed if i in parent}
@@ -54,7 +68,7 @@ def main() -> None:
             # no epic. Several landing together do: DEVELOPERS.md#pull-requests
             # wants what belongs to a batch recorded rather than remembered, and
             # silence here is how a batch skips that without anything noticing.
-            if len(landed) > 1:
+            if len(landed) > 1 and landed_commits > 1:
                 print(
                     "fail %d issues landed together with no epic: %s"
                     % (len(landed), " ".join(sorted(landed)))
@@ -72,6 +86,7 @@ def main() -> None:
         print("fail in the batch but not landed here: " + missing)
     for extra in sorted(landed - expected):
         print("fail landed here but not in the batch: " + extra)
+
 
 
 if __name__ == "__main__":

@@ -37,17 +37,19 @@ MESSAGE=${1:?usage: check-commit.sh [--amend] [--message-only] <message-file>}
 REPO_ROOT=$(git rev-parse --show-toplevel) || exit 1
 ISSUES=".beads/issues.jsonl"
 
-SUMMARY_LIMIT=50
-BODY_LIMIT=72
-
 # readlink -f first: DEVELOPERS.md has you install this as a symlink into
 # .beads/hooks, and bash reports the link's own path here rather than the
 # file's, so "beside me" would be the hooks directory.
 _here=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 . "$_here/report.sh"
 . "$_here/trailers.sh"
+# The rules themselves, so that check-batch.sh can apply the same ones without
+# reading this script's output. SUMMARY_LIMIT and BODY_LIMIT come from there.
+. "$_here/message-rules.sh"
 
-# Comments are git's own and never reach the stored message.
+# Comments are dropped by message-rules.sh, so that this script and
+# check-batch.sh see the same message; read here only for the summary line the
+# report prints and the merge/revert guard below.
 mapfile -t lines < <(grep -v '^#' "$MESSAGE")
 summary=${lines[0]:-}
 
@@ -55,7 +57,7 @@ summary=${lines[0]:-}
 # git writes their messages itself, and as a commit-msg hook this would refuse
 # every one of them.
 if [[ -f "$REPO_ROOT/.git/MERGE_HEAD" || -f "$REPO_ROOT/.git/CHERRY_PICK_HEAD" ]] ||
-  [[ "$summary" =~ ^(Merge|Revert)\  ]]; then
+  message_is_git_own "$summary"; then
   echo "Not an issue being landed (merge, revert or cherry-pick). Nothing to check."
   exit 0
 fi
@@ -134,127 +136,14 @@ fi
 echo "Message:"
 note "\"$summary\""
 
-if [[ -z "$summary" ]]; then
-  fail "the summary line is empty"
-fi
+message_rules "$(printf '%s\n' "${lines[@]}")"
 
-# The summary names its issue and then describes the change. The limit is on
-# the description: the identifier is addressing, not prose, and charging the
-# line for it would shorten every summary in the repository to pay for
-# something the reader gains nothing from reading.
-#
-# Only the distinguishing part appears here -- "c6j.6", not
-# "inventory-tng-c6j.6" -- because the repository prefix is the same on every
-# bead and would spend 14 of the 50 characters saying so. The trailer carries
-# the full identifier, which is what a machine reads.
-#
-# What makes it an identifier is that the trailer agrees: a prefix is only
-# waved through if the issue this commit belongs to actually ends with it.
-# Anything else -- a "Fix:" habit, a colon that happens to fall early -- is
-# prose and is charged for. Guessing from the shape of the token instead does
-# not work, because a bead identifier is arbitrary and need not contain a
-# digit: this repository has swr and jro as well as c6j and 2dg.
-# Read once and used by both the summary check and the trailer rules below.
-mapfile -t trailers < <(trailers_of "$(printf '%s\n' "${lines[@]}")")
-closing=()
-uncolonned=""
-for line in ${trailers+"${trailers[@]}"}; do
-  [[ "$line" == Closes* ]] && closing+=("$line")
-  parses_as_trailer "$line" || [[ -n "$uncolonned" ]] || uncolonned=$line
-done
-
-trailer_issue=""
-[[ ${#trailers[@]} -gt 0 ]] && trailer_issue=$(issue_of "${trailers[0]}")
-
-prose=$summary
-if [[ "$summary" =~ ^([^[:space:]]+):[[:space:]](.*)$ ]]; then
-  # *"$marker" covers the exact match too: [[ abc == *abc ]] is true.
-  [[ -n "$trailer_issue" && "$trailer_issue" == *"${BASH_REMATCH[1]}" ]] &&
-    prose=${BASH_REMATCH[2]}
-fi
-
-if [[ ${#prose} -gt $SUMMARY_LIMIT ]]; then
-  fail "the summary is ${#prose} characters, over $SUMMARY_LIMIT"
-  note "  usually the issue was too big rather than the line too short"
-fi
-
-if [[ "$summary" == *. ]]; then
-  fail "the summary line ends in a full stop"
-fi
-
-# Imperative mood, as far as a machine can tell: the past tense and the gerund
-# are what gets written instead. The exceptions are imperatives that simply end
-# that way; extend the list when a real commit trips it.
-first=${prose%% *}
-shopt -s nocasematch
-if [[ "$first" =~ (ed|ing)$ ]] &&
-  [[ ! "$first" =~ ^(Bring|Embed|Exceed|Feed|Proceed|Read|Seed|Shed|Speed|Spread|Succeed)$ ]]; then
-  fail "\"$first\" is not the imperative: write \"Extract\", not \"Extracted\" or \"Extracting\""
-fi
-shopt -u nocasematch
-
-if [[ ${#lines[@]} -gt 1 && -n "${lines[1]}" ]]; then
-  fail "the line after the summary must be blank"
-fi
-
-# Everything after the summary, rather than everything after the blank line:
-# a message that forgot the blank line still has a body, and it is still too
-# wide.
-# Every one of them, not the first. Stopping at one meant a message with three
-# long lines took three runs to fix, and the second and third were written
-# against a report that named neither -- which is how a line over the limit
-# reached this repository's history more than once.
-wide=()
-for line in "${lines[@]:1}"; do
-  # A line with nowhere to break -- a long URL, pasted output -- is left alone.
-  if [[ ${#line} -gt $BODY_LIMIT && "$line" == *" "* ]]; then
-    wide+=("${#line}: ${line:0:44}...")
-  fi
-done
-
-if [[ ${#wide[@]} -gt 0 ]]; then
-  if [[ ${#wide[@]} -eq 1 ]]; then
-    fail "one body line is over $BODY_LIMIT characters:"
-  else
-    fail "${#wide[@]} body lines are over $BODY_LIMIT characters:"
-  fi
-  for line in "${wide[@]}"; do
-    note "  $line"
-  done
-fi
-
-# Every trailer names an issue, and they all name the same one. That is what
-# "one issue per commit" reduces to in a message: an issue may take more than
-# one commit, so `Refs` exists for the ones that advance it without finishing
-# it, but no commit may name two issues whatever the verb.
-if [[ ${#trailers[@]} -gt 0 ]] && ! trailers_are_last "$(printf '%s\n' "${lines[@]}")"; then
-  fail "the trailers are not the last paragraph, so git reads them as prose"
-  note "  put them alone at the end, after a blank line"
-fi
-
-if [[ -n "$uncolonned" ]]; then
-  fail "\"$uncolonned\" is not a trailer git can read: write \"${uncolonned%% *}: ${uncolonned#* }\""
-  note "  git parses Key: value, so without the colon %(trailers) finds nothing"
-fi
-
-if [[ ${#trailers[@]} -eq 0 ]]; then
-  fail "expected a 'Closes: <issue>' or 'Refs: <issue>' trailer, found none"
-elif [[ ${#closing[@]} -gt 1 ]]; then
-  fail "${#closing[@]} 'Closes' trailers. One issue, one commit."
-else
-  named=$trailer_issue
-  for trailer in "${trailers[@]:1}"; do
-    other=$(issue_of "$trailer")
-    if [[ "$other" != "$named" ]]; then
-      fail "the trailers name $named and $other. A commit belongs to one issue."
-      break
-    fi
-  done
-
+named=$MESSAGE_TRAILER_ISSUE
+if [[ "$MESSAGE_TRAILER_COUNT" -gt 0 && "$MESSAGE_CLOSES_COUNT" -le 1 ]]; then
   # A commit that only advances an issue closes nothing, so there is no
   # closure to cross-check and none to object to.
   if [[ "$MESSAGE_ONLY" -eq 0 ]]; then
-    if [[ ${#closing[@]} -eq 0 ]]; then
+    if [[ "$MESSAGE_CLOSES_COUNT" -eq 0 ]]; then
       note "names $named without closing it"
       if [[ ${#closed[@]} -gt 0 ]]; then
         fail "the message closes nothing but the staged tracker closes ${closed[0]}"

@@ -12,8 +12,9 @@
 #
 # <range> defaults to origin/main..HEAD, or with --squashed to the last fifty
 # commits -- see TRIPWIRE_DEPTH. --epic names the batch's epic in the
-# tracker; without it the epic is inferred from the issues the range closes,
-# and if they do not agree on one, membership is simply not checked. --draft
+# tracker; without it the epic is inferred from the issues the range closes.
+# Issues from two epics are refused, and so are several landing under none.
+# --draft
 # says the branch is still under review, where commits waiting to be folded in
 # are expected rather than a fault.
 
@@ -86,11 +87,14 @@ REPO_ROOT=$(git rev-parse --show-toplevel) || exit 1
 # Beside this script rather than under the repository being read: the range may
 # belong to a checkout that has no scripts/ of its own, and the two are a pair.
 HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
-CHECK="$HERE/check-commit.sh"
 MEMBERSHIP="$HERE/batch-membership.py"
 
 . "$HERE/report.sh"
 . "$HERE/trailers.sh"
+# The message rules themselves. check-commit.sh is the other caller, so the two
+# enforce the same text by sharing this file rather than by one reading the
+# other's output.
+. "$HERE/message-rules.sh"
 
 # A range git cannot resolve is not an empty range. Swallowing the difference
 # would let a typo, a shallow checkout or a missing base commit report that
@@ -180,10 +184,10 @@ for sha in "${commits[@]}"; do
 
   mapfile -t trailers < <(trailers_of "${body_of[$sha]:-}")
 
-  # A commit naming no issue, or naming two, is check-commit.sh's objection to
-  # make -- it is delegated below and would say it again. What is collected
-  # here is only what a range needs and one message cannot give: which issue
-  # each commit belongs to, in order, and how often each is closed.
+  # A commit naming no issue, or naming two, is message_rules' objection to
+  # make -- it is applied below and would say it again. What is collected here
+  # is only what a range needs and one message cannot give: which issue each
+  # commit belongs to, in order, and how often each is closed.
   if [[ ${#trailers[@]} -eq 0 ]]; then
     order+=("")
     continue
@@ -258,7 +262,17 @@ if [[ -f "$ISSUES" ]]; then
 
     # Its exit status, not just its output: a helper that died has checked
     # nothing, and saying nothing is how that looks from here.
-    if ! verdict=$(EPIC="$EPIC" python3 "$MEMBERSHIP" "$ISSUES" "${landed[@]}" 2>&1); then
+    # How many commits did the closing, not how many issues were closed: one
+    # commit closing four is already refused as a squash, and telling its
+    # author to make an epic would be the wrong remedy for it.
+    closing_commits=0
+    for sha in "${commits[@]}"; do
+      while IFS= read -r trailer; do
+        [[ "$trailer" == Closes* ]] && { closing_commits=$((closing_commits + 1)); break; }
+      done < <(trailers_of "${body_of[$sha]:-}")
+    done
+    if ! verdict=$(EPIC="$EPIC" LANDED_COMMITS="$closing_commits" \
+      python3 "$MEMBERSHIP" "$ISSUES" "${landed[@]}" 2>&1); then
       fail "the batch could not be read from $ISSUES:"
       printf '      %s\n' "$verdict"
     else
@@ -275,38 +289,39 @@ fi
 
 # --- and each message still stands on its own ------------------------------
 #
-# Delegated rather than reimplemented: the summary and trailer rules have one
-# home, and it is the script a contributor runs before committing.
+# Shared rather than reimplemented: the summary and trailer rules have one
+# home, message-rules.sh, and both checkers source it.
 #
-# --message-only because the tracker cross-check reads a staged diff, and a
-# commit that has already landed has none. Asking for the rules that apply is
-# the whole of it; reading everything and then discarding objections whose
-# wording looked like staging would discard real ones too.
+# The rules only, not the tracker cross-check: that reads a staged diff, and a
+# commit that has already landed has none. message-rules.sh is exactly the half
+# that applies, which is why it is a file rather than a flag on check-commit.sh.
+#
+# Called, not forked. Two scripts beside each other, already sharing a library,
+# were agreeing on the rules only for as long as one kept parsing the other's
+# prose. The objections come back through report.sh already, so REPORT_PREFIX
+# attributes them to their commit rather than a scraper re-wrapping each line.
 
-if [[ -x "$CHECK" ]]; then
-  for sha in "${commits[@]}"; do
-    subject=${subject_of[$sha]:-}
-    # An amend! read as a standalone commit is charged seven characters of
-    # prefix against a fifty-column limit.
-    absorbed "$subject" && continue
-    if ! output=$("$CHECK" --message-only <(printf '%s\n' "${body_of[$sha]:-}") 2>&1); then
-      # The notes after a failure belong to it -- an objection that names two
-      # long lines puts them there -- so they are carried rather than dropped,
-      # which left "2 body lines over 72 characters:" and nothing after it.
-      keeping=0
-      while IFS= read -r line; do
-        if [[ "$line" == *"$MARK_FAIL"* ]]; then
-          keeping=1
-          fail "${sha:0:8} ${line#*"$MARK_FAIL" }"
-        elif [[ "$keeping" -eq 1 && "$line" == *"$MARK_NOTE"* ]]; then
-          note "${line#*"$MARK_NOTE" }"
-        else
-          keeping=0
-        fi
-      done <<<"$output"
-    fi
-  done
+# The module has to be here: sourcing it silently and calling an undefined
+# function would turn every rule below into a no-op while this script still
+# exited 0, which is a required check that read nothing.
+if ! declare -F message_rules >/dev/null; then
+  echo "Cannot read the message rules: $HERE/message-rules.sh is missing." >&2
+  exit 1
 fi
+
+for sha in "${commits[@]}"; do
+  subject=${subject_of[$sha]:-}
+  # An amend! read as a standalone commit is charged seven characters of
+  # prefix against a fifty-column limit.
+  absorbed "$subject" && continue
+  # git writes a merge, revert or cherry-pick message itself, and none of them
+  # is somebody's issue being landed. Forking check-commit.sh used to skip
+  # them for free, because that script refuses them at its own front door.
+  message_is_git_own "$subject" && continue
+  REPORT_PREFIX=${sha:0:8}
+  message_rules "${body_of[$sha]:-}"
+  REPORT_PREFIX=""
+done
 
 if [[ "$pending" -gt 0 ]]; then
   if [[ "$DRAFT" -eq 1 ]]; then
