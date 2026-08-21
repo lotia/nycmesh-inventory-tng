@@ -51,7 +51,14 @@ def main() -> None:
             return
         if not batches:
             # A single issue shipping on its own belongs to no batch and needs
-            # no epic. There is nothing here to disagree with.
+            # no epic. Several landing together do: DEVELOPERS.md#pull-requests
+            # wants what belongs to a batch recorded rather than remembered, and
+            # silence here is how a batch skips that without anything noticing.
+            if len(landed) > 1:
+                print(
+                    "fail %d issues landed together with no epic: %s"
+                    % (len(landed), " ".join(sorted(landed)))
+                )
             return
         epic = batches.pop()
 

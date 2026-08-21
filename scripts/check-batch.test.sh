@@ -195,6 +195,20 @@ land a 'aaa: Extract the decode loop
 Closes: inventory-tng-aaa'
 expect 0 "One commit, one issue" "a lone issue needs no epic"
 
+# The other half of the rule above: more than one issue does need an epic.
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","status":"closed"}
+JSONL
+land a 'aaa: Extract the decode loop
+
+Closes: inventory-tng-aaa'
+land b 'bbb: Move the detector behind an interface
+
+Closes: inventory-tng-bbb'
+expect 1 "2 issues landed together with no epic" "a batch without an epic is refused"
+
 # See batch-membership.py on why a malformed row is stepped over.
 scene
 tracker <<'JSONL'
