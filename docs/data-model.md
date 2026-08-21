@@ -159,8 +159,9 @@ Invariants, enforced by check constraints rather than application code:
 - `quantity` is greater than zero — direction is expressed by which side the
   location sits on, never by the sign of the number.
 
-Three more are triggers rather than check constraints, because each needs
-something a constraint cannot see — the parent row, or the current time:
+Four more are triggers rather than check constraints, because each needs
+something a constraint cannot see — the parent row, another table, or the
+current time:
 
 - a movement carries the sides its transaction's `kind` calls for, and not the
   ones it forbids (the rule is
@@ -168,7 +169,9 @@ something a constraint cannot see — the parent row, or the current time:
   section 6);
 - `occurred_at` is not in the future;
 - `actor` is a volunteer the pick-list still offers — neither merged nor
-  retired.
+  retired;
+- `to_location` is a location the pick-list still offers, for the reason
+  [decision 0019](decisions/0019-retired-means-not-offered.md) gives.
 
 Why these live in the database at all, and which related rules deliberately do
 not, is [decision 0016](decisions/0016-invariants-for-every-writer.md).

@@ -9,7 +9,12 @@ a basement needs to be told which of their 24 scans to fix. So those rules are
 stated here as well, and the database remains the thing that enforces them.
 Every rule below that names a row's own columns is one of these, including the
 four that reach across tables or across time and so are triggers rather than
-constraints (migration 0008):
+constraints (migration 0008). A fifth trigger has no mirror here and is meant
+to have none: ``stock_movement_to_location_is_active`` refuses stock arriving
+at a retired location (migration 0010, decision 0019), and a client cannot
+reach it -- the location pick-list does not offer a retired row, so a request
+naming one is not a mistake this module can explain more helpfully than the
+database does. The four with mirrors:
 
 - a batch may not be dated in the future
   (``StockTransactionCreateSerializer.validate_occurred_at``);
@@ -109,8 +114,11 @@ class StockMovementInputSerializer(serializers.ModelSerializer):
     """One line of a submitted batch."""
 
     # Any item or location, including retired ones the read API no longer
-    # offers. That asymmetry is deliberate only in the sense that nobody has
-    # decided it yet: inventory-tng-6c7.
+    # offers. Decision 0019: retirement takes a row out of the pick-list and
+    # says nothing about the stock it holds, which stays countable and
+    # drainable. The one thing refused is arrival at a retired location, and
+    # that is `stock_movement_to_location_is_active`'s to refuse rather than
+    # this queryset's -- the admin and the importer write here too.
     item = CachedPrimaryKeyRelatedField(queryset=Item.objects.all())
     from_location = CachedPrimaryKeyRelatedField(
         queryset=Location.objects.all(),
@@ -126,6 +134,26 @@ class StockMovementInputSerializer(serializers.ModelSerializer):
     class Meta:
         model = StockMovement
         fields = ["item", "quantity", "from_location", "to_location"]
+
+    def validate_to_location(self, value: Location | None) -> Location | None:
+        """Stock does not arrive at a location the pick-list no longer offers.
+
+        Mirrors ``stock_movement_to_location_is_active``, so a client sees a
+        400 naming the line rather than a 500 naming nothing. The trigger is
+        what holds it against the admin and the planned sheet importer; this
+        only decides what the caller is told, which is the distinction this
+        module's docstring draws.
+
+        A volunteer reaches this by scanning a wall sticker for a room retired
+        after their label cache was filled: the sticker is not revoked, so it
+        still resolves. Decision 0019 is why arriving is refused while leaving
+        is not.
+        """
+        if value is not None and not value.active:
+            raise serializers.ValidationError(
+                f"{value.name!r} is retired, so stock cannot be moved into it. Stock may still be moved out."
+            )
+        return value
 
     def validate_quantity(self, value: Any) -> Any:
         # Direction is which side the location sits on, never the sign of the
@@ -233,6 +261,44 @@ class StockTransactionCreateSerializer(serializers.ModelSerializer):
         if value > timezone.now() + CLOCK_SKEW:
             raise serializers.ValidationError("A batch cannot have happened in the future.")
         return value
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        """Stock does not arrive under an item the pick-list no longer offers.
+
+        The item half of ``stock_movement_to_location_is_active``, mirrored so
+        a client sees a 400 naming the line rather than a 500 naming nothing.
+        A receipt is pure arrival with no from-side, so the location rule's
+        reasoning applies to items unchanged: stock received against a retired
+        item is a balance ``/api/items`` never shows. Decision 0019.
+
+        Here rather than on the line, because a line does not know its batch's
+        kind, and an adjustment or a count arrives anywhere -- that is how
+        somebody says the shelf disagrees with the system, and decision 0011
+        section 6 makes it the one claim this API must never argue with.
+        """
+        kind = attrs.get("kind")
+        if kind in (StockTransaction.Kind.ADJUSTMENT, StockTransaction.Kind.COUNT):
+            return attrs
+        retired = {
+            index: line["item"].name
+            for index, line in enumerate(attrs.get("movements") or [])
+            if line.get("to_location") is not None and not line["item"].active
+        }
+        if retired:
+            raise serializers.ValidationError(
+                {
+                    "movements": {
+                        index: {
+                            "item": (
+                                f"{name!r} is retired, so stock cannot be moved under it. "
+                                "Stock may still be moved out, and a count may correct it."
+                            )
+                        }
+                        for index, name in retired.items()
+                    }
+                }
+            )
+        return attrs
 
     def get_unique_together_validators(self) -> list[UniqueTogetherValidator]:
         """No uniqueness validator for the idempotency key.
@@ -372,10 +438,11 @@ class VolunteerDetailSerializer(VolunteerSerializer):
         at the survivor is the obvious move and fails exactly when it matters:
         ``location_one_custody_per_volunteer`` stops it the moment the survivor
         already holds one, which is the ordinary shape of a real duplicate.
-        Retiring the location instead has no answer for the stock still
-        recorded there, which is the open question in inventory-tng-6c7. So
-        this says what to do first and lets a person decide, which is what the
-        409 in decision 0015 does with a name that is already taken.
+        Retiring the location instead leaves the stock where it is: decision
+        0019 makes a retired location stop being offered without emptying it,
+        so retirement moves the problem rather than answering it. So this says
+        what to do first and lets a person decide, which is what the 409 in
+        decision 0015 does with a name that is already taken.
         """
         if self.instance is None:
             return attrs

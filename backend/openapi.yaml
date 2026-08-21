@@ -112,10 +112,11 @@ paths:
         One grouping, read by anyone and renamed or re-parented by an administrator.
 
         A category carries no ``active`` column, so nothing here is withdrawn from
-        the list and both querysets are the same one. Adding such a column would
-        be guessing at inventory-tng-6c7's answer, and an unwanted grouping with
-        no items in it is already reachable through the Django admin, which
-        decision 0014 point 4 keeps for exactly this.
+        the list and both querysets are the same one. Decision 0019 gives retirement
+        a meaning for rows that hold stock, and a category holds none, so the column
+        would buy nothing; an unwanted grouping with no items in it is already
+        reachable through the Django admin, which decision 0014 point 4 keeps for
+        exactly this.
       parameters:
       - in: path
         name: id
@@ -151,10 +152,11 @@ paths:
         One grouping, read by anyone and renamed or re-parented by an administrator.
 
         A category carries no ``active`` column, so nothing here is withdrawn from
-        the list and both querysets are the same one. Adding such a column would
-        be guessing at inventory-tng-6c7's answer, and an unwanted grouping with
-        no items in it is already reachable through the Django admin, which
-        decision 0014 point 4 keeps for exactly this.
+        the list and both querysets are the same one. Decision 0019 gives retirement
+        a meaning for rows that hold stock, and a category holds none, so the column
+        would buy nothing; an unwanted grouping with no items in it is already
+        reachable through the Django admin, which decision 0014 point 4 keeps for
+        exactly this.
 
         Requires an administrator. See docs/decisions/0012-two-populations.md for who that is and why.
       parameters:
@@ -325,9 +327,10 @@ paths:
         One item, read by anyone and edited by an administrator.
 
         Retiring an item is a PATCH setting ``active`` to false, not a delete: the
-        ledger refers to it for as long as the ledger exists, and what
-        ``active=False`` should mean for stock still physically on a shelf is
-        inventory-tng-6c7.
+        ledger refers to it for as long as the ledger exists. What that means for
+        stock still physically on a shelf is
+        [decision 0019](../../../docs/decisions/0019-retired-means-not-offered.md) --
+        it stops being offered and stays countable.
       parameters:
       - in: path
         name: id
@@ -363,9 +366,10 @@ paths:
         One item, read by anyone and edited by an administrator.
 
         Retiring an item is a PATCH setting ``active`` to false, not a delete: the
-        ledger refers to it for as long as the ledger exists, and what
-        ``active=False`` should mean for stock still physically on a shelf is
-        inventory-tng-6c7.
+        ledger refers to it for as long as the ledger exists. What that means for
+        stock still physically on a shelf is
+        [decision 0019](../../../docs/decisions/0019-retired-means-not-offered.md) --
+        it stops being offered and stays countable.
 
         Requires an administrator. See docs/decisions/0012-two-populations.md for who that is and why.
       parameters:

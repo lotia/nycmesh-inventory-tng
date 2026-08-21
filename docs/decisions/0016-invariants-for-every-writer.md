@@ -54,6 +54,14 @@ it anyway — there is no column recording which writer a value came from.
    `label_code_is_printed`. The code is on a sticker on a shelf, and no database
    write can go and reprint it.
 
+A fifth was added later by the same test:
+[decision 0019](0019-retired-means-not-offered.md) refuses stock arriving at a
+retired location (`stock_movement_to_location_is_active`, migration 0010). It
+reads another table, and an administrator filling a decommissioned room should
+be refused too, so it is a trigger. It is the one with no mirrored `400`,
+because a client cannot reach it: the location pick-list does not offer a
+retired row.
+
 Each is checked **when the column is written**, not continuously. Retiring a
 volunteer who already holds a custody location stays an ordinary act, and an
 update that leaves the column alone — renaming a shelf — is not an occasion to

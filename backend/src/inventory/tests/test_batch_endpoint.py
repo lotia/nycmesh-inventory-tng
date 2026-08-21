@@ -1001,3 +1001,96 @@ def test_a_boolean_where_an_id_belongs_is_rejected_even_after_the_same_number(
     assert response.json()["errors"][0]["index"] == 1
     assert response.json()["errors"][0]["field"] == "item"
     assert StockTransaction.objects.count() == 0
+
+
+def test_a_batch_into_a_retired_location_is_refused_by_line(
+    client: Client, volunteer: Volunteer, item: Item, warehouse: Location
+) -> None:
+    """Decision 0019, reported the way decision 0016 says an invariant must be.
+
+    A wall sticker for a room retired after the label cache was filled is not
+    revoked and still resolves, so a volunteer can scan it, add two dozen
+    lines and press Save. Without this mirror the trigger answers that with a
+    500 naming nothing -- "reaching a volunteer with 24 scans as a 500 naming
+    nothing" is the outcome 0016 exists to prevent.
+    """
+    retired = Location.objects.create(name="Decommissioned room", kind=Location.Kind.ROOM)
+    Location.objects.filter(pk=retired.pk).update(active=False)
+
+    response = post(
+        client,
+        batch(
+            volunteer,
+            [{"item": item.pk, "quantity": "1", "from_location": warehouse.pk, "to_location": retired.pk}],
+            kind=StockTransaction.Kind.TRANSFER,
+        ),
+    )
+
+    assert response.status_code == 400
+    assert "retired" in str(response.json())
+
+
+def test_a_batch_out_of_a_retired_location_is_recorded(
+    client: Client, volunteer: Volunteer, item: Item, warehouse: Location
+) -> None:
+    """The half that makes decommissioning possible: draining is the point."""
+    retired = Location.objects.create(name="Emptying room", kind=Location.Kind.ROOM)
+    Location.objects.filter(pk=retired.pk).update(active=False)
+
+    response = post(
+        client,
+        batch(
+            volunteer,
+            [{"item": item.pk, "quantity": "1", "from_location": retired.pk, "to_location": warehouse.pk}],
+            kind=StockTransaction.Kind.TRANSFER,
+        ),
+    )
+
+    assert response.status_code == 201
+
+
+def test_a_receipt_of_a_retired_item_is_refused_by_line(
+    client: Client, volunteer: Volunteer, item: Item, warehouse: Location
+) -> None:
+    """Decision 0019 rule 1, the item half.
+
+    A receipt is pure arrival with no from-side, so "draining is legitimate,
+    filling is not" does not distinguish an item from a location: stock
+    received against a retired item is a balance ``/api/items`` never shows.
+    """
+    Item.objects.filter(pk=item.pk).update(active=False)
+
+    response = post(
+        client,
+        batch(
+            volunteer,
+            [{"item": item.pk, "quantity": "40", "to_location": warehouse.pk}],
+            kind=StockTransaction.Kind.RECEIPT,
+        ),
+    )
+
+    assert response.status_code == 400
+    assert "retired" in str(response.json())
+
+
+def test_a_count_may_still_correct_a_retired_item(
+    client: Client, volunteer: Volunteer, item: Item, warehouse: Location
+) -> None:
+    """Decision 0019 rule 2: retirement must not strand what it retires.
+
+    Finding three of a retired item on a shelf has to be recordable, or the
+    stock the rule above cares about is precisely the stock nobody can
+    reconcile. Decision 0011 section 6 is why counts constrain nothing.
+    """
+    Item.objects.filter(pk=item.pk).update(active=False)
+
+    response = post(
+        client,
+        batch(
+            volunteer,
+            [{"item": item.pk, "quantity": "3", "to_location": warehouse.pk}],
+            kind=StockTransaction.Kind.COUNT,
+        ),
+    )
+
+    assert response.status_code == 201

@@ -132,7 +132,11 @@ class LabelForm(forms.ModelForm):
         one constraint rather than one, because the admin does not pass through
         a serializer -- decision 0016.
         """
-        cleaned = super().clean()
+        # self.cleaned_data rather than super().clean()'s return, which is
+        # typed dict | None: the base returns the same object and Django's own
+        # documentation reads it from the attribute for exactly this reason.
+        super().clean()
+        cleaned = self.cleaned_data
         if cleaned.get("location") is not None:
             cleaned["quantity"] = None
         elif cleaned.get("item") is not None and cleaned.get("quantity") is None:
