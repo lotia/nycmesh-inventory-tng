@@ -31,6 +31,14 @@ dependencies = [
     # major that renamed it again would silently serve no policy at all.
     "django-csp==4.0.*",
     "drf-spectacular-sidecar>=2026.8.1",
+    # Reads the exported inventory workbook. A runtime dependency rather than a
+    # development one because profile_sheet, and the importer that follows it,
+    # are management commands that ship inside the backend image: Django
+    # imports a command's module to run it, so a dependency missing from the
+    # image is a command that lists in `manage.py help` and raises on use.
+    # Not because the migrate Job needs it -- that Job runs `migrate` and
+    # mounts nothing, and the import is run by hand.
+    "openpyxl==3.1.*",
 ]
 
 [dependency-groups]

@@ -29,16 +29,28 @@ cd backend && uv run python src/manage.py profile_sheet \
     "../ignored/NYC Mesh - Inventory Sheet.xlsx"
 ```
 
-That command does not exist yet — `inventory-tng-6s9` builds it. Until it does,
-every figure below is a hand count, and **a figure taken from here is quoted
-with its rule or not at all.**
+It prints a section per rule, and the rules land one at a time. A figure below
+that the command does not yet print is a hand count and says so — look for
+**(hand count)**. **A figure taken from here is quoted with its rule or not at
+all.**
 
 ## The population
 
 Which rows count, and why 3,439 rather than the tab's 3,456, is stated once in
 [decision 0008](../decisions/0008-stock-ledger-transfer-graph.md#context)
 alongside the counts that rest on it. Every figure here uses that same
-population.
+population, and `profile_sheet` prints it first so that a section beneath it
+can be read against the rows it divided:
+
+```
+Population
+  rows on QRresponses       3456
+    carrying a direction    3439
+      Checking Out          2455
+      Checking In            984
+    carrying neither          17
+  catalogued items            52
+```
 
 Catalogue figures come from the `Fast Inventory` tab, whose item name is
 **column D**; column C holds the QR link and happens to have the same number of
@@ -111,6 +123,9 @@ nothing has to parse prose again.
 
 ## 5. Submissions to batch
 
+*Not settled, and every figure in this section is a **(hand count)** —
+`profile_sheet` has no section for it yet. `inventory-tng-a82` settles it.*
+
 **Rule.** Chaining submissions by the same person with gaps of ten minutes or
 less. That gives a largest burst of **24** under every submitter key tried, and
 **76.6%** of submissions inside a burst keying on email with a name fallback
@@ -128,6 +143,9 @@ still needs settling, because 45% of submissions carry no email.
 by the cart: one submission carries many movements.
 
 ## 6. Person to volunteer
+
+*Not settled, and every figure in this section is a **(hand count)** —
+`profile_sheet` has no section for it yet. `inventory-tng-5r2` settles it.*
 
 **Rule.** Not settled. 102 distinct name spellings and 65 distinct emails, but
 45% of submissions carry no email, and 41 spellings never appear beside one at
