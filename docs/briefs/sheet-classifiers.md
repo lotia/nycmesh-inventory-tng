@@ -78,16 +78,61 @@ volunteer actually types.
 
 ## 2. Note to correction
 
-**Rule.** Not settled. Whole-note equality against `fixing inventory` (218),
-`updating inventory` (71), `inventory correction` (67) and `inventory correct`
-(50), case-insensitive, gives 406 rows — 11.8%. Substring matching
-double-counts, because `inventory correction` contains `inventory correct`, so
-each of those 67 rows is swept up by both predicates. A broad regex over
-fix/update/correct/adjust gives about 21%.
+**Rule.** A note is a correction when it names **the record** and **an act of
+adjusting it**, case-insensitively, and both halves are required:
 
-**Figure.** Decision 0008 previously stated 18.7%. That reproduces under none of
-the above, and its original method is unrecorded. **Treat the four exact counts
-as the only reproducible part** until the rule is settled.
+| Half | Pattern |
+| --- | --- |
+| the record | `inven\w*`, `invneottr`, `counts?`, `stock` |
+| the act | `fix\w*`, `correct\w*`, `updat\w*`, `adjust\w*`, `seed\w*`, `initial`, `recount\w*` |
+
+Neither half alone is a correction, and the export shows why both are needed:
+`fixing loose pole nn540` and `hex house fix` are repairs to hardware at a
+site, while `inventory order` is an order and `apartment stock` is a place. The
+three spellings `invenotry`, `inventry` and `invneottr` are in the record half
+because somebody typed them.
+
+**Whole-note against substring, settled.** This brief used to say substring
+matching double-counts because `inventory correction` contains `inventory
+correct`. That is true of *summing a count per phrase* and false of asking a
+row whether it matches any of them — a row is one row however many predicates
+it satisfies. Over the four phrases the three readings give 407 rows
+whole-note, 445 per row, and 517 summed per phrase; the last counts 72 rows
+twice — exactly 517 − 445 — and is not a count of anything. So the rule matches
+substrings, evaluated per row: whole-note equality loses `fixing inventory (2
+today)`, which is the same act with a detail added.
+
+All three are printed by the command, including the one being argued against,
+because a figure quoted here that no code produces is the failure this brief
+exists to stop.
+
+**Figures.** 606 of the 3,439 — **17.6%**.
+
+```
+Corrections
+  submissions                                       3439
+    with no note at all                             1184
+    naming the record and an act of adjusting it     606
+    naming the record only                           116
+    naming an act only                                32
+    naming neither, note or no note                 2685
+  the four enumerated phrases, whole-note            407
+    the same phrases, per row                        445
+    the same phrases, summed per phrase              517
+```
+
+The two half-matching lines are the ones to argue with, and the report prints
+them so that the argument has a number. `inventory` alone is 52 of the 116 and
+is plainly the same practice written lazily; `inventory order` and `apartment
+stock` are 25 more and are not, so the rule takes neither rather than
+special-casing a bare word.
+
+Decision 0008 previously stated 18.7%. It does not reproduce under this rule
+either, and its original method is unrecorded; 17.6% replaces it. The
+"about 21%" this brief also carried was a broad regex over
+fix/update/correct/adjust with no object required, which is the reading that
+imports `fixing loose pole nn540` as an adjustment. It is withdrawn on those
+grounds rather than merely superseded.
 
 **Becomes.** Historical rows imported as `adjustment`, not as volunteer
 activity. At runtime the stock-count workflow replaces the practice entirely.
@@ -178,17 +223,16 @@ not yet known.
 `Checking Out`, so a low return rate is what this instrument produces whether or
 not anything is returned.
 
-Nor can a check-in be read as a return. Sorting the 984 by what their notes say
-needs the correction rule of §2, which is not settled, so the shares here are
-not stated — that is the same discipline the rest of this brief asks for, and it
-applies to the argument it is being used to make. What can be said without a
-rule: **68 check-ins say in so many words that something came back**, on a
-whole-note reading, and that measures how often somebody wrote it down rather
-than how often it happened. It is a floor, not a rate.
+Nor can a check-in be read as a return. §2 can now tell a correction from a
+movement, so the 984 could be sorted — but a share of them would still measure
+how often somebody wrote something down rather than how often it happened,
+which is the point this section exists to make. What can be said without any
+rule at all: **68 check-ins say in so many words that something came back**
+(hand count), on a whole-note reading. That is a floor, not a rate.
 
 The earlier version of this section gave a four-way percentage split. Those
-shares rested on the broad regex §2 declines to endorse, and they did not sum to
-984. They are withdrawn rather than restated.
+shares rested on a broad regex nothing now endorses, and they did not sum to
+984. They are withdrawn rather than recomputed, for the reason above.
 
 This is not a classifier waiting to be written. It is the question the
 stakeholder meeting exists to answer
