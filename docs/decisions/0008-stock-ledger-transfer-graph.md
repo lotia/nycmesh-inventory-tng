@@ -20,7 +20,12 @@ shows what that costs:
   every submission. 1,557 submissions (45%) carry no email at all.
 - **2,455 check-outs against 984 check-ins.** Every printed QR code encodes a
   form link hardcoded to `Checking Out`, so returning stock costs strictly more
-  effort than taking it.
+  effort than taking it. And a check-in is mostly not a return: classified by
+  what each note says, the 984 are 39% corrections, 21% deliveries arriving,
+  23% blank and therefore unclassifiable, and 18% — 176 rows in four years —
+  a volunteer bringing something back. Read as return behaviour the column
+  says almost nothing, and what it does say is about the form rather than the
+  volunteers.
 - **18.7% of the ledger is corrections** — `fixing inventory` (218),
   `updating inventory` (71), `inventory correction` (67), `inventory correct`
   (50) and similar. Volunteers fake check-ins and check-outs because there is no
