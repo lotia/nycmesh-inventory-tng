@@ -18,15 +18,19 @@ or a string means, so the judgement is stated beside the number.
 
 ## How to re-run
 
-The workbook is not ours to publish and is gitignored, so nothing in CI can read
-it. Supply your own copy:
+The workbook carries volunteer names and email addresses and is not ours to
+publish, so nothing in CI can read it. **Keep your copy in `ignored/`**, which
+is where the repository expects it; `*.xlsx`, `*.ods` and `*.csv` are ignored
+everywhere as a second guard, because one `git add -A` over a copy left
+elsewhere would publish real people's contact details.
 
 ```bash
-uv run manage.py profile_sheet "path/to/NYC Mesh - Inventory Sheet.xlsx"
+cd backend && uv run python src/manage.py profile_sheet \
+    "../ignored/NYC Mesh - Inventory Sheet.xlsx"
 ```
 
-Until that command lands (`inventory-tng-6s9`), the figures below were counted by
-hand using exactly the predicates stated. **Any figure taken from here is quoted
+That command does not exist yet — `inventory-tng-6s9` builds it. Until it does,
+every figure below is a hand count, and **a figure taken from here is quoted
 with its rule or not at all.**
 
 ## The population
@@ -65,8 +69,9 @@ volunteer actually types.
 **Rule.** Not settled. Whole-note equality against `fixing inventory` (218),
 `updating inventory` (71), `inventory correction` (67) and `inventory correct`
 (50), case-insensitive, gives 406 rows — 11.8%. Substring matching
-double-counts, because `inventory correct` contains `inventory correction`. A
-broad regex over fix/update/correct/adjust gives about 21%.
+double-counts, because `inventory correction` contains `inventory correct`, so
+each of those 67 rows is swept up by both predicates. A broad regex over
+fix/update/correct/adjust gives about 21%.
 
 **Figure.** Decision 0008 previously stated 18.7%. That reproduces under none of
 the above, and its original method is unrecorded. **Treat the four exact counts
@@ -89,8 +94,9 @@ Narrowing to this room needs a second predicate, and the answer moves with it:
 `mesh room` plus (`131` or a `broome` misspelling) gives 205 across 31; `mesh
 room` plus `broome` alone gives 193 across 23. Folding case collapses the
 spellings further and raises the leading one from 97 to 118. **Cite whichever
-you use with the predicate attached** — three plausible readings of "how often
-is this room named" differ by 12%.
+you use with the predicate attached** — the widest and narrowest readings of
+"how often is this room named" are 231 and 193, which is 38 submissions apart,
+or a fifth of the smaller.
 
 **Becomes.** `Location` rows and the `from`/`to` sides of imported movements.
 Seeds `inventory-tng-o5t`.
@@ -105,11 +111,18 @@ nothing has to parse prose again.
 
 ## 5. Submissions to batch
 
-**Rule.** Not settled. Chaining submissions by the same person with gaps of ten
-minutes or less gives about 77% of submissions inside a burst and a largest
-burst of 24. A fixed ten-minute window anchored on the first submission gives
-about 76% but a largest of 17. Decision 0008 previously stated 76% and 24, which
-no single rule produces — the two halves come from different methods.
+**Rule.** Chaining submissions by the same person with gaps of ten minutes or
+less. That gives a largest burst of **24** under every submitter key tried, and
+**76.6%** of submissions inside a burst keying on email with a name fallback
+(76.8% by name, 77.8% by email alone). A fixed ten-minute window anchored on the
+first submission gives a largest burst of 17 instead, so the window rule is what
+decides that figure; the submitter key moves only the percentage, by about a
+point.
+
+**Correction.** An earlier version of this brief said decision 0008's "76% and
+24" came from two different methods and could not both be right. That was wrong:
+chaining produces both, and the pairing in 0008 reproduces. The submitter key
+still needs settling, because 45% of submissions carry no email.
 
 **Becomes.** One `StockTransaction` per burst. At runtime this is already solved
 by the cart: one submission carries many movements.
@@ -128,10 +141,19 @@ not yet known.
 
 **Whether hardware came back.** Every printed QR opens a form preset to
 `Checking Out`, so a low return rate is what this instrument produces whether or
-not anything is returned. Of the 984 check-ins, 39% are corrections, 21%
-deliveries, 23% carry no note at all, and 68 say in so many words that something
-came back — but that last figure measures how often somebody wrote it down, not
-how often it happened.
+not anything is returned.
+
+Nor can a check-in be read as a return. Sorting the 984 by what their notes say
+needs the correction rule of §2, which is not settled, so the shares here are
+not stated — that is the same discipline the rest of this brief asks for, and it
+applies to the argument it is being used to make. What can be said without a
+rule: **68 check-ins say in so many words that something came back**, on a
+whole-note reading, and that measures how often somebody wrote it down rather
+than how often it happened. It is a floor, not a rate.
+
+The earlier version of this section gave a four-way percentage split. Those
+shares rested on the broad regex §2 declines to endorse, and they did not sum to
+984. They are withdrawn rather than restated.
 
 This is not a classifier waiting to be written. It is the question the
 stakeholder meeting exists to answer
