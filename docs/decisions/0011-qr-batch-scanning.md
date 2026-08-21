@@ -9,9 +9,12 @@ This is the feature the project exists for. The system being replaced prints a
 QR code per item encoding a Google Form URL hardcoded to *Checking Out*, with
 the item's display name in a query parameter. One scan is therefore one form,
 one item, one submission. The measured consequences are in
-[decision 0008](0008-stock-ledger-transfer-graph.md#context) and are not
-repeated here; the burst figure there is the whole case for batching, because
-the bursts exist *because* one form can carry one item.
+[decision 0008](0008-stock-ledger-transfer-graph.md) and are not repeated here;
+the burst figure in its Consequences is the whole case for batching, because the
+bursts exist *because* one form can carry one item. What that figure depends on
+— how a burst is delimited, and how a submitter is identified when the email is
+blank — is in
+[the sheet classifiers brief](../briefs/sheet-classifiers.md).
 
 Three further facts shape this design. The first is solid, the other two are
 weaker than they look and are stated with their limits.

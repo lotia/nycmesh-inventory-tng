@@ -18,12 +18,17 @@ What fails is not its size — the sheet is small. The problems are structural:
   feature.**
 - **Nobody can correct it properly.** A large share of entries are corrections
   dressed as movements — [decision 0008](docs/decisions/0008-stock-ledger-transfer-graph.md)
-  counts them, and says what the sheet gives volunteers instead.
+  says what the sheet gives volunteers instead, and
+  [the classifiers brief](docs/briefs/sheet-classifiers.md) says how large a
+  share, and under which rule.
 - **It lives in a personal Google account**, so it cannot be edited by the
   people who depend on it and could be lost.
 
-Each of these is measured rather than assumed. The figures live once, in
-[docs/decisions/0008](docs/decisions/0008-stock-ledger-transfer-graph.md#context).
+Each of these is measured rather than assumed. The counts live once, in
+[decision 0008](docs/decisions/0008-stock-ledger-transfer-graph.md#context).
+Anything that needs a rule before it can be counted — which notes are
+corrections, which name a place — lives with that rule in
+[the sheet classifiers brief](docs/briefs/sheet-classifiers.md).
 
 ## Status
 
