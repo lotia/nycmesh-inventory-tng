@@ -115,8 +115,25 @@ Seeds `inventory-tng-o5t`.
 
 ## 4. Note to job reference
 
-**Rule.** A note containing `NN` followed by digits. 136 submissions cite one,
-across 54 distinct numbers.
+**Rule.** `NN`, an optional space, then digits, case-insensitively —
+`\bNN\s*(\d+)\b`. The census of the 137 references is `NN` 58, `Nn` 25, `nn`
+21, `NN␣` 17, `Nn␣` 15, `nn␣` 1, and it is what both pieces of latitude rest
+on: title case is 40 on its own, so a case-sensitive read finds 75 of the 136
+and loses 61; 33 submissions put a space in, so a pattern demanding `NN904`
+finds 103. No submission writes `NN#217`, so the pattern does not admit a `#`
+— latitude for input that is not in the ledger is latitude nothing can check.
+
+**Figures.** 136 submissions cite a job, across 54 distinct numbers. One note
+cites two — `nn498-nn6622`, a link between two nodes rather than two jobs — so
+the rule takes the first, and one cited job is therefore carried by nothing.
+
+```
+Job references
+  submissions citing a job                         136
+  distinct jobs cited                               54
+  submissions citing more than one                   1
+  cited jobs the imported field will not carry       1
+```
 
 **Becomes.** `StockTransaction.job_reference`, a field that already exists, so
 nothing has to parse prose again.
