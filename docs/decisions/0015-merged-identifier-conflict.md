@@ -22,7 +22,7 @@ self-registers with his own address, and is told "volunteer with this email
 already exists" about a record the API will not show him, on the one screen
 where there is nothing else to do. He has no way forward but to invent a second
 address or a second spelling of his name — which is how the sheet this project
-replaces came to hold 102 spellings for 65 people.
+replaces came to hold 102 spellings for fewer people than that.
 
 Three ways out were considered.
 

@@ -5,7 +5,7 @@
  * Every batch needs an actor, and the actor is a name picked from a list
  * rather than a credential -- docs/decisions/0012-two-populations.md point 5.
  * The order matters more than it looks: the sheet this replaces let anyone
- * type a name, and produced 102 spellings of 65 people. So the matches come
+ * type a name, and produced 102 spellings of fewer people. So the matches come
  * first and the "add me" option only after them.
  */
 import Alert from "@mui/material/Alert";

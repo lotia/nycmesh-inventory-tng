@@ -149,7 +149,7 @@ class Volunteer(models.Model):
         indexes = [
             # Trigram index: the self-registration form searches existing
             # volunteers before offering to create one, which is what stops a
-            # second generation of 102 spellings for 65 people.
+            # second generation of the sheet's 102 spellings.
             #
             # Indexes the bare column, not Lower(display_name): pg_trgm already
             # lowercases when it builds trigrams, so the index is case-

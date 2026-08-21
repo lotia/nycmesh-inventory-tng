@@ -37,7 +37,12 @@ ledger is designed in
 ### Volunteer
 
 A person who moves stock. Deliberately **not** `django.contrib.auth.User`:
-around 65 people transact, of whom a handful need administrative access. There
+under a hundred people transact, of whom a handful need administrative access.
+(How many exactly is not known — the sheet carries 102 name spellings and 65
+distinct email addresses, and 65 is a count of addresses rather than of people;
+[the classifiers brief](briefs/sheet-classifiers.md) says why and
+`inventory-tng-5r2` settles it. The argument here holds at either end of that
+range: both are small.) There
 is no link between the two models; administrators have a `User` (how they come
 by one is [decision 0013](decisions/0013-administrator-sign-in.md)) and a
 `Volunteer` row if they also move stock.
@@ -199,7 +204,7 @@ for its own sake.
 | Feature | Used for | Why |
 | --- | --- | --- |
 | `JSONB` + GIN | `Item.attributes` | Radios, cable, connectors, fibre and hand tools have genuinely disjoint specifications. The alternatives are EAV or a wide sparse table, both worse |
-| `pg_trgm` + GIN | `Volunteer.display_name` | Fuzzy search at the moment of self-registration is what prevents a second generation of 102-spellings-for-65-people |
+| `pg_trgm` + GIN | `Volunteer.display_name` | Fuzzy search at the moment of self-registration is what prevents a second generation of the sheet's 102 spellings |
 | Partial unique indexes | `email`, `slack_id`, custody locations | Uniqueness that only applies to non-`NULL` rows, and one custody location per volunteer |
 | Check constraints | Movement invariants, `held_by`, self-parent | Invariants that must hold regardless of which client wrote the row |
 | `BEFORE UPDATE OR DELETE` and `BEFORE TRUNCATE` triggers | Ledger tables | Makes append-only a property of the database, not a rule contributors must remember. Both are needed: a row trigger cannot see `TRUNCATE`. Why a trigger rather than `REVOKE` is in [decision 0008](decisions/0008-stock-ledger-transfer-graph.md) |
