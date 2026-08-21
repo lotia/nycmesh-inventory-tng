@@ -863,9 +863,9 @@ ITEMS = Item.objects.prefetch_related(
 
 # Retired items are not offered, the same way retired locations and merged
 # volunteers are not: this is a pick-list, and a retired item is not something
-# to add to a cart. What `active=False` should mean for stock that is still
-# physically on a shelf is inventory-tng-6c7, and until that is settled an
-# `active` parameter would be guessing at the answer.
+# to add to a cart. `active` is not a parameter here because `?withdrawn=true`
+# already lists what this collection took out, which is decision 0019's read
+# half -- retirement says a row is not offered, not that its stock is gone.
 OFFERED_ITEMS = ITEMS.filter(active=True)
 
 
@@ -895,9 +895,10 @@ class ItemDetailView(DetailView):
     """One item, read by anyone and edited by an administrator.
 
     Retiring an item is a PATCH setting ``active`` to false, not a delete: the
-    ledger refers to it for as long as the ledger exists, and what
-    ``active=False`` should mean for stock still physically on a shelf is
-    inventory-tng-6c7.
+    ledger refers to it for as long as the ledger exists. What that means for
+    stock still physically on a shelf is
+    [decision 0019](../../../docs/decisions/0019-retired-means-not-offered.md) --
+    it stops being offered and stays countable.
     """
 
     serializer_class = ItemDetailSerializer
@@ -956,10 +957,11 @@ class CategoryDetailView(DetailView):
     """One grouping, read by anyone and renamed or re-parented by an administrator.
 
     A category carries no ``active`` column, so nothing here is withdrawn from
-    the list and both querysets are the same one. Adding such a column would
-    be guessing at inventory-tng-6c7's answer, and an unwanted grouping with
-    no items in it is already reachable through the Django admin, which
-    decision 0014 point 4 keeps for exactly this.
+    the list and both querysets are the same one. Decision 0019 gives retirement
+    a meaning for rows that hold stock, and a category holds none, so the column
+    would buy nothing; an unwanted grouping with no items in it is already
+    reachable through the Django admin, which decision 0014 point 4 keeps for
+    exactly this.
     """
 
     serializer_class = CategorySerializer

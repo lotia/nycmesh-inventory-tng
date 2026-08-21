@@ -475,3 +475,43 @@ def test_str_methods(volunteer: Volunteer, item: Item, warehouse: Location) -> N
     assert "LiteBeam" in str(movement)
     assert "131 Broome" in str(movement)
     assert str(StockBalance.objects.get(item=item, location=warehouse)).startswith("-2")
+
+
+def test_stock_cannot_arrive_at_a_retired_location(volunteer: Volunteer, item: Item, warehouse: Location) -> None:
+    """Decision 0019: a retired location stops being offered, not stops existing.
+
+    Stock may leave it -- emptying the room is how it gets decommissioned --
+    and may not arrive, because a balance under a row no collection offers is
+    stock nobody can find. Enforced below the API so the admin and the sheet
+    importer meet it too, which is decision 0016's test.
+    """
+    retired = Location.objects.create(name="Decommissioned room", kind=Location.Kind.ROOM)
+    Location.objects.filter(pk=retired.pk).update(active=False)
+    batch = transaction_for(volunteer, StockTransaction.Kind.TRANSFER)
+
+    # Matched on the message, like every other trigger case in this file. The
+    # insert passes stock_movement_matches_kind too, and PostgreSQL fires
+    # BEFORE ROW triggers in name order, so that one runs first -- a bare
+    # IntegrityError here would stay green if this trigger were dropped.
+    with pytest.raises(IntegrityError, match="retired, so stock cannot arrive"):
+        StockMovement.objects.create(
+            transaction=batch, item=item, quantity=Decimal("1"), from_location=warehouse, to_location=retired
+        )
+
+
+def test_stock_may_still_leave_a_retired_location(volunteer: Volunteer, item: Item, warehouse: Location) -> None:
+    """The other half, and the one that makes decommissioning possible at all."""
+    retired = Location.objects.create(name="Emptying room", kind=Location.Kind.ROOM)
+    stocked = transaction_for(volunteer, StockTransaction.Kind.RECEIPT)
+    StockMovement.objects.create(transaction=stocked, item=item, quantity=Decimal("2"), to_location=retired)
+    Location.objects.filter(pk=retired.pk).update(active=False)
+    batch = transaction_for(volunteer, StockTransaction.Kind.TRANSFER)
+
+    StockMovement.objects.create(
+        transaction=batch, item=item, quantity=Decimal("2"), from_location=retired, to_location=warehouse
+    )
+
+    # The balance, not the attribute create() just set in memory: that would
+    # hold whether or not the row reached the database.
+    assert balance(item, retired) == Decimal("0")
+    assert balance(item, warehouse) == Decimal("2")
