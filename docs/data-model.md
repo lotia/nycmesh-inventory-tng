@@ -215,7 +215,9 @@ Vendors, prices, locations and identifiers are all tables.
 The export is small — a few dozen items and a few thousand submissions, not the
 15,000 rows originally assumed. The measured breakdown is in
 [decision 0008](decisions/0008-stock-ledger-transfer-graph.md#context) and is
-not repeated here. The work it implies:
+not repeated here; the rules needed to read the free-text field, and the figures
+each one produces, are in
+[the sheet classifiers brief](briefs/sheet-classifiers.md). The work it implies:
 
 - **Item strings must be resolved, not matched.** Every string that has ever
   named an item becomes an `ItemIdentifier`, including the ones that match

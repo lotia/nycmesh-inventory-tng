@@ -7,46 +7,42 @@ open pending stakeholder input.
 
 The system being replaced is a Google Sheet. Stock levels are computed by a
 chain of `INDIRECT()` formulas over raw Google Form submissions, and an item is
-identified by matching its display name exactly. Analysis of the exported sheet
-(52 catalogued items, 3,439 real submissions between July 2022 and August 2026)
-shows what that costs. Figures about submissions are counted over the
-`QRresponses` tab, restricted to the rows carrying a direction — 2,455
-`Checking Out` and 984 `Checking In`, which is what the 3,439 is; seventeen
-further rows carry neither and are sheet furniture rather than submissions.
-Figures about the catalogue come from the `Fast Inventory` tab, whose item name
-is column **D** — column C holds the QR link and happens to have the same number
-of filled rows, which is a trap worth naming:
+found by looking its display name up in a catalogue. Analysis of the exported
+sheet — 52 catalogued items and 3,439 submissions between July 2022 and August
+2026 — shows what that costs:
 
-- **145 distinct item strings for 52 items.** The sheet resolves an item with
-  `VLOOKUP(..., 0)`, which is case-insensitive, so `Mast straight` still finds
-  the catalogue's `mast straight`. Setting those nine case variants aside, **32
-  strings covering 83 submissions match nothing at all** — `archer 7`, `tp
-  link`, `Tough cable pro`, `Indoor Coupler` — and those movements silently
-  never reached a balance. A further 52 are a retired `NYCM-ER-LBEG2`-style SKU
-  scheme abandoned in 2022.
-- **102 spellings of 65 people** (`sean`/`Sean`, `Lydon`/`lydon`/`Lydon Thorpe`,
+- **145 distinct item strings for 52 items.** Some are typos, some are informal
+  names, and 52 are a retired `NYCM-ER-LBEG2`-style SKU scheme abandoned in
+  2022. A string the catalogue does not hold resolves to nothing, so those
+  movements silently never reached a balance.
+- **102 name spellings** (`sean`/`Sean`, `Lydon`/`lydon`/`Lydon Thorpe`,
   `JohnB`/`Johnb`/`johnb`), because the form asks for a name as free text on
-  every submission. 1,557 submissions (45%) carry no email at all.
+  every submission, and a large share of submissions carry no email to
+  disambiguate them.
 - **2,455 check-outs against 984 check-ins.** Every printed QR code encodes a
   form link hardcoded to `Checking Out`, so returning stock costs strictly more
-  effort than taking it. And a check-in is mostly not a return: classified by
-  what each note says, the 984 are 39% corrections, 21% deliveries arriving,
-  23% blank and therefore unclassifiable, 7% — 68 rows in four years — saying
-  in so many words that something came back, and 11% saying something else
-  entirely, most often a bare location like `Mesh room`. The column cannot be
-  read as return behaviour in either direction, and what it does measure is the
-  form rather than the volunteers.
-- **18.7% of the ledger is corrections** — `fixing inventory` (218),
-  `updating inventory` (71), `inventory correction` (67), `inventory correct`
-  (50) and similar. Volunteers fake check-ins and check-outs because there is no
-  other way to say "the shelf disagrees with the sheet".
+  effort than taking it. This is a bias in the instrument, not a measurement of
+  behaviour: a check-in is also how a correction and a delivery are recorded, so
+  **the column cannot be read as return behaviour in either direction**.
+- **A large share of the ledger is corrections** — `fixing inventory`,
+  `updating inventory`, `inventory correction` and similar. Volunteers fake
+  check-ins and check-outs because there is no other way to say "the shelf
+  disagrees with the sheet".
 - **The notes field carries three unrelated things at once**: a reason, a job
-  reference (136 submissions cite an NN number, 54 distinct), and a location —
-  one mesh room at 131 Broome accounts for 205 submissions written 31 different
-  ways, from `Sean mesh room 131 broome st` (97) down to `Sean mesh room 131
-  briome st` (1) — alongside `apartment stock`, `returning equipment from
-  apartment`, `Set aside for SN1`, `backup shelf` and
+  reference (an `NN` number), and a location — `Sean mesh room 131 broome st`
+  and its many misspellings, alongside `apartment stock`, `returning equipment
+  from apartment`, `Set aside for SN1`, `backup shelf` and
   `Moving inventory to basement`.
+
+Four of those five need a rule before they can be counted: which strings count
+as unresolvable, which notes are corrections, which name a place, which name a
+job. Those rules are not documentation — each one is a decision the sheet
+importer has to make about every historical row, so the rule and the number it
+produces belong together and away from here. Both live in
+[the sheet classifiers brief](../briefs/sheet-classifiers.md), which states each
+rule and the command that emits its figure. Quoting a number from that brief
+without the rule beside it is how this record previously came to carry several
+that nobody could reproduce.
 
 That last point is the important one. **Checking out is frequently not
 consumption.** Hardware moves to a volunteer's home or a hub, sits there, and is
@@ -113,8 +109,9 @@ workflow is built.
 The tension is that stock in a volunteer's apartment has two possible endings,
 and only one of them is currently recorded anywhere:
 
-- It **comes back to inventory** — already common today, and cheap to record,
-  since it is just a second scan in the opposite direction.
+- It **comes back to inventory** — cheap to record, since it is just a second
+  scan in the opposite direction. How often this happens today is not
+  knowable from the sheet, for the reason the Context gives.
 - It **gets fitted at an install** and never comes back. Recording this is a
   second event that volunteers do not perform today, and is the entire cost of
   the proposal.
@@ -151,7 +148,9 @@ down. The entity model does not change.
   minutes, and the largest is 24 items. The current one-form-per-item design is
   the reason those bursts exist.
 - Corrections, receipts, installs and genuine volunteer check-outs become
-  distinguishable, where today they are 100% indistinguishable in the data.
+  distinguishable by construction, where today telling them apart means reading
+  a free-text note and guessing — which is why the figures that rest on doing so
+  live in a brief with the rule that produced them.
 - More concepts than a counter. Locations and movement direction are things a
   contributor must understand before touching stock code, and this document plus
   [docs/data-model.md](../data-model.md) is where they learn them.
