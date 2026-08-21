@@ -9,12 +9,21 @@ The system being replaced is a Google Sheet. Stock levels are computed by a
 chain of `INDIRECT()` formulas over raw Google Form submissions, and an item is
 identified by matching its display name exactly. Analysis of the exported sheet
 (52 catalogued items, 3,439 real submissions between July 2022 and August 2026)
-shows what that costs:
+shows what that costs. Figures about submissions are counted over the
+`QRresponses` tab, restricted to the rows carrying a direction — 2,455
+`Checking Out` and 984 `Checking In`, which is what the 3,439 is; seventeen
+further rows carry neither and are sheet furniture rather than submissions.
+Figures about the catalogue come from the `Fast Inventory` tab, whose item name
+is column **D** — column C holds the QR link and happens to have the same number
+of filled rows, which is a trap worth naming:
 
-- **145 distinct item strings for 52 items.** 41 are typos or informal names
-  that match nothing (`archer 7`, `tp link`, `Mast straight`, 160 occurrences),
-  so those movements silently never reached a balance. A further 52 are a
-  retired `NYCM-ER-LBEG2`-style SKU scheme abandoned in 2022.
+- **145 distinct item strings for 52 items.** The sheet resolves an item with
+  `VLOOKUP(..., 0)`, which is case-insensitive, so `Mast straight` still finds
+  the catalogue's `mast straight`. Setting those nine case variants aside, **32
+  strings covering 83 submissions match nothing at all** — `archer 7`, `tp
+  link`, `Tough cable pro`, `Indoor Coupler` — and those movements silently
+  never reached a balance. A further 52 are a retired `NYCM-ER-LBEG2`-style SKU
+  scheme abandoned in 2022.
 - **102 spellings of 65 people** (`sean`/`Sean`, `Lydon`/`lydon`/`Lydon Thorpe`,
   `JohnB`/`Johnb`/`johnb`), because the form asks for a name as free text on
   every submission. 1,557 submissions (45%) carry no email at all.
@@ -22,19 +31,22 @@ shows what that costs:
   form link hardcoded to `Checking Out`, so returning stock costs strictly more
   effort than taking it. And a check-in is mostly not a return: classified by
   what each note says, the 984 are 39% corrections, 21% deliveries arriving,
-  23% blank and therefore unclassifiable, and 18% — 176 rows in four years —
-  a volunteer bringing something back. Read as return behaviour the column
-  says almost nothing, and what it does say is about the form rather than the
-  volunteers.
+  23% blank and therefore unclassifiable, 7% — 68 rows in four years — saying
+  in so many words that something came back, and 11% saying something else
+  entirely, most often a bare location like `Mesh room`. The column cannot be
+  read as return behaviour in either direction, and what it does measure is the
+  form rather than the volunteers.
 - **18.7% of the ledger is corrections** — `fixing inventory` (218),
   `updating inventory` (71), `inventory correction` (67), `inventory correct`
   (50) and similar. Volunteers fake check-ins and check-outs because there is no
   other way to say "the shelf disagrees with the sheet".
 - **The notes field carries three unrelated things at once**: a reason, a job
-  reference (136 submissions cite an NN number, 62 distinct), and a location —
-  `Sean mesh room 131 broome st` alone accounts for 175 submissions, alongside
-  `apartment stock`, `returning equipment from apartment`, `Set aside for SN1`,
-  `backup shelf` and `Moving inventory to basement`.
+  reference (136 submissions cite an NN number, 54 distinct), and a location —
+  one mesh room at 131 Broome accounts for 205 submissions written 31 different
+  ways, from `Sean mesh room 131 broome st` (97) down to `Sean mesh room 131
+  briome st` (1) — alongside `apartment stock`, `returning equipment from
+  apartment`, `Set aside for SN1`, `backup shelf` and
+  `Moving inventory to basement`.
 
 That last point is the important one. **Checking out is frequently not
 consumption.** Hardware moves to a volunteer's home or a hub, sits there, and is
