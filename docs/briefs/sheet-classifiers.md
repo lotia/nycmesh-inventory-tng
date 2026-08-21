@@ -8,10 +8,13 @@ to every historical row anyway. A number quoted without its rule is not
 reproducible, and this repository has already published several that were not.
 
 **Why these are not in [decision 0008](../decisions/0008-stock-ledger-transfer-graph.md).**
-That record keeps the counts that need no rule — 52 catalogued items, 3,439
-submissions, 2,455 check-outs against 984 check-ins, 145 item strings, 102 name
-spellings. Everything below needs a judgement about what a note means, so the
-judgement is stated beside the number.
+That record keeps the counts that need no judgement about meaning — 52
+catalogued items, 3,439 submissions, 2,455 check-outs against 984 check-ins,
+145 distinct item strings, 102 distinct name spellings. The last two are counts
+of *distinct strings*, which is why they belong there; how many distinct
+**things** those strings name is a different question, needs a case rule, and is
+answered in §1 and §6 below. Everything here needs a judgement about what a note
+or a string means, so the judgement is stated beside the number.
 
 ## How to re-run
 
@@ -28,13 +31,14 @@ with its rule or not at all.**
 
 ## The population
 
-Counted over the `QRresponses` tab, restricted to rows carrying a direction:
-2,455 `Checking Out` plus 984 `Checking In` is the 3,439. Seventeen further rows
-carry neither — they are sheet furniture (`ADD NEW PRODUCTS HERE TO PREVENT
-ERRORS`) and are not submissions. Catalogue figures come from the `Fast
-Inventory` tab, whose item name is **column D**; column C holds the QR link and
-happens to have the same number of filled rows, which has caught one reader
-already.
+Which rows count, and why 3,439 rather than the tab's 3,456, is stated once in
+[decision 0008](../decisions/0008-stock-ledger-transfer-graph.md#context)
+alongside the counts that rest on it. Every figure here uses that same
+population.
+
+Catalogue figures come from the `Fast Inventory` tab, whose item name is
+**column D**; column C holds the QR link and happens to have the same number of
+filled rows, which has caught one reader already.
 
 ## 1. Item string to item
 
@@ -73,11 +77,20 @@ activity. At runtime the stock-count workflow replaces the practice entirely.
 
 ## 3. Note to location
 
-**Rule.** Not settled; case handling is the open question. One room at 131
-Broome is written 31 ways across 205 submissions counting case-sensitively, of
-which `Sean mesh room 131 broome st` is 97; folding case gives 24 ways and 118
-for the leading spelling. Notes mentioning any mesh room, including a different
-site, total 231 across 41 — do not use that as the figure for this room.
+**Rule.** Not settled. Two questions are open: which notes name *this* room,
+and whether case is folded.
+
+The one figure needing no compound predicate: notes containing `mesh room`,
+case-insensitively, number **231 across 41 distinct strings**. Not all are the
+same room — `Blue Stockings + mesh room` is a different site — so that is the
+count for the phrase, not for the place.
+
+Narrowing to this room needs a second predicate, and the answer moves with it:
+`mesh room` plus (`131` or a `broome` misspelling) gives 205 across 31; `mesh
+room` plus `broome` alone gives 193 across 23. Folding case collapses the
+spellings further and raises the leading one from 97 to 118. **Cite whichever
+you use with the predicate attached** — three plausible readings of "how often
+is this room named" differ by 12%.
 
 **Becomes.** `Location` rows and the `from`/`to` sides of imported movements.
 Seeds `inventory-tng-o5t`.

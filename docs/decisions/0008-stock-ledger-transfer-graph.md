@@ -34,15 +34,21 @@ sheet — 52 catalogued items and 3,439 submissions between July 2022 and August
   from apartment`, `Set aside for SN1`, `backup shelf` and
   `Moving inventory to basement`.
 
-Four of those five need a rule before they can be counted: which strings count
-as unresolvable, which notes are corrections, which name a place, which name a
-job. Those rules are not documentation — each one is a decision the sheet
-importer has to make about every historical row, so the rule and the number it
-produces belong together and away from here. Both live in
-[the sheet classifiers brief](../briefs/sheet-classifiers.md), which states each
-rule and the command that emits its figure. Quoting a number from that brief
-without the rule beside it is how this record previously came to carry several
-that nobody could reproduce.
+The counts above are over the `QRresponses` tab, restricted to rows carrying a
+direction: 2,455 `Checking Out` plus 984 `Checking In` is the 3,439. Seventeen
+further rows carry neither and are sheet furniture rather than submissions, so a
+count over the whole tab will not agree with these.
+
+Four of those five bullets need more than a population before they can be
+counted: they need a rule for which strings are unresolvable, which notes are
+corrections, which name a place, which name a job. Those rules are not
+documentation — each is a decision the sheet importer has to make about every
+historical row — so the rule and the number it produces belong together, and
+with the code rather than here. Both live in
+[the sheet classifiers brief](../briefs/sheet-classifiers.md), which for each
+rule either states it or records that it is not settled and what the candidates
+produce. Quoting one of those numbers without the rule beside it is how this
+record came to carry several nobody could reproduce.
 
 That last point is the important one. **Checking out is frequently not
 consumption.** Hardware moves to a volunteer's home or a hub, sits there, and is
@@ -150,7 +156,8 @@ down. The entity model does not change.
 - Corrections, receipts, installs and genuine volunteer check-outs become
   distinguishable by construction, where today telling them apart means reading
   a free-text note and guessing — which is why the figures that rest on doing so
-  live in a brief with the rule that produced them.
+  live in a brief beside the rule that produced them, or beside a note saying no
+  rule has been agreed yet.
 - More concepts than a counter. Locations and movement direction are things a
   contributor must understand before touching stock code, and this document plus
   [docs/data-model.md](../data-model.md) is where they learn them.
