@@ -205,10 +205,17 @@ home, and it lets one item carry a code on the 305 m box and another on the
 shelf of offcuts — which no item-level pack size could express. It takes a
 positive-value check constraint named in the same style as its peers
 (`stock_movement_quantity_positive` and the rest), and it is meaningful only on
-an item label, so it is constrained to be `1` on a location label rather than
-left to mean nothing — the pattern `location_held_by_iff_custody` already sets.
-This is a schema change with a migration and a
-[data model](../data-model.md) update; there is no data to migrate yet.
+an item label, so it is `NULL` on a location label.
+
+> **Amended.** This section first pinned the column to `1` on a location label
+> "rather than left to mean nothing", citing `location_held_by_iff_custody` as
+> the pattern. That constraint resolves the same problem the other way round:
+> `held_by` is `NULL` where the column does not apply, not a sentinel. Pinning
+> made every reader carry the convention that `1` means "not applicable" — and
+> `GET /api/labels/{code}` returns `quantity` for both kinds of label, so every
+> client carried it too. `label_quantity_iff_item` now requires the column
+> exactly when the label names an item, and the resolver returns `null` for a
+> wall code. See `inventory-tng-v8r`.
 
 **Measured items are never defaulted.** Where `unit_of_measure` is anything
 other than `each`, a scan opens the quantity keypad and requires an entry. This

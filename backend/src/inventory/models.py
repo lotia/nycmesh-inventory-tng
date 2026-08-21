@@ -483,11 +483,20 @@ class Label(models.Model):
     code = models.CharField(max_length=32, unique=True)
     item = models.ForeignKey(Item, null=True, blank=True, on_delete=models.CASCADE, related_name="labels")
     location = models.ForeignKey(Location, null=True, blank=True, on_delete=models.CASCADE, related_name="labels")
+    # NULL on a location label, where the column does not apply, rather than a
+    # sentinel 1 every reader has to know means "not applicable". That is how
+    # `held_by` resolves the same problem on Location, and decision 0011
+    # section 5 now follows it rather than arguing the other way.
     quantity = models.DecimalField(
         max_digits=12,
         decimal_places=3,
+        null=True,
+        blank=True,
         default=1,
-        help_text="How much of the item one scan of this label stands for: a packet of 100 zip ties is 100.",
+        help_text=(
+            "How much of the item one scan of this label stands for: a packet of 100 zip ties "
+            "is 100. Null on a location label, which stands for no quantity of anything."
+        ),
     )
     printed_at = models.DateTimeField(auto_now_add=True)
     # Never in the future, by the same function as StockTransaction.occurred_at:
@@ -513,14 +522,20 @@ class Label(models.Model):
                 name="label_targets_exactly_one",
             ),
             models.CheckConstraint(
-                condition=models.Q(quantity__gt=0),
+                condition=models.Q(quantity__isnull=True) | models.Q(quantity__gt=0),
                 name="label_quantity_positive",
             ),
-            # Stated in terms of location rather than item so that it holds
-            # on its own, without leaning on the exactly-one constraint above.
+            # Present exactly when the label names an item. Stated over both
+            # columns rather than one, so it holds on its own without leaning
+            # on the exactly-one constraint above: a quantity on a location
+            # label means nothing, and a label with no quantity cannot say what
+            # one scan of an item stands for.
             models.CheckConstraint(
-                condition=models.Q(location__isnull=True) | models.Q(quantity=1),
-                name="label_quantity_is_one_for_a_location",
+                condition=(
+                    models.Q(item__isnull=False, quantity__isnull=False)
+                    | models.Q(item__isnull=True, quantity__isnull=True)
+                ),
+                name="label_quantity_iff_item",
             ),
             # The folding in TYPO_FOLDS only works while every stored code is
             # Crockford: a code containing I, L or O folds to a string matching

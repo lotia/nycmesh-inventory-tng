@@ -438,7 +438,7 @@ def test_label_cannot_target_both(item: Item, warehouse: Location) -> None:
 
 
 def test_label_may_target_a_location(warehouse: Location) -> None:
-    label = Label.objects.create(code="10CAT10N01", location=warehouse)
+    label = Label.objects.create(code="10CAT10N01", location=warehouse, quantity=None)
     assert label.location == warehouse
 
 
@@ -470,7 +470,8 @@ def test_everything_else_about_a_label_stays_editable(item: Item, warehouse: Loc
     label = Label.objects.create(code="7QK3M2XV9A", item=item, quantity=Decimal("100"))
     label.item = None
     label.location = warehouse
-    label.quantity = Decimal("1")
+    # Repointed at a location, so the quantity goes with the item it described.
+    label.quantity = None
     label.save()
     label.refresh_from_db()
     assert (label.code, label.location) == ("7QK3M2XV9A", warehouse)
@@ -514,11 +515,25 @@ def test_label_quantity_must_be_positive(item: Item) -> None:
         Label.objects.create(code="ZER0000000", item=item, quantity=Decimal("0"))
 
 
-def test_label_quantity_is_one_for_a_location(warehouse: Location) -> None:
-    pinned = Label.objects.create(code="10C0NE0000", location=warehouse, quantity=Decimal("1"))
-    assert pinned.quantity == Decimal("1")
-    with pytest.raises(IntegrityError):
+def test_label_quantity_is_absent_on_a_location(warehouse: Location) -> None:
+    """A quantity means nothing without an item, so a location label carries none.
+
+    Decision 0011 section 5 once pinned it to 1 rather than leaving it to mean
+    nothing. NULL is how `held_by` resolves the same problem on Location, and
+    it is what stops every reader having to know that 1 means "not applicable".
+    """
+    empty = Label.objects.create(code="10CNQTY000", location=warehouse, quantity=None)
+    assert empty.quantity is None
+    with pytest.raises(IntegrityError, match="label_quantity_iff_item"):
         Label.objects.create(code="10CQTY0000", location=warehouse, quantity=Decimal("100"))
+
+
+def test_label_quantity_is_required_for_an_item(item: Item) -> None:
+    """And the same constraint the other way: an item label says how much."""
+    # Matched on the constraint name: an invalid code would otherwise be
+    # refused by label_code_is_crockford_base32 and this would certify nothing.
+    with pytest.raises(IntegrityError, match="label_quantity_iff_item"):
+        Label.objects.create(code="1TEMNQTY00", item=item, quantity=None)
 
 
 # --------------------------------------------------------------------------

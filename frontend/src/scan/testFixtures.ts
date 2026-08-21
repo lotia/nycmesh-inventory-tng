@@ -118,7 +118,9 @@ export const PACKET: ResolvedLabel = {
 export const WALL: ResolvedLabel = {
   code: "5RJ9T4HB2K",
   kind: "location",
-  quantity: "1.000",
+  // Null, not the sentinel "1.000" this once carried: a wall code stands for
+  // no quantity of anything, and the API cannot produce the old shape.
+  quantity: null,
   revoked_at: null,
   item: null,
   location: 3,

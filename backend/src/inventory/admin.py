@@ -116,6 +116,32 @@ class LabelForm(forms.ModelForm):
         # reason -- it is the label's age, not a date somebody chooses.
         fields = ["code", "item", "location", "quantity", "revoked_at"]
 
+    def clean(self) -> dict[str, Any]:
+        """Empty the quantity on a location label, and require one on an item.
+
+        ``label_quantity_iff_item`` is what enforces this. The form has to
+        agree because the model still defaults the column to ``1`` -- the right
+        default for the common case, an item label standing for one of its
+        item, and exactly the value the constraint forbids on the other. So the
+        add form arrives pre-filled with a value that cannot be saved, and
+        without this an administrator printing a wall code meets the constraint
+        as a non-field error naming it, which is the opaque outcome this class
+        exists to prevent.
+
+        ``LabelSerializer.validate`` does the same for the API. Two mirrors of
+        one constraint rather than one, because the admin does not pass through
+        a serializer -- decision 0016.
+        """
+        cleaned = super().clean()
+        if cleaned.get("location") is not None:
+            cleaned["quantity"] = None
+        elif cleaned.get("item") is not None and cleaned.get("quantity") is None:
+            self.add_error(
+                "quantity",
+                "An item label says how much of its item one scan stands for, so it carries a quantity.",
+            )
+        return cleaned
+
     def clean_code(self) -> str:
         code = Label.normalise_code(self.cleaned_data["code"])
         if not re.match(CODE_PATTERN, code):

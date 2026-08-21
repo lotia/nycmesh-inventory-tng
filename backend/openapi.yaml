@@ -1506,11 +1506,14 @@ components:
           - $ref: '#/components/schemas/LabelKindEnum'
           readOnly: true
         quantity:
-          type: string
+          type:
+          - string
+          - 'null'
           format: decimal
           pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
           description: 'How much of the item one scan of this label stands for: a
-            packet of 100 zip ties is 100.'
+            packet of 100 zip ties is 100. Null on a location label, which stands
+            for no quantity of anything.'
         revoked_at:
           type:
           - string
@@ -1566,11 +1569,14 @@ components:
           - $ref: '#/components/schemas/LabelKindEnum'
           readOnly: true
         quantity:
-          type: string
+          type:
+          - string
+          - 'null'
           format: decimal
           pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
           description: 'How much of the item one scan of this label stands for: a
-            packet of 100 zip ties is 100.'
+            packet of 100 zip ties is 100. Null on a location label, which stands
+            for no quantity of anything.'
         item:
           type:
           - integer
@@ -1606,11 +1612,14 @@ components:
           - $ref: '#/components/schemas/LabelKindEnum'
           readOnly: true
         quantity:
-          type: string
+          type:
+          - string
+          - 'null'
           format: decimal
           pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
           description: 'How much of the item one scan of this label stands for: a
-            packet of 100 zip ties is 100.'
+            packet of 100 zip ties is 100. Null on a location label, which stands
+            for no quantity of anything.'
         revoked_at:
           type:
           - string
@@ -1847,11 +1856,14 @@ components:
           - $ref: '#/components/schemas/LabelKindEnum'
           readOnly: true
         quantity:
-          type: string
+          type:
+          - string
+          - 'null'
           format: decimal
           pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
           description: 'How much of the item one scan of this label stands for: a
-            packet of 100 zip ties is 100.'
+            packet of 100 zip ties is 100. Null on a location label, which stands
+            for no quantity of anything.'
         revoked_at:
           type:
           - string

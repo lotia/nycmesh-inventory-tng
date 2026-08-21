@@ -256,3 +256,43 @@ def test_a_printed_code_cannot_be_retyped_in_the_admin_either(editor: Client, it
 
     label.refresh_from_db()
     assert label.code == "ABC2345678"
+
+
+# --------------------------------------------------------------------------
+# LabelForm. The admin does not pass through a serializer, so decision 0016
+# has it mirror `label_quantity_iff_item` itself or meet it as a bare
+# constraint error naming nothing a person can act on.
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_the_admin_empties_a_wall_label_s_quantity() -> None:
+    """The model still defaults the column to 1, which the constraint forbids here.
+
+    So the add form arrives pre-filled with a value that cannot be saved, and
+    without this an administrator printing a wall code meets
+    `label_quantity_iff_item` as a non-field error naming the constraint.
+    """
+    from inventory.admin import LabelForm
+    from inventory.models import Location
+
+    room = Location.objects.create(name="Mesh room", kind=Location.Kind.ROOM)
+    form = LabelForm(data={"code": "WA1132XKTZ", "location": room.pk, "quantity": "1"})
+
+    assert form.is_valid(), form.errors
+    assert form.cleaned_data["quantity"] is None
+    assert form.save().quantity is None
+
+
+@pytest.mark.django_db
+def test_the_admin_requires_a_quantity_on_an_item_label() -> None:
+    """And the mirror image, which `blank=True` on the field otherwise allows."""
+    from inventory.admin import LabelForm
+    from inventory.models import Category, Item
+
+    item = Item.objects.create(name="LiteBeam", category=Category.objects.create(name="Radios"))
+    form = LabelForm(data={"code": "1TEMNQTY00", "item": item.pk, "quantity": ""})
+
+    assert not form.is_valid()
+    assert "quantity" in form.errors
+    assert "label_quantity_iff_item" not in str(form.errors)

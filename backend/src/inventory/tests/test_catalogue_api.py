@@ -214,13 +214,17 @@ def test_a_scanned_code_resolves_to_its_item(client: Client, item: Item) -> None
 
 def test_a_wall_code_resolves_to_its_location(client: Client, warehouse: Location) -> None:
     """The wall code: where is this stock moving from?"""
-    Label.objects.create(code="WA1132XKTZ", location=warehouse)
+    Label.objects.create(code="WA1132XKTZ", location=warehouse, quantity=None)
 
     body = resolve(client, "WA1132XKTZ").json()
 
     assert body["kind"] == "location"
     assert body["location"] == warehouse.pk
     assert body["item"] is None
+    # Null rather than the sentinel 1 decision 0011 section 5 once pinned: a
+    # wall code stands for no quantity of anything, and every client would
+    # otherwise carry the convention that 1 means "not applicable".
+    assert body["quantity"] is None
 
 
 @pytest.mark.parametrize("typed", ["7qk3m2xv9a", "  7QK3M2XV9A  ", "  7Qk3M2Xv9A  "])
@@ -267,7 +271,7 @@ def test_a_revoked_label_still_says_what_it_pointed_at(client: Client, item: Ite
 
 def test_every_live_label_is_listed_for_caching(client: Client, item: Item, warehouse: Location) -> None:
     Label.objects.create(code="AAA1110000", item=item, quantity=Decimal("100"))
-    Label.objects.create(code="BBB2220000", location=warehouse)
+    Label.objects.create(code="BBB2220000", location=warehouse, quantity=None)
 
     listed = results(client.get(reverse("labels")))
 
@@ -342,7 +346,7 @@ def test_the_cached_map_carries_what_a_cart_line_needs(client: Client, item: Ite
 
 def test_a_location_label_in_the_map_names_no_item(client: Client, warehouse: Location) -> None:
     """A wall code sets where the batch is; there is no item to name."""
-    Label.objects.create(code="WA11110000", location=warehouse)
+    Label.objects.create(code="WA11110000", location=warehouse, quantity=None)
 
     entry = next(row for row in results(client.get(reverse("labels"))) if row["code"] == "WA11110000")
 
