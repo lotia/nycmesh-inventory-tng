@@ -1,7 +1,7 @@
 """Tests for the volunteer pick-list and self-registration.
 
 The behaviour that matters here is not CRUD. The sheet this replaces holds 102
-spellings for 65 people, and the endpoint's job is to make the next volunteer
+spellings for fewer people, and the endpoint's job is to make the next volunteer
 find themselves rather than add themselves again -- so the tests are mostly
 about what search finds, and who is offered as a choice at all.
 """
@@ -459,7 +459,7 @@ def repair(client: Client, volunteer: Volunteer, body: dict[str, Any]) -> Any:
 
 
 def test_an_administrator_merges_a_duplicate(editor: Client, volunteer: Volunteer) -> None:
-    """The operation the 102 spellings of 65 people need. Decision 0012 point 2."""
+    """The operation the sheet's 102 spellings need. Decision 0012 point 2."""
     duplicate = Volunteer.objects.create(display_name="sean")
     assert repair(editor, duplicate, {"merged_into": volunteer.pk}).status_code == 200
     duplicate.refresh_from_db()

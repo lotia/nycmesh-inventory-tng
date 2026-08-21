@@ -2,7 +2,7 @@
  * The volunteer this device last worked as.
  *
  * Remembered so nobody retypes their name on every submission, which is what
- * produced 102 spellings of 65 people in the sheet this replaces. The cart
+ * produced 102 spellings of fewer people in the sheet this replaces. The cart
  * already carries `actorId` and survives a reload, but an id is not something
  * to show somebody: this keeps the name beside it so the picker can open
  * saying who you are rather than asking again.

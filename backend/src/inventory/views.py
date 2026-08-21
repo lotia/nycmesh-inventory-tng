@@ -616,7 +616,7 @@ class VolunteerFilter(FilterSet):
     Only the similarity half uses the GIN trigram index: ``icontains``
     compiles to ``UPPER(display_name) LIKE ...``, which an index on the bare
     column cannot serve, and the lookups are ORed, so the plan scans the table
-    and sorts. That is the right trade at this size -- 65 volunteers -- and the
+    and sorts. That is the right trade at this size -- under a hundred -- and the
     alternative, a case-sensitive ``contains``, would stop "sean" finding
     "Sean", which is how the picker is actually used.
     """
