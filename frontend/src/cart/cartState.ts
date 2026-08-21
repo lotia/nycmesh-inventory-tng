@@ -55,7 +55,6 @@ export interface CartLine {
 
 export interface CartState {
   idempotencyKey: string;
-  createdAt: string;
   actorId: number | null;
   kind: TransactionKind;
   /** The location this batch moves stock from or to, per `kind`. */
@@ -84,11 +83,9 @@ export function mintIdempotencyKey(): string {
 
 export function createCart(
   idempotencyKey: string = mintIdempotencyKey(),
-  createdAt: string = new Date().toISOString(),
 ): CartState {
   return {
     idempotencyKey,
-    createdAt,
     actorId: null,
     kind: "checkout",
     locationId: null,
@@ -106,7 +103,7 @@ export type CartAction =
   | { type: "setKind"; kind: TransactionKind }
   | { type: "setLocation"; locationId: number | null }
   | { type: "setJobReference"; jobReference: string }
-  | { type: "clear"; idempotencyKey: string; createdAt: string };
+  | { type: "clear"; idempotencyKey: string };
 
 /** One line per item, so a second scan of the same item adds to what is there. */
 function upsertLine(
@@ -191,6 +188,6 @@ export function cartReducer(state: CartState, action: CartAction): CartState {
     case "clear":
       // The volunteer at the shelf is still the same person; the job the next
       // batch belongs to is not.
-      return { ...createCart(action.idempotencyKey, action.createdAt), actorId: state.actorId };
+      return { ...createCart(action.idempotencyKey), actorId: state.actorId };
   }
 }

@@ -34,7 +34,6 @@ const isOfferedKind = (value: unknown): boolean =>
  */
 const CART_SHAPE: Shape = {
   idempotencyKey: isText,
-  createdAt: isText,
   kind: isOfferedKind,
   jobReference: isText,
   actorId: isIdOrNobody,

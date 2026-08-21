@@ -4,7 +4,7 @@ import { batchBody, KINDS, sideFor, whatIsMissing } from "./movements";
 
 function cartWith(overrides: Partial<ReturnType<typeof createCart>> = {}) {
   return {
-    ...createCart("key-1", "2026-08-19T00:00:00Z"),
+    ...createCart("key-1"),
     actorId: 7,
     locationId: 3,
     lines: [{ itemId: 1, name: "LiteBeam", unitOfMeasure: "each", quantity: 2, lastScan: null }],
@@ -31,6 +31,15 @@ describe("what a batch is missing", () => {
 });
 
 describe("the request a batch becomes", () => {
+  it("sends no occurred_at, because the server's clock decides it", () => {
+    // Decision 0018: a client time cannot be validated in the past, and the
+    // ledger is append-only, so a stale restored cart would write a wrong row
+    // that nothing could fix. Sending nothing is what makes the server decide.
+    const body = batchBody(cartWith({ kind: "checkout" }));
+
+    expect(body).not.toHaveProperty("occurred_at");
+  });
+
   it("carries the cart's own idempotency key, so a retry is the same batch", () => {
     expect(batchBody(cartWith()).idempotency_key).toBe("key-1");
   });
