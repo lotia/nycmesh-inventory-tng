@@ -209,6 +209,43 @@ land b 'bbb: Move the detector behind an interface
 Closes: inventory-tng-bbb'
 expect 1 "2 issues landed together with no epic" "a batch without an epic is refused"
 
+# git writes a revert's message itself, so none of the rules apply to it. It
+# used to be skipped for free, by check-commit.sh refusing it at its own door.
+scene
+land a 'aaa: Extract the decode loop
+
+Closes: inventory-tng-aaa'
+git revert --no-edit HEAD >/dev/null 2>&1
+expect 0 "2 commits, one issue each" "a revert is not somebody's issue being landed"
+
+# Both checkers read the same message. A body line git would drop must not be
+# a rule to one of them and invisible to the other.
+scene
+land a 'aaa: Extract the decode loop
+
+# This comment line is far longer than seventy-two characters and git drops it.
+
+Closes: inventory-tng-aaa'
+expect 0 "One commit, one issue" "a comment line is not part of the message"
+
+# The remedy for one commit closing four issues is to split it, not to make an
+# epic, and the squash objection already says so.
+scene
+land a 'aaa: Extract the decode loop
+
+Closes: inventory-tng-aaa
+Closes: inventory-tng-bbb'
+expect 1 "2 'Closes' trailers" "one commit closing two is a squash, not a batch"
+
+# The objection says which commit it belongs to. Deleting the prefix must fail
+# a case, or the feature is untested.
+scene
+land a 'aaa: Extracted the decode loop
+
+Closes: inventory-tng-aaa'
+sha=$(git rev-parse --short=8 HEAD)
+expect 1 "$sha \"Extracted\" is not the imperative" "an objection names its commit"
+
 # See batch-membership.py on why a malformed row is stepped over.
 scene
 tracker <<'JSONL'
