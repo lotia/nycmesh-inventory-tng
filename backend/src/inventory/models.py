@@ -325,6 +325,15 @@ class Item(models.Model):
         blank=True,
         help_text="Type-specific specifications. Radios, cable and hand tools have little in common.",
     )
+    # The counterpart of Volunteer.sheet_flag, and there for the same reason:
+    # the sheet import is not allowed to guess, so what it could not settle
+    # about an item is written where an administrator settling it is already
+    # looking. What it puts here, and why every imported item gets one, is
+    # inventory/management/commands/_ledger.py.
+    sheet_flag = models.TextField(
+        blank=True,
+        help_text="What the sheet import could not settle about this item. Clear it once you have.",
+    )
     history = HistoricalRecords()
 
     class Meta:
@@ -679,6 +688,11 @@ class StockTransaction(models.Model):
         help_text="Install or node this relates to, e.g. NN217.",
     )
     note = models.TextField(blank=True)
+    # The prefix the sheet import puts on every key it writes, and reserved to
+    # it: that import reads a key wearing this as one of its own rows, so a
+    # client allowed to write one could redirect the next run. The serializer
+    # refuses it; `_ledger.py` says what the import puts after it.
+    FROM_THE_SHEET = "sheet:"
     # A phone in a basement will retry. Replaying the same batch must not
     # double-post it. Scoped to the actor by the constraint below; decision
     # 0011 says why.

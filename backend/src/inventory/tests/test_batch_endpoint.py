@@ -639,6 +639,29 @@ def test_a_blank_idempotency_key_is_rejected_rather_than_stored(
     assert response.json()["errors"][0]["field"] == "idempotency_key"
 
 
+def test_a_key_claiming_the_sheet_imports_prefix_is_refused(
+    client: Client,
+    volunteer: Volunteer,
+    item: Item,
+    warehouse: Location,
+) -> None:
+    """What the import does with a key wearing its prefix, and so what a batch
+    free to write one could do to the next run, is on `validate_idempotency_
+    key`. Nothing is recorded, because the refusal is the whole point.
+    """
+    response = post(
+        client,
+        batch(
+            volunteer,
+            [{"item": item.pk, "quantity": "1", "from_location": warehouse.pk}],
+            idempotency_key=f"{StockTransaction.FROM_THE_SHEET}deadbeef",
+        ),
+    )
+    assert response.status_code == 400
+    assert response.json()["errors"][0]["field"] == "idempotency_key"
+    assert not StockTransaction.objects.exists()
+
+
 def test_a_null_idempotency_key_records_an_ordinary_batch(
     client: Client,
     volunteer: Volunteer,

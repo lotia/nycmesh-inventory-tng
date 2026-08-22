@@ -242,10 +242,28 @@ class StockTransactionCreateSerializer(serializers.ModelSerializer):
         max_length=64,
         required=False,
         allow_null=True,
+        help_text=f"Any string of your own, except one beginning {StockTransaction.FROM_THE_SHEET!r}, "
+        "which the sheet import reserves.",
     )
     # Merged and inactive volunteers are not choices; the rule and the reason
     # live once, on the queryset the pick-list uses too.
     actor = serializers.PrimaryKeyRelatedField(queryset=Volunteer.objects.selectable())
+
+    def validate_idempotency_key(self, value: Any) -> Any:
+        """The sheet import's prefix is its own, and no client may write one.
+
+        Three of that import's behaviours read a key wearing the prefix as a
+        row it posted, and the costliest takes the location one of them
+        touched as the place the whole import moves stock through. A batch
+        free to claim the prefix could therefore point the next run at a
+        location nobody chose, so it is refused at the door rather than the
+        import having to distrust rows that look like its own.
+        """
+        if value and value.startswith(StockTransaction.FROM_THE_SHEET):
+            raise serializers.ValidationError(
+                f"A key may not begin {StockTransaction.FROM_THE_SHEET!r}: the sheet import reserves it."
+            )
+        return value
 
     def validate_occurred_at(self, value: Any) -> Any:
         # The ledger is append-only, so a wrong timestamp can never be

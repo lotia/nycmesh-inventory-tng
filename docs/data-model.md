@@ -100,6 +100,16 @@ on one side of a movement, not by a row.
 `minimum_stock` (the reorder point), `reorder_quantity`, and `attributes` as
 JSONB.
 
+It also carries `sheet_flag`, which is the volunteer column of the same name
+seen from the catalogue side: what the sheet import could not settle about this
+item, for an administrator to settle and empty. Every item that import moves
+stock for gets one, because whether a historical quantity counted things or
+packets of them cannot be recovered from the export. Why that is a flag rather
+than a multiplier is
+[section 5 of decision 0011](decisions/0011-qr-batch-scanning.md#5-one-scan-is-not-one-unit-label-carries-the-quantity-it-represents),
+and what the flag says is
+`backend/src/inventory/management/commands/_ledger.py`.
+
 **Current stock is never stored on the item.** It is derived from the ledger.
 
 `ItemIdentifier` is the fix for name-matching brittleness. Every string that has
@@ -283,5 +293,26 @@ it cannot tell two apart it says so on the row instead of joining them, which
 [Volunteer](#volunteer) above describes and
 `backend/src/inventory/management/commands/_people.py` argues.
 
-Anything genuinely unresolvable imports against a placeholder item and
-volunteer, flagged for cleanup, rather than being silently dropped.
+`manage.py post_ledger` is the last of the four and the only one that writes to
+the ledger. Rule 5 says which staged rows were one trip to the shelf, and each
+trip becomes a `StockTransaction` carrying a `StockMovement` per row — one
+transaction per kind where a trip holds more than one, since a transaction has
+only the one. Everything it has to settle that no rule does — the zone a naive
+timestamp is read in, what becomes of a row it cannot post, the single
+provisional location every movement touches until the real ones are agreed, and
+what makes a second run add nothing — is argued in
+`backend/src/inventory/management/commands/_ledger.py`.
+
+Both of the minting steps meet rows they cannot settle, and neither is free to
+choose what to do with one. A submission whose **item** is unresolvable is
+still imported — against a placeholder, flagged for cleanup — rather than
+silently dropped; that settles what happens to the movement and not to
+identity, and nothing acquires an identifier by it.
+
+A submission whose **person** is unresolvable is not the mirror of that, and
+the difference is one of the triggers
+[above](#where-postgresql-specific-features-are-used): an actor has to be
+somebody the pick-list still offers, so a stand-in could only be posted against
+while volunteers were being offered it as a person. Those rows are not posted
+at all. They stay staged, the import counts them out loud on every run, and an
+administrator who knows whose they were records the movement.

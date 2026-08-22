@@ -74,8 +74,10 @@ class LocationAdmin(SimpleHistoryAdmin):
 
 @admin.register(Item)
 class ItemAdmin(SimpleHistoryAdmin):
-    list_display = ["name", "category", "unit_of_measure", "minimum_stock", "active"]
-    list_filter = ["category", "unit_of_measure", "active"]
+    """``sheet_flag`` is listed and filterable for the reason ``VolunteerAdmin`` gives."""
+
+    list_display = ["name", "category", "unit_of_measure", "minimum_stock", "active", "sheet_flag"]
+    list_filter = ["category", "unit_of_measure", "active", ("sheet_flag", admin.EmptyFieldListFilter)]
     search_fields = ["name", "identifiers__value"]
     inlines = [ItemIdentifierInline]
 
