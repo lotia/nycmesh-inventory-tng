@@ -146,10 +146,7 @@ def test_an_alias_the_catalogue_no_longer_holds_reaches_nothing() -> None:
 
 
 def test_normalisation_is_the_one_the_database_uses() -> None:
-    """`ItemIdentifier.value_normalised` is a `Lower(Trim())` generated column,
-    and data-model.md says normalisation must not drift between the write
-    path, the importer and the scan endpoint.
-    """
+    """``_normalised`` says which column this has to match and who says so."""
     assert resolve("STRASSE", ("Strasse",)).item == "Strasse"
     # casefold() maps this to 'strasse' and lower() does not, so the two
     # readings disagree about whether these are one identifier. The database

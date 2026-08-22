@@ -11,7 +11,7 @@ Commands (dev server, build, lint, test) are in
 requirements in
 [Testing and coverage](../../../DEVELOPERS.md#testing-and-coverage). Stack rationale is in
 [docs/decisions/0002-frontend-stack.md](../../../docs/decisions/0002-frontend-stack.md).
-This file covers only conventions you cannot infer from the code.
+Below is only what those do not already say.
 
 ## Calling the API
 

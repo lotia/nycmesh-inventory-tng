@@ -77,11 +77,9 @@ def test_balances_are_ordered_by_location_id(
     item: Item,
     warehouse: Location,
 ) -> None:
-    """By the id column, not the relation.
+    """By the id column, not the relation, for the reason ITEMS gives.
 
-    Ordering on ``location`` would follow the foreign key to Location's own
-    Meta.ordering, joining that table to sort by a name the response does not
-    carry. This annexe is named so that the two orders disagree.
+    This annexe is named so that the two orders disagree.
     """
     annexe = Location.objects.create(name="0 Annexe", kind=Location.Kind.WAREHOUSE)
     stock(client, volunteer, item, warehouse, "5")
@@ -243,7 +241,7 @@ def test_letters_people_get_wrong_are_folded(client: Client, item: Item, typed: 
 
 
 def test_an_unknown_code_is_a_typed_404(client: Client) -> None:
-    """The client offers item search rather than treating it as a dead end."""
+    """A code naming nothing is a 404 carrying a detail, not an empty 200."""
     response = resolve(client, "ZZZZZZZZZZ")
     assert response.status_code == 404
     assert response.json()["detail"]

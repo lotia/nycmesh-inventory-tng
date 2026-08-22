@@ -1,9 +1,11 @@
 """The workbook reader, and the population rule every figure rests on.
 
 Two tabs matter. `Fast Inventory` holds the catalogue, and the item name is
-**column D** -- column C holds the QR link and happens to have the same number
-of filled rows, which has caught one reader already. `QRresponses` holds the
-form submissions, one row per item taken or returned.
+**column D**; the column beside it holds the QR link and has the same number of
+filled rows, which
+[the brief](../../../../docs/briefs/sheet-classifiers.md) records has already
+caught a reader. `QRresponses` holds the form submissions, one row per item
+taken or returned.
 
 The population rule is the one
 [decision 0008](../../../../docs/decisions/0008-stock-ledger-transfer-graph.md#context)

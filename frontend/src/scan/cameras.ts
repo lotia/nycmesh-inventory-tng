@@ -86,10 +86,9 @@ export function constraints(deviceId: string | null): MediaStreamConstraints {
 /**
  * Whether this is the browser saying the camera asked for is not there.
  *
- * Read by duck typing for the reason ``refusal`` is: `getUserMedia` rejects
- * with a `DOMException`, which is not an `Error` subclass in the browsers this
- * runs in. `OverconstrainedError` is the answer to a remembered device id that
- * no longer exists, which is ordinary -- Safari mints new ones per session.
+ * Read by duck typing, for the reason `refusal` in CameraScanner.tsx gives.
+ * `OverconstrainedError` is the answer to a remembered device id that no
+ * longer exists, which is ordinary -- Safari mints new ones per session.
  */
 export function cameraIsGone(error: unknown): boolean {
   const name = (error as Partial<Error> | null | undefined)?.name ?? "";

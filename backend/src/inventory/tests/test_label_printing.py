@@ -1,12 +1,10 @@
 """Minting a label's code, and printing the sticker it goes on.
 
 Decision 0011 section 3 says the generator's output is asserted by tests rather
-than described in prose, "because a rule that lives only in prose drifts the
-first time somebody fits a label to a smaller sticker, and the failure
-resurfaces months later as labels that will not scan". So the symbols this
-produces are decoded here by a different implementation from the one that drew
-them -- ``zxing-cpp`` reading what ``segno`` wrote -- and the geometry is read
-back out of the SVG rather than taken on trust.
+than described in prose, and gives the reason. So the symbols this produces are
+decoded here by a different implementation from the one that drew them --
+``zxing-cpp`` reading what ``segno`` wrote -- and the geometry is read back out
+of the SVG rather than taken on trust.
 """
 
 import datetime
@@ -393,8 +391,7 @@ def test_the_sheet_prints_only_the_codes_it_was_asked_for(editor: Client, item: 
 def test_a_code_is_printed_however_it_was_typed(editor: Client, item: Item) -> None:
     """The same folding every other way of naming a code here gets.
 
-    A sheet that answered a lowercase code with a blank page would be the one
-    place in this API where the canonical form is the caller's problem.
+    LabelSheetView's docstring says what a sheet that did not fold would cost.
     """
     Label.objects.create(code=CODE, item=item)
 
@@ -430,9 +427,7 @@ def test_a_sheet_with_no_codes_named_is_refused(editor: Client, item: Item) -> N
 def test_a_sheet_longer_than_a_print_run_is_refused(editor: Client, item: Item) -> None:
     """Every code costs a QR encode, so the bound has to be stated, not assumed.
 
-    Far above a real sheet -- somebody is about to stand up and apply these --
-    and there so one request cannot hold a worker for as long as a query
-    string can be made long. Same reasoning as MAX_MOVEMENTS.
+    MAX_SHEET_LABELS says how far above a real sheet it sits, and why.
     """
     Label.objects.create(code=CODE, item=item)
     too_many = ",".join([CODE] * (MAX_SHEET_LABELS + 1))

@@ -2,11 +2,10 @@
  * Turning the batch in the browser into the request the ledger takes.
  *
  * The cart holds one location and a kind; the ledger takes a movement per
- * line, with the location on whichever side the kind means. That mapping is a
- * domain fact -- a check-out that takes stock from nowhere is not a check-out
- * -- and the server states it too, in `KIND_SIDES`
- * (backend/src/inventory/views.py), which is what actually enforces it. This
- * is here so the app can tell a volunteer what is missing before it asks.
+ * line, with the location on whichever side the kind means. The server states
+ * that mapping too, in `KIND_SIDES` (backend/src/inventory/views.py), which is
+ * what actually enforces it and says why it is stated per kind. This is here
+ * so the app can tell a volunteer what is missing before it asks.
  *
  * See docs/decisions/0011-qr-batch-scanning.md section 6.
  */

@@ -7,25 +7,19 @@ reporting mean anything -- decision 0008's supporting decision 4 rests on it.
 
 ## Whole-note against substring
 
-The brief long said substring matching double-counts, because `inventory
-correction` contains `inventory correct` and each of those rows is swept up by
-both predicates. That is true of *summing a count per phrase*, and false of
-asking a row whether it matches any of them: a row is one row however many
-predicates it satisfies. So the objection is to the arithmetic rather than to
-substring matching.
-
-Substring, evaluated per row, is therefore the reading, because whole-note
-equality is the one that loses rows it has no reason to: `fixing inventory (2
-today)` is the same act as `fixing inventory`, written by somebody who added a
-detail. All three readings are in
+Substring, evaluated per row, is the reading. The old objection was to the
+arithmetic rather than to substring matching, and
 [§2 of the brief](../../../../docs/briefs/sheet-classifiers.md#2-note-to-correction)
-with the counts they give, and `section` below prints them, so the argument
-can be checked rather than believed.
+settles it and carries all three readings with the counts they give; `section`
+below prints them, so the argument can be checked rather than believed. What
+whole-note equality would cost is rows it has no reason to lose: `fixing
+inventory (2 today)` is the same act as `fixing inventory`, written by
+somebody who added a detail.
 
 ## The rule
 
-A note is a correction when it names **the record** and **an act of adjusting
-it**, and both halves are needed. Neither on its own is one:
+A correction names **the record** and **an act of adjusting it**. Both halves
+are needed, and neither on its own is one:
 
 - `fixing loose pole nn540` and `hex house fix` are repairs to hardware at a
   site, not to a number in a spreadsheet.

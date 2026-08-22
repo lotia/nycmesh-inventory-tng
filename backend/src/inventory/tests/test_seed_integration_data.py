@@ -136,9 +136,8 @@ def test_a_failed_seed_leaves_the_previous_login_alone() -> None:
 def test_a_retired_item_or_location_is_revived_rather_than_published_retired() -> None:
     """An item name is unique outright, so a retired row IS the row.
 
-    Left retired it would be published as a scene the read API refuses to
-    offer, and the first test to read a pick-list would fail for a reason that
-    is not a bug.
+    The command's comment beside the reactivation says what leaving it retired
+    would publish.
     """
     category = Category.objects.create(name="Radios")
     retired_item = Item.objects.create(name="LiteBeam", category=category, active=False)

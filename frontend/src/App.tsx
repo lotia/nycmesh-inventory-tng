@@ -19,9 +19,8 @@ import { VolunteerPicker } from "./volunteers/VolunteerPicker";
  * The whole flow designed in docs/decisions/0011-qr-batch-scanning.md: the
  * code a label's QR opened the app with, who the batch is attributed to, the
  * three ways to fill it -- scanned, wedged or typed above, browsed in the
- * catalogue below, which is the path that works with no camera and no readable
- * label -- and the Save that sends it. What is built and what is not is listed
- * in docs/architecture.md.
+ * catalogue below -- and the Save that sends it. What each of them is for, and
+ * what is built and what is not, is listed in docs/architecture.md.
  *
  * Both providers are here rather than at the root so that a test renders the
  * app and gets the app -- the batch in hand, and who is signed in, which is

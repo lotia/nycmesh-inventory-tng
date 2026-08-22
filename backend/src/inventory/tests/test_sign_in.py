@@ -2,9 +2,8 @@
 
 [Decision 0013](../../../../docs/decisions/0013-administrator-sign-in.md) is
 the argument and is not restated here. What these tests hold in place is its
-point 5 -- identity comes from the provider, authority comes from a person who
-already has it -- and its point 3, that the local password path is not a way
-round the second factor.
+point 5, on where identity ends and authority begins, and its point 3, that
+the local password path is not a way round the second factor.
 
 Two shapes recur:
 
@@ -115,7 +114,7 @@ def whoami(client: Client) -> dict[str, Any]:
 
 
 def test_the_local_path_is_available_with_no_provider_configured(settings: Any) -> None:
-    """Point 2: the way in when a provider is unreachable or an account is lost.
+    """Point 2: the local path is there whatever else is configured.
 
     A fresh checkout and every deployment that has configured nothing land
     here, so the password form has to be what an unconfigured server offers --
@@ -283,7 +282,8 @@ def test_the_admin_sends_people_to_the_same_door(local: User) -> None:
 def test_local_accounts_are_issued_rather_than_registered() -> None:
     """Self-service registration would only manufacture accounts holding nothing.
 
-    The way in that point 2 guarantees is a password an administrator issued.
+    What decision 0013 point 2 guarantees instead is ACCOUNT_ADAPTER's comment
+    in settings.py.
     """
     before = User.objects.count()
 

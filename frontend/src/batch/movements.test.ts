@@ -61,8 +61,7 @@ describe("the request a batch becomes", () => {
   });
 
   it("offers only the kinds a scanned batch can actually express", () => {
-    // A transfer needs a location on both sides and the cart carries one; an
-    // adjustment and a count are not per-line movements at all.
+    // Four of the seven, and `KINDS` says which three are left out and why.
     expect(KINDS.map((k) => k.kind)).toEqual(["checkout", "checkin", "receipt", "consumption"]);
     expect(sideFor("transfer")).toBeNull();
   });

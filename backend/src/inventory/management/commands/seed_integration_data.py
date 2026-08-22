@@ -13,11 +13,10 @@ in the command itself, that this is what was wanted. Both conditions are
 checked below.
 
 The second factor is not a concession to the test suite -- it is the point.
-Decision 0013 requires one on the local password path, and the browser suite
-signs in that way because an OAuth round trip to Google or Slack cannot be
-completed from CI. Publishing the TOTP secret lets the suite compute a real
-code, so what it exercises is the second factor rather than an exemption from
-it.
+Decision 0013 requires one on the local password path, and DEVELOPERS.md says
+why the browser suite signs in that way. Publishing the TOTP secret lets the
+suite compute a real code, so what it exercises is the second factor rather
+than an exemption from it.
 """
 
 import json

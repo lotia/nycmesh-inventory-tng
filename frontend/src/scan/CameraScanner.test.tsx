@@ -260,9 +260,9 @@ describe("choosing the lens", () => {
   });
 
   it("forgets a remembered camera the device no longer has", async () => {
-    // Otherwise the choice is a dead end: the picker is only offered where the
-    // device reports more than one camera, and a browser that mints new device
-    // ids per session reports one until permission has been granted.
+    // Otherwise the choice is a dead end, and the picker cannot rescue it --
+    // the comment beside the `cameraIsGone` branch in CameraScanner.tsx
+    // says why.
     window.localStorage.setItem(STORAGE_KEY, '"gone"');
     const getUserMedia = vi.fn(async () => {
       throw new DOMException("Not there", "OverconstrainedError");

@@ -444,10 +444,10 @@ def test_a_retired_custody_location_comes_back_for_a_holder_still_offered(
 
 
 def test_the_detail_endpoint_shows_the_same_packaging_as_the_list(editor: Client, item: Item) -> None:
-    """One item read alone is the same shape as the same item read in a page.
+    """A revoked sticker is missing from the detail as well as from the list.
 
-    The chips a client renders come from either, and a revoked sticker must be
-    missing from both -- LabelManager.live() says so for exactly this reason.
+    The chips a client renders come from either, and LabelManager.live() says
+    so for exactly this reason; ITEMS is what makes the two agree.
     """
     Label.objects.create(code="KEPT110000", item=item, quantity=1)
     Label.objects.create(code="DEAD110000", item=item, quantity=5, revoked_at=timezone.now())
@@ -589,7 +589,7 @@ def test_a_volunteer_may_not_revoke_a_label(client: Client, item: Item) -> None:
 
 
 def test_the_revocation_timestamp_is_the_servers(editor: Client, item: Item) -> None:
-    """A client that could name the moment could revoke a sticker in the future."""
+    """``LabelSerializer`` says why the clock is the server's here."""
     label = Label.objects.create(code="C10CK10000", item=item)
     patch(editor, "label-resolve", {"revoked": True, "revoked_at": "2099-01-01T00:00:00Z"}, label.code)
     label.refresh_from_db()

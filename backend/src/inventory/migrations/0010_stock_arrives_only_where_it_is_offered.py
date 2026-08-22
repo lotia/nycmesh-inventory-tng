@@ -1,9 +1,10 @@
 """Stock may leave a retired location and may not arrive at one.
 
-Decision 0019: retirement is a statement about the pick-list, not about the
-world. A room keeps whatever it holds and that stock stays movable *out* --
-emptying it is how it gets decommissioned -- but nothing new arrives, because a
-balance under a row no collection offers is stock nobody can find.
+The write half of decision 0019, whose statement of what retirement means is
+the argument for it. A room keeps whatever it holds and that stock stays
+movable *out* -- emptying it is how it gets decommissioned -- but nothing new
+arrives, because a balance under a row no collection offers is stock nobody
+can find.
 
 A trigger rather than a check constraint: whether the row is active lives in
 another table, which a constraint cannot see. Decision 0016 is why that makes
@@ -17,8 +18,7 @@ migration too:
 
     manage.py migrate inventory 0009
 
-docs/deployment.md#rolling-back allows either backward compatibility or an
-explicit plan; this is the plan.
+This is the explicit plan docs/deployment.md#rolling-back asks for.
 """
 
 from django.db import migrations

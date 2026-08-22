@@ -150,11 +150,12 @@ def test_a_replay_is_matched_without_looking_at_the_body(
     second_item: Item,
     warehouse: Location,
 ) -> None:
-    """No hash of the body. Two carts under one key is an invisible client bug,
-    and turning it into an error the volunteer cannot act on helps nobody.
+    """The key and who sent it, and nothing out of the body.
 
-    The actor is still part of the match -- see the tests below -- so "the key
-    alone" means the key and who sent it, never the scans it carried.
+    Why no hash is taken is the comment beside the lookup in
+    StockTransactionCreateView. The actor is still part of the match -- see
+    the tests below -- so "the key alone" means the key and who sent it, never
+    the scans it carried.
     """
     first = post(
         client,
@@ -323,7 +324,7 @@ def test_a_line_cannot_start_and_end_in_the_same_place(
 
 
 # --------------------------------------------------------------------------
-# A batch that does not add up to the kind it claims
+# A batch whose lines are each fine and whose total is not
 # --------------------------------------------------------------------------
 
 
@@ -604,8 +605,8 @@ def test_a_replay_still_reports_that_stock_is_negative(
 ) -> None:
     """The retry exists because the first response was lost.
 
-    A volunteer who never saw "the shelf is negative" still needs telling, so
-    the replay reads the balances again rather than answering with silence.
+    So the replay reads the balances again rather than answering with silence,
+    which is what ``_body`` says it is for.
     """
     body = batch(
         volunteer,
@@ -807,8 +808,10 @@ def test_a_batch_cannot_have_happened_in_the_future(
     item: Item,
     warehouse: Location,
 ) -> None:
-    """Append-only means a wrong timestamp can never be corrected, only
-    compensated -- and it is the key every recent-activity view sorts by.
+    """The same refusal one level up from the trigger.
+
+    test_a_batch_cannot_be_dated_in_the_future says what a wrong timestamp
+    costs in a ledger that cannot be rewritten.
     """
     response = post(
         client,
@@ -1011,8 +1014,7 @@ def test_a_batch_into_a_retired_location_is_refused_by_line(
     A wall sticker for a room retired after the label cache was filled is not
     revoked and still resolves, so a volunteer can scan it, add two dozen
     lines and press Save. Without this mirror the trigger answers that with a
-    500 naming nothing -- "reaching a volunteer with 24 scans as a 500 naming
-    nothing" is the outcome 0016 exists to prevent.
+    500 naming nothing, which is the outcome 0016 exists to prevent.
     """
     retired = Location.objects.create(name="Decommissioned room", kind=Location.Kind.ROOM)
     Location.objects.filter(pk=retired.pk).update(active=False)
@@ -1052,11 +1054,8 @@ def test_a_batch_out_of_a_retired_location_is_recorded(
 def test_a_receipt_of_a_retired_item_is_refused_by_line(
     client: Client, volunteer: Volunteer, item: Item, warehouse: Location
 ) -> None:
-    """Decision 0019 rule 1, the item half.
-
-    A receipt is pure arrival with no from-side, so "draining is legitimate,
-    filling is not" does not distinguish an item from a location: stock
-    received against a retired item is a balance ``/api/items`` never shows.
+    """Decision 0019 rule 1, the item half, which that rule explains is not a
+    rule of its own.
     """
     Item.objects.filter(pk=item.pk).update(active=False)
 
@@ -1078,9 +1077,7 @@ def test_a_count_may_still_correct_a_retired_item(
 ) -> None:
     """Decision 0019 rule 2: retirement must not strand what it retires.
 
-    Finding three of a retired item on a shelf has to be recordable, or the
-    stock the rule above cares about is precisely the stock nobody can
-    reconcile. Decision 0011 section 6 is why counts constrain nothing.
+    Decision 0011 section 6 is why counts constrain nothing.
     """
     Item.objects.filter(pk=item.pk).update(active=False)
 

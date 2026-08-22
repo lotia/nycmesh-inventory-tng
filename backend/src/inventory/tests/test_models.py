@@ -66,9 +66,8 @@ def test_category_cannot_be_its_own_parent(category: Category) -> None:
 def test_categories_sharing_a_name_have_a_total_order(category: Category) -> None:
     """A name is unique only within a parent, so the list needs a tie-break.
 
-    Without one PostgreSQL may return tied rows in any order, and a paginated
-    list can then show one category twice and never show another -- the same
-    reasoning as Volunteer's ordering.
+    The same reasoning as Volunteer's ordering, which
+    test_two_volunteers_with_one_name_are_both_listed_once gives.
     """
     nested = Category.objects.create(name="Radios", parent=category)
     assert list(Category.objects.filter(name="Radios")) == sorted([category, nested], key=lambda row: row.pk)
@@ -215,9 +214,7 @@ def test_non_custody_location_must_not_have_a_holder(volunteer: Volunteer) -> No
 
 @pytest.mark.parametrize("withdrawn", ["merged", "retired"])
 def test_custody_is_recorded_against_somebody_the_list_still_offers(volunteer: Volunteer, withdrawn: str) -> None:
-    """A custody location attached to a merged duplicate is the second
-    generation of the duplicate the merge existed to remove.
-    """
+    """The comment on ``Location.held_by`` says what this prevents."""
     holder = Volunteer.objects.create(display_name="Sean B")
     if withdrawn == "merged":
         holder.merged_into = volunteer
@@ -453,9 +450,8 @@ def test_reprinting_replaces_the_token_not_the_item(item: Item) -> None:
 
 
 def test_a_printed_code_cannot_be_changed(item: Item) -> None:
-    """The code is on a sticker on a shelf. Changing it 404s that sticker for
-    the life of the object carrying it, and no database write can go and
-    reprint it. A reprint is a new label and a revocation of this one.
+    """What a changed code would cost is migration 0008's comment on
+    ``label_code_is_printed``.
     """
     label = Label.objects.create(code="7QK3M2XV9A", item=item)
     label.code = "N3WC0DE001"

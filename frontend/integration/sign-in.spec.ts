@@ -50,9 +50,10 @@ test("a wrong code does not get past the second factor", async ({ page }) => {
 });
 
 test("the admin's own login form is the same door", async ({ page }) => {
-  // Two sign-in surfaces exist and must agree. The admin ships a password
-  // form that knows nothing about providers or second factors, so what
-  // answers to its URL is the one that does.
+  // Two surfaces exist and must agree; the backend suite's
+  // `test_the_admin_sends_people_to_the_same_door` says why the admin's
+  // cannot be the one that answers. Held here too: only a browser follows
+  // the redirect chain the way a person meets it.
   await page.goto("/admin/login/?next=/admin/");
 
   await expect(page).toHaveURL(/\/accounts\/login\/\?next=/);

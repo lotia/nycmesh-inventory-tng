@@ -438,15 +438,13 @@ neither the unit suite nor a look at the bundle can answer it. The camera is
 opened against Chromium's fake device, which needs no flag of yours: the spec
 asks for it.
 
-One of them decodes a symbol through a browser, which no other test can. That
-the printed sticker is readable at all is settled in the backend suite, which
-decodes what the label generator drew with a different implementation from the
-one that drew it; what nothing could reach until now is the handoff between a
-camera frame and the decoder, where a scanner can decode nothing while every
-other suite stays green. `integration/decodes.spec.ts` closes that, and its
-header says what it found when it first ran. The clip it films is generated
-during the run rather than committed, and needs no ffmpeg and no container;
-how, and why, is in `frontend/integration/qrVideo.ts`.
+One of them decodes a symbol through a browser, which no other test can. What
+nothing could reach until now is the handoff between a camera frame and the
+decoder, where a scanner can decode nothing while every other suite stays
+green. `integration/decodes.spec.ts` closes that; its header says what the
+other suites already settle, and what it found when it first ran. The clip it
+films is generated during the run rather than committed, and needs no ffmpeg
+and no container; how, and why, is in `frontend/integration/qrVideo.ts`.
 
 The offline queue is here on a variant of the first argument.
 `integration/offline-batch.spec.ts` throws away a batch's *answer* instead of
@@ -575,16 +573,27 @@ the other half — an explanation pasted into a second file rather than linked t
 link text are not prose and are left out, so a repeated command or a repeated
 citation is not reported.
 
-It reads every Markdown file **and the comments of everything that is not
-application code** — scripts, workflows, the chart's values. Those are
-documentation of how this repository works, and the easiest place to re-derive
-something this guide already says.
+It reads every Markdown file **and the comments of everything else** — scripts,
+workflows, the chart's templates, and the application's own docstrings and
+comments. Those are documentation of how this repository works, and a docstring
+is the easiest place of all to re-derive a decision record.
 
-Stated as an exclusion so that a file added or moved is read by default. What
-it leaves out is `backend/src` and `frontend/src`: a docstring beside the
+No directory is excluded, so a file added or moved under one already read is
+read by default. What decides whether a file is read at all is its extension —
+`.md`, `.sh`, `.py`, `.yml`, `.yaml`, `.ts`, `.tsx` — which leaves the
+templates that carry no extension of their own, `nginx.conf.template` and the
+Dockerfiles, unread. Widening that is a matter of naming them. What is left
+out *within* a file is not prose: fenced blocks and
+tables in Markdown, and in code, anything a file *uses* rather than *says* — a
+string handed to `RunSQL` is a value however much of it reads like a sentence.
+Addressing is left out too, wherever it appears: a Markdown link, a bare path
+or URL in a comment, and a bare "decision 0016" all name a thing rather than
+explain it, and two files naming the same thing are obeying the rule.
+
+The judgement this leaves is real and is per passage. A docstring beside the
 invariant it enforces is the code explaining itself, which is a different thing
-from a topic having two homes. Reading those too is a decision per case and is
-tracked separately.
+from a topic having two homes; when it is the first, the fix is usually still
+to state the rule here and cite the record rather than reproduce its argument.
 
 When it objects, the fix is almost always to delete one copy and link to the
 other. `scripts/check-docs.allow` exists for the rare passage that is genuinely

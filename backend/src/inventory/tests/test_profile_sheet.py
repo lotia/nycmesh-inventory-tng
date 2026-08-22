@@ -101,8 +101,8 @@ def test_a_fully_blank_row_is_not_read_at_all(tmp_path: Path) -> None:
 
 
 def test_the_catalogue_is_read_from_the_name_column_and_not_the_qr_link(tmp_path: Path) -> None:
-    """Column C holds the QR link and has the same number of filled rows as
-    column D, so a reader taking the wrong one still returns 52 of something.
+    """A reader taking the wrong column still returns 52 of something, which
+    is why ``workbook``'s header names the two apart.
     """
     path = build(tmp_path, [submission()], catalogue=("LiteBeam", "OmniTikPOE"))
 
@@ -135,10 +135,7 @@ def test_every_field_arrives_trimmed_and_never_none(tmp_path: Path) -> None:
 
 
 def test_whitespace_inside_a_cell_is_collapsed_too(tmp_path: Path) -> None:
-    """A non-breaking space is what a value pasted from a web page carries,
-    and it defeats every rule silently: the direction stops being one, the
-    item reaches no alias, and the note names no place.
-    """
+    """``workbook._text`` names the character this uses and what it defeats."""
     path = build(tmp_path, [(AT, "", "", "Checking\xa0Out", "TP-Link\xa0SFP-RJ45", 1.0, "mesh\xa0room")])
 
     sheet = workbook.read(path)

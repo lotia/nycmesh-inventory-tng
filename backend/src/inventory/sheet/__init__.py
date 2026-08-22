@@ -13,7 +13,10 @@ without a scene, and `profile_sheet` and the importer both get the same answer
 from it.
 
 Every module here also exposes `section(sheet) -> Report`, which is that
-rule's own part of the printed breakdown.
+rule's own part of the printed breakdown. **A section prints the figures its
+rule is quoted for, including the readings its rule rejects**, because a
+number the brief argues from that no code produces is the failure this package
+exists to stop -- and it is the failure the brief itself kept committing.
 """
 
 from collections.abc import Iterable, Mapping
@@ -36,6 +39,12 @@ from collections.abc import Iterable, Mapping
 # plus two, or the previous line's plus one. `test_brief_figures` checks that of every section,
 # because the pasted block in the brief matching the code proves the two agree
 # and proves nothing about whether either is right.
+#
+# **A section's labels do not depend on its data.** Where a line is one of an
+# enumerated set -- a spelling, a reading -- the set is written down and every
+# member gets a line, including the ones this export happens not to hold. A
+# label that appeared only when the data held it would make the brief correct
+# for one workbook, and the labels are what the brief is checked against.
 #
 # Named here, upstream of every module that implements it, so that a rule can
 # annotate itself against its own contract. The alias for the function that

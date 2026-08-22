@@ -36,10 +36,10 @@ import { frameGrabber } from "./frame";
 /**
  * What is said when there is no camera API at all.
  *
- * `navigator.mediaDevices` is undefined on an insecure origin rather than
- * restricted, so the commonest cause of this message is the app being reached
- * over plain HTTP at a LAN address -- which is the natural way to try it from
- * a phone, and the reason decision 0011 lists TLS as a consequence.
+ * `cameraSupported` says when that happens, and why. The commonest cause is
+ * the app being reached over plain HTTP at a LAN address -- which is the
+ * natural way to try it from a phone, and the reason decision 0011 lists TLS
+ * as a consequence, so the message names HTTPS rather than the browser.
  *
  * This component is the only place that asks whether a camera can be opened:
  * Scanner.tsx offers the button whatever the answer, precisely so that this

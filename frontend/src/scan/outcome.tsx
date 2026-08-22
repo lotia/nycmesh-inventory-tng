@@ -31,8 +31,7 @@ function announcement(outcome: Outcome): {
       };
     case "measured":
       // Not a confirmation: nothing is in the batch yet, and saying so is the
-      // point. Decision 0011 section 5 -- a cable label says what a full box
-      // is, and a scan is as likely to be part of one coming back.
+      // point. Why nothing measured is defaulted is `countsItself`'s.
       return {
         severity: "warning",
         text: `${outcome.measured.label.item.name} is measured in ${outcome.measured.label.item.unitOfMeasure}. Say how much before it goes in the batch.`,

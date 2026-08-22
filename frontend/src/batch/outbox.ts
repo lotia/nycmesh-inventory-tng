@@ -2,11 +2,8 @@
  * Batches this device could not send, kept until it can.
  *
  * Decision 0011 section 6 deferred this and named a service worker. It is not
- * one, and the reason is in that section's amendment: Background Sync is
- * Chromium-only, so on the platform decision 0011 says to test on it would
- * wake up for nobody. What replaces it is a queue in `localStorage` that the
- * page drains -- when the app opens, when the browser fires `online`, when a
- * save gets through, and when the volunteer presses the button.
+ * one; that section's amendment says why, and says what drains this queue
+ * instead. Read it before changing what triggers a run.
  *
  * ## What "exactly once" rests on
  *

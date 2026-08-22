@@ -11,10 +11,10 @@ Every rule below that names a row's own columns is one of these, including the
 four that reach across tables or across time and so are triggers rather than
 constraints (migration 0008). A fifth trigger has no mirror here and is meant
 to have none: ``stock_movement_to_location_is_active`` refuses stock arriving
-at a retired location (migration 0010, decision 0019), and a client cannot
-reach it -- the location pick-list does not offer a retired row, so a request
-naming one is not a mistake this module can explain more helpfully than the
-database does. The four with mirrors:
+at a retired location (migration 0010, decision 0019), and no client can reach
+it for the reason 0016 gives, so a request naming one is not a mistake this
+module can explain more helpfully than the database does. The four with
+mirrors:
 
 - a batch may not be dated in the future
   (``StockTransactionCreateSerializer.validate_occurred_at``);
@@ -40,8 +40,8 @@ records them as client contracts:
 1. A client does not choose a label's code. It is minted here, by
    ``Label.mint_unique_code``, and a submitted one is refused rather than
    ignored.
-2. A client does not time a revocation. It sends the boolean ``revoked`` and
-   the server reads its own clock.
+2. A client does not time a revocation: ``revoked`` is a boolean, and the
+   clock is the server's.
 
 Anything writing past this module -- the admin, a fixture load, the planned
 sheet importer -- is held to everything in the first list and to neither of
@@ -156,8 +156,8 @@ class StockMovementInputSerializer(serializers.ModelSerializer):
         return value
 
     def validate_quantity(self, value: Any) -> Any:
-        # Direction is which side the location sits on, never the sign of the
-        # quantity -- so a negative here is a client bug, not a return.
+        # A negative here is a client bug, not a return: docs/data-model.md
+        # says how a movement expresses direction.
         if value <= 0:
             raise serializers.ValidationError("Quantity must be greater than zero.")
         return value
@@ -225,8 +225,8 @@ class StockTransactionCreateSerializer(serializers.ModelSerializer):
     """A batch as it is submitted: one act, many lines.
 
     Movements name items by id, never by label code. The client has already
-    resolved every code it scanned, and accepting codes here would add a second
-    resolution path that fails after the volunteer thinks they are done.
+    resolved every code it scanned, and decision 0011 section 6 says what a
+    second resolution path here would cost.
     """
 
     # max_length reaches the ListSerializer many=True builds, which the stubs
@@ -580,8 +580,7 @@ class LocationSerializer(TreeSerializer):
         The field is a plain relation over every volunteer row, and
         ``Volunteer.is_selectable`` is the row-level half of the one rule
         about who may be recorded against; see VolunteerManager.selectable().
-        A custody location attached to a merged duplicate is the second
-        generation of the duplicate the merge existed to remove.
+        The comment on ``Location.held_by`` says what this prevents.
         """
         if value is not None and not value.is_selectable:
             raise serializers.ValidationError(
@@ -666,8 +665,8 @@ class ItemDetailSerializer(ItemSerializer):
 class LabelResolveSerializer(serializers.ModelSerializer):
     """What a scanned code points at.
 
-    ``quantity`` is part of the contract because the client cannot spell out
-    the cart line without it. See decision 0011 section 5.
+    ``quantity`` is part of the contract, and decision 0011 section 6 says
+    what the client cannot do without it.
     """
 
     kind = serializers.SerializerMethodField()
@@ -782,10 +781,9 @@ class LabelSerializer(LabelResolveSerializer):
         elif "code" in submitted and Label.normalise_code(str(submitted["code"])) != self.instance.code:
             # Sending the code back unchanged is a client returning the whole
             # row it read, which is a correction and not a rename -- so only a
-            # different one is refused. Refused, again, rather than ignored:
-            # the code is printed on a sticker already out on a shelf, and
-            # changing it would 404 that sticker for good. A reprint is a new
-            # label and a revocation of this one.
+            # different one is refused. Refused, again, rather than ignored,
+            # and `label_code_is_printed` in migration 0008 is the rule this
+            # mirrors and says what a changed code costs.
             raise serializers.ValidationError(
                 {"code": "A label's code is printed on it and cannot be changed. Revoke it and print another."}
             )
@@ -814,10 +812,10 @@ class LabelSerializer(LabelResolveSerializer):
             # Emptied rather than left absent. DRF does not supply a default
             # here -- a model default makes the field `required=False` and
             # nothing more, so `quantity` is simply missing from attrs and
-            # Django applies `default=1` when it instantiates the model. That
-            # default serves the common case, an item label standing for one of
-            # its item, and is exactly what `label_quantity_iff_item` refuses on
-            # the other. Setting it to None is what stops the default arriving.
+            # Django applies `default=1` when it instantiates the model, which
+            # is exactly what `label_quantity_iff_item` refuses on a location
+            # label. Setting it to None is what stops the default arriving.
+            # LabelForm.clean says why the column defaults that way at all.
             attrs["quantity"] = None
         # Turned into the column the model stores here rather than in create()
         # and update(): `revoked` is not a field of Label, so it has to leave
@@ -862,11 +860,11 @@ class DetailSerializer(serializers.Serializer):
     contract and is described like any other response.
 
     ``code`` is the branch a client actually takes, and it is optional because
-    only the 403 carries one: two refusals share that status and mean opposite
-    things -- ``forbidden`` is a control to hide, ``reauthentication_required``
-    is a prompt to show somebody who is entitled to the thing (decision 0014
-    point 5). Nothing here is missing on a 404, where the sentence is the whole
-    answer. The values are attached by ``exception_handler`` in inventory/api.py.
+    only the 403 carries one: ``forbidden`` and ``reauthentication_required``
+    share that status and mean opposite things (decision 0014 point 5).
+    Nothing here is missing on a 404, where the sentence is the whole answer.
+    The values are attached by ``exception_handler`` in inventory/api.py, whose
+    comment says what each of the two asks a client to draw.
     """
 
     detail = serializers.CharField()

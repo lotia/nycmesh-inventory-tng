@@ -6,15 +6,12 @@ that is deliberately **not** a classifier, and it is here anyway because the
 alternative was leaving it a hand count -- which is how it came to be wrong.
 It says 68; the reading below gives 52.
 
-Read this before quoting it. Every printed QR opens a form preset to
-`Checking Out`, so the ledger's return rate is a property of the instrument
-rather than of anybody's behaviour, and a check-in is also how a correction
-and a delivery get recorded. So this counts **submissions whose note contains
-the word**, which is a floor under "how often did somebody write it down", and
-is not a rate of anything. An earlier version of the brief turned this
-question into a four-way percentage split; those shares were withdrawn, and
-the question they were trying to answer belongs to the stakeholder meeting
-(`inventory-tng-8sq`) rather than to this data.
+**Read
+[what no rule can recover](../../../../docs/briefs/sheet-classifiers.md#what-no-rule-can-recover)
+before quoting this.** It counts submissions whose note contains the word, and
+that is all it counts; the brief says what such a number is and is not, and why
+the question behind it belongs to the stakeholder meeting rather than to this
+data.
 
 The predicate is the narrowest one there is on purpose: the brief's claim is
 that these notes say it *in so many words*, so the rule is the word and

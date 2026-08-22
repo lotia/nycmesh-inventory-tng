@@ -269,9 +269,7 @@ def test_a_printed_code_cannot_be_retyped_in_the_admin_either(editor: Client, it
 def test_the_admin_empties_a_wall_label_s_quantity() -> None:
     """The model still defaults the column to 1, which the constraint forbids here.
 
-    So the add form arrives pre-filled with a value that cannot be saved, and
-    without this an administrator printing a wall code meets
-    `label_quantity_iff_item` as a non-field error naming the constraint.
+    `LabelForm.clean` says what an administrator would meet without this.
     """
     from inventory.admin import LabelForm
     from inventory.models import Location

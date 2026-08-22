@@ -166,9 +166,9 @@ AUTHENTICATION_BACKENDS = [
 LOGIN_URL = "account_login"
 LOGIN_REDIRECT_URL = "/"
 
-# Username and password, not email. Volunteers are a pick-list and are never
-# accounts (decision 0012 point 5), and a provider's email address is not
-# identity (decision 0013's last consequence), so an email address is
+# Username and password, not email. Decision 0012 point 5 settles what a
+# volunteer is and is not, and decision 0013's last consequence settles what
+# a provider's email address is worth; between them an email address is
 # something an account may have rather than the name it answers to.
 ACCOUNT_LOGIN_METHODS = {"username"}
 # Email is on the list but not starred, so it is offered and never demanded:
@@ -369,9 +369,8 @@ REST_FRAMEWORK = {
 # What the browser is allowed to load and execute.
 #
 # A requirement of decision 0014, not general good practice. That decision puts
-# administrative capability in the same application a volunteer uses, and
-# records the cost: script injected into that application reaches the
-# destructive operations too, from the browser of somebody who holds them.
+# administrative capability in the same application a volunteer uses, and its
+# consequences record what injected script would then reach.
 # Re-authentication (inventory/permissions.py, RecentlyAuthenticated) narrows
 # what such a script can reach; this narrows how it gets there in the first
 # place.
