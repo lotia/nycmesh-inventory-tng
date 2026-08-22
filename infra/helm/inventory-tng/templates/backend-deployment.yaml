@@ -33,6 +33,11 @@ spec:
             {{- include "inventory-tng.backendEnv" . | nindent 12 }}
           envFrom:
             {{- include "inventory-tng.backendEnvFrom" . | nindent 12 }}
+          # No Host header: the kubelet dials the pod's own address, and that
+          # address is one this deployment answers to, because DJANGO_POD_IP
+          # puts it in ALLOWED_HOSTS. A probe asserting some other name about
+          # itself would pass while the address it actually used was refused,
+          # which is the shape of the bug this replaced.
           livenessProbe:
             httpGet:
               path: /api/healthz

@@ -34,6 +34,10 @@ frontend:
 
 django:
   debug: false
+  # Every hostname a browser may use, comma-separated. Two things depend on
+  # it beyond Django itself: a release whose ingress.host none of these
+  # covers is refused at render time, and the pod adds its own address to
+  # this list so the kubelet can probe it. docs/deployment.md#health-checks.
   allowedHosts: "inventory.nycmesh.net"
   # Empty, and expected to stay empty; see docs/deployment.md for what it does
   # and does not buy. Comma-separated.

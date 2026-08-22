@@ -12,12 +12,15 @@ from typing import Any
 
 import environ
 
+from inventory_tng.hosts import allowed_hosts
+
 # BASE_DIR is backend/src/ -- the directory holding manage.py.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env(
     DJANGO_DEBUG=(bool, False),
     DJANGO_ALLOWED_HOSTS=(list, []),
+    DJANGO_EXTRA_ALLOWED_HOSTS=(list, []),
     CORS_ALLOWED_ORIGINS=(list, []),
     # Defaults are the ones a volunteer night needs; .env.sample says why.
     APPEND_BURST_RATE=(str, "20/min"),
@@ -40,7 +43,14 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 
 DEBUG = env("DJANGO_DEBUG")
 
-ALLOWED_HOSTS: list[str] = env("DJANGO_ALLOWED_HOSTS")
+# DJANGO_EXTRA_ALLOWED_HOSTS is for addresses only the running deployment
+# knows -- in Kubernetes, the pod's own, which is what a probe asks for and
+# what nobody could have written in a values file. Why that matters, and what
+# it costs when the list is wrong, is docs/deployment.md#health-checks; why the
+# two lists need stripping before use is on `allowed_hosts`. Both are read
+# through that one function, here and in inventory/tests/test_chart.py, so
+# there is never a second answer.
+ALLOWED_HOSTS: list[str] = allowed_hosts(env("DJANGO_ALLOWED_HOSTS"), env("DJANGO_EXTRA_ALLOWED_HOSTS"))
 
 INSTALLED_APPS = [
     "django.contrib.admin",

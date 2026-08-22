@@ -13,7 +13,7 @@ development — which uses `compose.yaml`, not this chart — see
 ## Read this before you start
 
 **This procedure has never been run through to the end against a cluster, and
-four known defects stand in the way of the first person who does.** They are in
+three known defects stand in the way of the first person who does.** They are in
 the chart rather than in this page, so
 this page cannot fix them; what it can do is name them where you would
 otherwise meet them as a symptom. Each is filed, and each is listed again at
@@ -22,13 +22,11 @@ the step it stops.
 | What happens | Why | Filed as |
 | --- | --- | --- |
 | `ImagePullBackOff` on every pod, at the first install | No image has ever been published from this repository, there is no `v0.1.0` to pull, and the chart renders no `imagePullSecrets` for a private one | `inventory-tng-qe7` |
-| Backend pods stay `0/1 Running` for ever, then restart every ~70 s | The probes send `Host: <pod IP>`, which `DJANGO_ALLOWED_HOSTS` refuses with a 400, so readiness never passes and liveness eventually kills the container. It reads exactly like a database problem and is not | `inventory-tng-adj` |
 | Every backend pod dies together during a brief database outage | Liveness probes `/api/healthz`, which runs a query, so an unreachable database is read as an unhealthy process | `inventory-tng-uq6` |
 | `helm upgrade` blocks until it times out, in a namespace with a `ResourceQuota` | The migrate Job renders with no `resources`, and a quota on cpu or memory refuses a pod that declares none unless a `LimitRange` fills them in | `inventory-tng-v7g` |
 
-The first two stop a first install outright. Until `inventory-tng-qe7` and
-`inventory-tng-adj` are done, treat what follows as the procedure that will
-work rather than one that has.
+The first stops an install outright. Until `inventory-tng-qe7` is done, treat
+what follows as the procedure that will work rather than one that has.
 
 **Only the rendering is proven.** CI has no cluster, so the furthest it can
 follow this page is `helm lint` and the `helm template` lines printed further
@@ -68,8 +66,7 @@ rest happen once for the life of an environment.
    means when it fails is [Migrations](#migrations).
 7. **Check that it came up**: `kubectl -n inventory-tng get pods`, then
    `curl https://<your host>/api/healthz`, which answers only once the database
-   is reachable — [health checks](#health-checks). This is where
-   `inventory-tng-adj` stops you today: the pods run and never become ready.
+   is reachable — [health checks](#health-checks).
 8. **Make the first administrator and enrol its second factor** —
    [First administrator](#first-administrator). This is the step people are
    most often stopped by, and it is the one that has to happen before the next.
@@ -144,13 +141,18 @@ Everything else in the table below is a value the chart already carries, so a
 release that supplies only those two starts. It starts answering to whatever
 hostname `values.yaml` was last left naming, which is why
 `django.allowedHosts` is marked required even though it is never missing.
+Emptying it is the one way to make that marking bite, and it is refused by
+`helm template` rather than at boot — not on Django's account but on the
+ingress's, which would otherwise forward a hostname nothing answers to.
+[Health checks](#health-checks) is where that lives.
 
 | Variable | Required | Source in Kubernetes | Notes |
 | --- | --- | --- | --- |
 | `DJANGO_SECRET_KEY` | yes | Secret | No default. A missing value fails at boot by design. |
 | `DATABASE_URL` | yes | Secret | `postgres://user:password@host:5432/dbname` |
 | `DJANGO_DEBUG` | no | chart (`django.debug`) | Must be `false` outside development |
-| `DJANGO_ALLOWED_HOSTS` | yes | chart (`django.allowedHosts`) | Comma-separated hostnames |
+| `DJANGO_ALLOWED_HOSTS` | yes | chart (`django.allowedHosts`) | Comma-separated hostnames. Two other things read it, and [health checks](#health-checks) says what they do with it |
+| `DJANGO_EXTRA_ALLOWED_HOSTS` | no | chart (the downward API), not a knob | The pod's own address, added to the list above. Not something to set by hand — the chart fills it because nobody can know it in advance, and [health checks](#health-checks) says what it is for |
 | `CORS_ALLOWED_ORIGINS` | no | chart (`django.corsAllowedOrigins`) | Normally empty: nginx proxies Django's paths, so the browser sees one origin. Setting it grants cross-origin *reads* to an unauthenticated client and nothing more — the session cookie is not sent cross-origin and writes have no trusted-origin list, so it does not make a frontend on a second hostname work |
 | `NUM_PROXIES` | no | chart (`django.numProxies`) | Proxies between the browser and Django; the default `2` matches the deployed chain of ingress then the frontend's nginx. It decides whose request a rate limit counts against, so it must match reality — see [`.env.sample`](../.env.sample) for which direction is dangerous |
 | `APPEND_BURST_RATE` | no | chart (`django.appendBurstRate`) | How fast one client may append. What each rate is for, and why the defaults are what they are, is in [`.env.sample`](../.env.sample) |
@@ -602,28 +604,27 @@ documented here apply unchanged.
 fails if the database is unreachable. The chart uses it for both liveness and
 readiness probes on the backend.
 
-**Two known defects live here, and between them they are what stops step 7
-today.**
+**A pod answers to its own address, and that is what makes any of this work.**
+The kubelet dials a pod rather than the site, so a probe asks for
+`<pod IP>:8000` — an address nobody could have listed in `django.allowedHosts`,
+because it does not exist until the pod does. Without it Django answers 400,
+readiness never passes, no pod joins the Service, and liveness kills each
+container about fifty seconds in — ten, then three failures twenty apart — for
+ever. So the chart passes the address in through the downward API, as
+`DJANGO_EXTRA_ALLOWED_HOSTS`, and Django adds it to the list. Nothing about that depends on what you wrote in
+`django.allowedHosts`, which is free to be several names, or `*`.
 
-A `httpGet` probe with no `host` set sends the pod's own IP as the `Host`
-header. `DJANGO_ALLOWED_HOSTS` is whatever `django.allowedHosts` says — a real
-hostname — so Django answers the probe with a 400, readiness never passes, and
-no backend pod is ever added to the Service. Liveness, on the same path, then
-restarts the container after roughly 70 seconds (a 10-second delay, then three
-20-second periods) and does it again for ever. It reads as a crash and it is a
-healthy Django refusing a hostname it was told to refuse; the giveaway is in
-that pod's own log, as `Invalid HTTP_HOST header` naming the pod's IP.
-`inventory-tng-adj`.
+**What the probes cannot tell you is whether the ingress agrees with them.**
+They reach the pod by its address and go green regardless, while nginx forwards
+a browser's `Host` untouched — so an `ingress.host` that `django.allowedHosts`
+does not cover gives you two Ready pods and a site that serves its shell and no
+data, with nothing in any log unless `DEBUG` is on, which it must not be. The
+chart refuses to render that release instead, naming both values.
 
-The second is what that probe asks. Liveness runs the same query readiness
-does, so a database that is briefly unreachable is read as a process that needs
-killing — and because every replica is asking the same database, they fail
-together. A one-minute blip becomes a full restart of the deployment.
-`inventory-tng-uq6`.
-
-Until both are fixed, `kubectl -n inventory-tng get pods` showing
-`0/1 Running` with a climbing restart count is the expected outcome of step 7
-rather than a sign that something about your cluster is wrong.
+**One known defect is left here.** Liveness runs the same query readiness does,
+so a database that is briefly unreachable is read as a process that needs
+killing — and because every replica asks the same database, they fail together.
+A one-minute blip becomes a full restart of the deployment. `inventory-tng-uq6`.
 
 ## Rollback
 
