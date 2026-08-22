@@ -48,6 +48,8 @@ Each topic is documented in exactly one place. Start with whichever fits you:
 
 | If you want to… | Read |
 | --- | --- |
+| Move stock in or out | [guides/volunteer.md](guides/volunteer.md) |
+| Keep the catalogue, the people and the labels | [guides/administrator.md](guides/administrator.md) |
 | Run this locally and make changes | [DEVELOPERS.md](DEVELOPERS.md) |
 | Contribute as a volunteer | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Understand how it is put together | [docs/architecture.md](docs/architecture.md) |

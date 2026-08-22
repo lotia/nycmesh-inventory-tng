@@ -15,7 +15,8 @@
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
-    "test:integration": "playwright test"
+    "test:integration": "playwright test",
+    "capture:guides": "playwright test --config playwright.capture.config.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

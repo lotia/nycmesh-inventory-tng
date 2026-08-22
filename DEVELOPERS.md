@@ -276,10 +276,12 @@ frontend/               Vite + React + MUI single-page app
   vite.config.ts        Build, dev server, and test/coverage configuration
   playwright.config.ts  Integration test configuration (servers, browser)
   integration/          Integration tests and the scene they run against
+  capture/              The screenshot run behind the guides, and its scene
   Dockerfile            Frontend image (nginx serving static files)
   nginx.conf.template   Runtime API proxy configuration
 infra/helm/             Kubernetes deployment chart
 scripts/                The development bootstrap, and the guardrail checkers
+guides/                 The two user guides, and the pictures in them
 docs/                   Architecture, deployment, and decision records
 .agents/skills/         On-demand context for AI coding agents
 compose.yaml            Local development stack
@@ -632,6 +634,42 @@ be finished without dialling anybody.
 They write to your development database rather than a throwaway one, because
 the point is to exercise the servers you actually run.
 
+### The guides' screenshots
+
+```bash
+cd frontend && npm run capture:guides
+```
+
+Every picture in [guides/volunteer.md](guides/volunteer.md) and
+[guides/administrator.md](guides/administrator.md) comes from that command
+rather than from somebody's phone, which is what makes them regenerable. It
+drives the same servers and the same seeded scene as the suite above — its
+config spreads `playwright.config.ts` rather than restating it — and writes one
+PNG per step into `guides/images/`.
+
+Kept out of `npm run test:integration` on purpose. A run of it rewrites every
+PNG under `guides/images/`, and those are then committed — a suite that edits
+the working tree is not a suite. CI does not run it either.
+
+What it adds to that scene — the stickers to scan, stock on a shelf, something
+measured whose scan asks how much, and the questions the sheet import leaves
+behind — is in `frontend/capture/scene.ts`, and every code and quantity in it
+is fixed, so a run against an unchanged app rewrites almost nothing. Two
+pictures do change every time and cannot not: one is of the movements, which a
+run appends to and nothing may edit, and one carries the date it was printed.
+Which pictures exist at all is `frontend/capture/shots.ts`, and `npm test`
+fails when one of them is missing from `guides/images/`, when the guide that
+claims it does not draw it, and when `guides/images/` holds a PNG no shot
+claims.
+
+`capture/` is measured by the coverage thresholds like anything else. The three
+files in it that only a browser can reach — the driver, the gestures against a
+live `Page`, and the scene, which shells out to `manage.py` — are excluded by
+name in `vite.config.ts`, with the reason beside them.
+
+Run it when you change a screen one of them shows, and commit the PNGs with
+that change.
+
 ### What breaks the build
 
 Both of these fail the command with a non-zero exit code, and therefore fail CI:
@@ -699,6 +737,9 @@ Where each topic lives:
 | Topic | Canonical location |
 | --- | --- |
 | What the project is, quickstart | [README.md](README.md) |
+| Using the app to move stock | [guides/volunteer.md](guides/volunteer.md) |
+| Running the catalogue, the people and the labels | [guides/administrator.md](guides/administrator.md) |
+| How the guides' pictures are made | [The guides' screenshots](#the-guides-screenshots) |
 | Development setup and workflow | This file |
 | Code style and linting | [Code style](#code-style) |
 | API schema and how it stays current | [The API schema](#the-api-schema) |
