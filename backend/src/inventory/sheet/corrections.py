@@ -43,6 +43,7 @@ today is not improved by omitting the obvious sibling of a word already in it.
 
 import re
 
+from inventory.sheet import Report
 from inventory.sheet.workbook import Sheet
 
 # The record being adjusted. `inven\w*` rather than the word, because
@@ -67,7 +68,7 @@ def is_correction(note: str) -> bool:
     return bool(RECORD.search(note) and ADJUSTMENT.search(note))
 
 
-def section(sheet: Sheet) -> tuple[str, list[tuple[str, int]]]:
+def section(sheet: Sheet) -> Report:
     """The partition, the near misses the rule declines, and all three
     readings of the enumerated phrases.
 

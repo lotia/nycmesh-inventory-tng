@@ -27,6 +27,7 @@ carries the figures behind both:
 import re
 from collections import Counter
 
+from inventory.sheet import Report
 from inventory.sheet.workbook import Sheet
 
 # The two halves of the room's own pattern, named because the report prints
@@ -88,7 +89,7 @@ def locations(note: str) -> tuple[str, ...]:
     return tuple(name for name, pattern in NAMED_BY.items() if pattern.search(note))
 
 
-def section(sheet: Sheet) -> tuple[str, list[tuple[str, int]]]:
+def section(sheet: Sheet) -> Report:
     """The seed, its coverage, and the three readings of the mesh room.
 
     The coverage lines are the important ones. A vocabulary that matched
@@ -104,9 +105,9 @@ def section(sheet: Sheet) -> tuple[str, list[tuple[str, int]]]:
     return "Locations", [
         ("submissions with a note", len(notes)),
         ("  naming a candidate location", len(named)),
-        # Three spaces rather than two: this is a subset of the line above it,
-        # not a third share of the line above that, and at the same indent the
-        # children would sum to six more than their parent.
+        # Three spaces rather than two, per the depth convention on `Report`:
+        # a subset of the line above it, not a third share of the population.
+        # At the same indent the children summed to six more than the parent.
         ("   of those, naming more than one", sum(1 for places in named if len(places) > 1)),
         ("  naming none of the vocabulary", len(notes) - len(named)),
         ("distinct candidates named", len(tally)),
