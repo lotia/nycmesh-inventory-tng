@@ -1,14 +1,30 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CartProvider, useCart } from "./CartProvider";
+import { STORAGE_KEY } from "./cartStorage";
 import { packet } from "./testFixtures";
 
+/** What was on the device the instant `handOver` returned. */
+let atHandOver: string | null = null;
+
 function Harness() {
-  const { cart, dispatch } = useCart();
+  const { cart, dispatch, handOver } = useCart();
   return (
     <>
       <button type="button" onClick={() => dispatch({ type: "scan", label: packet })}>
         Scan zip ties
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          handOver();
+          // Read here rather than after the click: what is being asserted is
+          // that nothing -- a reload above all -- can land between the caller
+          // storing the batch elsewhere and this cart being emptied.
+          atHandOver = window.localStorage.getItem(STORAGE_KEY);
+        }}
+      >
+        Hand it over
       </button>
       <button type="button" onClick={() => dispatch({ type: "setActor", actorId: 4 })}>
         Pick volunteer
@@ -42,6 +58,7 @@ function scanZipTies(): void {
 
 beforeEach(() => {
   window.localStorage.clear();
+  atHandOver = null;
 });
 
 // Restored here rather than at the end of the test that installs a spy: a
@@ -114,6 +131,26 @@ describe("CartProvider", () => {
 
     expect(key()).not.toBe(first);
     expect(lines()).toBe("");
+  });
+
+  it("puts the emptied cart on the device before handing back, not on the next render", () => {
+    // The submit bar calls this once the queue is holding the batch; what a
+    // reload in between would do to it is on `handOver` itself.
+    render(
+      <CartProvider>
+        <Harness />
+      </CartProvider>,
+    );
+    scanZipTies();
+    const handedOver = key();
+
+    fireEvent.click(screen.getByRole("button", { name: "Hand it over" }));
+
+    const written = JSON.parse(atHandOver ?? "null");
+    expect(written.lines).toEqual([]);
+    expect(written.idempotencyKey).not.toBe(handedOver);
+    // And the screen agrees with what was stored: one key, not two.
+    expect(written.idempotencyKey).toBe(key());
   });
 
   it("is unusable outside a provider rather than silently starting a second cart", () => {

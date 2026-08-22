@@ -36,10 +36,21 @@ export function read<T>(key: string, isRestorable: (value: unknown) => value is 
   }
 }
 
-export function write(key: string, value: unknown): void {
+/**
+ * Store this, and say whether it was stored.
+ *
+ * Nothing throws: the header above says why. But a caller that has *given the
+ * value away* on the strength of this call -- the outbox is handed a batch and
+ * the cart is emptied -- has to know, so the failure is reported in the return
+ * rather than only swallowed. A caller writing a copy of what it still holds
+ * can carry on ignoring it.
+ */
+export function write(key: string, value: unknown): boolean {
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
+    return true;
   } catch {
     // Full, or denied outright.
+    return false;
   }
 }

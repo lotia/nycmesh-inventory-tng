@@ -448,6 +448,12 @@ header says what it found when it first ran. The clip it films is generated
 during the run rather than committed, and needs no ffmpeg and no container;
 how, and why, is in `frontend/integration/qrVideo.ts`.
 
+The offline queue is here on a variant of the first argument.
+`integration/offline-batch.spec.ts` throws away a batch's *answer* instead of
+its request, so the browser retries something the ledger already holds — and
+whether that writes a second row is a question only a real ledger can be asked.
+Both sides of it are covered without a browser and neither can see the join.
+
 They need Docker (for PostgreSQL) and a one-off browser download:
 
 ```bash

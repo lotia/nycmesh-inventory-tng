@@ -169,7 +169,11 @@ Named here so the gaps are visible rather than surprising:
   label map and the catalogue are prefetched when the app opens and a scan
   resolves against them, which is section 6; a code the cache does not hold
   still falls back to the live read, and how stale it is allowed to get is in
-  `frontend/src/scan/labelCache.ts`.
+  `frontend/src/scan/labelCache.ts`. A save that reaches nothing at all leaves
+  the batch on the device rather than in the volunteer's lap: it waits in an
+  outbox, visible until the ledger has it, and goes on its own once there is a
+  connection — what that guarantees and what it does not is in
+  `frontend/src/batch/outbox.ts`.
 - **The administrative interface.** The catalogue write API is built: items,
   locations, categories and labels are created and edited through the API by
   somebody holding the staff flag, and a caller without it is refused rather
