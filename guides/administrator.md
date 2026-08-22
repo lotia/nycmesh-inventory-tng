@@ -13,16 +13,16 @@ what to do, and where.
 
 Two places, and they are one system.
 
-- **The app itself**, for anything you are already looking at. An item row
+- *The app itself*, for anything you are already looking at. An item row
   carries an **Edit** button for you and for nobody else.
-- **Django's admin**, at `/admin/`, for everything else. It is complete: every
+- *Django's admin*, at `/admin/`, for everything else. It is complete: every
   kind of record this system stores has a page there.
 
 Sign in at `/accounts/login/`. Signing in with a password asks for a code from
 an authenticator app as well, every time, and there is no way round it —
 [decision 0013](../docs/decisions/0013-administrator-sign-in.md) says why.
 
-**Saving** anything then asks you to sign in once more, inside the same
+*Saving* anything then asks you to sign in once more, inside the same
 session, and puts you back where you were. Reading never does.
 
 ---
@@ -139,7 +139,7 @@ empty.
 
 ![A printable sheet of stickers](images/administrator-label-sheet.png)
 
-That page is laid out to be printed as it is. **Print it at 100%** — anything
+That page is laid out to be printed as it is. **Print it at 100%.** Anything
 else shrinks the squares, and small squares are the first thing faded ink
 destroys. Everything else that decides whether a sticker still scans after a
 year in a basement is fixed for you and is not worth adjusting. The code is
@@ -170,3 +170,9 @@ that a shelf disagrees with the app, this list is where the answer is.
 Nothing in the ledger can be edited or deleted, by anybody, ever — the database
 itself refuses. A wrong figure is put right by recording a count, which is a
 new entry saying what is actually on the shelf.
+
+---
+
+*Bold marks a control or a field of the admin. Each one is looked for in a
+real browser before this page may be published; the pictures are not, and are
+redrawn by hand. Which is which: [what CI proves](../DEVELOPERS.md#what-ci-proves).*

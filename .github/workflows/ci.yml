@@ -175,6 +175,63 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  setup:
+    name: Setup instructions
+    runs-on: ubuntu-latest
+    # A clean machine, following the two setup documents rather than testing
+    # the code they set up. DEVELOPERS.md promises that a command in it works
+    # on one of these and calls a command that does not a bug in the guide;
+    # this is where that is found out. See DEVELOPERS.md#what-ci-proves.
+    #
+    # No service container: the guide says to start PostgreSQL with compose and
+    # so that is what runs, from compose.yaml. A container declared here would
+    # leave the compose file itself unexercised.
+    steps:
+      - uses: actions/checkout@v5
+      # The one prerequisite the guide names that a runner does not carry,
+      # installed with the guide's own line.
+      - name: Install mise
+        run: |
+          curl https://mise.run | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: From a fresh clone to a database with something in it
+        run: scripts/bootstrap-dev.sh
+      # Ran without complaining is not the same as worked. The screens a new
+      # contributor is promised are drawn from these rows.
+      - name: The seed left rows behind
+        working-directory: backend
+        run: |
+          mise exec -- uv run python src/manage.py shell -c '
+          from inventory.models import Item, Label, Location, StockMovement, Volunteer
+          for model in (Item, Label, Location, StockMovement, Volunteer):
+              assert model.objects.exists(), f"the seed left no {model.__name__} rows"
+          print("catalogue, labels, places, people and ledger: all populated")
+          '
+      - name: The API answers
+        working-directory: backend
+        run: |
+          mise exec -- uv run python src/manage.py runserver --noreload 8000 &
+          curl --retry 30 --retry-delay 2 --retry-connrefused -sf \
+            http://localhost:8000/api/healthz | tee /dev/stderr | grep -q '"ok"'
+      - name: The app a volunteer opens is served
+        working-directory: frontend
+        run: |
+          mise exec -- npm install
+          mise exec -- npm run dev &
+          curl --retry 30 --retry-delay 2 --retry-connrefused -sf \
+            http://localhost:5173/ | grep -q 'id="root"'
+      # The other setup document, as far as a runner with no cluster can go:
+      # what it asks you to render, rendered. Everything after that in it needs
+      # somewhere to install to. See docs/deployment.md.
+      - name: The deployment document's chart commands
+        run: |
+          mise exec -- helm lint infra/helm/inventory-tng
+          mise exec -- helm template test infra/helm/inventory-tng --set image.tag=v0.1.0 >/dev/null
+          mise exec -- helm template test infra/helm/inventory-tng --set image.tag=v0.1.0 \
+            --set ingress.administrative.enabled=true \
+            --set 'ingress.administrative.allowedSourceRanges={10.69.0.0/16}' \
+            | grep -E 'name:.*-admin|whitelist|^ +- path:'
+
   commit-check:
     name: Guardrail checkers
     runs-on: ubuntu-latest

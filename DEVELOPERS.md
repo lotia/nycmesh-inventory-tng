@@ -8,7 +8,9 @@ is put together, see [docs/architecture.md](docs/architecture.md).
 
 **This guide is expected to work.** If a command here fails on a clean machine,
 that is a bug in the guide — please open an issue or fix it in your next pull
-request. See [Definition of Done](#definition-of-done).
+request. See [Definition of Done](#definition-of-done). CI runs the setup below
+on a clean machine every push, so that expectation is checked rather than
+hoped for: [What CI proves](#what-ci-proves).
 
 ---
 
@@ -561,6 +563,44 @@ the date it was printed. Which pictures exist at all is
 Run it when you change a screen one of them shows, and commit the PNGs with
 that change.
 
+### What CI proves
+
+Some of what this repository's documents claim is executed on every push, and
+the rest is not. Which is which is worth knowing before you rely on either.
+
+**This guide's setup is run, not read.** The `Setup instructions` job starts a
+clean runner, installs mise off the line in [Prerequisites](#prerequisites),
+hands the machine to [`scripts/bootstrap-dev.sh`](scripts/bootstrap-dev.sh),
+and then asks whether any of it worked: the seed has to have left rows behind
+in the catalogue, the labels, the places, the people and the ledger, and both
+servers have to answer a request. That is the sentence at the top of this file
+being kept rather than repeated.
+
+**Deployment is rendered and no further.** No cluster exists in CI, so the same
+job runs the `helm lint` and `helm template` commands
+[deployment](docs/deployment.md#from-an-empty-cluster-to-a-first-sign-in)
+prints and stops there. Everything from the install onwards is unproven, and
+that document says so where it asks you to type it.
+
+**A command any document names has to exist.**
+`backend/src/inventory/tests/test_documented_commands.py` holds every
+`manage.py` subcommand, `npm run` script, file under `scripts/` and chart value
+the documents mention against what the repository actually has, and names the
+file and the line of anything stale. It costs nothing and it catches the
+commonest rot there is, which is a rename.
+
+**A control either guide names has to be on the screen.** Controls are written
+in bold there, so `frontend/integration/guide-controls.spec.ts` reads the names
+out of the guides themselves, walks the scene the pictures are taken from, and
+fails naming whatever the app no longer offers. Comparing regenerated PNGs
+would catch more and would also fail on a font or a shadow; this fails on the
+change that would actually mislead somebody.
+
+What none of it can see is whether a guide has gone on describing a job nobody
+does any more, or stayed quiet about one that has appeared. Somebody has to
+read them, which is why that is in the [Definition of Done](#definition-of-done)
+instead.
+
 ### What breaks the build
 
 Both of these fail the command with a non-zero exit code, and therefore fail CI:
@@ -631,6 +671,7 @@ Where each topic lives:
 | Using the app to move stock | [guides/volunteer.md](guides/volunteer.md) |
 | Running the catalogue, the people and the labels | [guides/administrator.md](guides/administrator.md) |
 | How the guides' pictures are made | [The guides' screenshots](#the-guides-screenshots) |
+| Which documents CI executes, and how far | [What CI proves](#what-ci-proves) |
 | Development setup and workflow | This file |
 | Code style and linting | [Code style](#code-style) |
 | API schema and how it stays current | [The API schema](#the-api-schema) |
@@ -713,6 +754,11 @@ hold:
       setup steps, commands, environment variables, architecture, the API
       surface, or the deployment procedure, the canonical document for that
       topic is updated in the same pull request.
+- [ ] **The two guides still describe this app.** Weigh the change against
+      [guides/volunteer.md](guides/volunteer.md) and
+      [guides/administrator.md](guides/administrator.md): neither may name a
+      role the app has dropped, nor omit one of its flows. This is the part no
+      checker sees — [What CI proves](#what-ci-proves) is the part that is seen
 - [ ] A decision that future readers would ask "why?" about has a record in
       [docs/decisions/](docs/decisions/)
 

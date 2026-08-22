@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { seeded, signIn } from "../integration/sign-in";
+import { DESK, PHONE, saveButton, scan } from "./drive";
 import { type Box, endingBefore, union } from "./frame";
 import {
   dressTheScene,
@@ -39,11 +40,6 @@ import { imagePath, SHOTS } from "./shots";
 
 /** Where the PNGs land: the repository root, not the frontend. */
 const REPO_ROOT = fileURLToPath(new URL("../..", import.meta.url));
-
-/** A phone at a shelf, which is what the volunteer's half is drawn for. */
-const PHONE = { width: 420, height: 900 };
-/** The admin is a desktop page and wraps unreadably below this. */
-const DESK = { width: 1280, height: 900 };
 
 /** Room around a cropped control, so it is not cut flush against its border. */
 const MARGIN = 8;
@@ -89,17 +85,6 @@ async function around(...locators: Locator[]): Promise<Box> {
     boxes.push(await boxOf(locator));
   }
   return union(boxes, MARGIN);
-}
-
-/** Hand one code to the app the way a scanner gun does. */
-async function scan(page: Page, code: string): Promise<void> {
-  await page.getByLabel("Scan or type a code").fill(code);
-  await page.getByLabel("Scan or type a code").press("Enter");
-}
-
-/** The Save button, whatever the last attempt left it saying. */
-function saveButton(page: Page): Locator {
-  return page.getByRole("button", { name: /^(Save|Try again)$/ });
 }
 
 test("every picture in the guides", async ({ page }) => {

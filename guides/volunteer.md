@@ -167,3 +167,9 @@ Neither of them needs a camera.
 
 If the picture is too wide to focus on a small label, a **Camera** chooser
 appears where the phone offers more than one lens. Pick another one.
+
+---
+
+*A control's name is set in bold above. Those short phrases are the app's own
+buttons and boxes, and a test drives the app on every push and fails if one of
+them has been renamed away — [what CI proves](../DEVELOPERS.md#what-ci-proves).*

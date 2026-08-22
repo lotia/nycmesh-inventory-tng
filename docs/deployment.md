@@ -47,6 +47,14 @@ release is called `inventory-tng`, as in step 4. The chart builds those names as
 `<release>-inventory-tng-<component>`, so a release under another name renames
 them with it.
 
+**Only the rendering is proven.** CI has no cluster, so the furthest it can
+follow this page is `helm lint` and the `helm template` lines printed further
+down — those it runs on every push, along with a check that every chart value
+quoted here is one the chart really has. Nothing that installs, applies or
+execs has been tried for you, and the first time any of it runs will be when
+you run it. What that leaves covered elsewhere is
+[What CI proves](../DEVELOPERS.md#what-ci-proves).
+
 ## Artifacts
 
 | Artifact | Source | Contents |
