@@ -649,18 +649,25 @@ drives the same servers and the same seeded scene as the suite above — its
 config spreads `playwright.config.ts` rather than restating it — and writes one
 PNG per step into `guides/images/`.
 
-Kept out of `npm run test:integration` on purpose. A run of it writes sixteen
-files that are then committed, and a suite that edits the working tree is not a
-suite. CI does not run it either.
+Kept out of `npm run test:integration` on purpose. A run of it rewrites every
+PNG under `guides/images/`, and those are then committed — a suite that edits
+the working tree is not a suite. CI does not run it either.
 
-What it adds to that scene — a sticker to scan, stock on a shelf, and the
-questions the sheet import leaves behind — is in `frontend/capture/scene.ts`,
-and every code and quantity in it is fixed, so a run against an unchanged app
-rewrites almost nothing. Two pictures do change every time and cannot not: one
-is of the ledger, which a run appends to and nothing may edit, and one carries
-the date it was printed. Which pictures exist at all is
-`frontend/capture/shots.ts`, and `npm test` fails when one is missing from
-`guides/images/` or the guide that claims it does not draw it.
+What it adds to that scene — the stickers to scan, stock on a shelf, something
+measured whose scan asks how much, and the questions the sheet import leaves
+behind — is in `frontend/capture/scene.ts`, and every code and quantity in it
+is fixed, so a run against an unchanged app rewrites almost nothing. Two
+pictures do change every time and cannot not: one is of the movements, which a
+run appends to and nothing may edit, and one carries the date it was printed.
+Which pictures exist at all is `frontend/capture/shots.ts`, and `npm test`
+fails when one of them is missing from `guides/images/`, when the guide that
+claims it does not draw it, and when `guides/images/` holds a PNG no shot
+claims.
+
+`capture/` is measured by the coverage thresholds like anything else. The three
+files in it that only a browser can reach — the driver, the gestures against a
+live `Page`, and the scene, which shells out to `manage.py` — are excluded by
+name in `vite.config.ts`, with the reason beside them.
 
 Run it when you change a screen one of them shows, and commit the PNGs with
 that change.

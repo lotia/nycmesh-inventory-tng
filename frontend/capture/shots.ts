@@ -41,6 +41,7 @@ export const SHOTS: Shot[] = [
   { name: "volunteer-who-you-are", guide: "volunteer" },
   { name: "volunteer-scan-box", guide: "volunteer" },
   { name: "volunteer-added", guide: "volunteer" },
+  { name: "volunteer-measured-amount", guide: "volunteer" },
   { name: "volunteer-catalogue-row", guide: "volunteer" },
   { name: "volunteer-batch", guide: "volunteer" },
   { name: "volunteer-line-refused", guide: "volunteer" },

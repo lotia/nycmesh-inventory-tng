@@ -1,7 +1,7 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { type Guide, guidePath, imagePath, SHOTS, shotsFor } from "./shots";
+import { type Guide, guidePath, IMAGE_DIR, imagePath, SHOTS, shotsFor } from "./shots";
 
 /**
  * The list, the committed PNGs and the guides, held to each other.
@@ -34,6 +34,16 @@ describe("the shot list", () => {
     for (const guide of GUIDES) {
       expect(shotsFor(guide).length).toBeGreaterThan(0);
     }
+  });
+
+  // The other direction, and the half the docstring above promised without
+  // anybody checking it. A renamed shot leaves the old PNG behind: the list
+  // and the guides both move on, the binary does not, and nothing anywhere
+  // would ever mention it again.
+  it("has nothing committed that no shot claims", () => {
+    const claimed = new Set(SHOTS.map((shot) => `${shot.name}.png`));
+    const committed = readdirSync(`${REPO_ROOT}${IMAGE_DIR}`);
+    expect(committed.filter((file) => !claimed.has(file))).toEqual([]);
   });
 });
 

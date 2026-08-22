@@ -8,6 +8,10 @@ import {
   dressTheScene,
   ITEM_CODE,
   ITEM_LABEL_QUANTITY,
+  MEASURED_CODE,
+  MEASURED_ITEM,
+  MEASURED_TAKEN,
+  MEASURED_UNIT,
   MORE_THAN_IS_THERE,
   NEAR_MISS,
   ON_HAND,
@@ -78,8 +82,22 @@ async function boxOf(locator: Locator): Promise<Box> {
   return box;
 }
 
-/** The rectangle holding all of these, with room around it. */
+/**
+ * The rectangle holding all of these, with room around it.
+ *
+ * Measured from the top of the document, and put there first. `fullPage`
+ * clips in the document's coordinates while `boundingBox` answers in the
+ * viewport's, so the two agree only while nothing has scrolled -- and clicking
+ * Save scrolls it into view. Left alone, every rectangle taken after the first
+ * refusal is shifted up the page by the scroll offset, which is a picture of
+ * the wrong part of the screen and looks like a picture of the right one.
+ */
 async function around(...locators: Locator[]): Promise<Box> {
+  const first = locators[0];
+  if (first === undefined) {
+    throw new Error("A shot needs at least one element to be drawn around.");
+  }
+  await first.page().evaluate(() => window.scrollTo(0, 0));
   const boxes = [];
   for (const locator of locators) {
     boxes.push(await boxOf(locator));
@@ -123,10 +141,26 @@ test("every picture in the guides", async ({ page }) => {
   await expect(added).toContainText(`${ITEM_LABEL_QUANTITY} × ${itemName}`);
   await shoot(page, "volunteer-added", await around(added));
 
+  // The one modal the volunteer's app has, and the only scan that does not
+  // put anything in the batch by itself. Its answer is also the second line of
+  // the batch below, which is what makes "the rest untouched" visible in the
+  // picture of a refusal.
+  await scan(page, MEASURED_CODE);
+  const howMuch = page.getByRole("dialog");
+  await expect(howMuch).toContainText(MEASURED_ITEM);
+  await shoot(page, "volunteer-measured-amount", await around(howMuch));
+  await howMuch.getByLabel(`Amount in ${MEASURED_UNIT}`).fill(String(MEASURED_TAKEN));
+  await howMuch.getByRole("button", { name: "Add" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: MEASURED_ITEM })).toBeVisible();
+
+  // By the heading rather than by any text in the row: `seed_demo_data` puts
+  // "LiteBeam AC Gen2" in the same catalogue, and the new setup path runs it
+  // against the same database, so a substring match finds two rows and
+  // Playwright refuses to measure either.
   const row = page
     .getByRole("list", { name: "Items" })
     .getByRole("listitem")
-    .filter({ hasText: itemName });
+    .filter({ has: page.getByRole("heading", { name: itemName, exact: true }) });
   await expect(row).toContainText(`${ON_HAND} on hand`);
   // Cropped before the Edit button, which is an administrator's and is drawn
   // here only because the capture run is signed in as one. See frame.ts.
@@ -143,7 +177,9 @@ test("every picture in the guides", async ({ page }) => {
   await shoot(page, "volunteer-batch", await around(kind, batch, saveButton(page)));
 
   // A quantity with more digits than the ledger's column takes: one bad line
-  // in a batch that is otherwise fine, which is what the guide is about.
+  // in a batch of two that is otherwise fine, which is what the guide is
+  // about. Two lines and not one, so that the untouched half of the promise --
+  // "fix that line and leave the rest alone" -- is in the picture.
   const quantity = page.getByLabel(`Quantity of ${itemName} in the batch`);
   await quantity.fill("1234567890");
   await saveButton(page).click();
@@ -223,16 +259,25 @@ test("every picture in the guides", async ({ page }) => {
   // Bounded rather than the whole list. Every run of this appends to the
   // ledger and nothing may ever take a row out again, so a picture of all of
   // it would grow by two rows and a few kilobytes every time it is taken.
+  //
+  // Wide enough to take the filter sidebar in with it. The guide sends a
+  // reader here to answer "why does this shelf disagree", and the only control
+  // that makes a ledger of thousands answerable is the one this picture used
+  // to crop off.
   const rows = page.locator("#result_list tbody tr");
   const shown = Math.min(await rows.count(), LEDGER_ROWS);
   await shoot(
     page,
     "administrator-ledger",
-    await around(page.locator("#result_list thead"), rows.nth(shown - 1)),
+    await around(
+      page.locator("#result_list thead"),
+      rows.nth(shown - 1),
+      page.locator("#changelist-filter"),
+    ),
   );
 
   // The list in shots.ts is what the guides and their test are written
-  // against, so a run that quietly took fifteen of sixteen is a failure here
+  // against, so a run that quietly took all but one of them is a failure here
   // rather than a broken image somebody meets later.
   expect(taken).toEqual(SHOTS.map((shot) => shot.name));
 });

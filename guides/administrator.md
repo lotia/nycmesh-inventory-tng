@@ -15,15 +15,21 @@ Two places, and they are one system.
 
 - *The app itself*, for anything you are already looking at. An item row
   carries an **Edit** button for you and for nobody else.
-- *Django's admin*, at `/admin/`, for everything else. It is complete: every
-  kind of record this system stores has a page there.
+- *Django's admin*, at `/admin/`, for everything else. Almost every kind of
+  record this system stores has a page there. The one that does not is the one
+  the last section is about: how much of an item is on a particular shelf.
 
-Sign in at `/accounts/login/`. Signing in with a password asks for a code from
-an authenticator app as well, every time, and there is no way round it —
-[decision 0013](../docs/decisions/0013-administrator-sign-in.md) says why.
+Sign in at `/accounts/login/` with the *username* the account was made under —
+not the email address you know yourself by. A password sign-in then asks for a
+code from an authenticator app as well, every time, and there is no way round
+it — [decision 0013](../docs/decisions/0013-administrator-sign-in.md) says why.
 
-*Saving* anything then asks you to sign in once more, inside the same
-session, and puts you back where you were. Reading never does.
+*Saving* anything under `/admin/` asks you to sign in again if it is more than
+fifteen minutes since you last did — and **what you typed is not kept**. The
+prompt comes before the save is even looked at; afterwards you are returned to
+the same page, freshly loaded, with your edit gone. Reading never asks. So
+before a long edit, save one small thing first to start the clock, or expect to
+type it twice.
 
 ---
 
@@ -36,11 +42,18 @@ typed. Underneath it on its page are its identifiers.
 
 **An identifier is any string that has ever meant this item**: a part number, a
 vendor's code, one of the retired `NYCM-` codes, or simply what people call it.
-A volunteer typing `tp link` into the search finds the item because somebody
-put `tp link` here.
 
-This is the whole fix for the old spreadsheet, where a name that did not match
-matched nothing at all and the movement was silently lost. So:
+**What that does today, and what it does not.** Typing `tp link` into the
+search box on the item list here in the admin finds the item, because this page
+searches identifiers as well as names. The volunteer's app does not: its search
+reads item names and nothing else, and nothing there ever shows an identifier.
+So an identifier helps you and whoever else works in the admin, and changes
+nothing a volunteer standing at a shelf can see. That gap is
+`inventory-tng-gz2`. Until it is closed, add the identifier *and* check that
+the item's own name is one somebody would think to type.
+
+Even so, this is the fix for the old spreadsheet, where a name that did not
+match matched nothing at all and the movement was silently lost. So:
 
 **When somebody's word for a thing finds nothing, add it as an identifier.** Do
 not rename the item to match. Two strings can name one item; one string may
@@ -62,13 +75,41 @@ What that does, and does not do:
 
 - The duplicate stops being offered to anybody, and stops being usable as the
   person a batch is recorded against.
-- **Every movement it is already on stays exactly where it was.** The ledger is
-  never rewritten, so nothing is lost and nothing changes number.
-- There is no delete, and there should not be.
+- **Every movement it is already on stays exactly where it was.** The record of
+  movements is never rewritten, so nothing is lost and nothing changes number.
+- It is not final. Emptying **Merged into** again puts the duplicate back in
+  the list, with everything it was on still on it.
+
+Three things worth knowing before you do one:
+
+- **Choose a survivor who has not themselves been merged.** The list you choose
+  from offers everybody, merged records included, and picking one of those is
+  refused by the database rather than by the form — what you get is a server
+  error page with nothing useful on it. The volunteer list shows a *Merged
+  into* column; check it first.
+- **Check first whether the duplicate is holding stock of their own.** Merging
+  or retiring somebody who still holds a location is refused everywhere else in
+  this system and allowed here, and doing it leaves that location active, with
+  stock in it, named after a person nobody is offered any more. The *Held by*
+  column on the location list is where to look; move the stock before you
+  merge.
+- Settling one pair is three changes and not one — see the next section.
 
 Retiring a record with **Active** is the other half: it takes somebody out of
 the list without claiming they were somebody else. Use it for a volunteer who
 has moved on.
+
+### About the Delete button
+
+There is a **Delete** button on this page, and on an item, a location and a
+label. **Never use it on an item or on a location.** Deleting either also
+deletes every label pointing at it, without warning and without asking. Those
+codes are printed on stickers that are already on shelves, they cannot be
+worked out again, and scanning one afterwards finds nothing, for ever. That is
+`inventory-tng-6pr`.
+
+**Merged into** and **Active** are how a record is taken out of use. Deleting
+is not the same thing and is never the answer here.
 
 ---
 
@@ -79,15 +120,21 @@ something it wrote the question onto the record and left it for you. There are
 two such columns, one on a volunteer and one on an item, and **both are
 answered by being emptied**.
 
-### On a volunteer
+Both lists carry the same filter for finding them, on the right-hand side:
+*By sheet flag*, then *Not empty*.
 
-Filter the list to the rows carrying one.
+### On a volunteer
 
 ![The volunteers the import could not tell apart](images/administrator-volunteers-flagged.png)
 
 Each says which other record it might be the same person as. Decide, then
-either merge it as above, or empty the field because they really are two
-people. Either way the field ends up empty, and an empty field means settled.
+either merge it as above, or leave the two as two people.
+
+**Emptying the field is what marks it settled, and merging does not do it for
+you.** Both rows of a pair carry a question of their own, so settling one pair
+is three changes across two records: the merge, and the field emptied on each.
+The duplicate takes the merge and its own emptying in one save; the survivor
+has to be opened separately.
 
 ### On an item
 
@@ -101,8 +148,9 @@ or that many packets of them. Nothing was multiplied by anything.
 Settling one means deciding what a packet of that item is, putting that number
 on the labels you print for it, and emptying the field.
 
-You cannot repair the historical rows by answering it. The ledger cannot be
-rewritten. If the number on the shelf is wrong, count it and record the count.
+You cannot repair the historical rows by answering it. Nothing already recorded
+can be rewritten. If the number on the shelf is wrong,
+[record a count](#putting-a-wrong-number-right).
 
 ---
 
@@ -110,11 +158,14 @@ rewritten. If the number on the shelf is wrong, count it and record the count.
 
 ![The places stock can be](images/administrator-locations.png)
 
-Locations nest: a site holds rooms, a room holds shelves. A volunteer carrying
-stock is a location too, with **Held by** naming them.
+Locations nest: a warehouse or a hub holds rooms, a room holds shelves. The
+kinds on offer are the six in the picture — *Warehouse*, *Hub*, *Room*,
+*Shelf*, *Volunteer custody* and *Vehicle* — and there is no other. A volunteer
+carrying stock is a location too, with **Held by** naming them.
 
-Retiring a location stops it being offered. Stock can still be taken out of a
-retired place, but nothing can be moved into one.
+Retiring a location with **Active** stops it being offered. Stock can still be
+taken out of a retired place, but nothing can be moved into one. That is the
+way to close a shelf; deleting it is not, for the reason above.
 
 ---
 
@@ -126,18 +177,33 @@ nothing by itself, so renaming an item never breaks a sticker.
 ![One label](images/administrator-label.png)
 
 **To make one:** add a label. The **Code** box arrives with a code already
-minted in it — leave it alone unless you are recording a sticker that was
-printed somewhere else. It cannot be changed afterwards, because by then it is
-on a shelf. Point the label at an item *or* at a location, never both. On an
-item label, **Quantity** is what one scan of that sticker means: put `100` on
-the sticker that goes on a packet of a hundred. On a wall label, leave it
-empty.
+filled in — leave it alone unless you are recording a sticker that was printed
+somewhere else. Once the label is saved the code can no longer be changed,
+because by then it is on a shelf, and the page shows it as plain text instead
+of a box. That is what the picture above is: a label that already exists.
+
+Point the label at an **Item** *or* at a **Location**, never both. **Quantity**
+arrives showing `1`. On an item label it is what one scan of that sticker
+means, so put `100` on the sticker that goes on a packet of a hundred. On a
+wall label, clear the box — the help text under it calls that *Null*, which
+only means empty: a wall code stands for a place and for no amount of anything.
 
 **To print them:** collect the codes and ask for a sheet, comma separated.
 
     /api/labels/sheet?code=7QK3M2XV9A,4NP8R7T2WQ
 
+Collecting them is the awkward part. The label list can be searched by code and
+by nothing else — not by item, not by shelf, not by when it was printed — so
+"find the codes for this shelf" means sorting a column and reading them off by
+eye. That is `inventory-tng-3ez`.
+
 ![A printable sheet of stickers](images/administrator-label-sheet.png)
+
+**A code that names nothing, or that has been revoked, is simply left off the
+sheet.** Nothing says so. The only sign is the line at the top of the page
+saying how many labels are on it, and that line is not printed — so count it
+against the number of codes you asked for before you send the page to the
+printer.
 
 That page is laid out to be printed as it is. **Print it at 100%.** Anything
 else shrinks the squares, and small squares are the first thing faded ink
@@ -162,17 +228,54 @@ that arrived somewhere, less everything that left.
 
 You read the number itself in the catalogue, on the item's row in the app —
 that is the figure a volunteer sees, and it is everything on every shelf added
-together. Per shelf, read the item through the API.
+together.
 
-You read *why* it is that number here, in the movements. When somebody reports
-that a shelf disagrees with the app, this list is where the answer is.
+**Per shelf, there is no screen anywhere.** The numbers are worked out and the
+app uses them, but nothing in the admin has a page for them. Adding up the
+movements for one place, by eye, is the only way to a per-shelf figure today.
 
-Nothing in the ledger can be edited or deleted, by anybody, ever — the database
-itself refuses. A wrong figure is put right by recording a count, which is a
-new entry saying what is actually on the shelf.
+You read *why* a total is what it is here, in the movements. When somebody
+reports that a shelf disagrees with the app, this list is where the answer is —
+with one thing to know before you go looking. It can be narrowed to a single
+item, by the filter on the right, and searched by an item's name or a job
+reference. It cannot be narrowed to a place. So "what has happened to this
+shelf" means picking the item and then reading the two location columns down
+the page.
+
+Nothing here can be edited or deleted, by anybody, ever — the database itself
+refuses.
+
+### Putting a wrong number right
+
+A wrong figure is not corrected. It is answered, by recording the difference as
+a stock count, which sits on top of everything already there.
+
+**A count is a difference, not a total.** If the shelf holds 12 and the app
+says 9, the number to record is `3`. Recording `12` would make the app say 21,
+and there is no undoing it.
+
+The volunteer's app cannot do this — its **What is happening** menu deliberately
+does not offer a count. It is done in the admin, under *Stock transactions* →
+*Add stock transaction*:
+
+- *Kind*: *Stock count*.
+- *Actor*: you.
+- *Reason*: what you counted, and when you counted it.
+- Then one *Stock movement* row underneath for each item you counted. Put the
+  difference — never the total, and always a positive number — in *Quantity*,
+  and let the two location boxes carry the direction:
+  - the shelf holds *more* than the app says: put the shelf in *To location*
+    and leave *From location* empty;
+  - the shelf holds *less*: put the shelf in *From location* and leave *To
+    location* empty.
+
+Save it once. The old rows stay exactly where they were, because nothing is
+ever taken out, and the total now agrees with the shelf.
 
 ---
 
-*Bold marks a control or a field of the admin. Each one is looked for in a
-real browser before this page may be published; the pictures are not, and are
-redrawn by hand. Which is which: [what CI proves](../DEVELOPERS.md#what-ci-proves).*
+*Bold marks a control or a field of the admin. Each one is looked for in a real
+browser on every push; the pictures are not — they are regenerated by a command
+somebody runs, never by CI. Which is which:
+[what CI proves](../DEVELOPERS.md#what-ci-proves). Italics are the screen's own
+words, including the fields on pages that check does not walk.*
