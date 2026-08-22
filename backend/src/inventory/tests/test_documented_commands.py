@@ -65,6 +65,14 @@ CHART_VALUE = re.compile(r"`([^`]+)`|--set[ \t]+'?([^\s'=]+)")
 # written. See `test_ci_activates_mise_with_the_line_the_guide_prints`.
 ACTIVATION = re.compile(r'eval "\$\([^"]*mise activate [^"]*\)"')
 
+# A Kubernetes object as `kubectl` is told to address it: a kind, a slash, and
+# the name the chart rendered. See
+# `test_every_resource_the_deployment_document_addresses_is_one_the_chart_renders`.
+ADDRESSED = re.compile(r"\b(?:deploy|deployment|job|svc|service|ingress)/([a-z0-9-]+)")
+
+# The release docs/deployment.md installs, which decides every rendered name.
+RELEASE = "inventory-tng"
+
 
 def documents() -> list[Path]:
     """Every tracked Markdown file that this repository is answerable for, once each.
@@ -265,6 +273,46 @@ def test_ci_activates_mise_with_the_line_the_guide_prints() -> None:
     guide = DEVELOPERS.read_text()
     adrift = [line for line in activations if line not in guide]
     assert not adrift, "CI activates mise with a line DEVELOPERS.md does not print:\n" + "\n".join(adrift)
+
+
+def rendered() -> set[str]:
+    """Every object name the chart makes, for the release the document installs.
+
+    Asked of helm rather than worked out from `_helpers.tpl`, because a rule
+    reimplemented here is a second answer to the question and this test exists
+    because the first answer drifted.
+    """
+    manifests = subprocess.run(
+        ["helm", "template", RELEASE, str(VALUES.parent), "--set", "image.tag=v0.1.0"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    return {
+        document["metadata"]["name"]
+        for document in yaml.safe_load_all(manifests)
+        if document and document.get("metadata", {}).get("name")
+    }
+
+
+def test_every_resource_the_deployment_document_addresses_is_one_the_chart_renders() -> None:
+    """The gap that let four `kubectl` lines name a Deployment nobody had.
+
+    The chart's names are not values, so the check above cannot see them, and
+    twice now this document has addressed a resource the chart does not make --
+    once before `inventory-tng-2cq` and once after it, in opposite directions.
+    The names are read back off a real render so neither correction can be the
+    last one that was right.
+    """
+    made = rendered()
+    complain(
+        [
+            f"{where}: {kind_and_name}"
+            for kind_and_name, where in named(ADDRESSED, [DEPLOYMENT])
+            if kind_and_name not in made
+        ],
+        "Kubernetes objects the deployment document addresses",
+    )
 
 
 def test_the_documents_being_read_are_the_committed_ones() -> None:
