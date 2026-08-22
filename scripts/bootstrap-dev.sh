@@ -47,8 +47,18 @@ mise install
 
 # uv arrives with the toolchain above. A shell with mise activated has it on
 # PATH already; one without has to ask for it by name.
+#
+# Which of the two it was is remembered rather than thrown away, because the
+# closing message below hands the reader commands to type in this same shell.
+# A shell that could not find uv will not find npm either, and printing a bare
+# `uv run ...` to somebody whose next keystroke answers `command not found` is
+# the failure this script exists to spare them.
 uv=(uv)
-command -v uv >/dev/null 2>&1 || uv=(mise exec -- uv)
+via=""
+if ! command -v uv >/dev/null 2>&1; then
+  uv=(mise exec -- uv)
+  via="mise exec -- "
+fi
 
 step "Configuration"
 if [[ -e .env ]]; then
@@ -61,15 +71,55 @@ else
 fi
 
 step "PostgreSQL"
-"${compose[@]}" up -d --wait postgres
+# Which port the container will be published on, and so which one has to be
+# free. compose.yaml reads the same variable; .env is where a person sets it.
+port=${POSTGRES_PORT:-5432}
+if [[ -e .env ]]; then
+  while IFS= read -r line; do
+    case "$line" in POSTGRES_PORT=*) port=${line#POSTGRES_PORT=} ;; esac
+  done < .env
+fi
+
+# Asked before the attempt rather than after, because a second run of this
+# script finds its own database already listening there and that is the
+# ordinary case, not a clash. Only a bind that then fails makes it one.
+# /dev/tcp is bash's own, so this adds no dependency.
+taken=0
+(exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null && taken=1
+
+if ! "${compose[@]}" up -d --wait postgres; then
+  if [[ "$taken" -eq 1 ]]; then
+    die "PostgreSQL could not start, and something was already listening on port $port
+before this run began -- another project's database, or one installed as a
+service. Rather than stopping theirs, move ours, by putting BOTH of these in
+.env with the same number in each:
+
+  POSTGRES_PORT=5433
+  DATABASE_URL=postgres://inventory:inventory@localhost:5433/inventory_tng
+
+Both, because the first is the port the container is published on and the
+second is where Django goes looking. Changing one alone aims Django at their
+cluster instead. Then run this script again."
+  fi
+  die "PostgreSQL did not come up. The error above is the container tool's own."
+fi
 
 step "Schema"
 (cd backend && "${uv[@]}" run python src/manage.py migrate)
 
 step "Something to look at"
-(cd backend && "${uv[@]}" run python src/manage.py seed_demo_data)
+# Held rather than streamed, so that the one line worth acting on -- the label
+# codes -- can be repeated under the closing message instead of being scrolled
+# off the top of it.
+seeded=$(cd backend && "${uv[@]}" run python src/manage.py seed_demo_data)
+printf '%s\n' "$seeded"
 
-cat <<'DONE'
+codes=""
+while IFS= read -r line; do
+  case "$line" in "Labels to scan"*) codes=$line ;; esac
+done <<< "$seeded"
+
+cat <<DONE
 
 == Over to you
 
@@ -80,7 +130,7 @@ none of them is a step that was forgotten -- each needs a person.
 1. Make yourself an account. It asks for a name and a password at the
    terminal, so it cannot be run for you:
 
-     cd backend && uv run python src/manage.py createsuperuser
+     cd backend && ${via}uv run python src/manage.py createsuperuser
 
    You need one even to look at the volunteer's half today, which
    DEVELOPERS.md "Signing in" explains and is not how it is meant to end up.
@@ -93,9 +143,37 @@ none of them is a step that was forgotten -- each needs a person.
 
 3. Start the two servers, in two terminals of your own:
 
-     cd backend  && uv run python src/manage.py runserver
-     cd frontend && npm install && npm run dev
+     cd backend  && ${via}uv run python src/manage.py runserver
+     cd frontend && ${via}npm install && ${via}npm run dev
 
    Then sign in at http://localhost:5173/accounts/login/.
 
+DONE
+
+if [[ -n "$via" ]]; then
+  cat <<'ACTIVATE'
+Those commands are prefixed because this shell cannot see mise's tools. That
+is worth fixing once rather than typing forever: add the line the mise
+installer printed to your shell's configuration and open a new terminal, and
+then the prefix comes off every command in DEVELOPERS.md as well. Its
+"Activate mise, then open a new shell" says exactly what to add.
+
+ACTIVATE
+fi
+
+cat <<DONE
+== What you should see, and what to try first
+
+Signed in, the app at http://localhost:5173 draws a catalogue of six items,
+four of them with a count beside them, and a pick-list of two volunteers. All
+zeroes, or an empty list, means you are looking at a different database from
+the one this just filled -- check DATABASE_URL in .env.
+
+${codes:-The seed printed no label codes this time; its own output above is what it did.}
+
+Those are the two stickers the seed printed, and typing one in is the quickest
+way to see what this is for. No camera needed: the app opens with the cursor
+in the box marked "Scan or type a code". Enter the first, and it names an item
+and adds one of it to the batch. The second names a shelf instead, and sets
+where the whole batch is going. guides/volunteer.md walks the rest.
 DONE

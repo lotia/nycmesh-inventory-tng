@@ -2059,8 +2059,8 @@ components:
           type:
           - string
           - 'null'
-          description: Any string of your own, except one beginning 'sheet:', which
-            the sheet import reserves.
+          description: Any string of your own, except one beginning 'sheet:' or 'demo:',
+            which the sheet import and the demo seed reserve.
           maxLength: 64
         kind:
           $ref: '#/components/schemas/TransactionKindEnum'

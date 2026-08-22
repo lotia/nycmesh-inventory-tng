@@ -14,10 +14,34 @@ you have, so the account stays yours to make with `createsuperuser`.
 Every name in here is invented. Nothing pretends to be a real volunteer, a real
 site or a real count.
 
+## Development servers only, and no flag to type
+
+`settings.DEBUG` off is a refusal, for the reason `seed_integration_data`
+gives: this command ships inside the backend image, so it is one wrong
+`kubectl` context away from a production pod, and the half of it that is not
+guarded by `ledger_is_ours()` -- three categories, six invented items, three
+places, two volunteers and two labels -- writes into whatever database
+`DATABASE_URL` names.
+
+Its sibling asks for an acknowledgement flag as well, and this one does not.
+The asymmetry is deliberate rather than an oversight. That flag is spent per
+invocation and so has to be typed every time; this command exists to be the
+first thing a new contributor runs, reached through `scripts/bootstrap-dev.sh`
+and through one copy-pasted line in README, and a flag would put a refusal in
+front of exactly the path it exists to smooth. What the flag buys there is
+consent to a published credential; there is no credential here, and `DEBUG`
+already answers the only other question -- whether this is a development
+server.
+
 ## Running it twice adds nothing
 
-Each catalogue row is fetched or created, and the two transactions carry an
-idempotency key, so a second run finds all of them where the first left them.
+Each catalogue row is fetched or created, and the two transactions are found by
+their idempotency key, so a second run finds all of them where the first left
+them. The key alone, not the key and the actor: the unique constraint is scoped
+to the pair, but a demo volunteer that has since been merged or retired is
+replaced by a fresh row on the next run -- which is the first thing
+`guides/administrator.md` teaches -- and a lookup carrying that new actor would
+match nothing and post the delivery a second time.
 
 ## Why the ledger is the one part it will decline to write
 
@@ -33,7 +57,8 @@ from collections import Counter
 from decimal import Decimal
 from typing import Any
 
-from django.core.management.base import BaseCommand
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from inventory.management.commands import _report
@@ -49,8 +74,10 @@ from inventory.models import (
 
 # What this command's own transactions are recognised by, both when it is asked
 # to run twice and when it is deciding whether the ledger is anybody else's.
-# Distinct from StockTransaction.FROM_THE_SHEET, which names imported rows.
-DEMO_KEY_PREFIX = "demo:"
+# Distinct from StockTransaction.FROM_THE_SHEET, which names imported rows, and
+# reserved beside it on the model so that the serializer can refuse a client
+# writing one -- without which `ledger_is_ours()` below can be made to lie.
+DEMO_KEY_PREFIX = StockTransaction.FROM_THE_DEMO_SEED
 
 CATEGORIES = ("Radios", "Antennas", "Cables and connectors")
 
@@ -211,15 +238,23 @@ def post(
     `stock_movement_matches_kind` trigger enforces: a receipt arrives from
     outside and so has only a destination, a check out leaves and so has only a
     source.
+
+    Found by the key alone and not by `get_or_create(actor=..., key=...)`, for
+    the reason the module docstring gives: the actor is not stable across runs
+    and the ledger cannot be corrected. `filter().first()` rather than `get()`,
+    because a database seeded before that was true may already hold the pair
+    this would otherwise raise on.
     """
     into = kind == StockTransaction.Kind.RECEIPT
-    recorded, created = StockTransaction.objects.get_or_create(
-        actor=actor,
-        idempotency_key=f"{DEMO_KEY_PREFIX}{key}",
-        defaults={"kind": kind, "reason": "Demo data"},
-    )
-    if not created:
+    full_key = f"{DEMO_KEY_PREFIX}{key}"
+    if StockTransaction.objects.filter(idempotency_key=full_key).exists():
         return
+    recorded = StockTransaction.objects.create(
+        actor=actor,
+        idempotency_key=full_key,
+        kind=kind,
+        reason="Demo data",
+    )
     added["transactions"] += 1
     for name, quantity in lines:
         StockMovement.objects.create(
@@ -269,6 +304,13 @@ class Command(BaseCommand):
     help = "Create a small invented catalogue, two places, two volunteers, two labels and some stock."
 
     def handle(self, *args: Any, **options: Any) -> None:
+        # See "Development servers only, and no flag to type" above for why
+        # this one condition and not the two its sibling checks.
+        if not settings.DEBUG:
+            raise CommandError(
+                "Refusing to seed: DEBUG is off, so this is not a development server. "
+                "This command writes an invented catalogue into whatever database DATABASE_URL names.",
+            )
         added: Counter[str] = Counter()
         # One transaction: a run that fails half way through would otherwise
         # leave a catalogue with no stock in it and no sign of why.

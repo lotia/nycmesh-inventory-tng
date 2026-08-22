@@ -30,7 +30,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-inventory}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-inventory}
     ports:
-      - "5432:5432"
+      # The published port is configurable because a laptop that has done any
+      # database work already has something on 5432, and the bind failure that
+      # produces is the commonest way a first setup stops. Whatever this is set
+      # to, DATABASE_URL has to name the same number -- see .env.sample.
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       # postgres:18+ keeps data in major-version subdirectories under
       # /var/lib/postgresql and refuses to start if it finds a mount at the

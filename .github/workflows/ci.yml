@@ -175,6 +175,56 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  compose:
+    name: Compose stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # compose.yaml gives all three services a read-only root filesystem and a
+    # tmpfs for each directory that one genuinely writes to, and DEVELOPERS.md
+    # "Option A" says so in prose. Nothing else finds out whether that is true:
+    # the `images` job builds the two images and stops, and the setup job
+    # starts postgres alone. The riskiest halves are the unproven ones --
+    # whether gunicorn survives with only /tmp and /home/app to write to, and
+    # whether nginx survives a tmpfs laid over the directory holding the
+    # configuration its own base image wrote at build time.
+    #
+    # Serving a request is the assertion, because that is what a reader of
+    # README's quickstart does next.
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure, as the quickstart says to
+        run: cp .env.sample .env
+      - name: Bring the whole stack up
+        run: docker compose up -d --build
+      - name: The API answers
+        run: |
+          curl -sf --retry 30 --retry-delay 2 --retry-connrefused \
+            http://localhost:8000/api/healthz | tee /dev/stderr | grep -q '"ok"'
+      - name: The app a volunteer opens is served
+        run: |
+          curl -sf --retry 30 --retry-delay 2 --retry-connrefused \
+            http://localhost:8080/ | grep -q 'id="root"'
+      # Through nginx rather than around it, which is the path a browser takes
+      # and the one the tmpfs over /etc/nginx/conf.d could break on its own.
+      - name: The API answers through the frontend's proxy
+        run: curl -sf http://localhost:8080/api/healthz | grep -q '"ok"'
+      # So that the three assertions above cannot start passing for the wrong
+      # reason the day somebody drops `read_only` to make something work.
+      - name: The root filesystems really are read-only
+        run: |
+          for service in postgres backend frontend; do
+            if docker compose exec -T "$service" sh -c 'touch /proof-of-a-writable-root' 2>/dev/null; then
+              echo "::error::$service accepted a write to its root filesystem"
+              exit 1
+            fi
+          done
+      - name: What the services said
+        if: failure()
+        run: docker compose logs --no-color --tail 200
+      - name: Stop it
+        if: always()
+        run: docker compose down -v
+
   setup:
     name: Setup instructions
     runs-on: ubuntu-latest

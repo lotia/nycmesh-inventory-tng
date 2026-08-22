@@ -9,17 +9,30 @@ developer's own database can already be in when it runs.
 
 import io
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from django.contrib.auth.models import User
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import Client
 from django.urls import reverse
 
-from inventory.management.commands.seed_demo_data import LABELS, PACKER, SHELF, STORE
+from inventory.management.commands.seed_demo_data import CHECKED_OUT, LABELS, PACKER, RECEIVED, SHELF, STORE
 from inventory.models import Item, Location, StockMovement, StockTransaction, Volunteer
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def _a_development_server(settings: Any) -> None:
+    """The command refuses unless DEBUG is on, and the test runner turns it off.
+
+    Every case below is about what the command does when it agrees to run, so
+    the condition is met once here; the one case about the refusal itself turns
+    it back off.
+    """
+    settings.DEBUG = True
 
 
 def run() -> str:
@@ -62,6 +75,20 @@ def test_it_creates_no_login() -> None:
     assert not User.objects.exists()
 
 
+def test_it_refuses_to_run_on_a_server_that_is_not_a_development_one(settings: Any) -> None:
+    """It ships inside the backend image, and the catalogue half writes
+    unconditionally into whatever database DATABASE_URL names.
+    """
+    settings.DEBUG = False
+
+    with pytest.raises(CommandError, match="DEBUG is off"):
+        run()
+
+    assert not Item.objects.exists()
+    assert not Location.objects.exists()
+    assert not Volunteer.objects.exists()
+
+
 def test_running_it_again_adds_nothing() -> None:
     """A developer re-running the bootstrap script must not get a second
     catalogue and a second delivery.
@@ -84,6 +111,36 @@ def test_a_retired_row_wearing_one_of_these_names_is_brought_back() -> None:
 
     retired.refresh_from_db()
     assert retired.active
+
+
+@pytest.mark.parametrize("settled", ["merged", "retired"])
+def test_a_second_run_after_the_demo_volunteer_is_settled_posts_no_second_delivery(
+    settled: str,
+    volunteer: Volunteer,
+) -> None:
+    """The exact sequence the two documents invite, and an append-only ledger.
+
+    `bootstrap-dev.sh`, then merge or retire `Demo Volunteer` -- which is the
+    first thing `guides/administrator.md` teaches -- then `bootstrap-dev.sh`
+    again, which DEVELOPERS.md says to run as often as you like. The seed then
+    mints a fresh volunteer of that name, so a lookup scoped to the actor finds
+    nothing and writes the delivery a second time, into two tables that refuse
+    UPDATE and DELETE.
+    """
+    run()
+    packer = Volunteer.objects.selectable().get(display_name=PACKER)
+    if settled == "merged":
+        packer.merged_into = volunteer
+    else:
+        packer.active = False
+    packer.save()
+
+    printed = run()
+
+    assert StockTransaction.objects.count() == 2
+    assert StockMovement.objects.count() == len(RECEIVED) + len(CHECKED_OUT)
+    assert counts(printed)["transactions"] == 0
+    assert counts(printed)["movements"] == 0
 
 
 def test_a_retired_volunteer_of_that_name_is_stepped_over_rather_than_revived() -> None:
