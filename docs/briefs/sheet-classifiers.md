@@ -314,16 +314,86 @@ by the cart: one submission carries many movements.
 
 ## 6. Person to volunteer
 
-*Not settled, and every figure in this section is a **(hand count)** —
-`profile_sheet` has no section for it yet. `inventory-tng-5r2` settles it.*
+**Rule.** A submission is from the volunteer its **name** field names, folded
+to lower case. Two folded spellings are one volunteer when the workbook shows
+*both* halves of a test:
 
-**Rule.** Not settled. 102 distinct name spellings and 65 distinct emails, but
-45% of submissions carry no email, and 41 spellings never appear beside one at
-all — several of them plainly separate people. **65 is a count of emails, not a
-headcount.** Case-folding names alone gives 86.
+| Half | What it asks |
+| --- | --- |
+| the same name | one spelling is the other written longer — a surname or an initial added — or differs from it by a single character, once spaces come out |
+| the same person | the two spellings appear beside a common address |
 
-**Becomes.** `Volunteer` rows and merges. The real headcount is above 65 and is
-not yet known.
+Where the name field holds no name — an address typed into it, a quantity, a
+note, the word `Testing` — the address stands in, and only where exactly one
+volunteer is ever named beside it. Everything the two halves do not join is a
+volunteer of its own. Why each half is needed, and why the joins are stated as
+a rule rather than written out per person, is in `inventory/sheet/people.py`.
+
+**Neither field is a key, and the address is the one that surprises.** 1,540
+of the 3,439 submissions — **44.8%** — carry no address at all, so keying on
+the address loses nearly half the ledger before it starts. Nor does it divide
+the half that is left: 13 volunteers wrote more than one address and the
+busiest wrote six, while 2 addresses carry submissions naming more than one
+volunteer and one of those names three. *Unioning* spellings that share an
+address is worse than keying on it, because it is transitive — the phone
+somebody lends the most pulls everybody it ever carried into a single row.
+
+**Figures.**
+
+```
+People
+  distinct name spellings                      102
+    the same but for case                       16
+  distinct names                                86
+    holding no name at all                       6
+    joined to another by a shared address       14
+    a volunteer in their own right              66
+  volunteers the import mints                   72
+    known only by an address                     6
+    flagged as possibly a duplicate             22
+  the fewest volunteers this can be             59
+  submissions reaching a volunteer            3432
+    by the name field                         3391
+    by an address, the name being unusable      41
+  submissions reaching nobody                    7
+  not-a-name entries no submission wrote         0
+```
+
+**65 was never a headcount, and it is not a floor either.** It counts
+addresses: 31 of the 66 volunteers the names give never wrote one, which
+pushes the answer up, and 13 of the remaining 35 wrote several, which pushes
+it down. Pairing it with the 102 gave a range whose ends measure two different
+things, and it is withdrawn on those grounds rather than corrected.
+
+**The answer is a range, and the report prints both ends.** 72 is what the
+import mints, and it is the top: merging only ever removes a row. 59 is the
+bottom — what is left when every flag that names a candidate turns out to be
+one. Not "if every flag is a duplicate": six of the 22 are addresses nobody
+was ever named beside, and there is nobody in particular for them to be a
+duplicate *of*, so they survive any answer to the other sixteen. Nothing in
+the workbook narrows the range further. So this ledger is **59 to 72
+people**. The claim this section used to carry, that the real headcount is
+above 65, does not survive the measurement either: the bottom of the range is
+below it.
+
+**Flagged rather than merged, and that is the whole design.** The 22 are 16
+names that never appeared beside an address and are another volunteer's name
+written longer or a character away from it, plus 6 addresses no name is ever
+written beside. Together they carry 107 submissions. Each is a `Volunteer` row
+an administrator merges in a moment — `merged_into` is set, the duplicate
+stops being offered, and the ledger is untouched — whereas a wrong merge is
+written into every row imported against it and an append-only ledger cannot
+take it back. Two people who share a first-name spelling and never gave an
+address are not one person, and nothing here can tell them from one person who
+spelled their name two ways.
+
+Flagging is deliberately generous for the same reason: a three-letter name one
+character from another three-letter name is flagged even where the two are
+plainly separate names. The cost is an administrator's glance.
+
+**Becomes.** `Volunteer` rows, and the merges an administrator makes over
+them. Seven submissions reach nobody at all and have no actor to be imported
+against; what the importer does with those is `inventory-tng-2dg`'s to settle.
 
 ## What no rule can recover
 
