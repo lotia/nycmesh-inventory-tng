@@ -293,24 +293,88 @@ nothing has to parse prose again.
 
 ## 5. Submissions to batch
 
-*Not settled, and every figure in this section is a **(hand count)** —
-`profile_sheet` has no section for it yet. `inventory-tng-a82` settles it.*
+**Rule.** A batch is a run of submissions by the **same submitter**, each within
+**ten minutes of the one before it**, where the submitter is the volunteer's
+**name, case-folded** — and a name is a name by §6's reading of the field, so a
+row answering it with `testing` or `update inventory` names nobody here just as
+it names nobody there. A submission the rule cannot attribute or cannot place in
+time — no name, or no timestamp — is a batch of one.
 
-**Rule.** Chaining submissions by the same person with gaps of ten minutes or
-less. That gives a largest burst of **24** under every submitter key tried, and
-**76.6%** of submissions inside a burst keying on email with a name fallback
-(76.8% by name, 77.8% by email alone). A fixed ten-minute window anchored on the
-first submission gives a largest burst of 17 instead, so the window rule is what
-decides that figure; the submitter key moves only the percentage, by about a
-point.
+**Chaining against a fixed window, settled.** Measuring the gap from the
+previous submission rather than from the first is what decides the largest
+batch: **24** chained against **17** anchored, a third of the figure. Anchoring
+cuts a trip on the clock rather than on a pause, so somebody working steadily
+through a dozen items crosses the boundary while still standing at the shelf and
+the rest of the trip becomes a second transaction that nothing in the ledger
+separates from the first. It does that 107 times over this export — the
+difference between the two batch counts below. The objection to chaining is the
+opposite one, that an unbroken afternoon could chain into a single enormous
+batch; in this export it does not, and **no batch spans as much as an hour**.
+The report prints the longest so that the next export cannot change that behind
+the rule.
 
-**Correction.** An earlier version of this brief said decision 0008's "76% and
-24" came from two different methods and could not both be right. That was wrong:
-chaining produces both, and the pairing in 0008 reproduces. The submitter key
-still needs settling, because 45% of submissions carry no email.
+**The name against the email, settled.** 1,540 submissions — 45% — carry no
+email, and keying on the email puts every one of them under one empty key. That
+is not a small distortion: it is where **77.8%** came from. Let the emailless
+rows stand alone instead, as rows the rule cannot attribute, and the same key
+reports **41.6%** inside a batch, so more than half of what it was measuring was
+the collapse rather than anybody's trip. The name is blank on 42 submissions
+rather than 1,540, so the same treatment costs it almost nothing: **76.3%**
+against the 76.8% it gives when those 42 are chained together too.
 
-**Becomes.** One `StockTransaction` per burst. At runtime this is already solved
-by the cart: one submission carries many movements.
+Email-with-a-name-fallback is the worst of the three rather than a compromise.
+It gives **112 keys** where the name gives 80, because a volunteer who typed
+their email on one visit and not on the next gets one of each. It splits real
+trips on whether somebody filled a field in, and it invents submitters while
+doing it.
+
+Case is folded, as in §1 and §3 and for the same reason: case has never
+distinguished two of anything in this ledger. What the folding costs in name
+spellings is §6's count, not this one's.
+
+**Figures.** The chosen rule first, then what each rejected reading would have
+said. Every alternative is printed rather than described, because a reading
+argued against in prose that no code produces is the failure this brief exists
+to stop.
+
+```
+Batches
+  submissions                                        3439
+    inside a batch of more than one                  2623
+    alone in a batch of their own                     768
+    naming nobody, or no time, alone by that rule      48
+  batches                                            1557
+  largest batch                                        24
+  longest batch, in minutes                            49
+  submitters the rule can name                         80
+  anchoring a fixed window instead, batches          1664
+    the anchored reading, inside a batch             2580
+    the anchored reading, largest batch                17
+  submissions carrying no email                      1540
+  keying on the email instead, submitters              65
+    the email key, inside a batch                    1430
+    the email key, largest batch                       23
+    the email key, chaining the emailless as one     2676
+     that reading's largest batch                      24
+  keying on the email with a name fallback, keys      112
+    the fallback key, inside a batch                 2633
+    the fallback key, largest batch                    24
+```
+
+Decision 0008's pairing of "76% and 24" reproduces: chaining gives both halves,
+and an earlier version of this brief was wrong to say they came from two
+different methods. What the pairing rested on was the reading in which nobody is
+a submitter — 24 holds under all three keys while the emailless rows chain as
+one, and the email key drops to 23 once they stop. The percentage moves further,
+and **76.3%** is what the settled rule gives.
+
+`submitters the rule can name` is a count of folded name spellings and not a
+headcount, for the same reason §6 gives about the emails: the real number of
+people is §6's question and is answered there.
+
+**Becomes.** One `StockTransaction` per batch, with one movement per submission
+in it. At runtime this is already solved by the cart: one submission carries many
+movements.
 
 ## 6. Person to volunteer
 
