@@ -34,6 +34,12 @@ that the command does not yet print is a hand count and says so — look for
 **(hand count)**. **A figure taken from here is quoted with its rule or not at
 all.**
 
+Every unlabelled fenced block below is that command's output, pasted. A test
+reads them back and fails if a block's labels are no longer the ones its
+section emits, so a rule that gains, loses or renames a line cannot leave a
+stale block behind. The numbers themselves are not checked and cannot be: they
+come from a workbook nothing in CI may read.
+
 ## The population
 
 Which rows count, and why 3,439 rather than the tab's 3,456, is stated once in
