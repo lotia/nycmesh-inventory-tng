@@ -17,7 +17,7 @@ from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 
-from inventory.sheet import corrections, jobs, workbook
+from inventory.sheet import corrections, items, jobs, workbook
 from inventory.sheet.workbook import NotTheWorkbook, Sheet
 
 # A section is a rule's own report: a heading, and labelled integers beneath
@@ -42,7 +42,7 @@ def population(sheet: Sheet) -> tuple[str, list[tuple[str, int]]]:
     ]
 
 
-SECTIONS: list[Section] = [population, corrections.section, jobs.section]
+SECTIONS: list[Section] = [population, items.section, corrections.section, jobs.section]
 
 
 class Command(BaseCommand):
