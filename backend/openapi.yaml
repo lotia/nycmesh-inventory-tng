@@ -2059,8 +2059,9 @@ components:
           type:
           - string
           - 'null'
-          description: Any string of your own, except one beginning 'sheet:', which
-            the sheet import reserves.
+          description: 'Any string of your own. These prefixes belong to writers of
+            this application''s own and are refused: ''sheet:'' (the sheet import),
+            ''demo:'' (the demo seed).'
           maxLength: 64
         kind:
           $ref: '#/components/schemas/TransactionKindEnum'

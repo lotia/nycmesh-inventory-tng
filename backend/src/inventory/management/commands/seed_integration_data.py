@@ -24,12 +24,12 @@ from typing import Any
 
 from allauth.mfa.recovery_codes.internal.auth import RecoveryCodes
 from allauth.mfa.totp.internal.auth import TOTP
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 from django.db import transaction
 
-from inventory.models import Category, Item, Location, Volunteer
+from inventory.management.commands import _seeding
+from inventory.models import Category, Item, Location
 
 USERNAME = "integration"
 PASSWORD = "integration-only-not-a-real-password"
@@ -64,12 +64,12 @@ class Command(BaseCommand):
 
     def handle(self, *args: Any, **options: Any) -> None:
         # Two conditions saying two different things, and neither implies the
-        # other. DEBUG says this is a development server. The flag says you
-        # meant to put a published credential on it. DEBUG on its own was the
-        # bug: it is a Helm value, so a cluster can legitimately run with it
-        # true, and this command ships inside the backend image.
-        if not settings.DEBUG:
-            raise CommandError("Refusing to seed: DEBUG is off, so this is not a development server.")
+        # other. The first, in `_seeding`, says this is a development server.
+        # The flag below says you meant to put a published credential on it.
+        # The first on its own was the bug: DEBUG is a Helm value, so a cluster
+        # can legitimately run with it true, and this command ships inside the
+        # backend image.
+        _seeding.refuse_unless_a_development_server()
         if not options[ACKNOWLEDGEMENT_DEST]:
             raise CommandError(
                 f"Refusing to seed: this creates the login {USERNAME!r}, whose password and second factor are both "
@@ -91,15 +91,7 @@ class Command(BaseCommand):
             TOTP.activate(login, TOTP_SECRET)
             RecoveryCodes.activate(login)
 
-            # Not get_or_create: display names are not unique (see Volunteer),
-            # so a second row carrying this one would make it raise. It must
-            # also come back selectable, because this runs against a
-            # developer's own database where the record may since have been
-            # merged or deactivated, and the batch endpoint refuses a retired
-            # actor.
-            volunteer = Volunteer.objects.selectable().filter(display_name=VOLUNTEER).first()
-            if volunteer is None:
-                volunteer = Volunteer.objects.create(display_name=VOLUNTEER)
+            volunteer, _ = _seeding.selectable_volunteer(VOLUNTEER)
 
             # parent=None is part of the lookup, not decoration: a category or
             # location name is unique only *within* its parent, so matching on
@@ -113,17 +105,10 @@ class Command(BaseCommand):
                 parent=None,
                 defaults={"kind": Location.Kind.WAREHOUSE},
             )
-            # Reactivated rather than stepped over, unlike the volunteer above:
-            # an item name is unique outright and a location name is unique
-            # within its parent, so a retired row carrying this name IS this
-            # row and no second one can be made. Left retired it would be
-            # published as a scene the read API refuses to offer, and the first
-            # test to read a pick-list would fail for a reason that is not a
-            # bug.
+            # Reactivated rather than stepped over, unlike the volunteer
+            # above; `_seeding` argues both.
             for row in (item, warehouse):
-                if not row.active:
-                    row.active = True
-                    row.save(update_fields=["active"])
+                _seeding.revived(row)
 
             scene = {
                 "username": USERNAME,

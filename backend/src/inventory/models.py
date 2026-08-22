@@ -693,6 +693,23 @@ class StockTransaction(models.Model):
     # client allowed to write one could redirect the next run. The serializer
     # refuses it; `_ledger.py` says what the import puts after it.
     FROM_THE_SHEET = "sheet:"
+    # The demo seed's prefix, reserved for the same reason and no weaker one.
+    # `seed_demo_data.ledger_is_ours()` decides whether to invent stock by
+    # asking whether every transaction in the ledger wears this, so a client
+    # able to write one could make that question answer yes over a real ledger
+    # -- into two tables that refuse UPDATE and DELETE. Reserved here rather
+    # than in the command, because the serializer is what has to refuse it and
+    # a view importing from a management command would be the wrong way round.
+    FROM_THE_DEMO_SEED = "demo:"
+    # Each prefix against the writer it belongs to, because naming that writer
+    # is what makes a refusal answerable. A mapping and not a tuple beside two
+    # sentences: the serializer walks this to refuse a key and renders its own
+    # help text off it, so a third writer is one line here and nothing
+    # anywhere else.
+    RESERVED_KEY_PREFIXES = {
+        FROM_THE_SHEET: "the sheet import",
+        FROM_THE_DEMO_SEED: "the demo seed",
+    }
     # A phone in a basement will retry. Replaying the same batch must not
     # double-post it. Scoped to the actor by the constraint below; decision
     # 0011 says why.

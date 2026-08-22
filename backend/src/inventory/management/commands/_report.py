@@ -1,7 +1,8 @@
 """One section of a printed report, as the lines it comes out as.
 
-Shared by the two commands that print sections -- `profile_sheet`, whose
-sections are the rules, and `import_sheet`, whose sections are the steps -- for
+Shared by the three commands that print sections -- `profile_sheet`, whose
+sections are the rules, `import_sheet`, whose sections are the steps, and
+`seed_demo_data`, whose one section is what the run added -- for
 the reason `_workbook.py` gives about the pair that read a path, and
 underscored for the reason it gives about its own name. What a section is, and
 what the indent on a label means, is the `Report` contract in
