@@ -33,6 +33,7 @@ from inventory.models import (
     VendorOffer,
     Volunteer,
 )
+from inventory.staging import StagedCatalogueRow, StagedSubmissionRow
 
 
 class ItemIdentifierInline(admin.TabularInline):
@@ -238,3 +239,46 @@ class StockMovementAdmin(AppendOnlyAdmin):
 
     def has_add_permission(self, request: HttpRequest) -> bool:
         return False
+
+
+# ---------------------------------------------------------------------------
+# The import's staging tables.
+#
+# Read-only, and for a different reason than the ledger above: nothing rejects
+# a write here, but a row typed over by hand would be the one thing in the
+# import that no longer says what the export said, which is the only property
+# these tables have. `manage.py stage_sheet` is how they change.
+# ---------------------------------------------------------------------------
+
+
+class StagedAdmin(admin.ModelAdmin):
+    """Rows arrive from the workbook and are read here, never written."""
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+
+@admin.register(StagedCatalogueRow)
+class StagedCatalogueRowAdmin(StagedAdmin):
+    list_display = ["row", "name", "staged_at"]
+    search_fields = ["name"]
+
+
+@admin.register(StagedSubmissionRow)
+class StagedSubmissionRowAdmin(StagedAdmin):
+    """What the row said, beside what was read out of it.
+
+    ``taken`` is a filter rather than only a column because the question this
+    page exists to answer is why one of the rows the population rule left out
+    was left out, and that starts by listing them.
+    """
+
+    list_display = ["row", "at", "name", "direction", "item", "quantity", "taken"]
+    list_filter = ["taken", "direction"]
+    search_fields = ["email", "name", "item", "note"]

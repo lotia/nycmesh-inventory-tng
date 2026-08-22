@@ -13,7 +13,7 @@ which is gitignored and is not ours to publish, so no test can assert them. A
 block that has gained, lost or renamed a line is what makes a pasted block
 stale, and that needs no workbook: a section over a sheet the test builds
 emits the same labels it emits over the real one. The layout is checked by
-feeding the brief's own numbers back through `profile_sheet.render`, so that
+feeding the brief's own numbers back through the command's renderer, so that
 changing the command's indent or its number column fails here rather than
 staleifying every block in the brief silently.
 """
@@ -23,8 +23,10 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 
-from inventory.management.commands.profile_sheet import SECTIONS, Section, render
+from inventory.management.commands._report import render
+from inventory.management.commands.profile_sheet import SECTIONS, Section
 from inventory.sheet.workbook import CHECKING_IN
+from inventory.tests.reports import counts_in, depths_are_allowed
 from inventory.tests.sheets import notes, sheet_of, submission
 
 BRIEF = Path(settings.REPO_ROOT) / "docs" / "briefs" / "sheet-classifiers.md"
@@ -78,20 +80,6 @@ def blocks() -> dict[str, list[str]]:
             block.append(line)
     assert len(seen) == len(set(seen)), f"the brief quotes two blocks under one heading: {seen}"
     return found
-
-
-def counts_in(lines: list[str]) -> list[tuple[str, int]]:
-    """A quoted block read back as the labels and numbers that made it.
-
-    The right-aligned number comes off the end and the label keeps its indent,
-    because the indent is what says a line is a subset rather than a share --
-    a review found one of those wrong too.
-    """
-    read = []
-    for line in lines:
-        label, _, count = line.rpartition("  ")
-        read.append((label.rstrip()[2:], int(count)))
-    return read
 
 
 @pytest.mark.parametrize("section", SECTIONS, ids=lambda s: s(SHEET)[0])
@@ -156,17 +144,4 @@ def test_a_section_over_no_submissions_still_names_its_lines() -> None:
 
 @pytest.mark.parametrize("section", SECTIONS, ids=lambda s: s(SHEET)[0])
 def test_every_indent_is_one_the_contract_allows(section: Section) -> None:
-    """Three sections got this wrong in review, and the block-matching tests
-    above cannot see it, so the rule on `Report` is checked here rather than
-    described there: a line sits at 0, or
-    beside the line above it, or two past an ancestor as a share of it, or one
-    past the line above it as a subset of that line.
-    """
-    ancestors = [0]
-    previous = 0
-    for label, _ in section(SHEET)[1]:
-        indent = len(label) - len(label.lstrip())
-        allowed = {0, previous, previous + 1} | {depth + 2 for depth in ancestors}
-        assert indent in allowed, f"{label!r} is indented {indent}, and {sorted(allowed)} were the options"
-        ancestors = [depth for depth in ancestors if depth < indent] + [indent]
-        previous = indent
+    depths_are_allowed(section(SHEET)[1])

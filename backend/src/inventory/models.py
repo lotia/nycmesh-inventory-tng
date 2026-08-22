@@ -14,6 +14,12 @@ from django.db.models.functions import Lower, Trim
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
+# Imported for the side effect of defining its models, which Django registers
+# only from a module reached while this one loads. It is a separate module
+# because the import's staging tables are not part of the entity model this
+# one implements, and `inventory/staging.py` says why that matters.
+from inventory import staging  # noqa: F401
+
 
 class Category(models.Model):
     """A grouping of items, nestable so that "Fibre" can contain "Pigtails".

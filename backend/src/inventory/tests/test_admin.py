@@ -34,6 +34,7 @@ from inventory.models import (
     VendorOffer,
     Volunteer,
 )
+from inventory.staging import StagedCatalogueRow, StagedSubmissionRow
 
 pytestmark = pytest.mark.django_db
 
@@ -97,6 +98,14 @@ def one_of_each_model(
             item=item,
             quantity=Decimal("3"),
             to_location=warehouse,
+        ),
+        StagedCatalogueRow: StagedCatalogueRow.objects.create(row=2, source={"D": "LiteBeam"}, name="LiteBeam"),
+        StagedSubmissionRow: StagedSubmissionRow.objects.create(
+            row=2,
+            source={"D": "Checking Out", "E": "LiteBeam"},
+            taken=True,
+            direction="Checking Out",
+            item="LiteBeam",
         ),
         StockTransaction: transaction,
         Vendor: vendor,
