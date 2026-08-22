@@ -1,0 +1,25 @@
+# Commands this repository has that no document names, and why each is right
+# to leave unwritten. Read by test_documented_commands.py, which fails on any
+# other one. See DEVELOPERS.md#what-ci-proves.
+#
+# One paragraph per allowance: the comment saying why nobody should write it
+# up, then the command on a line of its own, spelled as a document would spell
+# it -- `manage.py <subcommand>` or `npm run <script>`. Naming it is what makes
+# the omission a decision, and an entry that stops being needed is reported, so
+# a command that has gone away or been documented after all cannot leave a
+# stale line here.
+#
+# Keep it short. A long list is a set of documents that has stopped describing
+# this repository, not a checker being fussy.
+
+# Vite's own local preview of a production build. It takes no argument of ours
+# and belongs to no path through this project: `npm run dev` is what a
+# contributor runs and `npm run build` is what CI runs, so writing this up
+# would be documenting Vite in somebody else's guide.
+npm run preview
+
+# Formatting without linting, for an editor to call on save. The command a
+# person types is `npm run lint:fix`, which does both and is what
+# DEVELOPERS.md prints; a second entry beside it in that table would be two
+# answers to one question.
+npm run format

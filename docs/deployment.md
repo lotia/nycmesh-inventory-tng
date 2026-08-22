@@ -30,6 +30,14 @@ The first two stop a first install outright. Until `inventory-tng-qe7` and
 `inventory-tng-adj` are done, treat what follows as the procedure that will
 work rather than one that has.
 
+**Only the rendering is proven.** CI has no cluster, so the furthest it can
+follow this page is `helm lint` and the `helm template` lines printed further
+down — those it runs on every push, along with a check that every chart value
+quoted here is one the chart really has. Nothing that installs, applies or
+execs has been tried for you, and the first time any of it runs will be when
+you run it. What that leaves covered elsewhere is
+[What CI proves](../DEVELOPERS.md#what-ci-proves).
+
 ## From an empty cluster to a first sign-in
 
 Ten steps, in this order, each linking to the section that explains it. Steps 6

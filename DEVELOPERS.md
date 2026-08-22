@@ -8,7 +8,9 @@ is put together, see [docs/architecture.md](docs/architecture.md).
 
 **This guide is expected to work.** If a command here fails on a clean machine,
 that is a bug in the guide — please open an issue or fix it in your next pull
-request. See [Definition of Done](#definition-of-done).
+request. See [Definition of Done](#definition-of-done). CI runs the setup below
+on a clean machine every push, so that expectation is checked rather than
+hoped for: [What CI proves](#what-ci-proves).
 
 ---
 
@@ -670,6 +672,89 @@ name in `vite.config.ts`, with the reason beside them.
 Run it when you change a screen one of them shows, and commit the PNGs with
 that change.
 
+### What CI proves
+
+Some of what this repository's documents claim is executed on every push, and
+the rest is not. Which is which is worth knowing before you rely on either.
+
+**This guide's setup is run, not read.** The `Setup instructions` job starts a
+clean runner, installs mise off the line in [Prerequisites](#prerequisites),
+and activates it with the line
+[Activate mise, then open a new shell](#activate-mise-then-open-a-new-shell)
+tells you to add — nothing else, and no shim directory bolted onto the path
+behind your back. From there it types what is printed here and only that:
+`scripts/bootstrap-dev.sh`, then a bare `uv` and a bare `npm`, with no prefix
+a reader of this file would not have. A job reaching for
+`mise exec --` instead would be a green tick over a command this guide does
+not print, which is worse than no job at all.
+
+Then it asks whether any of it worked: the seed has to have left rows behind
+in the catalogue, the labels, the places, the people and the ledger, and the
+two servers — started with the two lines the bootstrap script signs off with —
+have to answer a request. That is the sentence at the top of this file being
+kept rather than repeated.
+
+**The quickstart is run too.** The `Compose stack` job is
+[README](README.md#quickstart) followed by somebody who has only Docker: it
+copies `.env.sample`, brings the three services up, asks each of them for a
+page, and then types the two commands that page calls not optional. Nothing
+else finds out whether the hardening every service declares lets the stack
+serve anything, or whether the seed's own refusal is satisfied by the file the
+quickstart tells you to copy.
+
+**Deployment is rendered and no further.** No cluster exists in CI, so the
+`Helm chart` job runs the `helm lint` and `helm template` commands
+[deployment](docs/deployment.md#from-an-empty-cluster-to-a-first-sign-in)
+prints — including the administrative ingress, which the default render does
+not draw — and stops there. Everything from the install onwards is unproven,
+and that document says so where it asks you to type it.
+
+**A command any document names has to exist.**
+`backend/src/inventory/tests/test_documented_commands.py` holds every
+`manage.py` subcommand, `npm run` script, file under `scripts/` and chart value
+the documents mention against what the repository actually has, and names the
+file and the line of anything stale. It costs nothing and it catches the
+commonest rot there is, which is a rename.
+
+**And a command this repository has must be named somewhere.** The same file
+asks it the other way about, which is the direction that actually rots: a
+`manage.py` subcommand or an `npm run` script *added* and never written up
+keeps every other check green. A couple of them genuinely want no write-up, and
+`backend/src/inventory/tests/undocumented.allow` is where saying so goes — its
+header says how an entry is written, and an entry that stops being needed is
+reported rather than left lying.
+
+**And CI activates mise with the line printed above.** The `Setup instructions`
+job's whole claim is that it types what this guide prints, which rests on the
+one line in
+[Activate mise, then open a new shell](#activate-mise-then-open-a-new-shell).
+That line is retyped in the workflow rather than shared with anything, so the
+same file compares the two and fails if they have drifted apart.
+
+**A control either guide names has to be on the screen.** Each guide keeps one
+typographic promise to its reader: a thing you press or type into is set in
+bold, and the screen's own words back to you are in italics. That promise is
+also what makes the guides machine-readable, so nothing lists the controls
+twice — `frontend/capture/controls.ts` reads the short bold phrases out of the
+guide itself, and `frontend/integration/guide-controls.spec.ts` walks the scene
+the pictures are taken from and fails naming whatever the app no longer offers.
+
+Each guide is held to the screens it is about, and not to the union of both:
+the volunteer's to the app, the administrator's to the app and to `/admin/`,
+because its first section says it is about the two of them. Pooling them would
+let a field on a Django page answer for a button a volunteer is told to press.
+The walk has to work for its names — a menu's choices exist only while the menu
+is open, and the box asking who you are is gone the moment you answer it — so
+it opens what it must and harvests before it moves on.
+
+Comparing regenerated PNGs would catch more and would also fail on a font or a
+shadow; this fails on the change that would actually mislead somebody.
+
+What none of it can see is whether a guide has gone on describing a job nobody
+does any more, or stayed quiet about one that has appeared. Somebody has to
+read them, which is why that is in the [Definition of Done](#definition-of-done)
+instead.
+
 ### What breaks the build
 
 Both of these fail the command with a non-zero exit code, and therefore fail CI:
@@ -740,6 +825,7 @@ Where each topic lives:
 | Using the app to move stock | [guides/volunteer.md](guides/volunteer.md) |
 | Running the catalogue, the people and the labels | [guides/administrator.md](guides/administrator.md) |
 | How the guides' pictures are made | [The guides' screenshots](#the-guides-screenshots) |
+| Which documents CI executes, and how far | [What CI proves](#what-ci-proves) |
 | Development setup and workflow | This file |
 | Code style and linting | [Code style](#code-style) |
 | API schema and how it stays current | [The API schema](#the-api-schema) |
@@ -822,6 +908,11 @@ hold:
       setup steps, commands, environment variables, architecture, the API
       surface, or the deployment procedure, the canonical document for that
       topic is updated in the same pull request.
+- [ ] **The two guides still describe this app.** Weigh the change against
+      [guides/volunteer.md](guides/volunteer.md) and
+      [guides/administrator.md](guides/administrator.md): neither may name a
+      role the app has dropped, nor omit one of its flows. This is the part no
+      checker sees — [What CI proves](#what-ci-proves) is the part that is seen
 - [ ] A decision that future readers would ask "why?" about has a record in
       [docs/decisions/](docs/decisions/)
 
