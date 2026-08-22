@@ -39,9 +39,11 @@ import yaml
 from django.conf import settings
 from django.core.management import get_commands
 
+from inventory.tests.charts import CHART, manifests
+
 REPO_ROOT = Path(settings.REPO_ROOT)
 DEPLOYMENT = REPO_ROOT / "docs" / "deployment.md"
-VALUES = REPO_ROOT / "infra" / "helm" / "inventory-tng" / "values.yaml"
+VALUES = CHART / "values.yaml"
 PACKAGE_JSON = REPO_ROOT / "frontend" / "package.json"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 DEVELOPERS = REPO_ROOT / "DEVELOPERS.md"
@@ -69,9 +71,6 @@ ACTIVATION = re.compile(r'eval "\$\([^"]*mise activate [^"]*\)"')
 # the name the chart rendered. See
 # `test_every_resource_the_deployment_document_addresses_is_one_the_chart_renders`.
 ADDRESSED = re.compile(r"\b(?:deploy|deployment|job|svc|service|ingress)/([a-z0-9-]+)")
-
-# The release docs/deployment.md installs, which decides every rendered name.
-RELEASE = "inventory-tng"
 
 
 def documents() -> list[Path]:
@@ -280,19 +279,10 @@ def rendered() -> set[str]:
 
     Asked of helm rather than worked out from `_helpers.tpl`, because a rule
     reimplemented here is a second answer to the question and this test exists
-    because the first answer drifted.
+    because the first answer drifted. Rendered by `charts.py`, for the same
+    reason one step out: the release and the flags are one answer too.
     """
-    manifests = subprocess.run(
-        ["helm", "template", RELEASE, str(VALUES.parent), "--set", "image.tag=v0.1.0"],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
-    return {
-        document["metadata"]["name"]
-        for document in yaml.safe_load_all(manifests)
-        if document and document.get("metadata", {}).get("name")
-    }
+    return {document["metadata"]["name"] for document in manifests() if document.get("metadata", {}).get("name")}
 
 
 def test_every_resource_the_deployment_document_addresses_is_one_the_chart_renders() -> None:

@@ -24,6 +24,37 @@ every resource rendered as `inventory-tng-inventory-tng-backend` and every
 {{- end -}}
 {{- end -}}
 
+{{/*
+Refuses a release whose ingress sends a hostname Django will not answer to.
+
+The probes cannot catch this and no probe could: they reach the pod by its own
+address, so they go green while every request through the ingress is refused —
+nginx forwards the browser's Host untouched, Django answers 400, and the app
+shell still loads because only /api is affected. Two pods Ready and a dead
+site, with DisallowedHost invisible because DEBUG is off.
+
+Matched the way Django matches, because a guard stricter than Django refuses
+releases that work and nobody debugs a chart that says no to something
+correct: `django.utils.http.is_same_domain` lowercases both sides and accepts
+an exact name, `*`, a leading-dot pattern as a suffix, and a leading-dot
+pattern against the bare apex. That rule is restated here because a template
+cannot ask Django; inventory/tests/test_chart.py holds this against the real
+function so the copy cannot drift.
+*/}}
+{{- define "inventory-tng.ingressHostIsAllowed" -}}
+{{- $host := lower .Values.ingress.host -}}
+{{- $covered := false -}}
+{{- range splitList "," (.Values.django.allowedHosts | toString) -}}
+{{- $pattern := lower (trim .) -}}
+{{- if or (eq $pattern "*") (eq $pattern $host) (and (hasPrefix "." $pattern) (or (hasSuffix $pattern $host) (eq (trimPrefix "." $pattern) $host))) -}}
+{{- $covered = true -}}
+{{- end -}}
+{{- end -}}
+{{- if not $covered -}}
+{{- fail (printf "ingress.host is %q, which django.allowedHosts (%q) does not cover: Django would refuse every request the ingress forwards, while the pods stayed Ready. Add it, or widen the list. See docs/deployment.md#health-checks." $host .Values.django.allowedHosts) -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "inventory-tng.labels" -}}
 app.kubernetes.io/name: {{ include "inventory-tng.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
@@ -46,6 +77,17 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
   value: {{ .Values.django.debug | quote }}
 - name: DJANGO_ALLOWED_HOSTS
   value: {{ .Values.django.allowedHosts | quote }}
+# The addresses this pod answers to that nobody could have listed in advance:
+# its own, which is what the kubelet asks for when it probes. Read from the pod
+# because it does not exist until the pod does. The variable is a list and the
+# downward API renders status.podIPs comma-separated into one, so a dual-stack
+# cluster that needs both families is a one-word change here rather than a
+# shape change in settings.py -- status.podIP until something needs that.
+# What it costs to get this wrong is docs/deployment.md#health-checks.
+- name: DJANGO_EXTRA_ALLOWED_HOSTS
+  valueFrom:
+    fieldRef:
+      fieldPath: status.podIP
 - name: CORS_ALLOWED_ORIGINS
   value: {{ .Values.django.corsAllowedOrigins | quote }}
 - name: NUM_PROXIES

@@ -702,12 +702,19 @@ else finds out whether the hardening every service declares lets the stack
 serve anything, or whether the seed's own refusal is satisfied by the file the
 quickstart tells you to copy.
 
-**Deployment is rendered and no further.** No cluster exists in CI, so the
-`Helm chart` job runs the `helm lint` and `helm template` commands
+**Deployment is rendered, and what it renders is put to the application.** No
+cluster exists in CI, so the `Helm chart` job runs the `helm lint` and
+`helm template` commands
 [deployment](docs/deployment.md#from-an-empty-cluster-to-a-first-sign-in)
 prints — including the administrative ingress, which the default render does
-not draw — and stops there. Everything from the install onwards is unproven,
-and that document says so where it asks you to type it.
+not draw. Rendering is not the whole of it:
+`backend/src/inventory/tests/test_chart.py` renders the chart in the `Backend`
+job, takes the request a probe would make and the environment the same
+manifest supplies, and asks Django what it answers. A manifest that is valid
+YAML and describes a pod this application would refuse is the failure that
+suite exists for, and it is one `helm lint` cannot see. Everything from the
+install onwards is still unproven, and that document says so where it asks you
+to type it.
 
 **A command any document names has to exist.**
 `backend/src/inventory/tests/test_documented_commands.py` holds every
