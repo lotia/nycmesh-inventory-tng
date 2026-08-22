@@ -196,18 +196,25 @@ jobs:
         run: cp .env.sample .env
       - name: Bring the whole stack up
         run: docker compose up -d --build
+      # --retry-all-errors, not just --retry-connrefused: the ports are
+      # published the moment the containers start, so a request arriving before
+      # gunicorn is listening is answered by an empty reply rather than
+      # refused, and curl retries an empty reply only when told to. The backend
+      # migrates before it serves, so this wait is a real one.
       - name: The API answers
         run: |
-          curl -sf --retry 30 --retry-delay 2 --retry-connrefused \
+          curl -sf --retry 30 --retry-delay 2 --retry-all-errors \
             http://localhost:8000/api/healthz | tee /dev/stderr | grep -q '"ok"'
       - name: The app a volunteer opens is served
         run: |
-          curl -sf --retry 30 --retry-delay 2 --retry-connrefused \
+          curl -sf --retry 30 --retry-delay 2 --retry-all-errors \
             http://localhost:8080/ | grep -q 'id="root"'
       # Through nginx rather than around it, which is the path a browser takes
       # and the one the tmpfs over /etc/nginx/conf.d could break on its own.
       - name: The API answers through the frontend's proxy
-        run: curl -sf http://localhost:8080/api/healthz | grep -q '"ok"'
+        run: |
+          curl -sf --retry 30 --retry-delay 2 --retry-all-errors \
+            http://localhost:8080/api/healthz | grep -q '"ok"'
       # So that the three assertions above cannot start passing for the wrong
       # reason the day somebody drops `read_only` to make something work.
       - name: The root filesystems really are read-only
