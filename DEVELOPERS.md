@@ -129,11 +129,16 @@ choose *Reopen in Container*, or run `devcontainer up --workspace-folder .`.
 
 ### Signing in
 
-The volunteer's half of the app asks for nobody's name: everything a volunteer
-does is reachable at the address above with no account at all, which
-[decision 0012](docs/decisions/0012-two-populations.md) argues for. An
-administrator signs in at `/accounts/login/` on whichever address you are
-using.
+Everybody signs in, for now. Every endpoint but the index, the health check and
+`/api/me` needs a session, the two a volunteer writes to included — so make an
+account before you expect either half of the app to answer, and sign in at
+`/accounts/login/` on whichever address you are using.
+
+That is a gap rather than the design.
+[Decision 0012](docs/decisions/0012-two-populations.md) settles that the two
+populations are told apart by what they may do and not by a credential, and
+[what is not built yet](docs/architecture.md#not-yet-built) is where the
+distance between that and today is recorded.
 
 The first sign-in of a new account stops and asks it to set up an authenticator
 app before it can reach anything, because

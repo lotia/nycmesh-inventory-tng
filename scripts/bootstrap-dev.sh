@@ -77,23 +77,25 @@ The database is up, its schema is current, and there is a catalogue, a
 warehouse, two volunteers and some stock in it. Three things are left, and
 none of them is a step that was forgotten -- each needs a person.
 
-1. Start the two servers, in two terminals of your own:
+1. Make yourself an account. It asks for a name and a password at the
+   terminal, so it cannot be run for you:
+
+     cd backend && uv run python src/manage.py createsuperuser
+
+   You need one even to look at the volunteer's half today, which
+   DEVELOPERS.md "Signing in" explains and is not how it is meant to end up.
+
+2. Find an authenticator app before you sign in -- a phone app, or any TOTP
+   tool. Your first sign-in stops and makes you enrol one, with no way past
+   it and no setting that turns it off:
+   docs/decisions/0013-administrator-sign-in.md is why. This is the wall
+   people hit when nobody told them.
+
+3. Start the two servers, in two terminals of your own:
 
      cd backend  && uv run python src/manage.py runserver
      cd frontend && npm install && npm run dev
 
-   Then open http://localhost:5173 -- that is the volunteer's side, and it
-   needs no account at all.
-
-2. Make yourself an administrator. This one asks for a name and a password at
-   the terminal, so it cannot be run for you:
-
-     cd backend && uv run python src/manage.py createsuperuser
-
-3. Have an authenticator app ready before you first sign in at
-   http://localhost:5173/accounts/login/ -- a phone app, or any TOTP tool.
-   That first sign-in stops and asks you to enrol one, and there is no way
-   past it: docs/decisions/0013-administrator-sign-in.md is why, and this is
-   the wall people hit when nobody told them.
+   Then sign in at http://localhost:5173/accounts/login/.
 
 DONE
