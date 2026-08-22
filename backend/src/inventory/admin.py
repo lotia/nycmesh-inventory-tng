@@ -51,9 +51,18 @@ class CategoryAdmin(SimpleHistoryAdmin):
 
 @admin.register(Volunteer)
 class VolunteerAdmin(SimpleHistoryAdmin):
-    list_display = ["display_name", "email", "active", "merged_into"]
-    list_filter = ["active"]
-    search_fields = ["display_name", "email", "slack_id"]
+    """Where the sheet import's doubts are answered.
+
+    ``sheet_flag`` is on the list and filterable because a flag the import
+    raises is work for whoever reads this page: the filter narrows the list to
+    the rows it could not tell apart, and the merge that settles one is two
+    fields away on the same page. ``EmptyFieldListFilter`` rather than a filter
+    of our own -- the question is only whether the field says anything.
+    """
+
+    list_display = ["display_name", "email", "active", "merged_into", "sheet_flag"]
+    list_filter = ["active", ("sheet_flag", admin.EmptyFieldListFilter)]
+    search_fields = ["display_name", "email", "slack_id", "sheet_key"]
 
 
 @admin.register(Location)

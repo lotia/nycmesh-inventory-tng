@@ -52,9 +52,24 @@ if they also move stock.
 | `email`, `slack_id` | Optional, unique where present (partial unique index) |
 | `active` | Retires a volunteer without deleting their ledger history |
 | `merged_into` | Self-FK. Set when an administrator merges a duplicate, and must point at a record the list still offers |
+| `sheet_key` | What the sheet import knew this volunteer by, unique where present. Empty on everybody who arrived any other way |
+| `sheet_flag` | What that import could not settle about them, for an administrator to settle. Empty once nothing is outstanding |
 
 Volunteers may add themselves from the UI, and the form searches existing
 records before offering to create one.
+
+Both are permanent columns rather than staging alongside the tables in
+`backend/src/inventory/staging.py`: `sheet_key` is how a re-run finds this row
+instead of minting a second beside it, and a `sheet_flag` is answered by being
+emptied, so each column outlives every value it will ever hold.
+
+The last two columns exist because the import may not do the one thing that
+cannot be undone. It mints a row per person the export names and writes its
+doubts into `sheet_flag` instead of acting on them; the admin's volunteer list
+filters on that column, and the row above it is where the merge is made.
+`inventory/management/commands/_people.py` is the import and says why, and the
+rule behind it is
+[§6 of the classifiers brief](briefs/sheet-classifiers.md#6-person-to-volunteer).
 
 Merging sets `merged_into` on the duplicate and changes nothing else. Ledger
 rows keep pointing at whichever volunteer row was recorded at the time — they
@@ -261,6 +276,12 @@ that the admin lists for review; the reasoning is on `UnresolvedItemString`.
 None of those three tables is part of the entity model above and none lives
 with it: `backend/src/inventory/staging.py` holds them and says why, including
 why a staged timestamp is text.
+
+`manage.py import_volunteers` is the third, over those same tables. Rule 6
+answers who the export's people are, and this gives each of them a row; where
+it cannot tell two apart it says so on the row instead of joining them, which
+[Volunteer](#volunteer) above describes and
+`backend/src/inventory/management/commands/_people.py` argues.
 
 Anything genuinely unresolvable imports against a placeholder item and
 volunteer, flagged for cleanup, rather than being silently dropped.
