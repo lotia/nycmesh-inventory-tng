@@ -181,24 +181,84 @@ activity. At runtime the stock-count workflow replaces the practice entirely.
 
 ## 3. Note to location
 
-**Rule.** Not settled. Two questions are open: which notes name *this* room,
-and whether case is folded.
+**Rule.** A note names a candidate location when it contains one of a stated
+vocabulary of place phrases, matched case-insensitively. The vocabulary is in
+`inventory/sheet/locations.py`, read off the export rather than imagined, and
+is **deliberately not exhaustive**: what the real list of stock locations is,
+is a question for the people who use the room, so this offers a seed and
+reports what it does not cover rather than inventing a gazetteer.
 
-The one figure needing no compound predicate: notes containing `mesh room`,
-case-insensitively, number **231 across 41 distinct strings**. Not all are the
-same room — `Blue Stockings + mesh room` is a different site — so that is the
-count for the phrase, not for the place.
+**Case is folded, and that is settled.** The mesh room is named in 41 distinct
+notes read literally and 33 read case-insensitively, and folding raises the
+commonest of them from 97 submissions to 118. Notes rather than spellings —
+two notes naming the room identically and differing after it are two, which is
+what the count has always been. Nothing is lost by folding: case has never
+distinguished two places in this ledger.
 
-Narrowing to this room needs a second predicate, and the answer moves with it:
-`mesh room` plus (`131` or a `broome` misspelling) gives 205 across 31; `mesh
-room` plus `broome` alone gives 193 across 23. Folding case collapses the
-spellings further and raises the leading one from 97 to 118. **Cite whichever
-you use with the predicate attached** — the widest and narrowest readings of
-"how often is this room named" are 231 and 193, which is 38 submissions apart,
-or a fifth of the smaller.
+Broome is spelled five ways: `broome` (198), `broom` (7 more), `beoome` (4),
+`briome` (1) and `brooke` (1). One pattern covers them, and the room's other
+half — `mesh room` — is likewise written once and used in both places the
+report speaks about that room, so its two lines cannot disagree.
 
-**Becomes.** `Location` rows and the `from`/`to` sides of imported movements.
-Seeds `inventory-tng-o5t`.
+**Which notes name *this* room** had three readings, 38 submissions apart —
+a fifth of the smaller — and the rule takes the widest, `mesh room`. The
+narrower two answer a question nobody asked: the mesh room is the mesh room,
+and the one note where the phrase is not only about it, `Blue Stockings + mesh
+room`, names *both* places. That is why a note yields a tuple rather than one
+answer, and why the report counts the notes naming more than one. All three
+readings stay printed, because a figure quoted without its predicate is not
+one.
+
+**Figures.** The seed, one line per candidate, and the coverage beneath it:
+
+```
+Locations
+  submissions with a note                     2255
+    naming a candidate location                408
+     of those, naming more than one              6
+    naming none of the vocabulary             1847
+  distinct candidates named                     19
+    131 Broome                                 232
+    Blue Stockings                               3
+    Mil Mundos                                  15
+    Olmsted                                     20
+    President Street                            14
+    Greenwood Cemetery                          11
+    Belmont                                      8
+    BAM                                          7
+    Astoria                                     13
+    Columbia                                     6
+    Flatbush Cats                                4
+    Grand Street                                21
+    Boro Park                                   12
+    Harlem                                      10
+    SN1                                          6
+    W 171st                                     10
+    a volunteer's home                          18
+    basement                                     3
+    backup shelf                                 2
+  the mesh room, however written               231
+    and 131 or a Broome spelling               205
+    and Broome spelled correctly               193
+  notes naming it, read literally               41
+  notes naming it, read case-insensitively      33
+```
+
+`131 Broome` is 232 rather than 231 because one note gives the address without
+the room. `naming more than one` is indented a level deeper than the two lines
+it sits between, because it is a subset of the first of them rather than a
+third share of the population. The 1,847 uncovered notes are mostly installs
+and orders rather than places, and the number is here because a seed that hid
+its coverage would read as a finished list.
+
+**`a volunteer's home` is not a `Location` row**, and o5t should not read it as
+one. `location_held_by_iff_custody` requires a custody location to name its
+holder, and which volunteer is §6's question. It is a marker that custody was
+meant, for the importer to pair with a person.
+
+**Becomes.** `Location` rows and the `from`/`to` sides of imported movements —
+after review, not before. This list is the seed `inventory-tng-o5t` takes to
+the stakeholder meeting.
 
 ## 4. Note to job reference
 
