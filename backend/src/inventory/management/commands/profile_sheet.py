@@ -42,6 +42,22 @@ def population(sheet: Sheet) -> tuple[str, list[tuple[str, int]]]:
     ]
 
 
+def render(heading: str, counted: list[tuple[str, int]]) -> list[str]:
+    """One section as the lines the brief quotes.
+
+    A function rather than four lines inside `handle`, because the test that
+    keeps the brief's blocks honest has to produce exactly this layout. Built
+    into the test instead, it would agree with itself while the command
+    changed underneath both -- which is the drift it exists to catch.
+
+    Widths come from the section rather than from a constant, so a rule whose
+    labels are longer than today's still lines up and nobody has to come back
+    and widen a number here.
+    """
+    width = max(len(label) for label, _ in counted)
+    return [heading, *(f"  {label:<{width}}  {count:>6}" for label, count in counted)]
+
+
 SECTIONS: list[Section] = [
     population,
     items.section,
@@ -73,12 +89,6 @@ class Command(BaseCommand):
         except NotTheWorkbook as wrong:
             raise CommandError(str(wrong)) from wrong
         for section in SECTIONS:
-            heading, counted = section(sheet)
-            self.stdout.write(heading)
-            # Widths from the whole section rather than a constant, so a rule
-            # whose labels are longer than today's still lines up and nobody
-            # has to come back and widen a number here.
-            label_width = max(len(label) for label, _ in counted)
-            for label, count in counted:
-                self.stdout.write(f"  {label:<{label_width}}  {count:>6}")
+            for line in render(*section(sheet)):
+                self.stdout.write(line)
             self.stdout.write("")
