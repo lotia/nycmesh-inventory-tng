@@ -6,11 +6,11 @@ a laptop and the address of the inventory app. Administrators have
 
 **The whole job is five taps:**
 
-1. Type your name into *Who are you?*, then tap yourself in the list.
+1. Type your name into **Who are you?**, then tap yourself in the list.
 2. Scan the code on the wall. The app answers *Location set for this batch*.
 3. Scan every label you are holding, or find each item in the list underneath.
-4. Check **What is happening**. It opens on *Taking stock out*, so change it if
-   you are bringing something back.
+4. Check **What is happening**. It opens on **Taking stock out**, so change it
+   if you are bringing something back.
 5. Press **Save**. Nothing is recorded until you do.
 
 Everything below is one of those five not going to plan. [Signing
@@ -21,7 +21,7 @@ bottom, out of the way.
 
 ## 1. Say who you are
 
-Type your name into *Who are you?*. Tap yourself in the list underneath.
+Type your name into **Who are you?**. Tap yourself in the list underneath.
 
 ![The name box, with one match listed under it](images/volunteer-who-you-are.png)
 
@@ -78,7 +78,7 @@ camera, which reads the same square many times a second and counts once.
 
 It opens empty on purpose — a full box and the last few metres of one look
 identical on a shelf — and it tells you what a full one holds. Type what you
-actually took and press *Add*. *Cancel* leaves it out of the batch entirely.
+actually took and press **Add**. **Cancel** leaves it out of the batch entirely.
 
 **A code the app does not know** is not a dead end. It says so and you find the
 item in the list below instead.
@@ -109,11 +109,11 @@ number reappears the moment you tap away.
 
 ![The batch, ready to save](images/volunteer-batch.png)
 
-**What is happening** starts at *Taking stock out*, whether you scanned the
+**What is happening** starts at **Taking stock out**, whether you scanned the
 stickers or picked from the list, because that is what a printed sticker is
 mostly scanned for. **Bringing something back is not the same gesture: change
-this box before you save.** The four choices read *Taking stock out*,
-*Bringing stock back*, *Receiving a delivery* and *Used on a job*. Nothing
+this box before you save.** The four choices read **Taking stock out**,
+**Bringing stock back**, **Receiving a delivery** and **Used on a job**. Nothing
 refuses the wrong one, and it costs double: an armful brought back but recorded
 as taken out leaves the shelf two armfuls short, and only an administrator's
 stock count puts that right.
@@ -225,8 +225,5 @@ appears where the phone offers more than one lens. Pick another one.
 
 ---
 
-*A control's name is set in bold above. Those short phrases are the app's own
-buttons and boxes, and a test drives the app on every push and fails if one of
-them has been renamed away — [what CI proves](../DEVELOPERS.md#what-ci-proves).
-Italics are the app's own words too: what it says back, and the handful of
-controls that test cannot reach.*
+*Bold above is something to press or type into. Italics are the app's own
+words back to you.*

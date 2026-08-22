@@ -1,7 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { type Guide, guidePath, IMAGE_DIR, imagePath, SHOTS, shotsFor } from "./shots";
+import { type Guide, guidePath, IMAGE_DIR, imagePath, REPO_ROOT, SHOTS, shotsFor } from "./shots";
 
 /**
  * The list, the committed PNGs and the guides, held to each other.
@@ -12,10 +11,6 @@ import { type Guide, guidePath, IMAGE_DIR, imagePath, SHOTS, shotsFor } from "./
  * catch from here.
  */
 
-// From the working directory rather than from `import.meta.url`, which is not
-// a file URL under jsdom. Vitest runs with `frontend/` as the root, which is
-// where `npm test` is run from and what vite.config.ts is beside.
-const REPO_ROOT = `${resolve(process.cwd(), "..")}/`;
 const GUIDES: Guide[] = ["volunteer", "administrator"];
 
 const read = (path: string): string => readFileSync(`${REPO_ROOT}${path}`, "utf8");

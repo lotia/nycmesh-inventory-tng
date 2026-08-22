@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { type Guide, guidePath } from "./shots";
+import { type Guide, guidePath, REPO_ROOT } from "./shots";
 
 /**
  * The controls a guide names, read out of the guide itself.
@@ -36,14 +35,9 @@ const ENDS_A_SENTENCE = /[.:]$/;
 /** Punctuation inside a span says the same thing. */
 const IS_A_CLAUSE = /[,;]/;
 
-/** Where the repository is, from the directory a suite is run in. */
-function repoRoot(): string {
-  return resolve(process.cwd(), "..");
-}
-
 /** One guide, as it is committed. */
 export function readGuide(guide: Guide): string {
-  return readFileSync(`${repoRoot()}/${guidePath(guide)}`, "utf8");
+  return readFileSync(`${REPO_ROOT}${guidePath(guide)}`, "utf8");
 }
 
 /**

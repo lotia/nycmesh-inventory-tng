@@ -679,11 +679,20 @@ the rest is not. Which is which is worth knowing before you rely on either.
 
 **This guide's setup is run, not read.** The `Setup instructions` job starts a
 clean runner, installs mise off the line in [Prerequisites](#prerequisites),
-hands the machine to [`scripts/bootstrap-dev.sh`](scripts/bootstrap-dev.sh),
-and then asks whether any of it worked: the seed has to have left rows behind
-in the catalogue, the labels, the places, the people and the ledger, and both
-servers have to answer a request. That is the sentence at the top of this file
-being kept rather than repeated.
+and activates it with the line
+[Activate mise, then open a new shell](#activate-mise-then-open-a-new-shell)
+tells you to add — nothing else, and no shim directory bolted onto the path
+behind your back. From there it types what is printed here and only that:
+`scripts/bootstrap-dev.sh`, then a bare `uv`, a bare `npm` and a bare `helm`,
+with no prefix a reader of this file would not have. A job reaching for
+`mise exec --` instead would be a green tick over a command this guide does
+not print, which is worse than no job at all.
+
+Then it asks whether any of it worked: the seed has to have left rows behind
+in the catalogue, the labels, the places, the people and the ledger, and the
+two servers — started with the two lines the bootstrap script signs off with —
+have to answer a request. That is the sentence at the top of this file being
+kept rather than repeated.
 
 **Deployment is rendered and no further.** No cluster exists in CI, so the same
 job runs the `helm lint` and `helm template` commands
@@ -698,12 +707,24 @@ the documents mention against what the repository actually has, and names the
 file and the line of anything stale. It costs nothing and it catches the
 commonest rot there is, which is a rename.
 
-**A control either guide names has to be on the screen.** Controls are written
-in bold there, so `frontend/integration/guide-controls.spec.ts` reads the names
-out of the guides themselves, walks the scene the pictures are taken from, and
-fails naming whatever the app no longer offers. Comparing regenerated PNGs
-would catch more and would also fail on a font or a shadow; this fails on the
-change that would actually mislead somebody.
+**A control either guide names has to be on the screen.** Each guide keeps one
+typographic promise to its reader: a thing you press or type into is set in
+bold, and the screen's own words back to you are in italics. That promise is
+also what makes the guides machine-readable, so nothing lists the controls
+twice — `frontend/capture/controls.ts` reads the short bold phrases out of the
+guide itself, and `frontend/integration/guide-controls.spec.ts` walks the scene
+the pictures are taken from and fails naming whatever the app no longer offers.
+
+Each guide is held to the screens it is about, and not to the union of both:
+the volunteer's to the app, the administrator's to the app and to `/admin/`,
+because its first section says it is about the two of them. Pooling them would
+let a field on a Django page answer for a button a volunteer is told to press.
+The walk has to work for its names — a menu's choices exist only while the menu
+is open, and the box asking who you are is gone the moment you answer it — so
+it opens what it must and harvests before it moves on.
+
+Comparing regenerated PNGs would catch more and would also fail on a font or a
+shadow; this fails on the change that would actually mislead somebody.
 
 What none of it can see is whether a guide has gone on describing a job nobody
 does any more, or stayed quiet about one that has appeared. Somebody has to

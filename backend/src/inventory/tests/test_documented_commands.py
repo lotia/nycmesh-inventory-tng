@@ -49,15 +49,23 @@ CHART_VALUE = re.compile(r"`([^`]+)`|--set[ \t]+'?([^\s'=]+)")
 
 
 def documents() -> list[Path]:
-    """Every tracked Markdown file that this repository is answerable for."""
+    """Every tracked Markdown file that this repository is answerable for.
+
+    Separated by NUL rather than by newline. Asked for a path holding a space
+    or anything non-ASCII, git answers with the path wrapped in quotes and the
+    awkward characters escaped, and splitting that on whitespace turns one
+    document into fragments -- fragments that then fail to open, or worse open
+    nothing and quietly shrink the corpus. `-z` is git's own answer to that:
+    the raw bytes of each path, and no quoting at all.
+    """
     listed = subprocess.run(
-        ["git", "ls-files", "*.md"],
+        ["git", "ls-files", "-z", "*.md"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
         check=True,
-    ).stdout.split()
-    return [REPO_ROOT / path for path in listed if not path.startswith(VENDORED)]
+    ).stdout.split("\0")
+    return [REPO_ROOT / path for path in listed if path and not path.startswith(VENDORED)]
 
 
 def named(pattern: re.Pattern[str], paths: list[Path] | None = None) -> list[tuple[str, str]]:

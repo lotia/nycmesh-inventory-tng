@@ -1,8 +1,7 @@
 import { mkdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { seeded, signIn } from "../integration/sign-in";
-import { DESK, PHONE, saveButton, scan } from "./drive";
+import { DESK, PHONE, saveButton, scan, WALKING_THE_SCENE_MAY_TAKE } from "./drive";
 import { type Box, endingBefore, union } from "./frame";
 import {
   dressTheScene,
@@ -17,7 +16,7 @@ import {
   ON_HAND,
   WALL_CODE,
 } from "./scene";
-import { imagePath, SHOTS } from "./shots";
+import { imagePath, REPO_ROOT, SHOTS } from "./shots";
 
 /**
  * Every picture in guides/, taken from the running app.
@@ -42,19 +41,13 @@ import { imagePath, SHOTS } from "./shots";
  * a picture of something that genuinely moves.
  */
 
-/** Where the PNGs land: the repository root, not the frontend. */
-const REPO_ROOT = fileURLToPath(new URL("../..", import.meta.url));
-
 /** Room around a cropped control, so it is not cut flush against its border. */
 const MARGIN = 8;
 
 /** How much of the ledger the picture of it shows. See the shot itself. */
 const LEDGER_ROWS = 6;
 
-/** Long enough for two saves, a sign-in and every screenshot. */
-const CAPTURE_MAY_TAKE = 300_000;
-
-test.describe.configure({ timeout: CAPTURE_MAY_TAKE });
+test.describe.configure({ timeout: WALKING_THE_SCENE_MAY_TAKE });
 
 /** Every shot the driver takes, so the run can say it took all of them. */
 const taken: string[] = [];

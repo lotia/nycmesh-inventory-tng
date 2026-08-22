@@ -233,17 +233,48 @@ jobs:
     # on one of these and calls a command that does not a bug in the guide;
     # this is where that is found out. See DEVELOPERS.md#what-ci-proves.
     #
+    # Every command below is typed the way that guide prints it -- bare `uv`,
+    # bare `npm`, bare `helm`. The prefix this job used to wear was the tell
+    # that it was proving something else: the guide's own lines only work in a
+    # shell that has mise activated, so activating one is the job, and adding
+    # `mise exec --` instead would have been this file quietly working around
+    # the very gap it is meant to report.
+    #
     # No service container: the guide says to start PostgreSQL with compose and
     # so that is what runs, from compose.yaml. A container declared here would
     # leave the compose file itself unexercised.
+    #
+    # Twenty minutes is about twice a good run of all of that -- a toolchain, a
+    # database, two dependency trees and two servers -- so a step that has hung
+    # is stopped rather than left holding a runner until the six-hour default.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       # The one prerequisite the guide names that a runner does not carry,
       # installed with the guide's own line.
       - name: Install mise
+        run: curl https://mise.run | sh
+      # And activated with the guide's own line too. Each step below is a fresh
+      # non-interactive shell, and BASH_ENV is the file such a shell reads as it
+      # starts -- so this pair is what "add the line to your shell, then open a
+      # new one" amounts to on a runner, and mise's own function and paths are
+      # in place before anything else is typed.
+      - name: Activate it, and open a new shell
         run: |
-          curl https://mise.run | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo 'eval "$(~/.local/bin/mise activate bash)"' >> "$HOME/.activated-shell"
+          echo "BASH_ENV=$HOME/.activated-shell" >> "$GITHUB_ENV"
+      # The two questions the guide says a new shell should answer, asked of
+      # this one. Without this a later `command not found` would look like a
+      # missing tool rather than a shell that never picked mise up.
+      - name: The shell answers the guide's two questions
+        run: |
+          mise --version
+          mise doctor > "$RUNNER_TEMP/doctor.txt" || true
+          grep -q 'activated: yes' "$RUNNER_TEMP/doctor.txt" || {
+            echo "::error::mise is installed but this shell has not activated it"
+            cat "$RUNNER_TEMP/doctor.txt"
+            exit 1
+          }
       - name: From a fresh clone to a database with something in it
         run: scripts/bootstrap-dev.sh
       # Ran without complaining is not the same as worked. The screens a new
@@ -251,36 +282,60 @@ jobs:
       - name: The seed left rows behind
         working-directory: backend
         run: |
-          mise exec -- uv run python src/manage.py shell -c '
+          uv run python src/manage.py shell -c '
           from inventory.models import Item, Label, Location, StockMovement, Volunteer
           for model in (Item, Label, Location, StockMovement, Volunteer):
               assert model.objects.exists(), f"the seed left no {model.__name__} rows"
           print("catalogue, labels, places, people and ledger: all populated")
           '
-      - name: The API answers
-        working-directory: backend
+      # The last thing bootstrap-dev.sh prints is these two lines and an
+      # instruction to run each in a terminal of its own. `setsid` is that
+      # terminal: a session per server, so the stop step can take one down
+      # along with everything it started, which the reloader's child would
+      # otherwise survive.
+      #
+      # Their output goes to a file and not to this step's. A background
+      # process still holding a step's stdout open is how a job whose work has
+      # finished goes on waiting for it.
+      - name: Start the two servers, as the script signs off telling you to
         run: |
-          mise exec -- uv run python src/manage.py runserver --noreload 8000 &
+          setsid bash -c 'cd backend && uv run python src/manage.py runserver' \
+            > "$RUNNER_TEMP/backend.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/backend.session"
+          setsid bash -c 'cd frontend && npm install && npm run dev' \
+            > "$RUNNER_TEMP/frontend.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/frontend.session"
+      - name: The API answers
+        run: |
           curl --retry 30 --retry-delay 2 --retry-connrefused -sf \
             http://localhost:8000/api/healthz | tee /dev/stderr | grep -q '"ok"'
+      # More patience than the API needs: this one waits for an `npm install`
+      # on a cold cache before Vite is even started.
       - name: The app a volunteer opens is served
-        working-directory: frontend
         run: |
-          mise exec -- npm install
-          mise exec -- npm run dev &
-          curl --retry 30 --retry-delay 2 --retry-connrefused -sf \
+          curl --retry 90 --retry-delay 2 --retry-connrefused -sf \
             http://localhost:5173/ | grep -q 'id="root"'
       # The other setup document, as far as a runner with no cluster can go:
       # what it asks you to render, rendered. Everything after that in it needs
       # somewhere to install to. See docs/deployment.md.
       - name: The deployment document's chart commands
         run: |
-          mise exec -- helm lint infra/helm/inventory-tng
-          mise exec -- helm template test infra/helm/inventory-tng --set image.tag=v0.1.0 >/dev/null
-          mise exec -- helm template test infra/helm/inventory-tng --set image.tag=v0.1.0 \
+          helm lint infra/helm/inventory-tng
+          helm template test infra/helm/inventory-tng --set image.tag=v0.1.0 >/dev/null
+          helm template test infra/helm/inventory-tng --set image.tag=v0.1.0 \
             --set ingress.administrative.enabled=true \
             --set 'ingress.administrative.allowedSourceRanges={10.69.0.0/16}' \
             | grep -E 'name:.*-admin|whitelist|^ +- path:'
+      - name: What the two servers said
+        if: failure()
+        run: tail -n 200 "$RUNNER_TEMP"/*.log || true
+      - name: Stop them
+        if: always()
+        run: |
+          for session in "$RUNNER_TEMP"/*.session; do
+            [ -e "$session" ] || continue
+            kill -- -"$(cat "$session")" 2>/dev/null || true
+          done
 
   commit-check:
     name: Guardrail checkers
