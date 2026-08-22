@@ -127,7 +127,7 @@ class Resolution:
     why: str = ""
 
 
-def _normalised(string: str) -> str:
+def normalised(string: str) -> str:
     """The string as the database compares it.
 
     `lower()` rather than `casefold()`, and not because either is better: it
@@ -135,6 +135,11 @@ def _normalised(string: str) -> str:
     column, and
     [data-model.md](../../../../docs/data-model.md#item-itemidentifier-category)
     says which readers of it have to agree. The reader has already trimmed.
+
+    Public because the importer is one of those readers: it has to know
+    whether two strings are one identifier before it inserts the second, and
+    a second spelling of this rule is exactly the drift the generated column
+    exists to prevent.
     """
     return string.lower()
 
@@ -143,21 +148,21 @@ def resolve(string: str, catalogue: tuple[str, ...]) -> Resolution:
     """The catalogued item this string names, or a reason it names none."""
     if string in catalogue:
         return Resolution(string, How.EXACT)
-    normalised = _normalised(string)
+    key = normalised(string)
     for name in catalogue:
-        if _normalised(name) == normalised:
+        if normalised(name) == key:
             return Resolution(name, How.CASE)
-    if normalised in ALIASES:
+    if key in ALIASES:
         # Only when the catalogue still holds what the alias names. An item
         # renamed there would otherwise resolve to a string that is not in it,
         # and the row would be counted as reaching a catalogued item while the
         # self-check below reported the same alias as pointing at nothing.
-        aliased = ALIASES[normalised]
+        aliased = ALIASES[key]
         if aliased in catalogue:
             return Resolution(aliased, How.ALIAS)
         return Resolution(None, How.UNRESOLVABLE, f"aliased to {aliased!r}, which the catalogue no longer holds")
-    if normalised in UNRESOLVABLE:
-        return Resolution(None, How.UNRESOLVABLE, UNRESOLVABLE[normalised])
+    if key in UNRESOLVABLE:
+        return Resolution(None, How.UNRESOLVABLE, UNRESOLVABLE[key])
     if RETIRED_CODE.match(string):
         return Resolution(None, How.UNRESOLVABLE, RETIRED_REASON)
     return Resolution(None, How.UNACCOUNTED)
@@ -182,7 +187,7 @@ def section(sheet: Sheet) -> Report:
     # Keyed normalised, because ALIASES is: `Omnitik` beside `omnitik` is one
     # decision, and counting the casings apart would report the largest as
     # smaller than it is.
-    aliased = Counter(_normalised(item) for item in named if resolutions[item].how is How.ALIAS)
+    aliased = Counter(normalised(item) for item in named if resolutions[item].how is How.ALIAS)
     largest_alias = max(aliased.values(), default=0)
     # The retired scheme, and the worst single guess declining to decode it
     # avoids: the brief argues from that number, so the report produces it.

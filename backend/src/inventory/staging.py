@@ -4,8 +4,8 @@
 
 That module implements the entity model of
 [docs/data-model.md](../../../docs/data-model.md), and nothing here is an
-entity of it: these tables describe a spreadsheet, keyed by the row
-number that spreadsheet shows, and they stop
+entity of it: these tables describe a spreadsheet -- two of them keyed by the
+row number that spreadsheet shows, one by a string it holds -- and they stop
 meaning anything the day the import is finished. They are also the opposite of
 the half of that module they would sit below -- the ledger is append-only and a
 trigger enforces it, whereas a staged row exists to be written over by the next
@@ -91,3 +91,55 @@ class StagedSubmissionRow(StagedRow):
 
     def __str__(self) -> str:
         return f"{self.row}: {self.direction or '(no direction)'} {self.item}".strip()
+
+
+class UnresolvedItemString(models.Model):
+    """An item string rule 1 answered with a reason instead of an item.
+
+    ## Why a row here rather than an `ItemIdentifier`
+
+    An `ItemIdentifier` names an `Item`, and these strings name none: `mast` is
+    one of three masts and `Matt` is somebody's name typed into the item field.
+    The rule, and the three kinds of string that get this answer, are in
+    [`inventory/sheet/items.py`](sheet/items.py).
+
+    Pointing them all at one stand-in row would be worse than leaving them
+    unanswered, and not because of the foreign key. The whole promise of that
+    model is that a scanned or typed string reaches exactly one item, so an
+    identifier is an assertion that it does; `mast` resolving to a stand-in is
+    that assertion made falsely, in the interface, to a volunteer who now
+    believes the system knew what they meant. Refusing to answer says the true
+    thing. What becomes of the *submissions* carrying such a string is a
+    separate question and the ledger step's to settle -- an unimportable row is
+    not a dropped row -- and docs/data-model.md, under migrating the sheet,
+    says what it must not do.
+
+    So the string is written down here instead, beside the staged rows that
+    carry it: a list an administrator can read, decide, and clear by adding a
+    catalogue row or a line to that rule's alias table. Nothing outside the
+    import reads this table, which is why it is here and not in
+    `inventory/models.py`.
+
+    ## Why the table is made equal to the export
+
+    A string is a row here for exactly as long as the rule still has no answer
+    for it. Add the missing catalogue row and the next run mints an identifier
+    and drops this one, so the table cannot go on asking for work already done.
+    """
+
+    value = models.TextField(
+        primary_key=True,
+        help_text="The item string as the submission wrote it, before normalisation.",
+    )
+    # Blank is `How.UNACCOUNTED`: the rule reached no answer and nobody wrote a
+    # reason. That is the outcome rule 1 says must never happen, so it is
+    # storable rather than an error -- a run that produced one has to be able to
+    # show which string it was -- and the importer counts them separately.
+    reason = models.TextField(blank=True, help_text="Why the rule can make nothing of it. Empty means nobody said.")
+    noted_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["value"]
+
+    def __str__(self) -> str:
+        return f"{self.value}: {self.reason or '(no reason written)'}"

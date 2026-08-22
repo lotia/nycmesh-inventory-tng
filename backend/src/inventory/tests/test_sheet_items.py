@@ -146,7 +146,7 @@ def test_an_alias_the_catalogue_no_longer_holds_reaches_nothing() -> None:
 
 
 def test_normalisation_is_the_one_the_database_uses() -> None:
-    """``_normalised`` says which column this has to match and who says so."""
+    """``normalised`` says which column this has to match and who says so."""
     assert resolve("STRASSE", ("Strasse",)).item == "Strasse"
     # casefold() maps this to 'strasse' and lower() does not, so the two
     # readings disagree about whether these are one identifier. The database
