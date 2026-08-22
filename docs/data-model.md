@@ -250,7 +250,15 @@ somebody who has a database rather than only by somebody holding an export
 that is not ours to publish. Running it again makes the tables equal the
 export once more, which includes dropping a row the export has lost.
 
-Neither of those tables is part of the entity model above and neither lives
+`manage.py mint_items` is the step after it, and reads only those tables. It
+gives every catalogued name an `Item` — uncategorised, because the export
+supplies no grouping — and gives every string that resolves to one an
+`ItemIdentifier`, collapsing the spellings that differ only in case the way the
+unique constraint does. A string the rule answers with a reason
+instead of an item gets no identifier at all and joins a third staging table
+that the admin lists for review; the reasoning is on `UnresolvedItemString`.
+
+None of those three tables is part of the entity model above and none lives
 with it: `backend/src/inventory/staging.py` holds them and says why, including
 why a staged timestamp is text.
 

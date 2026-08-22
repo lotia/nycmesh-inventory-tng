@@ -34,7 +34,7 @@ from inventory.models import (
     VendorOffer,
     Volunteer,
 )
-from inventory.staging import StagedCatalogueRow, StagedSubmissionRow
+from inventory.staging import StagedCatalogueRow, StagedSubmissionRow, UnresolvedItemString
 
 pytestmark = pytest.mark.django_db
 
@@ -108,6 +108,10 @@ def one_of_each_model(
             item="LiteBeam",
         ),
         StockTransaction: transaction,
+        UnresolvedItemString: UnresolvedItemString.objects.create(
+            value="mast",
+            reason="names one of three masts",
+        ),
         Vendor: vendor,
         VendorOffer: VendorOffer.objects.create(
             item=item,

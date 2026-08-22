@@ -33,7 +33,7 @@ from inventory.models import (
     VendorOffer,
     Volunteer,
 )
-from inventory.staging import StagedCatalogueRow, StagedSubmissionRow
+from inventory.staging import StagedCatalogueRow, StagedSubmissionRow, UnresolvedItemString
 
 
 class ItemIdentifierInline(admin.TabularInline):
@@ -282,3 +282,17 @@ class StagedSubmissionRowAdmin(StagedAdmin):
     list_display = ["row", "at", "name", "direction", "item", "quantity", "taken"]
     list_filter = ["taken", "direction"]
     search_fields = ["email", "name", "item", "note"]
+
+
+@admin.register(UnresolvedItemString)
+class UnresolvedItemStringAdmin(StagedAdmin):
+    """The strings the import could not turn into an identifier, and why.
+
+    Read-only like its neighbours, and for the extra reason that editing a row
+    here would look like resolving one: the way to clear an entry is to add the
+    missing catalogue row or the missing alias and stage and mint again, which
+    is also what puts the identifier in place.
+    """
+
+    list_display = ["value", "reason", "noted_at"]
+    search_fields = ["value", "reason"]
