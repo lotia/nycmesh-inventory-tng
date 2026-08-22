@@ -81,9 +81,12 @@ rest happen once for the life of an environment.
     it grants nobody anything by itself.
 
 Every `kubectl` command below names a resource as it is rendered when the
-release is called `inventory-tng`, as in step 6. The chart builds those names as
-`<release>-inventory-tng-<component>`, so a release under another name renames
-them with it.
+release is called `inventory-tng`, as in step 6. The chart names a resource
+`<release>-<component>` when the release is already called after the chart, and
+`<release>-inventory-tng-<component>` when it is not — so a release under
+another name renames all of them with it, and the commands below have to be
+adjusted. A test renders the chart and holds these names against it, so they
+cannot fall behind the chart the way they once did.
 
 ## Artifacts
 
@@ -472,7 +475,7 @@ Verify before and after:
 helm lint infra/helm/inventory-tng
 helm template test infra/helm/inventory-tng --set image.tag=v0.1.0   # inspect manifests
 kubectl -n inventory-tng get pods
-kubectl -n inventory-tng logs deploy/inventory-tng-inventory-tng-backend
+kubectl -n inventory-tng logs deploy/inventory-tng-backend
 ```
 
 ### Migrations
@@ -512,7 +515,7 @@ needs to predict what a release will do:
 To watch one, or to read why a release stopped:
 
 ```bash
-kubectl -n inventory-tng logs job/inventory-tng-inventory-tng-migrate-1
+kubectl -n inventory-tng logs job/inventory-tng-migrate-1
 ```
 
 with the trailing number being that release's revision, from `helm history`.
@@ -544,7 +547,7 @@ attempt deletes it to make room for its own.
 ### First administrator
 
 ```bash
-kubectl -n inventory-tng exec -it deploy/inventory-tng-inventory-tng-backend -- \
+kubectl -n inventory-tng exec -it deploy/inventory-tng-backend -- \
   python manage.py createsuperuser
 ```
 
@@ -567,7 +570,7 @@ that have already expired, which is the opposite of the set that matters, and
 it takes no flag that widens it. Delete them all, in a shell in the same pod:
 
 ```bash
-kubectl -n inventory-tng exec -it deploy/inventory-tng-inventory-tng-backend -- \
+kubectl -n inventory-tng exec -it deploy/inventory-tng-backend -- \
   python manage.py shell -c \
   'from django.contrib.sessions.models import Session; print(Session.objects.all().delete())'
 ```

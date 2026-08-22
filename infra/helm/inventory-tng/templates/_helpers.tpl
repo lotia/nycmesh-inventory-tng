@@ -2,11 +2,25 @@
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{/*
+The prefix every resource this chart makes is named with.
+
+A release whose name already contains the chart's is not prefixed again, which
+is the collapse the scaffold ships with and this chart was missing: the install
+docs/deployment.md prints names the release `inventory-tng`, so without it
+every resource rendered as `inventory-tng-inventory-tng-backend` and every
+`kubectl` line in that page had to carry the stutter.
+*/}}
 {{- define "inventory-tng.fullname" -}}
 {{- if .Values.fullnameOverride -}}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
-{{- printf "%s-%s" .Release.Name (include "inventory-tng.name" .) | trunc 63 | trimSuffix "-" -}}
+{{- $name := include "inventory-tng.name" . -}}
+{{- if contains $name .Release.Name -}}
+{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 
