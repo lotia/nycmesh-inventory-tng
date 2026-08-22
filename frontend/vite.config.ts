@@ -56,7 +56,11 @@ export default defineConfig(({ mode }) => ({
     // Unit tests only, and only where they live: next to the code. Vitest's
     // default glob would otherwise collect the Playwright suite, which has its
     // own runner and command -- see DEVELOPERS.md "Integration tests".
-    include: ["src/**/*.test.{ts,tsx}"],
+    //
+    // `capture/` is here for its own arithmetic and its own list of pictures,
+    // both of which are ordinary units. The driver beside them is a Playwright
+    // file and is named `.capture.ts` so that this glob leaves it alone.
+    include: ["src/**/*.test.{ts,tsx}", "capture/**/*.test.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
