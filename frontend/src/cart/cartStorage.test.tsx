@@ -64,10 +64,10 @@ describe("saveCart", () => {
   });
 
   it("ignores a stored kind this app cannot express", () => {
-    // A transfer needs a location on both sides and the cart carries one, so
-    // KINDS does not offer it -- but a cart written before that was true, or
-    // by hand, would restore, be sent, and be refused with a 409 nothing here
-    // renders, under a Retry that cannot succeed.
+    // A transfer is one of the kinds `KINDS` leaves out, for the reason it
+    // gives -- but a cart written before that was true, or by hand, would
+    // restore, be sent, and be refused with a 409 nothing here renders, under
+    // a Retry that cannot succeed.
     window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({ ...createCart("k"), kind: "transfer" }),

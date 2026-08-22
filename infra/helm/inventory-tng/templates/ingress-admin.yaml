@@ -1,10 +1,9 @@
 {{- /*
 The administrative routes, on their own Ingress.
 
-Decision 0013 point 6 restricts the routes only an administrator uses to a
-network volunteers do not need. Which paths those are, what a deployer has to
-set, and what is true while this is off are documented once, in
-docs/deployment.md#administrative-access.
+This resource is decision 0013 point 6 in Kubernetes. What that restricts and
+why, which paths those are, what a deployer has to set, and what is true while
+this is off are documented once, in docs/deployment.md#administrative-access.
 
 A second Ingress rather than a second rule on the one beside this: an
 allow-list, an identity-aware proxy and a service-mesh policy are all

@@ -6,63 +6,28 @@ as one `StockTransaction` with many movements, so the importer has to decide
 which rows were one trip. At runtime the question does not arise -- the cart
 is one transaction already -- which is why this is migration-only.
 
-Two things had to be settled, and
+**A batch is a run of submissions by one submitter, each within ten minutes of
+the one before it, keyed on the volunteer's case-folded name. A submission
+with no name, or no timestamp, is a batch of one.**
+
+Two things in that had to be settled -- the window, and the submitter key --
+and both arguments are
 [§5 of the brief](../../../../docs/briefs/sheet-classifiers.md#5-submissions-to-batch)
-carries every figure behind both. The reasoning is here and the figures are
-there because a figure has one home, and `profile_sheet` is what produces it.
+along with the figures that decide them. `section` below prints every rejected
+reading as well as the chosen one, for the reason `Report` gives.
 
-## The window: chaining, not a fixed window
+Three things a reader of this module needs that the brief does not carry:
 
-A batch continues while the next submission is within ten minutes of the
-**previous** one, rather than within ten minutes of the **first**. The two
-disagree about the largest batch by a third, so the choice is not cosmetic.
-
-Anchoring cuts a trip on the clock rather than on a pause: somebody working
-steadily through a dozen items crosses the anchor's boundary while still
-standing at the shelf, and the rows after it become a second transaction that
-nothing in the ledger separates from the first. Chaining cuts only where the
-person actually stopped, which is the thing being recovered.
-
-The objection to chaining is that it could run away -- a slow but unbroken
-afternoon chains into one enormous batch. In this export it does not: no batch
-under this rule spans as much as an hour, and the section below prints the
-largest so that the next export cannot quietly change that behind the rule.
-
-## The submitter key: the name, not the email
-
-Nearly half the submissions carry no email, and that is what settles it.
-Keying on the email puts every one of them under one empty key, so the rule
-chains submissions by people who have nothing to do with each other and calls
-the result a trip to the shelf. It is not a small effect: the share of
-submissions the email key reports inside a batch nearly halves once those rows
-are made to stand alone instead, which means most of what that key was
-measuring was the collapse rather than anybody's trip.
-
-The name is missing from a small enough number of rows that the same treatment
-costs almost nothing, and it is the key rule 6 has to work in anyway --
-`inventory-tng-5r2` builds volunteers out of name spellings, because the
-emails cannot reach the people who never typed one.
-
-Email-with-a-name-fallback is the worst of the three rather than a compromise.
-A volunteer who typed their email on one visit and not on the next gets two
-keys, so it invents more submitters than there are spellings of a name, and it
-splits real trips on whether somebody filled a field in.
-
-Case is folded, as it is in rules 1 and 3, and for the same reason: case has
-never distinguished two of anything in this ledger.
-
-## What is left out, and why it is a batch of one
-
-A submission the rule cannot attribute or cannot place in time is a batch of
-its own. `Submission.at` is `None` where a row was typed by hand rather than
-submitted through the form, and `workbook.py` asks any rule that sorts on it
-to say what it does with those; a row with no name is the same problem seen
-from the other side. Neither can honestly be chained to anything, and the two
-mistakes are not symmetrical -- importing a trip as several transactions loses
-the grouping, while merging strangers' rows into one transaction invents a
-trip that nobody made and attributes stock to the wrong person. So the
-unattributable row stands alone, and the report counts it rather than letting
-it disappear into the singletons.
+- The gap is measured from the **previous** submission, not the first, so the
+  window slides. `WINDOW` is the gap.
+- `Submission.at` is `None` where a row was typed by hand rather than
+  submitted through the form, and `workbook.py` asks any rule that sorts on it
+  to say what it does with those. This one puts them in a batch alone, which
+  is what it also does with a row naming nobody: losing a grouping is
+  recoverable, and inventing a trip out of two strangers is not.
+- The submitter key here is the folded name, and rule 6 builds volunteers out
+  of the same spellings. A merge rule that changes what counts as one name
+  moves the figures below.
 """
 
 from collections.abc import Callable, Sequence
@@ -114,9 +79,8 @@ def by_email_or_nobody(submission: Submission) -> str:
 
     Never None, which is the whole of what is wrong with it: the empty string
     is a key like any other here, so the rows carrying no email become one
-    prolific submitter. Kept because the figure it produces is the one the
-    brief used to quote, and a reading argued against in prose that no code
-    produces is the failure this package exists to stop.
+    prolific submitter. Kept, and printed, because the figure it produces is
+    the one the brief used to quote -- see the enumeration rule on `Report`.
     """
     return addressed(submission.email)
 

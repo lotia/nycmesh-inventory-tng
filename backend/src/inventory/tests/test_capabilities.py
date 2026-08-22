@@ -1,4 +1,4 @@
-"""Tests for GET /api/me: what the caller is, and what this server will let them do.
+"""Tests for GET /api/me, whose own docstring says what it answers.
 
 Decision 0014 point 3 makes this the answer the interface renders its
 administrative controls from, so what matters here is that the answer tracks
@@ -125,9 +125,9 @@ def test_nothing_but_the_two_volunteer_writes_is_open_to_a_volunteer() -> None:
     A new view written ``permission_classes = [IsAuthenticated]`` on a POST
     opens a write to anybody with a session, and every consumer of
     ``administrators_only`` agrees that it is fine -- they all read the same
-    permission list, so they fail together. Decision 0012's "any new endpoint
-    reachable without a credential has to be argued against this record" needs
-    something that does not.
+    permission list, so they fail together. Decision 0012 requires a new
+    credential-free endpoint to be argued against the record, and that needs
+    something which does not.
     """
     open_writes = {
         (view.__name__, method)

@@ -94,10 +94,8 @@ describe("the decoder", () => {
   });
 
   it("keeps the decoder it built, rather than rebuilding a 21 MiB heap per lens switch", async () => {
-    // prepareZXingModule keeps the instantiated module only while the
-    // overrides object it was given compares equal, so a fresh literal per
-    // call would drop it -- on every stop and start, and on every switch of
-    // lens, which is the first thing the picker exists for.
+    // A fresh literal per call would drop the cached module, and `OVERRIDES`
+    // is at module scope to stop that -- its docstring says what it costs.
     const { forgetDetector, loadDetector } = await import("./decoder");
     forgetDetector();
 

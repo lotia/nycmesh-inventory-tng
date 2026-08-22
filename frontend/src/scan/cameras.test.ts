@@ -72,9 +72,8 @@ describe("what getUserMedia is asked for", () => {
   });
 
   it("asks for the resolution as a preference and not a requirement", () => {
-    // Whichever lens is being asked for. A camera that cannot produce this
-    // must still open, because the alternative is no scanner at all -- so the
-    // width carries `ideal` and nothing else.
+    // Whichever lens is being asked for: the width carries `ideal` and
+    // nothing else, for the reason `constraints` gives.
     for (const asked of [constraints(null), constraints("back")]) {
       expect((asked.video as MediaTrackConstraints).width).toEqual({ ideal: IDEAL_WIDTH });
     }

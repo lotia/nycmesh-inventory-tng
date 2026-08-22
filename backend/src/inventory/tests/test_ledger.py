@@ -249,8 +249,8 @@ def test_a_movement_whose_transaction_is_not_there_yet_is_refused(item: Item, wa
 
 
 def test_a_batch_cannot_be_dated_in_the_future(volunteer: Volunteer) -> None:
-    """Append-only means a wrong timestamp is never corrected, only
-    compensated -- and it is the key every recent-activity view sorts by.
+    """The comment on ``StockTransaction.occurred_at`` says why this is worth
+    a trigger.
     """
     with pytest.raises(IntegrityError, match="in the future"):
         transaction_for(volunteer, occurred_at=timezone.now() + datetime.timedelta(days=1))
@@ -272,13 +272,11 @@ def test_a_batch_dated_a_moment_ahead_is_believed(volunteer: Volunteer) -> None:
 
 
 def test_the_database_allows_every_moment_the_api_does(volunteer: Volunteer) -> None:
-    """The allowance is written twice -- CLOCK_SKEW here and an interval in the
-    trigger -- and the pair only works one way round.
+    """The allowance is written twice: CLOCK_SKEW here, an interval in the
+    trigger.
 
-    A serializer that accepted more drift than the trigger allows would answer
-    201 to a batch the INSERT then refuses, which reaches a volunteer with 24
-    scans as a 500 naming nothing. Widening CLOCK_SKEW without widening the
-    trigger fails here instead.
+    Decision 0016's consequences say which way round the pair works and what
+    the other way costs. Widening CLOCK_SKEW alone fails here instead.
     """
     entry = transaction_for(volunteer, occurred_at=timezone.now() + CLOCK_SKEW)
     assert entry.pk is not None
@@ -480,10 +478,9 @@ def test_str_methods(volunteer: Volunteer, item: Item, warehouse: Location) -> N
 def test_stock_cannot_arrive_at_a_retired_location(volunteer: Volunteer, item: Item, warehouse: Location) -> None:
     """Decision 0019: a retired location stops being offered, not stops existing.
 
-    Stock may leave it -- emptying the room is how it gets decommissioned --
-    and may not arrive, because a balance under a row no collection offers is
-    stock nobody can find. Enforced below the API so the admin and the sheet
-    importer meet it too, which is decision 0016's test.
+    Migration 0010 says why arrival is the direction refused. Enforced below
+    the API so the admin and the sheet importer meet it too, which is decision
+    0016's test.
     """
     retired = Location.objects.create(name="Decommissioned room", kind=Location.Kind.ROOM)
     Location.objects.filter(pk=retired.pk).update(active=False)

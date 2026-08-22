@@ -56,9 +56,8 @@ then update everything that has to move with it — the full list is in
 - Filtering goes through `django-filter`, not ad-hoc query-parameter parsing.
 - `DEFAULT_PARSER_CLASSES` is `JSONParser` alone, so a form-encoded body is a
   415 rather than a payload nobody checked. Do not add a form parser back to a
-  view: DRF reads a key missing from a form body as `false` for a boolean, so a
-  form-encoded create silently arrives with `active=false` and retires the row
-  it just added. The reasoning is on the setting in `inventory_tng/settings.py`.
+  view: the reasoning, and what a form-encoded create would silently do to
+  `active`, is on the setting in `inventory_tng/settings.py`.
 
 ## Models and migrations
 

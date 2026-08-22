@@ -56,14 +56,11 @@ the ledger is append-only, so undoing it is not an edit anybody can make.
 The rule therefore errs toward separate rows, and **says which ones it is
 unsure of** rather than deciding for the administrator. A volunteer that never
 gave an address, and whose name is the same as another volunteer's under the
-first half of the test above, is its own row and is **flagged**: two people
-who share a first-name spelling and never gave an address are not one person,
-and nothing in the workbook can tell them from one person who spelled their
-name two ways.
-
-Flagging is deliberately generous, because it costs an administrator a glance
-and a wrong merge costs the ledger. A short name one letter from another short
-name is flagged even where the two are ordinary separate names.
+first half of the test above, is its own row and is **flagged** -- generously,
+so a short name one letter from another short name is flagged even where the
+two are ordinary separate names. Why generosity is the right side to err on,
+and what the flags cost, is
+[§6 of the brief](../../../../docs/briefs/sheet-classifiers.md#6-person-to-volunteer).
 
 ## What is not a name
 

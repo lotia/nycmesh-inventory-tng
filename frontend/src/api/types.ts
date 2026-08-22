@@ -24,17 +24,17 @@ export interface Page<T> {
   results: T[];
 }
 
-/** How much of one item is at one location, derived from the ledger. */
+/** One location's holding of an item, as `ItemBalanceSerializer` renders it. */
 export interface ItemBalance {
   location: number;
   quantity: string;
 }
 
 /**
- * An active label on an item, and what one scan of it means.
+ * One of an item's live labels, and the quantity a scan of it stands for.
  *
- * The distinct quantities across an item's labels *are* its packaging; see
- * docs/decisions/0011-qr-batch-scanning.md section 5.
+ * These are the one-tap chips the item list offers; `ItemLabelSerializer`
+ * says why the set of them is the item's packaging.
  */
 export interface ItemLabel {
   code: string;
@@ -62,8 +62,8 @@ export interface Volunteer {
 }
 
 /**
- * The 409 from `POST /api/volunteers`: the identifier is taken, by a record
- * the pick-list will not show.
+ * The 409 from `POST /api/volunteers`, naming whoever already holds the
+ * identifier.
  *
  * A dead end without this -- the searcher was offered nothing, and a plain
  * 400 would name a record the API refuses to show them. See
@@ -81,9 +81,8 @@ export interface VolunteerConflict {
 /**
  * What a scanned or typed code points at, as `GET /api/labels/{code}` answers.
  *
- * A revoked label resolves rather than 404s: the sticker is superseded, but it
- * still says what it pointed at, and refusing the scan would block a volunteer
- * over bookkeeping. `revoked_at` is how the client is told.
+ * A revoked label still resolves, and `revoked_at` is how the client is told.
+ * `LabelResolveView` says why that is not a 404.
  */
 export interface ResolvedLabel {
   code: string;
@@ -124,7 +123,7 @@ export interface BatchError {
   detail: string;
 }
 
-/** Nothing was saved. Every bad line is listed, so one pass fixes them all. */
+/** The 400 body: nothing written, and one entry per line that needs fixing. */
 export interface BatchRejected {
   detail: string;
   errors: BatchError[];

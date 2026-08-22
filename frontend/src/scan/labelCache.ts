@@ -7,11 +7,9 @@
  * scans in a basement was forty-eight, on the connection section 1 gives as
  * the reason the batch design exists at all.
  *
- * One request. The map carries the item's name and unit (see
- * `LabelMapSerializer`), so the catalogue does not have to be held as well --
- * which matters because the catalogue *is* paginated, and holding it meant
- * four round trips fetching eighty kilobytes of balances and labels to keep
- * three fields per item.
+ * One request. The map carries the item's name and unit, so the catalogue
+ * does not have to be held as well -- `LabelMapSerializer` says what holding
+ * the paginated catalogue used to cost.
  *
  * Filled when the app opens, in the same localStorage discipline as the cart
  * and the remembered volunteer.

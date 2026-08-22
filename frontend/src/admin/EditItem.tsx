@@ -1,10 +1,10 @@
 /**
  * Correcting a catalogue entry where the entry already is.
  *
- * Decision 0014 point 1: signing in does not navigate anywhere else, it
- * changes what the interface offers. An administrator who has just been
- * looking at an item's count and packaging edits it here rather than finding
- * the same item under a different name in a different application.
+ * This dialog is decision 0014 point 1 applied to the catalogue. An
+ * administrator who has just been looking at an item's count and packaging
+ * edits it here rather than finding the same item under a different name in a
+ * different application.
  *
  * Retiring is a change to `active`, not a delete: the ledger refers to the
  * item for as long as the ledger exists.

@@ -104,8 +104,8 @@ def test_a_shared_address_alone_does_not_join_two_names() -> None:
 
 
 def test_the_same_name_without_a_shared_address_is_two_volunteers() -> None:
-    """Two people who share a first-name spelling and never gave an address
-    are not one person.
+    """A shared spelling with no address behind it is not evidence of one
+    person, so the rule declines to join them.
     """
     who = directory(
         sheet_of(
@@ -196,8 +196,8 @@ def test_an_address_naming_one_volunteer_stands_in_for_a_missing_name() -> None:
 
 
 def test_an_address_nobody_is_named_beside_is_a_volunteer_of_its_own() -> None:
-    """Somebody moved that hardware, and a row an administrator can put a name
-    to keeps the movement attributed rather than dropping it.
+    """The movement stays attributed to a row an administrator can later put
+    a name to, rather than being dropped.
     """
     sheet = sheet_of([submission(name="", email="ghost@example.net")])
     who = directory(sheet)
@@ -208,7 +208,7 @@ def test_an_address_nobody_is_named_beside_is_a_volunteer_of_its_own() -> None:
 
 
 def test_an_address_naming_more_than_one_volunteer_names_nobody() -> None:
-    """Minting a row for it would mint a duplicate of somebody already here."""
+    """minting a row for it would duplicate somebody the directory already holds."""
     sheet = sheet_of(
         [
             submission(name="Ada", email="shared@example.net"),

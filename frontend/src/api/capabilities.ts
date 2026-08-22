@@ -1,9 +1,9 @@
 /**
  * What this session is and what it may do, as the server says.
  *
- * Decision 0014 point 3: the interface renders administrative controls from
- * this answer rather than guessing, because a client that draws an editing
- * control it is not allowed to use is a bug report waiting to happen.
+ * Every administrative control in this app is drawn from what is here, which
+ * is decision 0014 point 3; that record says why it is asked rather than
+ * guessed at.
  *
  * A capability is what the caller may do *now*. That is not the same as what
  * they are entitled to: a destructive operation also wants a recent sign-in

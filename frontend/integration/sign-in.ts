@@ -6,9 +6,8 @@ import { uv } from "./django";
  *
  * Through the local password path of
  * docs/decisions/0013-administrator-sign-in.md, because it is the only one a
- * test can complete: an OAuth round trip to Google or Slack from CI would be
- * testing their availability. The provider paths are covered in the backend
- * suite instead, where a callback can be completed without dialling anybody.
+ * test can complete. DEVELOPERS.md says why, and where the provider paths are
+ * covered instead.
  *
  * The second factor is not stepped around. The seed publishes the TOTP secret
  * along with the password, and the code below is computed from it the way an

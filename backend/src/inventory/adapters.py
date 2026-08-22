@@ -33,9 +33,9 @@ class AccountAdapter(DefaultAccountAdapter):
     def is_open_for_signup(self, request: HttpRequest) -> bool:
         """Local accounts are issued, not registered.
 
-        Point 2 keeps the local path as the way in when a provider is
-        unreachable or an account is lost, which is a password an
-        administrator handed over. Self-service registration would only
+        Point 2 keeps the local path available whatever else is configured,
+        and docs/deployment.md says what it is there for. It is a password an
+        administrator handed over: self-service registration would only
         manufacture accounts that hold nothing, and the administrator would
         still have to make the real one.
         """

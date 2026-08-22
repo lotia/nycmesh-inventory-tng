@@ -93,14 +93,12 @@ def recently_authenticated(request: Request | HttpRequest) -> bool:
 class RecentlyAuthenticated(BasePermission):
     """A destructive operation asks who you are again, inside a valid session.
 
-    Decision 0014 point 5. Putting administrative capability in the volunteer
-    app means script injected into that app reaches the destructive operations
-    too, from the browser of somebody who legitimately holds them -- so the
-    decision makes this a requirement of that work rather than general good
-    practice. Every write reserved to an administrator prompts again -- editing
-    the catalogue, merging volunteers, revoking labels, and minting the codes a
-    sheet of stickers is printed from; appending to the ledger, which is what an
-    administrator does most often, deliberately does not.
+    Decision 0014 point 5, and its consequences say why this is a requirement
+    of that decision rather than general good practice. Every write reserved
+    to an administrator prompts again -- editing the catalogue, merging
+    volunteers, revoking labels, and minting the codes a sheet of stickers is
+    printed from. Appending to the ledger deliberately does not, which is
+    point 5's own line.
 
     Paired with StaffWrites in the project default, so the set that needs a
     second look is exactly the set that needs the staff flag, and the two

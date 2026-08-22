@@ -105,9 +105,8 @@ def test_a_submission_naming_nobody_stands_alone() -> None:
 
 
 def test_a_submission_with_no_timestamp_stands_alone() -> None:
-    """`Submission.at` is None where a row was typed by hand rather than
-    submitted through the form, and `workbook.py` asks a rule that sorts on it
-    to say what it does with those.
+    """A row with no time cannot honestly be chained to anything, and this is
+    the answer `batches` gives to the question `workbook.py` poses.
     """
     found = batches([at(0), submission(row=99, at=None), at(1)])
 
@@ -164,7 +163,7 @@ def test_the_email_key_makes_one_prolific_submitter_of_everybody_without_one() -
 
 
 def test_the_name_fallback_splits_one_person_who_sometimes_typed_an_email() -> None:
-    """Why the fallback is the worst of the three rather than a compromise: it
+    """Why the the fallback key is the one that invents submitters, and it
     invents a second submitter out of a field somebody left blank.
     """
     ada = [at(0, email="ada@example.net", name="Ada"), at(1, email="", name="Ada")]
@@ -232,9 +231,8 @@ def test_the_report_prices_the_anchored_window_beside_the_chained_one() -> None:
 
 
 def test_the_report_prices_both_readings_of_the_email_key() -> None:
-    """The same key reads very differently depending on whether the rows
-    carrying no email are one person or nobody, and the difference is the
-    argument, so the report carries both numbers.
+    """What is done with the emailless rows moves this key more than the key
+    itself does, so the report carries both numbers rather than one.
     """
     strangers = sheet_of([at(0, email="", name="Ada"), at(1, email="", name="Grace")])
 

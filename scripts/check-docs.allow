@@ -2,9 +2,26 @@
 # DEVELOPERS.md#1-one-topic-one-place for when an entry here is the right
 # answer, which is seldom.
 #
-# One paragraph per allowance: the two files it covers, one per line, then the
-# passage. The pair is what makes it deliberate -- a third copy is news
-# whatever those two agreed -- and an allowance nothing matches is reported, so
-# the baseline cannot outlive the repetition it recorded.
+# One paragraph per allowance: the files it covers, one per line, then the
+# passage. Naming them is what makes it deliberate -- a copy in a file not on
+# the list is news whatever those on it agreed -- and an allowance nothing
+# matches is reported, so the baseline cannot outlive the repetition it
+# recorded. A path line has no space in it; that is what tells the two apart.
 #
-# There are none. Keep it that way.
+# Keep it short. A long list is the checker being wrong, not the code.
+
+# The label on `forgetAudio`, `forgetDetector`, `forgetLabelCache` and
+# `forgetOutbox`: four one-line JSDoc comments on four instances of one idiom,
+# a module-level singleton with a reset only a test calls. It is a label
+# rather than an explanation -- there is nothing here that could live in one
+# place and be linked from the others, and writing it four different ways
+# would say the four exports differ when the whole point is that they do not.
+# It runs to exactly twelve words, which is the only reason the checker sees
+# it at all. A fifth joins the list below rather than costing four more
+# entries.
+
+frontend/src/batch/outbox.ts
+frontend/src/scan/confirm.ts
+frontend/src/scan/decoder.ts
+frontend/src/scan/labelCache.ts
+Lets a test start again from nothing. Not used by the app.

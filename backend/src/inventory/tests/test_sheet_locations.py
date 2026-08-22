@@ -74,9 +74,7 @@ def test_a_volunteer_holding_stock_is_a_place() -> None:
 
 
 def test_the_report_offers_the_seed_and_admits_what_it_misses() -> None:
-    """A vocabulary that matched everything would be a gazetteer somebody
-    invented. What it leaves is the measure of how far o5t still has to go.
-    """
+    """The coverage lines are the point, for the reason ``section`` gives."""
     _, counted = section(notes("mesh room", "blue stockings + mesh room", "installs", ""))
 
     partition = dict(counted)
@@ -107,8 +105,7 @@ def test_the_report_keeps_all_three_readings_of_the_room() -> None:
 def test_the_report_counts_the_notes_naming_it_both_ways() -> None:
     """Folding is what collapses the 41 notes naming the room to 33, and the
     report shows the collapse rather than asserting it. Notes rather than
-    spellings: two notes naming the room identically and differing after it
-    are two, which is what the brief has always counted.
+    spellings, which is the unit docs/briefs/sheet-classifiers.md counts in.
     """
     _, counted = section(notes("Mesh Room", "mesh room", "mesh room 131"))
 

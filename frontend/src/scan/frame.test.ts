@@ -93,8 +93,7 @@ describe("grabbing a frame", () => {
 
   it("keeps one canvas across every frame, rather than one per decode", () => {
     // The whole point of the module: the decoder's own path allocates a fresh
-    // canvas and context per call, five times a second for as long as the
-    // camera is open.
+    // canvas and context per call, at the rate `frameGrabber` is called.
     const { canvases, drawImage } = recording();
     const grab = frameGrabber();
     const video = playing(1280, 720);

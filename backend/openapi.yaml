@@ -1328,11 +1328,11 @@ components:
         contract and is described like any other response.
 
         ``code`` is the branch a client actually takes, and it is optional because
-        only the 403 carries one: two refusals share that status and mean opposite
-        things -- ``forbidden`` is a control to hide, ``reauthentication_required``
-        is a prompt to show somebody who is entitled to the thing (decision 0014
-        point 5). Nothing here is missing on a 404, where the sentence is the whole
-        answer. The values are attached by ``exception_handler`` in inventory/api.py.
+        only the 403 carries one: ``forbidden`` and ``reauthentication_required``
+        share that status and mean opposite things (decision 0014 point 5).
+        Nothing here is missing on a 404, where the sentence is the whole answer.
+        The values are attached by ``exception_handler`` in inventory/api.py, whose
+        comment says what each of the two asks a client to draw.
       properties:
         detail:
           type: string
@@ -1605,8 +1605,8 @@ components:
       description: |-
         What a scanned code points at.
 
-        ``quantity`` is part of the contract because the client cannot spell out
-        the cart line without it. See decision 0011 section 5.
+        ``quantity`` is part of the contract, and decision 0011 section 6 says
+        what the client cannot do without it.
       properties:
         code:
           type: string
@@ -2052,8 +2052,8 @@ components:
         A batch as it is submitted: one act, many lines.
 
         Movements name items by id, never by label code. The client has already
-        resolved every code it scanned, and accepting codes here would add a second
-        resolution path that fails after the volunteer thinks they are done.
+        resolved every code it scanned, and decision 0011 section 6 says what a
+        second resolution path here would cost.
       properties:
         idempotency_key:
           type:

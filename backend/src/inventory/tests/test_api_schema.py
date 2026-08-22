@@ -2,9 +2,8 @@
 
 The schema at backend/openapi.yaml is committed so consumers can read it
 without running the project. A committed generated file rots the moment
-someone forgets to regenerate it, so drift fails the test run -- locally and in
-CI identically, the same approach as the coverage threshold in
-docs/decisions/0007-test-coverage.md.
+someone forgets to regenerate it, so drift fails the test run, in the way
+DEVELOPERS.md's "The API schema" describes.
 
 If one of these fails, you changed the API. Run:
 

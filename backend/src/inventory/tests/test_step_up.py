@@ -1,15 +1,12 @@
 """Tests for decision 0014 point 5: a second look before anything destructive.
 
-Putting administrative capability in the volunteer app means script injected
-into that app reaches the destructive operations too, from the browser of
-somebody who legitimately holds them. That is the consequence decision 0014
-records, and this is the mitigation it makes a requirement of the work rather
-than a later hardening.
+The consequence that makes it a requirement of the work rather than a later
+hardening is recorded in that decision; ``RecentlyAuthenticated`` is where the
+rule lives.
 
 The line it draws is the point: every write reserved to an administrator asks
 again -- editing the catalogue, merging volunteers, revoking labels, minting
-new ones; appending to the ledger, which is what an administrator does most
-often, does not.
+new ones. Appending to the ledger does not.
 """
 
 import re
@@ -152,9 +149,7 @@ def directives(response: Any) -> dict[str, str]:
 def test_the_app_is_served_with_a_policy(client: Client) -> None:
     """A requirement of decision 0014, not general good practice.
 
-    That decision puts administrative capability in the same application a
-    volunteer uses and records the cost: script injected into it reaches the
-    destructive operations too. This is what narrows how it gets there.
+    Why that is so is CONTENT_SECURITY_POLICY's own comment in settings.py.
     """
     assert client.get(reverse("api-root")).has_header("Content-Security-Policy")
 
@@ -215,9 +210,9 @@ def test_the_app_itself_is_served_with_the_same_policy() -> None:
 
     ``index.html`` is nginx's, and a policy is enforced against the document
     that carries it -- so the volunteer app, which is the thing decision 0014
-    is worried about, gets its policy from frontend/nginx.conf.template. The
-    two are written out separately because neither server can read the other's
-    configuration, and this is what stops them drifting.
+    is worried about, gets its policy from frontend/nginx.conf.template.
+    CONTENT_SECURITY_POLICY's comment says why there are two; this is what
+    stops them drifting.
     """
     header = re.search(
         r'add_header\s+Content-Security-Policy\s+"([^"]*)"',
@@ -265,11 +260,8 @@ def test_the_documentation_page_needs_no_exception_from_the_policy(editor: Clien
 def test_the_admin_asks_again_before_a_change(stale: Client, category: Category) -> None:
     """Decision 0014 point 4 keeps the admin complete, so it holds the same powers.
 
-    The threat point 5 records is script in the volunteer app acting from an
-    administrator's own browser. That script can read the CSRF token and post
-    to /admin exactly as easily as to /api, and the network restriction of
-    decision 0013 point 6 does not help, because it is that administrator's
-    browser doing the posting.
+    ``RequireSecondLookInTheAdmin`` says what threat point 5 records and why
+    no network restriction answers it.
     """
     response = stale.post(
         reverse("admin:inventory_category_change", args=[category.pk]),

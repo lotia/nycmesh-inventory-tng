@@ -217,8 +217,8 @@ class Location(models.Model):
         related_name="children",
     )
     # A volunteer the pick-list still offers, enforced by the trigger named on
-    # Volunteer.merged_into: custody attached to a merged duplicate is the
-    # second generation of the duplicate the merge existed to remove.
+    # Volunteer.merged_into. What that prevents, and what is refused in the
+    # other direction, is docs/data-model.md under Location.
     held_by = models.ForeignKey(
         Volunteer,
         null=True,
@@ -426,9 +426,8 @@ class VendorOffer(models.Model):
 # for a token printed on a sticker and read aloud across a room.
 CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
-# Ten characters of that alphabet is fifty bits, which is unguessable in any
-# sense that matters for a token printed on a wall, and still short enough to
-# read back off a dying label. See decision 0011 section 3.
+# Ten characters of that alphabet is fifty bits, and still short enough to read
+# back off a dying label. What fifty bits buys is decision 0011 section 3.
 CODE_LENGTH = 10
 
 # What the check constraint and the minter both mean by "a code". Built from
@@ -476,10 +475,9 @@ class Label(models.Model):
     # format, and only one of them rewrites the table.
     #
     # Immutable once the row exists: the `label_code_is_printed` trigger in
-    # migration 0008 refuses to change it, because it is on a sticker on a
-    # shelf and no database write can go and reprint that. Who *supplies* a
-    # code is a different question, and one the database cannot answer -- see
-    # decision 0016.
+    # migration 0008 refuses to change it, for the reason decision 0016 point 4
+    # gives. Who *supplies* a code is a different question, and one the
+    # database cannot answer -- see decision 0016.
     code = models.CharField(max_length=32, unique=True)
     item = models.ForeignKey(Item, null=True, blank=True, on_delete=models.CASCADE, related_name="labels")
     location = models.ForeignKey(Location, null=True, blank=True, on_delete=models.CASCADE, related_name="labels")
@@ -538,12 +536,11 @@ class Label(models.Model):
                 name="label_quantity_iff_item",
             ),
             # The folding in TYPO_FOLDS only works while every stored code is
-            # Crockford: a code containing I, L or O folds to a string matching
-            # nothing and is unresolvable for the life of the physical object
-            # carrying it. So the alphabet and the length are the database's to
-            # enforce, not a rule the minter is trusted to follow -- the minter
-            # is one write path, and the admin, the fixtures and the planned
-            # sheet importer are others. Decision 0011 section 3.
+            # Crockford, and decision 0011 section 3 says what a code outside
+            # that alphabet costs. So the alphabet and the length are the
+            # database's to enforce rather than the minter's: the minter is
+            # one write path, and the admin, the fixtures and the planned
+            # sheet importer are others.
             models.CheckConstraint(
                 condition=models.Q(code__regex=CODE_PATTERN),
                 name="label_code_is_crockford_base32",
@@ -685,8 +682,9 @@ class StockMovement(models.Model):
     """A quantity of one item moving between two places.
 
     Either side may be NULL, meaning somewhere outside the system: a vendor
-    shipment arriving, or hardware fitted at an install. Direction is expressed
-    by which side the location sits on, never by the sign of the quantity.
+    shipment arriving, or hardware fitted at an install. What the two columns
+    mean together, and why a quantity is always positive, is
+    docs/data-model.md.
 
     Which sides each kind of transaction requires and which it forbids is a
     cross-table rule -- these two columns against the parent's ``kind`` -- so a

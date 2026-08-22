@@ -14,8 +14,7 @@ printer and a phone camera can be trusted with. That fails loudly here rather
 than quietly on a shelf.
 
 The payload is uppercase -- ``HTTPS://INVENTORY.NYCMESH.NET/S/7QK3M2XV9A`` --
-because URL schemes and hostnames are case-insensitive and QR alphanumeric mode
-packs two characters into 11 bits where byte mode spends 8 on each. The host is
+which decision 0011 section 3 argues for on the encoding it buys. The host is
 deployment-varying and is read from the environment; see ``LABEL_BASE_URL`` in
 settings and .env.sample.
 """

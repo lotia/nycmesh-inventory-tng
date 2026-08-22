@@ -181,8 +181,7 @@ describe("the decode loop", () => {
 
   it("says so when the frame source throws, rather than rejecting into nothing", async () => {
     // Deliberately outside the swallow, because it is a bug rather than a bad
-    // frame -- but the interval callback is async, so it used to leave as an
-    // unhandled rejection five times a second that no error boundary saw.
+    // frame -- and `onFailure` says what used to become of it instead.
     const { onFailure } = running(
       () => Promise.resolve(found("NM-1")),
       () => {

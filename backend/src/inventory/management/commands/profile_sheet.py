@@ -5,10 +5,10 @@ reproducible rather than asserted. A figure there is the output of a rule the
 importer has to apply to every historical row anyway, so quoting one that no
 code produces is how the brief came to carry several nobody could reproduce.
 
-The workbook carries volunteer names and email addresses and is not ours to
-publish, so nothing in CI can read it: the sections below are tested against a
+The workbook is not in the repository and cannot be, for the reason the
+brief's "How to re-run" gives. So the sections below are tested against a
 workbook the test builds, and the real numbers come from a contributor running
-this against their own copy. How to do that is in the brief.
+this against their own copy. How to do that is in the brief too.
 """
 
 from collections.abc import Callable

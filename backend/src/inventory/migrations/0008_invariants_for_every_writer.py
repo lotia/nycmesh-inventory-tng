@@ -3,9 +3,8 @@
 #
 # Every rule below was previously enforced only by the serializers and the
 # batch view, so the admin, a fixture load and the planned sheet importer were
-# not held to any of them. Each needs something a CheckConstraint cannot see --
-# another table, the current time, or the row's own previous value -- which is
-# why each is a trigger. The house pattern is migration 0001
+# not held to any of them. Each is a trigger rather than a CheckConstraint for
+# the reason that record gives. The house pattern is migration 0001
 # (inventory_reject_tree_cycle) and 0002 (the append-only ledger).
 #
 # Backward compatible with the previous release, which is what a rollback

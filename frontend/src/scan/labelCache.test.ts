@@ -74,7 +74,6 @@ describe("the label cache", () => {
   });
 
   it("is ignored once it is older, rather than naming an item wrongly", async () => {
-    // A wrong item name in a cart line is worse than a slow scan.
     serving([mapped(PACKET)]);
     await refreshLabelCache(undefined, 1_000);
 

@@ -38,9 +38,8 @@ def test_a_job_is_recognised_however_it_is_spelled(note: str) -> None:
         "ANNEX 217",
         # Letters with no number are not a reference to anything.
         "for NN",
-        # No submission writes a hash, so the pattern does not admit one:
-        # latitude for input that is not in the ledger is latitude nothing
-        # can check.
+        # No submission writes a hash, and the module's docstring says why
+        # the pattern therefore does not admit one.
         "NN#217",
     ],
 )
@@ -71,9 +70,8 @@ def test_the_report_says_what_choosing_the_first_costs() -> None:
 def test_the_report_prices_the_latitude_the_pattern_takes() -> None:
     """The census is the whole evidence for folding case and for allowing a
     space, so the report carries it rather than the brief asserting it. Every
-    spelling the rule admits gets a line, including the ones nobody wrote --
-    a label that appeared only when the data held it would make the brief
-    correct for one export.
+    spelling the rule admits gets a line, including the ones nobody wrote, per
+    the enumeration rule on `Report`.
     """
     _, counted = section(notes("NN217", "Nn217", "nn 217", "no job here"))
 

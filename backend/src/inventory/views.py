@@ -266,10 +266,9 @@ def _drained_by(movements: list[StockMovement]) -> set[tuple[int, int]]:
 def _negative_balances(drained: set[tuple[int, int]]) -> list[dict[str, object]]:
     """Where stock stands below zero at the places a batch drew from.
 
-    Reported, never refused. Volunteers had no way to say "the shelf disagrees
-    with the system", so they faked corrections instead; see
-    docs/decisions/0008-stock-ledger-transfer-graph.md. The shelf is the
-    authority, and the answer is a stock count rather than a blocked volunteer.
+    Reported, never refused, for the reason
+    docs/decisions/0011-qr-batch-scanning.md gives under "Insufficient stock is
+    a warning, not a rejection".
 
     Ordered, because a set has no order and the warnings are a list the client
     renders: without this a replay could show the same warnings rearranged,
@@ -407,9 +406,9 @@ class StockTransactionCreateView(APIView):
     @staticmethod
     @atomic
     def _record(batch: dict[str, Any]) -> StockTransaction:
-        """All or nothing. A partly posted batch writes ledger rows nobody
-        intended, and the ledger is append-only, so they could only ever be
-        compensated.
+        """All or nothing, for the reason
+        docs/decisions/0011-qr-batch-scanning.md gives under "All or nothing,
+        but the rejection names every bad line".
         """
         recorded = StockTransaction.objects.create(
             **{name: value for name, value in batch.items() if name != "movements"},
@@ -795,9 +794,9 @@ def _survivor_of(volunteer: Volunteer) -> Volunteer:
     """Follow ``merged_into`` forward to whoever is left.
 
     Forward, because that is the direction docs/data-model.md says a reader
-    takes: a merge points the duplicate at the survivor and changes nothing
-    else. Chains happen -- a duplicate merged into a record later merged
-    itself -- and only the end of one is worth offering.
+    takes, and decision 0015 point 1 says why. Chains happen -- a duplicate
+    merged into a record later merged itself -- and only the end of one is
+    worth offering.
 
     The visited set is not decoration. The model forbids merging a record into
     itself and nothing forbids a longer cycle, and a cycle here would hang the
@@ -862,8 +861,8 @@ ITEMS = Item.objects.prefetch_related(
 )
 
 # Retired items are not offered, the same way retired locations and merged
-# volunteers are not: this is a pick-list, and a retired item is not something
-# to add to a cart. `active` is not a parameter here because `?withdrawn=true`
+# volunteers are not: this is a pick-list, and decision 0019's context says
+# what belongs on one. `active` is not a parameter here because `?withdrawn=true`
 # already lists what this collection took out, which is decision 0019's read
 # half -- retirement says a row is not offered, not that its stock is gone.
 OFFERED_ITEMS = ITEMS.filter(active=True)
@@ -1187,8 +1186,8 @@ class Operation(NamedTuple):
 # Not a second declaration of who may do what: each entry names real
 # operations, and the answer is those operations' own permission classes run
 # against this caller. Change what guards an endpoint and this changes with it,
-# which is the point -- a client that draws an editing control it is not
-# allowed to use is a bug report waiting to happen (decision 0014 point 3).
+# which is the point: decision 0014 point 3 says what a client drawing a
+# control it may not use costs.
 #
 # A capability may name several operations, because the interface's vocabulary
 # is coarser than the URL layout: "may I edit the catalogue" is one control and

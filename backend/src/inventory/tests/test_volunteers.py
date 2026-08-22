@@ -61,9 +61,7 @@ def test_search_puts_the_closest_match_first(client: Client) -> None:
 def test_search_finds_a_volunteer_by_the_email_address_they_typed(client: Client) -> None:
     """The field that exists to tell two Seans apart has to be searchable.
 
-    A volunteer who types their own address and is shown nobody adds a
-    duplicate -- the one outcome this endpoint exists to prevent, reached
-    through the field added to prevent it.
+    What a searcher shown nobody does next is VolunteerListView's docstring.
     """
     Volunteer.objects.create(display_name="Sean McGinnis", email="sean@example.org")
     Volunteer.objects.create(display_name="Olivia")
@@ -177,9 +175,8 @@ def test_a_duplicate_email_is_reported_rather_than_raised(client: Client) -> Non
 
 
 def test_a_duplicate_email_on_a_live_volunteer_stays_a_plain_rejection(client: Client) -> None:
-    """The searcher could have found them, so there is nothing to point at
-    that the pick-list does not already offer -- and naming somebody who is
-    findable anyway would turn this endpoint into an address lookup.
+    """A clash with a live volunteer stays a plain 400, which is decision 0015
+    point 3 and the reason it gives.
     """
     Volunteer.objects.create(display_name="Olivia", email="olivia@example.org")
     response = post(

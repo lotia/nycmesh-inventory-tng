@@ -75,10 +75,9 @@ def custody(volunteer: Volunteer) -> Location:
 def client(client: Client) -> Client:
     """The Django test client, signed in.
 
-    Every endpoint but the index and the health check requires a session
-    today, so almost every API test needs this. Overriding the built-in
-    ``client`` fixture rather than adding a name means a test reads as
-    ordinary unless it deliberately calls ``logout()``.
+    Almost every API test needs one. Overriding the built-in ``client``
+    fixture rather than adding a name means a test reads as ordinary unless it
+    deliberately calls ``logout()``.
     """
     client.force_login(User.objects.create_user(username="tester", password="not-a-real-password"))
     return client
@@ -99,9 +98,8 @@ def editor(administrator: User) -> Client:
     needing both sessions needs them at the same time.
 
     Signed in through the app's own door rather than with ``force_login``,
-    because a destructive operation asks when this session last proved who it
-    was (decision 0014 point 5, ``RecentlyAuthenticated``) and ``force_login``
-    leaves no answer to that. A test that wants the other case -- a session
+    because ``RecentlyAuthenticated`` puts a question to a destructive
+    operation that ``force_login`` leaves no answer to. A test that wants the other case -- a session
     old enough to be asked again -- has ``stale`` below.
     """
     return sign_in_locally(administrator, ADMINISTRATOR_PASSWORD)

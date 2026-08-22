@@ -204,11 +204,108 @@ mkdir -p tools
 printf '#!/usr/bin/env bash\n# %s\n' "$PASSAGE" > tools/moved.sh
 expect 1 "tools/moved.sh" "a helper outside scripts/ is read too"
 
-# Application source is inventory-tng-lwe, and is deliberately not read.
+# Application source is read too. A docstring is where a decision record gets
+# paraphrased, and the judgement about which of those are the code explaining
+# itself is check-docs.allow's rather than the input set's.
 scene
 printf '# One\n\n%s\n' "$PASSAGE" > one.md
 mkdir -p backend/src/inventory
 printf '"""%s"""\n' "$PASSAGE" > backend/src/inventory/models.py
-expect 0 "No prose repeated" "a docstring beside the code it enforces is left alone"
+expect 1 "backend/src/inventory/models.py" "an application docstring is read"
+
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+mkdir -p frontend/src
+printf '// %s\n' "$PASSAGE" > frontend/src/thing.ts
+expect 1 "frontend/src/thing.ts" "a TypeScript line comment is read"
+
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+mkdir -p frontend/src
+printf '/**\n * %s\n */\nexport const x = 1;\n' "$PASSAGE" > frontend/src/thing.tsx
+expect 1 "frontend/src/thing.tsx" "a JSDoc block is read, asterisks and all"
+
+# A Helm template spells a comment the same way, and used to be read as having
+# none at all.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+mkdir -p infra
+printf '{{- /*\n%s\n*/ -}}\nkind: Ingress\n' "$PASSAGE" > infra/thing.yaml
+expect 1 "infra/thing.yaml" "a block comment in a template is read"
+
+# The case that made reading application source expensive: two migrations
+# install near-identical trigger bodies, and a triple-quoted string handed to
+# RunSQL is code however much of it reads like a sentence.
+scene
+mkdir -p backend/src/inventory
+printf 'from django.db import migrations\n\nSQL = migrations.RunSQL("""%s""")\n' "$PASSAGE" > backend/src/inventory/a.py
+printf 'from django.db import migrations\n\nSQL = migrations.RunSQL("""%s""")\n' "$PASSAGE" > backend/src/inventory/b.py
+expect 0 "No prose repeated" "a string a Python file uses is a value, not a docstring"
+
+scene
+mkdir -p backend/src/inventory
+printf '"""%s"""\n' "$PASSAGE" > backend/src/inventory/a.py
+printf 'def f() -> None:\n    """%s"""\n' "$PASSAGE" > backend/src/inventory/b.py
+expect 1 "say the same thing" "a docstring is still read wherever it sits"
+
+# A file that will not parse is still read, rather than silently contributing
+# nothing to the comparison.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+mkdir -p backend/src/inventory
+printf '"""%s"""\n\ndef (\n' "$PASSAGE" > backend/src/inventory/broken.py
+expect 1 "backend/src/inventory/broken.py" "a Python file that does not parse is still read"
+
+# A citation written as a link is already dropped as addressing, and in a
+# comment the same citation is written bare. prose() says why dropping only
+# the bracketed form would be the asymmetry.
+scene
+printf '# One\n\nSee [the record](docs/decisions/0016-invariants.md) and nothing else here at all.\n' > one.md
+mkdir -p scripts
+printf '#!/usr/bin/env bash\n# See docs/decisions/0016-invariants.md and nothing else here at all.\n' > scripts/thing.sh
+expect 0 "No prose repeated" "a bare path in a comment is addressing, not prose"
+
+# Long enough that the address alone is a run of its own, so only stripping it
+# can keep the two apart.
+LONG_URL="https://docs.example.invalid/en/6.0/howto/deployment/asgi/and/further/parts/here/"
+scene
+printf '# One\n\nThe generated entry point, documented at %s by its own authors.\n' "$LONG_URL" > one.md
+mkdir -p scripts
+printf '#!/usr/bin/env bash\n# Something else entirely, though %s covers that as well.\n' "$LONG_URL" > scripts/thing.sh
+expect 0 "No prose repeated" "a bare URL is addressing too"
+
+# Short on purpose: the two lines share nothing but the citation, so this
+# says the two forms of it are read the same way and says nothing else.
+scene
+printf '# One\n\nSee [decision 0016](d.md) point 4 for the whole of it.\n' > one.md
+mkdir -p scripts
+printf '#!/usr/bin/env bash\n# See decision 0016 point 4 for the whole of it.\n' > scripts/thing.sh
+expect 0 "No prose repeated" "a bare record citation is addressing on both sides"
+
+# The other half of that, and the reason a citation is one word rather than
+# none: deleting it shortened the prose around it, so an explanation just
+# under the window passed by carrying a reference.
+scene
+printf '# One\n\nA volunteer is a pick-list entry and is never an account, per [decision 0012](d.md) point 5.\n' > one.md
+mkdir -p scripts
+printf '#!/usr/bin/env bash\n# A volunteer is a pick-list entry and is never an account, per decision 0012 point 5.\n' > scripts/thing.sh
+expect 1 "say the same thing" "a citation buys no discount on the explanation beside it"
+
+
+# One allowance covering more than two files, which is why it names a list
+# rather than a pair: the same label on four modules cost six entries when an
+# entry covered one pair.
+scene
+mkdir -p scripts
+for f in one.md two.md; do
+  printf '# X\n\nThe very same twelve words appear in every one of these three files here.\n' > "$f"
+done
+printf '#!/usr/bin/env bash\n# The very same twelve words appear in every one of these three files here.\n' > scripts/thing.sh
+printf 'one.md\ntwo.md\nscripts/thing.sh\nThe very same twelve words appear in every one of these three files here.\n' > scripts/check-docs.allow
+expect 0 "No prose repeated" "one allowance can name more than two files"
+
+# And it is not a blanket: a fourth file saying it is still news.
+printf '# Y\n\nThe very same twelve words appear in every one of these three files here.\n' > three.md
+expect 1 "say the same thing" "a file the allowance does not name is still reported"
 
 verdict
