@@ -52,12 +52,19 @@ from collections.abc import Iterable, Mapping
 type Report = tuple[str, list[tuple[str, int]]]
 
 
-def each(members: Iterable[str], counted: Mapping[str, int], indent: str = "  ") -> list[tuple[str, int]]:
+def each[Member: str](
+    members: Iterable[Member], counted: Mapping[Member, int], indent: str = "  "
+) -> list[tuple[str, int]]:
     """A line per member of an enumerated set, in the order it is written.
 
     The rule above, made executable. A section reaching for `Counter.items()`
     instead is exactly the drift the rule forbids -- it prints what the data
     held rather than what the rule admits -- and a named helper makes that
     visible in review rather than a thing to notice.
+
+    Generic over the member because a written-down set is as often a `StrEnum`
+    as a tuple of strings, and a `Mapping` is invariant in its key: pinning
+    this to `str` would refuse the tally a section had counted in the enum it
+    is printing.
     """
     return [(f"{indent}{member}", counted.get(member, 0)) for member in members]

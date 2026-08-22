@@ -2059,6 +2059,8 @@ components:
           type:
           - string
           - 'null'
+          description: Any string of your own, except one beginning 'sheet:', which
+            the sheet import reserves.
           maxLength: 64
         kind:
           $ref: '#/components/schemas/TransactionKindEnum'
