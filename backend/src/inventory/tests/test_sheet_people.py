@@ -292,11 +292,29 @@ def test_an_address_only_volunteer_survives_because_it_might_be_anybody() -> Non
     assert who.survivors() == 2
 
 
+def test_a_folded_key_carries_the_spelling_somebody_wrote_most_often() -> None:
+    """The fold is the key and never the display name. Ties go alphabetically,
+    which is the tie-break the key itself is chosen by, so the two cannot
+    disagree about which of two equally common spellings wins.
+    """
+    who = directory(sheet_of([submission(name="ada"), submission(name="Ada"), submission(name="Ada")]))
+
+    assert who.spellings == {"ada": "Ada"}
+
+
 def test_a_directory_built_by_hand_answers_the_same_way() -> None:
     """The rule is the directory's, not `directory()`'s, so the importer can
     hold one it assembled itself.
     """
-    who = Directory(by_name={"ada": "ada"}, by_address={}, flagged={}, held={}, shared={}, submissions={"ada": 1})
+    who = Directory(
+        by_name={"ada": "ada"},
+        spellings={"ada": "Ada"},
+        by_address={},
+        flagged={},
+        held={},
+        shared={},
+        submissions={"ada": 1},
+    )
 
     assert who.volunteers == {"ada"}
     assert who.volunteer(submission(name="Ada", email="")).key == "ada"

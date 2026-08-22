@@ -170,11 +170,22 @@ def near(one: str, other: str) -> str:
     return ""
 
 
+def busiest(among: Iterable[str], counted: Mapping[str, int]) -> str:
+    """The commonest of these strings, ties broken alphabetically.
+
+    The one tie-break this package picks a spelling by, named so that every
+    place that has to pick one -- the key a volunteer is known by, the name an
+    administrator is shown, the address that is theirs -- uses it rather than
+    writing it out again and being free to answer differently.
+    """
+    return min(among, key=lambda one: (-counted[one], one))
+
+
 def _spoken_for(written: Mapping[str, int], joined: Iterable[tuple[str, str]]) -> dict[str, str]:
     """Each spelling mapped to the one that speaks for its group.
 
-    The group's busiest spelling, ties broken alphabetically, so a volunteer's
-    key is a spelling somebody actually wrote rather than one this invents.
+    The group's busiest spelling, so a volunteer's key is a spelling somebody
+    actually wrote rather than one this invents.
     """
     parent = {spelling: spelling for spelling in written}
 
@@ -191,8 +202,7 @@ def _spoken_for(written: Mapping[str, int], joined: Iterable[tuple[str, str]]) -
         groups[root(spelling)].append(spelling)
     spoken: dict[str, str] = {}
     for group in groups.values():
-        speaks = min(group, key=lambda spelling: (-written[spelling], spelling))
-        spoken.update(dict.fromkeys(group, speaks))
+        spoken.update(dict.fromkeys(group, busiest(group, written)))
     return spoken
 
 
@@ -208,6 +218,11 @@ class Directory:
 
     # Folded name spelling to the volunteer it belongs to.
     by_name: Mapping[str, str]
+    # Folded name spelling to a spelling somebody actually typed. The fold is
+    # a good key and a poor thing to show an administrator, so the rule that
+    # picks the key picks the display name too rather than the importer
+    # picking a second one beside it.
+    spellings: Mapping[str, str]
     # Address to the volunteer it reaches, for the addresses that reach one.
     by_address: Mapping[str, str]
     # A volunteer this rule is unsure of, to the volunteers it might be the
@@ -267,12 +282,14 @@ class Directory:
 def directory(sheet: Sheet) -> Directory:
     """Read every submission, and answer who the workbook's people are."""
     written: Counter[str] = Counter()
+    typed: dict[str, Counter[str]] = defaultdict(Counter)
     addresses: dict[str, set[str]] = defaultdict(set)
     for one in sheet.submissions:
         name = spelled(one.name)
         if not name:
             continue
         written[name] += 1
+        typed[name][one.name] += 1
         if one.email:
             addresses[name].add(addressed(one.email))
     by_name = _spoken_for(
@@ -332,6 +349,7 @@ def directory(sheet: Sheet) -> Directory:
             submissions[by_address[address]] += 1
     return Directory(
         by_name=by_name,
+        spellings={folded: busiest(counted, counted) for folded, counted in typed.items()},
         by_address=by_address,
         flagged=flagged,
         shared={address: frozenset(reaches) for address, reaches in named_beside.items() if len(reaches) > 1},

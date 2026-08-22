@@ -92,11 +92,25 @@ class Volunteer(models.Model):
 
     display_name = models.CharField(max_length=100)
     # NULL rather than "" is deliberate, and is why DJ001 is suppressed on these
-    # two fields only. What that buys, and what keeps it true, is stated once on
-    # NULL_WHEN_BLANK below.
+    # three fields only. What that buys, and what keeps it true, is stated once
+    # on NULL_WHEN_BLANK below.
     email = models.EmailField(null=True, blank=True)  # noqa: DJ001
     slack_id = models.CharField(max_length=50, null=True, blank=True)  # noqa: DJ001
     active = models.BooleanField(default=True)
+    # The two columns the sheet import writes, and the only two things it may
+    # decide about a volunteer. Everything else it works out -- who is one
+    # person and who is two -- it either acts on or hands over here; the rule
+    # is inventory/sheet/people.py and the import is
+    # inventory/management/commands/_people.py.
+    sheet_key = models.TextField(  # noqa: DJ001
+        null=True,
+        blank=True,
+        help_text="The spelling or address the sheet import knew this volunteer by. Set by the import, and its key.",
+    )
+    sheet_flag = models.TextField(
+        blank=True,
+        help_text="What the sheet import could not settle about this volunteer. Clear it once you have.",
+    )
     # Points at somebody selectable(), and the database says so: the
     # `volunteer_merged_into_selectable` trigger in migration 0008 refuses a
     # merge into a record that has itself been merged or been retired. Without
@@ -126,7 +140,7 @@ class Volunteer(models.Model):
     # rather than at the API, which covers the admin as well -- but not
     # bulk_create() or queryset update(), so the sheet import will have to
     # normalise its own rows or go through save().
-    NULL_WHEN_BLANK = ("email", "slack_id")
+    NULL_WHEN_BLANK = ("email", "slack_id", "sheet_key")
 
     class Meta:
         # pk breaks the tie, and is not decoration: display names are
@@ -146,6 +160,15 @@ class Volunteer(models.Model):
                 fields=["slack_id"],
                 condition=models.Q(slack_id__isnull=False),
                 name="volunteer_unique_slack_id_when_present",
+            ),
+            # What makes a second import a no-op rather than a second set of
+            # rows, and what the ledger import joins a submission's person to.
+            # Partial for the same reason as the two above: nearly every
+            # volunteer added after the import will have no sheet key at all.
+            models.UniqueConstraint(
+                fields=["sheet_key"],
+                condition=models.Q(sheet_key__isnull=False),
+                name="volunteer_unique_sheet_key_when_present",
             ),
             models.CheckConstraint(
                 condition=~models.Q(merged_into=models.F("id")),

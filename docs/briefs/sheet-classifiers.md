@@ -491,7 +491,10 @@ plainly separate names. The cost is an administrator's glance.
 
 **Becomes.** `Volunteer` rows, and the merges an administrator makes over
 them. Seven submissions reach nobody at all and have no actor to be imported
-against; what the importer does with those is `inventory-tng-2dg`'s to settle.
+against; nothing is minted for them and they stay staged, for somebody who can
+say whose they were. Why that rather than a stand-in actor, and where the flags
+land so an administrator can act on them, is
+`inventory/management/commands/_people.py`.
 
 ## What no rule can recover
 
