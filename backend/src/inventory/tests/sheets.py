@@ -13,7 +13,7 @@ which one the rule read.
 
 from datetime import datetime
 
-from inventory.sheet.workbook import CHECKING_OUT, Sheet, Submission
+from inventory.sheet.workbook import CHECKING_OUT, CatalogueRow, Sheet, Submission, SubmissionRow
 
 AT = datetime(2026, 8, 21, 13, 0, 0)
 
@@ -50,12 +50,25 @@ def sheet_of(
     """A sheet holding exactly these submissions.
 
     `rows_read` defaults to the number of them, which says there was no sheet
-    furniture: a test about a rule is not also a test of the population.
+    furniture: a test about a rule is not also a test of the population. Ask
+    for more and the difference is made up with rows carrying no direction,
+    since that is the only way the reader produces one.
+
+    The cells behind every row are empty, because a rule reads the reading and
+    never the row: only `inventory.staging` wants the cells, and its own tests
+    build them from a real workbook.
     """
+    rows = [SubmissionRow(cells=(), read=one) for one in submissions]
+    following = max((one.row for one in submissions), default=1) + 1
+    furniture = 0 if rows_read is None else rows_read - len(submissions)
+    rows += [
+        SubmissionRow(cells=(), read=submission(row=following + which, direction="")) for which in range(furniture)
+    ]
     return Sheet(
-        catalogue=catalogue,
-        submissions=tuple(submissions),
-        rows_read=len(submissions) if rows_read is None else rows_read,
+        catalogue_rows=tuple(
+            CatalogueRow(number=number, cells=(), name=name) for number, name in enumerate(catalogue, start=2)
+        ),
+        rows=tuple(rows),
     )
 
 

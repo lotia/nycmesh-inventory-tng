@@ -208,6 +208,7 @@ for its own sake.
 | Feature | Used for | Why |
 | --- | --- | --- |
 | `JSONB` + GIN | `Item.attributes` | Radios, cable, connectors, fibre and hand tools have genuinely disjoint specifications. The alternatives are EAV or a wide sparse table, both worse |
+| `JSONB` | `StagedCatalogueRow.source`, `StagedSubmissionRow.source` | A spreadsheet row is whatever cells it had that day, and a column per cell would be a schema asserting a shape the export does not promise |
 | `pg_trgm` + GIN | `Volunteer.display_name` | Fuzzy search at the moment of self-registration is what prevents a second generation of the sheet's 102 spellings |
 | Partial unique indexes | `email`, `slack_id`, custody locations | Uniqueness that only applies to non-`NULL` rows, and one custody location per volunteer |
 | Check constraints | Movement invariants, `held_by`, self-parent | Invariants that must hold regardless of which client wrote the row |
@@ -239,6 +240,19 @@ each one produces, are in
 - **Locations must be extracted** from that same field.
 - Every imported row keeps its raw source as JSONB for provenance, so the import
   can be re-run and audited.
+
+`manage.py stage_sheet` is the first of those steps, and the only one that
+opens the workbook. It writes both tabs into `StagedCatalogueRow` and
+`StagedSubmissionRow`, keyed on the row number the spreadsheet shows, each row
+carrying its cells as JSONB beside what the reader made of them. Everything
+after it works from those tables, so a rule that changes is re-applied by
+somebody who has a database rather than only by somebody holding an export
+that is not ours to publish. Running it again makes the tables equal the
+export once more, which includes dropping a row the export has lost.
+
+Neither of those tables is part of the entity model above and neither lives
+with it: `backend/src/inventory/staging.py` holds them and says why, including
+why a staged timestamp is text.
 
 Anything genuinely unresolvable imports against a placeholder item and
 volunteer, flagged for cleanup, rather than being silently dropped.
