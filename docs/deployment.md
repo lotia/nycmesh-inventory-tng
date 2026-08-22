@@ -10,6 +10,73 @@ For what the components are, see [architecture.md](architecture.md). For local
 development — which uses `compose.yaml`, not this chart — see
 [DEVELOPERS.md](../DEVELOPERS.md).
 
+## Read this before you start
+
+**This procedure has never been run through to the end against a cluster, and
+four known defects stand in the way of the first person who does.** They are in
+the chart rather than in this page, so
+this page cannot fix them; what it can do is name them where you would
+otherwise meet them as a symptom. Each is filed, and each is listed again at
+the step it stops.
+
+| What happens | Why | Filed as |
+| --- | --- | --- |
+| `ImagePullBackOff` on every pod, at the first install | No image has ever been published from this repository, there is no `v0.1.0` to pull, and the chart renders no `imagePullSecrets` for a private one | `inventory-tng-qe7` |
+| Backend pods stay `0/1 Running` for ever, then restart every ~70 s | The probes send `Host: <pod IP>`, which `DJANGO_ALLOWED_HOSTS` refuses with a 400, so readiness never passes and liveness eventually kills the container. It reads exactly like a database problem and is not | `inventory-tng-adj` |
+| Every backend pod dies together during a brief database outage | Liveness probes `/api/healthz`, which runs a query, so an unreachable database is read as an unhealthy process | `inventory-tng-uq6` |
+| `helm upgrade` blocks until it times out, in a namespace with a `ResourceQuota` | The migrate Job renders with no `resources`, and a quota on cpu or memory refuses a pod that declares none unless a `LimitRange` fills them in | `inventory-tng-v7g` |
+
+The first two stop a first install outright. Until `inventory-tng-qe7` and
+`inventory-tng-adj` are done, treat what follows as the procedure that will
+work rather than one that has.
+
+## From an empty cluster to a first sign-in
+
+Ten steps, in this order, each linking to the section that explains it. Steps 6
+and 7 — install, then check — are the two you run again on every release; the
+rest happen once for the life of an environment.
+
+1. **Get a database.** This chart deploys none, for the reason
+   [Database](#database) gives, so the URL of one is an input rather than an
+   output.
+2. **Have an image to pull.** Nothing publishes one yet, so this is a step
+   somebody has to do by hand today — [Artifacts](#artifacts) says what to
+   build and where the chart looks for it.
+3. **Create the namespace**, because everything below is in it:
+
+   ```bash
+   kubectl create namespace inventory-tng
+   ```
+
+4. **Create the Secret** holding that URL and a signing key —
+   [Secrets](#secrets). Nothing starts without it, deliberately: see
+   [what has no default](#what-has-no-default).
+5. **Supply a certificate** in the Secret the chart names —
+   [the only route to the frontend pod](#the-only-route-to-the-frontend-pod).
+   There is no switch that skips this, because the camera a volunteer scans
+   with does not work without it.
+6. **Install the chart** — [Deploying to Kubernetes](#deploying-to-kubernetes).
+   The schema is migrated as part of this and before anything serves; what that
+   means when it fails is [Migrations](#migrations).
+7. **Check that it came up**: `kubectl -n inventory-tng get pods`, then
+   `curl https://<your host>/api/healthz`, which answers only once the database
+   is reachable — [health checks](#health-checks). This is where
+   `inventory-tng-adj` stops you today: the pods run and never become ready.
+8. **Make the first administrator and enrol its second factor** —
+   [First administrator](#first-administrator). This is the step people are
+   most often stopped by, and it is the one that has to happen before the next.
+9. **Restrict the administrative routes** —
+   [Administrative access](#administrative-access). After step 8, never before:
+   signing in needs `/accounts`, which is one of the paths this shuts.
+10. **Add a sign-in provider**, if you want one —
+    [the provider Secret](#the-provider-secret). Optional, changeable later, and
+    it grants nobody anything by itself.
+
+Every `kubectl` command below names a resource as it is rendered when the
+release is called `inventory-tng`, as in step 6. The chart builds those names as
+`<release>-inventory-tng-<component>`, so a release under another name renames
+them with it.
+
 ## Artifacts
 
 | Artifact | Source | Contents |
@@ -20,11 +87,52 @@ development — which uses `compose.yaml`, not this chart — see
 
 Both images run as non-root. The backend runs with a read-only root filesystem.
 
+### Nothing publishes them yet
+
+The chart pulls `ghcr.io/lotia/nycmesh-inventory-tng-backend:<image.tag>` and
+`-frontend:<image.tag>`. **No such image exists.** CI builds both on every push
+and pushes neither, this repository carries no release tag, and the chart
+renders no `imagePullSecrets`, so it could not authenticate to a private
+registry even if one held them. Filed as `inventory-tng-qe7`; until that lands,
+an install gets `ImagePullBackOff` on every pod.
+
+What to do in the meantime is build and push them yourself, and point the chart
+at wherever you put them:
+
+```bash
+docker build -t <your registry>/inventory-tng-backend:<tag> backend
+docker build -t <your registry>/inventory-tng-frontend:<tag> frontend
+docker push <your registry>/inventory-tng-backend:<tag>
+docker push <your registry>/inventory-tng-frontend:<tag>
+```
+
+`image.registry` and `image.repository` are the two values that move the chart
+onto that registry; the chart appends `-backend` and `-frontend` to the
+repository itself. A private registry needs a pull Secret the chart cannot
+reference, so either make the repository public or wait for
+`inventory-tng-qe7`.
+
 ## Environment variables
 
 The backend reads all of these from the environment. Locally they come from
 `.env` (see [`.env.sample`](../.env.sample)); in Kubernetes they come from the
 chart and from a Secret.
+
+### What has no default
+
+Two, and they are the two nothing else can supply for you.
+`DJANGO_SECRET_KEY` signs every session and every password-reset link, so any
+value shipped with the software would be a published key signing real sessions
+— Django refuses to start rather than fall back to one. `DATABASE_URL` decides
+*which* data this deployment is, and a default could only point somewhere
+plausible and wrong. Both fail at boot, which is the intended behaviour and not
+a rough edge: a pod that will not start is a deployment somebody fixes in the
+first minute, where one running on a guessed value is found much later.
+
+Everything else in the table below is a value the chart already carries, so a
+release that supplies only those two starts. It starts answering to whatever
+hostname `values.yaml` was last left naming, which is why
+`django.allowedHosts` is marked required even though it is never missing.
 
 | Variable | Required | Source in Kubernetes | Notes |
 | --- | --- | --- | --- |
@@ -110,20 +218,57 @@ NYC Mesh instance — so that the application's release cycle never risks the da
 NYC Mesh runs k3s on [Proxmox](https://www.proxmox.com/en/), which is standard
 Kubernetes as far as this chart is concerned.
 
+**Keep your values in a file, not in `--set` flags.** Helm carries nothing
+across an upgrade that is not either in the chart's defaults or given again, so
+a release installed with four `--set` flags and upgraded with one silently
+reverts the other three to the chart's values — which point at
+`inventory.nycmesh.net`, whoever you are. That is a whole deployment answering
+the wrong hostname, with no error anywhere. Write the file once:
+
+```yaml
+# my-values.yaml, kept wherever you keep deployment configuration
+image:
+  tag: v0.1.0
+ingress:
+  host: inventory.example.net
+django:
+  allowedHosts: inventory.example.net
+  labelBaseUrl: https://inventory.example.net
+```
+
 ```bash
 helm upgrade --install inventory-tng infra/helm/inventory-tng \
-  --namespace inventory-tng --create-namespace \
-  --set image.tag=v0.1.0 \
-  --set ingress.host=inventory.nycmesh.net \
-  --set django.allowedHosts=inventory.nycmesh.net
+  --namespace inventory-tng \
+  --values my-values.yaml
 ```
+
+The namespace is step 3's; `--create-namespace` is not used here because the
+Secret in step 4 had to go somewhere first.
+
+`django.labelBaseUrl` is in that file for a reason the others are not: it is
+the origin printed inside every QR code, so a release that leaves it at the
+chart default stickers your shelves with somebody else's hostname, and the
+stickers are the one thing a later release cannot correct. Set it before you
+print anything.
+
+If you would rather not keep a file, `helm upgrade --reuse-values` carries the
+previous release's values forward — but it also carries forward anything you
+have since removed from the chart, so a file is the arrangement that stays
+true.
 
 **TLS is not optional**, and the chart offers no switch to turn it off. QR
 scanning stops working over plain HTTP, including on a LAN address; why, and
 what the app says to whoever hits it, is in
-[decision 0011](decisions/0011-qr-batch-scanning.md#consequences). Rendering
-the chart without a certificate fails rather than quietly producing an ingress
-nobody can scan from — see below for supplying one.
+[decision 0011](decisions/0011-qr-batch-scanning.md#consequences).
+
+**Nothing fails when the certificate is missing**, so do not wait to be told.
+The chart checks only that one has been *named*: `ingress.tls.secretName`
+carries a default, so a render with no Secret anywhere in the cluster succeeds,
+and it is an explicitly emptied value — not an absent Secret — that is refused.
+What a missing Secret gets you is ingress-nginx serving its own self-signed
+fake certificate, a browser warning, and, the part that costs an evening, a
+camera that never opens: a certificate the browser does not trust is not a
+secure context. Supply one before you install; see below.
 
 If something in front of the ingress terminates TLS — a load balancer, a
 service mesh — set `ingress.tls.terminatedElsewhere=true`. That stops the
@@ -195,10 +340,22 @@ restriction the deployer names. A second resource rather than a second rule,
 because an allow-list is an annotation and annotations apply to every path of
 the Ingress carrying them.
 
+Add it to the same values file rather than as flags, for the reason
+[Deploying to Kubernetes](#deploying-to-kubernetes) gives — a later upgrade
+without them takes the restriction off again, and nothing says so:
+
+```yaml
+ingress:
+  administrative:
+    enabled: true
+    allowedSourceRanges:
+      - 10.69.0.0/16
+      - 199.170.132.0/24
+```
+
 ```bash
-helm upgrade --install inventory-tng infra/helm/inventory-tng ... \
-  --set ingress.administrative.enabled=true \
-  --set 'ingress.administrative.allowedSourceRanges={10.69.0.0/16,199.170.132.0/24}'
+helm upgrade --install inventory-tng infra/helm/inventory-tng \
+  --namespace inventory-tng --values my-values.yaml
 ```
 
 The same switch takes the other two shapes of the boundary, in
@@ -292,11 +449,13 @@ kubectl create secret tls inventory-tng-tls \
   --namespace inventory-tng --cert=fullchain.pem --key=privkey.pem
 ```
 
-or, where cert-manager runs in the cluster, let it fill the same Secret in:
+or, where cert-manager runs in the cluster, let it fill the same Secret in — in
+the values file, beside everything else:
 
-```bash
-helm upgrade --install inventory-tng infra/helm/inventory-tng ... \
-  --set ingress.annotations."cert-manager\.io/cluster-issuer"=letsencrypt-prod
+```yaml
+ingress:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 ```
 
 Verify before and after:
@@ -305,7 +464,7 @@ Verify before and after:
 helm lint infra/helm/inventory-tng
 helm template test infra/helm/inventory-tng --set image.tag=v0.1.0   # inspect manifests
 kubectl -n inventory-tng get pods
-kubectl -n inventory-tng logs deploy/inventory-tng-backend
+kubectl -n inventory-tng logs deploy/inventory-tng-inventory-tng-backend
 ```
 
 ### Migrations
@@ -316,10 +475,68 @@ would let several replicas apply the same migration concurrently. The Job runs
 once per release, before new pods roll out; if it fails, the release stops and
 the old pods keep serving.
 
+Three things follow from that arrangement, and they are what an administrator
+needs to predict what a release will do:
+
+- **The Job is the same image as the web pods, with the same environment.** It
+  reads `DATABASE_URL` out of the same Secret, so anything the Job can reach
+  the pods can, and a Job that fails to connect has told you the pods would
+  have too.
+- **`helm upgrade` blocks on it, for five minutes.** The hook runs to
+  completion before any new pod is created, so a command that returns
+  successfully is a database whose schema matches the image about to serve it.
+  One that fails leaves the previous release running and untouched. Five
+  minutes is Helm's default `--timeout` and it applies to the whole release,
+  hook included: a slow migration on a large table wants a longer one passed
+  explicitly, and a `--timeout` that expires does not stop the Job.
+- **A failure is four failures.** The Job carries `backoffLimit: 3`, so a
+  migration that is broken rather than unlucky is attempted four times before
+  the Job is failed. Each attempt is a fresh pod against the same database.
+- **A Job per release survives its release.** Its name carries the revision
+  number rather than being reused, so the migration that failed is still an
+  object in the namespace afterwards and its logs can be read.
+- **In a namespace with a `ResourceQuota`, it may never be admitted at all.**
+  The Job renders with no `resources`, and a quota on cpu or memory refuses a
+  pod that declares none unless a `LimitRange` supplies them. The symptom is a
+  release that blocks until the timeout with no pod to read logs from.
+  `inventory-tng-v7g`.
+
+To watch one, or to read why a release stopped:
+
+```bash
+kubectl -n inventory-tng logs job/inventory-tng-inventory-tng-migrate-1
+```
+
+with the trailing number being that release's revision, from `helm history`.
+
+### When the *first* install is what failed
+
+The paragraph above is about upgrades, and a first install behaves differently
+in a way that catches everybody once. `helm upgrade --install` on a release
+that has never had a successful deployment does not retry it — it answers:
+
+```
+Error: UPGRADE FAILED: "inventory-tng" has no deployed releases
+```
+
+There is no previous release to keep serving and nothing to roll back to, so
+the failed revision simply sits there and blocks the name. Clear it and install
+again:
+
+```bash
+helm uninstall inventory-tng --namespace inventory-tng
+```
+
+`uninstall` removes the release's objects; it does not touch the database,
+which this chart does not own, so whatever the failed migration did to the
+schema is still done. Read the migrate Job's logs before you try again: the
+Job carries `helm.sh/hook-delete-policy: before-hook-creation`, so the next
+attempt deletes it to make room for its own.
+
 ### First administrator
 
 ```bash
-kubectl -n inventory-tng exec -it deploy/inventory-tng-backend -- \
+kubectl -n inventory-tng exec -it deploy/inventory-tng-inventory-tng-backend -- \
   python manage.py createsuperuser
 ```
 
@@ -335,14 +552,20 @@ an administrator, and no provider can do it.
 factor is required of sessions allauth itself created — see `RequireSecondFactor`
 in `backend/src/inventory/middleware.py` — so anybody already signed in through
 the Django admin's old login form keeps a password-only session for as long as
-it lives. Once, against the deployed database:
+it lives.
+
+`manage.py clearsessions` is not the command for this: it deletes only sessions
+that have already expired, which is the opposite of the set that matters, and
+it takes no flag that widens it. Delete them all, in a shell in the same pod:
 
 ```bash
-python manage.py clearsessions --all 2>/dev/null || \
-  python -c "import django;django.setup();from django.contrib.sessions.models import Session;Session.objects.all().delete()"
+kubectl -n inventory-tng exec -it deploy/inventory-tng-inventory-tng-backend -- \
+  python manage.py shell -c \
+  'from django.contrib.sessions.models import Session; print(Session.objects.all().delete())'
 ```
 
-Everybody signs in again, this time through the door that asks for a code.
+Once, against the deployed database. Everybody signs in again, this time
+through the door that asks for a code.
 
 ## Deploying to CodeNOW
 
@@ -367,6 +590,29 @@ documented here apply unchanged.
 `GET /api/healthz` returns `{"status": "ok"}` and executes a trivial query, so it
 fails if the database is unreachable. The chart uses it for both liveness and
 readiness probes on the backend.
+
+**Two known defects live here, and between them they are what stops step 7
+today.**
+
+A `httpGet` probe with no `host` set sends the pod's own IP as the `Host`
+header. `DJANGO_ALLOWED_HOSTS` is whatever `django.allowedHosts` says — a real
+hostname — so Django answers the probe with a 400, readiness never passes, and
+no backend pod is ever added to the Service. Liveness, on the same path, then
+restarts the container after roughly 70 seconds (a 10-second delay, then three
+20-second periods) and does it again for ever. It reads as a crash and it is a
+healthy Django refusing a hostname it was told to refuse; the giveaway is in
+that pod's own log, as `Invalid HTTP_HOST header` naming the pod's IP.
+`inventory-tng-adj`.
+
+The second is what that probe asks. Liveness runs the same query readiness
+does, so a database that is briefly unreachable is read as a process that needs
+killing — and because every replica is asking the same database, they fail
+together. A one-minute blip becomes a full restart of the deployment.
+`inventory-tng-uq6`.
+
+Until both are fixed, `kubectl -n inventory-tng get pods` showing
+`0/1 Running` with a climbing restart count is the expected outcome of step 7
+rather than a sign that something about your cluster is wrong.
 
 ## Rollback
 

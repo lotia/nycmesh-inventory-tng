@@ -75,6 +75,14 @@ MAX_MOVEMENTS = 500
 # How far ahead of the server a client's clock may be and still be believed.
 CLOCK_SKEW = datetime.timedelta(minutes=5)
 
+# The reserved idempotency-key prefixes as a reader of the schema meets them,
+# rendered off the model's own mapping rather than written out here. The list
+# a client is shown and the list `validate_idempotency_key` enforces are then
+# the same list, and a third writer changes neither.
+RESERVED_PREFIXES = ", ".join(
+    f"{prefix!r} ({owner})" for prefix, owner in StockTransaction.RESERVED_KEY_PREFIXES.items()
+)
+
 
 class CachedPrimaryKeyRelatedField(serializers.PrimaryKeyRelatedField):
     """A related field that looks each distinct id up once per request.
@@ -242,27 +250,33 @@ class StockTransactionCreateSerializer(serializers.ModelSerializer):
         max_length=64,
         required=False,
         allow_null=True,
-        help_text=f"Any string of your own, except one beginning {StockTransaction.FROM_THE_SHEET!r}, "
-        "which the sheet import reserves.",
+        help_text="Any string of your own. These prefixes belong to writers of this application's own "
+        f"and are refused: {RESERVED_PREFIXES}.",
     )
     # Merged and inactive volunteers are not choices; the rule and the reason
     # live once, on the queryset the pick-list uses too.
     actor = serializers.PrimaryKeyRelatedField(queryset=Volunteer.objects.selectable())
 
     def validate_idempotency_key(self, value: Any) -> Any:
-        """The sheet import's prefix is its own, and no client may write one.
+        """Two prefixes belong to writers of our own, and no client may claim either.
 
-        Three of that import's behaviours read a key wearing the prefix as a
-        row it posted, and the costliest takes the location one of them
-        touched as the place the whole import moves stock through. A batch
-        free to claim the prefix could therefore point the next run at a
-        location nobody chose, so it is refused at the door rather than the
-        import having to distrust rows that look like its own.
+        Three of the sheet import's behaviours read a key wearing its prefix as
+        a row it posted, and the costliest takes the location one of them
+        touched as the place the whole import moves stock through. A batch free
+        to claim the prefix could therefore point the next run at a location
+        nobody chose, so it is refused at the door rather than the import
+        having to distrust rows that look like its own.
+
+        The demo seed's prefix is reserved on the same argument. It writes
+        invented stock only while every transaction in the ledger is one of its
+        own, so a single batch submitted under that prefix makes the question
+        answer yes and the next seed posts made-up quantities on top of real
+        ones -- permanently, because decision 0016 refuses UPDATE and DELETE
+        on both ledger tables.
         """
-        if value and value.startswith(StockTransaction.FROM_THE_SHEET):
-            raise serializers.ValidationError(
-                f"A key may not begin {StockTransaction.FROM_THE_SHEET!r}: the sheet import reserves it."
-            )
+        for prefix, owner in StockTransaction.RESERVED_KEY_PREFIXES.items():
+            if value and value.startswith(prefix):
+                raise serializers.ValidationError(f"A key may not begin {prefix!r}: it is reserved to {owner}.")
         return value
 
     def validate_occurred_at(self, value: Any) -> Any:

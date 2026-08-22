@@ -151,16 +151,37 @@ jobs:
   chart:
     name: Helm chart
     runs-on: ubuntu-latest
+    # Every render docs/deployment.md prints, and no more, because a runner has
+    # no cluster to install into. All of them here rather than some of them
+    # here and some in the setup job: the variants differ from the plain render
+    # by a flag or two, and a chart that has stopped rendering should say so
+    # once. See DEVELOPERS.md#what-ci-proves.
     steps:
       - uses: actions/checkout@v5
       - uses: azure/setup-helm@v4
       - run: helm lint infra/helm/inventory-tng
       - name: Render manifests
         run: helm template test infra/helm/inventory-tng --set image.tag=ci
+      # The administrative ingress is off by default, so the plain render above
+      # never draws it. The grep is the assertion: rendering clean while
+      # producing no second host and no address restriction would be a chart
+      # that has quietly stopped offering what the document sells.
+      - name: Render them again with the administrative ingress on
+        run: |
+          helm template test infra/helm/inventory-tng --set image.tag=ci \
+            --set ingress.administrative.enabled=true \
+            --set 'ingress.administrative.allowedSourceRanges={10.69.0.0/16}' \
+            | grep -E 'name:.*-admin|whitelist|^ +- path:'
 
   images:
     name: Container images
     runs-on: ubuntu-latest
+    # Both images, built from a matrix so a broken Dockerfile is named by the
+    # job that failed. This is also what fills the `type=gha` cache the
+    # `Compose stack` job below reads, which is why that one does not build
+    # cold. The two are not redundant: this proves each image builds on its
+    # own, that one proves the three of them serve a request together, and
+    # this one is a check `main` requires by name.
     strategy:
       matrix:
         component: [backend, frontend]
@@ -174,6 +195,133 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  compose:
+    name: Compose stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # compose.yaml gives all three services a read-only root filesystem and a
+    # tmpfs for each directory that one genuinely writes to, and DEVELOPERS.md
+    # "Option A" says so in prose. Nothing else finds out whether that is true:
+    # the `images` job builds the two images and stops, and the setup job
+    # starts postgres alone. The riskiest halves are the unproven ones --
+    # whether gunicorn survives with only /tmp and /home/app to write to, and
+    # whether nginx survives a tmpfs laid over the directory holding the
+    # configuration its own base image wrote at build time.
+    #
+    # Serving a request is the assertion, because that is what a reader of
+    # README's quickstart does next -- and then the two commands it tells them
+    # to run before any page of it is worth opening.
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure, as the quickstart says to
+        run: cp .env.sample .env
+      - uses: docker/setup-buildx-action@v3
+      # The two builds below are the quickstart's `--build`, taken out of
+      # `compose up` so they can read the same `type=gha` cache the `images`
+      # job fills. Built cold here, they were a second `uv sync` over 170
+      # packages and a second `npm ci` over 274 on every push.
+      #
+      # Tagged `<project>-<service>`, which is what compose calls a service it
+      # builds itself and so what `up` looks for. compose.yaml fixes the
+      # project name, so both names are settled here rather than discovered --
+      # asking `compose config --images` for one service answers with more
+      # than one line, and a lookup that can pick the wrong one is worse than
+      # a convention that is checked. The step after these two checks it.
+      - name: Build the backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          load: true
+          tags: inventory-tng-backend
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build the frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          load: true
+          tags: inventory-tng-frontend
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # If compose ever calls them something else, the two builds above were a
+      # waste and `up` below would silently build its own -- slower, and this
+      # job's whole reason for pre-building gone with no sign of it. So the
+      # convention is asserted rather than trusted.
+      - name: The names above are the ones compose looks for
+        run: |
+          compose_wants=$(docker compose config --images)
+          for image in inventory-tng-backend inventory-tng-frontend; do
+            if ! printf '%s\n' "$compose_wants" | grep -qx "$image"; then
+              echo "::error::compose does not look for $image; it wants:"
+              printf '%s\n' "$compose_wants"
+              exit 1
+            fi
+          done
+      - name: Bring the whole stack up
+        run: docker compose up -d
+      # --retry-all-errors, not just --retry-connrefused: the ports are
+      # published the moment the containers start, so a request arriving before
+      # gunicorn is listening is answered by an empty reply rather than
+      # refused, and curl retries an empty reply only when told to. The backend
+      # migrates before it serves, so this wait is a real one.
+      - name: The API answers
+        run: |
+          curl -sf --retry 30 --retry-delay 2 --retry-all-errors \
+            http://localhost:8000/api/healthz | tee /dev/stderr | grep -q '"ok"'
+      - name: The app a volunteer opens is served
+        run: |
+          curl -sf --retry 30 --retry-delay 2 --retry-all-errors \
+            http://localhost:8080/ | grep -q 'id="root"'
+      # Through nginx rather than around it, which is the path a browser takes
+      # and the one the tmpfs over /etc/nginx/conf.d could break on its own.
+      - name: The API answers through the frontend's proxy
+        run: |
+          curl -sf --retry 30 --retry-delay 2 --retry-all-errors \
+            http://localhost:8080/api/healthz | grep -q '"ok"'
+      # The two README calls not optional, in the shape it prints them. Without
+      # these the quickstart -- the path written for somebody who has only
+      # Docker -- would be the one route into this project that nothing runs
+      # end to end. The seed also refuses unless DEBUG is on, so this is where
+      # it is found out that `cp .env.sample .env` is what supplies it.
+      #
+      # createsuperuser asks at a terminal and there is none here, which is why
+      # README hands it to a person; the two arguments below are Django's own
+      # way to answer it in advance and are not a line this repository asks
+      # anybody to type.
+      - name: Something to look at, and an account to look at it with
+        run: |
+          docker compose exec -T backend python manage.py seed_demo_data
+          docker compose exec -T \
+            -e DJANGO_SUPERUSER_PASSWORD=ci-only-not-a-real-password backend \
+            python manage.py createsuperuser --noinput \
+            --username ci --email ci@example.invalid
+      - name: The seed left rows behind, and the account exists
+        run: |
+          docker compose exec -T backend python manage.py shell -c '
+          from django.contrib.auth.models import User
+          from inventory.models import Item, Label, Location, StockMovement, Volunteer
+          for model in (Item, Label, Location, StockMovement, Volunteer):
+              assert model.objects.exists(), f"the seed left no {model.__name__} rows"
+          assert User.objects.filter(username="ci", is_superuser=True).exists()
+          print("catalogue, labels, places, people, ledger and a login: all there")
+          '
+      # So that the three assertions above cannot start passing for the wrong
+      # reason the day somebody drops `read_only` to make something work.
+      - name: The root filesystems really are read-only
+        run: |
+          for service in postgres backend frontend; do
+            if docker compose exec -T "$service" sh -c 'touch /proof-of-a-writable-root' 2>/dev/null; then
+              echo "::error::$service accepted a write to its root filesystem"
+              exit 1
+            fi
+          done
+      - name: What the services said
+        if: failure()
+        run: docker compose logs --no-color --tail 200
+      - name: Stop it
+        if: always()
+        run: docker compose down -v
 
   commit-check:
     name: Guardrail checkers
@@ -192,6 +340,8 @@ jobs:
         run: scripts/repo-settings.test.sh
       - name: Check the batch-contents comment
         run: scripts/say-batch.test.sh
+      - name: Check the bootstrap script
+        run: scripts/bootstrap-dev.test.sh
 
   history:
     name: One issue per commit

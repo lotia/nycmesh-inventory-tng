@@ -662,6 +662,30 @@ def test_a_key_claiming_the_sheet_imports_prefix_is_refused(
     assert not StockTransaction.objects.exists()
 
 
+def test_a_key_claiming_the_demo_seeds_prefix_is_refused(
+    client: Client,
+    volunteer: Volunteer,
+    item: Item,
+    warehouse: Location,
+) -> None:
+    """One accepted batch under this prefix is enough to make
+    `seed_demo_data.ledger_is_ours()` answer yes over a real ledger, after
+    which the next seed posts invented quantities on top of real stock -- and
+    decision 0016 refuses UPDATE and DELETE, so they stay.
+    """
+    response = post(
+        client,
+        batch(
+            volunteer,
+            [{"item": item.pk, "quantity": "1", "from_location": warehouse.pk}],
+            idempotency_key=f"{StockTransaction.FROM_THE_DEMO_SEED}x",
+        ),
+    )
+    assert response.status_code == 400
+    assert response.json()["errors"][0]["field"] == "idempotency_key"
+    assert not StockTransaction.objects.exists()
+
+
 def test_a_null_idempotency_key_records_an_ordinary_batch(
     client: Client,
     volunteer: Volunteer,
