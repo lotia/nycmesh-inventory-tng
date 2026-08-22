@@ -20,7 +20,8 @@ sheet — 52 catalogued items and 3,439 submissions between July 2022 and August
 - **102 name spellings** (`sean`/`Sean`, `Lydon`/`lydon`/`Lydon Thorpe`,
   `JohnB`/`Johnb`/`johnb`), because the form asks for a name as free text on
   every submission, and a large share of submissions carry no email to
-  disambiguate them.
+  disambiguate them. How many people those spellings are is
+  [§6 of the brief](../briefs/sheet-classifiers.md#6-person-to-volunteer).
 - **2,455 check-outs against 984 check-ins.** Every printed QR code encodes a
   form link hardcoded to `Checking Out`, so returning stock costs strictly more
   effort than taking it. This is a bias in the instrument, not a measurement of

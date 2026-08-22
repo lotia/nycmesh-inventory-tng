@@ -38,14 +38,13 @@ ledger is designed in
 
 A person who moves stock. Deliberately **not** `django.contrib.auth.User`:
 under a hundred people transact, of whom a handful need administrative access.
-(How many exactly is not known — the sheet carries 102 name spellings and 65
-distinct email addresses, and 65 is a count of addresses rather than of people;
-[the classifiers brief](briefs/sheet-classifiers.md) says why and
-`inventory-tng-5r2` settles it. The argument here holds at either end of that
-range: both are small.) There
-is no link between the two models; administrators have a `User` (how they come
-by one is [decision 0013](decisions/0013-administrator-sign-in.md)) and a
-`Volunteer` row if they also move stock.
+(Between 59 and 72 of them, a range rather than a number for reasons
+[§6 of the classifiers brief](briefs/sheet-classifiers.md#6-person-to-volunteer)
+states beside the rule that produces it. The argument here holds at either end:
+both are small.) There is no link between the two models; administrators have a
+`User` (how they come by one is
+[decision 0013](decisions/0013-administrator-sign-in.md)) and a `Volunteer` row
+if they also move stock.
 
 | Field | Notes |
 | --- | --- |
