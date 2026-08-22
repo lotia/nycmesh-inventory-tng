@@ -266,8 +266,20 @@ each one produces, are in
 - Every imported row keeps its raw source as JSONB for provenance, so the import
   can be re-run and audited.
 
-`manage.py stage_sheet` is the first of those steps, and the only one that
-opens the workbook. It writes both tabs into `StagedCatalogueRow` and
+`manage.py import_sheet` is what a contributor runs. Given the path to an
+export it performs every step below, each one reading what the one before it
+wrote, and prints a section per step — closing with one that says what the run
+itself added, so a second run over the same export reads as a block of zeroes
+rather than as something to go and verify against the database. Why it composes
+those steps rather than replacing them, and why it takes no argument but the
+path, is argued in
+`backend/src/inventory/management/commands/import_sheet.py`.
+
+Each step is also a command of its own, so a rule that changes is re-applied by
+running the one that applies it.
+
+`manage.py stage_sheet` is the step that keeps that last promise, and the only
+one that opens the workbook. It writes both tabs into `StagedCatalogueRow` and
 `StagedSubmissionRow`, keyed on the row number the spreadsheet shows, each row
 carrying its cells as JSONB beside what the reader made of them. Everything
 after it works from those tables, so a rule that changes is re-applied by

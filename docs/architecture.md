@@ -184,6 +184,15 @@ Named here so the gaps are visible rather than surprising:
   endpoint but the index, the health check and `/api/me` still requires a
   session, including the two a volunteer needs.
 - **Migration from the existing Google Sheet** (52 items, 3,439 submissions).
+  It is built: `manage.py stage_sheet` loads an export into the
+  staging tables, `manage.py mint_items` and `manage.py import_volunteers` mint
+  the catalogue and everybody those rows name, `manage.py post_ledger`
+  posts the transactions and movements they describe, and `manage.py
+  import_sheet` runs the four of them in order and reports on what they did —
+  all described in
+  [data-model.md](data-model.md#migrating-the-existing-sheet). What is missing
+  is where the stock actually is: every imported movement touches one
+  provisional location until the real list is settled.
 - **Background jobs.** MeshDB uses Celery with Redis. Nothing here needs
   asynchronous work yet, so neither is deployed; the shape is known if that
   changes.
