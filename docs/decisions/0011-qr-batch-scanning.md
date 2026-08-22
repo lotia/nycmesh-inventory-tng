@@ -316,6 +316,19 @@ Queued offline submission is **deferred, not dropped**: the two things that
 would make it a rewrite, the client-side cart and the idempotency key, are being
 built now, so a service worker is purely additive later.
 
+> **Amended.** It is built, and it is not a service worker. Background Sync is
+> Chromium-only, so on the platform the consequences below name as the one to
+> test on it would wake for nobody, and a batch replayed out of sight is a
+> batch whose warnings and refusals nobody reads. What is built instead is an
+> **outbox in `localStorage` that the page drains** — when the app opens, when
+> the browser reports the network back, when a later save gets through, and
+> when the volunteer asks. A batch nothing answered is moved there and the cart
+> comes back empty; the entry keeps the request verbatim, so every attempt
+> carries the key this section scopes to the actor, and the ledger is what
+> makes it once. Every held batch is drawn at the top of the screen until it is
+> in or refused, because a queue nobody can see is worse than none. See
+> `frontend/src/batch/outbox.ts` and `inventory-tng-ykw`.
+
 The item list with balances, and the bulk label snapshot the cache needs, are
 ordinary catalogue reads specified with the read API rather than here.
 

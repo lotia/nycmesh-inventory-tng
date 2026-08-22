@@ -10,7 +10,11 @@
  * Decimals arrive as strings. DRF renders them that way on purpose: a decimal
  * is not a double, and a quantity of stock is not something to round on the
  * way through JSON.
+ *
+ * One guard lives here as well, for the one answer this app acts on before it
+ * has finished reading -- see `isRecordedBatch`.
  */
+import { isNumber, isText, matches } from "../storage";
 
 /** One page of a list endpoint, in DRF's `PageNumberPagination` shape. */
 export interface Page<T> {
@@ -138,6 +142,24 @@ export interface BatchWarning {
 export interface RecordedBatch {
   id: number;
   warnings: BatchWarning[];
+}
+
+/**
+ * Whether what came back really is one, rather than merely typed as one.
+ *
+ * The type parameter on `apiPost<RecordedBatch>` is a hope, not a fact: a 2xx
+ * whose body is not JSON resolves as null -- an empty answer, or an HTML page
+ * from something in front of Django -- and reading `warnings` off that throws
+ * on the success path, where a throw is read as the save having failed. Both
+ * the submit bar and the outbox ask this before they believe an answer.
+ */
+export function isRecordedBatch(value: unknown): value is RecordedBatch {
+  if (!matches(value, { id: isNumber, warnings: Array.isArray })) {
+    return false;
+  }
+  return (value as RecordedBatch).warnings.every((warning: unknown) =>
+    matches(warning, { detail: isText }),
+  );
 }
 
 /** Somewhere stock can be, as the pick-list shows it. */

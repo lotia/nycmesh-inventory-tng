@@ -4,6 +4,7 @@ import Typography from "@mui/material/Typography";
 import { useEffect } from "react";
 import { SessionProvider } from "./admin/SessionProvider";
 import { StaleSession } from "./admin/StepUp";
+import { Outbox } from "./batch/Outbox";
 import { SubmitBar } from "./batch/SubmitBar";
 import { CartProvider } from "./cart/CartProvider";
 import { ItemList } from "./items/ItemList";
@@ -51,6 +52,11 @@ export default function App() {
                 away at the same moment, and one prompt is what fixes all of
                 them. Nothing is drawn for a volunteer. */}
             <StaleSession />
+            {/* Above everything else, and before the volunteer starts the
+                next batch: a batch this device is still holding is the one
+                thing on this screen that somebody may walk away without
+                having seen. See batch/Outbox.tsx. */}
+            <Outbox />
             <DeepLink />
             <VolunteerPicker />
             <Scanner />

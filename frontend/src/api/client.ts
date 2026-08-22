@@ -24,14 +24,19 @@ export class ApiError extends Error {
     readonly status: number,
     message: string,
     readonly body: unknown = null,
+    /**
+     * Whether nothing was reached, as opposed to something answering badly.
+     *
+     * Recorded where the failure happened rather than read back off a status
+     * of 0, because that status also lands on anything `asApiError` had to
+     * dress up. A bug in this app throwing on the save path is not a signal
+     * problem, and treating it as one hands a batch to a queue that will
+     * replay it into the same bug for the rest of the device's life.
+     */
+    readonly offline: boolean = false,
   ) {
     super(message);
     this.name = "ApiError";
-  }
-
-  /** Whether nothing was reached, as opposed to something answering badly. */
-  get offline(): boolean {
-    return this.status === 0;
   }
 }
 
@@ -96,7 +101,7 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
     if (isAbort(cause)) {
       throw cause;
     }
-    throw new ApiError(0, UNREACHABLE);
+    throw new ApiError(0, UNREACHABLE, null, true);
   }
   const body = await parse(response);
   if (!response.ok) {
@@ -178,7 +183,13 @@ export function refusalBody<T>(
   return looksRight(body) ? (body as T) : null;
 }
 
-/** Whatever was thrown, as the error a screen can render. */
+/**
+ * Whatever was thrown, as the error a screen can render.
+ *
+ * Anything that is not already one of ours is *not* marked offline: it is a
+ * throw from this app's own code, and the one caller that acts on `offline`
+ * would otherwise queue the batch and replay a programming error.
+ */
 export function asApiError(error: unknown): ApiError {
   return error instanceof ApiError ? error : new ApiError(0, String(error));
 }

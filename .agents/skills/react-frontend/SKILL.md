@@ -57,12 +57,12 @@ and it catches accessibility regressions for free.
 
 ## Not yet built
 
-The scanning flow is built end to end, cart and Save included; one thing
-decision 0011 says the client does for itself is still missing from it. The
+The scanning flow is built end to end: cart, Save, the label map a scan
+resolves against, and the outbox a batch waits in when nothing answers. The
 screens around them — `src/items/`, `src/volunteers/`, `src/scan/` and
 `src/batch/` — show the shape to follow: `src/api/` is the only place this app
-fetches, and every component reads its data through `useResource`. Those gaps
-and the others are listed in
+fetches, and every component reads its data through `useResource`. What is
+still missing here, and elsewhere, is listed in
 [docs/architecture.md](../../../docs/architecture.md#not-yet-built). Read
 [decision 0011](../../../docs/decisions/0011-qr-batch-scanning.md) before
 touching it: it settles the scanning library, what the cart is, and what the

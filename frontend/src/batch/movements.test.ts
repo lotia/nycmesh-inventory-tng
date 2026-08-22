@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createCart } from "../cart/cartState";
-import { batchBody, KINDS, sideFor, whatIsMissing } from "./movements";
+import { batchBody, KINDS, sideFor, whatIsIn, whatIsMissing } from "./movements";
 
 function cartWith(overrides: Partial<ReturnType<typeof createCart>> = {}) {
   return {
@@ -65,5 +65,30 @@ describe("the request a batch becomes", () => {
     // adjustment and a count are not per-line movements at all.
     expect(KINDS.map((k) => k.kind)).toEqual(["checkout", "checkin", "receipt", "consumption"]);
     expect(sideFor("transfer")).toBeNull();
+  });
+});
+
+describe("what a batch is, in words", () => {
+  /** A cart of named lines, otherwise ready to go. */
+  function of(...names: string[]) {
+    return cartWith({
+      lines: names.map((name, index) => ({
+        itemId: index + 1,
+        name,
+        unitOfMeasure: "each",
+        quantity: 1,
+        lastScan: null,
+      })),
+    });
+  }
+
+  it("names both of two", () => {
+    expect(whatIsIn(of("LiteBeam", "Cat6 Outdoor"))).toBe("LiteBeam and Cat6 Outdoor");
+  });
+
+  it("counts the rest, because the phone is held in one hand", () => {
+    expect(whatIsIn(of("LiteBeam", "Cat6 Outdoor", "Zip Ties", "RJ45"))).toBe(
+      "LiteBeam, Cat6 Outdoor and 2 more",
+    );
   });
 });

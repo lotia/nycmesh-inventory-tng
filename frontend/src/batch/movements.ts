@@ -50,6 +50,20 @@ export function whatIsMissing(cart: CartState): string | null {
   return null;
 }
 
+/**
+ * What is in this batch, in words.
+ *
+ * For the outbox, which lists batches the volunteer can no longer see in the
+ * cart: without this they are told a batch is waiting and not which one. Two
+ * names and a count, because the phone is held in one hand.
+ */
+export function whatIsIn(cart: CartState): string {
+  const names = cart.lines.map((line) => line.name);
+  return names.length <= 2
+    ? names.join(" and ")
+    : `${names[0]}, ${names[1]} and ${names.length - 2} more`;
+}
+
 /** One line, as a movement. The side is the batch's, so it is decided once. */
 function movementFor(
   line: CartLine,
