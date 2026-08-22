@@ -62,16 +62,58 @@ filled rows, which has caught one reader already.
 names. The sheet's own lookup is `VLOOKUP` against that catalogue, and VLOOKUP
 is case-insensitive, so a string differing only in case still resolves.
 
-**Figures.** The 145 strings partition as 52 exact matches, 9 case-only variants
-(172 submissions — `Mast straight` against the catalogue's `mast straight` is
-most of them), 32 matching nothing at all (83 submissions), and 52 retired NYCM
-codes (125 submissions). Strings that resolve to nothing never reached a
-balance: 208 submissions between the last two groups.
+Everything the case rule does not settle is a judgement per string, written
+into an alias table in `inventory/sheet/items.py` rather than inferred by a
+pattern, because the readings have different consequences and no edit distance
+tells them apart. The largest unmatched string is `TP-Link SFP-RJ45` at 40
+submissions: the catalogue holds `SFP-RJ45 Module` and, separately, `Tp-Link`,
+which is a router. Read as a typo it mints an identifier against the router;
+read as what it is — a TP-Link-branded SFP-to-RJ45 module — it resolves to the
+module.
 
-**Caveat that matters.** The largest single unmatched string is
-`TP-Link SFP-RJ45` at 40 submissions, and the catalogue holds `SFP-RJ45 Module`
-separately — so it is an alias, not a typo, and the two readings have different
-consequences for the importer. Do not cite the 83 as "typos".
+**Unresolvable is an answer**, and a string that gets it carries the reason
+why. Three kinds do: ambiguous ones (`mast` names one of three masts,
+`RJ45 couplers` names either coupler), ones the catalogue simply does not hold
+(`RCA pole`, and `Matt`, which is somebody's name typed into the item field),
+and the 53 retired `NYCM-ER-LBEG2`-style codes, whose key is in no tab of the
+workbook. Seven of those decode to exactly one catalogued item and are aliased;
+the rest are left alone, because `NYCM-ER-SXTSQ` is an SXTsq and the catalogue
+holds two, so a guess is a coin toss over 9 submissions.
+
+**Figures.**
+
+```
+Item strings
+  distinct strings named                        145
+    matching the catalogue exactly               52
+    matching but for case                         9
+    resolved by a hand-written alias             28
+    recorded as naming no catalogued item        56
+    neither resolved nor accounted for            0
+  submissions naming an item                   3436
+    reaching a catalogued item                 3337
+    reaching nothing                             99
+  submissions naming no item at all               3
+  alias targets the catalogue does not hold       0
+```
+
+The last line of each group is a self-check rather than a figure. Zero
+unaccounted strings is what "every one of the 145 is decided" means as
+something a machine can say; zero stray alias targets is what notices an item
+renamed in the catalogue — and an alias whose target has gone resolves to
+nothing rather than to a name the catalogue does not hold, so the two halves
+of the report cannot disagree about the same row.
+
+Case is compared as `Lower(Trim())`, which is what
+`ItemIdentifier.value_normalised` is: [data-model.md](../data-model.md#item-itemidentifier-category)
+asks that normalisation not drift between the write path, the importer and the
+scan endpoint, and this is the importer.
+
+An earlier reading of this section gave 32 strings matching nothing across 83
+submissions and 52 retired codes across 125. Those partitioned 145 strings but
+only 3,436 submissions, because three rows name no item at all and were in
+neither group; the retired codes are 53, not 52. **Do not cite the unmatched
+strings as "typos"** — most of the submissions behind them are the alias above.
 
 **Becomes.** `ItemIdentifier` rows, and at runtime a search that resolves what a
 volunteer actually types.

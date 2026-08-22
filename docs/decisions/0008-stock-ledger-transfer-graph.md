@@ -11,10 +11,12 @@ found by looking its display name up in a catalogue. Analysis of the exported
 sheet — 52 catalogued items and 3,439 submissions between July 2022 and August
 2026 — shows what that costs:
 
-- **145 distinct item strings for 52 items.** Some are typos, some are informal
-  names, and 52 are a retired `NYCM-ER-LBEG2`-style SKU scheme abandoned in
-  2022. A string the catalogue does not hold resolves to nothing, so those
-  movements silently never reached a balance.
+- **145 distinct item strings for 52 items.** Some are informal names, some are
+  aliases for a thing the catalogue holds under another name, and 53 are a
+  retired `NYCM-ER-LBEG2`-style SKU scheme abandoned in 2022. A string the
+  catalogue does not hold resolves to nothing, so those movements silently
+  never reached a balance. Which string reaches which item is
+  [§1 of the brief](../briefs/sheet-classifiers.md#1-item-string-to-item).
 - **102 name spellings** (`sean`/`Sean`, `Lydon`/`lydon`/`Lydon Thorpe`,
   `JohnB`/`Johnb`/`johnb`), because the form asks for a name as free text on
   every submission, and a large share of submissions carry no email to
