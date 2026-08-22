@@ -1,0 +1,286 @@
+"""Put a small, made-up scene into a development database, so there is something to look at.
+
+`migrate` leaves every table empty, and an empty database draws as an empty
+catalogue, an empty pick-list and a scanner that resolves nothing -- so the
+first thing a new contributor sees says almost nothing about what this is. This
+writes a few dozen rows instead: a catalogue in three groups, a warehouse with
+a shelf in it and a hub, two volunteers, two printed labels, and enough ledger
+history that the counts beside the items are not all zero.
+
+It creates no login, deliberately. `seed_integration_data` creates one and is
+gated for it; this is meant to be run by hand on whatever development database
+you have, so the account stays yours to make with `createsuperuser`.
+
+Every name in here is invented. Nothing pretends to be a real volunteer, a real
+site or a real count.
+
+## Running it twice adds nothing
+
+Each catalogue row is fetched or created, and the two transactions carry an
+idempotency key, so a second run finds all of them where the first left them.
+
+## Why the ledger is the one part it will decline to write
+
+A catalogue row somebody did not want can be deleted. A movement cannot: the
+two ledger tables refuse UPDATE and DELETE outright, which is what decision
+0016 settles, so invented stock posted into a database holding real stock could
+never be taken back out. This therefore writes the catalogue always and the
+ledger only while nothing but its own transactions are in there, and says which
+of the two happened.
+"""
+
+from collections import Counter
+from decimal import Decimal
+from typing import Any
+
+from django.core.management.base import BaseCommand
+from django.db import transaction
+
+from inventory.management.commands import _report
+from inventory.models import (
+    Category,
+    Item,
+    Label,
+    Location,
+    StockMovement,
+    StockTransaction,
+    Volunteer,
+)
+
+# What this command's own transactions are recognised by, both when it is asked
+# to run twice and when it is deciding whether the ledger is anybody else's.
+# Distinct from StockTransaction.FROM_THE_SHEET, which names imported rows.
+DEMO_KEY_PREFIX = "demo:"
+
+CATEGORIES = ("Radios", "Antennas", "Cables and connectors")
+
+# name, category, unit of measure.
+ITEMS: tuple[tuple[str, str, str], ...] = (
+    ("LiteBeam AC Gen2", "Radios", Item.UnitOfMeasure.EACH),
+    ("NanoStation 5AC Loco", "Radios", Item.UnitOfMeasure.EACH),
+    ("OmniTik 5 PoE ac", "Radios", Item.UnitOfMeasure.EACH),
+    ("Sector antenna, 120 degrees, 5 GHz", "Antennas", Item.UnitOfMeasure.EACH),
+    ("Cat6 outdoor cable", "Cables and connectors", Item.UnitOfMeasure.METRE),
+    ("RJ45 shielded connector", "Cables and connectors", Item.UnitOfMeasure.EACH),
+)
+
+STORE = "Demo store"
+SHELF = "Shelf B2"
+HUB = "Demo hub"
+
+# name, kind, parent. Nested on purpose: one place with something inside it is
+# what shows that a location is a tree rather than a list.
+LOCATIONS: tuple[tuple[str, str, str | None], ...] = (
+    (STORE, Location.Kind.WAREHOUSE, None),
+    (SHELF, Location.Kind.SHELF, STORE),
+    (HUB, Location.Kind.HUB, None),
+)
+
+# Two, because one volunteer cannot show that a transaction is attributed to
+# somebody: with a single row the pick-list has nothing to pick between.
+PACKER = "Demo Volunteer"
+INSTALLER = "Demo Installer"
+VOLUNTEERS = (PACKER, INSTALLER)
+
+# code, item, location, quantity. Fixed rather than minted, so a second run
+# finds them and so the two codes can be written down in the guide as
+# something to scan. Both are Crockford Base32 as the column requires -- there
+# is no letter O in either, only the digit.
+LABELS: tuple[tuple[str, str | None, str | None, Decimal | None], ...] = (
+    ("DEM0000001", "LiteBeam AC Gen2", None, Decimal(1)),
+    ("DEM0000002", None, SHELF, None),
+)
+
+# A delivery, arriving from outside the system onto the shelf.
+RECEIVED: tuple[tuple[str, Decimal], ...] = (
+    ("LiteBeam AC Gen2", Decimal(12)),
+    ("NanoStation 5AC Loco", Decimal(6)),
+    ("Cat6 outdoor cable", Decimal(305)),
+    ("RJ45 shielded connector", Decimal(100)),
+)
+
+# And somebody taking a little of it away again, so the counts on the item list
+# are not simply the delivery read back.
+CHECKED_OUT: tuple[tuple[str, Decimal], ...] = (
+    ("LiteBeam AC Gen2", Decimal(2)),
+    ("RJ45 shielded connector", Decimal(8)),
+)
+
+
+def revived(row: Item | Location) -> None:
+    """Bring a retired row of one of these names back into the catalogue.
+
+    The same case `seed_integration_data` reactivates rather than steps over,
+    and for the reason argued there.
+    """
+    if not row.active:
+        row.active = True
+        row.save(update_fields=["active"])
+
+
+def categories(added: Counter[str]) -> dict[str, Category]:
+    """The groups the items hang under, by name."""
+    made = {}
+    for name in CATEGORIES:
+        # parent=None belongs in the lookup rather than the defaults, for the
+        # reason `seed_integration_data` gives about the same call.
+        made[name], created = Category.objects.get_or_create(name=name, parent=None)
+        added["categories"] += created
+    return made
+
+
+def items(groups: dict[str, Category], added: Counter[str]) -> dict[str, Item]:
+    """The catalogue, by name."""
+    made = {}
+    for name, group, unit in ITEMS:
+        made[name], created = Item.objects.get_or_create(
+            name=name,
+            defaults={"category": groups[group], "unit_of_measure": unit},
+        )
+        added["items"] += created
+        revived(made[name])
+    return made
+
+
+def locations(added: Counter[str]) -> dict[str, Location]:
+    """The places, by name. Parents first, which is the order LOCATIONS is in."""
+    made: dict[str, Location] = {}
+    for name, kind, parent in LOCATIONS:
+        made[name], created = Location.objects.get_or_create(
+            name=name,
+            parent=None if parent is None else made[parent],
+            defaults={"kind": kind},
+        )
+        added["locations"] += created
+        revived(made[name])
+    return made
+
+
+def volunteers(added: Counter[str]) -> dict[str, Volunteer]:
+    """The pick-list, by display name.
+
+    Not get_or_create: display names are deliberately not unique, so a second
+    row carrying one of these would make it raise. It must also come back
+    selectable, because the ledger refuses a retired or merged actor.
+    """
+    made = {}
+    for name in VOLUNTEERS:
+        found = Volunteer.objects.selectable().filter(display_name=name).first()
+        if found is None:
+            found = Volunteer.objects.create(display_name=name)
+            added["volunteers"] += 1
+        made[name] = found
+    return made
+
+
+def labels(catalogue: dict[str, Item], places: dict[str, Location], added: Counter[str]) -> None:
+    """The two printed stickers: one naming an item, one naming a place."""
+    for code, item, place, quantity in LABELS:
+        _, created = Label.objects.get_or_create(
+            code=code,
+            defaults={
+                "item": None if item is None else catalogue[item],
+                "location": None if place is None else places[place],
+                "quantity": quantity,
+            },
+        )
+        added["labels"] += created
+
+
+def ledger_is_ours() -> bool:
+    """Whether everything the ledger holds was put there by this command.
+
+    A transaction with no idempotency key counts as somebody else's, which is
+    what a batch submitted through the app looks like.
+    """
+    return not StockTransaction.objects.exclude(idempotency_key__startswith=DEMO_KEY_PREFIX).exists()
+
+
+def post(
+    key: str,
+    kind: str,
+    actor: Volunteer,
+    lines: tuple[tuple[str, Decimal], ...],
+    catalogue: dict[str, Item],
+    shelf: Location,
+    added: Counter[str],
+) -> None:
+    """One transaction and the movements under it, or nothing if it is already there.
+
+    Which side of a movement each kind requires is the rule the
+    `stock_movement_matches_kind` trigger enforces: a receipt arrives from
+    outside and so has only a destination, a check out leaves and so has only a
+    source.
+    """
+    into = kind == StockTransaction.Kind.RECEIPT
+    recorded, created = StockTransaction.objects.get_or_create(
+        actor=actor,
+        idempotency_key=f"{DEMO_KEY_PREFIX}{key}",
+        defaults={"kind": kind, "reason": "Demo data"},
+    )
+    if not created:
+        return
+    added["transactions"] += 1
+    for name, quantity in lines:
+        StockMovement.objects.create(
+            transaction=recorded,
+            item=catalogue[name],
+            quantity=quantity,
+            from_location=None if into else shelf,
+            to_location=shelf if into else None,
+        )
+        added["movements"] += 1
+
+
+def seed(added: Counter[str]) -> bool:
+    """Write the scene, returning whether the ledger half of it was written."""
+    catalogue = items(categories(added), added)
+    places = locations(added)
+    people = volunteers(added)
+    labels(catalogue, places, added)
+
+    if not ledger_is_ours():
+        return False
+    post(
+        "receipt",
+        StockTransaction.Kind.RECEIPT,
+        people[PACKER],
+        RECEIVED,
+        catalogue,
+        places[SHELF],
+        added,
+    )
+    post(
+        "checkout",
+        StockTransaction.Kind.CHECKOUT,
+        people[INSTALLER],
+        CHECKED_OUT,
+        catalogue,
+        places[SHELF],
+        added,
+    )
+    return True
+
+
+ROWS = ("categories", "items", "locations", "volunteers", "labels", "transactions", "movements")
+
+
+class Command(BaseCommand):
+    help = "Create a small invented catalogue, two places, two volunteers, two labels and some stock."
+
+    def handle(self, *args: Any, **options: Any) -> None:
+        added: Counter[str] = Counter()
+        # One transaction: a run that fails half way through would otherwise
+        # leave a catalogue with no stock in it and no sign of why.
+        with transaction.atomic():
+            posted = seed(added)
+
+        for line in _report.render("Added by this run", [(row, added[row]) for row in ROWS]):
+            self.stdout.write(line)
+        self.stdout.write("")
+        if not posted:
+            self.stdout.write(
+                "The ledger already holds transactions this command did not write, so no stock was "
+                "invented on top of them. The catalogue above is there either way.",
+            )
+        self.stdout.write(f"Labels to scan or type in: {', '.join(code for code, *_ in LABELS)}")

@@ -192,6 +192,8 @@ jobs:
         run: scripts/repo-settings.test.sh
       - name: Check the batch-contents comment
         run: scripts/say-batch.test.sh
+      - name: Check the bootstrap script
+        run: scripts/bootstrap-dev.test.sh
 
   history:
     name: One issue per commit

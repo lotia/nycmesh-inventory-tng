@@ -7,6 +7,24 @@ name: inventory-tng
 services:
   postgres:
     image: docker.io/library/postgres:18-bookworm
+    # The uid the image's own `postgres` account has. Named here rather than
+    # left to the entrypoint, which starts as root and drops to it: stated, the
+    # container never holds root at all, and the capabilities below can go.
+    user: "999:999"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      # The data lives on the volume below. These two are the only other places
+      # written: the unix socket, and the temporary file the entrypoint puts
+      # the initial password in while it creates the cluster. A mode is given
+      # because a tmpfs is root-owned otherwise and nothing here runs as root,
+      # which also makes the entrypoint's own chmod of the socket directory
+      # fail harmlessly and say so once at startup.
+      - /var/run/postgresql:mode=1777
+      - /tmp:mode=1777
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-inventory_tng}
       POSTGRES_USER: ${POSTGRES_USER:-inventory}
@@ -28,6 +46,27 @@ services:
   backend:
     build:
       context: ./backend
+    # The uid backend/Dockerfile creates and switches to. Repeated here so the
+    # restraint is visible in the file that runs the image rather than only in
+    # the one that builds it, and so a rebuild that lost the USER line would
+    # not quietly hand this stack a root container.
+    user: "1001:1001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      # gunicorn keeps a per-worker heartbeat file under the temporary
+      # directory and touches it every second, so this one is not optional.
+      # Nothing else in the image writes: static files are collected at build
+      # time and PYTHONDONTWRITEBYTECODE keeps .pyc files out.
+      - /tmp:mode=1777
+      # gunicorn 26 also puts its control socket under the account's home. It
+      # carries on without one, but it logs the refusal at ERROR on every
+      # start, and a stack whose first log line is an error teaches whoever
+      # brought it up to skim past errors.
+      - /home/app:mode=1777
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,6 +107,23 @@ services:
   frontend:
     build:
       context: ./frontend
+    # nginx-unprivileged's own uid. It listens on 8080 rather than 80, so
+    # dropping every capability costs it nothing -- not even NET_BIND_SERVICE.
+    user: "101:101"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      # Three places and no more: the rendered configuration, because the base
+      # image runs the template through envsubst at startup; the temporary
+      # paths a request body too large to hold in memory is spooled through;
+      # and the temporary directory, where this image keeps its pid file
+      # because /run is not writable to the account it runs as.
+      - /etc/nginx/conf.d:mode=1777
+      - /var/cache/nginx:mode=1777
+      - /tmp:mode=1777
     depends_on:
       - backend
     environment:

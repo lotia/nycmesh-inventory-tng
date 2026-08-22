@@ -31,20 +31,42 @@ is the single source of truth for the toolchain — CI installs from it too.
 ```bash
 git clone git@github.com:lotia/nycmesh-inventory-tng.git
 cd nycmesh-inventory-tng
+scripts/bootstrap-dev.sh
+```
+
+[`scripts/bootstrap-dev.sh`](scripts/bootstrap-dev.sh) is setup: it trusts and
+installs the toolchain, writes `.env` from [`.env.sample`](.env.sample) if you
+have none, starts PostgreSQL, applies the migrations, and puts an invented
+catalogue in the database so that no screen you open is blank. It composes the
+commands the rest of this guide describes and invents nothing of its own, so
+nothing here is out of reach if you would rather type them. Run it as often as
+you like; it writes no file it has written already, and it will not touch a
+`.env` you have edited.
+
+It stops short of two things, and says both as it finishes rather than leaving
+you to find them here. `createsuperuser` asks for a password at a terminal, so
+it cannot run unattended. And the first sign-in of the account it makes needs
+[a second factor](#signing-in), which means having an authenticator app to
+hand.
+
+`.env` holds your local configuration. It is git-ignored, and
+[`.env.sample`](.env.sample) documents every variable. Setting the toolchain
+and that file up by hand, if you would rather, is three commands:
+
+```bash
 mise trust      # allow mise to use this repo's mise.toml
 mise install    # installs Python, Node, uv, Helm at the pinned versions
 cp .env.sample .env
 ```
 
-`.env` holds your local configuration. It is git-ignored, and
-[`.env.sample`](.env.sample) documents every variable.
-
 ---
 
 ## Running it
 
-There are two ways. Use Docker when you want the whole system up; use the native
-setup when you are actively editing code and want fast reloads.
+Three ways, and the bootstrap script above prepares the second of them. Use
+Docker when you want the whole system up; use the native setup when you are
+actively editing code and want fast reloads; use the devcontainer when you want
+nothing at all on your host.
 
 ### Option A — everything in Docker
 
@@ -63,19 +85,12 @@ docker compose logs -f backend                                 # tail logs
 docker compose down -v                                         # stop, wipe database
 ```
 
-Sign in at <http://localhost:8080/accounts/login/>. The first sign-in asks that
-account to set up an authenticator app before it can reach anything, because
-[decision 0013](docs/decisions/0013-administrator-sign-in.md) requires a second
-factor of a local password. Which providers a deployment offers besides that
-one is configuration; the variables are in
-[deployment](docs/deployment.md#environment-variables).
-
-> **If you had this stack running before August 2026**, run `docker compose down
-> -v` once. The database volume now mounts `/var/lib/postgresql` rather than
-> `/var/lib/postgresql/data`, because postgres 18 keeps its data in a
-> major-version subdirectory. An older volume is not migrated: postgres would
-> silently start an empty cluster beside it, and you would wonder where your
-> local data went.
+Every service in [`compose.yaml`](compose.yaml) names the non-root uid it runs
+as, drops all capabilities, refuses to gain privileges, and runs with a
+read-only root filesystem — with a `tmpfs` for each directory that service
+genuinely writes to, and no others. Those are stated in the file rather than
+claimed in a comment, and none of them needs anything added under rootless
+Podman.
 
 ### Option B — native, with only PostgreSQL in Docker
 
@@ -112,6 +127,30 @@ origin and you will not hit CORS locally.
 the toolchain with nothing installed on your host. Open the repo in VS Code and
 choose *Reopen in Container*, or run `devcontainer up --workspace-folder .`.
 
+### Signing in
+
+The volunteer's half of the app asks for nobody's name: everything a volunteer
+does is reachable at the address above with no account at all, which
+[decision 0012](docs/decisions/0012-two-populations.md) argues for. An
+administrator signs in at `/accounts/login/` on whichever address you are
+using.
+
+The first sign-in of a new account stops and asks it to set up an authenticator
+app before it can reach anything, because
+[decision 0013](docs/decisions/0013-administrator-sign-in.md) requires a second
+factor of a local password. There is no way past that and no setting that turns
+it off, so have a phone or any other TOTP application ready before you start.
+Which providers a deployment offers besides that one is configuration; the
+variables are in [deployment](docs/deployment.md#environment-variables).
+
+### If you had this stack running before August 2026
+
+Run `docker compose down -v` once. The database volume now mounts
+`/var/lib/postgresql` rather than `/var/lib/postgresql/data`, because postgres
+18 keeps its data in a major-version subdirectory. An older volume is not
+migrated: postgres would silently start an empty cluster beside it, and you
+would wonder where your local data went.
+
 ---
 
 ## Repository layout
@@ -133,6 +172,7 @@ frontend/               Vite + React + MUI single-page app
   Dockerfile            Frontend image (nginx serving static files)
   nginx.conf.template   Runtime API proxy configuration
 infra/helm/             Kubernetes deployment chart
+scripts/                The development bootstrap, and the guardrail checkers
 docs/                   Architecture, deployment, and decision records
 .agents/skills/         On-demand context for AI coding agents
 compose.yaml            Local development stack
@@ -159,6 +199,7 @@ All backend commands run from `backend/`, all frontend commands from `frontend/`
 | Type check | `uv run ty check src` |
 | Make migrations | `uv run python src/manage.py makemigrations` |
 | Apply migrations | `uv run python src/manage.py migrate` |
+| Put demo rows in an empty database | `uv run python src/manage.py seed_demo_data` |
 | Open a Django shell | `uv run python src/manage.py shell` |
 | Add a dependency | `uv add <package>` |
 | Add a dev-only dependency | `uv add --group dev <package>` |
@@ -203,6 +244,14 @@ uv run python src/manage.py migrate
 Commit the generated migration file alongside the model change. In production,
 migrations run as a separate Kubernetes Job before new pods start, never from a
 running web pod — see [docs/deployment.md](docs/deployment.md).
+
+### Importing the old spreadsheet
+
+No part of setting up, and deliberately not in the path above: it needs an
+exported workbook, which is not in this repository and is not ours to publish.
+What `manage.py import_sheet` does, the four steps it composes, and when you
+would run one of them on its own are in
+[the data model](docs/data-model.md#migrating-the-existing-sheet).
 
 ---
 

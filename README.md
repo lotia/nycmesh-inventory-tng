@@ -77,6 +77,13 @@ That brings up PostgreSQL, the Django API, and the frontend together:
 | Sign in | <http://localhost:8000/accounts/login/> |
 | Django admin | <http://localhost:8000/admin/> |
 
+That database starts empty, so every one of those pages is a blank list. To put
+an invented catalogue, a warehouse, two volunteers and some stock in it:
+
+```bash
+docker compose exec backend python manage.py seed_demo_data
+```
+
 To create an admin login:
 
 ```bash

@@ -10,6 +10,43 @@ For what the components are, see [architecture.md](architecture.md). For local
 development — which uses `compose.yaml`, not this chart — see
 [DEVELOPERS.md](../DEVELOPERS.md).
 
+## From an empty cluster to a first sign-in
+
+Eight steps, in this order, each linking to the section that explains it. Only
+the last two are ever repeated; the rest happen once for the life of an
+environment.
+
+1. **Get a database.** This chart deploys none, for the reason
+   [Database](#database) gives, so the URL of one is an input rather than an
+   output.
+2. **Create the Secret** holding that URL and a signing key —
+   [Secrets](#secrets). Nothing starts without it, deliberately: see
+   [what has no default](#what-has-no-default).
+3. **Supply a certificate** in the Secret the chart names —
+   [the only route to the frontend pod](#the-only-route-to-the-frontend-pod).
+   There is no switch that skips this, because the camera a volunteer scans
+   with does not work without it.
+4. **Install the chart** — [Deploying to Kubernetes](#deploying-to-kubernetes).
+   The schema is migrated as part of this and before anything serves; what that
+   means when it fails is [Migrations](#migrations).
+5. **Check that it came up**: `kubectl -n inventory-tng get pods`, then
+   `curl https://<your host>/api/healthz`, which answers only once the database
+   is reachable — [health checks](#health-checks).
+6. **Make the first administrator and enrol its second factor** —
+   [First administrator](#first-administrator). This is the step people are
+   most often stopped by, and it is the one that has to happen before the next.
+7. **Restrict the administrative routes** —
+   [Administrative access](#administrative-access). After step 6, never before:
+   signing in needs `/accounts`, which is one of the paths this shuts.
+8. **Add a sign-in provider**, if you want one —
+   [the provider Secret](#the-provider-secret). Optional, changeable later, and
+   it grants nobody anything by itself.
+
+Every `kubectl` command below names a resource as it is rendered when the
+release is called `inventory-tng`, as in step 4. The chart builds those names as
+`<release>-inventory-tng-<component>`, so a release under another name renames
+them with it.
+
 ## Artifacts
 
 | Artifact | Source | Contents |
@@ -25,6 +62,22 @@ Both images run as non-root. The backend runs with a read-only root filesystem.
 The backend reads all of these from the environment. Locally they come from
 `.env` (see [`.env.sample`](../.env.sample)); in Kubernetes they come from the
 chart and from a Secret.
+
+### What has no default
+
+Two, and they are the two nothing else can supply for you.
+`DJANGO_SECRET_KEY` signs every session and every password-reset link, so any
+value shipped with the software would be a published key signing real sessions
+— Django refuses to start rather than fall back to one. `DATABASE_URL` decides
+*which* data this deployment is, and a default could only point somewhere
+plausible and wrong. Both fail at boot, which is the intended behaviour and not
+a rough edge: a pod that will not start is a deployment somebody fixes in the
+first minute, where one running on a guessed value is found much later.
+
+Everything else in the table below is a value the chart already carries, so a
+release that supplies only those two starts. It starts answering to whatever
+hostname `values.yaml` was last left naming, which is why
+`django.allowedHosts` is marked required even though it is never missing.
 
 | Variable | Required | Source in Kubernetes | Notes |
 | --- | --- | --- | --- |
@@ -305,7 +358,7 @@ Verify before and after:
 helm lint infra/helm/inventory-tng
 helm template test infra/helm/inventory-tng --set image.tag=v0.1.0   # inspect manifests
 kubectl -n inventory-tng get pods
-kubectl -n inventory-tng logs deploy/inventory-tng-backend
+kubectl -n inventory-tng logs deploy/inventory-tng-inventory-tng-backend
 ```
 
 ### Migrations
@@ -316,10 +369,33 @@ would let several replicas apply the same migration concurrently. The Job runs
 once per release, before new pods roll out; if it fails, the release stops and
 the old pods keep serving.
 
+Three things follow from that arrangement, and they are what an administrator
+needs to predict what a release will do:
+
+- **The Job is the same image as the web pods, with the same environment.** It
+  reads `DATABASE_URL` out of the same Secret, so anything the Job can reach
+  the pods can, and a Job that fails to connect has told you the pods would
+  have too.
+- **`helm upgrade` blocks on it.** The hook runs to completion before any new
+  pod is created, so a command that returns successfully is a database whose
+  schema matches the image about to serve it. One that fails leaves the
+  previous release running and untouched.
+- **A Job per release survives its release.** Its name carries the revision
+  number rather than being reused, so the migration that failed is still an
+  object in the namespace afterwards and its logs can be read.
+
+To watch one, or to read why a release stopped:
+
+```bash
+kubectl -n inventory-tng logs job/inventory-tng-inventory-tng-migrate-1
+```
+
+with the trailing number being that release's revision, from `helm history`.
+
 ### First administrator
 
 ```bash
-kubectl -n inventory-tng exec -it deploy/inventory-tng-backend -- \
+kubectl -n inventory-tng exec -it deploy/inventory-tng-inventory-tng-backend -- \
   python manage.py createsuperuser
 ```
 
