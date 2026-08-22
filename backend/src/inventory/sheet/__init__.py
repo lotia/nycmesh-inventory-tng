@@ -16,6 +16,8 @@ Every module here also exposes `section(sheet) -> Report`, which is that
 rule's own part of the printed breakdown.
 """
 
+from collections.abc import Iterable, Mapping
+
 # A section's report: a heading, and labelled integers beneath it. Integers
 # rather than free text is what lets one place align them and keeps six
 # classifiers from each inventing their own layout. Most of what a rule
@@ -23,14 +25,30 @@ rule's own part of the printed breakdown.
 # largest-of are neither -- so the contract is a label and a number and no
 # more.
 #
-# **A label's leading spaces carry its depth.** Two spaces is a child of the
-# line above it; three is a child of *that*, which is how a line says it is a
-# subset of its sibling rather than a further share of the population. The
-# rendering right-aligns the numbers and leaves the indent alone, and the test
-# that keeps the brief honest compares it, so an indent typed by accident is a
-# failure rather than a shrug.
+# **A label's leading spaces carry its depth, and the step says which kind of
+# line it is.** Two more spaces than the line it hangs from makes it a *share*
+# of that line, and the shares under one parent sum to it. **One** more space
+# makes it a *subset* of the line immediately above -- a fact about those rows
+# rather than another slice of them -- which is how `of those, naming more
+# than one` says it is counted inside the line above rather than beside it.
+#
+# So an indent is legal when it is 0, beside the line above it, an ancestor's
+# plus two, or the previous line's plus one. `test_brief_figures` checks that of every section,
+# because the pasted block in the brief matching the code proves the two agree
+# and proves nothing about whether either is right.
 #
 # Named here, upstream of every module that implements it, so that a rule can
 # annotate itself against its own contract. The alias for the function that
 # produces one lives with the registry, in the management command.
 type Report = tuple[str, list[tuple[str, int]]]
+
+
+def each(members: Iterable[str], counted: Mapping[str, int], indent: str = "  ") -> list[tuple[str, int]]:
+    """A line per member of an enumerated set, in the order it is written.
+
+    The rule above, made executable. A section reaching for `Counter.items()`
+    instead is exactly the drift the rule forbids -- it prints what the data
+    held rather than what the rule admits -- and a named helper makes that
+    visible in review rather than a thing to notice.
+    """
+    return [(f"{indent}{member}", counted.get(member, 0)) for member in members]

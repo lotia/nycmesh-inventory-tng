@@ -62,6 +62,11 @@ ADJUSTMENT = re.compile(
 # which is the failure this package exists to stop.
 ENUMERATED = ("fixing inventory", "updating inventory", "inventory correction", "inventory correct")
 
+# Notes naming the record while doing nothing to it, which is why the rule
+# does not special-case a bare `inventory`. Enumerated rather than inferred:
+# the point of the pair is that one reading is arguable and the other is not.
+NOT_THE_PRACTICE = ("inventory order", "apartment stock")
+
 
 def is_correction(note: str) -> bool:
     """Whether this note says the record was wrong rather than that stock moved."""
@@ -86,6 +91,7 @@ def section(sheet: Sheet) -> Report:
     record = [n for n in notes if RECORD.search(n)]
     adjustment = [n for n in notes if ADJUSTMENT.search(n)]
     corrections = [n for n in notes if is_correction(n)]
+    only_record = [n for n in record if not ADJUSTMENT.search(n)]
     return "Corrections", [
         # The denominator, because the four lines under it are a partition of
         # every submission rather than of the ones carrying a note -- unlike
@@ -97,6 +103,15 @@ def section(sheet: Sheet) -> Report:
         ("  naming the record only", len(record) - len(corrections)),
         ("  naming an act only", len(adjustment) - len(corrections)),
         ("  naming neither, note or no note", len(notes) - len(record) - len(adjustment) + len(corrections)),
+        # The two readings of "naming the record only" that the brief argues
+        # over: the bare word, which is plainly this practice written lazily,
+        # against the ones that are plainly a place or an order. Printed so
+        # that changing the rule is a decision made against a number.
+        # Over the rows the line above them counts, and by substring, which
+        # is the reading this module settles on. Equality here would have made
+        # the section argue one way and count the other.
+        ("   of those, the bare word alone", sum(1 for n in only_record if n == "inventory")),
+        ("   of those, an order or a place", sum(1 for n in only_record if any(p in n for p in NOT_THE_PRACTICE))),
         ("the four enumerated phrases, whole-note", sum(1 for n in notes if n in ENUMERATED)),
         ("  the same phrases, per row", sum(1 for n in notes if any(p in n for p in ENUMERATED))),
         ("  the same phrases, summed per phrase", sum(sum(1 for n in notes if p in n) for p in ENUMERATED)),

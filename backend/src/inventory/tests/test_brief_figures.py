@@ -24,6 +24,7 @@ import pytest
 from django.conf import settings
 
 from inventory.management.commands.profile_sheet import SECTIONS, Section, render
+from inventory.sheet.workbook import CHECKING_IN
 from inventory.tests.sheets import notes, sheet_of, submission
 
 BRIEF = Path(settings.REPO_ROOT) / "docs" / "briefs" / "sheet-classifiers.md"
@@ -37,6 +38,7 @@ SHEET = sheet_of(
         submission(item="omnitik", note="mesh room 131 broome"),
         submission(item="mast", note="install at NN217"),
         submission(item="NYCM-ER-SXTSQ", note="blue stockings + mesh room"),
+        submission(item="LiteBeam", note="returning spare", direction=CHECKING_IN),
         submission(item="", note=""),
     ],
 )
@@ -52,12 +54,18 @@ def blocks() -> dict[str, list[str]]:
     output.
     """
     found: dict[str, list[str]] = {}
+    # Keyed on the heading, so a second block under a heading already seen is
+    # a fault rather than a silent overwrite: two sections cannot share one,
+    # and a brief quoting the same block twice is one of the two going stale
+    # unnoticed. Eight sections make that a real possibility.
+    seen: list[str] = []
     inside = False
     block: list[str] | None = None
     for line in BRIEF.read_text().split("\n"):
         if line.startswith("```"):
             if inside:
                 if block:
+                    seen.append(block[0])
                     found[block[0]] = block[1:]
                 inside, block = False, None
             else:
@@ -68,6 +76,7 @@ def blocks() -> dict[str, list[str]]:
                 block = [] if line == "```" else None
         elif inside and block is not None:
             block.append(line)
+    assert len(seen) == len(set(seen)), f"the brief quotes two blocks under one heading: {seen}"
     return found
 
 
@@ -143,3 +152,21 @@ def test_a_section_over_no_submissions_still_names_its_lines() -> None:
         empty = [label for label, _ in section(notes())[1]]
         full = [label for label, _ in section(SHEET)[1]]
         assert empty == full
+
+
+@pytest.mark.parametrize("section", SECTIONS, ids=lambda s: s(SHEET)[0])
+def test_every_indent_is_one_the_contract_allows(section: Section) -> None:
+    """Three sections got this wrong in review, and the block-matching tests
+    above cannot see it, so the rule on `Report` is checked here rather than
+    described there: a line sits at 0, or
+    beside the line above it, or two past an ancestor as a share of it, or one
+    past the line above it as a subset of that line.
+    """
+    ancestors = [0]
+    previous = 0
+    for label, _ in section(SHEET)[1]:
+        indent = len(label) - len(label.lstrip())
+        allowed = {0, previous, previous + 1} | {depth + 2 for depth in ancestors}
+        assert indent in allowed, f"{label!r} is indented {indent}, and {sorted(allowed)} were the options"
+        ancestors = [depth for depth in ancestors if depth < indent] + [indent]
+        previous = indent
