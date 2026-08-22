@@ -323,6 +323,135 @@ jobs:
         if: always()
         run: docker compose down -v
 
+  setup:
+    name: Setup instructions
+    runs-on: ubuntu-latest
+    # A clean machine, following the two setup documents rather than testing
+    # the code they set up. DEVELOPERS.md promises that a command in it works
+    # on one of these and calls a command that does not a bug in the guide;
+    # this is where that is found out. See DEVELOPERS.md#what-ci-proves.
+    #
+    # Every command below is typed the way that guide prints it -- bare `uv`,
+    # bare `npm`. The prefix this job used to wear was the tell
+    # that it was proving something else: the guide's own lines only work in a
+    # shell that has mise activated, so activating one is the job, and adding
+    # `mise exec --` instead would have been this file quietly working around
+    # the very gap it is meant to report.
+    #
+    # No service container: the guide says to start PostgreSQL with compose and
+    # so that is what runs, from compose.yaml. A container declared here would
+    # leave the compose file itself unexercised.
+    #
+    # Twenty minutes is about twice a good run of all of that -- a toolchain, a
+    # database, two dependency trees and two servers -- so a step that has hung
+    # is stopped rather than left holding a runner until the six-hour default.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      # A cache, and with it a decision about what "a clean machine" means
+      # here, because caching weakens that claim on one axis and it is worth
+      # saying which.
+      #
+      # It means a machine with nothing of this project installed: no mise, no
+      # pinned toolchain, no virtualenv, no node_modules. All of that is still
+      # built below out of the guide's own lines, and none of it is restored
+      # ready-made -- `mise install`, `uv sync` and `npm install` each run and
+      # each has to succeed. What is restored is the pile of archives those
+      # three would otherwise download, which on a cold run is 187 MB of
+      # wheels and 427 MB of packages and something over a minute of the
+      # critical path. Whether a package is still fetchable from its registry
+      # is a question about the registry, and a red build here would tell a
+      # reader of DEVELOPERS.md nothing they could act on.
+      #
+      # Keyed on the three files that pin what gets downloaded, and given no
+      # restore-keys on purpose: change any of them and the next run is
+      # genuinely cold, which is exactly when a lock that cannot be resolved
+      # should be found out.
+      - name: What was downloaded the last time these were pinned as they are
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/mise
+            ~/.cache/mise
+            ~/.cache/uv
+            ~/.npm
+          key: setup-${{ runner.os }}-${{ hashFiles('mise.toml', 'backend/uv.lock', 'frontend/package-lock.json') }}
+      # The one prerequisite the guide names that a runner does not carry,
+      # installed with the guide's own line.
+      - name: Install mise
+        run: curl https://mise.run | sh
+      # And activated with the guide's own line too. Each step below is a fresh
+      # non-interactive shell, and BASH_ENV is the file such a shell reads as it
+      # starts -- so this pair is what "add the line to your shell, then open a
+      # new one" amounts to on a runner, and mise's own function and paths are
+      # in place before anything else is typed.
+      - name: Activate it, and open a new shell
+        run: |
+          echo 'eval "$(~/.local/bin/mise activate bash)"' >> "$HOME/.activated-shell"
+          echo "BASH_ENV=$HOME/.activated-shell" >> "$GITHUB_ENV"
+      # The two questions the guide says a new shell should answer, asked of
+      # this one. Without this a later `command not found` would look like a
+      # missing tool rather than a shell that never picked mise up.
+      - name: The shell answers the guide's two questions
+        run: |
+          mise --version
+          mise doctor > "$RUNNER_TEMP/doctor.txt" || true
+          grep -q 'activated: yes' "$RUNNER_TEMP/doctor.txt" || {
+            echo "::error::mise is installed but this shell has not activated it"
+            cat "$RUNNER_TEMP/doctor.txt"
+            exit 1
+          }
+      - name: From a fresh clone to a database with something in it
+        run: scripts/bootstrap-dev.sh
+      # Ran without complaining is not the same as worked. The screens a new
+      # contributor is promised are drawn from these rows.
+      - name: The seed left rows behind
+        working-directory: backend
+        run: |
+          uv run python src/manage.py shell -c '
+          from inventory.models import Item, Label, Location, StockMovement, Volunteer
+          for model in (Item, Label, Location, StockMovement, Volunteer):
+              assert model.objects.exists(), f"the seed left no {model.__name__} rows"
+          print("catalogue, labels, places, people and ledger: all populated")
+          '
+      # The last thing bootstrap-dev.sh prints is these two lines and an
+      # instruction to run each in a terminal of its own. `setsid` is that
+      # terminal: a session per server, so the stop step can take one down
+      # along with everything it started, which the reloader's child would
+      # otherwise survive.
+      #
+      # Their output goes to a file and not to this step's. A background
+      # process still holding a step's stdout open is how a job whose work has
+      # finished goes on waiting for it.
+      - name: Start the two servers, as the script signs off telling you to
+        run: |
+          setsid bash -c 'cd backend && uv run python src/manage.py runserver' \
+            > "$RUNNER_TEMP/backend.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/backend.session"
+          setsid bash -c 'cd frontend && npm install && npm run dev' \
+            > "$RUNNER_TEMP/frontend.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/frontend.session"
+      - name: The API answers
+        run: |
+          curl --retry 30 --retry-delay 2 --retry-connrefused -sf \
+            http://localhost:8000/api/healthz | tee /dev/stderr | grep -q '"ok"'
+      # More patience than the API needs: this one waits for an `npm install`
+      # on a cold cache before Vite is even started.
+      - name: The app a volunteer opens is served
+        run: |
+          curl --retry 90 --retry-delay 2 --retry-connrefused -sf \
+            http://localhost:5173/ | grep -q 'id="root"'
+      - name: What the two servers said
+        if: failure()
+        run: tail -n 200 "$RUNNER_TEMP"/*.log || true
+      - name: Stop them
+        if: always()
+        run: |
+          for session in "$RUNNER_TEMP"/*.session; do
+            [ -e "$session" ] || continue
+            kill -- -"$(cat "$session")" 2>/dev/null || true
+          done
+
   commit-check:
     name: Guardrail checkers
     runs-on: ubuntu-latest
