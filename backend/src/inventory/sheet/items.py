@@ -32,6 +32,7 @@ import re
 from dataclasses import dataclass
 from enum import StrEnum
 
+from inventory.sheet import Report
 from inventory.sheet.workbook import Sheet
 
 # Item string as written, to the catalogued name it means. Keyed normalised,
@@ -165,7 +166,7 @@ def resolve(string: str, catalogue: tuple[str, ...]) -> Resolution:
     return Resolution(None, How.UNACCOUNTED)
 
 
-def section(sheet: Sheet) -> tuple[str, list[tuple[str, int]]]:
+def section(sheet: Sheet) -> Report:
     """The partition over strings, then over the submissions carrying them.
 
     Both, because they answer different questions: 145 strings for 52 items is

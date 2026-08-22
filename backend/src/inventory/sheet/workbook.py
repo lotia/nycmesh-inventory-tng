@@ -22,6 +22,8 @@ from typing import Any
 
 from openpyxl import load_workbook
 
+from inventory.sheet import Report
+
 CATALOGUE_TAB = "Fast Inventory"
 SUBMISSIONS_TAB = "QRresponses"
 
@@ -196,3 +198,20 @@ def read(path: Path) -> Sheet:
     finally:
         workbook.close()
     return Sheet(catalogue=catalogue, submissions=tuple(submissions), rows_read=rows_read)
+
+
+def section(sheet: Sheet) -> Report:
+    """Which rows count, before any rule has an opinion about what they say.
+
+    Here rather than in the command, so that every rule's report is a section
+    of its own module and the importer can have the population without
+    importing a management command.
+    """
+    return "Population", [
+        (f"rows on {SUBMISSIONS_TAB}", sheet.rows_read),
+        ("  carrying a direction", len(sheet.submissions)),
+        (f"    {CHECKING_OUT}", sheet.check_outs),
+        (f"    {CHECKING_IN}", sheet.check_ins),
+        ("  carrying neither", sheet.without_direction),
+        ("catalogued items", len(sheet.catalogue)),
+    ]

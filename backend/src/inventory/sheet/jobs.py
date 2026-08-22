@@ -25,6 +25,7 @@ is what produces it.
 
 import re
 
+from inventory.sheet import Report
 from inventory.sheet.workbook import Sheet
 
 # NN, an optional space, then the digits. Case-insensitive, per the census
@@ -44,7 +45,7 @@ def job_reference(note: str) -> str | None:
     return f"NN{found.group(1)}" if found else None
 
 
-def section(sheet: Sheet) -> tuple[str, list[tuple[str, int]]]:
+def section(sheet: Sheet) -> Report:
     """What the rule finds, and what taking the first reference costs.
 
     The last two lines are the same submission seen from both ends: a note

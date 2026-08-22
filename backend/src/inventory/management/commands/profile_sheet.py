@@ -17,29 +17,14 @@ from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 
-from inventory.sheet import corrections, items, jobs, locations, workbook
+from inventory.sheet import Report, corrections, items, jobs, locations, workbook
 from inventory.sheet.workbook import NotTheWorkbook, Sheet
 
-# A section is a rule's own report: a heading, and labelled integers beneath
-# it. Integers rather than free text is what lets one place align them and
-# keeps six classifiers from each inventing their own layout. Most of what a
-# rule reports is a partition, but not all of it -- a distinct count and a
-# largest-of are neither -- so the contract is a label and a number and no
-# more. Each classifier adds a section as it lands, and that is what keeps the
-# brief's figures and the importer's behaviour coming from the same code.
-Section = Callable[[Sheet], tuple[str, list[tuple[str, int]]]]
-
-
-def population(sheet: Sheet) -> tuple[str, list[tuple[str, int]]]:
-    """Which rows count, before any rule has an opinion about what they say."""
-    return "Population", [
-        (f"rows on {workbook.SUBMISSIONS_TAB}", sheet.rows_read),
-        ("  carrying a direction", len(sheet.submissions)),
-        (f"    {workbook.CHECKING_OUT}", sheet.check_outs),
-        (f"    {workbook.CHECKING_IN}", sheet.check_ins),
-        ("  carrying neither", sheet.without_direction),
-        ("catalogued items", len(sheet.catalogue)),
-    ]
+# What a section is, and why a line is a label and a number, is stated once
+# with the type in inventory/sheet/. What is here is the registry: which
+# sections there are and in what order, which is the brief's order and not one
+# a discovery mechanism could work out.
+Section = Callable[[Sheet], Report]
 
 
 def render(heading: str, counted: list[tuple[str, int]]) -> list[str]:
@@ -59,7 +44,7 @@ def render(heading: str, counted: list[tuple[str, int]]) -> list[str]:
 
 
 SECTIONS: list[Section] = [
-    population,
+    workbook.section,
     items.section,
     corrections.section,
     locations.section,
