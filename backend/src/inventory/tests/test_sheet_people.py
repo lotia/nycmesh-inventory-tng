@@ -296,7 +296,7 @@ def test_a_directory_built_by_hand_answers_the_same_way() -> None:
     """The rule is the directory's, not `directory()`'s, so the importer can
     hold one it assembled itself.
     """
-    who = Directory(by_name={"ada": "ada"}, by_address={}, flagged={}, submissions={"ada": 1})
+    who = Directory(by_name={"ada": "ada"}, by_address={}, flagged={}, held={}, shared={}, submissions={"ada": 1})
 
     assert who.volunteers == {"ada"}
     assert who.volunteer(submission(name="Ada", email="")).key == "ada"

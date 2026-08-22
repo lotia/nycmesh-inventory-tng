@@ -216,6 +216,15 @@ class Directory:
     # A volunteer this rule is unsure of, to the volunteers it might be the
     # same person as. Empty where it is an address nobody was named beside.
     flagged: Mapping[str, tuple[str, ...]]
+    # Addresses each volunteer wrote. Kept because the two ways an address
+    # count misleads -- a volunteer who wrote none, and one who wrote several
+    # -- are what make the headcount a range, and the report has to show both.
+    held: Mapping[str, frozenset[str]]
+    # Addresses more than one volunteer was named beside, to the volunteers
+    # they reach. These are why keying on the address is no safer than keying
+    # on the name, so the report counts them rather than the brief asserting
+    # it: a volunteer with full hands hands their phone over.
+    shared: Mapping[str, frozenset[str]]
     # Submissions behind each volunteer, so that a reader can weigh a flag.
     submissions: Mapping[str, int]
 
@@ -223,6 +232,10 @@ class Directory:
     def volunteers(self) -> set[str]:
         """Every volunteer the import would mint."""
         return set(self.by_name.values()) | set(self.by_address.values())
+
+    def addresses(self, key: str) -> frozenset[str]:
+        """Every address this volunteer wrote, which may be none."""
+        return self.held.get(key, frozenset())
 
     def volunteer(self, submission: Submission) -> Person:
         """Which volunteer this submission is from."""
@@ -320,7 +333,14 @@ def directory(sheet: Sheet) -> Directory:
     for one in sheet.submissions:
         if not spelled(one.name) and (address := addressed(one.email)) in by_address:
             submissions[by_address[address]] += 1
-    return Directory(by_name=by_name, by_address=by_address, flagged=flagged, submissions=submissions)
+    return Directory(
+        by_name=by_name,
+        by_address=by_address,
+        flagged=flagged,
+        shared={address: frozenset(reaches) for address, reaches in named_beside.items() if len(reaches) > 1},
+        held={key: frozenset(written) for key, written in held.items()},
+        submissions=submissions,
+    )
 
 
 def section(sheet: Sheet) -> Report:
@@ -348,7 +368,20 @@ def section(sheet: Sheet) -> Report:
         ("volunteers the import mints", len(volunteers)),
         ("  known only by an address", len(volunteers) - len(by_name)),
         ("  flagged as possibly a duplicate", len(who.flagged)),
+        # Three spaces: this is what the flags on the line above carry, and it
+        # counts submissions rather than volunteers, so it is a child of that
+        # line and not a share of the one above it.
+        ("   submissions those flags carry", sum(1 for person in reached if person.key in who.flagged)),
         ("the fewest volunteers this can be", who.survivors()),
+        # Why the headcount is a range and not a number above or below 65.
+        # Addresses pull it both ways at once: a volunteer who never wrote one
+        # is invisible to an email count, and one who wrote several is counted
+        # more than once by it.
+        ("volunteers who wrote no address", sum(1 for key in by_name if not who.addresses(key))),
+        ("volunteers who wrote more than one", sum(1 for key in by_name if len(who.addresses(key)) > 1)),
+        (" the most any one of them wrote", max((len(who.addresses(key)) for key in by_name), default=0)),
+        ("addresses written beside more than one volunteer", len(who.shared)),
+        (" the most volunteers any one of them names", max((len(named) for named in who.shared.values()), default=0)),
         ("submissions reaching a volunteer", sum(1 for person in reached if person.key)),
         ("  by the name field", sum(1 for person in reached if person.how == How.NAME)),
         ("  by an address, the name being unusable", sum(1 for person in reached if person.how == How.ADDRESS)),

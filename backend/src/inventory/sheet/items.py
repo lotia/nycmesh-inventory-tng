@@ -1,13 +1,11 @@
 """Rule 1: which catalogued item an item string names.
 
-The sheet's own lookup is a `VLOOKUP` against the catalogue, and VLOOKUP is
-case-insensitive, so a string differing only in case already resolves today and
-the rule keeps that. Everything else is a judgement per string, written down
-below rather than inferred by a pattern, because the readings have different
-consequences and a pattern cannot tell them apart: whether `TP-Link SFP-RJ45`
-means the catalogue's `SFP-RJ45 Module` or a typo for its `Tp-Link`, which is a
-router, is not something an edit distance decides. Knowing what the things are
-does. That argument, and the partition it produces, are
+The sheet's own `VLOOKUP` is case-insensitive, so the rule keeps that.
+Everything else is a judgement per string, written down below rather than
+inferred: whether `TP-Link SFP-RJ45` means the catalogue's `SFP-RJ45 Module`
+or a typo for its `Tp-Link`, which is a router, is not something an edit
+distance decides. Knowing what the things are does. That argument, and the
+partition it produces, are
 [§1 of the brief](../../../../docs/briefs/sheet-classifiers.md#1-item-string-to-item).
 
 ## Unresolvable is an answer
@@ -23,12 +21,12 @@ the second is a real outcome rather than a gap. Three kinds of string get it:
 - **The retired SKU scheme.** The `NYCM-ER-LBEG2`-style codes, abandoned in
   2022, whose key is in no tab of the workbook. The few that decode to exactly
   one catalogued item are in `ALIASES` below -- `LBE` is a LiteBeam and the
-  catalogue holds one -- and the rest are left alone, because
-  `NYCM-ER-SXTSQ` is an SXTsq and the catalogue holds two, so a guess is a
-  coin toss over every submission that cites it.
+  catalogue holds one. The rest stay unresolved; §1 of the brief works one of
+  them through and gives the count it would put at risk.
 """
 
 import re
+from collections import Counter
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -135,9 +133,8 @@ def _normalised(string: str) -> str:
     `lower()` rather than `casefold()`, and not because either is better: it
     is what `ItemIdentifier.value_normalised` is, a `Lower(Trim())` generated
     column, and
-    [data-model.md](../../../../docs/data-model.md#item-itemidentifier-category) says that
-    normalisation must not drift between the write path, the importer and the
-    scan endpoint. The reader has already trimmed.
+    [data-model.md](../../../../docs/data-model.md#item-itemidentifier-category)
+    says which readers of it have to agree. The reader has already trimmed.
     """
     return string.lower()
 
@@ -179,6 +176,20 @@ def section(sheet: Sheet) -> Report:
     strings = set(named)
     resolutions = {string: resolve(string, sheet.catalogue) for string in strings}
 
+    # The alias table's biggest single decision. Whichever it is, the point of
+    # the line is the size of the largest judgement in the table -- naming the
+    # string here would be asserting which one that is.
+    # Keyed normalised, because ALIASES is: `Omnitik` beside `omnitik` is one
+    # decision, and counting the casings apart would report the largest as
+    # smaller than it is.
+    aliased = Counter(_normalised(item) for item in named if resolutions[item].how is How.ALIAS)
+    largest_alias = max(aliased.values(), default=0)
+    # The retired scheme, and the worst single guess declining to decode it
+    # avoids: the brief argues from that number, so the report produces it.
+    retired = [name for name in strings if RETIRED_CODE.match(name)]
+    undecoded = Counter(item for item in named if item in retired and not resolutions[item].item)
+    largest_retired = max(undecoded.values(), default=0)
+
     def strings_by(how: How) -> int:
         return sum(1 for r in resolutions.values() if r.how == how)
 
@@ -193,5 +204,11 @@ def section(sheet: Sheet) -> Report:
         ("  reaching a catalogued item", sum(1 for item in named if resolutions[item].item)),
         ("  reaching nothing", sum(1 for item in named if not resolutions[item].item)),
         ("submissions naming no item at all", len(sheet.submissions) - len(named)),
+        # The two the brief argues from: the alias that would have been read
+        # as a typo, and the retired scheme.
+        ("retired NYCM codes among the strings", len(retired)),
+        (" of those, decoding to one catalogued item", sum(1 for name in retired if resolutions[name].item)),
+        (" submissions on the largest that does not", largest_retired),
+        ("submissions the largest alias speaks for", largest_alias),
         ("alias targets the catalogue does not hold", len(set(ALIASES.values()) - set(sheet.catalogue))),
     ]

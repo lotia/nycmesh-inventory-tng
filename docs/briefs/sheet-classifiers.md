@@ -29,10 +29,12 @@ cd backend && uv run python src/manage.py profile_sheet \
     "../ignored/NYC Mesh - Inventory Sheet.xlsx"
 ```
 
-It prints a section per rule, and the rules land one at a time. A figure below
-that the command does not yet print is a hand count and says so — look for
-**(hand count)**. **A figure taken from here is quoted with its rule or not at
-all.**
+It prints a section per rule, and **every figure below now comes out of it.**
+There are no hand counts left in this document. A number in the prose is
+either in one of the fenced blocks, or is arithmetic over two of them — a
+percentage, or a difference — or is a withdrawn figure named as one, and those
+say so where they appear. **A figure taken from here is quoted with its rule or
+not at all.**
 
 Every unlabelled fenced block below is that command's output, pasted. A test
 reads them back and fails if a block's labels are no longer the ones its
@@ -90,17 +92,21 @@ holds two, so a guess is a coin toss over 9 submissions.
 
 ```
 Item strings
-  distinct strings named                        145
-    matching the catalogue exactly               52
-    matching but for case                         9
-    resolved by a hand-written alias             28
-    recorded as naming no catalogued item        56
-    neither resolved nor accounted for            0
-  submissions naming an item                   3436
-    reaching a catalogued item                 3337
-    reaching nothing                             99
-  submissions naming no item at all               3
-  alias targets the catalogue does not hold       0
+  distinct strings named                         145
+    matching the catalogue exactly                52
+    matching but for case                          9
+    resolved by a hand-written alias              28
+    recorded as naming no catalogued item         56
+    neither resolved nor accounted for             0
+  submissions naming an item                    3436
+    reaching a catalogued item                  3337
+    reaching nothing                              99
+  submissions naming no item at all                3
+  retired NYCM codes among the strings            53
+   of those, decoding to one catalogued item       7
+   submissions on the largest that does not        9
+  submissions the largest alias speaks for        40
+  alias targets the catalogue does not hold        0
 ```
 
 The last line of each group is a self-check rather than a figure. Zero
@@ -164,6 +170,8 @@ Corrections
     naming the record only                           116
     naming an act only                                32
     naming neither, note or no note                 2685
+     of those, the bare word alone                    52
+     of those, an order or a place                    25
   the four enumerated phrases, whole-note            407
     the same phrases, per row                        445
     the same phrases, summed per phrase              517
@@ -201,10 +209,11 @@ two notes naming the room identically and differing after it are two, which is
 what the count has always been. Nothing is lost by folding: case has never
 distinguished two places in this ledger.
 
-Broome is spelled five ways: `broome` (198), `broom` (7 more), `beoome` (4),
-`briome` (1) and `brooke` (1). One pattern covers them, and the room's other
-half — `mesh room` — is likewise written once and used in both places the
-report speaks about that room, so its two lines cannot disagree.
+Broome is spelled five ways and the report counts each of them, so the
+pattern's own reading is the one on the page rather than a substring count
+taken beside it. One pattern covers all five, and the room's other half —
+`mesh room` — is likewise written once and used in both places the report
+speaks about that room, so its two lines cannot disagree.
 
 **Which notes name *this* room** had three readings, 38 submissions apart —
 a fifth of the smaller — and the rule takes the widest, `mesh room`. The
@@ -219,35 +228,43 @@ one.
 
 ```
 Locations
-  submissions with a note                     2255
-    naming a candidate location                408
-     of those, naming more than one              6
-    naming none of the vocabulary             1847
-  distinct candidates named                     19
-    131 Broome                                 232
-    Blue Stockings                               3
-    Mil Mundos                                  15
-    Olmsted                                     20
-    President Street                            14
-    Greenwood Cemetery                          11
-    Belmont                                      8
-    BAM                                          7
-    Astoria                                     13
-    Columbia                                     6
-    Flatbush Cats                                4
-    Grand Street                                21
-    Boro Park                                   12
-    Harlem                                      10
-    SN1                                          6
-    W 171st                                     10
-    a volunteer's home                          18
-    basement                                     3
-    backup shelf                                 2
-  the mesh room, however written               231
-    and 131 or a Broome spelling               205
-    and Broome spelled correctly               193
-  notes naming it, read literally               41
-  notes naming it, read case-insensitively      33
+  submissions with a note                                  2255
+    naming a candidate location                             408
+     of those, naming more than one                           6
+    naming none of the vocabulary                          1847
+  distinct candidates named                                  19
+    131 Broome                                              232
+    Blue Stockings                                            3
+    Mil Mundos                                               15
+    Olmsted                                                  20
+    President Street                                         14
+    Greenwood Cemetery                                       11
+    Belmont                                                   8
+    BAM                                                       7
+    Astoria                                                  13
+    Columbia                                                  6
+    Flatbush Cats                                             4
+    Grand Street                                             21
+    Boro Park                                                12
+    Harlem                                                   10
+    SN1                                                       6
+    W 171st                                                  10
+    a volunteer's home                                       18
+    basement                                                  3
+    backup shelf                                              2
+  the mesh room, however written                            231
+    and 131 or a Broome spelling                            205
+    and Broome spelled correctly                            193
+  notes naming it, read literally                            41
+  notes naming it, read case-insensitively                   33
+  the commonest of those notes, read literally               97
+  the commonest of those notes, read case-insensitively     118
+  submissions spelling the street                           202
+    broome                                                  191
+    broom                                                     5
+    beoome                                                    4
+    briome                                                    1
+    brooke                                                    1
 ```
 
 `131 Broome` is 232 rather than 231 because one note gives the address without
@@ -269,12 +286,11 @@ the stakeholder meeting.
 ## 4. Note to job reference
 
 **Rule.** `NN`, an optional space, then digits, case-insensitively —
-`\bNN\s*(\d+)\b`. The census of the 137 references is `NN` 58, `Nn` 25, `nn`
-21, `NN␣` 17, `Nn␣` 15, `nn␣` 1, and it is what both pieces of latitude rest
-on: title case is 40 on its own, so a case-sensitive read finds 75 of the 136
-and loses 61; 33 submissions put a space in, so a pattern demanding `NN904`
-finds 103. No submission writes `NN#217`, so the pattern does not admit a `#`
-— latitude for input that is not in the ledger is latitude nothing can check.
+`\bNN\s*(\d+)\b`. The census below is what both pieces of latitude rest on,
+and it is title case rather than lower case that makes the first one matter —
+a case-sensitive read finds 75 of the 136. No submission writes `NN#217`, so
+the pattern does not admit a `#`: latitude for input that is not in the ledger
+is latitude nothing can check. `␣` marks the space the pattern allows.
 
 **Figures.** 136 submissions cite a job, across 54 distinct numbers. One note
 cites two — `nn498-nn6622`, a link between two nodes rather than two jobs — so
@@ -282,10 +298,21 @@ the rule takes the first, and one cited job is therefore carried by nothing.
 
 ```
 Job references
-  submissions citing a job                         136
-  distinct jobs cited                               54
-  submissions citing more than one                   1
-  cited jobs the imported field will not carry       1
+  submissions citing a job                            136
+  distinct jobs cited                                  54
+  submissions citing more than one                      1
+  cited jobs the imported field will not carry          1
+  references written                                  137
+    NN                                                 58
+    NN␣                                                17
+    Nn                                                 25
+    Nn␣                                                15
+    nN                                                  0
+    nN␣                                                 0
+    nn                                                 21
+    nn␣                                                 1
+  submissions a case-sensitive read would find         75
+  submissions a read allowing no space would find     103
 ```
 
 **Becomes.** `StockTransaction.job_reference`, a field that already exists, so
@@ -318,9 +345,10 @@ email, and keying on the email puts every one of them under one empty key. That
 is not a small distortion: it is where **77.8%** came from. Let the emailless
 rows stand alone instead, as rows the rule cannot attribute, and the same key
 reports **41.6%** inside a batch, so more than half of what it was measuring was
-the collapse rather than anybody's trip. The name is blank on 42 submissions
-rather than 1,540, so the same treatment costs it almost nothing: **76.3%**
-against the 76.8% it gives when those 42 are chained together too.
+the collapse rather than anybody's trip. The name field answers with nothing
+usable on 48 submissions rather than 1,540 — §6 decides what counts as a name,
+and this rule takes that answer — so the same treatment costs it almost
+nothing.
 
 Email-with-a-name-fallback is the worst of the three rather than a compromise.
 It gives **112 keys** where the name gives 80, because a volunteer who typed
@@ -406,21 +434,27 @@ somebody lends the most pulls everybody it ever carried into a single row.
 
 ```
 People
-  distinct name spellings                      102
-    the same but for case                       16
-  distinct names                                86
-    holding no name at all                       6
-    joined to another by a shared address       14
-    a volunteer in their own right              66
-  volunteers the import mints                   72
-    known only by an address                     6
-    flagged as possibly a duplicate             22
-  the fewest volunteers this can be             59
-  submissions reaching a volunteer            3432
-    by the name field                         3391
-    by an address, the name being unusable      41
-  submissions reaching nobody                    7
-  not-a-name entries no submission wrote         0
+  distinct name spellings                              102
+    the same but for case                               16
+  distinct names                                        86
+    holding no name at all                               6
+    joined to another by a shared address               14
+    a volunteer in their own right                      66
+  volunteers the import mints                           72
+    known only by an address                             6
+    flagged as possibly a duplicate                     22
+     submissions those flags carry                     107
+  the fewest volunteers this can be                     59
+  volunteers who wrote no address                       31
+  volunteers who wrote more than one                    13
+   the most any one of them wrote                        6
+  addresses written beside more than one volunteer       2
+   the most volunteers any one of them names             3
+  submissions reaching a volunteer                    3432
+    by the name field                                 3391
+    by an address, the name being unusable              41
+  submissions reaching nobody                            7
+  not-a-name entries no submission wrote                 0
 ```
 
 **65 was never a headcount, and it is not a floor either.** It counts
@@ -468,13 +502,28 @@ not anything is returned.
 Nor can a check-in be read as a return. §2 can now tell a correction from a
 movement, so the 984 could be sorted — but a share of them would still measure
 how often somebody wrote something down rather than how often it happened,
-which is the point this section exists to make. What can be said without any
-rule at all: **68 check-ins say in so many words that something came back**
-(hand count), on a whole-note reading. That is a floor, not a rate.
+which is the point this section exists to make.
 
-The earlier version of this section gave a four-way percentage split. Those
-shares rested on a broad regex nothing now endorses, and they did not sum to
-984. They are withdrawn rather than recomputed, for the reason above.
+What can be said without inferring anything is how often a note uses the word,
+and `profile_sheet` says it rather than this brief asserting it:
+
+```
+Return language
+  submissions whose note says return      58
+    recorded as a check-in                52
+    recorded as a check-out                6
+  check-ins                              984
+```
+
+**That is a floor under "how often did somebody write it down", and is not a
+rate of anything.** Six of the submissions that say `return` record stock going
+*out*, so the word does not reliably give even the direction. This brief
+previously said 68 check-ins on a hand count; the reading above gives 52, and
+68 reproduces under nothing.
+
+The earlier version of this section also gave a four-way percentage split.
+Those shares rested on a broad regex nothing now endorses, and they did not sum
+to 984. They are withdrawn rather than recomputed, for the reason above.
 
 This is not a classifier waiting to be written. It is the question the
 stakeholder meeting exists to answer

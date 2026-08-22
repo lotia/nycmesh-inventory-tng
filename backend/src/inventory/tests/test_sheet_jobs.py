@@ -61,9 +61,28 @@ def test_the_report_says_what_choosing_the_first_costs() -> None:
     """
     _, counted = section(notes("nn498-nn6622", "install at NN217", "fixing inventory"))
 
-    assert dict(counted) == {
-        "submissions citing a job": 2,
-        "distinct jobs cited": 3,
-        "submissions citing more than one": 1,
-        "cited jobs the imported field will not carry": 1,
-    }
+    partition = dict(counted)
+    assert partition["submissions citing a job"] == 2
+    assert partition["distinct jobs cited"] == 3
+    assert partition["submissions citing more than one"] == 1
+    assert partition["cited jobs the imported field will not carry"] == 1
+
+
+def test_the_report_prices_the_latitude_the_pattern_takes() -> None:
+    """The census is the whole evidence for folding case and for allowing a
+    space, so the report carries it rather than the brief asserting it. Every
+    spelling the rule admits gets a line, including the ones nobody wrote --
+    a label that appeared only when the data held it would make the brief
+    correct for one export.
+    """
+    _, counted = section(notes("NN217", "Nn217", "nn 217", "no job here"))
+
+    partition = dict(counted)
+    assert partition["references written"] == 3
+    assert partition["  NN"] == 1
+    assert partition["  Nn"] == 1
+    assert partition["  nn\u2423"] == 1
+    assert partition["  nN"] == 0
+    assert partition["  nN\u2423"] == 0
+    assert partition["submissions a case-sensitive read would find"] == 1
+    assert partition["submissions a read allowing no space would find"] == 2

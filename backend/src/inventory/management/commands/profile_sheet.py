@@ -17,7 +17,7 @@ from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 
-from inventory.sheet import Report, batches, corrections, items, jobs, locations, people, workbook
+from inventory.sheet import Report, batches, corrections, items, jobs, locations, people, returns, workbook
 from inventory.sheet.workbook import NotTheWorkbook, Sheet
 
 # What a section is, and why a line is a label and a number, is stated once
@@ -51,6 +51,7 @@ SECTIONS: list[Section] = [
     jobs.section,
     batches.section,
     people.section,
+    returns.section,
 ]
 
 
