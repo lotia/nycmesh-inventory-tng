@@ -56,7 +56,11 @@ export default defineConfig(({ mode }) => ({
     // Unit tests only, and only where they live: next to the code. Vitest's
     // default glob would otherwise collect the Playwright suite, which has its
     // own runner and command -- see DEVELOPERS.md "Integration tests".
-    include: ["src/**/*.test.{ts,tsx}"],
+    //
+    // `capture/` is here for its own arithmetic and its own list of pictures,
+    // both of which are ordinary units. The driver beside them is a Playwright
+    // file and is named `.capture.ts` so that this glob leaves it alone.
+    include: ["src/**/*.test.{ts,tsx}", "capture/**/*.test.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
@@ -64,7 +68,11 @@ export default defineConfig(({ mode }) => ({
       // complete picture rather than only a list of failures.
       skipFull: false,
       reportOnFailure: true,
-      include: ["src/**/*.{ts,tsx}"],
+      // `capture/` is measured for the same reason its tests are run: the
+      // arithmetic behind a crop and the list the guides are checked against
+      // are ordinary units, and leaving them out of this list was an exclusion
+      // nothing recorded. What is genuinely out of reach is named below.
+      include: ["src/**/*.{ts,tsx}", "capture/**/*.ts"],
       exclude: [
         // Bootstrap: mounts React onto the DOM, no behaviour of its own.
         "src/main.tsx",
@@ -76,6 +84,18 @@ export default defineConfig(({ mode }) => ({
         // vitest, so nothing outside a test can reach it. Excluded for the
         // same reason as test-setup.ts, which its filename does not say.
         "src/testHarness.tsx",
+        "capture/**/*.test.ts",
+        // The three files in capture/ that only a browser reaches. The driver
+        // is a Playwright spec run by `npm run capture:guides`; `drive.ts` is
+        // gestures against a live `Page`; `scene.ts` shells out to
+        // `manage.py`. Covering them from here would mean asserting that
+        // Playwright was called the way it was called, which is a restatement
+        // of the code rather than a test of it -- what they actually do is
+        // proved by the capture run and by
+        // `integration/guide-controls.spec.ts`, both of which fail loudly.
+        "capture/*.capture.ts",
+        "capture/drive.ts",
+        "capture/scene.ts",
       ],
       // Applies to the code left after the exclusions above -- that is, code
       // that actually implements behaviour. Raising this is welcome; lowering

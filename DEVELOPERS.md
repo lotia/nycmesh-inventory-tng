@@ -8,7 +8,9 @@ is put together, see [docs/architecture.md](docs/architecture.md).
 
 **This guide is expected to work.** If a command here fails on a clean machine,
 that is a bug in the guide — please open an issue or fix it in your next pull
-request. See [Definition of Done](#definition-of-done).
+request. See [Definition of Done](#definition-of-done). CI runs the setup below
+on a clean machine every push, so that expectation is checked rather than
+hoped for: [What CI proves](#what-ci-proves).
 
 ---
 
@@ -28,54 +30,121 @@ Two things, and nothing else installed globally:
 Every version this project uses is pinned in [`mise.toml`](mise.toml). That file
 is the single source of truth for the toolchain — CI installs from it too.
 
+### Activate mise, then open a new shell
+
+**Do this before typing anything else.** The installer above only puts a binary
+in `~/.local/bin`; it changes no shell of yours. Its last lines print the one
+line to add to your shell's configuration, of the form:
+
 ```bash
-git clone git@github.com:lotia/nycmesh-inventory-tng.git
+eval "$(~/.local/bin/mise activate bash)"      # or zsh, or fish
+```
+
+Add the line it printed — to `~/.bashrc`, `~/.zshrc`, or
+`~/.config/fish/config.fish` — and then **open a new shell**, because a running
+one will not pick it up. Everything after this point in this guide, and in the
+two documents it links to, assumes an activated shell.
+
+Until it is activated, `mise` may not be found at all, and `uv`, `python`,
+`node`, `npm` and `helm` certainly are not: this project installs none of them
+globally, so a shell that cannot see mise's shims answers `command not found`
+to every command below. The new shell should answer both of these:
+
+```bash
+mise --version
+mise doctor       # "activated: yes" is the line that matters
+```
+
+Three of the names mise brings recur throughout, so they are worth having
+straight now: **uv** manages the backend's Python environment, and `uv run
+<command>` is how every backend command is run inside it; **ty** is the Python
+type checker; **helm** renders the deployment chart.
+
+### Clone and bootstrap
+
+```bash
+git clone https://github.com/lotia/nycmesh-inventory-tng.git
 cd nycmesh-inventory-tng
+scripts/bootstrap-dev.sh
+```
+
+That URL is public and read-only, and needs no GitHub account and no SSH key.
+Where a remote you can push to matters is [Pull requests](#pull-requests).
+
+[`scripts/bootstrap-dev.sh`](scripts/bootstrap-dev.sh) is setup: it trusts and
+installs the toolchain, writes `.env` from [`.env.sample`](.env.sample) if you
+have none, starts PostgreSQL, applies the migrations, and puts an invented
+catalogue in the database so that no screen you open is blank. It composes the
+commands the rest of this guide describes and invents nothing of its own, so
+nothing here is out of reach if you would rather type them. Run it as often as
+you like; it writes no file it has written already, and it will not touch a
+`.env` you have edited.
+
+If it stops on a port that is already taken, or on anything else,
+[Troubleshooting](#troubleshooting) is two sections down and names the fix for
+each of them.
+
+It stops short of two things, and says both as it finishes rather than leaving
+you to find them here. `createsuperuser` asks for a password at a terminal, so
+it cannot run unattended. And the first sign-in of the account it makes needs
+[a second factor](#signing-in), which means having an authenticator app to
+hand.
+
+The last thing it prints is what to do with it: the two label codes the seed
+made, and the order to start the servers in. Read the end of its output rather
+than scrolling past it — those codes are the stickers a scanner resolves, and
+nothing else prints them.
+
+`.env` holds your local configuration. It is git-ignored, and
+[`.env.sample`](.env.sample) documents every variable. Setting the toolchain
+and that file up by hand, if you would rather, is three commands:
+
+```bash
 mise trust      # allow mise to use this repo's mise.toml
 mise install    # installs Python, Node, uv, Helm at the pinned versions
 cp .env.sample .env
 ```
 
-`.env` holds your local configuration. It is git-ignored, and
-[`.env.sample`](.env.sample) documents every variable.
+`mise trust` is a one-off confirmation that you meant to run the versions this
+repository asks for: mise refuses to read a `mise.toml` it has not been told
+about, so that a checkout cannot pick your toolchain for you unnoticed.
 
 ---
 
 ## Running it
 
-There are two ways. Use Docker when you want the whole system up; use the native
-setup when you are actively editing code and want fast reloads.
+Three ways, and the bootstrap script above prepares the second of them. Use
+Docker when you want the whole system up; use the native setup when you are
+actively editing code and want fast reloads; use the devcontainer when you want
+nothing at all on your host.
+
+**Run one at a time.** A and B both put Django on port 8000 — one in a
+container, one on your machine — so whichever starts second fails to bind.
+`docker compose down` before starting the native servers, or stop those before
+bringing the stack up. PostgreSQL is not a clash: both use the same compose
+service, and starting it twice starts it once.
 
 ### Option A — everything in Docker
 
-Best for a first run, or when you only care about one half of the stack.
+Best for a first run, or when you only care about one half of the stack. It is
+the quickstart, so the commands live in
+[README](README.md#quickstart) rather than a second time here. Frontend on
+<http://localhost:8080>, API on <http://localhost:8000>, and migrations run
+automatically on start.
+
+Two more worth knowing once it is up:
 
 ```bash
-docker compose up --build
-```
-
-Frontend on <http://localhost:8080>, API on <http://localhost:8000>. Migrations
-run automatically on start.
-
-```bash
-docker compose exec backend python manage.py createsuperuser   # an administrator
 docker compose logs -f backend                                 # tail logs
 docker compose down -v                                         # stop, wipe database
 ```
 
-Sign in at <http://localhost:8080/accounts/login/>. The first sign-in asks that
-account to set up an authenticator app before it can reach anything, because
-[decision 0013](docs/decisions/0013-administrator-sign-in.md) requires a second
-factor of a local password. Which providers a deployment offers besides that
-one is configuration; the variables are in
-[deployment](docs/deployment.md#environment-variables).
-
-> **If you had this stack running before August 2026**, run `docker compose down
-> -v` once. The database volume now mounts `/var/lib/postgresql` rather than
-> `/var/lib/postgresql/data`, because postgres 18 keeps its data in a
-> major-version subdirectory. An older volume is not migrated: postgres would
-> silently start an empty cluster beside it, and you would wonder where your
-> local data went.
+Every service in [`compose.yaml`](compose.yaml) names the non-root uid it runs
+as, drops all capabilities, refuses to gain privileges, and runs with a
+read-only root filesystem — with a `tmpfs` for each directory that service
+genuinely writes to, and no others. Those are stated in the file rather than
+claimed in a comment, and none of them needs anything added under rootless
+Podman.
 
 ### Option B — native, with only PostgreSQL in Docker
 
@@ -112,6 +181,85 @@ origin and you will not hit CORS locally.
 the toolchain with nothing installed on your host. Open the repo in VS Code and
 choose *Reopen in Container*, or run `devcontainer up --workspace-folder .`.
 
+### Signing in
+
+Everybody signs in, for now. Five endpoints answer without a session — the
+index `/api`, the health check `/api/healthz`, `/api/me`, and the API's own
+description at `/api/schema` and `/api/docs` — and every other one needs one,
+the two a volunteer writes to included. So make an account before you expect
+either half of the app to answer, and sign in at `/accounts/login/` on
+whichever address you are using. Those last two are readable by anyone who can
+reach the port, which is why a deployment puts a network boundary in front of
+them: [which paths are restricted](docs/deployment.md#which-paths-are-restricted).
+
+That is a gap rather than the design.
+[Decision 0012](docs/decisions/0012-two-populations.md) settles that the two
+populations are told apart by what they may do and not by a credential, and
+[what is not built yet](docs/architecture.md#not-yet-built) is where the
+distance between that and today is recorded.
+
+The first sign-in of a new account stops and asks it to set up an authenticator
+app before it can reach anything, because
+[decision 0013](docs/decisions/0013-administrator-sign-in.md) requires a second
+factor of a local password. There is no way past that and no setting that turns
+it off, so have a phone or any other TOTP application ready before you start.
+Which providers a deployment offers besides that one is configuration; the
+variables are in [deployment](docs/deployment.md#environment-variables).
+
+### If you had this stack running before August 2026
+
+Run `docker compose down -v` once. The database volume now mounts
+`/var/lib/postgresql` rather than `/var/lib/postgresql/data`, because postgres
+18 keeps its data in a major-version subdirectory. An older volume is not
+migrated: postgres would silently start an empty cluster beside it, and you
+would wonder where your local data went.
+
+---
+
+## Troubleshooting
+
+**`mise: command not found`, or `uv`/`npm`/`helm: command not found`.** You have
+installed mise but not activated it, which is by far the commonest way a first
+run stops. [Activate mise, then open a new shell](#activate-mise-then-open-a-new-shell)
+is the fix, and it is one line plus a new terminal.
+
+**`django.core.exceptions.ImproperlyConfigured: Set the DJANGO_SECRET_KEY
+environment variable`.** You have no `.env`. Run `cp .env.sample .env`. The
+settings module deliberately has no fallback secret, so a misconfigured
+deployment fails at boot instead of running with a known-public key.
+
+**`connection refused` on the database port.** PostgreSQL is not running.
+Start it with `docker compose up -d postgres`.
+
+**Frontend loads but every API call 404s.** You are on the Vite dev server
+(port 5173) with no backend running. Start Django, or use
+<http://localhost:8080> from the Docker stack.
+
+**`Bind for 0.0.0.0:5432 failed: port is already allocated`**, or
+`address already in use`. A PostgreSQL of somebody else's — a system service, or
+another project's stack — already holds the port this one wants to publish, and
+that is the ordinary state of a laptop that has done any database work before.
+Either stop theirs, or move ours, which takes **two** settings changed
+together:
+
+```bash
+POSTGRES_PORT=5433
+DATABASE_URL=postgres://inventory:inventory@localhost:5433/inventory_tng
+```
+
+Put both in `.env`. `POSTGRES_PORT` is what
+[`compose.yaml`](compose.yaml) publishes the container on and `DATABASE_URL` is
+where Django looks, so changing one alone points your Django at the stranger's
+cluster — it will connect, fail to authenticate or migrate a database that is
+not yours, and none of the errors will say why.
+[`.env.sample`](.env.sample) carries the same pairing.
+
+**Port 8000, 8080 or 5173 already in use.** Two of the three ways to
+[run it](#running-it) are up at once; bring one down. Failing that, something
+else on the machine holds the port and has to be stopped — those three are not
+configurable here, because both dev servers and the guides' addresses assume
+them.
+
 ---
 
 ## Repository layout
@@ -130,9 +278,12 @@ frontend/               Vite + React + MUI single-page app
   vite.config.ts        Build, dev server, and test/coverage configuration
   playwright.config.ts  Integration test configuration (servers, browser)
   integration/          Integration tests and the scene they run against
+  capture/              The screenshot run behind the guides, and its scene
   Dockerfile            Frontend image (nginx serving static files)
   nginx.conf.template   Runtime API proxy configuration
 infra/helm/             Kubernetes deployment chart
+scripts/                The development bootstrap, and the guardrail checkers
+guides/                 The two user guides, and the pictures in them
 docs/                   Architecture, deployment, and decision records
 .agents/skills/         On-demand context for AI coding agents
 compose.yaml            Local development stack
@@ -159,6 +310,7 @@ All backend commands run from `backend/`, all frontend commands from `frontend/`
 | Type check | `uv run ty check src` |
 | Make migrations | `uv run python src/manage.py makemigrations` |
 | Apply migrations | `uv run python src/manage.py migrate` |
+| Put demo rows in an empty database | `uv run python src/manage.py seed_demo_data` (refuses unless `DJANGO_DEBUG` is on) |
 | Open a Django shell | `uv run python src/manage.py shell` |
 | Add a dependency | `uv add <package>` |
 | Add a dev-only dependency | `uv add --group dev <package>` |
@@ -203,6 +355,14 @@ uv run python src/manage.py migrate
 Commit the generated migration file alongside the model change. In production,
 migrations run as a separate Kubernetes Job before new pods start, never from a
 running web pod — see [docs/deployment.md](docs/deployment.md).
+
+### Importing the old spreadsheet
+
+No part of setting up, and deliberately not in the path above: it needs an
+exported workbook, which is not in this repository and is not ours to publish.
+What `manage.py import_sheet` does, the four steps it composes, and when you
+would run one of them on its own are in
+[the data model](docs/data-model.md#migrating-the-existing-sheet).
 
 ---
 
@@ -476,6 +636,101 @@ be finished without dialling anybody.
 They write to your development database rather than a throwaway one, because
 the point is to exercise the servers you actually run.
 
+### The guides' screenshots
+
+```bash
+cd frontend && npm run capture:guides
+```
+
+Every picture in [guides/volunteer.md](guides/volunteer.md) and
+[guides/administrator.md](guides/administrator.md) comes from that command
+rather than from somebody's phone, which is what makes them regenerable. It
+drives the same servers and the same seeded scene as the suite above — its
+config spreads `playwright.config.ts` rather than restating it — and writes one
+PNG per step into `guides/images/`.
+
+Kept out of `npm run test:integration` on purpose. A run of it rewrites every
+PNG under `guides/images/`, and those are then committed — a suite that edits
+the working tree is not a suite. CI does not run it either.
+
+What it adds to that scene — the stickers to scan, stock on a shelf, something
+measured whose scan asks how much, and the questions the sheet import leaves
+behind — is in `frontend/capture/scene.ts`, and every code and quantity in it
+is fixed, so a run against an unchanged app rewrites almost nothing. Two
+pictures do change every time and cannot not: one is of the movements, which a
+run appends to and nothing may edit, and one carries the date it was printed.
+Which pictures exist at all is `frontend/capture/shots.ts`, and `npm test`
+fails when one of them is missing from `guides/images/`, when the guide that
+claims it does not draw it, and when `guides/images/` holds a PNG no shot
+claims.
+
+`capture/` is measured by the coverage thresholds like anything else. The three
+files in it that only a browser can reach — the driver, the gestures against a
+live `Page`, and the scene, which shells out to `manage.py` — are excluded by
+name in `vite.config.ts`, with the reason beside them.
+
+Run it when you change a screen one of them shows, and commit the PNGs with
+that change.
+
+### What CI proves
+
+Some of what this repository's documents claim is executed on every push, and
+the rest is not. Which is which is worth knowing before you rely on either.
+
+**This guide's setup is run, not read.** The `Setup instructions` job starts a
+clean runner, installs mise off the line in [Prerequisites](#prerequisites),
+and activates it with the line
+[Activate mise, then open a new shell](#activate-mise-then-open-a-new-shell)
+tells you to add — nothing else, and no shim directory bolted onto the path
+behind your back. From there it types what is printed here and only that:
+`scripts/bootstrap-dev.sh`, then a bare `uv`, a bare `npm` and a bare `helm`,
+with no prefix a reader of this file would not have. A job reaching for
+`mise exec --` instead would be a green tick over a command this guide does
+not print, which is worse than no job at all.
+
+Then it asks whether any of it worked: the seed has to have left rows behind
+in the catalogue, the labels, the places, the people and the ledger, and the
+two servers — started with the two lines the bootstrap script signs off with —
+have to answer a request. That is the sentence at the top of this file being
+kept rather than repeated.
+
+**Deployment is rendered and no further.** No cluster exists in CI, so the same
+job runs the `helm lint` and `helm template` commands
+[deployment](docs/deployment.md#from-an-empty-cluster-to-a-first-sign-in)
+prints and stops there. Everything from the install onwards is unproven, and
+that document says so where it asks you to type it.
+
+**A command any document names has to exist.**
+`backend/src/inventory/tests/test_documented_commands.py` holds every
+`manage.py` subcommand, `npm run` script, file under `scripts/` and chart value
+the documents mention against what the repository actually has, and names the
+file and the line of anything stale. It costs nothing and it catches the
+commonest rot there is, which is a rename.
+
+**A control either guide names has to be on the screen.** Each guide keeps one
+typographic promise to its reader: a thing you press or type into is set in
+bold, and the screen's own words back to you are in italics. That promise is
+also what makes the guides machine-readable, so nothing lists the controls
+twice — `frontend/capture/controls.ts` reads the short bold phrases out of the
+guide itself, and `frontend/integration/guide-controls.spec.ts` walks the scene
+the pictures are taken from and fails naming whatever the app no longer offers.
+
+Each guide is held to the screens it is about, and not to the union of both:
+the volunteer's to the app, the administrator's to the app and to `/admin/`,
+because its first section says it is about the two of them. Pooling them would
+let a field on a Django page answer for a button a volunteer is told to press.
+The walk has to work for its names — a menu's choices exist only while the menu
+is open, and the box asking who you are is gone the moment you answer it — so
+it opens what it must and harvests before it moves on.
+
+Comparing regenerated PNGs would catch more and would also fail on a font or a
+shadow; this fails on the change that would actually mislead somebody.
+
+What none of it can see is whether a guide has gone on describing a job nobody
+does any more, or stayed quiet about one that has appeared. Somebody has to
+read them, which is why that is in the [Definition of Done](#definition-of-done)
+instead.
+
 ### What breaks the build
 
 Both of these fail the command with a non-zero exit code, and therefore fail CI:
@@ -543,6 +798,10 @@ Where each topic lives:
 | Topic | Canonical location |
 | --- | --- |
 | What the project is, quickstart | [README.md](README.md) |
+| Using the app to move stock | [guides/volunteer.md](guides/volunteer.md) |
+| Running the catalogue, the people and the labels | [guides/administrator.md](guides/administrator.md) |
+| How the guides' pictures are made | [The guides' screenshots](#the-guides-screenshots) |
+| Which documents CI executes, and how far | [What CI proves](#what-ci-proves) |
 | Development setup and workflow | This file |
 | Code style and linting | [Code style](#code-style) |
 | API schema and how it stays current | [The API schema](#the-api-schema) |
@@ -625,6 +884,11 @@ hold:
       setup steps, commands, environment variables, architecture, the API
       surface, or the deployment procedure, the canonical document for that
       topic is updated in the same pull request.
+- [ ] **The two guides still describe this app.** Weigh the change against
+      [guides/volunteer.md](guides/volunteer.md) and
+      [guides/administrator.md](guides/administrator.md): neither may name a
+      role the app has dropped, nor omit one of its flows. This is the part no
+      checker sees — [What CI proves](#what-ci-proves) is the part that is seen
 - [ ] A decision that future readers would ask "why?" about has a record in
       [docs/decisions/](docs/decisions/)
 
@@ -744,6 +1008,18 @@ several commits close five issues each.
 Nothing reaches `main` except through a pull request, and `main` is protected so
 that there is no other way in.
 
+This is the first point at which the anonymous clone in
+[Prerequisites](#prerequisites) is not enough: pushing needs a credential. Add
+an SSH key to your GitHub account and point the remote at it —
+
+```bash
+git remote set-url origin git@github.com:lotia/nycmesh-inventory-tng.git
+```
+
+— or keep the HTTPS remote and let `gh auth login` install a credential helper
+for it. Contributors without write access push to a fork instead;
+[CONTRIBUTING.md](CONTRIBUTING.md) is that path.
+
 **One batch, one branch, one pull request.** A batch is the set of issues you
 mean to ship together. Branch from `main` as `batch/<name>`; if the batch is
 more than one issue, group them under an epic in the tracker so that what
@@ -845,25 +1121,3 @@ That rebase also brings the branch up to date with `main`, which is required:
 `main` accepts nothing that is behind it or that has a check outstanding, so the
 suite runs again on what will actually land. The merge stays blocked until it is
 green and every conversation is resolved.
-
----
-
-## Troubleshooting
-
-**`mise: command not found` after installing.** Add the shim directory to your
-shell as printed by the installer, then restart your shell.
-
-**`django.core.exceptions.ImproperlyConfigured: Set the DJANGO_SECRET_KEY
-environment variable`.** You have no `.env`. Run `cp .env.sample .env`. The
-settings module deliberately has no fallback secret, so a misconfigured
-deployment fails at boot instead of running with a known-public key.
-
-**`connection refused` on port 5432.** PostgreSQL is not running. Start it with
-`docker compose up -d postgres`.
-
-**Frontend loads but every API call 404s.** You are on the Vite dev server
-(port 5173) with no backend running. Start Django, or use
-<http://localhost:8080> from the Docker stack.
-
-**Port already in use.** Something else holds 5432, 8000, 8080, or 5173. Stop it,
-or change the published port in [`compose.yaml`](compose.yaml).

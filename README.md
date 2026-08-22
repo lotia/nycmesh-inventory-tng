@@ -48,6 +48,8 @@ Each topic is documented in exactly one place. Start with whichever fits you:
 
 | If you want to… | Read |
 | --- | --- |
+| Move stock in or out | [guides/volunteer.md](guides/volunteer.md) |
+| Keep the catalogue, the people and the labels | [guides/administrator.md](guides/administrator.md) |
 | Run this locally and make changes | [DEVELOPERS.md](DEVELOPERS.md) |
 | Contribute as a volunteer | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Understand how it is put together | [docs/architecture.md](docs/architecture.md) |
@@ -57,39 +59,52 @@ Each topic is documented in exactly one place. Start with whichever fits you:
 
 ## Quickstart
 
-You need [Docker](https://docs.docker.com/get-started/get-docker/) and
-[mise](https://mise.jdx.dev/getting-started.html).
+You need [Docker](https://docs.docker.com/get-started/get-docker/) and nothing
+else — every toolchain this uses is inside the images. Cloning needs no GitHub
+account either; the URL below is the anonymous one.
 
 ```bash
-git clone git@github.com:lotia/nycmesh-inventory-tng.git
+git clone https://github.com/lotia/nycmesh-inventory-tng.git
 cd nycmesh-inventory-tng
 cp .env.sample .env
-docker compose up --build
+docker compose up --build -d
 ```
 
-That brings up PostgreSQL, the Django API, and the frontend together:
+`-d` puts the three services in the background so that the terminal stays
+yours for the two commands below. `docker compose logs -f` follows them and
+`docker compose down` stops them again.
 
-| Service | URL |
-| --- | --- |
-| Frontend | <http://localhost:8080> |
-| API health check | <http://localhost:8000/api/healthz> |
-| API docs (OpenAPI) | <http://localhost:8000/api/docs> |
-| Sign in | <http://localhost:8000/accounts/login/> |
-| Django admin | <http://localhost:8000/admin/> |
-
-To create an admin login:
+**Everything but the health check and the API description needs an account**,
+and the database starts empty, so those two commands are not optional
+extras — without them every page below is a blank list or a redirect to the
+sign-in form:
 
 ```bash
-docker compose exec backend python manage.py createsuperuser
+docker compose exec backend python manage.py seed_demo_data    # something to look at
+docker compose exec backend python manage.py createsuperuser   # your login
 ```
+
+The first of those prints two label codes; they are the stickers to type into
+the scanner. Then:
+
+| Service | URL | Needs an account |
+| --- | --- | --- |
+| Sign in — start here | <http://localhost:8000/accounts/login/> | — |
+| Frontend | <http://localhost:8080> | yes |
+| Django admin | <http://localhost:8000/admin/> | yes |
+| API docs (OpenAPI) | <http://localhost:8000/api/docs> | no |
+| API health check | <http://localhost:8000/api/healthz> | no |
 
 Signing in with it the first time asks you to set up an authenticator app: a
 password on its own is not a way into this system, and how administrators sign
 in is
 [decision 0013](docs/decisions/0013-administrator-sign-in.md).
 
-For the full development environment — running the services outside Docker, tests,
-linting, and day-to-day commands — see [DEVELOPERS.md](DEVELOPERS.md).
+This stack is one of three ways to run the project, and the other two are set
+up differently: see [running it](DEVELOPERS.md#running-it). They cannot both
+have port 8000, so run `docker compose down` before following that guide's own
+setup. For the full development environment — tests, linting, and day-to-day
+commands — see [DEVELOPERS.md](DEVELOPERS.md).
 
 ## Deployment
 
