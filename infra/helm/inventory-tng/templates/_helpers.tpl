@@ -90,6 +90,10 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
       fieldPath: status.podIP
 - name: DJANGO_LOG_LEVEL
   value: {{ .Values.django.logLevel | quote }}
+- name: DJANGO_LOG_LEVELS
+  value: {{ .Values.django.logLevels | quote }}
+- name: DJANGO_LOG_FORMAT
+  value: {{ .Values.django.logFormat | quote }}
 - name: CORS_ALLOWED_ORIGINS
   value: {{ .Values.django.corsAllowedOrigins | quote }}
 - name: NUM_PROXIES

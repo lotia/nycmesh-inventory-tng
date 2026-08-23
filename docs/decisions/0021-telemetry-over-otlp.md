@@ -1,0 +1,169 @@
+# 0021 — Logs on standard output, traces and metrics over OTLP
+
+**Status:** accepted
+
+## Context
+
+This application had no telemetry of any kind. Not thin telemetry — none. There
+was no `getLogger` call anywhere in it, no metric, and `GET /api/healthz` ran a
+trivial query and said `ok`. Django's shipped configuration was left in place,
+and that configuration routes every record to one of two handlers chosen by
+mutually exclusive filters, neither of which a deployment can have: a console
+handler that only runs with `DEBUG` on, and an email handler that needs an
+`ADMINS` list. So a deployed process discarded everything, silently, including
+the tracebacks Django writes for unhandled exceptions.
+
+The price was paid before it was noticed. A misconfigured probe presented as a
+crash loop against a database that was perfectly healthy, and the reason it took
+as long as it did to diagnose is that the `DisallowedHost` explaining it reached
+nowhere at all. What the cluster showed was a 400 with no body and a container
+being killed. Everything needed to explain that had been generated and thrown
+away.
+
+Adding "some logging" would have fixed that particular afternoon. The question
+this record settles is the shape of the thing, because the parts interact: what
+a record contains decides what can be searched, where it is written decides what
+survives a crash, and who renders it decides whether anybody reads it at all.
+
+## Decision
+
+### Logs go to standard output as JSON, and are collected from there
+
+Not exported over OTLP from inside the application. Three reasons, in the order
+they matter.
+
+A line written to a stream survives the process that wrote it. An exporter with
+a buffer does not: the records explaining a crash are the ones still in the
+buffer when it happens. `kubectl logs` keeps working when the telemetry
+pipeline is the thing that is broken. And nothing is placed in the request path
+that can fail, block or add latency of its own.
+
+Traces and metrics are different and do go over OTLP, because there is no
+equivalent of "the runtime already collects your standard output" for them.
+
+### One processor chain, two drawings
+
+`structlog` is the accepted dependency, and it is one dependency doing two
+jobs. Every record — this application's, Django's, DRF's, gunicorn's — goes
+through the same chain and is then drawn either as JSON or in columns for a
+person.
+
+The property being bought is that the two differ **only** in drawing. A
+developer debugging against console output is looking at the same fields, with
+the same names, that a deployment emits; there is no second configuration that
+only exists in production and that therefore nobody has read. The alternative
+considered was a `logging.Formatter` subclass of about sixty lines and no
+dependency, which this repository's habits argue for. It was rejected because
+it is two renderers to write and maintain rather than one chain with two ends,
+and because bridging stdlib logging so that a library's records carry the same
+keys as ours is the part that is fiddly and that structlog already does.
+
+### Rendered on read, wherever something is collecting
+
+Where a collector is watching — under compose, and deployed — the process
+writes JSON and nothing else. Readability is a *read-time* concern: a
+pretty-printer in this repository redraws the stream in the terminal of whoever
+is reading it.
+
+This is better than a readable write format in two ways that are not obvious.
+There is one format in the system rather than two, so nothing has to be
+configured before a stream can be parsed. And the reader can measure the
+terminal, which the writing process cannot: a process logging into a pipe has no
+width, and guessing one is how output ends up wrapped for a terminal nobody has.
+
+Native development, which has no collector and no pipe, draws columns directly.
+
+### Nothing adapts silently
+
+Layout is chosen by measuring the terminal, and then **announced**: one line at
+startup naming the width found, the layout picked, what that layout leaves out,
+and the variable that overrides it.
+
+Output that changes shape on its own without saying so is magic, and the cost
+lands on somebody else — a developer comparing their console with a colleague's
+and finding a column missing has no way to discover why. The same rule is why a
+log level or a layout name the process does not recognise stops it at boot
+rather than quietly becoming the default. Being given something other than what
+you asked for, without being told, is worse than being stopped.
+
+### Timestamps carry the date and the offset
+
+A container logs UTC; the terminal reading it does not. A bare `14:32:07` is
+therefore not merely terse, it is misleading — and a line pasted into an issue
+should say when it happened without anyone having to ask where it came from.
+Narrow layouts drop the date when *drawing*; the record itself always has it,
+so what a collector receives never depends on who was watching.
+
+### Context is bound, not passed
+
+Request and process identity — a request id, the method, the templated path, the
+status, `trace_id`, `span_id`, a surrogate user id — is bound for the life of a
+request rather than passed as arguments. A developer writing `log.info("...")`
+with no keys at all still gets all of it, and only ever types the keys specific
+to that line.
+
+This is the decision that makes instrumenting the rest of the application cheap
+instead of a discipline nobody keeps. Its rendering half: the console hides
+keys that are on every line, because a request id repeated forty times is noise,
+and shows them on demand when following one request is the point.
+
+### The SDK starts after fork, not by wrapping the command
+
+gunicorn pre-forks. A `BatchSpanProcessor`'s exporter thread does not survive
+`fork()`, so an SDK initialised in the master leaves every worker buffering
+spans and exporting none — with no error anywhere, which is what makes it worth
+a decision record. It is started in a `post_fork` hook in gunicorn's own
+configuration file instead of by wrapping the command in `opentelemetry-instrument`.
+
+### The debug flag is signed, and the sampler is not `ParentBased` alone
+
+A request may ask to be recorded in full, which sets the W3C sampled bit and a
+custom sampler honours it. It may not be a bare `ParentBased` sampler: that
+hands an unauthenticated client the decision about what the backend records, and
+with function-level tracing behind it that is a work-amplification vector rather
+than a convenience. The flag is gated by a signed, expiring token.
+
+Ordinary traffic is sampled at a rate that is configurable rather than fixed.
+The code's default is deliberately conservative, and the configurations this
+repository ships override it upwards explicitly — so a deployment that sets
+nothing cannot flood a collector somebody else sized, while the rate actually
+wanted is visible in a file rather than implied by a default.
+
+### No personal data, enforced by an allowlist
+
+Telemetry is the easiest place in this system to leak personal data, because
+nobody reads a span attribute the way they read a template. The mechanism is
+deny-by-default: attributes not on an allowlist do not reach an exporter.
+
+An allowlist that has to be edited to add a field makes each addition a decision
+somebody takes on purpose. A denylist is a list of the leaks that have already
+been found. IP addresses are personal data and are not exempt, and neither is a
+stable pseudonymous identifier for a volunteer who never signed in —
+pseudonymised is not anonymous.
+
+### The chart does not render a collector
+
+A collector is infrastructure shared by everything on a cluster, not a component
+of this application. This repository ships one for development, where it doubles
+as the worked example, and documents how to stand one up for a cluster. Where
+that is deployed is not settled — it may be CodeNOW, it may be a cluster NYC
+Mesh runs itself — so nothing here may assume a platform that collects container
+output on your behalf.
+
+## Consequences
+
+Whatever collects container output is the whole of the log story, so a cluster
+that intends to be debuggable needs a collector shipping it somewhere durable.
+Nothing outlives a pod otherwise. [deployment.md](../deployment.md#reading-the-logs)
+is where that is said to whoever is standing one up.
+
+`structlog` is a runtime dependency of the backend image.
+
+Turning tracing on later does not change the shape of a record: `trace_id` and
+`span_id` are in the contract from the start and are empty until there is a
+tracer, so a collector's parsing and a saved stream both survive the day the SDK
+arrives.
+
+And logging stops being something a change may skip. It is an acceptance
+criterion on new work, checked by tooling rather than by whether a reviewer
+happened to look.

@@ -31,6 +31,11 @@ dependencies = [
     # major that renamed it again would silently serve no policy at all.
     "django-csp==4.0.*",
     "drf-spectacular-sidecar>=2026.8.1",
+    # One dependency for two drawings of a record rather than two: the same
+    # processor chain feeds a JSON renderer for a collector and a column
+    # renderer for a person, and it bridges stdlib logging so that Django's
+    # own loggers and gunicorn's come out looking like ours. Decision 0021.
+    "structlog==25.*",
     # Reads the exported inventory workbook. A runtime dependency rather than a
     # development one because profile_sheet, and the importer that follows it,
     # are management commands that ship inside the backend image: Django
@@ -117,6 +122,9 @@ omit = [
     "src/manage.py",
     "*/wsgi.py",
     "*/asgi.py",
+    # Read by gunicorn before Django exists, and by nothing else. What it
+    # computes is `logging_config`, which is covered.
+    "*/gunicorn.conf.py",
     # Declarative configuration, not behaviour. Imported by every test, so
     # counting it would inflate the number without testing anything.
     "*/settings.py",

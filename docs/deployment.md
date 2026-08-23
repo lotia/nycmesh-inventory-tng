@@ -152,6 +152,8 @@ ingress's, which would otherwise forward a hostname nothing answers to.
 | `DATABASE_URL` | yes | Secret | `postgres://user:password@host:5432/dbname` |
 | `DJANGO_DEBUG` | no | chart (`django.debug`) | Must be `false` outside development |
 | `DJANGO_LOG_LEVEL` | no | chart (`django.logLevel`) | How much the backend says, on standard output. Default `INFO`. Any level Python knows; one it does not know stops the process at boot rather than starting quietly at some other level. [Reading the logs](#reading-the-logs) is what to do with the output |
+| `DJANGO_LOG_LEVELS` | no | chart (`django.logLevels`) | Comma-separated `logger=LEVEL` pairs laid over `DJANGO_LOG_LEVEL`, so that one subsystem can be raised without raising everything — `inventory.sheet=DEBUG`. Empty by default. Not every logger answers: Django decides whether to record a query from `DJANGO_DEBUG` rather than from a logger's level, so raising its SQL logger gets you nothing in a deployment however it is set |
+| `DJANGO_LOG_FORMAT` | no | chart (`django.logFormat`) | `json` for a collector or `console` for a person. The record is identical either way and only the drawing differs. The chart sets `json`; the code's own default is `console`, so a process nobody configured is still readable |
 | `DJANGO_ALLOWED_HOSTS` | yes | chart (`django.allowedHosts`) | Comma-separated hostnames. Two other things read it, and [health checks](#health-checks) says what they do with it |
 | `DJANGO_EXTRA_ALLOWED_HOSTS` | no | chart (the downward API), not a knob | The pod's own address, added to the list above. Not something to set by hand — the chart fills it because nobody can know it in advance, and [health checks](#health-checks) says what it is for |
 | `CORS_ALLOWED_ORIGINS` | no | chart (`django.corsAllowedOrigins`) | Normally empty: nginx proxies Django's paths, so the browser sees one origin. Setting it grants cross-origin *reads* to an unauthenticated client and nothing more — the session cookie is not sent cross-origin and writes have no trusted-origin list, so it does not make a frontend on a second hostname work |
@@ -649,10 +651,23 @@ gone. A cluster that anyone intends to debug wants a log collector shipping this
 somewhere durable; standing one up is the cluster's business rather than this
 chart's, and this chart deliberately does not render one.
 
-**Both the application and gunicorn write here**, in two different formats —
-gunicorn's access line for every request, and Django's records for everything
-else. A collector parsing this stream has to tolerate that, which is a good
-reason to give it a parser per format rather than one that assumes.
+**It is one format, including gunicorn's.** gunicorn logs its own access line
+per request through handlers of its own, which would otherwise put plain text
+beside the application's JSON and leave whatever parses the stream meeting a
+line it was not written for. `backend/src/gunicorn.conf.py` points it at the
+same arrangement, so there is one shape to parse.
+
+**To read JSON yourself, draw it back into columns as you read it:**
+
+```bash
+kubectl -n inventory-tng logs -f deploy/inventory-tng-backend | scripts/pretty-logs
+```
+
+`scripts/pretty-logs` renders the same fields the process would have drawn for a
+terminal, and does it in *your* terminal — so it can measure a width the writing
+process never had. `DJANGO_LOG_LAYOUT` and `DJANGO_LOG_CONTEXT` steer it, and
+are documented for development in [`.env.sample`](../.env.sample); they do
+nothing to a deployment, which is drawing no columns.
 
 ## Rollback
 
