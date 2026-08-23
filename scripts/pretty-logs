@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Redraw a JSON log stream in columns, for a person.
+#
+# Deployed and under compose the backend writes JSON, because that is what a
+# collector parses. Readability is then a read-time concern, which is what this
+# is: it runs in YOUR terminal, so it measures the width the writing process
+# could not see. Why it is rendered on read rather than on write is
+# docs/decisions/0021-telemetry-over-otlp.md.
+#
+# Usage:  docker compose logs -f backend | scripts/pretty-logs
+#         kubectl -n inventory-tng logs -f deploy/inventory-tng-backend | scripts/pretty-logs
+#
+# The renderer imports nothing from Django, so this needs the backend project
+# only for an interpreter and never for a database or a settings module.
+
+set -euo pipefail
+
+HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+
+# src/ is on the path for pytest and for manage.py, neither of which is
+# running here, so this says it too.
+export PYTHONPATH="$HERE/../backend/src${PYTHONPATH:+:$PYTHONPATH}"
+
+exec uv run --project "$HERE/../backend" python -m inventory_tng.console "$@"

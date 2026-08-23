@@ -48,7 +48,12 @@ EXPOSE 8000
 
 # Migrations are NOT run here -- they run as a separate step so that scaling
 # to multiple replicas cannot race. See docs/deployment.md.
+# -c is what puts gunicorn's own access and error logs through the same
+# arrangement as the application's, so one stream carries one format. The two
+# logfile flags stay because they are what turns the access log ON at all;
+# where its records then go is the config file's business.
 CMD ["gunicorn", "inventory_tng.wsgi:application", \
+     "-c", "gunicorn.conf.py", \
      "--bind", "0.0.0.0:8000", \
      "--workers", "3", \
      "--access-logfile", "-", \

@@ -36,6 +36,12 @@ django:
   debug: false
   # How much the backend says, on standard output. See docs/deployment.md.
   logLevel: "INFO"
+  # Comma-separated logger=LEVEL pairs laid over logLevel, for turning one
+  # subsystem up without turning everything up. See docs/deployment.md.
+  logLevels: ""
+  # json, so that whatever collects this cluster's container output can parse
+  # it. The console drawing is for a terminal; see docs/deployment.md.
+  logFormat: "json"
   # Every hostname a browser may use, comma-separated. Two things depend on
   # it beyond Django itself: a release whose ingress.host none of these
   # covers is refused at render time, and the pod adds its own address to

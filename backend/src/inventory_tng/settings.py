@@ -7,13 +7,14 @@ See .env.sample at the repository root for the full list, and
 docs/deployment.md for how those values are supplied in each environment.
 """
 
+import sys
 from pathlib import Path
 from typing import Any
 
 import environ
 
 from inventory_tng.hosts import allowed_hosts
-from inventory_tng.logs import log_level, logging_config
+from inventory_tng.logs import from_environment
 
 # BASE_DIR is backend/src/ -- the directory holding manage.py.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,7 +22,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DJANGO_DEBUG=(bool, False),
     DJANGO_ALLOWED_HOSTS=(list, []),
-    DJANGO_LOG_LEVEL=(str, "INFO"),
     DJANGO_EXTRA_ALLOWED_HOSTS=(list, []),
     CORS_ALLOWED_ORIGINS=(list, []),
     # Defaults are the ones a volunteer night needs; .env.sample says why.
@@ -56,9 +56,20 @@ ALLOWED_HOSTS: list[str] = allowed_hosts(env("DJANGO_ALLOWED_HOSTS"), env("DJANG
 
 # Everything the process has to say, on standard output, in every environment.
 # What the arrangement is and why it does not vary with DEBUG is on
-# `logging_config`; where a deployment reads the result is
-# docs/deployment.md#reading-the-logs.
-LOGGING: dict[str, Any] = logging_config(log_level(env("DJANGO_LOG_LEVEL")))
+# `logging_config`; the reasoning is decision 0021; where a deployment reads
+# the result is docs/deployment.md#reading-the-logs.
+# Read straight from the environment rather than through `env`, because
+# gunicorn's configuration file reads the same five variables before Django
+# exists and the two must not drift. `.env` has already been loaded above, so
+# it is in `os.environ` by the time this runs.
+#
+# The line it hands back names the layout a terminal drawing settled on and
+# what that layout drops. It goes to standard error, so that it cannot land in
+# the middle of the record stream on standard output, and it is empty whenever
+# there is nothing a reader would be surprised by.
+LOGGING, _announcement = from_environment()
+if _announcement:
+    print(_announcement, file=sys.stderr)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
