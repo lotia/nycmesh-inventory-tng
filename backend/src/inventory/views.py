@@ -1,5 +1,6 @@
 from typing import Any, NamedTuple, cast
 
+import structlog
 from django.contrib.postgres.search import TrigramSimilarity
 from django.db import IntegrityError, connection
 from django.db.models import Prefetch, Q, QuerySet
@@ -19,6 +20,7 @@ from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
+from inventory import telemetry
 from inventory.labels import refusal_page, sheet
 from inventory.models import (
     Category,
@@ -48,6 +50,11 @@ from inventory.serializers import (
     VolunteerSerializer,
 )
 from inventory.throttling import APPEND_THROTTLES
+
+# Named for the module, which is what puts `inventory.views` in the `logger`
+# column. Every record it writes is inside a request, so it carries that
+# request's id and route without being told -- `inventory_tng.context`.
+log = structlog.get_logger(__name__)
 
 # The one place the entry points are declared. The response body, the schema
 # and the discovery test are all derived from it, so an entry point cannot be
@@ -339,10 +346,19 @@ class StockTransactionCreateView(APIView):
         # transaction would hand out a batch to whoever guesses one.
         serializer = StockTransactionCreateSerializer(data=request.data)
         if not serializer.is_valid():
+            # Which fields were wrong and how many lines, and not the messages
+            # themselves: DRF builds those from the values submitted -- "object
+            # with code=… does not exist" -- so they carry whatever somebody
+            # typed. The field names are the serializer's own and are static.
+            # Walked once and used twice: `_rejected` visits every movement,
+            # and a batch carries up to five hundred.
+            rejected = _rejected(serializer.errors)
+            log.warning("batch rejected", reason=sorted(serializer.errors), lines=len(rejected))
+            telemetry.APPENDS.add(1, {"outcome": "rejected"})
             return Response(
                 {
                     "detail": "Nothing was saved. Every line that needs fixing is listed.",
-                    "errors": _rejected(serializer.errors),
+                    "errors": rejected,
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -357,12 +373,16 @@ class StockTransactionCreateView(APIView):
         actor = serializer.validated_data["actor"]
         replayed = self._already_recorded(actor, key)
         if replayed is not None:
+            log.info("batch replayed", volunteer=actor.pk, transaction=replayed.pk)
+            telemetry.APPENDS.add(1, {"outcome": "replayed"})
             return Response(self._body(replayed), status=status.HTTP_200_OK)
 
         lines = serializer.validated_data["movements"]
         kind = serializer.validated_data["kind"]
         inconsistent = _inconsistent_lines(kind, lines)
         if inconsistent:
+            log.warning("batch inconsistent", kind=kind, volunteer=actor.pk, lines=len(inconsistent))
+            telemetry.APPENDS.add(1, {"outcome": "inconsistent", "kind": kind})
             return Response(
                 {
                     "detail": KIND_SIDES[kind].detail,
@@ -383,8 +403,13 @@ class StockTransactionCreateView(APIView):
             raced = self._already_recorded(actor, key) if _is_duplicate_key(error) else None
             if raced is None:
                 raise
+            log.info("batch raced", volunteer=actor.pk, transaction=raced.pk)
+            telemetry.APPENDS.add(1, {"outcome": "raced"})
             return Response(self._body(raced), status=status.HTTP_200_OK)
 
+        log.info("batch recorded", kind=kind, volunteer=actor.pk, transaction=recorded.pk, lines=len(lines))
+        telemetry.APPENDS.add(1, {"outcome": "recorded", "kind": kind})
+        telemetry.MOVEMENTS.add(len(lines), {"kind": kind})
         return Response(self._body(recorded), status=status.HTTP_201_CREATED)
 
     @staticmethod
@@ -542,6 +567,31 @@ class WithdrawnRows:
 WITHDRAWN_SCHEMA = extend_schema_view(get=extend_schema(parameters=[WithdrawnRows.WITHDRAWN_PARAMETER]))
 
 
+class RecordsWhatItCreated:
+    """Say that a row was added, on whichever collection this is mixed into.
+
+    A mixin rather than four `perform_create` overrides, because what is worth
+    recording is the same sentence in each: an administrator added a row to a
+    named collection. The volunteer list is not one of these -- it is written
+    by a volunteer, it has three outcomes rather than one, and it says so
+    itself.
+
+    The row's identifier and nothing else. A catalogue row holds names --
+    an item's, a location's -- and a record of one being added is not a reason
+    for those to reach a collector.
+    """
+
+    def perform_create(self, serializer: Any) -> None:
+        # A mixin sits in front of the generic view, so what this defers to is
+        # whatever it was mixed into and cannot be named here -- which a type
+        # checker is right to point out and which the annotation admits.
+        creating: Any = super()
+        creating.perform_create(serializer)
+        collection = serializer.Meta.model._meta.model_name
+        log.info("row added", collection=collection, code=serializer.instance.pk)
+        telemetry.CATALOGUE_EDITS.add(1, {"collection": collection})
+
+
 class DetailView(RetrieveUpdateAPIView):
     """One row of a collection, read by anyone and edited by an administrator.
 
@@ -571,6 +621,32 @@ class DetailView(RetrieveUpdateAPIView):
         # Re-evaluated per request, the way DRF's own get_queryset is, so a
         # class attribute cannot serve one request's rows to the next.
         return chosen.all()
+
+    def perform_update(self, serializer: Any) -> None:
+        """Say what was edited, from where the serializer is already in hand.
+
+        Here rather than in `update` below, because the row and the fields are
+        both already built at this point: asking `update` for a serializer of
+        its own to read `.fields` off made a third one per request, and every
+        one of those deep-copies every declared field.
+        """
+        super().perform_update(serializer)
+        # One record for every edit to a row that already existed, whichever
+        # collection it is in. The collection is the model's own name rather
+        # than the URL, so it does not change when a route does; the fields
+        # changed are named and their values are not, because a catalogue row
+        # holds a volunteer's name.
+        collection = self.get_queryset().model._meta.model_name
+        # Intersected with the serializer's own fields, and that is the whole
+        # of the fix: `request.data`'s keys are the CALLER's, so a PATCH body
+        # carrying an unknown key -- which DRF ignores -- put arbitrary text of
+        # unbounded length onto the record. `reason` is an allowlisted key and
+        # the allowlist checks names rather than values, so it went out
+        # verbatim. `redaction.ALLOWED_LOG_KEYS` states the rule: a reason is a
+        # word chosen in this code, never one chosen by whoever called.
+        named = sorted(set(self.request.data) & set(serializer.fields))
+        log.info("row edited", collection=collection, code=self.kwargs.get(self.lookup_field), reason=named)
+        telemetry.CATALOGUE_EDITS.add(1, {"collection": collection})
 
     def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         response = super().update(request, *args, **kwargs)
@@ -692,12 +768,35 @@ class VolunteerListCreateView(WithdrawnRows, ListCreateAPIView):
         should stay whatever the base class does with it.
         """
         try:
-            return super().create(request, *args, **kwargs)
+            created = super().create(request, *args, **kwargs)
         except serializers.ValidationError as rejected:
             conflict = self._unshowable_holder(rejected.detail, request.data)
             if conflict is None:
+                # An ordinary uniqueness refusal: the identifier belongs to
+                # somebody the list still offers, so the client can show them.
+                #
+                # THE TWO SHAPES ARE READ AS TWO. `detail` is a dict keyed by
+                # field name when the refusal is about a field, and a list of
+                # messages when it is not -- and DRF composes several of those
+                # messages out of what was submitted. Stringifying both shapes
+                # alike put a submitted value under `reason`, which is the one
+                # thing `redaction.ALLOWED_LOG_KEYS` says that key never holds.
+                # A non-field refusal is named for being one; which validator
+                # raised it is in the response the caller gets.
+                detail = rejected.detail
+                reason = sorted(detail) if isinstance(detail, dict) else ["non_field"]
+                log.info("volunteer refused", reason=reason)
+                telemetry.VOLUNTEERS.add(1, {"outcome": "refused"})
                 raise
+            # Decision 0015: the clash is with a record the list does not
+            # offer, so the volunteer cannot see who they collided with. The
+            # code says which kind; the name is in the response and not here.
+            log.warning("volunteer conflicts with a withdrawn record", reason=conflict["code"])
+            telemetry.VOLUNTEERS.add(1, {"outcome": "conflict"})
             return Response(conflict, status=status.HTTP_409_CONFLICT)
+        log.info("volunteer added", volunteer=created.data.get("id"))
+        telemetry.VOLUNTEERS.add(1, {"outcome": "added"})
+        return created
 
     @classmethod
     def _unshowable_holder(cls, errors: Any, submitted: Any) -> dict[str, Any] | None:
@@ -869,7 +968,7 @@ OFFERED_ITEMS = ITEMS.filter(active=True)
 
 
 @WITHDRAWN_SCHEMA
-class ItemListView(WithdrawnRows, ReadsAndWritesDiffer, ListCreateAPIView):
+class ItemListView(RecordsWhatItCreated, WithdrawnRows, ReadsAndWritesDiffer, ListCreateAPIView):
     """The catalogue, with the stock behind it. Administrators add to it.
 
     This is the screen the volunteer mockup is almost entirely made of: every
@@ -912,7 +1011,7 @@ OFFERED_LOCATIONS = LOCATIONS.filter(active=True)
 
 
 @WITHDRAWN_SCHEMA
-class LocationListView(WithdrawnRows, ListCreateAPIView):
+class LocationListView(RecordsWhatItCreated, WithdrawnRows, ListCreateAPIView):
     """Everywhere stock can be. A pick-list, like volunteers.
 
     Retired locations are not offered, and `active` is deliberately not a
@@ -944,7 +1043,7 @@ class LocationDetailView(DetailView):
 CATEGORIES = Category.objects.all()
 
 
-class CategoryListView(ListCreateAPIView):
+class CategoryListView(RecordsWhatItCreated, ListCreateAPIView):
     """The item groupings, for narrowing the catalogue."""
 
     serializer_class = CategorySerializer
@@ -977,7 +1076,7 @@ LABELS = Label.objects.all()
 LIVE_LABELS = Label.objects.live().select_related("item").order_by("code")
 
 
-class LabelListView(ReadsAndWritesDiffer, ListCreateAPIView):
+class LabelListView(RecordsWhatItCreated, ReadsAndWritesDiffer, ListCreateAPIView):
     """Every label that still points at something.
 
     Unpaginated, deliberately. This exists to be fetched once and cached, so
@@ -993,6 +1092,16 @@ class LabelListView(ReadsAndWritesDiffer, ListCreateAPIView):
     # The cached map drops what it can (see LabelMapSerializer); printing a
     # label needs the whole row back.
     write_serializer_class = LabelSerializer
+
+    def perform_create(self, serializer: Any) -> None:
+        super().perform_create(serializer)
+        # BESIDE the catalogue edit the mixin records, not instead of it. The
+        # two counters answer two questions: how much an administrator changed
+        # across every collection, and what became of stickers. `minted` and
+        # `revoked` were declared on `inventory.labels` and never recorded by
+        # anything, so the only outcome it ever carried was `printed` and the
+        # other two were a promise in a comment.
+        telemetry.LABELS.add(1, {"outcome": "minted"})
 
 
 # Far above a real print run, which is a page or two of stickers somebody is
@@ -1091,10 +1200,21 @@ class LabelSheetView(APIView):
                 {"detail": f"A sheet carries at most {MAX_SHEET_LABELS} labels; this asked for {len(asked)}."}
             )
         codes = [Label.normalise_code(code) for code in asked]
+        # Evaluated once. `count()` was a round trip of its own and `sheet()`
+        # then evaluated the queryset again, so a print cost two queries and
+        # the number recorded could disagree with the rows drawn if a label
+        # was revoked between them.
+        printing = list(LIVE_LABELS.filter(code__in=codes))
+        # Asked-for and found, because they differ when a code has been
+        # revoked since the list was fetched, and a sheet that came back short
+        # is a complaint somebody makes about the printer.
+        found = len(printing)
+        log.info("sheet printed", lines=found, reason=f"{len(codes)} asked for")
+        telemetry.LABELS.add(found, {"outcome": "printed"})
         # An HttpResponse rather than a Response: DRF's finalize_response passes
         # anything that is not a Response through untouched, so the document
         # reaches the browser as written and no renderer is involved.
-        return HttpResponse(sheet(LIVE_LABELS.filter(code__in=codes)), content_type=SHEET_CONTENT_TYPE)
+        return HttpResponse(sheet(printing), content_type=SHEET_CONTENT_TYPE)
 
     # DRF's stubs narrow this to a Response, but `dispatch` only ever hands the
     # result to `finalize_response`, which takes any HttpResponseBase and passes
@@ -1151,6 +1271,22 @@ class LabelResolveView(ReadsAndWritesDiffer, DetailView):
         # 404, object permissions, filter backends -- is the base class's.
         self.kwargs["code"] = Label.normalise_code(self.kwargs["code"])
         return super().get_object()
+
+    def perform_update(self, serializer: Any) -> None:
+        # The other half of `inventory.labels`. Read before and after rather
+        # than off the request body, because what is worth counting is a
+        # sticker that STOPPED being live -- a PATCH re-sending `revoked` on
+        # one already revoked has changed nothing and is not a second
+        # revocation.
+        #
+        # Both readings come off the instance the serializer is already
+        # holding, which is what makes the before free: asking `get_object`
+        # for it was a second SELECT of the row, and a second object-permission
+        # check with it, on every edit.
+        was_live = serializer.instance.revoked_at is None
+        super().perform_update(serializer)
+        if was_live and serializer.instance.revoked_at is not None:
+            telemetry.LABELS.add(1, {"outcome": "revoked"})
 
 
 class CapabilityProbe:

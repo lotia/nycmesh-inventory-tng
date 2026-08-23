@@ -92,10 +92,15 @@ ALLOWED_ATTRIBUTES = frozenset(
         "db.operation.name",
         "db.statement",
         "db.query.text",
-        # What this application measures about itself. `outcome` is one of a
-        # handful of words chosen in the code -- `inventory_tng.debugging` has
-        # the ones it uses -- and never anything a caller supplied.
+        # What this application measures about itself. Every one of these is a
+        # word chosen in the code -- `inventory.telemetry` lists the counters
+        # and `inventory_tng.debugging` the ones it uses -- and never anything
+        # a caller supplied.
         "outcome",
+        "kind",
+        "collection",
+        "reason",
+        "command",
     }
 )
 
@@ -181,6 +186,22 @@ ALLOWED_LOG_KEYS = frozenset(
         "alias",
         "suppressed",
         "suppressed_since",
+        # What this application's own records say about what it did. Counts,
+        # words chosen in the code, and surrogate identifiers -- never a name,
+        # an address or anything a caller typed. `inventory.telemetry` is the
+        # matching list for the metrics. `reason` is already above, admitted
+        # for the same argument.
+        "outcome",
+        "kind",
+        "collection",
+        "command",
+        "counted",
+        "lines",
+        "code",
+        "item",
+        "location",
+        "volunteer",
+        "transaction",
         # Free text, carrying exactly the responsibility the message carries:
         # declared because "why did that happen" is the field this application
         # will otherwise invent under six different names, and refused as a

@@ -9,6 +9,7 @@ to know that global policy sits in a module named after rate limiting.
 import math
 from typing import Any
 
+import structlog
 from drf_spectacular.openapi import AutoSchema
 from drf_spectacular.plumbing import ResolvedComponent
 from drf_spectacular.utils import Direction
@@ -17,9 +18,12 @@ from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
+from inventory import telemetry
 from inventory.permissions import RecentlyAuthenticated, administrators_only, open_to_anybody
 from inventory.serializers import DetailSerializer, ThrottledSerializer
 from inventory.throttling import AppendThrottle
+
+log = structlog.get_logger("inventory.api")
 
 
 def exception_handler(exc: Exception, context: Any) -> Response | None:
@@ -55,10 +59,19 @@ def exception_handler(exc: Exception, context: Any) -> Response | None:
         # 403 to a client: session authentication offers no challenge header,
         # so DRF renders "you did not say who you are" with this status too. A
         # code on some 403s and not others is a field a client cannot branch on.
+        second_look = _needs_a_second_look(exc)
         response.data = {
             **response.data,
-            "code": "reauthentication_required" if _needs_a_second_look(exc) else "forbidden",
+            "code": "reauthentication_required" if second_look else "forbidden",
         }
+        if second_look:
+            # Recorded here rather than in the permission class that decided
+            # it, and `RecentlyAuthenticated.has_permission` says why. A
+            # session going stale mid-job is the complaint an administrator
+            # makes, and the response alone does not say which operation it
+            # was; the route is on the record already -- `inventory_tng.context`.
+            log.info("asked to sign in again")
+            telemetry.REFUSALS.add(1, {"reason": "stale_session"})
     return response
 
 

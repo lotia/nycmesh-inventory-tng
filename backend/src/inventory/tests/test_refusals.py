@@ -56,9 +56,11 @@ def test_a_real_refused_host_is_named_and_carries_no_traceback(settings: Setting
         response = Client().get("/api/healthz/", headers={"host": "scanner.example"})
 
     assert response.status_code == 400
-    written = records(stream)
-    assert len(written) == 1, "one refusal, one record"
-    refusal = written[0]
+    # One refusal, one refusal record. The request writes its own alongside
+    # it -- `inventory_tng.context` -- which is a different thing.
+    refusals_written = [held for held in records(stream) if held["logger"].startswith("django.security.")]
+    assert len(refusals_written) == 1
+    refusal = refusals_written[0]
 
     assert refusal["logger"].startswith("django.security.")
     assert refusal["level"] == "error", "the volume was never in the level"

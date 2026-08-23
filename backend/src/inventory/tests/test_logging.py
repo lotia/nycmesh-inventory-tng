@@ -27,7 +27,7 @@ from django.test import Client
 from django.urls import path
 from pytest_django.fixtures import Settings
 
-from inventory.tests.helpers import applied
+from inventory.tests.helpers import applied, every_record
 from inventory_tng import console, logs, refusals
 from inventory_tng.logs import (
     configure,
@@ -67,7 +67,9 @@ def test_an_unhandled_exception_reaches_a_handler_with_debug_false(settings: Set
         response = Client(raise_request_exception=False).get("/explode/")
 
     assert response.status_code == 500
-    record = json.loads(stream.getvalue())
+    # A request now writes its own record too -- `inventory_tng.context` says
+    # why -- so this picks the one it is about rather than the only one.
+    record = next(held for held in every_record(stream) if held["logger"] == "django.request")
 
     assert record["logger"] == "django.request"
     assert record["level"] == "error"

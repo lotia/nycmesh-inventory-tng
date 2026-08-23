@@ -15,13 +15,16 @@ from typing import Any
 
 from django.core.management.base import BaseCommand
 
-from inventory.management.commands import _identifiers, _report, _staging
+from inventory.management.commands import _identifiers, _report, _staging, _telemetry
 
 
 class Command(BaseCommand):
     help = "Mint an Item per catalogued name and an ItemIdentifier per string that names one."
 
     def handle(self, *args: Any, **options: Any) -> None:
-        minted = _identifiers.mint(_staging.staged_sheet())
-        for line in _report.render(*_identifiers.section(minted)):
+        with _telemetry.running("mint_items") as counted:
+            minted = _identifiers.mint(_staging.staged_sheet())
+            section = _identifiers.section(minted)
+            counted.update(_telemetry.figures(section))
+        for line in _report.render(*section):
             self.stdout.write(line)

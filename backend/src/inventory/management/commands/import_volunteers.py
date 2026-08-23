@@ -11,13 +11,16 @@ from typing import Any
 
 from django.core.management.base import BaseCommand
 
-from inventory.management.commands import _people, _report, _staging
+from inventory.management.commands import _people, _report, _staging, _telemetry
 
 
 class Command(BaseCommand):
     help = "Give every volunteer the staged export names a row, flagging the ones it cannot tell apart."
 
     def handle(self, *args: Any, **options: Any) -> None:
-        minted = _people.mint(_staging.staged_sheet())
-        for line in _report.render(*_people.section(minted)):
+        with _telemetry.running("import_volunteers") as counted:
+            minted = _people.mint(_staging.staged_sheet())
+            section = _people.section(minted)
+            counted.update(_telemetry.figures(section))
+        for line in _report.render(*section):
             self.stdout.write(line)

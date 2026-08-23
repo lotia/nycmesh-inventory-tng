@@ -557,6 +557,35 @@ def test_a_label_is_corrected_rather_than_replaced(editor: Client, item: Item) -
     assert response.status_code == 405, response.content
 
 
+def test_a_sticker_minted_and_a_sticker_revoked_are_both_counted(
+    editor: Client, item: Item, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`inventory.labels` declares three outcomes; two of them were never
+    recorded by anything.
+
+    Minting reached `RecordsWhatItCreated` and revoking reached
+    `DetailView.update`, so both were counted as ordinary catalogue edits and
+    `{outcome="minted"}` and `{outcome="revoked"}` -- which the declaration and
+    docs/observability.md both promise -- were permanently empty series. The
+    catalogue count is still made: the two answer different questions.
+    """
+    from inventory import telemetry
+
+    counted: list[dict[str, str]] = []
+    monkeypatch.setattr(telemetry.LABELS, "add", lambda _amount, attributes: counted.append(attributes))
+
+    minted = post(editor, "labels", {"item": item.pk, "quantity": "1"})
+    assert minted.status_code == 201, minted.content
+    code = minted.json()["code"]
+    revoked = patch(editor, "label-resolve", {"revoked": True}, code)
+    assert revoked.status_code == 200, revoked.content
+    # Again, on one that is already revoked: nothing changed, so nothing more
+    # happened to this sticker.
+    patch(editor, "label-resolve", {"revoked": True}, code)
+
+    assert counted == [{"outcome": "minted"}, {"outcome": "revoked"}]
+
+
 def test_revoking_a_label_takes_it_out_of_the_cached_map(editor: Client, item: Item) -> None:
     label = Label.objects.create(code="FADED10000", item=item)
     response = patch(editor, "label-resolve", {"revoked": True}, label.code)
