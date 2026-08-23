@@ -29,3 +29,4 @@ to ask "why is it like this?". Number them sequentially.
 | [0017](0017-review-through-pull-requests.md) | Review happens in the pull request, not in the history |
 | [0018](0018-occurred-at-is-the-server-clock.md) | `occurred_at` is the server's clock, not the client's |
 | [0019](0019-retired-means-not-offered.md) | `active=False` means not offered, not not-there |
+| [0020](0020-who-merges.md) | Whoever finished the branch merges it |

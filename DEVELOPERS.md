@@ -1149,6 +1149,31 @@ is a draft they are the expected state and the check says so; marking it ready
 is what claims the branch is meant to merge.
 
 That rebase also brings the branch up to date with `main`, which is required:
-`main` accepts nothing that is behind it or that has a check outstanding, so the
-suite runs again on what will actually land. The merge stays blocked until it is
-green and every conversation is resolved.
+the suite has to run again on what will actually land rather than on what was
+reviewed beside it.
+
+### When a branch is ready to merge
+
+Four of these `main` enforces itself, and there is no way to merge without
+them:
+
+- every required check green **on the head being merged**
+- the branch not behind `main`
+- every review conversation resolved
+- a linear history, which is why the merge is `--rebase`
+
+Two it cannot see, and they are the ones a person has to hold to:
+
+- `scripts/check-batch.sh origin/main..HEAD` is clean, so every commit belongs
+  to exactly one issue — note it accepts a `Refs:`-only commit, so "belongs to"
+  is not the same as "closes"
+- the review pass in [Pull requests](#pull-requests) has actually happened, and
+  its findings have been triaged and answered
+
+Nobody is asked to weigh those against anything. A branch that does not meet
+them is one to finish, and whoever finished it merges it — an agent working a
+batch does not stop to ask, for the same reason a contributor with write access
+does not. `.claude/hooks/landing-gate.sh` reminds a Claude Code session about
+the second pair by refusing the merge until they are recorded, but it is a
+local convenience: it is not in the repository, and nothing enforces them for
+anybody else.
