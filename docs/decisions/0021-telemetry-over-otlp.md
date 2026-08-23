@@ -132,8 +132,26 @@ Django's instrumentation reads `settings` on the way in and, finding none
 configured, calls `settings.configure()` itself — binding that process to an
 empty settings object with no apps, no urlconf and no database, for good. From
 `post_fork` that is exactly the state, because gunicorn has not imported the
-application yet. So the framework is instrumented from the WSGI module, which
-Django imports with its settings already in hand, and never from the hook.
+application yet. So the framework is instrumented from the WSGI module and
+never from the hook.
+
+**And it is instrumented before the application is built, not after.** That is
+the second half of the same constraint, and getting it wrong cost a release:
+instrumenting Django does one thing, which is to put a middleware at the front
+of `settings.MIDDLEWARE`, and Django's handler reads that list exactly once, as
+it is constructed. A module that builds the application and *then* instruments
+changes a list nothing will read again, so the server runs without the
+middleware — no span for a request, no HTTP metrics, and an empty `trace_id` on
+every record because there is no request span for one to belong to. Nothing
+reports it; the traces simply arrive with a database query at the root.
+
+So the entry modules call `django.setup` themselves, then start, then build.
+`django.setup` is what `get_wsgi_application` would have called first anyway,
+so making it explicit changes the order and nothing else. `inventory-tng-iqff.1`
+is where that was found, and what makes it worth writing down here is that
+Django's test client builds a handler per request and therefore cannot see the
+difference: the tests asserting server spans passed for months against an
+arrangement no server had.
 
 ### The debug flag is signed, and the sampler is not `ParentBased` alone
 
