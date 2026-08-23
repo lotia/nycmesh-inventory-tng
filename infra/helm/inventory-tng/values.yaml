@@ -42,6 +42,17 @@ django:
   # json, so that whatever collects this cluster's container output can parse
   # it. The console drawing is for a terminal; see docs/deployment.md.
   logFormat: "json"
+  # Where traces and metrics are sent, over OTLP. Empty means the SDK is not
+  # started at all, which is the right default: a collector is cluster
+  # infrastructure this chart does not render. See docs/deployment.md.
+  otlpEndpoint: ""
+  otelServiceName: "inventory-tng-backend"
+  otelResourceAttributes: "deployment.environment=production"
+  # The fraction of traces recorded. 1.0 here rather than the code's own
+  # conservative default, so what is wanted is visible in a file. Lower it to
+  # sample a subset; see docs/deployment.md.
+  tracesSampler: "parentbased_traceidratio"
+  tracesSamplerArg: "1.0"
   # Every hostname a browser may use, comma-separated. Two things depend on
   # it beyond Django itself: a release whose ingress.host none of these
   # covers is refused at render time, and the pod adds its own address to

@@ -94,6 +94,16 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
   value: {{ .Values.django.logLevels | quote }}
 - name: DJANGO_LOG_FORMAT
   value: {{ .Values.django.logFormat | quote }}
+- name: OTEL_EXPORTER_OTLP_ENDPOINT
+  value: {{ .Values.django.otlpEndpoint | quote }}
+- name: OTEL_SERVICE_NAME
+  value: {{ .Values.django.otelServiceName | quote }}
+- name: OTEL_RESOURCE_ATTRIBUTES
+  value: {{ .Values.django.otelResourceAttributes | quote }}
+- name: OTEL_TRACES_SAMPLER
+  value: {{ .Values.django.tracesSampler | quote }}
+- name: OTEL_TRACES_SAMPLER_ARG
+  value: {{ .Values.django.tracesSamplerArg | quote }}
 - name: CORS_ALLOWED_ORIGINS
   value: {{ .Values.django.corsAllowedOrigins | quote }}
 - name: NUM_PROXIES

@@ -11,15 +11,14 @@ Loaded explicitly -- `gunicorn -c gunicorn.conf.py` -- rather than by gunicorn
 finding it in the working directory, so that a command that has stopped reading
 it is visible in the command rather than in its absence.
 
-This file is where the OpenTelemetry SDK will be started, in a `post_fork`
-hook: gunicorn pre-forks, and an exporter's thread does not survive fork, so an
-SDK started in the master leaves every worker buffering spans and exporting
-none. That is inventory-tng-nb8.2 and is not here yet.
+It is also where the OpenTelemetry SDK is started, in `post_fork` below.
 """
 
 import sys
+from typing import Any
 
 from inventory_tng.logs import from_environment
+from inventory_tng.telemetry import start
 
 # The same call Django's settings module makes, so the master and its workers
 # cannot disagree about the format, the level or the layout. Reading the five
@@ -28,3 +27,16 @@ from inventory_tng.logs import from_environment
 logconfig_dict, _announcement = from_environment()
 if _announcement:
     print(_announcement, file=sys.stderr)
+
+
+def post_fork(server: Any, worker: Any) -> None:
+    """Start the telemetry SDK in the worker rather than the master.
+
+    Why here rather than anywhere else -- and why the usual reason given for
+    it stopped being true -- is on `telemetry.start`.
+
+    `django=False` because gunicorn has not imported the application yet, and
+    instrumenting the framework now would configure empty settings rather than
+    wait. `wsgi.py` does that half, in the same worker, a moment later.
+    """
+    start(django=False)

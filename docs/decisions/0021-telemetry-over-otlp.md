@@ -107,13 +107,33 @@ instead of a discipline nobody keeps. Its rendering half: the console hides
 keys that are on every line, because a request id repeated forty times is noise,
 and shows them on demand when following one request is the point.
 
-### The SDK starts after fork, not by wrapping the command
+### The SDK starts in the worker, not by wrapping the command
 
-gunicorn pre-forks. A `BatchSpanProcessor`'s exporter thread does not survive
-`fork()`, so an SDK initialised in the master leaves every worker buffering
-spans and exporting none — with no error anywhere, which is what makes it worth
-a decision record. It is started in a `post_fork` hook in gunicorn's own
-configuration file instead of by wrapping the command in `opentelemetry-instrument`.
+It is started from a `post_fork` hook in gunicorn's own configuration, and from
+the WSGI module, rather than by wrapping the command in
+`opentelemetry-instrument`. The wrapper is rejected because it hides the
+arrangement in a command line, and because the configurator it relies on is
+reachable no other way.
+
+**A correction, recorded because this record asserted otherwise.** The usual
+argument for `post_fork` is that a `BatchSpanProcessor`'s exporter thread does
+not survive `fork()`, so an SDK initialised in the master exports nothing at
+all. That was the reasoning here, and it is not true of the version this
+project pins: measured on SDK 1.44.0, it registers a fork handler and rebuilds
+the batch processor in the child, and a span created after a fork is exported.
+
+The hook stays anyway, for a reason that does not depend on upstream: it puts
+the provider in the process that serves the requests whatever `preload_app` is
+set to. What changes is the claim — an argument that has stopped being true is
+worse than no argument, because the next person reads it and believes it.
+
+**The other half is not a matter of upstream behaviour and does still bite.**
+Django's instrumentation reads `settings` on the way in and, finding none
+configured, calls `settings.configure()` itself — binding that process to an
+empty settings object with no apps, no urlconf and no database, for good. From
+`post_fork` that is exactly the state, because gunicorn has not imported the
+application yet. So the framework is instrumented from the WSGI module, which
+Django imports with its settings already in hand, and never from the hook.
 
 ### The debug flag is signed, and the sampler is not `ParentBased` alone
 

@@ -486,9 +486,10 @@ A key bound for the life of a request, rather than passed on one call, is on
 every line — so the columns leave it out and `DJANGO_LOG_CONTEXT=shown` puts it
 back, which is what you want when following one request rather than reading a
 sequence of them. Only what the writer *inherited* is hidden: a key you passed
-yourself always appears, even one named `status` or `path`. Nothing binds any
-request context yet — that is `inventory-tng-nb8.9` — so today this only hides
-the empty `trace_id` and `span_id` waiting for a tracer.
+yourself always appears, even one named `status` or `path`. What that covers
+today is `trace_id` and `span_id` — empty until a collector is configured, and
+the way to find a log line's trace once one is. Nothing binds a request id yet;
+that is `inventory-tng-nb8.9`.
 
 Colour appears only when the output is a terminal, and never when `NO_COLOR` is
 set, so piping to `grep` or a file gives text you can read.

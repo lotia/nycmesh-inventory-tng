@@ -25,3 +25,14 @@ frontend/src/scan/confirm.ts
 frontend/src/scan/decoder.ts
 frontend/src/scan/labelCache.ts
 Lets a test start again from nothing. Not used by the app.
+
+# The header and the telemetry comment shared by wsgi.py and asgi.py. Django
+# specifies both modules and they differ in one word; the shape is the
+# framework's, not a choice this project made, and the comment is a pointer to
+# `inventory_tng.telemetry` rather than an explanation that could live in one
+# place. Writing the two differently would suggest the entry points differ in
+# some way that matters, which is the opposite of true.
+
+backend/src/inventory_tng/asgi.py
+backend/src/inventory_tng/wsgi.py
+entry point in the shape django documents cite here rather than in an app's hook for the reasons on it does nothing when no collector is configured
