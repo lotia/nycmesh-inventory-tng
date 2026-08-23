@@ -15,6 +15,7 @@ from typing import Any
 
 import pytest
 from django.conf import settings
+from django.db import connection
 
 from inventory.tests.conftest import COLLECTOR
 from inventory_tng import telemetry
@@ -292,6 +293,50 @@ def test_a_request_produces_a_server_span_named_for_its_route(recorded: Any, db:
     assert "healthz" in server[0].name
     assert server[0].attributes["http.route"] == "api/healthz"
     assert server[0].attributes["http.status_code"] == 200
+
+
+def test_the_handler_a_server_builds_has_the_middleware_too(substituted: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The arrangement above is not the one a deployment runs, and for a while
+    the difference was the whole of the instrumentation.
+
+    Django's test client builds a handler per request, so it picks up a
+    middleware inserted at any moment, and every assertion above passed for
+    months against a server that had none. `wsgi.py` says what the order has to
+    be; decision 0021 says what getting it wrong looked like.
+
+    So this drives a request through the module a server imports, built once
+    and in that module's own order, and asserts the span that was missing.
+
+    A route that touches no database, because a real handler disconnects the
+    test's connection on `request_started` the way it disconnects a worn-out
+    one in a deployment. The test client suppresses that; nothing here should.
+    """
+    import importlib
+
+    from django.test import RequestFactory
+    from opentelemetry.instrumentation.django import DjangoInstrumentor
+    from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
+
+    # Every trace, and before the module is imported: importing it is what
+    # starts the SDK, and a sampler built at a tenth would make this assertion
+    # about the dice rather than about the middleware.
+    monkeypatch.setenv("OTEL_TRACES_SAMPLER_ARG", "1.0")
+
+    from inventory_tng import wsgi
+
+    try:
+        served = importlib.reload(wsgi)
+        served.application(RequestFactory().get("/api").environ, lambda status, headers: None)
+    finally:
+        PsycopgInstrumentor().uninstrument()
+        DjangoInstrumentor().uninstrument()
+        connection.close()
+
+    spans = substituted.get_finished_spans()
+    server = [span for span in spans if span.kind.name == "SERVER"]
+
+    assert server, f"no server span among {[span.name for span in spans]}"
+    assert server[0].attributes["http.route"] == "api"
 
 
 def test_and_the_queries_it_ran_sit_beneath_it(recorded: Any, db: Any, client: Any) -> None:
