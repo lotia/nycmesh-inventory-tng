@@ -467,8 +467,11 @@ A level Python does not know stops the process rather than becoming `INFO`
 quietly — which is the general rule here, and the reason you will never be
 looking at output you did not ask for.
 
-Every function a request called is a level below this, and is not built yet:
-`inventory-tng-nb8.3`.
+`inventory=DEBUG` is also the switch for the level below this: every function
+a request called, recorded as spans rather than as lines.
+[observability.md](docs/observability.md#every-function-a-request-called) is
+which modules that covers, which two it deliberately leaves out, and what it
+costs when nobody has asked.
 
 ### Which columns you get
 
