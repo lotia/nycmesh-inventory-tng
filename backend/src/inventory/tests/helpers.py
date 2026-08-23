@@ -1,17 +1,69 @@
-"""Request helpers shared by the API tests.
+"""Helpers shared by the tests.
 
 Here rather than in conftest.py because they are plain functions: pytest
 collects fixtures from conftest, and a helper that is imported reads better at
 the call site than one that is injected.
 """
 
+import copy
+import io
+import json
+import logging
+import logging.config
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import pyotp
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import Client
 from django.urls import reverse
+
+from inventory_tng import redaction
+
+
+@contextmanager
+def applied(config: dict[str, Any], admitting: bool = False) -> Iterator[io.StringIO]:
+    """Apply a logging configuration, with its one handler pointed at a buffer.
+
+    The buffer stands in for standard output because pytest has already
+    replaced that by the time a test runs. Substituting the destination and
+    nothing else keeps every other part of the configuration under test --
+    which handler, at which level, attached to which loggers. That the
+    destination itself is right is asserted separately, so the substitution
+    cannot hide a handler writing to the wrong place.
+
+    Restores the real configuration afterwards, because `dictConfig` is global:
+    a test that left its own arrangement in place would be heard from much
+    later, in whichever test happened to run next. `redaction.settle` is the
+    same story one module along -- what `logs.configure` would have called, and
+    what the caller would otherwise have to remember to undo.
+
+    Three test modules had a copy of this and one of them had already grown the
+    `settle` half the others lacked, which is what a shared helper is for.
+    """
+    redaction.settle(admitting)
+    buffer = io.StringIO()
+    substituted = copy.deepcopy(config)
+    substituted["handlers"]["stdout"]["stream"] = buffer
+    logging.config.dictConfig(substituted)
+    try:
+        yield buffer
+    finally:
+        redaction.settle(False)
+        logging.config.dictConfig(settings.LOGGING)
+
+
+def one_record(stream: io.StringIO) -> dict[str, Any]:
+    """The single JSON record written to a buffer."""
+    return json.loads(stream.getvalue())
+
+
+def every_record(stream: io.StringIO) -> list[dict[str, Any]]:
+    """Every JSON record written to a buffer, in order."""
+    return [json.loads(line) for line in stream.getvalue().splitlines() if line.strip()]
 
 
 def post(client: Client, name: str, body: dict[str, Any], *args: Any) -> Any:

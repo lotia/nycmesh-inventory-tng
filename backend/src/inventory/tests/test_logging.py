@@ -12,17 +12,12 @@ is whether Django's own machinery actually reaches the handler, so the first
 test drives a real request through a real exception.
 """
 
-import copy
-import io
 import json
 import logging
 import logging.config
 import warnings
-from collections.abc import Iterator
-from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 import pytest
 import structlog
@@ -32,6 +27,7 @@ from django.test import Client
 from django.urls import path
 from pytest_django.fixtures import Settings
 
+from inventory.tests.helpers import applied
 from inventory_tng import console, logs, refusals
 from inventory_tng.logs import (
     configure,
@@ -52,51 +48,6 @@ def explode(request: HttpRequest) -> HttpResponse:
 # `override_settings(ROOT_URLCONF=__name__)` reads these, so the raising view is
 # reachable without adding a route the application would then have to carry.
 urlpatterns = [path("explode/", explode)]
-
-
-@contextmanager
-def applied(config: dict[str, Any]) -> Iterator[io.StringIO]:
-    """Apply a configuration, with its one handler pointed at a buffer.
-
-    The buffer stands in for standard output because pytest has already
-    replaced that by the time a test runs. Substituting the destination and
-    nothing else keeps every other part of the configuration under test --
-    which handler, at which level, attached to which loggers. That the
-    destination itself is right is a separate assertion below, so the
-    substitution cannot hide a handler writing to the wrong place.
-
-    Restores the real configuration afterwards, because `dictConfig` is
-    global: a test that left its own arrangement in place would be heard from
-    much later, in whichever test happened to run next.
-    """
-    buffer = io.StringIO()
-    substituted = copy.deepcopy(config)
-    substituted["handlers"]["stdout"]["stream"] = buffer
-    logging.config.dictConfig(substituted)
-    try:
-        yield buffer
-    finally:
-        logging.config.dictConfig(settings.LOGGING)
-
-
-@pytest.fixture(autouse=True)
-def _restore_the_processes_own_arrangement() -> Iterator[None]:
-    """`configure` writes process-global state, and tests call it.
-
-    structlog's configuration and this module's `_layout`, `_colour` and
-    `_context` outlive the test that set them, so a test asking for the `full`
-    layout leaves every later test drawing that way. Nothing bites today only
-    because of the order the files happen to sort in, which is a property of
-    their names rather than of anything anybody decided.
-    """
-    try:
-        yield
-    finally:
-        # Rebuilt from the environment rather than from a saved copy, because
-        # that is what settings.py did at import and is therefore what the
-        # rest of the suite is entitled to find.
-        logs.from_environment()
-        logging.config.dictConfig(settings.LOGGING)
 
 
 def test_an_unhandled_exception_reaches_a_handler_with_debug_false(settings: Settings) -> None:

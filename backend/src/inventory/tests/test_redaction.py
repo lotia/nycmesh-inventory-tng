@@ -14,13 +14,8 @@ of the conditions decision 0021 puts on it, because a toggle that is merely
 present is one that gets left on.
 """
 
-import copy
-import io
-import json
 import logging
 import logging.config
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -28,34 +23,12 @@ import pytest
 import structlog
 from django.conf import settings
 
+from inventory.tests.helpers import applied
+from inventory.tests.helpers import one_record as written
 from inventory_tng import redaction, telemetry
 from inventory_tng.logs import from_environment, logging_config
 
 REPO_ROOT = Path(settings.REPO_ROOT)
-
-
-@contextmanager
-def applied(config: dict[str, Any], admitting: bool = False) -> Iterator[io.StringIO]:
-    """One log configuration, its handler pointed at a buffer.
-
-    `settle` is what `logs.configure` would have called; done here because
-    these tests build a configuration without going through the environment.
-    """
-    redaction.settle(admitting)
-    buffer = io.StringIO()
-    substituted = copy.deepcopy(config)
-    substituted["handlers"]["stdout"]["stream"] = buffer
-    logging.config.dictConfig(substituted)
-    try:
-        yield buffer
-    finally:
-        redaction.settle(False)
-        logging.config.dictConfig(settings.LOGGING)
-
-
-def written(stream: io.StringIO) -> dict[str, Any]:
-    """The one JSON record written."""
-    return json.loads(stream.getvalue())
 
 
 def server_span(recorded: Any) -> Any:

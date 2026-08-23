@@ -60,6 +60,10 @@ def _redacting_again_afterwards() -> Iterator[None]:
     runs afterwards, and the suite passes anyway because the assertions that
     would notice happen to run first. That is an order dependency waiting for
     somebody to install pytest-randomly.
+
+    `helpers.applied` puts it back for the tests that go through it. This
+    catches the ones that do not, which is any test calling `from_environment`
+    or `configure` for what they return rather than for what they configure.
     """
     yield
     redaction.settle(False)
