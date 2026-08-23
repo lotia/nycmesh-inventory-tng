@@ -77,8 +77,10 @@ need one.
 
 - **`inventory_tng/`** — the project package: settings, root URLs, WSGI/ASGI
   entry points. Settings read every deployment-varying value from the
-  environment via `django-environ`, with no fallback for secrets, so a
-  misconfigured deployment fails at boot rather than starting insecurely.
+  environment via `django-environ`, read through the rule in
+  [decision 0022](decisions/0022-an-empty-variable-is-an-unset-one.md), with no
+  fallback for secrets — so a misconfigured deployment fails at boot rather
+  than starting insecurely.
 - **`inventory/`** — the domain app. Holds the health-check endpoint and the
   data model, catalogue and ledger both; see [docs/data-model.md](data-model.md) for the entity
   model. Catalogue records carry edit history through
