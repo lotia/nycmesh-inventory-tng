@@ -11,7 +11,7 @@ from typing import Any
 
 from django.core.management.base import BaseCommand, CommandParser
 
-from inventory.management.commands import _report, _staging, _workbook
+from inventory.management.commands import _report, _staging, _telemetry, _workbook
 
 
 class Command(BaseCommand):
@@ -21,6 +21,9 @@ class Command(BaseCommand):
         _workbook.add_argument(parser)
 
     def handle(self, *args: Any, **options: Any) -> None:
-        staged = _staging.stage(_workbook.sheet_at(options["workbook"]))
-        for line in _report.render(*_staging.section(staged)):
+        with _telemetry.running("stage_sheet") as counted:
+            staged = _staging.stage(_workbook.sheet_at(options["workbook"]))
+            section = _staging.section(staged)
+            counted.update(_telemetry.figures(section))
+        for line in _report.render(*section):
             self.stdout.write(line)

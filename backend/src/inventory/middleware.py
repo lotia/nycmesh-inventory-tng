@@ -48,6 +48,7 @@ single-page app with nothing to render but an error.
 from collections.abc import Callable
 from urllib.parse import quote
 
+import structlog
 from allauth.account.authentication import get_authentication_records
 from allauth.mfa.models import Authenticator
 from allauth.mfa.utils import is_mfa_enabled
@@ -57,7 +58,13 @@ from django.shortcuts import redirect
 from django.urls import Resolver404, resolve, reverse
 from rest_framework.permissions import SAFE_METHODS
 
+from inventory import telemetry
 from inventory.permissions import open_to_anybody, recently_authenticated
+
+# Named for the module. Both refusals here are about who the caller is rather
+# than about what they sent, which is what `inventory.telemetry`'s REFUSALS
+# counts -- so a rise in either is visible without reading a log.
+log = structlog.get_logger(__name__)
 
 # The value allauth records for a username-and-password sign-in. Its social,
 # MFA and login-by-code steps record their own names, so this identifies the
@@ -82,6 +89,8 @@ class RequireSecondFactor:
             # single-page app's own fetches, a script -- is told, because
             # following a redirect would hand it a page of HTML where it
             # asked for JSON and it would report the wrong problem.
+            log.warning("sign-in unfinished", reason="no second factor")
+            telemetry.REFUSALS.add(1, {"reason": "no_second_factor"})
             if "text/html" in request.headers.get("Accept", ""):
                 return redirect("mfa_activate_totp")
             return JsonResponse({"detail": UNFINISHED}, status=403)

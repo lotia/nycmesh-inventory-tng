@@ -78,15 +78,39 @@ there within a few seconds:
 | **Explore → Prometheus** | `http_server_duration_milliseconds_count`, by method, status and scheme |
 | **Explore → Loki**, `{service_name="inventory-tng-backend"}` | the records the backend wrote, with `logger` and `severity_text` to filter on |
 
-**One caveat about following a request from its trace into its logs**, because
-it is the thing somebody will try first. A record written *inside* a request
-carries the trace's id and Grafana will jump straight to it. Django's own
-records for a 4xx or a 5xx do not, and cannot: it logs those from
-`BaseHandler.get_response`, after the middleware chain has returned and the
-instrumentation has already ended its span. Neither does an access line, from
-`runserver` or from gunicorn, which is written outside the application
-altogether. So the jump works for records this application writes itself, and
-writing them is `inventory-tng-nb8.9`.
+**What the application says about itself**, as distinct from what the framework
+says: one record per request, and a record for each thing a person did — a
+batch recorded, replayed, rejected or refused for disagreeing with its own
+kind; somebody added to the pick-list, or refused because the identifier is
+already held; a catalogue row added or edited; a sheet printed; a session asked
+to sign in again; and every management command, which says when it started,
+what it counted and whether it finished.
+
+Beside them are the counters, which are for the shape rather than the detail:
+`inventory.appends` by outcome, `inventory.movements` by kind,
+`inventory.volunteers`, `inventory.labels`, `inventory.catalogue_edits`,
+`inventory.refusals` and `inventory.command_runs`.
+[`backend/src/inventory/telemetry.py`](../backend/src/inventory/telemetry.py)
+is the list and what earns a place on it.
+
+**Following a request from its trace into its logs** works because this
+application writes its own record for every request, from inside the
+middleware chain — `request finished`, with the templated route, the status
+and the duration, carrying both the trace id and a request id. Grafana jumps
+straight to it, and from there to everything else that request wrote, which all
+share the request id.
+
+The request id is the half that matters when nothing was sampled, which at the
+shipped ratio is most requests: a trace id is empty then, and the request id
+never is.
+
+**Two records cannot join in**, and they are the ones somebody looks for first.
+Django's own record for a 4xx or a 5xx is written from
+`BaseHandler.get_response`, after the middleware chain has returned — so it has
+neither id, and no middleware can give it one. Neither has an access line, from
+`runserver` or gunicorn, which is written outside the application altogether.
+What those records would have told you is on `request finished` instead, which
+is written for every request whatever it ended as.
 
 ### Why this image
 

@@ -20,12 +20,12 @@ settings and .env.sample.
 """
 
 import datetime
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 import segno
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import QuerySet
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.html import format_html
@@ -198,8 +198,12 @@ def printed(label: Label) -> PrintedLabel:
     )
 
 
-def sheet(labels: QuerySet[Label]) -> str:
+def sheet(labels: Iterable[Label]) -> str:
     """A printable page of stickers, as a self-contained HTML document.
+
+    Takes anything it can walk rather than a queryset, because walking is all
+    it does -- and the caller evaluates the rows once, so that counting them
+    and drawing them are not two trips to the database.
 
     HTML rather than PDF: every deployment already has a browser, print
     dialogs handle paper size and margins better than a server can guess at

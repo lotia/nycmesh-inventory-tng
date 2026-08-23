@@ -23,6 +23,8 @@ from django.urls import reverse
 
 from inventory.management.commands.seed_integration_data import ACKNOWLEDGEMENT
 from inventory.models import Category, Item, Location, Volunteer
+from inventory.tests.helpers import applied
+from inventory_tng.logs import logging_config
 
 pytestmark = pytest.mark.django_db
 
@@ -37,6 +39,26 @@ def run() -> str:
 def seed() -> dict[str, Any]:
     """Run the command and read back the scene it published on stdout."""
     return json.loads(run())
+
+
+@override_settings(DEBUG=True)
+def test_nothing_else_reaches_the_stream_the_scene_is_published_on() -> None:
+    """`global-setup.ts` calls `JSON.parse` on the whole of this command's
+    standard output, and in a deployment the log stream is that same file.
+
+    So a single record written while this runs is not a stray line -- it is the
+    browser suite failing in global setup with a `SyntaxError` naming column 3,
+    which says nothing about where it came from. That is what happened when the
+    retroactive sweep put every command under `_telemetry.running`; the command
+    says why it is the one exception.
+    """
+    written = io.StringIO()
+
+    with applied(logging_config("INFO", "console")) as logged:
+        call_command("seed_integration_data", ACKNOWLEDGEMENT, stdout=written)
+
+    assert json.loads(written.getvalue())["username"] == "integration"
+    assert logged.getvalue() == "", f"this would have been parsed as part of the scene: {logged.getvalue()!r}"
 
 
 @override_settings(DEBUG=True)

@@ -34,11 +34,12 @@ hold one open across several thousand inserts to buy an all-or-nothing that
 running it again gives for free.
 """
 
+from pathlib import Path
 from typing import Any
 
 from django.core.management.base import BaseCommand, CommandParser
 
-from inventory.management.commands import _identifiers, _ledger, _people, _report, _staging, _workbook
+from inventory.management.commands import _identifiers, _ledger, _people, _report, _staging, _telemetry, _workbook
 from inventory.sheet import Report
 
 
@@ -79,7 +80,23 @@ class Command(BaseCommand):
         _workbook.add_argument(parser)
 
     def handle(self, *args: Any, **options: Any) -> None:
-        staged = _staging.stage(_workbook.sheet_at(options["workbook"]))
+        with _telemetry.running("import_sheet") as counted:
+            sections = self._imported(options["workbook"])
+            counted.update(_telemetry.figures(*sections))
+        for heading, section in sections:
+            for line in _report.render(heading, section):
+                self.stdout.write(line)
+            self.stdout.write("")
+
+    @staticmethod
+    def _imported(workbook: Path) -> list[tuple[str, list[tuple[str, int]]]]:
+        """The four steps and the summary, run in order, as their sections.
+
+        Split out so the run is one expression the record above can wrap. What
+        each step does, and why the staged rows are read back once rather than
+        per step, is unchanged.
+        """
+        staged = _staging.stage(_workbook.sheet_at(workbook))
         # Read back once and handed to all three of the steps that follow,
         # rather than each of them querying for itself: this is what those
         # steps see when they are run by name, and it is several thousand rows.
@@ -88,14 +105,10 @@ class Command(BaseCommand):
         volunteers = _people.mint(sheet)
         ledger = _ledger.post(sheet)
 
-        sections = [
+        return [
             _staging.section(staged),
             _identifiers.section(catalogue),
             _people.section(volunteers),
             _ledger.section(ledger),
             written(staged, catalogue, volunteers, ledger),
         ]
-        for heading, counted in sections:
-            for line in _report.render(heading, counted):
-                self.stdout.write(line)
-            self.stdout.write("")

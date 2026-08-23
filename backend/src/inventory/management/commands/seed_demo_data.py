@@ -60,7 +60,7 @@ from typing import Any
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from inventory.management.commands import _report, _seeding
+from inventory.management.commands import _report, _seeding, _telemetry
 from inventory.models import (
     Category,
     Item,
@@ -294,12 +294,18 @@ class Command(BaseCommand):
             "This command writes an invented catalogue into whatever database DATABASE_URL names.",
         )
         added: Counter[str] = Counter()
-        # One transaction: a run that fails half way through would otherwise
-        # leave a catalogue with no stock in it and no sign of why.
-        with transaction.atomic():
-            posted = seed(added)
+        with _telemetry.running("seed_demo_data") as counted:
+            # One transaction: a run that fails half way through would otherwise
+            # leave a catalogue with no stock in it and no sign of why.
+            with transaction.atomic():
+                posted = seed(added)
+            # Built once and used twice, the way every sibling command does it:
+            # what is recorded and what is printed are the same figures, so
+            # producing them twice is two chances for them to differ.
+            section = (HEADING, [(row, added[row]) for row in ROWS])
+            counted.update(_telemetry.figures(section))
 
-        for line in _report.render(HEADING, [(row, added[row]) for row in ROWS]):
+        for line in _report.render(*section):
             self.stdout.write(line)
         self.stdout.write("")
         if not posted:

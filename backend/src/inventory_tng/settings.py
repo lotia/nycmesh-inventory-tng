@@ -129,6 +129,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # First, and the class says why that position is the point. What it binds,
+    # and the one record no middleware can reach, are there too.
+    "inventory_tng.context.RequestContext",
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",

@@ -79,6 +79,14 @@ class Command(BaseCommand):
         # One transaction, because the login is deleted before it is recreated.
         # A failure in between would leave the suite with no login at all, and
         # it would then fail at the login form minutes later rather than here.
+        #
+        # AND NOT UNDER `_telemetry.running`, which every other command here
+        # runs under. Its records are drawn to standard output, which for this
+        # command is a JSON document a program reads -- two lines of `command
+        # started` above it and `JSON.parse` in global-setup.ts raises on the
+        # first character. Nothing is lost by the exception: this seeds a
+        # scene for the browser suite and no deployment runs it. Argued in
+        # scripts/check-telemetry.allow, which is what admits it.
         with transaction.atomic():
             User.objects.filter(username=USERNAME).delete()
             # A superuser, so the suite can exercise the administrative half
@@ -132,6 +140,7 @@ class Command(BaseCommand):
             }
 
         # Printed after the commit, so nothing describes a scene that rolled
-        # back. JSON on stdout; frontend/integration/global-setup.ts
-        # republishes it.
+        # back. JSON on stdout and NOTHING ELSE on it; the comment above the
+        # transaction says what that rules out.
+        # frontend/integration/global-setup.ts republishes it.
         self.stdout.write(json.dumps(scene))

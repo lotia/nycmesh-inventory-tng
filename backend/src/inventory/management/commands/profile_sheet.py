@@ -16,7 +16,7 @@ from typing import Any
 
 from django.core.management.base import BaseCommand, CommandParser
 
-from inventory.management.commands import _report, _workbook
+from inventory.management.commands import _report, _telemetry, _workbook
 from inventory.sheet import Report, batches, corrections, items, jobs, locations, people, returns, workbook
 from inventory.sheet.workbook import Sheet
 
@@ -45,8 +45,11 @@ class Command(BaseCommand):
         _workbook.add_argument(parser)
 
     def handle(self, *args: Any, **options: Any) -> None:
-        sheet = _workbook.sheet_at(options["workbook"])
-        for section in SECTIONS:
-            for line in _report.render(*section(sheet)):
+        with _telemetry.running("profile_sheet") as counted:
+            sheet = _workbook.sheet_at(options["workbook"])
+            profiled = [section(sheet) for section in SECTIONS]
+            counted.update(_telemetry.figures(*profiled))
+        for heading, section in profiled:
+            for line in _report.render(heading, section):
                 self.stdout.write(line)
             self.stdout.write("")

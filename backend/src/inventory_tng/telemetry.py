@@ -20,11 +20,19 @@ famous reason for `post_fork` -- an exporter thread not surviving `fork()` --
 is not true of the SDK version pinned here, and the hook stays for a different
 reason.
 
-STARTED ONLY WHERE SOMETHING IS SERVED, which is what `wsgi.py` and `asgi.py`
-being the callers buys: Django imports them when it is about to serve and never
-for a management command. The pre-upgrade `migrate` Job gets the same
-environment as the web pods, and an SDK there would trace every statement and
-then hold up the release flushing them to a collector that may not answer.
+TRACING IS STARTED ONLY WHERE SOMETHING IS SERVED, which is what `wsgi.py` and
+`asgi.py` being the callers buys: Django imports them when it is about to serve
+and never for a management command. The pre-upgrade `migrate` Job gets the same
+environment as the web pods, and tracing there would make a span of every
+statement and then hold up the release flushing them to a collector that may
+not answer.
+
+A COMMAND STARTS THE METRICS HALF AND NOTHING ELSE -- `start(traces=False)`,
+from `inventory.management.commands._telemetry`. What it wants is one counter
+saying the run happened, which costs a meter provider and a flush of a handful
+of points; what it must not buy with that is an instrumented driver. The
+paragraph above is the reason, and `traces` is what keeps it true now that
+something other than a server calls this.
 
 READ FROM THE PROCESS ENVIRONMENT, not from an argument. The exporters and the
 resource read `os.environ` themselves, so a function taking some other mapping
@@ -260,7 +268,7 @@ def instrument_django() -> bool:
     return True
 
 
-def start(django: bool = True) -> bool:
+def start(django: bool = True, traces: bool = True) -> bool:
     """Start the SDK if there is a collector, and say whether it did.
 
     `django=False` is gunicorn's `post_fork` hook saying it knows the
@@ -269,6 +277,11 @@ def start(django: bool = True) -> bool:
     somebody imports a Django setting into the gunicorn configuration -- to
     take the worker count from it, say -- the framework does not quietly get
     instrumented before the fork.
+
+    `traces=False` is a management command saying it wants the counter and not
+    an instrumented driver; the header above is why that distinction exists at
+    all. It turns off the tracer provider AND the driver's instrumentation
+    together, because either one alone would be half a decision.
 
     Everything is imported inside, not at module scope: a checkout with no
     endpoint configured should not pay for importing the SDK, and the import
@@ -288,7 +301,7 @@ def start(django: bool = True) -> bool:
         # every series is the wrong place for a constant.
         resource = Resource.create({redaction.MARKER: True} if wanted.personal_data else None)
 
-        if wanted.traces:
+        if wanted.traces and traces:
             from opentelemetry import trace
             from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
             from opentelemetry.sdk.trace import TracerProvider
@@ -316,14 +329,15 @@ def start(django: bool = True) -> bool:
                 )
             )
 
-        # The driver is patched at `connect`, so this has to happen before
-        # anything opens a connection -- which, after a fork, it has not. What
-        # it gives, with Django's instrumentation, is each request's queries as
-        # spans beneath the request's own. The deliberate measurements are
-        # inventory-tng-nb8.9.
-        from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
+        if traces:
+            # The driver is patched at `connect`, so this has to happen before
+            # anything opens a connection -- which, after a fork, it has not.
+            # What it gives, with Django's instrumentation, is each request's
+            # queries as spans beneath the request's own. The deliberate
+            # measurements are inventory-tng-nb8.9.
+            from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
 
-        PsycopgInstrumentor().instrument(enable_commenter=False)
+            PsycopgInstrumentor().instrument(enable_commenter=False)
         _started = True
 
     if django:

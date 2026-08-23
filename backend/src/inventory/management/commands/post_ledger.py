@@ -18,13 +18,16 @@ from typing import Any
 
 from django.core.management.base import BaseCommand
 
-from inventory.management.commands import _ledger, _report, _staging
+from inventory.management.commands import _ledger, _report, _staging, _telemetry
 
 
 class Command(BaseCommand):
     help = "Post a StockTransaction per batch of staged rows, with a StockMovement for each row in it."
 
     def handle(self, *args: Any, **options: Any) -> None:
-        posted = _ledger.post(_staging.staged_sheet())
-        for line in _report.render(*_ledger.section(posted)):
+        with _telemetry.running("post_ledger") as counted:
+            posted = _ledger.post(_staging.staged_sheet())
+            section = _ledger.section(posted)
+            counted.update(_telemetry.figures(section))
+        for line in _report.render(*section):
             self.stdout.write(line)

@@ -56,6 +56,16 @@ def applied(config: dict[str, Any], admitting: bool = False) -> Iterator[io.Stri
         logging.config.dictConfig(settings.LOGGING)
 
 
+def written_by(stream: io.StringIO, logger: str) -> list[dict[str, Any]]:
+    """Every record one named logger wrote, in order.
+
+    Beside `every_record` because it is that with one question asked of it, and
+    because a test module that declared its own was the third copy of the same
+    comprehension.
+    """
+    return [record for record in every_record(stream) if record["logger"] == logger]
+
+
 def one_record(stream: io.StringIO) -> dict[str, Any]:
     """The single JSON record written to a buffer."""
     return json.loads(stream.getvalue())

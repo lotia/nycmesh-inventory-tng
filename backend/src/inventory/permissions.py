@@ -119,6 +119,13 @@ class RecentlyAuthenticated(BasePermission):
     code = "reauthentication_required"
 
     def has_permission(self, request: Request, view: APIView) -> bool:
+        # A PREDICATE AND NOTHING ELSE. What a stale session costs is recorded
+        # where the refusal actually happens -- `inventory.api.exception_handler`
+        # -- and not here, because this is not asked only by a request being
+        # refused. `CurrentUserView` runs every permission class against a
+        # probe to answer what a caller MAY do, so a record written here made
+        # one `GET /api/me` by a stale administrator emit four refusals for
+        # operations nobody attempted, on every page load.
         return request.method in SAFE_METHODS or recently_authenticated(request)
 
 
