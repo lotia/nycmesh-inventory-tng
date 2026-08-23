@@ -139,7 +139,9 @@ first minute, where one running on a guessed value is found much later.
 
 A value set to the empty string counts as unset, and takes its default —
 emptying `django.numProxies` in a values file is a release that starts on `2`,
-not a pod that will not start at all. `DJANGO_SECRET_KEY` is the exception, above.
+not a pod that will not start at all. The two Secret values above are the
+exceptions: they have no default, so emptying one stops the process, which is
+the whole reason they have none.
 
 Everything else in the table below is a value the chart already carries, so a
 release that supplies only those two starts. It starts answering to whatever
@@ -153,7 +155,7 @@ ingress's, which would otherwise forward a hostname nothing answers to.
 | Variable | Required | Source in Kubernetes | Notes |
 | --- | --- | --- | --- |
 | `DJANGO_SECRET_KEY` | yes | Secret | No default. A missing value fails at boot by design, and so does an empty one — signing sessions with nothing is the failure the refusal exists to prevent |
-| `DATABASE_URL` | yes | Secret | `postgres://user:password@host:5432/dbname` |
+| `DATABASE_URL` | yes | Secret | `postgres://user:password@host:5432/dbname`. No default, so an empty value stops the process exactly as a missing one does |
 | `DJANGO_DEBUG` | no | chart (`django.debug`) | Must be `false` outside development |
 | `DJANGO_LOG_LEVEL` | no | chart (`django.logLevel`) | How much the backend says, on standard output. Default `INFO`. Any level Python knows; one it does not know stops the process at boot rather than starting quietly at some other level. [Reading the logs](#reading-the-logs) is what to do with the output |
 | `DJANGO_LOG_LEVELS` | no | chart (`django.logLevels`) | Comma-separated `logger=LEVEL` pairs laid over `DJANGO_LOG_LEVEL`, so that one subsystem can be raised without raising everything — `inventory.sheet=DEBUG`. Empty by default. Not every logger answers: Django decides whether to record a query from `DJANGO_DEBUG` rather than from a logger's level, so raising its SQL logger gets you nothing in a deployment however it is set |
@@ -170,6 +172,9 @@ ingress's, which would otherwise forward a hostname nothing answers to.
 | `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_SERVER_URL` | no | provider Secret | Offers a generic OpenID Connect provider. `OIDC_SERVER_URL` is the issuer, the URL whose `/.well-known/openid-configuration` describes the rest. All three are needed |
 | `OIDC_NAME` | no | provider Secret | What the button for that provider says. Default `Single sign-on` |
 | `OIDC_PROVIDER_ID` | no | provider Secret | Appears in that provider's callback URL, so it must match what was registered with it. Default `oidc` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | no | chart (`django.otlpEndpoint`) | Where traces and metrics go. Empty means the SDK is not started at all. See [Telemetry](#telemetry) before setting it |
+| `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | no | chart (`django.otelServiceName`, `django.otelResourceAttributes`) | What this service is called wherever its telemetry lands, and what else is attached to every span. Standard OpenTelemetry names |
+| `OTEL_TRACES_SAMPLER`, `OTEL_TRACES_SAMPLER_ARG` | no | chart (`django.tracesSampler`, `django.tracesSamplerArg`) | The fraction of traces recorded. Code default `0.1`; the chart ships `1.0`. [Telemetry](#telemetry) says how to sample a subset instead |
 | `LABEL_BASE_URL` | no | chart (`django.labelBaseUrl`) | The origin encoded into every printed QR code. It is on the stickers, not in the database, so changing it does not change the labels already on the shelves: move the app and keep a permanent redirect from the old host rather than reprinting. It must stay within what QR alphanumeric mode can carry and short enough to print at the module size the generator insists on — both are refused loudly rather than printed, see [`.env.sample`](../.env.sample) |
 
 Both rates are counted **per backend process**, because the counters live in
@@ -635,6 +640,48 @@ naming both values.
 so a database that is briefly unreachable is read as a process that needs
 killing — and because every replica asks the same database, they fail together.
 A one-minute blip becomes a full restart of the deployment. `inventory-tng-uq6`.
+
+## Telemetry
+
+Traces and metrics leave the backend over OTLP; logs do not, and
+[Reading the logs](#reading-the-logs) is that half. Which arrangement this is,
+and why the two halves differ, is
+[decision 0021](decisions/0021-telemetry-over-otlp.md).
+
+**No endpoint means no SDK.** `OTEL_EXPORTER_OTLP_ENDPOINT` empty is the
+shipped default in the chart, so a release that says nothing starts no exporter,
+no sampler and no instrumented cursor — it behaves exactly as it did before any
+of this existed. Setting it is what turns telemetry on.
+
+> **Do not set it on a deployment yet.** Django's instrumentation records the
+> caller's address on every server span. An IP address is personal data, and the
+> allowlist that keeps it out of telemetry is still to come — `inventory-tng-nb8.5`.
+> This paragraph goes when it lands.
+
+**What a collector receives**, without anybody writing an instrumentation: a
+server span per request named for its route rather than its path, the database
+queries beneath it as child spans, HTTP duration and count by route and status,
+and database client duration.
+
+**Sampling** is `OTEL_TRACES_SAMPLER_ARG`, a fraction between 0 and 1. The
+code's own default is a conservative `0.1`, so a release that configures nothing
+cannot flood a collector somebody else sized; `django.tracesSamplerArg` in the
+chart sets `1.0`, which is what this traffic volume actually wants. Lower it to
+sample a subset — `0.05` keeps one trace in twenty. A request that arrives
+already marked as sampled is put through the same rate, not recorded outright:
+`TraceIdRatioBased` decides from the trace id, so two ends running the same rate
+reach the same answer about the same trace and it stays in one piece — without
+either end trusting the other. A caller therefore cannot raise the rate, which
+matters because the sampled bit is one header on an unauthenticated request.
+`OTEL_TRACES_SAMPLER` accepts `parentbased_traceidratio`, `always_off` and
+`always_on`; `OTEL_SDK_DISABLED=true` turns the whole thing off.
+
+**It starts in the worker**, from gunicorn's `post_fork` hook and from the WSGI
+module. The reason usually given for that — an exporter's thread not surviving
+`fork()`, so a master-initialised SDK exports nothing — no longer holds: the SDK
+rebuilds its batch processor in the child, measured on 1.44.0. The hook stays for a
+different reason, which [decision 0021](decisions/0021-telemetry-over-otlp.md)
+gives along with the measurement.
 
 ## Reading the logs
 

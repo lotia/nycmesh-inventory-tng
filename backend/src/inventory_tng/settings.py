@@ -11,9 +11,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from corsheaders.defaults import default_headers
+
 from inventory_tng.environment import Env
 from inventory_tng.hosts import allowed_hosts
 from inventory_tng.logs import from_environment
+from inventory_tng.telemetry import validate
 
 # BASE_DIR is backend/src/ -- the directory holding manage.py.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -68,6 +71,11 @@ ALLOWED_HOSTS: list[str] = allowed_hosts(env("DJANGO_ALLOWED_HOSTS"), env("DJANG
 # the middle of the record stream on standard output, and it is empty whenever
 # there is nothing a reader would be surprised by.
 LOGGING, _announcement = from_environment()
+
+# Read here rather than where the values are used, so that a malformed one
+# stops the process now instead of on the release that turns telemetry on.
+# `validate` says why a Django system check would not do.
+validate()
 if _announcement:
     print(_announcement, file=sys.stderr)
 
@@ -489,6 +497,12 @@ SPECTACULAR_SETTINGS = {
 # Cross-origin reads only, and normally unused: both the dev server and nginx
 # proxy Django's paths, so the browser sees one origin. See .env.sample.
 CORS_ALLOWED_ORIGINS: list[str] = env("CORS_ALLOWED_ORIGINS")
+
+# django-cors-headers' defaults do not include the W3C trace headers, so a
+# cross-origin request carrying one is refused at the preflight -- not stripped,
+# cancelled -- and a trace that starts in the browser cannot reach Django at
+# all. The dev server on one port and Django on another are exactly that pair.
+CORS_ALLOW_HEADERS = (*default_headers, "traceparent", "tracestate")
 
 # Behind an ingress or proxy that terminates TLS.
 USE_X_FORWARDED_HOST = True

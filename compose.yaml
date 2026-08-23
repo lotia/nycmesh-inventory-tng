@@ -92,6 +92,15 @@ services:
       # Pipe it back into columns to read it:
       #   docker compose logs -f backend | scripts/pretty-logs
       DJANGO_LOG_FORMAT: ${DJANGO_LOG_FORMAT:-json}
+      # Traces and metrics. Empty by default: no endpoint means no SDK, so
+      # this stack costs nothing until inventory-tng-nb8.6 puts a collector
+      # beside it. 1.0 rather than the code's conservative default, because
+      # what is wanted should be in a file rather than implied.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-inventory-tng-backend}
+      OTEL_RESOURCE_ATTRIBUTES: ${OTEL_RESOURCE_ATTRIBUTES:-deployment.environment=compose}
+      OTEL_TRACES_SAMPLER: ${OTEL_TRACES_SAMPLER:-parentbased_traceidratio}
+      OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-1.0}
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,backend
       CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:8080
       # One proxy in this stack -- nginx in the frontend container -- where a

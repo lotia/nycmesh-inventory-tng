@@ -36,6 +36,18 @@ dependencies = [
     # renderer for a person, and it bridges stdlib logging so that Django's
     # own loggers and gunicorn's come out looking like ours. Decision 0021.
     "structlog==25.*",
+    # OpenTelemetry. The SDK, the HTTP exporter, and the two instrumentations
+    # that cover most of what a request does. Deliberately NOT the -distro or
+    # -exporter-otlp metapackages: the first is only reachable through the
+    # `opentelemetry-instrument` wrapper this does not use, and the second
+    # drags grpcio -- some seventeen megabytes -- into every image for a
+    # transport nothing here can select. psycopg rather than psycopg2, because
+    # this backend pins psycopg[binary]==3.3.* and the older package would
+    # instrument a driver that is not installed, silently.
+    "opentelemetry-sdk==1.44.*",
+    "opentelemetry-exporter-otlp-proto-http==1.44.*",
+    "opentelemetry-instrumentation-django==0.65b0",
+    "opentelemetry-instrumentation-psycopg==0.65b0",
     # Reads the exported inventory workbook. A runtime dependency rather than a
     # development one because profile_sheet, and the importer that follows it,
     # are management commands that ship inside the backend image: Django

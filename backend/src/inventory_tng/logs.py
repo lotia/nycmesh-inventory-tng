@@ -29,6 +29,7 @@ from datetime import datetime
 from typing import Any
 
 import structlog
+from opentelemetry import trace
 
 from inventory_tng import console
 from inventory_tng.options import setting
@@ -101,16 +102,31 @@ def stamp(logger: Any, name: str, event: dict[str, Any]) -> dict[str, Any]:
 
 
 def trace_context(logger: Any, name: str, event: dict[str, Any]) -> dict[str, Any]:
-    """Bind `trace_id` and `span_id`, empty until there is a tracer.
+    """Bind `trace_id` and `span_id`: the record's place in a trace.
 
-    The keys are present from the start on purpose. This is the field contract
-    every record honours, and inventory-tng-nb8.2 fills the values in when the
-    OpenTelemetry SDK arrives; a collector's parsing, a dashboard's query and
-    anything reading a saved stream therefore do not change shape on the day
-    tracing is switched on.
+    Both keys are on every record whether or not anything is tracing, which is
+    the field contract nb8.1 established -- a collector's parsing, a
+    dashboard's query and a saved stream do not change shape on the day the
+    SDK is switched on, they simply stop being empty.
+
+    Read from the current span rather than from a bound variable, because that
+    is what makes a log line findable FROM a trace and a trace findable from a
+    log line. `get_current_span` costs a contextvar lookup and returns an
+    invalid span when nothing is recording, so the no-collector case pays
+    nothing beyond that.
+
+    Empty unless the trace was actually SAMPLED, which is the part that is
+    easy to get wrong. A span exists and carries a real id whether or not it
+    will be exported, so gating on the id being non-zero puts a plausible
+    thirty-two-character id on every record of every dropped trace -- at the
+    default ratio, nine records in ten pointing at something no collector was
+    ever sent. An id that cannot be looked up is worse than no id, because a
+    reader spends the search before concluding it.
     """
-    event.setdefault("trace_id", "")
-    event.setdefault("span_id", "")
+    span = trace.get_current_span().get_span_context()
+    recorded = span.trace_id and span.trace_flags.sampled
+    event.setdefault("trace_id", f"{span.trace_id:032x}" if recorded else "")
+    event.setdefault("span_id", f"{span.span_id:016x}" if recorded else "")
     return event
 
 
