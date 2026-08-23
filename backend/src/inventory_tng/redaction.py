@@ -221,6 +221,31 @@ ATTRIBUTES_ADMITTED = ALLOWED_ATTRIBUTES | PERSONAL_ATTRIBUTES
 EVENT_ATTRIBUTES_ADMITTED = EVENT_ATTRIBUTES | PERSONAL_ATTRIBUTES
 LOG_KEYS_ADMITTED = ALLOWED_LOG_KEYS | PERSONAL_LOG_KEYS
 
+# gunicorn's access line, which is the one record in this system an allowlist
+# cannot reach: it is a MESSAGE, assembled by gunicorn from a format string,
+# and this module governs fields. So the format itself is the redaction.
+#
+# What gunicorn's own default would have written, and what each part costs:
+# `%(h)s` is the caller's address; `%(r)s` is the request line, which carries
+# the query string -- and this application has `/api/volunteers?search=Ada`, so
+# that is a volunteer's name in every access record; `%(a)s` is the user agent,
+# a device fingerprint in all but name. None of the three survives here.
+#
+# What is kept is what an access line is actually read for, and no more. The
+# path is concrete rather than templated because gunicorn has never heard of
+# Django's routes; it carries surrogate ids, which the epic settles as
+# acceptable, and never a query.
+ACCESS_LOG_FORMAT = "%(m)s %(U)s %(s)s %(b)s %(D)s"
+
+# And what the toggle admits, since it would otherwise be the one place in the
+# system that says "personal data" and means "except over there".
+ACCESS_LOG_FORMAT_RECORDING = '%(h)s %(m)s %(U)s%(q)s %(s)s %(b)s %(D)s "%(a)s"'
+
+
+def access_log_format(admitting: bool) -> str:
+    """What gunicorn writes per request, which is a format rather than a list."""
+    return ACCESS_LOG_FORMAT_RECORDING if admitting else ACCESS_LOG_FORMAT
+
 
 def personal_data(requested: str) -> bool:
     """Whether personal data is being recorded, refusing anything unrecognised.

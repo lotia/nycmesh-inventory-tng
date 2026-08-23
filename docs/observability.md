@@ -367,6 +367,17 @@ eventually miss:
 text of a log message, and of an exception's message, is whoever wrote it. An
 allowlist governs fields. No list can read a sentence.
 
+One message in this system is assembled rather than written, and it is
+therefore the one place the boundary could be closed: gunicorn's access line.
+Its own default carries the caller's address, the request line **with its query
+string**, and the user agent — which in this application means
+`/api/volunteers?search=Ada` on an ordinary afternoon. The format is set in
+`backend/src/gunicorn.conf.py` instead, to the method, the path without its
+query, the status, the size and the duration, and it honours the same toggle as
+everything else. Django's own development server is not configured this way and
+its access lines do carry the query — it is for development, where `DEBUG` is
+on and no collector is watching.
+
 ## Recording personal data on purpose
 
 Deny-by-default is the resting state, not the only state. An IP address is

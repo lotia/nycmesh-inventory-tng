@@ -11,12 +11,14 @@ Loaded explicitly -- `gunicorn -c gunicorn.conf.py` -- rather than by gunicorn
 finding it in the working directory, so that a command that has stopped reading
 it is visible in the command rather than in its absence.
 
-It is also where the OpenTelemetry SDK is started, in `post_fork` below.
+It is also where the OpenTelemetry SDK is started, in `post_fork` below, and
+where the access line is given a shape that does not carry personal data.
 """
 
 import sys
 from typing import Any
 
+from inventory_tng import redaction
 from inventory_tng.logs import from_environment
 from inventory_tng.telemetry import start
 
@@ -27,6 +29,11 @@ from inventory_tng.telemetry import start
 logconfig_dict, _announcement = from_environment()
 if _announcement:
     print(_announcement, file=sys.stderr)
+
+# The one record in this system that no allowlist can reach, because it is a
+# message gunicorn assembles rather than a set of fields -- so the format is
+# where it is redacted. `redaction` holds it, and the argument for each part.
+access_log_format = redaction.access_log_format(redaction.recording())
 
 
 def post_fork(server: Any, worker: Any) -> None:
