@@ -32,7 +32,7 @@ from django.test import Client
 from django.urls import path
 from pytest_django.fixtures import Settings
 
-from inventory_tng import console, logs
+from inventory_tng import console, logs, refusals
 from inventory_tng.logs import (
     configure,
     from_environment,
@@ -166,9 +166,19 @@ def test_the_handler_writes_to_standard_output() -> None:
 
 
 def test_nothing_is_filtered_by_whether_debug_is_on() -> None:
-    """The precise defect. Django's own handlers each carry one of these."""
-    handlers = settings.LOGGING["handlers"].values()
-    assert not any(handler.get("filters") for handler in handlers)
+    """The precise defect. Django's own handlers each carry one of these.
+
+    Not "no filters at all", which is what this asserted until
+    `inventory_tng.refusals` arrived: there is one filter now, and it rations a
+    single logger family rather than selecting an environment. What has to stay
+    true is the thing that made Django's arrangement useless in a deployment --
+    that no record here is admitted or dropped on account of `DEBUG`.
+    """
+    declared = settings.LOGGING["filters"]
+
+    for handler in settings.LOGGING["handlers"].values():
+        for named in handler.get("filters", []):
+            assert declared[named]["()"] is refusals.Bounded, "a filter this test has not been told about"
 
 
 def test_a_lower_level_admits_less() -> None:

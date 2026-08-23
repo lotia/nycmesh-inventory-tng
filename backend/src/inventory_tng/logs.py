@@ -31,8 +31,8 @@ from typing import Any
 import structlog
 from opentelemetry import trace
 
-from inventory_tng import console
-from inventory_tng.options import setting
+from inventory_tng import console, refusals
+from inventory_tng.options import DEFAULTS, setting
 
 # What a record is drawn as when it is written. `console` is the default
 # because an unconfigured checkout has no collector and a person is the only
@@ -189,7 +189,9 @@ SHARED: list[Any] = [
 # from inside the logging machinery, so the frames a reader wants arrive under
 # seven frames of `logging/__init__.py`.
 FROM_LIBRARIES: list[Any] = [
-    structlog.stdlib.ExtraAdder(allow={"status_code", "duration", "params", "sql", "alias"}),
+    structlog.stdlib.ExtraAdder(
+        allow={"status_code", "duration", "params", "sql", "alias", "suppressed", "suppressed_since"}
+    ),
     *SHARED,
 ]
 
@@ -214,7 +216,12 @@ _colour = False
 _context = False
 
 
-def logging_config(level: str, drawn_as: str = "console", levels: dict[str, str] | None = None) -> dict[str, Any]:
+def logging_config(
+    level: str,
+    drawn_as: str = "console",
+    levels: dict[str, str] | None = None,
+    security_rate: str = DEFAULTS["DJANGO_SECURITY_LOG_RATE"],
+) -> dict[str, Any]:
     """A `dictConfig` sending everything at `level` and above to standard output.
 
     Standard output because a container runtime collects it there, and because
@@ -223,7 +230,12 @@ def logging_config(level: str, drawn_as: str = "console", levels: dict[str, str]
 
     It does not branch on `DEBUG`. One destination in every environment is the
     point: an arrangement that only exists in production is one nobody has read.
+
+    `security_rate` bounds one family of records rather than the stream:
+    `refusals` says which, and why that family alone is rationed.
     """
+    count, window = refusals.rate(security_rate)
+
     formatter = {
         "()": structlog.stdlib.ProcessorFormatter,
         "processors": [
@@ -259,11 +271,16 @@ def logging_config(level: str, drawn_as: str = "console", levels: dict[str, str]
         # warnings are worth having.
         "disable_existing_loggers": False,
         "formatters": {"structured": formatter},
+        # On the handler and not on a logger, because Django logs a refusal to
+        # a CHILD of `django.security` and Python consults filters only on the
+        # logger the call was made on. `refusals.Bounded` says the rest.
+        "filters": {"refusals": {"()": refusals.Bounded, "count": count, "window": window}},
         "handlers": {
             "stdout": {
                 "class": "logging.StreamHandler",
                 "stream": "ext://sys.stdout",
                 "formatter": "structured",
+                "filters": ["refusals"],
             },
         },
         # The root logger catches this application's own loggers and anything a
@@ -309,10 +326,10 @@ def from_environment(environment: dict[str, str] | None = None) -> tuple[dict[st
     """The configuration and its announcement, read from the environment once.
 
     Both entry points call this -- Django's settings module and gunicorn's
-    config file -- because they were each reading the same five variables with
-    their own defaults, and a master process drawing columns while its workers
-    drew JSON is one stream in two formats, which is the exact defect the
-    gunicorn configuration exists to prevent.
+    config file -- because they were each reading the same handful of variables
+    with their own defaults, and a master process drawing columns while its
+    workers drew JSON is one stream in two formats, which is the exact defect
+    the gunicorn configuration exists to prevent.
     """
     drawn_as = log_format(setting("DJANGO_LOG_FORMAT", environment))
     # Before `logging_config`, not after: the terminal drawing reads the
@@ -328,5 +345,6 @@ def from_environment(environment: dict[str, str] | None = None) -> tuple[dict[st
         log_level(setting("DJANGO_LOG_LEVEL", environment)),
         drawn_as,
         per_logger_levels(setting("DJANGO_LOG_LEVELS", environment)),
+        setting("DJANGO_SECURITY_LOG_RATE", environment),
     )
     return config, said

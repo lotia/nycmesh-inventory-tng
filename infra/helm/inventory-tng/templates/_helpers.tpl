@@ -94,6 +94,8 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
   value: {{ .Values.django.logLevels | quote }}
 - name: DJANGO_LOG_FORMAT
   value: {{ .Values.django.logFormat | quote }}
+- name: DJANGO_SECURITY_LOG_RATE
+  value: {{ .Values.django.securityLogRate | quote }}
 - name: OTEL_EXPORTER_OTLP_ENDPOINT
   value: {{ .Values.django.otlpEndpoint | quote }}
 - name: OTEL_SERVICE_NAME

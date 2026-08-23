@@ -92,6 +92,9 @@ services:
       # Pipe it back into columns to read it:
       #   docker compose logs -f backend | scripts/pretty-logs
       DJANGO_LOG_FORMAT: ${DJANGO_LOG_FORMAT:-json}
+      # How much a refused request may write, which this stack passes through
+      # so that a scanner found on a laptop's LAN behaves as it would deployed.
+      DJANGO_SECURITY_LOG_RATE: ${DJANGO_SECURITY_LOG_RATE:-10/min}
       # Traces and metrics. Empty by default: no endpoint means no SDK, so
       # this stack costs nothing until inventory-tng-nb8.6 puts a collector
       # beside it. 1.0 rather than the code's conservative default, because

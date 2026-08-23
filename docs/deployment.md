@@ -160,6 +160,7 @@ ingress's, which would otherwise forward a hostname nothing answers to.
 | `DJANGO_LOG_LEVEL` | no | chart (`django.logLevel`) | How much the backend says, on standard output. Default `INFO`. Any level Python knows; one it does not know stops the process at boot rather than starting quietly at some other level. [Reading the logs](#reading-the-logs) is what to do with the output |
 | `DJANGO_LOG_LEVELS` | no | chart (`django.logLevels`) | Comma-separated `logger=LEVEL` pairs laid over `DJANGO_LOG_LEVEL`, so that one subsystem can be raised without raising everything — `inventory.sheet=DEBUG`. Empty by default. Not every logger answers: Django decides whether to record a query from `DJANGO_DEBUG` rather than from a logger's level, so raising its SQL logger gets you nothing in a deployment however it is set |
 | `DJANGO_LOG_FORMAT` | no | chart (`django.logFormat`) | `json` for a collector or `console` for a person. The record is identical either way and only the drawing differs. The chart sets `json`; the code's own default is `console`, so a process nobody configured is still readable |
+| `DJANGO_SECURITY_LOG_RATE` | no | chart (`django.securityLogRate`) | How much a refused request may write, as `<count>/<period>`. Default and shipped value `10/min`, counted per logger and per gunicorn worker. Nought is refused rather than read as "write none". [Reading the logs](#reading-the-logs) says what these records contain and what they no longer contain |
 | `DJANGO_ALLOWED_HOSTS` | yes | chart (`django.allowedHosts`) | Comma-separated hostnames. Two other things read it, and [health checks](#health-checks) says what they do with it |
 | `DJANGO_EXTRA_ALLOWED_HOSTS` | no | chart (the downward API), not a knob | The pod's own address, added to the list above. Not something to set by hand — the chart fills it because nobody can know it in advance, and [health checks](#health-checks) says what it is for |
 | `CORS_ALLOWED_ORIGINS` | no | chart (`django.corsAllowedOrigins`) | Normally empty: nginx proxies Django's paths, so the browser sees one origin. Setting it grants cross-origin *reads* to an unauthenticated client and nothing more — the session cookie is not sent cross-origin and writes have no trusted-origin list, so it does not make a frontend on a second hostname work |
@@ -634,7 +635,8 @@ data. The refusal is at least visible now — Django's `DisallowedHost` security
 logger names the rejected hostname in the backend's output, where before this it reached
 nothing at all — but a release that has to be diagnosed from its logs is one
 that should not have installed, so the chart refuses to render it instead,
-naming both values.
+naming both values. What that record contains, and how many of them a scanner
+can make you write, is [Reading the logs](#reading-the-logs).
 
 **One known defect is left here.** Liveness runs the same query readiness does,
 so a database that is briefly unreachable is read as a process that needs
@@ -707,6 +709,21 @@ per request through handlers of its own, which would otherwise put plain text
 beside the application's JSON and leave whatever parses the stream meeting a
 line it was not written for. `backend/src/gunicorn.conf.py` points it at the
 same arrangement, so there is one shape to parse.
+
+**A refused request is bounded, and carries no traceback.** Django writes a
+record for every request it refuses — a `Host` it does not answer to, a body too
+large — and that path is reachable from the internet without a credential, so
+what it costs is decided by whoever is scanning rather than by you. Two things
+are done about it. The traceback is dropped, because those frames are the same
+three Django functions whatever the request was and the part worth having — the
+hostname that was refused — is in the message. And at most
+`DJANGO_SECURITY_LOG_RATE` of them are written per period, per logger and per
+gunicorn worker; the rest are counted, and the count arrives on the next one
+that is written, so a flood is measured rather than hidden. Per logger, so that
+a host scanner cannot spend the window belonging to the CSRF and session
+failures Django files under the same family. `django.securityLogRate` in the chart
+sets it, `10/min` is the shipped value, and raising it is what to do when a
+deployment is genuinely refusing requests it ought to be answering.
 
 **To read JSON yourself, draw it back into columns as you read it:**
 
