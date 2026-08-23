@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Post a JSON log stream to a collector, the way an agent on a node does.
+#
+# The backend writes its records to standard output and nothing else, because
+# a line that has been written survives the process dying and an exporter's
+# buffer does not -- docs/decisions/0021-telemetry-over-otlp.md. Getting those
+# lines into a collector is therefore somebody else's job, and under compose
+# this is that somebody.
+#
+# Usage:  podman compose logs -f backend | scripts/ship-logs
+#         podman compose logs -f backend | scripts/ship-logs | scripts/pretty-logs
+#
+# Every line is passed through unchanged, so a reader can sit after it.
+# Where it posts comes from OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, or from
+# OTEL_EXPORTER_OTLP_ENDPOINT with /v1/logs appended, and falls back to the
+# address the compose collector publishes. docs/observability.md is the rest.
+#
+# Development only: no retry, no queue on disk. A cluster runs a real agent.
+#
+# The reader imports nothing from Django, so this needs the backend project
+# only for an interpreter and never for a database or a settings module.
+
+set -euo pipefail
+
+HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+
+# src/ is on the path for pytest and for manage.py, neither of which is
+# running here, so this says it too.
+export PYTHONPATH="$HERE/../backend/src${PYTHONPATH:+:$PYTHONPATH}"
+
+exec uv run --project "$HERE/../backend" python -m inventory_tng.shipping "$@"

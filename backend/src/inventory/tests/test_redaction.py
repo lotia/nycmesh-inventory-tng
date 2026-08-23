@@ -374,7 +374,7 @@ def test_the_reason_an_error_span_gives_is_not_carried_verbatim() -> None:
     span = Span()
     redaction.redact_span(span, admitting=False)
 
-    assert "ada@example.net" not in span._status.description
+    assert "ada@example.net" not in (span._status.description or "")
     assert span._status.status_code is StatusCode.ERROR, "that it failed is not the part being withheld"
 
 
@@ -395,7 +395,7 @@ def test_a_link_is_stripped_like_everything_else() -> None:
 
     redaction.redact_span(Span(), admitting=False)
 
-    assert "volunteer.email" not in link.attributes
+    assert "volunteer.email" not in dict(link.attributes or {})
 
 
 # --------------------------------------------------------------------------

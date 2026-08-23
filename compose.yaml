@@ -96,9 +96,10 @@ services:
       # so that a scanner found on a laptop's LAN behaves as it would deployed.
       DJANGO_SECURITY_LOG_RATE: ${DJANGO_SECURITY_LOG_RATE:-10/min}
       # Traces and metrics. Empty by default: no endpoint means no SDK, so
-      # this stack costs nothing until inventory-tng-nb8.6 puts a collector
-      # beside it. 1.0 rather than the code's conservative default, because
-      # what is wanted should be in a file rather than implied.
+      # this stack costs nothing until somebody asks for the collector below,
+      # which is what fills this in. 1.0 rather than the code's conservative
+      # default, because what is wanted should be in a file rather than
+      # implied. docs/observability.md is the command.
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-inventory-tng-backend}
       OTEL_RESOURCE_ATTRIBUTES: ${OTEL_RESOURCE_ATTRIBUTES:-deployment.environment=compose}
@@ -139,6 +140,48 @@ services:
       sh -c "python manage.py migrate --noinput &&
              gunicorn inventory_tng.wsgi:application -c gunicorn.conf.py --bind 0.0.0.0:8000 --access-logfile -"
 
+  # Somewhere for telemetry to go, and the worked example of what a cluster
+  # needs. Not started by `compose up`: it is behind a profile, so a developer
+  # who has not asked for telemetry pays for nothing and DEVELOPERS.md's
+  # getting-started does not grow a step.
+  #
+  #   podman compose --profile telemetry up -d
+  #
+  # docs/observability.md is what to open, what it proves, and why this image.
+  collector:
+    profiles: [telemetry]
+    image: docker.io/grafana/otel-lgtm:0.31.0
+    # Two of the three restraints above, and not the third. This is somebody
+    # else's bundle of five servers, each of which writes to a directory of its
+    # own inside the image, so a read-only root would be a list of tmpfs mounts
+    # to keep in step with a release nobody here controls. Dropping privileges
+    # and capabilities costs nothing and is kept; the root filesystem is not,
+    # and this is the only service in this file that may say that. It is off by
+    # default and never deployed, which is what makes the trade payable.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ports:
+      # Grafana, which is what a person opens.
+      - "3000:3000"
+      # OTLP in, gRPC and HTTP. The backend uses the HTTP one; the other is
+      # published so that a browser or another service can be pointed here
+      # without editing this file.
+      - "4317:4317"
+      - "4318:4318"
+    environment:
+      # Grafana asks for a password otherwise, and there is nothing behind this
+      # but a laptop's own telemetry. Named here rather than left to the
+      # image's default so that it is a decision somebody can see.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      # Named, so that what was captured survives `compose down` and can be
+      # looked at again. `compose down -v` is how to forget it.
+      - collector_data:/data
+
   frontend:
     build:
       context: ./frontend
@@ -164,3 +207,4 @@ services:
 
 volumes:
   postgres_data:
+  collector_data:
