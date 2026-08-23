@@ -13,47 +13,20 @@ Django still attaches the exception to that record is exactly the sort of thing
 an upgrade changes underneath a filter that assumes it does.
 """
 
-import copy
-import io
-import json
 import logging
 import logging.config
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
 
 import pytest
 from django.conf import settings
 from django.test import Client
 from pytest_django.fixtures import Settings
 
+from inventory.tests.helpers import applied
+from inventory.tests.helpers import every_record as records
 from inventory_tng import refusals
 from inventory_tng.logs import from_environment, logging_config
 from inventory_tng.options import DEFAULTS
-
-
-@contextmanager
-def applied(config: dict[str, Any]) -> Iterator[io.StringIO]:
-    """`test_logging.applied`, and for the reasons given there.
-
-    Not imported from it: a test module importing another test module's
-    fixtures makes the second one impossible to read on its own, and this is
-    six lines.
-    """
-    buffer = io.StringIO()
-    substituted = copy.deepcopy(config)
-    substituted["handlers"]["stdout"]["stream"] = buffer
-    logging.config.dictConfig(substituted)
-    try:
-        yield buffer
-    finally:
-        logging.config.dictConfig(settings.LOGGING)
-
-
-def records(stream: io.StringIO) -> list[dict[str, Any]]:
-    """Every JSON record written, in order."""
-    return [json.loads(line) for line in stream.getvalue().splitlines() if line.strip()]
 
 
 def refuse(logger: str = "django.security.DisallowedHost", message: str = "Invalid HTTP_HOST header") -> None:
