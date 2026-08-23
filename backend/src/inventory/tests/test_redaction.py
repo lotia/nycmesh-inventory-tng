@@ -437,7 +437,7 @@ def test_a_captured_stack_reaches_the_collector() -> None:
 def test_a_key_nobody_set_is_not_written_as_a_null() -> None:
     """`ExtraAdder` reads an allowed name straight off the record, so every
     standard attribute the list names arrives as a null on every foreign
-    record. `stack_info` is the one, and it was on every access line.
+    record. `stack_info` is the one, and it was on every gunicorn access line.
     """
     with applied(logging_config("INFO", "json")) as stream:
         logging.getLogger("gunicorn.access").info("GET /api/healthz 200 15 4210")
@@ -446,3 +446,50 @@ def test_a_key_nobody_set_is_not_written_as_a_null() -> None:
 
     assert "stack_info" not in record
     assert record["event"] == "GET /api/healthz 200 15 4210"
+
+
+# --------------------------------------------------------------------------
+# The one record no allowlist can reach
+# --------------------------------------------------------------------------
+
+
+def test_gunicorns_access_line_carries_no_address_query_or_user_agent() -> None:
+    """It is a message gunicorn assembles, not a set of fields, so the format
+    is the redaction. Its default carries all three, and this application has
+    `/api/volunteers?search=Ada` -- a volunteer's name, on every access record.
+    """
+    written_as = redaction.access_log_format(admitting=False)
+
+    assert "%(h)s" not in written_as, "the caller's address"
+    assert "%(q)s" not in written_as and "%(r)s" not in written_as, "the query string"
+    assert "%(a)s" not in written_as, "the user agent"
+
+
+def test_but_still_says_what_was_asked_for_and_how_it_went() -> None:
+    """A bound that left an access line saying nothing would be met by
+    somebody putting the default back.
+    """
+    written_as = redaction.access_log_format(admitting=False)
+
+    for atom in ("%(m)s", "%(U)s", "%(s)s", "%(b)s", "%(D)s"):
+        assert atom in written_as, atom
+
+
+def test_and_the_toggle_reaches_this_stream_like_every_other() -> None:
+    """Otherwise it would be the one place that says "personal data" and
+    means "except over there".
+    """
+    written_as = redaction.access_log_format(admitting=True)
+
+    assert "%(h)s" in written_as
+    assert "%(q)s" in written_as
+    assert "%(a)s" in written_as
+
+
+def test_the_configuration_gunicorn_reads_sets_it() -> None:
+    """A format defined and never wired up is worse than none, because the
+    default is what runs and nothing says so.
+    """
+    read = (Path(settings.BASE_DIR) / "gunicorn.conf.py").read_text()
+
+    assert "access_log_format = redaction.access_log_format(" in read
