@@ -11,15 +11,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import environ
-
+from inventory_tng.environment import Env
 from inventory_tng.hosts import allowed_hosts
 from inventory_tng.logs import from_environment
 
 # BASE_DIR is backend/src/ -- the directory holding manage.py.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-env = environ.Env(
+# An empty value means the same as an unset one; `Env` says why.
+env = Env(
     DJANGO_DEBUG=(bool, False),
     DJANGO_ALLOWED_HOSTS=(list, []),
     DJANGO_EXTRA_ALLOWED_HOSTS=(list, []),

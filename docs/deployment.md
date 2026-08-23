@@ -137,6 +137,10 @@ plausible and wrong. Both fail at boot, which is the intended behaviour and not
 a rough edge: a pod that will not start is a deployment somebody fixes in the
 first minute, where one running on a guessed value is found much later.
 
+A value set to the empty string counts as unset, and takes its default —
+emptying `django.numProxies` in a values file is a release that starts on `2`,
+not a pod that will not start at all. `DJANGO_SECRET_KEY` is the exception, above.
+
 Everything else in the table below is a value the chart already carries, so a
 release that supplies only those two starts. It starts answering to whatever
 hostname `values.yaml` was last left naming, which is why
@@ -148,7 +152,7 @@ ingress's, which would otherwise forward a hostname nothing answers to.
 
 | Variable | Required | Source in Kubernetes | Notes |
 | --- | --- | --- | --- |
-| `DJANGO_SECRET_KEY` | yes | Secret | No default. A missing value fails at boot by design. |
+| `DJANGO_SECRET_KEY` | yes | Secret | No default. A missing value fails at boot by design, and so does an empty one — signing sessions with nothing is the failure the refusal exists to prevent |
 | `DATABASE_URL` | yes | Secret | `postgres://user:password@host:5432/dbname` |
 | `DJANGO_DEBUG` | no | chart (`django.debug`) | Must be `false` outside development |
 | `DJANGO_LOG_LEVEL` | no | chart (`django.logLevel`) | How much the backend says, on standard output. Default `INFO`. Any level Python knows; one it does not know stops the process at boot rather than starting quietly at some other level. [Reading the logs](#reading-the-logs) is what to do with the output |
