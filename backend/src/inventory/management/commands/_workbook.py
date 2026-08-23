@@ -14,8 +14,15 @@ from pathlib import Path
 
 from django.core.management.base import CommandError, CommandParser
 
+from inventory import tracing
 from inventory.sheet import workbook
 from inventory.sheet.workbook import NotTheWorkbook, Sheet
+
+# Every command that reads an export comes through here, which is what makes
+# this the right place: a rule is traced because a workbook is being read, not
+# because a particular command was the one to ask. `inventory.tracing` says
+# what the line is, and what happened when this sat somewhere narrower.
+tracing.cover(*tracing.COVERED_WHEN_A_WORKBOOK_IS_READ)
 
 
 def add_argument(parser: CommandParser) -> None:

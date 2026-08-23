@@ -340,6 +340,41 @@ send by hand:
 curl -H "X-Debug-Trace: <token>" http://localhost:8000/api/items
 ```
 
+## Every function a request called
+
+At DEBUG, each call in the covered modules is a span of its own, nested under
+the call that made it. Spans rather than log lines because "which functions
+ran, in what order, and how long each took" is what a trace already is, and it
+nests; a flat record cannot say that one call happened inside another.
+
+Two switches, and they answer different questions:
+
+```bash
+DJANGO_LOG_LEVELS=inventory=DEBUG    # this process, for as long as it runs
+```
+
+```bash
+curl -H "X-Debug-Trace: <token>" …   # this request, in a deployment
+```
+
+The first is the knob that already existed. The second is the same signed token
+that raises the sampling rate — so one volunteer's failing request can be
+recorded to this depth in a deployment without turning it on for everybody.
+
+**What is covered is a list, not a rule**, and
+[`backend/src/inventory/tracing.py`](../backend/src/inventory/tracing.py)
+is that list along with the two modules deliberately outside it: the models,
+which Django builds with a metaclass that a naively wrapped method breaks, and
+the serializers, which DRF calls once per field per row — a list of two hundred
+labels is thousands of calls, and burying the handful of spans somebody wants
+under them makes the whole thing useless at the moment it is needed.
+
+**What it costs when nobody has asked** is 95 nanoseconds per wrapped call, and
+the figures either side of that are in the same file. It is worth knowing that
+the guard sits *before* the tracer rather than inside it: starting a span that
+will not be exported costs about thirty times as much as declining to start
+one.
+
 ## What telemetry may carry
 
 **Nothing reaches an exporter unless this application has declared it.** Not
