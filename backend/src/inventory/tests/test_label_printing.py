@@ -357,7 +357,7 @@ def test_the_sheet_carries_the_code_as_readable_text(editor: Client, item: Item)
 
 
 def test_the_sheet_carries_the_date_the_label_was_printed(editor: Client, item: Item) -> None:
-    """So an aged batch can be found and replaced as a set."""
+    """The date is on the sheet for the reason the template gives."""
     label = Label.objects.create(code=CODE, item=item)
     printed_at(label, datetime.datetime(2026, 3, 4, 17, 0, tzinfo=datetime.UTC))
 
