@@ -64,7 +64,8 @@ What you may do on your own, and what you must ask for first:
 | | |
 | --- | --- |
 | On a `batch/*` branch, without asking | Commit, push, open and update the pull request, post findings to it, reply to and resolve its threads, `push --force-with-lease` when collapsing an issue's own commits |
-| Ask first, every time | Merging, anything touching `main` directly, a bare `push --force`, `bd dolt push`, and any change to repository or branch settings |
+| Merging a `batch/*` pull request, without asking | Once it meets [When a branch is ready to merge](DEVELOPERS.md#when-a-branch-is-ready-to-merge): `gh pr merge <pr> --rebase` |
+| Ask first, every time | Anything touching `main` directly, a bare `push --force`, `bd dolt push`, and any change to repository or branch settings |
 
 The line is what a mistake costs. A batch branch is proposed work: it can be
 rewritten or thrown away and the repository is untouched, and every step of it
@@ -72,6 +73,16 @@ is visible in the pull request as it happens. `--force-with-lease` is on the
 free side because the lease is the guard — it refuses if anything arrived since
 you last fetched, so it cannot overwrite work you have not seen. A bare
 `--force` has no such guard and so it asks.
+
+Merging is on the free side for a different reason: none of the bar is yours to
+judge, and most of it `main` will not let you waive. The part nothing enforces
+is that the review cycle ran, so that one is on your honour —
+[0020](docs/decisions/0020-who-merges.md) is why that trade is made and what it
+costs.
+
+So the rule is narrow on purpose. A pull request that is not mergeable is one
+to finish, never one to ask an exception for; and anything that is not a
+`batch/*` branch asks, whatever its state.
 
 When finishing, report changed files, what you validated, and the commands you
 would run next.

@@ -111,5 +111,13 @@ gh pr checks --watch
 gh pr merge <pr> --rebase
 ```
 
-Ask before that last line. Everything up to it is proposed work on a branch that
-can be thrown away; the merge is the step that cannot.
+The merge does not ask. The bar it has to clear is
+[When a branch is ready to merge](../../../DEVELOPERS.md#when-a-branch-is-ready-to-merge),
+and none of it is yours to weigh.
+
+Two things about that `record` line, because both are easy to get wrong. It
+records the head it saw and nothing else — it does not check that either pass
+ran, so it is a reminder and you are still the one answerable for the cycle.
+And anything pushed afterwards moves the head, so the merge is refused until
+you record again: when a late fix means another `fixup!`, the way back in is
+the whole block above, from the rebase down.

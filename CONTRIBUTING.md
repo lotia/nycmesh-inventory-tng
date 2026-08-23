@@ -58,7 +58,9 @@ Agents are welcome here, and so is not using them. If you use one, point it at
 only when a task needs it.
 
 Everything an agent is asked to do — tests, linting, documentation currency —
-is exactly what a human contributor is asked to do. There is one standard.
+is exactly what a human contributor is asked to do. There is one standard, and
+it includes who may merge —
+[When a branch is ready to merge](DEVELOPERS.md#when-a-branch-is-ready-to-merge).
 
 ## Questions
 
