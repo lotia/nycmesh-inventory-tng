@@ -151,6 +151,7 @@ ingress's, which would otherwise forward a hostname nothing answers to.
 | `DJANGO_SECRET_KEY` | yes | Secret | No default. A missing value fails at boot by design. |
 | `DATABASE_URL` | yes | Secret | `postgres://user:password@host:5432/dbname` |
 | `DJANGO_DEBUG` | no | chart (`django.debug`) | Must be `false` outside development |
+| `DJANGO_LOG_LEVEL` | no | chart (`django.logLevel`) | How much the backend says, on standard output. Default `INFO`. Any level Python knows; one it does not know stops the process at boot rather than starting quietly at some other level. [Reading the logs](#reading-the-logs) is what to do with the output |
 | `DJANGO_ALLOWED_HOSTS` | yes | chart (`django.allowedHosts`) | Comma-separated hostnames. Two other things read it, and [health checks](#health-checks) says what they do with it |
 | `DJANGO_EXTRA_ALLOWED_HOSTS` | no | chart (the downward API), not a knob | The pod's own address, added to the list above. Not something to set by hand — the chart fills it because nobody can know it in advance, and [health checks](#health-checks) says what it is for |
 | `CORS_ALLOWED_ORIGINS` | no | chart (`django.corsAllowedOrigins`) | Normally empty: nginx proxies Django's paths, so the browser sees one origin. Setting it grants cross-origin *reads* to an unauthenticated client and nothing more — the session cookie is not sent cross-origin and writes have no trusted-origin list, so it does not make a frontend on a second hostname work |
@@ -618,13 +619,40 @@ ever. So the chart passes the address in through the downward API, as
 They reach the pod by its address and go green regardless, while nginx forwards
 a browser's `Host` untouched — so an `ingress.host` that `django.allowedHosts`
 does not cover gives you two Ready pods and a site that serves its shell and no
-data, with nothing in any log unless `DEBUG` is on, which it must not be. The
-chart refuses to render that release instead, naming both values.
+data. The refusal is at least visible now — Django's `DisallowedHost` security
+logger names the rejected hostname in the backend's output, where before this it reached
+nothing at all — but a release that has to be diagnosed from its logs is one
+that should not have installed, so the chart refuses to render it instead,
+naming both values.
 
 **One known defect is left here.** Liveness runs the same query readiness does,
 so a database that is briefly unreachable is read as a process that needs
 killing — and because every replica asks the same database, they fail together.
 A one-minute blip becomes a full restart of the deployment. `inventory-tng-uq6`.
+
+## Reading the logs
+
+The backend writes everything at `DJANGO_LOG_LEVEL` and above to **standard
+output** and nowhere else. Nothing is mailed anywhere and no file is written, so
+whatever collects a container's output is the whole of it:
+
+```bash
+kubectl -n inventory-tng logs deploy/inventory-tng-backend --follow
+```
+
+Two consequences worth knowing before an incident rather than during one.
+
+**Nothing outlives the pod.** A container's output is kept by the node until
+the pod is replaced, and a `CrashLoopBackOff` is a pod being replaced. Reaching
+the run before the current one needs `--previous`, and the run before *that* is
+gone. A cluster that anyone intends to debug wants a log collector shipping this
+somewhere durable; standing one up is the cluster's business rather than this
+chart's, and this chart deliberately does not render one.
+
+**Both the application and gunicorn write here**, in two different formats —
+gunicorn's access line for every request, and Django's records for everything
+else. A collector parsing this stream has to tolerate that, which is a good
+reason to give it a parser per format rather than one that assumes.
 
 ## Rollback
 
