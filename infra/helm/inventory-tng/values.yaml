@@ -57,6 +57,10 @@ django:
   # sample a subset; see docs/deployment.md.
   tracesSampler: "parentbased_traceidratio"
   tracesSamplerArg: "1.0"
+  # Whether telemetry may carry personal data. This chart never ships anything
+  # but "redacted". Read docs/observability.md before changing it: what it
+  # admits, and what admitting it obliges of wherever the telemetry lands.
+  personalData: "redacted"
   # Every hostname a browser may use, comma-separated. Two things depend on
   # it beyond Django itself: a release whose ingress.host none of these
   # covers is refused at render time, and the pod adds its own address to

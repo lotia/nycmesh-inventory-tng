@@ -106,6 +106,8 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
   value: {{ .Values.django.tracesSampler | quote }}
 - name: OTEL_TRACES_SAMPLER_ARG
   value: {{ .Values.django.tracesSamplerArg | quote }}
+- name: TELEMETRY_PERSONAL_DATA
+  value: {{ .Values.django.personalData | quote }}
 - name: CORS_ALLOWED_ORIGINS
   value: {{ .Values.django.corsAllowedOrigins | quote }}
 - name: NUM_PROXIES

@@ -25,6 +25,9 @@ DEFAULTS = {
     # number and the argument for it; this dict holds every default in one
     # place, so it is named here and defined there.
     "DJANGO_SECURITY_LOG_RATE": refusals.DEFAULT_RATE,
+    # Off, here and in every configuration this repository ships. `redaction`
+    # holds what the two states mean and what turning it on makes true.
+    "TELEMETRY_PERSONAL_DATA": "redacted",
 }
 
 

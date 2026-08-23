@@ -176,6 +176,7 @@ ingress's, which would otherwise forward a hostname nothing answers to.
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | no | chart (`django.otlpEndpoint`) | Where traces and metrics go. Empty means the SDK is not started at all. See [Telemetry](#telemetry) before setting it |
 | `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | no | chart (`django.otelServiceName`, `django.otelResourceAttributes`) | What this service is called wherever its telemetry lands, and what else is attached to every span. Standard OpenTelemetry names |
 | `OTEL_TRACES_SAMPLER`, `OTEL_TRACES_SAMPLER_ARG` | no | chart (`django.tracesSampler`, `django.tracesSamplerArg`) | The fraction of traces recorded. Code default `0.1`; the chart ships `1.0`. [Telemetry](#telemetry) says how to sample a subset instead |
+| `TELEMETRY_PERSONAL_DATA` | no | chart (`django.personalData`) | `redacted`, which is what every configuration here ships, or `recorded`. A value that is neither stops the process. [observability.md](observability.md#recording-personal-data-on-purpose) is what it admits and what admitting it obliges of wherever the telemetry lands |
 | `LABEL_BASE_URL` | no | chart (`django.labelBaseUrl`) | The origin encoded into every printed QR code. It is on the stickers, not in the database, so changing it does not change the labels already on the shelves: move the app and keep a permanent redirect from the old host rather than reprinting. It must stay within what QR alphanumeric mode can carry and short enough to print at the module size the generator insists on — both are refused loudly rather than printed, see [`.env.sample`](../.env.sample) |
 
 Both rates are counted **per backend process**, because the counters live in
@@ -655,15 +656,18 @@ shipped default in the chart, so a release that says nothing starts no exporter,
 no sampler and no instrumented cursor — it behaves exactly as it did before any
 of this existed. Setting it is what turns telemetry on.
 
-> **Do not set it on a deployment yet.** Django's instrumentation records the
-> caller's address on every server span. An IP address is personal data, and the
-> allowlist that keeps it out of telemetry is still to come — `inventory-tng-nb8.5`.
-> This paragraph goes when it lands.
-
 **What a collector receives**, without anybody writing an instrumentation: a
 server span per request named for its route rather than its path, the database
 queries beneath it as child spans, HTTP duration and count by route and status,
 and database client duration.
+
+**What it does not receive is decided by an allowlist**, and that is where to
+look before pointing this at anything: the caller's address, the concrete URL
+and the user agent are dropped before an exporter sees them, and one setting
+re-admits them for as long as somebody needs to look.
+[observability.md](observability.md#what-telemetry-may-carry) is what it may
+carry, what it may not, and what turning that setting on obliges of wherever
+the telemetry lands.
 
 **Sampling** is `OTEL_TRACES_SAMPLER_ARG`, a fraction between 0 and 1. The
 code's own default is a conservative `0.1`, so a release that configures nothing
