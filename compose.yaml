@@ -104,6 +104,10 @@ services:
       OTEL_RESOURCE_ATTRIBUTES: ${OTEL_RESOURCE_ATTRIBUTES:-deployment.environment=compose}
       OTEL_TRACES_SAMPLER: ${OTEL_TRACES_SAMPLER:-parentbased_traceidratio}
       OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-1.0}
+      # Redacted, like every configuration here ships. Set it to `recorded` in
+      # .env for the afternoon you need to see an address or a query, and read
+      # what that makes true in .env.sample before you do.
+      TELEMETRY_PERSONAL_DATA: ${TELEMETRY_PERSONAL_DATA:-redacted}
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,backend
       CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:8080
       # One proxy in this stack -- nginx in the frontend container -- where a

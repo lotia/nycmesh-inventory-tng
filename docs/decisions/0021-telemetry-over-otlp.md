@@ -161,6 +161,37 @@ been found. IP addresses are personal data and are not exempt, and neither is a
 stable pseudonymous identifier for a volunteer who never signed in —
 pseudonymised is not anonymous.
 
+**Amended 2026-08-23, at Ali's asking: there is a way to look.** The paragraphs
+above were written as though deny-by-default were the only state, and that is
+not the decision. A volunteer's address is exactly what somebody chasing a
+throttle, a scanner, or one failing request has to see, and a rule with no way
+to look is one people route around — by reading a production database, by
+turning off the thing that was protecting them, or by giving up on the
+investigation. So there is a setting that re-admits an enumerated group, and
+deny-by-default is where it rests rather than where it is nailed.
+
+What makes that safe to have is not the setting but the four conditions on it,
+and they are the decision. It is off in the code and in every configuration this
+repository ships, so turning it on is an act somebody performs on a release they
+are watching. A value it does not recognise stops the process, because being
+misread in the permissive direction is a disclosure and there must be no
+spelling that quietly means "redacted". The process announces it at startup,
+because this record already refuses to let a console layout change silently and
+it would be absurd to hold this to a lower bar. And what it emits is marked, so
+that turning it on is reversible: whoever holds the collector can find that data
+and delete it rather than reasoning about which window was affected.
+
+It is a second enumerated group rather than a hole in the first, so what it
+admits is readable in one place. The cost is stated rather than implied:
+telemetry then contains personal data, and wherever it lands inherits that —
+retention, access and deletion — for as long as it is kept. That is a reason to
+turn it on for an afternoon, not a reason to have refused it.
+
+`inventory-tng-nb8.4` builds a signed, expiring debug token, which is a better
+shape for this in production than an environment variable: per request, and
+self-expiring. Whether that token should also carry this permission is decided
+there.
+
 ### The chart does not render a collector
 
 A collector is infrastructure shared by everything on a cluster, not a component

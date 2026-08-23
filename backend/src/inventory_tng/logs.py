@@ -31,7 +31,7 @@ from typing import Any
 import structlog
 from opentelemetry import trace
 
-from inventory_tng import console, refusals
+from inventory_tng import console, redaction, refusals
 from inventory_tng.options import DEFAULTS, setting
 
 # What a record is drawn as when it is written. `console` is the default
@@ -173,25 +173,29 @@ SHARED: list[Any] = [
     trace_context,
     structlog.processors.format_exc_info,
     structlog.processors.UnicodeDecoder(),
+    # Last, and last for a reason: it drops every key this application has not
+    # said telemetry may carry, and it has to see the record as it will be
+    # drawn. `redaction` is where the lists and the argument for them are.
+    redaction.redact_record,
 ]
 
 # For records from stdlib loggers, which never saw the chain above.
 #
 # `ExtraAdder` is the reason this list exists separately. Django attaches the
 # status code of every 4xx and 5xx through `extra=`, and without it not one
-# record in the system carries one. It is given an allowlist because
-# `log_response` also puts the `HttpRequest` in there, and a request object is
-# not a log field: it is large, it is not serialisable, and it holds exactly
-# the personal data the epic's redaction issue exists to keep out.
+# record in the system carries one. It is given `redaction`'s own lists rather
+# than a second one of its own: `log_response` also puts the `HttpRequest` in
+# there -- large, unserialisable, and holding the personal data this whole
+# arrangement exists to keep out -- and two allowlists for one question is two
+# things to keep in step. This one is the cheap early stop, `redact_record` at
+# the end of the chain is the one that decides, and they cannot disagree.
 #
 # `StackInfoRenderer` is deliberately absent: `ProcessorFormatter` has already
 # formatted `record.stack_info`, and running it again re-captures the stack
 # from inside the logging machinery, so the frames a reader wants arrive under
 # seven frames of `logging/__init__.py`.
 FROM_LIBRARIES: list[Any] = [
-    structlog.stdlib.ExtraAdder(
-        allow={"status_code", "duration", "params", "sql", "alias", "suppressed", "suppressed_since"}
-    ),
+    structlog.stdlib.ExtraAdder(allow=redaction.ALLOWED_LOG_KEYS | redaction.PERSONAL_LOG_KEYS),
     *SHARED,
 ]
 
@@ -290,13 +294,26 @@ def logging_config(
     }
 
 
-def configure(drawn_as: str, forced_layout: str = "", colour: bool = False, context: bool = False) -> str:
+def configure(
+    drawn_as: str,
+    forced_layout: str = "",
+    colour: bool = False,
+    context: bool = False,
+    admitting: bool = False,
+) -> str:
     """Point structlog at the stdlib, and settle how a terminal drawing looks.
 
-    Returns the line the process should print about its layout, or an empty
-    string when there is nothing to announce -- a JSON stream has no layout,
-    and neither does the widest one, which drops nothing. Returned rather than
-    printed so that the caller decides where it goes and a test can read it.
+    Returns what the process should print about how it is behaving, or an empty
+    string when there is nothing to announce. Two things can be worth saying: a
+    layout that drops columns -- a JSON stream has none, and neither does the
+    widest, which drops nothing -- and that telemetry is being allowed to carry
+    personal data. Returned rather than printed so that the caller decides
+    where it goes and a test can read it.
+
+    The second is announced in EVERY drawing, unlike the first. A layout is a
+    property of somebody's terminal; recording personal data is a property of
+    what this process is about to write down about people, and a deployment
+    emitting JSON is exactly where it must not go unsaid.
     """
     global _layout, _colour, _context
 
@@ -319,7 +336,13 @@ def configure(drawn_as: str, forced_layout: str = "", colour: bool = False, cont
     layout = console.choose(width, forced_layout)
     _layout, _colour, _context = layout, colour, context
 
-    return "" if drawn_as != "console" else console.announcement(layout, width, forced_layout)
+    # The processor at the end of the chain takes no configuration of its own,
+    # so what this process decided is put where it can read it.
+    redaction.settle(admitting)
+
+    said = [] if drawn_as != "console" else [console.announcement(layout, width, forced_layout)]
+    said.append(redaction.announcement(admitting))
+    return "\n".join(line for line in said if line)
 
 
 def from_environment(environment: dict[str, str] | None = None) -> tuple[dict[str, Any], str]:
@@ -340,6 +363,7 @@ def from_environment(environment: dict[str, str] | None = None) -> tuple[dict[st
         setting("DJANGO_LOG_LAYOUT", environment),
         colour=console.in_colour(sys.stdout),
         context=console.log_context(setting("DJANGO_LOG_CONTEXT", environment)),
+        admitting=redaction.recording(environment),
     )
     config = logging_config(
         log_level(setting("DJANGO_LOG_LEVEL", environment)),

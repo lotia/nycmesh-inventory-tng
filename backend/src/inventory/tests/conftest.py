@@ -6,7 +6,7 @@ rather than about test data.
 """
 
 import time
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -17,11 +17,13 @@ from allauth.account.authentication import AUTHENTICATION_METHODS_SESSION_KEY
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.db import connection
 from django.test import Client
 from pytest_django.fixtures import Settings
 
 from inventory.models import Category, Item, Location, Volunteer
 from inventory.tests.helpers import sign_in_locally
+from inventory_tng import redaction, telemetry
 
 # The one this suite signs in with. Not a secret and never one: the account is
 # made and destroyed inside a test database.
@@ -30,6 +32,37 @@ ADMINISTRATOR_PASSWORD = "not-a-real-password"
 # The generated schema, committed so it can be read without running anything.
 # See DEVELOPERS.md#the-api-schema.
 SCHEMA_PATH = Path(settings.BASE_DIR).parent / "openapi.yaml"
+
+# Where the fixtures below pretend a collector is. Nothing listens on it: the
+# exporters are substituted, and the address exists so that `start` sees an
+# endpoint configured and does its real work.
+COLLECTOR = "http://localhost:4318"
+
+
+@pytest.fixture(autouse=True)
+def _unstarted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`start` remembers what it has done, in module state that outlives a test.
+
+    Autouse across the whole suite rather than in the two modules that start an
+    SDK: what it guards against is a test finding the SDK already started by an
+    earlier one, and that is not a property of the module asking.
+    """
+    for flag in ("_started", "_instrumented_django"):
+        monkeypatch.setattr(telemetry, flag, False)
+
+
+@pytest.fixture(autouse=True)
+def _redacting_again_afterwards() -> Iterator[None]:
+    """`redaction.settle` writes a process global, like the console layout.
+
+    Anything that turns personal-data recording on -- a test, or a call to
+    `logs.from_environment` with it set -- leaves it on for every test that
+    runs afterwards, and the suite passes anyway because the assertions that
+    would notice happen to run first. That is an order dependency waiting for
+    somebody to install pytest-randomly.
+    """
+    yield
+    redaction.settle(False)
 
 
 @pytest.fixture(autouse=True)
@@ -153,3 +186,89 @@ def _static_files_are_not_collected(settings: Settings) -> None:
         **settings.STORAGES,
         "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
     }
+
+
+@pytest.fixture
+def substituted(monkeypatch: pytest.MonkeyPatch) -> Any:
+    """`start`'s exporters replaced, and nothing else.
+
+    A real one keeps a thread that outlives the test and retries against a
+    collector that is not there. Everything else -- the provider, the sampler,
+    both instrumentations, the order they run in -- is what a deployment gets,
+    which is the point: a fixture that rebuilt that by hand would keep passing
+    after `start` changed.
+    """
+    from opentelemetry import trace
+    from opentelemetry.metrics import _internal as metrics_internal
+    from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+    exporter = InMemorySpanExporter()
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", COLLECTOR)
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", raising=False)
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", raising=False)
+    monkeypatch.delenv("OTEL_SDK_DISABLED", raising=False)
+    monkeypatch.setattr(
+        "opentelemetry.exporter.otlp.proto.http.trace_exporter.OTLPSpanExporter", lambda **kwargs: exporter
+    )
+    monkeypatch.setattr(
+        "opentelemetry.exporter.otlp.proto.http.metric_exporter.OTLPMetricExporter", lambda **kwargs: None
+    )
+    monkeypatch.setattr("opentelemetry.sdk.trace.export.BatchSpanProcessor", SimpleSpanProcessor)
+    monkeypatch.setattr(
+        "opentelemetry.sdk.metrics.export.PeriodicExportingMetricReader", lambda *a, **k: InMemoryMetricReader()
+    )
+    # `get_tracer_provider` hands back the proxy WITHOUT assigning it, so
+    # putting its return value back afterwards installs a provider that
+    # delegates to itself and every later `get_tracer` raises RecursionError.
+    # The globals are read and written directly for that reason.
+    monkeypatch.setattr(trace, "_TRACER_PROVIDER", None)
+    monkeypatch.setattr(trace, "_TRACER_PROVIDER_SET_ONCE", trace.Once())
+    monkeypatch.setattr(metrics_internal, "_METER_PROVIDER", None)
+    monkeypatch.setattr(metrics_internal, "_METER_PROVIDER_SET_ONCE", trace.Once())
+    return exporter
+
+
+def started(monkeypatch: pytest.MonkeyPatch, substituted: Any) -> Iterator[Any]:
+    """The real `start`, exporting into memory.
+
+    Uninstrumenting afterwards is not optional: both instrumentations are
+    global and would follow this test into the next one. Written once and
+    delegated to by the two fixtures below, because that teardown is exactly
+    the half nobody wants two copies of.
+    """
+    from opentelemetry.instrumentation.django import DjangoInstrumentor
+    from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
+
+    monkeypatch.setenv("OTEL_TRACES_SAMPLER_ARG", "1.0")
+    assert telemetry.start() is True
+
+    # The driver is patched at `connect`, and Django holds a connection open
+    # from the previous test, so the next query has to open an instrumented
+    # one. In a worker that is simply the order things happen in.
+    connection.close()
+    try:
+        yield substituted
+    finally:
+        PsycopgInstrumentor().uninstrument()
+        DjangoInstrumentor().uninstrument()
+        connection.close()
+
+
+@pytest.fixture
+def recorded(substituted: Any, monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
+    """An SDK exporting into memory, redacting as a deployment would."""
+    yield from started(monkeypatch, substituted)
+
+
+@pytest.fixture
+def recorded_openly(monkeypatch: pytest.MonkeyPatch, substituted: Any) -> Iterator[Any]:
+    """The same, with `TELEMETRY_PERSONAL_DATA=recorded`.
+
+    Its own fixture rather than a parameter, because the toggle is read while
+    `start` runs and a test that set it afterwards would be asserting against
+    an SDK built before it.
+    """
+    monkeypatch.setenv("TELEMETRY_PERSONAL_DATA", "recorded")
+    yield from started(monkeypatch, substituted)

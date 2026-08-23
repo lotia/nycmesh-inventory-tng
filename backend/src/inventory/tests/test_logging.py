@@ -236,7 +236,7 @@ def test_a_json_line_parses_and_carries_the_whole_contract() -> None:
     assert record["event"] == "an append was refused"
     assert record["level"] == "warning"
     assert record["logger"] == "inventory.ledger"
-    assert record["reason"] == "closed", "a key the caller supplied survives to the collector"
+    assert record["reason"] == "closed", "a key the caller supplied, and this application declared, survives"
     assert record["trace_id"] == ""
     assert record["span_id"] == ""
     assert record["timestamp"].startswith("20")

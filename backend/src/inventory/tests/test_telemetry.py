@@ -15,18 +15,9 @@ from typing import Any
 
 import pytest
 from django.conf import settings
-from django.db import connection
 
+from inventory.tests.conftest import COLLECTOR
 from inventory_tng import telemetry
-
-COLLECTOR = "http://localhost:4318"
-
-
-@pytest.fixture(autouse=True)
-def _unstarted(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`start` remembers what it has done, in module state that outlives a test."""
-    for flag in ("_started", "_instrumented_django"):
-        monkeypatch.setattr(telemetry, flag, False)
 
 
 def test_no_endpoint_means_no_sdk() -> None:
@@ -288,73 +279,6 @@ def test_nothing_in_env_sample_defeats_the_compose_defaults() -> None:
 # --------------------------------------------------------------------------
 
 
-@pytest.fixture
-def substituted(monkeypatch: pytest.MonkeyPatch) -> Any:
-    """`start`'s exporters replaced, and nothing else.
-
-    A real one keeps a thread that outlives the test and retries against a
-    collector that is not there. Everything else -- the provider, the sampler,
-    both instrumentations, the order they run in -- is what a deployment gets,
-    which is the point: a fixture that rebuilt that by hand would keep passing
-    after `start` changed.
-    """
-    from opentelemetry import trace
-    from opentelemetry.metrics import _internal as metrics_internal
-    from opentelemetry.sdk.metrics.export import InMemoryMetricReader
-    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-
-    exporter = InMemorySpanExporter()
-    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", COLLECTOR)
-    monkeypatch.delenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", raising=False)
-    monkeypatch.delenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", raising=False)
-    monkeypatch.delenv("OTEL_SDK_DISABLED", raising=False)
-    monkeypatch.setattr(
-        "opentelemetry.exporter.otlp.proto.http.trace_exporter.OTLPSpanExporter", lambda **kwargs: exporter
-    )
-    monkeypatch.setattr(
-        "opentelemetry.exporter.otlp.proto.http.metric_exporter.OTLPMetricExporter", lambda **kwargs: None
-    )
-    monkeypatch.setattr("opentelemetry.sdk.trace.export.BatchSpanProcessor", SimpleSpanProcessor)
-    monkeypatch.setattr(
-        "opentelemetry.sdk.metrics.export.PeriodicExportingMetricReader", lambda *a, **k: InMemoryMetricReader()
-    )
-    # `get_tracer_provider` hands back the proxy WITHOUT assigning it, so
-    # putting its return value back afterwards installs a provider that
-    # delegates to itself and every later `get_tracer` raises RecursionError.
-    # The globals are read and written directly for that reason.
-    monkeypatch.setattr(trace, "_TRACER_PROVIDER", None)
-    monkeypatch.setattr(trace, "_TRACER_PROVIDER_SET_ONCE", trace.Once())
-    monkeypatch.setattr(metrics_internal, "_METER_PROVIDER", None)
-    monkeypatch.setattr(metrics_internal, "_METER_PROVIDER_SET_ONCE", trace.Once())
-    return exporter
-
-
-@pytest.fixture
-def recorded(substituted: Any, monkeypatch: pytest.MonkeyPatch) -> Any:
-    """The real `start`, exporting into memory.
-
-    Uninstrumenting afterwards is not optional: both instrumentations are
-    global and would follow this test into the next one.
-    """
-    from opentelemetry.instrumentation.django import DjangoInstrumentor
-    from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
-
-    monkeypatch.setenv("OTEL_TRACES_SAMPLER_ARG", "1.0")
-    assert telemetry.start() is True
-
-    # The driver is patched at `connect`, and Django holds a connection open
-    # from the previous test, so the next query has to open an instrumented
-    # one. In a worker that is simply the order things happen in.
-    connection.close()
-    try:
-        yield substituted
-    finally:
-        PsycopgInstrumentor().uninstrument()
-        DjangoInstrumentor().uninstrument()
-        connection.close()
-
-
 def test_a_request_produces_a_server_span_named_for_its_route(recorded: Any, db: Any, client: Any) -> None:
     """Named for the route rather than the concrete path, which is what makes
     a hundred item lookups one line on a dashboard instead of a hundred.
@@ -416,26 +340,6 @@ def test_a_log_record_carries_the_trace_it_was_written_inside(recorded: Any, db:
     assert len(record["trace_id"]) == 32
     assert len(record["span_id"]) == 16
     assert int(record["trace_id"], 16) != 0
-
-
-def test_a_span_still_carries_the_client_address_until_the_redaction_lands(recorded: Any, db: Any, client: Any) -> None:
-    """Recorded deliberately, so that it is a fact rather than a surprise.
-
-    Django's instrumentation puts the caller's address on every server span,
-    and an IP address is personal data -- point 12 of the epic, and the whole
-    subject of inventory-tng-nb8.5, which strips every attribute that is not
-    on an allowlist. That is the next issue, not this one.
-
-    Nothing leaves the process in the meantime: no endpoint is configured by
-    default, in the code, in compose or in the chart, so the SDK does not
-    start at all. This test fails the day nb8.5 lands, which is the point --
-    it is the reminder to delete it.
-    """
-    client.get("/api/healthz")
-
-    server = next(span for span in recorded.get_finished_spans() if span.kind.name == "SERVER")
-
-    assert "net.peer.ip" in server.attributes
 
 
 def test_starting_wires_the_provider_the_sampler_and_both_instrumentations(

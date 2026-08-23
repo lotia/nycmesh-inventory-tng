@@ -5,6 +5,10 @@ collected from there, for the reasons decision 0021 gives; this is the half
 that has no equivalent of "the runtime already collects your output" and so
 has to export.
 
+NOTHING REACHES AN EXPORTER UNREDACTED. A span is stripped to an allowlist by
+a processor registered before the exporting one, and a metric by a `View` over
+every instrument. `redaction` holds both lists, and the argument for them.
+
 NO ENDPOINT MEANS NO SDK. `OTEL_EXPORTER_OTLP_ENDPOINT` unset is the ordinary
 state of a checkout with nothing to send to, and it must cost nothing at all --
 not a background thread, not a sampler, not an instrumented cursor. So the
@@ -32,6 +36,7 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from inventory_tng import redaction
 from inventory_tng.options import missing
 
 # What a deployment that says nothing gets. Low on purpose: an unconfigured
@@ -122,6 +127,7 @@ class Configuration:
     disabled: bool
     sampler: str
     ratio: float
+    personal_data: bool
 
     @property
     def wanted(self) -> bool:
@@ -143,6 +149,7 @@ def configuration() -> Configuration:
         disabled=disabled(),
         sampler=sampler_name(),
         ratio=sampling_ratio(),
+        personal_data=redaction.recording(),
     )
 
 
@@ -233,7 +240,10 @@ def start(django: bool = True) -> bool:
     if not _started:
         from opentelemetry.sdk.resources import Resource
 
-        resource = Resource.create()
+        # The marker on the resource as well as on every span, because a metric
+        # cannot carry one: `redaction.views` says why adding an attribute to
+        # every series is the wrong place for a constant.
+        resource = Resource.create({redaction.MARKER: True} if wanted.personal_data else None)
 
         if wanted.traces:
             from opentelemetry import trace
@@ -242,6 +252,9 @@ def start(django: bool = True) -> bool:
             from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
             provider = TracerProvider(resource=resource, sampler=sampler(wanted.sampler, wanted.ratio))
+            # First, so that a span has been stripped by the time the exporting
+            # processor is handed it. Nothing reaches an exporter unredacted.
+            provider.add_span_processor(redaction.processor(wanted.personal_data))
             provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=wanted.traces)))
             trace.set_tracer_provider(provider)
 
@@ -252,7 +265,13 @@ def start(django: bool = True) -> bool:
             from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 
             reader = PeriodicExportingMetricReader(OTLPMetricExporter(endpoint=wanted.metrics))
-            set_meter_provider(MeterProvider(resource=resource, metric_readers=[reader]))
+            set_meter_provider(
+                MeterProvider(
+                    resource=resource,
+                    metric_readers=[reader],
+                    views=redaction.views(wanted.personal_data),
+                )
+            )
 
         # The driver is patched at `connect`, so this has to happen before
         # anything opens a connection -- which, after a fork, it has not. What

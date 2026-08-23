@@ -450,6 +450,10 @@ setting rather than from the logger's level, so no level at all makes its SQL
 logger speak with `DEBUG` off. Nothing tells you that at the time, which is why
 it is here.
 
+Those statements arrive with their parameters already interpolated, so they are
+one of the few things a local log holds that a collector's never does —
+[observability.md](docs/observability.md#what-telemetry-may-carry) is why.
+
 Both halves are comma-separated `logger=LEVEL` pairs laid over `DJANGO_LOG_LEVEL`.
 A level Python does not know stops the process rather than becoming `INFO`
 quietly — which is the general rule here, and the reason you will never be
@@ -947,6 +951,7 @@ Where each topic lives:
 | Architecture and technology choices | [docs/architecture.md](docs/architecture.md) |
 | Inventory data model | [docs/data-model.md](docs/data-model.md) |
 | Deployment | [docs/deployment.md](docs/deployment.md) |
+| What telemetry may carry, and the toggle that widens it | [docs/observability.md](docs/observability.md) |
 | Why a decision was made | [docs/decisions/](docs/decisions/) |
 | The investigation behind a decision | [docs/briefs/](docs/briefs/) |
 | Rules for AI coding agents | [AGENTS.md](AGENTS.md) |
