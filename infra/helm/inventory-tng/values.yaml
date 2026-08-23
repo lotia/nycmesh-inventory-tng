@@ -42,6 +42,10 @@ django:
   # json, so that whatever collects this cluster's container output can parse
   # it. The console drawing is for a terminal; see docs/deployment.md.
   logFormat: "json"
+  # How much a refused request may write. The ingress is internet-facing and
+  # that path takes no credential, so this is what stops a host scanner filling
+  # a node's disk. See docs/deployment.md.
+  securityLogRate: "10/min"
   # Where traces and metrics are sent, over OTLP. Empty means the SDK is not
   # started at all, which is the right default: a collector is cluster
   # infrastructure this chart does not render. See docs/deployment.md.
