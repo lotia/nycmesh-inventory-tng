@@ -661,6 +661,11 @@ server span per request named for its route rather than its path, the database
 queries beneath it as child spans, HTTP duration and count by route and status,
 and database client duration.
 
+**Where to send it is a decision this chart does not make**, and
+[observability.md](observability.md#choosing-a-destination) is where the options
+are weighed — including what it costs to run one on a cluster you host
+yourself, which is a live possibility here.
+
 **What it does not receive is decided by an allowlist**, and that is where to
 look before pointing this at anything: the caller's address, the concrete URL
 and the user agent are dropped before an exporter sees them, and one setting
@@ -669,18 +674,10 @@ re-admits them for as long as somebody needs to look.
 carry, what it may not, and what turning that setting on obliges of wherever
 the telemetry lands.
 
-**Sampling** is `OTEL_TRACES_SAMPLER_ARG`, a fraction between 0 and 1. The
-code's own default is a conservative `0.1`, so a release that configures nothing
-cannot flood a collector somebody else sized; `django.tracesSamplerArg` in the
-chart sets `1.0`, which is what this traffic volume actually wants. Lower it to
-sample a subset — `0.05` keeps one trace in twenty. A request that arrives
-already marked as sampled is put through the same rate, not recorded outright:
-`TraceIdRatioBased` decides from the trace id, so two ends running the same rate
-reach the same answer about the same trace and it stays in one piece — without
-either end trusting the other. A caller therefore cannot raise the rate, which
-matters because the sampled bit is one header on an unauthenticated request.
-`OTEL_TRACES_SAMPLER` accepts `parentbased_traceidratio`, `always_off` and
-`always_on`; `OTEL_SDK_DISABLED=true` turns the whole thing off.
+**How much is recorded** is `OTEL_TRACES_SAMPLER` and `OTEL_TRACES_SAMPLER_ARG`,
+and `OTEL_SDK_DISABLED=true` turns the whole thing off during an incident.
+[observability.md](observability.md#how-much-is-recorded) is what the values
+mean, what this chart ships, and how to sample a subset instead.
 
 **It starts in the worker**, from gunicorn's `post_fork` hook and from the WSGI
 module. The reason usually given for that — an exporter's thread not surviving

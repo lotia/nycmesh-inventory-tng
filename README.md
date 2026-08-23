@@ -54,6 +54,7 @@ Each topic is documented in exactly one place. Start with whichever fits you:
 | Contribute as a volunteer | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Understand how it is put together | [docs/architecture.md](docs/architecture.md) |
 | Deploy it | [docs/deployment.md](docs/deployment.md) |
+| See what it is doing, and decide where that goes | [docs/observability.md](docs/observability.md) |
 | Know why something was built this way | [docs/decisions/](docs/decisions/) |
 | Work on this with an AI coding agent | [AGENTS.md](AGENTS.md) |
 

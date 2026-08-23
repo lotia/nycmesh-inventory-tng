@@ -959,7 +959,7 @@ Where each topic lives:
 | Architecture and technology choices | [docs/architecture.md](docs/architecture.md) |
 | Inventory data model | [docs/data-model.md](docs/data-model.md) |
 | Deployment | [docs/deployment.md](docs/deployment.md) |
-| What telemetry may carry, and the toggle that widens it | [docs/observability.md](docs/observability.md) |
+| Telemetry: where it can be sent, and what it may carry | [docs/observability.md](docs/observability.md) |
 | Why a decision was made | [docs/decisions/](docs/decisions/) |
 | The investigation behind a decision | [docs/briefs/](docs/briefs/) |
 | Rules for AI coding agents | [AGENTS.md](AGENTS.md) |
