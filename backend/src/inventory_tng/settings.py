@@ -13,6 +13,7 @@ from typing import Any
 
 from corsheaders.defaults import default_headers
 
+from inventory_tng import debugging, refusals
 from inventory_tng.environment import Env
 from inventory_tng.hosts import allowed_hosts
 from inventory_tng.logs import from_environment
@@ -31,6 +32,10 @@ env = Env(
     APPEND_BURST_RATE=(str, "20/min"),
     APPEND_SUSTAINED_RATE=(str, "300/hour"),
     NUM_PROXIES=(int, 2),
+    # What a signed debug-tracing token is worth. `inventory_tng.debugging`
+    # holds both numbers and the argument for each.
+    DEBUG_TRACE_LIFETIME_SECONDS=(int, debugging.DEFAULT_LIFETIME_SECONDS),
+    DEBUG_TRACE_RATE=(str, debugging.DEFAULT_RATE),
     LABEL_BASE_URL=(str, "https://inventory.nycmesh.net"),
 )
 
@@ -72,10 +77,17 @@ ALLOWED_HOSTS: list[str] = allowed_hosts(env("DJANGO_ALLOWED_HOSTS"), env("DJANG
 # there is nothing a reader would be surprised by.
 LOGGING, _announcement = from_environment()
 
+DEBUG_TRACE_LIFETIME_SECONDS = env("DEBUG_TRACE_LIFETIME_SECONDS")
+DEBUG_TRACE_RATE = env("DEBUG_TRACE_RATE")
+
 # Read here rather than where the values are used, so that a malformed one
 # stops the process now instead of on the release that turns telemetry on.
-# `validate` says why a Django system check would not do.
+# `validate` says why a Django system check would not do. The rate is read the
+# same way and for the same reason: a typo in it would otherwise be found by
+# the first volunteer to present a token, which is the worst moment there is.
 validate()
+refusals.rate(DEBUG_TRACE_RATE, "DEBUG_TRACE_RATE")
+debugging.lifetime(DEBUG_TRACE_LIFETIME_SECONDS)
 if _announcement:
     print(_announcement, file=sys.stderr)
 
@@ -502,7 +514,12 @@ CORS_ALLOWED_ORIGINS: list[str] = env("CORS_ALLOWED_ORIGINS")
 # cross-origin request carrying one is refused at the preflight -- not stripped,
 # cancelled -- and a trace that starts in the browser cannot reach Django at
 # all. The dev server on one port and Django on another are exactly that pair.
-CORS_ALLOW_HEADERS = (*default_headers, "traceparent", "tracestate")
+#
+# The third is `inventory_tng.debugging`'s, and it is here for the same reason
+# and was missed for the same one: the header a volunteer's browser carries to
+# have their request recorded is a header the preflight has to name, or the
+# only way to present a token is by hand with curl.
+CORS_ALLOW_HEADERS = (*default_headers, "traceparent", "tracestate", debugging.HEADER.lower())
 
 # Behind an ingress or proxy that terminates TLS.
 USE_X_FORWARDED_HOST = True

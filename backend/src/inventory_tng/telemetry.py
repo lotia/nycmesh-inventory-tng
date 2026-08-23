@@ -181,19 +181,62 @@ def sampler(name: str, ratio: float) -> Any:
 
     A LOCAL parent is followed, because a span inside a request this server
     has already decided to record belongs to that recording.
+
+    WHAT CAN ASK FOR MORE is a signed, expiring token, checked before Django
+    sees the request. `inventory_tng.debugging` is what it is and why it is not
+    the sampled bit; here it means one wrapper on top of whichever sampler the
+    configuration chose, so a request that proved itself is recorded whole and
+    every other request is sampled exactly as it was.
+
+    EXCEPT `always_off`, which is not wrapped. It is documented as the switch
+    an operator reaches for when telemetry itself is the problem, and a switch
+    that leaves every outstanding token still recording is not off. There is no
+    corresponding case for the ratio: `0.0` is a rate, not a refusal, and a
+    deployment that wanted none of it says `always_off` or
+    `OTEL_SDK_DISABLED`. A token beats a ratio and does not beat an operator.
     """
-    from opentelemetry.sdk.trace.sampling import ALWAYS_OFF, ALWAYS_ON, ParentBased, TraceIdRatioBased
+    from opentelemetry.sdk.trace.sampling import (
+        ALWAYS_OFF,
+        ALWAYS_ON,
+        ParentBased,
+        Sampler,
+        SamplingResult,
+        TraceIdRatioBased,
+    )
+
+    from inventory_tng.debugging import debugging
 
     if name == "always_off":
         return ALWAYS_OFF
     if name == "always_on":
-        return ALWAYS_ON
-    ratio_sampler = TraceIdRatioBased(ratio)
-    return ParentBased(
-        root=ratio_sampler,
-        remote_parent_sampled=ratio_sampler,
-        remote_parent_not_sampled=ALWAYS_OFF,
-    )
+        chosen: Any = ALWAYS_ON
+    else:
+        ratio_sampler = TraceIdRatioBased(ratio)
+        chosen = ParentBased(
+            root=ratio_sampler,
+            remote_parent_sampled=ratio_sampler,
+            remote_parent_not_sampled=ALWAYS_OFF,
+        )
+
+    class Debuggable(Sampler):
+        """`chosen`, unless this request proved it may be recorded in full.
+
+        `chosen` is kept as an attribute rather than closed over silently: it
+        is what the configuration asked for, and a test asserting that a caller
+        cannot raise the rate has to be able to see it.
+        """
+
+        def __init__(self, wrapping: Any) -> None:
+            self.chosen = wrapping
+
+        def should_sample(self, parent_context: Any = None, *arguments: Any, **named: Any) -> SamplingResult:
+            asked = ALWAYS_ON if debugging() else self.chosen
+            return asked.should_sample(parent_context, *arguments, **named)
+
+        def get_description(self) -> str:
+            return f"Debuggable({self.chosen.get_description()})"
+
+    return Debuggable(chosen)
 
 
 def instrument_django() -> bool:

@@ -8,6 +8,7 @@ import os
 import django
 from django.core.wsgi import get_wsgi_application
 
+from inventory_tng.debugging import guarded
 from inventory_tng.telemetry import start
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "inventory_tng.settings")
@@ -24,4 +25,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "inventory_tng.settings")
 django.setup(set_prefix=False)
 start()
 
-application = get_wsgi_application()
+# Outside Django rather than inside it: whether this request may be
+# recorded in full has to be settled before the instrumentation's own
+# middleware creates and samples the span. `inventory_tng.debugging`.
+application = guarded(get_wsgi_application())

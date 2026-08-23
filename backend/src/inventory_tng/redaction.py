@@ -92,6 +92,10 @@ ALLOWED_ATTRIBUTES = frozenset(
         "db.operation.name",
         "db.statement",
         "db.query.text",
+        # What this application measures about itself. `outcome` is one of a
+        # handful of words chosen in the code -- `inventory_tng.debugging` has
+        # the ones it uses -- and never anything a caller supplied.
+        "outcome",
     }
 )
 

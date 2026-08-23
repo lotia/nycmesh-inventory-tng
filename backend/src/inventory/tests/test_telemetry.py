@@ -142,7 +142,9 @@ def test_a_caller_cannot_raise_the_rate_this_backend_records_at() -> None:
     """
     from opentelemetry.sdk.trace.sampling import ALWAYS_OFF, ParentBased, TraceIdRatioBased
 
-    built = telemetry.sampler("parentbased_traceidratio", 0.25)
+    # Through the wrapper that honours a signed debug token, which sits on top
+    # of whichever sampler the configuration chose -- inventory_tng.debugging.
+    built = telemetry.sampler("parentbased_traceidratio", 0.25).chosen
 
     assert isinstance(built, ParentBased)
     assert isinstance(built._root, TraceIdRatioBased)
@@ -177,11 +179,19 @@ def test_and_the_refusal_is_measured_rather_than_asserted() -> None:
     assert recorded < 50, f"{recorded} of 1000 caller-marked requests recorded at a rate of 0.001"
 
 
-@pytest.mark.parametrize("name", ["always_off", "always_on"])
-def test_the_other_two_sampler_names_are_what_they_say(name: str) -> None:
-    from opentelemetry.sdk.trace.sampling import ALWAYS_OFF, ALWAYS_ON
+def test_always_on_is_what_it_says() -> None:
+    from opentelemetry.sdk.trace.sampling import ALWAYS_ON
 
-    assert telemetry.sampler(name, 0.5) is (ALWAYS_OFF if name == "always_off" else ALWAYS_ON)
+    assert telemetry.sampler("always_on", 0.5).chosen is ALWAYS_ON
+
+
+def test_and_always_off_is_off_even_to_a_signed_token() -> None:
+    """The one sampler the debug wrapper does not sit on top of, and
+    `telemetry.sampler` is where that exception is argued.
+    """
+    from opentelemetry.sdk.trace.sampling import ALWAYS_OFF
+
+    assert telemetry.sampler("always_off", 0.5) is ALWAYS_OFF
 
 
 def test_the_sdk_is_started_from_the_worker_and_not_the_master() -> None:

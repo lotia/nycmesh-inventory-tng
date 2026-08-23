@@ -8,6 +8,7 @@ import os
 import django
 from django.core.asgi import get_asgi_application
 
+from inventory_tng.debugging import guarded_asgi
 from inventory_tng.telemetry import start
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "inventory_tng.settings")
@@ -20,4 +21,5 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "inventory_tng.settings")
 django.setup(set_prefix=False)
 start()
 
-application = get_asgi_application()
+# Wrapped for the reason `wsgi.py` gives, in the shape ASGI wants.
+application = guarded_asgi(get_asgi_application())
