@@ -34,6 +34,8 @@ frontend:
 
 django:
   debug: false
+  # How much the backend says, on standard output. See docs/deployment.md.
+  logLevel: "INFO"
   # Every hostname a browser may use, comma-separated. Two things depend on
   # it beyond Django itself: a release whose ingress.host none of these
   # covers is refused at render time, and the pod adds its own address to

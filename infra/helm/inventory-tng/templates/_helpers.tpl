@@ -88,6 +88,8 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
   valueFrom:
     fieldRef:
       fieldPath: status.podIP
+- name: DJANGO_LOG_LEVEL
+  value: {{ .Values.django.logLevel | quote }}
 - name: CORS_ALLOWED_ORIGINS
   value: {{ .Values.django.corsAllowedOrigins | quote }}
 - name: NUM_PROXIES

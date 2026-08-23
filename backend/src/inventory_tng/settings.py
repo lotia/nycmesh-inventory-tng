@@ -13,6 +13,7 @@ from typing import Any
 import environ
 
 from inventory_tng.hosts import allowed_hosts
+from inventory_tng.logs import log_level, logging_config
 
 # BASE_DIR is backend/src/ -- the directory holding manage.py.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,6 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DJANGO_DEBUG=(bool, False),
     DJANGO_ALLOWED_HOSTS=(list, []),
+    DJANGO_LOG_LEVEL=(str, "INFO"),
     DJANGO_EXTRA_ALLOWED_HOSTS=(list, []),
     CORS_ALLOWED_ORIGINS=(list, []),
     # Defaults are the ones a volunteer night needs; .env.sample says why.
@@ -51,6 +53,12 @@ DEBUG = env("DJANGO_DEBUG")
 # through that one function, here and in inventory/tests/test_chart.py, so
 # there is never a second answer.
 ALLOWED_HOSTS: list[str] = allowed_hosts(env("DJANGO_ALLOWED_HOSTS"), env("DJANGO_EXTRA_ALLOWED_HOSTS"))
+
+# Everything the process has to say, on standard output, in every environment.
+# What the arrangement is and why it does not vary with DEBUG is on
+# `logging_config`; where a deployment reads the result is
+# docs/deployment.md#reading-the-logs.
+LOGGING: dict[str, Any] = logging_config(log_level(env("DJANGO_LOG_LEVEL")))
 
 INSTALLED_APPS = [
     "django.contrib.admin",
