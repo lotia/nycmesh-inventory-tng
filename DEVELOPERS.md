@@ -135,7 +135,7 @@ automatically on start.
 Two more worth knowing once it is up:
 
 ```bash
-docker compose logs -f backend                                 # tail logs
+docker compose logs -f backend | scripts/pretty-logs           # tail logs
 docker compose down -v                                         # stop, wipe database
 ```
 
@@ -395,6 +395,107 @@ Notable rules that are deliberate rather than default: Python targets a
 120-character line and enables the bugbear, pyupgrade, and Django rule sets;
 TypeScript forbids `any` and non-null assertions, so a type error has to be
 solved rather than silenced.
+
+---
+
+## Reading the logs while you work
+
+The backend writes one kind of record and draws it two ways: in columns for a
+person, or as JSON for something that parses. Same fields, same names, same
+values — only the drawing differs, which is what makes debugging against your
+own terminal worth anything. [Decision 0021](docs/decisions/0021-telemetry-over-otlp.md)
+is why it is arranged that way; this is how to use it.
+
+### Running natively
+
+Nothing to do. `runserver` draws columns, because a checkout has no collector
+and you are the only reader:
+
+```bash
+cd backend && uv run python src/manage.py runserver
+```
+
+### Running under compose
+
+That stack writes JSON, deliberately — it is meant to look like a deployment
+rather than like a friendlier version of one. Pipe it through the reader:
+
+```bash
+docker compose logs -f backend | scripts/pretty-logs
+```
+
+Any JSON stream works, from anywhere, including one saved to a file weeks ago.
+The reader is the same code that would have drawn the columns in the first
+place, so nothing is approximated.
+
+It is the one thing here that needs `uv` even if you are running everything in
+Docker — it is a Python program in this repository, not something in the image.
+[Prerequisites](#prerequisites) installs it.
+
+### Turning one subsystem up
+
+Setting everything to `DEBUG` is almost never what you want: Django logs every
+SQL statement at that level, so the line you were reading becomes one in a
+thousand. Name the logger instead.
+
+```bash
+# every query the importer makes, and nothing else raised
+DJANGO_LOG_LEVELS=inventory.sheet=DEBUG,django.db.backends=DEBUG \
+  uv run python src/manage.py runserver
+```
+
+The SQL half of that only works with `DJANGO_DEBUG` on, which is the case here
+and never in a deployment: Django decides whether to record a query from that
+setting rather than from the logger's level, so no level at all makes its SQL
+logger speak with `DEBUG` off. Nothing tells you that at the time, which is why
+it is here.
+
+Both halves are comma-separated `logger=LEVEL` pairs laid over `DJANGO_LOG_LEVEL`.
+A level Python does not know stops the process rather than becoming `INFO`
+quietly — which is the general rule here, and the reason you will never be
+looking at output you did not ask for.
+
+Every function a request called is a level below this, and is not built yet:
+`inventory-tng-nb8.3`.
+
+### Which columns you get
+
+Measured from your terminal once, at startup, and said out loud whenever the
+answer costs you something — one line naming what it found, what it chose and
+what that choice leaves out. `full` drops nothing, so it says nothing; a JSON
+stream has no layout, so it says nothing either. Anything else announces
+itself, and you should never be comparing consoles with somebody else and
+wondering.
+
+| Layout | Needs | Timestamp | Logger | Drops |
+| --- | --- | --- | --- | --- |
+| `full` | 140 columns | `2026-08-23T14:32:07.412-04:00` | 34 columns, `inventory.sheet.batches` | nothing |
+| `compact` | 100 columns | `14:32:07.412` | 12 columns, `batches` | the date, the offset, the module path |
+| `minimal` | anything less | `14:32:07.412` | — | the above, and the logger column |
+
+A logger name longer than its column is cut from the *left*, so `…batches` — the
+tail is the half worth keeping. 34 columns fits every logger this project and
+Django actually use, including `django.security.DisallowedHost`.
+
+`DJANGO_LOG_LAYOUT=full` overrules the measurement, in either direction: it is
+how to keep the whole timestamp on a narrow window, and how to buy back the
+seventeen columns it costs on a wide one. It works on the reader too, which is
+the useful case — the process piping into it had no terminal to measure.
+
+A key bound for the life of a request, rather than passed on one call, is on
+every line — so the columns leave it out and `DJANGO_LOG_CONTEXT=shown` puts it
+back, which is what you want when following one request rather than reading a
+sequence of them. Only what the writer *inherited* is hidden: a key you passed
+yourself always appears, even one named `status` or `path`. Nothing binds any
+request context yet — that is `inventory-tng-nb8.9` — so today this only hides
+the empty `trace_id` and `span_id` waiting for a tracer.
+
+Colour appears only when the output is a terminal, and never when `NO_COLOR` is
+set, so piping to `grep` or a file gives text you can read.
+
+Every one of these is in [`.env.sample`](.env.sample) with its default. Where a
+*deployment* sends all this instead is
+[docs/deployment.md](docs/deployment.md#reading-the-logs).
 
 ---
 
@@ -783,7 +884,7 @@ leaves only a little room for the genuinely awkward case.
 
 | Excluded | Where | Why |
 | --- | --- | --- |
-| `manage.py`, `wsgi.py`, `asgi.py` | `backend/pyproject.toml` → `[tool.coverage.run] omit` | Entry points run by Django or the server, never by tests |
+| `manage.py`, `wsgi.py`, `asgi.py`, `gunicorn.conf.py` | `backend/pyproject.toml` → `[tool.coverage.run] omit` | Entry points run by Django or the server, never by tests. `gunicorn.conf.py` computes nothing of its own — what it calls is covered |
 | `settings.py` | same | Declarative configuration. Every test imports it, so counting it would inflate the percentage without testing any behaviour |
 | `migrations/` | same | Generated by `makemigrations` |
 | `src/main.tsx` | `frontend/vite.config.ts` → `test.coverage.exclude` | Bootstrap that mounts React onto the DOM; no behaviour of its own |
@@ -838,6 +939,7 @@ Where each topic lives:
 | API schema and how it stays current | [The API schema](#the-api-schema) |
 | Typing requirements | [Typing](#typing) |
 | Testing and coverage requirements | [Testing and coverage](#testing-and-coverage) |
+| Reading logs while developing | [Reading the logs while you work](#reading-the-logs-while-you-work) |
 | What one commit contains, and its message | [Commits](#commits) |
 | How work is reviewed and reaches `main` | [Pull requests](#pull-requests) |
 | How to contribute | [CONTRIBUTING.md](CONTRIBUTING.md) |
