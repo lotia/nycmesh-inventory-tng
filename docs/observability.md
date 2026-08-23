@@ -3,13 +3,105 @@
 What this application records about itself, and what it is not allowed to
 record about the people using it.
 
-Two halves of this are documented where they are used rather than repeated
-here: reading logs while developing is
-[DEVELOPERS.md](../DEVELOPERS.md#reading-the-logs-while-you-work), and reading
-them from a cluster — along with where traces and metrics are sent — is
-[deployment.md](deployment.md#telemetry). Why the arrangement is what it is, in
-every case, is
-[decision 0021](decisions/0021-telemetry-over-otlp.md).
+Reading a log stream in a terminal is documented where it is done rather than
+repeated here — while developing in
+[DEVELOPERS.md](../DEVELOPERS.md#reading-the-logs-while-you-work), and from a
+cluster in [deployment.md](deployment.md#reading-the-logs), which is also where
+a deployment's own settings live. Why the arrangement is what it is, in every
+case, is [decision 0021](decisions/0021-telemetry-over-otlp.md).
+
+## Somewhere to send it, on a laptop
+
+The stack in `compose.yaml` ships a collector, behind a profile so that nobody
+who has not asked for telemetry pays for a second container:
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318 \
+  podman compose --profile telemetry up -d
+```
+
+Grafana is then on <http://localhost:3000>, with no sign-in: it has Tempo,
+Prometheus and Loki behind it, already wired to each other.
+
+**On the command line rather than in `.env`**, and that is worth a sentence.
+`http://collector:4318` is a name on the container network; the settings module
+reads the same `.env` file, so a backend you run natively beside the stack —
+which is the ordinary development arrangement — would take that name, fail to
+resolve it, and retry against nothing. Keep the address where it is only true.
+A native backend wants `http://localhost:4318`.
+
+Logs are the half that needs a second command, and the reason is the whole
+architecture rather than an omission. The backend writes them to standard
+output and nothing else, so getting them into a collector is somebody else's
+job — on a Kubernetes node it is a log agent, and here it is a pipe:
+
+```bash
+OTEL_SERVICE_NAME=inventory-tng-backend \
+OTEL_RESOURCE_ATTRIBUTES=deployment.environment=compose \
+  podman compose logs -f backend | scripts/ship-logs
+```
+
+Those two are the same values `compose.yaml` gives the backend, repeated
+because this end runs on your machine and inherits nothing from the container.
+They are read by OpenTelemetry's own resource detector, so what they mean here
+is exactly what they mean to the SDK exporting the spans.
+They have to match: a collector files logs and spans by their resource, so a
+different service name puts them under two unrelated services, and a missing
+`deployment.environment` makes a dashboard scoped by it drop every log record
+while showing every span.
+
+`scripts/ship-logs` reads that stream and posts it, passing every line onward
+so `| scripts/pretty-logs` can sit after it and draw what a collector received.
+It is a development tool: no retry, no queue on disk, and a collector that is
+down loses whatever was in flight.
+
+### What it proves
+
+Make a request — `curl localhost:8000/api/healthz` — and all three signals are
+there within a few seconds:
+
+| In Grafana | What to look for |
+| --- | --- |
+| **Explore → Tempo**, search | one trace per request, named for its route, with each database query beneath it as its own span |
+| **Explore → Prometheus** | `http_server_duration_milliseconds_count`, by method, status and scheme |
+| **Explore → Loki**, `{service_name="inventory-tng-backend"}` | the records the backend wrote, with `logger` and `severity_text` to filter on |
+
+**One caveat about following a request from its trace into its logs**, because
+it is the thing somebody will try first. A record written *inside* a request
+carries the trace's id and Grafana will jump straight to it. Django's own
+records for a 4xx or a 5xx do not, and cannot: it logs those from
+`BaseHandler.get_response`, after the middleware chain has returned and the
+instrumentation has already ended its span. Neither does an access line, from
+`runserver` or from gunicorn, which is written outside the application
+altogether. So the jump works for records this application writes itself, and
+writing them is `inventory-tng-nb8.9`.
+
+### Why this image
+
+`grafana/otel-lgtm` — Grafana, Tempo, Prometheus, Loki and an OpenTelemetry
+Collector in one container, no configuration to write, OTLP in on 4317 and
+4318. Grafana's own project, and documented by it as being for development,
+demo and testing rather than for production, which is exactly the claim being
+made here.
+
+What it was chosen over, against one container and no configuration to write:
+
+- **SigNoz**, **Uptrace**, **HyperDX** — OpenTelemetry-native and closer to
+  what a production deployment might want, but each is a compose stack of its
+  own: a query service, a UI and a ClickHouse to keep. Three or four containers
+  to bring up a laptop.
+- **OpenObserve** — genuinely one container and lighter than this, and a real
+  candidate. It loses on the criterion that decided it: following one request
+  across its logs, its metrics and its traces is Grafana's oldest trick, and
+  the trace-to-logs link is already configured in this image with nothing to
+  set up.
+- **Jaeger all-in-one** — traces and nothing else.
+- **Elastic with Kibana** — the heaviest of them, and the reason to think twice
+  rather than the thing to reach for.
+
+The second criterion is that this doubles as the worked example for whoever
+stands up a cluster, and the Grafana stack is the one a volunteer organisation
+is most likely to run for itself.
 
 ## What telemetry may carry
 

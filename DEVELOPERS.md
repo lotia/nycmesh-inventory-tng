@@ -432,6 +432,14 @@ It is the one thing here that needs `uv` even if you are running everything in
 Docker — it is a Python program in this repository, not something in the image.
 [Prerequisites](#prerequisites) installs it.
 
+### Sending it somewhere instead of reading it
+
+A terminal is one reader; a collector is the other, and this repository ships
+one for development behind a compose profile — one command to start, and
+somewhere for traces and metrics to go as well as logs.
+[docs/observability.md](docs/observability.md#somewhere-to-send-it-on-a-laptop)
+is that command and what to open.
+
 ### Turning one subsystem up
 
 Setting everything to `DEBUG` is almost never what you want: Django logs every
