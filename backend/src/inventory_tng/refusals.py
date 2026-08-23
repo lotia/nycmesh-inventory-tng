@@ -76,24 +76,28 @@ DEFAULT_RATE = "10/min"
 PERIODS = {"s": 1, "min": 60, "hour": 3600, "day": 86400}
 
 
-def rate(requested: str) -> tuple[int, int]:
+def rate(requested: str, setting: str = "DJANGO_SECURITY_LOG_RATE") -> tuple[int, int]:
     """`10/min`, as a count and a window in seconds, refusing anything else.
 
     Refused rather than defaulted, like every other setting here: being given a
     rate other than the one you asked for, and not being told, is how a limit
     turns out to have been wrong during the incident it was set for.
+
+    `setting` is only which name the complaint uses. A second setting spelled
+    the same way -- `inventory_tng.debugging`'s -- reads it through here rather
+    than growing a parser of its own, and somebody reading the refusal has to
+    be told which of the two they got wrong.
     """
     written, separator, period = requested.strip().partition("/")
     named = period.strip().lower()
     if not separator or named not in PERIODS:
         raise ValueError(
-            f"DJANGO_SECURITY_LOG_RATE={requested!r} is not `<count>/<period>`. "
-            f"The period is one of: {', '.join(PERIODS)}."
+            f"{setting}={requested!r} is not `<count>/<period>`. The period is one of: {', '.join(PERIODS)}."
         )
     try:
         count = int(written.strip())
     except ValueError:
-        raise ValueError(f"DJANGO_SECURITY_LOG_RATE={requested!r} does not begin with a whole number.") from None
+        raise ValueError(f"{setting}={requested!r} does not begin with a whole number.") from None
     if count < 1:
         # Nought is refused rather than read as "none at all". Somebody
         # quietening a noisy deployment would reach for it, and the quiet that
@@ -105,8 +109,8 @@ def rate(requested: str) -> tuple[int, int]:
         # module's. What is refused here is a rate of nought, which is the one
         # spelling somebody would expect to mean "less, not none".
         raise ValueError(
-            f"DJANGO_SECURITY_LOG_RATE={requested!r} would write none at all. "
-            "Set a rate you can live with, or raise the logger's level if silence is really what you want."
+            f"{setting}={requested!r} would allow none at all. Set a rate you can live with, "
+            "or, where it is a logger this rations, raise that logger's level instead."
         )
     return count, PERIODS[named]
 

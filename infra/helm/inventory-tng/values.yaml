@@ -61,6 +61,10 @@ django:
   # but "redacted". Read docs/observability.md before changing it: what it
   # admits, and what admitting it obliges of wherever the telemetry lands.
   personalData: "redacted"
+  # A signed token has one volunteer's requests recorded in full. How long one
+  # lasts, and how much it may cost. See docs/observability.md.
+  debugTraceLifetimeSeconds: "3600"
+  debugTraceRate: "60/min"
   # Every hostname a browser may use, comma-separated. Two things depend on
   # it beyond Django itself: a release whose ingress.host none of these
   # covers is refused at render time, and the pod adds its own address to

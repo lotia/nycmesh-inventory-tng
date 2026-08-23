@@ -205,10 +205,25 @@ telemetry then contains personal data, and wherever it lands inherits that —
 retention, access and deletion — for as long as it is kept. That is a reason to
 turn it on for an afternoon, not a reason to have refused it.
 
-`inventory-tng-nb8.4` builds a signed, expiring debug token, which is a better
-shape for this in production than an environment variable: per request, and
-self-expiring. Whether that token should also carry this permission is decided
-there.
+**The debug token does not carry this permission**, decided in
+`inventory-tng-nb8.4` and recorded here because the two mechanisms are next to
+each other and the temptation to merge them will come round again.
+
+The token is a better shape than an environment variable in every way that
+suggests merging them: it is per request, it expires by itself, and an
+administrator hands it out deliberately. What decides it is that the two
+permissions have different consequences and different lifetimes. Recording a
+request in full costs processor time and collector volume, and stops when the
+token does. Recording somebody's address creates a disclosure and a retention
+obligation in whatever the telemetry lands in, and that outlives the token by
+however long that place keeps things — which is not a property the person who
+minted the token controls, or necessarily knows.
+
+The tokens also travel: an administrator sends one to a volunteer through a
+chat message or an email, where it is forwarded, quoted and kept. A link that
+quietly widened what is recorded about everybody near it wherever it was pasted
+is not a link worth having made, and "it expires" is no comfort about data
+already written down.
 
 ### The chart does not render a collector
 

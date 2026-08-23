@@ -250,12 +250,71 @@ none of these stops the process rather than quietly becoming the default.
 `OTEL_SDK_DISABLED=true` turns everything off, which is the switch to reach for
 during an incident.
 
+Both of those beat a debug token, and that is deliberate: a rate is a rate and
+a token may raise it, but neither an operator's `always_off` nor the
+specification's own off switch is something an outstanding token can talk its
+way past.
+
 **A caller cannot ask for more.** A request arriving already marked as sampled
 is put through the same rate rather than recorded outright: `TraceIdRatioBased`
 decides from the trace id, so a browser and this backend running the same rate
 reach the same answer about the same trace and it stays in one piece — without
 either end trusting the other. That matters because the sampled bit is one
 header on a request that needs no credential.
+
+## Recording one volunteer's requests
+
+Sampling decides what is recorded from ordinary traffic. Somebody chasing one
+failure needs the opposite: *that* request, whole, whatever the rate says.
+
+Volunteers do not sign in ([decision 0012](decisions/0012-two-populations.md)),
+and they are the people who meet the failures — so an administrators-only flag
+would debug only the sessions that were never the problem. The way in is a
+token an administrator mints and hands over:
+
+```bash
+python manage.py mint_debug_token
+```
+
+The volunteer's browser sends it as `X-Debug-Trace`, and every span that
+request produces is recorded regardless of the sampling rate. It expires by
+itself, so there is nothing to remember to switch off, and rotating
+`DJANGO_SECRET_KEY` revokes every token in existence at once.
+
+**Why it is not simply the sampled bit in `traceparent`.** That bit is one
+header on a request that needs no credential, so honouring it would hand
+whoever is sending traffic the decision about what this server records — and
+with per-function tracing behind it, that is a way to make the server do
+arbitrary work rather than a convenience.
+[Decision 0021](decisions/0021-telemetry-over-otlp.md) is where that is argued.
+`DEBUG_TRACE_RATE` is the second half of the same worry: a valid token that
+leaked into a channel is bounded too, at 60 requests a minute per token, which
+is far more than a person reproducing something and far less than a loop. And
+a token is bounded in time by `DEBUG_TRACE_LIFETIME_SECONDS`, with no store
+behind it — so **rotating `DJANGO_SECRET_KEY` is the revocation**, and it is
+one that `SECRET_KEY_FALLBACKS` cannot soften: these signatures are checked
+against the current key alone.
+
+**A token does not admit personal data.** That is a decision rather than an
+omission, and [0021](decisions/0021-telemetry-over-otlp.md) is where it is
+argued — the short of it being that a token expires and the data it would have
+admitted does not. [Recording personal
+data](#recording-personal-data-on-purpose) stays its own deliberate,
+process-wide act.
+
+**A metric counts what is presented** — `inventory.debug_traces`, by `outcome`:
+`honoured`, `refused`, or `throttled`. A refused count that climbs is somebody
+guessing at signatures, which is a shape over time rather than a line in a log.
+
+**The browser half is not built yet.** `inventory-tng-nb8.8` adds the flag that
+makes the SPA send this header and its own exporter, and the same token has to
+guard that exporter's ingest path — an unauthenticated OTLP endpoint proxied by
+nginx would be a write anybody can make. Until then the header is something to
+send by hand:
+
+```bash
+curl -H "X-Debug-Trace: <token>" http://localhost:8000/api/items
+```
 
 ## What telemetry may carry
 

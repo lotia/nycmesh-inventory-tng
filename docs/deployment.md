@@ -177,12 +177,15 @@ ingress's, which would otherwise forward a hostname nothing answers to.
 | `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | no | chart (`django.otelServiceName`, `django.otelResourceAttributes`) | What this service is called wherever its telemetry lands, and what else is attached to every span. Standard OpenTelemetry names |
 | `OTEL_TRACES_SAMPLER`, `OTEL_TRACES_SAMPLER_ARG` | no | chart (`django.tracesSampler`, `django.tracesSamplerArg`) | The fraction of traces recorded. Code default `0.1`; the chart ships `1.0`. [Telemetry](#telemetry) says how to sample a subset instead |
 | `TELEMETRY_PERSONAL_DATA` | no | chart (`django.personalData`) | `redacted`, which is what every configuration here ships, or `recorded`. A value that is neither stops the process. [observability.md](observability.md#recording-personal-data-on-purpose) is what it admits and what admitting it obliges of wherever the telemetry lands |
+| `DEBUG_TRACE_LIFETIME_SECONDS` | no | chart (`django.debugTraceLifetimeSeconds`) | How long a token from `manage.py mint_debug_token` has one volunteer's requests recorded in full. Default `3600`. Rotating `DJANGO_SECRET_KEY` revokes every one that exists |
+| `DEBUG_TRACE_RATE` | no | chart (`django.debugTraceRate`) | What one such token may cost, as `<count>/<period>`. Default `60/min`, counted per process like the append rates. [observability.md](observability.md#recording-one-volunteers-requests) is what a token authorises and what it does not |
 | `LABEL_BASE_URL` | no | chart (`django.labelBaseUrl`) | The origin encoded into every printed QR code. It is on the stickers, not in the database, so changing it does not change the labels already on the shelves: move the app and keep a permanent redirect from the old host rather than reprinting. It must stay within what QR alphanumeric mode can carry and short enough to print at the module size the generator insists on — both are refused loudly rather than printed, see [`.env.sample`](../.env.sample) |
 
-Both rates are counted **per backend process**, because the counters live in
-Django's default in-memory cache. Three gunicorn workers per pod means a client
-can append three times the configured rate, multiplied again by the replica
-count, so set the rate for one process and expect the deployment to allow more.
+Every rate in that table is counted **per backend process**, because the
+counters live in Django's default in-memory cache. Three gunicorn workers per
+pod means a client can append three times the configured rate, multiplied again
+by the replica count, so set a rate for one process and expect the deployment
+to allow more.
 Making it exact would take a cache shared between processes, which is not
 configured today — a bound that is loose is still a bound, and what it defends
 is [decision 0012](decisions/0012-two-populations.md).
