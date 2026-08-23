@@ -44,8 +44,21 @@ if [[ ${#paths[@]} -eq 0 ]]; then
   # beside the invariant it enforces looks the same to a machine, so the
   # judgement moves into check-docs.allow. See
   # DEVELOPERS.md#1-one-topic-one-place.
+  #
+  # It said that and then listed seven extensions, which is the same mistake
+  # one layer down: `.env.sample` is where every configuration variable in this
+  # repository is explained and matched none of them, and neither did the
+  # extensionless programs under scripts/ -- so the two files whose whole job
+  # is explaining things were the two nothing read. Three commits pasted prose
+  # into `.env.sample` before a review noticed.
+  #
+  # So: every tracked file, less the ones that are not prose. Excluded by what
+  # they are rather than by where they live -- images, fonts, a compiled
+  # module, a spreadsheet, the two lock files nobody writes by hand, and the
+  # tracker's own export.
   mapfile -t paths < <(
-    git ls-files '*.md' '*.sh' '*.py' '*.yml' '*.yaml' '*.ts' '*.tsx'
+    git ls-files | grep -Evi \
+      '\.(png|jpe?g|gif|ico|svg|woff2?|ttf|eot|wasm|xlsx|pdf|zip)$|(^|/)(uv\.lock|package-lock\.json)$|^\.beads/'
   )
 fi
 

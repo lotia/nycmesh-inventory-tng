@@ -8,24 +8,22 @@
 # this is that somebody.
 #
 # Usage:  podman compose logs -f backend | scripts/ship-logs
-#         podman compose logs -f backend | scripts/ship-logs | scripts/pretty-logs
 #
-# Every line is passed through unchanged, so a reader can sit after it.
+# Every line is passed through unchanged, so `| scripts/pretty-logs` can sit
+# after it and draw what the collector was sent.
 # Where it posts comes from OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, or from
 # OTEL_EXPORTER_OTLP_ENDPOINT with /v1/logs appended, and falls back to the
 # address the compose collector publishes. docs/observability.md is the rest.
 #
 # Development only: no retry, no queue on disk. A cluster runs a real agent.
 #
-# The reader imports nothing from Django, so this needs the backend project
-# only for an interpreter and never for a database or a settings module.
+# The two lines below are scripts/pretty-logs', and are here for the reasons it
+# gives: nothing in the reader imports Django, and the path has to be said.
 
 set -euo pipefail
 
 HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 
-# src/ is on the path for pytest and for manage.py, neither of which is
-# running here, so this says it too.
 export PYTHONPATH="$HERE/../backend/src${PYTHONPATH:+:$PYTHONPATH}"
 
 exec uv run --project "$HERE/../backend" python -m inventory_tng.shipping "$@"

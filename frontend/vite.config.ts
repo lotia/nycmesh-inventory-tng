@@ -47,8 +47,9 @@ export default defineConfig(({ mode }) => ({
     outDir: "dist",
     sourcemap: true,
   },
-  // Coverage runs on every `npm test`, so a local run and a CI run enforce the
-  // same rules. See DEVELOPERS.md "Testing and coverage".
+  // Coverage runs on every `npm test`, for the reason the backend's
+  // `pyproject.toml` gives about its own. See DEVELOPERS.md "Testing and
+  // coverage".
   test: {
     environment: "jsdom",
     globals: true,
@@ -97,9 +98,8 @@ export default defineConfig(({ mode }) => ({
         "capture/drive.ts",
         "capture/scene.ts",
       ],
-      // Applies to the code left after the exclusions above -- that is, code
-      // that actually implements behaviour. Raising this is welcome; lowering
-      // it needs a reason in the pull request.
+      // Over what the exclusions above leave, and held to the same bar as the
+      // backend's `fail_under`.
       thresholds: {
         lines: 90,
         functions: 90,
