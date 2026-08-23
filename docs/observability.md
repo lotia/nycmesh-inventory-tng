@@ -1,19 +1,31 @@
 # Observability
 
-What this application records about itself, and what it is not allowed to
-record about the people using it.
+What this application records about itself, where that can be sent, and what it
+is not allowed to record about the people using it.
+
+**Two readers.** A developer wants somewhere for telemetry to go on their own
+machine and a way to look at it, which is the first section and needs one
+command. Somebody standing a cluster up wants to know what this repository
+ships (a collector for development, and nothing for production), what it does
+not (any destination at all), and what they have therefore to decide — which is
+[Choosing a destination](#choosing-a-destination) onwards. Both want the last
+two sections, because what may be recorded about people is not a deployment
+setting.
 
 Reading a log stream in a terminal is documented where it is done rather than
 repeated here — while developing in
 [DEVELOPERS.md](../DEVELOPERS.md#reading-the-logs-while-you-work), and from a
 cluster in [deployment.md](deployment.md#reading-the-logs), which is also where
-a deployment's own settings live. Why the arrangement is what it is, in every
-case, is [decision 0021](decisions/0021-telemetry-over-otlp.md).
+a deployment's own settings are listed. Why the arrangement is what it is, in
+every case, is [decision 0021](decisions/0021-telemetry-over-otlp.md).
 
 ## Somewhere to send it, on a laptop
 
-The stack in `compose.yaml` ships a collector, behind a profile so that nobody
-who has not asked for telemetry pays for a second container:
+From a clone, this is three commands. The first two are the ordinary setup in
+[DEVELOPERS.md](../DEVELOPERS.md#running-it) — copy `.env.sample` to `.env`,
+bring the stack up — and the third is this one, which adds a collector
+behind a profile so that nobody who has not asked for telemetry pays for a
+second container:
 
 ```bash
 OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318 \
@@ -102,6 +114,148 @@ What it was chosen over, against one container and no configuration to write:
 The second criterion is that this doubles as the worked example for whoever
 stands up a cluster, and the Grafana stack is the one a volunteer organisation
 is most likely to run for itself.
+
+## Choosing a destination
+
+Nothing above this line applies to a deployment. A laptop's collector is one
+container that forgets everything; a deployment has to decide where telemetry
+lands, who can read it, how long it is kept, and what happens when that place
+is unreachable. **This repository ships no answer to that**, and the section
+after this one says why the chart does not try.
+
+Where this application will run is not settled — it may be CodeNOW, it may be a
+Kubernetes cluster NYC Mesh hosts itself on Proxmox — so nothing here assumes a
+platform that collects a container's output for you. If yours does, you will
+know; if it does not, the whole log story is yours to build, and
+[deployment.md](deployment.md#reading-the-logs) is what that costs when nobody
+has.
+
+There are three shapes, and the thing that actually distinguishes them is
+**where the credential lives**. That is the part nobody explains and the part
+that decides how much of this you can change later.
+
+### Straight to a vendor
+
+Point `OTEL_EXPORTER_OTLP_ENDPOINT` at the vendor's ingest URL and put its API
+key in `OTEL_EXPORTER_OTLP_HEADERS`. Nothing else to run.
+
+The key is then in the application's own environment, which means it is in the
+Secret every backend pod mounts, it rotates on a redeploy, and the pods talk to
+the internet. There is no queue: a vendor that is unreachable loses whatever
+was in flight, in a process that is also serving requests. Changing vendor is a
+redeploy of the application.
+
+Right for getting started, and for a deployment small enough that the vendor's
+free tier covers it.
+
+### Through a collector you run
+
+Point the application at an OpenTelemetry Collector inside the cluster; the
+collector holds the credential and forwards.
+
+The application then knows one plaintext in-cluster address and no secret at
+all, which is the point. The collector can fan out to more than one
+destination, can be given a disk-backed queue so that a destination being down
+is a delay rather than a loss, and can drop or rename attributes without a
+release of this application. Changing vendor becomes a change to the
+collector's configuration.
+
+The cost is a component to run and to keep upgraded. Right for anything that is
+going to be around, and it is the shape to grow into.
+
+### Standard output, scraped by an agent
+
+Logs are already there — this application writes them and nothing else — so an
+agent on the node can pick them up with no cooperation from the application at
+all. Traces and metrics still need one of the two above.
+
+The credential lives in the agent, which is usually one DaemonSet for the whole
+cluster and somebody else's problem if the cluster already has one. Ask before
+building anything: a cluster that already ships container output somewhere has
+solved the log half already.
+
+## For a cluster you host yourself
+
+Concretely, because "run a collector" is not an instruction.
+
+**A log agent, as a DaemonSet.** One per node, reading the container output the
+runtime already writes.
+
+| | |
+| --- | --- |
+| **Grafana Alloy** | The Grafana stack's own, and the natural choice if the backend is Loki. Speaks OTLP as well as scraping, so it can be the only agent |
+| **Fluent Bit** | The smallest of them, tens of megabytes of memory per node, and the one to pick if the node budget is tight |
+| **Vector** | The most capable at reshaping a stream before it lands; heavier, and worth it only if that is a problem you have |
+
+**A collector, as a Deployment.** Not a DaemonSet: the application posts to it
+over the network rather than to a node-local address, so it scales with
+telemetry volume rather than with node count, and two replicas behind a Service
+survive an upgrade. A sidecar per pod is the third option and is for isolating
+one noisy application, which is not this problem.
+
+Between them that is roughly 100–200 MB of memory per node for the agent, plus
+whatever the collector Deployment is given — a few hundred megabytes for a
+deployment this size. The storage is the part that surprises people, and it is
+decided by retention rather than by traffic.
+
+**Where it lands**, with real costs:
+
+| | |
+| --- | --- |
+| **Grafana stack** — Loki, Tempo, Prometheus, Grafana | Four components, each of which can be given object storage rather than volumes, which is what makes the retention affordable. The most work to stand up and the most widely known once it is. What the development collector here is, unbundled |
+| **SigNoz** | OpenTelemetry-native, one UI over all three signals, and fewer moving parts to reason about — but a ClickHouse underneath it that somebody has to look after |
+| **Elastic with Kibana** | The heaviest by a distance, in memory and in operator attention, and the reason to think twice: a volunteer organisation running this is committing somebody's evenings to it |
+
+**Retention is the decision that costs money**, not the choice of backend. Pick
+it first — a fortnight of logs and a couple of days of traces answers almost
+every question anybody actually asks — and size the storage to that.
+
+### The chart does not render a collector
+
+Deliberately, and [decision 0021](decisions/0021-telemetry-over-otlp.md) is
+where that is argued. What it means in practice: rendering one here would give
+the next application on the cluster a second copy of it, and would make an
+upgrade of this chart move a piece of the cluster's plumbing.
+
+`django.otlpEndpoint` is the whole of the connection between them, and it is
+empty by default. A release that says nothing starts no SDK at all.
+
+## How much is recorded
+
+`OTEL_TRACES_SAMPLER_ARG` is a fraction between 0 and 1.
+
+**The code's own default is `0.1`**, deliberately conservative: a release that
+configures nothing cannot flood a collector somebody else sized. **Every
+configuration this repository ships sets `1.0`** — `.env.sample`, `compose.yaml`
+and `django.tracesSamplerArg` in the chart — so the behaviour intended is the
+one that runs, and the safe behaviour is what happens in its absence.
+
+To sample a subset, lower the shipped value: `0.05` keeps one trace in twenty.
+Logs are unaffected by it — sampling is about traces, which are expensive per
+request in a way records are not.
+
+They are not, however, unconditionally complete, and the one exception is worth
+knowing before an incident rather than during one. Records under
+`django.security` — a `Host` this deployment does not answer to, a CSRF failure,
+a session that would not decode — are rationed by `DJANGO_SECURITY_LOG_RATE`,
+because that path is internet-facing and takes no credential.
+[deployment.md](deployment.md#reading-the-logs) is what that means. It is a
+ration rather than a silence: whatever is held back is counted, and the count
+arrives on the next record from that same logger, so a gap is always labelled
+with its size.
+
+`OTEL_TRACES_SAMPLER` picks which sampler: `parentbased_traceidratio` (the
+default and the one to keep), `always_off`, or `always_on`. A value that is
+none of these stops the process rather than quietly becoming the default.
+`OTEL_SDK_DISABLED=true` turns everything off, which is the switch to reach for
+during an incident.
+
+**A caller cannot ask for more.** A request arriving already marked as sampled
+is put through the same rate rather than recorded outright: `TraceIdRatioBased`
+decides from the trace id, so a browser and this backend running the same rate
+reach the same answer about the same trace and it stays in one piece — without
+either end trusting the other. That matters because the sampled bit is one
+header on a request that needs no credential.
 
 ## What telemetry may carry
 
