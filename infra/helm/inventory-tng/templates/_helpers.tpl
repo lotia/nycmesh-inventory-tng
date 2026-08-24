@@ -55,6 +55,32 @@ function so the copy cannot drift.
 {{- end -}}
 {{- end -}}
 
+{{/*
+How often the kubelet asks a backend pod whether it is ready.
+
+Defined rather than written into the probe, because one other thing has to
+agree with it: the ceiling on how long a connect to the database may block.
+Both read this, so they cannot drift.
+*/}}
+{{- define "inventory-tng.readinessPeriodSeconds" -}}10{{- end -}}
+
+{{/*
+Refuses a release whose connect timeout is not shorter than that period.
+
+Why that is the rule is the message below, and the arithmetic behind it is
+docs/deployment.md#health-checks. Why it is refused HERE is that a values file
+is where an operator raises the number, and nothing looked: the release
+rendered, installed, and reproduced the fault the setting was added to
+prevent, with every check green.
+*/}}
+{{- define "inventory-tng.connectTimeoutIsShortEnough" -}}
+{{- $period := int (include "inventory-tng.readinessPeriodSeconds" .) -}}
+{{- $bound := int .Values.django.databaseConnectTimeoutSeconds -}}
+{{- if ge $bound $period -}}
+{{- fail (printf "django.databaseConnectTimeoutSeconds is %d, which is not less than the readiness probe's periodSeconds (%d): a probe blocked on the database would still hold a worker when the next one arrives, and they accumulate until the pod serves nothing. Lower it, or shorten that period and raise the worker count together. See docs/deployment.md#health-checks." $bound $period) -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "inventory-tng.labels" -}}
 app.kubernetes.io/name: {{ include "inventory-tng.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
@@ -126,6 +152,8 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
   value: {{ .Values.django.reauthenticationTimeoutSeconds | quote }}
 - name: LABEL_BASE_URL
   value: {{ .Values.django.labelBaseUrl | quote }}
+- name: DATABASE_CONNECT_TIMEOUT_SECONDS
+  value: {{ .Values.django.databaseConnectTimeoutSeconds | quote }}
 - name: DJANGO_SECRET_KEY
   valueFrom:
     secretKeyRef:

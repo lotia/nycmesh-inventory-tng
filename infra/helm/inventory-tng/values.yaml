@@ -96,6 +96,11 @@ django:
   # The origin printed inside every QR code. Changing it does not change the
   # stickers already on the shelves; see docs/deployment.md.
   labelBaseUrl: "https://inventory.nycmesh.net"
+  # How long a request waits for a database that is not answering before it
+  # gives up. It has to stay under the readiness probe's periodSeconds, which
+  # is written out in the backend Deployment; docs/deployment.md#health-checks
+  # is what happens when it does not, and a test refuses the pair.
+  databaseConnectTimeoutSeconds: 5
   # Name of a pre-existing Secret holding DJANGO_SECRET_KEY and DATABASE_URL.
   # Never put these in values.yaml.
   existingSecret: inventory-tng-secrets

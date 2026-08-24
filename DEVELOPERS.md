@@ -353,7 +353,10 @@ All backend commands run from `backend/`, all frontend commands from `frontend/`
 ## Database and migrations
 
 PostgreSQL 18, reached through a single `DATABASE_URL`. Django settings read it
-via `django-environ`; nothing else configures the database.
+via `django-environ`, and one other variable bounds how long a connect to it
+may take — [`.env.sample`](.env.sample) says why that bound exists and
+[deployment](docs/deployment.md#health-checks) says what it must stay under.
+Nothing else configures the database.
 
 When you change a model:
 
