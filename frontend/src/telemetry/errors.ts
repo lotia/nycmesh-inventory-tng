@@ -21,13 +21,10 @@
 
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 
+import { failed, type Kind, thrown } from "./report";
+
 /** The scope these spans arrive under. */
 export const TRACER = "inventory.frontend.errors";
-
-/** What a thrown value comes to when it is not an `Error`. */
-function thrown(reason: unknown): Error {
-  return reason instanceof Error ? reason : new Error(String(reason));
-}
 
 /**
  * Record one failure as a span of its own.
@@ -36,12 +33,24 @@ function thrown(reason: unknown): Error {
  * moment `window.onerror` fires there may be nothing current at all -- the
  * stack that threw has already unwound.
  */
-export function report(reason: unknown, kind: string): void {
+export function report(reason: unknown, kind: Kind): void {
   const failure = thrown(reason);
   const span = trace.getTracer(TRACER).startSpan(kind);
   span.recordException(failure);
   span.setStatus({ code: SpanStatusCode.ERROR, message: failure.message });
   span.end();
+}
+
+/**
+ * Both halves, for a failure that reached the top of the stack.
+ *
+ * The span is for a session somebody asked about; the report is for every
+ * session, and `telemetry/report.ts` argues that asymmetry. Here they are the
+ * same event, so it is one call rather than two at each listener.
+ */
+export function caught(reason: unknown, kind: Kind): void {
+  report(reason, kind);
+  failed(reason, "app", kind);
 }
 
 /**
@@ -53,9 +62,9 @@ export function report(reason: unknown, kind: string): void {
  */
 export function watch(target: Window = window): () => void {
   const onError = (event: ErrorEvent): void =>
-    report(event.error ?? event.message, "window.onerror");
+    caught(event.error ?? event.message, "window.onerror");
   const onRejection = (event: PromiseRejectionEvent): void =>
-    report(event.reason, "unhandledrejection");
+    caught(event.reason, "unhandledrejection");
   target.addEventListener("error", onError);
   target.addEventListener("unhandledrejection", onRejection);
   return () => {

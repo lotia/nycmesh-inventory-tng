@@ -199,6 +199,57 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationError'
           description: ''
+  /api/client-failures:
+    post:
+      operationId: client_failures_create
+      description: |-
+        Where a volunteer's browser says something went wrong on their phone.
+
+        THE THIRD ENDPOINT THAT TAKES NO CREDENTIAL, and decision 0012's own
+        consequence says one of those has to be argued against that record rather
+        than added beside it. The argument is in
+        docs/decisions/0012-two-populations.md under "A third endpoint, and what
+        made it arguable"; the short of it is that this writes no row, corrects
+        nothing and is bounded in what it may say.
+
+        It records rather than stores. The failure becomes a log record at ERROR,
+        in the same stream every other record goes to, so whatever collects that
+        stream has it -- there is no table, nothing to correct, and nothing for a
+        later reader to have to clean up.
+
+        Rate limited, which is what stands in for the credential none of the three
+        ask for -- but on a budget of its own rather than the append endpoints',
+        because DRF keys a bucket on the scope and the client rather than on the
+        view. `inventory.throttling.ReportThrottle` argues why sharing one meant a
+        backend having a bad minute could spend a volunteer's whole allowance on
+        reports about it.
+      summary: Report a failure a browser could not handle
+      tags:
+      - client-failures
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientFailure'
+        required: true
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Throttled'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+          description: ''
   /api/debug-trace:
     get:
       operationId: debug_trace_retrieve
@@ -1303,6 +1354,64 @@ components:
       required:
       - id
       - name
+    ClientFailure:
+      type: object
+      description: |-
+        One failure a volunteer's browser could not handle.
+
+        Deliberately three fields and no more: no URL, no user agent, no volunteer,
+        no element. Decision 0012 argues why this endpoint exists at all and why
+        its shape is a list rather than whatever a client sends.
+
+        `detail` is free text and is the one thing here no list can police -- the
+        same boundary the module above draws around a log message. It is bounded
+        in length and the endpoint is rate limited; beyond that it is what somebody
+        wrote in a `throw`.
+      properties:
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/ClientFailureKindEnum'
+          description: |-
+            What kind of failure this is: one of the browser's two handlers, or one this app reports itself.
+
+            * `window.onerror` - window.onerror
+            * `unhandledrejection` - unhandledrejection
+            * `decode-loop` - decode-loop
+            * `refused` - refused
+            * `server-error` - server-error
+        where:
+          allOf:
+          - $ref: '#/components/schemas/WhereEnum'
+          description: |-
+            What the app was doing, in this app's own words -- `scan`, `outbox`, `print`.
+
+            * `scan` - scan
+            * `outbox` - outbox
+            * `print` - print
+            * `api` - api
+            * `app` - app
+        detail:
+          type: string
+          description: The message, and the stack where the browser gave one.
+          maxLength: 2000
+      required:
+      - detail
+      - kind
+      - where
+    ClientFailureKindEnum:
+      enum:
+      - window.onerror
+      - unhandledrejection
+      - decode-loop
+      - refused
+      - server-error
+      type: string
+      description: |-
+        * `window.onerror` - window.onerror
+        * `unhandledrejection` - unhandledrejection
+        * `decode-loop` - decode-loop
+        * `refused` - refused
+        * `server-error` - server-error
     CodeEnum:
       enum:
       - volunteer_merged
@@ -2292,6 +2401,20 @@ components:
       required:
       - display_name
       - id
+    WhereEnum:
+      enum:
+      - scan
+      - outbox
+      - print
+      - api
+      - app
+      type: string
+      description: |-
+        * `scan` - scan
+        * `outbox` - outbox
+        * `print` - print
+        * `api` - api
+        * `app` - app
   securitySchemes:
     cookieAuth:
       type: apiKey

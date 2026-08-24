@@ -31,9 +31,11 @@
  *   key is what protects it -- but a batch can be sent by the tab that still
  *   remembers it after another tab's write dropped it from storage.
  */
+
 import { apiPost, asApiError } from "../api/client";
 import { isRecordedBatch } from "../api/types";
 import { isNumber, isText, matches, read, type Shape, write } from "../storage";
+import { traced } from "../telemetry/report";
 import { recordedInWords } from "./recorded";
 
 /** Versioned, for the reason cartStorage's key is. */
@@ -205,10 +207,33 @@ async function attempt(batch: QueuedBatch): Promise<QueuedOutcome | null> {
   try {
     // A 200 here is the server saying it already had this batch, which is a
     // success and the whole point of the key. `apiPost` resolves for both.
-    answer = await apiPost<unknown>("/api/stock/transactions", batch.body);
+    //
+    // One span per attempt when this session is being recorded, so a batch
+    // that took four tries over an hour reads as four attempts rather than as
+    // one slow save.
+    answer = await traced("outbox.attempt", () =>
+      apiPost<unknown>("/api/stock/transactions", batch.body),
+    );
   } catch (error: unknown) {
     const refused = asApiError(error);
-    return isFinal(refused.status) ? { recorded: false, detail: refused.message } : null;
+    if (!isFinal(refused.status)) {
+      // Not a failure: no signal, and the batch waits. Reporting these would
+      // be reporting a basement.
+      return null;
+    }
+    // A refusal the ledger will never accept, so the volunteer is about to be
+    // told their batch is not going anywhere.
+    //
+    // NOT REPORTED, and `api/client.ts` is where that rule is argued -- it
+    // meets the identical situation two files away. The backend has already
+    // written this refusal down at WARNING and counted it under
+    // `inventory.appends{outcome=rejected}`; posting it back would record one
+    // ordinary refusal four times, one of them at ERROR, and spend a
+    // volunteer's report budget doing it.
+    //
+    // 5xx never reaches here -- `isFinal` is 4xx only -- and `client.ts`
+    // reports those itself, which is the one place that should.
+    return { recorded: false, detail: refused.message };
   }
   // Outside the catch above on purpose: everything from here on is this app
   // reading a successful answer, and a throw in it is a bug in this app. Read

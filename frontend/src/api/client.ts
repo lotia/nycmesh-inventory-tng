@@ -8,6 +8,8 @@
  */
 
 import { HEADER, asked as tracing } from "../telemetry/flag";
+import { failed } from "../telemetry/report";
+import { csrfToken } from "./csrf";
 
 /**
  * A request the API answered, and refused.
@@ -68,23 +70,6 @@ async function parse(response: Response): Promise<unknown> {
 }
 
 /**
- * The CSRF token Django expects back on every write.
- *
- * Session authentication enforces CSRF, and a single-page app never renders a
- * Django template, so the cookie is set by fetching the API index -- see
- * `ApiRootView` in backend/src/inventory/views.py. Read from the cookie on
- * each write rather than cached, because it is rotated on sign-in.
- */
-function csrfToken(): string {
-  // `document.cookie` rather than the Cookie Store API: that one is
-  // asynchronous, so reading it would make every write a two-step, and it is
-  // absent from Safari and from the jsdom the unit tests run in. There is one
-  // cookie to read and it is not a hot path.
-  const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
-  return match ? decodeURIComponent(match[1]) : "";
-}
-
-/**
  * One request, and the three ways it can end: an answer, a refusal, or
  * nothing at the other end.
  *
@@ -123,7 +108,16 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
   }
   const body = await parse(response);
   if (!response.ok) {
-    throw new ApiError(response.status, detailOf(body, response.status), body);
+    const refused = new ApiError(response.status, detailOf(body, response.status), body);
+    // A 5xx and nothing below it. A 4xx is the API refusing something and the
+    // screen renders what it said -- reporting those would be reporting the
+    // ordinary. A 5xx is this system failing at a volunteer, which is the
+    // thing nobody would otherwise hear about. `path` and not the query
+    // string: what was asked for is in the URL and is not ours to send.
+    if (response.status >= 500) {
+      failed(`${response.status} from ${path.split("?")[0]}`, "api", "server-error");
+    }
+    throw refused;
   }
   return body as T;
 }

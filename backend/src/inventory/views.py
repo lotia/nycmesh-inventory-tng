@@ -37,6 +37,7 @@ from inventory.serializers import (
     BatchInconsistentSerializer,
     BatchRejectedSerializer,
     CategorySerializer,
+    ClientFailureSerializer,
     ItemDetailSerializer,
     ItemSerializer,
     LabelMapSerializer,
@@ -49,7 +50,7 @@ from inventory.serializers import (
     VolunteerDetailSerializer,
     VolunteerSerializer,
 )
-from inventory.throttling import APPEND_THROTTLES
+from inventory.throttling import APPEND_THROTTLES, REPORT_THROTTLES
 from inventory_tng import debugging
 
 # Named for the module, which is what puts `inventory.views` in the `logger`
@@ -1353,16 +1354,52 @@ CAPABILITIES: dict[str, tuple[Operation, ...]] = {
 }
 
 
-@extend_schema(
-    summary="Verify a debug-tracing token",
-    description=(
-        "Answers 204 when the request carries a token this deployment signed and has not expired, and 403 "
-        "otherwise. It exists for nginx's `auth_request`, which cannot check a signature itself, and is what "
-        "keeps the collector's ingest path from being a write anybody can make. It reads nothing but the header "
-        "and answers with no body."
-    ),
-    responses={204: None, 403: None},
-)
+class ClientFailureView(APIView):
+    """Where a volunteer's browser says something went wrong on their phone.
+
+    THE THIRD ENDPOINT THAT TAKES NO CREDENTIAL, and decision 0012's own
+    consequence says one of those has to be argued against that record rather
+    than added beside it. The argument is in
+    docs/decisions/0012-two-populations.md under "A third endpoint, and what
+    made it arguable"; the short of it is that this writes no row, corrects
+    nothing and is bounded in what it may say.
+
+    It records rather than stores. The failure becomes a log record at ERROR,
+    in the same stream every other record goes to, so whatever collects that
+    stream has it -- there is no table, nothing to correct, and nothing for a
+    later reader to have to clean up.
+
+    Rate limited, which is what stands in for the credential none of the three
+    ask for -- but on a budget of its own rather than the append endpoints',
+    because DRF keys a bucket on the scope and the client rather than on the
+    view. `inventory.throttling.ReportThrottle` argues why sharing one meant a
+    backend having a bad minute could spend a volunteer's whole allowance on
+    reports about it.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = REPORT_THROTTLES
+
+    @extend_schema(
+        summary="Report a failure a browser could not handle",
+        request=ClientFailureSerializer,
+        responses={204: None},
+    )
+    def post(self, request: Request) -> Response:
+        # DRF's own refusal, which is the field map every other write in this
+        # API answers with. A bespoke body here would be a second shape for a
+        # client to handle and the schema test would say so.
+        reported = ClientFailureSerializer(data=request.data)
+        reported.is_valid(raise_exception=True)
+        failure = reported.validated_data
+        # At ERROR because it is one: something threw on a volunteer's phone
+        # and nobody caught it. `where` is this application's own word for
+        # what was happening, so a graph can group by it.
+        log.error("browser failure", kind=failure["kind"], reason=failure["where"], detail=failure["detail"])
+        telemetry.CLIENT_FAILURES.add(1, {"kind": failure["kind"], "reason": failure["where"]})
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class DebugTraceVerifyView(APIView):
     """Whether nginx should forward this post to the collector.
 
@@ -1383,6 +1420,16 @@ class DebugTraceVerifyView(APIView):
 
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        summary="Verify a debug-tracing token",
+        description=(
+            "Answers 204 when the request carries a token this deployment signed and has not expired, and 403 "
+            "otherwise. It exists for nginx's `auth_request`, which cannot check a signature itself, and is what "
+            "keeps the collector's ingest path from being a write anybody can make. It reads nothing but the "
+            "header and answers with no body."
+        ),
+        responses={204: None, 403: None},
+    )
     def get(self, request: Request) -> Response:
         if debugging.minted(request.headers.get(debugging.HEADER, "")):
             return Response(status=status.HTTP_204_NO_CONTENT)

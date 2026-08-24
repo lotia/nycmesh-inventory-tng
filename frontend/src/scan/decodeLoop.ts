@@ -13,6 +13,7 @@
  * frame.ts, cameras.ts and decoder.ts.
  */
 
+import { failed } from "../telemetry/report";
 import type { CodeDetector, Decoded } from "./decoder";
 
 /** Fast enough to feel instant, slow enough to leave the phone some battery. */
@@ -133,9 +134,11 @@ export function decodeLoop({ detect, frame, onCode, onFailure }: Decoding): () =
       // Nothing to report to anyone if the caller has already left.
       if (!stopped) {
         give_up();
-        // Worth surfacing to whatever collects errors as well: unlike a
-        // decoder refusing frames, this one is a bug.
-        console.error("the decode loop stopped", error);
+        // Reported as well as given up on: unlike a decoder refusing frames,
+        // this one is a bug, and it happens on a phone in a basement where
+        // the console is nobody's. `telemetry/report.ts` says why this path
+        // is always on while spans are not.
+        failed(error, "scan", "decode-loop");
       }
     } finally {
       // Whatever happened, and only here: a tick that left this set would end

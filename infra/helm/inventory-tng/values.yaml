@@ -86,6 +86,9 @@ django:
   # take no credential. Counted per backend process; see docs/deployment.md.
   appendBurstRate: "20/min"
   appendSustainedRate: "300/hour"
+  # What a browser may report about itself, on its own budget. .env.sample says
+  # why it is not a share of the two above.
+  clientReportRate: "30/min"
   # How long a sign-in counts as recent enough to make an administrative
   # change. Decision 0014 point 5 asks again inside a valid session; this is
   # how often. See docs/deployment.md.

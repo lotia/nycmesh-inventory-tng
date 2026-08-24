@@ -431,3 +431,121 @@ def test_a_request_nothing_resolved_still_says_which_request_it_was(client: Clie
 
     assert finished["route"] == "unresolved"
     assert finished["request_id"]
+
+
+# --------------------------------------------------------------------------
+# What a volunteer's browser says went wrong on their phone
+# --------------------------------------------------------------------------
+
+
+def reported(client: Client, **overrides: Any) -> Any:
+    body = {"kind": "unhandledrejection", "where": "scan", "detail": "the decode loop stopped", **overrides}
+    return client.post(reverse("client-failures"), data=body, content_type="application/json")
+
+
+def test_a_browser_failure_becomes_a_record_and_stores_nothing(client: Client) -> None:
+    """The only account anybody will ever get of a scanner failing in a
+    basement. Decision 0012 argues why this endpoint may exist at all.
+    """
+    with applied(logging_config("INFO", "json")) as stream:
+        response = reported(client)
+
+    assert response.status_code == 204
+    (failure,) = written_by(stream, "inventory.views")
+
+    assert failure["event"] == "browser failure"
+    assert failure["level"] == "error"
+    assert failure["reason"] == "scan"
+    assert failure["detail"] == "the decode loop stopped"
+
+
+def test_and_a_report_this_api_does_not_accept_is_refused(client: Client) -> None:
+    """Three fields and no more, for the reason decision 0012 gives."""
+    assert reported(client, kind="something-else").status_code == 400
+    assert reported(client, detail="x" * 3000).status_code == 400
+    assert client.post(reverse("client-failures"), data={}, content_type="application/json").status_code == 400
+
+
+def test_every_kind_and_place_this_app_reports_is_one_this_api_admits() -> None:
+    """The two ends of one contract, held against each other.
+
+    THREE OF THE FOUR CALL SITES SENT A KIND THIS SERIALIZER REFUSED. `kind`
+    admitted only the browser's two handler names, and the app also reports
+    `decode-loop`, `refused` and `server-error` -- so a decode loop dying on a
+    volunteer's phone, a batch the ledger would never take and a 5xx were all
+    answered 400 and dropped. Not one of them raised: a 400 is not a rejected
+    promise, so the `.catch` never fired and nothing was checked. Those three
+    are exactly the cases docs/observability.md names as always reported.
+
+    Neither side can enforce this alone. A TypeScript union is erased at
+    runtime, so it cannot stop a caller minting a series on a credential-free
+    endpoint; a `ChoiceField` cannot stop this application sending something it
+    will refuse. So the lists are read out of both and compared, which is the
+    only thing that would have noticed.
+    """
+    import re
+    from pathlib import Path
+
+    from django.conf import settings
+
+    from inventory.serializers import ClientFailureSerializer
+
+    source = (Path(settings.BASE_DIR).parent.parent / "frontend/src/telemetry/report.ts").read_text()
+
+    def union(name: str) -> set[str]:
+        declared = re.search(rf"export type {name} =([^;]+);", source)
+        assert declared, f"{name} is no longer declared as a union in report.ts"
+        return set(re.findall(r'"([^"]+)"', declared.group(1)))
+
+    assert union("Kind") == set(ClientFailureSerializer.KINDS)
+    assert union("Doing") == set(ClientFailureSerializer.DOING)
+
+
+def test_and_a_place_nobody_wrote_down_cannot_mint_a_series(client: Client) -> None:
+    """`where` becomes an attribute on `inventory.client_failures`, and this
+    endpoint takes no credential -- so a bare `CharField` let anybody mint
+    unbounded time series, which is the one thing a metric backend does not
+    recover from. It landed on the log record verbatim as well.
+    """
+    assert reported(client, where="x" * 100).status_code == 400
+    assert reported(client, where="scan").status_code == 204
+
+
+def test_and_reporting_a_failure_does_not_spend_a_volunteer_s_append_budget(
+    client: Client,
+    volunteer: Volunteer,
+    item: Item,
+    warehouse: Location,
+    custody: Location,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """What `inventory.throttling.ReportThrottle` exists for, exercised.
+
+    That class argues why this endpoint may not share the append endpoints'
+    budget. The short of it is that the batch is the thing this system exists
+    not to lose.
+
+    Driven through both endpoints rather than asserted about scope names,
+    because "the two scopes differ" stays true of a pair DRF has gone back to
+    counting together. The rate is set the way `test_throttling.py` sets one,
+    and that fixture says why it is assigned to the class.
+    """
+    from inventory.throttling import AppendBurstThrottle
+
+    monkeypatch.setattr(AppendBurstThrottle, "rate", "3/min", raising=False)
+
+    for _ in range(5):
+        assert reported(client).status_code == 204, "the reports have a budget of their own"
+
+    recorded = post(client, batch(volunteer, [one_line(item, warehouse, custody)]))
+
+    assert recorded.status_code == 201, "the reports spent the allowance the batch needed"
+
+
+def test_and_nobody_has_to_sign_in_to_send_one(client: Client) -> None:
+    """A volunteer has no credential to hold. Rate limiting is what stands in
+    for it, the same as on the two endpoints beside this one.
+    """
+    client.logout()
+
+    assert reported(client).status_code == 204
