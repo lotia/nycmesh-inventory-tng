@@ -1030,6 +1030,12 @@ hold:
 - [ ] New behaviour has a test. If you added code that coverage counts, it is
       covered; if you excluded something, the exclusion is justified in the
       pull request
+- [ ] **Code that changes something says so.** Run
+      `scripts/check-telemetry.sh`: its header states what it reads and what it
+      leaves alone, and `scripts/check-telemetry.allow` is where a module that
+      is right to stay quiet is argued. What is worth recording, and what may
+      never be recorded at all, is
+      [docs/observability.md](docs/observability.md)
 - [ ] **Documentation is consistent with the change.** If the change alters
       setup steps, commands, environment variables, architecture, the API
       surface, or the deployment procedure, the canonical document for that

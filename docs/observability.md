@@ -19,6 +19,12 @@ cluster in [deployment.md](deployment.md#reading-the-logs), which is also where
 a deployment's own settings are listed. Why the arrangement is what it is, in
 every case, is [decision 0021](decisions/0021-telemetry-over-otlp.md).
 
+**Work added after this was written is expected to keep it true**, and that is
+checked rather than remembered: `scripts/check-telemetry.sh` fails the build on
+a view or a management command that changes something and records nothing. The
+rule it enforces is one line of the
+[Definition of Done](../DEVELOPERS.md#definition-of-done).
+
 ## Somewhere to send it, on a laptop
 
 From a clone, this is three commands. The first two are the ordinary setup in
