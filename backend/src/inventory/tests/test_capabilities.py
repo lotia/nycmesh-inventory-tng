@@ -4,12 +4,18 @@ Decision 0014 point 3 makes this the answer the interface renders its
 administrative controls from, so what matters here is that the answer tracks
 the endpoints rather than restating them: a capability is reported true
 exactly when the operation behind it would be permitted.
+
+The last two are about the URL table those answers are audited against rather
+than about the endpoint, and are here because this is where the walks over it
+are.
 """
+
+from collections import Counter
 
 import pytest
 from django.contrib.auth.models import User
 from django.test import Client
-from django.urls import reverse
+from django.urls import URLPattern, get_resolver, reverse
 from rest_framework.permissions import SAFE_METHODS
 
 from inventory.permissions import RecentlyAuthenticated, StaffWrites, administrators_only
@@ -195,3 +201,61 @@ def test_the_prompt_points_at_a_route_that_exists() -> None:
     administrator in the middle of an edit rather than failing a build.
     """
     assert reverse("account_reauthenticate") == "/accounts/reauthenticate/"
+
+
+# --------------------------------------------------------------------------
+# The table those audits walk
+# --------------------------------------------------------------------------
+
+
+def test_every_route_is_registered_exactly_once() -> None:
+    """Here because the audits above are what a repeated registration deceives.
+
+    A route listed twice is visited twice by every one of them: the audit that
+    gathers a set of open writes reads the two entries as one, and the two
+    written as plain loops re-run an identical assertion. Django hides the
+    repeat as well -- it resolves the first registration and ``reverse()``
+    answers the last, which agree exactly while the entries are identical. So
+    nothing fails. The one walk that counts rather than gathers,
+    ``test_telemetry.py``'s "more than ten routes were reached", had room to
+    absorb it and went from 22 to 21 when the repeat was deleted; the next one
+    written closer to the number would be off by one for a reason nobody would
+    look for. ``api/schema`` was registered twice from 9e2e86a until
+    inventory-tng-qdbm.
+
+    Both halves of the property, because a repeat is not always a copy. The
+    names half asks the resolver rather than this list, because the namespace
+    ``reverse()`` reads is wider than the list: ``allauth`` mounts its own
+    names into it unprefixed, which is how the test above reverses one of them
+    bare. A name of ours colliding with one of theirs would send decision
+    0013's redirect to a view it never meant, and counting only this list
+    would not see it.
+
+    What it cannot see is a second registration spelled differently --
+    ``<int:id>`` beside ``<int:pk>``, or a ``re_path`` for a URL a ``path``
+    already answers -- which is dead in the same way and compares unequal
+    here. Catching that means reversing each registration and resolving it
+    back, over a walk the audits here would share rather than a sixth of their
+    own; inventory-tng-s047.
+    """
+    # Only what this table declares itself: an `include()` mount is another
+    # URLconf's to keep unique, and Django lets two of them share one prefix
+    # and falls through, so a repeated prefix is not a repeated route.
+    declared = [pattern for pattern in urls.urlpatterns if isinstance(pattern, URLPattern)]
+
+    resolver = get_resolver()
+    colliding = sorted(
+        {
+            pattern.name
+            for pattern in declared
+            if pattern.name is not None and len(resolver.reverse_dict.getlist(pattern.name)) > 1
+        }
+    )
+    assert not colliding, f"more than one route answers to reverse() by these names: {colliding}"
+
+    routes = Counter(str(pattern.pattern) for pattern in declared)
+    repeated = sorted(route for route, count in routes.items() if count > 1)
+    assert not repeated, f"registered more than once in urlpatterns: {repeated}"
+
+    # The walk finding nothing would pass both assertions above it.
+    assert len(routes) > 10, f"only {sorted(routes)} were found; the walk has stopped finding routes"

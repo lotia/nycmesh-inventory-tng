@@ -94,5 +94,4 @@ urlpatterns = [
     # assets come from the sidecar package rather than a CDN; see
     # SPECTACULAR_SETTINGS.
     path("api/docs", SpectacularSwaggerSplitView.as_view(url_name="schema"), name="docs"),
-    path("api/schema", SpectacularAPIView.as_view(), name="schema"),
 ]
