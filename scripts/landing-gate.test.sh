@@ -139,7 +139,12 @@ case_is() {
 echo "what the gate reads as a guarded action"
 case_is "ls -la"                                 PERMIT "an unrelated command is permitted"
 case_is "git push"                               PERMIT "a push to a batch branch is free"
+case_is "git push --force-with-lease"            PERMIT "--force-with-lease is free"
+case_is "git push --force-with-lease origin batch/x" PERMIT "and stays free with a remote and a branch after it"
 case_is "bd create --title='gh pr merge 7 fails'" PERMIT "the words inside a quoted string are data"
+case_is "git push --force origin batch/x"        "bare --force" "a bare --force is refused"
+case_is "git push -f origin batch/x"             "bare --force" "-f is the same flag and is refused with it"
+case_is "git push --follow-tags"                 PERMIT "a flag that merely contains -f is not it"
 case_is "gh pr merge 7 --rebase"                 "No review cycle" "an unrecorded merge is refused"
 
 echo

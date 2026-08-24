@@ -574,6 +574,15 @@ def classify(raw):
     elsewhere = re.search(r"(?:^|\s)(?:-R|--repo)(?:=|\s+)\S+", cmd) is not None
 
     if runs(prog("git") + r"\s+" + GIT_FLAGS + r"push\b"):
+        # A bare --force has no lease, so it overwrites whatever arrived while
+        # you were not looking. -f is the same flag and is caught with it.
+        #
+        # The two boundaries are what keep --force-with-lease -- a different
+        # flag, and a free one -- out of both patterns: the lookahead stops
+        # --force matching its prefix, and the lookbehind stops -f matching the
+        # one inside it. --follow-tags is the same shape and the same reason.
+        if re.search(r"\bpush\b[^;&|]*(?:--force(?![\w-])|(?<![\w-])-f(?![\w-]))", cmd):
+            return "push-force"
         # Whether this push lands on main is NOT decided here.
         #
         # It used to be, by looking for the word `main` anywhere in the command,
@@ -661,6 +670,20 @@ as its own command, after the last push. It records the head it sees, so
 anything published afterwards invalidates it.'
 
 case "$action" in
+  push-force)
+    deny "A bare --force overwrites whatever arrived while you were not looking.
+
+Use --force-with-lease instead. It does the same job and refuses if the remote
+moved since you last fetched, which is the only difference between them and the
+whole reason AGENTS.md puts one on the free row and the other behind an ask.
+
+  git push --force-with-lease
+
+If the lease genuinely has to be broken -- somebody else pushed, and you have
+agreed with them that their commits go -- then that is the ask, and it is a
+person's to answer rather than yours. See AGENTS.md \"Git\"."
+    ;;
+
   push)
     # THIS ARM IS A SHORTCUT, NOT THE ENFORCEMENT, and it is the only one here
     # that is. `scripts/repo-settings.sh` sets `enforce_admins`,

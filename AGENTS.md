@@ -107,7 +107,9 @@ rewritten or thrown away and the repository is untouched, and every step of it
 is visible in the pull request as it happens. `--force-with-lease` is on the
 free side because the lease is the guard — it refuses if anything arrived since
 you last fetched, so it cannot overwrite work you have not seen. A bare
-`--force` has no such guard and so it asks.
+`--force` has no such guard and so it asks, and `scripts/landing-gate.sh`
+refuses it rather than leaving the row to be remembered — see
+[When a branch is ready to merge](DEVELOPERS.md#when-a-branch-is-ready-to-merge).
 
 Merging is on the free side for a different reason: none of the bar is yours to
 judge, and most of it `main` will not let you waive. The part nothing enforces
