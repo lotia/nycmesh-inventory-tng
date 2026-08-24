@@ -273,6 +273,14 @@ jobs:
         run: |
           curl -sf --retry 30 --retry-delay 2 --retry-all-errors \
             http://localhost:8000/api/healthz | tee /dev/stderr | grep -q '"ok"'
+      # The other probe, from outside the process, because the chart tests
+      # compare the chart against the URLconf and both come from this tree --
+      # so nothing else would notice this path failing to serve out of a built
+      # image. It is the path pods are killed over.
+      - name: And so does the path liveness asks for
+        run: |
+          curl -sf --retry 30 --retry-delay 2 --retry-all-errors \
+            http://localhost:8000/api/livez | tee /dev/stderr | grep -q '"alive"'
       - name: The app a volunteer opens is served
         run: |
           curl -sf --retry 30 --retry-delay 2 --retry-all-errors \

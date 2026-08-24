@@ -183,13 +183,17 @@ choose *Reopen in Container*, or run `devcontainer up --workspace-folder .`.
 
 ### Signing in
 
-Everybody signs in, for now. Five endpoints answer without a session — the
-index `/api`, the health check `/api/healthz`, `/api/me`, and the API's own
-description at `/api/schema` and `/api/docs` — and every other one needs one,
-the two a volunteer writes to included. So make an account before you expect
-either half of the app to answer, and sign in at `/accounts/login/` on
-whichever address you are using. Those last two are readable by anyone who can
-reach the port, which is why a deployment puts a network boundary in front of
+Everybody signs in, for now. These answer without a session — the index
+`/api`, the two probes `/api/healthz` and `/api/livez`, `/api/me`, the two
+credential-free reports `/api/client-failures` and `/api/debug-trace`, and the
+API's own description at `/api/schema` and `/api/docs` — and every other one
+needs one, the two a volunteer writes to included. The list is deliberately
+not a count: it was written as one and was wrong twice running. So make an
+account
+before you expect either half of the app to answer, and sign in at
+`/accounts/login/` on whichever address you are using. Those last two are
+readable by anyone who can reach the port, which is why a deployment puts a
+network boundary in front of
 them: [which paths are restricted](docs/deployment.md#which-paths-are-restricted).
 
 That is a gap rather than the design.

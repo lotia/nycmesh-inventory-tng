@@ -39,10 +39,17 @@ so beside the release step.
 
 The endpoints that ask nothing of anybody are exempt too, for the same reason
 they are open at all: the index hands out the CSRF cookie the activation form
-needs, the health check runs before authentication exists, and ``/api/me``
-exists precisely so a client can be told what state it is in. Refusing the
-endpoint whose job is to say "you have not finished signing in" would leave the
+needs, the probes run before authentication exists, and ``/api/me`` exists
+precisely so a client can be told what state it is in. Refusing the endpoint
+whose job is to say "you have not finished signing in" would leave the
 single-page app with nothing to render but an error.
+
+Which endpoints those are is ``permissions.open_to_anybody``'s to answer and
+is deliberately not listed here. This paragraph named three of them until one
+more arrived and made it four, which is the point: the exemption is a class,
+not a list, and a list kept in prose beside the code that does not read it is
+one somebody eventually trusts. ``inventory-tng-lb95`` is the enumeration that
+fails when it stops being true.
 """
 
 from collections.abc import Callable

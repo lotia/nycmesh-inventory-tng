@@ -38,18 +38,39 @@ spec:
           # puts it in ALLOWED_HOSTS. A probe asserting some other name about
           # itself would pass while the address it actually used was refused,
           # which is the shape of the bug this replaced.
+          #
+          # Liveness and readiness ask different questions, so they ask
+          # different paths. Which path belongs to which, what the split gives
+          # up as well as what it buys, and why swapping the two back is an
+          # outage rather than an untidiness, are all
+          # docs/deployment.md#health-checks.
+          #
+          # Every field either probe leans on is written out below, defaults
+          # included, because that document quotes what they come to and
+          # nothing about a default appears near here to check it against.
+          # test_chart.py holds both against it.
           livenessProbe:
+            # /api/livez reaches for nothing, so a restart -- which is the
+            # only thing a failure here buys -- is a cure for anything it can
+            # report.
             httpGet:
-              path: /api/healthz
+              path: /api/livez
               port: http
             initialDelaySeconds: 10
             periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
           readinessProbe:
+            # /api/healthz runs the query, which is the whole point of it: a
+            # dependency belongs on the probe whose failure stops traffic
+            # rather than on the one whose failure kills the process.
             httpGet:
               path: /api/healthz
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 1
+            failureThreshold: 3
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
           securityContext:

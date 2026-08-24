@@ -27,7 +27,6 @@ from typing import Any
 import pytest
 from django.http.request import validate_host
 from django.test import Client, override_settings
-from django.urls import reverse
 from environ import Env
 
 from inventory.tests.charts import manifests, render
@@ -40,6 +39,17 @@ from inventory_tng.hosts import allowed_hosts
 # would pass this suite for the wrong one.
 POD_ADDRESS = "10.42.0.17"
 KUBELET_HOST = f"{POD_ADDRESS}:8000"
+
+# How many queries each probe's request is allowed to make. Not which endpoint
+# it asks for: a pairing table would restate the manifest, which is the one
+# thing this module's own docstring forbids, and editing the chart and the
+# table together would leave every test here green. What inventory-tng-uq6 is
+# actually about is the count -- liveness must reach nothing, because a probe
+# that runs a query restarts every replica the first time a failover runs long
+# -- so the count is what is asserted, against whatever path the chart names.
+# That also catches liveness repointed at some future endpoint that grows a
+# query of its own, which no pairing table would.
+QUERIES_ALLOWED = {"livenessProbe": 0, "readinessProbe": 1}
 
 
 def backend_container(**overrides: str) -> dict[str, Any]:
@@ -76,10 +86,20 @@ def as_the_pod_would_read_it(container: dict[str, Any]) -> list[str]:
     return allowed_hosts(listed, [POD_ADDRESS])
 
 
-def answer(container: dict[str, Any], host: str) -> int:
-    """What this deployment answers a request carrying `host`."""
+def answer(container: dict[str, Any], host: str, probe: str = "readinessProbe") -> int:
+    """What this deployment answers `probe`'s request, carrying `host`.
+
+    The path comes out of the rendered manifest rather than being named here,
+    so a probe repointed at something this application does not serve is a
+    404 rather than a test still asking about the old path.
+
+    One probe answers for both below, because a host is refused in middleware
+    before anything is routed -- the path cannot change that answer, and what
+    each path costs to serve is asserted separately.
+    """
+    asked = container[probe]["httpGet"]["path"]
     with override_settings(ALLOWED_HOSTS=as_the_pod_would_read_it(container)):
-        return Client().get(reverse("healthz"), headers={"host": host}).status_code
+        return Client().get(asked, headers={"host": host}).status_code
 
 
 @pytest.mark.django_db
@@ -103,8 +123,7 @@ def test_a_probe_is_answered_whatever_allowed_hosts_says(listed: str) -> None:
 
     Over every value that has broken this or plausibly could, because a probe
     that depends on the shape of `django.allowedHosts` is the mistake this
-    replaced. One request covers both probes: they ask for the same path with
-    the same headers, and that they do is asserted next door.
+    replaced.
     """
     # The ingress is off because its own guard would refuse most of these
     # values, for a reason that has nothing to do with what a probe does.
@@ -131,26 +150,82 @@ def test_the_hostname_a_browser_uses_is_answered_too() -> None:
     assert answer(backend_container(), "inventory.nycmesh.net") == 200
 
 
-def test_both_probes_ask_the_pod_for_a_path_and_port_it_serves() -> None:
-    """Everything about the probes that a host assertion cannot see.
+def test_neither_probe_asserts_anything_about_the_pod_it_dials() -> None:
+    """That they name no host is the fix `backend-deployment.yaml` explains.
 
-    That they name no host is the fix itself, for the reason
-    `backend-deployment.yaml` gives where they are declared. That they ask for a
-    path this application serves is the failure nothing else here would notice:
-    every host assertion above passes against a probe pointed at a 404.
+    The template says why where it declares them. That each asks a path this
+    application serves is asserted below instead, by driving it.
     """
     container = backend_container()
     served = container["ports"][0]
 
-    for probe in ("livenessProbe", "readinessProbe"):
+    for probe in QUERIES_ALLOWED:
         asked = container[probe]["httpGet"]
         assert asked.get("httpHeaders") is None, (
             f"the {probe} names a host, which asserts something about the pod; it reaches its own address"
         )
-        assert asked["path"] == reverse("healthz"), (
-            f"the {probe} asks for {asked['path']}, which this application does not serve"
-        )
         assert asked["port"] == served["name"]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("probe", "allowed"), QUERIES_ALLOWED.items())
+def test_a_probe_reaches_for_no_more_than_its_own_question_needs(
+    probe: str, allowed: int, django_assert_num_queries: Any
+) -> None:
+    """inventory-tng-uq6, asserted against the chart rather than against a name.
+
+    The bug was not that liveness asked for the wrong path; it was that the
+    path it asked for ran a query, so a database that went away took every
+    replica with it. This drives whatever path the manifest names and counts
+    what it costs, so repointing liveness at the readiness endpoint fails --
+    and so does repointing it at some endpoint that has no query today and
+    grows one later, which is the same bug arriving by a different road.
+    """
+    asked = backend_container()[probe]["httpGet"]["path"]
+
+    with django_assert_num_queries(allowed):
+        assert Client().get(asked).status_code == 200
+
+
+# What each probe's timing is, and therefore what docs/deployment.md is
+# allowed to say about it. Every field either probe relies on, including the
+# ones whose values happen to equal a Kubernetes default: a default that a
+# document quotes is a number this repository has taken responsibility for,
+# and leaving it out of here is how the document goes wrong on its own.
+TIMINGS = {
+    "livenessProbe": {
+        "initialDelaySeconds": 10,
+        "periodSeconds": 20,
+        "timeoutSeconds": 5,
+        "failureThreshold": 3,
+    },
+    "readinessProbe": {
+        "initialDelaySeconds": 5,
+        "periodSeconds": 10,
+        "timeoutSeconds": 1,
+        "failureThreshold": 3,
+    },
+}
+
+
+@pytest.mark.parametrize(("probe", "expected"), TIMINGS.items())
+def test_a_probe_waits_exactly_as_long_as_the_documents_say_it_does(probe: str, expected: dict[str, int]) -> None:
+    """The arithmetic is quoted in prose, so it is pinned where it is written.
+
+    docs/deployment.md#health-checks tells a deployer how long a wedged pod is
+    left alone before it is killed, and how long an unready one takes to leave
+    the Service. Both are products of fields here, and neither document nor
+    chart would notice the other changing. This is what makes them notice.
+    """
+    # Compared whole, minus the request itself, rather than by projecting the
+    # manifest onto the keys named here: a projection is blind in the
+    # direction that matters, because a field ADDED to the chart is not one of
+    # the keys and so is never looked at. Give readiness a longer deadline to
+    # survive load and the documented figure moves while a projection stays
+    # green.
+    declared = {field: value for field, value in backend_container()[probe].items() if field != "httpGet"}
+
+    assert declared == expected
 
 
 def test_an_ingress_host_no_allowed_host_covers_is_refused_at_render_time() -> None:

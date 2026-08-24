@@ -127,24 +127,62 @@ class ApiRootView(APIView):
 
 
 class HealthCheckView(APIView):
-    """Liveness and readiness probe used by Kubernetes.
+    """Readiness probe: whether this process can serve a request.
 
     Issues a trivial query so the check fails when the database is
-    unreachable, rather than reporting healthy while unable to serve.
-    See docs/deployment.md.
+    unreachable, rather than reporting healthy while unable to serve. Failing
+    it stops traffic reaching this pod rather than restarting it, which is
+    what a dependency's outage calls for.
+
+    Not the liveness probe. That is `GET /api/livez`, and what the two ask,
+    what pointing both at this one costs, and what the split gives up in
+    exchange are docs/deployment.md#health-checks.
     """
 
     # Deliberately public: probes run before authentication exists.
     permission_classes = [AllowAny]
 
     @extend_schema(
-        summary="Liveness and readiness probe",
+        summary="Readiness probe",
         responses=inline_serializer(name="HealthCheck", fields={"status": serializers.CharField()}),
     )
     def get(self, request: Request) -> Response:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
         return Response({"status": "ok"})
+
+
+class LivenessCheckView(APIView):
+    """Liveness probe: whether this process is still running.
+
+    Reaches for nothing of its own -- no database, no cache, no disk -- and
+    that is the whole of its design. A failed liveness probe is answered by
+    killing the container, so it may only report a fault that killing the
+    container repairs; every dependency this process has belongs on the
+    readiness probe at `GET /api/healthz` instead. Why that division is not a
+    matter of taste is docs/deployment.md#health-checks.
+
+    "Of its own" is exact rather than modest. What surrounds a request still
+    costs what it costs: a caller presenting a session cookie is looked up by
+    the middleware before this method is reached, and a caller asking for HTML
+    is answered by the browsable API. A kubelet does neither, which is why the
+    probe is free; anything else pointed at this path is not a kubelet and
+    should be weighed as what it is.
+    """
+
+    # Deliberately public: probes run before authentication exists.
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary="Liveness probe",
+        responses=inline_serializer(name="LivenessCheck", fields={"status": serializers.CharField()}),
+    )
+    def get(self, request: Request) -> Response:
+        # A different word from the readiness probe's, so that a person with
+        # curl and one of these responses knows which of the two they reached.
+        # Both words are written down in docs/deployment.md#health-checks,
+        # because a distinction nobody can look up is not one.
+        return Response({"status": "alive"})
 
 
 class KindSides(NamedTuple):

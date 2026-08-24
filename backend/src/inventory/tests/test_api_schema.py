@@ -153,8 +153,13 @@ def test_the_public_links_resolve_without_logging_in(client: Client) -> None:
 
     `me` is public for a third reason: the volunteer app asks it what it may do
     before anybody has signed in, and never will. See CurrentUserView.
+
+    Logged out first, because the shared fixture arrives signed in and this
+    test asserted nothing at all until it did.
     """
-    for name in ("api-root", "healthz", "me"):
+    client.logout()
+
+    for name in ("api-root", "healthz", "livez", "me"):
         assert client.get(reverse(name)).status_code == 200
 
 
@@ -193,9 +198,15 @@ def test_reading_is_not_declared_as_an_administrators_operation(schema: Mapping[
 
 
 def test_a_read_still_declares_the_refusal_it_can_answer_with(schema: Mapping[str, Any]) -> None:
-    """Anonymous callers get a 403 from every endpoint but three, so it is documented."""
+    """Anonymous callers get a 403 from all but a handful, so it is documented.
+
+    Which handful is `permissions.open_to_anybody`'s to say and deliberately
+    not a number here: this docstring carried one, and so did that predicate's,
+    and both were wrong. See inventory-tng-lb95.
+    """
     assert "403" in schema["paths"]["/api/items"]["get"]["responses"]
     assert "403" not in schema["paths"]["/api/healthz"]["get"]["responses"]
+    assert "403" not in schema["paths"]["/api/livez"]["get"]["responses"]
 
 
 def test_every_endpoint_addressing_one_row_declares_its_404(schema: Mapping[str, Any]) -> None:

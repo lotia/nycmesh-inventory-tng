@@ -81,7 +81,7 @@ need one.
   [decision 0022](decisions/0022-an-empty-variable-is-an-unset-one.md), with no
   fallback for secrets — so a misconfigured deployment fails at boot rather
   than starting insecurely.
-- **`inventory/`** — the domain app. Holds the health-check endpoint and the
+- **`inventory/`** — the domain app. Holds the two probe endpoints and the
   data model, catalogue and ledger both; see [docs/data-model.md](data-model.md) for the entity
   model. Catalogue records carry edit history through
   [django-simple-history](https://django-simple-history.readthedocs.io/), as
@@ -183,8 +183,8 @@ Named here so the gaps are visible rather than surprising:
   below — so what is missing is the screens that use it. Who may write what is
   settled in [decision 0012](decisions/0012-two-populations.md) and where
   administrators work in [0014](decisions/0014-one-interface.md). Every API
-  endpoint but the index, the health check and `/api/me` still requires a
-  session, including the two a volunteer needs.
+  endpoint but the ones [DEVELOPERS.md](../DEVELOPERS.md#signing-in) lists
+  still requires a session, including the two a volunteer needs.
 - **Migration from the existing Google Sheet** (52 items, 3,439 submissions).
   It is built: `manage.py stage_sheet` loads an export into the
   staging tables, `manage.py mint_items` and `manage.py import_volunteers` mint

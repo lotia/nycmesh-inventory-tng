@@ -157,10 +157,16 @@ def administrators_only(view: APIView, method: str) -> bool:
 def open_to_anybody(view: APIView) -> bool:
     """Whether this view asks nothing at all of the caller.
 
-    True of the three endpoints that have to answer before anybody has signed
-    in, or finished signing in: the index that hands out the CSRF cookie, the
-    health check the cluster probes, and ``/api/me``, whose whole job is to say
-    what the caller is. Everything else is guarded by something.
+    True of every endpoint that has to answer before anybody has signed in, or
+    finished signing in: the index that hands out the CSRF cookie, the two
+    checks the cluster probes, ``/api/me``, whose whole job is to say what the
+    caller is, and the credential-free reports and descriptions beside them.
+
+    Deliberately not a count. It carried one until this sentence replaced it,
+    and the count was wrong by five: two changes in a row incremented it
+    instead of recounting, which is what a number nothing checks does. The
+    enumeration belongs in a test that fails when it stops being true, and
+    that is inventory-tng-lb95.
 
     One predicate rather than an ``AllowAny`` check repeated wherever the
     question comes up -- the schema asks it to decide whether an operation can

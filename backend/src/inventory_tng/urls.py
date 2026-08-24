@@ -18,6 +18,7 @@ from inventory.views import (
     LabelListView,
     LabelResolveView,
     LabelSheetView,
+    LivenessCheckView,
     LocationDetailView,
     LocationListView,
     StockTransactionCreateView,
@@ -49,9 +50,15 @@ urlpatterns = [
     # No trailing slash, matching every other endpoint below.
     path("api", ApiRootView.as_view(), name="api-root"),
     path("api/healthz", HealthCheckView.as_view(), name="healthz"),
+    # Asked by the kubelet and by nobody else, which is why it is not in
+    # ENDPOINTS beside the readiness check above: a client discovering this
+    # API has no use for a question only a kubelet acts on. See
+    # LivenessCheckView for what separates the two, and the chart's
+    # backend-deployment.yaml for which probe asks which.
+    path("api/livez", LivenessCheckView.as_view(), name="livez"),
     path("api/me", CurrentUserView.as_view(), name="me"),
     # Where a browser reports what it could not handle. Credential-free like
-    # the two beside it, and argued in decision 0012.
+    # the ones beside it, and argued in decision 0012.
     path("api/client-failures", ClientFailureView.as_view(), name="client-failures"),
     # Asked by nginx before it forwards a browser's spans to the collector,
     # never by the app itself. See DebugTraceVerifyView and
