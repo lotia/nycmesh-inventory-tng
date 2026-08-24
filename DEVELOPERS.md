@@ -23,6 +23,31 @@ Two things, and nothing else installed globally:
 | [mise](https://mise.jdx.dev/getting-started.html) | Installs the pinned Python, Node, uv, and Helm versions. No system Python or Node needed. | `curl https://mise.run \| sh` |
 | [Docker](https://docs.docker.com/get-started/get-docker/) | Runs PostgreSQL, and optionally the whole stack. | Platform installer |
 
+If you intend to run a coding agent in this repository — Claude Code, Codex,
+Gemini or another — there are three more, and they are listed separately
+because they are **not** what running the application needs:
+
+| Tool | Why an agent session needs it |
+| --- | --- |
+| `git` | Every guardrail in `scripts/` reads the repository through it. |
+| `python3` | The commit checker and [the landing gate](#when-a-branch-is-ready-to-merge) both read through it. |
+| [`gh`](https://cli.github.com/), authenticated | The landing gate asks GitHub what a pull request's head is and what has been posted to it. `gh auth login` once. |
+
+**A shim is not enough for these three, and that is the whole reason they are
+called out.** Hooks and git hooks inherit whatever `PATH` the invoking process
+had, which is not always an activated shell: a GUI git client, a launcher, or a
+terminal where mise was never activated are all real cases. `mise.toml` pins a
+Python for the project rather than installing one globally, so `python3` can be
+absent exactly there. The checkers refuse rather than pass when one of these is
+missing — that is deliberate, and
+[the landing gate](#when-a-branch-is-ready-to-merge) explains why — so the
+symptom is a command that will not run and a message naming the program, not a
+guard that quietly stopped guarding.
+
+```bash
+git --version && python3 --version && gh auth status
+```
+
 [Podman](https://podman.io/) works too — substitute `podman compose` for
 `docker compose` in the commands below. The images are fully qualified
 (`docker.io/library/...`) so Podman resolves them without extra configuration.
@@ -1273,6 +1298,22 @@ Simplification runs afterwards, over the same pull request, under the same
 rules. Its findings are posted to the pull request before they are applied —
 "these three issues each grew the same helper" is the third row by construction.
 
+**Each findings comment carries a marker**, on a line of its own anywhere in the
+body:
+
+```
+<!-- review-cycle: code-review -->
+<!-- review-cycle: simplify -->
+```
+
+They are what [the landing gate](#when-a-branch-is-ready-to-merge) reads as
+evidence that a pass happened, and they are the reason it can record what it
+found rather than what it was told. A review submitted through GitHub's review
+API — which is what `/code-review --comment` leaves behind — already counts for
+the first, so in practice the marker only has to be typed on the simplify
+comment. It is the same device as the `<!-- batch-contents -->` marker CI posts,
+for the same reason: a marker survives rewording and prose does not.
+
 ### Merging
 
 Squash merge and merge commits are disabled on this repository, so the merge
@@ -1336,7 +1377,59 @@ Two it cannot see, and they are the ones a person has to hold to:
 Nobody is asked to weigh those against anything. A branch that does not meet
 them is one to finish, and whoever finished it merges it — an agent working a
 batch does not stop to ask, for the same reason a contributor with write access
-does not. `.claude/hooks/landing-gate.sh` reminds a Claude Code session about
-the second pair by refusing the merge until they are recorded, but it is a
-local convenience: it is not in the repository, and nothing enforces them for
-anybody else.
+does not.
+
+`scripts/landing-gate.sh` is what holds a Claude Code session to that second
+pair. It ships with the repository and is registered in the tracked
+`.claude/settings.json`, so a fresh clone, a fork and every worktree get it. It
+refuses `gh pr merge` until the cycle has been recorded against the exact head
+being merged, refuses `gh pr ready` while the checks are not green, and refuses
+a push that would land on `main`.
+
+"Would land on `main`" is asked of git rather than read off the command line,
+so a bare `git push` on a checked-out `main` and `git push origin HEAD` are
+both refused, and a branch called `batch/main-fix` is not.
+
+`record` stores what it found on the pull request — the review submissions and
+the marker comments from [One review pass](#one-review-pass-findings-filed-per-issue),
+by id, author and timestamp — and refuses to write a receipt for a stage with
+nothing behind it:
+
+```bash
+scripts/landing-gate.sh record <pr>     # as its own command; see below
+scripts/landing-gate.sh status          # what is recorded, and on what evidence
+scripts/landing-gate.sh clear [<pr>]
+```
+
+Two things about it are worth knowing before you meet them.
+
+**It fails closed, on purpose.** A missing `python3` or `gh`, or a `gh` that is
+unauthenticated or rate-limited, makes it *refuse* the command and name the
+program it could not find — see
+[Prerequisites](#prerequisites) for the three an agent session needs. It used to
+fail open in exactly those three ways, which is worse than having no gate at
+all: the rule above goes on being believed while nothing is checking it, and
+nothing announces that the guard has stopped working. Only the commands it
+guards are affected; everything else runs as normal.
+
+A `gh` that is merely *slow* is the same case, and it needs its own deadline
+rather than the hook's: a hook killed for exceeding its timeout prints no
+verdict, and no verdict is read as permission. So the gate gives `gh` a shorter
+deadline than the timeout registered in `.claude/settings.json` and refuses in
+time to say so. Set `GH_DEADLINE` if a slow network makes it refuse honest
+commands — but raise the registered timeout with it, or the harness kills the
+gate before it can speak. The one place the same reasoning points the other way
+is `clear <pr>`: rather than treat a receipts file it cannot parse as empty and
+rewrite it, it refuses and leaves the file alone. `clear` with no argument is
+the way out, and it removes the file whole.
+
+**`record` must be its own command.** Piping it — `record 12 | tail -2 && gh pr
+merge 12` — takes the pipeline's exit status, so the record does not take
+effect and the merge is then refused with "No review cycle has been recorded",
+which reads like the record failed rather than like the shell ate it.
+
+What it is not is a security boundary. It reads a command line, and a command
+line has more spellings than any reader has patterns; the enforcement that
+matters is the four rules `main` holds itself. It is a guardrail against
+forgetting, and [0020](docs/decisions/0020-who-merges.md) is the decision about
+what may rest on one.

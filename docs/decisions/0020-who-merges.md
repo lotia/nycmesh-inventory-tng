@@ -41,15 +41,22 @@ that is not a `batch/*` branch.
 
 ## Consequences
 
-The honest cost is that **the review cycle having happened is now attested
-rather than checked.** `.claude/hooks/landing-gate.sh` refuses a merge until
-the cycle is recorded, but it records whatever it is told, it is not in the
-repository, and it runs for one editor on one machine —
-`inventory-tng-3sp` is the work of deciding whether that becomes a real
-guarantee or stays a reminder. Until it is answered, this decision rests on
-the same thing every other repository rule here rests on: that the person or
-agent doing the work follows it, and that the pull request records enough for
-anyone to check afterwards.
+The honest cost is that **the review cycle having happened is attested rather
+than proven.** `inventory-tng-3sp` asked whether the gate this rests on should
+become a real guarantee or stay a reminder, and answered it by making it as
+real as a client-side guard can be: `scripts/landing-gate.sh` now ships with
+the repository, is registered in tracked settings so every clone and worktree
+has it, refuses rather than permits whenever a dependency is missing, and
+records the artifacts it found on the pull request rather than a literal it was
+handed. Three of the four things this paragraph originally conceded are no
+longer true.
+
+The fourth stands and is not fixable here. A marker comment can be posted by
+somebody who reviewed nothing, and a command line can be spelt in ways no
+reader catches; a client-side gate can make forgetting hard and cannot make
+lying hard. So this decision still rests on the same thing every other
+repository rule here rests on: that the person or agent doing the work follows
+it, and that the pull request records enough for anyone to check afterwards.
 
 That last part is what makes the trade acceptable rather than reckless. Under
 0017 every review, every triage and every answered finding is already written

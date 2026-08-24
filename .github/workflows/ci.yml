@@ -487,6 +487,8 @@ jobs:
         run: scripts/bootstrap-dev.test.sh
       - name: Check the setup checker
         run: scripts/check-setup.test.sh
+      - name: Check the landing gate
+        run: scripts/landing-gate.test.sh
       # And then run it, which none of the above do to their own subject. What
       # it reads here is what a clone is handed before anybody configures
       # anything, so a hook that stopped arriving with the checkout is caught
