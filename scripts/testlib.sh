@@ -33,11 +33,19 @@ check() {
 }
 
 # A throwaway directory, removed however the suite exits.
+#
+# Also the point at which the machine stops being an input. A `git init` here
+# still reads the person's own global and system configuration, so a setting
+# any of them carries -- `core.hooksPath` is the one that caught this -- turns
+# a suite red on their laptop and stays green on a bare runner, which is the
+# worst way round. /dev/null reads as a configuration with nothing in it.
 workspace() {
   WORK=$(mktemp -d)
   # shellcheck disable=SC2064  # $WORK is wanted now, not when the trap fires
   trap "rm -rf '$WORK'" EXIT
   export WORK
+  export GIT_CONFIG_GLOBAL=/dev/null
+  export GIT_CONFIG_SYSTEM=/dev/null
 }
 
 # A git repository with an identity, which several suites need before they can

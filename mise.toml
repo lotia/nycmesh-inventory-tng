@@ -8,3 +8,10 @@ uv = "latest"          # backend package manager
 node = "24"            # frontend runtime (current LTS)
 helm = "latest"        # renders/validates the deployment chart in infra/helm/
 devcontainer-cli = "latest"
+
+# `mise tasks` lists these; `mise run <name>` runs one. Named here so that the
+# tool a contributor has already installed can tell them what there is to run,
+# rather than the answer living only in a document they have to find first.
+[tasks.setup]
+description = "Set this clone up: toolchain, .env, git hooks, database, seed"
+run = "scripts/bootstrap-dev.sh"

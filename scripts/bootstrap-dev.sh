@@ -70,6 +70,103 @@ else
   note "Wrote .env from .env.sample. Nothing in it needs changing to start."
 fi
 
+step "Git hooks"
+# The checkers under scripts/ can refuse a commit before it exists, but only if
+# git has been pointed at the directory holding them -- and that pointer lives
+# in .git/config, which a clone does not carry. So a checkout arrives with the
+# hooks in the tree and runs none of them until this runs.
+#
+# .beads/hooks is where they go because beads already owns that directory and
+# already keeps five hooks of its own in it; DEVELOPERS.md#checking-it says why
+# a second directory is not an option, and says that those five start running
+# too, because this pointer is what arms all six.
+HOOKS=.beads/hooks
+
+# Asked about THIS directory rather than "am I inside a repository", which is a
+# different question with the same answer nearly always. A copy unpacked under
+# somebody else's checkout is inside one, and wiring it there would aim their
+# git at a directory that is not in their tree -- turning every hook they had
+# off, in a repository this script was never pointed at.
+if ! [[ "$(git rev-parse --show-toplevel 2>/dev/null)" -ef "$ROOT" ]]; then
+  note "This is not a git checkout of its own, so there are no hooks to install."
+else
+  # Made now so that every path below resolves to something whether or not this
+  # clone has ever run beads. It writes nothing if the directory is there.
+  mkdir -p "$HOOKS"
+
+  # The link and its target first, and the pointer to them afterwards. A
+  # checkout that cannot hold a symlink -- core.symlinks off, or a filesystem
+  # without them -- is then refused while git is still running the hooks it was
+  # running before, rather than aimed at a directory this script is about to
+  # call broken.
+  hook=$HOOKS/commit-msg
+  if [[ -e "$hook" || -L "$hook" ]]; then
+    note "The commit-msg hook is already there."
+  else
+    # Only reachable in a checkout made before the hook was tracked; a clone
+    # taken since brings it along.
+    ln -s ../../scripts/check-commit.sh "$hook"
+    note "Linked $hook to the commit checker."
+  fi
+
+  # Said here rather than left for the first refused commit, because a hook
+  # that cannot run is a hook git reports as a failed commit and nothing else.
+  target=$(readlink -f "$hook" || true)
+  [[ "$target" == "$ROOT/scripts/check-commit.sh" ]] ||
+    die "$hook should lead to $ROOT/scripts/check-commit.sh and leads to ${target:-nothing}.
+Delete it and run this script again to have it made afresh."
+  [[ -x "$target" ]] ||
+    die "$target is not executable, so git could not run it. Fix it with:
+
+  chmod +x $target"
+
+  # Every scope, not the local one alone, and the same question
+  # scripts/check-setup.sh asks so the two cannot answer differently. A local
+  # value overrides a global one, so reading only local means writing one over
+  # somebody's global hooks -- signing, secret scanning, an employer's policy
+  # -- and reporting that as success.
+  #
+  # Compared by where the paths lead rather than by how they are spelled: beads
+  # writes an absolute one and this writes a relative one, and they name the
+  # same directory. And one directory serves every worktree of a repository,
+  # because core.hooksPath is shared with them all, so the main checkout's is
+  # right for a linked worktree too and is what git will really run.
+  main_hooks=$(dirname "$(readlink -f "$(git rev-parse --git-common-dir)")")/$HOOKS
+  configured=$(git config --get core.hooksPath || true)
+  if [[ -z "$configured" ]]; then
+    # Whatever is in git's own hooks directory stops running the moment
+    # core.hooksPath names anywhere else, and git says nothing about it. That
+    # is where pre-commit, husky and a hand-written hook all put their files,
+    # none of which set core.hooksPath -- so nothing above would have noticed.
+    shopt -s nullglob
+    for installed in "$(git rev-parse --git-path hooks)"/*; do
+      [[ -x "$installed" && "$installed" != *.sample ]] || continue
+      note "Note: ${installed##*/} and anything beside it in git's own hooks"
+      note "directory stop running now, because one hooks directory is all git"
+      note "takes. Move what you keep there into $HOOKS."
+      break
+    done
+    shopt -u nullglob
+    git config --local core.hooksPath "$HOOKS"
+    note "Pointed core.hooksPath at $HOOKS. beads' five hooks run from here too."
+  elif [[ "$(readlink -f "$configured")" == "$(readlink -f "$HOOKS")" ]] ||
+    [[ "$configured" -ef "$main_hooks" ]]; then
+    note "core.hooksPath already points at $HOOKS. Left as it was."
+  else
+    # Somebody chose this, and a single path is all git takes -- so overwriting
+    # it would silently stop whatever they pointed it at. Theirs to move, not
+    # ours.
+    scope=$(git config --show-scope --get core.hooksPath 2>/dev/null | cut -f1)
+    die "core.hooksPath is set to $configured${scope:+, in your $scope configuration}, and this repository's hooks are in $HOOKS.
+Only one directory can be in force at a time, so this will not overwrite yours.
+Move what you keep in $configured into $HOOKS, then run:
+
+  git config --local core.hooksPath $HOOKS
+
+and run this script again."
+  fi
+fi
+
 step "PostgreSQL"
 # Which port the container will be published on, and so which one has to be
 # free. compose.yaml reads the same variable; .env is where a person sets it.

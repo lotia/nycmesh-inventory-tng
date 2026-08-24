@@ -485,6 +485,16 @@ jobs:
         run: scripts/say-batch.test.sh
       - name: Check the bootstrap script
         run: scripts/bootstrap-dev.test.sh
+      - name: Check the setup checker
+        run: scripts/check-setup.test.sh
+      # And then run it, which none of the above do to their own subject. What
+      # it reads here is what a clone is handed before anybody configures
+      # anything, so a hook that stopped arriving with the checkout is caught
+      # on the push that broke it rather than by the next contributor.
+      # --shipped-only because this checkout has no git configuration of its
+      # own and nothing here commits; the script's header is why.
+      - name: The commit hook this repository ships is intact
+        run: scripts/check-setup.sh --shipped-only
 
   history:
     name: One issue per commit

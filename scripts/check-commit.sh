@@ -37,9 +37,9 @@ MESSAGE=${1:?usage: check-commit.sh [--amend] [--message-only] <message-file>}
 REPO_ROOT=$(git rev-parse --show-toplevel) || exit 1
 ISSUES=".beads/issues.jsonl"
 
-# readlink -f first: DEVELOPERS.md has you install this as a symlink into
-# .beads/hooks, and bash reports the link's own path here rather than the
-# file's, so "beside me" would be the hooks directory.
+# readlink -f first: .beads/hooks/commit-msg is a symlink to this file and is
+# how this normally runs, and bash reports the link's own path here rather than
+# the file's, so "beside me" would be the hooks directory.
 _here=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 . "$_here/report.sh"
 . "$_here/trailers.sh"
