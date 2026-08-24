@@ -45,12 +45,20 @@ match nothing and post the delivery a second time.
 
 ## Why the ledger is the one part it will decline to write
 
-A catalogue row somebody did not want can be deleted. A movement cannot: the
+A catalogue row somebody did not want can be undone. A movement cannot: the
 two ledger tables refuse UPDATE and DELETE outright, which is what decision
 0016 settles, so invented stock posted into a database holding real stock could
 never be taken back out. This therefore writes the catalogue always and the
 ledger only while nothing but its own transactions are in there, and says which
 of the two happened.
+
+UNDONE RATHER THAN DELETED, and the distinction is not pedantry. This mints
+labels, and `Label.item` is PROTECT, so an invented item cannot be deleted
+while its sticker exists -- delete the label first, or mark the row inactive,
+which is what an administrator does with a real one anyway. Saying "deleted"
+here promised something the guard took away, and on the declined-ledger path,
+where nothing else refers to these rows, the label was the only thing standing
+in the way.
 """
 
 from collections import Counter

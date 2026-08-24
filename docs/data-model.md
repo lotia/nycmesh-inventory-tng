@@ -150,6 +150,18 @@ the same thing, but the database could not then enforce it and the columns
 would lose their types — normalisation is worth more here than the flexibility
 of pointing a label at some future third kind of target.
 
+Both of those keys are `PROTECT`: an item or a location a label names cannot be
+deleted while the label exists. The sticker is on a shelf and the code cannot be
+worked out again, so a row removed out from under one would leave a scan
+resolving to nothing for ever. It is not narrowed to labels still in use — a
+revoked sticker still says what it pointed at.
+
+**The guard is Django's, not the database's.** `PROTECT` is enforced in the
+ORM's collector, and Postgres was never asked to cascade these in the first
+place, so a `DELETE` issued through `dbshell` reaches the row regardless. What
+that buys is every path the application itself has — the admin, a management
+command, a shell, an endpoint — and no more.
+
 This replaces the current scheme, in which the QR encodes a Google Form URL with
 the item's display name embedded in a query parameter.
 

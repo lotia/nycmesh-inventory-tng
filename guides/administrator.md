@@ -102,14 +102,27 @@ has moved on.
 ### About the Delete button
 
 There is a **Delete** button on this page, and on an item, a location and a
-label. **Never use it on an item or on a location.** Deleting either also
-deletes every label pointing at it, without warning and without asking. Those
-codes are printed on stickers that are already on shelves, they cannot be
-worked out again, and scanning one afterwards finds nothing, for ever. That is
-`inventory-tng-6pr`.
+label. **Do not use it.** Use **Merged into** and **Active** instead: those are
+how a record is taken out of use, and deleting is not the same thing.
 
-**Merged into** and **Active** are how a record is taken out of use. Deleting
-is not the same thing and is never the answer here.
+An item or a location that a sticker points at now refuses to be deleted, which
+is a guard rather than a permission. Those codes are printed on stickers
+already on shelves, a code cannot be worked out again, and scanning one whose
+row had gone would find nothing, for ever.
+
+**The guard does not cover everything, so do not read a refusal as the only
+thing standing between you and a mistake.** Deleting an item still takes its
+barcodes and its legacy NYCM codes with it — those are printed too — and its
+recorded purchase prices. That is
+`inventory-tng-6kyb`.
+Deleting a label is still offered and still works, though the app itself has
+no way to do it: `inventory-tng-ls6d`.
+
+**And what the refusal says varies.** Where a sticker is the only thing in the
+way, the page names the label codes it is protecting. Where the row has also
+moved stock, Django reports it as a permissions problem about "stock movement"
+instead and shows no code at all — the row is still safe either way, but the
+message is not always the one that explains why.
 
 ---
 
