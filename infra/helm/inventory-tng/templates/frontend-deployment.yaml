@@ -35,6 +35,14 @@ spec:
             # origin and no API URL is baked into the bundle.
             - name: BACKEND_ORIGIN
               value: http://{{ include "inventory-tng.fullname" . }}-backend:{{ .Values.backend.port }}
+            # Where a browser's own spans are forwarded, for whoever holds a
+            # debug token. Empty here means the image's default, which refuses
+            # the connection -- this chart renders no collector, and pointing
+            # at the cluster's is a value somebody sets. docs/observability.md.
+            {{- with .Values.frontend.collectorOrigin }}
+            - name: COLLECTOR_ORIGIN
+              value: {{ . | quote }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /

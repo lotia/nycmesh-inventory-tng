@@ -204,6 +204,19 @@ services:
       - backend
     environment:
       BACKEND_ORIGIN: http://backend:8000
+      # Where the browser's spans go, when somebody has a debug token and the
+      # collector profile is up. Set alongside OTEL_EXPORTER_OTLP_ENDPOINT by
+      # the command in docs/observability.md, on the command line for the same
+      # reason that one is.
+      #
+      # NOT DEFAULTED TO `collector`, which is what shipped and what stopped
+      # this stack serving anything at all. nginx resolves a `proxy_pass` host
+      # once, at startup, and refuses to start when it does not resolve -- so
+      # naming a service that exists only under the `telemetry` profile killed
+      # the frontend container of the ordinary quickstart with `host not found
+      # in upstream`. frontend/Dockerfile defaults to this discard address and
+      # says why; there is nothing for compose to improve on.
+      COLLECTOR_ORIGIN: ${COLLECTOR_ORIGIN:-http://127.0.0.1:9}
     ports:
       - "8080:8080"
 

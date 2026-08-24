@@ -7,6 +7,8 @@
  * environment would compile an environment into the bundle and break that.
  */
 
+import { HEADER, asked as tracing } from "../telemetry/flag";
+
 /**
  * A request the API answered, and refused.
  *
@@ -91,10 +93,26 @@ function csrfToken(): string {
  * an abort stays an abort, that a refusal keeps its parsed body -- is the
  * same, and two copies of it are two places for one of them to drift.
  */
+/**
+ * The headers this request carries beyond the caller's own.
+ *
+ * One header, and only while an administrator has asked for this device to be
+ * recorded: the signed token from `telemetry/flag.ts`. The backend records a
+ * request carrying it in full whatever its sampling rate says, so a volunteer
+ * meeting a failure produces the trace that explains it.
+ */
+function asked(init: RequestInit): RequestInit {
+  const token = tracing();
+  if (token === null) {
+    return init;
+  }
+  return { ...init, headers: { ...init.headers, [HEADER]: token } };
+}
+
 async function request<T>(path: string, init: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(path, init);
+    response = await fetch(path, asked(init));
   } catch (cause) {
     // An abort is the caller's own doing -- a search moving on, a screen
     // closing -- so it is re-thrown rather than dressed up as a failure.

@@ -10,6 +10,7 @@ from inventory.views import (
     CategoryDetailView,
     CategoryListView,
     CurrentUserView,
+    DebugTraceVerifyView,
     HealthCheckView,
     ItemDetailView,
     ItemListView,
@@ -48,6 +49,10 @@ urlpatterns = [
     path("api", ApiRootView.as_view(), name="api-root"),
     path("api/healthz", HealthCheckView.as_view(), name="healthz"),
     path("api/me", CurrentUserView.as_view(), name="me"),
+    # Asked by nginx before it forwards a browser's spans to the collector,
+    # never by the app itself. See DebugTraceVerifyView and
+    # frontend/nginx.conf.template.
+    path("api/debug-trace", DebugTraceVerifyView.as_view(), name="debug-trace"),
     path("api/volunteers", VolunteerListCreateView.as_view(), name="volunteers"),
     path("api/volunteers/<int:pk>", VolunteerDetailView.as_view(), name="volunteer-detail"),
     path("api/items", ItemListView.as_view(), name="items"),

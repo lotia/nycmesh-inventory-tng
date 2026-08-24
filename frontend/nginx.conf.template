@@ -14,6 +14,34 @@ map $http_x_forwarded_proto $forwarded_proto {
     http    http;
 }
 
+# What a span post is counted against.
+#
+# NOT `$binary_remote_addr`, which is what shipped and what made this limit
+# mean something other than it says. This container sits behind an ingress and
+# sees the client only through a header -- the same fact that puts the
+# administrative narrowing at that boundary rather than here -- so every
+# browser in the deployment arrived as one address and shared one bucket. Two
+# volunteers handed debug links during the same incident, or a single batch
+# flush of more than `burst`, and nginx answered 503 to the session actually
+# being debugged.
+#
+# The token is what the allowance is about. It is one debugging session by
+# construction, it is the same thing the backend counts its own
+# DEBUG_TRACE_RATE against, and `auth_request` below refuses any that this
+# deployment did not sign. A post arriving with no token has nowhere to go
+# anyway, so those fall back to the address and are counted together.
+map $http_x_debug_trace $span_bucket {
+    ""      $binary_remote_addr;
+    default $http_x_debug_trace;
+}
+
+# How much of the browser's own telemetry one session may post. A page reloaded
+# in a loop, or a tab left open overnight, must not be able to fill whatever
+# the collector writes to -- and the exporter batches, so a real session posts
+# every few seconds rather than every span. Defined here because a zone is
+# shared by every worker and cannot be declared inside a location.
+limit_req_zone $span_bucket zone=spans:1m rate=2r/s;
+
 server {
     listen       8080;
     server_name  _;
@@ -64,6 +92,41 @@ server {
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $forwarded_proto;
+    }
+
+    # Where the browser posts its spans, forwarded to the collector.
+    #
+    # SAME-ORIGIN BECAUSE THE POLICY SAYS SO. `connect-src 'self'` below is not
+    # to be widened -- an exporter pointed straight at a collector would be
+    # blocked by it, and admitting one origin admits it for everything else
+    # this page could be made to fetch. So the browser posts here and nginx
+    # forwards, which also keeps the collector off the internet entirely.
+    #
+    # AND IT IS NOT AN OPEN WRITE PATH. `auth_request` asks Django whether the
+    # X-Debug-Trace header carries a token it signed and has not expired;
+    # nothing is forwarded until that answers 204. nginx cannot check a
+    # signature itself, which is why this is a subrequest rather than a rule.
+    # See DebugTraceVerifyView and backend/src/inventory_tng/debugging.py.
+    #
+    # A batch from one page is kilobytes, so the body cap is small and the
+    # rate is two a second. Both are the bound on what a leaked token can cost.
+    location /v1/traces {
+        auth_request       /api/debug-trace;
+        limit_req          zone=spans burst=5 nodelay;
+        client_max_body_size 64k;
+        proxy_pass         ${COLLECTOR_ORIGIN};
+        proxy_set_header   Host $host;
+    }
+
+    # The subrequest above, and nothing else: it is not routable from outside,
+    # so a client cannot use this deployment to test tokens against.
+    location = /api/debug-trace {
+        internal;
+        proxy_pass         ${BACKEND_ORIGIN}/api/debug-trace;
+        proxy_pass_request_body off;
+        proxy_set_header   Content-Length "";
+        proxy_set_header   Host $host;
         proxy_set_header   X-Forwarded-Proto $forwarded_proto;
     }
 

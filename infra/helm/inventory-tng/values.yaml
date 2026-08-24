@@ -25,6 +25,11 @@ backend:
 frontend:
   replicaCount: 2
   port: 8080
+  # Where the browser posts its spans, forwarded by nginx so the page's own
+  # content policy stays as it is. Empty unless this cluster runs a collector;
+  # nothing posts here without a signed debug token either way. See
+  # docs/observability.md.
+  collectorOrigin: ""
   resources:
     requests:
       cpu: 50m

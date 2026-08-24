@@ -32,6 +32,7 @@ request's span has already been created and sampled, which is too late to
 decide anything about it.
 """
 
+import functools
 import secrets
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -223,11 +224,57 @@ def asked(token: str) -> Iterator[None]:
         _authorised.reset(held)
 
 
+# The name of the one route that carries a token and is not a request being
+# traced: nginx asks it before forwarding a batch of the browser's spans, so it
+# arrives once per exporter flush -- every few seconds, for the length of a
+# session.
+#
+# THE NAME AND NOT THE PATH. The path was written here as a literal, which made
+# it the third copy of the same string -- `urls.py`, here, and
+# `frontend/nginx.conf.template` -- and the one whose going out of step is
+# silent: a route renamed with this left behind starts quietly draining the
+# allowance again, which is the defect this whole function exists to have
+# fixed. Reversed rather than compared, so the URLconf is the single place the
+# path is written.
+VERIFYING = "debug-trace"
+
+
+@functools.cache
+def _verifying_path() -> str:
+    """Resolved once, and not at import: `urls` reaches `views`, which reaches
+    this module, so asking at import time is a cycle.
+    """
+    from django.urls import reverse
+
+    return reverse(VERIFYING)
+
+
+def spends_the_allowance(path: str) -> bool:
+    """Whether a request on this path should be charged to the token.
+
+    `DebugTraceVerifyView` states the rule; this is where it is kept, because
+    the wrapper below runs OUTSIDE Django and therefore reaches the view that
+    was written believing it did not. So nginx's `auth_request` was spending
+    the allowance meant for the requests it was authorising -- around a fifth
+    of a 60/min budget at an ordinary export interval, with `counted` filing
+    each one as an honoured trace besides -- and once the window ran out the
+    volunteer's own requests stopped being recorded while the exporter kept
+    posting.
+
+    A test through Django's `Client` cannot see any of this: that client does
+    not go through `inventory_tng.wsgi.application`, which is the thing that
+    charges. `inventory_tng.context` names that divergence as exactly the
+    defect inventory-tng-iqff.1 was.
+    """
+    return path != _verifying_path()
+
+
 def guarded(application: Any) -> Any:
     """The WSGI application, wrapped so the sampler can be told before it runs."""
 
     def serving(environ: dict[str, Any], start_response: Any) -> Any:
-        with asked(environ.get(ENVIRON, "")):
+        charged = environ.get(ENVIRON, "") if spends_the_allowance(environ.get("PATH_INFO", "")) else ""
+        with asked(charged):
             return application(environ, start_response)
 
     return serving
@@ -252,7 +299,8 @@ def guarded_asgi(application: Any) -> Any:
     """
 
     async def serving(scope: dict[str, Any], receive: Any, send: Any) -> None:
-        with asked(presented(scope) if scope.get("type") == "http" else ""):
+        http = scope.get("type") == "http" and spends_the_allowance(scope.get("path", ""))
+        with asked(presented(scope) if http else ""):
             await application(scope, receive, send)
 
     return serving
