@@ -1383,8 +1383,10 @@ does not.
 pair. It ships with the repository and is registered in the tracked
 `.claude/settings.json`, so a fresh clone, a fork and every worktree get it. It
 refuses `gh pr merge` until the cycle has been recorded against the exact head
-being merged, refuses `gh pr ready` while the checks are not green, and refuses
-a push that would land on `main`.
+being merged, refuses `gh pr ready` while the checks are not green, refuses a
+push that would land on `main`, and refuses a bare `git push --force` or `-f` —
+`--force-with-lease` is free, and [AGENTS.md](AGENTS.md#git) says why the two
+are on opposite sides of that line.
 
 "Would land on `main`" is asked of git rather than read off the command line,
 so a bare `git push` on a checked-out `main` and `git push origin HEAD` are
