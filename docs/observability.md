@@ -350,6 +350,13 @@ and starts its own tracing. A badge says so on screen with a **Stop** beside
 it, because the person holding the phone did not choose this and a switch
 nobody can see is a switch nobody turns off.
 
+**Two things end it, and both take the same path down.** Pressing **Stop**
+shuts the SDK down and forgets the token; so does the hour running out, on its
+own, with nothing tapped. Either way the provider is shut down rather than left
+running — a flush of what is queued, then no more spans — and the badge goes
+when that has finished rather than before it, so what is on screen never
+outlives what the phone is doing.
+
 With no token the app starts nothing at all: no SDK, no exporter, no header.
 
 By hand, without a browser:

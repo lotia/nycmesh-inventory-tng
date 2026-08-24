@@ -7,11 +7,21 @@
  * carrying one is forwarded, screenshotted and pasted back.
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { report, watch } from "./errors";
-import { asked, claimed, forget, HEADER, LIFETIME, remember, settle, withoutIt } from "./flag";
+import {
+  asked,
+  claimed,
+  forget,
+  HEADER,
+  LIFETIME,
+  remember,
+  runsOutIn,
+  settle,
+  withoutIt,
+} from "./flag";
 import { Recording } from "./Recording";
 import { described, FAILURES, failed } from "./report";
 import { recording, start, stop } from "./start";
@@ -171,21 +181,133 @@ describe("failures nobody caught", () => {
 
 describe("the indicator", () => {
   it("is absent unless this device is being recorded", () => {
-    render(<Recording recording={false} />);
+    render(<Recording />);
 
     expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
   });
 
-  it("says so in words, and stopping it forgets the token", () => {
+  it("says so in words, and stopping it forgets the token", async () => {
     remember(TOKEN);
-    render(<Recording recording />);
+    await start(TOKEN);
+    render(<Recording />);
 
     expect(screen.getByText(/Recording this device/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Stop" }));
 
     expect(asked()).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Stop" })).toBeNull());
+  });
+
+  it("and goes when the SDK does, rather than when it was told to", async () => {
+    // Why the badge asks rather than remembering is written where it asks --
+    // `Recording.tsx`. This is the case that would have caught it: nothing but
+    // the button used to be able to take the badge away.
+    remember(TOKEN);
+    await start(TOKEN);
+    render(<Recording />);
+
+    expect(screen.getByText(/Recording this device/)).toBeInTheDocument();
+
+    await act(async () => {
+      await stop();
+    });
+
     expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+  });
+});
+
+describe("running out on its own", () => {
+  it("tears the SDK down at the hour, which is what flag.ts promised", async () => {
+    vi.useFakeTimers();
+    const now = Date.parse("2026-08-24T10:00:00Z");
+    vi.setSystemTime(now);
+    remember(TOKEN, now);
+
+    await start(TOKEN);
+    expect(recording()).toBe(true);
+
+    // A minute short: nothing has happened yet, which is the half that would
+    // pass against a teardown armed for the wrong moment.
+    await vi.advanceTimersByTimeAsync(LIFETIME - 60_000);
+    expect(recording()).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(recording()).toBe(false);
+  });
+
+  it("and the badge goes with it", async () => {
+    vi.useFakeTimers();
+    const now = Date.parse("2026-08-24T10:00:00Z");
+    vi.setSystemTime(now);
+    remember(TOKEN, now);
+    await start(TOKEN);
+    render(<Recording />);
+
+    expect(screen.getByText(/Recording this device/)).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LIFETIME);
+    });
+
+    expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+  });
+
+  it("falls back to the declared hour when this device could store nothing", async () => {
+    // A private window: `settle` deliberately hands back a token it could not
+    // store, so `runsOutIn` has nothing to answer from. Without the fallback
+    // nothing is armed at all and the SDK runs for the life of the page --
+    // on a volunteer's data -- while the badge promises otherwise.
+    vi.useFakeTimers();
+    const refusing = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("this browser stores nothing");
+    });
+
+    expect(await start(TOKEN)).toBe(true);
+    expect(runsOutIn()).toBeNull();
+
+    await vi.advanceTimersByTimeAsync(LIFETIME);
+
+    expect(recording()).toBe(false);
+    refusing.mockRestore();
+  });
+
+  it("arms nothing for a device that is not recording", async () => {
+    // `start(null)` returns before the timer, so a page nobody asked about
+    // schedules no work at all -- the same promise the SDK import keeps.
+    vi.useFakeTimers();
+
+    expect(await start(null)).toBe(false);
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("stopping while the SDK is still loading", () => {
+  it("tears down what the attempt built rather than leaving it registered", async () => {
+    // `start.ts` says what the window between claiming `started` and the chunk
+    // resolving is, and what assigning the result afterwards would leave
+    // behind. This is that case, driven.
+    remember(TOKEN);
+    const starting = start(TOKEN);
+    await stop();
+
+    expect(await starting).toBe(false);
+    expect(recording()).toBe(false);
+    // And the page can still be started again, which it could not if the
+    // instrumentations from the abandoned attempt were still patched on.
+    expect(await start(TOKEN)).toBe(true);
+  });
+
+  it("and a second stop waits for the first rather than returning early", async () => {
+    remember(TOKEN);
+    await start(TOKEN);
+
+    await Promise.all([stop(), stop()]);
+
+    expect(recording()).toBe(false);
+    expect(await start(TOKEN)).toBe(true);
   });
 });
 

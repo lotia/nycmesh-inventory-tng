@@ -21,9 +21,10 @@ watch();
 // Spans are the other half, and they are not free, so they wait for somebody
 // to have asked. `telemetry/flag.ts` says what an administrator's link is;
 // `telemetry/start.ts` says why nothing is awaited here.
-const token = settle();
-const recording = token !== null;
-void start(token);
+// Not held here and not passed anywhere: `start.ts` owns whether this device
+// is recording, and the badge subscribes to it. A boolean computed here was a
+// second answer to the same question, which is how it came to disagree.
+void start(settle());
 
 const container = document.getElementById("root");
 if (!container) {
@@ -35,7 +36,7 @@ createRoot(container).render(
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <App />
-      <Recording recording={recording} />
+      <Recording />
     </ThemeProvider>
   </StrictMode>,
 );
