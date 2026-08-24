@@ -16,18 +16,12 @@ why that is not the same answer as declining a row, is argued there as well.
 
 from typing import Any
 
-from django.core.management.base import BaseCommand
+from inventory.management.commands import _ledger, _staging, _telemetry
+from inventory.sheet import Report
 
-from inventory.management.commands import _ledger, _report, _staging, _telemetry
 
-
-class Command(BaseCommand):
+class Command(_telemetry.ReportingCommand):
     help = "Post a StockTransaction per batch of staged rows, with a StockMovement for each row in it."
 
-    def handle(self, *args: Any, **options: Any) -> None:
-        with _telemetry.running("post_ledger") as counted:
-            posted = _ledger.post(_staging.staged_sheet())
-            section = _ledger.section(posted)
-            counted.update(_telemetry.figures(section))
-        for line in _report.render(*section):
-            self.stdout.write(line)
+    def run(self, **options: Any) -> list[Report]:
+        return [_ledger.section(_ledger.post(_staging.staged_sheet()))]

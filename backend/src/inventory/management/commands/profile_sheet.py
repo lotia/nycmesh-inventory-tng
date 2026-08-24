@@ -14,9 +14,9 @@ this against their own copy. How to do that is in the brief too.
 from collections.abc import Callable
 from typing import Any
 
-from django.core.management.base import BaseCommand, CommandParser
+from django.core.management.base import CommandParser
 
-from inventory.management.commands import _report, _telemetry, _workbook
+from inventory.management.commands import _telemetry, _workbook
 from inventory.sheet import Report, batches, corrections, items, jobs, locations, people, returns, workbook
 from inventory.sheet.workbook import Sheet
 
@@ -38,18 +38,14 @@ SECTIONS: list[Section] = [
 ]
 
 
-class Command(BaseCommand):
+class Command(_telemetry.ReportingCommand):
+    blank_after_each_section = True
+
     help = "Print the breakdown each sheet classifier produces over an exported workbook."
 
     def add_arguments(self, parser: CommandParser) -> None:
         _workbook.add_argument(parser)
 
-    def handle(self, *args: Any, **options: Any) -> None:
-        with _telemetry.running("profile_sheet") as counted:
-            sheet = _workbook.sheet_at(options["workbook"])
-            profiled = [section(sheet) for section in SECTIONS]
-            counted.update(_telemetry.figures(*profiled))
-        for heading, section in profiled:
-            for line in _report.render(heading, section):
-                self.stdout.write(line)
-            self.stdout.write("")
+    def run(self, **options: Any) -> list[Report]:
+        sheet = _workbook.sheet_at(options["workbook"])
+        return [section(sheet) for section in SECTIONS]

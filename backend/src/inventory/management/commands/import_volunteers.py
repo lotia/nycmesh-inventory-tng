@@ -9,18 +9,12 @@ to the submissions that reach nobody are all in `_people.py`.
 
 from typing import Any
 
-from django.core.management.base import BaseCommand
+from inventory.management.commands import _people, _staging, _telemetry
+from inventory.sheet import Report
 
-from inventory.management.commands import _people, _report, _staging, _telemetry
 
-
-class Command(BaseCommand):
+class Command(_telemetry.ReportingCommand):
     help = "Give every volunteer the staged export names a row, flagging the ones it cannot tell apart."
 
-    def handle(self, *args: Any, **options: Any) -> None:
-        with _telemetry.running("import_volunteers") as counted:
-            minted = _people.mint(_staging.staged_sheet())
-            section = _people.section(minted)
-            counted.update(_telemetry.figures(section))
-        for line in _report.render(*section):
-            self.stdout.write(line)
+    def run(self, **options: Any) -> list[Report]:
+        return [_people.section(_people.mint(_staging.staged_sheet()))]

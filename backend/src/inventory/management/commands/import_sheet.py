@@ -37,9 +37,9 @@ running it again gives for free.
 from pathlib import Path
 from typing import Any
 
-from django.core.management.base import BaseCommand, CommandParser
+from django.core.management.base import CommandParser
 
-from inventory.management.commands import _identifiers, _ledger, _people, _report, _staging, _telemetry, _workbook
+from inventory.management.commands import _identifiers, _ledger, _people, _staging, _telemetry, _workbook
 from inventory.sheet import Report
 
 
@@ -73,29 +73,23 @@ def written(
     return "Written by this run", [("imported rows added or removed", sum(count for _, count in changed)), *changed]
 
 
-class Command(BaseCommand):
+class Command(_telemetry.ReportingCommand):
+    blank_after_each_section = True
+
     help = "Stage an exported workbook, mint its catalogue and its volunteers, and post the ledger it describes."
 
     def add_arguments(self, parser: CommandParser) -> None:
         _workbook.add_argument(parser)
 
-    def handle(self, *args: Any, **options: Any) -> None:
-        with _telemetry.running("import_sheet") as counted:
-            sections = self._imported(options["workbook"])
-            counted.update(_telemetry.figures(*sections))
-        for heading, section in sections:
-            for line in _report.render(heading, section):
-                self.stdout.write(line)
-            self.stdout.write("")
-
-    @staticmethod
-    def _imported(workbook: Path) -> list[tuple[str, list[tuple[str, int]]]]:
+    def run(self, **options: Any) -> list[Report]:
         """The four steps and the summary, run in order, as their sections.
 
-        Split out so the run is one expression the record above can wrap. What
-        each step does, and why the staged rows are read back once rather than
-        per step, is unchanged.
+        What each step does, and why the staged rows are read back once rather
+        than per step, is below. This was a staticmethod called from `handle`,
+        split out for no reason but to make the run one expression the record
+        could wrap -- which is the surgery `ReportingCommand` exists to undo.
         """
+        workbook: Path = options["workbook"]
         staged = _staging.stage(_workbook.sheet_at(workbook))
         # Read back once and handed to all three of the steps that follow,
         # rather than each of them querying for itself: this is what those
