@@ -176,7 +176,7 @@ describe("a batch that does not save", () => {
     await waitFor(() => {
       const posts = (
         (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls as [string, RequestInit][]
-      ).filter(([, init]) => init?.method === "POST");
+      ).filter(([path, init]) => init?.method === "POST" && path === "/api/stock/transactions");
       expect(posts).toHaveLength(2);
       const keys = posts.map(([, init]) => JSON.parse(String(init.body)).idempotency_key);
       expect(keys).toEqual(["key-1", "key-1"]);

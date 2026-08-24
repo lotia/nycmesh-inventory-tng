@@ -196,6 +196,10 @@ ALLOWED_LOG_KEYS = frozenset(
         "collection",
         "command",
         "counted",
+        # The message a browser's failure carried. Free text, and named here
+        # for the same reason `reason` is: `inventory.views` bounds its length
+        # and nothing can police what somebody wrote in a `throw`.
+        "detail",
         "lines",
         "code",
         "item",

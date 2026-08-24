@@ -50,3 +50,23 @@ class AppendSustainedThrottle(AppendThrottle):
 # provably share one posture, and so a third would be added by copying a name
 # rather than by remembering a pair.
 APPEND_THROTTLES = [AppendBurstThrottle, AppendSustainedThrottle]
+
+
+class ReportThrottle(AppendThrottle):
+    """A budget of its own for the failures a browser reports.
+
+    NOT `APPEND_THROTTLES`, and the difference is the traffic rather than the
+    posture. DRF keys a bucket on the scope and the client, not on the view, so
+    sharing a scope means sharing a budget -- and the two endpoints that shared
+    one were both a volunteer deliberately writing something. This one the app
+    posts to BY ITSELF, once per failing call: a backend answering 5xx while
+    somebody types in a search box spends the whole allowance on reports, and
+    the volunteer's actual batch is refused 429 the moment the server comes
+    back. Losing a report is a cost worth paying; losing the batch is the thing
+    this system exists not to do.
+    """
+
+    scope = "report"
+
+
+REPORT_THROTTLES = [ReportThrottle]

@@ -31,6 +31,7 @@ env = Env(
     # Defaults are the ones a volunteer night needs; .env.sample says why.
     APPEND_BURST_RATE=(str, "20/min"),
     APPEND_SUSTAINED_RATE=(str, "300/hour"),
+    CLIENT_REPORT_RATE=(str, "30/min"),
     NUM_PROXIES=(int, 2),
     # What a signed debug-tracing token is worth. `inventory_tng.debugging`
     # holds both numbers and the argument for each.
@@ -415,6 +416,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "append-burst": env("APPEND_BURST_RATE"),
         "append-sustained": env("APPEND_SUSTAINED_RATE"),
+        "report": env("CLIENT_REPORT_RATE"),
     },
 }
 

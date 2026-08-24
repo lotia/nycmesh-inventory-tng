@@ -62,6 +62,41 @@ included, which is exactly why the app cannot yet be put in front of anybody.
    ([data model](../data-model.md#volunteer)), and that stays true whatever
    authenticates the request.
 
+### A third endpoint, and what made it arguable
+
+Amended 2026-08-24. Point 3 named two endpoints, and the consequences below say
+any further credential-free endpoint has to be argued against this record
+rather than added beside it. This is that argument, for
+`POST /api/client-failures`.
+
+**What it is for.** The volunteer app runs on a phone in a basement. When its
+scanner stops, or a submission cannot be sent, or a sheet will not print, the
+only account of it was a `console.error` nobody was ever going to read. A
+volunteer cannot send a stack trace and should not be asked to. Without this
+the failures that happen to the people this project is for are the ones nobody
+can see, which is the whole of what `inventory-tng-nb8` exists to end.
+
+**Why it does not weaken the posture above.** The argument for that posture is
+that the write surface appends and nothing more, so a client that is abused can
+write rows that are wrong but cannot delete, edit or rewrite. This endpoint is
+weaker still: it writes **no row at all**. It records a log line and returns
+`204`. There is nothing to correct afterwards, nothing to compensate, and no
+table for a later reader to have to clean.
+
+**What it can be abused for, and what bounds it.** Volume, and putting text
+somebody chose into a collector. The same rate limits as the two endpoints
+above, one bounded field for the message, and no field for anything else — no
+URL, no user agent, no identifier. `inventory_tng.redaction` is deny-by-default
+about what may reach a collector; this is the one place a caller writes into
+that stream, so what it may carry is a list rather than whatever a client
+thinks to send. What no list can police is the sentence itself, which is the
+same boundary every log message in this system has.
+
+**What it is not.** It is not somewhere to send telemetry generally. A
+browser's spans go to the collector through a path that requires the signed
+token of decision 0021, and that stays true; this carries the failures that are
+worth hearing about from a device nobody has flagged.
+
 ## Consequences
 
 - **The dangerous surface is small and already gated.** A volunteer client that

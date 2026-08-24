@@ -23,9 +23,14 @@ import {
   stubFetch,
 } from "./testFixtures";
 
-/** The bodies that were posted, in order. */
+/** Where a batch goes, as opposed to where a failure report goes. */
+const LEDGER = "/api/stock/transactions";
+
+/** The bodies that were posted to the ledger, in order. */
 function posted(): unknown[] {
-  return fetching.mock.calls.map(([, init]) => JSON.parse(String((init as RequestInit).body)));
+  return fetching.mock.calls
+    .filter(([path]) => path === LEDGER)
+    .map(([, init]) => JSON.parse(String((init as RequestInit).body)));
 }
 
 /** The keys they went under, which is what the server recognises a replay by. */
@@ -309,19 +314,35 @@ describe("a batch the server will never take", () => {
 
     await sendOutbox();
 
+    // One request in total, not one to the ledger and another somewhere else.
+    // `outbox.ts` says why a refusal like this is not reported.
+    expect(posted()).toHaveLength(1);
     expect(fetching).toHaveBeenCalledTimes(1);
     expect(outbox()[0].outcome).toEqual({ recorded: false, detail: "Nothing was saved." });
   });
 
   it("does not hold up the batches behind it", async () => {
+    // One answer per batch, in order. Running out is a case this test did not
+    // mean to write rather than an answer of `undefined`, so it says so.
+    const queued = [answered(409, "That is not a check-out."), recorded()];
     queueBatch(batch("key-1"));
     queueBatch(batch("key-2", "Cat6"));
-    fetching.mockResolvedValueOnce(answered(409, "That is not a check-out."));
-    fetching.mockResolvedValueOnce(recorded());
+    fetching.mockImplementation(async (path: string) => {
+      const next = path === LEDGER ? queued.shift() : undefined;
+      if (next === undefined) {
+        throw new Error(`unexpected request to ${path}`);
+      }
+      return next;
+    });
 
     await sendOutbox();
 
     expect(outbox().map((held) => held.outcome?.recorded)).toEqual([false, true]);
+    // Two requests and both to the ledger. The stub throwing on anything else
+    // is what makes that assertion mean something: a regression posting a
+    // report per batch would be caught by the mock rather than swallowed by
+    // `failed`'s own `.catch`, which is what hid it before.
+    expect(fetching).toHaveBeenCalledTimes(2);
   });
 
   it("keeps a batch a lapsed session refused, because that is about the session", async () => {
@@ -355,7 +376,12 @@ describe("a batch the server will never take", () => {
 
     await sendOutbox();
 
-    expect(fetching).toHaveBeenCalledTimes(1);
+    // One submission, not two: the second batch is left alone. Two requests in
+    // total, because a 5xx IS reported -- `client.ts` is the one place that
+    // does it, and this is the case that says so.
+    expect(posted()).toHaveLength(1);
+    expect(fetching).toHaveBeenCalledTimes(2);
+    expect(fetching.mock.calls[1]?.[0]).toBe("/api/client-failures");
     expect(waiting(outbox())).toHaveLength(2);
   });
 });

@@ -9,6 +9,7 @@ from inventory.views import (
     ApiRootView,
     CategoryDetailView,
     CategoryListView,
+    ClientFailureView,
     CurrentUserView,
     DebugTraceVerifyView,
     HealthCheckView,
@@ -49,6 +50,9 @@ urlpatterns = [
     path("api", ApiRootView.as_view(), name="api-root"),
     path("api/healthz", HealthCheckView.as_view(), name="healthz"),
     path("api/me", CurrentUserView.as_view(), name="me"),
+    # Where a browser reports what it could not handle. Credential-free like
+    # the two beside it, and argued in decision 0012.
+    path("api/client-failures", ClientFailureView.as_view(), name="client-failures"),
     # Asked by nginx before it forwards a browser's spans to the collector,
     # never by the app itself. See DebugTraceVerifyView and
     # frontend/nginx.conf.template.

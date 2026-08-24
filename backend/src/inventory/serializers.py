@@ -368,6 +368,53 @@ class StockTransactionCreateSerializer(serializers.ModelSerializer):
         ]
 
 
+# What a browser may say about a failure, in characters. A stack from a
+# minified bundle is a few hundred; this is generous enough for one and small
+# enough that a loop cannot post prose into the log stream. Refused rather than
+# truncated, so a client that has started sending something else finds out.
+MAX_FAILURE = 2000
+
+
+class ClientFailureSerializer(serializers.Serializer):
+    """One failure a volunteer's browser could not handle.
+
+    Deliberately three fields and no more: no URL, no user agent, no volunteer,
+    no element. Decision 0012 argues why this endpoint exists at all and why
+    its shape is a list rather than whatever a client sends.
+
+    `detail` is free text and is the one thing here no list can police -- the
+    same boundary the module above draws around a log message. It is bounded
+    in length and the endpoint is rate limited; beyond that it is what somebody
+    wrote in a `throw`.
+    """
+
+    # BOTH CLOSED, and both for the same reason: each becomes an attribute on
+    # `inventory.client_failures`, so a value a caller chose is a time series a
+    # caller minted -- on an endpoint that takes no credential, which is the
+    # unbounded cardinality a metric backend does not recover from. It is also
+    # what `inventory/telemetry.py` promises about every attribute it records:
+    # words chosen in this code, never anything a caller supplied.
+    #
+    # The two sets are the ones `frontend/src/telemetry/report.ts` declares as
+    # TypeScript unions, which are erased at runtime and so cannot be the
+    # enforcement. `test_client_failures.py` holds the two ends together.
+    KINDS = ("window.onerror", "unhandledrejection", "decode-loop", "refused", "server-error")
+    DOING = ("scan", "outbox", "print", "api", "app")
+
+    kind = serializers.ChoiceField(
+        choices=[(kind, kind) for kind in KINDS],
+        help_text="What kind of failure this is: one of the browser's two handlers, or one this app reports itself.",
+    )
+    where = serializers.ChoiceField(
+        choices=[(doing, doing) for doing in DOING],
+        help_text="What the app was doing, in this app's own words -- `scan`, `outbox`, `print`.",
+    )
+    detail = serializers.CharField(
+        max_length=MAX_FAILURE,
+        help_text="The message, and the stack where the browser gave one.",
+    )
+
+
 class ApiErrorSerializer(serializers.Serializer):
     """One thing wrong, and where.
 

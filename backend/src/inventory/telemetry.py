@@ -70,6 +70,13 @@ CATALOGUE_EDITS = counter("inventory.catalogue_edits", "Edits to a catalogue row
 # writes.
 REFUSALS = counter("inventory.refusals", "Requests refused on account of the caller, by reason.")
 
+# Failures a volunteer's browser could not handle. Counted apart from anything
+# the server refused, because these are the ones nobody would otherwise ever
+# hear about: they happen on a phone in a basement.
+CLIENT_FAILURES = counter(
+    "inventory.client_failures", "Failures reported by a browser, by handler and by what it was doing."
+)
+
 # Management commands, which run unattended and so are the one thing here
 # nobody watches. `command` names it and `outcome` says whether it finished.
 COMMAND_RUNS = counter("inventory.command_runs", "Management command runs, by command and outcome.")

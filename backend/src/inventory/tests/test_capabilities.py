@@ -139,6 +139,10 @@ def test_nothing_but_the_two_volunteer_writes_is_open_to_a_volunteer() -> None:
     assert open_writes == {
         ("VolunteerListCreateView", "POST"),
         ("StockTransactionCreateView", "POST"),
+        # The third, and the only one that writes no row: it records a failure
+        # a volunteer's browser could not handle. Argued against decision 0012
+        # in that record, under "A third endpoint, and what made it arguable".
+        ("ClientFailureView", "POST"),
     }, "a write was opened to volunteers; argue it against decision 0012 before widening this"
 
 

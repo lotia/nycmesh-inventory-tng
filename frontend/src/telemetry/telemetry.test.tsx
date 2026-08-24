@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { report, watch } from "./errors";
 import { asked, claimed, forget, HEADER, LIFETIME, remember, settle, withoutIt } from "./flag";
 import { Recording } from "./Recording";
+import { described, FAILURES, failed } from "./report";
 import { recording, start, stop } from "./start";
 import { ENDPOINT, wiring } from "./wiring";
 
@@ -31,6 +32,12 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.useRealTimers();
+  // HERE RATHER THAN AT THE END OF EACH TEST BODY, which is where it was: a
+  // failing assertion aborts before the last statement, so one genuine failure
+  // left `fetch` globally replaced and cascaded into unrelated ones that hid
+  // it. The asymmetry was visible on its face -- this block already restored
+  // timers and not globals.
+  vi.unstubAllGlobals();
 });
 
 describe("the flag", () => {
@@ -179,5 +186,57 @@ describe("the indicator", () => {
 
     expect(asked()).toBeNull();
     expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+  });
+});
+
+describe("what is reported whatever the flag says", () => {
+  it("goes to the backend, not to the collector", () => {
+    const posting = vi.fn(async () => new Response("", { status: 204 }));
+    vi.stubGlobal("fetch", posting);
+
+    failed(new Error("the decode loop stopped"), "scan", "decode-loop");
+
+    const [path, init] = posting.mock.calls[0] as unknown as [string, RequestInit];
+
+    expect(path).toBe(FAILURES);
+    expect(JSON.parse(String(init.body))).toEqual({
+      kind: "decode-loop",
+      where: "scan",
+      detail: expect.stringContaining("the decode loop stopped"),
+    });
+  });
+
+  it("and carries the two headers every other write carries", () => {
+    const posting = vi.fn(async () => new Response("", { status: 204 }));
+    vi.stubGlobal("fetch", posting);
+    // biome-ignore lint/suspicious/noDocumentCookie: arranged the way client.test.ts arranges one.
+    document.cookie = "csrftoken=a-token-django-set";
+    remember(TOKEN);
+
+    failed(new Error("boom"), "app");
+
+    const [, init] = posting.mock.calls[0] as unknown as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+
+    // What each of the two is for, and what leaving it off cost, is written
+    // where they are set -- `report.ts`.
+    expect(headers["X-CSRFToken"]).toBe("a-token-django-set");
+    expect(headers[HEADER]).toBe(TOKEN);
+  });
+
+  it("and is bounded, because a message is whatever somebody threw", () => {
+    expect(described(new Error("x".repeat(9000)))).toHaveLength(2000);
+    expect(described("not an Error")).toBe("not an Error");
+  });
+
+  it("never becomes the failure itself", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => {
+        throw new Error("this browser refused outright");
+      }),
+    );
+
+    expect(() => failed(new Error("boom"), "app")).not.toThrow();
   });
 });

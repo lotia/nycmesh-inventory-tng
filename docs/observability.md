@@ -401,6 +401,31 @@ the guard sits *before* the tracer rather than inside it: starting a span that
 will not be exported costs about thirty times as much as declining to start
 one.
 
+## What the app on a phone reports, and what it does not
+
+Browser telemetry is not free the way a server's is: it costs a volunteer's
+battery and their data, in a basement. So the frontend is deliberately
+asymmetric, and
+[`frontend/src/telemetry/report.ts`](../frontend/src/telemetry/report.ts) is
+where that is written down so a later change has to argue with it.
+
+| | |
+| --- | --- |
+| **Spans** | only for a session somebody handed a debug link to. With no token there is no SDK at all — not a sampler set to zero, nothing |
+| **Failures** | always, from every device: a decode loop that stopped, a batch the ledger will never take, a 5xx |
+
+Failures go to the backend rather than to the collector, because the collector's
+ingest path needs a token an ordinary device does not have. That is a third
+endpoint reachable without a credential, which
+[decision 0012](decisions/0012-two-populations.md#a-third-endpoint-and-what-made-it-arguable)
+argues rather than assumes: it writes no row, it carries three fields and no
+identifier, and it is rate limited like the two beside it.
+
+What is **not** reported: a request that reached nothing. From a volunteer's
+point of view a basement and a broken server look the same, but they are not,
+and the outbox already holds the batch until there is a signal. Reporting those
+would be reporting the weather.
+
 ## What telemetry may carry
 
 **Nothing reaches an exporter unless this application has declared it.** Not

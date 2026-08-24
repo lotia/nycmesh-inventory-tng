@@ -118,6 +118,7 @@ services:
       NUM_PROXIES: ${NUM_PROXIES:-1}
       APPEND_BURST_RATE: ${APPEND_BURST_RATE:-20/min}
       APPEND_SUSTAINED_RATE: ${APPEND_SUSTAINED_RATE:-300/hour}
+      CLIENT_REPORT_RATE: ${CLIENT_REPORT_RATE:-30/min}
       LABEL_BASE_URL: ${LABEL_BASE_URL:-https://inventory.nycmesh.net}
       DATABASE_URL: postgres://${POSTGRES_USER:-inventory}:${POSTGRES_PASSWORD:-inventory}@postgres:5432/${POSTGRES_DB:-inventory_tng}
       # Sign-in providers, all optional and all empty by default: a provider
