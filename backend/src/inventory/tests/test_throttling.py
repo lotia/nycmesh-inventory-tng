@@ -138,10 +138,18 @@ def test_the_documented_body_is_the_one_that_is_sent() -> None:
     assert response["content"]["application/json"]["schema"]["$ref"].endswith("/Throttled")
 
 
-def test_reads_do_not_claim_they_can_be_throttled() -> None:
+def test_a_read_claims_it_can_be_throttled_only_where_something_counts_it() -> None:
+    """The promise follows the throttle attached, never the method.
+
+    Reads used to be exempt everywhere, so "a GET says nothing about 429" was
+    a property of the whole API. It stopped being one when the pick-list took
+    `AnonymousReadThrottle` -- provisional, off unless `ANONYMOUS_READ_RATE`
+    names a rate, and `inventory-tng-81f7.1` is the argument for what it is
+    actually for. The catalogue carries no read limit and must not claim one.
+    """
     paths = operations()
 
-    assert "429" not in paths["/api/volunteers"]["get"]["responses"]
+    assert "429" in paths["/api/volunteers"]["get"]["responses"]
     assert "429" not in paths["/api/items"]["get"]["responses"]
 
 

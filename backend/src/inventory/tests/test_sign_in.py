@@ -145,6 +145,11 @@ def test_the_local_path_signs_in_with_the_password_and_the_code(local: User) -> 
         "username": local.username,
         "administrator": True,
         "recently_authenticated": True,
+        # Provisional; `inventory_tng.postures` says what the word means, and
+        # this is what every deployment answers until one sets VOLUNTEER_ACCESS.
+        "enrolment": "not_required",
+        # Provisional too, and nought for every deployment that sets nothing.
+        "search_minimum": 0,
         "capabilities": {
             "append_stock": True,
             "add_volunteer": True,

@@ -12,6 +12,7 @@ from inventory.views import (
     ClientFailureView,
     CurrentUserView,
     DebugTraceVerifyView,
+    DeviceEnrolmentView,
     HealthCheckView,
     ItemDetailView,
     ItemListView,
@@ -64,6 +65,10 @@ urlpatterns = [
     # never by the app itself. See DebugTraceVerifyView and
     # frontend/nginx.conf.template.
     path("api/debug-trace", DebugTraceVerifyView.as_view(), name="debug-trace"),
+    # Where a browser enrols the device it is running on, while VOLUNTEER_ACCESS
+    # asks it to. Provisional, like everything under `inventory_tng.postures`:
+    # inventory-tng-81f7.4 takes this route out with the setting.
+    path("api/devices", DeviceEnrolmentView.as_view(), name="devices"),
     path("api/volunteers", VolunteerListCreateView.as_view(), name="volunteers"),
     path("api/volunteers/<int:pk>", VolunteerDetailView.as_view(), name="volunteer-detail"),
     path("api/items", ItemListView.as_view(), name="items"),

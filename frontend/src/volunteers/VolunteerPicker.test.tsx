@@ -8,8 +8,8 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "../api/testFixtures";
 import type { Volunteer } from "../api/types";
-import { renderScreen } from "../testHarness";
-import { olivia, sean } from "./testFixtures";
+import { renderScreen, stubSession, VOLUNTEER } from "../testHarness";
+import { namedOnly, olivia, sean } from "./testFixtures";
 import { VolunteerPicker } from "./VolunteerPicker";
 
 /** A list endpoint that searches, and a create that answers however asked. */
@@ -54,10 +54,13 @@ describe("finding somebody who is already there", () => {
   });
 
   it("offers no way to add anybody before something has been typed", async () => {
+    // Both labels, because the offer wears two -- `Add x` where nothing
+    // matched and `Not listed -- add x` where something did -- and a matcher
+    // anchored on the first missed an empty box drawing the second.
     api([sean]);
     show();
     await screen.findByRole("button", { name: /sean mcginnis/i });
-    expect(screen.queryByRole("button", { name: /^add /i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /add\b/i })).not.toBeInTheDocument();
   });
 
   it("offers the matches before it offers to add a name", async () => {
@@ -67,6 +70,71 @@ describe("finding somebody who is already there", () => {
     const match = await screen.findByRole("button", { name: /sean mcginnis/i });
     const add = await screen.findByRole("button", { name: /not listed/i });
     expect(match.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("does not offer to add somebody when the server never ran the search", async () => {
+    // SEARCH_MINIMUM=3. Two letters come back as an empty page, which from
+    // here is indistinguishable from a search that matched nobody; `searched`
+    // in VolunteerPicker.tsx is what the offer below now waits for.
+    stubSession(
+      { ...VOLUNTEER, search_minimum: 3 },
+      (async () =>
+        new Response(JSON.stringify(page()), { status: 200 })) as unknown as typeof fetch,
+    );
+    show();
+    type("Se");
+    await waitFor(() => expect(screen.queryByRole("progressbar")).toBeNull());
+
+    expect(screen.queryByRole("button", { name: /^add /i })).not.toBeInTheDocument();
+  });
+
+  it("offers no way to add anybody with an empty box and no minimum at all", async () => {
+    // Nought is every deployment's answer today, and `"".length >= 0` is true:
+    // the offer was drawn on first paint and posted an empty display name when
+    // it was pressed.
+    stubSession(
+      { ...VOLUNTEER, search_minimum: 0 },
+      (async () =>
+        new Response(JSON.stringify(page()), { status: 200 })) as unknown as typeof fetch,
+    );
+    show();
+    await waitFor(() => expect(screen.queryByRole("progressbar")).toBeNull());
+
+    expect(screen.queryByRole("button", { name: /add\b/i })).not.toBeInTheDocument();
+  });
+
+  it("offers again once enough has been typed for the server to answer", async () => {
+    stubSession(
+      { ...VOLUNTEER, search_minimum: 3 },
+      (async () =>
+        new Response(JSON.stringify(page()), { status: 200 })) as unknown as typeof fetch,
+    );
+    show();
+    type("Sean");
+
+    expect(await screen.findByRole("button", { name: /^add sean$/i })).toBeInTheDocument();
+  });
+
+  it("renders a row that carries no address at all", async () => {
+    // Two ways a row arrives without one and this screen cannot tell them
+    // apart: 45% of volunteers never gave an address, and a narrowed
+    // ANONYMOUS_PAYLOAD sends none to a caller with no session. Both draw one
+    // line, which is what makes the payload change something no component had
+    // to be edited for -- see inventory-tng-81f7.3.
+    api([namedOnly]);
+    show();
+    type("priya");
+    const row = await screen.findByRole("button", { name: /priya raman/i });
+    expect(row).toHaveTextContent("Priya Raman");
+    expect(row.textContent).toBe("Priya Raman");
+  });
+
+  it("works as somebody picked from a row that carried no address", async () => {
+    api([namedOnly]);
+    show();
+    type("priya");
+    fireEvent.click(await screen.findByRole("button", { name: /priya raman/i }));
+    expect(await screen.findByText(/working as/i)).toHaveTextContent("Priya Raman");
   });
 
   it("works as whoever was picked", async () => {

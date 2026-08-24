@@ -14,3 +14,14 @@ export const sean: Volunteer = {
 };
 
 export const olivia: Volunteer = { id: 8, display_name: "Olivia", email: null, slack_id: null };
+
+/**
+ * The same person as a narrowed payload sends her: a name and an id, and no
+ * identifier fields at all.
+ *
+ * PROVISIONAL, with `ANONYMOUS_PAYLOAD` -- inventory-tng-81f7.4 removes it.
+ * Here rather than inline because it is a shape the API can answer with rather
+ * than one test's data, and because the property it exists to hold is that
+ * this screen does not have to change to render it.
+ */
+export const namedOnly: Volunteer = { id: 9, display_name: "Priya Raman" };

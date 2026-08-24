@@ -185,8 +185,11 @@ choose *Reopen in Container*, or run `devcontainer up --workspace-folder .`.
 
 Everybody signs in, for now. These answer without a session — the index
 `/api`, the two probes `/api/healthz` and `/api/livez`, `/api/me`, the two
-credential-free reports `/api/client-failures` and `/api/debug-trace`, and the
-API's own description at `/api/schema` and `/api/docs` — and every other one
+credential-free reports `/api/client-failures` and `/api/debug-trace`,
+`/api/devices` — which is provisional demo scaffolding and refuses under every
+posture but the two that ask a device to enrol, see
+[docs/architecture.md](docs/architecture.md#demo-scaffolding-on-its-way-out) —
+and the API's own description at `/api/schema` and `/api/docs` — and every other one
 needs one, the two a volunteer writes to included. The list is deliberately
 not a count: it was written as one and was wrong twice running. It is also a
 convenience rather than the authority — that is an audit in

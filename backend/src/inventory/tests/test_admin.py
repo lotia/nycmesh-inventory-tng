@@ -24,6 +24,7 @@ from simple_history.models import HistoricalChanges
 from inventory.models import (
     CODE_PATTERN,
     Category,
+    Device,
     Item,
     ItemIdentifier,
     Label,
@@ -85,6 +86,9 @@ def one_of_each_model(
     transaction = StockTransaction.objects.create(actor=volunteer, kind=StockTransaction.Kind.RECEIPT)
     return {
         Category: category,
+        # Provisional, with everything else under `inventory_tng.postures`:
+        # inventory-tng-81f7.4 removes this entry with the model.
+        Device: Device.objects.create(identifier="0123456789abcdef"),
         Item: item,
         ItemIdentifier: ItemIdentifier.objects.create(
             item=item,

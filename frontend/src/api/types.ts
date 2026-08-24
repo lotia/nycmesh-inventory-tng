@@ -53,12 +53,22 @@ export interface Item {
   labels: ItemLabel[];
 }
 
-/** A volunteer as the pick-list shows them. */
+/**
+ * A volunteer as the pick-list shows them.
+ *
+ * The two identifiers are OPTIONAL as well as nullable, and provisionally so:
+ * `ANONYMOUS_PAYLOAD` decides what a caller with no session is sent, and under
+ * its two narrowed values the fields are simply absent rather than null. The
+ * default is `full`, which is both of them, so nothing changes for anybody who
+ * sets nothing -- and every screen already renders a missing address as no
+ * second line, because 45% of volunteers never gave one. inventory-tng-81f7.4
+ * puts this back to what it was.
+ */
 export interface Volunteer {
   id: number;
   display_name: string;
-  email: string | null;
-  slack_id: string | null;
+  email?: string | null;
+  slack_id?: string | null;
 }
 
 /**

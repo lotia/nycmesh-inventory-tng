@@ -7,6 +7,7 @@
  * environment would compile an environment into the bundle and break that.
  */
 
+import { HEADER as DEVICE_HEADER, held as enrolledAs } from "../device/credential";
 import { HEADER, asked as tracing } from "../telemetry/flag";
 import { failed } from "../telemetry/report";
 import { csrfToken } from "./csrf";
@@ -104,13 +105,28 @@ function asked(init: RequestInit): RequestInit {
   // the object was empty. What the two callers actually share is the token,
   // and `flag.asked` already is that.
   const token = tracing();
-  if (token === null) {
-    // The ordinary request, on every phone that was never handed a link:
-    // handed back untouched, whatever shape its headers were in.
+  // PROVISIONAL, and the second of the two things this function attaches: the
+  // opaque credential an enrolled device presents while `VOLUNTEER_ACCESS`
+  // asks for one. `device/credential.ts` says what it is and, more
+  // importantly, what it is not; inventory-tng-81f7.4 removes these two lines
+  // with the setting. Here rather than at each call site for the same reason
+  // the tracing token is: this is the one place this app talks to the API, and
+  // a header attached anywhere else is a request that would quietly not carry
+  // it.
+  const device = enrolledAs();
+  if (token === null && device === null) {
+    // The ordinary request, on every phone that was never handed a link and
+    // never asked to enrol: handed back untouched, whatever shape its headers
+    // were in.
     return init;
   }
   const headers = new Headers(init.headers);
-  headers.set(HEADER, token);
+  if (token !== null) {
+    headers.set(HEADER, token);
+  }
+  if (device !== null) {
+    headers.set(DEVICE_HEADER, device);
+  }
   return { ...init, headers };
 }
 

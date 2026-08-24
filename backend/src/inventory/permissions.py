@@ -11,8 +11,13 @@ expressible on the view itself.
 from typing import TYPE_CHECKING, Any
 
 from allauth.account.internal.flows.reauthentication import did_recently_authenticate
-from rest_framework.permissions import SAFE_METHODS, AllowAny, BasePermission, IsAuthenticated
+from django.conf import settings
+from rest_framework.permissions import SAFE_METHODS, AllowAny, BasePermission
 from rest_framework.request import Request
+from rest_framework.settings import api_settings
+from rest_framework.throttling import BaseThrottle
+
+from inventory_tng import postures
 
 if TYPE_CHECKING:
     from django.http import HttpRequest
@@ -56,6 +61,147 @@ class StaffWrites(BasePermission):
         return request.method in SAFE_METHODS or is_administrator(request.user)
 
 
+def client_address(request: Request) -> str:
+    """The caller's address, or nothing where it cannot be trusted.
+
+    THE READING IS DRF'S, borrowed from `BaseThrottle` rather than
+    reimplemented: `NUM_PROXIES` hops counted back from the RIGHT of
+    `X-Forwarded-For`, which is the part appended by proxies a request actually
+    passed through. `.env.sample` is where that number's argument is written
+    down, and a rate limit and a network rule reading it differently would be
+    two definitions of one client.
+
+    AND ONE THING ON TOP, which is not a second reading but a refusal to make
+    the first one. DRF clamps: `addrs[-min(num_proxies, len(addrs))]`. So a
+    header SHORTER than the configured hop count hands back an entry the
+    caller wrote -- and with the shipped `NUM_PROXIES=2`,
+    `curl -H 'X-Forwarded-For: 10.69.0.1'` was admitted by `mesh_only` from
+    anywhere on the internet. That clamp is right for a throttle, where the
+    cost of believing a forger is one bucket, and wrong for admission, where
+    it is the roster. So a header too short for this deployment's proxies is
+    treated as no address at all rather than as the caller's: `within` puts an
+    empty string in no range. A request carrying no header is unaffected and
+    still reads `REMOTE_ADDR`, which is what a development machine has.
+
+    WHAT THIS DOES NOT DO, said here because the line above it is exactly the
+    kind that gets read as "forgery closed". It counts entries, and entries are
+    free: `X-Forwarded-For: 10.69.0.1,` -- one trailing comma -- is two entries
+    and walks straight back through, measured. It stops the naive header and
+    nothing cleverer, and it cannot do better, because no rule reading this
+    header can tell how many proxies a request actually crossed. The sound
+    version needs a list of addresses this deployment will believe a header
+    from, which is a decision about the ingress rather than a line here, and it
+    is `inventory-tng-3hgc`. Until then `mesh_only` is a demo posture and not
+    an access control, which is what `inventory-tng-81f7` convenes to decide
+    about anyway.
+    """
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+    hops = api_settings.NUM_PROXIES
+    if forwarded is not None and hops and len(forwarded.split(",")) < hops:
+        return ""
+    return BaseThrottle().get_ident(request) or ""
+
+
+def enrolled(request: Request) -> bool:
+    """Whether this request carries a device token this deployment still honours.
+
+    Two questions, and both have to answer yes: the signature, which
+    `inventory_tng.postures` checks and which is what stops a token being
+    invented, and the row, which is what `Device.revoked_at` acts on -- and the
+    `Device` model is where the reason for that pair is written down.
+
+    MEMOISED, exactly as `recently_authenticated` below is and for the same
+    measured reason. `VolunteerAccess` is first in the default permission list
+    so ``all()`` never short-circuits before it, ``CurrentUserView`` runs the
+    whole list once per capability it reports, and ``enrolment_state`` asks
+    again -- seven identical selects for one ``GET /api/me``, which were the
+    only seven queries that request made. Stashed on the Django request
+    underneath, because the capability probe wraps the DRF one per operation
+    and they all share the one below.
+
+    The model is imported here rather than at the top of the file: Django
+    resolves ``DEFAULT_PERMISSION_CLASSES`` by importing this module, and this
+    module's header says how early that is.
+    """
+    from inventory.models import Device
+
+    underneath: Any = getattr(request, "_request", request)
+    answer = getattr(underneath, "_enrolled_device", None)
+    if answer is not None:
+        return bool(answer)
+    identifier = postures.presented_device(request.headers.get(postures.DEVICE_HEADER, ""))
+    answer = bool(identifier) and Device.objects.filter(identifier=identifier, revoked_at__isnull=True).exists()
+    underneath._enrolled_device = answer
+    return answer
+
+
+def enrolment_state(request: Request) -> str:
+    """What this caller would have to do to be admitted, in one word.
+
+    The vocabulary, and why ``/api/me`` answers this at all, is
+    ``inventory_tng.postures.ENROLMENT_STATES``.
+
+    ASKED IN THE ORDER ``VolunteerAccess`` ASKS IT, which is the correction
+    this needed. That class admits anybody signed in before it looks at a
+    device at all, and this branched on the posture alone -- so under an
+    enrolling posture a signed-in administrator was answered ``code`` while
+    the API was already answering their requests, and the client's gate
+    replaced the whole application with an enrolment screen for somebody who
+    needed nothing. Nothing is required of a caller the posture does not ask
+    anything of.
+    """
+    posture = settings.VOLUNTEER_ACCESS
+    if posture not in postures.ENROLLING or request.user.is_authenticated:
+        return postures.NOT_REQUIRED
+    if enrolled(request):
+        return postures.ENROLLED
+    return postures.ENROL_SELF if posture == postures.ENROLLED_SELF else postures.ENROL_WITH_CODE
+
+
+class VolunteerAccess(BasePermission):
+    """What a caller must have before this API answers them at all.
+
+    PROVISIONAL, AND THE DEFAULT IS TODAY. Under ``VOLUNTEER_ACCESS=session``
+    -- what a deployment that sets nothing gets -- this is exactly
+    ``IsAuthenticated``, which is what stood here before and what decision 0012
+    point 3 has not yet been implemented against. The other four values are the
+    postures ``inventory-tng-81f7`` asks a room to choose between, and
+    ``inventory-tng-81f7.4`` takes the loser out.
+
+    Somebody signed in is admitted under every posture. An administrator has
+    already proved more than any of these ask for, and a gate that locked one
+    out of their own application while a device credential was being compared
+    would be demonstrating something other than the posture.
+
+    It is not ``AllowAny`` even when it admits everybody, and that is
+    deliberate: ``open_to_anybody`` reads the classes a view names, so a view
+    guarded by this stays a view that documents a 403 and stays inside the
+    audit that decision 0012's consequence asks for.
+
+    NO ``message``, and it is worth saying why rather than leaving the next
+    reader to add one. The only caller this ever refuses is one with no
+    session -- anybody signed in is admitted above -- and DRF answers exactly
+    that caller with ``NotAuthenticated`` rather than ``PermissionDenied``,
+    which carries no message of a permission's. A sentence here would be
+    unreachable, and a sentence nothing can print is worse than none: it reads
+    as a promise the API makes. What tells a client to offer enrolment is the
+    ``enrolment`` field on ``/api/me``, which answers before anything has been
+    refused.
+    """
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        posture = settings.VOLUNTEER_ACCESS
+        if posture == postures.OPEN:
+            return True
+        if request.user.is_authenticated:
+            return True
+        if posture in postures.ENROLLING:
+            return enrolled(request)
+        if posture == postures.MESH_ONLY:
+            return postures.within(client_address(request), settings.VOLUNTEER_ACCESS_NETWORKS)
+        return False
+
+
 # The two endpoints decision 0012 point 3 opens to a volunteer, and the only
 # things in this API that may be written without the staff flag. Named once so
 # that they are one list rather than two identical literals, so that what these
@@ -63,7 +209,7 @@ class StaffWrites(BasePermission):
 # decision 0014 point 5 below -- and so that a test can assert nothing else is
 # on it. What stands in for the credential they do not ask for is the rate
 # limiting in inventory/throttling.py.
-VOLUNTEER_APPEND = [IsAuthenticated]
+VOLUNTEER_APPEND = [VolunteerAccess]
 
 
 def recently_authenticated(request: Request | HttpRequest) -> bool:

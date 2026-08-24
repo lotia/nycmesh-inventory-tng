@@ -23,6 +23,7 @@ from inventory.models import (
     CODE_LENGTH,
     CODE_PATTERN,
     Category,
+    Device,
     Item,
     ItemIdentifier,
     Label,
@@ -193,6 +194,29 @@ class LabelAdmin(SimpleHistoryAdmin):
 
     def get_readonly_fields(self, request: HttpRequest, obj: Any = None) -> list[str]:
         return ["code"] if obj is not None else []
+
+
+@admin.register(Device)
+class DeviceAdmin(admin.ModelAdmin):
+    """Revoking one enrolled device, which is the whole reason the row exists.
+
+    PROVISIONAL, with everything else under `inventory_tng.postures`:
+    inventory-tng-81f7.4 removes this page along with the setting that lets a
+    device enrol at all.
+
+    Read and revoke, never add. The identifier is half of a credential and is
+    minted at `POST /api/devices`; typing one in here would enrol a device
+    whose token nobody holds, which is a row that can only ever be deleted
+    again. Revoking is setting `revoked_at`, which is what the demo's fourth
+    act claims an enrolled posture buys.
+    """
+
+    list_display = ["identifier", "enrolled_at", "revoked_at"]
+    list_filter = ["revoked_at"]
+    readonly_fields = ["identifier", "enrolled_at"]
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
 
 
 # ---------------------------------------------------------------------------
