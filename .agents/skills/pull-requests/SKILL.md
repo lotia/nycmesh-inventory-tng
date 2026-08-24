@@ -93,6 +93,12 @@ session and the pull request records fixes nobody can trace:
 gh pr comment <pr> --body "$(cat findings.md)"
 ```
 
+The body carries `<!-- review-cycle: simplify -->` on a line of its own. That
+marker is what step 5 below reads as evidence the pass happened, and without it
+the record is refused. The code-review pass needs no marker typed: the review it
+submits is evidence in its own right. See
+[One review pass](../../../DEVELOPERS.md#one-review-pass-findings-filed-per-issue).
+
 Triage identically. Expect most of it to be the third row: "these three issues
 each grew the same helper" is a finding no one issue owns, and the extraction is
 its own piece of work.
@@ -107,7 +113,7 @@ git rebase -i --autosquash origin/main
 scripts/check-batch.sh origin/main..HEAD
 git push --force-with-lease
 gh pr checks --watch
-.claude/hooks/landing-gate.sh record <pr>    # if the local gate is installed
+scripts/landing-gate.sh record <pr>
 gh pr merge <pr> --rebase
 ```
 
@@ -116,8 +122,13 @@ The merge does not ask. The bar it has to clear is
 and none of it is yours to weigh.
 
 Two things about that `record` line, because both are easy to get wrong. It
-records the head it saw and nothing else — it does not check that either pass
-ran, so it is a reminder and you are still the one answerable for the cycle.
+records the head it saw **and the evidence it found**, so it refuses outright
+when the pull request carries nothing for a stage — but posting a marker is not
+the same as having reviewed, so you are still the one answerable for the cycle.
 And anything pushed afterwards moves the head, so the merge is refused until
 you record again: when a late fix means another `fixup!`, the way back in is
 the whole block above, from the rebase down.
+
+It also has to be its own command rather than one end of a pipe, and
+[When a branch is ready to merge](../../../DEVELOPERS.md#when-a-branch-is-ready-to-merge)
+says why, along with what the gate refuses and what it needs installed.
