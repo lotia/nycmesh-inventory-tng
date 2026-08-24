@@ -13,7 +13,7 @@ from typing import Any
 
 from corsheaders.defaults import default_headers
 
-from inventory_tng import debugging, refusals
+from inventory_tng import database, debugging, refusals
 from inventory_tng.environment import Env
 from inventory_tng.hosts import allowed_hosts
 from inventory_tng.logs import from_environment
@@ -38,6 +38,11 @@ env = Env(
     DEBUG_TRACE_LIFETIME_SECONDS=(int, debugging.DEFAULT_LIFETIME_SECONDS),
     DEBUG_TRACE_RATE=(str, debugging.DEFAULT_RATE),
     LABEL_BASE_URL=(str, "https://inventory.nycmesh.net"),
+    # How long a connect to the database may block. Read as text, like the
+    # rate above it, because `inventory_tng.database` is what turns it into a
+    # number: it holds the figure, the floor, and the refusal that says which
+    # setting a bad value came from.
+    DATABASE_CONNECT_TIMEOUT_SECONDS=(str, str(database.DEFAULT_CONNECT_TIMEOUT_SECONDS)),
 )
 
 # Read the repository-root .env when present -- the same file docker compose
@@ -188,8 +193,11 @@ WSGI_APPLICATION = "inventory_tng.wsgi.application"
 ASGI_APPLICATION = "inventory_tng.asgi.application"
 
 # PostgreSQL via a single DATABASE_URL, which is what both Kubernetes Secrets
-# and docker compose hand us most naturally.
-DATABASES = {"default": env.db("DATABASE_URL")}
+# and docker compose hand us most naturally -- with a ceiling on the wait for
+# one, which `inventory_tng.database` holds along with the variable that moves
+# it. Read there rather than here because the number has an argument attached
+# and this file is a list of settings.
+DATABASES = {"default": database.configured(env)}
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},

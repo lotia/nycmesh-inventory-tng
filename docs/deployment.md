@@ -13,7 +13,7 @@ development — which uses `compose.yaml`, not this chart — see
 ## Read this before you start
 
 **This procedure has never been run through to the end against a cluster, and
-three known defects stand in the way of the first person who does.** They are in
+two known defects stand in the way of the first person who does.** They are in
 the chart rather than in this page, so
 this page cannot fix them; what it can do is name them where you would
 otherwise meet them as a symptom. Each is filed, and each is listed again at
@@ -23,7 +23,6 @@ the step it stops.
 | --- | --- | --- |
 | `ImagePullBackOff` on every pod, at the first install | No image has ever been published from this repository, there is no `v0.1.0` to pull, and the chart renders no `imagePullSecrets` for a private one | `inventory-tng-qe7` |
 | `helm upgrade` blocks until it times out, in a namespace with a `ResourceQuota` | The migrate Job renders with no `resources`, and a quota on cpu or memory refuses a pod that declares none unless a `LimitRange` fills them in | `inventory-tng-v7g` |
-| Every backend pod dies together, some minutes into a database failover that blackholes packets | Each readiness probe blocks in the driver until its worker is killed at 30 seconds, so probe traffic alone can occupy all three; liveness then misses its deadlines from the accept queue | `inventory-tng-39ng` |
 
 The first stops an install outright. Until `inventory-tng-qe7` is done, treat
 what follows as the procedure that will work rather than one that has.
@@ -156,6 +155,7 @@ ingress's, which would otherwise forward a hostname nothing answers to.
 | --- | --- | --- | --- |
 | `DJANGO_SECRET_KEY` | yes | Secret | No default. A missing value fails at boot by design, and so does an empty one — signing sessions with nothing is the failure the refusal exists to prevent |
 | `DATABASE_URL` | yes | Secret | `postgres://user:password@host:5432/dbname`. No default, so an empty value stops the process exactly as a missing one does |
+| `DATABASE_CONNECT_TIMEOUT_SECONDS` | no | chart (`django.databaseConnectTimeoutSeconds`) | Seconds to wait for a database that is not answering. Default `5`, and it must stay under the readiness probe's `periodSeconds` — [health checks](#health-checks) is the arithmetic and what raising it obliges. A `connect_timeout` in `DATABASE_URL` overrides it |
 | `DJANGO_DEBUG` | no | chart (`django.debug`) | Must be `false` outside development |
 | `DJANGO_LOG_LEVEL` | no | chart (`django.logLevel`) | How much the backend says, on standard output. Default `INFO`. Any level Python knows; one it does not know stops the process at boot rather than starting quietly at some other level. [Reading the logs](#reading-the-logs) is what to do with the output |
 | `DJANGO_LOG_LEVELS` | no | chart (`django.logLevels`) | Comma-separated `logger=LEVEL` pairs laid over `DJANGO_LOG_LEVEL`, so that one subsystem can be raised without raising everything — `inventory.sheet=DEBUG`. Empty by default. Not every logger answers: Django decides whether to record a query from `DJANGO_DEBUG` rather than from a logger's level, so raising its SQL logger gets you nothing in a deployment however it is set |
@@ -530,6 +530,12 @@ needs to predict what a release will do:
 - **A failure is four failures.** The Job carries `backoffLimit: 3`, so a
   migration that is broken rather than unlucky is attempted four times before
   the Job is failed. Each attempt is a fresh pod against the same database.
+  Those four are quick now: the same environment gives this Job
+  `DATABASE_CONNECT_TIMEOUT_SECONDS`, chosen for the web pods' probes, so an
+  attempt that cannot reach the database gives up in seconds rather than
+  minutes and all four are done inside two. A database that is coming back up
+  is therefore no longer waited out by the retries, and a release attempted
+  during a failover is one to run again afterwards rather than one to watch.
 - **A Job per release survives its release.** Its name carries the revision
   number rather than being reused, so the migration that failed is still an
   object in the namespace afterwards and its logs can be read.
@@ -703,15 +709,41 @@ better quarter of an hour than the crash loop it replaced, because nothing has
 to recover from being killed: the pods are still there, still healthy, and
 rejoin the moment the query succeeds.
 
-**One known defect is left here**, and it is what stops this being the whole
-answer: readiness itself can starve the process it is protecting. gunicorn runs
-synchronous workers and the database connection has no `connect_timeout`, so a
-failover that blackholes packets rather than refusing them leaves each readiness
-probe blocked in the driver until the worker is killed at 30 seconds — long
-enough that probe traffic alone can occupy every worker, and `/api/livez` then
-misses its own deadlines from the accept queue. `inventory-tng-39ng` bounds the
-connection, which is the fix that makes every request fail fast rather than only
-the probes.
+**Readiness could once starve the process it protects, and what stops it is a
+number.** gunicorn runs three synchronous workers per pod, so a probe waiting
+in the database driver holds one of the three for as long as the wait lasts.
+With nothing bounding that wait it ends when the arbiter kills the worker at
+30 seconds, and six probes a minute at 30 seconds each is 180 worker-seconds
+demanded of the 180 a pod has in that minute — every worker, spent on probes,
+before a single volunteer is served. `/api/livez` then misses its own
+deadlines waiting to be accepted, and the container is killed for it:
+`inventory-tng-uq6`'s outage again, arrived at from underneath.
+`DATABASE_CONNECT_TIMEOUT_SECONDS` is the bound, and at its default of 5 those
+same six probes take 30 of the 180, leaving five sixths of the pod for the
+people using it. Why that figure, which way it is dangerous to move it, and
+what else shares its budget are [`.env.sample`](../.env.sample).
+
+**Keep it below the readiness period, which is 10.** The rule is what makes
+the figure safe rather than merely smaller, and the reason is how many probes
+can be holding a worker at one instant: under the period, one, because each
+wait is over before its successor begins. Every further period it is raised
+past adds another — and three of them is the whole pod, which is also where
+gunicorn's own 30-second kill lands. So this is not a knob to turn on its own.
+Raising it means shortening that period, or running more workers, in the same
+change; and a longer wait is sometimes the right answer, because the budget
+covers name resolution and authentication as well as the dial, and is spent
+per resolved address rather than per connect. The chart refuses to render a
+value that breaks the rule, naming both numbers, and a test finds that refusal
+by rendering either side of it — so this paragraph is checked rather than
+hoped.
+
+**The bound is on reaching the database, not on being answered by it.** A
+database that admits the connection and then goes quiet — a stall, a lock
+pile-up, a pooler queueing what it accepted — holds the worker exactly as
+before, because nothing here puts a deadline on the query the probe then runs.
+That is the remaining half of this failure and it is filed as
+`inventory-tng-nqoi`; the fix for it is a number that would apply to every
+query this application makes, which is why it was not settled here.
 
 **A pod answers to its own address, and that is what makes any of this work.**
 The kubelet dials a pod rather than the site, so a probe asks for

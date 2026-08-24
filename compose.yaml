@@ -121,6 +121,12 @@ services:
       CLIENT_REPORT_RATE: ${CLIENT_REPORT_RATE:-30/min}
       LABEL_BASE_URL: ${LABEL_BASE_URL:-https://inventory.nycmesh.net}
       DATABASE_URL: postgres://${POSTGRES_USER:-inventory}:${POSTGRES_PASSWORD:-inventory}@postgres:5432/${POSTGRES_DB:-inventory_tng}
+      # How long a request waits on a database that is not answering. Here for
+      # parity with what a cluster supplies rather than to be watched working:
+      # stopping the service below is refused instantly by the kernel or by
+      # Docker's own resolver, and neither of those ever starts this clock.
+      # What does is described in .env.sample.
+      DATABASE_CONNECT_TIMEOUT_SECONDS: ${DATABASE_CONNECT_TIMEOUT_SECONDS:-5}
       # Sign-in providers, all optional and all empty by default: a provider
       # whose pair is absent is simply not offered, so this stack comes up
       # with the local password path of

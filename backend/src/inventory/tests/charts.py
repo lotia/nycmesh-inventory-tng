@@ -54,6 +54,20 @@ def render(**overrides: str) -> str:
     return _rendered(tuple(sorted(overrides.items())))
 
 
+def refused(**overrides: str) -> str | None:
+    """What the chart said about `overrides`, if it refused to render them.
+
+    Here rather than in the test that asks, because the chart has more than one
+    render-time guard and each is proved the same way: give it the values, and
+    read the complaint. `None` is a chart that rendered.
+    """
+    try:
+        render(**overrides)
+    except subprocess.CalledProcessError as objection:
+        return str(objection.stderr)
+    return None
+
+
 def manifests(**overrides: str) -> list[dict[str, Any]]:
     """Every object the chart renders."""
     return [document for document in yaml.safe_load_all(render(**overrides)) if document]

@@ -1,3 +1,4 @@
+{{- include "inventory-tng.connectTimeoutIsShortEnough" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -68,7 +69,9 @@ spec:
               path: /api/healthz
               port: http
             initialDelaySeconds: 5
-            periodSeconds: 10
+            # Read from a define because the ceiling on the database connect
+            # timeout is measured against it; _helpers.tpl is where both meet.
+            periodSeconds: {{ include "inventory-tng.readinessPeriodSeconds" . }}
             timeoutSeconds: 1
             failureThreshold: 3
           resources:

@@ -21,15 +21,19 @@ pod by its own address, so it goes green whatever `ingress.host` is; only the
 chart can refuse a release whose ingress sends a name Django will not answer.
 """
 
+import re
 import subprocess
+from pathlib import Path
 from typing import Any
 
 import pytest
+from django.conf import settings
 from django.http.request import validate_host
 from django.test import Client, override_settings
 from environ import Env
 
-from inventory.tests.charts import manifests, render
+from inventory.tests.charts import manifests, refused, render
+from inventory_tng.database import DEFAULT_CONNECT_TIMEOUT_SECONDS
 from inventory_tng.hosts import allowed_hosts
 
 # What a kubelet puts in Host when a probe sets no header of its own: the pod's
@@ -226,6 +230,90 @@ def test_a_probe_waits_exactly_as_long_as_the_documents_say_it_does(probe: str, 
     declared = {field: value for field, value in backend_container()[probe].items() if field != "httpGet"}
 
     assert declared == expected
+
+
+# What gunicorn is asked for, and where. Every figure in
+# docs/deployment.md#health-checks divides worker-seconds by three, and the
+# three are a flag in the image's command line -- a place no manifest mentions
+# and nothing else here reads, so that section would go on dividing by a number
+# the pod had stopped running. Both files that configure gunicorn are read,
+# because the command line names a configuration module and either could carry
+# the setting that breaks the model.
+DOCKERFILE = Path("backend") / "Dockerfile"
+GUNICORN_CONF = Path("backend") / "src" / "gunicorn.conf.py"
+WORKERS = re.compile(r'"(?:--workers|-w)",\s*"3"')
+ON_THE_COMMAND_LINE = re.compile(r'"(?:--worker-class|-k|--timeout|-t)"')
+IN_THE_CONFIGURATION = re.compile(r"^\s*(?:worker_class|workers|timeout)\s*=", re.MULTILINE)
+
+
+def test_the_chart_refuses_a_connect_that_outlives_a_readiness_period() -> None:
+    """The one relationship in this deployment that spans two files.
+
+    A probe blocked on the database holds a worker until the driver gives up,
+    so the bound decides how much of a three-worker pod probe traffic can be
+    holding at once. Under the period it is one worker's worth at any instant;
+    each further period it is raised past costs another worker, and at three of
+    them the pod is serving nobody. docs/deployment.md#health-checks is that
+    arithmetic in full.
+
+    A values file is where an operator would raise it, so nothing but a refusal
+    at render time can catch it -- and the period the guard measures against is
+    asked of the same define the probe is drawn from, so this only has to prove
+    the guard is wired to it.
+    """
+    period = backend_container()["readinessProbe"]["periodSeconds"]
+
+    assert refused(**{"django.databaseConnectTimeoutSeconds": str(period - 1)}) is None, (
+        f"the chart refuses {period - 1}s, which is inside a period of {period}s"
+    )
+    objection = refused(**{"django.databaseConnectTimeoutSeconds": str(period)})
+    assert objection is not None, (
+        f"the chart renders a connect timeout of {period}s against a readiness probe every {period}s, so a "
+        "blocked probe still holds its worker when the next one arrives and they accumulate"
+    )
+    assert "periodSeconds" in objection
+
+
+def test_what_a_deployment_configuring_nothing_is_bounded_by() -> None:
+    """The other way in, which the guard above cannot see.
+
+    The chart's value is only its default: a release that sets nothing runs on
+    the application's, which is not a number `helm` has any view of.
+    """
+    period = backend_container()["readinessProbe"]["periodSeconds"]
+
+    assert period > DEFAULT_CONNECT_TIMEOUT_SECONDS, (
+        f"a process nobody configured waits {DEFAULT_CONNECT_TIMEOUT_SECONDS}s, which a probe every "
+        f"{period}s does not outlast"
+    )
+
+
+def test_the_pod_runs_the_workers_the_arithmetic_divides_by() -> None:
+    """The last number that document quotes from outside these manifests.
+
+    `TIMINGS` above says why a figure a document quotes belongs in this file
+    whatever else holds it. This is the same argument reaching past the chart:
+    drop the count to two, or hand gunicorn threads instead, and every figure
+    in that section is wrong with the suite green -- threads worst of all,
+    because worker-seconds stop being the model rather than the arithmetic
+    coming out differently.
+    """
+    command = (settings.REPO_ROOT / DOCKERFILE).read_text()
+    configuration = (settings.REPO_ROOT / GUNICORN_CONF).read_text()
+
+    assert WORKERS.search(command), (
+        f"docs/deployment.md#health-checks divides its worker-seconds by three workers, and {DOCKERFILE} no "
+        "longer asks for three"
+    )
+    for where, chosen in (
+        (DOCKERFILE, ON_THE_COMMAND_LINE.search(command)),
+        (GUNICORN_CONF, IN_THE_CONFIGURATION.search(configuration)),
+    ):
+        assert chosen is None, (
+            f"{where} chooses gunicorn's worker class, worker count or request timeout, so a pod no longer "
+            "holds one blocked request per worker and the worker-seconds in "
+            "docs/deployment.md#health-checks are not the model for it"
+        )
 
 
 def test_an_ingress_host_no_allowed_host_covers_is_refused_at_render_time() -> None:
