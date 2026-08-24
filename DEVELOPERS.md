@@ -71,10 +71,15 @@ scripts/bootstrap-dev.sh
 That URL is public and read-only, and needs no GitHub account and no SSH key.
 Where a remote you can push to matters is [Pull requests](#pull-requests).
 
+`mise run setup` is the same script under the name mise lists it by, so
+`mise tasks` in a fresh clone answers "what am I supposed to run?" without your
+having found this page first.
+
 [`scripts/bootstrap-dev.sh`](scripts/bootstrap-dev.sh) is setup: it trusts and
 installs the toolchain, writes `.env` from [`.env.sample`](.env.sample) if you
-have none, starts PostgreSQL, applies the migrations, and puts an invented
-catalogue in the database so that no screen you open is blank. It composes the
+have none, points git at the hooks that check a commit as you make one, starts
+PostgreSQL, applies the migrations, and puts an invented catalogue in the
+database so that no screen you open is blank. It composes the
 commands the rest of this guide describes and invents nothing of its own, so
 nothing here is out of reach if you would rather type them. Run it as often as
 you like; it writes no file it has written already, and it will not touch a
@@ -297,7 +302,7 @@ guides/                 The two user guides, and the pictures in them
 docs/                   Architecture, deployment, and decision records
 .agents/skills/         On-demand context for AI coding agents
 compose.yaml            Local development stack
-mise.toml               Pinned toolchain versions
+mise.toml               Pinned toolchain versions, and the setup task
 ```
 
 The backend uses a `src/` layout mirroring
@@ -1162,13 +1167,30 @@ scripts/check-commit.sh --amend <message-file>   # replacing the last one
 
 It objects if more than one issue is closed by what is staged, if the message
 and the tracker disagree about which, or if the summary line breaks the rules
-above. A guardrail rather than a gate. To have it run every time, add it to the
-hooks beads already installs — `core.hooksPath` is taken, so a second hooks
-directory would turn beads' own git integration off:
+above. A guardrail rather than a gate.
 
-```bash
-ln -s ../../scripts/check-commit.sh .beads/hooks/commit-msg
-```
+It also runs on every commit you make, without your arranging anything:
+`.beads/hooks/commit-msg` is a link to it that arrives with the clone, and
+[bootstrap](#clone-and-bootstrap) points git at the directory holding it. That
+directory is beads' own, and it holds five hooks of beads' making — a second
+one is not an option, because `core.hooksPath` is one path and beads' git
+integration goes quiet the moment it names anywhere else.
+
+Two consequences of that pointer being one path, both worth knowing before you
+are surprised by them. Beads' own five start running too, so a commit, a
+checkout and a pull each cost a fraction of a second more than they did. And
+anything you keep in git's default `.git/hooks` stops running — `pre-commit`,
+husky, a hook of your own — so move what you want kept into `.beads/hooks`;
+bootstrap says so when it finds any, rather than switching them off quietly.
+
+Two ways it can be absent, both of which say so rather than passing silently.
+A clone that never ran bootstrap has the hook and no `core.hooksPath`, and
+`scripts/check-setup.sh` tells you which of the two is missing. A checkout that
+lost the link fails CI, where the same script runs as `--shipped-only` — its
+header says why the halves are split and which one a runner can be asked.
+
+There is one way past all of it, `git commit --no-verify`, and the rule about
+using it is in [AGENTS.md](AGENTS.md#git).
 
 History before this section predates it, and is not the example to follow:
 several commits close five issues each.

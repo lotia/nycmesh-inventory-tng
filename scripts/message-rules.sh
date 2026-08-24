@@ -10,8 +10,8 @@
 #
 # Source it after report.sh and trailers.sh, both of which this file calls, and
 # resolve the path the way check-commit.sh does -- through readlink -f, because
-# DEVELOPERS.md installs that script as a symlink and "beside me" is otherwise
-# the hooks directory. Then:
+# a hook reaches that script through a symlink and "beside me" is otherwise the
+# hooks directory. Then:
 #
 #   message_rules "$(cat message.txt)"
 #
@@ -32,10 +32,20 @@ MESSAGE_TRAILER_ISSUE=""
 MESSAGE_CLOSES_COUNT=0
 MESSAGE_TRAILER_COUNT=0
 
-# message_is_git_own <summary> — a merge, revert or cherry-pick, whose message
-# git writes itself and which is nobody's issue being landed.
+# message_is_git_own <summary> — a message git wrote rather than a person, and
+# so nobody's issue being landed.
+#
+# The three `!` forms are here because this became a hook everybody has. A
+# `fixup!` subject is the one before it with six characters bolted on, and it
+# carries no trailer because the commit it will be folded into already has one
+# -- so held to the rules for a message a person wrote, every single one is
+# refused, and answering a review comment the way
+# .agents/skills/pull-requests/SKILL.md says to became impossible. They are
+# also the least dangerous thing to exempt: `git rebase --autosquash` runs no
+# commit-msg hook at all, so what these become is read by check-batch.sh over
+# the landed range, where the rules are applied to the message that survived.
 message_is_git_own() {
-  [[ "$1" =~ ^(Merge|Revert)\  ]]
+  [[ "$1" =~ ^(Merge|Revert|fixup!|squash!|amend!)\  ]]
 }
 
 # message_rules <message text> — everything that can be judged from the message

@@ -173,6 +173,41 @@ Merge branch 'batch/catalogue-write-api'
 MSG
 expect 0 "Nothing to check" "a merge is not somebody's issue being landed"
 
+# The subjects git writes for a commit that is not finished being written. Held
+# to the rules for a message somebody composed, every one of them is refused --
+# no trailer, and a subject six characters longer than one that already fitted
+# -- which is the whole of answering a review comment.
+scene
+message <<'MSG'
+fixup! aaa: Extract the decode loop into its own module
+MSG
+expect 0 "Nothing to check" "a fixup is the commit it will be folded into, not a new one"
+
+scene
+message <<'MSG'
+squash! aaa: Extract the decode loop into its own module
+MSG
+expect 0 "Nothing to check" "and so is a squash"
+
+scene
+message <<'MSG'
+amend! aaa: Extract the decode loop into its own module
+MSG
+expect 0 "Nothing to check" "and an amend! written by rebase --autosquash"
+
+# Not any line that merely starts with the word. The exemption is for the
+# subjects git composes, which carry the bang.
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+message <<'MSG'
+fixup the decode loop
+MSG
+expect 1 "found none" "a summary that merely begins with the word is still somebody's message"
+
 scene
 tracker <<'JSONL'
 {"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}

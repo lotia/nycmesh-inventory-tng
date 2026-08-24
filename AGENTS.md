@@ -119,6 +119,10 @@ So the rule is narrow on purpose. A pull request that is not mergeable is one
 to finish, never one to ask an exception for; and anything that is not a
 `batch/*` branch asks, whatever its state.
 
+**Never `git commit --no-verify`.** It is the one way past the commit-msg hook,
+and a guard that is stepped over the moment it refuses something is not a
+guard. A refusal is the work; fix what it named.
+
 When finishing, report changed files, what you validated, and the commands you
 would run next.
 
