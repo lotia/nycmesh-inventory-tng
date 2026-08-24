@@ -162,6 +162,55 @@ def test_every_registered_model_has_a_row_to_render_its_pages_with(
 
 
 @pytest.mark.usefixtures("_static_files_are_not_collected")
+def test_the_admin_refuses_to_delete_a_row_a_sticker_names(editor: Client, item: Item) -> None:
+    """THE ONLY SURFACE ON WHICH inventory-tng-6pr IS OBSERVABLE.
+
+    The API exposes no DELETE at all, so an administrator's confirmation page
+    is the whole of how this guard is met -- and asserting `ProtectedError`
+    from the ORM says nothing about what that page does with it. This is how
+    the guard got in with a claim about the page that turned out to be false
+    for half the cases; see the second assertion.
+    """
+    Label.objects.create(code="PR0TECT001", item=item)
+
+    page = editor.get(reverse("admin:inventory_item_delete", args=[item.pk]))
+
+    assert page.status_code == 200
+    body = page.content.decode()
+    assert "PR0TECT001" in body, "the page does not say which sticker it is protecting"
+    # No confirm button: Django renders the protected list INSTEAD of the form.
+    assert 'name="post"' not in body, "the page still offers to go through with it"
+
+
+@pytest.mark.usefixtures("_static_files_are_not_collected")
+def test_but_names_the_movement_rather_than_the_sticker_once_stock_has_moved(
+    editor: Client, item: Item, warehouse: Location, volunteer: Volunteer
+) -> None:
+    """The half the guide had to be corrected about, pinned so it stays true.
+
+    `format_callback` puts an object into `perms_needed` rather than
+    `protected` when its own ModelAdmin refuses deletion -- and
+    `StockMovementAdmin` does, being append-only. Both delete templates test
+    `perms_lacking` BEFORE `protected`, so a row that has moved stock reports a
+    permissions problem about "stock movement" and never names the label at
+    all. The row is still safe; the message is simply not the one that
+    explains why, and an administrator reading it would not learn that a
+    sticker is involved.
+    """
+    Label.objects.create(code="PR0TECT002", item=item)
+    moved = StockTransaction.objects.create(kind=StockTransaction.Kind.CHECKOUT, actor=volunteer)
+    # One location, not two: a checkout has to take stock OUT of somewhere --
+    # the `inventory_movement_matches_kind` trigger -- and nothing needs a
+    # destination. What matters is only that the item has moved at all.
+    StockMovement.objects.create(transaction=moved, item=item, quantity=1, from_location=warehouse)
+
+    body = editor.get(reverse("admin:inventory_item_delete", args=[item.pk])).content.decode()
+
+    assert "stock movement" in body.lower()
+    assert "PR0TECT002" not in body, "if this now names the label, the guide can say so again"
+
+
+@pytest.mark.usefixtures("_static_files_are_not_collected")
 def test_every_changelist_renders(
     editor: Client,
     one_of_each_model: dict[type[models.Model], models.Model],

@@ -17,6 +17,7 @@ from decimal import Decimal
 import pytest
 from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
+from django.db.models import ProtectedError
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
@@ -414,6 +415,108 @@ def test_offer_units_per_order_must_be_positive(item: Item, vendor: Vendor) -> N
 def test_label_str(item: Item) -> None:
     label = Label.objects.create(code="7QK3M2XV9A", item=item)
     assert str(label) == "7QK3M2XV9A"
+
+
+@pytest.mark.parametrize("revoked_at", [None, datetime.datetime(2026, 8, 18, tzinfo=datetime.UTC)])
+def test_a_label_outlives_an_attempt_on_the_item_it_names(item: Item, revoked_at: datetime.datetime | None) -> None:
+    """The sticker is on a shelf, so the row it names cannot simply go.
+
+    `Label.item` says what these keys were and what that cost. Parametrised
+    over revocation because the guard deliberately covers both, and that field
+    argues why.
+    """
+    label = Label.objects.create(code="7QK3M2XV9A", item=item, revoked_at=revoked_at)
+
+    # `match` because `StockMovement.item` is PROTECT too, so the exception
+    # type alone cannot say which reference refused. No `atomic` around it:
+    # PROTECT raises inside the collector, before any statement is issued.
+    with pytest.raises(ProtectedError, match=r"Label\.item"):
+        item.delete()
+
+    label.refresh_from_db()
+    assert label.item == item
+
+
+def test_and_an_attempt_on_the_location_it_names(warehouse: Location) -> None:
+    """The other of the two, because a location label is printed and applied
+    exactly as an item's is."""
+    # No quantity, which is what a location label is: `label_quantity_iff_item`
+    # requires one exactly when the label names an item.
+    label = Label.objects.create(code="7QK3M2XV9B", location=warehouse, quantity=None)
+
+    with pytest.raises(ProtectedError, match=r"Label\.location"):
+        warehouse.delete()
+
+    label.refresh_from_db()
+    assert label.location == warehouse
+
+
+# What may point at an item or a location and still let it be deleted, and why.
+# An entry is a decision somebody argued, not a gap: the reason is the point,
+# and a line here without one is a line nobody can weigh.
+MAY_CASCADE = {
+    ("ItemIdentifier", "item"): "inventory-tng-6kyb -- a printed barcode goes with the row, and should not",
+    ("VendorOffer", "item"): "inventory-tng-6kyb -- the price history its own docstring says it preserves",
+}
+
+
+def test_nothing_new_may_point_at_an_item_or_a_location_and_cascade() -> None:
+    """The guard as a rule about the schema, not two hand-typed keywords.
+
+    `Label.item` and `Label.location` are PROTECT because a sticker on a shelf
+    refers to them. That reasoning is not about labels: it is about anything
+    the application records against a row it did not create, and a sixth model
+    gaining a key to `Item` would get whatever its author typed, with this
+    whole issue re-derived by hand when somebody noticed.
+
+    Read off the app registry rather than a list written here, which is the
+    same move `test_admin._models_needing_admin` makes and for the same reason
+    -- a list in this file would be the promise the test exists to replace.
+
+    Two exclusions, both by rule rather than by name. `django-simple-history`'s
+    `Historical*` rows must outlive what they record, so DO_NOTHING is the
+    whole point of them. And a model backed by a database view writes nothing
+    and cannot orphan anything.
+    """
+    from django.apps import apps
+    from django.db.models import CASCADE, ForeignKey
+
+    cascading = {}
+    for model in apps.get_app_config("inventory").get_models():
+        if model.__name__.startswith("Historical") or not model._meta.managed:
+            continue
+        for field in model._meta.get_fields():
+            named = isinstance(field, ForeignKey) and field.remote_field.model.__name__ in {"Item", "Location"}
+            if named and field.remote_field.on_delete is CASCADE:
+                cascading[(model.__name__, field.name)] = None
+
+    assert cascading.keys() <= MAY_CASCADE.keys(), (
+        f"{sorted(cascading.keys() - MAY_CASCADE.keys())} would be destroyed with the row it names. "
+        "PROTECT it, or add it to MAY_CASCADE with the reason that makes losing it acceptable."
+    )
+    assert MAY_CASCADE.keys() <= cascading.keys(), (
+        f"{sorted(MAY_CASCADE.keys() - cascading.keys())} no longer cascades; take it out of MAY_CASCADE."
+    )
+
+
+def test_and_the_guard_lifts_once_the_sticker_is_gone(item: Item) -> None:
+    """PROTECT rather than refusing deletion outright, so what is protected is
+    the reference and not the row.
+
+    Driven through the label rather than asserted about a bare item, because an
+    item with nothing pointing at it was deletable before this change too and
+    so proves nothing about it. Removing the label and finding the item now
+    deletable is what says the guard is the reference.
+    """
+    named = item.pk
+    label = Label.objects.create(code="7QK3M2XV9D", item=item)
+    with pytest.raises(ProtectedError, match=r"Label\.item"):
+        item.delete()
+
+    label.delete()
+    item.delete()
+
+    assert not Item.objects.filter(pk=named).exists()
 
 
 def test_label_is_active_until_revoked(item: Item) -> None:

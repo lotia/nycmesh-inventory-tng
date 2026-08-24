@@ -517,8 +517,30 @@ class Label(models.Model):
     # gives. Who *supplies* a code is a different question, and one the
     # database cannot answer -- see decision 0016.
     code = models.CharField(max_length=32, unique=True)
-    item = models.ForeignKey(Item, null=True, blank=True, on_delete=models.CASCADE, related_name="labels")
-    location = models.ForeignKey(Location, null=True, blank=True, on_delete=models.CASCADE, related_name="labels")
+    # PROTECT, and it is the whole of inventory-tng-6pr. These were CASCADE, so
+    # deleting an item or a location from the admin -- where the Delete button
+    # is live, because only AppendOnlyAdmin and StagedAdmin refuse it -- took
+    # every label pointing at the row with it, without warning and without
+    # asking. Those codes are printed on stickers that are already on shelves;
+    # a code is opaque and cannot be worked out again, and `code` is unique and
+    # immutable by the trigger above. So scanning one afterwards found nothing,
+    # for ever, and nothing in the database or on the screen had said so.
+    #
+    # The window was not the obvious one. `StockMovement` already PROTECTs the
+    # same two rows, so an item that had MOVED was safe; what was exposed was
+    # an item catalogued and labelled and not yet moved -- which is every item
+    # during onboarding.
+    #
+    # Deliberately not narrowed to live labels. A revoked sticker is superseded
+    # rather than meaningless -- it still says what it pointed at, and it is
+    # still resolvable, which is why `LabelResolveView` answers one rather than
+    # 404ing it. Deleting the row out from under it would break that as surely
+    # as breaking a live one.
+    #
+    # WHAT IT DOES AND DOES NOT REACH is in docs/data-model.md under Label, and
+    # migration 0015 says what Postgres makes of it, which is nothing.
+    item = models.ForeignKey(Item, null=True, blank=True, on_delete=models.PROTECT, related_name="labels")
+    location = models.ForeignKey(Location, null=True, blank=True, on_delete=models.PROTECT, related_name="labels")
     # NULL on a location label, where the column does not apply, rather than a
     # sentinel 1 every reader has to know means "not applicable". That is how
     # `held_by` resolves the same problem on Location, and decision 0011
