@@ -1051,6 +1051,9 @@ hold:
       checker sees — [What CI proves](#what-ci-proves) is the part that is seen
 - [ ] A decision that future readers would ask "why?" about has a record in
       [docs/decisions/](docs/decisions/)
+- [ ] **No cryptography was written.** An established library, or a thin
+      wrapper over one's public API, or the work stopped and asked — see
+      [rule 3 in AGENTS.md](AGENTS.md#three-rules-that-are-not-negotiable)
 
 The documentation item is not a formality and not a follow-up ticket. A change
 that leaves the docs describing the old behaviour is incomplete, because the

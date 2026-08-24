@@ -8,7 +8,7 @@ NYC Mesh inventory. Read [README.md](README.md) for what it is and
 [DEVELOPERS.md](DEVELOPERS.md) for how to build and run it. Do not restate
 either here.
 
-## Two rules that are not negotiable
+## Three rules that are not negotiable
 
 **1. One topic, one place.** Every piece of documentation lives in exactly one
 file; everywhere else links to it. Never paste an explanation into a second
@@ -22,6 +22,41 @@ API surface, or deployment — and if so, update that topic's canonical document
 in the same change. This is an acceptance criterion, never a follow-up ticket.
 NYC Mesh is a volunteer community; stale setup docs are the biggest barrier to
 new contributors.
+
+**3. Never write cryptography.** Not a primitive, not a construction, not
+"just" a key-derivation step, a nonce scheme, a padding mode, a signature
+envelope, a token format, or a constant-time comparison. Three routes, in
+order, and it is an order rather than a menu:
+
+1. **Use an established library** — well known, actively maintained, widely
+   deployed, independently audited. Here that means Django's own
+   `django.core.signing`, `django.contrib.auth.hashers` and
+   `django.utils.crypto.constant_time_compare` first, because they are already
+   dependencies and already carry this project's threat model; then
+   pyca/`cryptography`, `hmac`, `hashlib`, `secrets`. In a browser it is
+   WebCrypto and nothing else. `inventory_tng.debugging` already signs tokens
+   this way — copy it rather than inventing beside it.
+2. **Otherwise, a thin wrapper over that library's public API.** Thin means it
+   arranges calls, validates inputs, and names the operation in this project's
+   vocabulary. It never implements the algorithm, and it never reaches for a
+   private or underscore-prefixed name. Once a wrapper contains arithmetic on
+   bytes it has stopped being a wrapper, and route 3 applies.
+3. **Otherwise stop, and say so loudly.** Do not prototype it to see. Do not
+   leave a TODO and carry on. Do not put it behind a flag. Say that the work
+   has hit this rule, name what was needed and why neither route above reached
+   it, and wait for a person. That decision is made deliberately, by a human,
+   and its reasoning goes in [docs/decisions/](docs/decisions/).
+
+This rule is absolute because the failure is silent. Cryptographic code that is
+wrong produces output byte-shaped exactly like output that is right, so it
+passes every test in this repository and no review here is qualified to catch
+it. The safety net the rest of this file relies on — tests, coverage
+thresholds, a reviewer — does not exist for this one category. And the cost of
+being wrong is not borne by whoever wrote it; it is borne by the volunteers
+whose names, addresses and whereabouts the code was protecting.
+
+So reaching route 3 is not a setback to work around. It is this rule doing the
+only job it has.
 
 ## Definition of Done
 
