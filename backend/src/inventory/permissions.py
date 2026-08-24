@@ -162,11 +162,18 @@ def open_to_anybody(view: APIView) -> bool:
     checks the cluster probes, ``/api/me``, whose whole job is to say what the
     caller is, and the credential-free reports and descriptions beside them.
 
-    Deliberately not a count. It carried one until this sentence replaced it,
-    and the count was wrong by five: two changes in a row incremented it
-    instead of recounting, which is what a number nothing checks does. The
-    enumeration belongs in a test that fails when it stops being true, and
-    that is inventory-tng-lb95.
+    Deliberately not a count, still. It carried one until this sentence
+    replaced it, and the count was wrong by five: two changes in a row
+    incremented it instead of recounting, which is what a number nothing
+    checks does. What is checked now is the enumeration itself, in
+    inventory/tests/test_capabilities.py, where every view this is true of is
+    held against a list saying why each is on it. A count written back in here
+    would be a second tally of that list, kept by hand, which is how the first
+    one went wrong.
+
+    This reads the classes a view names, which is narrower than asking what a
+    request would be admitted to. That audit's docstring is where the
+    difference is written down, and inventory-tng-2hbv is closing it.
 
     One predicate rather than an ``AllowAny`` check repeated wherever the
     question comes up -- the schema asks it to decide whether an operation can

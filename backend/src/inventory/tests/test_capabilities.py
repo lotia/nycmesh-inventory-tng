@@ -18,7 +18,12 @@ from django.test import Client
 from django.urls import URLPattern, get_resolver, reverse
 from rest_framework.permissions import SAFE_METHODS
 
-from inventory.permissions import RecentlyAuthenticated, StaffWrites, administrators_only
+from inventory.permissions import (
+    RecentlyAuthenticated,
+    StaffWrites,
+    administrators_only,
+    open_to_anybody,
+)
 from inventory.tests.helpers import post
 from inventory.views import CAPABILITIES
 from inventory_tng import urls
@@ -152,6 +157,86 @@ def test_nothing_but_the_two_volunteer_writes_is_open_to_a_volunteer() -> None:
     }, "a write was opened to volunteers; argue it against decision 0012 before widening this"
 
 
+def test_every_endpoint_asking_nothing_of_its_caller_is_one_the_record_argued() -> None:
+    """The audit above sees writes only, which is how ``/api/livez`` slipped past it.
+
+    ``method not in SAFE_METHODS`` is a filter over methods, so a view written
+    ``permission_classes = [AllowAny]`` with nothing but a GET on it is not
+    merely permitted there -- it is never looked at. inventory-tng-uq6 added
+    exactly that and nothing in this repository said a word. Decision 0012's
+    consequences are about what is reachable without a credential, and reading
+    is most of what this API does; inventory-tng-81f7 is the open question of
+    what such a caller may learn about a person, and it is open because the
+    read surface was never the half anybody was watching.
+
+    So this asks the view-level question instead and holds the whole answer
+    against a list, each entry saying where its case was made rather than
+    making it here. A line added to that list is the moment somebody has to
+    write the next one, and inventory-tng-gnhl is about to ask for several.
+
+    WHAT THIS DOES NOT COVER, stated here because this is the only place it
+    belongs and everywhere else cites it. It is not the whole of decision
+    0012's consequence, and neither that record nor DEVELOPERS.md claims it
+    is. Two gaps, both measured, both inventory-tng-2hbv. ``open_to_anybody``
+    reads the permission classes a view names rather than asking what an
+    anonymous request would be admitted to, so a view that keeps
+    ``StaffWrites`` and drops ``IsAuthenticated`` serves every read to
+    anybody and is invisible here. And this walk reads the routes this table
+    declares itself, so the patterns behind ``accounts/`` are out of its
+    sight -- among them the sign-in and sign-up pages, which answer anybody
+    by design and are nobody's decision to make twice.
+    """
+    # Keyed by where the class is defined, not by its bare name: half of these
+    # are third-party and all of them are called something generic, so a
+    # second HealthCheckView mounted beside the first would be one member of
+    # this set and ship unargued. Every other consumer keys on the class
+    # itself -- api.py on `self.view`, middleware.py on the resolved one.
+    argued = {
+        "inventory.views.ApiRootView": "the index, and the CSRF cookie a browser needs before it can sign in",
+        "inventory.views.HealthCheckView": "the readiness probe; decision 0012 point 3's posture covered this one",
+        "inventory.views.LivenessCheckView": "the second probe, argued in decision 0012 under 'A fourth'",
+        "inventory.views.CurrentUserView": "says what the caller is, so demanding a session makes every load a failure",
+        "inventory.views.ClientFailureView": "argued in decision 0012; the view's own docstring cites the passage",
+        "inventory.views.DebugTraceVerifyView": "the signed token it is handed is the credential; see the view",
+        "drf_spectacular.views.SpectacularAPIView": "describes this surface rather than being part of it",
+        "drf_spectacular.views.SpectacularSwaggerSplitView": "renders that same description for a person",
+        "django.views.generic.base.RedirectView": "sends the admin's own login form to allauth's; see the route",
+    }
+    assert all(argued.values()), "an entry with no reason is a name, and a name is not an argument"
+
+    open_to_everybody = set()
+    for pattern in urls.urlpatterns:
+        callback = pattern.callback
+        # `cls` first, because that is what the other consumers here read, and
+        # `view_class` after it, because a view that is not DRF's has only
+        # that one -- and one such is in this table. An `include()` mount has
+        # no callback at all and is another URLconf's to audit, which is where
+        # allauth's names go; see the docstring.
+        view = getattr(callback, "cls", None) or getattr(callback, "view_class", None)
+        if view is None:
+            continue
+        # Built the way the URLconf builds it, from the attribute Django's own
+        # `as_view` sets on every view function. `as_view(permission_classes=...)`
+        # is legal and DRF applies it per request, so a route the table opened
+        # on purpose reads as closed if the class is instantiated bare.
+        mounted = getattr(callback, "view_initkwargs", None) or {}
+        # A view that is not DRF's has no permission layer to ask at all, so
+        # it is open by construction rather than by declaration.
+        if not hasattr(view, "get_permissions") or open_to_anybody(view(**mounted)):
+            open_to_everybody.add(f"{view.__module__}.{view.__qualname__}")
+
+    # Two assertions, because the two directions call for opposite edits and
+    # one sentence cannot say both. Tightening the read surface is planned
+    # work -- inventory-tng-81f7 -- so the second is not the unlikely one.
+    unargued = sorted(open_to_everybody - set(argued))
+    assert not unargued, (
+        f"{unargued} answer a caller holding no credential at all: argue each against "
+        "decision 0012 and name it above with that argument, or give it a permission class"
+    )
+    stale = sorted(set(argued) - open_to_everybody)
+    assert not stale, f"{stale} no longer answer such a caller; delete the line rather than restore the endpoint"
+
+
 def test_a_session_that_must_sign_in_again_is_told_which_no_it_is(stale: Client) -> None:
     """A capability says what the caller may do *now*, so a false one is ambiguous.
 
@@ -235,8 +320,8 @@ def test_every_route_is_registered_exactly_once() -> None:
     ``<int:id>`` beside ``<int:pk>``, or a ``re_path`` for a URL a ``path``
     already answers -- which is dead in the same way and compares unequal
     here. Catching that means reversing each registration and resolving it
-    back, over a walk the audits here would share rather than a sixth of their
-    own; inventory-tng-s047.
+    back, over a walk the audits here would share rather than one more of
+    their own; inventory-tng-s047, which counts them.
     """
     # Only what this table declares itself: an `include()` mount is another
     # URLconf's to keep unique, and Django lets two of them share one prefix
