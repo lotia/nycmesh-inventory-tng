@@ -202,7 +202,8 @@ def test_a_read_still_declares_the_refusal_it_can_answer_with(schema: Mapping[st
 
     Which handful is `permissions.open_to_anybody`'s to say and deliberately
     not a number here: this docstring carried one, and so did that predicate's,
-    and both were wrong. See inventory-tng-lb95.
+    and both were wrong. What holds that handful to a list now is
+    test_capabilities.py, one audit over.
     """
     assert "403" in schema["paths"]["/api/items"]["get"]["responses"]
     assert "403" not in schema["paths"]["/api/healthz"]["get"]["responses"]

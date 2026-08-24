@@ -188,10 +188,16 @@ Everybody signs in, for now. These answer without a session — the index
 credential-free reports `/api/client-failures` and `/api/debug-trace`, and the
 API's own description at `/api/schema` and `/api/docs` — and every other one
 needs one, the two a volunteer writes to included. The list is deliberately
-not a count: it was written as one and was wrong twice running. So make an
-account
-before you expect either half of the app to answer, and sign in at
-`/accounts/login/` on whichever address you are using. Those last two are
+not a count: it was written as one and was wrong twice running. It is also a
+convenience rather than the authority — that is an audit in
+`backend/src/inventory/tests/test_capabilities.py`, which keeps the same set
+with the argument for each entry beside it, and whether an endpoint may join
+them at all is
+[decision 0012](docs/decisions/0012-two-populations.md). So make an
+account before you expect either half of the app to answer, and sign in at
+`/accounts/login/` on whichever address you are using — that page and the rest
+of `/accounts` answer anybody, because a sign-in form has to. `/api/schema`
+and `/api/docs` are
 readable by anyone who can reach the port, which is why a deployment puts a
 network boundary in front of
 them: [which paths are restricted](docs/deployment.md#which-paths-are-restricted).
