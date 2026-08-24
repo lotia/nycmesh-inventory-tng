@@ -52,6 +52,7 @@ import datetime
 import decimal
 from typing import Any
 
+from django.conf import settings
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
@@ -66,6 +67,7 @@ from inventory.models import (
     StockTransaction,
     Volunteer,
 )
+from inventory_tng import postures
 
 # Far above a real cart of a couple of dozen scans. It exists only so that one
 # request cannot open an unbounded write transaction against an append-only
@@ -415,6 +417,36 @@ class ClientFailureSerializer(serializers.Serializer):
     )
 
 
+class DeviceEnrolmentSerializer(serializers.Serializer):
+    """What a browser sends to enrol. Provisional; see `DeviceEnrolmentView`.
+
+    One optional field, and it is optional in the serializer rather than in the
+    posture: under ``enrolled_self`` there is nothing to send, and under
+    ``enrolled_code`` a missing code and a wrong one are refused identically,
+    so making it required here would produce two different refusals for the
+    same fact. The view is where that is decided.
+    """
+
+    code = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=100,
+        help_text="The enrolment code this deployment was given, where VOLUNTEER_ACCESS=enrolled_code.",
+    )
+
+
+class DeviceCredentialSerializer(serializers.Serializer):
+    """The token an enrolled device stores and presents. Provisional.
+
+    Answered once, at enrolment, and never readable again: there is no endpoint
+    that hands an existing device its token back, because the only copy is the
+    one the browser stored. Losing it is enrolling again, which is exactly the
+    cost the demo's fifth act exists to show.
+    """
+
+    token = serializers.CharField(help_text="Send this back in the X-Device header on every request.")
+
+
 class ApiErrorSerializer(serializers.Serializer):
     """One thing wrong, and where.
 
@@ -455,11 +487,68 @@ class VolunteerSerializer(serializers.ModelSerializer):
     ``email`` and ``slack_id`` are here because two people called Sean are the
     whole reason this list is searched before anyone adds themselves; without
     something to tell them apart the picker cannot help.
+
+    WHAT A CALLER WITH NO SESSION IS SENT IS A SETTING, and a provisional one
+    -- ``ANONYMOUS_PAYLOAD``, whose default is ``full`` and so is exactly the
+    three fields above. ``inventory_tng.postures`` says what the other two
+    words mean and ``inventory-tng-81f7.4`` is what takes them out again once
+    ``inventory-tng-81f7`` has chosen. This is two representations keyed on who
+    is asking rather than a field deleted from the model: an administrator
+    signs in and keeps the whole record, which is what makes merging duplicates
+    possible at all.
     """
 
     class Meta:
         model = Volunteer
         fields = ["id", "display_name", "email", "slack_id"]
+
+    def to_representation(self, instance: Any) -> Any:
+        """The row, less whatever this posture withholds from this caller.
+
+        ON THE WAY OUT AND NOWHERE ELSE, which is the whole design of the
+        narrowed postures. What a caller may READ and what they may SUBMIT are
+        different questions, and act three of the demo turns on the answer to
+        the second being unchanged: somebody sharing a display name identifies
+        themselves by TYPING their own address, so the field has to keep taking
+        one, keep its uniqueness validator, and keep raising the 409 decision
+        0015 describes. Narrowing the fields themselves would have quietly
+        stopped every one of those -- the address would have arrived, been
+        ignored, and been recorded as absent.
+
+        HERE RATHER THAN IN A SECOND SERIALIZER CLASS, so everything built on
+        this one is shaped by the posture without anybody remembering to key
+        it: ``VolunteerDetailSerializer`` and the volunteer nested inside a 409
+        both inherit it. A pair of parallel classes is how one of them comes to
+        answer with an address after the other stopped.
+
+        NO REQUEST IN THE CONTEXT IS READ AS ANONYMOUS, which is the strict
+        direction. Two callers arrive that way: the schema generator, where the
+        default posture makes the answer identical either way, and the 409 body
+        built in ``views.py``, where an administrator provoking a conflict
+        under a narrowed posture is shown a name rather than an address. Both
+        are the answer to prefer if this is ever wrong.
+        """
+        rendered = super().to_representation(instance)
+        user = getattr(self.context.get("request"), "user", None)
+        posture = settings.ANONYMOUS_PAYLOAD
+        if posture == postures.FULL or (user is not None and user.is_authenticated):
+            return rendered
+        # Dropped under BOTH narrowed postures, and that is deliberate rather
+        # than an oversight about which field the argument was about. A Slack
+        # ID tells two people apart perfectly well, so a blurred address beside
+        # one would be a blur that blurs nothing -- and it is on the wire today
+        # and rendered by no screen here, so nothing loses anything by it.
+        rendered.pop("slack_id", None)
+        if posture == postures.NAMES_ONLY:
+            rendered.pop("email", None)
+        elif posture == postures.MASKED:
+            # Named rather than left as the remaining branch, because
+            # `inventory-tng-81f7.4`'s acceptance is a grep per value that
+            # comes back empty -- and a value whose only implementation is an
+            # unnamed `else` is a value that grep never reaches. It is also
+            # what stops a fourth word for this setting silently masking.
+            rendered["email"] = postures.masked(rendered.get("email"))
+        return rendered
 
 
 class VolunteerConflictSerializer(serializers.Serializer):

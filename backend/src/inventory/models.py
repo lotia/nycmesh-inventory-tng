@@ -840,3 +840,47 @@ class StockBalance(models.Model):
 
     def __str__(self) -> str:
         return f"{self.quantity} x {self.item} at {self.location}"
+
+
+class Device(models.Model):
+    """A browser that has enrolled, so this API will answer it.
+
+    DEMO SCAFFOLDING, and provisional like everything else under
+    ``VOLUNTEER_ACCESS``. It exists so ``inventory-tng-81f7`` can be argued
+    from a posture people have used rather than one they were told about;
+    ``inventory-tng-81f7.4`` removes it along with the setting that reads it.
+    ``inventory_tng.postures`` is what the credential is, and -- more
+    importantly -- what it is not.
+
+    A ROW RATHER THAN A BARE SIGNATURE, and that is the whole reason this model
+    exists. A signature on its own can only be withdrawn by rotating the key,
+    and rotating signs every device out at once. The demo's fourth act claims
+    that an enrolled posture buys the ability to count and cut off *a device*
+    rather than a network; a row is what makes that claim true, and
+    ``revoked_at`` is where it is made.
+
+    It holds no person. ``identifier`` is a random opaque string and there is
+    no column for whose phone this is: a device is not a volunteer, and
+    decision 0012 point 5 keeps attribution on ``StockTransaction.actor``
+    whatever authenticates a request.
+    """
+
+    identifier = models.CharField(
+        max_length=64,
+        unique=True,
+        editable=False,
+        help_text="The opaque name inside this device's token. Random, and says nothing about anybody.",
+    )
+    enrolled_at = models.DateTimeField(auto_now_add=True)
+    revoked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Set to stop honouring this device's token. Enrolling again is a new row.",
+    )
+
+    class Meta:
+        ordering = ["-enrolled_at", "pk"]
+
+    def __str__(self) -> str:
+        state = "revoked" if self.revoked_at is not None else "enrolled"
+        return f"Device {self.identifier[:8]} ({state})"

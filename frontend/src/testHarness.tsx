@@ -19,6 +19,10 @@ export const VOLUNTEER = {
   username: null,
   administrator: false,
   recently_authenticated: false,
+  // Provisional, with the access-posture demo; see src/device/credential.ts.
+  // What every deployment answers until one sets VOLUNTEER_ACCESS.
+  enrolment: "not_required",
+  search_minimum: 0,
   capabilities: {
     append_stock: true,
     add_volunteer: true,

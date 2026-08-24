@@ -201,3 +201,32 @@ Named here so the gaps are visible rather than surprising:
 
 Each of these is tracked as a design issue — run `bd ready` to see the current
 state.
+
+---
+
+## Demo scaffolding, on its way out
+
+One group of settings in this application is **provisional and is scheduled for
+removal**, and it is named here so nobody builds on it by mistake:
+`ANONYMOUS_PAYLOAD`, `VOLUNTEER_ACCESS` (with `VOLUNTEER_ACCESS_CODE` and
+`VOLUNTEER_ACCESS_NETWORKS`), `SEARCH_MINIMUM`, `ANONYMOUS_READ_RATE` and
+`CUSTODY_VISIBILITY`. What each value means is in
+[.env.sample](../.env.sample); the code they reach is
+`backend/src/inventory_tng/postures.py`, which is also where the argument for
+each of them lives.
+
+They exist to make one meeting decidable. `inventory-tng-81f7` asks NYC Mesh
+volunteers what an anonymous caller may learn about a person, and the costs it
+turns on are entirely about how the application *feels* on a first day —
+which nobody can weigh from prose. So each option is a value that can be
+changed between two sentences, and `manage.py seed_posture_demo` puts an
+invented roster behind them to be changed in front of. That argument is not
+restated here; it is on the bead.
+
+**Every default is what this application already did**, so a deployment that
+sets none of them behaves exactly as it did before they existed.
+
+`inventory-tng-81f7.4` removes them once that question is settled, and decides
+one of exactly two things per setting: the chosen value becomes the only
+behaviour, or the whole thing goes. Nothing enforces that, which is why it is
+written down in three places rather than remembered.

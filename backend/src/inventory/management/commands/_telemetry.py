@@ -60,12 +60,12 @@ def named(command: BaseCommand) -> str:
     """What a command is called, read off the module Django found it in.
 
     NOT A LITERAL, and a function rather than a method on the base below for
-    the reason that base gives about the two commands it excludes: every one of
+    the reason that base gives about the commands it excludes: every one of
     them wrote its own filename out a second time, which is a thing that can go
     out of step and a thing nobody would notice had. Leaving the fix on the base
-    would have cured it for six and left the last two as the only places in the
-    tree where it could still happen -- so the exemption costs them the printing
-    hook they do not want, and not this.
+    would have cured it for six and left the exempt ones as the only places in
+    the tree where it could still happen -- so the exemption costs them the
+    printing hook they do not want, and not this.
     """
     return type(command).__module__.rsplit(".", 1)[-1]
 
@@ -143,16 +143,18 @@ class ReportingCommand(BaseCommand):
     Everything else -- the record, the figures, the printing, and the name,
     which is read off the module rather than typed -- is here.
 
-    TWO COMMANDS DELIBERATELY DO NOT INHERIT IT, and it is worth saying which
-    so the next reader does not think they were missed. `mint_debug_token`
-    produces no section at all: it mints a token and prints it with three lines
-    of prose about what it is for. `seed_demo_data` produces one section and
-    then says more -- whether stock was invented on top of an existing ledger,
-    and the label codes to scan. Both still use `running` directly, which is
-    what it is for. A hook here for "and then say this too" would be machinery
-    built for two callers.
+    THREE COMMANDS DELIBERATELY DO NOT INHERIT IT, and it is worth saying
+    which so the next reader does not think they were missed.
+    `mint_debug_token` produces no section at all: it mints a token and prints
+    it with three lines of prose about what it is for. `seed_demo_data`
+    produces one section and then says more -- whether stock was invented on
+    top of an existing ledger, and the label codes to scan -- and
+    `seed_posture_demo` does the same with the pair to search for on the day.
+    All three still use `running` directly, which is what it is for. A hook
+    here for "and then say this too" would be machinery built for three
+    callers.
 
-    `seed_integration_data` is a third, and a different case again: its
+    `seed_integration_data` is a fourth, and a different case again: its
     standard output is a JSON document a program parses, so it says nothing at
     all. `scripts/check-telemetry.allow` is where that is argued.
     """

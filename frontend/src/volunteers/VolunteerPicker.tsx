@@ -17,6 +17,7 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useState } from "react";
+import { useCurrentSession } from "../admin/SessionProvider";
 import { type ApiError, apiPost, asApiError, refusalBody, searchPath } from "../api/client";
 import type { Page, Volunteer, VolunteerConflict } from "../api/types";
 import { useResource } from "../api/useResource";
@@ -69,6 +70,26 @@ export function VolunteerPicker() {
   const typed = search.trim();
   const identifier = identifierField(typed);
   const ready = identifier === null || name.trim() !== "";
+  // WHETHER THE SEARCH WAS ACTUALLY ASKED, which is two conditions and not
+  // one. NOTHING TYPED IS NOT A SEARCH, whatever any minimum says: at the
+  // default of nought an empty box satisfies `>=` on its own, which drew the
+  // offer on first paint with nothing in it and sent `display_name: ""` to
+  // the server when it was pressed.
+  //
+  // AND ENOUGH TYPED FOR THE SERVER TO HAVE RUN IT. `SEARCH_MINIMUM` is
+  // provisional (inventory-tng-81f7.4 removes it) and nought for every
+  // deployment that sets nothing. Where it is set, the server answers an
+  // empty page for a term that is too short -- indistinguishable, from here,
+  // from a term that genuinely matched nobody -- and the offer would have put
+  // "Se" on the pick-list as somebody's name.
+  //
+  // `?? 0` for the same reason `useCan` insists on an explicit true and
+  // `ANONYMOUS` carries a nought: a server that has never heard of this field
+  // must leave the screen behaving exactly as it did before the field existed.
+  // Read before the `&&`, because `&&` short-circuits and a hook behind one is
+  // a hook that is not always called.
+  const minimum = useCurrentSession().search_minimum ?? 0;
+  const searched = typed !== "" && typed.length >= minimum;
   const chosen = remembered?.id === cart.actorId ? remembered : null;
 
   function choose(volunteer: Volunteer): void {
@@ -153,10 +174,11 @@ export function VolunteerPicker() {
 
       {error ? <Alert severity="error">{error.message}</Alert> : null}
 
-      {/* Only after the matches, and only once the search has *succeeded*:
-          offering to add somebody because the search failed is how a network
-          fault produces the duplicate this screen exists to prevent. */}
-      {typed !== "" && !loading && !error ? (
+      {/* Only after the matches, and only once the search has actually been
+          MADE and succeeded: offering to add somebody because the search
+          failed -- or because the server never ran it -- is how a duplicate
+          gets onto the list this screen exists to keep clean. */}
+      {searched && !loading && !error ? (
         <Stack spacing={1}>
           {identifier !== null ? (
             <TextField

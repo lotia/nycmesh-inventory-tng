@@ -269,6 +269,49 @@ paths:
           description: No response body
         '403':
           description: No response body
+  /api/devices:
+    post:
+      operationId: devices_create
+      description: Mints the opaque token an enrolled device presents in `X-Device`.
+        Answers 403 unless `VOLUNTEER_ACCESS` names an enrolling posture, and under
+        `enrolled_code` unless the body carries the code this deployment was given.
+        Demo scaffolding for inventory-tng-81f7; inventory-tng-81f7.4 removes it.
+      summary: Enrol this device
+      tags:
+      - devices
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceEnrolment'
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceCredential'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Throttled'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+          description: ''
   /api/healthz:
     get:
       operationId: healthz_retrieve
@@ -733,6 +776,12 @@ paths:
               schema:
                 type: string
           description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Throttled'
+          description: ''
   /api/livez:
     get:
       operationId: livez_retrieve
@@ -1086,6 +1135,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedVolunteerList'
           description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Throttled'
+          description: ''
         '403':
           content:
             application/json:
@@ -1179,6 +1234,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VolunteerDetail'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Throttled'
           description: ''
         '403':
           content:
@@ -1470,13 +1531,19 @@ components:
           type: boolean
         recently_authenticated:
           type: boolean
+        enrolment:
+          $ref: '#/components/schemas/EnrolmentEnum'
+        search_minimum:
+          type: integer
         capabilities:
           $ref: '#/components/schemas/Capabilities'
       required:
       - administrator
       - authenticated
       - capabilities
+      - enrolment
       - recently_authenticated
+      - search_minimum
       - username
     Detail:
       type: object
@@ -1507,6 +1574,48 @@ components:
             again is what fixes it.'
       required:
       - detail
+    DeviceCredential:
+      type: object
+      description: |-
+        The token an enrolled device stores and presents. Provisional.
+
+        Answered once, at enrolment, and never readable again: there is no endpoint
+        that hands an existing device its token back, because the only copy is the
+        one the browser stored. Losing it is enrolling again, which is exactly the
+        cost the demo's fifth act exists to show.
+      properties:
+        token:
+          type: string
+          description: Send this back in the X-Device header on every request.
+      required:
+      - token
+    DeviceEnrolment:
+      type: object
+      description: |-
+        What a browser sends to enrol. Provisional; see `DeviceEnrolmentView`.
+
+        One optional field, and it is optional in the serializer rather than in the
+        posture: under ``enrolled_self`` there is nothing to send, and under
+        ``enrolled_code`` a missing code and a wrong one are refused identically,
+        so making it required here would produce two different refusals for the
+        same fact. The view is where that is decided.
+      properties:
+        code:
+          type: string
+          description: The enrolment code this deployment was given, where VOLUNTEER_ACCESS=enrolled_code.
+          maxLength: 100
+    EnrolmentEnum:
+      enum:
+      - not_required
+      - enrolled
+      - self
+      - code
+      type: string
+      description: |-
+        * `not_required` - not_required
+        * `enrolled` - enrolled
+        * `self` - self
+        * `code` - code
     FieldEnum:
       enum:
       - email
@@ -2347,6 +2456,15 @@ components:
         ``email`` and ``slack_id`` are here because two people called Sean are the
         whole reason this list is searched before anyone adds themselves; without
         something to tell them apart the picker cannot help.
+
+        WHAT A CALLER WITH NO SESSION IS SENT IS A SETTING, and a provisional one
+        -- ``ANONYMOUS_PAYLOAD``, whose default is ``full`` and so is exactly the
+        three fields above. ``inventory_tng.postures`` says what the other two
+        words mean and ``inventory-tng-81f7.4`` is what takes them out again once
+        ``inventory-tng-81f7`` has chosen. This is two representations keyed on who
+        is asking rather than a field deleted from the model: an administrator
+        signs in and keeps the whole record, which is what makes merging duplicates
+        possible at all.
       properties:
         id:
           type: integer

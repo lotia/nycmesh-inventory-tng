@@ -1,6 +1,7 @@
 from typing import Any, NamedTuple, cast
 
 import structlog
+from django.conf import settings
 from django.contrib.postgres.search import TrigramSimilarity
 from django.db import IntegrityError, connection
 from django.db.models import Prefetch, Q, QuerySet
@@ -24,6 +25,7 @@ from inventory import telemetry
 from inventory.labels import refusal_page, sheet
 from inventory.models import (
     Category,
+    Device,
     Item,
     Label,
     Location,
@@ -32,12 +34,20 @@ from inventory.models import (
     StockTransaction,
     Volunteer,
 )
-from inventory.permissions import VOLUNTEER_APPEND, is_administrator, recently_authenticated
+from inventory.permissions import (
+    VOLUNTEER_APPEND,
+    enrolment_state,
+    is_administrator,
+    recently_authenticated,
+)
 from inventory.serializers import (
     BatchInconsistentSerializer,
     BatchRejectedSerializer,
     CategorySerializer,
     ClientFailureSerializer,
+    DetailSerializer,
+    DeviceCredentialSerializer,
+    DeviceEnrolmentSerializer,
     ItemDetailSerializer,
     ItemSerializer,
     LabelMapSerializer,
@@ -50,8 +60,14 @@ from inventory.serializers import (
     VolunteerDetailSerializer,
     VolunteerSerializer,
 )
-from inventory.throttling import APPEND_THROTTLES, REPORT_THROTTLES
-from inventory_tng import debugging
+from inventory.throttling import (
+    ANONYMOUS_READ_THROTTLES,
+    APPEND_THROTTLES,
+    ENROLMENT_THROTTLES,
+    LABEL_SHEET_THROTTLES,
+    REPORT_THROTTLES,
+)
+from inventory_tng import debugging, postures
 
 # Named for the module, which is what puts `inventory.views` in the `logger`
 # column. Every record it writes is inside a request, so it carries that
@@ -569,26 +585,38 @@ class WithdrawnRows:
         ),
     )
 
+    def withdrawn_asked(self) -> bool:
+        """Whether this request asked for the withdrawn rows or the offered ones.
+
+        ITS OWN METHOD BECAUSE TWO THINGS ASK IT, and the second of them got a
+        different answer by reading the parameter's mere PRESENCE:
+        ``VolunteerListCreateView`` withholds its collection until enough has
+        been typed and must not narrow a listing nobody types into -- but a
+        generated client sends ``withdrawn=false`` for the default, so
+        "present" and "asked for" are not the same question. Reading it there
+        by hand handed that client the whole first page with no search term.
+
+        The schema says boolean, so ``false`` must get the default rather than
+        a 400. The values are DRF's own ``BooleanField`` vocabulary, so what
+        this parameter accepts is what every other boolean in this API accepts.
+        """
+        asked = self.request.query_params.get("withdrawn")
+        if asked is None:
+            return False
+        try:
+            return bool(serializers.BooleanField().to_internal_value(asked))
+        except ValidationError as refused:
+            # Re-keyed, so the body names the parameter rather than answering
+            # with a bare sentence the caller has to guess the subject of.
+            raise ValidationError({"withdrawn": refused.detail}) from refused
+
     def get_queryset(self) -> QuerySet[Any]:
         # The collection's own, whatever the view beside this decided it is.
         # Reached through the MRO rather than by naming a base: this is a mixin
         # in front of whichever generic view the collection uses, and it has no
         # base of its own to declare.
         offered = cast("QuerySet[Any]", super().get_queryset())  # ty: ignore[unresolved-attribute]
-        asked = self.request.query_params.get("withdrawn")
-        if asked is None:
-            return offered
-        # The schema says boolean, so a generated client will send `false` for
-        # the default and must get the default rather than a 400. The values
-        # are DRF's own BooleanField vocabulary, so what the parameter accepts
-        # is what every other boolean in this API accepts.
-        try:
-            wanted = serializers.BooleanField().to_internal_value(asked)
-        except ValidationError as refused:
-            # Re-keyed, so the body names the parameter rather than answering
-            # with a bare sentence the caller has to guess the subject of.
-            raise ValidationError({"withdrawn": refused.detail}) from refused
-        if not wanted:
+        if not self.withdrawn_asked():
             return offered
         # Asked after the value is understood: a volunteer who sends nonsense
         # is told it is nonsense, and one who asks properly is told they may
@@ -795,9 +823,45 @@ class VolunteerListCreateView(WithdrawnRows, ListCreateAPIView):
     # The other; see VOLUNTEER_APPEND.
     permission_classes = VOLUNTEER_APPEND
 
-    # Rate limited; see inventory/throttling.py. Searching is not counted --
-    # the client does that as somebody types.
-    throttle_classes = APPEND_THROTTLES
+    # Rate limited; see inventory/throttling.py. Appending is counted always;
+    # searching is counted only where ANONYMOUS_READ_RATE says so, which is
+    # off by default and is what `AnonymousReadThrottle` is for.
+    throttle_classes = [*APPEND_THROTTLES, *ANONYMOUS_READ_THROTTLES]
+
+    def get_queryset(self) -> QuerySet[Any]:
+        """The pick-list, or nothing at all until enough has been typed.
+
+        SEARCH_MINIMUM is provisional, defaults to nought, and at nought this
+        is exactly the collection `WithdrawnRows` hands back -- the whole first
+        page for an empty search, which is what `searchPath` in the client
+        asks for and what the picker draws on its first paint.
+
+        It is a USABILITY DECISION AND NEVER A DEFENCE, and that sentence is
+        the reason the setting exists at all: the demo shows a roster of 86
+        swept in 43 searches at a minimum of three, so a room can watch a
+        threshold fail to be a control rather than be told that it is one.
+        `inventory-tng-81f7.1` carries the measurement.
+
+        Applied to every caller rather than to anonymous ones, because "how
+        many characters before the list appears" is a question about the
+        screen and there is only one screen.
+
+        NOT TO `?withdrawn=true`, WHICH IS A DIFFERENT QUESTION. `WithdrawnRows`
+        says so itself: not "what may I pick" but "what did I withdraw", asked
+        by an administrator who is repairing a mistaken merge and who has
+        nothing to type into a search box. Narrowing it emptied the one route
+        to a withdrawn row that decision 0014 point 1 exists to provide, and
+        answered 200 with nothing rather than saying why.
+
+        Asked of `withdrawn_asked` rather than of the query string, because
+        `?withdrawn=false` is the ordinary collection under another spelling
+        and reading the parameter's presence exempted it too.
+        """
+        rows = super().get_queryset()
+        if self.withdrawn_asked():
+            return rows
+        typed = self.request.query_params.get("search", "").strip()
+        return rows if len(typed) >= settings.SEARCH_MINIMUM else rows.none()
 
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Ordinary creation, except when the clash is with somebody unshowable.
@@ -963,6 +1027,12 @@ class VolunteerDetailView(DetailView):
     every_row = VOLUNTEERS
     offered_rows = OFFERED_VOLUNTEERS
 
+    # Counted for the same reason the collection beside it is: the membership
+    # oracle `inventory-tng-81f7.1` describes is asked of either one, and a
+    # limit on the list alone would leave the same question answerable a row
+    # at a time. Off by default; see `AnonymousReadThrottle`.
+    throttle_classes = ANONYMOUS_READ_THROTTLES
+
 
 class ItemFilter(FilterSet):
     """What the item list can be narrowed by."""
@@ -1050,6 +1120,32 @@ LOCATIONS = Location.objects.all()
 OFFERED_LOCATIONS = LOCATIONS.filter(active=True)
 
 
+def disclosed(rows: QuerySet[Any], request: Request) -> QuerySet[Any]:
+    """Locations this caller may be told about, which is all of them by default.
+
+    CUSTODY_VISIBILITY is provisional and defaults to ``identified``, which is
+    what this application already does: every read of this collection needs a
+    session today, so nothing is disclosed to anybody who has not signed in and
+    this narrowing has nothing to narrow.
+
+    WHAT IT IS ABOUT. A custody location is somewhere a volunteer is personally
+    holding stock, and ``location_held_by_iff_custody`` guarantees it says who
+    -- so this collection, joined against an item's balances, answers "which
+    named person has how much hardware at home". Each of those two reads is
+    reasonable on its own, which is why the join is easy to build by accident;
+    `inventory-tng-81f7` is the consultation about whether an anonymous caller
+    may make it, and `inventory-tng-81f7.4` removes this once it has.
+
+    The ROWS go rather than the ``held_by`` field. Withholding the holder and
+    keeping the row would leave a location named after somebody -- a custody
+    location is -- so the name would go out in ``name`` instead, which is the
+    disclosure with an extra step.
+    """
+    if settings.CUSTODY_VISIBILITY == postures.ANONYMOUS or request.user.is_authenticated:
+        return rows
+    return rows.exclude(kind=Location.Kind.VOLUNTEER_CUSTODY)
+
+
 @WITHDRAWN_SCHEMA
 class LocationListView(RecordsWhatItCreated, WithdrawnRows, ListCreateAPIView):
     """Everywhere stock can be. A pick-list, like volunteers.
@@ -1065,6 +1161,9 @@ class LocationListView(RecordsWhatItCreated, WithdrawnRows, ListCreateAPIView):
     every_row = LOCATIONS
     queryset = OFFERED_LOCATIONS
 
+    def get_queryset(self) -> QuerySet[Any]:
+        return disclosed(super().get_queryset(), self.request)
+
 
 class LocationDetailView(DetailView):
     """One location, read by anyone and edited by an administrator.
@@ -1076,6 +1175,14 @@ class LocationDetailView(DetailView):
     serializer_class = LocationSerializer
     every_row = LOCATIONS
     offered_rows = OFFERED_LOCATIONS
+
+    def get_queryset(self) -> QuerySet[Any]:
+        """The same narrowing the list above applies, so one row is not a way round it.
+
+        A collection that withheld a row while the detail endpoint beside it
+        served the same row by id would be a policy with a URL that skips it.
+        """
+        return disclosed(super().get_queryset(), self.request)
 
 
 # Nothing withdraws a category from the list, so there is one queryset rather
@@ -1226,6 +1333,16 @@ class LabelSheetView(APIView):
     # throttles, the exception handler, and get_permissions, which
     # RequireSecondFactor asks of this class. Was inventory-tng-s0m.
     #
+    # COUNTED WHERE A DEPLOYMENT COUNTS READS AT ALL, which it did not need to
+    # be while `IsAuthenticated` stood in front of it. `VolunteerAccess` is the
+    # project default now, so under four of its five postures this is reachable
+    # with no session -- and it is the one endpoint in this API whose own
+    # docstring calls a request expensive. `ANONYMOUS_READ_RATE` is off by
+    # default, so nothing changes for a deployment that sets nothing; what this
+    # buys is that an operator who does set it covers this too. Out of a bucket
+    # of its own rather than the pick-list's -- see `LabelSheetThrottle`.
+    throttle_classes = LABEL_SHEET_THROTTLES
+
     # No docstring on the handler: drf-spectacular describes an operation with
     # the handler's docstring where there is one and the view's only otherwise,
     # and it is the class docstring above that is written for a schema reader.
@@ -1438,6 +1555,85 @@ class ClientFailureView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class DeviceEnrolmentView(APIView):
+    """Where a browser asks to be a device this API will answer.
+
+    PROVISIONAL, AND IT MUST NOT OUTLIVE THE QUESTION IT WAS BUILT FOR. It
+    exists only while ``VOLUNTEER_ACCESS`` names an enrolling posture, and
+    `inventory-tng-81f7.4` removes it with the setting. Under every other
+    posture -- the default included -- it refuses outright, because handing out
+    a credential nothing checks is a way of pretending one is required.
+
+    A FOURTH CREDENTIAL-FREE WRITE, and decision 0012's consequence says one of
+    those is argued rather than added. The argument is that it is not an
+    addition to this API: it is a temporary consequence of a setting that
+    exists to let the record BE argued, on a branch nobody merges. It writes a
+    row holding no person -- see `Device` -- it corrects nothing, and it is
+    rate limited on the same terms as the two writes a volunteer already makes.
+    On the same TERMS and not out of the same bucket, for which
+    `EnrolmentThrottle` is the argument.
+
+    WHAT THE CREDENTIAL IS NOT is a security control, and
+    `inventory_tng.postures` says so at length. It is an opaque token minted by
+    `django.core.signing`, the way `inventory_tng.debugging` mints its own.
+    Nothing here implements a token format or a comparison. The cryptography a
+    real enrolled device would use belongs to `inventory-tng-jro`, which is
+    where it gets argued; what a room can judge is the screens, and those are
+    identical either way.
+    """
+
+    permission_classes = [AllowAny]
+    # A bucket of its own rather than the append endpoints'. See
+    # `EnrolmentThrottle`.
+    throttle_classes = ENROLMENT_THROTTLES
+
+    @extend_schema(
+        summary="Enrol this device",
+        description=(
+            "Mints the opaque token an enrolled device presents in `X-Device`. Answers 403 unless "
+            "`VOLUNTEER_ACCESS` names an enrolling posture, and under `enrolled_code` unless the body "
+            "carries the code this deployment was given. Demo scaffolding for inventory-tng-81f7; "
+            "inventory-tng-81f7.4 removes it."
+        ),
+        request=DeviceEnrolmentSerializer,
+        # THE 403 IS NAMED HERE, and it is the one refusal on this API that a
+        # view has to declare for itself. `PolicyAwareAutoSchema` derives that
+        # response from whether anything guards the endpoint, and nothing does
+        # -- an endpoint handing out the credential cannot ask for one -- so
+        # the refusal is the handler's own. The rule it keeps is stated on
+        # `open_to_anybody` in inventory/permissions.py.
+        responses={201: DeviceCredentialSerializer, 403: DetailSerializer},
+    )
+    def post(self, request: Request) -> Response:
+        posture = settings.VOLUNTEER_ACCESS
+        if posture not in postures.ENROLLING:
+            log.info("enrolment refused", reason="not_enrolling")
+            telemetry.DEVICES.add(1, {"outcome": "refused", "reason": "not_enrolling"})
+            raise PermissionDenied("This deployment does not enrol devices.")
+        offered = DeviceEnrolmentSerializer(data=request.data)
+        offered.is_valid(raise_exception=True)
+        if posture == postures.ENROLLED_CODE and not postures.code_matches(
+            offered.validated_data.get("code", ""), settings.VOLUNTEER_ACCESS_CODE
+        ):
+            # The same refusal for a missing code and a wrong one: a caller who
+            # could tell them apart would learn whether one was needed by
+            # trying, and there is nothing useful to do differently about
+            # either.
+            log.info("enrolment refused", reason="wrong_code")
+            telemetry.DEVICES.add(1, {"outcome": "refused", "reason": "wrong_code"})
+            raise PermissionDenied("That is not this deployment's enrolment code.")
+        device = Device.objects.create(identifier=postures.new_device_identifier())
+        # The row's own id and never the identifier inside the token: that
+        # string is the credential, and `inventory_tng.redaction` is what keeps
+        # a credential out of a record.
+        log.info("device enrolled", code=device.pk, reason=posture)
+        telemetry.DEVICES.add(1, {"outcome": "enrolled", "reason": posture})
+        return Response(
+            DeviceCredentialSerializer({"token": postures.mint_device_token(device.identifier)}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
 class DebugTraceVerifyView(APIView):
     """Whether nginx should forward this post to the collector.
 
@@ -1509,6 +1705,20 @@ class CurrentUserView(APIView):
                 # it is why the interface can offer to re-authenticate rather
                 # than hide a control the person is entitled to.
                 "recently_authenticated": serializers.BooleanField(),
+                # PROVISIONAL, and what it is for is on `enrolment_state` in
+                # inventory/permissions.py. `not_required` is what a deployment
+                # that sets nothing answers, which is every deployment today;
+                # `inventory-tng-81f7.4` removes the field with the setting.
+                "enrolment": serializers.ChoiceField(choices=list(postures.ENROLMENT_STATES)),
+                # PROVISIONAL, and the second thing a client cannot infer from
+                # an answer. A search the server suppressed and a search that
+                # genuinely found nobody are the same empty page, and the
+                # picker offers to ADD whoever was typed when it sees one --
+                # so with a minimum set, typing two letters offered to put
+                # "Se" on the pick-list, which is the duplicate that screen
+                # exists to prevent. Nought is today's behaviour and every
+                # deployment's until one sets SEARCH_MINIMUM.
+                "search_minimum": serializers.IntegerField(),
                 "capabilities": inline_serializer(
                     name="Capabilities",
                     # One field instance per entry, for the reason spelled out
@@ -1526,6 +1736,8 @@ class CurrentUserView(APIView):
                 "username": user.get_username() if user.is_authenticated else None,
                 "administrator": is_administrator(user),
                 "recently_authenticated": recently_authenticated(request),
+                "enrolment": enrolment_state(request),
+                "search_minimum": settings.SEARCH_MINIMUM,
                 "capabilities": {
                     name: all(self._permitted(request, operation) for operation in operations)
                     for name, operations in CAPABILITIES.items()

@@ -22,7 +22,7 @@ from rest_framework.views import exception_handler as drf_exception_handler
 from inventory import telemetry
 from inventory.permissions import RecentlyAuthenticated, administrators_only, open_to_anybody
 from inventory.serializers import DetailSerializer, ThrottledSerializer
-from inventory.throttling import AppendThrottle
+from inventory.throttling import CountingThrottle
 
 log = structlog.get_logger("inventory.api")
 
@@ -40,8 +40,20 @@ def exception_handler(exc: Exception, context: Any) -> Response | None:
         # Throttled carries `wait`, which is None when a throttle refuses
         # without saying for how long, and which the DRF stubs omit.
         seconds = math.ceil(getattr(exc, "wait", None) or 0)
+        # WHICH SENTENCE DEPENDS ON WHAT WAS REFUSED, and it did not until a
+        # read could be limited. "Nothing was saved" is the reassurance a
+        # volunteer whose batch bounced needs and is a lie to one who was
+        # typing in a search box -- the picker prints this verbatim, so
+        # somebody holding a filled cart was told their unsent work was lost
+        # and would reasonably re-scan it. A read refuses without claiming
+        # anything about what the caller is holding.
+        reading = getattr(context.get("request"), "method", "") in SAFE_METHODS
         response.data = {
-            "detail": "Too many submissions from here. Nothing was saved; send this again shortly.",
+            "detail": (
+                "Too many requests from here. Wait a moment and try again."
+                if reading
+                else "Too many submissions from here. Nothing was saved; send this again shortly."
+            ),
             "code": "throttled",
             "retry_after_seconds": seconds,
         }
@@ -235,7 +247,7 @@ class PolicyAwareAutoSchema(AutoSchema):
     def _get_response_bodies(self, direction: Direction = "response") -> dict[str, Any]:
         responses = super()._get_response_bodies(direction)
         if direction == "response":
-            if self._is_throttled_write():
+            if self._is_throttled():
                 responses["429"] = self._get_response_for_code(ThrottledSerializer, "429", direction=direction)
             if self._is_guarded():
                 responses.setdefault("403", self._get_response_for_code(DetailSerializer, "403", direction=direction))
@@ -246,10 +258,24 @@ class PolicyAwareAutoSchema(AutoSchema):
                 responses.setdefault("400", self._get_response_for_code(schema, "400", direction=direction))
         return responses
 
-    def _is_throttled_write(self) -> bool:
-        if self.method in SAFE_METHODS:
-            return False
-        return any(isinstance(throttle, AppendThrottle) for throttle in self.view.get_throttles())
+    def _is_throttled(self) -> bool:
+        """Whether any throttle on this view can refuse this method.
+
+        Asked of the throttles rather than of the method, because the two
+        answers stopped agreeing the moment a read could be limited:
+        one throttle counts unsafe methods and another counts safe ones, and a
+        schema that assumed "throttled means a write" would document a 429 on
+        the endpoint that cannot make one and omit it from the one that can.
+        `counts` is the predicate each throttle already answers a live request
+        with, so the promise and the behaviour are one statement -- and asking
+        for the base rather than for each subclass means a fourth throttle is
+        described without this line being edited.
+        """
+        return any(
+            throttle.counts(self.method)
+            for throttle in self.view.get_throttles()
+            if isinstance(throttle, CountingThrottle)
+        )
 
     def _is_guarded(self) -> bool:
         """Whether anything at all can refuse this operation.

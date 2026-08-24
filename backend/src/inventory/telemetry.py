@@ -87,3 +87,10 @@ CLIENT_FAILURES = counter(
 # Management commands, which run unattended and so are the one thing here
 # nobody watches. `command` names it and `outcome` says whether it finished.
 COMMAND_RUNS = counter("inventory.command_runs", "Management command runs, by command and outcome.")
+
+# Devices enrolling, while a posture asks them to. PROVISIONAL, like everything
+# under `inventory_tng.postures`: `inventory-tng-81f7.4` removes this counter
+# with the setting that makes enrolment possible at all. `outcome` says whether
+# a device was enrolled or refused and `reason` says which posture, or which
+# refusal -- both words chosen here and never anything a caller sent.
+DEVICES = counter("inventory.devices", "Device enrolments, by outcome and by the posture asking for one.")

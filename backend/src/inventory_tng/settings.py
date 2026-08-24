@@ -13,7 +13,7 @@ from typing import Any
 
 from corsheaders.defaults import default_headers
 
-from inventory_tng import database, debugging, refusals
+from inventory_tng import database, debugging, postures, refusals
 from inventory_tng.environment import Env
 from inventory_tng.hosts import allowed_hosts
 from inventory_tng.logs import from_environment
@@ -43,6 +43,17 @@ env = Env(
     # number: it holds the figure, the floor, and the refusal that says which
     # setting a bad value came from.
     DATABASE_CONNECT_TIMEOUT_SECONDS=(str, str(database.DEFAULT_CONNECT_TIMEOUT_SECONDS)),
+    # The five the consultation watches, and the two values two of them need
+    # beside them. Every default is what this application already does, so a
+    # deployment setting none of them is unchanged. `inventory_tng.postures`
+    # is what each word means and why none of them gets to stay.
+    ANONYMOUS_PAYLOAD=(str, postures.FULL),
+    VOLUNTEER_ACCESS=(str, postures.SESSION),
+    VOLUNTEER_ACCESS_CODE=(str, ""),
+    VOLUNTEER_ACCESS_NETWORKS=(list, []),
+    SEARCH_MINIMUM=(int, 0),
+    ANONYMOUS_READ_RATE=(str, ""),
+    CUSTODY_VISIBILITY=(str, postures.IDENTIFIED),
 )
 
 # Read the repository-root .env when present -- the same file docker compose
@@ -94,6 +105,29 @@ DEBUG_TRACE_RATE = env("DEBUG_TRACE_RATE")
 validate()
 refusals.rate(DEBUG_TRACE_RATE, "DEBUG_TRACE_RATE")
 debugging.lifetime(DEBUG_TRACE_LIFETIME_SECONDS)
+
+# --------------------------------------------------------------------------
+# THE DEMO'S FIVE, AND THEY ARE ALL PROVISIONAL. Read here with everything
+# else, checked here for the reason the two lines above are checked here: a
+# posture that will not parse must stop the process at boot rather than at the
+# moment somebody switches to it in front of a room.
+#
+# What each word means, why the defaults are today's behaviour, and why none of
+# these gets to stay is `inventory_tng.postures`. `inventory-tng-81f7.4` is the
+# bead that removes them once `inventory-tng-81f7` is settled.
+# --------------------------------------------------------------------------
+ANONYMOUS_PAYLOAD = postures.chosen("ANONYMOUS_PAYLOAD", env("ANONYMOUS_PAYLOAD"), postures.ANONYMOUS_PAYLOAD_VALUES)
+VOLUNTEER_ACCESS = postures.chosen("VOLUNTEER_ACCESS", env("VOLUNTEER_ACCESS"), postures.VOLUNTEER_ACCESS_VALUES)
+VOLUNTEER_ACCESS_CODE = postures.enrolment_code(VOLUNTEER_ACCESS, env("VOLUNTEER_ACCESS_CODE"))
+VOLUNTEER_ACCESS_NETWORKS = postures.networks(VOLUNTEER_ACCESS, env("VOLUNTEER_ACCESS_NETWORKS"))
+SEARCH_MINIMUM = postures.search_minimum(env("SEARCH_MINIMUM"))
+ANONYMOUS_READ_RATE = env("ANONYMOUS_READ_RATE")
+CUSTODY_VISIBILITY = postures.chosen(
+    "CUSTODY_VISIBILITY", env("CUSTODY_VISIBILITY"), postures.CUSTODY_VISIBILITY_VALUES
+)
+if ANONYMOUS_READ_RATE:
+    refusals.rate(ANONYMOUS_READ_RATE, "ANONYMOUS_READ_RATE")
+
 if _announcement:
     print(_announcement, file=sys.stderr)
 
@@ -388,8 +422,23 @@ REST_FRAMEWORK = {
     # taken back -- so the two endpoints a volunteer needs name their own
     # permissions and everything else is reserved without anybody remembering.
     # See inventory/permissions.py.
+    # `VolunteerAccess` stands where `IsAuthenticated` stood, and under the
+    # default posture it IS `IsAuthenticated` -- see the class. It is the
+    # project default rather than a decoration on one view because
+    # VOLUNTEER_ACCESS is a statement about this API's whole read surface, and
+    # a posture applied to the pick-list alone would leave the catalogue and
+    # the locations answering a different question from the people.
+    #
+    # WHAT IT MOVES FOR A WRITE, since "only reads" would be wrong. Every write
+    # an administrator owns is still reserved: StaffWrites and
+    # RecentlyAuthenticated below are what reserve it and neither is touched.
+    # The two writes a VOLUNTEER makes name their own permissions --
+    # `VOLUNTEER_APPEND` is this class and nothing else -- so under any posture
+    # but `session` those two do open to a caller with no session. That is not
+    # a side effect: it is decision 0012 point 3 arriving as a setting, and it
+    # is the whole thing `inventory-tng-81f7` is convened to decide.
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
+        "inventory.permissions.VolunteerAccess",
         "inventory.permissions.StaffWrites",
         "inventory.permissions.RecentlyAuthenticated",
     ],
@@ -425,6 +474,11 @@ REST_FRAMEWORK = {
         "append-burst": env("APPEND_BURST_RATE"),
         "append-sustained": env("APPEND_SUSTAINED_RATE"),
         "report": env("CLIENT_REPORT_RATE"),
+        # The burst rate's own number under a scope of its own. PROVISIONAL,
+        # and `inventory.throttling.EnrolmentThrottle` argues why what had to
+        # be separate is the bucket rather than the figure -- so there is no
+        # sixth variable here, and `inventory-tng-81f7.4` removes this line.
+        "enrolment": env("APPEND_BURST_RATE"),
     },
 }
 
@@ -532,7 +586,19 @@ CORS_ALLOWED_ORIGINS: list[str] = env("CORS_ALLOWED_ORIGINS")
 # and was missed for the same one: the header a volunteer's browser carries to
 # have their request recorded is a header the preflight has to name, or the
 # only way to present a token is by hand with curl.
-CORS_ALLOW_HEADERS = (*default_headers, "traceparent", "tracestate", debugging.HEADER.lower())
+# The fourth is `inventory_tng.postures`'s, and it is here for the third time
+# for the third identical reason: a header this application reads has to be
+# named in the preflight or a cross-origin browser never sends it. An enrolled
+# device attaches it to EVERY request, which makes every request non-simple --
+# so the omission would not have been a lost header, it would have been an app
+# that enrolled once and then never loaded again.
+CORS_ALLOW_HEADERS = (
+    *default_headers,
+    "traceparent",
+    "tracestate",
+    debugging.HEADER.lower(),
+    postures.DEVICE_HEADER.lower(),
+)
 
 # Behind an ingress or proxy that terminates TLS.
 USE_X_FORWARDED_HOST = True
