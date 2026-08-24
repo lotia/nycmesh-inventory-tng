@@ -67,8 +67,16 @@ export function withoutIt(location: Location): string {
   return `${location.pathname}${query ? `?${query}` : ""}${location.hash}`;
 }
 
-/** Whatever this device was asked to record, if it has not run out. */
-export function asked(now: number = Date.now()): string | null {
+/**
+ * What this device is recording under, if it has not run out.
+ *
+ * ONE READING, because there are three questions about the same record and
+ * the expiry rule was written twice before this -- with the two copies
+ * differing in what they did about a dead entry, one forgetting it and one
+ * leaving it on the device. This module's own header says the two must not be
+ * able to say different things about the same device.
+ */
+function live(now: number): Asked | null {
   const stored = read<Asked>(KEY, isAsked);
   if (stored === null) {
     return null;
@@ -77,7 +85,27 @@ export function asked(now: number = Date.now()): string | null {
     forget();
     return null;
   }
-  return stored.token;
+  return stored;
+}
+
+/** Whatever this device was asked to record, if it has not run out. */
+export function asked(now: number = Date.now()): string | null {
+  return live(now)?.token ?? null;
+}
+
+/**
+ * How long this device has left, in milliseconds, or null if it is not
+ * recording at all.
+ *
+ * The expiry was written down and never read: `LIFETIME` promised at the top
+ * of this file that the indicator goes away and the app stops paying for an
+ * SDK, and nothing armed anything on it. `start.ts` is what reads this now.
+ * Answered from the same stored value `asked` reads, so the two cannot say
+ * different things about the same device.
+ */
+export function runsOutIn(now: number = Date.now()): number | null {
+  const stored = live(now);
+  return stored === null ? null : stored.until - now;
 }
 
 /** Store the token, and say whether it was stored. `settle` needs the answer. */

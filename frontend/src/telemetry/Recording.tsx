@@ -12,13 +12,18 @@
 
 import Button from "@mui/material/Button";
 import Snackbar from "@mui/material/Snackbar";
-import { useState } from "react";
+import { useSyncExternalStore } from "react";
 
 import { forget } from "./flag";
-import { stop } from "./start";
+import { recording, stop, subscribe } from "./start";
 
-export function Recording({ recording }: { recording: boolean }) {
-  const [showing, setShowing] = useState(recording);
+export function Recording() {
+  // SUBSCRIBED, NOT COPIED. This took the answer as a prop and put it in
+  // `useState` at mount, so it was a photograph of what was true when the page
+  // rendered: the SDK could stop -- on its expiry -- and the badge would go on
+  // saying otherwise, which is exactly the thing a switch nobody can see is
+  // for. `start.ts` owns the answer and this asks it.
+  const showing = useSyncExternalStore(subscribe, recording);
   if (!showing) {
     return null;
   }
@@ -33,13 +38,10 @@ export function Recording({ recording }: { recording: boolean }) {
           size="small"
           onClick={() => {
             forget();
-            // The half that was missing. Clearing the token stops the header
-            // on API calls, because `api/client.ts` re-reads the flag per
-            // request -- but the provider went on batching spans and posting
-            // them until the page was closed or the signature ran out, up to
-            // an hour later, with the badge gone. `start.stop` is the teardown.
+            // `start.stop` is the teardown, and the expiry takes the same one.
+            // Nothing is set here afterwards: stopping is what makes the badge
+            // go, through the subscription above.
             void stop();
-            setShowing(false);
           }}
         >
           Stop
