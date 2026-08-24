@@ -39,6 +39,53 @@ note() {
   printf '  %s %s\n' "$MARK_NOTE" "$1"
 }
 
+# dispatch <what a reader printed>
+#
+# A reader says what it found as `fail <line>` and `note <line>`; this turns
+# that back into calls. Three scripts had a byte-identical copy of the loop --
+# check-docs.sh, check-telemetry.sh and check-batch.sh -- which is the same
+# drift the header above describes about `fail` and `note` themselves, one
+# level up: the vocabulary was shared and the reading of it was not.
+dispatch() {
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    case "$line" in
+      fail\ *) fail "${line#fail }" ;;
+      note\ *) note "${line#note }" ;;
+    esac
+  done <<<"$1"
+}
+
+# relay <command...>
+#
+# Run a reader and dispatch what it printed, or say that nothing was checked
+# and stop.
+#
+# THE GUARD IS THE POINT, and it is the half that cannot be tested by reading:
+# a reader that crashed prints nothing, so without this the dispatch below sees
+# an empty string, reports nothing, and `verdict` prints the all-clear over a
+# check that never ran. Exits 2 rather than 1, so a caller can tell "it looked
+# and objected" from "it could not look".
+#
+# The command is taken already built, because callers pass different
+# environments to their readers and `env VAR=value ...` in the argument list is
+# how they say so.
+#
+# The caller is not asked its own name. `BASH_SOURCE[1]` inside a function
+# defined in this sourced file is the script that called it, so a checker does
+# not write its own filename out a second time -- which is the same literal,
+# and the same way of going stale, that `ReportingCommand.named` exists to
+# abolish on the Python side.
+relay() {
+  local name findings
+  name=${BASH_SOURCE[1]##*/}
+  findings=$("$@") || {
+    echo "$name: the reader failed, so nothing was checked." >&2
+    exit 2
+  }
+  dispatch "$findings"
+}
+
 # verdict <sentence when there is nothing wrong> <what the fixing is before>
 verdict() {
   echo
