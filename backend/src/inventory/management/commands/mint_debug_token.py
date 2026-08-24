@@ -13,6 +13,7 @@ from typing import Any
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
+from inventory.management.commands import _telemetry
 from inventory_tng import debugging
 
 
@@ -20,7 +21,9 @@ class Command(BaseCommand):
     help = "Mint a signed, expiring token that has one volunteer's requests traced in full."
 
     def handle(self, *args: Any, **options: Any) -> None:
-        self.stdout.write(debugging.mint())
+        with _telemetry.running("mint_debug_token"):
+            token = debugging.mint()
+        self.stdout.write(token)
         self.stdout.write("")
         self.stdout.write(f"Send it as {debugging.HEADER}.")
         self.stdout.write(

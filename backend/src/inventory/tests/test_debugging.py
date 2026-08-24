@@ -283,6 +283,21 @@ def test_the_command_prints_a_token_that_works() -> None:
     assert debugging.HEADER in written.getvalue()
 
 
+def test_and_that_it_says_it_handed_one_out() -> None:
+    """Somebody now holds, for an hour, the ability to raise what this server
+    records about them. A capability granted with nothing said about it is one
+    nobody can account for afterwards -- and standard output is where the token
+    goes, not where a record of it having been minted survives.
+    """
+    from inventory.tests.helpers import applied
+    from inventory_tng.logs import logging_config
+
+    with applied(logging_config("INFO", "json")) as stream:
+        call_command("mint_debug_token", stdout=StringIO())
+
+    assert "mint_debug_token" in stream.getvalue()
+
+
 def test_a_rate_the_process_cannot_read_stops_it(settings: Any) -> None:
     """Refused the way every rate in this application is -- and named, so that
     somebody who mistyped one of the two knows which.

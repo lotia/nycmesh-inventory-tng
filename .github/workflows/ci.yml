@@ -469,6 +469,8 @@ jobs:
         run: scripts/check-batch.test.sh
       - name: Check the duplication checker
         run: scripts/check-docs.test.sh
+      - name: Check the telemetry checker
+        run: scripts/check-telemetry.test.sh
       - name: Check the settings checker
         run: scripts/repo-settings.test.sh
       - name: Check the batch-contents comment
@@ -521,10 +523,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       # Documentation here is heavily cross-linked by design -- one topic lives
-      # in one file and everything else links to it. These two jobs are what
-      # stop that arrangement rotting: the first when a link's target moves,
-      # the second when an explanation is pasted into a second file instead of
-      # being linked to. See DEVELOPERS.md#documentation-rules
+      # in one file and everything else links to it. The first two steps are
+      # what stop that arrangement rotting: the first when a link's target
+      # moves, the second when an explanation is pasted into a second file
+      # instead of being linked to. See DEVELOPERS.md#documentation-rules
       - name: Check Markdown links
         uses: lycheeverse/lychee-action@v2
         with:
@@ -532,3 +534,9 @@ jobs:
           fail: true
       - name: Check for duplicated prose
         run: scripts/check-docs.sh
+      # The third is the same kind of rule about code rather than prose: work
+      # that changes something has to say so. It sits here because it is
+      # enforcement of a written rule, and because like check-docs.sh it needs
+      # nothing but a checkout. See DEVELOPERS.md#definition-of-done
+      - name: Check for silent changes
+        run: scripts/check-telemetry.sh

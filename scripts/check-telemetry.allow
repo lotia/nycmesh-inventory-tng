@@ -1,0 +1,10 @@
+# Modules that change something and are allowed to say nothing about it.
+#
+# One per line: the path, a colon, and why. The reason is the point -- an
+# exception nobody argued is a gap, and a line without one is refused. So is a
+# line that no longer excuses anything, so this cannot outlive what it was for.
+#
+# How long it should get, and what a long one would mean, is the same answer
+# scripts/check-docs.allow gives about its own.
+
+backend/src/inventory/management/commands/seed_integration_data.py: its standard output is a JSON document that frontend/integration/global-setup.ts parses, and a record drawn onto the same stream is a SyntaxError in global setup rather than a stray line. It seeds a scene for the browser suite and no deployment runs it, so there is nothing here a collector wanted. The command says the same at the transaction it does not wrap.

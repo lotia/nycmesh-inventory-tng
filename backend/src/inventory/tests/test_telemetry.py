@@ -336,6 +336,72 @@ def test_a_request_produces_a_server_span_named_for_its_route(recorded: Any, db:
     assert server[0].attributes["http.status_code"] == 200
 
 
+@pytest.mark.usefixtures("_static_files_are_not_collected")
+def test_and_so_is_every_other_route_in_the_urlconf(recorded: Any, db: Any, client: Any) -> None:
+    """The same claim as above, made about the whole URLconf rather than one
+    endpoint, because the endpoint above is not the one that will go wrong.
+
+    The fixture is load-bearing rather than decoration, and the reason is the
+    trap it exists for: `/api/docs` renders a template asking for a hashed
+    asset, so a developer whose `.env` sets `DJANGO_DEBUG=true` watches this
+    pass and CI, which sets no such thing, watches it fail on the manifest.
+
+    A route loses its name silently. The instrumentation falls back to naming a
+    span for the method alone when it cannot find a route, and the result is a
+    dashboard where a handful of endpoints are readable and the rest are piled
+    under `GET`. Nothing raises, nothing logs, and the endpoint that stopped
+    being readable is the new one nobody has written a test for.
+
+    So this walks `urlpatterns` and drives one request at each, asserting the
+    span is named for the pattern the URLconf holds -- which for a route with
+    an argument in it is a template rather than the path that was asked for,
+    the property that makes a hundred item lookups one line.
+
+    An `include` is skipped: it is another URLconf, and the admin's and
+    allauth's surfaces are theirs to cover rather than this repository's.
+    """
+    from django.urls import URLPattern, reverse
+    from django.urls.converters import get_converters
+
+    from inventory_tng import urls
+
+    # A value per converter the URLconf uses, so a route with an argument can
+    # be asked for at all. Keyed by the name a route is written with.
+    specimens: dict[str, Any] = {"int": 1, "str": "specimen"}
+    named = {type(converter): name for name, converter in get_converters().items()}
+
+    checked = []
+    for pattern in urls.urlpatterns:
+        if not isinstance(pattern, URLPattern):
+            continue
+        arguments = {}
+        for argument, converter in pattern.pattern.converters.items():
+            kind = named.get(type(converter))
+            assert kind in specimens, f"{pattern.pattern} takes a {kind}, which this test has no specimen of"
+            arguments[argument] = specimens[kind]
+        route = str(pattern.pattern)
+        asked = reverse(pattern.name, kwargs=arguments)
+
+        recorded.clear()
+        client.get(asked)
+        spans = recorded.get_finished_spans()
+        server = [span for span in spans if span.kind.name == "SERVER"]
+
+        assert server, f"{asked} produced no server span, among {[span.name for span in spans]}"
+        assert server[0].attributes.get("http.route") == route, (
+            f"{asked} produced a span routed {server[0].attributes.get('http.route')!r}, not {route!r}"
+        )
+        assert server[0].name != "GET", f"{asked} produced a span named for its method alone"
+        for value in arguments.values():
+            assert str(value) not in server[0].name, (
+                f"{asked} is named for the value it was asked with, so every lookup is its own line"
+            )
+        checked.append(route)
+
+    # The walk finding nothing would pass every assertion above it.
+    assert len(checked) > 10, f"only {checked} were checked; the walk has stopped finding routes"
+
+
 def test_the_handler_a_server_builds_has_the_middleware_too(substituted: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     """The arrangement above is not the one a deployment runs, and for a while
     the difference was the whole of the instrumentation.
