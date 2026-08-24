@@ -13,7 +13,8 @@ import structlog
 from drf_spectacular.openapi import AutoSchema
 from drf_spectacular.plumbing import ResolvedComponent
 from drf_spectacular.utils import Direction
-from rest_framework.exceptions import NotAuthenticated, PermissionDenied, Throttled
+from rest_framework import status
+from rest_framework.exceptions import APIException, NotAuthenticated, PermissionDenied, Throttled
 from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
@@ -71,8 +72,71 @@ def exception_handler(exc: Exception, context: Any) -> Response | None:
             # makes, and the response alone does not say which operation it
             # was; the route is on the record already -- `inventory_tng.context`.
             log.info("asked to sign in again")
-            telemetry.REFUSALS.add(1, {"reason": "stale_session"})
+    if response is not None and response.status_code in REFUSED:
+        # ONE COUNT FOR EVERY REFUSAL DRF ANSWERED, and the gate is the STATUS
+        # rather than the exception's class. That is not a shortcut: DRF's own
+        # handler converts Django's `PermissionDenied` and `Http404` into its
+        # own classes by rebinding `exc` INSIDE ITS OWN FRAME, so the exception
+        # this function is holding is still the original -- an `isinstance`
+        # tuple here never matches one, and a model's `clean()` or a
+        # third-party mixin raising Django's would have been answered 403 and
+        # counted nowhere. Reading the answer avoids having to enumerate every
+        # class that can produce one, `AuthenticationFailed` included.
+        #
+        # THROTTLED IS ONE OF THEM, and it had been counted nowhere -- which is
+        # the gap this closes. It is handled twelve lines up in this same
+        # function and it is a refusal on account of the caller, which is word
+        # for word what `inventory.telemetry.REFUSALS` says it counts.
+        #
+        # NOT EVERY REFUSAL IN THIS APPLICATION PASSES HERE, and the next reader
+        # should not go looking for the consolidation that is not available.
+        # `middleware.RequireSecondFactor` returns a JsonResponse and
+        # `DebugTraceVerifyView` returns a Response; neither raises, so no
+        # handler of DRF's can see them, and both count for themselves.
+        telemetry.REFUSALS.add(1, {"reason": refused_as(exc, response.status_code)})
     return response
+
+
+# What this counts, by the status the API answered with. 400 is deliberately
+# absent: that is the request being wrong rather than the caller, and the
+# endpoint writes its own record of it.
+REFUSED: dict[int, str] = {
+    status.HTTP_401_UNAUTHORIZED: "not_authenticated",
+    status.HTTP_403_FORBIDDEN: "forbidden",
+    status.HTTP_429_TOO_MANY_REQUESTS: "throttled",
+}
+
+
+def declared_code(exc: Exception) -> str | None:
+    """The word this exception names itself with, where it names one at all.
+
+    `get_codes` is DRF's own and is used rather than reached for by hand: it
+    descends a detail that is a list or a dict, where reading `.code` off the
+    detail simply finds nothing.
+
+    Nothing for an exception that is not DRF's -- Django's own `PermissionDenied`
+    among them, which this module cannot see as DRF's for the reason above.
+    """
+    codes = exc.get_codes() if isinstance(exc, APIException) else None
+    return codes if isinstance(codes, str) else None
+
+
+def refused_as(exc: Exception, answered: int) -> str:
+    """The word this refusal is counted under.
+
+    The code where the exception declares one, so a permission class gets its
+    own series by declaring one -- and the status otherwise, so a refusal
+    raised as Django's still lands somewhere named.
+
+    Indexed rather than `get`: both callers are already inside `REFUSED`, so a
+    default would be a bucket nothing can reach and a name a reader would look
+    for on a dashboard in vain. Widening the gate without widening the map is
+    then a `KeyError` rather than an unnamed series.
+
+    The set stays closed and bounded either way: every word here is DRF's, this
+    application's, or a status, and nothing a caller sends reaches any of them.
+    """
+    return declared_code(exc) or REFUSED[answered]
 
 
 def _needs_a_second_look(exc: Exception) -> bool:
@@ -82,7 +146,7 @@ def _needs_a_second_look(exc: Exception) -> bool:
     into the exception it raises, so the class names itself without anybody
     comparing a sentence that a translation could change.
     """
-    return getattr(getattr(exc, "detail", None), "code", None) == RecentlyAuthenticated.code
+    return declared_code(exc) == RecentlyAuthenticated.code
 
 
 # What marks an operation as one decision 0012 reserves for somebody signed

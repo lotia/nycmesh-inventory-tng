@@ -313,13 +313,80 @@ def test_a_session_too_old_to_change_things_says_so(stale: Client, item: Item) -
     assert refused["route"] == "api/items/<int:pk>"
 
 
+def test_every_refusal_drf_raises_is_counted_once_and_named_for_itself(
+    client: Client,
+    stale: Client,
+    item: Item,
+    volunteer: Volunteer,
+    warehouse: Location,
+    custody: Location,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`api.refused_as` says why the word is read off the exception.
+
+    THROTTLED IS THE ONE THAT WAS MISSING, and the handler says why it belongs.
+    What it cost: an outage spent entirely on 429s looked, from a collector,
+    like an outage in which nothing was refused.
+    """
+    from django.test import Client as Anonymous
+
+    from inventory import telemetry
+    from inventory.throttling import AppendBurstThrottle
+
+    counted: list[str] = []
+    monkeypatch.setattr(telemetry.REFUSALS, "add", lambda _n, attributes: counted.append(attributes["reason"]))
+    edit = reverse("item-detail", args=[item.pk])
+
+    # An administrator whose session has gone stale: the permission class
+    # named itself by declaring a code, which is the whole point of reading it.
+    stale.patch(edit, data={"name": "x"}, content_type="application/json")
+    # Somebody who never said who they are: DRF's own word for it.
+    Anonymous().patch(edit, data={"name": "x"}, content_type="application/json")
+    # And one refused by a throttle rather than by a permission.
+    monkeypatch.setattr(AppendBurstThrottle, "rate", "1/min", raising=False)
+    lines = [one_line(item, warehouse, custody)]
+    assert post(client, batch(volunteer, lines)).status_code == 201
+    assert post(client, batch(volunteer, lines)).status_code == 429
+
+    assert counted == ["reauthentication_required", "not_authenticated", "throttled"]
+
+
+def test_and_one_raised_as_django_s_own_exception_is_counted_too(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The reason the gate is the status rather than the exception's class.
+
+    DRF converts Django's `PermissionDenied` into its own -- by rebinding `exc`
+    inside its own frame, so the handler is still holding the original. An
+    `isinstance` gate never matched one, which meant a model's `clean()`, a
+    signal receiver or a third-party mixin raising Django's could be answered
+    403 and counted nowhere at all.
+    """
+    from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+
+    from inventory import telemetry
+    from inventory.views import HealthCheckView
+
+    counted: list[str] = []
+    monkeypatch.setattr(telemetry.REFUSALS, "add", lambda _n, attributes: counted.append(attributes["reason"]))
+
+    def refuse(self: Any, request: Any) -> Any:
+        raise DjangoPermissionDenied("not yours")
+
+    monkeypatch.setattr(HealthCheckView, "get", refuse)
+    response = client.get(reverse("healthz"))
+
+    assert response.status_code == 403
+    assert counted == ["forbidden"], "a refusal DRF converted was answered and counted nowhere"
+
+
 def test_and_asking_what_a_stale_session_may_do_refuses_nothing(stale: Client) -> None:
     """The finding that moved the record off the permission class.
 
     `/api/me` answers what a caller MAY do by running every permission class
     against a probe, so a class that wrote a record turned one page load by a
     stale administrator into four refusals of operations nobody attempted --
-    and `inventory.refusals{reason=stale_session}` counted every one of them.
+    and `inventory.refusals{reason=reauthentication_required}` counted them all.
     A predicate asked hypothetically has to be able to answer without leaving
     a mark.
     """

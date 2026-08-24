@@ -64,10 +64,17 @@ LABELS = counter("inventory.labels", "Label operations, by what was done.")
 # 0012 reserves. `collection` says which of them.
 CATALOGUE_EDITS = counter("inventory.catalogue_edits", "Edits to a catalogue row, by collection.")
 
-# An unfinished sign-in, and a session too old to change something; `reason`
-# names which. A 400 is deliberately not counted here -- that is the request
-# being wrong rather than the caller, and it is on the record the endpoint
-# writes.
+# Every refusal on the caller's account: an unfinished sign-in, a session too
+# old to change something, a caller who never said who they are, and a
+# throttle. `reason` names which, and `inventory.api.refused_as` says where the
+# word comes from. A 400 is deliberately not counted here -- that is the
+# request being wrong rather than the caller, and it is on the record the
+# endpoint writes.
+#
+# NOT EVERY ONE OF THEM ARRIVES BY THE SAME ROUTE. Most are raised and counted
+# in that handler; `middleware.RequireSecondFactor` and `DebugTraceVerifyView`
+# return a refusal rather than raising one, so no DRF handler sees them and
+# they count for themselves.
 REFUSALS = counter("inventory.refusals", "Requests refused on account of the caller, by reason.")
 
 # Failures a volunteer's browser could not handle. Counted apart from anything
