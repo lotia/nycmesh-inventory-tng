@@ -21,7 +21,7 @@ class Command(BaseCommand):
     help = "Mint a signed, expiring token that has one volunteer's requests traced in full."
 
     def handle(self, *args: Any, **options: Any) -> None:
-        with _telemetry.running("mint_debug_token"):
+        with _telemetry.running(_telemetry.named(self)):
             token = debugging.mint()
         self.stdout.write(token)
         self.stdout.write("")

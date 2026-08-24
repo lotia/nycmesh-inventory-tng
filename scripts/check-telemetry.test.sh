@@ -237,6 +237,62 @@ class ThingView(APIView):
 PY
 expect 1 "changes something and says nothing" "an async write that says nothing is found too"
 
+# A command that reports through the shared base, and the three things that
+# exemption must NOT stretch to. `check-telemetry.py` argues why `run` is not
+# an entry point rather than why it is.
+scene
+cat > "$SRC/command.py" <<'PY'
+from inventory.management.commands import _telemetry
+
+
+class Command(_telemetry.ReportingCommand):
+    def run(self, **options):
+        return [("Staged", [("rows", 1)])]
+PY
+expect 0 "says so" "a command whose base does the reporting is left alone"
+
+scene
+cat > "$SRC/command.py" <<'PY'
+from inventory.management.commands import _telemetry
+
+
+class Command(_telemetry.ReportingCommand):
+    def handle(self, *args, **options):
+        return None
+PY
+expect 1 "changes something and says nothing" "but one overriding handle has bypassed the record"
+
+scene
+cat > "$SRC/command.py" <<'PY'
+from inventory.management.commands import _telemetry
+
+
+class Command(_telemetry.ReportingCommand):
+    def run(self, **options):
+        return []
+
+    def perform_destroy(self, instance):
+        instance.delete()
+PY
+expect 1 "changes something and says nothing" "and everything else it declares is still asked"
+
+scene
+cat > "$SRC/view.py" <<'PY'
+import structlog
+from rest_framework.views import APIView
+
+log = structlog.get_logger(__name__)
+
+
+class ThingView(APIView):
+    def get(self, request):
+        return self.run([])
+
+    def run(self, rows):
+        return len(rows)
+PY
+expect 0 "says so" "a helper that happens to be called run is not an entry point"
+
 # The corpus leaves the tests out, and check-telemetry.sh says why. This is the
 # case that would notice that stopping.
 scene

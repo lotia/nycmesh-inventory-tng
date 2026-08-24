@@ -26,8 +26,11 @@ from contextlib import contextmanager
 from typing import Any
 
 import structlog
+from django.core.management.base import BaseCommand
 
 from inventory import telemetry
+from inventory.management.commands import _report
+from inventory.sheet import Report
 from inventory_tng import telemetry as sdk
 
 log = structlog.get_logger("inventory.commands")
@@ -51,6 +54,20 @@ def _pushed() -> None:
         flush = getattr(provider, "force_flush", None)
         if flush is not None:
             flush()
+
+
+def named(command: BaseCommand) -> str:
+    """What a command is called, read off the module Django found it in.
+
+    NOT A LITERAL, and a function rather than a method on the base below for
+    the reason that base gives about the two commands it excludes: every one of
+    them wrote its own filename out a second time, which is a thing that can go
+    out of step and a thing nobody would notice had. Leaving the fix on the base
+    would have cured it for six and left the last two as the only places in the
+    tree where it could still happen -- so the exemption costs them the printing
+    hook they do not want, and not this.
+    """
+    return type(command).__module__.rsplit(".", 1)[-1]
 
 
 @contextmanager
@@ -101,7 +118,7 @@ def running(command: str) -> Iterator[dict[str, Any]]:
             _pushed()
 
 
-def figures(*sections: tuple[str, list[tuple[str, int]]]) -> dict[str, Any]:
+def figures(*sections: Report) -> dict[str, Any]:
     """The sections a command prints, as the field a record carries.
 
     Keyed by heading so two sections cannot collide, and flattened no further:
@@ -109,3 +126,60 @@ def figures(*sections: tuple[str, list[tuple[str, int]]]) -> dict[str, Any]:
     a field name out of prose somebody may reword.
     """
     return {heading: dict(counted) for heading, counted in sections}
+
+
+class ReportingCommand(BaseCommand):
+    """A command that runs, records what it counted, and prints it.
+
+    THE SHAPE WAS COPIED SEVEN TIMES BEFORE THIS. Each command opened
+    `running("<its own name>")`, called `figures(...)` on what it produced, and
+    then had to hoist that result out of the `with` block so the printing could
+    happen after the record -- surgery visible in `import_sheet`, which grew a
+    staticmethod whose only purpose was to make its run one expression. The
+    name was a string literal duplicating the module's own filename, so a
+    rename left the record pointing at a command that no longer existed.
+
+    A subclass writes `run`, which does the work and hands back its sections.
+    Everything else -- the record, the figures, the printing, and the name,
+    which is read off the module rather than typed -- is here.
+
+    TWO COMMANDS DELIBERATELY DO NOT INHERIT IT, and it is worth saying which
+    so the next reader does not think they were missed. `mint_debug_token`
+    produces no section at all: it mints a token and prints it with three lines
+    of prose about what it is for. `seed_demo_data` produces one section and
+    then says more -- whether stock was invented on top of an existing ledger,
+    and the label codes to scan. Both still use `running` directly, which is
+    what it is for. A hook here for "and then say this too" would be machinery
+    built for two callers.
+
+    `seed_integration_data` is a third, and a different case again: its
+    standard output is a JSON document a program parses, so it says nothing at
+    all. `scripts/check-telemetry.allow` is where that is argued.
+    """
+
+    # WHAT EACH OF THESE PRINTED BEFORE, exactly, and the two shapes differed:
+    # a command with one section ended at its last line, and the two with
+    # several put a blank line after every one of them -- including the last,
+    # which is what separates the blocks pasted into
+    # docs/briefs/sheet-classifiers.md.
+    #
+    # Declared by the subclass rather than derived from how many sections this
+    # particular run produced, because it is a property of the command. Read
+    # off `len(sections)` it would have been a command's output format
+    # depending on its data -- one that dropped an empty section would change
+    # shape between runs.
+    blank_after_each_section = False
+
+    def run(self, **options: Any) -> list[Report]:
+        """Do the work, and hand back what is worth reporting about it."""
+        raise NotImplementedError
+
+    def handle(self, *args: Any, **options: Any) -> None:
+        with running(named(self)) as counted:
+            sections = self.run(**options)
+            counted.update(figures(*sections))
+        for heading, counted_lines in sections:
+            for line in _report.render(heading, counted_lines):
+                self.stdout.write(line)
+            if self.blank_after_each_section:
+                self.stdout.write("")

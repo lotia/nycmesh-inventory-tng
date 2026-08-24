@@ -469,6 +469,38 @@ def test_and_the_counter_it_keeps_can_actually_leave_the_process(
     assert ("inventory.command_runs", "finished") in counted, f"nothing left the process; got {counted}"
 
 
+def test_a_reporting_command_prints_what_its_shape_printed_before() -> None:
+    """The base took over the printing from seven commands, and the two shapes
+    it took over were not the same.
+
+    `ReportingCommand` says what the two shapes are, what depends on the
+    difference, and why the subclass declares which it is rather than the base
+    deriving it from how many sections a run happened to produce. Nothing
+    pinned either shape, because every test that reads a command's report skips
+    blank lines while parsing it.
+    """
+    import io
+
+    from inventory.management.commands import _telemetry
+
+    class One(_telemetry.ReportingCommand):
+        def run(self, **options: Any) -> Any:
+            return [("Staged", [("rows", 1)])]
+
+    class Several(_telemetry.ReportingCommand):
+        blank_after_each_section = True
+
+        def run(self, **options: Any) -> Any:
+            return [("Staged", [("rows", 1)]), ("Minted", [("codes", 2)])]
+
+    one, several = io.StringIO(), io.StringIO()
+    One(stdout=one).handle()
+    Several(stdout=several).handle()
+
+    assert not one.getvalue().endswith("\n\n"), "one section ends at its last line"
+    assert several.getvalue().endswith("\n\n"), "several are each followed by a blank, the last included"
+
+
 def test_and_says_so_when_it_does_not_finish() -> None:
     from inventory.management.commands import _telemetry
 

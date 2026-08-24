@@ -13,18 +13,12 @@ nothing of, are both in `_identifiers.py`.
 
 from typing import Any
 
-from django.core.management.base import BaseCommand
+from inventory.management.commands import _identifiers, _staging, _telemetry
+from inventory.sheet import Report
 
-from inventory.management.commands import _identifiers, _report, _staging, _telemetry
 
-
-class Command(BaseCommand):
+class Command(_telemetry.ReportingCommand):
     help = "Mint an Item per catalogued name and an ItemIdentifier per string that names one."
 
-    def handle(self, *args: Any, **options: Any) -> None:
-        with _telemetry.running("mint_items") as counted:
-            minted = _identifiers.mint(_staging.staged_sheet())
-            section = _identifiers.section(minted)
-            counted.update(_telemetry.figures(section))
-        for line in _report.render(*section):
-            self.stdout.write(line)
+    def run(self, **options: Any) -> list[Report]:
+        return [_identifiers.section(_identifiers.mint(_staging.staged_sheet()))]

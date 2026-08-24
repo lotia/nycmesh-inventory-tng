@@ -294,7 +294,7 @@ class Command(BaseCommand):
             "This command writes an invented catalogue into whatever database DATABASE_URL names.",
         )
         added: Counter[str] = Counter()
-        with _telemetry.running("seed_demo_data") as counted:
+        with _telemetry.running(_telemetry.named(self)) as counted:
             # One transaction: a run that fails half way through would otherwise
             # leave a catalogue with no stock in it and no sign of why.
             with transaction.atomic():

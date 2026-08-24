@@ -88,6 +88,23 @@ CHANGES = {
     "handle": "run",
 }
 
+# `run` IS DELIBERATELY NOT ONE OF THESE, and the reasoning is worth keeping
+# because the obvious move is wrong twice over.
+#
+# A `ReportingCommand` subclass writes `run` rather than `handle`, and the base
+# calls it -- so the first instinct was to add `run` here and exempt any class
+# with that base. Both halves were mistakes. Adding the name made every method
+# in the corpus called `run` an entry point, including a private helper on a
+# view no request reaches; and exempting the class silenced everything else it
+# declared, so a subclass overriding `handle` to bypass the record entirely, or
+# carrying a silent `perform_destroy`, was passed without a word.
+#
+# Neither is needed. A subclass declaring only `run` declares nothing in
+# `CHANGES`, inherits no write this reader can see, and so is asked for
+# nothing -- which is right, because its base is what does the recording. A
+# subclass that overrides `handle` declares one, and is asked, which is also
+# right: overriding `handle` is exactly how the record gets bypassed.
+
 # What a module says with. A logger or a counter -- both are the module
 # speaking, and which is right for a given path is a review's question.
 SPEAKS = ("log.", "logger.", "telemetry.", "_telemetry.")

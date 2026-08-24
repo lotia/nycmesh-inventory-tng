@@ -9,21 +9,17 @@ too.
 
 from typing import Any
 
-from django.core.management.base import BaseCommand, CommandParser
+from django.core.management.base import CommandParser
 
-from inventory.management.commands import _report, _staging, _telemetry, _workbook
+from inventory.management.commands import _staging, _telemetry, _workbook
+from inventory.sheet import Report
 
 
-class Command(BaseCommand):
+class Command(_telemetry.ReportingCommand):
     help = "Stage every non-blank row of an exported workbook, keeping each row as it was."
 
     def add_arguments(self, parser: CommandParser) -> None:
         _workbook.add_argument(parser)
 
-    def handle(self, *args: Any, **options: Any) -> None:
-        with _telemetry.running("stage_sheet") as counted:
-            staged = _staging.stage(_workbook.sheet_at(options["workbook"]))
-            section = _staging.section(staged)
-            counted.update(_telemetry.figures(section))
-        for line in _report.render(*section):
-            self.stdout.write(line)
+    def run(self, **options: Any) -> list[Report]:
+        return [_staging.section(_staging.stage(_workbook.sheet_at(options["workbook"])))]
