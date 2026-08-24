@@ -50,6 +50,7 @@ from inventory.serializers import (
     VolunteerSerializer,
 )
 from inventory.throttling import APPEND_THROTTLES
+from inventory_tng import debugging
 
 # Named for the module, which is what puts `inventory.views` in the `logger`
 # column. Every record it writes is inside a request, so it carries that
@@ -1350,6 +1351,44 @@ CAPABILITIES: dict[str, tuple[Operation, ...]] = {
     "revoke_label": (Operation(LabelResolveView, "PATCH"),),
     "merge_volunteers": (Operation(VolunteerDetailView, "PATCH"),),
 }
+
+
+@extend_schema(
+    summary="Verify a debug-tracing token",
+    description=(
+        "Answers 204 when the request carries a token this deployment signed and has not expired, and 403 "
+        "otherwise. It exists for nginx's `auth_request`, which cannot check a signature itself, and is what "
+        "keeps the collector's ingest path from being a write anybody can make. It reads nothing but the header "
+        "and answers with no body."
+    ),
+    responses={204: None, 403: None},
+)
+class DebugTraceVerifyView(APIView):
+    """Whether nginx should forward this post to the collector.
+
+    A subrequest rather than a rule nginx could apply on its own: the token is
+    a Django signature over a random id with an expiry, and nothing in an nginx
+    configuration can check one. `inventory_tng.debugging` is what it is and
+    why the ingest path needs it at all.
+
+    Open to anybody, deliberately, because the token in the header is the
+    credential -- volunteers do not sign in, so requiring a session here would
+    lock out exactly the person an administrator sent the link to.
+
+    It does NOT count against the token's rate limit. That limit is on how much
+    tracing one token may make this server do, and answering a subrequest is
+    not that; charging it here would make the browser's own exporter spend the
+    allowance meant for the requests it is tracing.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request: Request) -> Response:
+        if debugging.minted(request.headers.get(debugging.HEADER, "")):
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        log.info("debug ingest refused")
+        telemetry.REFUSALS.add(1, {"reason": "unsigned_ingest"})
+        return Response(status=status.HTTP_403_FORBIDDEN)
 
 
 class CurrentUserView(APIView):

@@ -199,6 +199,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValidationError'
           description: ''
+  /api/debug-trace:
+    get:
+      operationId: debug_trace_retrieve
+      description: Answers 204 when the request carries a token this deployment signed
+        and has not expired, and 403 otherwise. It exists for nginx's `auth_request`,
+        which cannot check a signature itself, and is what keeps the collector's ingest
+        path from being a write anybody can make. It reads nothing but the header
+        and answers with no body.
+      summary: Verify a debug-tracing token
+      tags:
+      - debug-trace
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+        '403':
+          description: No response body
   /api/healthz:
     get:
       operationId: healthz_retrieve

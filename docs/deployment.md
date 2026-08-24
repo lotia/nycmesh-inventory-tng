@@ -198,9 +198,16 @@ adds a way to prove who you are and nothing else — and the local username and
 password path is retained whatever else is set, because it is the way in when
 a provider is unreachable or an account is lost.
 
-The frontend image takes one variable, `BACKEND_ORIGIN`, which the chart sets to
-the backend Service. Nothing environment-specific is compiled into the
-JavaScript bundle, so one image tag is valid in every environment.
+The frontend image takes two variables. `BACKEND_ORIGIN`, which the chart sets
+to the backend Service. And `COLLECTOR_ORIGIN` (`frontend.collectorOrigin`,
+empty by default), where nginx forwards a browser's own spans — nothing posts
+there without a signed debug token, and an unset value means the image's
+default, which refuses the connection.
+[observability.md](observability.md#recording-one-volunteers-requests) is what
+that path is guarded by.
+
+Nothing environment-specific is compiled into the JavaScript bundle either way,
+so one image tag is valid in every environment.
 
 ## Secrets
 

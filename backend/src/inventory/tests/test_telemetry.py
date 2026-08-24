@@ -12,6 +12,7 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import pytest
 from django.conf import settings
@@ -95,6 +96,36 @@ def test_and_every_configuration_this_repository_ships_raises_it() -> None:
 
     assert "OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-1.0}" in (root / "compose.yaml").read_text()
     assert 'tracesSamplerArg: "1.0"' in (root / "infra/helm/inventory-tng/values.yaml").read_text()
+
+
+def test_the_stack_that_ships_names_no_host_only_a_profile_creates() -> None:
+    """The other half of a knob having a default: the default has to work.
+
+    What a name that nothing creates costs is written beside `COLLECTOR_ORIGIN`
+    in `compose.yaml`, which is where it was got wrong. The short of it is that
+    the frontend container of the ordinary quickstart did not start at all.
+
+    Written against every default in the file rather than against that one
+    variable, because the mistake is the shape and not the name.
+    """
+    import re
+
+    import yaml
+
+    compose = yaml.safe_load((Path(settings.BASE_DIR).parent.parent / "compose.yaml").read_text())
+    optional = {name for name, service in compose["services"].items() if service.get("profiles")}
+    assert optional, "no service is behind a profile any more; this test is asserting nothing"
+
+    for name, service in compose["services"].items():
+        for variable, value in (service.get("environment") or {}).items():
+            # `${VAR:-fallback}`: the fallback is what a stack nobody
+            # configured actually runs with.
+            fallback = re.fullmatch(r"\$\{[A-Z_]+:-(.*)\}", str(value))
+            host = urlsplit(fallback.group(1)).hostname if fallback else None
+            assert host not in optional, (
+                f"{name}.{variable} falls back to {host!r}, which only the "
+                f"{compose['services'][host]['profiles']} profile creates"
+            )
 
 
 @pytest.mark.parametrize("ratio", ["1.0", "0", "0.25"])

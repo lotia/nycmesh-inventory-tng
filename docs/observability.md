@@ -29,8 +29,14 @@ second container:
 
 ```bash
 OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318 \
+COLLECTOR_ORIGIN=http://collector:4318 \
   podman compose --profile telemetry up -d
 ```
+
+Two variables and not one, because two different processes forward to that
+address: the backend exports its own spans there, and the frontend's nginx
+forwards a browser's. Neither is defaulted to the collector's name, because a
+name that only the profile creates is one nginx refuses to start without.
 
 Grafana is then on <http://localhost:3000>, with no sign-in: it has Tempo,
 Prometheus and Loki behind it, already wired to each other.
@@ -330,15 +336,35 @@ process-wide act.
 `honoured`, `refused`, or `throttled`. A refused count that climbs is somebody
 guessing at signatures, which is a shape over time rather than a line in a log.
 
-**The browser half is not built yet.** `inventory-tng-nb8.8` adds the flag that
-makes the SPA send this header and its own exporter, and the same token has to
-guard that exporter's ingest path — an unauthenticated OTLP endpoint proxied by
-nginx would be a write anybody can make. Until then the header is something to
-send by hand:
+**The volunteer opens a link.** `?trace=<token>` on any address the app serves
+is the whole of turning it on: the app takes the token out of the address bar
+immediately — a token left there ends up in the history, in a screenshot and in
+whatever gets pasted back — stores it for an hour, sends it on every API call,
+and starts its own tracing. A badge says so on screen with a **Stop** beside
+it, because the person holding the phone did not choose this and a switch
+nobody can see is a switch nobody turns off.
+
+With no token the app starts nothing at all: no SDK, no exporter, no header.
+
+By hand, without a browser:
 
 ```bash
 curl -H "X-Debug-Trace: <token>" http://localhost:8000/api/items
 ```
+
+**Where the browser's own spans go.** The page is served under
+`connect-src 'self'`, so an exporter pointed straight at a collector is blocked
+— and widening that policy would widen it for everything else the page could be
+made to fetch. So the browser posts to `/v1/traces` on its own origin and nginx
+forwards it, which also keeps the collector off the internet.
+
+That path is not open. nginx asks Django whether the token is one it signed and
+has not expired (`auth_request`, because nginx cannot check a signature), and
+forwards nothing until that answers. On top of it: two posts a second per
+debugging session — counted against the token rather than the address, because
+behind an ingress every browser arrives as the same one — and a 64 KB body cap. `COLLECTOR_ORIGIN` on the frontend image is where
+they are forwarded to — the discard port by default, so a deployment without a
+collector serves the app normally and this one path refuses.
 
 ## Every function a request called
 

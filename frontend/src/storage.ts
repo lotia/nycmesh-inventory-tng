@@ -45,6 +45,16 @@ export function read<T>(key: string, isRestorable: (value: unknown) => value is 
  * rather than only swallowed. A caller writing a copy of what it still holds
  * can carry on ignoring it.
  */
+export function forget(key: string): void {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // The header says why nothing here throws. Nothing is reported either:
+    // a caller removing something has given nothing away, so there is no
+    // decision for it to make about a failure.
+  }
+}
+
 export function write(key: string, value: unknown): boolean {
   try {
     window.localStorage.setItem(key, JSON.stringify(value));

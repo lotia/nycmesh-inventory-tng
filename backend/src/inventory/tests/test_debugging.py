@@ -20,7 +20,7 @@ import pytest
 from django.conf import settings
 from django.core import signing
 from django.core.management import call_command
-from django.test import RequestFactory
+from django.test import Client, RequestFactory
 
 from inventory_tng import debugging, telemetry
 
@@ -336,3 +336,51 @@ def test_the_header_a_browser_has_to_send_is_one_the_preflight_admits() -> None:
     have worked -- only the curl beside it.
     """
     assert debugging.HEADER.lower() in settings.CORS_ALLOW_HEADERS
+
+
+# --------------------------------------------------------------------------
+# The path a browser posts its spans to
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_a_signed_post_is_the_only_one_nginx_is_told_to_forward(client: Client) -> None:
+    """nginx cannot check a Django signature, so it asks. Without this the
+    collector's ingest path would be a write anybody could make.
+    """
+    from django.urls import reverse
+
+    where = reverse("debug-trace")
+
+    assert client.get(where, headers={debugging.HEADER.lower(): debugging.mint()}).status_code == 204
+    assert client.get(where).status_code == 403
+    assert client.get(where, headers={debugging.HEADER.lower(): "not-a-token"}).status_code == 403
+
+
+@pytest.mark.django_db
+def test_and_answering_it_does_not_spend_the_token_s_allowance(settings: Any) -> None:
+    """The allowance bounds how much tracing one token may make this server
+    do. A browser's exporter asking whether it may post is not that, and
+    charging it would spend what the traced requests need.
+
+    DRIVEN THROUGH THE WSGI APPLICATION, because that is what charges. This
+    test read 204 five times through Django's `Client` and concluded the
+    allowance was untouched -- and it was, in that arrangement, because the
+    test client never goes near `inventory_tng.wsgi.application`. In a
+    deployment the wrapper charged every one of them. `spends_the_allowance`
+    says what that cost.
+    """
+    from django.test import RequestFactory
+    from django.urls import reverse
+
+    from inventory_tng import wsgi
+
+    settings.DEBUG_TRACE_RATE = "5/min"
+    token = debugging.mint()
+    asking = RequestFactory().get(reverse("debug-trace"), headers={debugging.HEADER.lower(): token})
+
+    for _ in range(5):
+        wsgi.application(asking.environ, lambda status, headers: None)
+
+    assert debugging.authorised(token) is True, "the allowance is untouched"
+    assert debugging.authorised(token) is True
