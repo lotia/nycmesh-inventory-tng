@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { HEADER, remember } from "../telemetry/flag";
 import { ApiError, apiGet, apiPost } from "./client";
 
 function answers(body: unknown, init: ResponseInit = {}): void {
@@ -10,6 +11,13 @@ function answers(body: unknown, init: ResponseInit = {}): void {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  // HERE RATHER THAN AT THE END OF THE TEST THAT SETS IT. A failing assertion
+  // aborts before the last statement, so a `forget()` written there would
+  // leave the debug token set for every later test -- and `apiGet`'s first
+  // case deep-equals the headers, so one real failure would cascade into
+  // unrelated red ones that hid it. `telemetry.test.tsx` makes the same
+  // argument about the same mistake with `vi.unstubAllGlobals` above.
+  window.localStorage.clear();
 });
 
 describe("apiGet", () => {
@@ -101,6 +109,31 @@ describe("apiPost", () => {
       "/api/volunteers",
       expect.objectContaining({ headers: expect.objectContaining({ "X-CSRFToken": "abc123" }) }),
     );
+  });
+
+  it("carries the debug token while this device is being recorded, and not otherwise", async () => {
+    // The propagation half of the debug flag: a volunteer an administrator
+    // handed a link to has their requests recorded in full, and the backend
+    // reads that off this header. Asserted here as well as on the failure
+    // report, because they are two call sites of one helper and only one of
+    // them was covered -- so `flag.debugHeaders` could have returned nothing
+    // and this path would not have noticed.
+    answers({}, { status: 200 });
+    await apiGet("/api/items");
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/items",
+      expect.not.objectContaining({
+        headers: expect.objectContaining({ [HEADER]: expect.anything() }),
+      }),
+    );
+
+    remember("a-signed-token");
+    answers({}, { status: 200 });
+    await apiGet("/api/items");
+    // Read through `Headers` rather than as a plain object: the recording path
+    // normalises, which is what makes a caller's own header shape safe.
+    const [, init] = vi.mocked(fetch).mock.lastCall as unknown as [string, RequestInit];
+    expect(new Headers(init.headers).get(HEADER)).toBe("a-signed-token");
   });
 
   it("carries a refused body, because a 409 is a thing to render", async () => {

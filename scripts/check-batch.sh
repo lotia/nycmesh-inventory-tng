@@ -276,13 +276,7 @@ if [[ -f "$ISSUES" ]]; then
       fail "the batch could not be read from $ISSUES:"
       printf '      %s\n' "$verdict"
     else
-      while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        case "$line" in
-          fail\ *) fail "${line#fail }" ;;
-          note\ *) note "${line#note }" ;;
-        esac
-      done <<<"$verdict"
+      dispatch "$verdict"
     fi
   fi
 fi

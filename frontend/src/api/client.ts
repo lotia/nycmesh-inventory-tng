@@ -87,11 +87,31 @@ async function parse(response: Response): Promise<unknown> {
  * meeting a failure produces the trace that explains it.
  */
 function asked(init: RequestInit): RequestInit {
+  // NORMALISED RATHER THAN SPREAD. `HeadersInit` is three shapes -- a plain
+  // object, an array of pairs, and a `Headers` -- and spreading the last two
+  // silently loses everything: a `Headers` keeps its entries behind
+  // `Symbol.iterator` rather than as own properties, so `{...headers}` is
+  // `{}`. TypeScript accepts all three, so nothing would have said so.
+  //
+  // Every caller here passes an object literal today, so this was latent --
+  // but it stopped being confined to the recording path when the early return
+  // went, and the way it would surface is `Content-Type` and `X-CSRFToken`
+  // vanishing together, which Django refuses as a CSRF failure that reads
+  // like a session problem. The return below puts that guard back as well.
+  // THE TOKEN RATHER THAN THE HEADERS. `debugHeaders` is shaped for the one
+  // caller that spreads it, and asking it here made every request on every
+  // phone allocate an object and then an array of its keys purely to find out
+  // the object was empty. What the two callers actually share is the token,
+  // and `flag.asked` already is that.
   const token = tracing();
   if (token === null) {
+    // The ordinary request, on every phone that was never handed a link:
+    // handed back untouched, whatever shape its headers were in.
     return init;
   }
-  return { ...init, headers: { ...init.headers, [HEADER]: token } };
+  const headers = new Headers(init.headers);
+  headers.set(HEADER, token);
+  return { ...init, headers };
 }
 
 async function request<T>(path: string, init: RequestInit): Promise<T> {

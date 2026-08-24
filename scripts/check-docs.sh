@@ -64,23 +64,11 @@ fi
 
 ALLOW="$REPO_ROOT/scripts/check-docs.allow"
 
-findings=$(WORDS="$WORDS" ALLOW="$ALLOW" python3 "$HERE/check-docs.py" "${paths[@]}") || {
-  # Tested, because the assignment's status is not: without this a traceback
-  # inside the heredoc leaves findings empty, the loop below emits nothing,
-  # and the all-clear prints over a checker that read nothing at all. The
-  # corpus is every tracked source file now, so the crash surface is large
-  # and the rule this guards is the one CLAUDE.md calls non-negotiable.
-  echo "check-docs.sh: the reader failed, so nothing was checked." >&2
-  exit 2
-}
-
-while IFS= read -r line; do
-  [[ -z "$line" ]] && continue
-  case "$line" in
-    fail\ *) fail "${line#fail }" ;;
-    note\ *) note "${line#note }" ;;
-  esac
-done <<<"$findings"
+# The corpus is every tracked source file, so the crash surface is large and
+# the rule this guards is the one AGENTS.md calls non-negotiable -- which is
+# why `relay` exists rather than a bare assignment whose exit status nothing
+# reads.
+relay env WORDS="$WORDS" ALLOW="$ALLOW" python3 "$HERE/check-docs.py" "${paths[@]}"
 
 verdict "No prose repeated across files in runs of $WORDS words or more." \
   "one of each pair is a link"

@@ -94,6 +94,22 @@ export function asked(now: number = Date.now()): string | null {
 }
 
 /**
+ * The header a request carries while this device is being recorded, and
+ * nothing at all when it is not.
+ *
+ * Here because this module declares `HEADER` and holds the token, and because
+ * two callers were building the same object from the same two things --
+ * `api/client.ts` on every API call and `telemetry/report.ts` on every failure
+ * report. `telemetry/wiring.ts` looks like a third and is not: it builds the
+ * header from a token it is HANDED, which is what lets it be called from
+ * `sdk.ts`, where reading the flag would defeat the point of the split.
+ */
+export function debugHeaders(now: number = Date.now()): Record<string, string> {
+  const token = asked(now);
+  return token === null ? {} : { [HEADER]: token };
+}
+
+/**
  * How long this device has left, in milliseconds, or null if it is not
  * recording at all.
  *

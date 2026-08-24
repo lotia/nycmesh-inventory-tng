@@ -27,19 +27,7 @@ if [[ ${#paths[@]} -eq 0 ]]; then
   mapfile -t paths < <(git ls-files 'backend/src/inventory/*.py' 'backend/src/inventory/**/*.py' | grep -v '/tests/')
 fi
 
-findings=$(ALLOW="$REPO_ROOT/scripts/check-telemetry.allow" python3 "$HERE/check-telemetry.py" "${paths[@]}") || {
-  # Tested, for the reason check-docs.sh gives about its own: a reader that
-  # crashed leaves nothing to report and the all-clear would print over it.
-  echo "check-telemetry.sh: the reader failed, so nothing was checked." >&2
-  exit 2
-}
-
-while IFS= read -r line; do
-  [[ -z "$line" ]] && continue
-  case "$line" in
-    fail\ *) fail "${line#fail }" ;;
-    note\ *) note "${line#note }" ;;
-  esac
-done <<<"$findings"
+relay \
+  env ALLOW="$REPO_ROOT/scripts/check-telemetry.allow" python3 "$HERE/check-telemetry.py" "${paths[@]}"
 
 verdict "Everything that changes something says so." "each one says what it did"

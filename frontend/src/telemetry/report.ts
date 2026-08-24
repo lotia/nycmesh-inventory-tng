@@ -21,13 +21,7 @@
 import { trace as otel, type Span, SpanStatusCode } from "@opentelemetry/api";
 
 import { csrfToken } from "../api/csrf";
-import { asked, HEADER } from "./flag";
-
-/** The debug header, when this device is being recorded, and nothing when not. */
-function recording(): Record<string, string> {
-  const token = asked();
-  return token === null ? {} : { [HEADER]: token };
-}
+import { debugHeaders } from "./flag";
 
 /** Where a failure is reported. Rate limited, and it stores nothing. */
 export const FAILURES = "/api/client-failures";
@@ -113,7 +107,7 @@ export function failed(reason: unknown, where: Doing, kind: Kind = "unhandledrej
       headers: {
         "Content-Type": "application/json",
         "X-CSRFToken": csrfToken(),
-        ...recording(),
+        ...debugHeaders(),
       },
       body: JSON.stringify({ kind, where, detail: described(reason) }),
       keepalive: true,
