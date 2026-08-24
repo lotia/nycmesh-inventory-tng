@@ -97,6 +97,35 @@ browser's spans go to the collector through a path that requires the signed
 token of decision 0021, and that stays true; this carries the failures that are
 worth hearing about from a device nobody has flagged.
 
+### A fourth, and why a probe is the easiest of them to argue
+
+Amended 2026-08-24, for `GET /api/livez`. The consequence below asks for an
+argument rather than a footnote, and this one is short.
+
+**What it is for.** The cluster has to be able to ask whether this process is
+still running, separately from whether the database is reachable, and the two
+answers have to come from different places or a database blip restarts every
+pod at once — [health checks](../deployment.md#health-checks) is the whole of
+that reasoning and `inventory-tng-uq6` is where it was found.
+
+**Why it cannot hold a credential.** A kubelet is not a client of this API and
+has no session, no cookie jar and nothing to sign with. An endpoint that asked
+it for one would fail from the first second of the pod's life and kill a
+container that was serving perfectly well — which is not a hardening but a
+different outage. The same is true of the readiness check beside it, which is
+why point 3's posture already covered one probe before this added the second.
+
+**What it discloses.** That something answered, and nothing else. It reads no
+row, writes no row, takes no input, and returns one constant field —
+`{"status": "alive"}`, which is its whole response. There is no query
+parameter to vary and no state for a response to differ by, so it cannot be
+used to ask a question about anybody.
+
+**What it can be abused for.** Load, bounded by the same thing that bounds a
+request for any static path, and the fact that the answer costs nothing is the
+reason it is a poor target. It carries no rate limit for that reason and
+because a limit is one more thing that can refuse a probe.
+
 ## Consequences
 
 - **The dangerous surface is small and already gated.** A volunteer client that

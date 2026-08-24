@@ -273,12 +273,17 @@ paths:
     get:
       operationId: healthz_retrieve
       description: |-
-        Liveness and readiness probe used by Kubernetes.
+        Readiness probe: whether this process can serve a request.
 
         Issues a trivial query so the check fails when the database is
-        unreachable, rather than reporting healthy while unable to serve.
-        See docs/deployment.md.
-      summary: Liveness and readiness probe
+        unreachable, rather than reporting healthy while unable to serve. Failing
+        it stops traffic reaching this pod rather than restarting it, which is
+        what a dependency's outage calls for.
+
+        Not the liveness probe. That is `GET /api/livez`, and what the two ask,
+        what pointing both at this one costs, and what the split gives up in
+        exchange are docs/deployment.md#health-checks.
+      summary: Readiness probe
       tags:
       - healthz
       security:
@@ -727,6 +732,38 @@ paths:
             text/html:
               schema:
                 type: string
+          description: ''
+  /api/livez:
+    get:
+      operationId: livez_retrieve
+      description: |-
+        Liveness probe: whether this process is still running.
+
+        Reaches for nothing of its own -- no database, no cache, no disk -- and
+        that is the whole of its design. A failed liveness probe is answered by
+        killing the container, so it may only report a fault that killing the
+        container repairs; every dependency this process has belongs on the
+        readiness probe at `GET /api/healthz` instead. Why that division is not a
+        matter of taste is docs/deployment.md#health-checks.
+
+        "Of its own" is exact rather than modest. What surrounds a request still
+        costs what it costs: a caller presenting a session cookie is looked up by
+        the middleware before this method is reached, and a caller asking for HTML
+        is answered by the browsable API. A kubelet does neither, which is why the
+        probe is free; anything else pointed at this path is not a kubelet and
+        should be weighed as what it is.
+      summary: Liveness probe
+      tags:
+      - livez
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessCheck'
           description: ''
   /api/locations:
     get:
@@ -1768,6 +1805,13 @@ components:
       required:
       - code
       - kind
+    LivenessCheck:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+      - status
     Location:
       type: object
       description: Somewhere stock can be, including a volunteer holding it.

@@ -75,7 +75,7 @@ docker compose up --build -d
 yours for the two commands below. `docker compose logs -f` follows them and
 `docker compose down` stops them again.
 
-**Everything but the health check and the API description needs an account**,
+**Everything but the two probes and the API description needs an account**,
 and the database starts empty, so those two commands are not optional
 extras — without them every page below is a blank list or a redirect to the
 sign-in form:
@@ -94,7 +94,8 @@ the scanner. Then:
 | Frontend | <http://localhost:8080> | yes |
 | Django admin | <http://localhost:8000/admin/> | yes |
 | API docs (OpenAPI) | <http://localhost:8000/api/docs> | no |
-| API health check | <http://localhost:8000/api/healthz> | no |
+| API readiness probe | <http://localhost:8000/api/healthz> | no |
+| API liveness probe | <http://localhost:8000/api/livez> | no |
 
 Signing in with it the first time asks you to set up an authenticator app: a
 password on its own is not a way into this system, and how administrators sign

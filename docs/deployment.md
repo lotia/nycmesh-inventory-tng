@@ -22,8 +22,8 @@ the step it stops.
 | What happens | Why | Filed as |
 | --- | --- | --- |
 | `ImagePullBackOff` on every pod, at the first install | No image has ever been published from this repository, there is no `v0.1.0` to pull, and the chart renders no `imagePullSecrets` for a private one | `inventory-tng-qe7` |
-| Every backend pod dies together during a brief database outage | Liveness probes `/api/healthz`, which runs a query, so an unreachable database is read as an unhealthy process | `inventory-tng-uq6` |
 | `helm upgrade` blocks until it times out, in a namespace with a `ResourceQuota` | The migrate Job renders with no `resources`, and a quota on cpu or memory refuses a pod that declares none unless a `LimitRange` fills them in | `inventory-tng-v7g` |
+| Every backend pod dies together, some minutes into a database failover that blackholes packets | Each readiness probe blocks in the driver until its worker is killed at 30 seconds, so probe traffic alone can occupy all three; liveness then misses its deadlines from the accept queue | `inventory-tng-39ng` |
 
 The first stops an install outright. Until `inventory-tng-qe7` is done, treat
 what follows as the procedure that will work rather than one that has.
@@ -344,7 +344,8 @@ network you control.
 | `/accounts` | yes | Every way in — the local password form, the providers, the second factors |
 | `/api/labels/sheet` | yes | A print run of stickers; a volunteer scans labels and never prints them |
 | `/api/schema`, `/api/docs` | yes | The description of the whole surface, both halves, and no volunteer flow fetches either |
-| `/api`, `/api/me`, `/api/healthz` | no | The index that hands the browser its CSRF token, who-am-I, and the probe |
+| `/api`, `/api/me`, `/api/healthz`, `/api/livez` | no | The index that hands the browser its CSRF token, who-am-I, and the two probes |
+| `/api/client-failures`, `/api/debug-trace` | no | What a volunteer's browser could not handle, and the token check nginx makes before forwarding its spans — [decision 0012](decisions/0012-two-populations.md) argues the first |
 | `/api/stock/transactions`, `/api/volunteers` | no | The two appends [decision 0012](decisions/0012-two-populations.md) exists to keep open |
 | `/api/items`, `/api/locations`, `/api/categories`, `/api/labels`, `/api/labels/{code}` | no | A volunteer reads all of these; the cached label map is what makes a scan resolve from a basement |
 | `/`, `/assets`, `/S/{code}` | no | The volunteer app and the URL printed on every sticker |
@@ -624,17 +625,103 @@ documented here apply unchanged.
 
 ## Health checks
 
-`GET /api/healthz` returns `{"status": "ok"}` and executes a trivial query, so it
-fails if the database is unreachable. The chart uses it for both liveness and
-readiness probes on the backend.
+The backend has two probes, and it has two because the kubelet does two very
+different things with the answers.
+
+| Probe | Path | Answers | What it asks | What a failure does |
+| --- | --- | --- | --- | --- |
+| Readiness | `GET /api/healthz` | `{"status": "ok"}` | Runs a trivial query, so it fails while the database is unreachable | The pod stops receiving traffic 21–31 seconds later, and rejoins by itself when it passes again |
+| Liveness | `GET /api/livez` | `{"status": "alive"}` | Nothing at all — no database, no cache, no disk | The kubelet kills the container 45–65 seconds later and Kubernetes starts a new one |
+
+**The two words are different on purpose**, because the two answers mean
+different things and a person with `curl` needs to know which they reached.
+`ok` is the one that has been to the database. `alive` means only that a
+process answered, so reading it as "this pod can serve" during an incident is
+exactly the mistake the split exists to make visible.
+
+**A liveness probe that asks about a dependency is the shape of an outage, not
+a stricter check.** Killing a container repairs a process that has stopped
+serving; it does nothing whatever for a database in the middle of a failover.
+Point liveness at the query and a failover running past a minute takes out
+every replica at once — they all ask the same database, so they all fail
+together — and each restarts into a database still recovering, fails again, and
+is backed off exponentially. A blip becomes a quarter of an hour with nothing
+running, presented to whoever is paged as `CrashLoopBackOff` against a database
+that is by then perfectly healthy. So the rule is that anything this process
+depends on belongs on readiness, and liveness is left to answer the only
+question a restart is a cure for.
+
+**Both of those are ranges rather than figures, and the range is not slack in
+the writing.** The kubelet starts each attempt on a fixed schedule and records
+a failure only when that attempt returns, so where in the current period a pod
+goes quiet decides how much of that period is wasted. Liveness is three
+failures twenty seconds apart with five seconds allowed for each, which lands
+between 45 and 65; readiness is three ten apart at a one-second deadline,
+which lands between 21 and 31. Quote the top of each range when you are sizing
+a failover window or writing an alert, because that is the one an incident
+will find.
+
+The chart writes out every field those come from, defaults included, so the
+arithmetic can be read beside the probe instead of assembled from a table of
+Kubernetes defaults somewhere else. `test_chart.py` compares each probe whole
+against what this paragraph claims, so a field added, removed or retuned fails
+the suite rather than making a sentence here quietly wrong.
+
+**Two things the split gives up, neither of which is a bug to report.** They
+are stated here because both look like faults when you meet them.
+
+The first is that *Kubernetes never restarts a container for prolonged
+unreadiness*. When liveness ran the query, a pod whose own database access had
+wedged — a leaked socket, exhausted file descriptors, a stale DNS answer held
+by one pod — failed liveness and was restarted into a working state. Now it
+answers `/api/livez` for ever, fails readiness for ever, and sits out of the
+Service with no restart and no `CrashLoopBackOff` to page on. Capacity quietly
+drops by a replica. A pod that has been `0/1 Running` for a long time is that
+case, and `kubectl delete pod` is the answer.
+
+**Neither probe is reachable through the ingress at the moment you want it.**
+Readiness gates the pod's membership of the Service as a whole rather than
+per path, so a pod failing `/api/healthz` stops routing `/api/livez` at the
+same instant — during a failover the site answers 503 for both, and for a
+single unready pod there is no route to it at all. So the `curl` in step 7
+answers the question only while nothing is wrong. Ask a particular pod
+instead:
+
+```bash
+kubectl -n inventory-tng port-forward <pod> 8000:8000
+curl -s localhost:8000/api/livez ; curl -s localhost:8000/api/healthz
+```
+
+`alive` with no `ok` is the whole diagnosis: the process is fine and its
+database is not, which is a pod to leave alone.
+
+The second is that "its siblings take the traffic" is only true of a fault one
+pod has. Every replica asks the same database, so a failover fails readiness on
+all of them within 30 seconds and the Service empties — the ingress answers 503
+until the database is back. That is a worse minute than a single pod's and a far
+better quarter of an hour than the crash loop it replaced, because nothing has
+to recover from being killed: the pods are still there, still healthy, and
+rejoin the moment the query succeeds.
+
+**One known defect is left here**, and it is what stops this being the whole
+answer: readiness itself can starve the process it is protecting. gunicorn runs
+synchronous workers and the database connection has no `connect_timeout`, so a
+failover that blackholes packets rather than refusing them leaves each readiness
+probe blocked in the driver until the worker is killed at 30 seconds — long
+enough that probe traffic alone can occupy every worker, and `/api/livez` then
+misses its own deadlines from the accept queue. `inventory-tng-39ng` bounds the
+connection, which is the fix that makes every request fail fast rather than only
+the probes.
 
 **A pod answers to its own address, and that is what makes any of this work.**
 The kubelet dials a pod rather than the site, so a probe asks for
 `<pod IP>:8000` — an address nobody could have listed in `django.allowedHosts`,
 because it does not exist until the pod does. Without it Django answers 400,
 readiness never passes, no pod joins the Service, and liveness kills each
-container about fifty seconds in — ten, then three failures twenty apart — for
-ever. So the chart passes the address in through the downward API, as
+container about fifty seconds in — the ten it waits before starting, then
+three refusals twenty apart, and a 400 comes back at once rather than using
+any of its five seconds — for ever. So the chart passes the address in through
+the downward API, as
 `DJANGO_EXTRA_ALLOWED_HOSTS`, and Django adds it to the list. Nothing about that depends on what you wrote in
 `django.allowedHosts`, which is free to be several names, or `*`.
 
@@ -648,11 +735,6 @@ nothing at all — but a release that has to be diagnosed from its logs is one
 that should not have installed, so the chart refuses to render it instead,
 naming both values. What that record contains, and how many of them a scanner
 can make you write, is [Reading the logs](#reading-the-logs).
-
-**One known defect is left here.** Liveness runs the same query readiness does,
-so a database that is briefly unreachable is read as a process that needs
-killing — and because every replica asks the same database, they fail together.
-A one-minute blip becomes a full restart of the deployment. `inventory-tng-uq6`.
 
 ## Telemetry
 
