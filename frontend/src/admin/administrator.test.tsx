@@ -17,7 +17,9 @@ import {
   renderScreen,
   STALE_ADMINISTRATOR,
   stubSession,
+  theWrite,
   VOLUNTEER,
+  writes,
 } from "../testHarness";
 import { StaleSession } from "./StepUp";
 
@@ -58,20 +60,6 @@ function catalogue(
 
 const edit = () => screen.getByRole("button", { name: /edit zip ties reusable/i });
 const add = () => screen.getByRole("button", { name: /add an item/i });
-
-/** Every write the app made by one method, as the bodies it sent. */
-function written(method = "PATCH"): unknown[] {
-  return (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
-    .filter(([, init]) => (init as RequestInit | undefined)?.method === method)
-    .map(([, init]) => JSON.parse(String((init as RequestInit).body)));
-}
-
-/** The one write, asserted to be exactly one before it is read. */
-function theWrite(method = "PATCH"): unknown {
-  const writes = written(method);
-  expect(writes).toHaveLength(1);
-  return writes[0];
-}
 
 /** Open the create dialog and fill in the two fields the API insists on. */
 async function newItemNamed(named: string): Promise<HTMLElement> {
@@ -128,7 +116,7 @@ describe("what an administrator sees", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(theWrite()).toMatchObject({ name: "Zip Ties" });
+    expect(theWrite("PATCH").body).toMatchObject({ name: "Zip Ties" });
   });
 
   it("retires an item rather than deleting it", async () => {
@@ -266,7 +254,7 @@ describe("adding an item to the catalogue", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: /^add$/i }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(theWrite("POST")).toEqual({
+    expect(theWrite("POST").body).toEqual({
       name: "Grounding Wire",
       category: CATEGORIES[0].id,
       unit_of_measure: "each",
@@ -286,7 +274,7 @@ describe("adding an item to the catalogue", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: /^add$/i }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(theWrite("POST")).toMatchObject({ unit_of_measure: "metre" });
+    expect(theWrite("POST").body).toMatchObject({ unit_of_measure: "metre" });
   });
 
   it("will not send an item with no category, because the API cannot take one", async () => {
@@ -303,7 +291,7 @@ describe("adding an item to the catalogue", () => {
     // Asked for on the form rather than discovered as a 400 the server has to
     // explain: `Item.category` is not nullable.
     expect(within(dialog).getByRole("button", { name: /^add$/i })).toBeDisabled();
-    expect(written("POST")).toHaveLength(0);
+    expect(writes("POST")).toHaveLength(0);
   });
 
   it("says so when there is no category to join", async () => {
@@ -399,7 +387,7 @@ describe("adding an item to the catalogue", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: /^add$/i }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(theWrite("POST")).toMatchObject({ minimum_stock: "25", reorder_quantity: "100" });
+    expect(theWrite("POST").body).toMatchObject({ minimum_stock: "25", reorder_quantity: "100" });
   });
 
   it("says the other kind of no as a sentence, and keeps the form", async () => {
@@ -437,7 +425,7 @@ describe("adding an item to the catalogue", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: /cancel/i }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(written("POST")).toHaveLength(0);
+    expect(writes("POST")).toHaveLength(0);
   });
 });
 
@@ -459,7 +447,7 @@ describe("the rest of the edit form", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(theWrite()).toMatchObject({
+    expect(theWrite("PATCH").body).toMatchObject({
       minimum_stock: "25",
       reorder_quantity: "100",
       active: false,
@@ -476,7 +464,7 @@ describe("the rest of the edit form", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: /cancel/i }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(written()).toHaveLength(0);
+    expect(writes("PATCH")).toHaveLength(0);
   });
 
   it("draws nothing at all when the session cannot be read", async () => {

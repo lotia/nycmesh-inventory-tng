@@ -205,11 +205,11 @@ Named here so the gaps are visible rather than surprising:
   settled in [decision 0012](decisions/0012-two-populations.md) and where
   administrators work in [0014](decisions/0014-one-interface.md), and where a
   screen goes when it belongs to no row in
-  [0025](decisions/0025-work-that-belongs-to-no-row.md). The item list has both
-  halves an item has — a row is corrected where it is, and one is added from the
-  head of the list — which is two of the six endpoints `edit_catalogue` covers;
-  locations, categories and every other capability `CAPABILITIES` names have no
-  screen yet. Every API endpoint but the ones
+  [0025](decisions/0025-work-that-belongs-to-no-row.md). All six endpoints
+  `edit_catalogue` covers have a screen now: an item is added from the head of
+  the list and corrected on its row, and the two small vocabularies are made and
+  corrected where an item and a batch choose one. The other capabilities
+  `CAPABILITIES` names have no screen yet. Every API endpoint but the ones
   [DEVELOPERS.md](../DEVELOPERS.md#signing-in) lists still requires a session,
   including the two a volunteer needs.
 - **Migration from the existing Google Sheet** (52 items, 3,439 submissions).

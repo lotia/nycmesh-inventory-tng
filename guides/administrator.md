@@ -18,6 +18,16 @@ Two places, and they are one system.
   carries **Add an item** above it. Adding one asks for a name and a category,
   because an item has to be in one; the rest can be corrected afterwards from
   the same **Edit**.
+
+  The two small lists an item and a batch choose from are made in the same
+  places they are chosen. Inside **Add an item**, under the category box, is
+  **New category** — and, once one is chosen, a way to rename it. On the
+  batch's *Where the stock is* box is **New place**, and beside it a way to
+  edit the one you picked. Neither offers a delete, because the API has none:
+  a place stops being offered by clearing **Offered in the pick-list**, and a
+  grouping cannot be removed from the app at all. Two things stay in the admin
+  below: making a *volunteer custody* place, which needs a person named on it,
+  and changing what kind of place an existing one is.
 - *Django's admin*, at `/admin/`, for everything else. Almost every kind of
   record this system stores has a page there. The one that does not is the one
   the last section is about: how much of an item is on a particular shelf.

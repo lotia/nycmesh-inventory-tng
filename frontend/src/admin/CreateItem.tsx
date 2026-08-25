@@ -20,10 +20,11 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import { useState } from "react";
 import { type ApiError, apiPost, asApiError } from "../api/client";
-import type { Category, Item, Page } from "../api/types";
-import { useResource } from "../api/useResource";
+import type { Category, Item } from "../api/types";
 import { unitChoices } from "../items/quantity";
+import { EditCategory } from "./EditCategory";
 import { Refusal } from "./Refusal";
+import { useVocabulary } from "./vocabulary";
 
 /**
  * What an item can be counted in, from the one place this app spells them out.
@@ -44,9 +45,13 @@ export function CreateItem({ onClose, onCreated }: { onClose: () => void; onCrea
   const [refused, setRefused] = useState<ApiError | null>(null);
   // Read when the dialog opens rather than with the item list: a volunteer
   // never sees this control, so nobody pays for the request who is not about
-  // to use it.
-  const { data, error, loading } = useResource<Page<Category>>("/api/categories");
-  const categories = data?.results ?? [];
+  // to use it. Everything else about the groupings -- what is being made, and
+  // the re-read after -- is `useVocabulary`'s.
+  const groupings = useVocabulary<Category>("/api/categories", (saved) =>
+    setCategory(String(saved.id)),
+  );
+  const { rows: categories, error, loading } = groupings;
+  const chosen = categories.find((one) => String(one.id) === category) ?? null;
 
   // An item belongs to a category and the column is not nullable, so Add cannot
   // succeed without one. Not the client enforcing an invariant -- the server
@@ -120,6 +125,29 @@ export function CreateItem({ onClose, onCreated }: { onClose: () => void; onCrea
               </MenuItem>
             ))}
           </TextField>
+          {/* Under the select, because this is the moment somebody discovers
+              the grouping they want is not in the list -- and the same place
+              is where the one they did choose is corrected. The panel opens
+              here rather than over this dialog; EditCategory says why. */}
+          {groupings.editing ? (
+            <EditCategory
+              existing={groupings.editing.row}
+              categories={categories}
+              onClose={groupings.close}
+              onSaved={groupings.settled}
+            />
+          ) : (
+            <Stack direction="row" spacing={1}>
+              <Button size="small" onClick={groupings.add}>
+                New category
+              </Button>
+              {chosen ? (
+                <Button size="small" onClick={() => groupings.correct(chosen)}>
+                  Rename {chosen.name}
+                </Button>
+              ) : null}
+            </Stack>
+          )}
           <TextField
             select
             label="Counted in"
