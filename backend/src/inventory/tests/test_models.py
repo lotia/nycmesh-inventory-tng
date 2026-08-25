@@ -451,13 +451,51 @@ def test_and_an_attempt_on_the_location_it_names(warehouse: Location) -> None:
     assert label.location == warehouse
 
 
+@pytest.mark.parametrize(
+    "kind",
+    [ItemIdentifier.Kind.BARCODE, ItemIdentifier.Kind.LEGACY_NYCM, ItemIdentifier.Kind.ALIAS],
+)
+def test_an_identifier_outlives_an_attempt_on_the_item_it_names(item: Item, kind: str) -> None:
+    """A barcode is printed on the thing itself, and the string is unique here.
+
+    `ItemIdentifier.item` says what this key was and what that cost. The three
+    kinds are parametrised because the guard is deliberately not narrowed to
+    the printed two: freeing an `alias` lets it be created against a different
+    item, which is the answer-wrongly half of the same defect.
+    """
+    identifier = ItemIdentifier.objects.create(item=item, kind=kind, value="NYCM-ER-LBEG2")
+
+    # `match` because several of an item's references are PROTECT, so the
+    # exception type alone cannot say which one refused.
+    with pytest.raises(ProtectedError, match=r"ItemIdentifier\.item"):
+        item.delete()
+
+    identifier.refresh_from_db()
+    assert identifier.item == item
+
+
+def test_a_recorded_price_outlives_an_attempt_on_the_item_it_is_for(item: Item, vendor: Vendor) -> None:
+    """`VendorOffer`'s own docstring promises a purchase price stays
+    recoverable, and one delete of an unlabelled, unmoved item wiped the
+    series -- with no physical artefact left to notice the loss by.
+    """
+    recorded = offer(item, vendor, unit_price=Decimal("42.00"))
+
+    with pytest.raises(ProtectedError, match=r"VendorOffer\.item"):
+        item.delete()
+
+    recorded.refresh_from_db()
+    assert recorded.unit_price == Decimal("42.00")
+
+
 # What may point at an item or a location and still let it be deleted, and why.
 # An entry is a decision somebody argued, not a gap: the reason is the point,
 # and a line here without one is a line nobody can weigh.
-MAY_CASCADE = {
-    ("ItemIdentifier", "item"): "inventory-tng-6kyb -- a printed barcode goes with the row, and should not",
-    ("VendorOffer", "item"): "inventory-tng-6kyb -- the price history its own docstring says it preserves",
-}
+#
+# EMPTY, and that is the answer rather than an oversight: inventory-tng-6kyb
+# took out the two it shipped with. A new entry is a claim that losing
+# something with the row it names is acceptable, and it has to be argued here.
+MAY_CASCADE: dict[tuple[str, str], str] = {}
 
 
 def test_nothing_new_may_point_at_an_item_or_a_location_and_cascade() -> None:
