@@ -1,15 +1,19 @@
-"""`django-environ`, with one change: a variable that says nothing is unset.
+"""`django-environ`, with two changes to what a variable is taken to say.
 
-The rule, what it is worth, and the one place it makes a refusal stricter
-rather than softer are all in
+A variable that says nothing is unset. The rule, what it is worth, and the one
+place it makes a refusal stricter rather than softer are all in
 docs/decisions/0022-an-empty-variable-is-an-unset-one.md. This is the half that
 applies it to everything Django reads; `options.missing` is the predicate, and
 lives there because a module that must import nothing outside the standard
 library needs it too.
+
+And a comma-separated variable is a list of values rather than of values with
+spaces stuck to them, which is `entries` below.
 """
 
 import os
-from collections.abc import MutableMapping
+from collections.abc import Iterable, MutableMapping
+from typing import Any
 
 import environ
 
@@ -57,7 +61,42 @@ class Speaking:
         return default
 
 
+def entries(values: Iterable[str]) -> list[str]:
+    """What a comma-separated variable actually holds.
+
+    `django-environ`'s list cast is `split(",")` and nothing else, so `"a, b"`
+    -- the way anybody writes a list of two -- yields `" b"`. That matches
+    nothing, for ever, and the space does not show in the file that caused it:
+    it was a live production bug here in `DJANGO_ALLOWED_HOSTS`, and
+    `CORS_ALLOWED_ORIGINS` carried the identical one a screen below in
+    `settings.py`.
+
+    Fixed at the mechanism rather than at either variable. Every list cast goes
+    through `Env.parse_value` below, so a third one added later is trimmed
+    without anybody remembering this, and `hosts.allowed_hosts` calls this
+    directly for the list only a running deployment can supply.
+
+    Blanks are dropped with the spaces. A trailing comma, or a value of `""`
+    arriving as one empty element, would otherwise be an entry that matches
+    nothing -- and for `ALLOWED_HOSTS` an empty pattern is worth being certain
+    about rather than reasoning about.
+    """
+    return [value.strip() for value in values if value.strip()]
+
+
 class Env(environ.Env):
-    """`environ.Env`, reading through the view above."""
+    """`environ.Env`, reading through the view above, and trimming every list."""
 
     ENVIRON = Speaking(os.environ)
+
+    @classmethod
+    def parse_value(cls, value: Any, cast: Any) -> Any:
+        """Every `list`-cast read, trimmed once, here.
+
+        The cast is compared to `list` itself rather than to a list instance:
+        `django-environ` spells "a list of some element type" as `[int]`, which
+        casts each element and would trim a value this application never asks
+        for. `(list, [])` is the only shape `settings.py` uses.
+        """
+        parsed = super().parse_value(value, cast)
+        return entries(parsed) if cast is list else parsed

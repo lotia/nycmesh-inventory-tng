@@ -34,6 +34,7 @@ from environ import Env
 
 from inventory.tests.charts import manifests, refused, render
 from inventory_tng.database import DEFAULT_CONNECT_TIMEOUT_SECONDS
+from inventory_tng.environment import entries
 from inventory_tng.hosts import allowed_hosts
 
 # What a kubelet puts in Host when a probe sets no header of its own: the pod's
@@ -358,7 +359,11 @@ def test_the_chart_covers_an_ingress_host_exactly_when_django_would(host: str, l
     failure of the two it could have: nobody debugs a chart that says no to
     something correct.
     """
-    django_would_answer = validate_host(host, [pattern.strip() for pattern in listed.split(",")])
+    # Through `entries`, because the whole claim here is that the chart and
+    # Django answer alike, and a hand-rolled trim beside them would be a third
+    # answer nobody compares -- which is the shape of the bug the trim exists
+    # for. `inventory_tng.environment` is where that argument lives.
+    django_would_answer = validate_host(host, entries(listed.split(",")))
 
     try:
         render(**{"ingress.host": host, "django.allowedHosts": listed})

@@ -62,10 +62,11 @@ DEBUG = env("DJANGO_DEBUG")
 # DJANGO_EXTRA_ALLOWED_HOSTS is for addresses only the running deployment
 # knows -- in Kubernetes, the pod's own, which is what a probe asks for and
 # what nobody could have written in a values file. Why that matters, and what
-# it costs when the list is wrong, is docs/deployment.md#health-checks; why the
-# two lists need stripping before use is on `allowed_hosts`. Both are read
-# through that one function, here and in inventory/tests/test_chart.py, so
-# there is never a second answer.
+# it costs when the list is wrong, is docs/deployment.md#health-checks; why a
+# comma-separated variable needs trimming before use is on
+# `environment.entries`, which every list cast in this file now goes through.
+# Both lists are read through that one function, here and in
+# inventory/tests/test_chart.py, so there is never a second answer.
 ALLOWED_HOSTS: list[str] = allowed_hosts(env("DJANGO_ALLOWED_HOSTS"), env("DJANGO_EXTRA_ALLOWED_HOSTS"))
 
 # Everything the process has to say, on standard output, in every environment.
@@ -520,7 +521,9 @@ SPECTACULAR_SETTINGS = {
 }
 
 # Cross-origin reads only, and normally unused: both the dev server and nginx
-# proxy Django's paths, so the browser sees one origin. See .env.sample.
+# proxy Django's paths, so the browser sees one origin. See .env.sample. An
+# origin written with a space after the comma is trimmed by `Env` itself; the
+# argument is on `environment.entries`.
 CORS_ALLOWED_ORIGINS: list[str] = env("CORS_ALLOWED_ORIGINS")
 
 # django-cors-headers' defaults do not include the W3C trace headers, so a
