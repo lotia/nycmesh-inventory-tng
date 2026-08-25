@@ -32,3 +32,4 @@ to ask "why is it like this?". Number them sequentially.
 | [0020](0020-who-merges.md) | Whoever finished the branch merges it |
 | [0021](0021-telemetry-over-otlp.md) | Logs on standard output, traces and metrics over OTLP |
 | [0022](0022-an-empty-variable-is-an-unset-one.md) | An empty environment variable means the same as an absent one |
+| [0023](0023-which-addresses-may-speak-for-another.md) | Which addresses may speak for another |

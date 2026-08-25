@@ -13,7 +13,7 @@ from typing import Any
 
 from corsheaders.defaults import default_headers
 
-from inventory_tng import database, debugging, refusals
+from inventory_tng import database, debugging, forwarded, refusals
 from inventory_tng.environment import Env
 from inventory_tng.hosts import allowed_hosts
 from inventory_tng.logs import from_environment
@@ -33,6 +33,7 @@ env = Env(
     APPEND_SUSTAINED_RATE=(str, "300/hour"),
     CLIENT_REPORT_RATE=(str, "30/min"),
     NUM_PROXIES=(int, 2),
+    TRUSTED_PROXIES=(list, []),
     # What a signed debug-tracing token is worth. `inventory_tng.debugging`
     # holds both numbers and the argument for each.
     DEBUG_TRACE_LIFETIME_SECONDS=(int, debugging.DEFAULT_LIFETIME_SECONDS),
@@ -271,6 +272,15 @@ ACCOUNT_REAUTHENTICATION_TIMEOUT = env.int("REAUTHENTICATION_TIMEOUT_SECONDS", d
 # proxies is the ingress: every administrator would share one bucket, and ten
 # failed sign-ins from anywhere would lock all of them out.
 ALLAUTH_TRUSTED_PROXY_COUNT = env.int("NUM_PROXIES")
+
+# The list decision 0023 settles, and `inventory_tng.forwarded` reads.
+#
+# Parsed here rather than where it is read, so an entry nobody can make sense
+# of stops the process at boot instead of at the first request that needed it
+# -- the same reason the telemetry settings above are validated here. Empty in
+# every configuration this repository ships, and .env.sample says which way
+# that is dangerous to get wrong.
+TRUSTED_PROXIES: list[forwarded.Network] = forwarded.networks(env("TRUSTED_PROXIES"))
 
 # Decision 0013 point 5. Automatic sign-up is off, so arriving from a provider
 # for the first time is a step somebody takes rather than something that

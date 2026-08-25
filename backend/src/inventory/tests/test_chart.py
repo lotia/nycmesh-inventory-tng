@@ -33,6 +33,7 @@ from django.test import Client, override_settings
 from environ import Env
 
 from inventory.tests.charts import manifests, refused, render
+from inventory_tng import forwarded
 from inventory_tng.database import DEFAULT_CONNECT_TIMEOUT_SECONDS
 from inventory_tng.environment import entries
 from inventory_tng.hosts import allowed_hosts
@@ -286,6 +287,33 @@ def test_what_a_deployment_configuring_nothing_is_bounded_by() -> None:
     assert period > DEFAULT_CONNECT_TIMEOUT_SECONDS, (
         f"a process nobody configured waits {DEFAULT_CONNECT_TIMEOUT_SECONDS}s, which a probe every "
         f"{period}s does not outlast"
+    )
+
+
+def test_the_pod_is_handed_the_proxy_list_the_chart_offers_to_set() -> None:
+    """A value nothing wires is a knob that does nothing, quietly.
+
+    `values.yaml` offering `django.trustedProxies` and `_helpers.tpl` naming
+    `TRUSTED_PROXIES` are two separate facts, and only the second decides what
+    a pod reads. Asked of the render for exactly that reason: read out of
+    `values.yaml` instead, deleting the `_helpers.tpl` block would leave the
+    settings module's empty default in place and this suite green.
+
+    Read through `forwarded.networks` rather than compared as a string, because
+    what has to hold is what the application makes of what the manifest
+    supplies -- the same move as the probes above. The shipped answer is the
+    empty list, which believes no forwarded header from anybody; decision 0023
+    is why that is the safe direction rather than merely the current one.
+    """
+    supplied = environment(backend_container())
+
+    assert "TRUSTED_PROXIES" in supplied, (
+        "the chart offers django.trustedProxies and hands the pod nothing, so setting it would do nothing"
+    )
+    listed = entries(Env.parse_value(supplied["TRUSTED_PROXIES"]["value"], list))
+
+    assert forwarded.networks(listed) == [], (
+        f"the shipped chart would have a pod believe a forwarded header from {listed}"
     )
 
 

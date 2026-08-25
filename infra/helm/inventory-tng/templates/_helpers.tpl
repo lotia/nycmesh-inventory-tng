@@ -142,6 +142,8 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
   value: {{ .Values.django.corsAllowedOrigins | quote }}
 - name: NUM_PROXIES
   value: {{ .Values.django.numProxies | quote }}
+- name: TRUSTED_PROXIES
+  value: {{ .Values.django.trustedProxies | quote }}
 - name: APPEND_BURST_RATE
   value: {{ .Values.django.appendBurstRate | quote }}
 - name: APPEND_SUSTAINED_RATE
