@@ -225,6 +225,57 @@ git -C "$WORK/repo" commit -q -m "aaa: Extract the decode loop into its own modu
 good_message
 expect 1 "nothing staged closes inventory-tng-aaa" "a matching summary alone is not enough when HEAD closed something else"
 
+# --- when the interpreter is not there -------------------------------------
+#
+# inventory-tng-pg63. The tracker half is read by python3, and its exit status
+# used to be discarded by `mapfile < <(...)`: a broken interpreter produced no
+# closures, so an honest commit was told it closed nothing, with python3
+# mentioned nowhere. Missing and broken take the same path, so a shim that
+# exits non-zero stands for both.
+
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+good_message
+expect 0 "closes inventory-tng-aaa" "with a working python3 the closure is read"
+
+mkdir -p "$WORK/broken"
+printf '#!/bin/sh\nexit 1\n' > "$WORK/broken/python3"
+chmod +x "$WORK/broken/python3"
+
+output=$(PATH="$WORK/broken:$PATH" "$CHECK" "$WORK/repo/message" 2>&1)
+status=$?
+assert "$output" "$status" 2 "python3 could not read" "a python3 that cannot answer says so"
+refute "$output" "$status" 2 "does not close" "and does not accuse the commit instead"
+
+# Nothing staged for the tracker means nothing for python3 to read, so the
+# message half stands on its own -- and is not held hostage to an interpreter
+# it never needed.
+scene
+good_message
+output=$(PATH="$WORK/broken:$PATH" "$CHECK" "$WORK/repo/message" 2>&1)
+assert "$output" $? 1 "nothing staged closes" "a commit staging no tracker change needs no python3"
+
+# The other diff python3 is asked to read is HEAD's, in `amends_head`, and it
+# was left running through a pipeline whose status nothing looked at -- the
+# same discard, in the same file, as the one above. A broken interpreter made
+# an honest amend look like a commit that closed nothing.
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+git -C "$WORK/repo" commit -q -m "aaa: Extract the decode loop into its own module"
+good_message
+output=$(PATH="$WORK/broken:$PATH" "$CHECK" "$WORK/repo/message" 2>&1)
+status=$?
+assert "$output" "$status" 2 "python3 could not read" "an amend read against a broken python3 says so as well"
+refute "$output" "$status" 2 "nothing staged closes" "and is not told it closed nothing instead"
+
 # --- reading a commit that has already landed ------------------------------
 #
 # check-batch.sh asks for this over history, where there is no staged diff for

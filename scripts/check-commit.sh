@@ -124,6 +124,21 @@ for kind, issue_id in sorted(now - was):
 '
 }
 
+# What to say when the reader above could not run, in the one place both
+# callers reach for it: the staged diff below, and HEAD's own in `amends_head`.
+# Two call sites and one refusal, because the first version of this said it in
+# only one of them and the other went on quietly deciding that a broken
+# interpreter meant no closures.
+#
+# Exit 2, not 1: nothing was checked, which is a different answer from having
+# checked and objected. Either way the commit does not proceed.
+tracker_unreadable() {
+  echo "check-commit.sh: python3 could not read $ISSUES, so nothing was checked." >&2
+  echo "  It is one of the three programs an agent session needs, and" >&2
+  echo "  DEVELOPERS.md 'Prerequisites' says why a shim is not enough." >&2
+  exit 2
+}
+
 # Is this message replacing HEAD rather than adding a commit after it?
 #
 # git hands a commit-msg hook the message path and nothing else, so --amend
@@ -154,12 +169,23 @@ for kind, issue_id in sorted(now - was):
 # that follow-up on the evidence a commit-msg hook is given, so it is refused
 # and the refusal says which way is through. Decided on inventory-tng-h0hr.
 amends_head() {
-  local named=$1 head_summary
+  local named=$1 head_summary head_diff head_closures
   head_summary=$(git log -1 --format=%s 2>/dev/null) || return 1
   [[ -n "$head_summary" && "$summary" == "$head_summary" ]] || return 1
   # `git show` rather than a diff against HEAD~1, so that amending the first
   # commit in a repository is read like any other rather than erroring.
-  git show --format= HEAD -- "$ISSUES" | tracker_closures | grep -qxF "work $named"
+  head_diff=$(git show --format= HEAD -- "$ISSUES") || return 1
+  # HEAD touched nothing here, so it closed nothing, and there is no reason to
+  # start an interpreter to be told so.
+  [[ -n "$head_diff" ]] || return 1
+  # Read separately from the grep, and the two failures kept apart: a reader
+  # that could not run is not a HEAD that closed something else. Piped straight
+  # into grep, python3's status went where `mapfile` used to send it -- into a
+  # pipeline nothing asked about -- and the answer was the same wrong one, an
+  # honest amend told nothing staged closes the issue with python3 named
+  # nowhere. This half was left behind when the other was fixed.
+  head_closures=$(printf '%s\n' "$head_diff" | tracker_closures) || tracker_unreadable
+  grep -qxF "work $named" <<<"$head_closures"
 }
 
 # How to land a message the check above cannot accept, said wherever it
@@ -190,7 +216,21 @@ if [[ "$MESSAGE_ONLY" -eq 0 ]]; then
   # against a tracker of a hundred-odd rows on every local commit.
   staged_tracker=$(git diff --cached "$BASE" -- "$ISSUES")
 
-  mapfile -t moved < <(printf '%s\n' "$staged_tracker" | tracker_closures)
+  moved=()
+  # No tracker change means no closure to find, and no interpreter to start
+  # looking for one. Most commits stage nothing here, and this now runs on
+  # every one of them: measured on inventory-tng-pg63, the spawn against an
+  # empty diff was 18.8 ms of the checker's 30.0 ms, for byte-identical output.
+  if [[ -n "$staged_tracker" ]]; then
+    # The exit status IS part of the check. `mapfile < <(...)` throws it away,
+    # so a python3 that was missing or broken yielded no closures and the
+    # script went on to accuse an honest commit of not closing what it had in
+    # fact closed -- naming neither python3 nor the real reason. Not a remote
+    # case, either: DEVELOPERS.md "Prerequisites" says how a hook comes to be
+    # run without the interpreter this needs.
+    read_out=$(printf '%s\n' "$staged_tracker" | tracker_closures) || tracker_unreadable
+    mapfile -t moved <<<"$read_out"
+  fi
 
   # Partitioned here rather than filtered there, so one read answers both
   # questions: what work this closes, and which epics it tidies up after.
