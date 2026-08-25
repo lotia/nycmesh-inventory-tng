@@ -114,9 +114,9 @@ has moved on.
 
 ### About the Delete button
 
-There is a **Delete** button on this page, and on a location and a label. **Do
-not use it.** Use **Merged into** and **Active** instead: those are how a
-record is taken out of use, and deleting is not the same thing.
+There is a **Delete** button on this page, and on a location. **Do not use
+it.** Use **Merged into** and **Active** instead: those are how a record is
+taken out of use, and deleting is not the same thing.
 
 **An item has no such button at all**, and nothing in the item list's menu
 offers one either. An item leaves the catalogue by having **Active** cleared,
@@ -142,9 +142,15 @@ with the wrong thing rather than with nothing. A purchase price is a series
 meant to stay readable, with no object out in the world to notice its going.
 
 A location a sticker points at refuses to be deleted for the first of those,
-and the refusal is a guard rather than a permission. Deleting a label is still
-offered and still works, though the app itself has no way to do it:
-`inventory-tng-ls6d`.
+and the refusal is a guard rather than a permission.
+
+**A label has no Delete button either**, for the same reason twice over. Its
+code is on a sticker that is already on a shelf; it was picked at random rather
+than worked out, so nothing can reconstruct it. Delete the row and the scan
+finds nothing, for ever — and the code goes back into the pool the next print
+run draws from, so the sticker on the wall can start answering with a different
+item altogether. Put a date in **Revoked at** instead: that is the only way out,
+and it is the one the app itself takes.
 
 Nothing anywhere removes a movement, or the batch it was part of. That is the
 database refusing rather than a screen declining, so there is no button behind a
@@ -155,11 +161,17 @@ settled rather than left open. If you believe a row genuinely has to leave the
 database, that is a conversation with whoever runs the server and not a thing to
 look for here.
 
-**And what a refusal says varies.** Where a sticker is the only thing in the
-way, the page names the label codes it is protecting. Where the row has also
-moved stock, Django reports it as a permissions problem about "stock movement"
-instead and shows no code at all — the row is still safe either way, but the
-message is not always the one that explains why.
+**And a refusal never says much.** Django reports one as a permissions
+problem naming the *kind* of record in the way — "label", or "stock movement" —
+and shows you none of them. The row is safe either way; the message simply does
+not explain itself.
+
+**And you cannot look them up either**, which is the part worth knowing before
+you go hunting. The label list searches codes and nothing else, so there is no
+way from here to ask which stickers name a given shelf. That gap is
+`inventory-tng-3ez`. Until it is closed, the answer is the one thing that does
+work: scan the sticker, or open its own link, and the app tells you what it
+points at.
 
 ---
 

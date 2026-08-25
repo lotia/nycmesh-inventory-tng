@@ -6,10 +6,10 @@ Offered in the pick-list
 Merged into
 Active
 Delete
+Revoked at
 Held by
 Code
 Item
 Location
 Quantity
-Revoked at
 What is happening
