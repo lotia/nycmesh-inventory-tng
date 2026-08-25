@@ -418,6 +418,22 @@ class ItemIdentifier(models.Model):
                 name="item_identifier_unique_normalised_value",
             ),
         ]
+        indexes = [
+            # A second index over the column the unique constraint already
+            # covers, and not redundant with it: this database is `en_US`
+            # rather than `C`, so the unique btree sorts by collation and a
+            # prefix is not a range in it. `text_pattern_ops` sorts by byte
+            # value, which is what makes one.
+            #
+            # Only a query written the way `identifiers.matching` writes it can
+            # reach this. That function says what the constraint on the caller
+            # is and why it is invisible when broken.
+            models.Index(
+                fields=["value_normalised"],
+                name="item_identifier_prefix",
+                opclasses=["text_pattern_ops"],
+            ),
+        ]
 
     def __str__(self) -> str:
         # Kind(self.kind).label rather than get_kind_display(): Django generates

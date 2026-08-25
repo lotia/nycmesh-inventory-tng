@@ -14,7 +14,7 @@ import pytest
 from django.apps import apps
 from django.db import IntegrityError, connection, transaction
 
-from inventory.identifiers import INVISIBLES, SPACES, normalised
+from inventory.identifiers import INVISIBLES, SPACES, matching, normalised
 from inventory.models import Item, ItemIdentifier
 
 pytestmark = pytest.mark.django_db
@@ -184,6 +184,72 @@ def test_the_stored_value_keeps_the_spelling_that_was_typed(item: Item) -> None:
 
     assert stored.value == typed
     assert stored.value_normalised == "tp-link sfp-rj45"
+
+
+# --------------------------------------------------------------------------
+# Decision 6. The index, and the lookup that can reach it.
+# --------------------------------------------------------------------------
+
+
+def test_the_prefix_search_does_not_wrap_the_column_in_a_function() -> None:
+    """The guard that stops `__istartswith` coming back.
+
+    Both spellings return the same rows, so only the compiled SQL can tell
+    them apart -- which is why `identifiers.matching` exists and why this
+    asserts over SQL rather than over results.
+    """
+    sql = str(ItemIdentifier.objects.filter(matching("LiteB")).query)
+
+    assert "LIKE" in sql.upper(), sql
+    assert "UPPER(" not in sql.upper(), sql
+
+
+def test_istartswith_is_still_the_thing_being_guarded_against() -> None:
+    """Pins the reason, not just the rule.
+
+    If Django ever stops compiling `__istartswith` to `UPPER(col) LIKE
+    UPPER(...)`, the guard above is defending against something that no longer
+    exists and decision 6 is worth re-reading. This is what says so.
+    """
+    sql = str(ItemIdentifier.objects.filter(value_normalised__istartswith="LiteB").query).upper()
+
+    assert "UPPER(" in sql, "the case decision 0026 measured has changed; re-read decision 6"
+
+
+def test_the_index_exists_over_the_column_with_byte_ordering() -> None:
+    """`text_pattern_ops`, which is what makes a prefix a range.
+
+    Read off the database rather than off `Meta.indexes`, because the model
+    saying so and the table having it are different claims and a migration is
+    what stands between them.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT indexdef FROM pg_indexes WHERE tablename = %s AND indexname = %s",
+            ["inventory_itemidentifier", "item_identifier_prefix"],
+        )
+        found = cursor.fetchone()
+
+    assert found is not None, "the prefix index is not on the table"
+    assert "value_normalised text_pattern_ops" in found[0]
+
+
+def test_the_unique_index_alone_cannot_serve_a_prefix_query(item: Item) -> None:
+    """Why a second index over the same column is not redundant.
+
+    With sequential scans off the planner must reach for an index, and the one
+    it can use is this one. Had the unique index been able to serve a prefix
+    query, the model would not need to declare another.
+    """
+    for spelling in ("LiteBeam", "Litebeam 5AC", "Omni DC", "Mast straight"):
+        alias(item, spelling)
+
+    with connection.cursor() as cursor:
+        cursor.execute("SET LOCAL enable_seqscan TO off")
+        plan = ItemIdentifier.objects.filter(matching("liteb")).explain()
+
+    assert "item_identifier_prefix" in plan, plan
+    assert "item_identifier_unique_normalised_value" not in plan
 
 
 # The two character sets, pinned as codepoints.
