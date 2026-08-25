@@ -85,6 +85,23 @@ describe("the item list", () => {
     expect(screen.getByRole("heading", { name: "Cat6 Outdoor" })).toBeInTheDocument();
   });
 
+  it("draws the item's name and never the identifier that matched it", async () => {
+    // Decision 0026 rule 5: search identifiers, display items. The row is
+    // stubbed with an extra field on purpose -- the API carries no such field
+    // today, and the moment somebody annotates the matched value so the list
+    // can say why a row appeared, this is the test that fails rather than a
+    // pulldown offering one product under three spellings.
+    //
+    // A whitelist of fields would not catch it, because the field that leaks
+    // is the one nobody has added yet. So this asserts over the rendered text.
+    const matched = { ...zipTies, matched_on: "zip ties reuseable" };
+    serving(matched as unknown as Item);
+    show();
+
+    expect(await screen.findByRole("heading", { name: "Zip Ties Reusable" })).toBeInTheDocument();
+    expect(screen.queryByText(/zip ties reuseable/i)).not.toBeInTheDocument();
+  });
+
   it("says so when a search matches nothing, rather than showing an empty page", async () => {
     serving(zipTies);
     show();
