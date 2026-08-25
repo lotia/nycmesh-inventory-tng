@@ -24,7 +24,13 @@ if [[ ${#paths[@]} -eq 0 ]]; then
   # The application's own source, and not its tests: a test that changes
   # something changes it in a database nobody is watching, which is the whole
   # of what this rule is about.
-  mapfile -t paths < <(git ls-files 'backend/src/inventory/*.py' 'backend/src/inventory/**/*.py' | grep -v '/tests/')
+  #
+  # A module written and not yet committed counts, and the enumeration flags
+  # that arrange it are check-docs.sh's, argued there rather than twice.
+  mapfile -t paths < <(
+    git ls-files --cached --others --exclude-standard \
+      'backend/src/inventory/*.py' 'backend/src/inventory/**/*.py' | grep -v '/tests/'
+  )
 fi
 
 relay \

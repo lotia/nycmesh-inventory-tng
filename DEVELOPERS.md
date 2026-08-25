@@ -1030,7 +1030,9 @@ workflows, the chart's templates, and the application's own docstrings and
 comments. Those are documentation of how this repository works, and a docstring
 is the easiest place of all to re-derive a decision record.
 
-The corpus is every tracked file less the ones whose prose nobody here writes:
+The corpus is every file in your checkout that git will admit to — committed or
+not, so long as `.gitignore` does not cover it — less the ones whose prose
+nobody here writes:
 images, fonts, a compiled module, a spreadsheet, the two lock files a resolver
 produces, and `.beads/` entire — the tracker's exports are data, its five git
 hooks are generated and repeat a banner between themselves, and its `README.md`

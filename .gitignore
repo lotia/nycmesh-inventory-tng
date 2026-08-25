@@ -16,6 +16,15 @@ coverage/
 .coverage
 htmlcov/
 
+# Tool caches. Each of these writes a `.gitignore` of its own holding `*`, so
+# git already leaves them alone -- but the checkers' corpus is now everything
+# git can see rather than everything committed, which makes that habit of
+# somebody else's load-bearing. 1300-odd cache files arriving in
+# `scripts/check-docs.sh`'s corpus would quadruple its run and feed it blobs.
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
 # Playwright: traces and failure screenshots. Browser binaries live outside
 # the repository, in the shared Playwright cache.
 test-results/

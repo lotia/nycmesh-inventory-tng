@@ -14,9 +14,9 @@ CHECK="$HERE/check-docs.sh"
 . "$HERE/testlib.sh"
 workspace
 
-# No commits are made here -- check-docs.sh reads `git ls-files`, so staging is
-# enough -- and it finds the repository from the working directory, so it can be
-# run where it lives.
+# No commits are made here -- writing a file is enough to be read -- and the
+# checker finds the repository from the working directory, so it can be run
+# where it lives.
 scene() {
   new_repo "$WORK/repo"
   mkdir -p "$WORK/repo/scripts"
@@ -26,8 +26,9 @@ scene() {
 PASSAGE="The ledger is append-only, so a row that is wrong stands until somebody
 works out what happened and writes a compensating one against it."
 
-# What is written has to be staged first: check-docs.sh reads `git ls-files`,
-# which is also why no case here ever commits.
+# Most cases stage anyway, so that the two enumerations the corpus is built
+# from are both exercised rather than only the untracked one. The block at the
+# foot of this file is the half that stages nothing.
 staged_check() {
   git -C "$WORK/repo" add -A >/dev/null 2>&1
   (cd "$WORK/repo" && "$CHECK" "$@")
@@ -347,5 +348,39 @@ printf '# One\n\n%s\n' "$PASSAGE" > one.md
 mkdir -p .beads
 printf '# %s\n' "$PASSAGE" > .beads/README.md
 expect 0 "No prose repeated" "and neither is the tracker's own directory"
+
+# --- the corpus is the checkout, not the index ----------------------------
+#
+# inventory-tng-hoc6. Every case above stages before it looks, which is what the
+# enumeration used to need. A page written and not yet added was invisible, so
+# an author ran this, saw green, committed, and watched CI fail on the file they
+# had just checked. These stage nothing at all.
+unstaged_check() {
+  (cd "$WORK/repo" && "$CHECK" "$@")
+}
+check unstaged_check
+
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+printf '# Two\n\n%s\n' "$PASSAGE" > two.md
+expect 1 "say the same thing" "a file written and never added is read"
+
+# The shape the bug actually took: the new page is the second copy, and the
+# first has been in the repository for months.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+git add -A >/dev/null 2>&1
+git commit -qm one >/dev/null 2>&1
+printf '# Two\n\n%s\n' "$PASSAGE" > two.md
+expect 1 "two.md" "a new page is weighed against what is already committed"
+
+# And .gitignore still decides, so a build directory somebody's tooling left
+# behind is not suddenly prose.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+printf 'build/\n' > .gitignore
+mkdir -p build
+printf '# Built\n\n%s\n' "$PASSAGE" > build/one.md
+expect 0 "No prose repeated" "a file .gitignore covers is not read"
 
 verdict

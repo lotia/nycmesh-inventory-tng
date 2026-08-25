@@ -26,8 +26,8 @@ scene() {
   cd "$WORK/repo" || exit 1
 }
 
-# What is written has to be staged first: the corpus comes from `git ls-files`,
-# which is also why no case here ever commits.
+# Most cases stage anyway, so the tracked half of the corpus is exercised as
+# well as the untracked one. The block at the foot of this file stages nothing.
 staged_check() {
   git -C "$WORK/repo" add -A >/dev/null 2>&1
   (cd "$WORK/repo" && scripts/check-telemetry.sh "$@")
@@ -373,5 +373,38 @@ cat > "$SRC/view.py" <<'PY'
 class ThingView(APIView:
 PY
 expect 2 "nothing was checked" "a reader that could not read says so instead of passing"
+
+# --- the corpus is the checkout, not the index ----------------------------
+#
+# inventory-tng-hoc6, and check-docs.sh carries the argument. The two checkers
+# enumerate the same way, so they go stale the same way, and this is the case
+# that would notice one of them being put back.
+unstaged_check() {
+  (cd "$WORK/repo" && scripts/check-telemetry.sh "$@")
+}
+check unstaged_check
+
+scene
+cat > "$SRC/view.py" <<'PY'
+from rest_framework.views import APIView
+
+
+class ThingView(APIView):
+    def post(self, request):
+        return None
+PY
+expect 1 "changes something and says nothing" "a module written and never added is read"
+
+scene
+cat > "$SRC/view.py" <<'PY'
+from rest_framework.views import APIView
+
+
+class ThingView(APIView):
+    def post(self, request):
+        return None
+PY
+printf '%s/view.py\n' "$SRC" > .gitignore
+expect 0 "says so" "a module .gitignore covers is not read"
 
 verdict
