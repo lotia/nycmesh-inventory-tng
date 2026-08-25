@@ -9,11 +9,12 @@
  */
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { page } from "../api/testFixtures";
+import { answering, page } from "../api/testFixtures";
 import { ItemList } from "../items/ItemList";
 import { cable, zipTies } from "../items/testFixtures";
 import {
   ADMINISTRATOR,
+  pickOption,
   renderScreen,
   STALE_ADMINISTRATOR,
   stubSession,
@@ -25,9 +26,6 @@ import { StaleSession } from "./StepUp";
 
 /** The groupings an item can be added to. See CreateItem. */
 const CATEGORIES = [{ id: 7, name: "Cable and connectors", parent: null }];
-
-/** An answer of this shape, which is what every stub below hands back. */
-const answering = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
 /**
  * The catalogue, the groupings, and whatever a write should answer with.
@@ -68,10 +66,7 @@ async function newItemNamed(named: string): Promise<HTMLElement> {
   fireEvent.change(within(dialog).getByRole("textbox", { name: /^name$/i }), {
     target: { value: named },
   });
-  fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: /category/i }));
-  // The option list is portalled out of the dialog, so it is found on the
-  // screen rather than within it.
-  fireEvent.click(await screen.findByRole("option", { name: CATEGORIES[0].name }));
+  await pickOption(within(dialog), /category/i, CATEGORIES[0].name);
   return dialog;
 }
 
@@ -269,8 +264,7 @@ describe("adding an item to the catalogue", () => {
     await screen.findByRole("heading", { name: "Zip Ties Reusable" });
 
     const dialog = await newItemNamed("Cat6 Outdoor");
-    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: /counted in/i }));
-    fireEvent.click(await screen.findByRole("option", { name: "Metre" }));
+    await pickOption(within(dialog), /counted in/i, "Metre");
     fireEvent.click(within(dialog).getByRole("button", { name: /^add$/i }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());

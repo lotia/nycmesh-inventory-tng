@@ -7,7 +7,7 @@
  * would pass for the wrong reason. Rendering through this makes the session
  * something a test states rather than something it omits.
  */
-import { render } from "@testing-library/react";
+import { fireEvent, render, screen, type within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { expect, vi } from "vitest";
 import { SessionProvider } from "./admin/SessionProvider";
@@ -121,6 +121,29 @@ export function theWrite(method?: string): Write {
   const made = writes(method);
   expect(made).toHaveLength(1);
   return made[0];
+}
+
+/**
+ * Answer a MUI select: open it, then take one of what it offers.
+ *
+ * TWO THINGS THAT LOOK LIKE STYLE AND ARE NOT. It opens on `mouseDown` rather
+ * than on a click, which is what MUI listens for. And the option list is
+ * PORTALLED out of whatever the select is inside, so it is found on `screen`
+ * even when the select was found `within` a dialog -- a copy that narrows the
+ * second lookup fails with a "not found" that says nothing about why.
+ *
+ * Both of those were written down once and relied on twenty-two times before
+ * this existed, which is `inventory-tng-cf7u.1`.
+ */
+export async function pickOption(
+  // Either `screen` or a `within(...)`, which are two types answering the same
+  // query: whichever of them found the select is the one that should find it.
+  where: Pick<ReturnType<typeof within>, "getByRole"> | typeof screen,
+  select: RegExp | string,
+  option: RegExp | string,
+): Promise<void> {
+  fireEvent.mouseDown(where.getByRole("combobox", { name: select }));
+  fireEvent.click(await screen.findByRole("option", { name: option }));
 }
 
 export function renderScreen(ui: ReactNode) {

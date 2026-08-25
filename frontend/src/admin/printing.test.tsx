@@ -10,12 +10,13 @@
  */
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { page } from "../api/testFixtures";
+import { answering, page } from "../api/testFixtures";
 import type { Item, MappedLabel } from "../api/types";
 import { ItemList } from "../items/ItemList";
 import { cable, zipTies } from "../items/testFixtures";
 import {
   ADMINISTRATOR,
+  pickOption,
   renderScreen,
   STALE_ADMINISTRATOR,
   stubSession,
@@ -51,8 +52,6 @@ const WALL: MappedLabel = {
   item_name: null,
   unit_of_measure: null,
 };
-
-const answering = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
 /**
  * The catalogue, the live map, and whatever a mint should answer with.
@@ -220,8 +219,7 @@ describe("making the stickers in the first place", () => {
   it("mints one row per sticker and ticks what it made", async () => {
     warehouse(ADMINISTRATOR);
     const dialog = await printing();
-    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: /^for$/i }));
-    fireEvent.click(await screen.findByRole("option", { name: zipTies.name }));
+    await pickOption(within(dialog), /^for$/i, zipTies.name);
     fireEvent.change(within(dialog).getByRole("textbox", { name: /how many stickers/i }), {
       target: { value: "2" },
     });
@@ -249,8 +247,7 @@ describe("making the stickers in the first place", () => {
 
     expect(within(dialog).getByRole("button", { name: /make them/i })).toBeDisabled();
 
-    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: /^for$/i }));
-    fireEvent.click(await screen.findByRole("option", { name: zipTies.name }));
+    await pickOption(within(dialog), /^for$/i, zipTies.name);
     fireEvent.change(within(dialog).getByRole("textbox", { name: /how many stickers/i }), {
       target: { value: "0" },
     });
@@ -267,8 +264,7 @@ describe("making the stickers in the first place", () => {
       ),
     );
     const dialog = await printing();
-    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: /^for$/i }));
-    fireEvent.click(await screen.findByRole("option", { name: zipTies.name }));
+    await pickOption(within(dialog), /^for$/i, zipTies.name);
     fireEvent.click(within(dialog).getByRole("button", { name: /make them/i }));
 
     expect(await screen.findByRole("link", { name: /sign in again/i })).toHaveAttribute(
@@ -288,8 +284,7 @@ describe("making the stickers in the first place", () => {
         : answering({ detail: "Too many submissions." }, 429);
     });
     const dialog = await printing();
-    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: /^for$/i }));
-    fireEvent.click(await screen.findByRole("option", { name: zipTies.name }));
+    await pickOption(within(dialog), /^for$/i, zipTies.name);
     fireEvent.change(within(dialog).getByRole("textbox", { name: /how many stickers/i }), {
       target: { value: "5" },
     });
@@ -307,8 +302,7 @@ describe("making the stickers in the first place", () => {
     // the answer; this is that holding.
     warehouse(ADMINISTRATOR, [PACKET, BOX], undefined, narrowing);
     const dialog = await printing();
-    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: /^for$/i }));
-    fireEvent.click(await screen.findByRole("option", { name: zipTies.name }));
+    await pickOption(within(dialog), /^for$/i, zipTies.name);
 
     fireEvent.change(within(dialog).getByRole("textbox", { name: /search items/i }), {
       target: { value: cable.name },

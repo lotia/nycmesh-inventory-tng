@@ -10,10 +10,11 @@
  */
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { page } from "../api/testFixtures";
+import { answering, page } from "../api/testFixtures";
 import type { Volunteer, VolunteerConflict } from "../api/types";
 import {
   ADMINISTRATOR,
+  pickOption,
   renderScreen,
   STALE_ADMINISTRATOR,
   stubSession,
@@ -31,8 +32,6 @@ const OTHER_SEAN: Volunteer = {
   email: "s.mcginnis@example.org",
   slack_id: "U024BE7LH",
 };
-
-const answering = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
 /**
  * The pick-list as it answers a search, plus whatever a write should say.
@@ -95,11 +94,9 @@ async function merging(): Promise<HTMLElement> {
   return screen.findByRole("dialog");
 }
 
-/** Answer one of the dialog's two ends. The option list is portalled out. */
-async function pick(dialog: HTMLElement, end: RegExp, who: Volunteer): Promise<void> {
-  fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: end }));
-  fireEvent.click(await screen.findByRole("option", { name: who.display_name }));
-}
+/** Answer one of the dialog's two ends, which is what the pair is about. */
+const pick = (dialog: HTMLElement, end: RegExp, who: Volunteer) =>
+  pickOption(within(dialog), end, who.display_name);
 
 const STOP = /stop offering this one/i;
 const KEEP = /keep this one/i;
