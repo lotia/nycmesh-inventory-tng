@@ -154,6 +154,12 @@ def test_nothing_but_the_two_volunteer_writes_is_open_to_a_volunteer() -> None:
         # a volunteer's browser could not handle. Argued against decision 0012
         # in that record, under "A third endpoint, and what made it arguable".
         ("ClientFailureView", "POST"),
+        # The fourth. It has to take no credential, because a device has
+        # nothing to present until it has enrolled -- and what it writes holds
+        # no person. The view says why the guard is the throttle rather than
+        # the signature, and `inventory_tng.devices` says what the credential
+        # is for and what it deliberately is not.
+        ("DeviceEnrolmentView", "POST"),
     }, "a write was opened to volunteers; argue it against decision 0012 before widening this"
 
 
@@ -198,6 +204,7 @@ def test_every_endpoint_asking_nothing_of_its_caller_is_one_the_record_argued() 
         "inventory.views.CurrentUserView": "says what the caller is, so demanding a session makes every load a failure",
         "inventory.views.ClientFailureView": "argued in decision 0012; the view's own docstring cites the passage",
         "inventory.views.DebugTraceVerifyView": "the signed token it is handed is the credential; see the view",
+        "inventory.views.DeviceEnrolmentView": "nothing to present until it enrols; the throttle is the guard",
         "drf_spectacular.views.SpectacularAPIView": "describes this surface rather than being part of it",
         "drf_spectacular.views.SpectacularSwaggerSplitView": "renders that same description for a person",
         "django.views.generic.base.RedirectView": "sends the admin's own login form to allauth's; see the route",

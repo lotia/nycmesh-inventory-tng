@@ -13,7 +13,7 @@ from typing import Any
 
 from corsheaders.defaults import default_headers
 
-from inventory_tng import database, debugging, forwarded, refusals
+from inventory_tng import database, debugging, devices, forwarded, refusals
 from inventory_tng.environment import Env
 from inventory_tng.hosts import allowed_hosts
 from inventory_tng.logs import from_environment
@@ -32,6 +32,9 @@ env = Env(
     APPEND_BURST_RATE=(str, "20/min"),
     APPEND_SUSTAINED_RATE=(str, "300/hour"),
     CLIENT_REPORT_RATE=(str, "30/min"),
+    # What constrains minting a device credential. `inventory_tng.devices`
+    # says why that is where the guard is.
+    DEVICE_ENROLMENT_RATE=(str, "10/hour"),
     NUM_PROXIES=(int, 2),
     TRUSTED_PROXIES=(list, []),
     # What a signed debug-tracing token is worth. `inventory_tng.debugging`
@@ -399,10 +402,15 @@ REST_FRAMEWORK = {
     # taken back -- so the two endpoints a volunteer needs name their own
     # permissions and everything else is reserved without anybody remembering.
     # See inventory/permissions.py.
+    # And a fourth that is not a direction of its own: a device somebody has
+    # revoked stops being answered. It refuses nobody who presents nothing --
+    # see inventory/permissions.py, DeviceNotRevoked -- so it is a default
+    # rather than a posture.
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
         "inventory.permissions.StaffWrites",
         "inventory.permissions.RecentlyAuthenticated",
+        "inventory.permissions.DeviceNotRevoked",
     ],
     # JSON only, in both directions, on every endpoint. A form encoding cannot
     # carry the shapes this API uses -- an array of objects on the batch
@@ -436,6 +444,9 @@ REST_FRAMEWORK = {
         "append-burst": env("APPEND_BURST_RATE"),
         "append-sustained": env("APPEND_SUSTAINED_RATE"),
         "report": env("CLIENT_REPORT_RATE"),
+        # A bucket of its own, so a room enrolling cannot spend what a
+        # volunteer's batch needs. See DeviceEnrolmentThrottle.
+        "device-enrolment": env("DEVICE_ENROLMENT_RATE"),
     },
 }
 
@@ -545,7 +556,13 @@ CORS_ALLOWED_ORIGINS: list[str] = env("CORS_ALLOWED_ORIGINS")
 # and was missed for the same one: the header a volunteer's browser carries to
 # have their request recorded is a header the preflight has to name, or the
 # only way to present a token is by hand with curl.
-CORS_ALLOW_HEADERS = (*default_headers, "traceparent", "tracestate", debugging.HEADER.lower())
+CORS_ALLOW_HEADERS = (
+    *default_headers,
+    "traceparent",
+    "tracestate",
+    debugging.HEADER.lower(),
+    devices.HEADER.lower(),
+)
 
 # Behind an ingress or proxy that terminates TLS.
 USE_X_FORWARDED_HOST = True

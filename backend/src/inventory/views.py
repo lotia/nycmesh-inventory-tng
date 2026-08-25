@@ -1,6 +1,7 @@
 from typing import Any, NamedTuple, cast
 
 import structlog
+from django.conf import settings
 from django.contrib.postgres.search import TrigramSimilarity
 from django.db import IntegrityError, connection
 from django.db.models import Prefetch, Q, QuerySet
@@ -24,6 +25,7 @@ from inventory import telemetry
 from inventory.labels import refusal_page, sheet
 from inventory.models import (
     Category,
+    Device,
     Item,
     Label,
     Location,
@@ -32,12 +34,19 @@ from inventory.models import (
     StockTransaction,
     Volunteer,
 )
-from inventory.permissions import VOLUNTEER_APPEND, is_administrator, recently_authenticated
+from inventory.permissions import (
+    DEVICE_STATES,
+    VOLUNTEER_APPEND,
+    is_administrator,
+    presented_device,
+    recently_authenticated,
+)
 from inventory.serializers import (
     BatchInconsistentSerializer,
     BatchRejectedSerializer,
     CategorySerializer,
     ClientFailureSerializer,
+    DeviceEnrolmentSerializer,
     ItemDetailSerializer,
     ItemSerializer,
     LabelMapSerializer,
@@ -50,8 +59,9 @@ from inventory.serializers import (
     VolunteerDetailSerializer,
     VolunteerSerializer,
 )
-from inventory.throttling import APPEND_THROTTLES, REPORT_THROTTLES
-from inventory_tng import debugging
+from inventory.throttling import APPEND_THROTTLES, DEVICE_ENROLMENT_THROTTLES, REPORT_THROTTLES
+from inventory_tng import debugging, devices
+from inventory_tng.forwarded import address_or_none, client_address
 
 # Named for the module, which is what puts `inventory.views` in the `logger`
 # column. Every record it writes is inside a request, so it carries that
@@ -83,6 +93,7 @@ ENDPOINTS = {
     "labels": "labels",
     "stock": "stock-transactions",
     "me": "me",
+    "devices": "devices",
     "schema": "schema",
     "docs": "docs",
 }
@@ -1476,6 +1487,65 @@ class DebugTraceVerifyView(APIView):
         return Response(status=status.HTTP_403_FORBIDDEN)
 
 
+class DeviceEnrolmentView(APIView):
+    """Mint the opaque name a device is told apart by, and cut off by.
+
+    THE FOURTH ENDPOINT THAT TAKES NO CREDENTIAL, and decision 0012's own
+    consequence asks that one of those be argued rather than added quietly.
+    The argument is that it has to take none: a device has nothing to present
+    until it has enrolled, and a credential that could only be obtained by
+    somebody already carrying one would admit nobody. It writes one row holding
+    no person, and what that row is for -- attribution, not admission -- is
+    `inventory_tng.devices`, which also says plainly what it does not buy.
+
+    SO THE GUARD IS THE THROTTLE, NOT THE SIGNATURE, and that is the sentence
+    to keep hold of when reading this. Fifty calls buy fifty buckets and every
+    signature checks out; `DEVICE_ENROLMENT_THROTTLES` is the thing standing in
+    the way, out of a bucket of its own, and `.env.sample` sizes it.
+
+    AND EVERY MINT RECORDS WHERE IT WAS ASKED FROM. Not preventable on a flat
+    network, and not meant to be: it is what turns "fifty devices appeared this
+    afternoon" from something nobody notices into one query and one bulk
+    revoke. `inventory_tng.forwarded.client_address` is the reading, so this
+    agrees with decision 0023 about whose address it is rather than trusting a
+    header nobody vouched for.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = DEVICE_ENROLMENT_THROTTLES
+
+    @extend_schema(
+        summary="Enrol this device and receive the token it carries",
+        request=None,
+        responses={201: DeviceEnrolmentSerializer},
+    )
+    def post(self, request: Request) -> Response:
+        identifier = devices.new_identifier()
+        # An address the deployment vouches for, or nothing. `client_address`
+        # answers with the peer when no proxy is trusted, which in a checkout
+        # is the loopback address and in a cluster is the ingress -- neither of
+        # which says anything about a caller. Stored anyway rather than
+        # second-guessed here: what makes it worth having is that two mints
+        # sharing one is visible, and that holds whichever of those it is.
+        #
+        # `address_or_none` and not the bare answer, because that answer is
+        # allowed to be a string a caller invented -- and this column is typed
+        # `inet`, so one that is not an address at all would be a 500 on a
+        # credential-free endpoint rather than a row.
+        Device.objects.create(
+            identifier=identifier,
+            enrolled_from=address_or_none(client_address(request.META, settings.TRUSTED_PROXIES)),
+        )
+        # The identifier and never the token. A token in a log is a credential
+        # in a log, and `redaction` is what keeps this one to a surrogate.
+        log.info("device enrolled", device=identifier)
+        telemetry.DEVICES_ENROLLED.add(1)
+        return Response(
+            {"token": devices.mint(identifier), "device": identifier},
+            status=status.HTTP_201_CREATED,
+        )
+
+
 class CurrentUserView(APIView):
     """Who the caller is, and what this server will let them do.
 
@@ -1509,6 +1579,20 @@ class CurrentUserView(APIView):
                 # it is why the interface can offer to re-authenticate rather
                 # than hide a control the person is entitled to.
                 "recently_authenticated": serializers.BooleanField(),
+                # What this server makes of the device token the request
+                # carried, in one word. A 403 cannot say "this device was
+                # removed" as against "not you", and the two want opposite
+                # screens -- a button that enrols again, or a wall. This
+                # answers before anything has been refused, which is why the
+                # endpoint saying it is one a revoked device is still served.
+                #
+                # NOTHING READS IT YET, and that is stated rather than left to
+                # be discovered: the app carries the header and does not act on
+                # either `revoked` or `unknown`. `inventory-tng-wpf2` is that
+                # work. The field ships first because the alternative is a
+                # client change that cannot be written until the server one has
+                # landed.
+                "device": serializers.ChoiceField(choices=DEVICE_STATES),
                 "capabilities": inline_serializer(
                     name="Capabilities",
                     # One field instance per entry, for the reason spelled out
@@ -1526,6 +1610,7 @@ class CurrentUserView(APIView):
                 "username": user.get_username() if user.is_authenticated else None,
                 "administrator": is_administrator(user),
                 "recently_authenticated": recently_authenticated(request),
+                "device": presented_device(request)[0],
                 "capabilities": {
                     name: all(self._permitted(request, operation) for operation in operations)
                     for name, operations in CAPABILITIES.items()

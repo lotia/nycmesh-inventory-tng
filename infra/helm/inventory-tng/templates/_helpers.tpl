@@ -150,6 +150,8 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
   value: {{ .Values.django.appendSustainedRate | quote }}
 - name: CLIENT_REPORT_RATE
   value: {{ .Values.django.clientReportRate | quote }}
+- name: DEVICE_ENROLMENT_RATE
+  value: {{ .Values.django.deviceEnrolmentRate | quote }}
 - name: REAUTHENTICATION_TIMEOUT_SECONDS
   value: {{ .Values.django.reauthenticationTimeoutSeconds | quote }}
 - name: LABEL_BASE_URL

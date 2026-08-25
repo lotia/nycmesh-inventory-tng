@@ -14,6 +14,8 @@ from allauth.account.internal.flows.reauthentication import did_recently_authent
 from rest_framework.permissions import SAFE_METHODS, AllowAny, BasePermission, IsAuthenticated
 from rest_framework.request import Request
 
+from inventory_tng import devices
+
 if TYPE_CHECKING:
     from django.http import HttpRequest
 
@@ -56,6 +58,109 @@ class StaffWrites(BasePermission):
         return request.method in SAFE_METHODS or is_administrator(request.user)
 
 
+#: This request carries no device token at all, which is the ordinary case and
+#: is never a refusal. Attribution is offered, not demanded --
+#: `inventory_tng.devices` says why.
+NO_DEVICE = "none"
+#: A token this deployment honours, and a row that is still live.
+DEVICE_ENROLLED = "enrolled"
+#: A token that verifies against a row somebody has cut off. The one state that
+#: refuses, and it wants a screen of its own rather than a wall.
+DEVICE_REVOKED = "revoked"
+#: A token that does not verify, or verifies to a row that is not there any
+#: more. Told apart from `NO_DEVICE` so a client can throw away what it is
+#: holding and enrol again instead of presenting a dead string for ever.
+DEVICE_UNKNOWN = "unknown"
+
+DEVICE_STATES = (NO_DEVICE, DEVICE_ENROLLED, DEVICE_REVOKED, DEVICE_UNKNOWN)
+
+
+def presented_device(request: Request | HttpRequest) -> tuple[str, str]:
+    """This request's device, as a state and the identifier it was carried under.
+
+    TWO QUESTIONS, AND BOTH ARE ASKED EVERY TIME. The signature, which
+    `inventory_tng.devices` checks and which is what stops a token being
+    invented; and then the row, which is what `Device.revoked_at` acts on. The
+    second is not an optimisation to be skipped later on the grounds that the
+    first already proved something -- skipping it removes revocation entirely
+    and fails no assertion about a token, which is why the test that holds this
+    revokes a device and asks for the next request rather than inspecting what
+    it is carrying.
+
+    The identifier comes back even for a revoked or unknown device, because it
+    is what the log line and the metric are worth anything for: "this device
+    was refused" is only useful if it says which.
+
+    MEMOISED on the underlying request, exactly as `recently_authenticated`
+    below is and for the reason given there -- `CurrentUserView` runs the whole
+    permission list once per capability it reports, and this would otherwise be
+    one identical select per capability for a request that carries a token.
+    Stashed on the Django request, because the capability probe wraps the DRF
+    one per operation and they all share the one underneath.
+
+    The model is imported here rather than at the top of the file, for the
+    reason this module's header gives about how early Django reads it.
+    """
+    from inventory.models import Device
+
+    underneath: Any = getattr(request, "_request", request)
+    answered = getattr(underneath, "_presented_device", None)
+    if answered is not None:
+        return answered
+
+    carried = request.headers.get(devices.HEADER, "").strip()
+    identifier = devices.presented_on(request)
+    if not identifier:
+        # Nothing at all is the ordinary case. A string that will not verify is
+        # `DEVICE_UNKNOWN`, so a client holding something this server has
+        # stopped honouring -- a key rotated away from, a mangled copy -- is
+        # told to throw it away rather than presenting it for ever.
+        answered = (DEVICE_UNKNOWN, "") if carried else (NO_DEVICE, "")
+    else:
+        # `order_by()` because `Meta.ordering` would otherwise sort a
+        # unique-index lookup of one row.
+        row = Device.objects.filter(identifier=identifier).order_by().only("revoked_at").first()
+        if row is None:
+            answered = (DEVICE_UNKNOWN, identifier)
+        elif row.revoked_at is not None:
+            answered = (DEVICE_REVOKED, identifier)
+        else:
+            answered = (DEVICE_ENROLLED, identifier)
+
+    underneath._presented_device = answered
+    return answered
+
+
+class DeviceNotRevoked(BasePermission):
+    """A device somebody has cut off stops being answered, on its next request.
+
+    This is the whole of what revocation buys, and it is deliberately the only
+    thing a device credential decides. Carrying no token is not a refusal --
+    the network does admission (`inventory-tng-2jzx`) and this is attribution
+    -- so the state that refuses is `DEVICE_REVOKED` and nothing else.
+
+    ITS OWN REASON ON THE WIRE. "You may not" and "this device was removed"
+    are the same status code and want opposite screens: the first is a wall
+    and the second is a button that enrols again. `code` is what carries that
+    distinction through DRF, and a client reading it does not have to match on
+    prose.
+
+    THE SURFACES THAT STILL ANSWER A REVOKED DEVICE are the ones that name
+    `AllowAny` for themselves -- the index, the two probes, `/api/me`, the
+    failure report and the debug-trace check. That is deliberate rather than
+    an oversight: `/api/me` is how a client finds out it has been cut off, and
+    refusing the endpoint that says so would leave it guessing from a 403 on
+    something else. None of them writes anything a device could be blamed for.
+    """
+
+    message = "This device has been removed. Enrol again to carry on."
+    code = "device_revoked"
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        state, _ = presented_device(request)
+        return state != DEVICE_REVOKED
+
+
 # The two endpoints decision 0012 point 3 opens to a volunteer, and the only
 # things in this API that may be written without the staff flag. Named once so
 # that they are one list rather than two identical literals, so that what these
@@ -63,7 +168,11 @@ class StaffWrites(BasePermission):
 # decision 0014 point 5 below -- and so that a test can assert nothing else is
 # on it. What stands in for the credential they do not ask for is the rate
 # limiting in inventory/throttling.py.
-VOLUNTEER_APPEND = [IsAuthenticated]
+#
+# `DeviceNotRevoked` rides along for the reason it is on the project default
+# too: these two are the writes, so they are the last place a device somebody
+# has cut off should go on being answered.
+VOLUNTEER_APPEND = [IsAuthenticated, DeviceNotRevoked]
 
 
 def recently_authenticated(request: Request | HttpRequest) -> bool:

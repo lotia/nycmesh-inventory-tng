@@ -87,3 +87,11 @@ CLIENT_FAILURES = counter(
 # Management commands, which run unattended and so are the one thing here
 # nobody watches. `command` names it and `outcome` says whether it finished.
 COMMAND_RUNS = counter("inventory.command_runs", "Management command runs, by command and outcome.")
+
+# Devices asking to be told apart. Counted because it is the shape that says
+# something rather than any one of them: a browser mints once and keeps what
+# it is given, so this is flat in ordinary use and a step in it is somebody
+# minting on purpose. No attribute at all -- the identifier and the address it
+# came from would each turn every device into a series of its own, and both
+# are on the record the endpoint writes instead.
+DEVICES_ENROLLED = counter("inventory.devices_enrolled", "Devices that asked to be told apart from the rest.")

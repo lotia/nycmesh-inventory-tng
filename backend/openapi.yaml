@@ -269,6 +269,44 @@ paths:
           description: No response body
         '403':
           description: No response body
+  /api/devices:
+    post:
+      operationId: devices_create
+      description: |-
+        Mint the opaque name a device is told apart by, and cut off by.
+
+        THE FOURTH ENDPOINT THAT TAKES NO CREDENTIAL, and decision 0012's own
+        consequence asks that one of those be argued rather than added quietly.
+        The argument is that it has to take none: a device has nothing to present
+        until it has enrolled, and a credential that could only be obtained by
+        somebody already carrying one would admit nobody. It writes one row holding
+        no person, and what that row is for -- attribution, not admission -- is
+        `inventory_tng.devices`, which also says plainly what it does not buy.
+
+        SO THE GUARD IS THE THROTTLE, NOT THE SIGNATURE, and that is the sentence
+        to keep hold of when reading this. Fifty calls buy fifty buckets and every
+        signature checks out; `DEVICE_ENROLMENT_THROTTLES` is the thing standing in
+        the way, out of a bucket of its own, and `.env.sample` sizes it.
+
+        AND EVERY MINT RECORDS WHERE IT WAS ASKED FROM. Not preventable on a flat
+        network, and not meant to be: it is what turns "fifty devices appeared this
+        afternoon" from something nobody notices into one query and one bulk
+        revoke. `inventory_tng.forwarded.client_address` is the reading, so this
+        agrees with decision 0023 about whose address it is rather than trusting a
+        header nobody vouched for.
+      summary: Enrol this device and receive the token it carries
+      tags:
+      - devices
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceEnrolment'
+          description: ''
   /api/healthz:
     get:
       operationId: healthz_retrieve
@@ -1293,6 +1331,9 @@ components:
         me:
           type: string
           format: uri
+        devices:
+          type: string
+          format: uri
         schema:
           type: string
           format: uri
@@ -1301,6 +1342,7 @@ components:
           format: uri
       required:
       - categories
+      - devices
       - docs
       - health
       - items
@@ -1470,12 +1512,15 @@ components:
           type: boolean
         recently_authenticated:
           type: boolean
+        device:
+          $ref: '#/components/schemas/DeviceEnum'
         capabilities:
           $ref: '#/components/schemas/Capabilities'
       required:
       - administrator
       - authenticated
       - capabilities
+      - device
       - recently_authenticated
       - username
     Detail:
@@ -1503,10 +1548,48 @@ components:
           type: string
         code:
           type: string
-          description: '`forbidden`, or `reauthentication_required` when signing in
-            again is what fixes it.'
+          description: '`forbidden`; `reauthentication_required` when signing in again
+            is what fixes it; `device_revoked` when this browser''s own credential
+            has been withdrawn and enrolling again is.'
       required:
       - detail
+    DeviceEnrolment:
+      type: object
+      description: |-
+        What a device is handed once, and stores.
+
+        ``token`` is the whole credential: opaque, signed, and carried in the
+        ``X-Device`` header on every request afterwards. ``device`` is the name
+        inside it, handed back separately so that a person reporting a problem can
+        read it off their own device without unpicking a signature -- it is the
+        same string an administrator revokes by, and it identifies a browser rather
+        than anybody holding one.
+
+        There is no second chance at ``token``. Nothing stores it, so a device that
+        loses it enrols again and becomes a new row, which is what
+        ``Device.revoked_at``'s help text means by saying so.
+      properties:
+        token:
+          type: string
+          description: Send this back in the X-Device header. Keep it; it is not reissued.
+        device:
+          type: string
+          description: The opaque name inside the token, and what a revocation names.
+      required:
+      - device
+      - token
+    DeviceEnum:
+      enum:
+      - none
+      - enrolled
+      - revoked
+      - unknown
+      type: string
+      description: |-
+        * `none` - none
+        * `enrolled` - enrolled
+        * `revoked` - revoked
+        * `unknown` - unknown
     FieldEnum:
       enum:
       - email

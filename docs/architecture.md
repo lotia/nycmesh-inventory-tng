@@ -129,6 +129,23 @@ Static files are collected at image build time and served by
 is only for the Django admin's own CSS and JavaScript; application assets are
 the frontend's concern.
 
+## Telling one browser from another
+
+Volunteers do not sign in, so until now every request from a hub shared one
+identity: one address, one rate-limit bucket, and log records nothing could
+separate. `POST /api/devices` mints an opaque name a browser stores and sends
+back on every request afterwards, which gives each of them a bucket and a
+thread through the logs, and gives an administrator one row to set to stop
+honouring one of them.
+
+It is **attribution and not admission**, and the distinction is the whole of
+what may be claimed for it — the network is what keeps anybody out
+([decision 0012](decisions/0012-two-populations.md) is the population, and
+`inventory-tng-2jzx` is the posture). Carrying nothing is never a refusal;
+carrying a credential somebody has withdrawn is. What it does not buy, and
+why signing it stops it being invented but not being asked for, is in
+[`backend/src/inventory_tng/devices.py`](../backend/src/inventory_tng/devices.py).
+
 ## Frontend
 
 A static single-page application. There is no Node process in production — the

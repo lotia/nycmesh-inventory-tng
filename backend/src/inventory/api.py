@@ -20,11 +20,34 @@ from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
 from inventory import telemetry
-from inventory.permissions import RecentlyAuthenticated, administrators_only, open_to_anybody
+from inventory.permissions import DeviceNotRevoked, RecentlyAuthenticated, administrators_only, open_to_anybody
 from inventory.serializers import DetailSerializer, ThrottledSerializer
 from inventory.throttling import AppendThrottle
 
 log = structlog.get_logger("inventory.api")
+
+
+# Refusal codes this API adds to DRF's own, and the whole of what a client may
+# meet beyond `forbidden` and `reauthentication_required`. A permission class
+# names one on itself; this is what lets it through the flattening below, and
+# keeping the set closed here is what keeps `code` a field a client can branch
+# on rather than a string that varies with whichever class refused.
+NAMED_REFUSALS = frozenset({DeviceNotRevoked.code})
+
+
+def _named_code(exc: Exception) -> str:
+    """The code the refusing permission class named, or the general one.
+
+    Every class that names none gets DRF's `permission_denied`, which is DRF's
+    word and not this API's -- hence `forbidden` as the general answer, and
+    hence honouring a code only when it is one this API declared above.
+
+    `declared_code` and not the detail's own attribute, because that attribute
+    is not always there to be read; the helper says where it goes looking
+    instead.
+    """
+    named = declared_code(exc)
+    return named if named in NAMED_REFUSALS else "forbidden"
 
 
 def exception_handler(exc: Exception, context: Any) -> Response | None:
@@ -63,7 +86,7 @@ def exception_handler(exc: Exception, context: Any) -> Response | None:
         second_look = _needs_a_second_look(exc)
         response.data = {
             **response.data,
-            "code": "reauthentication_required" if second_look else "forbidden",
+            "code": "reauthentication_required" if second_look else _named_code(exc),
         }
         if second_look:
             # Recorded here rather than in the permission class that decided

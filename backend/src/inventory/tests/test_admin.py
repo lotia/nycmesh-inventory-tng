@@ -25,6 +25,7 @@ from simple_history.models import HistoricalChanges
 from inventory.models import (
     CODE_PATTERN,
     Category,
+    Device,
     Item,
     ItemIdentifier,
     Label,
@@ -86,6 +87,7 @@ def one_of_each_model(
     transaction = StockTransaction.objects.create(actor=volunteer, kind=StockTransaction.Kind.RECEIPT)
     return {
         Category: category,
+        Device: Device.objects.create(identifier="9f0c2b1e4d6a8c0e", enrolled_from="10.69.0.1"),
         Item: item,
         ItemIdentifier: ItemIdentifier.objects.create(
             item=item,

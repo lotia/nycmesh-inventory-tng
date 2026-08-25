@@ -256,6 +256,25 @@ blocked while you get round to it.
 
 ---
 
+## Stopping one phone
+
+Nobody signs in to use the app, so a browser tells the server which browser it
+is by carrying a name it was given the first time it loaded. You will never see
+that happen and neither will a volunteer: nothing is typed and no screen
+appears.
+
+What it buys you is one thing, and it is on the *Devices* page in `/admin/`.
+Each row is one browser, with the date it first appeared and the address it
+appeared from; filling in *Revoked at* on one stops the server answering that
+browser from its next request onwards, and the app then offers that person the
+same silent start again rather than a locked door.
+
+Reach for it when one phone is doing something odd — a stuck app repeating a
+submission, a device somebody has lost. It is not a way to stop a *person*
+doing anything: the same person on another browser is another row, and
+[the deployment guide](../docs/deployment.md#cutting-off-a-device) is where the
+larger levers are, including the one that clears every device at once.
+
 ## Reading a balance
 
 **A balance is never stored.** It is arithmetic over the movements: everything

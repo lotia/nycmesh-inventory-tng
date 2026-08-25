@@ -180,6 +180,7 @@ ingress's, which would otherwise forward a hostname nothing answers to.
 | `TELEMETRY_PERSONAL_DATA` | no | chart (`django.personalData`) | `redacted`, which is what every configuration here ships, or `recorded`. A value that is neither stops the process. [observability.md](observability.md#recording-personal-data-on-purpose) is what it admits and what admitting it obliges of wherever the telemetry lands |
 | `DEBUG_TRACE_LIFETIME_SECONDS` | no | chart (`django.debugTraceLifetimeSeconds`) | How long a token from `manage.py mint_debug_token` has one volunteer's requests recorded in full. Default `3600`. Rotating `DJANGO_SECRET_KEY` revokes every one that exists |
 | `DEBUG_TRACE_RATE` | no | chart (`django.debugTraceRate`) | What one such token may cost, as `<count>/<period>`. Default `60/min`, counted per process like the append rates. [observability.md](observability.md#recording-one-volunteers-requests) is what a token authorises and what it does not |
+| `DEVICE_ENROLMENT_RATE` | no | chart (`django.deviceEnrolmentRate`) | How often a browser may ask `POST /api/devices` for the credential it is told apart by, as `<count>/<period>`. Default `10/hour`. This number is the guard, and the signature on what it hands back is not — [`backend/src/inventory_tng/devices.py`](../backend/src/inventory_tng/devices.py) says why, and [Cutting off a device](#cutting-off-a-device) is what to do when one is abused |
 | `LABEL_BASE_URL` | no | chart (`django.labelBaseUrl`) | The origin encoded into every printed QR code. It is on the stickers, not in the database, so changing it does not change the labels already on the shelves: move the app and keep a permanent redirect from the old host rather than reprinting. It must stay within what QR alphanumeric mode can carry and short enough to print at the module size the generator insists on — both are refused loudly rather than printed, see [`.env.sample`](../.env.sample) |
 
 Every rate in that table is counted **per backend process**, because the
@@ -209,6 +210,34 @@ that path is guarded by.
 
 Nothing environment-specific is compiled into the JavaScript bundle either way,
 so one image tag is valid in every environment.
+
+### Cutting off a device
+
+A browser that has enrolled carries an opaque name in an `X-Device` header, and
+that name is what a rate limit counts against and what every log record of its
+requests is stamped with. What it is for and what it deliberately does not buy
+— it is attribution, never admission, and the network is what keeps anybody out
+— is in
+[`backend/src/inventory_tng/devices.py`](../backend/src/inventory_tng/devices.py).
+
+**One device** is stopped from `/admin/inventory/device/`: find the name, set
+*Revoked at*, and its next request is refused. Nothing else has to happen and no
+process has to restart. The refusal carries `device_revoked` rather than the
+general `forbidden`, so the app offers to enrol again instead of drawing a wall.
+
+**A burst of them** is what the *Enrolled from* column is for. Enrolment answers
+everybody — a browser has nothing to present until it has one — so fifty
+credentials asked for from one address in an afternoon is the shape of abuse
+this design has, and it is a filter and a bulk revoke rather than something
+nobody would notice.
+
+**All of them at once** is a rotation of `DJANGO_SECRET_KEY` with
+`DJANGO_SECRET_KEY_FALLBACKS` left unset. Every signature stops verifying, so
+every browser re-enrols on its next load, and it costs nothing but that. Which
+is also the trap in the other direction: an *ordinary* key rotation, done for
+hygiene, signs every device out unless the old key is put in
+`DJANGO_SECRET_KEY_FALLBACKS` for as long as the rotation takes. It signs out
+administrators too, for the same reason and by the same fix.
 
 ### Which addresses may speak for another
 

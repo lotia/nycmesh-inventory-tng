@@ -12,6 +12,7 @@ from inventory.views import (
     ClientFailureView,
     CurrentUserView,
     DebugTraceVerifyView,
+    DeviceEnrolmentView,
     HealthCheckView,
     ItemDetailView,
     ItemListView,
@@ -57,6 +58,11 @@ urlpatterns = [
     # backend-deployment.yaml for which probe asks which.
     path("api/livez", LivenessCheckView.as_view(), name="livez"),
     path("api/me", CurrentUserView.as_view(), name="me"),
+    # Where a browser asks to be told apart from the others. Credential-free
+    # because a device has nothing to present until it has enrolled; what
+    # stands in for that, and what the credential is and is not, is
+    # DeviceEnrolmentView and inventory_tng/devices.py.
+    path("api/devices", DeviceEnrolmentView.as_view(), name="devices"),
     # Where a browser reports what it could not handle. Credential-free like
     # the ones beside it, and argued in decision 0012.
     path("api/client-failures", ClientFailureView.as_view(), name="client-failures"),
