@@ -10,11 +10,17 @@ The figure itself is pinned across every file that quotes it. Four of them do,
 and none of them can see the others, so a change made in one and forgotten in
 the rest is exactly what this catches -- the pattern is `test_debugging.py`'s,
 for the same reason.
+
+The last one is about reaching the database at all rather than about how long
+that may take: which database the development stack's own probe asks for, which
+is here because `compose.yaml` is already read above and the answer has to be
+the one the stack creates.
 """
 
 from typing import Any
 
 import pytest
+import yaml
 from django.conf import settings
 
 from inventory_tng.database import (
@@ -174,3 +180,28 @@ def test_the_floor_is_the_one_the_driver_imposes() -> None:
     """Named where the refusals are argued, and quoted to a deployer here."""
     assert MINIMUM_CONNECT_TIMEOUT_SECONDS == 2
     assert "anything under two stops the process" in (settings.REPO_ROOT / ".env.sample").read_text()
+
+
+def test_the_stack_probes_the_database_the_stack_creates() -> None:
+    """`pg_isready` with no `-d` asks for a database named after the user.
+
+    That database is never created here, so the probe connected, was refused,
+    and passed anyway -- a server that refuses a database is a server that is
+    accepting connections. The only evidence was a `FATAL` in the postgres log
+    every five seconds. Asserted against the two variables rather than against
+    the defaults, because it is the pairing that has to hold.
+    """
+    compose = yaml.safe_load((settings.REPO_ROOT / "compose.yaml").read_text())
+    postgres = compose["services"]["postgres"]
+    healthcheck = postgres["healthcheck"]["test"]
+    environment = postgres["environment"]
+
+    # Asserted rather than unpacked, so a probe that has become something else
+    # says so instead of raising on the shape.
+    assert healthcheck[0] == "CMD-SHELL", f"the probe is no longer one shell command: {healthcheck}"
+    probe = healthcheck[1]
+
+    # Quoted from the service's own environment rather than restated, so the
+    # probe and the cluster it is probing cannot be given different defaults.
+    assert f"-U {environment['POSTGRES_USER']}" in probe
+    assert f"-d {environment['POSTGRES_DB']}" in probe
