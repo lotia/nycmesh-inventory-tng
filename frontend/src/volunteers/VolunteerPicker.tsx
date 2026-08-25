@@ -17,6 +17,9 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useState } from "react";
+import { MergeVolunteers } from "../admin/MergeVolunteers";
+import { useCan } from "../admin/SessionProvider";
+import { VolunteerConflict as ConflictAlert } from "../admin/VolunteerConflict";
 import { type ApiError, apiPost, asApiError, refusalBody, searchPath } from "../api/client";
 import type { Page, Volunteer, VolunteerConflict } from "../api/types";
 import { useResource } from "../api/useResource";
@@ -61,8 +64,16 @@ export function VolunteerPicker() {
   const [name, setName] = useState("");
   const [failure, setFailure] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Drawn from the server's answer, never guessed: decision 0014 point 3.
+  const mayMerge = useCan("merge_volunteers");
+  const [merging, setMerging] = useState(false);
+  // Bumped when a merge lands, which is what asks the hook to search again --
+  // the duplicate is not in `selectable()` any more, so the list is now one
+  // person shorter and says so.
+  const [changed, setChanged] = useState(0);
   const { data, error, loading } = useResource<Page<Volunteer>>(
     searchPath("/api/volunteers", search),
+    changed,
   );
 
   const matches = data?.results ?? [];
@@ -173,17 +184,27 @@ export function VolunteerPicker() {
         </Stack>
       ) : null}
 
-      {conflict ? (
-        <Alert severity="warning">
-          <Typography variant="body2">{conflict.detail}</Typography>
-          {conflict.selectable ? (
-            <Button
-              size="small"
-              onClick={() => choose(conflict.volunteer)}
-            >{`Continue as ${conflict.volunteer.display_name}`}</Button>
-          ) : null}
-        </Alert>
+      {/* Two of these are the same person, said where the two are on screen.
+          Only once something has been typed, and only with something to
+          compare: an empty search is the collection's first page, so without
+          the first of those an administrator opening the app is offered a
+          merge over fifty people who have nothing to do with each other. The
+          Add block above carries the same gate for the same reason. */}
+      {mayMerge && typed !== "" && matches.length > 1 ? (
+        <Button size="small" onClick={() => setMerging(true)}>
+          Two of these are the same person
+        </Button>
       ) : null}
+
+      {merging ? (
+        <MergeVolunteers
+          candidates={matches}
+          onClose={() => setMerging(false)}
+          onMerged={() => setChanged((count) => count + 1)}
+        />
+      ) : null}
+
+      {conflict ? <ConflictAlert conflict={conflict} onContinueAs={choose} /> : null}
 
       {failure ? <Alert severity="error">{failure}</Alert> : null}
     </Stack>
