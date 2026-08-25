@@ -2,6 +2,12 @@
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
+import { sayIfMismatched } from "./scripts/preflight-node";
+
+// Every frontend command loads this file, so every one of them says which node
+// it is on when that is not the node mise.toml pins. The module says why it is
+// called from here rather than from an npm lifecycle script.
+sayIfMismatched(process.cwd(), process.versions.node);
 
 // The repository root, where the one .env this project has lives.
 const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -61,7 +67,11 @@ export default defineConfig(({ mode }) => ({
     // `capture/` is here for its own arithmetic and its own list of pictures,
     // both of which are ordinary units. The driver beside them is a Playwright
     // file and is named `.capture.ts` so that this glob leaves it alone.
-    include: ["src/**/*.test.{ts,tsx}", "capture/**/*.test.ts"],
+    //
+    // `scripts/` is the preflight `npm test` runs before itself. Node runs it
+    // as TypeScript directly, so it is annotated like everything else here and
+    // measured like everything else here.
+    include: ["src/**/*.test.{ts,tsx}", "capture/**/*.test.ts", "scripts/**/*.test.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
@@ -73,7 +83,7 @@ export default defineConfig(({ mode }) => ({
       // arithmetic behind a crop and the list the guides are checked against
       // are ordinary units, and leaving them out of this list was an exclusion
       // nothing recorded. What is genuinely out of reach is named below.
-      include: ["src/**/*.{ts,tsx}", "capture/**/*.ts"],
+      include: ["src/**/*.{ts,tsx}", "capture/**/*.ts", "scripts/**/*.ts"],
       exclude: [
         // Bootstrap: mounts React onto the DOM, no behaviour of its own.
         "src/main.tsx",
@@ -86,6 +96,7 @@ export default defineConfig(({ mode }) => ({
         // same reason as test-setup.ts, which its filename does not say.
         "src/testHarness.tsx",
         "capture/**/*.test.ts",
+        "scripts/**/*.test.ts",
         // The three files in capture/ that only a browser reaches. The driver
         // is a Playwright spec run by `npm run capture:guides`; `drive.ts` is
         // gestures against a live `Page`; `scene.ts` shells out to

@@ -371,6 +371,24 @@ All backend commands run from `backend/`, all frontend commands from `frontend/`
 
 `npm install` updates `package-lock.json`. **Commit it.**
 
+**Which node these run on is not always the one pinned**, and the symptom when
+it is not can be hundreds of failures at once with nothing in them naming a
+version. Every command in the table above therefore prints one line saying so
+before it does anything, and [`mise.toml`](mise.toml) asks mise to put this
+project's tools ahead of the machine's rather than behind them, which settles it
+for any shell that has activated mise.
+
+For a shell that has not, name the directory on the command:
+
+```bash
+env PATH="$(mise where node)/bin:$PATH" npm test
+```
+
+`mise exec -- npm test` looks like the answer and is not. It resolves the
+command it is given, then hands the child a `PATH` with the system's copy still
+in front — so npm, the script it runs, and every worker vitest spawns all look
+up `node` again and find the other one.
+
 ### Deployment chart
 
 | Task | Command |

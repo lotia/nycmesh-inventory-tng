@@ -2,6 +2,22 @@
 # `mise install` in the repo root installs all of it.
 # See DEVELOPERS.md for the full setup walkthrough.
 
+# Put this project's tools at the FRONT of PATH rather than after whatever the
+# machine already had. Without it mise appends, so a tool that also exists in
+# /usr/bin -- node is the only one of ours that does -- is resolved to the
+# system's copy by every child process: an npm script, a shell, vitest
+# spawning a worker. `mise exec -- node` was right and `mise exec -- sh -c
+# 'node --version'` was two major versions out, which is the shape that costs
+# an afternoon.
+#
+# A repository asserting a setting is worth being uneasy about, and this one is
+# narrow on purpose: it reorders the tools this file already pins ahead of the
+# system's, which is what pinning them was for. It changes nothing outside a
+# shell that has entered this directory. inventory-tng-s6w3 has the
+# measurements, including the two spellings of it that do not work.
+[settings]
+activate_aggressive = true
+
 [tools]
 python = "3.14"        # backend runtime
 uv = "latest"          # backend package manager
