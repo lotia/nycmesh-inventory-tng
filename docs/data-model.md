@@ -32,6 +32,9 @@ ledger is designed in
       job_reference?                    from_location? ──> Location
       occurred_at                       to_location?   ──> Location
 
+    Device (stands alone: no key to anything, and nothing keys to it)
+      identifier, enrolled_at, enrolled_from?, revoked_at?
+
 ## Entities
 
 ### Volunteer
@@ -240,6 +243,35 @@ bottleneck it can become a materialised view without any change to the ledger.
 
 An item is low on stock when its balance falls below `minimum_stock`. No extra
 schema is required for the low-stock alerting the volunteers have asked for.
+
+### Device
+
+One browser that has asked to be told apart from the others, and the only table
+here that is not part of the catalogue or the ledger. It holds no key to
+anything and nothing holds a key to it: **a device is not a person**, and
+attribution for what was moved stays on `StockTransaction.actor` whatever
+carried the request ([decision 0012](decisions/0012-two-populations.md) point
+5). What the credential is for and what it deliberately is not is in
+[`backend/src/inventory_tng/devices.py`](../backend/src/inventory_tng/devices.py);
+how one is cut off is
+[deployment](deployment.md#cutting-off-a-device).
+
+`identifier` is random and opaque and says nothing about anybody. `revoked_at`
+is what stops this application honouring the token, which is why the row is
+never deleted — removing it would leave the token indistinguishable from one
+this deployment never minted, and that is a state which refuses nothing.
+
+**`enrolled_from` is an address, and it is the one field on this page that
+could identify somebody.** It is here because minting answers everybody, so
+credentials asked for in bulk are the abuse this design has, and the column is
+what turns that from something nobody notices into one filter and one bulk
+revoke. It is worth being uneasy about: this system deliberately keeps a
+caller's address out of its logs entirely
+([observability](observability.md#what-telemetry-may-carry)), and this is a row
+that keeps one. Two things bound it — it is per browser rather than per
+request, so it is written once and never updated, and it is null wherever the
+value was not an address this deployment believes. Nothing prunes an old one
+yet; that is `inventory-tng-6g3w`.
 
 ## Units of measure
 

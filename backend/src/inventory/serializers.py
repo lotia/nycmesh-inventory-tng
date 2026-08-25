@@ -949,7 +949,10 @@ class DetailSerializer(serializers.Serializer):
     detail = serializers.CharField()
     code = serializers.CharField(
         required=False,
-        help_text="`forbidden`, or `reauthentication_required` when signing in again is what fixes it.",
+        help_text=(
+            "`forbidden`; `reauthentication_required` when signing in again is what fixes it; "
+            "`device_revoked` when this browser's own credential has been withdrawn and enrolling again is."
+        ),
     )
 
 
@@ -964,3 +967,22 @@ class ThrottledSerializer(serializers.Serializer):
     detail = serializers.CharField()
     code = serializers.CharField()
     retry_after_seconds = serializers.IntegerField()
+
+
+class DeviceEnrolmentSerializer(serializers.Serializer):
+    """What a device is handed once, and stores.
+
+    ``token`` is the whole credential: opaque, signed, and carried in the
+    ``X-Device`` header on every request afterwards. ``device`` is the name
+    inside it, handed back separately so that a person reporting a problem can
+    read it off their own device without unpicking a signature -- it is the
+    same string an administrator revokes by, and it identifies a browser rather
+    than anybody holding one.
+
+    There is no second chance at ``token``. Nothing stores it, so a device that
+    loses it enrols again and becomes a new row, which is what
+    ``Device.revoked_at``'s help text means by saying so.
+    """
+
+    token = serializers.CharField(help_text="Send this back in the X-Device header. Keep it; it is not reissued.")
+    device = serializers.CharField(help_text="The opaque name inside the token, and what a revocation names.")

@@ -4,6 +4,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import App from "./App";
+import { enrol } from "./device/credential";
 import { watch } from "./telemetry/errors";
 import { settle } from "./telemetry/flag";
 import { Recording } from "./telemetry/Recording";
@@ -25,6 +26,10 @@ watch();
 // is recording, and the badge subscribes to it. A boolean computed here was a
 // second answer to the same question, which is how it came to disagree.
 void start(settle());
+
+// Not awaited, for the reason `start` above is not: `device/credential.ts`
+// owns what this buys and why nothing may wait on it.
+void enrol();
 
 const container = document.getElementById("root");
 if (!container) {

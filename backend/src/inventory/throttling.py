@@ -15,6 +15,8 @@ from rest_framework.request import Request
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
+from inventory.permissions import DEVICE_ENROLLED, presented_device
+
 
 class AppendThrottle(UserRateThrottle):
     """A limit on appending, counted per client and never on a read.
@@ -32,6 +34,47 @@ class AppendThrottle(UserRateThrottle):
         if request.method in SAFE_METHODS:
             return True
         return super().allow_request(request, view)
+
+    def get_ident(self, request: Request) -> str:
+        """The device, where one is carried, and DRF's reading of the address otherwise.
+
+        WHAT IT IS FOR. A hub of volunteers behind one address shares one
+        allowance -- `inventory-tng-81f7.1` records it, and decision 0023
+        records the same shape for the reading of the header -- so one person's
+        batch can exhaust what the room needs. A device identifier is per
+        browser, so it separates them.
+
+        AND ALMOST NOTHING REACHES IT YET, which is worth knowing before
+        believing the paragraph above about a running deployment.
+        `UserRateThrottle` consults this only for a caller it found no account
+        for. Every endpoint but one asks for a session, so for those the bucket
+        is still the account and this is a precondition rather than a repair --
+        the way `TRUSTED_PROXIES` is one under decision 0023, and
+        `inventory-tng-gnhl` is what makes it reachable.
+
+        THE ONE is `ClientFailureView`, which names `AllowAny` and carries
+        `ReportThrottle` below. It reaches this and gets no benefit from it,
+        because `frontend/src/telemetry/report.ts` posts there with a bare
+        `fetch` rather than through `api/client.ts`, so no device header
+        arrives. `inventory-tng-wpf2` is the client half of that.
+
+        It is not a stronger bucket, only a narrower one, and that is worth
+        stating rather than leaving to be assumed: anybody may mint another
+        device, so this raises the cost of taking the whole room's allowance
+        rather than removing it. `.env.sample` bounds how fast that can be
+        done, on `DEVICE_ENROLMENT_RATE`, and `Device.enrolled_from` is what
+        makes a burst of it findable afterwards.
+
+        A revoked device deliberately falls back to the address rather than
+        keeping a bucket of its own. It is refused before it reaches a view
+        anyway -- `DeviceNotRevoked` -- and letting a cut-off device name its
+        own bucket would hand it a fresh allowance per identifier for the
+        refusals themselves.
+        """
+        state, identifier = presented_device(request)
+        if state == DEVICE_ENROLLED:
+            return f"device:{identifier}"
+        return str(super().get_ident(request))
 
 
 class AppendBurstThrottle(AppendThrottle):
@@ -70,3 +113,21 @@ class ReportThrottle(AppendThrottle):
 
 
 REPORT_THROTTLES = [ReportThrottle]
+
+
+class DeviceEnrolmentThrottle(UserRateThrottle):
+    """What constrains minting, which `inventory_tng.devices` argues is where
+    the guard is rather than in the signature.
+
+    A bucket of its own is the part that is this module's: sharing the append
+    allowance would let a room enrolling spend what a volunteer's batch needs,
+    which is the argument `ReportThrottle` above makes about its own traffic.
+
+    Not derived from `AppendThrottle`: that one exempts reads, and this
+    endpoint has none to exempt.
+    """
+
+    scope = "device-enrolment"
+
+
+DEVICE_ENROLMENT_THROTTLES = [DeviceEnrolmentThrottle]

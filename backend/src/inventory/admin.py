@@ -24,6 +24,7 @@ from inventory.models import (
     CODE_LENGTH,
     CODE_PATTERN,
     Category,
+    Device,
     Item,
     ItemIdentifier,
     Label,
@@ -345,3 +346,49 @@ class UnresolvedItemStringAdmin(StagedAdmin):
 
     list_display = ["value", "reason", "noted_at"]
     search_fields = ["value", "reason"]
+
+
+# ---------------------------------------------------------------------------
+# The devices this API tells apart. Not the catalogue and not the ledger: one
+# row per browser that asked to be distinguishable, holding no person.
+# `inventory_tng/devices.py` is what the credential is and what it is not.
+# ---------------------------------------------------------------------------
+
+
+@admin.register(Device)
+class DeviceAdmin(NeverDeletedAdmin):
+    """Where a device is cut off, and the one screen that can do it.
+
+    EDITING `revoked_at` IS THE WHOLE POINT of this page, so unlike the
+    read-only admins above this one is writable -- and it is the only field
+    worth writing. Everything else describes an enrolment that has already
+    happened.
+
+    NOT ADDABLE. A row created here would carry an identifier nobody holds a
+    token for, since `identifier` is written at enrolment and never editable.
+    It would be a row that can never match a request.
+
+    AND NOT DELETABLE, which matters more than it looks. Deleting a REVOKED row
+    un-revokes that device: `presented_device` reads the row to decide, and a
+    token whose row has gone is indistinguishable from one this deployment
+    never minted, which is a state that refuses nothing. So the row is the
+    revocation, and removing it is the one edit that quietly undoes the thing
+    this page exists for. Decision 0024 is the general argument; this is the
+    particular one.
+
+    `enrolled_from` IS A COLUMN AND A SEARCH, and deliberately not a filter.
+    Searching is the query the address was recorded for -- fifty devices from
+    one address in three minutes is a burst somebody closes by finding them
+    here. A `list_filter` on it would draw one sidebar link per distinct
+    address off a `SELECT DISTINCT` over the whole table, on every load of this
+    page, and this table gains a row per browser and loses none.
+    """
+
+    list_display = ["identifier", "enrolled_at", "enrolled_from", "revoked_at"]
+    list_filter = [("revoked_at", admin.EmptyFieldListFilter)]
+    search_fields = ["identifier", "enrolled_from"]
+    readonly_fields = ["identifier", "enrolled_at", "enrolled_from"]
+    date_hierarchy = "enrolled_at"
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False

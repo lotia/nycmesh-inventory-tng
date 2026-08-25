@@ -866,3 +866,68 @@ class StockBalance(models.Model):
 
     def __str__(self) -> str:
         return f"{self.quantity} x {self.item} at {self.location}"
+
+
+class Device(models.Model):
+    """The row behind one enrolled browser. `docs/data-model.md` places it.
+
+    A ROW RATHER THAN A BARE SIGNATURE, and this is the whole reason the model
+    exists. A signature on its own can only be withdrawn by rotating the key,
+    and rotating signs every device out at once. `revoked_at` is what makes
+    cutting off ONE device possible; what it costs to keep true, and the rule
+    that must not be optimised away, are on
+    `inventory.permissions.presented_device`.
+
+    IT HOLDS NO PERSON. `identifier` is random and opaque and there is no
+    column for whose phone this is. A device is not a volunteer: decision 0012
+    point 5 keeps attribution for what was moved on `StockTransaction.actor`,
+    whatever carried the request.
+
+    `enrolled_from` IS THE CHEAP THING WORTH NOT LEAVING OUT. Minting is open
+    to anybody, so fifty devices from one address in three minutes is the abuse
+    shape this design has -- and it is not preventable on a flat network. What
+    this column buys is that it is one query and one bulk revoke instead of
+    something nobody notices. It is an address rather than a person, and it is
+    the only column here that could be either, which is why it is nullable: a
+    deployment whose proxies are not configured records nothing rather than
+    recording a proxy's address as though it meant something.
+    """
+
+    identifier = models.CharField(
+        max_length=64,
+        unique=True,
+        editable=False,
+        help_text="The opaque name inside this device's token. Random, and says nothing about anybody.",
+    )
+    enrolled_at = models.DateTimeField(auto_now_add=True)
+    enrolled_from = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        editable=False,
+        help_text="Where the token was asked from, so a burst of them can be found and revoked together.",
+    )
+    revoked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Set to stop honouring this device's token. Enrolling again is a new row, not this one back.",
+    )
+
+    class Meta:
+        ordering = ["-enrolled_at", "pk"]
+        indexes = [
+            # What the request path asks, on every request that carries a
+            # token: this identifier, and is it revoked. `unique=True` already
+            # indexes the column; this one is here for the OTHER question --
+            # everything minted from one address, which is what makes the
+            # bulk revoke above a thing somebody can actually do.
+            models.Index(fields=["enrolled_from", "enrolled_at"], name="device_enrolled_from"),
+        ]
+
+    def __str__(self) -> str:
+        state = "revoked" if self.revoked_at is not None else "enrolled"
+        return f"Device {self.identifier[:8]} ({state})"
+
+    @property
+    def is_active(self) -> bool:
+        """Whether this application still honours this device's token."""
+        return self.revoked_at is None

@@ -49,6 +49,8 @@ from typing import Any
 import structlog
 from django.http import HttpRequest, HttpResponse
 
+from inventory_tng import devices
+
 log = structlog.get_logger("inventory.request")
 
 # What a request is called before anything has resolved it. A record written
@@ -112,3 +114,19 @@ class RequestContext:
         structlog.contextvars.bind_contextvars(route=resolved.route)
         if request.user.is_authenticated:
             structlog.contextvars.bind_contextvars(user=request.user.pk)
+        # And the device, where one was presented. This is the correlation a
+        # volunteer's requests have never had: nobody signs in, so without it
+        # everything from one hub behind one address is one undifferentiated
+        # stream. It is a surrogate exactly as `user` above is -- the row
+        # behind it holds no person, and `inventory_tng.devices` says why that
+        # is deliberate rather than incidental.
+        #
+        # THE SIGNATURE AND NOT THE ROW, on purpose. What belongs on every
+        # record is which token was PRESENTED, including on the records of a
+        # request that was then refused for carrying a revoked one -- the
+        # status on the request record is what says which happened. Whether it
+        # is still honoured needs a table, and `presented_on` says why this
+        # module cannot reach one.
+        presented = devices.presented_on(request)
+        if presented:
+            structlog.contextvars.bind_contextvars(device=presented)

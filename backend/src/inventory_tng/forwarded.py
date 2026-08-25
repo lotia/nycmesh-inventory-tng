@@ -129,3 +129,20 @@ def client_address(meta: Mapping[str, str], proxies: Sequence[Network]) -> str:
     # Every entry was one of ours, or there were none: the peer is the nearest
     # thing to a caller this request has.
     return peer
+
+
+def address_or_none(candidate: str) -> str | None:
+    """`candidate` if it is an address at all, and nothing if it is not.
+
+    `client_address` deliberately hands back an entry it does not trust WITHOUT
+    checking that the entry is an address -- `trusted` says why that is the
+    right answer for the question it is asked. A caller storing the result has
+    a second question, and it is this one: `X-Forwarded-For: not-an-address`
+    reaches a column typed `inet` otherwise, and the request is a 500 rather
+    than whatever it was.
+    """
+    try:
+        ip_address(candidate.strip())
+    except ValueError:
+        return None
+    return candidate.strip()

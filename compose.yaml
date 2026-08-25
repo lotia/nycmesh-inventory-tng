@@ -125,6 +125,7 @@ services:
       APPEND_BURST_RATE: ${APPEND_BURST_RATE:-20/min}
       APPEND_SUSTAINED_RATE: ${APPEND_SUSTAINED_RATE:-300/hour}
       CLIENT_REPORT_RATE: ${CLIENT_REPORT_RATE:-30/min}
+      DEVICE_ENROLMENT_RATE: ${DEVICE_ENROLMENT_RATE:-10/hour}
       LABEL_BASE_URL: ${LABEL_BASE_URL:-https://inventory.nycmesh.net}
       DATABASE_URL: postgres://${POSTGRES_USER:-inventory}:${POSTGRES_PASSWORD:-inventory}@postgres:5432/${POSTGRES_DB:-inventory_tng}
       # How long a request waits on a database that is not answering. Here for

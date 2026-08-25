@@ -7,6 +7,7 @@
  * environment would compile an environment into the bundle and break that.
  */
 
+import { HEADER as DEVICE_HEADER, held } from "../device/credential";
 import { HEADER, asked as tracing } from "../telemetry/flag";
 import { failed } from "../telemetry/report";
 import { csrfToken } from "./csrf";
@@ -81,10 +82,17 @@ async function parse(response: Response): Promise<unknown> {
 /**
  * The headers this request carries beyond the caller's own.
  *
- * One header, and only while an administrator has asked for this device to be
- * recorded: the signed token from `telemetry/flag.ts`. The backend records a
- * request carrying it in full whatever its sampling rate says, so a volunteer
- * meeting a failure produces the trace that explains it.
+ * Two, and neither is a credential this API asks for. The signed token from
+ * `telemetry/flag.ts` rides along only while an administrator has asked for
+ * this device to be recorded, and the backend then records the request in full
+ * whatever its sampling rate says. The one from `device/credential.ts` rides
+ * on every request there is one for, and says which browser is asking so that
+ * a rate limit and a log line can tell two of them apart.
+ *
+ * The device header is read and never asked for. `main.tsx` mints one once,
+ * without awaiting it, so a cold start sends its first requests without the
+ * header rather than holding them -- which is what every request did before
+ * this existed.
  */
 function asked(init: RequestInit): RequestInit {
   // NORMALISED RATHER THAN SPREAD. `HeadersInit` is three shapes -- a plain
@@ -104,13 +112,19 @@ function asked(init: RequestInit): RequestInit {
   // the object was empty. What the two callers actually share is the token,
   // and `flag.asked` already is that.
   const token = tracing();
-  if (token === null) {
-    // The ordinary request, on every phone that was never handed a link:
-    // handed back untouched, whatever shape its headers were in.
+  const device = held();
+  if (token === null && device === null) {
+    // The ordinary request on a browser that has neither: handed back
+    // untouched, whatever shape its headers were in.
     return init;
   }
   const headers = new Headers(init.headers);
-  headers.set(HEADER, token);
+  if (token !== null) {
+    headers.set(HEADER, token);
+  }
+  if (device !== null) {
+    headers.set(DEVICE_HEADER, device);
+  }
   return { ...init, headers };
 }
 

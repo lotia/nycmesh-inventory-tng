@@ -176,6 +176,13 @@ ALLOWED_LOG_KEYS = frozenset(
         "request_id",
         "method",
         "route",
+        # The browser a request came from, where it presented a token saying
+        # so. A surrogate in the same sense `user` is, and it is admitted on
+        # the same argument: the row behind it carries no name, no address of
+        # a person and no account. What it buys is that a volunteer's requests
+        # can be followed at all, since nobody signs in --
+        # `inventory_tng.devices` states the ceiling on that.
+        "device",
         "status",
         "user",
         # Attached by libraries through `extra=`. `status_code` is Django's on
