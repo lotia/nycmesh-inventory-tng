@@ -101,32 +101,39 @@ has moved on.
 
 ### About the Delete button
 
-There is a **Delete** button on this page, and on an item, a location and a
-label. **Do not use it.** Use **Merged into** and **Active** instead: those are
-how a record is taken out of use, and deleting is not the same thing.
+There is a **Delete** button on this page, and on a location and a label. **Do
+not use it.** Use **Merged into** and **Active** instead: those are how a
+record is taken out of use, and deleting is not the same thing.
 
-An item or a location that a sticker points at now refuses to be deleted, which
-is a guard rather than a permission. Those codes are printed on stickers
-already on shelves, a code cannot be worked out again, and scanning one whose
-row had gone would find nothing, for ever.
+**An item has no such button at all**, and nothing in the item list's menu
+offers one either. An item leaves the catalogue by having **Active** cleared,
+which is on the same form you are already looking at, and that is now the only
+way out.
 
-An item refuses for two more reasons, both added since. It refuses while it has
-any identifier — a barcode, a legacy NYCM code, or one of the informal names
-the import recorded — because a barcode is printed on the object as surely as a
-code is on a sticker, and because a string freed by a delete can be typed
-against a different item afterwards, which leaves the label on the shelf
-answering with the wrong thing rather than with nothing. And it refuses while
-any purchase price is recorded against it, which is a series meant to stay
-readable and has no object out in the world to notice its going.
+That is the end of an argument rather than a new rule. Every reference to an
+item is a guard: a sticker, an identifier, a recorded price, a movement. The
+button therefore refused for any item that had been catalogued, printed,
+priced or moved — which the import made nearly all of them — and went through
+without comment for the one case left, a row created a minute earlier by
+mistake. A button that will not tell you which of those it is about to do is
+worse on this page than on any other, because this is the page you are on when
+the app has already refused you something.
 
-**In practice that means almost no item can be deleted, and that is the
-intention rather than a side effect.** The import wrote an identifier for every
-catalogued name, so **Active** is how an item leaves the catalogue.
+Why each of those references is a guard is worth knowing, because it is the
+same reasoning that stops a location going. A code is printed on a sticker
+already on a shelf, cannot be worked out again, and scanning one whose row had
+gone would find nothing, for ever. A barcode is printed on the object as surely
+as a code is on a sticker — and a string freed by a delete can be typed against
+a different item afterwards, which leaves the sticker on the shelf answering
+with the wrong thing rather than with nothing. A purchase price is a series
+meant to stay readable, with no object out in the world to notice its going.
 
-Deleting a label is still offered and still works, though the app itself has
-no way to do it: `inventory-tng-ls6d`.
+A location a sticker points at refuses to be deleted for the first of those,
+and the refusal is a guard rather than a permission. Deleting a label is still
+offered and still works, though the app itself has no way to do it:
+`inventory-tng-ls6d`.
 
-**And what the refusal says varies.** Where a sticker is the only thing in the
+**And what a refusal says varies.** Where a sticker is the only thing in the
 way, the page names the label codes it is protecting. Where the row has also
 moved stock, Django reports it as a permissions problem about "stock movement"
 instead and shows no code at all — the row is still safe either way, but the

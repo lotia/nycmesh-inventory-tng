@@ -15,6 +15,7 @@ from typing import Any
 
 from django import forms
 from django.contrib import admin
+from django.contrib.admin import ActionLocation  # ty: ignore[unresolved-import]  # stub predates it; see below
 from django.http import HttpRequest
 from simple_history.admin import SimpleHistoryAdmin
 
@@ -41,6 +42,37 @@ class ItemIdentifierInline(admin.TabularInline):
     extra = 1
     # Written by the database, so it is shown but never edited.
     readonly_fields = ["value_normalised"]
+
+
+class NeverDeletedAdmin(admin.ModelAdmin):
+    """Both routes to a delete, closed together. Each user says why for itself.
+
+    There are two, and closing one is the mistake that leaves this looking
+    done. ``has_delete_permission`` is what the change form and the
+    confirmation page read; ``delete_selected`` is an action, offered in two
+    places since Django 6.1 -- the changelist's menu and the change form's.
+    Django does filter the action by this same permission, but that is Django's
+    arrangement rather than a promise this module made, and the loss if it ever
+    changes lands hardest on the ledger below.
+    """
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    # Two suppressions here and two of the same pair in `tests/test_admin.py`.
+    # django-stubs still describes Django 6.0's admin, which had neither
+    # `ActionLocation` nor the parameter naming it, so `ty` reports as errors
+    # what Django deprecation-warns for omitting. Spelled out rather than
+    # swallowed by `**kwargs`, because Django decides whether an override is
+    # current by reading its signature for that name.
+    def get_actions(
+        self,
+        request: HttpRequest,
+        action_location: ActionLocation = ActionLocation.CHANGE_LIST,
+    ) -> dict[str, Any]:
+        actions = super().get_actions(request, action_location)  # ty: ignore[too-many-positional-arguments]
+        actions.pop("delete_selected", None)
+        return actions
 
 
 @admin.register(Category)
@@ -73,8 +105,20 @@ class LocationAdmin(SimpleHistoryAdmin):
 
 
 @admin.register(Item)
-class ItemAdmin(SimpleHistoryAdmin):
-    """``sheet_flag`` is listed and filterable for the reason ``VolunteerAdmin`` gives."""
+class ItemAdmin(NeverDeletedAdmin, SimpleHistoryAdmin):
+    """``sheet_flag`` is listed and filterable for the reason ``VolunteerAdmin`` gives.
+
+    And no Delete, which is the half worth explaining. Every reference to an
+    item is PROTECT -- a sticker, an identifier, a recorded price, a movement
+    -- so the button refused for anything catalogued, printed, priced or moved,
+    and went quietly through for a row somebody had created a minute earlier by
+    mistake. A control whose effect cannot be read off it, on the one page an
+    administrator reaches for when the app will not do something, is worse than
+    no control. ``active`` is how an item leaves the catalogue and it is
+    already on this form; ``guides/administrator.md`` says so to the person
+    using it, and ``docs/decisions/0024-no-hard-delete.md`` says what this does
+    and does not settle for the models around it.
+    """
 
     list_display = ["name", "category", "unit_of_measure", "minimum_stock", "active", "sheet_flag"]
     list_filter = ["category", "unit_of_measure", "active", ("sheet_flag", admin.EmptyFieldListFilter)]
@@ -205,13 +249,10 @@ class LabelAdmin(SimpleHistoryAdmin):
 # ---------------------------------------------------------------------------
 
 
-class AppendOnlyAdmin(admin.ModelAdmin):
+class AppendOnlyAdmin(NeverDeletedAdmin):
     """Rows may be added and read here, never changed or removed."""
 
     def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
-        return False
-
-    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         return False
 
 
@@ -262,16 +303,13 @@ class StockMovementAdmin(AppendOnlyAdmin):
 # ---------------------------------------------------------------------------
 
 
-class StagedAdmin(admin.ModelAdmin):
+class StagedAdmin(NeverDeletedAdmin):
     """Rows arrive from the workbook and are read here, never written."""
 
     def has_add_permission(self, request: HttpRequest) -> bool:
         return False
 
     def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
-        return False
-
-    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         return False
 
 

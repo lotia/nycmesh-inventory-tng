@@ -14,6 +14,7 @@ from decimal import Decimal
 import pytest
 from django.apps import apps
 from django.contrib import admin
+from django.contrib.admin import ActionLocation  # ty: ignore[unresolved-import]  # see inventory/admin.py
 from django.contrib.auth.models import User
 from django.db import models
 from django.http import HttpRequest
@@ -162,7 +163,7 @@ def test_every_registered_model_has_a_row_to_render_its_pages_with(
 
 
 @pytest.mark.usefixtures("_static_files_are_not_collected")
-def test_the_admin_refuses_to_delete_a_row_a_sticker_names(editor: Client, item: Item) -> None:
+def test_the_admin_refuses_to_delete_a_row_a_sticker_names(editor: Client, warehouse: Location) -> None:
     """THE ONLY SURFACE ON WHICH inventory-tng-6pr IS OBSERVABLE.
 
     The API exposes no DELETE at all, so an administrator's confirmation page
@@ -170,10 +171,16 @@ def test_the_admin_refuses_to_delete_a_row_a_sticker_names(editor: Client, item:
     from the ORM says nothing about what that page does with it. This is how
     the guard got in with a claim about the page that turned out to be false
     for half the cases; see the second assertion.
-    """
-    Label.objects.create(code="PR0TECT001", item=item)
 
-    page = editor.get(reverse("admin:inventory_item_delete", args=[item.pk]))
+    Driven through a location rather than through an item, since
+    inventory-tng-k2sg took the item's confirmation page away and left nothing
+    there to observe. The claim is unchanged: a shelf carries stickers too.
+    What an item's own references do to a delete is `test_models.py`'s, where
+    it always was.
+    """
+    Label.objects.create(code="PR0TECT001", location=warehouse, quantity=None)
+
+    page = editor.get(reverse("admin:inventory_location_delete", args=[warehouse.pk]))
 
     assert page.status_code == 200
     body = page.content.decode()
@@ -196,48 +203,86 @@ def test_but_names_the_movement_rather_than_the_sticker_once_stock_has_moved(
     all. The row is still safe; the message is simply not the one that
     explains why, and an administrator reading it would not learn that a
     sticker is involved.
+
+    A location, for the reason the test above gives.
     """
-    Label.objects.create(code="PR0TECT002", item=item)
+    Label.objects.create(code="PR0TECT002", location=warehouse, quantity=None)
     moved = StockTransaction.objects.create(kind=StockTransaction.Kind.CHECKOUT, actor=volunteer)
     # One location, not two: a checkout has to take stock OUT of somewhere --
     # the `inventory_movement_matches_kind` trigger -- and nothing needs a
-    # destination. What matters is only that the item has moved at all.
+    # destination. What matters is only that the location has been moved from.
     StockMovement.objects.create(transaction=moved, item=item, quantity=1, from_location=warehouse)
 
-    body = editor.get(reverse("admin:inventory_item_delete", args=[item.pk])).content.decode()
+    body = editor.get(reverse("admin:inventory_location_delete", args=[warehouse.pk])).content.decode()
 
     assert "stock movement" in body.lower()
     assert "PR0TECT002" not in body, "if this now names the label, the guide can say so again"
 
 
 @pytest.mark.usefixtures("_static_files_are_not_collected")
-def test_and_refuses_a_row_a_printed_code_or_a_recorded_price_names(editor: Client, item: Item) -> None:
-    """The same argument as two tests above, for inventory-tng-6kyb's two keys.
+def test_an_item_is_retired_rather_than_deleted_and_the_admin_offers_nothing_else(
+    editor: Client, administrator_request: HttpRequest, item: Item
+) -> None:
+    """inventory-tng-k2sg, on both of the two paths that reach a delete.
 
-    Held here and not only in `test_models.py` for the reason the first of
-    those gives: the confirmation page is the whole of how this guard is met,
-    and what the page says is a separate claim from what the ORM raises.
+    The confirmation page and the changelist's action menu are separate routes
+    to the same loss, and closing one is the mistake that leaves this looking
+    done. `guides/administrator.md` tells an administrator that an item leaves
+    the catalogue by going inactive; nothing else may contradict it.
 
-    Both of these are ordinary `SimpleHistoryAdmin`s rather than append-only
-    ones, so unlike the stock-movement case above the reference lands in
-    `protected` and is named. `guides/administrator.md` tells an administrator
-    that an item with an identifier or a price refuses; this is that sentence
-    being true.
+    A row with nothing pointing at it, deliberately. That is the case PROTECT
+    never covered -- an item catalogued a minute ago by mistake -- and so it is
+    the case that says this refusal is the admin's own rather than the
+    database's answering for it.
     """
-    ItemIdentifier.objects.create(item=item, kind=ItemIdentifier.Kind.BARCODE, value="0123456789012")
-    VendorOffer.objects.create(
-        item=item,
-        vendor=Vendor.objects.create(name="streakwave"),
-        observed_at=datetime.date(2026, 8, 18),
-    )
+    model_admin = admin.site.get_model_admin(Item)
+    delete_url = reverse("admin:inventory_item_delete", args=[item.pk])
 
-    page = editor.get(reverse("admin:inventory_item_delete", args=[item.pk]))
+    # Both arities: the action menu asks with no object and the confirmation
+    # page asks with one.
+    assert not model_admin.has_delete_permission(administrator_request)
+    assert not model_admin.has_delete_permission(administrator_request, item)
+    assert editor.get(delete_url).status_code == 403
+    # And the refusal comes before the delete, not after it.
+    assert editor.post(delete_url, {"post": "yes"}).status_code == 403
+    assert Item.objects.filter(pk=item.pk).exists()
 
-    assert page.status_code == 200
-    body = page.content.decode()
-    assert "0123456789012" in body, "the page does not say which printed code it is protecting"
-    assert "streakwave" in body.lower(), "the page does not say a recorded price is in the way"
-    assert 'name="post"' not in body, "the page still offers to go through with it"
+    # And the way out that remains is on the form the administrator is already
+    # looking at.
+    change = editor.get(reverse("admin:inventory_item_change", args=[item.pk]))
+    body = change.content.decode()
+    assert delete_url not in body, "the change form still links to a page that refuses"
+    assert 'name="active"' in body
+
+
+def test_an_admin_that_refuses_a_delete_does_not_offer_the_bulk_one(
+    administrator_request: HttpRequest,
+) -> None:
+    """The second route, held as a property rather than model by model.
+
+    Django does filter `delete_selected` by the delete permission, so this
+    passes for a `ModelAdmin` that only turned that permission off -- and that
+    is exactly why it is asserted rather than assumed. `NeverDeletedAdmin`
+    drops the action by name because the coupling is Django's arrangement and
+    not ours, and this is what would notice either half going away.
+
+    Read off the registry, so an admin added later is included without being
+    listed here.
+    """
+    registered = [(model, admin.site.get_model_admin(model)) for model in _models_needing_admin()]
+    refusing = [
+        (model, model_admin)
+        for model, model_admin in registered
+        if not model_admin.has_delete_permission(administrator_request)
+    ]
+
+    assert len(refusing) >= 6, "the admins that refuse a delete have gone missing, not the action"
+    for model, model_admin in refusing:
+        for where in ActionLocation:
+            offered = model_admin.get_actions(administrator_request, where)  # ty: ignore[too-many-positional-arguments]
+            assert "delete_selected" not in offered, (
+                f"{model.__name__} refuses a delete and still offers the bulk one on the {where.value.lower()}"
+            )
 
 
 @pytest.mark.usefixtures("_static_files_are_not_collected")
