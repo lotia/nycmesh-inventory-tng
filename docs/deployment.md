@@ -165,6 +165,7 @@ ingress's, which would otherwise forward a hostname nothing answers to.
 | `DJANGO_EXTRA_ALLOWED_HOSTS` | no | chart (the downward API), not a knob | The pod's own address, added to the list above. Not something to set by hand — the chart fills it because nobody can know it in advance, and [health checks](#health-checks) says what it is for |
 | `CORS_ALLOWED_ORIGINS` | no | chart (`django.corsAllowedOrigins`) | Normally empty: nginx proxies Django's paths, so the browser sees one origin. Setting it grants cross-origin *reads* to an unauthenticated client and nothing more — the session cookie is not sent cross-origin and writes have no trusted-origin list, so it does not make a frontend on a second hostname work |
 | `NUM_PROXIES` | no | chart (`django.numProxies`) | Proxies between the browser and Django; the default `2` matches the deployed chain of ingress then the frontend's nginx. It decides whose request a rate limit counts against, so it must match reality — see [`.env.sample`](../.env.sample) for which direction is dangerous |
+| `TRUSTED_PROXIES` | no | chart (`django.trustedProxies`) | *Which* addresses those proxies are, comma-separated, each an address or a CIDR block. Empty by default, which believes no forwarded header at all — [Which addresses may speak for another](#which-addresses-may-speak-for-another) is what to put in it |
 | `APPEND_BURST_RATE` | no | chart (`django.appendBurstRate`) | How fast one client may append. What each rate is for, and why the defaults are what they are, is in [`.env.sample`](../.env.sample) |
 | `APPEND_SUSTAINED_RATE` | no | chart (`django.appendSustainedRate`) | The same limit over an hour, for a flood paced to stay under the burst rate |
 | `REAUTHENTICATION_TIMEOUT_SECONDS` | no | chart (`django.reauthenticationTimeoutSeconds`) | How long a sign-in counts as recent enough to make an administrative change; after it, the API answers those writes with `reauthentication_required` and the app offers the sign-in form again. Default `900`. Why there is a second prompt inside a valid session at all is [decision 0014](decisions/0014-one-interface.md) point 5 |
@@ -208,6 +209,33 @@ that path is guarded by.
 
 Nothing environment-specific is compiled into the JavaScript bundle either way,
 so one image tag is valid in every environment.
+
+### Which addresses may speak for another
+
+`django.trustedProxies` is the one value here that no default can be right
+about, because it describes this cluster and nothing else. It is the list of
+addresses a request may arrive *from* and still have its `X-Forwarded-For`
+believed — the ingress, and the frontend's nginx, and nothing besides.
+
+```yaml
+django:
+  trustedProxies: "10.42.0.0/16, 10.43.7.9"
+```
+
+Each entry is an address or a CIDR block. Blocks are there because an ingress
+pod's address is assigned rather than chosen; `kubectl get pods -o wide` in the
+ingress controller's namespace is where to read the range the cluster draws
+from. List every hop rather than only the outermost: the reading discards its
+own proxies from the right of the header and keeps the first entry it did not
+put there, so an unlisted hop stops the walk at the proxy instead of at the
+caller.
+
+**Read the note on it in [`.env.sample`](../.env.sample) before you set it**, as
+the `NUM_PROXIES` row above asks you to: this is the value in the table whose
+two directions are least alike, and the chart ships the safe one. Why it is a
+list of addresses rather than a count of hops, and what `NUM_PROXIES` goes on
+doing beside it, are in
+[decision 0023](decisions/0023-which-addresses-may-speak-for-another.md).
 
 ## Secrets
 

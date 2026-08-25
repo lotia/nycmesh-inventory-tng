@@ -82,6 +82,11 @@ django:
   # nginx. This decides whose request a rate limit counts against, so it must
   # match the real chain; see docs/deployment.md.
   numProxies: 2
+  # WHICH addresses those proxies are, rather than how many there are: the
+  # cluster's own, comma-separated, each an address or a CIDR block. Empty here
+  # because no two clusters share one, and empty is the safe direction -- see
+  # docs/deployment.md, which says which way this is dangerous to get wrong.
+  trustedProxies: ""
   # How fast one client may append to the ledger or the volunteer list, which
   # take no credential. Counted per backend process; see docs/deployment.md.
   appendBurstRate: "20/min"
