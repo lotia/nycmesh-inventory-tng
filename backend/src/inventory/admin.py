@@ -39,8 +39,19 @@ from inventory.staging import StagedCatalogueRow, StagedSubmissionRow, Unresolve
 
 
 class ItemIdentifierInline(admin.TabularInline):
+    """An item's identifiers, on the item's own form, added and corrected there.
+
+    ``can_delete`` is the third route to the loss ``ItemIdentifierAdmin``
+    argues against, and it is a separate switch from the two
+    ``NeverDeletedAdmin`` closes: an inline draws its own "Delete?" box and
+    reads this rather than the related admin's permission. Closing one and not
+    the other would leave the whole argument reachable from the page an
+    administrator is most often on.
+    """
+
     model = ItemIdentifier
     extra = 1
+    can_delete = False
     # Written by the database, so it is shown but never edited.
     readonly_fields = ["value_normalised"]
 
@@ -128,12 +139,48 @@ class ItemAdmin(NeverDeletedAdmin, SimpleHistoryAdmin):
 
 
 @admin.register(ItemIdentifier)
-class ItemIdentifierAdmin(SimpleHistoryAdmin):
+class ItemIdentifierAdmin(NeverDeletedAdmin, SimpleHistoryAdmin):
     """Editable on its own as well as inline on the item.
 
     An identifier that resolves to the wrong item is found by searching for the
     string somebody scanned, not by already knowing which item it was mistyped
     onto.
+
+    AND CORRECTED RATHER THAN REMOVED, which is inventory-tng-k50y and is this
+    model's own argument. ``item_identifier_unique_normalised_value`` makes the
+    normalised string unique across the whole table, which is what lets a scan
+    resolve to exactly one item. Deleting a row therefore FREES the string, and
+    a freed string can be created again against a different item -- at which
+    point the barcode printed on the object, or the sticker on the shelf that
+    resolves through it, goes on scanning and answers with the wrong item. That
+    is precisely the harm inventory-tng-6kyb made ``ItemIdentifier.item``
+    PROTECT to prevent, reachable from the screen instead of from the ORM, and
+    answering wrongly is worse than answering not at all.
+
+    THE WRINKLE THE ITEM'S ARGUMENT DID NOT HAVE, stated because it is the
+    reason this is not simply the same case again: an identifier typed against
+    the wrong item is a real mistake somebody has to be able to undo, and until
+    now deleting it was how. It is not the only how, and it was never the best
+    one. Every repair here is a CORRECTION to a field on this row and every one
+    of those fields is on this form:
+
+    * the string was typed against the wrong item -- change ``item``, which is
+      what the standalone page above exists for;
+    * the string itself was mistyped -- change ``value``, and the generated
+      column follows;
+    * the kind was wrong -- change ``kind``.
+
+    Correcting beats deleting on the merits rather than by policy: the string
+    stays owned throughout, so there is no window in which somebody else can
+    claim it, and ``django-simple-history`` keeps what it used to say. The one
+    thing a delete can express that a correction cannot is "this string should
+    now mean nothing at all", and that is the case that must not be possible,
+    because the barcode is still printed on the object.
+
+    NOT A SWEEP. Decision 0024 is explicit that each of these is one screen's
+    question; a volunteer, a category, a vendor and an offer keep their buttons
+    and are not argued here. ``guides/administrator.md`` is where an
+    administrator is told which move replaced which.
     """
 
     list_display = ["value", "kind", "item"]

@@ -293,6 +293,62 @@ def test_a_label_is_revoked_rather_than_deleted(editor: Client, administrator_re
     assert 'name="revoked_at_0"' in body
 
 
+@pytest.mark.usefixtures("_static_files_are_not_collected")
+def test_an_identifier_is_moved_rather_than_deleted(
+    editor: Client, administrator_request: HttpRequest, item: Item
+) -> None:
+    """inventory-tng-k50y, on all THREE routes rather than the usual two.
+
+    `ItemIdentifierAdmin` is the argument for the refusal and
+    `ItemIdentifierInline` is the argument for why the third route needs a
+    switch of its own. What is asserted here is only that the string cannot be
+    freed from any of the places an administrator meets it: the confirmation
+    page, the changelist's action menu, and the item's own form.
+    """
+    identifier = ItemIdentifier.objects.create(item=item, kind=ItemIdentifier.Kind.BARCODE, value="0123456789012")
+    model_admin = admin.site.get_model_admin(ItemIdentifier)
+    delete_url = reverse("admin:inventory_itemidentifier_delete", args=[identifier.pk])
+
+    assert not model_admin.has_delete_permission(administrator_request)
+    assert not model_admin.has_delete_permission(administrator_request, identifier)
+    assert editor.get(delete_url).status_code == 403
+    assert editor.post(delete_url, {"post": "yes"}).status_code == 403
+    assert ItemIdentifier.objects.filter(pk=identifier.pk).exists()
+
+    # The third route: the inline on the item, which is a different switch.
+    inline = next(one for one in admin.site.get_model_admin(Item).inlines if one.model is ItemIdentifier)
+    assert not inline.can_delete, "the inline still offers to remove one from the item's own form"
+
+    # And every repair that remains is a field on the identifier's own form.
+    body = editor.get(reverse("admin:inventory_itemidentifier_change", args=[identifier.pk])).content.decode()
+    assert delete_url not in body, "the change form still links to a page that refuses"
+    for editable in ("item", "value", "kind"):
+        assert f'name="{editable}"' in body, f"{editable} is the correction that replaced the delete"
+
+
+@pytest.mark.usefixtures("_static_files_are_not_collected")
+def test_an_item_form_offers_no_way_to_free_an_identifier(editor: Client, item: Item) -> None:
+    """The inline as it is rendered, rather than as it is configured.
+
+    The assertion above reads `can_delete` off the class, which is the setting;
+    this reads the page, which is what an administrator actually meets. Django
+    names the box `<prefix>-0-DELETE`, so its absence is the claim.
+
+    And both halves of what the inline is FOR, because `can_delete` is a
+    separate switch from `has_add_permission` and turning off the wrong one
+    would leave the item's form able to remove identifiers and not to add them.
+    With `extra = 1` and one saved row, form 0 is that row and form 1 is the
+    blank one an addition is typed into.
+    """
+    ItemIdentifier.objects.create(item=item, kind=ItemIdentifier.Kind.ALIAS, value="litebeam")
+
+    body = editor.get(reverse("admin:inventory_item_change", args=[item.pk])).content.decode()
+
+    assert "identifiers-0-DELETE" not in body, "the item's form still offers to remove an identifier"
+    assert "identifiers-0-value" in body, "the identifier is no longer correctable from the item"
+    assert "identifiers-1-value" in body, "the item's form no longer offers a row to add one in"
+
+
 def test_an_admin_that_refuses_a_delete_does_not_offer_the_bulk_one(
     administrator_request: HttpRequest,
 ) -> None:

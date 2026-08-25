@@ -70,13 +70,12 @@ is not asked again from the shape of the code.
 
 **That is narrower than "nothing here deletes anything", and the difference
 matters.** Django's admin still offers a Delete on a volunteer, a category, a
-vendor, an offer, an identifier and an unlabelled location, and for a row
-nothing refers to it goes through. Each of those is a question about one screen
-and is argued where it belongs — `inventory-tng-k50y` for an identifier, and
-`inventory-tng-k2sg` closed the item's while `inventory-tng-ls6d` closed the
-label's. This record is not a blanket over them and must not be cited as one.
-What it decides is that the answer to any of them is never "and here is the
-supported way to do it properly".
+vendor, an offer and an unlabelled location, and for a row nothing refers to it
+goes through. Each of those is a question about one screen and is argued where
+it belongs: `inventory-tng-k2sg` closed the item's, `inventory-tng-ls6d` the
+label's, and `inventory-tng-k50y` an identifier's. This record is not a blanket
+over any of them and must not be cited as one — what it decides is only that the
+answer is never "and here is the supported way to do it properly".
 
 **Retirement is the answer the application gives**, and a correction to the
 ledger is a compensating movement rather than an edit. Both are built and both
@@ -104,7 +103,8 @@ acceptable, and the test refuses one without a reason beside it.
 - **A legal-erasure requirement is still unanswered**, and the Context above
   says why it would not be answered from here anyway. Somebody has to open that
   question when it arrives; nothing in this repository will raise it.
-- **One of the buttons the Decision leaves standing is an open question**, and
-  it is not decided here: `inventory-tng-k50y`. `inventory-tng-ls6d` has since
-  been decided the other way, and the label's Delete is gone. This record was
-  unaffected by that, as it said it would be.
+- **The two buttons the Decision left standing as open questions have since
+  been decided the other way**, and both of the Deletes are gone:
+  `inventory-tng-ls6d` and `inventory-tng-k50y`. This record was unaffected by
+  either, as it said it would be — each was argued from its own model, and
+  neither was argued from here.
