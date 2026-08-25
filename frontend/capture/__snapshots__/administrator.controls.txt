@@ -12,5 +12,8 @@ Code
 Item
 Location
 Quantity
+Print labels
+Make them
+Print the sheet
 Revoke this label
 What is happening

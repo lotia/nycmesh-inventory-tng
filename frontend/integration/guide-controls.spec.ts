@@ -237,6 +237,16 @@ test("the app still offers every control the guides name", async ({ page }) => {
   await correcting.getByRole("button", { name: "Cancel" }).click();
   await expect(correcting).toBeHidden();
 
+  // And the sheet, which is the other surface only an administrator is drawn
+  // and which the guide names three controls on. Opened for the same reason
+  // the item dialog is: they are in the page only while it is.
+  await page.getByRole("button", { name: "Print labels" }).click();
+  const sheet = page.getByRole("dialog");
+  await expect(sheet).toBeVisible();
+  await harvest("app");
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await expect(sheet).toBeHidden();
+
   // ---- The administrator's half ----------------------------------------
 
   await page.setViewportSize(DESK);

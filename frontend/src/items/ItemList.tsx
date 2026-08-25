@@ -14,6 +14,7 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useCallback, useMemo, useState } from "react";
 import { CreateItem } from "../admin/CreateItem";
+import { PrintLabels } from "../admin/PrintLabels";
 import { useCan } from "../admin/SessionProvider";
 import { searchPath } from "../api/client";
 import type { Item, Page } from "../api/types";
@@ -28,6 +29,11 @@ export function ItemList() {
   // list rather than on a row: the item this makes is not one of them yet.
   const mayEdit = useCan("edit_catalogue");
   const [creating, setCreating] = useState(false);
+  // A sheet of stickers spans items and belongs to no row, so decision 0025
+  // places it here -- beside the collection it is about, opened from the one
+  // column and drawn over it.
+  const mayPrint = useCan("print_label");
+  const [printing, setPrinting] = useState(false);
   // Read on every keystroke, deliberately: the list is one page of a small
   // catalogue on a local network, and a debounce would put a delay between a
   // volunteer typing and the shelf they are standing at appearing.
@@ -60,15 +66,19 @@ export function ItemList() {
           every volunteer came for, and sharing its row would narrow it on the
           phone this screen is laid out for. Nothing is drawn here at all
           without the capability. */}
-      {mayEdit ? (
-        <Button
-          size="small"
-          variant="outlined"
-          sx={{ alignSelf: "flex-end" }}
-          onClick={() => setCreating(true)}
-        >
-          Add an item
-        </Button>
+      {mayEdit || mayPrint ? (
+        <Stack direction="row" spacing={1} sx={{ alignSelf: "flex-end" }}>
+          {mayEdit ? (
+            <Button size="small" variant="outlined" onClick={() => setCreating(true)}>
+              Add an item
+            </Button>
+          ) : null}
+          {mayPrint ? (
+            <Button size="small" variant="outlined" onClick={() => setPrinting(true)}>
+              Print labels
+            </Button>
+          ) : null}
+        </Stack>
       ) : null}
 
       {/* Height reserved whether or not it is loading, so the list does not
@@ -99,6 +109,8 @@ export function ItemList() {
       </List>
 
       {creating ? <CreateItem onClose={() => setCreating(false)} onCreated={reread} /> : null}
+
+      {printing ? <PrintLabels onClose={() => setPrinting(false)} /> : null}
     </Stack>
   );
 }

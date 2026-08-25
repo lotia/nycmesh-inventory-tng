@@ -197,11 +197,11 @@ Named here so the gaps are visible rather than surprising:
   outbox, visible until the ledger has it, and goes on its own once there is a
   connection — what that guarantees and what it does not is in
   `frontend/src/batch/outbox.ts`.
-- **The administrative interface.** The catalogue write API is built: items,
-  locations, categories and labels are created and edited through the API by
-  somebody holding the staff flag, and a caller without it is refused rather
-  than shown a control that will not work. Signing in is built too — see
-  below — so what is missing is the screens that use it. Who may write what is
+- **The administrative interface.** It is built. The catalogue write API is:
+  items, locations, categories and labels are created and edited through the
+  API by somebody holding the staff flag, and a caller without it is refused
+  rather than shown a control that will not work. Signing in is, and so are the
+  screens that use it. Who may write what is
   settled in [decision 0012](decisions/0012-two-populations.md) and where
   administrators work in [0014](decisions/0014-one-interface.md), and where a
   screen goes when it belongs to no row in
@@ -212,8 +212,14 @@ Named here so the gaps are visible rather than surprising:
   line that says what scanning it did, and duplicates are merged in the picker
   that showed two of them — including the act
   [0015](decisions/0015-merged-identifier-conflict.md)'s conflict names and
-  could not previously offer. `print_label` has no screen yet. Every API
-  endpoint but the ones
+  could not previously offer. Stickers are minted and laid out on a sheet from
+  the head of the item list, which is the one surface
+  [0025](decisions/0025-work-that-belongs-to-no-row.md) was written for. So
+  every capability `CAPABILITIES` names now has a screen, and what remains of
+  this bullet is the standing cost
+  [0014](decisions/0014-one-interface.md)'s last consequence names: a model
+  added tomorrow reaches the Django admin at once and this interface when
+  somebody builds it. Every API endpoint but the ones
   [DEVELOPERS.md](../DEVELOPERS.md#signing-in) lists still requires a session,
   including the two a volunteer needs.
 - **Migration from the existing Google Sheet** (52 items, 3,439 submissions).
