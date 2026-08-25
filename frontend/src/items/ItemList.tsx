@@ -6,12 +6,15 @@
  * docs/decisions/0011-qr-batch-scanning.md.
  */
 import Alert from "@mui/material/Alert";
+import Button from "@mui/material/Button";
 import LinearProgress from "@mui/material/LinearProgress";
 import List from "@mui/material/List";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useCallback, useMemo, useState } from "react";
+import { CreateItem } from "../admin/CreateItem";
+import { useCan } from "../admin/SessionProvider";
 import { searchPath } from "../api/client";
 import type { Item, Page } from "../api/types";
 import { useResource } from "../api/useResource";
@@ -21,6 +24,10 @@ import { ItemRow } from "./ItemRow";
 export function ItemList() {
   const { cart, dispatch } = useCart();
   const [search, setSearch] = useState("");
+  // The same gate as the Edit control on a row (decision 0014 point 3), on the
+  // list rather than on a row: the item this makes is not one of them yet.
+  const mayEdit = useCan("edit_catalogue");
+  const [creating, setCreating] = useState(false);
   // Read on every keystroke, deliberately: the list is one page of a small
   // catalogue on a local network, and a debounce would put a delay between a
   // volunteer typing and the shelf they are standing at appearing.
@@ -49,6 +56,21 @@ export function ItemList() {
         fullWidth
       />
 
+      {/* Under the search box rather than beside it: the box is the control
+          every volunteer came for, and sharing its row would narrow it on the
+          phone this screen is laid out for. Nothing is drawn here at all
+          without the capability. */}
+      {mayEdit ? (
+        <Button
+          size="small"
+          variant="outlined"
+          sx={{ alignSelf: "flex-end" }}
+          onClick={() => setCreating(true)}
+        >
+          Add an item
+        </Button>
+      ) : null}
+
       {/* Height reserved whether or not it is loading, so the list does not
           jump under a finger between keystrokes. */}
       <LinearProgress
@@ -75,6 +97,8 @@ export function ItemList() {
           />
         ))}
       </List>
+
+      {creating ? <CreateItem onClose={() => setCreating(false)} onCreated={reread} /> : null}
     </Stack>
   );
 }

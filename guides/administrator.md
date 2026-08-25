@@ -14,7 +14,10 @@ what to do, and where.
 Two places, and they are one system.
 
 - *The app itself*, for anything you are already looking at. An item row
-  carries an **Edit** button for you and for nobody else.
+  carries an **Edit** button for you and for nobody else, and the item list
+  carries **Add an item** above it. Adding one asks for a name and a category,
+  because an item has to be in one; the rest can be corrected afterwards from
+  the same **Edit**.
 - *Django's admin*, at `/admin/`, for everything else. Almost every kind of
   record this system stores has a page there. The one that does not is the one
   the last section is about: how much of an item is on a particular shelf.
