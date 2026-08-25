@@ -273,14 +273,24 @@ means, so put `100` on the sticker that goes on a packet of a hundred. On a
 wall label, clear the box — the help text under it calls that *Null*, which
 only means empty: a wall code stands for a place and for no amount of anything.
 
-**To print them:** collect the codes and ask for a sheet, comma separated.
+**Do all of that in the app instead.** Above the item list is **Print labels**,
+for you and for nobody else. It makes the stickers and lays them out in one
+go: choose the item, say how many stickers and what one scan of each stands
+for, press **Make them**, and what it made is already ticked on the sheet
+below. Tick anything else you want on the same page — the search box narrows
+both halves, by item name as well as by code — and press **Print the sheet**,
+which opens it in a new tab for your browser to print. That is the whole job, and
+the rest of this section is what it is doing on your behalf.
+
+**To do it by hand:** collect the codes and ask for a sheet, comma separated.
 
     /api/labels/sheet?code=7QK3M2XV9A,4NP8R7T2WQ
 
-Collecting them is the awkward part. The label list can be searched by code and
-by nothing else — not by item, not by shelf, not by when it was printed — so
-"find the codes for this shelf" means sorting a column and reading them off by
-eye. That is `inventory-tng-3ez`.
+Collecting them here is the awkward part. The label list can be searched by
+code and by nothing else — not by item, not by shelf, not by when it was
+printed — so "find the codes for this shelf" means sorting a column and reading
+them off by eye. That is `inventory-tng-3ez`, and it is why the app's own
+sheet narrows by item name.
 
 ![A printable sheet of stickers](images/administrator-label-sheet.png)
 
