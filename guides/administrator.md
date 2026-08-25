@@ -133,6 +133,15 @@ and the refusal is a guard rather than a permission. Deleting a label is still
 offered and still works, though the app itself has no way to do it:
 `inventory-tng-ls6d`.
 
+Nothing anywhere removes a movement, or the batch it was part of. That is the
+database refusing rather than a screen declining, so there is no button behind a
+warning and no setting that changes it — and there will be no "only if you
+really know what you are doing" screen added later, and no command for one.
+[Decision 0024](../docs/decisions/0024-no-hard-delete.md) is why that was
+settled rather than left open. If you believe a row genuinely has to leave the
+database, that is a conversation with whoever runs the server and not a thing to
+look for here.
+
 **And what a refusal says varies.** Where a sticker is the only thing in the
 way, the page names the label codes it is protecting. Where the row has also
 moved stock, Django reports it as a permissions problem about "stock movement"
