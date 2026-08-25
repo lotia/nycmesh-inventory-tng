@@ -52,10 +52,16 @@ if [[ ${#paths[@]} -eq 0 ]]; then
   # is explaining things were the two nothing read. Three commits pasted prose
   # into `.env.sample` before a review noticed.
   #
-  # So: every tracked file, less the ones that are not prose. Excluded by what
-  # they are rather than by where they live -- images, fonts, a compiled
-  # module, a spreadsheet, the two lock files nobody writes by hand, and the
-  # tracker's own export.
+  # So the corpus is stated as a subtraction, and the pattern below is the whole
+  # of it. What keeps a file out is that its prose is nobody's here, which comes
+  # out as three clauses rather than one tidy rule -- extensions, for what is
+  # not text; two names, for the lock files a resolver writes; and one
+  # directory. The directory is the tracker's: the exports are data, the five
+  # generated hooks carry beads' own banner and reading them reports four
+  # repetitions nothing here can fix, and the README came with the tool. It is
+  # the only path excluded for where it is, and it is worth being uneasy about
+  # -- a `.beads/` holding something of ours would go unread and say nothing.
+  # DEVELOPERS.md#1-one-topic-one-place puts that in words.
   mapfile -t paths < <(
     git ls-files | grep -Evi \
       '\.(png|jpe?g|gif|ico|svg|woff2?|ttf|eot|wasm|xlsx|pdf|zip)$|(^|/)(uv\.lock|package-lock\.json)$|^\.beads/'

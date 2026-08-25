@@ -1030,12 +1030,19 @@ workflows, the chart's templates, and the application's own docstrings and
 comments. Those are documentation of how this repository works, and a docstring
 is the easiest place of all to re-derive a decision record.
 
-No directory is excluded, so a file added or moved under one already read is
-read by default. What decides whether a file is read at all is its extension —
-`.md`, `.sh`, `.py`, `.yml`, `.yaml`, `.ts`, `.tsx` — which leaves the
-templates that carry no extension of their own, `nginx.conf.template` and the
-Dockerfiles, unread. Widening that is a matter of naming them. What is left
-out *within* a file is not prose: fenced blocks and
+The corpus is every tracked file less the ones whose prose nobody here writes:
+images, fonts, a compiled module, a spreadsheet, the two lock files a resolver
+produces, and `.beads/` entire — the tracker's exports are data, its five git
+hooks are generated and repeat a banner between themselves, and its `README.md`
+arrived with the tool. That last one is the only thing kept out for *where* it
+sits, and it is the only directory anybody here does not author; everywhere
+else a file added or moved under a directory already read is read by default,
+whatever it is called. The rule is stated as a subtraction on purpose.
+It was once a list of seven extensions, and the files whose whole job is
+explaining something — `.env.sample`, the chart's `_helpers.tpl`, the
+Dockerfiles, `nginx.conf.template`, the extensionless programs under `scripts/`
+— were precisely the ones it left out. What is left out *within* a file is not
+prose: fenced blocks and
 tables in Markdown, and in code, anything a file *uses* rather than *says* — a
 string handed to `RunSQL` is a value however much of it reads like a sentence.
 Addressing is left out too, wherever it appears: a Markdown link, a bare path
