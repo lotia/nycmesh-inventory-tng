@@ -139,6 +139,37 @@ land a 'aaa: Extract the decode loop
 Closes: inventory-tng-aaa'
 land b 'fixup! aaa: Extract the decode loop'
 expect 1 "waiting to be folded in" "an unfolded fixup is refused"
+# The advice has to be runnable by whoever is being advised, and this repository
+# lets an agent do the collapse unattended: `-i` opens an editor that never
+# returns, leaving the branch mid-rebase so the retry fails too. AGENTS.md
+# "Shell" is the rule; inventory-tng-4md is where it was not being kept.
+expect 1 "core.editor=true" "and told how to fold them in without an editor"
+output=$("${CHECK_CMD[@]}" "${CHECK_ARGS[@]}" 2>&1)
+status=$?
+refute "$output" "$status" 1 "rebase -i" "never with the interactive flag"
+refute "$output" "$status" 1 "sequence.editor" "and not the editor a non-interactive rebase never opens"
+
+# The case that showed the advice was wrong. A fixup! needs no editor whatever
+# is configured, so it could not tell the two settings apart; a squash! asks
+# for the combined message and fails without one. `absorbed` counts both, so
+# both are advised, and the advice has to work for the harder of them.
+scene
+land a 'aaa: Extract the decode loop
+
+Closes: inventory-tng-aaa'
+land b 'squash! aaa: Extract the decode loop'
+expect 1 "core.editor=true" "a pending squash! is advised the same way"
+# And that the advice does what it says on this git, rather than only reading
+# as though it does: run it, with no editor reachable by any other route.
+(
+  cd "$WORK/repo" &&
+    env -u GIT_EDITOR -u EDITOR -u VISUAL \
+      git -c core.editor=true rebase --autosquash base >/dev/null 2>&1
+)
+status=$?
+output=$(git -C "$WORK/repo" log --oneline base..HEAD)
+assert "$output" "$status" 0 "aaa: Extract the decode loop" \
+  "and running it folds the squash! in without stopping"
 
 # amend! carries the original message, trailers and all. Resolved to its target
 # like a fixup, it neither loses the commit's issue nor closes it twice.

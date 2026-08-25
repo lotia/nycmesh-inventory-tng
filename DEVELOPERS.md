@@ -1370,9 +1370,13 @@ branch before merging, and only once every review thread is resolved:
 
 ```bash
 git commit --fixup=<that issue's commit>   # while fixing
-git rebase -i --autosquash origin/main     # once, at the end
+git -c core.editor=true rebase --autosquash origin/main   # at the end
 git push --force-with-lease
 ```
+
+`core.editor` there, not `sequence.editor`: what a fold can stop to ask for is a
+*message*, and the todo list a `sequence.editor` would answer for is something a
+rebase run without `-i` never writes.
 
 Nothing folds those in on the way to `main` — rebase merge replays them as they
 stand — so the branch is not mergeable until you have. While the pull request
