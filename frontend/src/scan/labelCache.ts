@@ -106,6 +106,36 @@ export async function refreshLabelCache(
   return true;
 }
 
+/**
+ * Take one code out, because this device has just stopped it being live.
+ *
+ * THE OTHER HALF OF REVOKING FROM THIS APP. The map holds live labels only, so
+ * a row in it is not revoked by construction (see `MappedLabel`) -- and a cache
+ * filled before the revocation would go on answering the next scan of that
+ * sticker as though nothing had happened, for up to `CACHE_MAX_AGE_MS`. The
+ * sticker somebody is holding would read as fine on the very device that
+ * retired it, which is the opposite of what a revocation is for.
+ *
+ * Only this device's. Everybody else's map is stale until it is refreshed,
+ * which is the ordinary staleness the rule above already covers: their scan
+ * still resolves and the shelf is still counted, and they are told the next
+ * time the app opens. What this closes is the case where the client already
+ * knows better than what it is holding.
+ */
+export function forgetLabel(code: string, now: number = Date.now()): void {
+  // Through `current` rather than off `live`, so a cache this session has not
+  // read yet is hydrated from storage before it is edited. Reading `live`
+  // directly did nothing at all in the one case worth covering: a refresh that
+  // failed over a cache still young enough to be trusted, which is the basement
+  // this module exists for. A cache too old to be read is left alone, because
+  // nothing will read it either.
+  const cache = current(now);
+  if (cache !== null) {
+    delete cache.labels[code];
+    write(STORAGE_KEY, cache);
+  }
+}
+
 /** Lets a test start again from nothing. Not used by the app. */
 export function forgetLabelCache(): void {
   live = null;

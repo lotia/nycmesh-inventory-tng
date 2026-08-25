@@ -208,8 +208,9 @@ Named here so the gaps are visible rather than surprising:
   [0025](decisions/0025-work-that-belongs-to-no-row.md). All six endpoints
   `edit_catalogue` covers have a screen now: an item is added from the head of
   the list and corrected on its row, and the two small vocabularies are made and
-  corrected where an item and a batch choose one. The other capabilities
-  `CAPABILITIES` names have no screen yet. Every API endpoint but the ones
+  corrected where an item and a batch choose one. A sticker is revoked on the
+  line that says what scanning it did. `print_label` and `merge_volunteers` have
+  no screen yet. Every API endpoint but the ones
   [DEVELOPERS.md](../DEVELOPERS.md#signing-in) lists still requires a session,
   including the two a volunteer needs.
 - **Migration from the existing Google Sheet** (52 items, 3,439 submissions).

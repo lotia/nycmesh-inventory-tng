@@ -8,12 +8,12 @@
  * catalogue, that the box empties itself for the next code -- is asserted for
  * the camera too, up to the decode itself.
  */
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useCart } from "../cart/CartProvider";
 import { STORAGE_KEY } from "../cart/cartStorage";
 import { cable, zipTies } from "../items/testFixtures";
-import { callsTo, renderScreen } from "../testHarness";
+import { ADMINISTRATOR, callsTo, renderScreen, stubSession } from "../testHarness";
 import { Scanner } from "./Scanner";
 import {
   CABLE_LABEL,
@@ -281,5 +281,32 @@ describe("a camera holding one label in frame", () => {
         ),
       ).toHaveLength(2),
     );
+  });
+});
+
+describe("retiring the sticker that was just scanned", () => {
+  it("leaves the line reading as replaced, and the batch exactly as it was", async () => {
+    // The half of inventory-tng-2oba.3 that only the hook can answer: a
+    // revocation confirmed here has to reach the sentence the volunteer is
+    // looking at, and must not disturb what the scan already put in the cart.
+    stubSession(ADMINISTRATOR, (async (path: string, init?: RequestInit) => {
+      if (init?.method !== undefined && init.method !== "GET") {
+        return new Response("{}", { status: 200 });
+      }
+      return new Response(JSON.stringify(path.startsWith("/api/labels/") ? PACKET : zipTies), {
+        status: 200,
+      });
+    }) as unknown as typeof fetch);
+    show();
+    wedge(PACKET.code);
+    await waitFor(() => expect(stored().lines).toHaveLength(1));
+
+    fireEvent.click(await screen.findByRole("button", { name: /revoke this label/i }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", { name: /revoke it/i }),
+    );
+
+    expect(await screen.findByText(/that sticker has been replaced/i)).toBeInTheDocument();
+    expect(stored().lines).toHaveLength(1);
   });
 });
