@@ -43,8 +43,65 @@ describe("apiGet", () => {
     });
   });
 
-  it("still says something when a refusal carries no sentence", async () => {
-    answers({ name: ["This field is required."] }, { status: 400 });
+  it("reads a field-keyed refusal, which is what a rejected write actually sends", async () => {
+    // The commonest refusal there is: `Item.name` is unique, and DRF answers a
+    // field's own validator with a map and no `detail` at all. This used to
+    // come out as the number 400 and nothing else.
+    answers({ name: ["item with this name already exists."] }, { status: 400 });
+    await expect(apiGet("/api/items")).rejects.toMatchObject({
+      status: 400,
+      message: "Name: item with this name already exists.",
+    });
+  });
+
+  it("names the field the way somebody has to go back to it", async () => {
+    answers(
+      { minimum_stock: ["A minimum stock level is how little may be left."] },
+      { status: 400 },
+    );
+    await expect(apiGet("/api/items")).rejects.toMatchObject({
+      message: "Minimum stock: A minimum stock level is how little may be left.",
+    });
+  });
+
+  it("says the complaint about the whole submission before the fields", async () => {
+    // `validate()` raising a bare string is `non_field_errors`, and it is the
+    // reason the write was refused; a field line is what to do about it.
+    answers(
+      { name: ["This field is required."], non_field_errors: ["Sean still holds a location."] },
+      { status: 400 },
+    );
+    await expect(apiGet("/api/items")).rejects.toMatchObject({
+      message: "Sean still holds a location. Name: This field is required.",
+    });
+  });
+
+  it("keeps every message a field carries", async () => {
+    answers({ code: ["Not that.", "Nor that."] }, { status: 400 });
+    await expect(apiGet("/api/items")).rejects.toMatchObject({
+      message: "Code: Not that. Nor that.",
+    });
+  });
+
+  it("reads a bare list, which is what a top-level refusal sends", async () => {
+    answers(["Nothing doing."], { status: 400 });
+    await expect(apiGet("/api/items")).rejects.toMatchObject({ message: "Nothing doing." });
+  });
+
+  it("leaves the batch endpoint's own shape to the batch endpoint", async () => {
+    // `detail` wins, so the per-line map under `movements` is never flattened
+    // into the sentence -- SubmitBar renders those lines itself.
+    answers(
+      { detail: "Nothing was saved.", errors: [{ index: 0, field: "item", detail: "no" }] },
+      { status: 400 },
+    );
+    await expect(apiGet("/api/stock/transactions")).rejects.toMatchObject({
+      message: "Nothing was saved.",
+    });
+  });
+
+  it("still says something when a refusal carries nothing this can read", async () => {
+    answers({ movements: { 0: { item: "gone" } } }, { status: 400 });
     await expect(apiGet("/api/items")).rejects.toMatchObject({ status: 400, message: /400/ });
   });
 
