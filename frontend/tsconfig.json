@@ -19,6 +19,7 @@
     "src",
     "integration",
     "capture",
+    "scripts",
     "vite.config.ts",
     "playwright.config.ts",
     "playwright.capture.config.ts"
