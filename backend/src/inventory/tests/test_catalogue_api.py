@@ -16,6 +16,7 @@ from django.urls import reverse
 from inventory.models import (
     Category,
     Item,
+    ItemIdentifier,
     Label,
     Location,
     StockTransaction,
@@ -140,6 +141,47 @@ def test_a_revoked_label_is_not_offered_as_packaging(client: Client, item: Item)
 def test_items_can_be_searched_by_name(client: Client, item: Item, category: Category) -> None:
     Item.objects.create(name="Zip Ties", category=category)
     assert [entry["name"] for entry in results(client.get(reverse("items"), {"search": "beam"}))] == ["LiteBeam"]
+
+
+def anywhere_in(body: Any, wanted: str) -> bool:
+    """Whether ``wanted`` appears anywhere in a decoded JSON response.
+
+    A recursive walk rather than a list of fields that may not carry it,
+    because a list of fields is a promise about the fields that exist today and
+    the leak this guards against arrives as a new one.
+
+    A substring test at the leaf, not equality. The likeliest shape of the leak
+    is a composed label -- ``"LiteBeam (litebeam)"`` -- which is a string equal
+    to neither of the two things it is made of.
+    """
+    if isinstance(body, str):
+        return wanted in body
+    if isinstance(body, dict):
+        return any(anywhere_in(value, wanted) for value in body.values())
+    if isinstance(body, list):
+        return any(anywhere_in(value, wanted) for value in body)
+    return False
+
+
+def test_the_item_list_never_answers_with_an_identifier_value(client: Client, item: Item) -> None:
+    """Decision 0026's rule 5: search identifiers, display items.
+
+    Nothing violates this today -- `ItemIdentifier` is imported by no
+    serializer and no view. This is the guard for when something searches them,
+    because the natural next step is to annotate the value that matched so the
+    interface can say why a row appeared, and an annotation rendered as an
+    option label is one product offered under three spellings.
+
+    The mis-cased spelling is the point: it is one a pick-list must never show,
+    and it is distinct from the item's name, so finding it in the response
+    means it came from the identifier and nowhere else.
+    """
+    ItemIdentifier.objects.create(item=item, kind=ItemIdentifier.Kind.ALIAS, value="litebeam")
+
+    body = client.get(reverse("items"), {"search": "beam"}).json()
+
+    assert anywhere_in(body, "LiteBeam"), "the item's own name is what a pick-list draws"
+    assert not anywhere_in(body, "litebeam"), "an identifier value reached the item list"
 
 
 def test_items_can_be_narrowed_to_a_category(client: Client, item: Item, category: Category) -> None:
