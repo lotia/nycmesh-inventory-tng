@@ -64,9 +64,11 @@ gives about an address it declines to write.
 
 from dataclasses import dataclass
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
+from django.db.models import Value
 
 from inventory import identifiers
+from inventory.identifiers import Canonical
 from inventory.models import Category, Item, ItemIdentifier
 from inventory.sheet import Report, items
 from inventory.sheet.workbook import Sheet
@@ -127,6 +129,13 @@ class Minted:
     # what the unique constraint makes of them.
     identifiers: int
     identifiers_added: int
+    # Times the column contradicted what Python's fold predicted -- either
+    # direction, which is why this is named after the disagreement rather than
+    # after one of its outcomes. Not a fault and not a failure: decision 0026
+    # makes the column the authority, so this counts how often it exercised
+    # that. Expected to be zero on an ASCII catalogue, and worth reading when
+    # it is not.
+    folds_disagreed: int
     # Strings whose identifier already names some other item. Left alone, for
     # the reason the module docstring gives, and reported so that "no string
     # resolves to an item the rule said it does not name" is checkable.
@@ -154,6 +163,7 @@ def section(minted: Minted) -> Report:
         ("  catalogue rows too long to be a name", minted.names_too_long),
         ("identifiers", minted.identifiers),
         ("  this run added", minted.identifiers_added),
+        ("  the two folds disagreed", minted.folds_disagreed),
         ("  already naming another item", minted.naming_another_item),
         ("strings naming no catalogued item", minted.unresolved),
         ("  with no reason written", minted.unaccounted),
@@ -226,6 +236,35 @@ def _catalogue(names: tuple[str, ...]) -> tuple[dict[str, Item], int]:
     return catalogued, added
 
 
+def _hold(item: Item, value: str) -> tuple[ItemIdentifier, bool]:
+    """The row that holds ``value``, and whether this call is what made it.
+
+    The insert is tried first and the refusal is an answer, because the two
+    folds cannot be made to agree and only one of them is entitled to decide.
+    `inventory.identifiers` says why; the consequence is here.
+
+    A savepoint rather than the enclosing transaction, so that a string the
+    database considers taken costs this one insert rather than the whole
+    import. That was the actual fault: `mint` is atomic, so one disagreement
+    between the two folds rolled back every row
+    of the catalogue, and the operator saw a constraint name rather than a
+    number in a report.
+
+    Anything that is not the unique index is re-raised untouched. `held` comes
+    back empty in that case, because no row holds the value.
+    """
+    try:
+        with transaction.atomic():
+            return ItemIdentifier.objects.create(item=item, kind=_kind(value), value=value), True
+    except IntegrityError:
+        # Asked of the database, with the database's own fold, because Python
+        # having got this wrong is the only reason to be here.
+        held = ItemIdentifier.objects.filter(value_normalised=Canonical(Value(value))).first()
+        if held is None:
+            raise
+        return held, False
+
+
 @transaction.atomic
 def mint(sheet: Sheet) -> Minted:
     """Mint what rule 1 resolves, and write down what it does not.
@@ -245,6 +284,13 @@ def mint(sheet: Sheet) -> Minted:
     # Keyed by the normalised value because that is what the unique constraint
     # is keyed by: `LiteBeam` and `litebeam` are one identifier, and inserting
     # the second would raise rather than add a row.
+    #
+    # ITS KEYS ARE A UNION OF TWO FOLDS, DELIBERATELY, and that is worth saying
+    # because the two are documented as disagreeing. The seed below is what the
+    # database computed; the loop adds Python's as well, so a string
+    # either fold answers for is found without a query. Nothing reads a key to
+    # learn which fold produced it -- they are all just ways of reaching a row,
+    # and the row is the answer.
     answering = {one.value_normalised: one for one in ItemIdentifier.objects.all()}
     # The catalogued names first, then the strings volunteers typed, so that a
     # string differing from a name only in case finds the name already there
@@ -256,18 +302,41 @@ def mint(sheet: Sheet) -> Minted:
     answered: set[str] = set()
     added = 0
     elsewhere = 0
+    disagreed = 0
     for value, name in naming:
-        key = identifiers.normalised(value)
-        answered.add(key)
         item = catalogued[name]
-        held = answering.get(key)
-        if held is None:
-            answering[key] = ItemIdentifier.objects.create(item=item, kind=_kind(value), value=value)
-            added += 1
+        key = identifiers.normalised(value)
+        predicted = answering.get(key)
+        # Python's fold may say "this is already here"; it may not say "this is
+        # already here, under a different item". The second is it deciding that
+        # two strings are one, which decision 0026 reserves for the column, and
+        # getting it wrong leaves an item with no identifier at all.
+        #
+        # Unless the two strings are the same string. Any deterministic fold
+        # agrees with itself, so there is nothing for the column to settle and
+        # nothing to gain by asking -- which matters because this is the
+        # ordinary re-run path for a string already naming another item, and
+        # asking would cost a failed insert on every import for ever.
+        if predicted is not None and (predicted.item_id == item.pk or predicted.value == value):  # ty: ignore[unresolved-attribute]
+            held = predicted
+        else:
+            held, minted_now = _hold(item, value)
+            # Under both folds, so that the next string either of them answers
+            # for finds this row without asking the database a second time.
+            answering[key] = answering[held.value_normalised] = held
+            added += minted_now
+            # The column contradicting the prediction, in whichever direction:
+            # a string Python thought was new and the column already held, or
+            # one Python thought was taken and the column accepted.
+            disagreed += (not minted_now) if predicted is None else minted_now
+        # Counted by what the database made of it, never by what Python did:
+        # where the two folds differ it is the column that decides how many
+        # distinct identifiers there are, and this figure claims to be that.
+        answered.add(held.value_normalised)
         # item_id rather than item, so that a row already in the table is not
         # re-fetched to compare a key it already holds. See DEVELOPERS.md#typing
         # for why the checker cannot see it.
-        elif held.item_id != item.pk:  # ty: ignore[unresolved-attribute]
+        if held.item_id != item.pk:  # ty: ignore[unresolved-attribute]
             elsewhere += 1
 
     unresolved = [
@@ -289,6 +358,7 @@ def mint(sheet: Sheet) -> Minted:
         names_too_long=tab.too_long,
         identifiers=len(answered),
         identifiers_added=added,
+        folds_disagreed=disagreed,
         naming_another_item=elsewhere,
         unresolved=len(unresolved),
         unaccounted=sum(1 for one in unresolved if not one.reason),
