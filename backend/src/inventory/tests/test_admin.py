@@ -211,6 +211,36 @@ def test_but_names_the_movement_rather_than_the_sticker_once_stock_has_moved(
 
 
 @pytest.mark.usefixtures("_static_files_are_not_collected")
+def test_and_refuses_a_row_a_printed_code_or_a_recorded_price_names(editor: Client, item: Item) -> None:
+    """The same argument as two tests above, for inventory-tng-6kyb's two keys.
+
+    Held here and not only in `test_models.py` for the reason the first of
+    those gives: the confirmation page is the whole of how this guard is met,
+    and what the page says is a separate claim from what the ORM raises.
+
+    Both of these are ordinary `SimpleHistoryAdmin`s rather than append-only
+    ones, so unlike the stock-movement case above the reference lands in
+    `protected` and is named. `guides/administrator.md` tells an administrator
+    that an item with an identifier or a price refuses; this is that sentence
+    being true.
+    """
+    ItemIdentifier.objects.create(item=item, kind=ItemIdentifier.Kind.BARCODE, value="0123456789012")
+    VendorOffer.objects.create(
+        item=item,
+        vendor=Vendor.objects.create(name="streakwave"),
+        observed_at=datetime.date(2026, 8, 18),
+    )
+
+    page = editor.get(reverse("admin:inventory_item_delete", args=[item.pk]))
+
+    assert page.status_code == 200
+    body = page.content.decode()
+    assert "0123456789012" in body, "the page does not say which printed code it is protecting"
+    assert "streakwave" in body.lower(), "the page does not say a recorded price is in the way"
+    assert 'name="post"' not in body, "the page still offers to go through with it"
+
+
+@pytest.mark.usefixtures("_static_files_are_not_collected")
 def test_every_changelist_renders(
     editor: Client,
     one_of_each_model: dict[type[models.Model], models.Model],

@@ -118,6 +118,18 @@ ever referred to an item — manufacturer part number, vendor SKU, the retired
 on a normalised form of the value. A scan or a typed string resolves to exactly
 one item, and renaming an item cannot break a count.
 
+`item` is `PROTECT`, so an item with any identifier at all cannot be deleted.
+Two things are at stake and the second is the worse. A barcode is printed on
+the object itself, so losing the row leaves a scan answering nothing; and the
+normalised value is unique across the whole table, so a string freed by a
+delete can afterwards be created against another item, and the same barcode
+then answers with something else. That second risk does not care which kind the
+row is, which is why the guard is not narrowed to the printed kinds. The
+practical effect is that a catalogue row is retired rather than deleted —
+`mint_items` writes an identifier for every catalogued name, so after an import
+almost every item has one. What the guard does and does not reach is
+[under Label](#label).
+
 ### Label
 
 Maps an opaque printed token to the thing it names, so that a faded or damaged
@@ -156,11 +168,12 @@ worked out again, so a row removed out from under one would leave a scan
 resolving to nothing for ever. It is not narrowed to labels still in use — a
 revoked sticker still says what it pointed at.
 
-**The guard is Django's, not the database's.** `PROTECT` is enforced in the
-ORM's collector, and Postgres was never asked to cascade these in the first
-place, so a `DELETE` issued through `dbshell` reaches the row regardless. What
-that buys is every path the application itself has — the admin, a management
-command, a shell, an endpoint — and no more.
+**The guard is Django's, not the database's**, and this holds of every `PROTECT`
+on this page, [VendorOffer](#vendor-vendoroffer)'s below included. It is
+enforced in the ORM's collector, and Postgres was never asked to
+cascade these in the first place, so a `DELETE` issued through `dbshell` reaches
+the row regardless. What that buys is every path the application itself has —
+the admin, a management command, a shell, an endpoint — and no more.
 
 This replaces the current scheme, in which the QR encodes a Google Form URL with
 the item's display name embedded in a query parameter.
@@ -174,7 +187,10 @@ written into free-text notes (`134.44 streakwave / 131.41 VodaNet / 65.00
 Baltic`), which are a repeating group and therefore a table.
 
 Prices are timestamped rather than overwritten, so a historical purchase price
-remains recoverable.
+remains recoverable. Both foreign keys are `PROTECT`, which is what makes that
+sentence true of a catalogue somebody is tidying: deleting the item took the
+whole series with it, and no physical object is left to notice the loss by.
+Again, [under Label](#label) for what the guard reaches.
 
 ### StockTransaction and StockMovement
 

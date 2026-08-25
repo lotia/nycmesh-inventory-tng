@@ -110,11 +110,19 @@ is a guard rather than a permission. Those codes are printed on stickers
 already on shelves, a code cannot be worked out again, and scanning one whose
 row had gone would find nothing, for ever.
 
-**The guard does not cover everything, so do not read a refusal as the only
-thing standing between you and a mistake.** Deleting an item still takes its
-barcodes and its legacy NYCM codes with it — those are printed too — and its
-recorded purchase prices. That is
-`inventory-tng-6kyb`.
+An item refuses for two more reasons, both added since. It refuses while it has
+any identifier — a barcode, a legacy NYCM code, or one of the informal names
+the import recorded — because a barcode is printed on the object as surely as a
+code is on a sticker, and because a string freed by a delete can be typed
+against a different item afterwards, which leaves the label on the shelf
+answering with the wrong thing rather than with nothing. And it refuses while
+any purchase price is recorded against it, which is a series meant to stay
+readable and has no object out in the world to notice its going.
+
+**In practice that means almost no item can be deleted, and that is the
+intention rather than a side effect.** The import wrote an identifier for every
+catalogued name, so **Active** is how an item leaves the catalogue.
+
 Deleting a label is still offered and still works, though the app itself has
 no way to do it: `inventory-tng-ls6d`.
 
