@@ -72,6 +72,20 @@ match matched nothing at all and the movement was silently lost. So:
 not rename the item to match. Two strings can name one item; one string may
 never name two, and the database enforces that.
 
+**An identifier is corrected, never removed.** There is no Delete on one — not
+on its own page, not in the list's menu, and not on the item's form, where the
+row simply has no *Delete?* box. Everything a mistake here needs is a field you
+can change on the identifier itself: it is on the wrong item, so change *Item*;
+the string was mistyped, so change *Value*; it is the wrong sort of code, so
+change *Kind*.
+
+That is not tidiness. The string has to be unique across every identifier
+there is — that is what makes a scan find exactly one item — so removing a row
+*frees* it, and somebody can then put the same string on something else. The
+barcode on the object goes on scanning and starts answering with the wrong
+item, which is worse than answering with nothing. Correcting the row never
+lets go of the string, and the history of what it used to say is kept.
+
 ---
 
 ## Volunteers, and merging duplicates
