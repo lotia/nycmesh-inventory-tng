@@ -19,9 +19,9 @@ import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import { useState } from "react";
-import { type ApiError, apiPatch, asApiError } from "../api/client";
+import { apiPatch } from "../api/client";
 import type { Item } from "../api/types";
-import { Refusal } from "./Refusal";
+import { useSaving } from "./useSaving";
 
 export function EditItem({
   item,
@@ -36,13 +36,10 @@ export function EditItem({
   const [minimum, setMinimum] = useState(item.minimum_stock);
   const [reorder, setReorder] = useState(item.reorder_quantity);
   const [active, setActive] = useState(item.active);
-  const [saving, setSaving] = useState(false);
-  const [refused, setRefused] = useState<ApiError | null>(null);
+  const { saving, refusal, run } = useSaving();
 
-  async function save(): Promise<void> {
-    setSaving(true);
-    setRefused(null);
-    try {
+  const save = () =>
+    run(async () => {
       await apiPatch<Item>(`/api/items/${item.id}`, {
         name,
         minimum_stock: minimum,
@@ -51,12 +48,7 @@ export function EditItem({
       });
       onSaved();
       onClose();
-    } catch (error: unknown) {
-      setRefused(asApiError(error));
-    } finally {
-      setSaving(false);
-    }
-  }
+    });
 
   return (
     <Dialog open onClose={onClose} aria-labelledby="edit-item" fullWidth>
@@ -89,7 +81,7 @@ export function EditItem({
             // the item stops being offered and stays in the ledger.
             label="Offered in the pick-list"
           />
-          {refused ? <Refusal error={refused} onDismiss={() => setRefused(null)} /> : null}
+          {refusal}
         </Stack>
       </DialogContent>
       <DialogActions>

@@ -34,10 +34,10 @@ import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import { useState } from "react";
-import { type ApiError, apiPatch, apiPost, asApiError } from "../api/client";
+import { apiPatch, apiPost } from "../api/client";
 import type { Location } from "../api/types";
-import { Refusal } from "./Refusal";
 import { parentChoices, parentId, parentValue } from "./tree";
+import { useSaving } from "./useSaving";
 
 /**
  * The kinds of place this dialog will make.
@@ -72,16 +72,13 @@ export function EditLocation({
   const [kind, setKind] = useState(existing?.kind ?? KINDS[0].value);
   const [parent, setParent] = useState(() => parentValue(existing));
   const [active, setActive] = useState(existing?.active ?? true);
-  const [saving, setSaving] = useState(false);
-  const [refused, setRefused] = useState<ApiError | null>(null);
+  const { saving, refusal, run } = useSaving();
 
-  async function save(): Promise<void> {
-    setSaving(true);
-    setRefused(null);
-    // The two fields both shapes carry. What each adds is on its own branch
-    // below, so a create and a correction are each readable in one place.
-    const shared = { name: name.trim(), parent: parentId(parent) };
-    try {
+  const save = () =>
+    run(async () => {
+      // The two fields both shapes carry. What each adds is on its own branch
+      // below, so a create and a correction are each readable in one place.
+      const shared = { name: name.trim(), parent: parentId(parent) };
       const saved =
         existing === null
           ? // `kind` only here. A PATCH carrying it would either re-send what
@@ -101,12 +98,7 @@ export function EditLocation({
             );
       onSaved(saved);
       onClose();
-    } catch (error: unknown) {
-      setRefused(asApiError(error));
-    } finally {
-      setSaving(false);
-    }
-  }
+    });
 
   return (
     <Dialog open onClose={onClose} aria-labelledby="edit-location" fullWidth>
@@ -160,7 +152,7 @@ export function EditLocation({
               label="Offered in the pick-list"
             />
           ) : null}
-          {refused ? <Refusal error={refused} onDismiss={() => setRefused(null)} /> : null}
+          {refusal}
         </Stack>
       </DialogContent>
       <DialogActions>

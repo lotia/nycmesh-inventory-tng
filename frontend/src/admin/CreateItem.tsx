@@ -19,11 +19,11 @@ import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import { useState } from "react";
-import { type ApiError, apiPost, asApiError } from "../api/client";
+import { apiPost } from "../api/client";
 import type { Category, Item } from "../api/types";
 import { unitChoices } from "../items/quantity";
 import { EditCategory } from "./EditCategory";
-import { Refusal } from "./Refusal";
+import { useSaving } from "./useSaving";
 import { useVocabulary } from "./vocabulary";
 
 /**
@@ -41,8 +41,7 @@ export function CreateItem({ onClose, onCreated }: { onClose: () => void; onCrea
   const [unit, setUnit] = useState(UNITS[0].value);
   const [minimum, setMinimum] = useState("0");
   const [reorder, setReorder] = useState("1");
-  const [saving, setSaving] = useState(false);
-  const [refused, setRefused] = useState<ApiError | null>(null);
+  const { saving, refusal, run } = useSaving();
   // Read when the dialog opens rather than with the item list: a volunteer
   // never sees this control, so nobody pays for the request who is not about
   // to use it. Everything else about the groupings -- what is being made, and
@@ -61,10 +60,8 @@ export function CreateItem({ onClose, onCreated }: { onClose: () => void; onCrea
   // the form rather than only in the absence of a way forward.
   const ready = name.trim() !== "" && category !== "";
 
-  async function save(): Promise<void> {
-    setSaving(true);
-    setRefused(null);
-    try {
+  const save = () =>
+    run(async () => {
       await apiPost<Item>("/api/items", {
         name: name.trim(),
         category: Number(category),
@@ -74,12 +71,7 @@ export function CreateItem({ onClose, onCreated }: { onClose: () => void; onCrea
       });
       onCreated();
       onClose();
-    } catch (error: unknown) {
-      setRefused(asApiError(error));
-    } finally {
-      setSaving(false);
-    }
-  }
+    });
 
   return (
     <Dialog open onClose={onClose} aria-labelledby="create-item" fullWidth>
@@ -172,7 +164,7 @@ export function CreateItem({ onClose, onCreated }: { onClose: () => void; onCrea
             value={reorder}
             onChange={(event) => setReorder(event.target.value)}
           />
-          {refused ? <Refusal error={refused} onDismiss={() => setRefused(null)} /> : null}
+          {refusal}
         </Stack>
       </DialogContent>
       <DialogActions>
