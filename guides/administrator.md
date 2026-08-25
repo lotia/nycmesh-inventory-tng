@@ -96,6 +96,14 @@ not a repair.
 Open the duplicate — the one you want to stop seeing — and set **Merged into**
 to the record you are keeping.
 
+**Or do it in the app, where you noticed it.** Type the name into *Who are
+you?*; if the search shows more than one of them, **Two of these are the same
+person** appears underneath for you and for nobody else. It asks which to stop
+offering and which to keep, in those words, and does the same thing this page
+does. Of the three cautions below, the first cannot arise there at all — the
+app's list offers only people who are still offered — and the second it tells
+you about in so many words when you press Merge.
+
 ![Merging one record into another](images/administrator-merge.png)
 
 What that does, and does not do:
@@ -109,11 +117,12 @@ What that does, and does not do:
 
 Three things worth knowing before you do one:
 
-- **Choose a survivor who has not themselves been merged.** The list you choose
-  from offers everybody, merged records included, and picking one of those is
+- **Choose a survivor who has not themselves been merged.** The list *on this
+  page* offers everybody, merged records included, and picking one of those is
   refused by the database rather than by the form — what you get is a server
   error page with nothing useful on it. The volunteer list shows a *Merged
-  into* column; check it first.
+  into* column; check it first. The app's own list never offers one, so this
+  caution is this page's alone.
 - **Check first whether the duplicate is holding stock of their own.** Merging
   or retiring somebody who still holds a location is refused everywhere else in
   this system and allowed here, and doing it leaves that location active, with
