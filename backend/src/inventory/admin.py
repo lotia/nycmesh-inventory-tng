@@ -214,7 +214,7 @@ class LabelForm(forms.ModelForm):
 
 
 @admin.register(Label)
-class LabelAdmin(SimpleHistoryAdmin):
+class LabelAdmin(NeverDeletedAdmin, SimpleHistoryAdmin):
     """Printing and revoking a label, from the fallback interface.
 
     The code is minted by default and frozen once printed, which is
@@ -222,6 +222,33 @@ class LabelAdmin(SimpleHistoryAdmin):
     else, and a code typed by hand would reach that constraint as an
     ``IntegrityError`` rather than as something the form could say; and a code
     changed after printing would 404 a sticker already out on a shelf.
+
+    AND NO DELETE, which is inventory-tng-ls6d and is its own argument rather
+    than the item's repeated. A label is the one row here that nothing else
+    points at -- no foreign key names it, and ``label_code_is_printed`` is
+    BEFORE UPDATE -- so unlike an item's, this button never refused anybody and
+    took every sticker it was pressed on.
+
+    WHAT GOES WITH THE ROW IS THE STICKER'S ONLY MEANING. A code is ten
+    characters of an alphabet chosen for being readable off a fading label, it
+    is minted rather than derived, and it is already stuck to a shelf. Delete
+    the row and the scan resolves to nothing, for ever, with no way to work out
+    what it had pointed at.
+
+    AND THEN IT GETS WORSE, which is the half that makes this the same harm as
+    inventory-tng-k50y rather than a tidier version of it.
+    ``Label.mint_unique_code`` draws a code and keeps it if no row holds it, so
+    a deleted code is a FREE code: the next print run can reissue it against a
+    different item or a different shelf. The sticker on the wall goes on
+    scanning and starts answering with something else, which is worse than
+    answering with nothing.
+
+    THE WAY OUT IS REVOKING, and it is on this form. ``LabelResolveView`` says
+    it in the API's own words -- a PATCH of ``revoked``, never a delete,
+    because the ledger's history refers to what the sticker pointed at -- and
+    that API exposes no DELETE at all. This is the admin agreeing with it.
+    Decision 0024 is the general posture; this is the particular argument, and
+    ``guides/administrator.md`` is where an administrator reads it.
     """
 
     form = LabelForm

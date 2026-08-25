@@ -172,13 +172,21 @@ def test_the_admin_refuses_to_delete_a_row_a_sticker_names(editor: Client, wareh
     is the whole of how this guard is met -- and asserting `ProtectedError`
     from the ORM says nothing about what that page does with it. This is how
     the guard got in with a claim about the page that turned out to be false
-    for half the cases; see the second assertion.
+    for half the cases; see the test below.
 
     Driven through a location rather than through an item, since
     inventory-tng-k2sg took the item's confirmation page away and left nothing
     there to observe. The claim is unchanged: a shelf carries stickers too.
     What an item's own references do to a delete is `test_models.py`'s, where
     it always was.
+
+    AND THE MESSAGE IS NOW THE POORER ONE, which is inventory-tng-ls6d's price
+    and is asserted rather than discovered. `format_callback` puts an object
+    into `perms_needed` rather than `protected` when its own ModelAdmin refuses
+    deletion, and `LabelAdmin` now does -- so this page reports a permissions
+    problem about "label" where it used to name the code it was protecting. The
+    row is exactly as safe; `guides/administrator.md` is where an administrator
+    is told which of the two they are looking at.
     """
     Label.objects.create(code="PR0TECT001", location=warehouse, quantity=None)
 
@@ -186,8 +194,9 @@ def test_the_admin_refuses_to_delete_a_row_a_sticker_names(editor: Client, wareh
 
     assert page.status_code == 200
     body = page.content.decode()
-    assert "PR0TECT001" in body, "the page does not say which sticker it is protecting"
-    # No confirm button: Django renders the protected list INSTEAD of the form.
+    assert "label" in body.lower(), "the page does not say a sticker is in the way at all"
+    assert "PR0TECT001" not in body, "if this names the code again, the guide can say so again"
+    # No confirm button: Django renders the refusal INSTEAD of the form.
     assert 'name="post"' not in body, "the page still offers to go through with it"
 
 
@@ -255,6 +264,33 @@ def test_an_item_is_retired_rather_than_deleted_and_the_admin_offers_nothing_els
     body = change.content.decode()
     assert delete_url not in body, "the change form still links to a page that refuses"
     assert 'name="active"' in body
+
+
+@pytest.mark.usefixtures("_static_files_are_not_collected")
+def test_a_label_is_revoked_rather_than_deleted(editor: Client, administrator_request: HttpRequest, item: Item) -> None:
+    """inventory-tng-ls6d. `LabelAdmin` is the argument; this is it holding.
+
+    Driven through a label with nothing pointing at it, and every label is that
+    label: nothing in the schema refuses this delete, so unlike an item's the
+    refusal here is the admin's own from the first row onwards.
+    """
+    label = Label.objects.create(code="REV0KE0001", item=item)
+    model_admin = admin.site.get_model_admin(Label)
+    delete_url = reverse("admin:inventory_label_delete", args=[label.pk])
+
+    assert not model_admin.has_delete_permission(administrator_request)
+    assert not model_admin.has_delete_permission(administrator_request, label)
+    assert editor.get(delete_url).status_code == 403
+    assert editor.post(delete_url, {"post": "yes"}).status_code == 403
+    assert Label.objects.filter(pk=label.pk).exists()
+
+    # And the way out that remains is on the form already open, which is what
+    # the API calls it too: a PATCH of `revoked`, never a delete.
+    body = editor.get(reverse("admin:inventory_label_change", args=[label.pk])).content.decode()
+    assert delete_url not in body, "the change form still links to a page that refuses"
+    # `_0` because the admin splits a datetime into a date and a time; the
+    # field is `revoked_at` and this is the half a widget names first.
+    assert 'name="revoked_at_0"' in body
 
 
 def test_an_admin_that_refuses_a_delete_does_not_offer_the_bulk_one(
