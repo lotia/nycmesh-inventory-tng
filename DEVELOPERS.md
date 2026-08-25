@@ -1441,6 +1441,32 @@ all: the rule above goes on being believed while nothing is checking it, and
 nothing announces that the guard has stopped working. Only the commands it
 guards are affected; everything else runs as normal.
 
+**With one exception, and it is the gate's own source.** If a rebase stops on a
+conflict *in `scripts/landing-gate.sh` itself*, the half-written file cannot
+judge anything, and every command it guards is then refused over something that
+has nothing to do with the command. The gate stands down there, saying so on
+stderr, and it takes three things at once: the matcher has already failed, git
+reports an operation actually in flight, and the file carries conflict markers.
+Any two of the three leave it guarding as usual. This is the one place it fails
+open, and it is deliberate.
+
+Deliberate, and worth less than it first looks — which is worth knowing before
+leaning on it. Whether the guarded verbs appear at all is settled before the
+matcher is consulted, so anything without `gh` or `push` in it never needed
+this file to be readable: continuing or abandoning the rebase was never
+prevented. What the stand-down releases is the guarded pair themselves, the
+force-with-lease that ends a collapse and a merge that nothing is checking. The
+break that really does take a session down is markers in the shell half, where
+bash exits with the status the harness reads as *blocked* before any of this
+runs — out of reach from inside the file, and `inventory-tng-ghqk` records both
+the measurement and what it would take to cover.
+
+It cannot cover every shape of that. Markers in the *shell* half mean bash never
+parses the file, so nothing in it runs and nothing in it can help; the symptom
+is a hook error rather than a refusal, and the answer is to resolve the markers
+with an editor. `inventory-tng-ghqk` records why a wrapper was weighed and not
+taken.
+
 A `gh` that is merely *slow* is the same case, and it needs its own deadline
 rather than the hook's: a hook killed for exceeding its timeout prints no
 verdict, and no verdict is read as permission. So the gate gives `gh` a shorter

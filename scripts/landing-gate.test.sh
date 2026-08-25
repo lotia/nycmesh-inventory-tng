@@ -339,4 +339,92 @@ out=$(in_repo "" "" clear 7)
 assert "$out" 0 0 "Cleared the receipt" "a single receipt can be cleared"
 case_is "gh pr merge 7 --rebase"                 "No review cycle" "and the merge is refused again afterwards"
 
+# ---------------------------------------------------------------------------
+# the gate's own source, mid-conflict
+# ---------------------------------------------------------------------------
+#
+# inventory-tng-ghqk, and the one place this file fails OPEN rather than
+# closed. `own_source_is_mid_conflict` argues why; these cases pin that it
+# takes BOTH conditions, because either alone would switch the guard off far
+# too easily.
+echo
+echo "a gate whose own source is mid-conflict"
+
+# gate_copy <path> <text> -- the real gate, with <text> dropped into its python
+# half. Two cases below want one, differing only in what breaks it, and the
+# assertion that the matcher still starts where this expects belongs to both:
+# written twice it is one edit away from a fixture that silently stops being a
+# copy of anything.
+gate_copy() {
+  python3 - "$GATE" "$1" "$2" <<'PY'
+import sys
+src = open(sys.argv[1]).read()
+needle = "import json, re, sys\n"
+assert needle in src, "the matcher's first line moved; these fixtures need updating"
+open(sys.argv[2], "w").write(src.replace(needle, needle + sys.argv[3], 1))
+PY
+  chmod +x "$1"
+}
+
+# Markers in the PYTHON half. Bash still parses the file -- they arrive inside a
+# single-quoted string -- so the script runs and the matcher is what fails,
+# which is the shape that was hit. Written with `$'...'` so this suite does not
+# carry conflict markers of its own at the start of a line.
+CONFLICTED="$WORK/repo/conflicted-gate.sh"
+gate_copy "$CONFLICTED" $'<<<<<<< HEAD\n=======\n>>>>>>> other\n'
+
+# The verdict and the explanation go to different streams, and here they must
+# be read apart: a broken matcher puts python's own SyntaxError on stderr, and
+# a `2>&1` that mixed it into stdout would leave nothing that parses as JSON.
+run_copy() {
+  payload "$2" | (cd "$REPO" && env PATH="$(full_path)" GH_FIXTURES="$FIX" \
+    CLAUDE_PROJECT_DIR="$REPO" "$1" check)
+}
+run_conflicted() { run_copy "$CONFLICTED" "$1"; }
+conflicted() { printf '%s' "$(run_conflicted "$1" 2>/dev/null)"; }
+conflicted_said() { run_conflicted "$1" 2>&1 >/dev/null; }
+
+# A second copy whose matcher fails for a reason that is not a rebase: it
+# carries no markers anywhere. This is the condition the cases below could not
+# see -- swap the marker test in `own_source_is_mid_conflict` for `return 0` and
+# every one of them stayed green, because each either had markers or had no
+# operation in flight.
+UNMARKED="$WORK/repo/unmarked-gate.sh"
+gate_copy "$UNMARKED" $'raise SystemExit(2)\n'
+
+# Markers, but nothing in flight: still a refusal. A stray `<<<<<<<` in a
+# comment must not be enough to disarm the gate.
+out=$(decision "$(conflicted "gh pr merge 7")")
+assert "$out" 0 0 "could not find out" "markers alone do not stand the gate down"
+
+# Now a rebase actually stopped here. `--git-path` answers relative to the cwd
+# it is asked from, so it is asked from inside the repository.
+(cd "$REPO" && : > "$(git rev-parse --git-path MERGE_HEAD)")
+out=$(decision "$(conflicted "gh pr merge 7")")
+assert "$out" 0 0 "PERMIT" "mid-conflict and mid-operation, the gate stands down"
+out=$(conflicted_said "gh pr merge 7")
+assert "$out" 0 0 "standing down" "and says so, rather than going quiet"
+
+# The trap `own_source_is_mid_conflict` warns about, pinned: REBASE_HEAD is a
+# leftover rather than a signal, and the first draft of that function listed it
+# among the in-flight ones, which quietly cost the guard its second condition.
+(cd "$REPO" && rm -f "$(git rev-parse --git-path MERGE_HEAD)" \
+  && : > "$(git rev-parse --git-path REBASE_HEAD)")
+out=$(decision "$(conflicted "gh pr merge 7")")
+assert "$out" 0 0 "could not find out" "a leftover REBASE_HEAD is not an operation in flight"
+(cd "$REPO" && rm -f "$(git rev-parse --git-path REBASE_HEAD)")
+(cd "$REPO" && : > "$(git rev-parse --git-path MERGE_HEAD)")
+
+# The other half of "both, never either alone", and the one nothing held: an
+# operation in flight, a matcher that failed, and a source with nothing wrong
+# with it. A rebase somewhere else in the tree is not a reason to believe a
+# refusal came from this file.
+out=$(decision "$(run_copy "$UNMARKED" "gh pr merge 7" 2>/dev/null)")
+assert "$out" 0 0 "could not find out" "a matcher failing with no markers here still refuses"
+
+# The unbroken gate, mid-operation, guards exactly as it did: an operation in
+# flight is not on its own a reason to stop.
+case_is "gh pr merge 7 --rebase" "No review cycle" "an intact gate mid-rebase still guards"
+(cd "$REPO" && rm -f "$(git rev-parse --git-path MERGE_HEAD)")
+
 verdict

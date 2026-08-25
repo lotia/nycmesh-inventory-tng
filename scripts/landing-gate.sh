@@ -134,6 +134,59 @@ ready to merge\"."
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# Is this gate's own source in the middle of being rewritten?
+#
+# THE ONE PLACE FAILING OPEN IS RIGHT -- and it buys less than the reason first
+# given for it, which was that a half-written gate refuses every Bash command in
+# the session, the git commands needed to finish the rebase included. That was
+# asserted rather than measured, and measuring it split this file's two ways of
+# breaking apart:
+#
+#   Markers in the SHELL half do block everything, because bash exits 2 on the
+#   syntax error and 2 is the harness's own "block this call". Nothing in this
+#   file runs then, so nothing in this file can help, and this function makes no
+#   claim to. inventory-tng-ghqk says what would.
+#
+#   Markers in the inlined PYTHON, which is the half that reaches here, block
+#   nothing of the sort. The file parses, the prefilter answers first, and every
+#   command that does not say `gh` or `push` as a word -- rebase --continue,
+#   --abort, add, status, mergetool -- was permitted throughout. Only a guarded
+#   command ever reached the matcher and was refused.
+#
+# So what standing down actually buys is the guarded pair itself: the
+# `git push --force-with-lease` that ends a collapse, and the merge this gate
+# exists to hold. Thinner than "the session is stranded", and stated at its
+# real size, because the cost is the same size -- a merge waved through while
+# nothing can read it. Both are small because reaching here is: it takes an
+# operation in flight AND markers in this very file.
+#
+# TWO CONDITIONS HERE, because either alone is too easily true. An operation
+# that can halt half-way has to actually be in flight, AND this file has to be
+# one of the ones carrying markers. Without the first, a stray `<<<<<<<` in a
+# comment would switch the guard off; without the second, any conflicted rebase
+# anywhere in the tree would. THREE for the stand-down, because this is asked
+# only where the matcher has already failed: an intact gate mid-rebase guards
+# exactly as it always did.
+#
+# NOT `REBASE_HEAD`, and this is the trap: git LEAVES IT BEHIND when a rebase
+# finishes, so it is present in any repository that has ever rebased and says
+# nothing about now. Listing it would make the first condition permanently true
+# and quietly reduce this to "does my source contain markers", which is the
+# single condition the paragraph above rejects. The rebase directories are the
+# in-flight signal; MERGE_HEAD and the other two are removed on completion.
+own_source_is_mid_conflict() {
+  have git || return 1
+  local self op
+  self=$(readlink -f "${BASH_SOURCE[0]}") || return 1
+  for op in rebase-merge rebase-apply MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD; do
+    if [[ -e "$(git rev-parse --git-path "$op" 2>/dev/null)" ]]; then
+      grep -qE '^(<{7}|={7}|>{7})([ \t]|$)' "$self"
+      return $?
+    fi
+  done
+  return 1
+}
+
 # ---------------------------------------------------------------------------
 # Reading GitHub
 # ---------------------------------------------------------------------------
@@ -638,6 +691,15 @@ for candidate in [cmd] + shell_payloads(cmd):
   # to permit, and the old code's `2>/dev/null` plus an empty verdict is exactly
   # how the second one used to be read as "nothing to guard".
   have python3 || deny_dependency python3 "reading what a command actually runs"
+  # The matcher could not be read, and the reason may be that this file is the
+  # one the rebase stopped in. Said on stderr rather than passed over quietly:
+  # the guard really is off, and that is worth seeing in the transcript.
+  if own_source_is_mid_conflict; then
+    echo "landing-gate: this file is mid-conflict, so the gate is standing down" >&2
+    echo "  until the markers are gone. Finish or abort the rebase; nothing is guarded" >&2
+    echo "  meanwhile. See DEVELOPERS.md \"When a branch is ready to merge\"." >&2
+    exit 0
+  fi
   deny_unavailable "a reading of what this command runs" "the matcher"
 }
 
