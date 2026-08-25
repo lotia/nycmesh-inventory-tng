@@ -259,6 +259,43 @@ Merge branch 'batch/catalogue-write-api'
 MSG
 expect 0 "Nothing to check" "a merge is not somebody's issue being landed"
 
+# --- git's own commits, found by the file rather than by the subject -------
+#
+# inventory-tng-wr9o. A merge or a revert committed with a custom -m, and any
+# conflicted cherry-pick, has a subject nobody can recognise, so the only thing
+# that identifies it is the file git leaves beside HEAD. These subjects are
+# deliberately NOT ones `message_is_git_own` catches, and carry no trailer, so
+# the escape is the only thing that can produce a pass.
+
+# The path is derived from the .git file rather than from `git rev-parse
+# --git-path`, which is the thing under test -- a test that asked the same
+# question the same way would agree with a wrong answer.
+worktree_gitdir() { sed 's/^gitdir: //' "$1/.git"; }
+
+scene
+git -C "$WORK/repo" worktree add -q -b side "$WORK/side"
+cd "$WORK/side" || exit 1
+message <<'MSG'
+Bring the catalogue branch in by hand
+MSG
+expect 1 "trailer, found none" "in a worktree, an ordinary message is still held to the rules"
+
+: > "$(worktree_gitdir "$WORK/side")/MERGE_HEAD"
+expect 0 "Nothing to check" "and a conflicted merge in that worktree is git's own"
+
+rm -f "$(worktree_gitdir "$WORK/side")/MERGE_HEAD"
+: > "$(worktree_gitdir "$WORK/side")/CHERRY_PICK_HEAD"
+expect 0 "Nothing to check" "so is a conflicted cherry-pick there"
+
+# The main checkout, where .git is a directory: the same escape, unregressed.
+scene
+: > "$WORK/repo/.git/MERGE_HEAD"
+message <<'MSG'
+Bring the catalogue branch in by hand
+MSG
+expect 0 "Nothing to check" "and the main checkout still finds it where it always did"
+rm -f "$WORK/repo/.git/MERGE_HEAD"
+
 # The subjects git writes for a commit that is not finished being written. Held
 # to the rules for a message somebody composed, every one of them is refused --
 # no trailer, and a subject six characters longer than one that already fitted

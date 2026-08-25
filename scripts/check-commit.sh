@@ -34,8 +34,24 @@ while [[ "${1:-}" == --* ]]; do
   esac
 done
 MESSAGE=${1:?usage: check-commit.sh [--amend] [--message-only] <message-file>}
-REPO_ROOT=$(git rev-parse --show-toplevel) || exit 1
 ISSUES=".beads/issues.jsonl"
+
+# Where git keeps the two files that say a commit is one of its own.
+#
+# This used to be "$REPO_ROOT/.git/MERGE_HEAD", off `--show-toplevel`, and in a
+# LINKED WORKTREE that path cannot exist: the worktree root holds a .git FILE
+# saying `gitdir: ...`, and the per-worktree state lives where that points. So
+# both tests were permanently false and the escape below was unreachable --
+# every conflicted cherry-pick in a worktree was refused as somebody's issue
+# being landed badly. This repository's agents work in .claude/worktrees/, so
+# that was the ordinary case rather than an exotic one: inventory-tng-wr9o.
+#
+# `--git-path` is the question actually being asked -- where does git keep this
+# -- and it answers correctly in a main checkout, in a linked worktree, and
+# under a relocated GIT_DIR. It also fails outside a repository, which is the
+# guard `--show-toplevel` used to provide here.
+MERGE_HEAD_PATH=$(git rev-parse --git-path MERGE_HEAD) || exit 1
+CHERRY_PICK_HEAD_PATH=$(git rev-parse --git-path CHERRY_PICK_HEAD) || exit 1
 
 # readlink -f first: .beads/hooks/commit-msg is a symlink to this file and is
 # how this normally runs, and bash reports the link's own path here rather than
@@ -56,7 +72,7 @@ summary=${lines[0]:-}
 # A merge, a revert and a cherry-pick are not somebody's issue being landed:
 # git writes their messages itself, and as a commit-msg hook this would refuse
 # every one of them.
-if [[ -f "$REPO_ROOT/.git/MERGE_HEAD" || -f "$REPO_ROOT/.git/CHERRY_PICK_HEAD" ]] ||
+if [[ -f "$MERGE_HEAD_PATH" || -f "$CHERRY_PICK_HEAD_PATH" ]] ||
   message_is_git_own "$summary"; then
   echo "Not an issue being landed (merge, revert or cherry-pick). Nothing to check."
   exit 0
