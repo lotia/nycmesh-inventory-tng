@@ -12,7 +12,7 @@ import re
 import unicodedata
 from typing import Any
 
-from django.db.models import Func, Value
+from django.db.models import Func, Q, Value
 
 # Every character Unicode gives the White_Space property. `TRIM` strips U+0020
 # and nothing else, which is the whole of the defect this closes: a value
@@ -109,3 +109,24 @@ def normalised(string: str) -> str:
     """
     visible = unicodedata.normalize("NFC", string).translate(_DROPPED)
     return _RUNS.sub(" ", visible).strip(" ").lower()
+
+
+def matching(typed: str) -> Q:
+    """Identifiers that begin with what somebody has typed.
+
+    The one place that knows how this column is searched, because getting it
+    wrong is invisible: the query returns the right rows either way and only
+    the plan is different.
+
+    ``__startswith`` against a term lowered here, never ``__istartswith``.
+    Django compiles the latter to ``UPPER(col) LIKE UPPER(pattern)``, and an
+    index is over a column rather than over a function of one, so that form
+    matches nothing and reads the whole table. The index this pairs with is
+    ``item_identifier_prefix``.
+
+    Folding in Python is safe *here* in a way it is not on a write path: the
+    worst a disagreement can do to a search is offer a row somebody did not
+    mean or miss one they did, and the next keystroke corrects it. Nothing is
+    stored, so nothing can be stored wrongly.
+    """
+    return Q(value_normalised__startswith=normalised(typed))
