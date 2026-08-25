@@ -1234,6 +1234,13 @@ A clone that never ran bootstrap has the hook and no `core.hooksPath`, and
 lost the link fails CI, where the same script runs as `--shipped-only` — its
 header says why the halves are split and which one a runner can be asked.
 
+It asks a third thing, because a hook that runs and an interpreter it can reach
+are not the same question: the checker reads the tracker through `python3`, and
+a hook inherits whatever `PATH` invoked it rather than an activated shell's. So
+a perfectly wired clone can still refuse every commit that stages the tracker,
+and the refusal, like the others, names the program rather than blaming the
+commit.
+
 There is one way past all of it, `git commit --no-verify`, and the rule about
 using it is in [AGENTS.md](AGENTS.md#git).
 

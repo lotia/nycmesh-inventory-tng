@@ -60,6 +60,31 @@ scene
 unwired
 expect --shipped-only -- 0 "read before it becomes one" "a checkout nobody commits from is not held to a hooks path"
 
+# inventory-tng-pg63. The PATH below holds what check-setup.sh itself needs and
+# nothing more, so what the case removes is the checker's dependency rather than
+# the footing this suite stands on.
+#
+# `head` and `cut` are in the list because check-setup.sh reads the hook's index
+# mode through both, and leaving them out did not make the case stricter -- it
+# made it wrong. The checker reported the tracked hook as untracked, so the
+# exit 1 this asserts was two failures rather than the one it names. The
+# `refute` below is what holds the list complete: drop either program and the
+# spurious objection comes back and the case says so.
+no_python() {
+  local dir="$WORK/no-python" p
+  mkdir -p "$dir"
+  for p in git bash sed grep readlink dirname basename cat rm mkdir chmod ln head cut; do
+    ln -sf "$(command -v "$p" 2>/dev/null)" "$dir/$p" 2>/dev/null
+  done
+  printf '%s' "$dir"
+}
+
+scene
+output=$(PATH="$(no_python)" "$CHECK" 2>&1)
+status=$?
+assert "$output" "$status" 1 "python3 is not on this PATH" "a wired hook with no interpreter is still reported"
+refute "$output" "$status" 1 "is not tracked" "and the interpreter is the only thing it is missing"
+
 scene
 mkdir -p "$WORK/repo/.githooks"
 git -C "$WORK/repo" config --local core.hooksPath .githooks

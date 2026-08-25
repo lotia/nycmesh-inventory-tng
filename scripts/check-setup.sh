@@ -87,6 +87,16 @@ elif [[ ! -x "$CHECKER" ]]; then
   note "Fix it with: chmod +x $CHECKER"
 fi
 
+# Only the wiring was being asked, and wiring is not the whole of whether a
+# commit gets read: the checker reaches the tracker through python3, which a
+# hook can easily fail to see for the reason DEVELOPERS.md "Prerequisites"
+# gives. Finding that out at the first refused commit is worse than finding it
+# out here, so it is asked here too -- inventory-tng-pg63.
+if ! command -v python3 >/dev/null 2>&1; then
+  fail "python3 is not on this PATH, and $CHECKER reads the tracker through it."
+  note "Commits staging the tracker would be refused. See DEVELOPERS.md 'Prerequisites'."
+fi
+
 if [[ "$SHIPPED_ONLY" -eq 0 ]]; then
   # In a linked worktree the path git holds names the main checkout's hooks,
   # for the reason scripts/bootstrap-dev.sh gives at its own copy of this
