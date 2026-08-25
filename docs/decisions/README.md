@@ -34,3 +34,4 @@ to ask "why is it like this?". Number them sequentially.
 | [0022](0022-an-empty-variable-is-an-unset-one.md) | An empty environment variable means the same as an absent one |
 | [0023](0023-which-addresses-may-speak-for-another.md) | Which addresses may speak for another |
 | [0024](0024-no-hard-delete.md) | No hard-delete path is built, and none will be |
+| [0025](0025-work-that-belongs-to-no-row.md) | Work that belongs to no row opens over the column, and closes back to it |
