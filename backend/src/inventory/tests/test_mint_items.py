@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 from django.core.management import call_command
+from django.db import IntegrityError, connection
 
 from inventory.management.commands import _identifiers, _staging
 from inventory.management.commands._identifiers import LONGEST_NAME, LONGEST_VALUE, UNCATEGORISED
@@ -81,6 +82,82 @@ def test_a_string_differing_only_in_case_is_the_same_identifier() -> None:
     # The catalogue's spelling, because the catalogue is minted first: it is
     # the one the pick-list shows and the one a person recognises.
     assert identifiers() == [("LiteBeam", ItemIdentifier.Kind.ALIAS, "LiteBeam")]
+
+
+def test_the_database_disagreeing_with_python_costs_one_row_and_not_the_import() -> None:
+    """The load-bearing case decision 0026 was written for.
+
+    `İSTANBUL` and `ISTANBUL` are one string to PostgreSQL, which folds U+0130
+    to a bare `i`, and two to Python, which leaves a combining dot behind. So
+    the catalogue tab keeps both -- it dedupes with Python's fold -- two items
+    are minted, and the second identifier meets a unique index that has already
+    seen its own spelling of the first.
+
+    Before this, `mint` was atomic and the insert was not, so that single
+    disagreement rolled back the entire catalogue and the operator was shown a
+    constraint name. Now it is a savepoint, a number in the report, and an
+    import that finished.
+    """
+    minted = _identifiers.mint(sheet_of([submission()], catalogue=("ISTANBUL", "İSTANBUL")))
+
+    assert minted.items_added == 2, "both spellings are still separate items; only the identifier collides"
+    assert minted.folds_disagreed == 1
+    # One identifier, because one is what the column will hold -- counted by
+    # the database's answer rather than by Python's, which would say two.
+    assert (minted.identifiers, minted.identifiers_added) == (1, 1)
+    assert ItemIdentifier.objects.count() == 1
+    # And the second item is reported as one whose string names another item,
+    # which is the pre-existing signal for exactly this shape of problem.
+    assert minted.naming_another_item == 1
+
+
+def test_an_integrity_error_that_is_not_the_unique_index_is_not_swallowed(category: Category) -> None:
+    """The refusal is an answer only when it is the answer being asked for.
+
+    `_hold` reads an `IntegrityError` as "the database already holds this
+    string", which is right for the unique index and wrong for everything else.
+    So it goes back and asks which row holds it, and re-raises when the answer
+    is that none does -- here, a foreign key pointing at an item that has been
+    deleted. Treating that as an ordinary outcome would turn a broken import
+    into a report full of zeroes.
+    """
+    item = Item.objects.create(name="Vanishing", category=category)
+    Item.objects.filter(pk=item.pk).delete()
+    # Django makes foreign keys DEFERRABLE INITIALLY DEFERRED, so without this
+    # the violation surfaces at commit -- long after `_hold` has returned, and
+    # in a test that would have passed while proving nothing.
+    with connection.cursor() as cursor:
+        cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
+
+    with pytest.raises(IntegrityError):
+        _identifiers._hold(item, "whatever")
+
+
+def test_python_merging_two_names_the_database_keeps_apart_is_a_duplicate_row() -> None:
+    """The disagreement read the other way round, and where it is caught.
+
+    Python's `str.lower()` applies the final-sigma rule, so it makes one string
+    of these two; PostgreSQL's `lower()` does not, so it makes two. Left to the
+    minting loop that would be the worse outcome of the pair -- no exception,
+    one item quietly given no identifier, and nothing in the report saying so.
+
+    It never reaches the loop. `_tab` folds the catalogue before an `Item`
+    exists, so this is one catalogued name and a duplicate row, which is
+    already a number somebody reads. That is the check doing exactly what its
+    docstring claims: settling a refusal before anything has been minted.
+
+    The guard in the loop stands anyway, because the tab is not the only thing
+    that reaches it, and because Python is not entitled to decide this either
+    way round.
+    """
+    minted = _identifiers.mint(sheet_of([submission()], catalogue=("ΟΔΟΣ", "ΟΔΟς")))
+
+    assert (minted.items, minted.items_added) == (1, 1)
+    assert minted.duplicated == 1
+    assert (minted.identifiers, minted.identifiers_added) == (1, 1)
+    assert minted.folds_disagreed == 0
+    # And the one item that exists has an identifier, which is the promise.
+    assert ItemIdentifier.objects.count() == 1
 
 
 def test_a_hand_written_alias_names_the_item_it_was_written_for() -> None:
@@ -275,6 +352,7 @@ def test_the_command_reads_the_staged_rows_and_says_what_it_minted(tmp_path: Pat
         "catalogue rows too long to be a name 0",
         "identifiers 3",
         "this run added 3",
+        "the two folds disagreed 0",
         "already naming another item 0",
         "strings naming no catalogued item 1",
         "with no reason written 0",
