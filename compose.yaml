@@ -53,7 +53,13 @@ services:
       # older /var/lib/postgresql/data path. Mount the parent.
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-inventory}"]
+      # -d as well as -U, and the same two defaults the service is given above.
+      # Without it pg_isready connects to a database named after the user, which
+      # this stack never creates: the probe still passes, because a server that
+      # refuses the database is a server that is accepting connections, and the
+      # only sign is `FATAL: database "inventory" does not exist` in the
+      # postgres log every five seconds for as long as the stack is up.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-inventory} -d ${POSTGRES_DB:-inventory_tng}"]
       interval: 5s
       timeout: 3s
       retries: 5
