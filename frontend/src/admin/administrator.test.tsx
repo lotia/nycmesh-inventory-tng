@@ -11,7 +11,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "../api/testFixtures";
 import { ItemList } from "../items/ItemList";
-import { zipTies } from "../items/testFixtures";
+import { cable, zipTies } from "../items/testFixtures";
 import {
   ADMINISTRATOR,
   renderScreen,
@@ -21,33 +21,70 @@ import {
 } from "../testHarness";
 import { StaleSession } from "./StepUp";
 
-/** The catalogue, plus whatever the write should answer with. */
+/** The groupings an item can be added to. See CreateItem. */
+const CATEGORIES = [{ id: 7, name: "Cable and connectors", parent: null }];
+
+/** An answer of this shape, which is what every stub below hands back. */
+const answering = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+
+/**
+ * The catalogue, the groupings, and whatever a write should answer with.
+ *
+ * Every stub in this file goes through here so that "the item list answers with
+ * `page(zipTies)`" is written once. `categories` is a thunk rather than a body
+ * because two of the cases below are about *when* it answers rather than what
+ * it says.
+ */
 function catalogue(
   session: unknown,
-  write: () => Response = () => new Response("{}", { status: 200 }),
+  write: () => Response = () => answering({}),
+  categories: () => Promise<Response> | Response = () => answering(page(...CATEGORIES)),
 ) {
-  stubSession(session, (async (_path: string, init?: RequestInit) => {
-    if (init?.method === "PATCH") {
+  stubSession(session, (async (path: string, init?: RequestInit) => {
+    // Every unsafe method, not only PATCH: correcting an item and adding one
+    // are the two halves of `edit_catalogue` this screen has, and a test that
+    // stubbed only the first would let the second reach the real fetch.
+    if (init?.method !== undefined && init.method !== "GET") {
       return write();
     }
-    return new Response(JSON.stringify(page(zipTies)), { status: 200 });
+    if (path.startsWith("/api/categories")) {
+      return categories();
+    }
+    // Two rows, not one: a claim that a control belongs to the collection
+    // rather than to a row cannot be made against a list of one.
+    return answering(page(zipTies, cable));
   }) as unknown as typeof fetch);
 }
 
 const edit = () => screen.getByRole("button", { name: /edit zip ties reusable/i });
+const add = () => screen.getByRole("button", { name: /add an item/i });
 
-/** Every write the app made, as the bodies it sent. */
-function written(): unknown[] {
+/** Every write the app made by one method, as the bodies it sent. */
+function written(method = "PATCH"): unknown[] {
   return (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
-    .filter(([, init]) => (init as RequestInit | undefined)?.method === "PATCH")
+    .filter(([, init]) => (init as RequestInit | undefined)?.method === method)
     .map(([, init]) => JSON.parse(String((init as RequestInit).body)));
 }
 
 /** The one write, asserted to be exactly one before it is read. */
-function theWrite(): unknown {
-  const writes = written();
+function theWrite(method = "PATCH"): unknown {
+  const writes = written(method);
   expect(writes).toHaveLength(1);
   return writes[0];
+}
+
+/** Open the create dialog and fill in the two fields the API insists on. */
+async function newItemNamed(named: string): Promise<HTMLElement> {
+  fireEvent.click(add());
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.change(within(dialog).getByRole("textbox", { name: /^name$/i }), {
+    target: { value: named },
+  });
+  fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: /category/i }));
+  // The option list is portalled out of the dialog, so it is found on the
+  // screen rather than within it.
+  fireEvent.click(await screen.findByRole("option", { name: CATEGORIES[0].name }));
+  return dialog;
 }
 
 beforeEach(() => {
@@ -59,12 +96,13 @@ afterEach(() => {
 });
 
 describe("what a volunteer sees", () => {
-  it("is no editing control at all", async () => {
+  it("is no way to change the catalogue, on a row or on the list", async () => {
     catalogue(VOLUNTEER);
     renderScreen(<ItemList />);
     await screen.findByRole("heading", { name: "Zip Ties Reusable" });
 
     expect(screen.queryByRole("button", { name: /edit/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /add an item/i })).not.toBeInTheDocument();
   });
 });
 
@@ -115,6 +153,7 @@ describe("a session the server wants a second look at", () => {
     await screen.findByRole("heading", { name: "Zip Ties Reusable" });
 
     expect(screen.queryByRole("button", { name: /edit/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /add an item/i })).not.toBeInTheDocument();
   });
 
   it("offers the way back before anything is pressed", async () => {
@@ -201,6 +240,201 @@ describe("a session the server wants a second look at", () => {
 
     expect(await screen.findByText(/reserved for administrators/i)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /sign in again/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("adding an item to the catalogue", () => {
+  it("is offered on the list rather than on a row", async () => {
+    catalogue(ADMINISTRATOR);
+    renderScreen(<ItemList />);
+    await screen.findByRole("heading", { name: "Zip Ties Reusable" });
+
+    // One control for the collection against a list of two, which is what
+    // makes this a claim about the anchor rather than an accident of the
+    // fixture: a per-row control would answer two here. Both rows do carry
+    // their own Edit, which is the contrast.
+    expect(screen.getAllByRole("button", { name: /add an item/i })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^edit /i })).toHaveLength(2);
+  });
+
+  it("adds one without leaving the app", async () => {
+    catalogue(ADMINISTRATOR);
+    renderScreen(<ItemList />);
+    await screen.findByRole("heading", { name: "Zip Ties Reusable" });
+
+    const dialog = await newItemNamed("Grounding Wire");
+    fireEvent.click(within(dialog).getByRole("button", { name: /^add$/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(theWrite("POST")).toEqual({
+      name: "Grounding Wire",
+      category: CATEGORIES[0].id,
+      unit_of_measure: "each",
+      minimum_stock: "0",
+      reorder_quantity: "1",
+    });
+  });
+
+  it("sends the unit it was told, not the one it started with", async () => {
+    catalogue(ADMINISTRATOR);
+    renderScreen(<ItemList />);
+    await screen.findByRole("heading", { name: "Zip Ties Reusable" });
+
+    const dialog = await newItemNamed("Cat6 Outdoor");
+    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: /counted in/i }));
+    fireEvent.click(await screen.findByRole("option", { name: "Metre" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /^add$/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(theWrite("POST")).toMatchObject({ unit_of_measure: "metre" });
+  });
+
+  it("will not send an item with no category, because the API cannot take one", async () => {
+    catalogue(ADMINISTRATOR);
+    renderScreen(<ItemList />);
+    await screen.findByRole("heading", { name: "Zip Ties Reusable" });
+    fireEvent.click(add());
+
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByRole("textbox", { name: /^name$/i }), {
+      target: { value: "Grounding Wire" },
+    });
+
+    // Asked for on the form rather than discovered as a 400 the server has to
+    // explain: `Item.category` is not nullable.
+    expect(within(dialog).getByRole("button", { name: /^add$/i })).toBeDisabled();
+    expect(written("POST")).toHaveLength(0);
+  });
+
+  it("says so when there is no category to join", async () => {
+    catalogue(ADMINISTRATOR, undefined, () => answering(page()));
+    renderScreen(<ItemList />);
+    await screen.findByRole("heading", { name: "Zip Ties Reusable" });
+    fireEvent.click(add());
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/no categories yet/i)).toBeInTheDocument();
+  });
+
+  it("does not call a category list it has not read yet an empty one", async () => {
+    // See CreateItem for why the two states are told apart. Held open here
+    // rather than answered instantly, because a stub that resolves at once
+    // never renders the state this is about.
+    let answer: (rows: unknown) => void = () => {};
+    const held = new Promise<unknown>((resolve) => {
+      answer = resolve;
+    });
+    catalogue(ADMINISTRATOR, undefined, async () => answering(await held));
+    renderScreen(<ItemList />);
+    await screen.findByRole("heading", { name: "Zip Ties Reusable" });
+    fireEvent.click(add());
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByText(/no categories yet/i)).not.toBeInTheDocument();
+    expect(within(dialog).getByText(/reading the categories/i)).toBeInTheDocument();
+
+    // And once it answers, neither sentence is left behind.
+    answer(page(...CATEGORIES));
+    await waitFor(() =>
+      expect(within(dialog).queryByText(/reading the categories/i)).not.toBeInTheDocument(),
+    );
+    expect(within(dialog).queryByText(/no categories yet/i)).not.toBeInTheDocument();
+  });
+
+  it("does not call an unreadable category list an empty one", async () => {
+    // The two look the same on screen and mean opposite things: one says to
+    // make a category first, the other says the network is down and the item
+    // cannot be added at all.
+    catalogue(ADMINISTRATOR, undefined, () =>
+      answering({ detail: "Categories could not be read." }, 500),
+    );
+    renderScreen(<ItemList />);
+    await screen.findByRole("heading", { name: "Zip Ties Reusable" });
+    fireEvent.click(add());
+
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText(/categories could not be read/i)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/no categories yet/i)).not.toBeInTheDocument();
+  });
+
+  it("offers the way back when the server wants a second look", async () => {
+    catalogue(
+      ADMINISTRATOR,
+      () =>
+        new Response(
+          JSON.stringify({
+            detail: "Sign in again to make this change.",
+            code: "reauthentication_required",
+          }),
+          { status: 403 },
+        ),
+    );
+    renderScreen(<ItemList />);
+    await screen.findByRole("heading", { name: "Zip Ties Reusable" });
+
+    const dialog = await newItemNamed("Grounding Wire");
+    fireEvent.click(within(dialog).getByRole("button", { name: /^add$/i }));
+
+    expect(await screen.findByRole("link", { name: /sign in again/i })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/accounts/reauthenticate/"),
+    );
+    // And the dialog is still there, holding what was typed, so the way back
+    // does not cost the work.
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("sends the stock levels as typed, not as the defaults it opened with", async () => {
+    catalogue(ADMINISTRATOR);
+    renderScreen(<ItemList />);
+    await screen.findByRole("heading", { name: "Zip Ties Reusable" });
+
+    const dialog = await newItemNamed("Grounding Wire");
+    fireEvent.change(within(dialog).getByRole("textbox", { name: /minimum stock/i }), {
+      target: { value: "25" },
+    });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: /reorder quantity/i }), {
+      target: { value: "100" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^add$/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(theWrite("POST")).toMatchObject({ minimum_stock: "25", reorder_quantity: "100" });
+  });
+
+  it("says the other kind of no as a sentence, and keeps the form", async () => {
+    catalogue(
+      ADMINISTRATOR,
+      () =>
+        new Response(JSON.stringify({ detail: "An item with this name already exists." }), {
+          status: 400,
+        }),
+    );
+    renderScreen(<ItemList />);
+    await screen.findByRole("heading", { name: "Zip Ties Reusable" });
+
+    const dialog = await newItemNamed("Zip Ties Reusable");
+    fireEvent.click(within(dialog).getByRole("button", { name: /^add$/i }));
+
+    expect(await screen.findByText(/already exists/i)).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    // And it can be put away, leaving the form to be corrected rather than
+    // an alert stuck above the field it is about.
+    fireEvent.click(within(dialog).getByRole("button", { name: /close/i }));
+    await waitFor(() => expect(screen.queryByText(/already exists/i)).not.toBeInTheDocument());
+  });
+
+  it("leaves the catalogue alone when the add is abandoned", async () => {
+    catalogue(ADMINISTRATOR);
+    renderScreen(<ItemList />);
+    await screen.findByRole("heading", { name: "Zip Ties Reusable" });
+
+    const dialog = await newItemNamed("Grounding Wire");
+    fireEvent.click(within(dialog).getByRole("button", { name: /cancel/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(written("POST")).toHaveLength(0);
   });
 });
 

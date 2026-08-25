@@ -53,6 +53,13 @@ export interface Item {
   labels: ItemLabel[];
 }
 
+/** A grouping of items, nestable, as `CategorySerializer` renders it. */
+export interface Category {
+  id: number;
+  name: string;
+  parent: number | null;
+}
+
 /** A volunteer as the pick-list shows them. */
 export interface Volunteer {
   id: number;

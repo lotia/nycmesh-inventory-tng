@@ -8,12 +8,33 @@
  * section 6, "Nothing is ever added silently".
  */
 
-/** The units `Item.unit_of_measure` can hold, and how to say them. */
+/**
+ * The units `Item.unit_of_measure` can hold, and how to say them.
+ *
+ * `Item.UnitOfMeasure` in backend/src/inventory/models.py is where these are
+ * decided. They are transcribed once, here, because two transcriptions of one
+ * enum is one of them being edited alone -- and this is the file that already
+ * says what an unknown unit does. `unitChoices` below is how a form draws them.
+ */
 const UNITS: Record<string, { one: string; many: string }> = {
   each: { one: "each", many: "each" },
   metre: { one: "metre", many: "metres" },
   foot: { one: "foot", many: "feet" },
 };
+
+/**
+ * The same units as a `<select>` draws them: the stored value, and a label.
+ *
+ * The singular capitalised, which is how a form names a unit and how the API's
+ * own choices label them. Derived rather than listed again, so a unit added to
+ * the map above is offered without anybody remembering to.
+ */
+export function unitChoices(): { value: string; label: string }[] {
+  return Object.entries(UNITS).map(([value, { one }]) => ({
+    value,
+    label: one.charAt(0).toUpperCase() + one.slice(1),
+  }));
+}
 
 /** A decimal from the API, as a number, without trailing zeros in the display. */
 export function toNumber(decimal: string): number {

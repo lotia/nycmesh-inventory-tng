@@ -203,9 +203,15 @@ Named here so the gaps are visible rather than surprising:
   than shown a control that will not work. Signing in is built too — see
   below — so what is missing is the screens that use it. Who may write what is
   settled in [decision 0012](decisions/0012-two-populations.md) and where
-  administrators work in [0014](decisions/0014-one-interface.md). Every API
-  endpoint but the ones [DEVELOPERS.md](../DEVELOPERS.md#signing-in) lists
-  still requires a session, including the two a volunteer needs.
+  administrators work in [0014](decisions/0014-one-interface.md), and where a
+  screen goes when it belongs to no row in
+  [0025](decisions/0025-work-that-belongs-to-no-row.md). The item list has both
+  halves an item has — a row is corrected where it is, and one is added from the
+  head of the list — which is two of the six endpoints `edit_catalogue` covers;
+  locations, categories and every other capability `CAPABILITIES` names have no
+  screen yet. Every API endpoint but the ones
+  [DEVELOPERS.md](../DEVELOPERS.md#signing-in) lists still requires a session,
+  including the two a volunteer needs.
 - **Migration from the existing Google Sheet** (52 items, 3,439 submissions).
   It is built: `manage.py stage_sheet` loads an export into the
   staging tables, `manage.py mint_items` and `manage.py import_volunteers` mint
