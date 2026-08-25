@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCart } from "../cart/CartProvider";
 import { SCAN_DEBOUNCE_MS } from "../cart/cartState";
-import { applyCode, type Measured, type Outcome, recordMeasured } from "./applyCode";
+import { applyCode, type Measured, namesASticker, type Outcome, recordMeasured } from "./applyCode";
 import { confirmScan } from "./confirm";
 import { codeFromScan } from "./deepLink";
 
@@ -40,6 +40,16 @@ export interface ScannedCode {
   scan: (code: string, signal?: AbortSignal) => void;
   /** The amount, once entered. */
   enter: (quantity: number) => void;
+  /**
+   * This code has just been revoked, so the announcement should say so.
+   *
+   * A scan that is already in the batch stays in it -- revoking a sticker
+   * changes nothing already recorded, which is the whole reason it is not a
+   * delete. What changes is the sentence: it now reads as the replaced sticker
+   * it is, so the person holding it is told to reprint rather than left with a
+   * line that says everything is fine.
+   */
+  revoked: (code: string) => void;
   /** Put the announcement away, and abandon a measured scan with it. */
   dismiss: () => void;
 }
@@ -76,7 +86,7 @@ export function useScannedCode(): ScannedCode {
           setOutcome(applied);
           // Only a code that reached the batch has anything to confirm. A
           // measured one has not: it is still being asked about.
-          if (applied.applied === "item" || applied.applied === "location") {
+          if (namesASticker(applied)) {
             confirmUntil.current = Date.now() + CONFIRM_WINDOW_MS;
           }
         })
@@ -100,6 +110,17 @@ export function useScannedCode(): ScannedCode {
     [measured, dispatch],
   );
 
+  const revoked = useCallback((code: string) => {
+    setOutcome((last) => {
+      // This very code. A revocation confirmed while a later scan is already
+      // on screen must not relabel that one.
+      if (last === null || !namesASticker(last) || last.code !== code) {
+        return last;
+      }
+      return { ...last, revoked: true };
+    });
+  }, []);
+
   const dismiss = useCallback(() => setOutcome(null), []);
 
   // The cart is what says a scan landed, so the beep follows the cart rather
@@ -121,5 +142,5 @@ export function useScannedCode(): ScannedCode {
     }
   }, [lines, locationId]);
 
-  return { outcome, measured, scan, enter, dismiss };
+  return { outcome, measured, scan, enter, revoked, dismiss };
 }

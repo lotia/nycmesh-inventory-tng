@@ -27,13 +27,35 @@ export interface Measured {
   revoked: boolean;
 }
 
-/** What happened, in the terms the volunteer needs to hear it. */
+/**
+ * What happened, in the terms the volunteer needs to hear it.
+ *
+ * Both of the outcomes that resolved something carry the `code` as well, which
+ * is not for the sentence: it is what the administrative control beside that
+ * sentence acts on. A revocation names the sticker, and the sticker is the
+ * only thing on the screen at that moment.
+ */
 export type Outcome =
-  | { applied: "item"; name: string; quantity: number; revoked: boolean }
-  | { applied: "location"; revoked: boolean }
+  | { applied: "item"; code: string; name: string; quantity: number; revoked: boolean }
+  | { applied: "location"; code: string; revoked: boolean }
   | { applied: "measured"; measured: Measured }
   | { applied: "unknown"; code: string }
   | { applied: "failed"; detail: string };
+
+/**
+ * Whether this outcome resolved a sticker, and so has a code to act on.
+ *
+ * The one place that question is answered, for the reason
+ * `inventory.permissions.administrators_only` gives about its own: three
+ * callers ask it -- the beep, owed only where the batch changed; the
+ * announcement, which draws a revoke control; and the revocation, which has to
+ * mark the right outcome. A fourth variant carrying a code is then one edit,
+ * and the caller that would otherwise be missed is the last, whose symptom is a
+ * sticker retired under a line still saying the scan was fine.
+ */
+export function namesASticker(outcome: Outcome): outcome is Extract<Outcome, { revoked: boolean }> {
+  return outcome.applied === "item" || outcome.applied === "location";
+}
 
 /**
  * Whether a scan of this item may be recorded without asking how much.
@@ -98,7 +120,7 @@ export async function applyCode(
     // It is the mockup's "only 1 QR code to scan", and setting it is
     // idempotent, so scanning it twice is harmless.
     dispatch({ type: "setLocation", locationId: label.location });
-    return { applied: "location", revoked };
+    return { applied: "location", code: label.code, revoked };
   }
 
   if (label.item === null) {
@@ -140,7 +162,13 @@ export async function applyCode(
   }
 
   dispatch({ type: "scan", label: scanned });
-  return { applied: "item", name: item.name, quantity: scanned.quantity, revoked };
+  return {
+    applied: "item",
+    code: scanned.code,
+    name: item.name,
+    quantity: scanned.quantity,
+    revoked,
+  };
 }
 
 /** The measured scan above, once somebody has said how much. */
@@ -154,6 +182,7 @@ export function recordMeasured(
   dispatch({ type: "scan", label: measured.label, quantity });
   return {
     applied: "item",
+    code: measured.label.code,
     name: measured.label.item.name,
     quantity,
     revoked: measured.revoked,

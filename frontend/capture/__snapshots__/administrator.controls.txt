@@ -12,4 +12,5 @@ Code
 Item
 Location
 Quantity
+Revoke this label
 What is happening

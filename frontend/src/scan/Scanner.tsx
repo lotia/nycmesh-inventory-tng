@@ -28,7 +28,7 @@ import { OutcomeAlert } from "./outcome";
 import { useScannedCode } from "./useScannedCode";
 
 export function Scanner() {
-  const { outcome, measured, scan, enter, dismiss } = useScannedCode();
+  const { outcome, measured, scan, enter, revoked, dismiss } = useScannedCode();
   const [typed, setTyped] = useState("");
   const [camera, setCamera] = useState(false);
   return (
@@ -66,7 +66,7 @@ export function Scanner() {
         <MeasuredAmount measured={measured} onCancel={dismiss} onEntered={enter} />
       ) : null}
 
-      {outcome ? <OutcomeAlert outcome={outcome} onClose={dismiss} /> : null}
+      {outcome ? <OutcomeAlert outcome={outcome} onClose={dismiss} onRevoked={revoked} /> : null}
     </Stack>
   );
 }

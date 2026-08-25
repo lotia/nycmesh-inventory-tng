@@ -16,7 +16,7 @@ import { OutcomeAlert } from "./outcome";
 import { useScannedCode } from "./useScannedCode";
 
 export function DeepLink() {
-  const { outcome, measured, scan, enter, dismiss } = useScannedCode();
+  const { outcome, measured, scan, enter, revoked, dismiss } = useScannedCode();
   // Read before the first render rather than on each one: the effect below
   // clears the address bar, so reading it there would race its own cleanup in
   // React's development double-invoke.
@@ -40,7 +40,7 @@ export function DeepLink() {
       {measured ? (
         <MeasuredAmount measured={measured} onCancel={dismiss} onEntered={enter} />
       ) : null}
-      <OutcomeAlert outcome={outcome} onClose={dismiss} />
+      <OutcomeAlert outcome={outcome} onClose={dismiss} onRevoked={revoked} />
     </>
   );
 }

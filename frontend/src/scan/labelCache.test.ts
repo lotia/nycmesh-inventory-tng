@@ -8,6 +8,7 @@ import { zipTies } from "../items/testFixtures";
 import {
   CACHE_MAX_AGE_MS,
   cachedLabel,
+  forgetLabel,
   forgetLabelCache,
   refreshLabelCache,
   STORAGE_KEY,
@@ -121,5 +122,50 @@ describe("the label cache", () => {
     expect(await refreshLabelCache()).toBe(false);
 
     expect(cachedLabel(PACKET.code)?.item_name).toBe(zipTies.name);
+  });
+});
+
+describe("a code this device has just revoked", () => {
+  it("stops being answered out of the cache, and stays out across a reload", async () => {
+    // `forgetLabel` says what this closes: without it, a cache filled before
+    // the revocation goes on calling that sticker fine on the very device
+    // that retired it.
+    serving([mapped(PACKET), mapped(WALL, null)]);
+    await refreshLabelCache();
+
+    forgetLabel(PACKET.code);
+
+    expect(cachedLabel(PACKET.code)).toBeNull();
+    // The wall code is untouched: one sticker was revoked, not the map.
+    expect(cachedLabel(WALL.code)).not.toBeNull();
+    // And written through, so the next load of the app does not bring it back.
+    forgetLabelCache();
+    expect(cachedLabel(PACKET.code)).toBeNull();
+    expect(cachedLabel(WALL.code)).not.toBeNull();
+  });
+
+  it("hydrates from storage first, which is the failed-refresh case it is for", async () => {
+    // A refresh that failed leaves nothing in memory, and the map on disk is
+    // still young enough to be answered from -- so reading it is exactly when
+    // the revocation has to reach it.
+    serving([mapped(PACKET)]);
+    await refreshLabelCache();
+    forgetLabelCache();
+
+    forgetLabel(PACKET.code);
+
+    forgetLabelCache();
+    expect(cachedLabel(PACKET.code)).toBeNull();
+  });
+
+  it("does nothing at all when there is no cache to take it out of", () => {
+    // The ordinary case on a cold start: the app revokes before the map has
+    // been filled, and this must not mint one.
+    forgetLabelCache();
+    window.localStorage.clear();
+
+    forgetLabel(PACKET.code);
+
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 });

@@ -293,6 +293,13 @@ old one. Do not reprint the old code. A revoked sticker still scans, and the
 volunteer scanning it is told to have the shelf reprinted — so nobody is
 blocked while you get round to it.
 
+**And you do not have to come here to do it.** Scan the sticker in the app, or
+follow its own QR, and the line that says what the scan did carries **Revoke
+this label** underneath — for you and for nobody else. It asks first, naming
+the code, and then does exactly what setting *Revoked at* here does. That is
+the one to reach for when you are standing at the shelf holding the sticker
+you have decided about; this page is for a batch of them at a desk.
+
 ---
 
 ## Stopping one phone
