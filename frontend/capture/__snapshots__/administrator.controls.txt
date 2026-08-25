@@ -1,5 +1,8 @@
 Edit
 Add an item
+New category
+New place
+Offered in the pick-list
 Merged into
 Active
 Delete

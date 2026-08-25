@@ -11,37 +11,80 @@
  *
  * So this is the same choice offered as a list. A wall scan sets it too, and
  * whichever set it last is what shows.
+ *
+ * AND IT IS WHERE A PLACE IS MADE. An administrator standing at a shelf that is
+ * not in this list is the moment decision 0014 point 1 is about, so the control
+ * for making one is here rather than on a locations screen -- gated on
+ * `edit_catalogue`, so a volunteer's own screen is exactly what it was.
  */
+import Button from "@mui/material/Button";
 import MenuItem from "@mui/material/MenuItem";
+import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
-import type { Location, Page } from "../api/types";
-import { useResource } from "../api/useResource";
+import { EditLocation } from "../admin/EditLocation";
+import { useCan } from "../admin/SessionProvider";
+import { useVocabulary } from "../admin/vocabulary";
+import type { Location } from "../api/types";
 import { useCart } from "../cart/CartProvider";
 
 export function LocationPicker() {
   const { cart, dispatch } = useCart();
-  const { data, error } = useResource<Page<Location>>("/api/locations");
-  const locations = data?.results ?? [];
+  // Drawn from the server's answer, never guessed: decision 0014 point 3.
+  const mayEdit = useCan("edit_catalogue");
+  const places = useVocabulary<Location>("/api/locations", (saved) =>
+    // Only a place the list still offers. Clearing "Offered in the pick-list"
+    // is a save like any other, and taking it as the answer to "where is this
+    // stock" would leave the batch pointing at a row the next read of this
+    // list will not carry -- an empty select, a Save still enabled, and the
+    // server refusing the whole batch at `stock_movement_to_location_is_active`.
+    dispatch({ type: "setLocation", locationId: saved.active ? saved.id : null }),
+  );
+  const { rows: locations, error } = places;
+  const chosen = locations.find((one) => one.id === cart.locationId) ?? null;
 
   return (
-    <TextField
-      select
-      label="Where the stock is"
-      // An empty string rather than null: a select with no value is
-      // uncontrolled, and React says so loudly in the console.
-      value={cart.locationId === null ? "" : String(cart.locationId)}
-      onChange={(event) =>
-        dispatch({ type: "setLocation", locationId: Number(event.target.value) })
-      }
-      helperText={error ? error.message : "Or scan the code on the wall."}
-      error={error !== null}
-      disabled={locations.length === 0}
-    >
-      {locations.map((location) => (
-        <MenuItem key={location.id} value={String(location.id)}>
-          {location.name}
-        </MenuItem>
-      ))}
-    </TextField>
+    <Stack spacing={1}>
+      <TextField
+        select
+        label="Where the stock is"
+        // An empty string rather than null: a select with no value is
+        // uncontrolled, and React says so loudly in the console.
+        value={cart.locationId === null ? "" : String(cart.locationId)}
+        onChange={(event) =>
+          dispatch({ type: "setLocation", locationId: Number(event.target.value) })
+        }
+        helperText={error ? error.message : "Or scan the code on the wall."}
+        error={error !== null}
+        disabled={locations.length === 0}
+      >
+        {locations.map((location) => (
+          <MenuItem key={location.id} value={String(location.id)}>
+            {location.name}
+          </MenuItem>
+        ))}
+      </TextField>
+
+      {mayEdit ? (
+        <Stack direction="row" spacing={1}>
+          <Button size="small" onClick={places.add}>
+            New place
+          </Button>
+          {chosen ? (
+            <Button size="small" onClick={() => places.correct(chosen)}>
+              Edit {chosen.name}
+            </Button>
+          ) : null}
+        </Stack>
+      ) : null}
+
+      {places.editing ? (
+        <EditLocation
+          existing={places.editing.row}
+          locations={locations}
+          onClose={places.close}
+          onSaved={places.settled}
+        />
+      ) : null}
+    </Stack>
   );
 }

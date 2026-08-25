@@ -9,7 +9,7 @@
  */
 import { render } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { vi } from "vitest";
+import { expect, vi } from "vitest";
 import { SessionProvider } from "./admin/SessionProvider";
 import { CartProvider } from "./cart/CartProvider";
 
@@ -76,6 +76,51 @@ export function callsTo(prefix: string): unknown[] {
   return (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.filter(
     ([path]) => typeof path === "string" && path.startsWith(prefix),
   );
+}
+
+/** One request this app made that was not a read. */
+export interface Write {
+  path: string;
+  method: string;
+  body: unknown;
+}
+
+/**
+ * Every write the app made, as the path, the method and the body it sent.
+ *
+ * Here rather than in each administrative test file: what an administrative
+ * screen does is send one write, and asserting that means the same three
+ * things every time. Reads are left out because every screen makes several
+ * before it can draw anything, which is what `callsTo` above is for.
+ *
+ * `method` narrows further, for a screen that has more than one: correcting a
+ * row is a PATCH and adding one is a POST, and a test about either has to be
+ * able to say there were none of the other.
+ */
+export function writes(method?: string): Write[] {
+  return (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
+    .filter(([, init]) => {
+      const sent = (init as RequestInit | undefined)?.method;
+      return sent !== undefined && sent !== "GET" && (method === undefined || sent === method);
+    })
+    .map(([path, init]) => ({
+      path: String(path),
+      method: String((init as RequestInit).method),
+      body: JSON.parse(String((init as RequestInit).body)),
+    }));
+}
+
+/**
+ * The one write, asserted to be exactly one before it is read.
+ *
+ * The assertion is the point: a screen that sent its body twice, or sent a
+ * second request nobody asked for, would otherwise pass a test that only ever
+ * looked at the first.
+ */
+export function theWrite(method?: string): Write {
+  const made = writes(method);
+  expect(made).toHaveLength(1);
+  return made[0];
 }
 
 export function renderScreen(ui: ReactNode) {

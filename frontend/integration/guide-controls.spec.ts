@@ -203,6 +203,40 @@ test("the app still offers every control the guides name", async ({ page }) => {
   await expect(outbox.getByRole("button", { name: "Dismiss" })).toBeVisible();
   await harvest("app");
 
+  // The administrative controls the item list carries, which are drawn from
+  // `/api/me` and so are only here because this walk signed in. The dialog is
+  // opened because a category is made from inside it: those controls are in
+  // the page only while it is, and a walk that never opened it would leave the
+  // guide free to name a button nobody could reach. Named here rather than in
+  // drive.ts because only this run needs them -- that file says so.
+  await page.getByRole("button", { name: "Add an item" }).click();
+  const adding = page.getByRole("dialog");
+  await expect(adding).toBeVisible();
+  await harvest("app");
+  await adding.getByRole("button", { name: "New category" }).click();
+  const grouping = adding.getByRole("region", { name: "Add a category" });
+  await expect(grouping).toBeVisible();
+  await harvest("app");
+  // Out through the two Cancels rather than with Escape. MUI listens for that
+  // key on the modal's own root, and clicking a control that then unmounts
+  // leaves focus on the body -- outside it -- so the dialog never hears it.
+  // The step above this one escapes cleanly because nothing in it is clicked
+  // and the autofocus MUI does on open is still where it was put.
+  await grouping.getByRole("button", { name: "Cancel" }).click();
+  await expect(grouping).toBeHidden();
+  await adding.getByRole("button", { name: "Cancel" }).click();
+  await expect(adding).toBeHidden();
+
+  // And the item's own editor, which is the only screen in this app carrying
+  // the word an item and a place are both retired by. The guide names it, and
+  // Django's admin calls the same column something else.
+  await page.getByRole("button", { name: `Edit ${itemName}` }).click();
+  const correcting = page.getByRole("dialog");
+  await expect(correcting).toBeVisible();
+  await harvest("app");
+  await correcting.getByRole("button", { name: "Cancel" }).click();
+  await expect(correcting).toBeHidden();
+
   // ---- The administrator's half ----------------------------------------
 
   await page.setViewportSize(DESK);
