@@ -29,38 +29,32 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
 import { useState } from "react";
-import { type ApiError, apiPatch, asApiError } from "../api/client";
+import { apiPatch } from "../api/client";
 import { forgetLabel } from "../scan/labelCache";
-import { Refusal } from "./Refusal";
 import { useCan } from "./SessionProvider";
+import { useSaving } from "./useSaving";
 
 export function RevokeLabel({ code, onRevoked }: { code: string; onRevoked: () => void }) {
   // Drawn from the server's answer, never guessed: decision 0014 point 3.
   const mayRevoke = useCan("revoke_label");
   const [asking, setAsking] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [refused, setRefused] = useState<ApiError | null>(null);
+  const { saving, refusal, run } = useSaving();
 
   if (!mayRevoke) {
     return null;
   }
 
-  async function revoke(): Promise<void> {
-    setSaving(true);
-    setRefused(null);
-    try {
+  const revoke = () =>
+    run(async () => {
       await apiPatch(`/api/labels/${encodeURIComponent(code)}`, { revoked: true });
       // Before the caller is told, so that whatever it re-reads cannot be
       // answered out of a map that still calls this sticker live.
       forgetLabel(code);
       onRevoked();
+      // The question this component asked itself, rather than a caller's
+      // dialog: there is nothing left to ask about.
       setAsking(false);
-    } catch (error: unknown) {
-      setRefused(asApiError(error));
-    } finally {
-      setSaving(false);
-    }
-  }
+    });
 
   return (
     <>
@@ -75,7 +69,7 @@ export function RevokeLabel({ code, onRevoked }: { code: string; onRevoked: () =
               Scanning it will go on working and will say the sticker has been replaced, so nothing
               already recorded against it changes. Print a new label for whatever this was on.
             </DialogContentText>
-            {refused ? <Refusal error={refused} onDismiss={() => setRefused(null)} /> : null}
+            {refusal}
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setAsking(false)}>Keep it</Button>

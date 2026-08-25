@@ -24,10 +24,10 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useState } from "react";
-import { type ApiError, apiPatch, apiPost, asApiError } from "../api/client";
+import { apiPatch, apiPost } from "../api/client";
 import type { Category } from "../api/types";
-import { Refusal } from "./Refusal";
 import { parentChoices, parentId, parentValue } from "./tree";
+import { useSaving } from "./useSaving";
 
 export function EditCategory({
   existing,
@@ -44,27 +44,19 @@ export function EditCategory({
 }) {
   const [name, setName] = useState(existing?.name ?? "");
   const [parent, setParent] = useState(() => parentValue(existing));
-  const [saving, setSaving] = useState(false);
-  const [refused, setRefused] = useState<ApiError | null>(null);
+  const { saving, refusal, run } = useSaving();
   const heading = existing === null ? "Add a category" : `Rename ${existing.name}`;
 
-  async function save(): Promise<void> {
-    setSaving(true);
-    setRefused(null);
-    const body = { name: name.trim(), parent: parentId(parent) };
-    try {
+  const save = () =>
+    run(async () => {
+      const body = { name: name.trim(), parent: parentId(parent) };
       const saved =
         existing === null
           ? await apiPost<Category>("/api/categories", body)
           : await apiPatch<Category>(`/api/categories/${existing.id}`, body);
       onSaved(saved);
       onClose();
-    } catch (error: unknown) {
-      setRefused(asApiError(error));
-    } finally {
-      setSaving(false);
-    }
-  }
+    });
 
   return (
     <Paper variant="outlined" component="section" aria-label={heading} sx={{ p: 2 }}>
@@ -98,7 +90,7 @@ export function EditCategory({
             be removed in the admin.
           </Typography>
         ) : null}
-        {refused ? <Refusal error={refused} onDismiss={() => setRefused(null)} /> : null}
+        {refusal}
         <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
           <Button size="small" onClick={onClose}>
             Cancel
