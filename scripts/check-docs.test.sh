@@ -308,4 +308,44 @@ expect 0 "No prose repeated" "one allowance can name more than two files"
 printf '# Y\n\nThe very same twelve words appear in every one of these three files here.\n' > three.md
 expect 1 "say the same thing" "a file the allowance does not name is still reported"
 
+# --- what counts as a file worth reading ----------------------------------
+#
+# inventory-tng-1tt. The corpus was once a list of seven extensions, and the
+# files that carry prose and no extension of their own -- the chart's helper
+# template, the Dockerfiles, nginx.conf.template, .env.sample -- were the ones
+# nothing read. It is now every tracked file less the ones that are not prose,
+# and these pin that so a return to naming extensions is a red suite rather
+# than a quiet gap.
+for pair in \
+  "infra/helm/inventory-tng/templates/_helpers.tpl:the chart's helper template" \
+  "backend/Dockerfile:an extensionless Dockerfile" \
+  "frontend/nginx.conf.template:a .template" \
+  ".env.sample:the file every variable is explained in"
+do
+  path=${pair%%:*}
+  what=${pair#*:}
+  scene
+  mkdir -p "$(dirname "$path")"
+  printf '# One\n\n%s\n' "$PASSAGE" > one.md
+  printf '# %s\n' "$PASSAGE" > "$path"
+  expect 1 "say the same thing" "$what is read"
+done
+
+# The other side of it: a file that is not prose stays out, whatever it holds.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+mkdir -p frontend
+printf '# %s\n' "$PASSAGE" > frontend/package-lock.json
+expect 0 "No prose repeated" "and a lock file nobody writes by hand is not"
+
+# The one exclusion that is a path rather than a kind, pinned because it is the
+# exception to the paragraph above and was described for a while as though it
+# did not exist. If a second directory is ever added to the pattern, this is
+# where somebody notices that "read by default" has stopped being the rule.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+mkdir -p .beads
+printf '# %s\n' "$PASSAGE" > .beads/README.md
+expect 0 "No prose repeated" "and neither is the tracker's own directory"
+
 verdict
