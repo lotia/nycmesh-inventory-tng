@@ -48,12 +48,89 @@ export class ApiError extends Error {
 const UNREACHABLE =
   "The inventory service could not be reached. Check the connection and try again.";
 
-/** The sentence to show, preferring what the API said over what we would guess. */
+/** DRF's own key for a complaint about the submission rather than about a field. */
+const NON_FIELD = "non_field_errors";
+
+/** Every message under one key, however DRF nested it. */
+function messagesIn(value: unknown): string[] {
+  if (typeof value === "string") {
+    return [value];
+  }
+  // A list of messages, or a list of lists. Anything else -- a map keyed by
+  // position, which is the batch endpoint's shape -- contributes nothing here,
+  // because that endpoint answers with a `detail` of its own and a client
+  // renders its lines from `errors` rather than from a sentence.
+  return Array.isArray(value) ? value.flatMap(messagesIn) : [];
+}
+
+/**
+ * `minimum_stock` as somebody reads it, so the sentence says where to go back to.
+ *
+ * THE SERVER'S WORD FOR THE FIELD, NOT THE FORM'S, and the difference is worth
+ * knowing before it surprises somebody: this has only the wire key to go on,
+ * and a form is free to label a box whatever reads best. `unit_of_measure`
+ * comes out as "Unit of measure" against a box labelled "Counted in".
+ *
+ * Kept anyway, because the alternative is worse. DRF's commonest messages are
+ * "This field is required." and "This field may not be blank.", which say
+ * nothing at all without a field in front of them, and two of those joined
+ * without prefixes is an unattributable run-on. A screen that wants its own
+ * attribution has the parsed body on `ApiError.body` and `refusalBody` to
+ * narrow it; this is what everything else gets for free.
+ */
+function named(field: string): string {
+  const words = field.replaceAll("_", " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * A field-keyed refusal, as one sentence.
+ *
+ * The complaint about the submission as a whole comes first wherever there is
+ * one: it is the reason the write was refused, and the field lines are what to
+ * do about it.
+ */
+function complaintsIn(body: object): string[] {
+  const whole: string[] = [];
+  const fields: string[] = [];
+  for (const [field, value] of Object.entries(body)) {
+    const messages = messagesIn(value);
+    if (messages.length === 0) {
+      continue;
+    }
+    if (field === NON_FIELD) {
+      whole.push(messages.join(" "));
+    } else {
+      fields.push(`${named(field)}: ${messages.join(" ")}`);
+    }
+  }
+  return [...whole, ...fields];
+}
+
+/**
+ * The sentence to show, preferring what the API said over what we would guess.
+ *
+ * THREE SHAPES, because DRF sends three and only the first carries `detail`.
+ * A permission, a throttle and this API's own refusals answer with a sentence
+ * under that key. A serializer's `validate()` answers with `non_field_errors`,
+ * and a field's own validator answers with a map keyed by field name -- which
+ * is what `POST /api/items` sends for the commonest mistake there is, since
+ * `Item.name` is unique. Reading only the first left every one of those as the
+ * status code and nothing else.
+ *
+ * The fallback stays for a body that is not JSON at all, or is JSON this knows
+ * nothing about: an HTML error page from something in front of Django, an empty
+ * 502. A status is a poor sentence and it is better than a blank one.
+ */
 function detailOf(body: unknown, status: number): string {
-  if (typeof body === "object" && body !== null && "detail" in body) {
-    const detail = (body as { detail: unknown }).detail;
+  if (typeof body === "object" && body !== null) {
+    const detail = (body as { detail?: unknown }).detail;
     if (typeof detail === "string") {
       return detail;
+    }
+    const complaints = Array.isArray(body) ? messagesIn(body) : complaintsIn(body);
+    if (complaints.length > 0) {
+      return complaints.join(" ");
     }
   }
   return `The inventory service answered ${status}.`;

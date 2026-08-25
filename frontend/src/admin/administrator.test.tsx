@@ -403,10 +403,13 @@ describe("adding an item to the catalogue", () => {
   });
 
   it("says the other kind of no as a sentence, and keeps the form", async () => {
+    // The body the server really sends for a duplicate name: DRF keys a
+    // field's own refusal by field name and there is no `detail` anywhere in
+    // it. A stub carrying one would be green over a screen saying nothing.
     catalogue(
       ADMINISTRATOR,
       () =>
-        new Response(JSON.stringify({ detail: "An item with this name already exists." }), {
+        new Response(JSON.stringify({ name: ["item with this name already exists."] }), {
           status: 400,
         }),
     );
