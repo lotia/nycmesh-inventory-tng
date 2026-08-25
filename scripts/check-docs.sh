@@ -62,18 +62,28 @@ if [[ ${#paths[@]} -eq 0 ]]; then
   # the only path excluded for where it is, and it is worth being uneasy about
   # -- a `.beads/` holding something of ours would go unread and say nothing.
   # DEVELOPERS.md#1-one-topic-one-place puts that in words.
+  #
+  # `--others --exclude-standard` alongside `--cached` is what makes the answer
+  # here the answer CI gives. A bare `git ls-files` enumerates the index, so a
+  # page written and not yet committed is invisible to a run of this and plainly
+  # visible to the job that runs after it is -- which is a checker passing on a
+  # corpus that is not the one under test. `--others` adds what git can see and
+  # is not tracking; `--exclude-standard` keeps .gitignore deciding, so a build
+  # artefact and a node_modules stay out. Asking an author to `git add -N` first
+  # was the alternative, and a guard that only works when you remember a flag is
+  # not one. inventory-tng-hoc6, after it cost two runs in one sitting.
   mapfile -t paths < <(
-    git ls-files | grep -Evi \
+    git ls-files --cached --others --exclude-standard | grep -Evi \
       '\.(png|jpe?g|gif|ico|svg|woff2?|ttf|eot|wasm|xlsx|pdf|zip)$|(^|/)(uv\.lock|package-lock\.json)$|^\.beads/'
   )
 fi
 
 ALLOW="$REPO_ROOT/scripts/check-docs.allow"
 
-# The corpus is every tracked source file, so the crash surface is large and
-# the rule this guards is the one AGENTS.md calls non-negotiable -- which is
-# why `relay` exists rather than a bare assignment whose exit status nothing
-# reads.
+# The corpus is every source file in the checkout, so the crash surface is
+# large and the rule this guards is the one AGENTS.md calls non-negotiable --
+# which is why `relay` exists rather than a bare assignment whose exit status
+# nothing reads.
 relay env WORDS="$WORDS" ALLOW="$ALLOW" python3 "$HERE/check-docs.py" "${paths[@]}"
 
 verdict "No prose repeated across files in runs of $WORDS words or more." \

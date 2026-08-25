@@ -24,9 +24,8 @@ Every failure below names the token and the line it was read from, because a
 checker that says only "something is out of date" leaves the reader doing the
 search by hand.
 
-The corpus is the tracked Markdown, so a document added anywhere is read
-without being listed here, and a scratch file in the working tree is not read
-at all.
+The corpus is the Markdown git can see, so a document added anywhere is read
+without being listed here, and one `.gitignore` covers is not read at all.
 """
 
 import json
@@ -74,7 +73,14 @@ ADDRESSED = re.compile(r"\b(?:deploy|deployment|job|svc|service|ingress)/([a-z0-
 
 
 def documents() -> list[Path]:
-    """Every tracked Markdown file that this repository is answerable for, once each.
+    """Every Markdown file in the checkout that this repository is answerable for, once each.
+
+    Not only the committed ones, and for the reason `scripts/check-docs.sh`
+    gives about its own corpus: a document written and not yet added would
+    otherwise be held to none of the rules below until the moment it was too
+    late to hear about it. Markdown is the corpus most likely to hold a file
+    that new, so this is the enumeration where it mattered most and the one
+    that was missed.
 
     Separated by NUL rather than by newline. Asked for a path holding a space
     or anything non-ASCII, git answers with the path wrapped in quotes and the
@@ -84,7 +90,7 @@ def documents() -> list[Path]:
     the raw bytes of each path, and no quoting at all.
     """
     listed = subprocess.run(
-        ["git", "ls-files", "-z", "*.md"],
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "*.md"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -305,7 +311,7 @@ def test_every_resource_the_deployment_document_addresses_is_one_the_chart_rende
     )
 
 
-def test_the_documents_being_read_are_the_committed_ones() -> None:
+def test_the_documents_being_read_are_the_ones_in_the_checkout() -> None:
     """An empty corpus is the failure mode of a checker like this one: it
     reports the all-clear having opened nothing. The `assert read` in each test
     above guards the same thing from the other end.
@@ -319,3 +325,23 @@ def test_the_documents_being_read_are_the_committed_ones() -> None:
     # than by restating the filter that produced this list.
     assert (REPO_ROOT / "AGENTS.md") in paths
     assert (REPO_ROOT / "CLAUDE.md") not in paths
+
+
+def test_a_document_written_and_not_yet_added_is_read_too() -> None:
+    """The corpus is what CI will see once the work is committed, which is the
+    only corpus worth checking against.
+
+    Written into the checkout rather than into a temporary directory, because
+    what is being asked is whether *this* enumeration finds it, and a file
+    outside the repository would not be found by any spelling of the question.
+    Removed in a `finally`, and named so that a run interrupted between the two
+    leaves something obviously disposable behind.
+    """
+    scratch = REPO_ROOT / "docs" / "delete-me-test_documented_commands.md"
+    try:
+        scratch.write_text("# Not committed\n")
+        assert scratch in documents(), "a document not yet added is held to none of the rules above"
+    finally:
+        scratch.unlink(missing_ok=True)
+
+    assert scratch not in documents()
