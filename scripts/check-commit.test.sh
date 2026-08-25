@@ -136,8 +136,94 @@ tracker <<'JSONL'
 JSONL
 git -C "$WORK/repo" commit -q -m landed
 good_message
-expect 1 "nothing staged closes inventory-tng-aaa" "an amend without the flag cannot see the closure"
+expect 1 "nothing staged closes inventory-tng-aaa" "an amend rewriting the summary is refused"
 expect --amend 0 "closes inventory-tng-aaa" "an amend sees the closure its commit already carries"
+
+# --- an amend git cannot tell a commit-msg hook about ----------------------
+#
+# inventory-tng-h0hr. The flag used above is not available to a hook -- see
+# `amends_head` in check-commit.sh for what git does and does not pass one --
+# so the shape has to be recognised from HEAD instead. These cases are as much
+# about what that must go on refusing as about what it newly accepts.
+
+# The plain shape: nothing staged at all, because the index already equals HEAD.
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+git -C "$WORK/repo" commit -q -m "aaa: Extract the decode loop into its own module"
+good_message
+expect 0 "amends the commit that closed inventory-tng-aaa" "an amend whose summary is HEAD's is read as one"
+
+# The shape that actually bites, and the reason this is P1: beads re-exports
+# the tracker on every commit, so the amend stages a tracker that HAS changed
+# and closes nothing. The refusal that produced was "issues.jsonl is staged but
+# does not close inventory-tng-614", on the commit that had closed it.
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+git -C "$WORK/repo" commit -q -m "aaa: Extract the decode loop into its own module"
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two, and now commented on","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+good_message
+expect 0 "amends the commit that closed inventory-tng-aaa" "and so is one whose tracker was re-exported without closing anything"
+
+# THE NARROWING, which is the whole reason the summary is compared at all: a
+# follow-up that stages nothing and claims the closure the commit before it
+# made. Indistinguishable from a reword on the evidence available, so both are
+# refused rather than the rule being weakened to admit one of them.
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+git -C "$WORK/repo" commit -q -m "aaa: Extract the decode loop into its own module"
+message <<'MSG'
+aaa: Tidy up after the decode loop extraction
+
+Closes: inventory-tng-aaa
+MSG
+expect 1 "nothing staged closes inventory-tng-aaa" "a second commit claiming the same closure is still refused"
+expect 1 "--fixup=reword:" "and the refusal names the spelling that changes a summary"
+
+# AND THE LIMIT OF THE NARROWING, asserted here so that it is a fact of the
+# suite rather than a claim in a comment. The same follow-up, with HEAD's
+# subject copied instead of its own, is accepted. check-commit.sh says why
+# nothing handed to a commit-msg hook can separate the two, and check-batch.sh
+# is what refuses the pair over the range.
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+git -C "$WORK/repo" commit -q -m "aaa: Extract the decode loop into its own module"
+echo "work of an entirely different kind" > "$WORK/repo/elsewhere.txt"
+git -C "$WORK/repo" add -A
+good_message
+expect 0 "amends the commit that closed inventory-tng-aaa" \
+  "a follow-up that copies HEAD's summary is not caught here"
+
+# The other half of "both, never either alone": the summary matches, but the
+# issue this message names is not the one HEAD closed.
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"closed"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+git -C "$WORK/repo" commit -q -m "aaa: Extract the decode loop into its own module"
+good_message
+expect 1 "nothing staged closes inventory-tng-aaa" "a matching summary alone is not enough when HEAD closed something else"
 
 # --- reading a commit that has already landed ------------------------------
 #

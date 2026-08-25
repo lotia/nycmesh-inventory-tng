@@ -1194,6 +1194,26 @@ It objects if more than one issue is closed by what is staged, if the message
 and the tracker disagree about which, or if the summary line breaks the rules
 above. A guardrail rather than a gate.
 
+**Amending is recognised, within one limit.** The flag above is for running it
+by hand; as a hook it is told nothing about how git was invoked, so it works the
+shape out instead — `HEAD` already closed the issue the message names, *and* the
+summary line is still `HEAD`'s. Both, because either alone would also describe a
+fresh commit claiming a closure that the one before it made. So amending to
+revise a body, or to fold in work you forgot to stage, passes; amending to
+rewrite the summary is refused, and so is a reword during a rebase.
+
+That pair narrows the shape; it does not pin it down. A brand new commit whose
+subject repeats `HEAD`'s word for word, closing nothing itself, is read as an
+amend and accepted — and nothing given to a hook run against one message could
+decide otherwise. `scripts/check-batch.sh` is what covers it, by reading the
+whole range instead: an issue closed twice is an objection there, and a branch
+carrying one does not merge.
+
+To change a summary, reach for `git commit --fixup=reword:<commit>`, which puts
+the new one in an `amend!` for `git rebase --autosquash` to fold in. The
+`reword:` is the part that matters — a plain `--fixup` throws its own message
+away and the old summary survives the fold.
+
 It also runs on every commit you make, without your arranging anything:
 `.beads/hooks/commit-msg` is a link to it that arrives with the clone, and
 [bootstrap](#clone-and-bootstrap) points git at the directory holding it. That

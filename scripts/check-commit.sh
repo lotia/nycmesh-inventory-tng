@@ -79,13 +79,14 @@ closed=()
 epics_closed=()
 staged_tracker=""
 
-if [[ "$MESSAGE_ONLY" -eq 0 ]]; then
-  # Read once and used twice: whether the path was staged at all is the same
-  # question as whether this diff is empty, and it runs as a commit-msg hook
-  # against a tracker of a hundred-odd rows on every local commit.
-  staged_tracker=$(git diff --cached "$BASE" -- "$ISSUES")
-
-  mapfile -t moved < <(printf '%s\n' "$staged_tracker" | python3 -c '
+# What a tracker diff on stdin moves to closed, as "<kind> <id>" lines.
+#
+# A function rather than an inlined heredoc because `amends_head` below asks
+# the same question of a different diff -- HEAD's own -- and the two must agree
+# exactly. A second copy that drifted would decide that an amend was a new
+# commit, which is the bug this is part of fixing.
+tracker_closures() {
+  python3 -c '
 import json, sys
 
 was, now = set(), set()
@@ -104,7 +105,76 @@ for line in sys.stdin:
 
 for kind, issue_id in sorted(now - was):
     print(kind, issue_id)
-')
+'
+}
+
+# Is this message replacing HEAD rather than adding a commit after it?
+#
+# git hands a commit-msg hook the message path and nothing else, so --amend
+# cannot be detected the way it is passed on a command line: it reaches this
+# script only from a person at a terminal. During an amend the index already
+# equals HEAD's tree, so the closure the commit being replaced already carries
+# is invisible to the staged diff and looks missing. That is inventory-tng-h0hr.
+#
+# TWO CONDITIONS, NEVER EITHER ALONE: HEAD itself closed the issue this message
+# names, AND this summary is HEAD's summary. Without the second, every
+# follow-up that stages nothing for the tracker and claims `Closes: X` where
+# the commit before it closed X would be waved through.
+#
+# WHAT THAT NARROWS TO, RATHER THAN CLOSES. The follow-up it stops is the one
+# that wrote its own summary, which is the shape the mistake actually takes.
+# One that repeats HEAD's summary character for character is still accepted --
+# measured, not assumed: a new commit with an unrelated file staged, nothing
+# moved to closed, and `Closes: X` under HEAD's own subject passes here. No
+# commit-msg hook can do better, because git hands it a message path and
+# nothing about the tree the message is being committed against, and an amend
+# folding in forgotten work stages exactly that unrelated file.
+#
+# The backstop is a range rather than a commit: check-batch.sh objects that an
+# issue is closed by two commits, and a branch does not merge until it stops
+# saying so. So the gap is one commit wide and something else is watching it.
+#
+# The known cost is a reword: changing the summary is indistinguishable from
+# that follow-up on the evidence a commit-msg hook is given, so it is refused
+# and the refusal says which way is through. Decided on inventory-tng-h0hr.
+amends_head() {
+  local named=$1 head_summary
+  head_summary=$(git log -1 --format=%s 2>/dev/null) || return 1
+  [[ -n "$head_summary" && "$summary" == "$head_summary" ]] || return 1
+  # `git show` rather than a diff against HEAD~1, so that amending the first
+  # commit in a repository is read like any other rather than erroring.
+  git show --format= HEAD -- "$ISSUES" | tracker_closures | grep -qxF "work $named"
+}
+
+# How to land a message the check above cannot accept, said wherever it
+# refuses: rewording is the case it cannot see, and this is the way round it.
+#
+# `reword:`, and not a bare `--fixup`, which is what this said until a review
+# tried it. A plain fixup! carries its own message nowhere -- autosquash keeps
+# the target's subject -- so following that advice left the summary exactly as
+# it was refused. `--fixup=reword:<commit>` writes an amend! whose body is the
+# new message, and the fold takes that. Both spellings run this hook when they
+# are committed, and both pass it because git wrote the subject line and
+# message-rules.sh exempts the three `!` forms; only the rebase that folds them
+# in runs no commit-msg hook.
+#
+# One `note` per line rather than one string with newlines in it, because
+# `note` marks the line it is handed and every line after the first would come
+# out unmarked and unindented, against the run of the report around it.
+note_reword() {
+  note "  amending? the summary has to match HEAD's, or this cannot tell an"
+  note "  amend from a follow-up claiming the closure made before it."
+  note "  To reword: git commit --fixup=reword:<commit>, then git rebase"
+  note "  --autosquash. A plain --fixup would leave this summary unchanged."
+}
+
+if [[ "$MESSAGE_ONLY" -eq 0 ]]; then
+  # Read once and used twice: whether the path was staged at all is the same
+  # question as whether this diff is empty, and it runs as a commit-msg hook
+  # against a tracker of a hundred-odd rows on every local commit.
+  staged_tracker=$(git diff --cached "$BASE" -- "$ISSUES")
+
+  mapfile -t moved < <(printf '%s\n' "$staged_tracker" | tracker_closures)
 
   # Partitioned here rather than filtered there, so one read answers both
   # questions: what work this closes, and which epics it tidies up after.
@@ -160,12 +230,21 @@ if [[ "$MESSAGE_TRAILER_COUNT" -gt 0 && "$MESSAGE_CLOSES_COUNT" -le 1 ]]; then
       # batch merged. Saying the tracker does not close it would be false.
       note "closes the epic $named, which is bookkeeping rather than work"
     elif [[ ${#closed[@]} -eq 0 ]]; then
-      if [[ -z "$staged_tracker" ]]; then
+      # Before either refusal, because both of them describe a commit being
+      # added after HEAD and this is the case where it is HEAD being replaced.
+      # Both spellings reach here: an amend that stages nothing at all, and the
+      # commoner one where beads re-exports the tracker so something IS staged
+      # and simply closes nothing.
+      if amends_head "$named"; then
+        note "amends the commit that closed $named"
+      elif [[ -z "$staged_tracker" ]]; then
         # beads exports the tracker on its own schedule, so the close may be
         # recorded and simply not written out yet.
         fail "nothing staged closes $named -- run 'bd close $named', then stage $ISSUES"
+        note_reword
       else
         fail "$ISSUES is staged but does not close $named"
+        note_reword
       fi
     fi
   fi
