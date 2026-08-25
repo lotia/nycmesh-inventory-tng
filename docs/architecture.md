@@ -160,6 +160,10 @@ Shared client state is one `useReducer` behind a React context, in
 scalars do not need one. That is the multi-scan cart, and it is the only such
 state; anything needing more is a decision worth recording.
 
+There is no router, and the only addresses this app answers to are a label's
+and its own root. Where administrative work that belongs to no row goes instead
+is [decision 0025](decisions/0025-work-that-belongs-to-no-row.md).
+
 QR decoding belongs here too, in the browser. The approach, the library and the
 constraints that follow from it are in
 [decision 0011](decisions/0011-qr-batch-scanning.md).
