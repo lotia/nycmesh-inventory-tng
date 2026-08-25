@@ -11,13 +11,14 @@
  */
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { page } from "../api/testFixtures";
+import { answering, page } from "../api/testFixtures";
 import type { Category, Location } from "../api/types";
 import { LocationPicker } from "../batch/LocationPicker";
 import { ItemList } from "../items/ItemList";
 import { zipTies } from "../items/testFixtures";
 import {
   ADMINISTRATOR,
+  pickOption,
   renderScreen,
   stubSession,
   theWrite,
@@ -37,8 +38,6 @@ const WAREHOUSE: Location = {
   active: true,
 };
 const SHELF: Location = { ...WAREHOUSE, id: 4, name: "Shelf 1", kind: "shelf", parent: 3 };
-
-const answering = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
 /**
  * Every collection these screens read, and whatever a write should answer with.
@@ -148,8 +147,7 @@ describe("a category, made where an item is put in one", () => {
     fireEvent.change(within(panel).getByRole("textbox", { name: /category name/i }), {
       target: { value: "Connectors" },
     });
-    fireEvent.mouseDown(within(panel).getByRole("combobox", { name: /inside/i }));
-    fireEvent.click(await screen.findByRole("option", { name: CABLES.name }));
+    await pickOption(within(panel), /inside/i, CABLES.name);
     fireEvent.click(within(panel).getByRole("button", { name: /save category/i }));
 
     await waitFor(() => expect(writes()).toHaveLength(1));
@@ -159,8 +157,7 @@ describe("a category, made where an item is put in one", () => {
   it("corrects the one that is chosen, from the same place", async () => {
     warehouse(ADMINISTRATOR, () => answering(FITTINGS));
     const dialog = await addingAnItem();
-    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: /category/i }));
-    fireEvent.click(await screen.findByRole("option", { name: FITTINGS.name }));
+    await pickOption(within(dialog), /category/i, FITTINGS.name);
     fireEvent.click(within(dialog).getByRole("button", { name: `Rename ${FITTINGS.name}` }));
 
     const panel = await within(dialog).findByRole("region", { name: /rename/i });
@@ -186,8 +183,7 @@ describe("a category, made where an item is put in one", () => {
   it("says there is no way to remove one, rather than offering a control that would 404", async () => {
     warehouse(ADMINISTRATOR);
     const dialog = await addingAnItem();
-    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: /category/i }));
-    fireEvent.click(await screen.findByRole("option", { name: CABLES.name }));
+    await pickOption(within(dialog), /category/i, CABLES.name);
     fireEvent.click(within(dialog).getByRole("button", { name: `Rename ${CABLES.name}` }));
 
     const panel = await within(dialog).findByRole("region", { name: /rename/i });
@@ -261,10 +257,8 @@ describe("a place, made where a batch says where it is", () => {
     fireEvent.change(within(dialog).getByRole("textbox", { name: /^name$/i }), {
       target: { value: "Shelf 9" },
     });
-    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: /what kind of place/i }));
-    fireEvent.click(await screen.findByRole("option", { name: "Shelf" }));
-    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: /inside/i }));
-    fireEvent.click(await screen.findByRole("option", { name: WAREHOUSE.name }));
+    await pickOption(within(dialog), /what kind of place/i, "Shelf");
+    await pickOption(within(dialog), /inside/i, WAREHOUSE.name);
     fireEvent.click(within(dialog).getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
@@ -306,8 +300,8 @@ describe("a place, made where a batch says where it is", () => {
     // was only meant to retire it.
     warehouse(ADMINISTRATOR, () => answering({ ...SHELF, active: false }));
     renderScreen(<LocationPicker />);
-    fireEvent.mouseDown(await screen.findByRole("combobox", { name: /where the stock is/i }));
-    fireEvent.click(await screen.findByRole("option", { name: SHELF.name }));
+    await screen.findByRole("combobox", { name: /where the stock is/i });
+    await pickOption(screen, /where the stock is/i, SHELF.name);
     fireEvent.click(screen.getByRole("button", { name: `Edit ${SHELF.name}` }));
 
     const dialog = await screen.findByRole("dialog");
@@ -342,8 +336,8 @@ describe("a place, made where a batch says where it is", () => {
       () => there,
     );
     renderScreen(<LocationPicker />);
-    fireEvent.mouseDown(await screen.findByRole("combobox", { name: /where the stock is/i }));
-    fireEvent.click(await screen.findByRole("option", { name: SHELF.name }));
+    await screen.findByRole("combobox", { name: /where the stock is/i });
+    await pickOption(screen, /where the stock is/i, SHELF.name);
     fireEvent.click(screen.getByRole("button", { name: `Edit ${SHELF.name}` }));
 
     const dialog = await screen.findByRole("dialog");
@@ -365,8 +359,8 @@ describe("a place, made where a batch says where it is", () => {
     // EditLocation's save() says what re-sending it would walk into.
     warehouse(ADMINISTRATOR, () => answering({ ...SHELF, name: "Shelf One" }));
     renderScreen(<LocationPicker />);
-    fireEvent.mouseDown(await screen.findByRole("combobox", { name: /where the stock is/i }));
-    fireEvent.click(await screen.findByRole("option", { name: SHELF.name }));
+    await screen.findByRole("combobox", { name: /where the stock is/i });
+    await pickOption(screen, /where the stock is/i, SHELF.name);
     fireEvent.click(screen.getByRole("button", { name: `Edit ${SHELF.name}` }));
 
     const dialog = await screen.findByRole("dialog");
