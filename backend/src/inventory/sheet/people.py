@@ -134,9 +134,12 @@ def addressed(email: str) -> str:
     written inline in both places is two modules quietly deciding separately
     whether two addresses are one address.
 
-    `lower` rather than `casefold`, matching `spelled` and matching the
-    `Lower(Trim())` column the identifier tables normalise with -- §1 of the
-    brief says why the importer has to agree with them.
+    `lower` rather than `casefold`, matching `spelled`. It used to say this
+    also matched the column the identifier tables normalise with, which was
+    true of `Lower(Trim())` and is not true of what replaced it. Whether the
+    wider claim behind that -- that this fold has a database counterpart at
+    all -- was ever right is `inventory-tng-xvp1`; `Volunteer.email` has a
+    plain case-sensitive unique index and no generated column.
     """
     return email.lower()
 

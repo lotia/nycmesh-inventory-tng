@@ -312,26 +312,11 @@ def test_identifier_str(item: Item) -> None:
     assert str(identifier) == "litebeam (Alias)"
 
 
-def test_identifier_normalisation_is_done_by_the_database(item: Item) -> None:
-    identifier = ItemIdentifier.objects.create(
-        item=item,
-        kind=ItemIdentifier.Kind.ALIAS,
-        value="  Lbe 5ac Gen2  ",
-    )
-    identifier.refresh_from_db()
-    assert identifier.value_normalised == "lbe 5ac gen2"
-
-
-def test_identifiers_resolve_to_exactly_one_item(item: Item, category: Category) -> None:
-    """The failure this model exists to prevent.
-
-    In the sheet, 'archer 7' and 'Archer a7' were different items as far as the
-    lookup was concerned, and 41 such strings matched nothing at all.
-    """
-    other = Item.objects.create(name="Archer A7", category=category)
-    ItemIdentifier.objects.create(item=item, kind=ItemIdentifier.Kind.ALIAS, value="Litebeam")
-    with pytest.raises(IntegrityError):
-        ItemIdentifier.objects.create(item=other, kind=ItemIdentifier.Kind.ALIAS, value="  litebeam ")
+# What the database makes of a value, and which values it treats as one, are
+# `test_identifiers.py` -- over the whole of `Canonical` rather than the trim
+# and the case fold these two used to claim. The failure the model exists to
+# prevent is the same one: in the sheet, `archer 7` and `Archer a7` were
+# different items as far as the lookup was concerned.
 
 
 def test_differing_identifiers_coexist(item: Item) -> None:

@@ -116,10 +116,13 @@ renamed in the catalogue — and an alias whose target has gone resolves to
 nothing rather than to a name the catalogue does not hold, so the two halves
 of the report cannot disagree about the same row.
 
-Case is compared as `Lower(Trim())`, which is what
-`ItemIdentifier.value_normalised` is: [data-model.md](../data-model.md#item-itemidentifier-category)
-asks that normalisation not drift between the write path, the importer and the
-scan endpoint, and this is the importer.
+Strings are compared through `inventory.identifiers.normalised`, which is the
+importer's copy of what the database computes for
+`ItemIdentifier.value_normalised` — case, Unicode form and whitespace, settled
+in [decision 0026](../decisions/0026-what-makes-two-strings-one-identifier.md).
+The figures here are unmoved by that: every one of the 145 strings folds
+identically under the old rule and the new one, which the record's own
+measurement predicted and `test_brief_figures.py` re-checks.
 
 An earlier reading of this section gave 32 strings matching nothing across 83
 submissions and 52 retired codes across 125. Those partitioned 145 strings but

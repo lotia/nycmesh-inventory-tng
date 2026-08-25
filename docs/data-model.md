@@ -299,7 +299,7 @@ for its own sake.
 | Check constraints | Movement invariants, `held_by`, self-parent | Invariants that must hold regardless of which client wrote the row |
 | `BEFORE UPDATE OR DELETE` and `BEFORE TRUNCATE` triggers | Ledger tables | Makes append-only a property of the database, not a rule contributors must remember. Both are needed: a row trigger cannot see `TRUNCATE`. Why a trigger rather than `REVOKE` is in [decision 0008](decisions/0008-stock-ledger-transfer-graph.md) |
 | `BEFORE INSERT` and `BEFORE UPDATE` triggers | Movement shape and a batch's actor and date (insert only, the ledger being append-only); a label's code (update only, since a code is chosen once); selectable volunteers and future revocations elsewhere (both) | Invariants that need another table, the current time, or the row's previous value, so a `CheckConstraint` cannot express them. Which rules are here and which stayed at the API is [decision 0016](decisions/0016-invariants-for-every-writer.md) |
-| `GENERATED ... STORED` | `ItemIdentifier.value_normalised` | Normalisation cannot drift between the write path, the importer and the scan endpoint if the database computes it |
+| `GENERATED ... STORED` | `ItemIdentifier.value_normalised` | Only the database gets to say whether two spellings are one identifier, so no write path can hold a different opinion. What it folds, and why a Python answer is not usable as one, is [decision 0026](decisions/0026-what-makes-two-strings-one-identifier.md) |
 | `NULLS NOT DISTINCT` | Category and Location names | A unique constraint on `(parent, name)` otherwise does nothing at the top level, where `parent` is NULL |
 
 `JSONB` is deliberately **not** used for anything queried relationally.
