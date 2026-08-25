@@ -15,10 +15,12 @@ from inventory_tng.hosts import allowed_hosts
 
 
 def test_the_space_after_a_comma_is_not_part_of_the_hostname() -> None:
-    """`django-environ` splits and does nothing else, so `"a, b"` yields `" b"`.
+    """That this list is trimmed too, whoever supplied it.
 
-    Which matches no request Django ever receives, so the host is refused for
-    ever and the space does not show in the file that caused it.
+    Why a comma-separated variable needs trimming at all is argued once, on
+    `inventory_tng.environment.entries`, and held in `test_environment.py`.
+    What is asserted here is the other caller: a list handed straight to this
+    function, which is what `test_chart.py` does with what the chart renders.
     """
     assert allowed_hosts(["first.example.org", " second.example.org"], []) == [
         "first.example.org",

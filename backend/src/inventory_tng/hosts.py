@@ -8,18 +8,19 @@ opinion, and the first version of that test held one -- it stripped whitespace
 `settings.py` did not, and hid a live bug for as long as it stood.
 """
 
+from inventory_tng.environment import entries
+
 
 def allowed_hosts(listed: list[str], extra: list[str]) -> list[str]:
     """The hostnames to accept, from the configured list and the deployment's.
 
-    Both arrive from the environment already split on commas by
-    `django-environ`, which splits and does nothing else -- so `"a, b"`, the
-    way anybody writes a list of two, yields `" b"`. That matches no request
-    and would refuse that host for ever, invisibly, because the space does not
-    show in a values file. Stripped here, once, for both.
-
     `extra` is what only the running deployment can know: addresses assigned
     to it that nobody could have listed in advance. Empty everywhere but a
     cluster. docs/deployment.md#health-checks says what fills it and why.
+
+    Both lists are put through `environment.entries`, which is where the
+    trimming and its argument live. Called here rather than relied upon,
+    because `test_chart.py` hands this function what the chart renders rather
+    than what `Env` read, and the two answers have to be one answer.
     """
-    return [host.strip() for host in [*listed, *extra] if host.strip()]
+    return entries([*listed, *extra])

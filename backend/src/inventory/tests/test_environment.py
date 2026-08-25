@@ -6,13 +6,21 @@ blanks a chart setting; and the application then refuses to start with a
 traceback naming neither. `.env.sample` ships several variables empty, so the
 shape is one this project teaches.
 
-The direction that matters most is the opposite one, at the bottom: a setting
-with no default gets *stricter*, not softer.
+The direction that matters most is that one's opposite: a setting with no
+default gets *stricter*, not softer.
+
+The last group is the other reading `Env` corrects, and it is invisible for the
+same reason: a list written with a space after the comma. Held against `Env`
+rather than against the two variables that had the bug, because what has to
+stay true is about a variable somebody declares later.
 """
 
 import os
+import re
+from pathlib import Path
 
 import pytest
+from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
 from inventory_tng.environment import Env, Speaking
@@ -133,3 +141,72 @@ def test_surrounding_whitespace_is_not_part_of_a_value(monkeypatch: pytest.Monke
     monkeypatch.setenv("A_SECRET", "s3cret\n")
 
     assert Env()("A_SECRET") == "s3cret"
+
+
+def test_the_space_after_a_comma_is_not_part_of_a_list_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`django-environ` splits on commas and does nothing else.
+
+    So `"a, b"` -- the way anybody writes a list of two -- was `[" b"]` for the
+    second entry, matching nothing for ever, and the space did not show in the
+    file that caused it.
+    """
+    monkeypatch.setenv("A_LIST", "first, second ,third")
+
+    assert Env(A_LIST=(list, []))("A_LIST") == ["first", "second", "third"]
+
+
+def test_a_trailing_comma_adds_no_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An entry matching nothing is a line in a list that means nothing."""
+    monkeypatch.setenv("A_LIST", "first, ,second,")
+
+    assert Env(A_LIST=(list, []))("A_LIST") == ["first", "second"]
+
+
+def test_an_origin_written_with_a_space_is_still_that_origin(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The variable this was reported against, under its own name.
+
+    `Env` never sees a variable's name, so this runs what the test above it
+    runs. It is here because the report was about origins and somebody looking
+    for that should find it; what pins the real declaration is the last test in
+    this file.
+    """
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173, https://inventory.nycmesh.net")
+
+    assert Env(CORS_ALLOWED_ORIGINS=(list, []))("CORS_ALLOWED_ORIGINS") == [
+        "http://localhost:5173",
+        "https://inventory.nycmesh.net",
+    ]
+
+
+def test_a_cast_that_is_not_a_list_is_left_alone(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`entries` is for the `(list, [])` shape and no other.
+
+    A `dict` cast splits on commas too, and trimming its halves here would be
+    this repository deciding something about a variable it does not have.
+    """
+    monkeypatch.setenv("A_MAP", "one=1,two=2")
+
+    assert Env(A_MAP=(dict, {}))("A_MAP") == {"one": "1", "two": "2"}
+
+
+def test_every_list_the_settings_declare_is_read_through_that_one_place() -> None:
+    """The criterion is the mechanism rather than the variable that had the bug.
+
+    Read off the source, because what has to hold is about a declaration
+    somebody adds later: a list declared on `env` is trimmed by
+    `Env.parse_value` without their knowing it happened.
+
+    WHAT THIS CANNOT SEE, said because the assertion reads as though it could.
+    A list parsed somewhere else entirely -- `os.environ["X"].split(",")` --
+    has no declaration here, so it is not in `declared` and nothing below looks
+    at it. What is held is that every declared list is read back through `env`
+    and therefore through the trim, which is the shape `settings.py` uses and
+    the one a new variable is copied from.
+    """
+    source = (Path(settings.BASE_DIR) / "inventory_tng" / "settings.py").read_text()
+    declared = re.findall(r"^\s*(\w+)=\(list, \[\]\),$", source, re.MULTILINE)
+
+    assert "CORS_ALLOWED_ORIGINS" in declared
+    assert "DJANGO_ALLOWED_HOSTS" in declared
+    for name in declared:
+        assert f'env("{name}")' in source, name
