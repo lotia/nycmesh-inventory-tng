@@ -30,6 +30,7 @@ from collections import Counter
 from dataclasses import dataclass
 from enum import StrEnum
 
+from inventory import identifiers
 from inventory.sheet import Report
 from inventory.sheet.workbook import Sheet
 
@@ -127,30 +128,13 @@ class Resolution:
     why: str = ""
 
 
-def normalised(string: str) -> str:
-    """The string as the database compares it.
-
-    `lower()` rather than `casefold()`, and not because either is better: it
-    is what `ItemIdentifier.value_normalised` is, a `Lower(Trim())` generated
-    column, and
-    [data-model.md](../../../../docs/data-model.md#item-itemidentifier-category)
-    says which readers of it have to agree. The reader has already trimmed.
-
-    Public because the importer is one of those readers: it has to know
-    whether two strings are one identifier before it inserts the second, and
-    a second spelling of this rule is exactly the drift the generated column
-    exists to prevent.
-    """
-    return string.lower()
-
-
 def resolve(string: str, catalogue: tuple[str, ...]) -> Resolution:
     """The catalogued item this string names, or a reason it names none."""
     if string in catalogue:
         return Resolution(string, How.EXACT)
-    key = normalised(string)
+    key = identifiers.normalised(string)
     for name in catalogue:
-        if normalised(name) == key:
+        if identifiers.normalised(name) == key:
             return Resolution(name, How.CASE)
     if key in ALIASES:
         # Only when the catalogue still holds what the alias names. An item
@@ -187,7 +171,7 @@ def section(sheet: Sheet) -> Report:
     # Keyed normalised, because ALIASES is: `Omnitik` beside `omnitik` is one
     # decision, and counting the casings apart would report the largest as
     # smaller than it is.
-    aliased = Counter(normalised(item) for item in named if resolutions[item].how is How.ALIAS)
+    aliased = Counter(identifiers.normalised(item) for item in named if resolutions[item].how is How.ALIAS)
     largest_alias = max(aliased.values(), default=0)
     # The retired scheme, and the worst single guess declining to decode it
     # avoids: the brief argues from that number, so the report produces it.

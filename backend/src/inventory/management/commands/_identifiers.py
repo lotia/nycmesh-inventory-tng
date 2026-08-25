@@ -66,6 +66,7 @@ from dataclasses import dataclass
 
 from django.db import transaction
 
+from inventory import identifiers
 from inventory.models import Category, Item, ItemIdentifier
 from inventory.sheet import Report, items
 from inventory.sheet.workbook import Sheet
@@ -188,7 +189,7 @@ def _tab(catalogue: tuple[str, ...]) -> Tab:
     for name in catalogue:
         if len(name) > LONGEST_NAME:
             too_long += 1
-        elif (key := items.normalised(name)) in kept:
+        elif (key := identifiers.normalised(name)) in kept:
             duplicated += 1
         else:
             kept[key] = name
@@ -256,7 +257,7 @@ def mint(sheet: Sheet) -> Minted:
     added = 0
     elsewhere = 0
     for value, name in naming:
-        key = items.normalised(value)
+        key = identifiers.normalised(value)
         answered.add(key)
         item = catalogued[name]
         held = answering.get(key)
