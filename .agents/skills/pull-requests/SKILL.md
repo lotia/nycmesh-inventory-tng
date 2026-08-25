@@ -109,7 +109,7 @@ Only once every thread is resolved — see
 [Merging](../../../DEVELOPERS.md#merging) for why the order matters:
 
 ```bash
-git rebase -i --autosquash origin/main
+git -c core.editor=true rebase --autosquash origin/main
 scripts/check-batch.sh origin/main..HEAD
 git push --force-with-lease
 gh pr checks --watch

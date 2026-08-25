@@ -323,7 +323,18 @@ if [[ "$pending" -gt 0 ]]; then
   else
     fail "$pending commits are waiting to be folded in. Nothing does it on the way in:"
   fi
-  note "  git rebase -i --autosquash origin/main"
+  # `core.editor`, and this said `sequence.editor` until a review ran it. The
+  # sequence editor is the one shown the TODO LIST, which a rebase that was not
+  # asked for `-i` never opens, so setting it changed nothing at all. What
+  # `absorbed` counts includes squash!, and a squash! asks for the combined
+  # MESSAGE -- core.editor's job -- so the rebase this printed stopped on
+  # "there was a problem with the editor" or sat waiting for one. Measured on
+  # git 2.55, both ways round, on inventory-tng-4md.
+  #
+  # Folding a squash! with no editor takes the message git assembled, which is
+  # the target's followed by the squash's own. That can leave the trailers in
+  # the middle of the message, and the rules above say so on the next run.
+  note "  git -c core.editor=true rebase --autosquash origin/main"
 fi
 
 kept=$(( ${#commits[@]} - pending ))
