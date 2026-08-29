@@ -21,7 +21,7 @@ Two things, and nothing else installed globally:
 | Tool | Why | Install |
 | --- | --- | --- |
 | [mise](https://mise.jdx.dev/getting-started.html) | Installs the pinned Python, Node, uv, and Helm versions. No system Python or Node needed. | `curl https://mise.run \| sh` |
-| [Docker](https://docs.docker.com/get-started/get-docker/) | Runs PostgreSQL, and optionally the whole stack. | Platform installer |
+| [Docker](https://docs.docker.com/get-started/get-docker/) or [Podman](https://podman.io/) | Runs PostgreSQL, and optionally the whole stack. Either one; see [below](#podman). | Platform installer |
 
 If you intend to run a coding agent in this repository — Claude Code, Codex,
 Gemini or another — there are three more, and they are listed separately
@@ -48,9 +48,28 @@ guard that quietly stopped guarding.
 git --version && python3 --version && gh auth status
 ```
 
-[Podman](https://podman.io/) works too — substitute `podman compose` for
-`docker compose` in the commands below. The images are fully qualified
-(`docker.io/library/...`) so Podman resolves them without extra configuration.
+### Podman
+
+[Podman](https://podman.io/) works too, and the two are interchangeable
+everywhere in this project — substitute `podman compose` for `docker compose`
+in the commands below and nothing else changes. The images are fully qualified
+(`docker.io/library/...`) so Podman resolves them without extra configuration,
+and every restraint `compose.yaml` places on a service was chosen to hold under
+rootless Podman.
+
+One thing is Podman's alone: `podman compose` does not implement compose
+itself, it hands the work to an external provider that speaks the Docker API,
+so Podman's API socket has to be listening or the command stops at `failed to
+connect to the docker API`.
+
+```bash
+systemctl --user enable --now podman.socket
+```
+
+`enable --now` starts it and keeps it across logins; plain `start` lasts only
+until you log out.
+
+### Pinned versions
 
 Every version this project uses is pinned in [`mise.toml`](mise.toml). That file
 is the single source of truth for the toolchain — CI installs from it too.
