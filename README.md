@@ -50,6 +50,7 @@ Each topic is documented in exactly one place. Start with whichever fits you:
 | --- | --- |
 | Move stock in or out | [guides/volunteer.md](guides/volunteer.md) |
 | Keep the catalogue, the people and the labels | [guides/administrator.md](guides/administrator.md) |
+| Try the app out, by following a session | [guides/worked-examples.md](guides/worked-examples.md) |
 | Run this locally and make changes | [DEVELOPERS.md](DEVELOPERS.md) |
 | Contribute as a volunteer | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Understand how it is put together | [docs/architecture.md](docs/architecture.md) |
@@ -60,51 +61,99 @@ Each topic is documented in exactly one place. Start with whichever fits you:
 
 ## Quickstart
 
-You need [Docker](https://docs.docker.com/get-started/get-docker/) and nothing
-else — every toolchain this uses is inside the images. Cloning needs no GitHub
-account either; the URL below is the anonymous one.
+You need **either [Docker](https://docs.docker.com/get-started/get-docker/) or
+[Podman](https://podman.io/)** and nothing else — every toolchain this uses is
+inside the images. The two are interchangeable throughout this project, and
+every command below is the same word for word apart from the one it starts
+with; what Podman asks for that Docker does not is
+[Podman](DEVELOPERS.md#podman). Cloning needs no GitHub account either; the URL
+below is the anonymous one.
+
+### Start it
 
 ```bash
 git clone https://github.com/lotia/nycmesh-inventory-tng.git
 cd nycmesh-inventory-tng
 cp .env.sample .env
+```
+
+Then, with Docker:
+
+```bash
 docker compose up --build -d
 ```
 
+Or with Podman:
+
+```bash
+systemctl --user start podman.socket
+podman compose up --build -d
+```
+
+That first line is the one thing Podman needs and Docker does not.
+[Podman](DEVELOPERS.md#podman) says why, and how to stop typing it.
+
+Keep `--build`. Without it a stale image from an earlier checkout is reused,
+and the failure that follows names a missing file rather than the real cause.
+
 `-d` puts the three services in the background so that the terminal stays
-yours for the two commands below. `docker compose logs -f` follows them and
-`docker compose down` stops them again.
+yours for the two commands below. `docker compose logs -f` (or `podman compose
+logs -f`) follows them, and `down` in place of `up` stops them again.
+
+### Put something in it
 
 **Everything but the two probes and the API description needs an account**,
-and the database starts empty, so those two commands are not optional
-extras — without them every page below is a blank list or a redirect to the
-sign-in form:
+and the database starts empty, so these are not optional extras — without them
+every page below is a blank list or a redirect to the sign-in form. With
+Docker:
 
 ```bash
 docker compose exec backend python manage.py seed_demo_data    # something to look at
 docker compose exec backend python manage.py createsuperuser   # your login
 ```
 
+Or with Podman:
+
+```bash
+podman compose exec backend python manage.py seed_demo_data    # something to look at
+podman compose exec backend python manage.py createsuperuser   # your login
+```
+
 The first of those prints two label codes; they are the stickers to type into
-the scanner. Then:
+the scanner.
+
+### Sign in for the first time
+
+Everything is reachable on **<http://localhost:8080>**, which is the one to
+open: it serves the app and forwards the API, the admin and the sign-in pages
+to Django, so signing in there returns you to the app afterwards.
+
+Go to <http://localhost:8080/accounts/login/> and use the account
+`createsuperuser` just made. Signing in with it the first time asks you to set
+up an authenticator app — a password on its own is not a way into this system,
+and how administrators sign in is
+[decision 0013](docs/decisions/0013-administrator-sign-in.md). Have a TOTP app
+to hand before you start; you will be shown a QR code to scan once, and a set
+of recovery codes to keep.
+
+Once you are in:
 
 | Service | URL | Needs an account |
 | --- | --- | --- |
-| Sign in — start here | <http://localhost:8000/accounts/login/> | — |
-| Frontend | <http://localhost:8080> | yes |
-| Django admin | <http://localhost:8000/admin/> | yes |
-| API docs (OpenAPI) | <http://localhost:8000/api/docs> | no |
-| API readiness probe | <http://localhost:8000/api/healthz> | no |
-| API liveness probe | <http://localhost:8000/api/livez> | no |
+| Frontend — start here | <http://localhost:8080> | yes |
+| Sign in | <http://localhost:8080/accounts/login/> | — |
+| Django admin | <http://localhost:8080/admin/> | yes |
+| API docs (OpenAPI) | <http://localhost:8080/api/docs> | no |
+| API readiness probe | <http://localhost:8080/api/healthz> | no |
+| API liveness probe | <http://localhost:8080/api/livez> | no |
 
-Signing in with it the first time asks you to set up an authenticator app: a
-password on its own is not a way into this system, and how administrators sign
-in is
-[decision 0013](docs/decisions/0013-administrator-sign-in.md).
+Django is also published directly on <http://localhost:8000> for the times you
+want to reach it without nginx in the way. Prefer port 8080: port 8000 has no
+page at `/`, so signing in there lands on a 404.
 
 This stack is one of three ways to run the project, and the other two are set
 up differently: see [running it](DEVELOPERS.md#running-it). They cannot both
-have port 8000, so run `docker compose down` before following that guide's own
+have port 8000, so bring this one `down` before following that guide's own
 setup. For the full development environment — tests, linting, and day-to-day
 commands — see [DEVELOPERS.md](DEVELOPERS.md).
 
