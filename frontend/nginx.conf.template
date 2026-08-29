@@ -14,6 +14,30 @@ map $http_x_forwarded_proto $forwarded_proto {
     http    http;
 }
 
+# The host this container was reached on, forwarded to everything behind it.
+#
+# THE PORT IS THE WHOLE REASON THIS IS NOT `$host`. Django settles whether a
+# write is safe by rebuilding the origin it expects from the host it was handed
+# and comparing that against what the browser claims. `$host` is nginx's
+# normalised name and it leaves the port off, so Django was comparing
+# `http://localhost` against a browser saying `http://localhost:8080`, deciding
+# they disagreed, and refusing every POST, PUT, PATCH and DELETE in the
+# application with "CSRF Failed: Origin checking failed".
+#
+# That never showed in a deployment, which is why it survived being written:
+# there a browser arrives on 443 and omits the port on both sides, so the two
+# agree. Only a stack reached by some other port can see it, and every local
+# one is.
+#
+# `$http_host` is the header verbatim, which is what fixes it. The fallback is
+# for the case `$host` used to cover on its own: the header is not compulsory
+# in HTTP/1.0, and forwarding an empty one would earn a DisallowedHost from
+# Django where this used to answer. Nothing a browser does reaches that arm.
+map $http_host $forwarded_host {
+    ""      $host;
+    default $http_host;
+}
+
 # What a span post is counted against.
 #
 # NOT `$binary_remote_addr`, which is what shipped and what made this limit
@@ -87,9 +111,15 @@ server {
     # also states the condition that makes trusting the header sound at all.
     # The `map` at the top falls back to $scheme when the header is absent, so
     # running this image without an ingress in front of it still works.
+    #
+    # Host comes from the `map` at the top of this file, which is where the
+    # reason it is not `$scheme`'s neighbour `$host` is written down. Every
+    # location below forwards the same one: a proxy that rewrites the host for
+    # some of what is behind it and not the rest is a thing to reason about
+    # twice, and there is nothing to be gained here for the cost of that.
     location ~ ^/(api|admin|accounts|static)(/|$) {
         proxy_pass         ${BACKEND_ORIGIN};
-        proxy_set_header   Host              $host;
+        proxy_set_header   Host              $forwarded_host;
         proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
         proxy_set_header   X-Forwarded-Proto $forwarded_proto;
@@ -116,7 +146,7 @@ server {
         limit_req          zone=spans burst=5 nodelay;
         client_max_body_size 64k;
         proxy_pass         ${COLLECTOR_ORIGIN};
-        proxy_set_header   Host $host;
+        proxy_set_header   Host $forwarded_host;
     }
 
     # The subrequest above, and nothing else: it is not routable from outside,
@@ -126,7 +156,7 @@ server {
         proxy_pass         ${BACKEND_ORIGIN}/api/debug-trace;
         proxy_pass_request_body off;
         proxy_set_header   Content-Length "";
-        proxy_set_header   Host $host;
+        proxy_set_header   Host $forwarded_host;
         proxy_set_header   X-Forwarded-Proto $forwarded_proto;
     }
 
