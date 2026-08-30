@@ -325,6 +325,49 @@ reviews = payload.get("reviews") or []
 
 
 def marked(mark):
+    """Comments carrying the marker ON A LINE OF ITS OWN.
+
+    A substring test over the whole body was what this did, and a comment that
+    merely MENTIONED the marker was then evidence that the pass had run --
+    quoted in prose, in backticks, or in a fenced block explaining what the
+    marker is for. That is not a hypothetical: pull request 48 merged with no
+    code-review marker, and the correction comment posted afterwards, the one
+    REPORTING that the receipt was missing, quoted the marker while explaining
+    the omission and thereby became the evidence. A comment reporting an
+    absence created the thing it reported absent. inventory-tng-egh4.1.
+
+    A line of its own is what .agents/skills/pull-requests/SKILL.md has always
+    asked for, so nothing that follows the documentation changes; every
+    accidental mention stops counting. Somebody determined can still put the
+    marker alone on a line, which is a forgery rather than an accident and is
+    not what this closes.
+    """
+    def carries(body):
+        # POSTED, not shown. Two ways a marker appears in a comment without
+        # being one, and both are ordinary: indented four spaces, which is a
+        # Markdown code block, and inside a fence. The refusal message below
+        # prints the marker indented, and the pull-requests skill shows it in a
+        # fence -- so a comment quoting either back would otherwise be evidence
+        # that the pass had run.
+        #
+        # NO APOSTROPHES ANYWHERE IN THIS READER. It is the body of a
+        # single-quoted `python3 -c`, so one closes the quote and takes the
+        # whole gate down with it -- and this file is the PreToolUse hook, so
+        # what it takes down is every command in the session.
+        fenced = False
+        for line in (body or "").splitlines():
+            bare = line.rstrip()
+            if bare.lstrip().startswith(("```", "~~~")):
+                fenced = not fenced
+                continue
+            if fenced:
+                continue
+            # Markdown allows up to three spaces before a construct; the fourth
+            # makes it a code block, which is the marker being displayed.
+            if bare.lstrip() == mark and len(bare) - len(bare.lstrip()) < 4:
+                return True
+        return False
+
     return [
         {
             "kind": "comment",
@@ -334,7 +377,7 @@ def marked(mark):
             "url": c.get("url"),
         }
         for c in comments
-        if mark in (c.get("body") or "")
+        if carries(c.get("body"))
     ]
 
 

@@ -304,6 +304,15 @@ if os.environ["CR"] == "review":
     reviews.append({"id": "R_1", "author": {"login": "someone"},
                     "submittedAt": "2026-08-24T10:00:00Z",
                     "commit": {"oid": "b" * 40}, "state": "COMMENTED"})
+elif os.environ["CR"] == "quoted":
+    comments.append({"id": "C_3", "author": {"login": "someone"},
+                     "createdAt": "2026-08-24T10:00:00Z", "url": "http://x/3",
+                     "body": "my comment carried no `<!-- review-cycle: code-review -->` marker, "
+                             "which is why nothing recorded"})
+elif os.environ["CR"] == "fenced":
+    comments.append({"id": "C_4", "author": {"login": "someone"},
+                     "createdAt": "2026-08-24T10:00:00Z", "url": "http://x/4",
+                     "body": "post the findings with:\n\n    <!-- review-cycle: code-review -->\n\nand it records"})
 elif os.environ["CR"] == "marker":
     comments.append({"id": "C_1", "author": {"login": "someone"},
                      "createdAt": "2026-08-24T10:00:00Z", "url": "http://x/1",
@@ -342,6 +351,20 @@ pr_json marker marker
 out=$(record); status=$?
 assert "$out" "$status" 0 "Merging is unblocked" "a marker comment is evidence for code-review too"
 
+# QUOTING THE MARKER IS NOT POSTING IT -- inventory-tng-egh4.1. A substring
+# test over the body made a comment that merely mentioned the marker into
+# evidence that the pass had run. It is not hypothetical: pull request 48
+# merged with no code-review marker, and the correction comment posted
+# afterwards -- the one reporting the receipt was missing -- quoted the marker
+# while explaining the omission and became the evidence. A comment reporting an
+# absence created the thing it reported absent.
+pr_json quoted marker
+out=$(record); status=$?
+assert "$out" "$status" 1 "code-review pass ran" "a marker quoted inside a sentence is not evidence"
+
+pr_json fenced marker
+out=$(record); status=$?
+assert "$out" "$status" 1 "code-review pass ran" "nor one quoted in a fenced block explaining it"
 
 GH_FAILS=1
 out=$(record); status=$?
