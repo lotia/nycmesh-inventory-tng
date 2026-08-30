@@ -37,3 +37,4 @@ to ask "why is it like this?". Number them sequentially.
 | [0025](0025-work-that-belongs-to-no-row.md) | Work that belongs to no row opens over the column, and closes back to it |
 | [0026](0026-what-makes-two-strings-one-identifier.md) | What makes two strings one identifier, and what decides it |
 | [0027](0027-the-admin-is-meant-to-look-different.md) | The admin is meant to look different, and that is not an omission |
+| [0028](0028-a-certificate-a-phone-will-trust.md) | A certificate a phone will trust, made locally, so the camera can be worked on |
