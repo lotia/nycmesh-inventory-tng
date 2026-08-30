@@ -40,8 +40,12 @@ offering several providers, and grant authority separately.**
 
 3. **Second factors on the local path.** `allauth.mfa` supplies TOTP, recovery
    codes and passkeys. TOTP and recovery codes are required for local
-   passwords; passkeys are offered. Accounts arriving through a provider
-   inherit whatever that provider enforced.
+   passwords **by default**; passkeys are offered. Accounts arriving through a
+   provider inherit whatever that provider enforced. **Amended 2026-08-30 —
+   see [the amendment](#amendment-2026-08-30--the-requirement-is-a-default-not-a-rule)
+   below.** What makes "required" true is `RequireSecondFactor` in
+   [`backend/src/inventory/middleware.py`](../../backend/src/inventory/middleware.py);
+   what decides whether it applies is `REQUIRE_SECOND_FACTOR`.
 
 4. **Sign in with Apple is deferred, not refused.** It needs Apple Developer
    Program membership at $99 a year and domain verification, and it is the only
@@ -97,6 +101,65 @@ offering several providers, and grant authority separately.**
   returns a relay address, and Slack an address the workspace controls. The
   `User` record is the identity; a provider account is a way of proving you may
   use it.
+
+## Amendment, 2026-08-30 — the requirement is a default, not a rule
+
+Point 3 said TOTP and recovery codes were **required** on the local password
+path, with no environment carved out and no way to say otherwise. They are now
+**required by default**, and `REQUIRE_SECOND_FACTOR` is an operator's answer in
+every environment: no loopback test, no refusal to start, no environment gate
+of any kind. A deployment may have the requirement off in production, and that
+is a supported configuration rather than a hole somebody found.
+
+**The reasoning is the part that matters here**, because a later contributor
+will find this setting and want to remove it on security grounds, with entirely
+good intentions. This is the argument they have to answer first.
+
+What this application replaces is a Google Form writing into a Google Sheet in
+somebody's personal account: no second factor, no audit trail, no referential
+integrity, and no way for the people depending on it to correct it. An
+inventory-tng with the second factor turned off is better than that on every
+axis except the one — and it is the *thing being replaced* that a prospective
+operator is comparing it against, not an ideal. A deployment that will not
+start because it cannot have a second factor is one nobody runs, and an
+application nobody runs protects nobody's data at all.
+
+So: adoption first, then the nudge. Point 3's original position was not wrong
+about the risk; it was wrong about who gets to weigh it. That belongs to
+whoever is answerable to the people using the deployment.
+
+**Three things keep this a nudge rather than a concession**, and removing any
+of them would turn the amendment into a retreat:
+
+1. **The default points at the requirement**, so a deployment that says nothing
+   gets it. Every file this repository ships then states its value explicitly
+   rather than leaning on that — which is
+   [decision 0021](0021-telemetry-over-otlp.md) point 11's pattern, and it means the
+   case nobody thought about is the careful one.
+2. **Off does not mean absent.** `allauth.mfa` stays installed and enrolment
+   stays reachable, so somebody may set up a second factor on a deployment that
+   does not ask for one, and an operator may turn the requirement on later
+   without a migration, a different image, or a coordinated enrolment day.
+   Anybody who already enrolled is unaffected when they do. This is what makes
+   "nudge them towards better security" a values change rather than a rebuild.
+3. **The deployment says so, every start**, on standard error, whenever the
+   requirement is off — which is
+   [decision 0021](0021-telemetry-over-otlp.md) point 5's rule that adaptation is
+   never silent. It refuses nothing. It means an operator cannot have this off
+   without being reminded that they chose it.
+
+**What is not amended.** Point 5 still holds: signing in never grants
+authority, and this changes nothing about who becomes an administrator.
+[Decision 0014](0014-one-interface.md) point 5's step-up before an
+administrative write is a separate control answering a separate threat — a
+script running in an administrator's own browser, which an authenticator
+enrolled months ago does nothing about — and it is deliberately not wired to
+this setting. `RequireSecondLookInTheAdmin` says so where it lives.
+
+Configuring it is
+[deployment](../deployment.md#choosing-whether-to-require-a-second-factor);
+the mechanism and the shape of the argument are in
+[`backend/src/inventory_tng/second_factor.py`](../../backend/src/inventory_tng/second_factor.py).
 
 ## References
 

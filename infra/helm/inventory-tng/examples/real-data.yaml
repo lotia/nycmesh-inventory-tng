@@ -1,0 +1,19 @@
+# Staging, QA and production -- anywhere the inventory in it is the
+# organisation's actual inventory.
+#
+# The other starting point is onboarding.yaml; README.md is the index.
+
+image:
+  tag: 0.1.0
+
+ingress:
+  host: inventory.example.net
+
+django:
+  allowedHosts: inventory.example.net
+  labelBaseUrl: https://inventory.example.net
+
+  # REQUIRED, which is also the chart's default -- written here anyway, so that
+  # the difference between this file and onboarding.yaml is visible rather than
+  # implied and so that the answer is in the file rather than inherited.
+  requireSecondFactor: true

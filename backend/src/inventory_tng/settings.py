@@ -13,7 +13,7 @@ from typing import Any
 
 from corsheaders.defaults import default_headers
 
-from inventory_tng import database, debugging, devices, forwarded, refusals
+from inventory_tng import database, debugging, devices, forwarded, refusals, second_factor
 from inventory_tng.environment import Env
 from inventory_tng.hosts import allowed_hosts
 from inventory_tng.logs import from_environment
@@ -47,6 +47,11 @@ env = Env(
     # number: it holds the figure, the floor, and the refusal that says which
     # setting a bad value came from.
     DATABASE_CONNECT_TIMEOUT_SECONDS=(str, str(database.DEFAULT_CONNECT_TIMEOUT_SECONDS)),
+    # Whether an account that signed in with a password must have a second
+    # factor before it can do anything. `second_factor` holds the argument for
+    # the default pointing this way and what turning it off does and does not
+    # change.
+    REQUIRE_SECOND_FACTOR=(bool, True),
 )
 
 # Read the repository-root .env when present -- the same file docker compose
@@ -315,9 +320,15 @@ SOCIALACCOUNT_ADAPTER = "inventory.adapters.SocialAccountAdapter"
 SOCIALACCOUNT_EMAIL_AUTHENTICATION = False
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = False
 
-# Decision 0013 point 3. TOTP and recovery codes are required on the local
-# path -- inventory/middleware.py is what makes "required" true -- and a
-# passkey is offered as an extra key rather than as a way round the first two.
+# Decision 0013 point 3, as amended. TOTP and recovery codes are required on
+# the local path BY DEFAULT -- inventory/middleware.py is what makes
+# "required" true, and REQUIRE_SECOND_FACTOR below is what an operator sets to
+# decide otherwise -- and a passkey is offered as an extra key rather than as
+# a way round the first two.
+#
+# This list is deliberately NOT conditional on that setting. `second_factor`
+# says why: optional must not mean absent, or turning the requirement on later
+# stops being a configuration change.
 MFA_SUPPORTED_TYPES = ["totp", "recovery_codes", "webauthn"]
 MFA_TOTP_ISSUER = "NYC Mesh Inventory"
 # One step of tolerance either side, which is thirty seconds. A phone's clock
@@ -326,6 +337,15 @@ MFA_TOTP_ISSUER = "NYC Mesh Inventory"
 # allowed, and refusing an administrator their own key is its own kind of
 # lockout.
 MFA_TOTP_TOLERANCE = 1
+
+# The operator's answer, and the only thing here that says whether a second
+# factor is REQUIRED rather than how one works. Read beside the settings it
+# qualifies rather than up with the environment block, so that the three lines
+# above and this one are found together.
+REQUIRE_SECOND_FACTOR = env("REQUIRE_SECOND_FACTOR")
+_second_factor_announcement = second_factor.announcement(REQUIRE_SECOND_FACTOR)
+if _second_factor_announcement:
+    print(_second_factor_announcement, file=sys.stderr)
 
 # Provider credentials, all optional. A provider whose client id or secret is
 # absent is not offered, so this application boots with nothing configured and

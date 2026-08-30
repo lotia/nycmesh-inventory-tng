@@ -33,9 +33,12 @@ Two places, and they are one system.
   the last section is about: how much of an item is on a particular shelf.
 
 Sign in at `/accounts/login/` with the *username* the account was made under —
-not the email address you know yourself by. A password sign-in then asks for a
-code from an authenticator app as well, every time, and there is no way round
-it — [decision 0013](../docs/decisions/0013-administrator-sign-in.md) says why.
+not the email address you know yourself by. On most deployments a password
+sign-in then asks for a code from an authenticator app as well, every time —
+[decision 0013](../docs/decisions/0013-administrator-sign-in.md) says why, and
+whether yours asks is a choice whoever runs it made. If it does not, you can
+still set one up from `/accounts/`, and it is worth doing: the account you are
+signing into can change what the organisation believes it owns.
 
 *Saving* anything under `/admin/` asks you to sign in again if it is more than
 fifteen minutes since you last did — and **what you typed is not kept**. The

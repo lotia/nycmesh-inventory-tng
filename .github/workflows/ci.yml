@@ -348,7 +348,8 @@ jobs:
       # nothing in it saves a batch. This step is the gap those two leave.
       #
       # The session is minted server-side rather than by signing in, because
-      # the local path requires a second factor by decision 0013 and a TOTP
+      # the local path may require a second factor -- decision 0013 as amended,
+      # and inventory-tng-o1uj.3 -- and a TOTP
       # dance in bash would be testing the wrong thing. What is under test is
       # the origin comparison, which happens on the request no matter how the
       # session was made.

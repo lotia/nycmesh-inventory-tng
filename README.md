@@ -129,12 +129,12 @@ open: it serves the app and forwards the API, the admin and the sign-in pages
 to Django, so signing in there returns you to the app afterwards.
 
 Go to <http://localhost:8080/accounts/login/> and use the account
-`createsuperuser` just made. Signing in with it the first time asks you to set
-up an authenticator app — a password on its own is not a way into this system,
-and how administrators sign in is
-[decision 0013](docs/decisions/0013-administrator-sign-in.md). Have a TOTP app
-to hand before you start; you will be shown a QR code to scan once, and a set
-of recovery codes to keep.
+`createsuperuser` just made. The password is all it asks for here, because this
+stack ships with `REQUIRE_SECOND_FACTOR=false` — a deployment defaults to the
+opposite, and how administrators sign in is
+[decision 0013](docs/decisions/0013-administrator-sign-in.md).
+[Signing in](DEVELOPERS.md#signing-in) is how to turn it on locally and when
+you would want to.
 
 Once you are in:
 
