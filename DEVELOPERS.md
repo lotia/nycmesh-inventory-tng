@@ -265,6 +265,19 @@ it off, so have a phone or any other TOTP application ready before you start.
 Which providers a deployment offers besides that one is configuration; the
 variables are in [deployment](docs/deployment.md#environment-variables).
 
+**Enrol once, not once per database.** Wiping the database is an ordinary thing
+to do while developing, and it takes the account and its authenticator with it.
+Rather than enrolling again each time, use the login the integration suite's
+seed makes — the command is in [Common tasks](#common-tasks), and what its
+acknowledgement flag is for is [Integration tests](#integration-tests).
+
+The part worth knowing here is that **its TOTP secret is fixed rather than
+generated**. Scan it into a phone once and the same codes keep working after
+every `down -v`, because each run writes the same secret back. Running it again
+replaces the login rather than duplicating it.
+
+Never give a deployment this account.
+
 ### If you had this stack running before August 2026
 
 Run `docker compose down -v` once. The database volume now mounts
@@ -370,6 +383,7 @@ All backend commands run from `backend/`, all frontend commands from `frontend/`
 | Make migrations | `uv run python src/manage.py makemigrations` |
 | Apply migrations | `uv run python src/manage.py migrate` |
 | Put demo rows in an empty database | `uv run python src/manage.py seed_demo_data` (refuses unless `DJANGO_DEBUG` is on) |
+| Make the login that survives a wipe | `uv run python src/manage.py seed_integration_data --i-know-this-creates-a-published-login` — see [Signing in](#signing-in) |
 | Open a Django shell | `uv run python src/manage.py shell` |
 | Add a dependency | `uv add <package>` |
 | Add a dev-only dependency | `uv add --group dev <package>` |
