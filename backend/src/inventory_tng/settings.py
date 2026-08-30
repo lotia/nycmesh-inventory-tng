@@ -139,6 +139,13 @@ INSTALLED_APPS = [
     "inventory",
 ]
 
+# Where collectstatic puts what it collects, and whether it has. Up here
+# because the middleware list below asks the second question and settings are
+# read top to bottom; STATIC_URL stays with STORAGES, which is the only thing
+# that needs it.
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATIC_FILES_ARE_COLLECTED = STATIC_ROOT.is_dir()
+
 MIDDLEWARE = [
     # First, and the class says why that position is the point. What it binds,
     # and the one record no middleware can reach, are there too.
@@ -171,10 +178,20 @@ MIDDLEWARE = [
     "inventory.middleware.RequireSecondLookInTheAdmin",
 ]
 
-# WhiteNoise serves the Django admin's own static files in the built image.
-# In development, Django's staticfiles app does it and collectstatic has not
-# run, so adding WhiteNoise here would only emit a missing-directory warning.
-if not DEBUG:
+# WhiteNoise serves the Django admin's own static files, and the question is
+# whether there are any to serve rather than whether this is a development
+# machine. `collectstatic` runs in backend/Dockerfile, so STATIC_ROOT exists in
+# every built image and in no ordinary checkout -- the directory is gitignored.
+#
+# THE CONDITION USED TO BE `not DEBUG`, AND THAT IS A DIFFERENT QUESTION. It
+# stood in for "is anything else already serving static files", whose real
+# answer is `runserver`, which has a staticfiles handler of its own. Under
+# gunicorn nothing does -- so the one arrangement the old condition did not
+# describe was DEBUG on AND gunicorn, which is exactly what compose.yaml ships:
+# every admin stylesheet answered 404 and the page rendered in Times New Roman
+# on a transparent background. The image is where static files exist, so the
+# image is what this asks about.
+if STATIC_FILES_ARE_COLLECTED:
     MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
 
 ROOT_URLCONF = "inventory_tng.urls"
@@ -371,10 +388,21 @@ TIME_ZONE = "America/New_York"
 USE_I18N = True
 USE_TZ = True
 
+# STATIC_ROOT, and whether anything was collected into it, are set above --
+# beside the middleware list that asks.
+#
 STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
 # The manifest storage requires collectstatic to have run, which is true in the
 # built image but not in a development checkout -- hence the DEBUG split.
+#
+# AND IT IS A DIFFERENT QUESTION FROM THE MIDDLEWARE'S, deliberately, because
+# the two look alike enough to be worth separating. That one asks whether there
+# is anything to serve; this asks which names to serve it under, and DEBUG is a
+# reasonable stand-in for the second because hashed names are a deployment's
+# concern rather than a developer's. The pair is sound in every combination
+# that occurs: the image collects with DEBUG unset, so the manifest is built,
+# and a container run with DEBUG on then draws unhashed names that WhiteNoise
+# serves from the same directory.
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {

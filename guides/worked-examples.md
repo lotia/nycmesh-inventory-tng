@@ -143,7 +143,7 @@ explained once; and whether anything on screen stops you typing the total
 instead of the difference.
 
 **Note what you had to already know**, because that is the finding. The
-volunteer's app deliberately does not offer a count, so this is admin-only —
-and the admin currently renders with no styling at all, which is
-`inventory-tng-o1uj.1` and makes this walkthrough considerably harder than it
-should be.
+volunteer's app deliberately does not offer a count, so this is admin-only, and
+the admin is Django's rather than something designed for the person doing this
+job. Whether that is good enough for a volunteer administrator, or whether this
+belongs in the app, is the question the session exists to put to you.

@@ -291,6 +291,22 @@ jobs:
         run: |
           curl -sf --retry 30 --retry-delay 2 --retry-all-errors \
             http://localhost:8080/api/healthz | grep -q '"ok"'
+      # The admin draws itself, which no unit test can say. The suite asserts
+      # WhiteNoise is loaded exactly where collectstatic has run -- and in a
+      # checkout it has not, so both sides of that are false and the case this
+      # is about is exercised nowhere but here. The image is the only place the
+      # files exist. inventory-tng-o1uj.1 was every one of these answering 404
+      # and the admin rendering as unstyled HTML.
+      - name: And the admin's own stylesheets are served
+        run: |
+          for sheet in base dashboard nav_sidebar responsive; do
+            status=$(curl -s -o /dev/null -w '%{http_code}' \
+              "http://localhost:8080/static/admin/css/$sheet.css")
+            if [ "$status" != "200" ]; then
+              echo "::error::/static/admin/css/$sheet.css answered $status; the Django admin has no styling"
+              exit 1
+            fi
+          done
       # The two README calls not optional, in the shape it prints them. Without
       # these the quickstart -- the path written for somebody who has only
       # Docker -- would be the one route into this project that nothing runs

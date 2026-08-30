@@ -33,6 +33,7 @@ from django.test import Client, override_settings
 from environ import Env
 
 from inventory.tests.charts import manifests, refused, render
+from inventory.tests.helpers import BACKEND_DOCKERFILE, shipped
 from inventory_tng import forwarded
 from inventory_tng.database import DEFAULT_CONNECT_TIMEOUT_SECONDS
 from inventory_tng.environment import entries
@@ -241,7 +242,6 @@ def test_a_probe_waits_exactly_as_long_as_the_documents_say_it_does(probe: str, 
 # the pod had stopped running. Both files that configure gunicorn are read,
 # because the command line names a configuration module and either could carry
 # the setting that breaks the model.
-DOCKERFILE = Path("backend") / "Dockerfile"
 GUNICORN_CONF = Path("backend") / "src" / "gunicorn.conf.py"
 WORKERS = re.compile(r'"(?:--workers|-w)",\s*"3"')
 ON_THE_COMMAND_LINE = re.compile(r'"(?:--worker-class|-k|--timeout|-t)"')
@@ -327,15 +327,15 @@ def test_the_pod_runs_the_workers_the_arithmetic_divides_by() -> None:
     because worker-seconds stop being the model rather than the arithmetic
     coming out differently.
     """
-    command = (settings.REPO_ROOT / DOCKERFILE).read_text()
+    command = shipped(BACKEND_DOCKERFILE)
     configuration = (settings.REPO_ROOT / GUNICORN_CONF).read_text()
 
     assert WORKERS.search(command), (
-        f"docs/deployment.md#health-checks divides its worker-seconds by three workers, and {DOCKERFILE} no "
+        f"docs/deployment.md#health-checks divides its worker-seconds by three workers, and {BACKEND_DOCKERFILE} no "
         "longer asks for three"
     )
     for where, chosen in (
-        (DOCKERFILE, ON_THE_COMMAND_LINE.search(command)),
+        (BACKEND_DOCKERFILE, ON_THE_COMMAND_LINE.search(command)),
         (GUNICORN_CONF, IN_THE_CONFIGURATION.search(configuration)),
     ):
         assert chosen is None, (
