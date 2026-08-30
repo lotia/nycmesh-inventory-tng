@@ -67,9 +67,9 @@ def entries(values: Iterable[str]) -> list[str]:
     `django-environ`'s list cast is `split(",")` and nothing else, so `"a, b"`
     -- the way anybody writes a list of two -- yields `" b"`. That matches
     nothing, for ever, and the space does not show in the file that caused it:
-    it was a live production bug here in `DJANGO_ALLOWED_HOSTS`, and
-    `CORS_ALLOWED_ORIGINS` carried the identical one a screen below in
-    `settings.py`.
+    it was a live production bug here in `DJANGO_ALLOWED_HOSTS`, and the
+    since-removed `CORS_ALLOWED_ORIGINS` carried the identical one a screen
+    below in `settings.py`.
 
     Fixed at the mechanism rather than at either variable. Every list cast goes
     through `Env.parse_value` below, so a third one added later is trimmed

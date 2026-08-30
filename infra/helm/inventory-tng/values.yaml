@@ -75,9 +75,6 @@ django:
   # covers is refused at render time, and the pod adds its own address to
   # this list so the kubelet can probe it. docs/deployment.md#health-checks.
   allowedHosts: "inventory.nycmesh.net"
-  # Empty, and expected to stay empty; see docs/deployment.md for what it does
-  # and does not buy. Comma-separated.
-  corsAllowedOrigins: ""
   # Origins Django accepts a WRITE from, when the host it computes for itself
   # is not the one the browser claims. Empty and expected to stay empty: the
   # frontend forwards the browser's own host, so the two agree. An ingress that

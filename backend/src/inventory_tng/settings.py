@@ -27,7 +27,6 @@ env = Env(
     DJANGO_DEBUG=(bool, False),
     DJANGO_ALLOWED_HOSTS=(list, []),
     DJANGO_EXTRA_ALLOWED_HOSTS=(list, []),
-    CORS_ALLOWED_ORIGINS=(list, []),
     CSRF_TRUSTED_ORIGINS=(list, []),
     # Defaults are the ones a volunteer night needs; .env.sample says why.
     APPEND_BURST_RATE=(str, "20/min"),
@@ -570,14 +569,27 @@ SPECTACULAR_SETTINGS = {
     },
 }
 
-# Cross-origin reads only, and normally unused: both the dev server and nginx
-# proxy Django's paths, so the browser sees one origin. See .env.sample. An
-# origin written with a space after the comma is trimmed by `Env` itself; the
-# argument is on `environment.entries`.
-CORS_ALLOWED_ORIGINS: list[str] = env("CORS_ALLOWED_ORIGINS")
+# NO CROSS-ORIGIN READS. There is no CORS_ALLOWED_ORIGINS here and no variable
+# that sets one, which is inventory-tng-o1uj.4 settled: this application is
+# reached through one origin, and every arrangement it ships puts a proxy in
+# front of it to make that true -- nginx in the image, the dev server's proxy
+# locally.
+#
+# What was there advertised something that could not work. A browser reading
+# this API from another origin has to send the session cookie, and a
+# credentialed request is refused unless the response carries
+# Access-Control-Allow-Credentials -- which nothing here has ever set. So an
+# origin listed there bought a preflight that passed and a read that the
+# browser then withheld from the page. .env.sample said as much in a comment
+# while compose.yaml listed two origins anyway.
+#
+# Supporting it means the credentials header AND a trusted-origin list for
+# writes AND deciding which origins may hold a volunteer's session. That is a
+# decision rather than a variable, and it has not been made.
 
-# Origins a WRITE may come from, which is a different question from the one
-# above: that is about reading, this about writing.
+# Origins a WRITE may come from, which survived the removal above because it
+# answers a different question: that was about reading this API from elsewhere,
+# this is about Django recognising a write as coming from itself.
 #
 # The comparison this feeds, and why it is normally satisfied without help, is
 # written down once on the `map` at the top of frontend/nginx.conf.template --
