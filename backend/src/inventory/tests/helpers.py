@@ -10,12 +10,14 @@ import io
 import json
 import logging
 import logging.config
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 import pyotp
+from allauth.account.authentication import AUTHENTICATION_METHODS_SESSION_KEY
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -33,6 +35,31 @@ from inventory_tng import redaction
 # agree until they do not, and the one that drifts goes on passing.
 NGINX_TEMPLATE = Path("frontend") / "nginx.conf.template"
 BACKEND_DOCKERFILE = Path("backend") / "Dockerfile"
+
+
+def wind_back(client: Client) -> Client:
+    """The same session, whose sign-in is no longer recent enough.
+
+    Wound back rather than waited out: the window is fifteen minutes and a
+    test suite is not going to sit through one. What is moved is the timestamp
+    allauth itself records and reads, so this is the same state a session
+    reaches by being left open.
+
+    Takes the client rather than making one, because WHICH session is stale is
+    the only thing callers differ on -- conftest's `stale` winds back one that
+    enrolled a second factor, and test_second_factor.py winds back one that
+    signed in with a password and never did.
+    """
+    # Held rather than re-read: `Client.session` builds a store from the cookie
+    # each time it is asked, so writing through the property and saving through
+    # it again saves a different object than the one that was changed.
+    session = client.session
+    stale_at = time.time() - settings.ACCOUNT_REAUTHENTICATION_TIMEOUT - 1
+    session[AUTHENTICATION_METHODS_SESSION_KEY] = [
+        {**record, "at": stale_at} for record in session[AUTHENTICATION_METHODS_SESSION_KEY]
+    ]
+    session.save()
+    return client
 
 
 def shipped(path: Path) -> str:

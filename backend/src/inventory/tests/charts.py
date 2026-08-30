@@ -91,6 +91,17 @@ def environment(container: dict[str, Any]) -> dict[str, Any]:
     return {entry["name"]: entry for entry in container["env"]}
 
 
+def rendered(**overrides: str) -> dict[str, Any]:
+    """The backend container's environment, as the chart renders it.
+
+    The composition of the two above, which three modules were each spelling
+    out for themselves -- the same drift `workloads` below was factored to
+    stop. Every test asking "does a deployment get this variable, and with
+    what in it" starts here.
+    """
+    return environment(backend_container(**overrides))
+
+
 def workloads(**overrides: str) -> list[dict[str, Any]]:
     """Every rendered document that runs a pod, whatever kind it is.
 

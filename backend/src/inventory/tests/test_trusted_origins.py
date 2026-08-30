@@ -14,13 +14,12 @@ needs it is that deployment's business; having no way to say so was the defect.
 """
 
 import importlib
-from typing import Any
 
 import pytest
 from django.conf import settings
 from environ import Env
 
-from inventory.tests.charts import backend_container, environment
+from inventory.tests.charts import rendered
 from inventory_tng.environment import entries
 
 SETTING = "CSRF_TRUSTED_ORIGINS"
@@ -82,11 +81,6 @@ def test_every_shipped_configuration_says_so_rather_than_implying_it(shipped: st
         f"{shipped} does not mention {SETTING}, so its value is whatever the code defaults to rather than "
         "something this repository chose. The next person to meet a refused write reads these files"
     )
-
-
-def rendered(**overrides: str) -> dict[str, Any]:
-    """The backend container's environment, as the chart renders it."""
-    return environment(backend_container(**overrides))
 
 
 def test_the_chart_renders_it_and_leaves_it_empty() -> None:
