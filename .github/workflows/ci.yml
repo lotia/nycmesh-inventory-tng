@@ -608,6 +608,8 @@ jobs:
         run: scripts/check-setup.test.sh
       - name: Check the landing gate
         run: scripts/landing-gate.test.sh
+      - name: Check the configuration checker
+        run: scripts/check-config.test.sh
       # And then run it, which none of the above do to their own subject. What
       # it reads here is what a clone is handed before anybody configures
       # anything, so a hook that stopped arriving with the checkout is caught
@@ -673,6 +675,10 @@ jobs:
           fail: true
       - name: Check for duplicated prose
         run: scripts/check-docs.sh
+      # And the configuration, for the same reason: a value added without a
+      # word about it is caught on the push that added it.
+      - name: Every configuration value says what it is for
+        run: scripts/check-config.sh
       # The third is the same kind of rule about code rather than prose: work
       # that changes something has to say so. It sits here because it is
       # enforcement of a written rule, and because like check-docs.sh it needs
