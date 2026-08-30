@@ -28,6 +28,7 @@ env = Env(
     DJANGO_ALLOWED_HOSTS=(list, []),
     DJANGO_EXTRA_ALLOWED_HOSTS=(list, []),
     CORS_ALLOWED_ORIGINS=(list, []),
+    CSRF_TRUSTED_ORIGINS=(list, []),
     # Defaults are the ones a volunteer night needs; .env.sample says why.
     APPEND_BURST_RATE=(str, "20/min"),
     APPEND_SUSTAINED_RATE=(str, "300/hour"),
@@ -574,6 +575,23 @@ SPECTACULAR_SETTINGS = {
 # origin written with a space after the comma is trimmed by `Env` itself; the
 # argument is on `environment.entries`.
 CORS_ALLOWED_ORIGINS: list[str] = env("CORS_ALLOWED_ORIGINS")
+
+# Origins a WRITE may come from, which is a different question from the one
+# above: that is about reading, this about writing.
+#
+# The comparison this feeds, and why it is normally satisfied without help, is
+# written down once on the `map` at the top of frontend/nginx.conf.template --
+# the component that decides the other side of it. This list is what admits a
+# request when that comparison fails, and until inventory-tng-o1uj.7 nothing
+# read the variable, so a deployment meeting the failure had no answer to it.
+#
+# Empty is the right default and is what every configuration here ships: one
+# origin sits in front of everything, so nothing needs admitting on top. It is
+# for the deployment whose host Django cannot work out for itself -- an ingress
+# that rewrites it, a tunnel, a name a pod does not know itself by.
+#
+# Entries carry a scheme, which is Django's requirement rather than ours.
+CSRF_TRUSTED_ORIGINS: list[str] = env("CSRF_TRUSTED_ORIGINS")
 
 # django-cors-headers' defaults do not include the W3C trace headers, so a
 # cross-origin request carrying one is refused at the preflight -- not stripped,

@@ -32,7 +32,7 @@ from django.http.request import validate_host
 from django.test import Client, override_settings
 from environ import Env
 
-from inventory.tests.charts import manifests, refused, render
+from inventory.tests.charts import backend_container, environment, refused, render
 from inventory.tests.helpers import BACKEND_DOCKERFILE, shipped
 from inventory_tng import forwarded
 from inventory_tng.database import DEFAULT_CONNECT_TIMEOUT_SECONDS
@@ -57,24 +57,6 @@ KUBELET_HOST = f"{POD_ADDRESS}:8000"
 # That also catches liveness repointed at some future endpoint that grows a
 # query of its own, which no pairing table would.
 QUERIES_ALLOWED = {"livenessProbe": 0, "readinessProbe": 1}
-
-
-def backend_container(**overrides: str) -> dict[str, Any]:
-    """The one container the probes belong to."""
-    deployments = [
-        document
-        for document in manifests(**overrides)
-        if document["kind"] == "Deployment" and document["metadata"]["name"].endswith("-backend")
-    ]
-    assert len(deployments) == 1, "the chart is expected to render exactly one backend Deployment"
-    containers = deployments[0]["spec"]["template"]["spec"]["containers"]
-    assert len(containers) == 1, "the chart is expected to render exactly one backend container"
-    return containers[0]
-
-
-def environment(container: dict[str, Any]) -> dict[str, Any]:
-    """The container's `env`, by name, values and `valueFrom` alike."""
-    return {entry["name"]: entry for entry in container["env"]}
 
 
 def as_the_pod_would_read_it(container: dict[str, Any]) -> list[str]:

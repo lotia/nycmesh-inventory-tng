@@ -78,6 +78,12 @@ django:
   # Empty, and expected to stay empty; see docs/deployment.md for what it does
   # and does not buy. Comma-separated.
   corsAllowedOrigins: ""
+  # Origins Django accepts a WRITE from, when the host it computes for itself
+  # is not the one the browser claims. Empty and expected to stay empty: the
+  # frontend forwards the browser's own host, so the two agree. An ingress that
+  # rewrites the host is what fills it, and the symptom is every write refused.
+  # Comma-separated, each entry carrying a scheme.
+  csrfTrustedOrigins: ""
   # Proxies between the browser and Django: the ingress, then the frontend's
   # nginx. This decides whose request a rate limit counts against, so it must
   # match the real chain; see docs/deployment.md.

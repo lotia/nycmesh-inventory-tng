@@ -71,3 +71,21 @@ def refused(**overrides: str) -> str | None:
 def manifests(**overrides: str) -> list[dict[str, Any]]:
     """Every object the chart renders."""
     return [document for document in yaml.safe_load_all(render(**overrides)) if document]
+
+
+def backend_container(**overrides: str) -> dict[str, Any]:
+    """The one container the probes belong to."""
+    deployments = [
+        document
+        for document in manifests(**overrides)
+        if document["kind"] == "Deployment" and document["metadata"]["name"].endswith("-backend")
+    ]
+    assert len(deployments) == 1, "the chart is expected to render exactly one backend Deployment"
+    containers = deployments[0]["spec"]["template"]["spec"]["containers"]
+    assert len(containers) == 1, "the chart is expected to render exactly one backend container"
+    return containers[0]
+
+
+def environment(container: dict[str, Any]) -> dict[str, Any]:
+    """The container's `env`, by name, values and `valueFrom` alike."""
+    return {entry["name"]: entry for entry in container["env"]}
