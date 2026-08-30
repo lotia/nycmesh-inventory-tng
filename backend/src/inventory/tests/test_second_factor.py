@@ -22,23 +22,20 @@ removed.
 """
 
 import importlib
-import time
-from typing import Any
+from pathlib import Path
 
 import pyotp
 import pytest
-from allauth.account.authentication import AUTHENTICATION_METHODS_SESSION_KEY
 from allauth.mfa.models import Authenticator
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import Client
 from django.urls import reverse
 from environ import Env
 from pytest_django.fixtures import Settings
 
-from inventory.tests.charts import backend_container, environment
+from inventory.tests.charts import rendered
 from inventory.tests.conftest import ADMINISTRATOR_PASSWORD as PASSWORD
-from inventory.tests.helpers import activate_totp, start_local_sign_in
+from inventory.tests.helpers import activate_totp, shipped, start_local_sign_in, wind_back
 from inventory_tng import second_factor
 
 SETTING = "REQUIRE_SECOND_FACTOR"
@@ -48,17 +45,6 @@ SHIPPED = ("compose.yaml", ".env.sample")
 # say. They exist so that an operator's starting point states the answer rather
 # than inheriting it, which is worth nothing if they drift from the setting.
 EXAMPLES = {"onboarding.yaml": "false", "real-data.yaml": "true"}
-
-
-@pytest.fixture
-def local(administrator: User) -> User:
-    """An account with a password and no second factor set up.
-
-    `administrator` is conftest's, which is exactly that: created with a
-    password and nothing else. Named again here so that what each test below
-    depends on is legible without following the fixture.
-    """
-    return administrator
 
 
 # ---------------------------------------------------------------------------
@@ -91,21 +77,21 @@ def test_the_default_is_the_careful_one() -> None:
 
 
 @pytest.mark.django_db
-def test_a_password_alone_is_refused_when_it_is_required(local: User, settings: Settings) -> None:
+def test_a_password_alone_is_refused_when_it_is_required(administrator: User, settings: Settings) -> None:
     settings.REQUIRE_SECOND_FACTOR = True
 
-    refused = start_local_sign_in(local, PASSWORD).get(reverse("items"))
+    refused = start_local_sign_in(administrator, PASSWORD).get(reverse("items"))
 
     assert refused.status_code == 403
     assert "second factor" in refused.json()["detail"]
 
 
 @pytest.mark.django_db
-def test_a_password_alone_is_enough_when_it_is_not(local: User, settings: Settings) -> None:
+def test_a_password_alone_is_enough_when_it_is_not(administrator: User, settings: Settings) -> None:
     """The operator's answer, honoured. No environment gate reaches this."""
     settings.REQUIRE_SECOND_FACTOR = False
 
-    admitted = start_local_sign_in(local, PASSWORD).get(reverse("items"))
+    admitted = start_local_sign_in(administrator, PASSWORD).get(reverse("items"))
 
     assert admitted.status_code == 200, (
         "an operator turned the requirement off and the middleware refused anyway, so the setting is "
@@ -127,7 +113,7 @@ def test_the_machinery_stays_installed_whatever_the_answer_is(settings: Settings
 
 
 @pytest.mark.django_db
-def test_somebody_may_still_enrol_where_nobody_has_to(local: User, settings: Settings) -> None:
+def test_somebody_may_still_enrol_where_nobody_has_to(administrator: User, settings: Settings) -> None:
     """A volunteer who wants a second factor gets one on a deployment without.
 
     Driven through the activation page rather than the model, the way
@@ -135,21 +121,21 @@ def test_somebody_may_still_enrol_where_nobody_has_to(local: User, settings: Set
     still works rather than that the table can hold a row.
     """
     settings.REQUIRE_SECOND_FACTOR = False
-    client = start_local_sign_in(local, PASSWORD)
+    client = start_local_sign_in(administrator, PASSWORD)
 
     page = client.get(reverse("mfa_activate_totp"))
     secret = page.context["form"].secret
     client.post(reverse("mfa_activate_totp"), {"code": pyotp.TOTP(secret).now()})
 
     assert page.status_code == 200, "the enrolment page is unreachable where the requirement is off"
-    assert Authenticator.objects.filter(user=local, type=Authenticator.Type.TOTP).exists(), (
+    assert Authenticator.objects.filter(user=administrator, type=Authenticator.Type.TOTP).exists(), (
         "enrolment does not complete where the requirement is off, so turning the requirement on later "
         "is a coordinated enrolment day rather than a values change"
     )
 
 
 @pytest.mark.django_db
-def test_a_second_factor_already_set_up_is_still_asked_for(local: User, settings: Settings) -> None:
+def test_a_second_factor_already_set_up_is_still_asked_for(administrator: User, settings: Settings) -> None:
     """Optional for the account that has none; unchanged for the account that has one.
 
     This is what stops "not required" from meaning "not used". allauth's own
@@ -158,10 +144,10 @@ def test_a_second_factor_already_set_up_is_still_asked_for(local: User, settings
     enrolled.
     """
     settings.REQUIRE_SECOND_FACTOR = False
-    activate_totp(local)
+    activate_totp(administrator)
 
     client = Client()
-    accepted = client.post(reverse("account_login"), {"login": local.get_username(), "password": PASSWORD})
+    accepted = client.post(reverse("account_login"), {"login": administrator.get_username(), "password": PASSWORD})
 
     # The password was right AND the sign-in is not finished: allauth held it
     # at its own challenge. Asserted rather than inferred from the refusal
@@ -184,7 +170,7 @@ def test_a_second_factor_already_set_up_is_still_asked_for(local: User, settings
 
 
 @pytest.mark.django_db
-def test_the_admin_step_up_is_not_wired_to_this(local: User, settings: Settings) -> None:
+def test_the_admin_step_up_is_not_wired_to_this(administrator: User, settings: Settings) -> None:
     """Decision 0014 point 5 is a separate control and stays on.
 
     It answers a different threat, which decision 0013's amendment names and
@@ -200,13 +186,7 @@ def test_the_admin_step_up_is_not_wired_to_this(local: User, settings: Settings)
     ask for one.
     """
     settings.REQUIRE_SECOND_FACTOR = False
-    client = start_local_sign_in(local, PASSWORD)
-    session = client.session
-    stale_at = time.time() - settings.ACCOUNT_REAUTHENTICATION_TIMEOUT - 1
-    session[AUTHENTICATION_METHODS_SESSION_KEY] = [
-        {**record, "at": stale_at} for record in session[AUTHENTICATION_METHODS_SESSION_KEY]
-    ]
-    session.save()
+    client = wind_back(start_local_sign_in(administrator, PASSWORD))
 
     written = client.post(f"{reverse('admin:index')}auth/user/add/", {})
 
@@ -269,20 +249,15 @@ def test_what_the_environment_says_is_what_the_setting_becomes() -> None:
     )
 
 
-@pytest.mark.parametrize("shipped", SHIPPED)
-def test_every_shipped_configuration_says_so_rather_than_implying_it(shipped: str) -> None:
+@pytest.mark.parametrize("a_file", SHIPPED)
+def test_every_shipped_configuration_says_so_rather_than_implying_it(a_file: str) -> None:
     """The local stack's answer is in a file, not inherited from the code."""
-    text = (settings.REPO_ROOT / shipped).read_text()
+    text = shipped(Path(a_file))
 
     assert SETTING in text, (
-        f"{shipped} does not mention {SETTING}, so what a fresh clone runs with is whatever the code fell "
+        f"{a_file} does not mention {SETTING}, so what a fresh clone runs with is whatever the code fell "
         "back to rather than something this repository chose"
     )
-
-
-def rendered(**overrides: str) -> dict[str, Any]:
-    """The backend container's environment, as the chart renders it."""
-    return environment(backend_container(**overrides))
 
 
 def test_the_chart_renders_it_and_requires_it_by_default() -> None:
@@ -324,7 +299,7 @@ def test_each_example_states_the_answer_it_is_named_for(example: str, expected: 
     inherited, so an example that stopped setting it -- or that agreed with the
     other one -- would be worse than not shipping it at all.
     """
-    text = (settings.REPO_ROOT / "infra/helm/inventory-tng/examples" / example).read_text()
+    text = shipped(Path("infra/helm/inventory-tng/examples") / example)
 
     assert f"requireSecondFactor: {expected}" in text, (
         f"{example} no longer says requireSecondFactor: {expected}, so the starting point named for this "

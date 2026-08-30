@@ -24,13 +24,14 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.http import HttpResponseBase
 from django.test import Client
 from django.urls import reverse
 
 from inventory.tests.conftest import ADMINISTRATOR_PASSWORD as PASSWORD
 from inventory.tests.helpers import start_local_sign_in
 
+# Every test here renders a page, which needs a session table -- except the two
+# at the bottom, which only look at the filesystem and say so.
 pytestmark = pytest.mark.django_db
 
 # Where the two stylesheets live before collectstatic moves them. The theme is
@@ -59,14 +60,9 @@ def asked_for(page: str, stylesheet: str) -> bool:
     return re.search(rf"accounts/{re.escape(stem)}(\.[0-9a-f]+)?{re.escape(dot + extension)}", page) is not None
 
 
-def asks_for(response: HttpResponseBase) -> str:
-    """The rendered page. These are always ordinary rendered responses."""
-    return b"".join(response).decode()
-
-
 @pytest.mark.parametrize("name", OPEN_TO_ANYBODY)
 def test_a_page_reached_with_nothing_is_styled(name: str) -> None:
-    page = asks_for(Client().get(reverse(name)))
+    page = Client().get(reverse(name)).content.decode()
 
     assert asked_for(page, "theme.css"), (
         f"{name} asks for no theme stylesheet, so it renders as browser-default HTML -- which is the "
@@ -83,7 +79,7 @@ def test_a_page_reached_part_way_in_is_styled(name: str, administrator: User) ->
     so a change that exempted them from the layout rather than from the
     requirement would show up here and nowhere else.
     """
-    page = asks_for(start_local_sign_in(administrator, PASSWORD).get(reverse(name)))
+    page = start_local_sign_in(administrator, PASSWORD).get(reverse(name)).content.decode()
 
     assert asked_for(page, "theme.css"), f"{name} is served without the stylesheet the others get"
 
@@ -97,7 +93,7 @@ def test_the_override_is_reached_rather_than_allauth_s_own() -> None:
     what makes the override win, and this is what fails if somebody tidies it
     away -- the wordmark appears in no template allauth ships.
     """
-    page = asks_for(Client().get(reverse("account_login")))
+    page = Client().get(reverse("account_login")).content.decode()
 
     assert "NYC Mesh Inventory" in page
     assert "Menu:" not in page, (
@@ -112,11 +108,12 @@ def test_the_way_out_is_still_on_the_page(administrator: User) -> None:
     the other allauth pages, and a frame that dropped it while making things
     tidier would strand somebody on the enrolment screen.
     """
-    page = asks_for(start_local_sign_in(administrator, PASSWORD).get(reverse("mfa_activate_totp")))
+    page = start_local_sign_in(administrator, PASSWORD).get(reverse("mfa_activate_totp")).content.decode()
 
     assert reverse("account_logout") in page
 
 
+@pytest.mark.django_db(transaction=False)
 @pytest.mark.parametrize("stylesheet", ["theme.css", "accounts.css"])
 def test_the_stylesheet_is_there_to_be_collected(stylesheet: str) -> None:
     """A page asking for a file nothing serves is the o1uj.1 failure again.

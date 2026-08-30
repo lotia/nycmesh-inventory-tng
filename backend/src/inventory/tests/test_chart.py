@@ -32,7 +32,7 @@ from django.http.request import validate_host
 from django.test import Client, override_settings
 from environ import Env
 
-from inventory.tests.charts import backend_container, environment, manifests, refused, render, workloads
+from inventory.tests.charts import backend_container, environment, manifests, refused, render, rendered, workloads
 from inventory.tests.helpers import BACKEND_DOCKERFILE, shipped
 from inventory_tng import forwarded
 from inventory_tng.database import DEFAULT_CONNECT_TIMEOUT_SECONDS
@@ -348,7 +348,7 @@ def test_the_pod_is_handed_the_proxy_list_the_chart_offers_to_set() -> None:
     empty list, which believes no forwarded header from anybody; decision 0023
     is why that is the safe direction rather than merely the current one.
     """
-    supplied = environment(backend_container())
+    supplied = rendered()
 
     assert "TRUSTED_PROXIES" in supplied, (
         "the chart offers django.trustedProxies and hands the pod nothing, so setting it would do nothing"

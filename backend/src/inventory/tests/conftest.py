@@ -5,7 +5,6 @@ and a radio -- so tests in either module read as statements about NYC Mesh
 rather than about test data.
 """
 
-import time
 from collections.abc import Iterator, Mapping
 from pathlib import Path
 from types import MappingProxyType
@@ -13,7 +12,6 @@ from typing import Any
 
 import pytest
 import yaml
-from allauth.account.authentication import AUTHENTICATION_METHODS_SESSION_KEY
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
@@ -22,7 +20,7 @@ from django.test import Client
 from pytest_django.fixtures import Settings
 
 from inventory.models import Category, Item, Location, Volunteer
-from inventory.tests.helpers import sign_in_locally
+from inventory.tests.helpers import sign_in_locally, wind_back
 from inventory_tng import redaction, telemetry
 
 # The one this suite signs in with. Not a secret and never one: the account is
@@ -146,21 +144,11 @@ def editor(administrator: User) -> Client:
 def stale(editor: Client) -> Client:
     """The same administrator, whose sign-in is no longer recent enough.
 
-    Wound back rather than waited out: the window is fifteen minutes and a
-    test suite is not going to sit through one. What is moved is the timestamp
-    allauth itself records and reads, so this is the same state a session
-    reaches by being left open.
+    How it is made stale, and why that rather than waiting, is `wind_back` in
+    helpers.py -- which test_second_factor.py also uses, for a session that
+    signed in with a password and enrolled nothing.
     """
-    # Held rather than re-read: `Client.session` builds a store from the cookie
-    # each time it is asked, so writing through the property and saving through
-    # it again saves a different object than the one that was changed.
-    session = editor.session
-    stale_at = time.time() - settings.ACCOUNT_REAUTHENTICATION_TIMEOUT - 1
-    session[AUTHENTICATION_METHODS_SESSION_KEY] = [
-        {**record, "at": stale_at} for record in session[AUTHENTICATION_METHODS_SESSION_KEY]
-    ]
-    session.save()
-    return editor
+    return wind_back(editor)
 
 
 @pytest.fixture(scope="session")
