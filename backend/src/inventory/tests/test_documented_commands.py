@@ -57,7 +57,11 @@ VENDORED = (".beads/",)
 # pattern spanning newlines reads as a subcommand called `inventory_tng`.
 SUBCOMMAND = re.compile(r"manage\.py[ \t]+([a-z_][a-z0-9_]*)")
 NPM_SCRIPT = re.compile(r"npm run[ \t]+([A-Za-z0-9:_-]+)")
-SCRIPT_FILE = re.compile(r"\bscripts/([A-Za-z0-9._-]+)")
+# `\b` is not enough of an anchor: it matches inside `frontend/scripts/`, so a
+# document naming a file in THAT directory was reported as a missing one in the
+# repository root's. Requiring the start of a line or a character that cannot
+# be part of a path is what tells the two apart.
+SCRIPT_FILE = re.compile(r"(?:^|[^A-Za-z0-9._/-])scripts/([A-Za-z0-9._-]+)", re.MULTILINE)
 
 # A chart value is named either in backticks or as an argument to --set.
 CHART_VALUE = re.compile(r"`([^`]+)`|--set[ \t]+'?([^\s'=]+)")

@@ -410,9 +410,21 @@ All backend commands run from `backend/`, all frontend commands from `frontend/`
 | Fix lint and formatting | `npm run lint:fix` |
 | Type check | `npm run typecheck` |
 | Run tests (with coverage) | `npm test` |
+| Regenerate the sign-in stylesheet | `npm run theme:css` — see below |
 | Add a dependency | `npm install <package>` |
 
 `npm install` updates `package-lock.json`. **Commit it.**
+
+**Run `npm run theme:css` after any change to `src/theme.ts`.** Django renders
+the pages under `/accounts/` — sign in, the TOTP challenge, enrolment — and
+they are styled from this app's theme, resolved into CSS custom properties and
+written to `backend/src/inventory/static/accounts/theme.css`. That file is
+generated and committed, the same arrangement `capture/` uses for the guide
+screenshots and for the same reason. `npm test` goes red when it is not what
+the theme now resolves to, so this is a step you are reminded of rather than
+one you have to remember. Why it is generated rather than copied by hand, and
+why a symlink is not available, is in
+[`frontend/scripts/theme-css.ts`](frontend/scripts/theme-css.ts).
 
 **Which node these run on is not always the one pinned**, and the symptom when
 it is not can be hundreds of failures at once with nothing in them naming a

@@ -1,0 +1,218 @@
+/* The frame around allauth's pages. Written by hand, unlike theme.css beside
+ * it, and the split is the point: every COLOUR, radius and font here comes
+ * from a custom property the app's own theme resolved, and this file decides
+ * only arrangement. So a palette added to frontend/src/theme.ts arrives here
+ * without anybody editing this file, and nothing here can quietly disagree
+ * with the app about what blue is.
+ *
+ * The fallbacks in each var() are not belt-and-braces. If theme.css failed to
+ * collect -- the exact shape of inventory-tng-o1uj.1, where nothing served
+ * STATIC_ROOT under gunicorn -- this page must still be legible, because it is
+ * the page somebody types a password into. Unstyled is what u1am was about;
+ * unreadable would be worse.
+ *
+ * Deliberately small. allauth renders the forms themselves and this styles
+ * what it emits: a form, its labels, its inputs, its buttons. Adding rules for
+ * markup no allauth template produces is how a stylesheet becomes a place
+ * things go to be forgotten.
+ */
+
+/* The one rule here that overrides theme.css rather than reading from it, and
+ * it is the fallback the header describes: if the generated sheet failed to
+ * collect, this is what still tells the browser to render form controls for
+ * the reader's scheme instead of assuming light. theme.css sets the same
+ * property per scheme and loses to this by order, which costs nothing --
+ * `light dark` is what its two values amount to together. */
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  box-sizing: border-box;
+  background: var(--mui-palette-background-default, #fff);
+  color: var(--mui-palette-text-primary, rgba(0, 0, 0, 0.87));
+  font: var(--mui-font-body1, 400 1rem/1.5 "Roboto", "Helvetica", "Arial", sans-serif);
+}
+
+/* One column, and narrow on purpose. These pages ask for one thing at a time
+ * and a wide measure makes a two-field form look like an oversight. */
+.card {
+  width: 100%;
+  max-width: 26rem;
+  box-sizing: border-box;
+  padding: 2rem;
+  border-radius: calc(var(--mui-shape-borderRadius, 4px) * 2);
+  background: var(--mui-palette-background-paper, #fff);
+  box-shadow: var(--mui-shadows-3, 0 1px 3px rgba(0, 0, 0, 0.2));
+  /* The border is doing the work the shadow cannot. MUI resolves
+   * `background.paper` to the same value as `background.default` in BOTH
+   * schemes -- #fff and #121212 -- because a real MUI Paper separates itself
+   * with an elevation overlay this static page has no way to apply. So in
+   * light the shadow alone carries it and in dark nothing does, and the card
+   * disappears into the page. Measured in the browser rather than guessed. */
+  border: 1px solid var(--mui-palette-divider, rgba(0, 0, 0, 0.12));
+}
+
+.wordmark {
+  margin: 0 0 1.5rem;
+  font: var(--mui-font-h6, 500 1.25rem/1.6 "Roboto", "Helvetica", "Arial", sans-serif);
+  color: var(--mui-palette-primary-main, #1976d2);
+}
+
+h1:not(.wordmark),
+h2 {
+  margin: 0 0 0.75rem;
+  font: var(--mui-font-h5, 400 1.5rem/1.334 "Roboto", "Helvetica", "Arial", sans-serif);
+}
+
+/* Prose only. NOT every `p`: allauth renders its fields with `form.as_p`, so
+ * each label and input sits inside one, and colouring those secondary made
+ * everything a person TYPED render dimmer than the page it was typed on --
+ * legible, but an accidental colour rather than a chosen one. `:has()` keeps
+ * the rule off any paragraph that is really a form row. */
+p {
+  margin: 0 0 1rem;
+}
+
+p:not(:has(input, textarea)) {
+  color: var(--mui-palette-text-secondary, rgba(0, 0, 0, 0.6));
+}
+
+/* allauth emits bare <input>s with <label>s beside them and no classes of its
+ * own, so these are element selectors by necessity rather than by preference.
+ * Scoped to the card so that nothing here reaches a page this file did not
+ * expect to be loaded on.
+ *
+ * Blocked selectively: a checkbox's label wraps it, and blocking that one puts
+ * "Remember Me:" on a line of its own above an orphaned box. */
+.card label:not(:has(input[type="checkbox"])) {
+  display: block;
+}
+
+.card label {
+  margin-bottom: 0.25rem;
+  font: var(--mui-font-body2, 400 0.875rem/1.43 "Roboto", "Helvetica", "Arial", sans-serif);
+  color: var(--mui-palette-text-secondary, rgba(0, 0, 0, 0.6));
+}
+
+.card input[type="text"],
+.card input[type="email"],
+.card input[type="password"],
+.card textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--mui-palette-divider, rgba(0, 0, 0, 0.23));
+  border-radius: var(--mui-shape-borderRadius, 4px);
+}
+
+.card input:focus-visible,
+.card textarea:focus-visible {
+  outline: 2px solid var(--mui-palette-primary-main, #1976d2);
+  outline-offset: -1px;
+}
+
+.card button {
+  padding: 0.625rem 1.25rem;
+  font: var(--mui-font-button, 500 0.875rem/1.75 "Roboto", "Helvetica", "Arial", sans-serif);
+  letter-spacing: 0.02857em;
+  text-transform: uppercase;
+  color: var(--mui-palette-primary-contrastText, #fff);
+  background: var(--mui-palette-primary-main, #1976d2);
+  border: none;
+  border-radius: var(--mui-shape-borderRadius, 4px);
+  cursor: pointer;
+}
+
+.card button:hover {
+  background: var(--mui-palette-primary-dark, #1565c0);
+}
+
+/* The errors allauth raises, and the messages Django's framework carries. Both
+ * are lists of text with no classes on the items. */
+.messages,
+.card ul.errorlist {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  list-style: none;
+  border-radius: var(--mui-shape-borderRadius, 4px);
+  background: var(--mui-palette-action-hover, rgba(0, 0, 0, 0.04));
+}
+
+.card ul.errorlist {
+  color: var(--mui-palette-error-main, #d32f2f);
+  background: var(--mui-palette-action-selected, rgba(0, 0, 0, 0.08));
+}
+
+/* The providers a deployment offers -- allauth/elements/provider_list.html is
+ * a bare `ul` of `li > a` with no classes. Unstyled it is browser-default
+ * discs and a 40px indent, which is the same bulleted-list look this file
+ * exists to remove; invisible in a checkout because nothing here configures a
+ * provider, so it is the DEPLOYED path that would have shown it. Excludes the
+ * message and error lists, which are blocks and are styled above. */
+.card ul:not(.messages):not(.errorlist) {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.card ul:not(.messages):not(.errorlist) a {
+  display: block;
+  padding: 0.625rem 1rem;
+  text-align: center;
+  text-decoration: none;
+  border: 1px solid var(--mui-palette-divider, rgba(0, 0, 0, 0.23));
+  border-radius: var(--mui-shape-borderRadius, 4px);
+}
+
+/* allauth separates the local form from the providers with a bare `hr`. */
+.card hr {
+  margin: 1.5rem 0;
+  border: none;
+  border-top: 1px solid var(--mui-palette-divider, rgba(0, 0, 0, 0.12));
+}
+
+/* Where else you can go from here. On a page reached mid sign-in this is the
+ * only way out, so it is quiet rather than hidden. */
+.elsewhere {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--mui-palette-divider, rgba(0, 0, 0, 0.12));
+  font: var(--mui-font-body2, 400 0.875rem/1.43 "Roboto", "Helvetica", "Arial", sans-serif);
+}
+
+a {
+  color: var(--mui-palette-primary-main, #1976d2);
+}
+
+/* The QR code on the enrolment page, which allauth emits as an <img> with a
+ * data URI. Left at its natural size it is either tiny or enormous depending
+ * on the generator, and it is the one thing on that page a phone has to read.
+ */
+.card img {
+  display: block;
+  max-width: 12rem;
+  height: auto;
+  margin: 0 0 1rem;
+  /* A dark-mode background would swallow a QR code drawn in black on
+   * transparent, and a code nobody can scan makes the page useless. */
+  background: #fff;
+  padding: 0.5rem;
+  border-radius: var(--mui-shape-borderRadius, 4px);
+}

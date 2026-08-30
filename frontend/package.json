@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
     "test:integration": "playwright test",
-    "capture:guides": "playwright test --config playwright.capture.config.ts"
+    "capture:guides": "playwright test --config playwright.capture.config.ts",
+    "theme:css": "node --experimental-strip-types scripts/theme-css.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
