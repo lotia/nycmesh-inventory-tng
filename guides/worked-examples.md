@@ -145,5 +145,11 @@ instead of the difference.
 **Note what you had to already know**, because that is the finding. The
 volunteer's app deliberately does not offer a count, so this is admin-only, and
 the admin is Django's rather than something designed for the person doing this
-job. Whether that is good enough for a volunteer administrator, or whether this
-belongs in the app, is the question the session exists to put to you.
+job.
+
+That it *looks* like Django is not the thing to report —
+[decision 0027](../docs/decisions/0027-the-admin-is-meant-to-look-different.md)
+settles that it is meant to, so that leaving the app is something you can see.
+What the session is putting to you is the other half: whether an administrator
+can actually get this done here, and whether a job this ordinary belongs in the
+app instead.
