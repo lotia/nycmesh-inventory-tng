@@ -173,6 +173,20 @@ container, one on your machine — so whichever starts second fails to bind.
 bringing the stack up. PostgreSQL is not a clash: both use the same compose
 service, and starting it twice starts it once.
 
+**The camera does not work from your phone yet, and the failure is silent.**
+All three serve plain HTTP — 8080 for A and C, 5173 for B's dev server — so
+scanning works on your own machine and stops the moment you open the same stack
+at that port on a LAN address from a phone.
+[Decision 0011](docs/decisions/0011-qr-batch-scanning.md#consequences) has the
+rule that causes it and why the refusal looks like a bug in the app rather than
+a missing certificate.
+
+Fixing that is [decision 0028](docs/decisions/0028-a-certificate-a-phone-will-trust.md)
+and `inventory-tng-dzwu.2`. **When it lands the certificate will be self-signed,
+so your browser will warn you** — that is expected, not a fault, and the setup
+steps will say so where you meet it. Until then, the camera is testable on your
+own machine and on a deployment, and not from a phone against a checkout.
+
 ### Option A — everything in Docker
 
 Best for a first run, or when you only care about one half of the stack. It is
