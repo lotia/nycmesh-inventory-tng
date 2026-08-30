@@ -1465,12 +1465,8 @@ rules. Its findings are posted to the pull request before they are applied —
 "these three issues each grew the same helper" is the third row by construction.
 
 **Each findings comment carries a marker**, on a line of its own anywhere in the
-body:
-
-```
-<!-- review-cycle: code-review -->
-<!-- review-cycle: simplify -->
-```
+body — `<!-- review-cycle: code-review -->` for the first pass and
+`<!-- review-cycle: simplify -->` for the second.
 
 They are what [the landing gate](#when-a-branch-is-ready-to-merge) reads as
 evidence that a pass happened, and they are the reason it can record what it

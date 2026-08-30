@@ -757,9 +757,33 @@ SHELL_C = re.compile(r"\b(?:ba|z|k|da)?sh\s+(?:-\w+\s+)*-\w*c\w*\s+")
 # ordinary way to run gh as another identity) walked straight past, because
 # assignments were only allowed AFTER a wrapper keyword.
 ASSIGN = r"(?:\w+=\S*\s+)*"
+# Wrappers that take only options before the program they run.
+WRAPPERS = r"env|command|exec|sudo|doas|nohup|nice|time|xargs|stdbuf|setsid"
+# A flag may carry its value as a SEPARATE word -- `nice -n 5`, `xargs -n 1`,
+# `stdbuf -o 0` -- and without the number here `nice -n 5 timeout 60 gh pr
+# merge 7` walked past for the same reason `timeout 180 gh` did: the pattern
+# stops at a word that is neither a flag nor an assignment. Restricted to a
+# bare number rather than any word, because `-x gh` must not let the program
+# itself be eaten as somebody else options value.
+OPTS = r"(?:-\S+\s+(?:[0-9]+\s+)?|\w+=\S*\s+)*"
+# `timeout` is the third member of the family, and it needed its own arm rather
+# than another name in the list above: it takes a DURATION as a positional
+# argument -- `timeout 180 gh pr merge 7` -- and the options-only pattern stops
+# dead at `180`. Adding the word alone would have looked like a fix and changed
+# nothing.
+#
+# It is the one that matters most here, which is why it is called out. The shell
+# guidance every agent works to asks for non-interactive invocations that cannot
+# hang, so nearly every command in this repository is written `timeout N ...`.
+# That made the bypassing spelling the ORDINARY one and the guarded spelling the
+# exception -- and inventory-tng-mno6 is what it cost: pull request 48 merged
+# with no receipt and nothing refused it.
+#
+# One or more numbers, because `timeout -k 10 180 gh ...` carries two.
+DURATION = r"(?:[0-9]+(?:\.[0-9]+)?[smhd]?\s+)+"
 WRAP = (ASSIGN
-        + r"(?:(?:env|command|exec|sudo|doas|nohup|nice|time|xargs|stdbuf|setsid)"
-          r"\s+(?:-\S+\s+|\w+=\S*\s+)*)*")
+        + r"(?:(?:timeout\s+" + OPTS + DURATION
+        + r"|(?:" + WRAPPERS + r")\s+" + OPTS + r")" + ASSIGN + r")*")
 # The program, however it is spelt: a bare name, or any path ending in it.
 def prog(name):
     return r"(?:[\w./~+-]*/)?" + name
