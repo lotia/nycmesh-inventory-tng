@@ -12,6 +12,7 @@ import logging
 import logging.config
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any
 
 import pyotp
@@ -22,6 +23,21 @@ from django.test import Client
 from django.urls import reverse
 
 from inventory_tng import redaction
+
+# Files outside the backend that tests assert against, named once.
+#
+# Several modules read these -- what the image collects, what the proxy
+# forwards, what its content policy says -- and each used to name its own path
+# and build it its own way, one from `REPO_ROOT` and another from `BASE_DIR`.
+# Two spellings of one path is the shape `charts.py` warns about: the copies
+# agree until they do not, and the one that drifts goes on passing.
+NGINX_TEMPLATE = Path("frontend") / "nginx.conf.template"
+BACKEND_DOCKERFILE = Path("backend") / "Dockerfile"
+
+
+def shipped(path: Path) -> str:
+    """The text of a file in this repository, whatever the caller's directory."""
+    return (settings.REPO_ROOT / path).read_text()
 
 
 @contextmanager
