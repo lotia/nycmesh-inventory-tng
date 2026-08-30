@@ -19,6 +19,12 @@ x-hardened: &hardened
     - ALL
   read_only: true
 
+# Where both the backend and the seeder find the database. One spelling,
+# because two services now connect to it and a URL that drifted in one of them
+# is a stack that half works with nothing saying which half.
+x-database-url: &database-url
+  postgres://${POSTGRES_USER:-inventory}:${POSTGRES_PASSWORD:-inventory}@postgres:5432/${POSTGRES_DB:-inventory_tng}
+
 services:
   postgres:
     image: docker.io/library/postgres:18-bookworm
@@ -155,7 +161,7 @@ services:
       CLIENT_REPORT_RATE: ${CLIENT_REPORT_RATE:-30/min}
       DEVICE_ENROLMENT_RATE: ${DEVICE_ENROLMENT_RATE:-10/hour}
       LABEL_BASE_URL: ${LABEL_BASE_URL:-https://inventory.nycmesh.net}
-      DATABASE_URL: postgres://${POSTGRES_USER:-inventory}:${POSTGRES_PASSWORD:-inventory}@postgres:5432/${POSTGRES_DB:-inventory_tng}
+      DATABASE_URL: *database-url
       # How long a request waits on a database that is not answering. Here for
       # parity with what a cluster supplies rather than to be watched working:
       # stopping the service below is refused instantly by the kernel or by
@@ -183,6 +189,81 @@ services:
     command: >
       sh -c "python manage.py migrate --noinput &&
              gunicorn inventory_tng.wsgi:application -c gunicorn.conf.py --bind 0.0.0.0:8000 --access-logfile -"
+    # WHAT THIS PROVES IS THE SCHEMA, not merely a listening socket, and that is
+    # why the seeder below can wait on it. `migrate` and `gunicorn` are two
+    # halves of one `&&`, so nothing answers on this port until the migration
+    # has finished -- which is the ordering guarantee a seeder needs and the one
+    # `/api/healthz` cannot give on its own, since it asks the database for
+    # `SELECT 1` and a `SELECT 1` succeeds against an empty schema.
+    #
+    # Python rather than curl or wget: this is a slim image and has neither, and
+    # adding a package to make a probe possible is a worse trade than four lines
+    # of the interpreter that is already here.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/api/healthz").read()
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  # Something to look at, so that `compose up` does not hand somebody a working
+  # application with every screen empty. inventory-tng-zjqt.
+  #
+  # NOT BEHIND A PROFILE, unlike the collector below, and the difference is the
+  # point of both. A profile is for what costs something a developer did not
+  # ask for -- the collector is a second stack. This costs a few dozen rows and
+  # a second or two, and its absence is the thing being complained about; the
+  # command's own docstring says what an unseeded database looks like.
+  #
+  # RUNS ON EVERY `up`, which is safe because the command is idempotent by
+  # construction: every catalogue row is fetched-or-created and the two
+  # movements are found by their idempotency key, so a second run finds what
+  # the first left. The command's own docstring is the authority on that.
+  #
+  # IT WILL NOT PUT INVENTED STOCK INTO REAL STOCK. Decision 0016 makes the
+  # ledger refuse UPDATE and DELETE, so a movement written here could never be
+  # taken out again -- and `seed_demo_data` therefore writes the ledger only
+  # while nothing but its own transactions are in it, and says which of the two
+  # it did. That guard is what makes running this unattended acceptable.
+  #
+  # A SEPARATE SERVICE rather than another `&&` in the backend's command, for
+  # two reasons. A seed that fails would otherwise stop the application
+  # starting, which is a poor trade for sample data; and the ordering it needs
+  # is expressible here -- the backend is healthy only once gunicorn is
+  # answering, and gunicorn starts only after `migrate` returns, so waiting for
+  # health is waiting for the schema.
+  seed:
+    build:
+      context: ./backend
+    <<: *hardened
+    user: "1001:1001"
+    tmpfs:
+      - /tmp:mode=1777
+      - /home/app:mode=1777
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      # Only what reaching the database and satisfying the command's own guard
+      # requires. It writes no labels a browser will follow and emits no
+      # telemetry, so the rest of the backend's environment would be noise here
+      # -- and every name repeated is a name that can drift.
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-only-not-for-deployment-change-me}
+      # The command refuses outright with this off, which is deliberate: it
+      # ships inside the backend image and is one wrong context away from a
+      # production pod. Turning it off in .env therefore turns the seeding off
+      # too, and the stack still comes up -- see DEVELOPERS.md "Option A".
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
+      DATABASE_URL: *database-url
+    # Once, and not again if it fails. `restart: no` is compose's default and
+    # is written out because this is the one service where a restart loop would
+    # be the wrong answer to a refusal rather than a way through it.
+    restart: "no"
+    command: python manage.py seed_demo_data
 
   # Somewhere for telemetry to go, and the worked example of what a cluster
   # needs. Not started by `compose up`: it is behind a profile, so a developer
