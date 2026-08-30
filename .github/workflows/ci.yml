@@ -640,11 +640,27 @@ jobs:
       # The membership check needs the beads tracker and simply sits out when
       # there is none, so a contributor working from GitHub issues is held to
       # the structural rules and nothing else. See DEVELOPERS.md#issue-tracking
-      # --draft while the pull request is one. See DEVELOPERS.md#merging.
+      # ALWAYS --unfinished, and the reason is the whole of inventory-tng-ee2c.
+      #
+      # It was --draft, passed only while the pull request was a GitHub draft,
+      # and that flag ends at `gh pr ready` -- which is exactly when this
+      # project's review cycle BEGINS. So the two objections about a branch
+      # being unfinished were asked on every push through both halves of the
+      # documented flow: while a batch is built one issue at a time, and while
+      # fixups are being folded in. Measured across every pull request run this
+      # repository has, the job failed on 48% of them, and the failure was the
+      # process doing exactly what it is told.
+      #
+      # What is still refused here is everything structural -- one issue per
+      # commit, an issue landed that the batch does not hold, the message rules
+      # -- none of which is ever temporarily true, and all of which is worth
+      # holding a fork's pull request to where no local hook runs.
+      #
+      # The finished question is asked once, by scripts/landing-gate.sh, at the
+      # merge. See DEVELOPERS.md#when-a-branch-is-ready-to-merge.
       - name: Check the commits in this pull request
         run: |
-          scripts/check-batch.sh \
-            ${{ github.event.pull_request.draft && '--draft' || '' }} \
+          scripts/check-batch.sh --unfinished \
             "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
 
       # Said here rather than typed into the description, so the list is the one

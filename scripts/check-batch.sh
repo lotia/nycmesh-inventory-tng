@@ -8,15 +8,22 @@
 #
 # The rules are in DEVELOPERS.md "Pull requests" and "Commits".
 #
-# Usage: check-batch.sh [<range>] [--epic <id>] [--draft] [--list] [--squashed]
+# Usage: check-batch.sh [<range>] [--epic <id>] [--unfinished] [--list] [--squashed]
+#
+# It was --draft until the flag stopped tracking GitHub's draft bit: CI passes
+# it on every push now, so the only thing it ever meant was that the branch is
+# not finished. The name says that instead.
 #
 # <range> defaults to origin/main..HEAD, or with --squashed to the last fifty
 # commits -- see TRIPWIRE_DEPTH. --epic names the batch's epic in the
 # tracker; without it the epic is inferred from the issues the range closes.
 # Issues from two epics are refused, and so are several landing under none.
-# --draft
-# says the branch is still under review, where commits waiting to be folded in
-# are expected rather than a fault.
+# --unfinished says so: still being built, or under review. The two objections
+# about FINISHED-NESS are then notes rather than failures:
+# commits waiting to be folded in, and issues in the batch that have not landed
+# yet. Everything structural is still refused, because none of it is ever
+# temporarily true. Where the finished question is asked instead is
+# DEVELOPERS.md "When a branch is ready to merge".
 
 set -uo pipefail
 
@@ -25,7 +32,7 @@ RANGE=""
 # history older than the conventions it reads would fail it forever.
 TRIPWIRE_DEPTH=50
 EPIC=""
-DRAFT=0
+UNFINISHED=0
 LIST=0
 SQUASHED=0
 while [[ $# -gt 0 ]]; do
@@ -35,8 +42,8 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     # See DEVELOPERS.md#merging on why a branch under review is different.
-    --draft)
-      DRAFT=1
+    --unfinished)
+      UNFINISHED=1
       shift
       ;;
     # A tripwire over landed history; see below.
@@ -56,13 +63,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "$SQUASHED" -eq 1 && ( "$LIST" -eq 1 || -n "$EPIC" || "$DRAFT" -eq 1 ) ]]; then
+if [[ "$SQUASHED" -eq 1 && ( "$LIST" -eq 1 || -n "$EPIC" || "$UNFINISHED" -eq 1 ) ]]; then
   echo "--squashed asks one question of landed history; the other flags do not apply." >&2
   exit 2
 fi
 
-if [[ "$LIST" -eq 1 && ( -n "$EPIC" || "$DRAFT" -eq 1 ) ]]; then
-  echo "--list says what the range holds and checks nothing, so --epic and --draft do not apply." >&2
+if [[ "$LIST" -eq 1 && ( -n "$EPIC" || "$UNFINISHED" -eq 1 ) ]]; then
+  echo "--list says what the range holds and checks nothing, so --epic and --unfinished do not apply." >&2
   exit 2
 fi
 
@@ -271,7 +278,14 @@ if [[ -f "$ISSUES" ]]; then
         [[ "$trailer" == Closes* ]] && { closing_commits=$((closing_commits + 1)); break; }
       done < <(trailers_of "${body_of[$sha]:-}")
     done
+    # UNFINISHED carries --unfinished through to the membership reader, which asks
+    # the other half of the same question: an issue in the batch that has not
+    # landed yet is a branch mid-construction rather than a fault, and
+    # DEVELOPERS.md asks for exactly that shape by pushing each issue as it is
+    # finished. The reader's header argues which of its two objections this
+    # covers and which it deliberately does not.
     if ! verdict=$(EPIC="$EPIC" LANDED_COMMITS="$closing_commits" \
+      UNFINISHED="$UNFINISHED" \
       python3 "$MEMBERSHIP" "$ISSUES" "${landed[@]}" 2>&1); then
       fail "the batch could not be read from $ISSUES:"
       printf '      %s\n' "$verdict"
@@ -318,7 +332,7 @@ for sha in "${commits[@]}"; do
 done
 
 if [[ "$pending" -gt 0 ]]; then
-  if [[ "$DRAFT" -eq 1 ]]; then
+  if [[ "$UNFINISHED" -eq 1 ]]; then
     note "$pending commits are waiting to be folded in, which is fine while reviewing:"
   else
     fail "$pending commits are waiting to be folded in. Nothing does it on the way in:"

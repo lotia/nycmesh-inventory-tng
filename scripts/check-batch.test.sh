@@ -216,6 +216,12 @@ land a 'aaa: Extract the decode loop
 Closes: inventory-tng-aaa'
 expect 1 "in the batch but not landed here: inventory-tng-bbb" "a batch half landed is refused"
 
+# THE OTHER HALF OF --unfinished, and the one inventory-tng-ee2c was about. A batch
+# built one issue at a time is half landed on every push until the last, which
+# is the shape DEVELOPERS.md asks for, and asking whether it is finished is
+# asking the wrong question of it.
+expect --unfinished -- 0 "not landed here yet" "a half-landed batch is fine while it is unfinished"
+
 # See batch-membership.py on why no epic is not a disagreement.
 scene
 tracker <<'JSONL'
@@ -292,13 +298,13 @@ expect 0 "One commit, one issue" "a malformed tracker line is stepped over"
 scene
 expect 0 "Nothing to check" "an empty range is not a failure"
 
-# See check-batch.sh on --draft.
+# See check-batch.sh on --unfinished.
 scene
 land a 'aaa: Extract the decode loop
 
 Closes: inventory-tng-aaa'
 land b 'fixup! aaa: Extract the decode loop'
-expect --draft -- 0 "which is fine while reviewing" "a draft may carry commits waiting to be folded in"
+expect --unfinished -- 0 "which is fine while reviewing" "an unfinished branch may carry commits waiting to be folded in"
 
 # But a structural fault still fails, draft or not.
 scene
@@ -306,7 +312,25 @@ land a 'aaa: Extract the decode loop
 
 Closes: inventory-tng-aaa
 Refs: inventory-tng-bbb'
-expect --draft -- 1 "belongs to one issue" "a draft does not excuse a commit holding two issues"
+expect --unfinished -- 1 "belongs to one issue" "an unfinished branch does not excuse a commit holding two issues"
+
+# The membership objection that is a MISTAKE rather than an unfinished branch:
+# a commit closing something nobody put in this batch. No amount of further
+# work makes that right, so --unfinished does not touch it.
+scene
+tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-epic","status":"open"}
+{"_type":"issue","id":"inventory-tng-aaa","status":"closed","dependencies":[{"issue_id":"inventory-tng-aaa","depends_on_id":"inventory-tng-epic","type":"parent-child"}]}
+{"_type":"issue","id":"inventory-tng-zzz","status":"closed"}
+JSONL
+land a 'aaa: Extract the decode loop
+
+Closes: inventory-tng-aaa'
+land b 'zzz: Close an issue this batch does not hold
+
+Closes: inventory-tng-zzz'
+expect --unfinished -- 1 "landed here but not in the batch" \
+  "an unfinished branch does not excuse landing an issue the batch does not hold"
 
 # See check-batch.sh on why the delegation loop must skip what was absorbed.
 scene
@@ -316,7 +340,7 @@ Closes: inventory-tng-aaa'
 land b 'amend! aaa: Extract the decode loop into its own new module
 
 Closes: inventory-tng-aaa'
-output=$("$CHECK" --draft base..HEAD 2>&1)
+output=$("$CHECK" --unfinished base..HEAD 2>&1)
 refute "$output" $? 0 "over 50" "an amend! subject is not charged its own prefix"
 
 # See absorbed in check-batch.sh on a prefix that names nothing.
@@ -353,7 +377,7 @@ scene
 land a 'aaa: Extract the decode loop
 
 Closes: inventory-tng-aaa'
-output=$("$CHECK" --list --draft base..HEAD 2>&1)
+output=$("$CHECK" --list --unfinished base..HEAD 2>&1)
 assert "$output" $? 2 "do not apply" "--list refuses a flag that cannot matter"
 
 # The squash tripwire: one question of landed history, readable whatever

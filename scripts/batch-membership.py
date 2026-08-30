@@ -4,10 +4,28 @@ Used by check-batch.sh. The export is committed, so it is the same file the
 branch is proposing and CI can read it without installing the tracker itself.
 Membership is recorded there as a parent-child dependency on the batch's epic.
 
-Usage: batch-membership.py <issues.jsonl> <issue>...   with EPIC optionally set
+Usage: batch-membership.py <issues.jsonl> <issue>...   with EPIC optionally set,
+and UNFINISHED=1 while the branch is still being built or reviewed.
 
 Prints lines the caller turns into its own output, "note <text>" for something
 worth saying and "fail <text>" for something worth refusing over.
+
+TWO OBJECTIONS, AND ONLY ONE OF THEM IS ABOUT A MISTAKE.
+
+An issue landed here that the batch does not hold is wrong whenever it is
+found: it means a commit closed something nobody put in this batch, and no
+amount of further work makes it right.
+
+An issue in the batch that has not landed yet only means the batch is not
+finished. That is the normal state of a branch being built one issue at a
+time -- which is exactly what DEVELOPERS.md asks for, so that CI runs per issue
+rather than once at the end -- and asking it of an unfinished branch is asking
+the wrong question. Measured across every pull request run this repository has,
+that question was answered "no" on 48% of them, and a check that is red as a
+matter of routine is one nobody reads. inventory-tng-ee2c has the numbers.
+
+So UNFINISHED downgrades the second to a note and leaves the first alone. What
+asks the finished question is the landing gate, once, at the merge.
 """
 
 from __future__ import annotations
@@ -82,8 +100,12 @@ def main() -> None:
     if not expected:
         return
 
+    unfinished = os.environ.get("UNFINISHED") == "1"
     for missing in sorted(expected - landed):
-        print("fail in the batch but not landed here: " + missing)
+        if unfinished:
+            print("note not landed here yet, which is fine until the batch is done: " + missing)
+        else:
+            print("fail in the batch but not landed here: " + missing)
     for extra in sorted(landed - expected):
         print("fail landed here but not in the batch: " + extra)
 
