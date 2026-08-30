@@ -14,7 +14,7 @@ you have, so the account stays yours to make with `createsuperuser`.
 Every name in here is invented. Nothing pretends to be a real volunteer, a real
 site or a real count.
 
-## Development servers only, and no flag to type
+## Development servers only, or an acknowledgement typed on the spot
 
 `settings.DEBUG` off is a refusal, for the reason `seed_integration_data`
 gives: this command ships inside the backend image, so it is one wrong
@@ -23,15 +23,22 @@ guarded by `ledger_is_ours()` -- three categories, six invented items, three
 places, two volunteers and two labels -- writes into whatever database
 `DATABASE_URL` names.
 
-Its sibling asks for an acknowledgement flag as well, and this one does not.
-The asymmetry is deliberate rather than an oversight. That flag is spent per
-invocation and so has to be typed every time; this command exists to be the
-first thing a new contributor runs, reached through `scripts/bootstrap-dev.sh`
-and through one copy-pasted line in README, and a flag would put a refusal in
-front of exactly the path it exists to smooth. What the flag buys there is
-consent to a published credential; there is no credential here, and `DEBUG`
-already answers the only other question -- whether this is a development
-server.
+Its sibling asks for an acknowledgement flag as well, and for a long time this
+one did not: a flag has to be typed every time, and this command exists to be
+the first thing a new contributor runs -- reached through
+`scripts/bootstrap-dev.sh` and one copy-pasted line in README -- so putting a
+refusal in front of it would obstruct exactly the path it exists to smooth.
+
+That reasoning still holds, and it is why the flag is not required. `DEBUG` on
+its own is enough on a development machine and nothing about that path changed.
+
+What changed is that DEBUG was the ONLY way in, and a demo deployment cannot
+have it: a cluster requires `DEBUG` off, so the two rules met and a deployment
+somebody wanted to show people had no way to be given anything to look at.
+`inventory-tng-w91j.1`. So the flag is the other door, and it is a flag rather
+than a variable for the reason `_seeding` gives: a variable is ambient and
+would switch this off for every invocation in a cluster from then on, where a
+flag is spent per invocation and shows up in the command that ran.
 
 ## Running it twice adds nothing
 
@@ -65,7 +72,7 @@ from collections import Counter
 from decimal import Decimal
 from typing import Any
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
 
 from inventory.management.commands import _report, _seeding, _telemetry
@@ -292,14 +299,34 @@ ROWS = ("categories", "items", "locations", "volunteers", "labels", "transaction
 HEADING = "Added by this run"
 
 
+ACKNOWLEDGEMENT = "--i-know-this-writes-invented-data"
+ACKNOWLEDGEMENT_DEST = ACKNOWLEDGEMENT.removeprefix("--").replace("-", "_")
+
+
 class Command(BaseCommand):
     help = "Create a small invented catalogue, two places, two volunteers, two labels and some stock."
 
+    def add_arguments(self, parser: CommandParser) -> None:
+        parser.add_argument(
+            ACKNOWLEDGEMENT,
+            action="store_true",
+            help=(
+                "Admits this on a server where DEBUG is off -- a demo deployment. "
+                "Confirms you meant to write invented data into whatever database DATABASE_URL names."
+            ),
+        )
+
     def handle(self, *args: Any, **options: Any) -> None:
-        # See "Development servers only, and no flag to type" above for why
-        # this one condition and not the two its sibling checks.
+        # DEBUG alone on a development machine, which is the path README hands
+        # a newcomer and which gains no extra words. The flag is the other way
+        # in and exists for one case: a demo deployment, where DEBUG is off
+        # because a cluster requires it and there is still nothing to look at.
+        # See "Development servers only" above for why the guard is shaped this
+        # way rather than as a second variable.
         _seeding.refuse_unless_a_development_server(
-            "This command writes an invented catalogue into whatever database DATABASE_URL names.",
+            f"This command writes an invented catalogue into whatever database DATABASE_URL names. "
+            f"If that is what you want on this server, pass {ACKNOWLEDGEMENT}.",
+            acknowledged=options.get(ACKNOWLEDGEMENT_DEST, False),
         )
         added: Counter[str] = Counter()
         with _telemetry.running(_telemetry.named(self)) as counted:

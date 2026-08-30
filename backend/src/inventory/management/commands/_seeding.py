@@ -26,16 +26,23 @@ from inventory.models import Item, Location, Volunteer
 REFUSAL = "Refusing to seed: DEBUG is off, so this is not a development server."
 
 
-def refuse_unless_a_development_server(and_also: str = "") -> None:
+def refuse_unless_a_development_server(and_also: str = "", acknowledged: bool = False) -> None:
     """Stop unless `settings.DEBUG` says this is somebody's own machine.
 
     Both commands ship inside the backend image, so either is one wrong
     `kubectl` context away from a pod holding real stock. `and_also` is
     appended by a caller with something further to say about what it would
     otherwise have written.
+
+    `acknowledged` is a caller saying its own flag was typed on THIS
+    invocation, which is the only thing allowed past the DEBUG rule. Why that
+    is a flag rather than another variable is argued once, on
+    `seed_integration_data`'s own acknowledgement, and it is the reason a
+    deployed demo gets one too.
     """
-    if not settings.DEBUG:
-        raise CommandError(f"{REFUSAL} {and_also}".strip())
+    if settings.DEBUG or acknowledged:
+        return
+    raise CommandError(f"{REFUSAL} {and_also}".strip())
 
 
 def revived(row: Item | Location) -> None:

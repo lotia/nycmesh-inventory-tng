@@ -36,7 +36,7 @@ you run it. What that leaves covered elsewhere is
 
 ## From an empty cluster to a first sign-in
 
-Ten steps, in this order, each linking to the section that explains it. Steps 6
+Eleven steps, in this order, each linking to the section that explains it. Steps 6
 and 7 — install, then check — are the two you run again on every release; the
 rest happen once for the life of an environment.
 
@@ -68,10 +68,26 @@ rest happen once for the life of an environment.
 8. **Make the first administrator and enrol its second factor** —
    [First administrator](#first-administrator). This is the step people are
    most often stopped by, and it is the one that has to happen before the next.
-9. **Restrict the administrative routes** —
+9. **Put something in it, if this is a demo** — a deployment nobody can see
+   anything in is one nobody can give you feedback on, and the database starts
+   empty:
+
+   ```bash
+   kubectl -n inventory-tng exec deploy/inventory-tng-backend -- \
+     python manage.py seed_demo_data --i-know-this-writes-invented-data
+   ```
+
+   Every name it writes is invented and none of it pretends to be a real
+   volunteer, site or count. The flag is required because `DEBUG` is off here
+   and that is the only other thing standing between this command and a
+   database holding real stock — it is typed per invocation and cannot be
+   turned on in advance by configuration, which is the whole reason it is a
+   flag. **Skip this on anything but a demo.**
+
+10. **Restrict the administrative routes** —
    [Administrative access](#administrative-access). After step 8, never before:
    signing in needs `/accounts`, which is one of the paths this shuts.
-10. **Add a sign-in provider**, if you want one —
+11. **Add a sign-in provider**, if you want one —
     [the provider Secret](#the-provider-secret). Optional, changeable later, and
     it grants nobody anything by itself.
 
