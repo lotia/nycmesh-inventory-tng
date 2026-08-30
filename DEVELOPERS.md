@@ -1468,6 +1468,14 @@ rules. Its findings are posted to the pull request before they are applied —
 body — `<!-- review-cycle: code-review -->` for the first pass and
 `<!-- review-cycle: simplify -->` for the second.
 
+**Quoting one is not posting one.** A marker indented four spaces, or inside a
+fenced block, is being *shown* rather than applied and counts for nothing. That
+is not pedantry about whitespace: the gate used to look for the marker anywhere
+in the body, so a comment that merely mentioned it became evidence that the pass
+had run — and a comment reporting that a receipt was *missing* quoted the marker
+while explaining the omission and thereby created it. Write about a marker as
+freely as you like; put it at the left margin only when you mean it.
+
 They are what [the landing gate](#when-a-branch-is-ready-to-merge) reads as
 evidence that a pass happened, and they are the reason it can record what it
 found rather than what it was told. A review submitted through GitHub's review
