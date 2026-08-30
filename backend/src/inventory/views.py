@@ -22,6 +22,7 @@ from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
 from inventory import telemetry
+from inventory.identifiers import matching
 from inventory.labels import refusal_page, sheet
 from inventory.models import (
     Category,
@@ -978,11 +979,28 @@ class VolunteerDetailView(DetailView):
 class ItemFilter(FilterSet):
     """What the item list can be narrowed by."""
 
-    search = CharFilter(field_name="name", lookup_expr="icontains", label="Name contains")
+    search = CharFilter(method="by_name_or_identifier", label="Name or identifier")
 
     class Meta:
         model = Item
         fields = ["category"]
+
+    def by_name_or_identifier(self, items: QuerySet[Item], name: str, typed: str) -> QuerySet[Item]:
+        """Decision 0026 point 5: search identifiers, display items.
+
+        This read `Item.name` and nothing else, so the identifier table was
+        reachable from Django's admin and from nothing the app offers --
+        inventory-tng-gz2. Why it searches BOTH rather than identifiers alone
+        is that record's ordering argument, and is not repeated here.
+
+        `matching` rather than a lookup spelled out, because the shape that
+        reaches `item_identifier_prefix` is not the obvious one and that module
+        is the one place that knows.
+
+        `distinct`, because an item with three identifiers matching one prefix
+        is one row on the screen and three rows out of the join.
+        """
+        return items.filter(Q(name__icontains=typed) | matching(typed, through="identifiers")).distinct()
 
 
 # Every item, with the two things the screen needs attached in bulk. Shared by

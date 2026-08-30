@@ -361,7 +361,7 @@ paths:
         name: search
         schema:
           type: string
-        description: Name contains
+        description: Name or identifier
       - in: query
         name: withdrawn
         schema:
