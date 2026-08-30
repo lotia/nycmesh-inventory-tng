@@ -160,6 +160,20 @@ django:
 # Runs `manage.py migrate` as a pre-upgrade Job so that scaling the backend to
 # multiple replicas can never race on schema changes.
 migrations:
+  # What the schema migration reserves. Present at all because a namespace with
+  # a ResourceQuota refuses a pod declaring nothing, and a Job that is never
+  # admitted is a `helm upgrade` that blocks until it times out rather than an
+  # error naming the cause.
+  #
+  # Smaller than the backend's, and no cpu limit for the reason given there:
+  # this runs once, serves nothing and exits, and throttling it only makes a
+  # migration take longer while holding the release open.
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
   # Off only when something else is applying the schema -- a migration run by
   # hand during an incident, say. Off with nothing else doing it is a backend
   # talking to a database it does not match.

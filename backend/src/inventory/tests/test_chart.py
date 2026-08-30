@@ -32,7 +32,7 @@ from django.http.request import validate_host
 from django.test import Client, override_settings
 from environ import Env
 
-from inventory.tests.charts import backend_container, environment, refused, render
+from inventory.tests.charts import backend_container, environment, manifests, refused, render
 from inventory.tests.helpers import BACKEND_DOCKERFILE, shipped
 from inventory_tng import forwarded
 from inventory_tng.database import DEFAULT_CONNECT_TIMEOUT_SECONDS
@@ -228,6 +228,39 @@ GUNICORN_CONF = Path("backend") / "src" / "gunicorn.conf.py"
 WORKERS = re.compile(r'"(?:--workers|-w)",\s*"3"')
 ON_THE_COMMAND_LINE = re.compile(r'"(?:--worker-class|-k|--timeout|-t)"')
 IN_THE_CONFIGURATION = re.compile(r"^\s*(?:worker_class|workers|timeout)\s*=", re.MULTILINE)
+
+
+def test_every_container_the_chart_renders_declares_what_it_needs() -> None:
+    """A pod that declares nothing is refused by a namespace with a quota.
+
+    And the migrate Job is the one where that refusal is worst, which is why
+    this asserts every container rather than only the two Deployments. The Job
+    is a pre-upgrade hook, so a pod that is never admitted is not an error
+    about resources: `helm upgrade` waits for a Job that cannot run and gives
+    up at its timeout, leaving nothing in the release to look at. That is
+    inventory-tng-v7g, and it is the second row of the troubleshooting table
+    docs/deployment.md opens with.
+
+    Requests only. A memory limit is a policy this chart does have and a cpu
+    limit is one it deliberately does not -- see values.yaml -- so asserting
+    the pair would be asserting the opposite of a decision.
+    """
+    bare = []
+    for document in manifests():
+        kind = document.get("kind")
+        if kind not in ("Deployment", "Job"):
+            continue
+        spec = document["spec"]["template"]["spec"]
+        for container in spec["containers"]:
+            requests = (container.get("resources") or {}).get("requests") or {}
+            if not {"cpu", "memory"} <= set(requests):
+                bare.append(f"{kind}/{document['metadata']['name']}:{container['name']}")
+
+    assert not bare, (
+        f"{bare} declare no cpu or memory request, so a namespace with a ResourceQuota refuses them unless "
+        "a LimitRange fills them in -- and for the migrate Job that is a helm upgrade which blocks until it "
+        "times out rather than an error naming the cause"
+    )
 
 
 def test_the_chart_refuses_a_connect_that_outlives_a_readiness_period() -> None:
