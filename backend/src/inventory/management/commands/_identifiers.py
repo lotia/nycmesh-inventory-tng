@@ -64,11 +64,9 @@ gives about an address it declines to write.
 
 from dataclasses import dataclass
 
-from django.db import IntegrityError, transaction
-from django.db.models import Value
+from django.db import transaction
 
 from inventory import identifiers
-from inventory.identifiers import Canonical
 from inventory.models import Category, Item, ItemIdentifier
 from inventory.sheet import Report, items
 from inventory.sheet.workbook import Sheet
@@ -237,32 +235,12 @@ def _catalogue(names: tuple[str, ...]) -> tuple[dict[str, Item], int]:
 
 
 def _hold(item: Item, value: str) -> tuple[ItemIdentifier, bool]:
-    """The row that holds ``value``, and whether this call is what made it.
+    """``identifiers.hold``, with the kind read off the value's own shape.
 
-    The insert is tried first and the refusal is an answer, because the two
-    folds cannot be made to agree and only one of them is entitled to decide.
-    `inventory.identifiers` says why; the consequence is here.
-
-    A savepoint rather than the enclosing transaction, so that a string the
-    database considers taken costs this one insert rather than the whole
-    import. That was the actual fault: `mint` is atomic, so one disagreement
-    between the two folds rolled back every row
-    of the catalogue, and the operator saw a constraint name rather than a
-    number in a report.
-
-    Anything that is not the unique index is re-raised untouched. `held` comes
-    back empty in that case, because no row holds the value.
+    Which kind a string is happens to be this importer's business rather than
+    that module's: a serializer minting an item's own name already knows.
     """
-    try:
-        with transaction.atomic():
-            return ItemIdentifier.objects.create(item=item, kind=_kind(value), value=value), True
-    except IntegrityError:
-        # Asked of the database, with the database's own fold, because Python
-        # having got this wrong is the only reason to be here.
-        held = ItemIdentifier.objects.filter(value_normalised=Canonical(Value(value))).first()
-        if held is None:
-            raise
-        return held, False
+    return identifiers.hold(item, value, _kind(value))
 
 
 @transaction.atomic
