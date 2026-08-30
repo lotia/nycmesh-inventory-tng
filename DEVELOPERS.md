@@ -1479,6 +1479,32 @@ push that would land on `main`, and refuses a bare `git push --force` or `-f` â€
 `--force-with-lease` is free, and [AGENTS.md](AGENTS.md#git) says why the two
 are on opposite sides of that line.
 
+And it refuses **to end a turn** on a `batch/*` branch whose pull request is
+ready, green, and has no recorded cycle. That one is registered as a `Stop`
+hook rather than on a command, because the failure it answers is not a command
+at all: it is a session deciding the work is finished and writing a summary
+instead of running the cycle. Ending the turn is what gets refused, so the
+summary cannot be written in place of the work.
+
+Three things about it are deliberate and are not how the rest of this gate
+behaves:
+
+- **It fails open.** Every other refusal here fails closed, because letting an
+  unreviewed merge through is worse than being unable to merge. Ending a turn
+  is the opposite: a session that cannot stop also cannot fix whatever is
+  stopping it, because fixing it ends in stopping too. So a missing `python3`,
+  an unauthenticated `gh`, a rate limit or no network all let the turn end and
+  say on stderr that nothing was checked.
+- **It asks once per head.** A refusal that repeated every time you meant it
+  would be a session nobody could end, so it is remembered against the commit
+  it was about. Push anything and it asks again, which is right â€” what was
+  reviewed is no longer what is there.
+- **Drafts and red checks are exempt.** A batch under construction is a draft
+  by the flow above, and stopping in the middle of one is ordinary.
+
+That makes it a nudge rather than a lock, on purpose. The lock is the merge
+refusal above, which does not forget and cannot be spent.
+
 "Would land on `main`" is asked of git rather than read off the command line,
 so a bare `git push` on a checked-out `main` and `git push origin HEAD` are
 both refused, and a branch called `batch/main-fix` is not.

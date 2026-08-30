@@ -50,6 +50,24 @@ RECEIPTS="$REPO_ROOT/.claude/.review-receipts.json"
 MARK_REVIEW='<!-- review-cycle: code-review -->'
 MARK_SIMPLIFY='<!-- review-cycle: simplify -->'
 
+# Where the cycle is written down, rather than the cycle.
+#
+# This held its own copy of all five steps until the review of PR #30 pointed
+# out that the file's own header says "None of that is repeated here" four
+# lines above it, that AGENTS.md rule 1 forbids the second copy outright, and
+# that the copy had ALREADY drifted -- "collapse each issue own commits", where
+# AGENTS.md says "collapsing an issue's own commits". check-docs.sh missed it
+# because the run is under twelve words, which is the rule failing exactly
+# where it was meant to bite.
+CYCLE='The cycle is DEVELOPERS.md "One review pass, findings filed per issue",
+and .agents/skills/pull-requests/SKILL.md is the procedure for running it. It
+ends with:
+
+  scripts/landing-gate.sh record <pr>
+
+as its own command, after the last push. It records the head it sees, so
+anything published afterwards invalidates it.'
+
 # ---------------------------------------------------------------------------
 # Saying no
 # ---------------------------------------------------------------------------
@@ -380,11 +398,203 @@ print("Recorded the review cycle for pull request %s at %s. Merging is unblocked
 ' <<<"$payload" || return 1
 }
 
+# What the receipts say about one pull request: its head, and which stages have
+# nothing behind them.
+#
+# One reader, because there were two -- `stop_mode` and the merge guard asked
+# the same twelve lines of the same file for the same thing and differed only
+# in the last of them. This file's own header carries the story of `CYCLE`
+# being deduplicated for exactly this reason, and records that the copy had
+# already drifted before anybody noticed.
+#
+# Prints "<head>|<missing,stages>", and the separator is `|` rather than a
+# space for a reason worth keeping: either half may be empty, and `read` with
+# its default IFS drops a leading blank field, so a receipt that does not exist
+# put the missing-stage list into the head and told the merge guard the branch
+# had moved. A non-whitespace separator preserves the empty field.
+receipt_status() {
+  RECEIPTS="$RECEIPTS" PR="$1" python3 -c '
+import json, os
+try:
+    with open(os.environ["RECEIPTS"]) as fh:
+        receipts = json.load(fh)
+except (OSError, ValueError):
+    receipts = {}
+if not isinstance(receipts, dict):
+    receipts = {}
+receipt = receipts.get(os.environ["PR"])
+if not isinstance(receipt, dict):
+    receipt = {}
+evidence = receipt.get("evidence")
+if not isinstance(evidence, dict):
+    evidence = {}
+missing = [stage for stage in ("code-review", "simplify") if not evidence.get(stage)]
+print("%s|%s" % (receipt.get("head") or "", ",".join(missing)))
+'
+}
+
+# ---------------------------------------------------------------------------
+# stop mode: invoked by the Stop hook when a session tries to end a turn
+# ---------------------------------------------------------------------------
+
+# Where a nudge is remembered, so that it is a nudge and not a wall.
+NUDGES="$REPO_ROOT/.claude/.stop-nudges.json"
+
+# THIS ONE FAILS OPEN, AND IT IS THE ONLY MODE THAT MAY.
+#
+# Everywhere else in this file a dependency that is missing or an answer that
+# cannot be got REFUSES, because the thing being guarded is a merge and a guard
+# that fails open lets unreviewed work onto main while the rule that rests on it
+# goes on being believed. `deny_dependency` argues that at length.
+#
+# Here the asymmetry reverses, and it reverses completely. What this mode
+# guards is the END OF A TURN. A missing python3, an unauthenticated gh, a rate
+# limit or a network that is down would, failing closed, leave a session unable
+# to stop -- and unable to fix the thing that would release it, because fixing
+# it is work that also ends in trying to stop. The cost of failing open is a
+# nudge not delivered; the cost of failing closed is a session that cannot be
+# ended by anybody. So every uncertain answer below lets the turn end, and says
+# on stderr that it could not look.
+stop_open() {
+  [[ -n "${1:-}" ]] && echo "landing-gate: not checking the review cycle -- $1" >&2
+  exit 0
+}
+
+# Refusing to end the turn. The Stop hook's own shape, which is not the
+# PreToolUse one `deny` writes.
+stop_block() {
+  printf '{"decision":"block","reason":"%s"}\n' "$(json_escape "$1")"
+  exit 0
+}
+
+stop_mode() {
+  local payload branch pr state draft head checks recorded
+  IFS= read -r -d '' payload
+
+  # THE BRANCH FIRST, and the order is the point rather than tidiness. This
+  # runs at the end of EVERY turn, and most turns do not end on a batch. Asking
+  # git one question and leaving is the common path, so nothing heavier is
+  # required until there is genuinely something to check -- otherwise every
+  # turn on `main` pays for a python3 that was never going to matter, and a
+  # machine without one is told so on every turn about a check that would have
+  # been skipped anyway. A warning that fires when nothing is wrong is a
+  # warning people learn to skip past.
+  have git || stop_open "git is not on the PATH"
+
+  # `symbolic-ref`, not `rev-parse --abbrev-ref`, and the push guard below
+  # already asks this way for the same reason: a branch with no commits on it
+  # yet has no HEAD to resolve, so rev-parse fails where the branch name is
+  # perfectly well known. A batch is usually not in that state, but a mode
+  # that fails open would then be quietly failing open on every stop.
+  branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) \
+    || stop_open "git could not say which branch this is"
+  [[ "$branch" == batch/* ]] || exit 0
+
+  have python3 || stop_open "python3 is not on the PATH"
+
+  # ALREADY NUDGED IN THIS STOP SEQUENCE. The harness sets this when the
+  # session is continuing *because* a Stop hook blocked it, and honouring it is
+  # what keeps a refusal from being a loop with no way out.
+  # Answered by the exit status rather than printed and matched, because this
+  # runs on every stop taken while a batch is in hand and piping into `grep`
+  # spent a second process on one boolean. The same reasoning as the Bash
+  # matcher's prefilter above, on the same grounds.
+  printf '%s' "$payload" | python3 -c '
+import json, sys
+try:
+    sys.exit(0 if json.load(sys.stdin).get("stop_hook_active") else 1)
+except Exception:
+    sys.exit(1)
+' && exit 0
+
+  have gh || stop_open "gh is not on the PATH"
+
+  # One round trip for everything the decision needs, for the reason
+  # `record_receipt` gives about not asking twice and racing itself.
+  payload=$(gh_json pr view --json number,state,isDraft,headRefOid,statusCheckRollup) \
+    || stop_open "gh could not describe the pull request for $branch"
+
+  # Captured and tested, NOT `read ... || stop_open`: a herestring built from
+  # empty output is still a line, so read assigns nothing and returns 0 and
+  # that refusal could never fire. The mode failed open correctly anyway and
+  # said nothing at all, which is the silent half of exactly what this file was
+  # rewritten to remove.
+  scene=$(printf '%s' "$payload" | python3 -c '
+import json, sys
+pr = json.load(sys.stdin)
+rollup = pr.get("statusCheckRollup") or []
+def settled(check):
+    verdict = (check.get("conclusion") or check.get("state") or "").upper()
+    return verdict in ("SUCCESS", "NEUTRAL", "SKIPPED")
+print(pr.get("number") or 0,
+      pr.get("state") or "",
+      "draft" if pr.get("isDraft") else "ready",
+      pr.get("headRefOid") or "",
+      "green" if rollup and all(settled(c) for c in rollup) else "not-green")
+')
+  [[ -n "$scene" ]] || stop_open "could not read what gh said about $branch"
+  read -r pr state draft head checks <<<"$scene"
+
+  # A draft is work in progress and stopping in the middle of it is ordinary.
+  # Red or unreported checks mean there is nothing to review yet.
+  [[ "$state" == "OPEN" ]] || exit 0
+  [[ "$draft" == "ready" ]] || exit 0
+  [[ "$checks" == "green" ]] || exit 0
+  [[ -n "$head" ]] || stop_open "gh did not say what the head of #$pr is"
+
+  # The same question `check` asks before a merge, asked earlier.
+  local recorded_head missing
+  IFS="|" read -r recorded_head missing <<<"$(receipt_status "$pr")"
+
+  [[ "$recorded_head" == "$head" && -z "$missing" ]] && exit 0
+
+  # ONCE PER HEAD, keyed on the commit rather than the pull request. Why that
+  # bound is here, and why this mode is a nudge where `check` is a lock, is
+  # DEVELOPERS.md "When a branch is ready to merge" with the rest of what this
+  # gate refuses.
+  [[ -d "$REPO_ROOT/.claude" ]] || mkdir -p "$REPO_ROOT/.claude"
+  NUDGES="$NUDGES" PR="$pr" HEAD_SHA="$head" python3 -c '
+import json, os, sys
+path = os.environ["NUDGES"]
+try:
+    with open(path) as fh:
+        nudged = json.load(fh)
+except (OSError, ValueError):
+    nudged = {}
+if not isinstance(nudged, dict):
+    nudged = {}
+if nudged.get(os.environ["PR"]) == os.environ["HEAD_SHA"]:
+    sys.exit(1)
+nudged[os.environ["PR"]] = os.environ["HEAD_SHA"]
+with open(path, "w") as fh:
+    json.dump(nudged, fh, indent=2, sort_keys=True)
+    fh.write("\n")
+' || exit 0
+
+  [[ -n "$missing" ]] || missing="code-review,simplify"
+  stop_block "Pull request #$pr is ready and green, and its review cycle has not been recorded.
+
+  branch:  $branch
+  missing: ${missing//,/ and }
+
+A batch is finished when it is merged. Stopping here leaves work that looks
+done and is not, which is the state this hook exists to make visible.
+
+$CYCLE
+
+If you are stopping deliberately, say so and stop again -- this asks once per
+head, not once per attempt."
+}
+
 # ---------------------------------------------------------------------------
 # check mode: invoked by the PreToolUse hook with the payload on stdin
 # ---------------------------------------------------------------------------
 
 case "${1:-check}" in
+  stop)
+    stop_mode
+    exit 0
+    ;;
   record)
     pr=${2:?usage: landing-gate.sh record <pr-number>}
     record_receipt "$pr"
@@ -432,6 +642,10 @@ with open(path, "w") as fh:
       rm -f "$RECEIPTS"
       echo "Cleared every receipt."
     fi
+    # The nudges go with them. They are a record of having asked rather than
+    # evidence of anything, so there is nothing to preserve and a stale one
+    # would mean the next stop said nothing about a cycle that is now missing.
+    rm -f "$NUDGES"
     exit 0
     ;;
   status)
@@ -713,23 +927,6 @@ for candidate in [cmd] + shell_payloads(cmd):
 read -r action rest <<<"$verdict"
 pr=$rest
 
-# Where the cycle is written down, rather than the cycle.
-#
-# This held its own copy of all five steps until the review of PR #30 pointed
-# out that the file's own header says "None of that is repeated here" four
-# lines above it, that AGENTS.md rule 1 forbids the second copy outright, and
-# that the copy had ALREADY drifted -- "collapse each issue own commits", where
-# AGENTS.md says "collapsing an issue's own commits". check-docs.sh missed it
-# because the run is under twelve words, which is the rule failing exactly
-# where it was meant to bite.
-CYCLE='The cycle is DEVELOPERS.md "One review pass, findings filed per issue",
-and .agents/skills/pull-requests/SKILL.md is the procedure for running it. It
-ends with:
-
-  scripts/landing-gate.sh record <pr>
-
-as its own command, after the last push. It records the head it sees, so
-anything published afterwards invalidates it.'
 
 case "$action" in
   push-force)
@@ -859,24 +1056,12 @@ linter would have said is a review wasted. Wait for the checks, or fix them.
     # shape: it is exactly what the gate wrote before this change, and leaving
     # those readable would mean the merges it was rewritten to stop are
     # permitted by whatever is already on disk.
-    recorded=$(RECEIPTS="$RECEIPTS" PR="$pr" python3 -c '
-import json, os
-try:
-    with open(os.environ["RECEIPTS"]) as fh:
-        receipts = json.load(fh)
-except (OSError, ValueError):
-    receipts = {}
-if not isinstance(receipts, dict):
-    receipts = {}
-receipt = receipts.get(os.environ["PR"])
-if not isinstance(receipt, dict):
-    receipt = {}
-evidence = receipt.get("evidence")
-if not isinstance(evidence, dict):
-    evidence = {}
-if all(evidence.get(stage) for stage in ("code-review", "simplify")):
-    print(receipt.get("head") or "")
-') || deny_unavailable "the recorded review cycle" "the receipts file"
+    status=$(receipt_status "$pr") \
+      || deny_unavailable "the recorded review cycle" "the receipts file"
+    IFS="|" read -r recorded missing <<<"$status"
+    # All or nothing here, unlike the stop hook: a receipt missing either stage
+    # is not a receipt, and the head it names vouches for nothing.
+    [[ -n "$missing" ]] && recorded=""
 
     [[ -n "$recorded" ]] || deny "No review cycle has been recorded for pull request $pr.
 

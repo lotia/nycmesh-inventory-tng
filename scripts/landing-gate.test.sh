@@ -41,6 +41,10 @@ case "$args" in
   # The combined form first: `record` asks for all three at once, so that the
   # head and the evidence come from the same moment.
   *"--json headRefOid,comments,reviews"*) cat "$GH_FIXTURES/pr.json" ;;
+  # Before the looser `--json number` arm below, which this string also
+  # matches: it asks for number,state,isDraft,... and would be answered with
+  # a bare integer.
+  *"isDraft"*)            cat "$GH_FIXTURES/stop.json" ;;
   *"--json headRefOid"*)  cat "$GH_FIXTURES/head" ;;
   *"--json number"*)      cat "$GH_FIXTURES/number" ;;
   *"pr checks"*)          cat "$GH_FIXTURES/failing" ;;
@@ -56,6 +60,22 @@ echo "$HEAD_OID" >"$FIX/head"
 echo 7 >"$FIX/number"
 echo 0 >"$FIX/failing"
 echo "{\"headRefOid\":\"$HEAD_OID\",\"comments\":[],\"reviews\":[]}" >"$FIX/pr.json"
+
+# What the stop hook asks about: a ready pull request whose checks are green.
+# Each case below rewrites this to the state it is about.
+stop_scene() {
+  STOP_STATE=${1:-OPEN} STOP_DRAFT=${2:-false} STOP_CHECK=${3:-SUCCESS} \
+  STOP_HEAD=${4:-$HEAD_OID} FIX=$FIX python3 -c '
+import json, os
+rollup = ([] if os.environ["STOP_CHECK"] == "none"
+          else [{"conclusion": os.environ["STOP_CHECK"]}])
+scene = {"number": 7, "state": os.environ["STOP_STATE"],
+         "isDraft": os.environ["STOP_DRAFT"] == "true",
+         "headRefOid": os.environ["STOP_HEAD"], "statusCheckRollup": rollup}
+open(os.environ["FIX"] + "/stop.json", "w").write(json.dumps(scene))
+'
+}
+stop_scene
 
 # A PATH holding everything the gate needs, and one missing a named program.
 # `env -i` is not used: the gate shells out to git, which wants a HOME.
@@ -426,5 +446,155 @@ assert "$out" 0 0 "could not find out" "a matcher failing with no markers here s
 # flight is not on its own a reason to stop.
 case_is "gh pr merge 7 --rebase" "No review cycle" "an intact gate mid-rebase still guards"
 (cd "$REPO" && rm -f "$(git rev-parse --git-path MERGE_HEAD)")
+
+# ---------------------------------------------------------------------------
+# stop mode
+# ---------------------------------------------------------------------------
+
+# The Stop hook's payload, and the gate's answer to it. Sets STOP_OUT and
+# STOP_STATUS, because every case here asserts on both and a helper that
+# printed only the output would leave each one capturing the status by hand.
+stopped() {
+  local body=${1:-'{"stop_hook_active":false}'} repo=${2:-$REPO} path=${3:-$(full_path)}
+  STOP_OUT=$(printf '%s' "$body" | (cd "$repo" && env PATH="$path" GH_FIXTURES="$FIX" \
+    CLAUDE_PROJECT_DIR="$repo" GH_DEADLINE=5 ${GH_FAILS:+GH_FAILS=1} "$GATE" stop) 2>&1)
+  STOP_STATUS=$?
+}
+
+forget_nudges() { rm -f "$REPO/.claude/.stop-nudges.json"; }
+
+# The case this hook exists for: a batch that is ready, green and unreviewed.
+forget_nudges
+stopped
+assert "$STOP_OUT" "$STOP_STATUS" 0 '"decision":"block"' \
+  "a ready, green, unreviewed batch is not allowed to end the turn"
+assert "$STOP_OUT" "$STOP_STATUS" 0 "code-review and simplify" \
+  "the refusal names both missing stages"
+
+# ONCE PER HEAD. The refusal above has been spent; a second attempt is allowed
+# through, so that meaning it costs one exchange rather than the session.
+stopped
+refute "$STOP_OUT" "$STOP_STATUS" 0 "decision" "the same head is not refused twice"
+
+# A new head is a new question, because what was reviewed is no longer there.
+stop_scene OPEN false SUCCESS bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+stopped
+assert "$STOP_OUT" "$STOP_STATUS" 0 '"decision":"block"' \
+  "a head nobody has been asked about is refused again"
+stop_scene
+forget_nudges
+
+# The harness says it is already continuing because a Stop hook blocked it.
+# Honouring that is what keeps a refusal from being a loop.
+stopped '{"stop_hook_active":true}'
+refute "$STOP_OUT" "$STOP_STATUS" 0 "decision" \
+  "a stop the hook itself caused is not refused again"
+
+# Work in progress. Stopping in the middle of a draft is ordinary.
+stop_scene OPEN true
+stopped
+refute "$STOP_OUT" "$STOP_STATUS" 0 "decision" "a draft is not refused"
+stop_scene
+forget_nudges
+
+# Nothing to review yet.
+stop_scene OPEN false FAILURE
+stopped
+refute "$STOP_OUT" "$STOP_STATUS" 0 "decision" "a batch whose checks are red is not refused"
+stop_scene
+forget_nudges
+
+stop_scene OPEN false none
+stopped
+refute "$STOP_OUT" "$STOP_STATUS" 0 "decision" \
+  "a batch whose checks have not reported is not refused"
+stop_scene
+forget_nudges
+
+# Not a batch at all.
+stopped '{"stop_hook_active":false}' "$ON_MAIN"
+refute "$STOP_OUT" "$STOP_STATUS" 0 "decision" "a branch that is not a batch is not refused"
+
+# A recorded cycle against this head is the whole point, and ends the turn.
+mkdir -p "$REPO/.claude"
+receipt_for() {
+  cat >"$REPO/.claude/.review-receipts.json" <<RECEIPT
+{"7": {"head": "$1", "evidence": {"code-review": [{"kind": "comment"}], "simplify": [{"kind": "comment"}]}}}
+RECEIPT
+}
+receipt_for "$HEAD_OID"
+forget_nudges
+stopped
+refute "$STOP_OUT" "$STOP_STATUS" 0 "decision" "a batch that has been through its cycle ends the turn"
+
+# A receipt for a head that has since been pushed over is not a receipt.
+receipt_for cccccccccccccccccccccccccccccccccccccccc
+stopped
+assert "$STOP_OUT" "$STOP_STATUS" 0 '"decision":"block"' \
+  "a receipt from a superseded head does not end the turn"
+rm -f "$REPO/.claude/.review-receipts.json"
+forget_nudges
+
+# THE DIRECTION THIS MODE FAILS IN, and it is the opposite of every other case
+# in this file. A missing program or an unreachable gh must let the turn END:
+# failing closed here leaves a session that cannot stop and cannot fix what
+# would release it, because fixing it also ends in stopping.
+for missing in python3 gh; do
+  stopped '{"stop_hook_active":false}' "$REPO" "$(without "$missing")"
+  refute "$STOP_OUT" "$STOP_STATUS" 0 "decision" \
+    "a missing $missing lets the turn end rather than trapping the session"
+  assert "$STOP_OUT" "$STOP_STATUS" 0 "not checking the review cycle" \
+    "a missing $missing says on stderr that it did not look"
+  forget_nudges
+done
+
+GH_FAILS=1 stopped
+refute "$STOP_OUT" "$STOP_STATUS" 0 "decision" "a gh that cannot answer lets the turn end"
+unset GH_FAILS
+forget_nudges
+
+# gh that answers with something nobody can parse. The turn still ends -- but
+# it has to SAY so, which is the half the first version of this could not do:
+# the refusal hung off `read`, and a herestring made from empty output still
+# returns 0, so it never fired and the mode failed open in silence.
+printf 'not json' >"$FIX/stop.json"
+stopped
+refute "$STOP_OUT" "$STOP_STATUS" 0 "decision" "an answer nobody can parse lets the turn end"
+assert "$STOP_OUT" "$STOP_STATUS" 0 "could not read what gh said" \
+  "and says so, rather than failing open in silence"
+stop_scene
+forget_nudges
+
+# ---------------------------------------------------------------------------
+# the registration itself
+# ---------------------------------------------------------------------------
+
+# A gate nobody has registered guards nothing, and the failure is silent: every
+# case above passes against a settings.json that stopped mentioning this file.
+# That is the same reason CI runs the commit hook this repository ships rather
+# than only its suite -- what a clone is handed is the thing being tested.
+#
+# The real file, not a fixture, because a fixture would be a second copy of the
+# arrangement and could agree with itself while the shipped one had drifted.
+SHIPPED_SETTINGS=$(readlink -f "$(dirname "$GATE")/../.claude/settings.json")
+registered=$(SETTINGS="$SHIPPED_SETTINGS" python3 -c '
+import json, os
+try:
+    with open(os.environ["SETTINGS"]) as fh:
+        hooks = json.load(fh).get("hooks") or {}
+except (OSError, ValueError) as exc:
+    raise SystemExit("unreadable: %s" % exc)
+for event in ("PreToolUse", "Stop"):
+    commands = [inner.get("command", "")
+                for entry in hooks.get(event) or []
+                for inner in entry.get("hooks") or []]
+    print(event, "yes" if any("landing-gate.sh" in c for c in commands) else "no",
+          " ".join(c.rsplit("landing-gate.sh", 1)[-1].strip() for c in commands
+                   if "landing-gate.sh" in c))
+' 2>&1)
+assert "$registered" 0 0 "PreToolUse yes check" \
+  "the shipped settings register the gate on every Bash call"
+assert "$registered" 0 0 "Stop yes stop" \
+  "the shipped settings register the gate on the end of a turn"
 
 verdict
