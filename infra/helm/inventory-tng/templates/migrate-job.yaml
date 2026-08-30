@@ -34,6 +34,20 @@ spec:
             {{- include "inventory-tng.backendEnv" . | nindent 12 }}
           envFrom:
             {{- include "inventory-tng.backendEnvFrom" . | nindent 12 }}
+          # Declared, because a namespace with a ResourceQuota on cpu or memory
+          # REFUSES a pod that declares none -- unless a LimitRange happens to
+          # fill them in, which is not something a chart may assume. The Job is
+          # a pre-upgrade hook, so what that refusal looks like is not an error
+          # about resources: `helm upgrade` waits for a Job that will never be
+          # admitted and gives up at its timeout, with nothing in the release
+          # to look at. inventory-tng-v7g.
+          #
+          # Its own figures rather than the backend's. This runs migrations once
+          # and exits; it serves nothing, holds no connections open and has no
+          # replicas, so sizing it like a web process would reserve what a
+          # quota then refuses to give the pods that actually serve.
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

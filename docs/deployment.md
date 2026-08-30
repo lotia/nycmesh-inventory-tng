@@ -22,7 +22,6 @@ the step it stops.
 | What happens | Why | Filed as |
 | --- | --- | --- |
 | `ImagePullBackOff` on every pod, at the first install | No image has ever been published from this repository, there is no `v0.1.0` to pull, and the chart renders no `imagePullSecrets` for a private one | `inventory-tng-qe7` |
-| `helm upgrade` blocks until it times out, in a namespace with a `ResourceQuota` | The migrate Job renders with no `resources`, and a quota on cpu or memory refuses a pod that declares none unless a `LimitRange` fills them in | `inventory-tng-v7g` |
 
 The first stops an install outright. Until `inventory-tng-qe7` is done, treat
 what follows as the procedure that will work rather than one that has.
@@ -597,11 +596,11 @@ needs to predict what a release will do:
 - **A Job per release survives its release.** Its name carries the revision
   number rather than being reused, so the migration that failed is still an
   object in the namespace afterwards and its logs can be read.
-- **In a namespace with a `ResourceQuota`, it may never be admitted at all.**
-  The Job renders with no `resources`, and a quota on cpu or memory refuses a
-  pod that declares none unless a `LimitRange` supplies them. The symptom is a
-  release that blocks until the timeout with no pod to read logs from.
-  `inventory-tng-v7g`.
+- **It declares what it needs**, so a namespace with a `ResourceQuota` admits
+  it. It did not until `inventory-tng-v7g`, and the symptom was the worst shape
+  a hook can fail in: a release that blocked until its timeout with no pod to
+  read logs from. The figures are `migrations.resources`, sized for something
+  that runs once and exits rather than something that serves.
 
 To watch one, or to read why a release stopped:
 
