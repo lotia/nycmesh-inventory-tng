@@ -16,6 +16,12 @@ image:
   repository: lotia/nycmesh-inventory-tng
   # Overridden per release; never rely on :latest in a real environment.
   tag: ""
+  # Secrets a pod presents to pull these images. Empty because what this
+  # repository publishes is public and needs none -- it is for a deployment
+  # that mirrors the images somewhere of its own, or makes the package
+  # private. A list of `{name: <secret>}`, and the Secret is yours to create:
+  # docs/deployment.md#a-private-registry says how.
+  pullSecrets: []
   # IfNotPresent because a tag is a release here rather than a moving pointer.
   # Always would re-pull an image the node already has, for a digest that
   # cannot have changed.

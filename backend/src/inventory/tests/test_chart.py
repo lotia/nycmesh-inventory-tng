@@ -32,7 +32,7 @@ from django.http.request import validate_host
 from django.test import Client, override_settings
 from environ import Env
 
-from inventory.tests.charts import backend_container, environment, manifests, refused, render
+from inventory.tests.charts import backend_container, environment, manifests, refused, render, workloads
 from inventory.tests.helpers import BACKEND_DOCKERFILE, shipped
 from inventory_tng import forwarded
 from inventory_tng.database import DEFAULT_CONNECT_TIMEOUT_SECONDS
@@ -230,6 +230,37 @@ ON_THE_COMMAND_LINE = re.compile(r'"(?:--worker-class|-k|--timeout|-t)"')
 IN_THE_CONFIGURATION = re.compile(r"^\s*(?:worker_class|workers|timeout)\s*=", re.MULTILINE)
 
 
+def test_a_pull_secret_reaches_every_pod_that_pulls() -> None:
+    """All three, and the Job is the one it would be forgotten on.
+
+    Both Deployments are visible when a pull fails -- `ImagePullBackOff` on a
+    pod somebody is watching. The Job is not, and migrate-job.yaml says what it
+    does instead; inventory-tng-v7g is what that already cost once.
+
+    Rendered only when asked for: the images this repository publishes are
+    public, and a chart that named a Secret nobody created would refuse to
+    start every pod for the sake of a case most deployments do not have.
+    """
+    without = [
+        f"{document['kind']}/{document['metadata']['name']}"
+        for document in manifests()
+        if document.get("kind") in ("Deployment", "Job") and "imagePullSecrets" in document["spec"]["template"]["spec"]
+    ]
+    assert not without, f"{without} name a pull secret nobody asked for, so every pod needs one to exist"
+
+    asked = manifests(**{"image.pullSecrets[0].name": "a-registry-credential"})
+    carrying = [
+        document["metadata"]["name"]
+        for document in asked
+        if document.get("kind") in ("Deployment", "Job")
+        and document["spec"]["template"]["spec"].get("imagePullSecrets") == [{"name": "a-registry-credential"}]
+    ]
+    assert len(carrying) == 3, (
+        f"only {carrying} carry the pull secret. A pod left out cannot pull from a private registry at all, "
+        "and for the migrate Job that is a release which blocks rather than an error"
+    )
+
+
 def test_every_container_the_chart_renders_declares_what_it_needs() -> None:
     """A pod that declares nothing is refused by a namespace with a quota.
 
@@ -246,12 +277,9 @@ def test_every_container_the_chart_renders_declares_what_it_needs() -> None:
     the pair would be asserting the opposite of a decision.
     """
     bare = []
-    for document in manifests():
-        kind = document.get("kind")
-        if kind not in ("Deployment", "Job"):
-            continue
-        spec = document["spec"]["template"]["spec"]
-        for container in spec["containers"]:
+    for document in workloads():
+        kind = document["kind"]
+        for container in document["spec"]["template"]["spec"]["containers"]:
             requests = (container.get("resources") or {}).get("requests") or {}
             if not {"cpu", "memory"} <= set(requests):
                 bare.append(f"{kind}/{document['metadata']['name']}:{container['name']}")

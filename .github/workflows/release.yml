@@ -1,0 +1,88 @@
+name: Release
+
+# Publishes the two images a release is made of. Nothing here builds anything
+# CI has not already built on the commit being tagged -- what this adds is a
+# registry to push to and a name to pull by, which is all that stood between
+# this repository and an install that works: inventory-tng-qe7.
+#
+# ON A TAG, and only on a tag. An image published per push would be a moving
+# pointer, and docs/deployment.md tells an operator never to rely on one --
+# `image.tag` is a release rather than a channel. So the tag IS the version,
+# and pushing one is the whole act of releasing.
+on:
+  push:
+    tags: ["v*"]
+  # For a first publish before any tag exists, and for re-publishing a tag
+  # whose run failed. It asks for the tag rather than inferring one, because a
+  # workflow that guesses which version it is publishing is a workflow that
+  # publishes the wrong one quietly.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The tag to build and publish, e.g. v0.1.0"
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.component }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # What lets GITHUB_TOKEN push to ghcr.io. Nothing else in this repository
+      # asks for it, which is why it is granted here rather than at the top.
+      packages: write
+    strategy:
+      matrix:
+        component: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Sign in to the registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # Lowercased, because a registry path must be and a GitHub owner need not
+      # be. `lotia` is already lowercase; a fork owned by someone whose name is
+      # not would otherwise push to a name the registry refuses.
+      - name: Work out what to call it
+        id: name
+        run: |
+          set -euo pipefail
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          # THE LEADING v COMES OFF, and it is not cosmetic. A git tag carries
+          # one by convention and an image tag matches the chart's appVersion,
+          # which is `0.1.0` -- so publishing `v0.1.0` would mean a default
+          # `helm install` pulled `:0.1.0` and got nothing, which is the exact
+          # ImagePullBackOff this workflow exists to stop. Stripping it here
+          # makes `image.tag` something an operator sets to pin an OLDER
+          # release rather than something they must set to get any release.
+          version="${{ github.event.inputs.tag || github.ref_name }}"
+          version="${version#v}"
+          echo "image=ghcr.io/$owner/nycmesh-inventory-tng-${{ matrix.component }}" >> "$GITHUB_OUTPUT"
+          echo "tag=$version" >> "$GITHUB_OUTPUT"
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.component }}
+          push: true
+          # The tag, and nothing else. No `latest`: docs/deployment.md says
+          # never to rely on one in a real environment, and publishing it here
+          # would be this repository offering exactly what it tells operators
+          # not to take.
+          tags: ${{ steps.name.outputs.image }}:${{ steps.name.outputs.tag }}
+          # The same cache CI fills on every push, so a release rebuilds
+          # almost nothing.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Say where it went
+        run: |
+          echo "::notice::Published ${{ steps.name.outputs.image }}:${{ steps.name.outputs.tag }}"

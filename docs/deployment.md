@@ -12,19 +12,16 @@ development — which uses `compose.yaml`, not this chart — see
 
 ## Read this before you start
 
-**This procedure has never been run through to the end against a cluster, and
-two known defects stand in the way of the first person who does.** They are in
-the chart rather than in this page, so
-this page cannot fix them; what it can do is name them where you would
-otherwise meet them as a symptom. Each is filed, and each is listed again at
-the step it stops.
+**This procedure has never been run through to the end against a cluster.** The
+two defects that used to stand in the way of the first person who tried are
+fixed — there is a release workflow that publishes both images, and the
+migration Job declares what a quota needs it to. What is left is that nobody
+has done it, so treat what follows as a procedure that should work rather than
+one that has, and say so if it does not.
 
-| What happens | Why | Filed as |
-| --- | --- | --- |
-| `ImagePullBackOff` on every pod, at the first install | No image has ever been published from this repository, there is no `v0.1.0` to pull, and the chart renders no `imagePullSecrets` for a private one | `inventory-tng-qe7` |
-
-The first stops an install outright. Until `inventory-tng-qe7` is done, treat
-what follows as the procedure that will work rather than one that has.
+**No tag has been pushed yet either.** The workflow publishes on one, so the
+first release is a `git tag` away rather than a piece of work —
+[Publishing a release](#publishing-a-release).
 
 **Only the rendering is proven.** CI has no cluster, so the furthest it can
 follow this page is `helm lint` and the `helm template` lines printed further
@@ -43,9 +40,9 @@ rest happen once for the life of an environment.
 1. **Get a database.** This chart deploys none, for the reason
    [Database](#database) gives, so the URL of one is an input rather than an
    output.
-2. **Have an image to pull.** Nothing publishes one yet, so this is a step
-   somebody has to do by hand today — [Artifacts](#artifacts) says what to
-   build and where the chart looks for it.
+2. **Have an image to pull.** Pushing a tag publishes both —
+   [Publishing a release](#publishing-a-release) — and `image.tag` is what
+   names the one this release installs.
 3. **Create the namespace**, because everything below is in it:
 
    ```bash
@@ -109,30 +106,56 @@ cannot fall behind the chart the way they once did.
 
 Both images run as non-root. The backend runs with a read-only root filesystem.
 
-### Nothing publishes them yet
+### Publishing a release
 
-The chart pulls `ghcr.io/lotia/nycmesh-inventory-tng-backend:<image.tag>` and
-`-frontend:<image.tag>`. **No such image exists.** CI builds both on every push
-and pushes neither, this repository carries no release tag, and the chart
-renders no `imagePullSecrets`, so it could not authenticate to a private
-registry even if one held them. Filed as `inventory-tng-qe7`; until that lands,
-an install gets `ImagePullBackOff` on every pod.
-
-What to do in the meantime is build and push them yourself, and point the chart
-at wherever you put them:
+**Push a tag.** `.github/workflows/release.yml` builds both images from the
+tagged commit and pushes them to `ghcr.io/<owner>/nycmesh-inventory-tng-backend`
+and `-frontend`, tagged with the tag itself:
 
 ```bash
-docker build -t <your registry>/inventory-tng-backend:<tag> backend
-docker build -t <your registry>/inventory-tng-frontend:<tag> frontend
-docker push <your registry>/inventory-tng-backend:<tag>
-docker push <your registry>/inventory-tng-frontend:<tag>
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
-`image.registry` and `image.repository` are the two values that move the chart
-onto that registry; the chart appends `-backend` and `-frontend` to the
-repository itself. A private registry needs a pull Secret the chart cannot
-reference, so either make the repository public or wait for
-`inventory-tng-qe7`.
+The image is tagged with the version, `0.1.0` — the leading `v` a git tag
+carries comes off, so that it matches the chart's `appVersion` and a default
+install pulls what was just published. It is the only tag published — no
+`latest`,
+because relying on a moving pointer is the thing this document tells you not to
+do and offering one would be an odd way to say it. `Release` under Actions is
+where a run appears; it can also be started by hand against a tag, which is
+what to do for a first publish or after a failed run.
+
+That is what `image.tag` in the chart names. `image.registry` and
+`image.repository` move a deployment onto some other registry — the chart
+appends `-backend` and `-frontend` to the repository itself — which is what to
+set when you mirror the images rather than pulling them from here.
+
+### A private registry
+
+The published images are public and need no credential. A deployment that
+mirrors them somewhere private, or makes the package private, supplies a pull
+Secret and names it:
+
+```bash
+kubectl -n inventory-tng create secret docker-registry a-registry-credential \
+  --docker-server=<registry> --docker-username=<user> --docker-password=<token>
+```
+
+```yaml
+image:
+  pullSecrets:
+    - name: a-registry-credential
+```
+
+It reaches all three pods that pull — both Deployments and the migration Job.
+The Job is the one worth naming, because a hook that cannot start fails the way
+[Migrations](#migrations) describes rather than the way a Deployment does.
+
+The chart does not create that Secret. A chart that did would carry a
+credential in a values file, which is the one place a values file must not
+carry one — [Secrets](#secrets) is the same argument about the database URL and
+the signing key.
 
 ## Environment variables
 
@@ -525,7 +548,7 @@ Confirm what was rendered before applying it:
 
 ```bash
 helm lint infra/helm/inventory-tng
-helm template test infra/helm/inventory-tng --set image.tag=v0.1.0 \
+helm template test infra/helm/inventory-tng --set image.tag=0.1.0 \
   --set ingress.administrative.enabled=true \
   --set 'ingress.administrative.allowedSourceRanges={10.69.0.0/16}' \
   | grep -E 'name:.*-admin|whitelist|^ +- path:'
@@ -573,7 +596,7 @@ Verify before and after:
 
 ```bash
 helm lint infra/helm/inventory-tng
-helm template test infra/helm/inventory-tng --set image.tag=v0.1.0   # inspect manifests
+helm template test infra/helm/inventory-tng --set image.tag=0.1.0   # inspect manifests
 kubectl -n inventory-tng get pods
 kubectl -n inventory-tng logs deploy/inventory-tng-backend
 ```
