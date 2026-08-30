@@ -314,6 +314,49 @@ normalising comparisons, and guessing here would write a wrong spelling into
 the column every later screen reads. `inventory-tng-ypwr` is where it waits
 for one.
 
+## Amendment, 2026-08-30 — what an item's own name becomes, and what a rename does
+
+Point 5 named a gap and deferred it: `mint_items` writes an identifier per
+catalogued name, **nothing on the API's create path did**, so an item added
+through the app had none at all. That was `inventory-tng-w4dg`, and it is
+closed. Two things had to be decided to close it, and only one of them was
+obvious.
+
+**An item created through the API mints an alias for its own name**, exactly as
+the importer would have. `alias` because a display name is not a part number, a
+vendor's code or a barcode; the importer reads the kind off the value's shape,
+and here the shape is known.
+
+**A rename keeps the old alias and adds one for the new name.** This is the
+part that could have fallen out of the implementation either way, so it is
+written down.
+
+Keeping the old one follows from what this table is: every string that has ever
+meant an item. Somebody still holding a printout with the old name on it, or
+still saying it out loud, is exactly who that promise was written for — and
+dropping it would make a rename silently break them, which is the spreadsheet's
+failure returning by a new route.
+
+Adding one for the new name is the half that is easy to miss, because search
+reads `Item.name` as well and the item therefore stays findable without it. It
+is minted anyway, so that the invariant holds rather than being propped up by a
+second mechanism: **if search were ever narrowed to identifiers alone — which
+point 5 says becomes safe once this gap is closed — an item renamed without it
+would become unfindable by the only name anybody now uses.** Leaning on the
+name search here would put that trap back the day somebody took the ordering
+this record offers.
+
+**A collision is decision 4's clean conflict, from the opposite direction.** A
+duplicate identifier is somebody typing one string twice; this is somebody
+*naming* an item what another item is already known by. It reaches the same
+unique index from the other side, so it gets its own answer — a refusal naming
+the item that holds the string — rather than a 500 or a bare constraint name.
+
+The item and its alias are written in one transaction. An item whose alias
+failed is precisely the state this amendment removes, and committing half of it
+would be worse than the original defect: the item would exist and be findable
+by nothing.
+
 ## Consequences
 
 - **The migration rewrites the column, and may surface duplicates the old

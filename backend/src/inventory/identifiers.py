@@ -137,3 +137,41 @@ def matching(typed: str, *, through: str = "") -> Q:
     """
     lookup = "value_normalised__startswith"
     return Q(**{f"{through}__{lookup}" if through else lookup: normalised(typed)})
+
+
+def hold(item: Any, value: str, kind: str) -> tuple[Any, bool]:
+    """The row that holds ``value``, and whether this call is what made it.
+
+    THE INSERT IS TRIED FIRST AND THE REFUSAL IS THE ANSWER. The two folds --
+    Python's above and the database's generated column -- cannot be made to
+    agree for every string, and only one of them is entitled to decide.
+    Asking Python first would be asking the party that is not.
+
+    So: insert, and if the unique index refuses, ask the DATABASE which row it
+    thinks holds that value, with the database's own fold. Anything that is
+    not that index is re-raised untouched.
+
+    A savepoint rather than the enclosing transaction, so a string the database
+    considers taken costs this one insert rather than everything around it.
+    That was a real fault rather than a precaution: `mint` is atomic, so one
+    disagreement between the folds rolled back an entire catalogue import and
+    showed the operator a constraint name instead of a number in a report.
+
+    THE MODEL IS IMPORTED INSIDE THE FUNCTION, and it has to be: `models.py`
+    imports `Canonical` from this module, so a module-level import here would
+    close the cycle. This is the only function here that touches a model, and
+    keeping it beside the fold it depends on is worth the awkward import --
+    the alternative is a second module whose whole content is this.
+    """
+    from django.db import IntegrityError, transaction
+
+    from inventory.models import ItemIdentifier
+
+    try:
+        with transaction.atomic():
+            return ItemIdentifier.objects.create(item=item, kind=kind, value=value), True
+    except IntegrityError:
+        held = ItemIdentifier.objects.filter(value_normalised=Canonical(Value(value))).first()
+        if held is None:
+            raise
+        return held, False

@@ -52,14 +52,17 @@ import datetime
 import decimal
 from typing import Any
 
+from django.db import transaction
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
 
+from inventory import identifiers
 from inventory.models import (
     Category,
     Item,
+    ItemIdentifier,
     Label,
     Location,
     StockMovement,
@@ -713,6 +716,49 @@ class ItemSerializer(serializers.ModelSerializer):
             "balances",
             "labels",
         ]
+
+    def create(self, validated_data: dict[str, Any]) -> Item:
+        """Make the item, and make its own name findable.
+
+        Why it mints one at all, why the kind is `alias`, and why the two
+        writes are one transaction are decision 0026's amendment.
+        inventory-tng-w4dg.
+        """
+        with transaction.atomic():
+            item = super().create(validated_data)
+            self._also_findable_by_its_name(item, item.name)
+        return item
+
+    def update(self, instance: Item, validated_data: dict[str, Any]) -> Item:
+        """Rename it, and keep both names findable.
+
+        The old alias stays and the new name gains one of its own. That is a
+        decision rather than a fallout, and decision 0026's amendment is where
+        it is argued.
+        """
+        with transaction.atomic():
+            item = super().update(instance, validated_data)
+            self._also_findable_by_its_name(item, item.name)
+        return item
+
+    @staticmethod
+    def _also_findable_by_its_name(item: Item, name: str) -> None:
+        """Mint the alias, and turn a taken name into a conflict rather than a 500.
+
+        Decision 0026 point 4's clean conflict, reached from the other side and
+        so produced here rather than inherited. `hold` asks the database who
+        holds the string, with the database's own fold.
+        """
+        held, minted = identifiers.hold(item, name, ItemIdentifier.Kind.ALIAS)
+        if not minted and held.item_id != item.pk:
+            raise serializers.ValidationError(
+                {
+                    "name": (
+                        f"{name} is already an identifier for {held.item.name}, so it cannot also name "
+                        "this item. Two strings may mean one item; one string may not mean two."
+                    )
+                }
+            )
 
     def validate_minimum_stock(self, value: decimal.Decimal) -> decimal.Decimal:
         """Mirrors ``item_minimum_stock_not_negative``; see LocationSerializer.validate."""
