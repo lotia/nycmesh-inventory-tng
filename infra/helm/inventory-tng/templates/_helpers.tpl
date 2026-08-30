@@ -140,6 +140,8 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
   value: {{ .Values.django.debugTraceRate | quote }}
 - name: CORS_ALLOWED_ORIGINS
   value: {{ .Values.django.corsAllowedOrigins | quote }}
+- name: CSRF_TRUSTED_ORIGINS
+  value: {{ .Values.django.csrfTrustedOrigins | quote }}
 - name: NUM_PROXIES
   value: {{ .Values.django.numProxies | quote }}
 - name: TRUSTED_PROXIES

@@ -119,6 +119,11 @@ services:
       DEBUG_TRACE_RATE: ${DEBUG_TRACE_RATE:-60/min}
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,backend
       CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:8080
+      # Empty on purpose, and set rather than left out so that the intended
+      # value is in a file. nginx forwards the browser's own host, so Django
+      # computes the origin the browser claims and needs nothing admitted on
+      # top. .env.sample says what would fill it.
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
       # One proxy in this stack -- nginx in the frontend container -- where a
       # deployed environment has two. See .env.sample.
       NUM_PROXIES: ${NUM_PROXIES:-1}
