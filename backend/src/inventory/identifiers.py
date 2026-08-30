@@ -111,8 +111,14 @@ def normalised(string: str) -> str:
     return _RUNS.sub(" ", visible).strip(" ").lower()
 
 
-def matching(typed: str) -> Q:
+def matching(typed: str, *, through: str = "") -> Q:
     """Identifiers that begin with what somebody has typed.
+
+    ``through`` names the relation when the question is asked of something
+    else -- ``matching(term, through="identifiers")`` narrows ``Item``. It is a
+    parameter rather than a second function because the lookup below is the
+    thing that must not be written twice, and a caller that spelled the
+    relation itself would be spelling the lookup with it.
 
     The one place that knows how this column is searched, because getting it
     wrong is invisible: the query returns the right rows either way and only
@@ -129,4 +135,5 @@ def matching(typed: str) -> Q:
     mean or miss one they did, and the next keystroke corrects it. Nothing is
     stored, so nothing can be stored wrongly.
     """
-    return Q(value_normalised__startswith=normalised(typed))
+    lookup = "value_normalised__startswith"
+    return Q(**{f"{through}__{lookup}" if through else lookup: normalised(typed)})

@@ -59,14 +59,23 @@ typed. Underneath it on its page are its identifiers.
 **An identifier is any string that has ever meant this item**: a part number, a
 vendor's code, one of the retired `NYCM-` codes, or simply what people call it.
 
-**What that does today, and what it does not.** Typing `tp link` into the
-search box on the item list here in the admin finds the item, because this page
-searches identifiers as well as names. The volunteer's app does not: its search
-reads item names and nothing else, and nothing there ever shows an identifier.
-So an identifier helps you and whoever else works in the admin, and changes
-nothing a volunteer standing at a shelf can see. That gap is
-`inventory-tng-gz2`. Until it is closed, add the identifier *and* check that
-the item's own name is one somebody would think to type.
+**What that does.** Typing `tp link` into the search box finds the item —
+here in the admin, and in the volunteer's app, which searches names and
+identifiers together. An identifier you add is therefore worth something to
+somebody standing at a shelf and not only to whoever works in here.
+
+**What it never does is show the identifier back.** The app offers items by
+their own name, so a volunteer who types a part number sees the thing they were
+looking for rather than the code they typed. Matched against, never displayed.
+
+**An identifier matches from its start.** A name matches anywhere inside it —
+typing `beam` finds *LiteBeam AC Gen2* — but a part number or a barcode is
+found by what it begins with, so the first characters work and the last ones
+find nothing. That is deliberate, and
+[decision 0026](../docs/decisions/0026-what-makes-two-strings-one-identifier.md)
+measured why: a search from the start can use an index and a search from the
+middle cannot, and a long catalogue would slow to a crawl on every keystroke.
+So when somebody reads a code aloud, start from the left.
 
 Even so, this is the fix for the old spreadsheet, where a name that did not
 match matched nothing at all and the movement was silently lost. So:
