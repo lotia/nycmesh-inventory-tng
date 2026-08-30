@@ -38,6 +38,10 @@ services:
       - /var/run/postgresql:mode=1777
       - /tmp:mode=1777
     environment:
+      # Read from .env when it is there and defaulted here when it is not, so
+      # `compose up` works in a fresh clone before anybody has copied the
+      # sample. .env.sample carries what these three are and why changing one
+      # after the first start does not rename anything.
       POSTGRES_DB: ${POSTGRES_DB:-inventory_tng}
       POSTGRES_USER: ${POSTGRES_USER:-inventory}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-inventory}
@@ -89,8 +93,21 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      # The default says what it is: this key signs sessions and password
+      # reset links on a laptop and nothing else. settings.py gives the setting
+      # NO default, so a deployment that forgets one fails to boot rather than
+      # starting with a key that is in a public repository.
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-only-not-for-deployment-change-me}
+      # ON here, which is the opposite of the code default, because this stack
+      # is where somebody is debugging. It buys Django's error page and its SQL
+      # log. It is also the setting inventory-tng-o1uj.1 was about: what serves
+      # static files must not be decided from it, because DEBUG is on here
+      # while gunicorn -- not runserver -- is what is serving.
       DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
+      # How much reaches the stream below. DJANGO_LOG_LEVEL is the floor for
+      # everything; DJANGO_LOG_LEVELS raises or lowers named loggers against
+      # it, as `logger=LEVEL` pairs. .env.sample has the spelling and
+      # docs/observability.md is what to do with the result.
       DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-INFO}
       DJANGO_LOG_LEVELS: ${DJANGO_LOG_LEVELS:-}
       # json rather than the console default, because this stack is meant to
@@ -221,6 +238,11 @@ services:
     depends_on:
       - backend
     environment:
+      # Where this container's nginx forwards Django's paths. The service name
+      # on the compose network, so it is resolved rather than written down as
+      # an address -- and re-resolved per request, which is
+      # inventory-tng-o1uj.2 and is why the frontend survives the backend
+      # restarting. frontend/Dockerfile carries the image's own default.
       BACKEND_ORIGIN: http://backend:8000
       # Where the browser's spans go, when somebody has a debug token and the
       # collector profile is up. Set alongside OTEL_EXPORTER_OTLP_ENDPOINT by
