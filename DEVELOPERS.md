@@ -1068,6 +1068,7 @@ Two jobs in CI keep that arrangement from rotting, and both can be run by hand:
 ```bash
 scripts/check-docs.sh          # the same passage in two files
 scripts/check-docs.sh --words 8   # stricter, if you are hunting one down
+scripts/check-config.sh        # a configuration value nobody explained
 ```
 
 A link checker catches a link whose target you renamed. `check-docs.sh` catches
@@ -1080,6 +1081,25 @@ It reads every Markdown file **and the comments of everything else** — scripts
 workflows, the chart's templates, and the application's own docstrings and
 comments. Those are documentation of how this repository works, and a docstring
 is the easiest place of all to re-derive a decision record.
+
+`check-config.sh` holds the row above it — that configuration variables are
+documented where they are declared. Every value in
+[`.env.sample`](.env.sample), [`compose.yaml`](compose.yaml) and the chart's
+`values.yaml` must have prose beside it, and every variable the chart renders
+into a container must appear in
+[deployment](docs/deployment.md#environment-variables). That last rule is the
+one worth having: it is what found a rate limit an operator could set, the
+chart would honour, and the document listing what may be set had never heard
+of.
+
+What counts as documented is what a reader uses rather than what is easy to
+check — a comment above the *group* a value belongs to, and in YAML a comment
+on an enclosing key covering what is nested beneath it. Grouping related values
+under one comment is the better way to write these files, so a checker that
+demanded one comment per line would be arguing against the house style. What it
+cannot judge is whether the prose is any good; `scripts/check-config.allow` is
+for the few values that genuinely need none, and an entry there wants a reason
+like every other allowlist here.
 
 The corpus is every file in your checkout that git will admit to — committed or
 not, so long as `.gitignore` does not cover it — less the ones whose prose

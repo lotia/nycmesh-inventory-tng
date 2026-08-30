@@ -1,0 +1,9 @@
+# Configuration values allowed to sit with nothing saying what they are for.
+#
+# Written like scripts/check-telemetry.allow, whose header argues the shape and
+# why a line lacking its reason is ignored rather than honoured: the name, a
+# colon, then the justification.
+#
+# Expect this file to stay short. A value that genuinely needs no prose is
+# rarer than it feels while writing one -- `port` looks obvious until somebody
+# asks which side of the container it is on.
