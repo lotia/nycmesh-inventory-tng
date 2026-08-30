@@ -1518,7 +1518,10 @@ Two it cannot see, and they are the ones a person has to hold to:
 
 - `scripts/check-batch.sh origin/main..HEAD` is clean, so every commit belongs
   to exactly one issue — note it accepts a `Refs:`-only commit, so "belongs to"
-  is not the same as "closes"
+  is not the same as "closes". The gate runs this itself before a merge, so it
+  is checked rather than remembered; what CI asks on every push is the half of
+  it that is about structure rather than about being finished, and
+  [One review pass](#one-review-pass-findings-filed-per-issue) says why
 - the review pass in [Pull requests](#pull-requests) has actually happened, and
   its findings have been triaged and answered
 
@@ -1535,6 +1538,16 @@ being merged, refuses `gh pr ready` while the checks are not green, refuses a
 push that would land on `main`, and refuses a bare `git push --force` or `-f` —
 `--force-with-lease` is free, and [AGENTS.md](AGENTS.md#git) says why the two
 are on opposite sides of that line.
+
+It also refuses a merge whose branch is **not finished** — commits still
+waiting to be folded in, or an issue in the batch epic that has not landed.
+Those two questions used to be asked by CI on every push, which meant they were
+answered "no" through the whole of building and reviewing a batch: the job
+failed on 48% of this repository's pull request runs, every one of them the
+documented flow doing what it is told. They are questions about whether a
+branch is *ready*, so they are asked once, here, where that is the thing being
+decided. CI still asks everything structural, and still holds a fork's pull
+request to it where no local hook runs.
 
 And it refuses **to end a turn** on a `batch/*` branch whose pull request is
 ready, green, and has no recorded cycle. That one is registered as a `Stop`

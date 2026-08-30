@@ -1046,6 +1046,13 @@ linter would have said is a review wasted. Wait for the checks, or fix them.
       read -r pr current <<<"$both"
     fi
 
+    # THE FINISHED QUESTION, asked here because this is the only moment it is
+    # the right question. CI asks the structural half on every push and stays
+    # quiet about a branch that is merely unfinished -- inventory-tng-ee2c is
+    # why, and it is 48% of this repository's pull request runs. A batch that
+    # is not collapsed, or holds an issue that has not landed, is not wrong: it
+    # is not ready, and the difference only matters at a merge.
+    #
     # No `[[ -f "$RECEIPTS" ]]` guard: the reader below catches the missing file
     # under its own `except`, prints nothing, and falls into the identical
     # refusal four lines further down. Two copies of one refusal is the thing
@@ -1078,6 +1085,35 @@ merge is not what was reviewed.
 
   reviewed: $recorded
   current:  $current
+
+$CYCLE"
+    fi
+
+    # ASKED OF THE BRANCH BEING MERGED, not the one that happens to be checked
+    # out. `gh pr merge <n>` takes a number and will merge a pull request that
+    # is not what you are standing on -- and a tidy local `main` has nothing
+    # waiting to be folded in and no half-landed epic, so the checker would
+    # pass and this would permit a merge it never looked at. That is the
+    # direction this file may not fail in.
+    checked_out=$(cd "$REPO_ROOT" && git rev-parse HEAD 2>/dev/null) \
+      || deny_unavailable "which commit is checked out" git
+    if [[ "$checked_out" != "$current" ]]; then
+      deny "Pull request $pr is not what is checked out, so its readiness cannot be checked here.
+
+  pull request $pr: $current
+  checked out:      $checked_out
+
+Check out the branch you are merging. This refuses rather than merging
+something it has not looked at."
+    fi
+
+    # Its own exit status, not its output: a checker that died has checked
+    # nothing, which is the direction this file refuses in everywhere else.
+    checker=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/check-batch.sh
+    if ! unfinished=$(cd "$REPO_ROOT" && "$checker" origin/main..HEAD 2>&1); then
+      deny "Pull request $pr is not finished, so it is not ready to merge.
+
+$unfinished
 
 $CYCLE"
     fi

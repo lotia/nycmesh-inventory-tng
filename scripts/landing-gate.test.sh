@@ -22,14 +22,27 @@ workspace
 # `main` off the command line. `$WORK/on-main` below is the other side of that.
 new_repo "$WORK/repo" batch/test
 REPO="$WORK/repo"
+# A commit and an origin/main to measure against, because the merge guard now
+# asks check-batch.sh whether the branch is finished and that question needs a
+# range. A repository with neither is not a state any batch is ever in.
+started() {
+  local repo=$1
+  git -C "$repo" commit -q --allow-empty -m "start: the commit a branch forks from"
+  git -C "$repo" update-ref refs/remotes/origin/main HEAD
+}
+started "$REPO"
 new_repo "$WORK/on-main" main
 ON_MAIN="$WORK/on-main"
+started "$ON_MAIN"
 
 REAL_PATH=$PATH
 BIN="$WORK/bin"
 mkdir -p "$BIN"
 
-HEAD_OID=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+# The pull request's head, and it has to be the repository's ACTUAL head now:
+# the merge guard refuses to judge a branch that is not the one checked out,
+# so a made-up sha would deny every case rather than exercise it.
+HEAD_OID=$(git -C "$REPO" rev-parse HEAD)
 
 # A gh that answers from files this suite writes, so a case says what GitHub
 # said by writing it down rather than by reaching for it.
@@ -446,6 +459,46 @@ assert "$out" 0 0 "could not find out" "a matcher failing with no markers here s
 # flight is not on its own a reason to stop.
 case_is "gh pr merge 7 --rebase" "No review cycle" "an intact gate mid-rebase still guards"
 (cd "$REPO" && rm -f "$(git rev-parse --git-path MERGE_HEAD)")
+
+# ---------------------------------------------------------------------------
+# the finished question, asked at the merge
+# ---------------------------------------------------------------------------
+
+# Point the stub at a head and give it both markers, which is what `record`
+# needs before there is a receipt to merge against.
+head_is() {
+  echo "$1" >"$FIX/head"
+  pr_json marker marker
+}
+
+# A branch still carrying a fixup is not ready. This is the ONLY place that is
+# asked now -- CI deliberately stays quiet about it, which is inventory-tng-et6o
+# -- so if this case goes, nothing anywhere refuses an uncollapsed merge.
+(cd "$REPO" && git commit -q --allow-empty -m 'fixup! start: the commit a branch forks from')
+head_is "$(git -C "$REPO" rev-parse HEAD)"
+record >/dev/null
+case_is "gh pr merge 7 --rebase" "not finished" \
+  "a branch with a commit waiting to be folded in is not merged"
+
+(cd "$REPO" && git reset -q --hard HEAD~1)
+head_is "$HEAD_OID"
+record >/dev/null
+case_is "gh pr merge 7 --rebase" "" "a collapsed branch with a receipt merges"
+
+# THE HOLE THE REVIEW FOUND. `gh pr merge <n>` will merge a pull request that is
+# not what is checked out, and a tidy branch elsewhere has nothing waiting to be
+# folded in -- so the checker would have passed and permitted a merge it never
+# looked at. Simulated by recording against the head, then moving the checkout
+# off it, which is the same disagreement from the other side.
+record >/dev/null
+(cd "$REPO" && git commit -q --allow-empty -m 'start: a commit the pull request does not have')
+case_is "gh pr merge 7 --rebase" "is not what is checked out" \
+  "a pull request that is not the branch in hand is refused rather than judged elsewhere"
+(cd "$REPO" && git reset -q --hard "$HEAD_OID")
+
+# Put the receipts back as they were found. The stop-mode cases below are about
+# a batch with NO recorded cycle, and a receipt left here would satisfy them.
+in_repo "" "" clear >/dev/null
 
 # ---------------------------------------------------------------------------
 # stop mode
