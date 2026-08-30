@@ -1356,6 +1356,28 @@ Mark the pull request ready when the batch is complete and CI is green. What
 the batch holds is posted there as a comment, read off the commits rather than
 typed, so the list is the one that was checked.
 
+### A batch is done when it is merged
+
+Not when the commits are pushed, not when the checks go green, and not when the
+pull request is marked ready. Those are the middle of it.
+[AGENTS.md](AGENTS.md#git) already says merging a mergeable `batch/*` pull
+request needs nobody's permission and that whoever finished it merges it; this
+is the consequence, which had never been written down.
+
+So there are two honest ways to leave a batch, and a ready-but-unreviewed pull
+request is neither:
+
+- merged, or
+- stopped at a named stage, saying why, with what
+  `scripts/landing-gate.sh status` reports
+
+Stopping anywhere else is a deviation. Say so plainly rather than describing it
+as finished — a summary that reports a stalled batch as done is how one gets
+left behind, and the reader has no way to tell from the outside. The gate
+refuses to end a turn in exactly that state, which is
+[what it refuses](#when-a-branch-is-ready-to-merge), but the refusal asks once
+and is not a substitute for saying it.
+
 ### One review pass, findings filed per issue
 
 The batch is reviewed **once**, against the pull request, and the commentary
@@ -1377,6 +1399,21 @@ work, and giving it its own issue keeps it revertible on its own. Fixes are then
 applied one issue at a time, each checked and published before the next is
 started, and each recorded against the finding it answers by replying to the
 review comment and resolving it.
+
+**A finding that is not any of those three is either filed or fixed, and which
+one is not a matter of taste.** A finding orthogonal to what the epic is for
+gets an issue of its own and is left for later — `inventory-tng-nb8.15` through
+`nb8.18` came out of PR #20 that way, and `o1uj.8` out of PR #41, all
+correctly. But a finding that shows the work so far is **insufficient to close
+the epic** may not be deferred. It becomes an issue on the **batch epic**, and
+the epic is not complete until it has landed.
+
+The emphasis on *batch* epic is the whole of what makes that binding rather
+than hopeful. `scripts/batch-membership.py` reads parentage as batch
+membership, and `check-batch.sh` refuses a pull request whose landed issues are
+not exactly one epic's children — so an issue parented onto the batch epic and
+not landed cannot be merged past. Parent the same issue onto any other epic and
+nothing checks it at all.
 
 If a batch produces that third case twice, the issues were one issue. Merge them
 in the tracker and rewrite the branch rather than fighting it.
