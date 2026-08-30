@@ -49,13 +49,17 @@ and what that costs the person doing it.
 
 ## Decision
 
-**A local certificate authority, run from a container, whose root the
-contributor installs once on each device they test from. TLS terminates in a
-`profiles:`-gated proxy beside the stack, and every other way of running this
-project is unchanged.**
+**A certificate made locally by a container, served by a `profiles:`-gated
+proxy beside the stack, with every other way of running this project
+unchanged.** *Amended 2026-08-30: self-signed by default, with a local
+authority as the documented way to avoid the warning — see
+[the amendment](#amendment-2026-08-30--self-signed-by-default-and-the-warning-is-documented).*
 
-1. **A container makes the authority and the certificate.** No contributor
-   types an `openssl` command, and no document contains one. If a reader has to
+1. **A container makes the certificate.** No contributor types an `openssl`
+   command, and no document contains one. **Amended 2026-08-30** — it is
+   self-signed rather than issued by a local authority; see
+   [the amendment](#amendment-2026-08-30--self-signed-by-default-and-the-warning-is-documented).
+   The rest of this point is unchanged and is the acceptance criterion. If a reader has to
    copy a line with `-subj` and `-addext` in it, this decision has not been
    implemented — that is the acceptance criterion, in the owner's words.
 
@@ -85,7 +89,10 @@ project is unchanged.**
    was never the problem.
 
 6. **Installing the root on a device is a documented one-time ritual, and the
-   documentation says plainly what it costs.** On iOS it is three steps in two
+   documentation says plainly what it costs.** **Amended 2026-08-30 — this is
+   now optional**, and the default is a self-signed certificate whose warning
+   is documented instead. What follows describes the route somebody takes to
+   avoid that warning. On iOS it is three steps in two
    different places — download the profile, install it under **Settings →
    General → VPN & Device Management**, then enable it under **Settings →
    General → About → Certificate Trust Settings**, which is obscure enough that
@@ -154,6 +161,61 @@ given you a deployment. That is the fiefdom the epic's framing warns about.
   tool through its own interface. `AGENTS.md` rule 3 governs, and reaching for
   anything that looks like implementing a construction is the point at which
   the work stops and asks a person.
+
+## Amendment, 2026-08-30 — self-signed by default, and the warning is documented
+
+Point 1 above chose a local certificate **authority**, whose root a contributor
+installs once on each device, precisely so that no warning ever appears. Point 6
+accepted the per-device trust ritual as the cost of that.
+
+**The default is now a self-signed certificate, and the browser warning is
+expected.** The owner's call, and his words:
+
+> I'm okay with self signed cert by default since developers are/should be
+> aware that the browser will present a warning. I'd also like that clearly
+> indicated in the relevant docs.
+
+**The reasoning, which is the part worth keeping.** The audience for the local
+stack is developers, not volunteers. A warning about a certificate your own
+machine made a minute ago, on a hostname you typed yourself, is information
+rather than a threat — and somebody working on this project can be expected to
+read it. Against that, the trust ritual is real work repeated on every device,
+and what it buys is the absence of a dialog the person seeing it already
+understands. That is a poor trade for the common case, and it is the operator's
+trade to make.
+
+It also removes the single worst step in the original plan: the iOS ritual is
+three actions in two places, obscure enough that this record had to spell them
+out, and every one of them is a chance for somebody to give up before they see
+the app.
+
+**What does not change, and must not be lost.** The subject of this record was
+never the warning. It was that the camera is the reason any of this exists, and
+that **clicking through a warning may not yield the secure context
+`getUserMedia` requires** — a claim this record states plainly as untested. That
+stays untested, and it now sits underneath the default rather than beside it:
+
+- If clicking through **does** give a secure context, self-signed is the right
+  default and the authority is an optional comfort.
+- If it **does not**, then self-signed alone does not achieve the goal on that
+  platform, and the authority is the answer there rather than an upgrade.
+
+So `inventory-tng-dzwu.2` still settles it on a real iOS device early. It is now
+the first thing that issue does rather than a detail within it, because the
+answer decides whether the documented default works for the feature it exists
+to serve.
+
+**The local authority stays documented**, as the route for anybody who wants no
+warning, who is demonstrating the app to somebody who should not be taught to
+dismiss security dialogs, or who finds the camera refuses. It moves from
+"the default" to "the way out", and no work is discarded.
+
+**And the warning is written down where somebody meets it.** Not as a footnote:
+in the words a person seeing it would recognise, at the point in the setup where
+it appears, saying what it is and that it is expected. A warning nobody was
+warned about is the same defect as a camera that fails silently — it teaches the
+reader that this project is broken, at the moment they are deciding whether to
+keep going.
 
 ## References
 
