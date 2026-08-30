@@ -204,7 +204,13 @@ ROOT_URLCONF = "inventory_tng.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        # The project's own templates, which exist to override a dependency's.
+        # It has to be DIRS rather than an app directory: `APP_DIRS` searches
+        # INSTALLED_APPS in order, `inventory` is listed after `allauth`, and
+        # so an `allauth/` template placed in the app would lose to the one it
+        # was written to replace. DIRS is searched first whatever the order,
+        # which is what makes the override an override.
+        "DIRS": [BASE_DIR / "inventory_tng" / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -412,24 +418,32 @@ USE_TZ = True
 # beside the middleware list that asks.
 #
 STATIC_URL = "static/"
-# The manifest storage requires collectstatic to have run, which is true in the
-# built image but not in a development checkout -- hence the DEBUG split.
+# WHICH NAMES a collected file is served under, and it reads the same
+# directory the middleware list above does -- on purpose, so that "this
+# deployment serves collected files" has one answer rather than two.
 #
-# AND IT IS A DIFFERENT QUESTION FROM THE MIDDLEWARE'S, deliberately, because
-# the two look alike enough to be worth separating. That one asks whether there
-# is anything to serve; this asks which names to serve it under, and DEBUG is a
-# reasonable stand-in for the second because hashed names are a deployment's
-# concern rather than a developer's. The pair is sound in every combination
-# that occurs: the image collects with DEBUG unset, so the manifest is built,
-# and a container run with DEBUG on then draws unhashed names that WhiteNoise
-# serves from the same directory.
+# The manifest backend renames every file to include a hash of its contents,
+# writes gzip and brotli copies beside it, and then REFUSES a `{% static %}`
+# for any name absent from the manifest collectstatic wrote. That refusal is
+# worth keeping: absent from the manifest means the file will 404, and failing
+# at the first request beats serving a broken page for a week.
+#
+# WHICH IS WHY THE DOCKERFILE CREATES THIS DIRECTORY BEFORE IT COLLECTS.
+# collectstatic is what fills STATIC_ROOT, so a condition reading it is
+# otherwise false at exactly the moment the manifest would be written: the
+# build picks a storage that post-processes nothing, and the finished image --
+# where the directory now exists -- picks the manifest backend and finds
+# nothing in it. Every rendered page 500s, `/admin/` included, and every test
+# in a checkout still passes. That is not hypothetical; it is what the first
+# attempt at inventory-tng-u1am shipped, and test_static.py holds both halves
+# now.
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {
         "BACKEND": (
-            "django.contrib.staticfiles.storage.StaticFilesStorage"
-            if DEBUG
-            else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+            "whitenoise.storage.CompressedManifestStaticFilesStorage"
+            if STATIC_FILES_ARE_COLLECTED
+            else "django.contrib.staticfiles.storage.StaticFilesStorage"
         )
     },
 }

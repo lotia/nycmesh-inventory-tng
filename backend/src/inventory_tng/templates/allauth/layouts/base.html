@@ -1,0 +1,76 @@
+{% comment %}
+Overrides allauth's own layout, which ships deliberately unstyled so that a
+project can put its frame around it. This is that frame.
+
+Overriding THIS ONE reaches every page under /accounts/: allauth's
+entrance.html and manage.html both extend it, so sign in, the TOTP challenge,
+enrolment, the reauthentication prompt and every provider page arrive here.
+
+Every block allauth's own base.html defines is kept, with the same names --
+head_title, extra_head, body, content, extra_body -- because its templates
+fill them and a missing one silently renders nothing. What changed is the
+frame around `content` and not the contract with the pages inside it.
+
+The nav is allauth's, entry for entry, rendered as links rather than as a
+bulleted list headed "Menu:". It is not decoration: on a page reached mid
+sign-in it is the only way out.
+
+WHY THIS LOOKS LIKE THE VOLUNTEER APP AND THE DJANGO ADMIN DOES NOT --
+docs/decisions/0027-the-admin-is-meant-to-look-different.md. The short of it
+is that the contrast only reads as deliberate if this side is consistent.
+{% endcomment %}
+{% load i18n %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>
+            {% block head_title %}
+            {% endblock head_title %}
+        </title>
+        {# Generated from the app's MUI theme -- frontend/scripts/theme-css.ts. #}
+        <link rel="stylesheet" href="{% static 'accounts/theme.css' %}">
+        <link rel="stylesheet" href="{% static 'accounts/accounts.css' %}">
+        {% block extra_head %}
+        {% endblock extra_head %}
+    </head>
+    <body>
+        {% block body %}
+            <main class="card">
+                <h1 class="wordmark">NYC Mesh Inventory</h1>
+                {% if messages %}
+                    <ul class="messages" role="status">
+                        {% for message in messages %}<li>{{ message }}</li>{% endfor %}
+                    </ul>
+                {% endif %}
+                {% block content %}
+                {% endblock content %}
+                <nav class="elsewhere">
+                    {% if user.is_authenticated %}
+                        {% url 'account_email' as email_url_ %}
+                        {% if email_url_ %}<a href="{{ email_url_ }}">{% trans "Change Email" %}</a>{% endif %}
+                        {% url 'account_change_password' as change_password_url_ %}
+                        {% if change_password_url_ %}<a href="{{ change_password_url_ }}">{% trans "Change Password" %}</a>{% endif %}
+                        {% url 'socialaccount_connections' as connections_url_ %}
+                        {% if connections_url_ %}<a href="{{ connections_url_ }}">{% trans "Account Connections" %}</a>{% endif %}
+                        {% url 'mfa_index' as mfa_url_ %}
+                        {% if mfa_url_ %}<a href="{{ mfa_url_ }}">{% trans "Two-Factor Authentication" %}</a>{% endif %}
+                        {% url 'usersessions_list' as usersessions_list_url_ %}
+                        {% if usersessions_list_url_ %}<a href="{{ usersessions_list_url_ }}">{% trans "Sessions" %}</a>{% endif %}
+                        {% url 'account_logout' as logout_url_ %}
+                        {% if logout_url_ %}<a href="{{ logout_url_ }}">{% trans "Sign Out" %}</a>{% endif %}
+                    {% else %}
+                        {% url 'account_login' as login_url_ %}
+                        {% if login_url_ %}<a href="{{ login_url_ }}">{% trans "Sign In" %}</a>{% endif %}
+                        {% url 'account_signup' as signup_url_ %}
+                        {% if signup_url_ %}<a href="{{ signup_url_ }}">{% trans "Sign Up" %}</a>{% endif %}
+                    {% endif %}
+                </nav>
+            </main>
+        {% endblock body %}
+        {% block extra_body %}
+        {% endblock extra_body %}
+    </body>
+</html>

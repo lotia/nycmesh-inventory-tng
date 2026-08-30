@@ -36,3 +36,20 @@ Lets a test start again from nothing. Not used by the app.
 backend/src/inventory_tng/asgi.py
 backend/src/inventory_tng/wsgi.py
 entry point in the shape django documents cite here rather than in an app's hook for the reasons on it does nothing when no collector is configured
+
+# The generated stylesheet opens with the preamble its generator holds as a
+# constant, because that is the only place a reader who opens the CSS will
+# look. Linking is not available -- a CSS comment cannot be a link, and the
+# whole purpose of the text is to be read by somebody who has just opened the
+# wrong file. It is one string in one place in the source, `PREAMBLE`, and the
+# copy in the artifact is written by the generator rather than typed by a
+# person, so the two cannot drift.
+
+backend/src/inventory/static/accounts/theme.css
+frontend/scripts/theme-css.ts
+GENERATED FILE -- DO NOT EDIT. The application's MUI theme, resolved into CSS
+custom properties so that Django's /accounts/ pages are styled from the same
+values the app is. Editing this by hand is undone by the next person who runs:
+cd frontend && npm run theme:css Change frontend/src/theme.ts instead.
+frontend/scripts/theme-css.ts says why this arrangement rather than a symlink
+or a hand-written copy.

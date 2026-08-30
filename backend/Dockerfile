@@ -40,7 +40,13 @@ WORKDIR /app/src
 
 # collectstatic needs settings to import, but the real secret and database are
 # only present at run time. These values are used for this build step alone.
-RUN DJANGO_SECRET_KEY=build-time-only \
+#
+# THE DIRECTORY IS CREATED FIRST, and that is load-bearing rather than tidy.
+# Without it this image builds cleanly and then answers every rendered page
+# with 500. The reason is on STORAGES in settings.py; do not remove this line
+# without reading it.
+RUN mkdir -p staticfiles && \
+    DJANGO_SECRET_KEY=build-time-only \
     DATABASE_URL=postgres://build:build@localhost:5432/build \
     python manage.py collectstatic --noinput
 

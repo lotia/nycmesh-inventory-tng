@@ -12,6 +12,12 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "noEmit": true,
+    // `scripts/theme-css.ts` is run by node directly, and node's type
+    // stripping resolves an import exactly as written -- so it needs the `.ts`
+    // on `../src/theme.ts`. Nothing is emitted from this project anyway (vite
+    // builds the app), so allowing the extension costs nothing and the
+    // alternative is a second tsconfig for one file.
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "types": ["vite/client", "node"]
   },

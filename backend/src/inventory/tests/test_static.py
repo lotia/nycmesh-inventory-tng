@@ -23,6 +23,10 @@ from inventory.tests.helpers import BACKEND_DOCKERFILE, shipped
 WHITENOISE = "whitenoise.middleware.WhiteNoiseMiddleware"
 
 COLLECTS = re.compile(r"manage\.py\s+collectstatic")
+# Anything that brings STATIC_ROOT into existence. Matched loosely on purpose:
+# what matters is that the directory is there before the line below runs, not
+# which command put it there.
+MAKES_THE_DIRECTORY = re.compile(r"mkdir[^\n]*\bstaticfiles\b")
 
 
 def test_whitenoise_is_loaded_exactly_where_there_are_collected_files_to_serve() -> None:
@@ -46,6 +50,34 @@ def test_whitenoise_is_loaded_exactly_where_there_are_collected_files_to_serve()
         f"{settings.STATIC_ROOT} {'exists' if settings.STATIC_ROOT.is_dir() else 'does not exist'}. Those "
         "have to agree: under gunicorn nothing else serves collected files, and in a checkout there is "
         "nothing collected to serve"
+    )
+
+
+def test_the_image_makes_the_directory_before_it_collects_into_it() -> None:
+    """The chicken and egg, asserted so that it stays got right.
+
+    Why the order matters is the comment on STORAGES in settings.py, and is
+    not repeated here. What belongs here is that NONE of the checks which
+    already exist would have caught getting it wrong: the compose smoke test
+    fetches static files directly, and unhashed copies are present and served;
+    the backend suite runs in a checkout, where STATIC_ROOT is absent and the
+    manifest backend is never chosen at all; the images job builds and stops.
+    Measured rather than reasoned -- without the mkdir, collectstatic reports
+    "164 copied", and with it "164 copied, 474 post-processed".
+
+    So this asserts the ORDER, which is the whole of the fix.
+    """
+    dockerfile = shipped(BACKEND_DOCKERFILE)
+    made = MAKES_THE_DIRECTORY.search(dockerfile)
+    collects = COLLECTS.search(dockerfile)
+
+    assert made, (
+        f"{BACKEND_DOCKERFILE} no longer creates {'staticfiles'} before collecting into it, so the build "
+        "writes no manifest and every page the image renders returns 500 -- while every test here passes"
+    )
+    assert collects and made.start() < collects.start(), (
+        f"{BACKEND_DOCKERFILE} creates the static directory AFTER collectstatic rather than before, which "
+        "is the same failure: the storage is chosen while the directory is still absent"
     )
 
 
