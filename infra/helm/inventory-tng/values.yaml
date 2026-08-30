@@ -2,19 +2,39 @@
 # Deployment procedure and the meaning of each production value are documented
 # once, in docs/deployment.md. This file documents only the knobs themselves.
 
+# Helm's two conventional escape hatches for the names every object is built
+# from. Empty means the release name, which is what the documented install
+# produces; set one only when a cluster already has something answering to it.
 nameOverride: ""
 fullnameOverride: ""
 
 image:
+  # Where both images are pulled from. They are published together and share a
+  # tag, so a release is one tag rather than two. Nothing has ever pushed to
+  # this registry yet -- inventory-tng-qe7 -- so a real install needs its own.
   registry: ghcr.io
   repository: lotia/nycmesh-inventory-tng
   # Overridden per release; never rely on :latest in a real environment.
   tag: ""
+  # IfNotPresent because a tag is a release here rather than a moving pointer.
+  # Always would re-pull an image the node already has, for a digest that
+  # cannot have changed.
   pullPolicy: IfNotPresent
 
 backend:
+  # Two, so a rolling update and a lost node both leave one serving. Migrations
+  # do NOT run per replica -- they are a Job, so replicas cannot race.
   replicaCount: 2
+  # What gunicorn binds inside the container, and what the Service targets.
   port: 8000
+  # Requests are what the scheduler reserves; the memory limit is what the
+  # kernel kills over. NO CPU LIMIT, deliberately: throttling a web process
+  # turns a busy moment into latency on every request rather than shedding one.
+  #
+  # These are load-bearing beyond the pod. docs/deployment.md#health-checks
+  # works out how much of a three-worker pod a blocked probe can hold, and
+  # test_chart.py holds the chart to that arithmetic -- so a figure changed
+  # here without reading that section makes a documented model wrong.
   resources:
     requests:
       cpu: 100m
@@ -23,13 +43,19 @@ backend:
       memory: 512Mi
 
 frontend:
+  # Two, for the same reason as the backend's. This one is nginx serving static
+  # files and proxying, so it is cheap to run a second.
   replicaCount: 2
+  # What nginx listens on inside the container. 8080 rather than 80 because the
+  # image runs unprivileged and cannot bind a low port.
   port: 8080
   # Where the browser posts its spans, forwarded by nginx so the page's own
   # content policy stays as it is. Empty unless this cluster runs a collector;
   # nothing posts here without a signed debug token either way. See
   # docs/observability.md.
   collectorOrigin: ""
+  # Smaller than the backend's, and for the same reasons -- see there. nginx
+  # serving a built bundle needs very little.
   resources:
     requests:
       cpu: 50m
@@ -38,6 +64,11 @@ frontend:
       memory: 128Mi
 
 django:
+  # DJANGO_DEBUG in the cluster, and FALSE is the only supported answer here.
+  # On, it hands anybody who can reach a 500 a stack trace, the settings around
+  # it and a SQL log. The compose stack turns it on deliberately and says why;
+  # a cluster is not a laptop. It is also NOT what decides whether static files
+  # are served -- inventory-tng-o1uj.1 is that lesson.
   debug: false
   # How much the backend says, on standard output. See docs/deployment.md.
   logLevel: "INFO"
@@ -129,11 +160,23 @@ django:
 # Runs `manage.py migrate` as a pre-upgrade Job so that scaling the backend to
 # multiple replicas can never race on schema changes.
 migrations:
+  # Off only when something else is applying the schema -- a migration run by
+  # hand during an incident, say. Off with nothing else doing it is a backend
+  # talking to a database it does not match.
   enabled: true
 
 ingress:
+  # Off when something in front of this chart already routes to the frontend
+  # Service. The application is then reachable only from inside the cluster.
   enabled: true
+  # Which ingress controller claims it. `nginx` is the common one; a cluster
+  # running something else names it here, and getting it wrong renders an
+  # Ingress no controller ever picks up -- which fails silently, as a hostname
+  # that never resolves rather than an error.
   className: nginx
+  # The name browsers use, and the name Django is told to accept: the chart
+  # puts it in ALLOWED_HOSTS and refuses a release where the two disagree.
+  # docs/deployment.md#health-checks is why that matters to the probes.
   host: inventory.nycmesh.net
   tls:
     # No switch to turn TLS off: it is a functional requirement, not only a
@@ -142,6 +185,10 @@ ingress:
     # Set this only when TLS is terminated in front of this ingress;
     # docs/deployment.md says when that applies and what it does not mean.
     terminatedElsewhere: false
+  # Passed through to the Ingress unchanged, for whatever the cluster's
+  # controller reads them for -- a cert-manager issuer, a body-size limit, a
+  # timeout. Empty because none of it is this chart's to guess: an annotation
+  # that means something to one controller means nothing to the next.
   annotations: {}
   # Decision 0013 point 6: the routes only an administrator uses are also
   # restricted to a network volunteers do not need. Rendered as a second
