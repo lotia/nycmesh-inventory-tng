@@ -13,6 +13,8 @@ that is not obvious from reading the JSON.
 
 import io
 import json
+import os
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +43,99 @@ def a_line(record: dict[str, Any]) -> str:
     return json.dumps(record) + "\n"
 
 
+# A pipe holds a fixed amount and a write blocks once it is full. These tests
+# fill one and then read it, which deadlocks the moment the payload does not
+# fit: nothing can empty the pipe, because the read is on the line after the
+# write returns.
+#
+# inventory-tng-nre8 is what that cost. The suite HUNG rather than failed,
+# forever, at 93%, and "the full suite passes" was said three times against
+# runs that had actually timed out. A test that hangs reports no failure, so
+# every later claim about the suite becomes a guess.
+#
+# WHY IT SURVIVED. Linux gives a new pipe 64 KiB and the largest payload here
+# is about 13 KiB, so it fitted. But the kernel hands out two-page pipes
+# instead of sixteen-page ones once a user is over `fs.pipe-user-pages-soft`,
+# which a long session with containers and subprocesses reaches easily -- and
+# then it does not fit. Green on CI, green on a quiet laptop, hung on a busy
+# one.
+#
+# THE FIX IS TO STOP DEPENDING ON THE DEFAULT, not to drain while filling. A
+# writer thread would also clear the deadlock, and it was tried; it quietly
+# weakens the burst test below, whose whole subject is what happens when sixty
+# lines are ALREADY THERE and `select` therefore has nothing to report. A
+# writer still filling keeps the descriptor readable, which is the condition
+# that hides exactly the defect that test exists to catch. So the pipe is
+# made big enough instead, and the arrangement the tests were written against
+# is preserved rather than traded away.
+# Asked for as a multiple of the page size and only as much as the payload
+# needs, because the limit that shrank the pipe in the first place is a budget
+# over ALL of a user's pipes -- so a greedy request is refused on exactly the
+# loaded machine this is for. 256 KiB was tried and refused there; twice the
+# payload is granted.
+PAGE = 4096
+
+
+def room_for(data: bytes) -> int:
+    """Capacity to ask for: enough for `data`, rounded up to whole pages."""
+    return max(2 * PAGE, -(-2 * len(data) // PAGE) * PAGE)
+
+
+# F_SETPIPE_SZ and F_GETPIPE_SZ, which `fcntl` does not name.
+SET_PIPE_SIZE = 1031
+GET_PIPE_SIZE = 1032
+
+
+def pipe_capacity(descriptor: int) -> int | None:
+    """How much that pipe holds, or None where the question cannot be asked."""
+    try:
+        import fcntl
+    except ImportError:  # Linux is what CI and development run
+        return None
+    return int(fcntl.fcntl(descriptor, GET_PIPE_SIZE))
+
+
+def filled_with(data: bytes) -> int:
+    """The reading end of a pipe holding all of `data`, with the writer closed.
+
+    The capacity is asked for rather than assumed. Growing is allowed up to
+    `fs.pipe-max-size` -- a megabyte by default -- and, unlike the size a new
+    pipe is given, it is not reduced when a user is over the soft page limit.
+    So this holds on the busy machine that found the bug as well as the quiet
+    one that did not.
+
+    A kernel that refuses is not worth failing over here: the write below
+    would then block exactly as it used to, which is the deadlock. Rather than
+    leave that possible, the refusal falls back to a writer thread -- weaker,
+    because a descriptor still being written to always looks readable, but a
+    weaker test beats a suite that stops.
+    """
+    reading_end, writing_end = os.pipe()
+    try:
+        import fcntl
+
+        fcntl.fcntl(writing_end, SET_PIPE_SIZE, room_for(data))
+    except (ImportError, OSError):  # Linux, and there it grows
+        pass
+
+    held = pipe_capacity(writing_end)
+    if held is not None and held < len(data):
+
+        def fill() -> None:
+            try:
+                with os.fdopen(writing_end, "wb") as sink:
+                    sink.write(data)
+            except BrokenPipeError:
+                pass
+
+        threading.Thread(target=fill, daemon=True).start()
+        return reading_end
+
+    os.write(writing_end, data)
+    os.close(writing_end)
+    return reading_end
+
+
 def a_stream(text: str) -> Any:
     """Something `main` can read as standard input, buffer and all.
 
@@ -48,12 +143,7 @@ def a_stream(text: str) -> Any:
     descriptor and an in-memory stream has none -- which is the arrangement
     these very tests are here to hold.
     """
-    import os
-
-    reading_end, writing_end = os.pipe()
-    os.write(writing_end, text.encode())
-    os.close(writing_end)
-    return io.TextIOWrapper(os.fdopen(reading_end, "rb"))
+    return io.TextIOWrapper(os.fdopen(filled_with(text.encode()), "rb"))
 
 
 def attributes(shipped: dict[str, Any]) -> dict[str, Any]:
@@ -149,27 +239,45 @@ def test_a_burst_arriving_in_one_write_is_one_post_rather_than_sixty() -> None:
     undecoded remainder itself, so the question is asked only when the stream
     has genuinely gone quiet.
     """
-    import os
+    burst = "".join(f"{json.dumps(A_RECORD)}\n" for _ in range(60)).encode()
 
-    reading_end, writing_end = os.pipe()
-    os.write(writing_end, ("".join(f"{json.dumps(A_RECORD)}\n" for _ in range(60))).encode())
-    os.close(writing_end)
-
-    with os.fdopen(reading_end, "rb") as stream:
+    with os.fdopen(filled_with(burst), "rb") as stream:
         lines = list(shipping.reading(stream, shipping.waiting))
 
     assert [len(batch) for batch in shipped(lines)] == [60]
 
 
+def test_the_pipe_holds_everything_these_tests_put_through_it() -> None:
+    """The property the burst test above rests on, asserted rather than assumed.
+
+    That test is about sixty lines being ALREADY THERE when the reader starts:
+    `select` has nothing to report, and correct code must still make one batch
+    of them. If the payload stopped fitting, the write would block and the
+    suite would hang again -- and if it were made to fit by filling from a
+    thread instead, the descriptor would stay readable throughout and the test
+    would pass whether or not `reading` held the remainder, which is the one
+    thing it is for.
+
+    So the capacity is held against the real payload rather than a remembered
+    number, and this is what goes red if `ROOM` is lowered, if the grow stops
+    working, or if the records here get longer.
+    """
+    largest = "".join(f"{json.dumps(A_RECORD)}\n" for _ in range(60)).encode()
+    reading_end = filled_with(largest)
+    try:
+        held = pipe_capacity(reading_end)
+    finally:
+        os.close(reading_end)
+
+    assert held is None or held >= len(largest), (
+        f"the pipe holds {held} bytes and the largest payload here is {len(largest)}, so filling it "
+        "before reading blocks and the suite hangs rather than fails -- inventory-tng-nre8 exactly"
+    )
+
+
 def test_a_line_still_arriving_when_the_stream_ends_is_not_lost() -> None:
     """A writer that dies mid-line has still said something."""
-    import os
-
-    reading_end, writing_end = os.pipe()
-    os.write(writing_end, b"a half-written li")
-    os.close(writing_end)
-
-    with os.fdopen(reading_end, "rb") as stream:
+    with os.fdopen(filled_with(b"a half-written li"), "rb") as stream:
         assert list(shipping.reading(stream)) == ["a half-written li"]
 
 
