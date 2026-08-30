@@ -170,9 +170,9 @@ def test_an_origin_written_with_a_space_is_still_that_origin(monkeypatch: pytest
     for that should find it; what pins the real declaration is the last test in
     this file.
     """
-    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173, https://inventory.nycmesh.net")
+    monkeypatch.setenv("CSRF_TRUSTED_ORIGINS", "http://localhost:5173, https://inventory.nycmesh.net")
 
-    assert Env(CORS_ALLOWED_ORIGINS=(list, []))("CORS_ALLOWED_ORIGINS") == [
+    assert Env(CSRF_TRUSTED_ORIGINS=(list, []))("CSRF_TRUSTED_ORIGINS") == [
         "http://localhost:5173",
         "https://inventory.nycmesh.net",
     ]
@@ -206,7 +206,7 @@ def test_every_list_the_settings_declare_is_read_through_that_one_place() -> Non
     source = (Path(settings.BASE_DIR) / "inventory_tng" / "settings.py").read_text()
     declared = re.findall(r"^\s*(\w+)=\(list, \[\]\),$", source, re.MULTILINE)
 
-    assert "CORS_ALLOWED_ORIGINS" in declared
+    assert "CSRF_TRUSTED_ORIGINS" in declared
     assert "DJANGO_ALLOWED_HOSTS" in declared
     for name in declared:
         assert f'env("{name}")' in source, name
