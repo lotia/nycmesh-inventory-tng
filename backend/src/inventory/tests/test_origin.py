@@ -20,7 +20,8 @@ from django.middleware.csrf import get_token
 from django.test import Client, RequestFactory, override_settings
 from django.urls import reverse
 
-NGINX_TEMPLATE = "frontend/nginx.conf.template"
+from inventory.tests.helpers import NGINX_TEMPLATE, shipped
+
 FORWARDS_THE_HOST = re.compile(r"proxy_set_header\s+Host\s+(\$\w+);")
 # The two arms of the `map` that variable comes from, asserted apart rather
 # than as one block. Either deleted on its own is still a failure, which is the
@@ -53,7 +54,7 @@ def test_nginx_forwards_the_browsers_host_rather_than_a_host_without_its_port() 
     is cheaper to keep than an exception list, and nothing here wants the
     exception.
     """
-    template = (settings.REPO_ROOT / NGINX_TEMPLATE).read_text()
+    template = shipped(NGINX_TEMPLATE)
     forwarded = FORWARDS_THE_HOST.findall(template)
 
     assert forwarded, (

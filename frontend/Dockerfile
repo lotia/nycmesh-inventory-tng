@@ -31,6 +31,17 @@ ENV BACKEND_ORIGIN=http://backend:8000
 # collector to turn the browser's half on; docs/observability.md.
 ENV COLLECTOR_ORIGIN=http://127.0.0.1:9
 
+# Asks the base image's entrypoint to read /etc/resolv.conf and publish the
+# nameservers as NGINX_LOCAL_RESOLVERS, which nginx.conf.template needs in
+# order to re-resolve its upstreams while running. Set here rather than in
+# compose.yaml or the chart because the template does not render without it:
+# every place this image runs needs it, so the image carries it.
+#
+# Read at start rather than written down, because the address differs by
+# runtime -- Docker answers on 127.0.0.11 and rootless Podman on an address
+# belonging to the network the container joined.
+ENV NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
+
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 

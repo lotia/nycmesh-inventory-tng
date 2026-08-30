@@ -71,6 +71,45 @@ server {
     server_name  _;
     root         /usr/share/nginx/html;
 
+    # WITHOUT THIS, AN UPSTREAM THAT MOVES IS NEVER FOUND AGAIN. nginx resolves
+    # the name in a `proxy_pass` once, when it loads its configuration, and
+    # holds that address for the life of the worker. Restart the backend on its
+    # own -- an ordinary thing to do while changing a setting -- and it comes
+    # back on a different container address while this one goes on dialling the
+    # old one, so every proxied path answers 502 for as long as the frontend is
+    # left alone. The backend is up and answering directly the whole time,
+    # which is what makes it read as the wrong container's fault.
+    #
+    # A `resolver`, plus an upstream held in a variable, is what makes nginx
+    # ask again rather than remember. The nameservers come from the entrypoint
+    # reading /etc/resolv.conf -- frontend/Dockerfile says why they cannot be
+    # written down here.
+    #
+    # `valid` is deliberately short. This is a container address that changes
+    # when a service restarts, so the cost of asking is a lookup on a local
+    # resolver and the cost of not asking is the 502 above.
+    #
+    # IT IS A TRADE RATHER THAN A FREE WIN, and the direction is worth knowing
+    # before anybody tunes it. Resolving once meant a running proxy could not
+    # be hurt by DNS at all; resolving per request means it can. The problem
+    # being solved is a local one -- in a cluster the backend is a Service with
+    # a stable address, so re-resolving buys little there and costs a
+    # dependency on the cluster's DNS that this container did not have.
+    #
+    # Kept anyway, for three reasons: `valid` absorbs any blip shorter than
+    # itself, an address that really has changed is otherwise a permanent
+    # outage rather than a slow one, and one behaviour everywhere is worth more
+    # than an environment that is configured differently from the one people
+    # develop against. Lengthen `valid` before reaching for anything else.
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=10s;
+    resolver_timeout 5s;
+
+    # The upstreams, held in variables so that the `resolver` above is
+    # consulted per request. `proxy_pass` given a variable no longer appends
+    # the request's own URI, so every use of these below states it.
+    set $backend ${BACKEND_ORIGIN};
+    set $collector ${COLLECTOR_ORIGIN};
+
     gzip on;
     # application/wasm is the QR decoder, and it is roughly a megabyte
     # uncompressed on a page that has to work in a basement. See
@@ -118,7 +157,7 @@ server {
     # some of what is behind it and not the rest is a thing to reason about
     # twice, and there is nothing to be gained here for the cost of that.
     location ~ ^/(api|admin|accounts|static)(/|$) {
-        proxy_pass         ${BACKEND_ORIGIN};
+        proxy_pass         $backend$request_uri;
         proxy_set_header   Host              $forwarded_host;
         proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
@@ -145,7 +184,7 @@ server {
         auth_request       /api/debug-trace;
         limit_req          zone=spans burst=5 nodelay;
         client_max_body_size 64k;
-        proxy_pass         ${COLLECTOR_ORIGIN};
+        proxy_pass         $collector$request_uri;
         proxy_set_header   Host $forwarded_host;
     }
 
@@ -153,7 +192,7 @@ server {
     # so a client cannot use this deployment to test tokens against.
     location = /api/debug-trace {
         internal;
-        proxy_pass         ${BACKEND_ORIGIN}/api/debug-trace;
+        proxy_pass         $backend/api/debug-trace;
         proxy_pass_request_body off;
         proxy_set_header   Content-Length "";
         proxy_set_header   Host $forwarded_host;

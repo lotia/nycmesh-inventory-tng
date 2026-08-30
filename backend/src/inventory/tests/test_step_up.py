@@ -10,7 +10,6 @@ new ones. Appending to the ledger does not.
 """
 
 import re
-from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
@@ -21,7 +20,7 @@ from django.urls import reverse
 
 from inventory.models import Category, Item, Label, Location, StockTransaction, Volunteer
 from inventory.tests.conftest import ADMINISTRATOR_PASSWORD
-from inventory.tests.helpers import patch, post
+from inventory.tests.helpers import NGINX_TEMPLATE, patch, post, shipped
 
 pytestmark = pytest.mark.django_db
 
@@ -202,9 +201,6 @@ def test_the_decoder_may_compile_its_webassembly(client: Client) -> None:
     assert "'wasm-unsafe-eval'" in sources
 
 
-NGINX_TEMPLATE = Path(settings.BASE_DIR).parent.parent / "frontend" / "nginx.conf.template"
-
-
 def test_the_app_itself_is_served_with_the_same_policy() -> None:
     """The policy above covers what Django serves, which is not the app.
 
@@ -216,7 +212,7 @@ def test_the_app_itself_is_served_with_the_same_policy() -> None:
     """
     header = re.search(
         r'add_header\s+Content-Security-Policy\s+"([^"]*)"',
-        NGINX_TEMPLATE.read_text(),
+        shipped(NGINX_TEMPLATE),
     )
     assert header is not None, f"no Content-Security-Policy in {NGINX_TEMPLATE}"
 
