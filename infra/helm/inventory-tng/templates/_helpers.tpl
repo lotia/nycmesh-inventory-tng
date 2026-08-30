@@ -184,3 +184,23 @@ start rather than wait forever for a Secret nobody meant to create.
     name: {{ .Values.django.providerSecret }}
     optional: true
 {{- end -}}
+
+{{/*
+How a pod authenticates to a private registry.
+
+Rendered on all three pod specs, both Deployments and the migrate Job. Leaving
+the Job out would be the failure shape migrate-job.yaml describes over its own
+resources: not an error, a release that waits.
+
+Empty by default, and that is the ordinary case: the images this repository
+publishes are public, so nothing has to be supplied to pull them. It is for a
+deployment that mirrors them somewhere of its own, or makes the package
+private. The Secret is the operator's to create -- docs/deployment.md says how
+and why this chart does not create it.
+*/}}
+{{- define "inventory-tng.imagePullSecrets" -}}
+{{- with .Values.image.pullSecrets }}
+imagePullSecrets:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end -}}

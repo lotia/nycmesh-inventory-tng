@@ -300,7 +300,6 @@ HEADING = "Added by this run"
 
 
 ACKNOWLEDGEMENT = "--i-know-this-writes-invented-data"
-ACKNOWLEDGEMENT_DEST = ACKNOWLEDGEMENT.removeprefix("--").replace("-", "_")
 
 
 class Command(BaseCommand):
@@ -309,6 +308,11 @@ class Command(BaseCommand):
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             ACKNOWLEDGEMENT,
+            # Named rather than left to be re-derived. argparse turns the flag
+            # into `i_know_this_writes_invented_data` on its own, and computing
+            # that string a second time to read it back is a copy of a rule
+            # argparse already owns.
+            dest="acknowledged",
             action="store_true",
             help=(
                 "Admits this on a server where DEBUG is off -- a demo deployment. "
@@ -326,7 +330,7 @@ class Command(BaseCommand):
         _seeding.refuse_unless_a_development_server(
             f"This command writes an invented catalogue into whatever database DATABASE_URL names. "
             f"If that is what you want on this server, pass {ACKNOWLEDGEMENT}.",
-            acknowledged=options.get(ACKNOWLEDGEMENT_DEST, False),
+            acknowledged=options.get("acknowledged", False),
         )
         added: Counter[str] = Counter()
         with _telemetry.running(_telemetry.named(self)) as counted:

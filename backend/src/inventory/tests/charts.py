@@ -89,3 +89,13 @@ def backend_container(**overrides: str) -> dict[str, Any]:
 def environment(container: dict[str, Any]) -> dict[str, Any]:
     """The container's `env`, by name, values and `valueFrom` alike."""
     return {entry["name"]: entry for entry in container["env"]}
+
+
+def workloads(**overrides: str) -> list[dict[str, Any]]:
+    """Every rendered document that runs a pod, whatever kind it is.
+
+    The two kinds were written out at three call sites before this, which is
+    the drift this module exists to prevent: a chart that grew a CronJob would
+    be held by whichever of them somebody remembered.
+    """
+    return [document for document in manifests(**overrides) if document.get("kind") in ("Deployment", "Job")]

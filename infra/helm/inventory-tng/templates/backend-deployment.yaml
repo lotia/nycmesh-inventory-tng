@@ -19,6 +19,7 @@ spec:
         {{- include "inventory-tng.labels" . | nindent 8 }}
         app.kubernetes.io/component: backend
     spec:
+      {{- include "inventory-tng.imagePullSecrets" . | nindent 6 }}
       securityContext:
         runAsNonRoot: true
         seccompProfile:
