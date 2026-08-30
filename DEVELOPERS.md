@@ -195,12 +195,36 @@ the quickstart, so the commands live in
 <http://localhost:8080>, API on <http://localhost:8000>, and migrations run
 automatically on start.
 
-Two more worth knowing once it is up:
+**It seeds itself, so no screen you open is blank.** A one-shot `seed` service
+runs [`seed_demo_data`](#common-tasks) once the backend is answering, which is
+also once migrations have finished. It is idempotent, so bringing the stack up
+again changes nothing, and it will not invent stock on top of a ledger holding
+anything it did not write — [decision 0016](docs/decisions/0016-invariants-for-every-writer.md)
+makes those rows unremovable, so that guard is what makes seeding unattended
+safe.
+
+**What it does not give you is a login.** `createsuperuser` asks for a password
+at a terminal, so Option A cannot make one for you and
+[README](README.md#quickstart) hands it to you as a step. That is the one thing
+this option leaves you to do by hand.
+
+Three more worth knowing once it is up:
 
 ```bash
+docker compose exec backend python manage.py show_label_codes  # what to scan
 docker compose logs -f backend | scripts/pretty-logs           # tail logs
 docker compose down -v                                         # stop, wipe database
 ```
+
+The first is there because the seed prints its label codes once, in
+`docker compose logs seed`, and those codes are what you type into the box
+marked **Scan or type a code**. Nothing else in the application shows them, so
+ask for them whenever you need them rather than scrolling for them.
+
+`DJANGO_DEBUG=false` in your `.env` turns the seeding off, because the command
+refuses to run without it. The stack still comes up and still serves; it comes
+up empty, and `docker compose ps` shows the `seed` service exited non-zero with
+the refusal in its log. That is the refusal working, not the stack failing.
 
 Every service in [`compose.yaml`](compose.yaml) names the non-root uid it runs
 as, drops all capabilities, refuses to gain privileges, and runs with a
@@ -407,6 +431,7 @@ All backend commands run from `backend/`, all frontend commands from `frontend/`
 | Make migrations | `uv run python src/manage.py makemigrations` |
 | Apply migrations | `uv run python src/manage.py migrate` |
 | Put demo rows in an empty database | `uv run python src/manage.py seed_demo_data` (refuses unless `DJANGO_DEBUG` is on) |
+| Show the label codes to scan | `uv run python src/manage.py show_label_codes` — reads the database, so it is right after any seed |
 | Make the login that survives a wipe | `uv run python src/manage.py seed_integration_data --i-know-this-creates-a-published-login` — see [Signing in](#signing-in) |
 | Open a Django shell | `uv run python src/manage.py shell` |
 | Add a dependency | `uv add <package>` |

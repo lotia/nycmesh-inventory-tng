@@ -307,24 +307,53 @@ jobs:
               exit 1
             fi
           done
-      # The two README calls not optional, in the shape it prints them. Without
-      # these the quickstart -- the path written for somebody who has only
-      # Docker -- would be the one route into this project that nothing runs
-      # end to end. The seed also refuses unless DEBUG is on, so this is where
-      # it is found out that `cp .env.sample .env` is what supplies it.
+      # The one README call not optional, in the shape it prints it. Without it
+      # the quickstart -- the path written for somebody who has only Docker --
+      # would be the one route into this project that nothing runs end to end.
       #
       # createsuperuser asks at a terminal and there is none here, which is why
       # README hands it to a person; the two arguments below are Django's own
       # way to answer it in advance and are not a line this repository asks
       # anybody to type.
-      - name: Something to look at, and an account to look at it with
+      - name: An account to look at it with
         run: |
-          docker compose exec -T backend python manage.py seed_demo_data
           docker compose exec -T \
             -e DJANGO_SUPERUSER_PASSWORD=ci-only-not-a-real-password backend \
             python manage.py createsuperuser --noinput \
             --username ci --email ci@example.invalid
-      - name: The seed left rows behind, and the account exists
+      # WAITED FOR, not hoped for. The seeder starts only once the backend is
+      # healthy, so it is still running while the steps above are checking
+      # URLs, and the assertion below would otherwise be racing it -- passing
+      # on this machine, failing on a slower one, for a reason nothing in the
+      # output would name. `wait` blocks until the container exits AND returns
+      # its exit code, so a seed that refused fails here rather than showing up
+      # as absent rows further down.
+      - name: The seeder finished, and finished cleanly
+        run: |
+          # `docker compose wait` was the obvious spelling and answered "no
+          # containers for project" on this runner while the stack was plainly
+          # up. Asking docker directly for the container works on every version
+          # and says more when it fails.
+          container=$(docker compose ps -aq seed)
+          if [ -z "$container" ]; then
+            echo "::error::compose created no seed container, so nothing seeded the stack"
+            docker compose ps -a
+            exit 1
+          fi
+          status=$(docker wait "$container")
+          docker compose logs seed
+          if [ "$status" != "0" ]; then
+            echo "::error::the seeder exited $status; the rows asserted below will be missing"
+            exit 1
+          fi
+      # THE SEED IS NOT RUN HERE ANY MORE, and that is the assertion.
+      # `compose up` brings up a one-shot `seed` service of its own
+      # (inventory-tng-zjqt), so running it again would prove only that the
+      # command works -- which the backend suite already covers. What is worth
+      # proving is that somebody who types the one command in README gets rows
+      # without typing a second, so the rows below are the ONLY seeding this
+      # job does.
+      - name: "`compose up` alone left rows behind, and the account exists"
         run: |
           docker compose exec -T backend python manage.py shell -c '
           from django.contrib.auth.models import User
@@ -334,6 +363,14 @@ jobs:
           assert User.objects.filter(username="ci", is_superuser=True).exists()
           print("catalogue, labels, places, people, ledger and a login: all there")
           '
+      # The codes are what a person types into "Scan or type a code", and the
+      # seed prints them once in a log nobody keeps. This is the command that
+      # answers at any time, and it is exercised here because DEVELOPERS.md
+      # hands it to a developer as the way to find them.
+      - name: And the label codes can be asked for
+        run: |
+          docker compose exec -T backend python manage.py show_label_codes \
+            | tee /dev/stderr | grep -q "Scan or type any of these"
       # THE ONE THING NOTHING ELSE HERE DOES: a write, through nginx, with a
       # session.
       #
