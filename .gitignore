@@ -52,9 +52,15 @@ ignored/
 # contributors' tokens). See .claude/settings.local.json.
 .claude/settings.local.json
 .claude/hooks/
-# Whatever the local gate is calling its receipt. It was .landing-receipt.json
-# until the gate moved onto the merge and started keying them by pull request,
-# and a name that changes is a name to match rather than to list.
+# Whatever the local gate is writing down. It was .landing-receipt.json until
+# the gate moved onto the merge and started keying them by pull request, and a
+# name that changes is a name to match rather than to list.
+#
+# The nudges are a second such file and did not match the first pattern, so
+# every checkout that met the stop hook once grew an untracked file that a
+# `git add -A` would have committed. Matched on the directory now, because the
+# next thing this gate writes will not be called a receipt either.
+.claude/.*.json
 .claude/*receipt*
 .claude/**/*receipt*
 
