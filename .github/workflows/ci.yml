@@ -334,6 +334,109 @@ jobs:
           assert User.objects.filter(username="ci", is_superuser=True).exists()
           print("catalogue, labels, places, people, ledger and a login: all there")
           '
+      # THE ONE THING NOTHING ELSE HERE DOES: a write, through nginx, with a
+      # session.
+      #
+      # Every assertion above this reads, and reading was never what broke.
+      # inventory-tng-o1uj.6 was a defect that refused EVERY write in the
+      # application -- the scanning flow of decision 0011 and every
+      # administrative screen -- and it reached a green build, because nginx
+      # forwarded a host without its port and Django then compared an origin no
+      # browser had sent. The backend suite could not see it: it drives Django's
+      # test client, which never crosses a proxy. The browser suite could not
+      # either: it runs against Vite, whose proxy leaves the host alone, and
+      # nothing in it saves a batch. This step is the gap those two leave.
+      #
+      # The session is minted server-side rather than by signing in, because
+      # the local path requires a second factor by decision 0013 and a TOTP
+      # dance in bash would be testing the wrong thing. What is under test is
+      # the origin comparison, which happens on the request no matter how the
+      # session was made.
+      - name: A volunteer's batch survives the trip through nginx
+        run: |
+          set -euo pipefail
+          scene=$(docker compose exec -T backend python manage.py shell -c '
+          import json
+          from django.contrib.auth.models import User
+          from django.contrib.sessions.backends.db import SessionStore
+          from inventory.models import Item, Location, Volunteer
+          user = User.objects.get(username="ci")
+          session = SessionStore()
+          session["_auth_user_id"] = str(user.pk)
+          session["_auth_user_backend"] = "django.contrib.auth.backends.ModelBackend"
+          # Django refuses a session without it, so leaving it out reads as an
+          # anonymous request and this step would assert nothing about origins.
+          session["_auth_user_hash"] = user.get_session_auth_hash()
+          session.create()
+          print(json.dumps({
+              "session": session.session_key,
+              "actor": Volunteer.objects.first().pk,
+              "item": Item.objects.first().pk,
+              "location": Location.objects.first().pk,
+          }))
+          ' | tail -1)
+          echo "$scene"
+          # One parse rather than a subprocess per field, and `read` rather
+          # than `eval` so that shellcheck can still see what is assigned.
+          read -r session actor item location <<<"$(printf '%s' "$scene" | python3 -c '
+          import json, sys
+          scene = json.load(sys.stdin)
+          print(scene["session"], scene["actor"], scene["item"], scene["location"])
+          ')"
+
+          # The endpoint index is where a browser is handed its CSRF token, so
+          # this is the sequence the app itself performs.
+          csrf=$(curl -sf -c - -b "sessionid=$session" http://localhost:8080/api \
+            | awk '$6 == "csrftoken" { print $7 }')
+          test -n "$csrf"
+
+          body=$(printf '{"kind":"checkout","actor":%s,"movements":[{"item":%s,"quantity":"1","from_location":%s}]}' \
+            "$actor" "$item" "$location")
+          status=$(curl -s -o /tmp/write.json -w '%{http_code}' \
+            -X POST http://localhost:8080/api/stock/transactions \
+            -H 'Content-Type: application/json' \
+            -H "Origin: http://localhost:8080" \
+            -H "X-CSRFToken: $csrf" \
+            -b "sessionid=$session; csrftoken=$csrf" \
+            --data "$body")
+          cat /tmp/write.json
+          if grep -q 'Origin checking failed' /tmp/write.json; then
+            echo "::error::nginx is forwarding a host Django does not agree with; every write is refused"
+            exit 1
+          fi
+          if [ "$status" != "201" ]; then
+            echo "::error::a signed-in write through nginx answered $status"
+            exit 1
+          fi
+
+          # The same request with the port taken off the host, which is what
+          # the defect made nginx forward. Django has to refuse this, or the
+          # assertion above passes for a reason that has nothing to do with
+          # what is being proxied and would go on passing through the bug.
+          refused=$(curl -s -o /tmp/refused.json -w '%{http_code}' \
+            -X POST http://localhost:8080/api/stock/transactions \
+            -H 'Content-Type: application/json' \
+            -H 'Host: localhost' \
+            -H "Origin: http://localhost:8080" \
+            -H "X-CSRFToken: $csrf" \
+            -b "sessionid=$session; csrftoken=$csrf" \
+            --data "$body")
+          if ! grep -q 'Origin checking failed' /tmp/refused.json; then
+            echo "::error::a host with no port was accepted ($refused), so the check above proves nothing"
+            cat /tmp/refused.json
+            exit 1
+          fi
+      # Asserting the ledger rather than the status, because a 201 over a
+      # transaction that wrote nothing would satisfy the step above.
+      - name: And the ledger actually moved
+        run: |
+          docker compose exec -T backend python manage.py shell -c '
+          from inventory.models import StockTransaction
+          assert StockTransaction.objects.filter(kind="checkout").exists(), (
+              "the write was accepted and no checkout reached the ledger"
+          )
+          print("the batch is in the ledger")
+          '
       # So that the three assertions above cannot start passing for the wrong
       # reason the day somebody drops `read_only` to make something work.
       - name: The root filesystems really are read-only
