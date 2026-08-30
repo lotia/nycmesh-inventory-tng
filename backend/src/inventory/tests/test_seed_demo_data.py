@@ -36,10 +36,10 @@ def _a_development_server(settings: Any) -> None:
     settings.DEBUG = True
 
 
-def run() -> str:
+def run(*args: str) -> str:
     """Seed, returning what the command printed."""
     out = io.StringIO()
-    call_command("seed_demo_data", stdout=out)
+    call_command("seed_demo_data", *args, stdout=out)
     return out.getvalue()
 
 
@@ -94,6 +94,35 @@ def test_it_refuses_to_run_on_a_server_that_is_not_a_development_one(settings: A
     assert not Item.objects.exists()
     assert not Location.objects.exists()
     assert not Volunteer.objects.exists()
+
+
+def test_the_refusal_names_the_way_past_it(settings: Any) -> None:
+    """A refusal that does not say what to do is a dead end.
+
+    And this one is met by somebody standing in front of an empty demo
+    deployment, who has a legitimate reason to be here and no way to guess it.
+    """
+    settings.DEBUG = False
+
+    with pytest.raises(CommandError, match="--i-know-this-writes-invented-data"):
+        run()
+
+
+def test_a_flag_typed_on_the_spot_admits_it_where_debug_cannot(settings: Any) -> None:
+    """The other door, and the only one a demo deployment can use.
+
+    A cluster requires DEBUG off, so before this there was no way to put
+    anything in front of the people a demo exists for. Why the way past is a
+    flag rather than a second variable is argued on `seed_integration_data`'s
+    acknowledgement, which came first.
+    """
+    settings.DEBUG = False
+
+    run("--i-know-this-writes-invented-data")
+
+    assert Item.objects.exists()
+    assert Location.objects.exists()
+    assert Volunteer.objects.exists()
 
 
 def test_running_it_again_adds_nothing() -> None:
