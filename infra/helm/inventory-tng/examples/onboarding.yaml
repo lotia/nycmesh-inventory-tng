@@ -1,0 +1,26 @@
+# A deployed development environment, a demo, or anywhere people are meeting
+# this app for the first time.
+#
+# One of two starting points; README.md beside it is the index.
+
+image:
+  tag: 0.1.0
+
+ingress:
+  host: inventory-dev.example.net
+
+django:
+  allowedHosts: inventory-dev.example.net
+  labelBaseUrl: https://inventory-dev.example.net
+
+  # NOT REQUIRED, and that is the only reason this file exists separately.
+  #
+  # The people arriving at a demo have not decided to use this yet, and asking
+  # them to install an authenticator before they can look at a screen is asking
+  # for a decision they have no reason to make. The full argument, and what
+  # turning it off does NOT change, is
+  # docs/deployment.md#choosing-whether-to-require-a-second-factor.
+  #
+  # Do not take this file for an environment holding real stock, whatever it
+  # is called.
+  requireSecondFactor: false

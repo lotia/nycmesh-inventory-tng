@@ -50,6 +50,21 @@ pytestmark = pytest.mark.django_db
 PASSWORD = "not-a-real-password-either"
 
 
+@pytest.fixture(autouse=True)
+def _the_second_factor_is_required(settings: Any) -> None:
+    """This module is about the path where it IS, so it says so.
+
+    Since inventory-tng-o1uj.3 that is a default rather than a rule, and
+    `.env.sample` ships it OFF for local development -- so a contributor who
+    followed the setup instructions has a `.env` that settings.py reads, and
+    three tests here would fail on their machine while passing in CI, which
+    teaches people that a red suite is normal. Pinned rather than assumed for
+    that reason alone; what happens when it is off is
+    inventory/tests/test_second_factor.py's subject, not this module's.
+    """
+    settings.REQUIRE_SECOND_FACTOR = True
+
+
 @pytest.fixture
 def _providers(settings: Any) -> None:
     """Every provider decision 0013 point 1 names, configured with fakes.

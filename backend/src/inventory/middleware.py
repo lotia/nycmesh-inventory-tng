@@ -1,5 +1,11 @@
 """What makes decision 0013 point 3's "required" a fact rather than a wish.
 
+Required BY DEFAULT, since that decision was amended. ``REQUIRE_SECOND_FACTOR``
+is the operator's answer and ``inventory_tng.second_factor`` holds the
+reasoning; what follows describes the deployment that keeps the default, which
+is every deployment that has not decided otherwise.
+
+
 allauth already asks for a TOTP code from anybody who has set one up: that is
 its authenticate stage, and it is the whole of the second factor for an
 account that has one. What it does not do is insist that a local account has
@@ -106,6 +112,12 @@ class RequireSecondFactor:
 
     @staticmethod
     def _is_unfinished(request: HttpRequest) -> bool:
+        # The operator's answer, read per request rather than captured at
+        # startup, so that a test overriding it and a deployment setting it
+        # are answered by the same line. `inventory_tng.second_factor` holds
+        # the argument for it being an answer at all.
+        if not settings.REQUIRE_SECOND_FACTOR:
+            return False
         user = getattr(request, "user", None)
         if user is None or not user.is_authenticated:
             return False
@@ -153,6 +165,18 @@ class RequireSecondLookInTheAdmin:
 
     Only writes, and only under the admin. A GET is the admin being read, which
     is what somebody does before deciding to change anything.
+
+    **``REQUIRE_SECOND_FACTOR`` does not reach this class, deliberately.** It
+    would be the obvious place to put it -- both classes are named for asking
+    something extra -- and it would be wrong. What this asks for is RECENT
+    authentication, which allauth satisfies with whatever the account has: a
+    password on an account with no second factor, a code on one that has. So
+    it already works with the requirement off, and it is answering a different
+    threat -- decision 0014 point 5's script running in an administrator's own
+    browser, which a second factor set up months ago does nothing about. An
+    operator turning the requirement off is saying enrolment may not be
+    compulsory; they are not saying the admin should accept a write from a
+    session that has not proved itself recently.
     """
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:

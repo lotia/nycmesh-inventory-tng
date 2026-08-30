@@ -154,6 +154,8 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
   value: {{ .Values.django.deviceEnrolmentRate | quote }}
 - name: REAUTHENTICATION_TIMEOUT_SECONDS
   value: {{ .Values.django.reauthenticationTimeoutSeconds | quote }}
+- name: REQUIRE_SECOND_FACTOR
+  value: {{ .Values.django.requireSecondFactor | quote }}
 - name: LABEL_BASE_URL
   value: {{ .Values.django.labelBaseUrl | quote }}
 - name: DATABASE_CONNECT_TIMEOUT_SECONDS

@@ -142,6 +142,12 @@ django:
   # change. Decision 0014 point 5 asks again inside a valid session; this is
   # how often. See docs/deployment.md.
   reauthenticationTimeoutSeconds: 900
+  # ON here, which is the code's default too, so a deployment that changes
+  # nothing is asked for one. It is an operator's decision in every
+  # environment; what the choice means and what it does not change is
+  # docs/deployment.md#choosing-whether-to-require-a-second-factor, and
+  # examples/ carries a starting point for each answer.
+  requireSecondFactor: true
   # The origin printed inside every QR code. Changing it does not change the
   # stickers already on the shelves; see docs/deployment.md.
   labelBaseUrl: "https://inventory.nycmesh.net"

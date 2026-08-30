@@ -208,6 +208,7 @@ ingress's, which would otherwise forward a hostname nothing answers to.
 | `APPEND_SUSTAINED_RATE` | no | chart (`django.appendSustainedRate`) | The same limit over an hour, for a flood paced to stay under the burst rate |
 | `CLIENT_REPORT_RATE` | no | chart (`django.clientReportRate`) | How much a browser may report about its own failures at `POST /api/client-failures`, as `<count>/<period>`. Default `30/min`. A budget of its own rather than a share of the two above, because the app posts here without being asked — once per failing call — so a backend having a bad minute would otherwise spend a volunteer's whole append allowance on reports about it. [`backend/src/inventory/throttling.py`](../backend/src/inventory/throttling.py) argues it |
 | `REAUTHENTICATION_TIMEOUT_SECONDS` | no | chart (`django.reauthenticationTimeoutSeconds`) | How long a sign-in counts as recent enough to make an administrative change; after it, the API answers those writes with `reauthentication_required` and the app offers the sign-in form again. Default `900`. Why there is a second prompt inside a valid session at all is [decision 0014](decisions/0014-one-interface.md) point 5 |
+| `REQUIRE_SECOND_FACTOR` | no | chart (`django.requireSecondFactor`) | Whether an account signing in with a password must set up an authenticator before it can do anything. Default `true`, and turning it off is a supported choice rather than a hole — [Choosing whether to require a second factor](#choosing-whether-to-require-a-second-factor) is what to weigh |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | provider Secret | Offers Google sign-in. Absent, or half set, means it is not offered |
 | `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` | no | provider Secret | Offers Slack sign-in, the strongest signal that somebody is actually involved in NYC Mesh |
 | `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_SERVER_URL` | no | provider Secret | Offers a generic OpenID Connect provider. `OIDC_SERVER_URL` is the issuer, the URL whose `/.well-known/openid-configuration` describes the rest. All three are needed |
@@ -358,16 +359,14 @@ reverts the other three to the chart's values — which point at
 `inventory.nycmesh.net`, whoever you are. That is a whole deployment answering
 the wrong hostname, with no error anywhere. Write the file once:
 
-```yaml
-# my-values.yaml, kept wherever you keep deployment configuration
-image:
-  tag: v0.1.0
-ingress:
-  host: inventory.example.net
-django:
-  allowedHosts: inventory.example.net
-  labelBaseUrl: https://inventory.example.net
-```
+Two starting points are shipped beside the chart, one for an environment
+holding real stock and one for a demo —
+[`examples/`](../infra/helm/inventory-tng/examples/README.md) says which is
+which and what differs. Copy one and change every hostname in it.
+
+**`image.tag` carries no leading `v`.** The git tag does, by convention, and
+[Publishing a release](#publishing-a-release) strips it — so a release tagged
+`v0.1.0` is published as `:0.1.0`, and that is what goes here.
 
 ```bash
 helm upgrade --install inventory-tng infra/helm/inventory-tng \
@@ -681,15 +680,17 @@ kubectl -n inventory-tng exec -it deploy/inventory-tng-backend -- \
 ```
 
 That account signs in at `/accounts/login/` — the Django admin's own login form
-redirects there — and is asked to set up an authenticator app before it can
-reach anything else, which is
-[decision 0013](decisions/0013-administrator-sign-in.md) point 3. Everybody
+redirects there — and, on a deployment that has kept the default, is asked to
+set up an authenticator app before it can reach anything else, which is
+[decision 0013](decisions/0013-administrator-sign-in.md) point 3 and is
+`REQUIRE_SECOND_FACTOR`'s doing. Everybody
 after them signs in however they like and is granted the staff flag by this
 account, in the admin under **Users**; that grant is the only thing that makes
 an administrator, and no provider can do it.
 
-**Flush the sessions on the release that first brings sign-in in.** The second
-factor is required of sessions allauth itself created — see `RequireSecondFactor`
+**Flush the sessions on the release that first brings sign-in in.** This
+applies where the second factor is required; it is required of sessions
+allauth itself created — see `RequireSecondFactor`
 in `backend/src/inventory/middleware.py` — so anybody already signed in through
 the Django admin's old login form keeps a password-only session for as long as
 it lives.
@@ -706,6 +707,43 @@ kubectl -n inventory-tng exec -it deploy/inventory-tng-backend -- \
 
 Once, against the deployed database. Everybody signs in again, this time
 through the door that asks for a code.
+
+### Choosing whether to require a second factor
+
+`django.requireSecondFactor` decides whether an account that signed in with a
+password must set up an authenticator before it can do anything. It defaults to
+`true` and there is no environment where you are prevented from setting it to
+`false` — no loopback check, no refusal to start, nothing that treats one
+answer as a mistake. Two example files carry the two answers with the reasoning
+attached: [`examples/`](../infra/helm/inventory-tng/examples/README.md).
+
+**Turning it off is a supported configuration** rather than a hole somebody
+found. The argument for that, which is an argument about adoption and not about
+the risk being small, is the amendment on
+[decision 0013](decisions/0013-administrator-sign-in.md#amendment-2026-08-30--the-requirement-is-a-default-not-a-rule).
+Read it before deciding either way; what follows is only what the choice does.
+
+**Off does not mean gone**, which is the part worth knowing before you decide:
+
+- Enrolment stays available, so a volunteer who wants a second factor may set
+  one up on a deployment that does not ask for one.
+- It is still honoured at sign-in for anybody who has one.
+- Turning it on later is a values change and a `helm upgrade`. Not a migration,
+  not a different image, and nobody who already enrolled has to do anything.
+
+So the useful sequence is off while people are being brought in and on once
+they are, rather than a decision made once at install time.
+
+**The deployment says which it is, every start.** With the requirement off, the
+backend prints a line on standard error naming the setting — visible in
+`kubectl logs` alongside the startup output. There is no equivalent line when
+it is on, because a process that announces its ordinary configuration teaches
+you to skip its first lines.
+
+What it does *not* change: administrative writes still ask for a recent
+sign-in. That is a different control answering a different threat —
+[decision 0014](decisions/0014-one-interface.md) point 5 — and it works whether
+or not anybody has a second factor.
 
 ## Deploying to CodeNOW
 

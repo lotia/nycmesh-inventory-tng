@@ -257,19 +257,29 @@ populations are told apart by what they may do and not by a credential, and
 [what is not built yet](docs/architecture.md#not-yet-built) is where the
 distance between that and today is recorded.
 
-The first sign-in of a new account stops and asks it to set up an authenticator
-app before it can reach anything, because
-[decision 0013](docs/decisions/0013-administrator-sign-in.md) requires a second
-factor of a local password. There is no way past that and no setting that turns
-it off, so have a phone or any other TOTP application ready before you start.
-Which providers a deployment offers besides that one is configuration; the
+**A local checkout does not ask for a second factor**, and that is a choice
+this repository made rather than the code's own default.
+`REQUIRE_SECOND_FACTOR` is `false` in both `.env.sample` and `compose.yaml`, so
+a password is the whole of signing in here; a deployment that configures
+nothing gets the opposite. It is an operator's decision in every environment,
+and the argument is the amendment on
+[decision 0013](docs/decisions/0013-administrator-sign-in.md#amendment-2026-08-30--the-requirement-is-a-default-not-a-rule).
+
+Turn it on in your `.env` when you are working on the sign-in flow itself —
+enrolment, the TOTP challenge, the reauthentication prompt — because with it
+off none of those is on the path anybody walks. Then the first sign-in of a new
+account stops and asks for an authenticator app before it reaches anything, so
+have a phone or any other TOTP application ready.
+
+Which providers a deployment offers besides the local one is configuration; the
 variables are in [deployment](docs/deployment.md#environment-variables).
 
 **Enrol once, not once per database.** Wiping the database is an ordinary thing
-to do while developing, and it takes the account and its authenticator with it.
-Rather than enrolling again each time, use the login the integration suite's
-seed makes — the command is in [Common tasks](#common-tasks), and what its
-acknowledgement flag is for is [Integration tests](#integration-tests).
+to do while developing, and with the requirement on it takes the account and
+its authenticator with it. Rather than enrolling again each time, use the login
+the integration suite's seed makes — the command is in
+[Common tasks](#common-tasks), and what its acknowledgement flag is for is
+[Integration tests](#integration-tests).
 
 The part worth knowing here is that **its TOTP secret is fixed rather than
 generated**. Scan it into a phone once and the same codes keep working after

@@ -140,6 +140,13 @@ services:
       # computes the origin the browser claims and needs nothing admitted on
       # top. .env.sample says what would fill it.
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
+      # OFF here, which is the opposite of the code default, and set rather
+      # than left out so that the intended value is in a file. Somebody who
+      # has just cloned this gets a sign-in that asks for a password and
+      # nothing else; enrolling a second factor is still offered and still
+      # honoured if they do. .env.sample says what the choice means and
+      # backend/src/inventory_tng/second_factor.py argues it.
+      REQUIRE_SECOND_FACTOR: ${REQUIRE_SECOND_FACTOR:-false}
       # One proxy in this stack -- nginx in the frontend container -- where a
       # deployed environment has two. See .env.sample.
       NUM_PROXIES: ${NUM_PROXIES:-1}
