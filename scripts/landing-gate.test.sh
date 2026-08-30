@@ -220,6 +220,28 @@ case_is "(gh pr merge 7 --rebase)"               "No review cycle" "a subshell i
 case_is "{ gh pr merge 7 --rebase; }"            "No review cycle" "so is a brace group"
 case_is "if true; then gh pr merge 7; fi"        "No review cycle" "so is the body of an if"
 case_is "git -C /tmp/repo push --force origin batch/x" "bare --force" "git -C, whose flag takes a separate value"
+
+echo
+echo "and the one that actually got a merge through -- inventory-tng-mno6"
+# A WRAPPER TAKING A POSITIONAL ARGUMENT, which the options-only pattern could
+# not skip. This is the spelling that merged pull request 48 with no receipt;
+# WRAP in landing-gate.sh says why it was the ordinary spelling rather than an
+# exotic one.
+case_is "timeout 180 gh pr merge 7 --rebase"     "No review cycle" "timeout, whose duration is a bare word"
+case_is "timeout 2m gh pr merge 7"               "No review cycle" "and a duration carrying a unit"
+case_is "timeout -k 10 180 gh pr merge 7"        "No review cycle" "and one carrying two, after a flag"
+case_is "env timeout 180 gh pr merge 7"          "No review cycle" "and behind a second wrapper"
+case_is "timeout 60 git push --force origin batch/x" "bare --force" "the push guard sees through it too"
+# And the other direction, because a matcher that refuses everything guards
+# nothing either: the words have to be in command position, not merely present.
+case_is "echo timeout 180 gh pr merge 7"         PERMIT "naming the command in an echo is not running it"
+# THE SIBLING HOLE, found by asking the same question of the rest of the list
+# rather than stopping at the one that had been used. A flag carrying its value
+# as a separate word breaks the options pattern exactly as a positional
+# duration did.
+case_is "nice -n 5 timeout 60 gh pr merge 7"     "No review cycle" "a flag whose value is a separate word"
+case_is "xargs -n 1 gh pr merge 7"               "No review cycle" "and the same shape on xargs"
+case_is "stdbuf -o 0 gh pr merge 7"              "No review cycle" "and on stdbuf"
 case_is "git -c user.name=x push --force"        "bare --force" "and git -c, which does the same"
 case_is 'gh api -X PUT "repos/o/r/pulls/7/merge"' "No review cycle" "a REST merge whose URL is quoted"
 # The other side of that fix, and it bit within the hour of being written:
@@ -319,6 +341,7 @@ refute "$(cat "$RECEIPTS")" 0 0 '"stages"' "and stores no hardcoded stage list"
 pr_json marker marker
 out=$(record); status=$?
 assert "$out" "$status" 0 "Merging is unblocked" "a marker comment is evidence for code-review too"
+
 
 GH_FAILS=1
 out=$(record); status=$?
