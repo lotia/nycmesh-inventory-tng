@@ -15,6 +15,7 @@ import io
 import json
 import os
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -136,6 +137,44 @@ def filled_with(data: bytes) -> int:
     return reading_end
 
 
+def filled_and_then_quiet(data: bytes) -> int:
+    """A pipe holding `data`, whose writer goes QUIET before it closes.
+
+    THE ONLY ARRANGEMENT IN WHICH `waiting` CAN SAY NO, and the reason this
+    exists apart from `filled_with`. `select` reports a descriptor at end of
+    file as READABLE -- that is how a reader is told to go and collect the
+    zero-length read -- so on a pipe whose writer has closed, `shipping.waiting`
+    returns True for ever and the quiet path in `reading` is never reached.
+
+    That is inventory-tng-tpe8.1. The burst test below is entirely about that
+    path, and with a closed writer it passed whatever `reading` did: its one
+    batch came from the flush at the end of iteration rather than from a
+    boundary. Restoring the original defect left the module green, 32 of 32.
+
+    So the writer stays open, idle, for longer than `shipping.QUIET`. A reader
+    that has drained the pipe now genuinely finds nothing, which is the
+    question the test means to ask.
+
+    It costs a fifth of a second. That is what asking a timeout-based question
+    honestly costs, and the alternative is an assertion that cannot fail.
+    """
+    reading_end, writing_end = os.pipe()
+
+    def fill_and_wait() -> None:
+        try:
+            os.write(writing_end, data)
+            # Long enough that the reader's `select` expires while the writer
+            # is still open, and not so long that the suite notices.
+            time.sleep(shipping.QUIET * 2)
+        except BrokenPipeError:  # the reader stopped early
+            pass
+        finally:
+            os.close(writing_end)
+
+    threading.Thread(target=fill_and_wait, daemon=True).start()
+    return reading_end
+
+
 def a_stream(text: str) -> Any:
     """Something `main` can read as standard input, buffer and all.
 
@@ -241,7 +280,7 @@ def test_a_burst_arriving_in_one_write_is_one_post_rather_than_sixty() -> None:
     """
     burst = "".join(f"{json.dumps(A_RECORD)}\n" for _ in range(60)).encode()
 
-    with os.fdopen(filled_with(burst), "rb") as stream:
+    with os.fdopen(filled_and_then_quiet(burst), "rb") as stream:
         lines = list(shipping.reading(stream, shipping.waiting))
 
     assert [len(batch) for batch in shipped(lines)] == [60]
