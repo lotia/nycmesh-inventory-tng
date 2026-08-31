@@ -1255,7 +1255,29 @@ bd close <id>            # done (see Definition of Done first)
 ```
 
 You do not have to use beads to contribute. GitHub issues and pull requests work
-fine — see [CONTRIBUTING.md](CONTRIBUTING.md).
+fine — see [CONTRIBUTING.md](CONTRIBUTING.md). An issue you open there is meant
+to reach the tracker rather than sit beside it:
+
+```bash
+scripts/pull-new-issues.sh --dry-run   # which issues no bead points at yet
+scripts/pull-new-issues.sh             # bring them in
+```
+
+`bd` syncs what it already knows about and enumerates nothing, so without this
+an issue filed by somebody who has never run `bd` is invisible to it. The script
+asks GitHub what exists, compares each issue's URL against the links already
+recorded in `.beads/issues.jsonl`, and pulls the difference. It reads the
+committed export rather than the local database, so it gives the same answer in
+a fresh clone and in CI.
+
+It needs `gh` authenticated and a `GITHUB_TOKEN`; without them it says so and
+stops rather than reporting that there was nothing to do. Being unable to run it
+does not break anything — the tracker is not made wrong by an unsynced issue,
+only incomplete.
+
+**Every bead you write is published.** See
+[0029](docs/decisions/0029-the-issue-tracker-is-public.md) for what that means
+and the four things that must never go in one.
 
 ---
 
