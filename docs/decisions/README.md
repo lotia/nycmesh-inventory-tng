@@ -38,3 +38,4 @@ to ask "why is it like this?". Number them sequentially.
 | [0026](0026-what-makes-two-strings-one-identifier.md) | What makes two strings one identifier, and what decides it |
 | [0027](0027-the-admin-is-meant-to-look-different.md) | The admin is meant to look different, and that is not an omission |
 | [0028](0028-a-certificate-a-phone-will-trust.md) | A certificate a phone will trust, made locally, so the camera can be worked on |
+| [0029](0029-the-issue-tracker-is-public.md) | The issue tracker is public, on purpose, and what may never go in a bead |

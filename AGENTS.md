@@ -89,6 +89,13 @@ checklists. Session hooks already inject the full beads command reference and
 stored memories at session start, so that reference is deliberately not repeated
 here; run `bd prime` if you need it and it is missing.
 
+**Every bead you write is published.** `.beads/issues.jsonl` is committed and
+this repository is public, so a bead is readable by anybody the moment it is
+pushed, and it stays in the history. That is deliberate —
+[0029](docs/decisions/0029-the-issue-tracker-is-public.md) — and it names the
+four things that must never go in one. Read it before filing anything that
+touches a person, a credential, or a weakness nothing has fixed yet.
+
 ## Git
 
 Work reaches `main` the way [Pull requests](DEVELOPERS.md#pull-requests)
