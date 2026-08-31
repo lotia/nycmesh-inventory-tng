@@ -118,7 +118,12 @@ jobs:
         run: |
           bd export -o .beads/issues.jsonl
           cp .beads/issues.jsonl "$RUNNER_TEMP/synced.jsonl"
-          git checkout -- .
+          # `git reset --hard`, and NOT `git checkout -- .`, which was the
+          # first attempt and did nothing. bd STAGES what it rewrites, and a
+          # working-tree checkout takes its content from the index -- so it
+          # restored the staged copies faithfully and left them staged. Eight
+          # files reached the next commit. `inventory-tng-y466`.
+          git reset --hard HEAD
           git clean -fd
           cp "$RUNNER_TEMP/synced.jsonl" .beads/issues.jsonl
           # bd set this; a fresh checkout has none, and CI has never run hooks.
