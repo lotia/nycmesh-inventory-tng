@@ -1720,8 +1720,12 @@ both refused, and a branch called `batch/main-fix` is not.
 
 `record` stores what it found on the pull request — the review submissions and
 the marker comments from [One review pass](#one-review-pass-findings-filed-per-issue),
-by id, author and timestamp — and refuses to write a receipt for a stage with
-nothing behind it:
+by id, author and timestamp. It stores that much whether or not it is
+everything, and **a receipt is not a permission**: one missing a stage refuses
+the merge exactly as no receipt would. What it buys is a truthful nudge, since
+the stop hook reads the receipt rather than the pull request and would
+otherwise go on naming a pass that had already run. Finding nothing at all
+still writes nothing.
 
 ```bash
 scripts/landing-gate.sh record <pr>     # as its own command; see below

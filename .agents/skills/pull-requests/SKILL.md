@@ -144,7 +144,8 @@ and none of it is yours to weigh.
 
 Two things about that `record` line, because both are easy to get wrong. It
 records the head it saw **and the evidence it found**, so it refuses outright
-when the pull request carries nothing for a stage.
+when the pull request carries nothing for a stage, while still keeping what it
+did find.
 And anything pushed afterwards moves the head, so the merge is refused until
 you record again: when a late fix means another `fixup!`, the way back in is
 the whole block above, from the rebase down.

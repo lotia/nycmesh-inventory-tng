@@ -254,6 +254,7 @@ case_is "gh pr merge 7 --repo other/repo"        "names another repository" "ano
 case_is "gh pr merge 7 -R other/repo"            "names another repository" "and the short spelling of that flag"
 
 echo
+echo
 echo "every dependency that goes missing refuses rather than permits"
 case_is "gh pr merge 7" "missing: python3" "no python3 refuses a merge" "" "$(without python3)"
 case_is "ls -la" PERMIT "no python3 still permits what the gate does not guard" "" "$(without python3)"
@@ -350,6 +351,66 @@ assert "$out" "$status" 1 "simplify pass ran" "a review pass alone is not the wh
 refute "$out" "$status" 1 "code-review pass ran" "and the stage that did run is not complained about"
 assert "$out" "$status" 1 "review-cycle: simplify" \
   "a missing simplify pass does still name the marker, which is how it is evidenced"
+
+# HALF A CYCLE IS STILL WORTH WRITING DOWN -- inventory-tng-gfkr. It used to
+# exit before the write, so nothing on disk knew the review had happened, and
+# the Stop hook -- which reads the receipt and never the pull request -- went
+# on naming every stage. `record_receipt` carries the argument; what is pinned
+# here is that the write happens at all.
+assert "$(cat "$RECEIPTS")" 0 0 "R_1" \
+  "the stage that did run is kept, so the stop hook can tell what is outstanding"
+refute "$out" "$status" 1 "Merging is unblocked" \
+  "and keeping it is not the same as recording the cycle"
+assert "$out" "$status" 1 "does not unblock the merge" "which the refusal still says in as many words"
+assert "$out" "$status" 1 "Kept what was found" "and says that something was kept, which is the new half"
+
+# THE HALF THAT MUST NOT MOVE. A partial receipt is a truthful nudge and never
+# a licence: the merge guard reads the same file and is all or nothing.
+case_is "gh pr merge 7 --rebase" "No review cycle" \
+  "a half-written receipt does not unblock the merge"
+
+# AND `status` MUST NOT READ IT AS WHOLE, which is the shape it got wrong for
+# most of the receipts on a real machine. The reader carries why.
+out=$(in_repo "" "" status); status=$?
+assert "$out" "$status" 0 "nothing found" "status names the stage that has nothing behind it"
+assert "$out" "$status" 0 "review by someone" "and still names the evidence it does have"
+
+# THE SHAPES A RECEIPTS FILE CAN TAKE WITHOUT RAISING, which the `status` arm
+# argues about. Both used to reach `.items()` on something that has none.
+printf '[]' >"$RECEIPTS"
+out=$(in_repo "" "" status); status=$?
+assert "$out" "$status" 0 "No receipts" "a receipts file that is a list is read as empty, not a traceback"
+refute "$out" "$status" 0 "Traceback" "and nothing is raised at the person asking"
+
+printf '{"7": "corrupted"}' >"$RECEIPTS"
+out=$(in_repo "" "" status); status=$?
+assert "$out" "$status" 0 "nothing found" "a receipt that is not an object is reported as holding nothing"
+refute "$out" "$status" 0 "Traceback" "rather than raised at them"
+
+# THE ONE ANSWER THIS MUST NEVER GIVE BY ACCIDENT: an empty stage list, which
+# means nothing is missing. `receipt_status` carries what that costs.
+echo "an empty stage list refuses rather than reporting a clean cycle"
+# A COPY WITH THE CONSTANT EMPTIED, not an environment variable. The gate
+# assigns STAGES unconditionally at the top -- deliberately, so nothing
+# inherited can steer it -- which also means an inherited value proves nothing
+# and a test written that way passes whatever the reader does. What is being
+# tested is the editing mistake, so the edit is what the test makes.
+BROKEN="$WORK/broken-gate.sh"
+sed "s/^STAGES='code-review simplify'$/STAGES=''/" "$GATE" >"$BROKEN"
+chmod +x "$BROKEN"
+grep -q "^STAGES=''$" "$BROKEN" \
+  || fail_case "the fixture did not empty STAGES, so the case below proves nothing"
+# A receipts file has to exist or `status` leaves before reading one, and the
+# case would then pass on the early exit without reaching the guard at all.
+printf '{}' >"$RECEIPTS"
+out=$( (cd "$REPO" && env PATH="$(full_path)" GH_FIXTURES="$FIX" \
+  CLAUDE_PROJECT_DIR="$REPO" "$BROKEN" status) 2>&1 ); status=$?
+# Non-zero as well as the message, and the two are a pair rather than belt and
+# braces: `status` ended in a flat `exit 0`, so the reader could die, print its
+# complaint, and still report success. This case is what noticed.
+assert "$out" "$status" 1 "STAGES is empty" "an emptied stage list says so and exits non-zero"
+refute "$out" "$status" 1 "nothing found" "rather than reporting on no stages at all"
+rm -f "$RECEIPTS"
 
 pr_json review marker
 out=$(record); status=$?
@@ -690,6 +751,22 @@ assert "$STOP_OUT" "$STOP_STATUS" 0 "ask a person to run: /code-review 7 --comme
   "with only the review pass outstanding, that is what the refusal asks for"
 refute "$STOP_OUT" "$STOP_STATUS" 0 "yours to run" \
   "and it does not ask again for the pass that has already run"
+forget_nudges
+
+# BOTH AT ONCE, which inventory-tng-gfkr made reachable: a partial receipt is
+# now written, so it can also be left behind by a push. Reporting one of the
+# two would send somebody to do half the work and stop -- run the missing pass
+# and never record, or record and never run it.
+receipt_for cccccccccccccccccccccccccccccccccccccccc simplify
+stopped
+# Whole lines on both, because the stale label is padded to `missing_block`'"'"'s
+# column by hand and they are adjacent for the first time -- so a change to
+# that column would show as a ragged block in the one message this issue
+# exists to make readable, and nothing would catch it.
+assert "$STOP_OUT" "$STOP_STATUS" 0 "  stale:   the cycle was recorded against an earlier head; record it again" \
+  "a stale partial receipt says the head moved"
+assert "$STOP_OUT" "$STOP_STATUS" 0 "  missing: code-review  ask a person to run: /code-review 7 --comment" \
+  "and still names the stage that has nothing behind it, lined up under it"
 rm -f "$RECEIPTS"
 forget_nudges
 

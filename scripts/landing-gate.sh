@@ -50,6 +50,18 @@ RECEIPTS="$REPO_ROOT/.claude/.review-receipts.json"
 MARK_REVIEW='<!-- review-cycle: code-review -->'
 MARK_SIMPLIFY='<!-- review-cycle: simplify -->'
 
+# THE STAGES A CYCLE HAS, for the two readers that ask a receipt which of them
+# it is short of. They have to agree: `receipt_status` decides what is missing
+# and `status` prints it, so a stage one of them knows about and the other does
+# not is a receipt reported complete and refused, or the reverse.
+#
+# Only those two. `record_receipt` maps each stage to a different expression
+# for what counts as its evidence, and `missing_block` to different advice, so
+# neither is a list of names with the same thing done to each -- and a table
+# that spanned all four would be more machinery than two stable values are
+# worth. This is the pair, not a registry.
+STAGES='code-review simplify'
+
 # Where the cycle is written down, rather than the cycle.
 #
 # This held its own copy of all five steps until the review of PR #30 pointed
@@ -258,8 +270,9 @@ pr_current() { gh_json pr view --json number --jq .number; }
 #
 # What it stores now is what it FOUND: the marker comments and the review
 # submissions that are on the pull request, by id, author and timestamp, so the
-# receipt points at artifacts anybody can go and read. It refuses to write one
-# at all when a stage has nothing behind it.
+# receipt points at artifacts anybody can go and read. Since inventory-tng-gfkr
+# a short cycle is written down too rather than dropped; the write below says
+# why, and DEVELOPERS.md "When a branch is ready to merge" says what it means.
 #
 # This is still a guardrail. Somebody determined to merge unreviewed work can
 # post an empty comment carrying the marker, and the gate will believe it. What
@@ -320,6 +333,11 @@ if not head:
 # The failure direction is the safe one, and the way out is to post the
 # findings comment again -- which is cheap, and which a paginating reader would
 # be buying at the cost of a second API shape to keep working.
+#
+# Since inventory-tng-gfkr that refusal also WRITES, so a truncated page can
+# replace a complete receipt at the same head with a partial one. Still safe --
+# refused either way, and re-running against an untruncated page restores it --
+# but the sentence above used to imply the file was left alone, and it is not.
 comments = payload.get("comments") or []
 reviews = payload.get("reviews") or []
 
@@ -433,10 +451,26 @@ if missing:
         print("", file=sys.stderr)
     print(
         "The receipt records what it finds, so a stage with nothing behind it\n"
-        "cannot be recorded. See DEVELOPERS.md \"Pull requests\".",
+        "does not unblock the merge. See DEVELOPERS.md \"Pull requests\".",
         file=sys.stderr,
     )
-    sys.exit(1)
+
+    # WHAT IT FOUND IS WORTH KEEPING EVEN WHEN IT IS NOT ENOUGH, so this used
+    # to exit here and no longer does. A half-run cycle left NOTHING on disk,
+    # and DEVELOPERS.md "When a branch is ready to merge" says what the Stop
+    # hook then went on doing about it. inventory-tng-gfkr.
+    #
+    # NO APOSTROPHES IN HERE -- `marked()` above says why.
+    #
+    # A partial receipt still cannot unblock a merge: the `merge` arm below is
+    # all or nothing, and argues it there.
+    #
+    # NOTHING FOUND STILL WRITES NOTHING. A receipt with a head and no evidence
+    # is the shape that arm calls unreadable, and putting one on disk to say
+    # "I looked and saw nothing" would be writing garbage to record an absence
+    # the missing file already records.
+    if not any(evidence.values()):
+        sys.exit(1)
 
 path = os.environ["RECEIPTS"]
 try:
@@ -452,9 +486,23 @@ with open(path, "w") as fh:
     json.dump(receipts, fh, indent=2, sort_keys=True)
     fh.write("\n")
 
+# THE TALLY GOES WHERE THE REST OF THIS MESSAGE WENT. It used to be stdout
+# unconditionally, which put it on the far side of a buffer from the refusal
+# above -- so when a caller captured both, the rows arrived AFTER the sentence
+# that introduces them and read as though they belonged to nothing.
+out = sys.stderr if missing else sys.stdout
 for stage, found in sorted(evidence.items()):
-    print("  %-12s %d on the pull request" % (stage, len(found)))
-print()
+    print("  %-12s %d on the pull request" % (stage, len(found)), file=out)
+print(file=out)
+
+# The verdict, and only when there is a good one to give. The refusal above has
+# already said the merge is blocked and why; what it could not say, before the
+# write moved, is that anything was kept.
+if missing:
+    print("Kept what was found at %s, so the stop hook can say what is outstanding."
+          % head, file=sys.stderr)
+    sys.exit(1)
+
 print("Recorded the review cycle for pull request %s at %s. Merging is unblocked."
       % (os.environ["PR"], head))
 ' <<<"$payload" || return 1
@@ -475,8 +523,8 @@ print("Recorded the review cycle for pull request %s at %s. Merging is unblocked
 # put the missing-stage list into the head and told the merge guard the branch
 # had moved. A non-whitespace separator preserves the empty field.
 receipt_status() {
-  RECEIPTS="$RECEIPTS" PR="$1" python3 -c '
-import json, os
+  RECEIPTS="$RECEIPTS" PR="$1" STAGES="$STAGES" python3 -c '
+import json, os, sys
 try:
     with open(os.environ["RECEIPTS"]) as fh:
         receipts = json.load(fh)
@@ -490,7 +538,16 @@ if not isinstance(receipt, dict):
 evidence = receipt.get("evidence")
 if not isinstance(evidence, dict):
     evidence = {}
-missing = [stage for stage in ("code-review", "simplify") if not evidence.get(stage)]
+# AN EMPTY STAGE LIST WOULD MEAN "NOTHING IS MISSING", which is the one answer
+# this must never give by accident. The list used to be a literal here and
+# could not be empty; reading it from the environment made that possible, and
+# the merge guard treats an empty `missing` as a complete cycle -- so a
+# mistake in the constant would permit every merge in the repository, silently
+# and in the direction this file says a guard must never fail in.
+stages = os.environ["STAGES"].split()
+if not stages:
+    sys.exit("landing-gate: STAGES is empty, so which stages a cycle has is unknown.")
+missing = [stage for stage in stages if not evidence.get(stage)]
 print("%s|%s" % (receipt.get("head") or "", ",".join(missing)))
 '
 }
@@ -641,8 +698,15 @@ print(pr.get("number") or 0,
   [[ -n "$head" ]] || stop_open "gh did not say what the head of #$pr is"
 
   # The same question `check` asks before a merge, asked earlier.
-  local recorded_head missing
-  IFS="|" read -r recorded_head missing <<<"$(receipt_status "$pr")"
+  # The status is read, unlike before: the merge guard has always checked it
+  # and this had no reason to until `receipt_status` gained a way to refuse.
+  # Failing OPEN rather than blocking, which is this mode and not the merge
+  # guard -- `stop_open` above says why a session that cannot stop is worse
+  # than a stop that was not checked.
+  local recorded_head missing recorded
+  recorded=$(receipt_status "$pr") \
+    || stop_open "the recorded review cycle could not be read"
+  IFS="|" read -r recorded_head missing <<<"$recorded"
 
   [[ "$recorded_head" == "$head" && -z "$missing" ]] && exit 0
 
@@ -669,26 +733,30 @@ with open(path, "w") as fh:
     fh.write("\n")
 ' || exit 0
 
-  # AN EMPTY LIST HERE IS A DIFFERENT ANSWER, not a default to fill in.
+  # WHAT IS OUTSTANDING, AND IT CAN BE BOTH OF THESE AT ONCE.
   #
   # Reaching this point means the receipt did not satisfy the check, and there
-  # are two ways for that: a stage with nothing behind it, or every stage
-  # evidenced and the head moved since it was recorded -- which is the ordinary
-  # late fixup. The second is not somebody to fetch. It is `record` to run
-  # again, and inventory-tng-8nqo says the review already there still counts.
+  # are two ways for that, which are independent rather than alternatives: a
+  # stage with nothing behind it, and a head that has moved since the receipt
+  # was written -- the ordinary late fixup. Since inventory-tng-gfkr a receipt
+  # records what was seen even when that was not everything, so a branch can
+  # carry a partial receipt AND have been pushed over, and reporting one of the
+  # two sends somebody to do half the work and stop.
   #
-  # It used to fall back to naming both stages, which was merely vague. Once
-  # the stages carry an operator each it becomes wrong: it tells an agent to
-  # interrupt a person over a cycle that has already happened, which is the
+  # A stale head is not somebody to fetch: it is `record` to run again, and
+  # inventory-tng-8nqo says the review already there still counts. Naming a
+  # stage for it, which is what a fall back to both stages used to do, tells an
+  # agent to interrupt a person over a cycle that has already happened -- the
   # hand-off inventory-tng-d854 exists to stop rather than to manufacture.
-  local outstanding
-  if [[ -n "$missing" ]]; then
-    outstanding=$(missing_block "$pr" "$missing")
-  else
+  local outstanding=""
+  if [[ -n "$recorded_head" && "$recorded_head" != "$head" ]]; then
     outstanding="  stale:   the cycle was recorded against an earlier head; record it again"
   fi
+  [[ -n "$missing" ]] && outstanding+=${outstanding:+$'\n'}$(missing_block "$pr" "$missing")
 
-  stop_block "Pull request #$pr is ready and green, and its review cycle has not been recorded.
+  # "in full", because a partial receipt at this head IS a record, and this
+  # line used to tell the one person who had just made one that they had not.
+  stop_block "Pull request #$pr is ready and green, and its review cycle has not been recorded in full.
 
   branch:  $branch
 $outstanding
@@ -770,23 +838,54 @@ with open(path, "w") as fh:
       exit 0
     fi
     have python3 || { echo "landing-gate: python3 is needed to read the receipts." >&2; exit 1; }
-    RECEIPTS="$RECEIPTS" python3 -c '
-import json, os
+    RECEIPTS="$RECEIPTS" STAGES="$STAGES" python3 -c '
+import json, os, sys
 try:
     with open(os.environ["RECEIPTS"]) as fh:
         receipts = json.load(fh)
 except (OSError, ValueError):
     receipts = {}
+# THE SHAPES `receipt_status` ALREADY GUARDS, and for the same reason: valid
+# JSON that is not an object parses without raising, and this then called
+# .items() on a list. `clear` exists because this file can end up unparseable,
+# so the command somebody runs to find out what is on file was the one that
+# died on them instead of saying.
+if not isinstance(receipts, dict):
+    receipts = {}
+stages = os.environ["STAGES"].split()
+if not stages:
+    sys.exit("landing-gate: STAGES is empty, so which stages a cycle has is unknown.")
 if not receipts:
     print("No receipts. Merging is blocked.")
 for pr, receipt in sorted(receipts.items()):
+    if not isinstance(receipt, dict):
+        receipt = {}
     print("pr #%s  %s" % (pr, (receipt.get("head") or "")[0:12]))
-    for stage, found in sorted((receipt.get("evidence") or {}).items()):
+    # THE STAGES ARE ASKED FOR, not read off the receipt.
+    #
+    # Walking the evidence dict prints only stages the receipt happens to
+    # mention, so a stage with nothing behind it has no row and the entry reads
+    # as complete. Two shapes have that problem and only one is new: a receipt
+    # written since inventory-tng-gfkr may hold a stage with an empty list, and
+    # every receipt older than the evidence format has no evidence key at all.
+    # On this machine that second kind is most of the file.
+    #
+    # `receipt_status` decides missing-ness against this same pair, so asking
+    # for it here is what makes the two agree -- and it costs the special case
+    # rather than adding one.
+    for stage in stages:
+        found = (receipt.get("evidence") or {}).get(stage) or []
+        if not found:
+            print("    %-12s nothing found, so the merge stays refused" % stage)
         for item in found:
             print("    %-12s %s by %s at %s" % (
                 stage, item.get("kind"), item.get("author"), item.get("at")))
 '
-    exit 0
+    # The reader's status, not a flat success. `exit 0` here discarded it, so a
+    # reader that died printed its complaint and this still reported success --
+    # the shape the header of this file is about, in the one command whose
+    # whole job is telling somebody what is on file.
+    exit $?
     ;;
   check) ;;
   *)
