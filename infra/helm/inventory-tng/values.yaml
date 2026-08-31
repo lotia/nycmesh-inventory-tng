@@ -138,6 +138,10 @@ django:
   # on minting a device credential rather than the credential itself; see
   # docs/deployment.md.
   deviceEnrolmentRate: "10/hour"
+  # What a caller with no account may read. .env.sample carries the
+  # arithmetic; the short of it is that it slows the membership question and
+  # does nothing against copying the catalogue.
+  anonymousReadRate: 120/min
   # How long a sign-in counts as recent enough to make an administrative
   # change. Decision 0014 point 5 asks again inside a valid session; this is
   # how often. See docs/deployment.md.

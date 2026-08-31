@@ -18,20 +18,25 @@ from rest_framework.views import APIView
 from inventory.permissions import DEVICE_ENROLLED, presented_device
 
 
-class AppendThrottle(UserRateThrottle):
-    """A limit on appending, counted per client and never on a read.
+class CountingThrottle(UserRateThrottle):
+    """What every limit here shares, so a subclass says only what it counts.
 
-    Reads are exempt because the endpoint that takes a volunteer's name is also
-    the pick-list the client searches as somebody types, and a limit sized for
-    submissions would be exhausted by typing.
+    Two throttles now want the same bucket and opposite halves of the traffic
+    -- appends, and reads by somebody with no account -- and the bucket is the
+    interesting part. Stated once so that a third is one method rather than a
+    copy of ``get_ident`` and its whole argument.
 
     Derived from ``UserRateThrottle`` rather than ``AnonRateThrottle`` so the
     bucket is the client's address while nobody signs in and the account
     afterwards, instead of the limit vanishing the moment a session exists.
     """
 
+    def counts(self, request: Request) -> bool:
+        """Whether this request is one this limit is about."""
+        raise NotImplementedError
+
     def allow_request(self, request: Request, view: APIView) -> bool:
-        if request.method in SAFE_METHODS:
+        if not self.counts(request):
             return True
         return super().allow_request(request, view)
 
@@ -77,6 +82,19 @@ class AppendThrottle(UserRateThrottle):
         return str(super().get_ident(request))
 
 
+class AppendThrottle(CountingThrottle):
+    """A limit on appending, counted per client and never on a read.
+
+    Reads are exempt because the endpoint that takes a volunteer's name is also
+    the pick-list the client searches as somebody types, and a limit sized for
+    submissions would be exhausted by typing. What counts THOSE is
+    ``AnonymousReadThrottle`` below, which is this one's mirror image.
+    """
+
+    def counts(self, request: Request) -> bool:
+        return request.method not in SAFE_METHODS
+
+
 class AppendBurstThrottle(AppendThrottle):
     """Stops a loop. Scope name is the key in DEFAULT_THROTTLE_RATES."""
 
@@ -113,6 +131,47 @@ class ReportThrottle(AppendThrottle):
 
 
 REPORT_THROTTLES = [ReportThrottle]
+
+
+class AnonymousReadThrottle(CountingThrottle):
+    """A limit on reading, counted only against a caller with no account.
+
+    ``AppendThrottle``'s mirror image, and the pair is worth reading together:
+    that one exempts every safe method because the pick-list is queried as
+    somebody types, and this one counts nothing else.
+
+    WHAT IT IS FOR, because sizing it as though it were the defence against
+    copying the roster is the mistake `inventory-tng-81f7.1` was filed to
+    prevent. Against copying, a limit does almost nothing: `display_name` is
+    matched with `icontains`, so a single letter returns 54 of 86 names and six
+    searches sweep the lot. Measured, not supposed.
+
+    What it IS for is the membership question -- whether a given address
+    belongs to a volunteer, asked one request at a time. .env.sample states
+    both sides of that, because the person changing the number is reading
+    there rather than here.
+
+    ONLY A CALLER WITH NO ACCOUNT, so the number never has to be a compromise
+    between a stranger and an administrator working all day.
+
+    THE SIZE IS SET BY TYPING RATHER THAN BY THE ATTACK, which sounds
+    backwards and is not: neither pick-list debounces, for the reason
+    `ItemList.tsx` gives, so a keystroke is a request and one name is a dozen.
+    A limit tight enough to trouble the oracle refuses somebody mid-name, and
+    what it would buy against a roster sweep is nothing.
+    """
+
+    scope = "anonymous-read"
+
+    def counts(self, request: Request) -> bool:
+        if request.method not in SAFE_METHODS:
+            return False
+        return not (request.user and request.user.is_authenticated)
+
+
+# Named for the reason APPEND_THROTTLES is: so the endpoints carrying it are
+# provably carrying one posture rather than two spellings of it.
+ANONYMOUS_READ_THROTTLES = [AnonymousReadThrottle]
 
 
 class DeviceEnrolmentThrottle(UserRateThrottle):

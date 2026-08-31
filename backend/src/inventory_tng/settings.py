@@ -35,6 +35,9 @@ env = Env(
     # What constrains minting a device credential. `inventory_tng.devices`
     # says why that is where the guard is.
     DEVICE_ENROLMENT_RATE=(str, "10/hour"),
+    # What a caller with no account may read, in the shape of the limits
+    # above. `AnonymousReadThrottle` argues what it is and is not for.
+    ANONYMOUS_READ_RATE=(str, "120/min"),
     NUM_PROXIES=(int, 2),
     TRUSTED_PROXIES=(list, []),
     # What a signed debug-tracing token is worth. `inventory_tng.debugging`
@@ -532,6 +535,9 @@ REST_FRAMEWORK = {
         # A bucket of its own, so a room enrolling cannot spend what a
         # volunteer's batch needs. See DeviceEnrolmentThrottle.
         "device-enrolment": env("DEVICE_ENROLMENT_RATE"),
+        # What a caller with no account may read. See AnonymousReadThrottle,
+        # and .env.sample for how the number was arrived at.
+        "anonymous-read": env("ANONYMOUS_READ_RATE"),
     },
 }
 

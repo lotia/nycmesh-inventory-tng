@@ -167,6 +167,7 @@ services:
       APPEND_SUSTAINED_RATE: ${APPEND_SUSTAINED_RATE:-300/hour}
       CLIENT_REPORT_RATE: ${CLIENT_REPORT_RATE:-30/min}
       DEVICE_ENROLMENT_RATE: ${DEVICE_ENROLMENT_RATE:-10/hour}
+      ANONYMOUS_READ_RATE: ${ANONYMOUS_READ_RATE:-120/min}
       LABEL_BASE_URL: ${LABEL_BASE_URL:-https://inventory.nycmesh.net}
       DATABASE_URL: *database-url
       # How long a request waits on a database that is not answering. Here for
