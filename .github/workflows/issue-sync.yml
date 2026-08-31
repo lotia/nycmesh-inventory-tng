@@ -77,11 +77,21 @@ jobs:
 
       # The Dolt database is gitignored, so a runner has none. The committed
       # export is the whole of what is shared, and importing it is how a fresh
-      # clone gets a tracker at all -- checked locally against this repository's
-      # own export before this job was written.
+      # workspace gets a tracker at all.
+      #
+      # THE CONFIG IS MOVED ASIDE FIRST, and without that this does not run.
+      # .beads/config.yaml is committed and names a sync remote over SSH, so
+      # `bd init` does not initialise a local database -- it tries to CLONE
+      # that remote, and a runner has no key. `inventory-tng-65ij`.
+      #
+      # A runner needs nothing the file holds: the prefix is given below,
+      # export.auto means nothing to a job that exports explicitly, and the
+      # remote is for a developer's machine pushing Dolt history. Nothing
+      # commits it either -- the step that commits names issues.jsonl alone.
       - name: Build a tracker from the committed export
         run: |
-          bd init --prefix inventory-tng
+          mv .beads/config.yaml /tmp/beads-config.yaml
+          bd init --prefix inventory-tng --non-interactive
           bd import .beads/issues.jsonl
 
       - name: Bring in issues no bead points at
