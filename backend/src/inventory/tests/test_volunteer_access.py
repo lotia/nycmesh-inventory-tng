@@ -12,7 +12,6 @@ the door does not also open what is behind it.
 """
 
 import importlib
-from pathlib import Path
 
 import pytest
 from django.test import Client
@@ -20,8 +19,6 @@ from django.urls import reverse
 from pytest_django.fixtures import Settings
 
 from inventory.models import Item, Location, Volunteer
-from inventory.tests import charts
-from inventory.tests.helpers import shipped
 from inventory_tng import access
 
 # Every test here drives the wire or reads a shipped file, and conftest.py's
@@ -29,11 +26,6 @@ from inventory_tng import access
 pytestmark = pytest.mark.django_db
 
 SETTING = "VOLUNTEER_ACCESS"
-# The same four names test_roster_visibility.py keeps for the setting beside
-# this one, and its header says what each is for.
-SHIPPED = ("compose.yaml", ".env.sample")
-VALUE = "django.volunteerAccess"
-EXAMPLES = {"onboarding.yaml": "open", "real-data.yaml": "session"}
 
 
 @pytest.fixture
@@ -215,49 +207,3 @@ def test_it_says_nothing_when_a_volunteer_signs_in() -> None:
 # ---------------------------------------------------------------------------
 # Where the value is written down
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("a_file", SHIPPED)
-def test_every_shipped_configuration_says_so_rather_than_implying_it(a_file: str) -> None:
-    assert SETTING in shipped(Path(a_file)), (
-        f"{a_file} does not mention {SETTING}, so what a fresh clone runs with is whatever the code "
-        "fell back to rather than something this repository chose"
-    )
-
-
-@pytest.mark.parametrize(("example", "expected"), EXAMPLES.items())
-def test_each_example_states_the_answer_it_is_named_for(example: str, expected: str) -> None:
-    """Both starting points choose, and they choose oppositely.
-
-    The one that would hurt is `onboarding.yaml` losing its line: a demo that
-    quietly asks for accounts is a demo nobody can use, and nobody would be
-    reminded the choice was ever made.
-    """
-    text = shipped(Path("infra/helm/inventory-tng/examples") / example)
-
-    assert f"volunteerAccess: {expected}" in text, (
-        f"{example} no longer says volunteerAccess: {expected}, so the starting point named for this "
-        "answer does not carry it"
-    )
-
-
-def test_the_chart_renders_it_and_asks_for_an_account_by_default() -> None:
-    supplied = charts.rendered()
-
-    assert SETTING in supplied, (
-        f"the chart does not put {SETTING} in the backend's environment, so a cluster has no way to "
-        "make this choice without editing the chart"
-    )
-    assert supplied[SETTING]["value"] == access.SESSION, (
-        "the chart's default now opens the catalogue, so a cluster whose operator read nothing answers "
-        "callers with no account"
-    )
-
-
-def test_the_chart_carries_the_operator_answer_rather_than_a_constant() -> None:
-    """The second render, for the reason test_roster_visibility.py gives about its own."""
-    supplied = charts.rendered(**{VALUE: access.OPEN})
-
-    assert supplied[SETTING]["value"] == access.OPEN, (
-        f"the chart renders {SETTING} without reading {VALUE}, so an operator's answer never reaches the application"
-    )

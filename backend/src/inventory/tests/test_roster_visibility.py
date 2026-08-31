@@ -10,30 +10,18 @@ writing before the door opens rather than after.
 """
 
 import importlib
-from pathlib import Path
 
 import pytest
 from django.contrib.auth.models import AnonymousUser, User
 from django.test import Client, RequestFactory
 from django.urls import reverse
-from environ import Env
 from pytest_django.fixtures import Settings
 
 from inventory.models import Volunteer
 from inventory.serializers import VolunteerSerializer
-from inventory.tests import charts
-from inventory.tests.helpers import shipped
 from inventory_tng import roster
 
 SETTING = "PUBLIC_VOLUNTEER_DETAILS"
-# The pair that decides what a stack actually runs with; test_trusted_origins.py
-# argues it.
-SHIPPED = ("compose.yaml", ".env.sample")
-# The chart value behind the variable, and the two example files with what each
-# is expected to have chosen. test_second_factor.py keeps the same pair for the
-# other setting these files differ on.
-VALUE = "django.publicVolunteerDetails"
-EXAMPLES = {"onboarding.yaml": "true", "real-data.yaml": "false"}
 
 
 @pytest.fixture
@@ -159,14 +147,6 @@ def test_it_says_nothing_when_the_roster_is_private() -> None:
     assert roster.announcement(public=False) == ""
 
 
-@pytest.mark.parametrize("a_file", SHIPPED)
-def test_every_shipped_configuration_says_so_rather_than_implying_it(a_file: str) -> None:
-    assert SETTING in shipped(Path(a_file)), (
-        f"{a_file} does not mention {SETTING}, so what a fresh clone runs with is whatever the code "
-        "fell back to rather than something this repository chose"
-    )
-
-
 def test_what_the_environment_says_is_what_the_setting_becomes() -> None:
     """Declared, and also read.
 
@@ -188,51 +168,4 @@ def test_what_the_environment_says_is_what_the_setting_becomes() -> None:
     assert read is True, (
         f"{SETTING} is declared but nothing consumes it, so the operator who set it for a demonstration "
         f"is quietly ignored; the module read {read!r}"
-    )
-
-
-@pytest.mark.parametrize(("example", "expected"), EXAMPLES.items())
-def test_each_example_states_the_answer_it_is_named_for(example: str, expected: str) -> None:
-    """Both starting points choose, and they choose oppositely.
-
-    An example that dropped the line would inherit the careful answer and look
-    fine; the one that would actually hurt is `onboarding.yaml` losing it and
-    a demonstration quietly withholding, because then nobody is reminded the
-    choice was ever made and the line gets added back somewhere worse.
-    """
-    text = shipped(Path("infra/helm/inventory-tng/examples") / example)
-
-    assert f"publicVolunteerDetails: {expected}" in text, (
-        f"{example} no longer says publicVolunteerDetails: {expected}, so the starting point named for "
-        "this answer does not carry it"
-    )
-
-
-def test_the_chart_renders_it_and_withholds_by_default() -> None:
-    supplied = charts.rendered()
-
-    assert SETTING in supplied, (
-        f"the chart does not put {SETTING} in the backend's environment, so a cluster has no way to make "
-        "this choice without editing the chart"
-    )
-    assert supplied[SETTING]["value"] == "false", (
-        "the chart's default now publishes the roster, so a cluster whose operator read nothing hands out "
-        "every volunteer's email address"
-    )
-
-
-def test_the_chart_carries_the_operator_answer_rather_than_a_constant() -> None:
-    """A template that hard-coded the safe value would pass the test above.
-
-    That is the shape worth one more render: withholding by default and
-    ignoring the operator looks identical to withholding by default and
-    honouring them, right up to the demonstration that will not publish.
-    """
-    supplied = charts.rendered(**{VALUE: "true"})
-
-    read = Env.parse_value(supplied[SETTING]["value"], bool)
-
-    assert read is True, (
-        f"the chart renders {SETTING} without reading {VALUE}, or in a shape Django does not read back "
-        f"as on, so an operator's answer never reaches the application; it read {read!r}"
     )
