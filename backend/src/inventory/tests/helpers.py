@@ -25,6 +25,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import Client
 from django.urls import reverse
+from rest_framework.views import APIView
 
 from inventory_tng import redaction
 
@@ -307,6 +308,42 @@ def routes() -> list[Route]:
             )
         )
     return found
+
+
+def drf_routes() -> list[tuple[Route, type[APIView]]]:
+    """The routes whose view is DRF's, which is what most of the audits want.
+
+    ONE PLACE, for the same reason `routes` is one place. Four consumers spelt
+    ``view is None or not issubclass(view, APIView)`` for themselves, in three
+    spellings, and one of the three inverted it inside a comprehension --
+    ``inventory-tng-r05r.2``. That is `s047`'s defect one level down: the walk
+    stopped six callers disagreeing about what a route is, and then they went
+    on to disagree about what a DRF route is.
+
+    An audit that must ACT on the non-DRF case rather than skip it still wants
+    `routes` and a branch of its own. Only the ones meaning "DRF views, and
+    the rest are somebody else's" belong here.
+
+    THE VIEW COMES BACK BESIDE THE ROUTE rather than on it, which is the one
+    thing here that is about the type checker: `Route.view` is `type | None`
+    because a router-mounted ViewSet has neither spelling, and nothing can
+    narrow a dataclass field for a caller. Returning the pair says "not None,
+    and DRF's" in the signature, so no consumer re-asserts it -- and every
+    consumer wanted the view anyway.
+    """
+    return [(route, route.view) for route in routes() if route.view is not None and issubclass(route.view, APIView)]
+
+
+def offered(view: type[APIView]) -> list[str]:
+    """The methods a view actually answers, upper-cased as a request spells them.
+
+    ``http_method_names`` is what a view ALLOWS -- DRF's default lists all of
+    them -- and the ``hasattr`` narrows that to what it HANDLES. Easy to leave
+    out, and leaving it out probes a view with a method it does not serve: for
+    the credential-free audit that would report a view open on a ``PUT`` it
+    would have answered 405 to.
+    """
+    return [name.upper() for name in view.http_method_names if hasattr(view, name)]
 
 
 def admits_anonymously(route: Route, method: str) -> bool:

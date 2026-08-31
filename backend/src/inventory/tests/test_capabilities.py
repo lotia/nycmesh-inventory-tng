@@ -115,25 +115,22 @@ def test_no_administrators_endpoint_is_missing_from_the_answer() -> None:
     nothing about /api/me itself would notice.
     """
     named = {(operation.view, operation.method) for operations in CAPABILITIES.values() for operation in operations}
-    for route in helpers.routes():
-        view = route.view
-        # DRF views only, which is what the `.cls` spelling used to select by
-        # accident: DRF's permission machinery is what every assertion below
-        # asks for, and Django's own views -- the admin's login redirect -- do
-        # not have it. It stays narrow deliberately, and inventory-tng-2hbv is
-        # where that was weighed rather than inherited: a capability is a name
-        # the interface renders a control from, and the admin renders its own
-        # controls from Django's permissions, so widening this would demand a
-        # capability per admin view and teach /api/me a vocabulary none of its
-        # callers speak. The audit that HAD to widen is the credential-free
-        # one below, and it did.
-        if view is None or not issubclass(view, APIView):
-            continue
+    # DRF views only, which is what the `.cls` spelling used to select by
+    # accident: DRF's permission machinery is what every assertion below
+    # asks for, and Django's own views -- the admin's login redirect -- do
+    # not have it. It stays narrow deliberately, and inventory-tng-2hbv is
+    # where that was weighed rather than inherited: a capability is a name
+    # the interface renders a control from, and the admin renders its own
+    # controls from Django's permissions, so widening this would demand a
+    # capability per admin view and teach /api/me a vocabulary none of its
+    # callers speak. The audit that HAD to widen is the credential-free
+    # one below, and it did.
+    for _, view in helpers.drf_routes():
         # By method, not by view: a capability naming a view's PATCH says
         # nothing about a DELETE added to it later. `http_method_names` is
         # what a view *allows*, so it is narrowed to the ones it handles the
         # way Django's own _allowed_methods narrows it.
-        for method in (name.upper() for name in view.http_method_names if hasattr(view, name)):
+        for method in helpers.offered(view):
             if not administrators_only(view(), method):
                 continue
             assert (view, method) in named, (
@@ -153,10 +150,8 @@ def test_nothing_but_the_two_volunteer_writes_is_open_to_a_volunteer() -> None:
     """
     open_writes = {
         (view.__name__, method)
-        for view in (route.view for route in helpers.routes())
-        # DRF views only; see the note on the walk above.
-        if view is not None and issubclass(view, APIView)
-        for method in (name.upper() for name in view.http_method_names if hasattr(view, name))
+        for _, view in helpers.drf_routes()
+        for method in helpers.offered(view)
         if method not in SAFE_METHODS and not administrators_only(view(), method)
     }
     assert open_writes == {
@@ -246,7 +241,7 @@ def test_every_endpoint_asking_nothing_of_its_caller_is_one_the_record_argued() 
         # if a stranger can reach ANY of what it offers -- and the class-level
         # question could not see a view that admits every GET and refuses
         # every POST, which is exactly the shape the defect took.
-        offered = [name.upper() for name in view.http_method_names if hasattr(view, name)]
+        offered = helpers.offered(view)
         if any(helpers.admits_anonymously(route, method) for method in offered):
             open_to_everybody.add(f"{view.__module__}.{view.__qualname__}")
 
@@ -338,11 +333,8 @@ def test_the_staff_flag_and_a_recent_sign_in_guard_exactly_the_same_operations()
     not RecentlyAuthenticated would make that offer a lie -- signing in again
     would not bring the control back -- and every existing test would pass.
     """
-    for route in helpers.routes():
-        view = route.view
-        # DRF views only; the audit above says why that stays narrow.
-        if view is None or not issubclass(view, APIView):
-            continue
+    # DRF views only; the audit above says why that stays narrow.
+    for _, view in helpers.drf_routes():
         guards = {type(permission) for permission in view().get_permissions()}
         assert (StaffWrites in guards) == (RecentlyAuthenticated in guards), (
             f"{view.__name__} is guarded by one of the pair and not the other"
