@@ -64,8 +64,17 @@ export interface Category {
 export interface Volunteer {
   id: number;
   display_name: string;
-  email: string | null;
-  slack_id: string | null;
+  /**
+   * Absent, not null, for a caller with no account. `PUBLIC_VOLUNTEER_DETAILS`
+   * decides, the backend omits the key rather than nulling it, and
+   * `backend/openapi.yaml` has always said these two are optional -- this file
+   * disagreed with it from `inventory-tng-81f7.5` until `inventory-tng-aoji.2`.
+   *
+   * The distinction is the whole reason for the `?`: a withheld address reads
+   * as `undefined`, so a `=== null` check passes straight through it.
+   */
+  email?: string | null;
+  slack_id?: string | null;
 }
 
 /**
@@ -174,6 +183,7 @@ export interface Location {
   name: string;
   kind: string;
   parent: number | null;
-  held_by: number | null;
+  /** Absent for a caller with no account, for the reason `Volunteer` gives. */
+  held_by?: number | null;
   active: boolean;
 }
