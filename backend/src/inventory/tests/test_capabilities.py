@@ -235,7 +235,6 @@ def test_every_endpoint_asking_nothing_of_its_caller_is_one_the_record_argued() 
         view = route.view
         if view is None:
             continue
-        mounted = getattr(route.pattern.callback, "view_initkwargs", None) or {}
         # A view that is not DRF's has no permission layer to ask at all, so it
         # is open by construction rather than by declaration.
         if not issubclass(view, APIView):
@@ -248,7 +247,7 @@ def test_every_endpoint_asking_nothing_of_its_caller_is_one_the_record_argued() 
         # question could not see a view that admits every GET and refuses
         # every POST, which is exactly the shape the defect took.
         offered = [name.upper() for name in view.http_method_names if hasattr(view, name)]
-        if any(helpers.admits_anonymously(view, method, route.url, mounted) for method in offered):
+        if any(helpers.admits_anonymously(route, method) for method in offered):
             open_to_everybody.add(f"{view.__module__}.{view.__qualname__}")
 
     # Two assertions, because the two directions call for opposite edits and
@@ -435,7 +434,7 @@ def test_every_registration_is_the_one_that_answers_its_own_url() -> None:
     for route in helpers.routes():
         answered = resolve(route.url).func
 
-        assert answered == route.pattern.callback, (
+        assert answered == route.callback, (
             f"{route.name} reverses to {route.url}, which is answered by a different callable -- so this "
             "registration is dead and something else is serving its URL. Two registrations spelled "
             "differently is how that happens."
