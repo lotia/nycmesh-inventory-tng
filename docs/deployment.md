@@ -747,6 +747,25 @@ sign-in. That is a different control answering a different threat —
 [decision 0014](decisions/0014-one-interface.md) point 5 — and it works whether
 or not anybody has a second factor.
 
+### Which of these settings are meant to go away
+
+Some of the values above exist because this project has not finished deciding
+something, and are meant to be deleted once it has. Others are a genuine choice
+that will differ between deployments for ever. Telling them apart matters: a
+deployment should not build a process around a flag that is about to vanish,
+and nobody should "tidy away" a choice that was put there on purpose.
+
+`backend/src/inventory_tng/postures.py` is the register, it says which each one
+is, and for the temporary ones it names the issue whose settling removes them.
+It is not a list kept by hand and hoped over — a test walks this application
+for settings that change its posture and fails when one is missing from the
+register, or is called permanent without an argument, or is called temporary
+without naming what would end it.
+
+Today `VOLUNTEER_ACCESS` and `PUBLIC_VOLUNTEER_DETAILS` are the temporary two,
+both waiting on the same question about what an anonymous caller may learn
+about a person.
+
 ### Letting volunteers in without an account
 
 `django.volunteerAccess` decides whether this application answers a caller with
