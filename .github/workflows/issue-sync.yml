@@ -48,16 +48,32 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version: stable
-
-      # PINNED, and not @latest. This job runs unattended and writes to the
-      # tracker; a release that changed how a pull maps its fields would do so
-      # without anybody choosing it. v1.1.2 is what the behaviour recorded on
-      # inventory-tng-cwpa was measured against.
+      # THE PUBLISHED BINARY, NOT `go install`. The first version compiled from
+      # source, which builds the whole of Dolt to get a CLI, and the first run
+      # of this workflow died verifying one of its modules against
+      # sum.golang.org. That failure was transient; needing a healthy checksum
+      # database and a full database-engine build on every run is not.
+      # `inventory-tng-t3w9`.
+      #
+      # PINNED, and not the latest release. This job runs unattended and writes
+      # to the tracker, so a version that changed how a pull maps its fields
+      # would do so without anybody choosing it. v1.1.2 is the version every
+      # behaviour recorded on inventory-tng-cwpa was measured against.
+      #
+      # VERIFIED AGAINST THE PUBLISHED CHECKSUM rather than trusted, because
+      # what is being installed then writes to the tracker.
       - name: Install beads
-        run: go install github.com/steveyegge/beads/cmd/bd@v1.1.2
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: 1.1.2
+        run: |
+          gh release download "v$VERSION" --repo steveyegge/beads \
+            --pattern "beads_${VERSION}_linux_amd64.tar.gz" --pattern checksums.txt
+          grep " beads_${VERSION}_linux_amd64.tar.gz\$" checksums.txt | sha256sum --check --strict
+          tar -xzf "beads_${VERSION}_linux_amd64.tar.gz" bd
+          install -m 755 bd /usr/local/bin/bd
+          rm -f "beads_${VERSION}_linux_amd64.tar.gz" checksums.txt bd
+          bd version
 
       # The Dolt database is gitignored, so a runner has none. The committed
       # export is the whole of what is shared, and importing it is how a fresh
