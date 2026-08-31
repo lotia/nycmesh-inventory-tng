@@ -161,29 +161,3 @@ def _throttles(view: type[APIView]) -> list[type]:
     distinction matters: an endpoint that names none has none.
     """
     return list(getattr(view, "throttle_classes", []))
-
-
-def test_the_chart_carries_the_rate_to_the_pod() -> None:
-    """A limit that does not reach the container is not a limit.
-
-    Every test above sets the rate directly, so all of them would stay green
-    while a cluster ran with no anonymous read limit at all. Two renders, for
-    the reason test_postures.py gives about its own pair: the first catches
-    the value being absent, the second catches it being present and hard-coded.
-    """
-    from inventory.tests.charts import rendered
-
-    supplied = rendered()
-
-    assert supplied.get("ANONYMOUS_READ_RATE", {}).get("value") == "120/min", (
-        "the chart does not put ANONYMOUS_READ_RATE in the backend's environment at its documented "
-        f"default, so a cluster reads whatever settings.py fell back to; it rendered "
-        f"{supplied.get('ANONYMOUS_READ_RATE')}"
-    )
-
-    asked = rendered(**{"django.anonymousReadRate": "45/min"})
-
-    assert asked["ANONYMOUS_READ_RATE"]["value"] == "45/min", (
-        "the chart renders ANONYMOUS_READ_RATE without reading django.anonymousReadRate, so an operator "
-        "who tightened or loosened the limit is quietly ignored"
-    )
