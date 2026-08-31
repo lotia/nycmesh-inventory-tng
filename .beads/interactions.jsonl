@@ -333,3 +333,4 @@
 {"id":"int-d3c773a74870fb0683ee19c27d4b8292","kind":"field_change","created_at":"2026-08-31T13:12:47.696784362Z","actor":"Ali Asad Lotia","issue_id":"inventory-tng-y466","extra":{"field":"status","new_value":"closed","old_value":"open"}}
 {"id":"int-619721bd6bb5819b956697dec7fbc3b4","kind":"field_change","created_at":"2026-08-31T13:20:34.074653093Z","actor":"Ali Asad Lotia","issue_id":"inventory-tng-cco6","extra":{"field":"status","new_value":"closed","old_value":"open"}}
 {"id":"int-142f72dedbd265c90dec36255290ba3c","kind":"field_change","created_at":"2026-08-31T18:01:25.113844196Z","actor":"Ali Asad Lotia","issue_id":"inventory-tng-pmw2","extra":{"field":"status","new_value":"closed","old_value":"open"}}
+{"id":"int-a12d9d9f71b66b5a66fbc06ebb0fd1cf","kind":"field_change","created_at":"2026-08-31T18:11:00.006814081Z","actor":"Ali Asad Lotia","issue_id":"inventory-tng-wjkd","extra":{"field":"status","new_value":"closed","old_value":"open"}}

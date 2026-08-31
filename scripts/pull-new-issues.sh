@@ -84,6 +84,7 @@ fi
 # success is how this stops working without anybody noticing.
 if [[ -z "$offered" ]]; then
   note "GitHub has no issues, so there is nothing here to bring in."
+  [[ -n "${GITHUB_OUTPUT:-}" ]] && echo "pulled=0" >> "$GITHUB_OUTPUT"
   verdict "Nothing to pull." pulling
 fi
 
@@ -93,11 +94,21 @@ new=$(printf '%s\n' "$offered" | python3 "$HERE/unsynced.py" "$EXPORT") || exit 
 
 if [[ -z "$new" ]]; then
   note "Every issue on GitHub is already linked to a bead."
+  [[ -n "${GITHUB_OUTPUT:-}" ]] && echo "pulled=0" >> "$GITHUB_OUTPUT"
   verdict "Nothing to pull." pulling
 fi
 
 count=$(printf '%s\n' "$new" | wc -l | tr -d ' ')
 note "$count issue(s) on GitHub that no bead points at: $(printf '%s' "$new" | tr '\n' ' ')"
+
+# SAID IN A FORM A CALLER CAN READ, because "did anything arrive" is not
+# answerable from the tracker afterwards: importing the export in a fresh
+# workspace loses fields -- `defer_until` at least, inventory-tng-oavo -- so
+# the file differs whether or not an issue was pulled. A run that proposed on
+# that difference proposed its own churn. inventory-tng-wjkd.
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+  echo "pulled=$count" >> "$GITHUB_OUTPUT"
+fi
 
 if [[ "$dry_run" == true ]]; then
   verdict "Nothing pulled: this was a dry run." pulling
