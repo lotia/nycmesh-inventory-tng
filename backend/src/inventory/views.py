@@ -61,7 +61,12 @@ from inventory.serializers import (
     VolunteerDetailSerializer,
     VolunteerSerializer,
 )
-from inventory.throttling import APPEND_THROTTLES, DEVICE_ENROLMENT_THROTTLES, REPORT_THROTTLES
+from inventory.throttling import (
+    ANONYMOUS_READ_THROTTLES,
+    APPEND_THROTTLES,
+    DEVICE_ENROLMENT_THROTTLES,
+    REPORT_THROTTLES,
+)
 from inventory_tng import debugging, devices
 from inventory_tng.forwarded import address_or_none, client_address
 
@@ -818,7 +823,11 @@ class VolunteerListCreateView(WithdrawnRows, ListCreateAPIView):
 
     # Rate limited; see inventory/throttling.py. Searching is not counted --
     # the client does that as somebody types.
-    throttle_classes = APPEND_THROTTLES
+    # BOTH, and the sum rather than a choice: this endpoint is the append a
+    # volunteer makes AND the pick-list they search to make it, so it is the
+    # one place where the two limits meet. Naming only the appends would leave
+    # the search -- which is the membership oracle -- counted by nothing.
+    throttle_classes = APPEND_THROTTLES + ANONYMOUS_READ_THROTTLES
 
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Ordinary creation, except when the clash is with somebody unshowable.
@@ -1060,6 +1069,7 @@ class ItemListView(RecordsWhatItCreated, WithdrawnRows, ReadsAndWritesDiffer, Li
     # The catalogue and its balances. The screen a scanner is mostly made of,
     # so a volunteer with no account reaching this is most of gnhl.
     permission_classes = VOLUNTEER_READ
+    throttle_classes = ANONYMOUS_READ_THROTTLES
 
     filterset_class = ItemFilter
     queryset = OFFERED_ITEMS
@@ -1085,6 +1095,7 @@ class ItemDetailView(DetailView):
     # reaches.py says when and why that fallback fires. Its payload is a row of
     # the list above, which is already open, so this discloses nothing new.
     permission_classes = VOLUNTEER_READ
+    throttle_classes = ANONYMOUS_READ_THROTTLES
 
     serializer_class = ItemDetailSerializer
     every_row = ITEMS
@@ -1110,6 +1121,7 @@ class LocationListView(RecordsWhatItCreated, WithdrawnRows, ListCreateAPIView):
     # Where a transaction says stock went. Custody locations are still
     # rendered without their holder to anybody anonymous -- LocationSerializer.
     permission_classes = VOLUNTEER_READ
+    throttle_classes = ANONYMOUS_READ_THROTTLES
 
     serializer_class = LocationSerializer
     filterset_fields = ["kind", "parent"]
@@ -1181,6 +1193,7 @@ class LabelListView(RecordsWhatItCreated, ReadsAndWritesDiffer, ListCreateAPIVie
     # administrator's; opening that instead is the mistake this comment exists
     # to stop somebody repeating.
     permission_classes = VOLUNTEER_READ
+    throttle_classes = ANONYMOUS_READ_THROTTLES
 
     pagination_class = None
     queryset = LIVE_LABELS
@@ -1354,6 +1367,7 @@ class LabelResolveView(ReadsAndWritesDiffer, DetailView):
 
     # The resolver for one scanned code, which is the scan itself.
     permission_classes = VOLUNTEER_READ
+    throttle_classes = ANONYMOUS_READ_THROTTLES
 
     # A revoked label is still offered here, so there is nothing withdrawn and
     # both querysets are the same one. Its code cannot be changed once printed

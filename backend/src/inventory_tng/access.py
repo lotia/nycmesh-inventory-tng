@@ -43,18 +43,22 @@ names without addresses. The two settings are deliberately separate, because
 "may a stranger use the scanner" and "may a stranger read your email address"
 are different questions with different answers.
 
-## What it costs, said plainly rather than discovered
+## What stands in for the credential
 
-An open read surface has no rate limit of its own. `AppendThrottle` exempts
-safe methods deliberately and its own docstring says why, so what stands in
-for the credential on WRITES does not reach reads at all.
-`inventory-tng-81f7.1` is that limit -- sized against the membership oracle
-rather than against enumeration, which is the part easy to get backwards --
-and it is not in this change.
+`AnonymousReadThrottle` counts what a caller with no account reads, and
+`AppendThrottle` counts what they write. The two are separate buckets on
+purpose: a volunteer who has spent an allowance searching for their own name
+must still be able to record what they took.
 
-So `open` is honest for a demonstration and is not yet the posture for a
-deployment holding real volunteers' names. `announcement` below says so at
-every start rather than leaving it to whoever reads this file.
+Neither is a defence against copying the catalogue, and the read one says so
+at length rather than letting somebody size it as though it were. What it
+buys is that the membership question -- does this address belong to a
+volunteer -- costs hours instead of seconds.
+
+So `open` is a posture a deployment can be held to, rather than one that
+merely works. What it still is NOT is a decision about what an anonymous
+caller may learn about a person: that is `inventory-tng-81f7`, and
+`PUBLIC_VOLUNTEER_DETAILS` is what withholds in the meantime.
 """
 
 #: Today's behaviour, and the default: an account, as `IsAuthenticated` asks
@@ -67,15 +71,15 @@ OPEN = "open"
 VALUES = (SESSION, OPEN)
 
 # Standard error, at every start where the surface is open; `roster` cites the
-# decision that requires it. What is worth noting HERE is that the line names
-# the missing rate limit rather than the setting alone -- an operator who
-# turned this on has read what it does, and has almost certainly not read
-# `inventory-tng-81f7.1`.
+# decision that requires it. It names the OTHER setting rather than only this
+# one, because the two together are what somebody actually needs to know: an
+# operator who opened the door has read what that does, and may not have
+# noticed that what the door leads to is decided elsewhere.
 ANNOUNCEMENT = (
     "volunteer access: OPEN (VOLUNTEER_ACCESS is open). "
     "The catalogue, the pick-list, the label map and the code resolver answer callers with no "
-    "account, and anonymous reads carry no rate limit yet. "
-    "This is a demonstration posture -- see docs/deployment.md."
+    "account. Reads are rate limited (ANONYMOUS_READ_RATE) and what they may say about a person "
+    "is PUBLIC_VOLUNTEER_DETAILS. See docs/deployment.md."
 )
 
 

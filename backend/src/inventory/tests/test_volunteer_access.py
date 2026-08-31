@@ -193,9 +193,10 @@ def test_it_says_so_when_the_surface_is_open() -> None:
     said = access.announcement(access.OPEN)
 
     assert SETTING in said, "the line does not name the setting, so a reader cannot tell what to change"
-    assert "rate limit" in said, (
-        "the line no longer says that anonymous reads are unlimited, which is the part an operator "
-        "will not already know from the setting's name"
+    assert "PUBLIC_VOLUNTEER_DETAILS" in said, (
+        "the line names only the door and not what is behind it: an operator who opened this has read "
+        "what it does, and the setting deciding what a stranger learns about a person is the one they "
+        "will not have gone looking for"
     )
 
 
