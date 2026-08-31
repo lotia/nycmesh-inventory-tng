@@ -55,8 +55,7 @@ is deliberately not listed here. This paragraph named three of them until one
 more arrived and made it four, which is the point: the exemption is a class,
 not a list, and a list kept in prose beside the code that does not read it is
 one somebody eventually trusts. The enumeration that fails when it stops being
-true is in inventory/tests/test_capabilities.py, and what it does not yet
-reach is inventory-tng-2hbv.
+true is in inventory/tests/test_capabilities.py.
 """
 
 from collections.abc import Callable

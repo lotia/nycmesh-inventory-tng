@@ -280,9 +280,20 @@ def open_to_anybody(view: APIView) -> bool:
     would be a second tally of that list, kept by hand, which is how the first
     one went wrong.
 
-    This reads the classes a view names, which is narrower than asking what a
-    request would be admitted to. That audit's docstring is where the
-    difference is written down, and inventory-tng-2hbv is closing it.
+    THIS READS THE CLASSES A VIEW NAMES, which is not the same question as
+    what a request would be admitted to, and the difference is worth being
+    exact about because it used to be a hole. A view naming
+    ``[StaffWrites, RecentlyAuthenticated]`` admits an anonymous GET and is
+    reported here as closed. The audit that has to notice that no longer asks
+    this predicate -- inventory-tng-2hbv -- because there the error ran the
+    dangerous way: an open endpoint reading as closed is one nobody argues.
+
+    It is kept for the two callers below, where the same error runs the other
+    way and costs little. An admitting view read as closed makes the schema
+    document a 403 that cannot happen, and makes RequireSecondFactor bounce a
+    half-signed-in session it could have let through. Both are the cautious
+    answer. Neither is silent about a door being open, which is the only
+    failure that matters here.
 
     One predicate rather than an ``AllowAny`` check repeated wherever the
     question comes up -- the schema asks it to decide whether an operation can
