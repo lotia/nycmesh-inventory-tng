@@ -1287,6 +1287,32 @@ the beads it files issues for, which rewrites the committed export, so a hook on
 `git push` would leave the tracker dirty every time. CI runs it instead, where
 that change is committed rather than abandoned.
 
+An issue pulled in this way becomes a bead named for the moment it arrived —
+`inventory-tng-1788200756998-1-26030a28` — typed `task` at priority 2, with no
+parent. That is a sensible default and a poor resting place: the id cannot be
+read in a commit message, the type is a guess, and nothing joins it to the work
+it belongs with. So it wants a person:
+
+```bash
+scripts/untriaged.py .beads/issues.jsonl   # what arrived and was never looked at
+```
+
+For each one it names the issue it came from, offers a few `bd search` terms
+drawn from its title so you can tell whether it duplicates something already
+tracked, and spells out the two commands that finish it — `bd rename`, then
+`bd update` for the type, the priority and the parent.
+
+Deciding what the thing actually *is* — whether it duplicates something, what
+kind of work it is, how urgent, whose epic, and how much of the body you may
+honestly write — is [Triaging an issue somebody else
+filed](docs/triage.md). The commands are the easy half.
+
+**The name is the marker.** A bead still carrying the one it arrived with has
+not been through this; renaming takes it off the list. Nothing has to be set or
+cleared, so there is no second record to fall out of step with the first.
+Renaming keeps the GitHub link: `bd rename` preserves the reference and
+repoints anything that mentioned the old id.
+
 **Every bead you write is published.** See
 [0029](docs/decisions/0029-the-issue-tracker-is-public.md) for what that means
 and the four things that must never go in one.

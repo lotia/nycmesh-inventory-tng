@@ -197,7 +197,9 @@ jobs:
           Beads made from issues filed on GitHub, which `bd` cannot find for itself.
 
           Each arrives with a synthetic id, typed `task` at priority 2, and no parent.
-          Giving them a real identity is `inventory-tng-cwpa.4`, and it wants a person.
+          Giving them a real name is a person's job, and `scripts/untriaged.py` lists
+          what is waiting and spells out the commands. DEVELOPERS.md, under Issue
+          tracking, says what each step is for.
 
           If this should not be merged, close it — nothing is lost. The next run
           proposes the same issues again, because closing this records nothing.

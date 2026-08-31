@@ -650,6 +650,8 @@ jobs:
         run: scripts/check-config.test.sh
       - name: Check the unsynced-issue reader
         run: scripts/unsynced.test.sh
+      - name: Check the untriaged-arrival reader
+        run: scripts/untriaged.test.sh
       # And then run it, which none of the above do to their own subject. What
       # it reads here is what a clone is handed before anybody configures
       # anything, so a hook that stopped arriving with the checkout is caught
