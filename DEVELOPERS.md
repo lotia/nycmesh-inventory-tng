@@ -1566,9 +1566,12 @@ each commit onto `main` individually. Why it is arranged that way rather than
 left to discipline is
 [0017](docs/decisions/0017-review-through-pull-requests.md).
 
-That setting, and what `main` accepts, are GitHub's rather than the
-repository's, so they are written down as `scripts/repo-settings.sh` rather than
-left as something somebody once clicked. `--check` reports what has drifted;
+That setting, what `main` accepts, and whether Actions may open a pull request
+are GitHub's rather than the repository's, so they are written down as
+`scripts/repo-settings.sh` rather than left as something somebody once clicked.
+The last of those is what lets the issue-sync workflow propose the beads it
+makes from GitHub issues; with it off that job fails at its final step, and
+before it was declared here the only thing that noticed was the job itself. `--check` reports what has drifted;
 running it without puts it back, which is what to do after adding or renaming a
 job in CI that ought to be required. A weekly job runs `--check` and reports,
 so drift is found rather than remembered — and it runs on any pull request that
