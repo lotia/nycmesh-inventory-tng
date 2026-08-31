@@ -433,6 +433,7 @@ All backend commands run from `backend/`, all frontend commands from `frontend/`
 | Apply migrations | `uv run python src/manage.py migrate` |
 | Put demo rows in an empty database | `uv run python src/manage.py seed_demo_data` (refuses unless `DJANGO_DEBUG` is on) |
 | Add the pick-list a demonstration needs | `uv run python src/manage.py seed_demo_data --with-demo-roster` — 86 invented names, two of them worn by two people, and the measured share carrying no address |
+| Make sure there is an administrator | `uv run python src/manage.py ensure_administrator --username=you` with `DJANGO_SUPERUSER_PASSWORD` set — creates one if absent, says so and changes nothing if not. A deployment runs it for you; see [The first administrator](docs/deployment.md#the-first-administrator) |
 | Show the label codes to scan | `uv run python src/manage.py show_label_codes` — reads the database, so it is right after any seed |
 | Make the login that survives a wipe | `uv run python src/manage.py seed_integration_data --i-know-this-creates-a-published-login` — see [Signing in](#signing-in) |
 | Open a Django shell | `uv run python src/manage.py shell` |

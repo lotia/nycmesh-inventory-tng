@@ -64,6 +64,22 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
         payload cannot raise an account that an administrator has already
         seen.
         """
+        # CLEARED BEFORE THE ROW IS WRITTEN, not only after. Both, and the
+        # order is the point: clearing afterwards leaves a moment where the
+        # database holds an account the provider promoted, and migration 0020
+        # refuses the write that would take the last administrator away -- so
+        # in a system with no other administrator, the UPDATE that strips this
+        # one was refused and the account KEPT what the payload claimed.
+        #
+        # Which way that has to resolve is not close. A system with no
+        # administrator is recoverable: re-run the deploy-time Job, or reach
+        # the database. A system where an unvetted account holds one is not
+        # recoverable by anything automatic. So the flags never reach the
+        # table, and the clearing below becomes the belt rather than the
+        # braces. inventory-tng-s8dk.
+        for flag in AUTHORITY_FLAGS:
+            setattr(sociallogin.user, flag, False)
+
         user: User = super().save_user(request, sociallogin, form)
         granted = [flag for flag in AUTHORITY_FLAGS if getattr(user, flag)]
         if granted:
