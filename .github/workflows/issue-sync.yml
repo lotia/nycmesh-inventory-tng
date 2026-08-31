@@ -91,7 +91,7 @@ jobs:
       - name: Build a tracker from the committed export
         run: |
           mv .beads/config.yaml /tmp/beads-config.yaml
-          bd init --prefix inventory-tng --non-interactive
+          bd init --prefix inventory-tng --non-interactive --skip-agents
           bd import .beads/issues.jsonl
 
       - name: Bring in issues no bead points at
@@ -105,8 +105,29 @@ jobs:
       # Export explicitly rather than trusting the hook that normally does it:
       # nothing is committed here, so the hook that exports on commit has not
       # run, and a proposal built from a stale export would propose nothing.
-      - name: Write the tracker back out
-        run: bd export -o .beads/issues.jsonl
+      #
+      # THEN PUT EVERYTHING ELSE BACK. `bd init` scaffolds a workspace -- it
+      # rewrites its hooks and config, and without --skip-agents it appends to
+      # AGENTS.md and rewrites .claude/settings.json too. A run before this
+      # existed pushed a branch holding ten files, including eighty new lines
+      # on this repository's agent instructions. `inventory-tng-rbvb`.
+      #
+      # Restoring wholesale rather than naming what to undo, so that whatever a
+      # future version of bd decides to scaffold is undone as well.
+      - name: Write the tracker back out, and put everything else back
+        run: |
+          bd export -o .beads/issues.jsonl
+          cp .beads/issues.jsonl "$RUNNER_TEMP/synced.jsonl"
+          git checkout -- .
+          git clean -fd
+          cp "$RUNNER_TEMP/synced.jsonl" .beads/issues.jsonl
+          # bd set this; a fresh checkout has none, and CI has never run hooks.
+          # Returning the runner to that state, rather than stepping over a
+          # guard: what installed beads' pre-commit hook here was bd init, and
+          # that hook stages the whole .beads directory, which is how ten files
+          # reached a commit that adds one by name.
+          git config --unset core.hooksPath || true
+          git status --short
 
       - name: Propose what arrived
         env:
@@ -159,5 +180,19 @@ jobs:
           If this should not be merged, close it — nothing is lost. The next run
           proposes the same issues again, because closing this records nothing.
           BODY
-          gh pr create --title "Tracker: issues filed on GitHub" \
-            --body-file /tmp/sync-body --base main --head "$branch"
+          # NOT PERMITTED IS A REAL ANSWER, not a crash. "Allow GitHub Actions
+          # to create and approve pull requests" is off by default, and only
+          # the repository owner can turn it on -- Settings, Actions, General,
+          # Workflow permissions. Until they do, the branch is still pushed, so
+          # nothing is lost and a person can open the pull request themselves.
+          # Said plainly and failed loudly, because a job that silently stopped
+          # proposing would look exactly like a job with nothing to propose.
+          if ! gh pr create --title "Tracker: issues filed on GitHub" \
+            --body-file /tmp/sync-body --base main --head "$branch"; then
+            echo "::error::Could not open the pull request. If this says Actions are"
+            echo "::error::not permitted to create them, enable that in Settings ->"
+            echo "::error::Actions -> General -> Workflow permissions. The branch"
+            echo "::error::$branch is pushed, so open it by hand meanwhile:"
+            echo "::error::https://github.com/$GITHUB_REPOSITORY/compare/$branch?expand=1"
+            exit 1
+          fi
