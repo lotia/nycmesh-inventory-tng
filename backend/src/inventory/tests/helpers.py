@@ -13,8 +13,10 @@ import logging.config
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import pyotp
 from allauth.account.authentication import AUTHENTICATION_METHODS_SESSION_KEY
@@ -201,3 +203,90 @@ def sign_in_locally(user: User, password: str) -> Client:
     client = start_local_sign_in(user, password)
     client.post(reverse("mfa_authenticate"), {"code": pyotp.TOTP(secret).now()})
     return client
+
+
+# ---------------------------------------------------------------------------
+# One walk over the URLconf, for every audit that needs one
+# ---------------------------------------------------------------------------
+
+# A value per converter a route may be written with, so that a route carrying
+# an argument can be reversed at all. Keyed by the name the route spells.
+#
+# Deliberately not exhaustive, and `routes()` refuses loudly rather than
+# skipping when it meets a converter that is missing here. A walk that quietly
+# passed over the routes it could not build would be an audit with a hole in
+# exactly the shape of whatever was added last.
+SPECIMENS: dict[str, Any] = {"int": 1, "str": "specimen", "slug": "specimen", "uuid": UUID(int=0)}
+
+
+@dataclass(frozen=True)
+class Route:
+    """One registration this repository owns, with everything an audit asks of it."""
+
+    name: str
+    # The route as the URLconf spells it -- `api/items/<int:pk>` rather than
+    # the path somebody asked for. What a span is named after, and what tells
+    # a hundred item lookups apart from a hundred routes.
+    route: str
+    # The view CLASS, however the registration spells it. `.cls` is where
+    # `APIView.as_view()` puts it and `.view_class` is where Django's own
+    # `View.as_view()` does; a router-mounted ViewSet has neither, and then
+    # this is None rather than a guess.
+    view: type | None
+    arguments: dict[str, Any]
+    url: str
+    pattern: Any
+
+
+def routes() -> list[Route]:
+    """Every route `inventory_tng.urls` declares itself.
+
+    THE ONE PLACE THAT DECIDES WHAT A ROUTE IS. Six hand-rolled walks existed
+    before this and they disagreed: three asked `getattr(callback, "cls",
+    None)` and two asked `isinstance(pattern, URLPattern)`, so the day an
+    endpoint moved behind a router the first three stopped seeing views and
+    passed in silence -- and the repair would have been needed in six places.
+    `inventory-tng-s047`.
+
+    AN `include` IS NOT WALKED, and that is a boundary rather than an
+    oversight: what is behind `accounts/` is allauth's routing and what is
+    behind `admin/` is Django's, and asserting about their internals means
+    asserting about somebody else's design. `every_mounted_route` is for the
+    audit that has to look past that, and it asks a different and weaker
+    question for the same reason.
+    """
+    from django.urls import URLPattern, reverse
+    from django.urls.converters import get_converters
+
+    from inventory_tng import urls
+
+    named = {type(converter): name for name, converter in get_converters().items()}
+    found = []
+    for pattern in urls.urlpatterns:
+        if not isinstance(pattern, URLPattern):
+            continue
+        arguments: dict[str, Any] = {}
+        for argument, converter in pattern.pattern.converters.items():
+            kind = named.get(type(converter))
+            assert kind in SPECIMENS, (
+                f"{pattern.pattern} takes a {kind}, which inventory.tests.helpers.SPECIMENS has no "
+                "value for -- add one rather than letting this route go unwalked"
+            )
+            arguments[argument] = SPECIMENS[kind]
+        # REFUSED RATHER THAN SKIPPED, like a missing specimen above. An
+        # unnamed route cannot be reversed, so it cannot be walked -- and a
+        # walk that passed silently over it would leave the audits blind to
+        # exactly the registration somebody added without a name.
+        assert pattern.name, f"{pattern.pattern} is registered without a name, so no audit here can reach it"
+        callback = pattern.callback
+        found.append(
+            Route(
+                name=pattern.name,
+                route=str(pattern.pattern),
+                view=getattr(callback, "cls", None) or getattr(callback, "view_class", None),
+                arguments=arguments,
+                url=reverse(pattern.name, kwargs=arguments),
+                pattern=pattern,
+            )
+        )
+    return found

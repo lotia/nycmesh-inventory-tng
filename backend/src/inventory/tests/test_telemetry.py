@@ -18,6 +18,7 @@ import pytest
 from django.conf import settings
 from django.db import connection
 
+from inventory.tests import helpers
 from inventory.tests.conftest import COLLECTOR
 from inventory_tng import telemetry
 
@@ -360,27 +361,11 @@ def test_and_so_is_every_other_route_in_the_urlconf(recorded: Any, db: Any, clie
     An `include` is skipped: it is another URLconf, and the admin's and
     allauth's surfaces are theirs to cover rather than this repository's.
     """
-    from django.urls import URLPattern, reverse
-    from django.urls.converters import get_converters
-
-    from inventory_tng import urls
-
-    # A value per converter the URLconf uses, so a route with an argument can
-    # be asked for at all. Keyed by the name a route is written with.
-    specimens: dict[str, Any] = {"int": 1, "str": "specimen"}
-    named = {type(converter): name for name, converter in get_converters().items()}
-
     checked = []
-    for pattern in urls.urlpatterns:
-        if not isinstance(pattern, URLPattern):
-            continue
-        arguments = {}
-        for argument, converter in pattern.pattern.converters.items():
-            kind = named.get(type(converter))
-            assert kind in specimens, f"{pattern.pattern} takes a {kind}, which this test has no specimen of"
-            arguments[argument] = specimens[kind]
-        route = str(pattern.pattern)
-        asked = reverse(pattern.name, kwargs=arguments)
+    for walked in helpers.routes():
+        arguments = walked.arguments
+        route = walked.route
+        asked = walked.url
 
         recorded.clear()
         client.get(asked)

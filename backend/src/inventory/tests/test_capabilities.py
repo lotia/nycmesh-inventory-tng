@@ -15,8 +15,9 @@ from collections import Counter
 import pytest
 from django.contrib.auth.models import User
 from django.test import Client
-from django.urls import URLPattern, get_resolver, reverse
+from django.urls import get_resolver, resolve, reverse
 from rest_framework.permissions import SAFE_METHODS
+from rest_framework.views import APIView
 
 from inventory.permissions import (
     RecentlyAuthenticated,
@@ -24,9 +25,9 @@ from inventory.permissions import (
     administrators_only,
     open_to_anybody,
 )
+from inventory.tests import helpers
 from inventory.tests.helpers import post
 from inventory.views import CAPABILITIES
-from inventory_tng import urls
 
 pytestmark = pytest.mark.django_db
 
@@ -114,9 +115,16 @@ def test_no_administrators_endpoint_is_missing_from_the_answer() -> None:
     nothing about /api/me itself would notice.
     """
     named = {(operation.view, operation.method) for operations in CAPABILITIES.values() for operation in operations}
-    for pattern in urls.urlpatterns:
-        view = getattr(pattern.callback, "cls", None)
-        if view is None:
+    for route in helpers.routes():
+        view = route.view
+        # DRF views only, which is what the `.cls` spelling used to select by
+        # accident: DRF's permission machinery is what every assertion below
+        # asks for,
+        # and Django's own views -- the admin's login redirect -- do not have
+        # it. Stated rather than inherited, so that widening this is a decision
+        # somebody makes rather than a crash. Whether it SHOULD widen is
+        # inventory-tng-2hbv.
+        if view is None or not issubclass(view, APIView):
             continue
         # By method, not by view: a capability naming a view's PATCH says
         # nothing about a DELETE added to it later. `http_method_names` is
@@ -142,8 +150,9 @@ def test_nothing_but_the_two_volunteer_writes_is_open_to_a_volunteer() -> None:
     """
     open_writes = {
         (view.__name__, method)
-        for view in (getattr(pattern.callback, "cls", None) for pattern in urls.urlpatterns)
-        if view is not None
+        for view in (route.view for route in helpers.routes())
+        # DRF views only; see the note on the walk above.
+        if view is not None and issubclass(view, APIView)
         for method in (name.upper() for name in view.http_method_names if hasattr(view, name))
         if method not in SAFE_METHODS and not administrators_only(view(), method)
     }
@@ -212,8 +221,8 @@ def test_every_endpoint_asking_nothing_of_its_caller_is_one_the_record_argued() 
     assert all(argued.values()), "an entry with no reason is a name, and a name is not an argument"
 
     open_to_everybody = set()
-    for pattern in urls.urlpatterns:
-        callback = pattern.callback
+    for route in helpers.routes():
+        callback = route.pattern.callback
         # `cls` first, because that is what the other consumers here read, and
         # `view_class` after it, because a view that is not DRF's has only
         # that one -- and one such is in this table. An `include()` mount has
@@ -276,9 +285,16 @@ def test_the_staff_flag_and_a_recent_sign_in_guard_exactly_the_same_operations()
     not RecentlyAuthenticated would make that offer a lie -- signing in again
     would not bring the control back -- and every existing test would pass.
     """
-    for pattern in urls.urlpatterns:
-        view = getattr(pattern.callback, "cls", None)
-        if view is None:
+    for route in helpers.routes():
+        view = route.view
+        # DRF views only, which is what the `.cls` spelling used to select by
+        # accident: DRF's permission machinery is what every assertion below
+        # asks for,
+        # and Django's own views -- the admin's login redirect -- do not have
+        # it. Stated rather than inherited, so that widening this is a decision
+        # somebody makes rather than a crash. Whether it SHOULD widen is
+        # inventory-tng-2hbv.
+        if view is None or not issubclass(view, APIView):
             continue
         guards = {type(permission) for permission in view().get_permissions()}
         assert (StaffWrites in guards) == (RecentlyAuthenticated in guards), (
@@ -326,28 +342,53 @@ def test_every_route_is_registered_exactly_once() -> None:
     What it cannot see is a second registration spelled differently --
     ``<int:id>`` beside ``<int:pk>``, or a ``re_path`` for a URL a ``path``
     already answers -- which is dead in the same way and compares unequal
-    here. Catching that means reversing each registration and resolving it
-    back, over a walk the audits here would share rather than one more of
-    their own; inventory-tng-s047, which counts them.
+    here. That is the test below, and it is why both exist: this one asks
+    whether two registrations LOOK the same, and that one asks whether each
+    one is the registration that actually answers.
     """
-    # Only what this table declares itself: an `include()` mount is another
-    # URLconf's to keep unique, and Django lets two of them share one prefix
-    # and falls through, so a repeated prefix is not a repeated route.
-    declared = [pattern for pattern in urls.urlpatterns if isinstance(pattern, URLPattern)]
+    # Only what this table declares itself, which is what the shared walk
+    # yields: an `include()` mount is another URLconf's to keep unique, and
+    # Django lets two of them share one prefix and falls through, so a repeated
+    # prefix is not a repeated route.
+    declared = helpers.routes()
 
     resolver = get_resolver()
-    colliding = sorted(
-        {
-            pattern.name
-            for pattern in declared
-            if pattern.name is not None and len(resolver.reverse_dict.getlist(pattern.name)) > 1
-        }
-    )
+    colliding = sorted({route.name for route in declared if len(resolver.reverse_dict.getlist(route.name)) > 1})
     assert not colliding, f"more than one route answers to reverse() by these names: {colliding}"
 
-    routes = Counter(str(pattern.pattern) for pattern in declared)
-    repeated = sorted(route for route, count in routes.items() if count > 1)
+    counted = Counter(route.route for route in declared)
+    repeated = sorted(route for route, count in counted.items() if count > 1)
     assert not repeated, f"registered more than once in urlpatterns: {repeated}"
 
     # The walk finding nothing would pass both assertions above it.
-    assert len(routes) > 10, f"only {sorted(routes)} were found; the walk has stopped finding routes"
+    assert len(counted) > 10, f"only {sorted(counted)} were found; the walk has stopped finding routes"
+
+
+def test_every_registration_is_the_one_that_answers_its_own_url() -> None:
+    """The property the comparison above cannot express.
+
+    Two registrations spelled differently are two entries that compare
+    unequal, so counting them finds nothing -- and one of them is dead, because
+    only one can answer. Measured against this checkout when
+    inventory-tng-s047 was filed, all three of these passed the test above:
+
+        path("api/items/<int:id>", ...)   beside <int:pk>
+        path("api/labels/<slug:code>", ...) beside <str:code>
+        re_path(r"^api/schema$", ...)     beside path("api/schema", ...)
+
+    Asking instead whether each registration is the one that ANSWERS its own
+    URL catches all three, and would have caught the original ``api/schema``
+    duplicate on its own: two ``as_view()`` calls are two distinct callables,
+    so the loser resolves to the winner's and is visibly dead.
+
+    Over the shared walk rather than a seventh of its own, which is the other
+    half of that issue.
+    """
+    for route in helpers.routes():
+        answered = resolve(route.url).func
+
+        assert answered == route.pattern.callback, (
+            f"{route.name} reverses to {route.url}, which is answered by a different callable -- so this "
+            "registration is dead and something else is serving its URL. Two registrations spelled "
+            "differently is how that happens."
+        )
