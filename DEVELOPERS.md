@@ -1669,8 +1669,17 @@ them is one to finish, and whoever finished it merges it — an agent working a
 batch does not stop to ask, for the same reason a contributor with write access
 does not.
 
-`scripts/landing-gate.sh` is what holds a Claude Code session to that second
-pair. It ships with the repository and is registered in the tracked
+**The review cycle is held by a required check**, the `Review cycle` job in
+`ci.yml`, which sees every route to a merge rather than only the ones a local
+hook meets — though not, as [0020](docs/decisions/0020-who-merges.md) is careful
+to say, every way of changing what it checks. Evidence posted after the last
+push is picked up by `review-cycle.yml`, which asks CI again rather than making
+somebody push a commit to satisfy a checker. What that closed, what it did not,
+and why the local gate stays are all in
+[0020](docs/decisions/0020-who-merges.md).
+
+`scripts/landing-gate.sh` holds a Claude Code session to the same pair locally.
+It ships with the repository and is registered in the tracked
 `.claude/settings.json`, so a fresh clone, a fork and every worktree get it. It
 refuses `gh pr merge` until the cycle has been recorded against the exact head
 being merged, refuses `gh pr ready` while the checks are not green, refuses a

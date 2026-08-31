@@ -1,0 +1,154 @@
+# Ask CI again when the evidence it was waiting for arrives.
+#
+# The "Review cycle" job in ci.yml reads the pull request's comments and
+# reviews, and ci.yml runs on push and pull_request -- so a marker posted after
+# the last push would never be seen, and the required check would sit red on a
+# pull request that had in fact been reviewed. The obvious way out is to push
+# something, which is a commit made to satisfy a checker rather than to change
+# anything.
+#
+# So this watches for the evidence itself and re-runs the check. It decides
+# nothing: the answer still comes from the required job in ci.yml, at the pull
+# request's own head. inventory-tng-x0jp.
+#
+# It is not, however, invisible. A run triggered by either review event carries
+# the pull request head as its head SHA, so `Ask CI again` shows up among that
+# head's checks -- which means a red one here is read as a red check by
+# `gh pr checks` and by the greenness question scripts/landing-gate.sh asks.
+# That is the reason the failure path below is narrow: it fails only when the
+# nudge is genuinely dead, never when there was simply nothing to do.
+#
+# WHY IT IS A SEPARATE FILE. scripts/repo-settings.sh derives the required
+# contexts from the job names in ci.yml, so a job put there becomes required.
+# This one must not be: it is a nudge, it runs on events that have no pull
+# request head to report against, and a required check that cannot report is a
+# branch nobody can merge.
+#
+# WHICH COPY OF THIS FILE RUNS, because the three triggers do not agree and it
+# decides what can be tested before merging. Checked against GitHub's event
+# reference rather than assumed:
+#
+#   issue_comment                 the DEFAULT BRANCH copy. GITHUB_REF is the
+#                                 default branch, and the event is on the list
+#                                 that only fires when the workflow exists
+#                                 there -- so this half cannot be tested until
+#                                 it has merged, including the first time.
+#   pull_request_review           the PULL REQUEST copy. Neither review event
+#   pull_request_review_comment   is on that list; both get GITHUB_REF of
+#                                 refs/pull/N/merge.
+name: Review cycle
+
+on:
+  issue_comment:
+    types: [created, edited]
+  pull_request_review:
+    types: [submitted, edited]
+  # THE THIRD KIND OF COMMENT, and it is evidence. A review body arrives under
+  # `reviews`, and so does an inline diff comment -- as an entry with an empty
+  # body, which review_cycle.py counts. Without this trigger a reviewer who
+  # leaves only inline findings has evidenced the stage and nothing re-reads it.
+  #
+  # Whether a standalone inline comment ALSO fires pull_request_review is
+  # undocumented and did not settle under measurement, so both are listened for
+  # and the concurrency group below collapses the duplicate.
+  pull_request_review_comment:
+    types: [created]
+
+# One re-run per pull request. A review pass posts a comment and a review
+# within a second or two of each other, and without this each one starts a
+# re-run of the same workflow against the same head.
+concurrency:
+  group: review-cycle-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  rerun:
+    name: Ask CI again
+    runs-on: ubuntu-latest
+    # `issue_comment` fires for issues as well as pull requests, and an issue
+    # has no head to re-run anything against. That is the ONLY event this has to
+    # sort, so it is written as the exception rather than as a list of the
+    # events that are allowed: naming them meant a trigger added above and not
+    # added here was a trigger that fired and then skipped, which is what
+    # happened to `pull_request_review_comment` -- listened for on purpose, and
+    # silently filtered out by a condition that only knew two event names.
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
+    permissions:
+      # `contents: read` is not idle on a public repository: gh needs it to
+      # read a pull request if this repository is ever made private, and a
+      # permissions block that only works while something is public is one that
+      # breaks on a day nobody connects to this file.
+      contents: read
+      actions: write
+      pull-requests: read
+    steps:
+      - name: Re-run the checks against the evidence that just arrived
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          head=$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
+
+          # The most recent CI run for this head. `--json` rather than parsing
+          # the table, and the head is what ties it to this pull request rather
+          # than to whatever ran last.
+          run=$(gh run list --repo "$REPO" --workflow ci.yml --commit "$head" \
+                  --limit 1 --json databaseId --jq '.[0]')
+
+          if [[ -z "$run" || "$run" == "null" ]]; then
+            echo "No CI run for $head yet, so there is nothing to ask again."
+            exit 0
+          fi
+
+          id=$(printf '%s' "$run" | jq -r .databaseId)
+
+          # THE JOB, NOT THE RUN, and the difference is the whole window this
+          # exists for. `Review cycle` finishes in seconds; the run it belongs
+          # to takes minutes, because the browser tests are in it. Asking about
+          # the run meant that a comment posted in between -- which is the
+          # normal order, since fixes are pushed and then the findings posted --
+          # found an in-progress run, declined, and logged that the evidence
+          # would be read by a job that had already read nothing and failed.
+          conclusion=$(gh run view "$id" --repo "$REPO" --json jobs \
+                         --jq '[.jobs[] | select(.name == "Review cycle")][0].conclusion')
+
+          # NULL IS TWO ANSWERS, and the message has to cover both: a job that
+          # is still running -- which will read this evidence itself, so there
+          # is nothing to ask again -- and a job that is not in this run at all,
+          # which is what an older run looks like and what a run cancelled
+          # before its jobs were created looks like. Neither is re-runnable, so
+          # both leave; saying only the first would state something untrue about
+          # the second.
+          if [[ "$conclusion" == "null" || -z "$conclusion" ]]; then
+            echo "Run $id has no finished review-cycle job to ask again:"
+            echo "it is either still running, and will read this evidence itself,"
+            echo "or it does not carry that job at all."
+            exit 0
+          fi
+          if [[ "$conclusion" == "success" ]]; then
+            echo "The review cycle was already satisfied on run $id."
+            exit 0
+          fi
+
+          # `--failed` rather than the whole run: everything else on that head
+          # already passed and re-running it would spend several minutes of
+          # somebody else's queue to reach the same answer.
+          #
+          # THE TWO NON-ZERO EXITS ARE NOT THE SAME ANSWER, and collapsing them
+          # was the bug. Nothing-to-re-run is success -- the cycle is already
+          # green. Anything else is this nudge being dead: the token losing
+          # `actions: write`, the run past its 30-day re-run window or its 50
+          # re-run limit, Actions disabled. Reported as "nothing failed", that
+          # is a guard which cannot see saying it has nothing to object to, and
+          # every pull request afterwards sits red with no explanation anywhere.
+          if ! out=$(gh run rerun "$id" --repo "$REPO" --failed 2>&1); then
+            if printf %s "$out" | grep -qi "cannot be rerun"; then
+              echo "Nothing failed on run $id, so the cycle is already green."
+            else
+              echo "::error::could not ask CI again about run $id: $out"
+              exit 1
+            fi
+          fi

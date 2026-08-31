@@ -51,12 +51,52 @@ records the artifacts it found on the pull request rather than a literal it was
 handed. Three of the four things this paragraph originally conceded are no
 longer true.
 
-The fourth stands and is not fixable here. A marker comment can be posted by
-somebody who reviewed nothing, and a command line can be spelt in ways no
-reader catches; a client-side gate can make forgetting hard and cannot make
-lying hard. So this decision still rests on the same thing every other
-repository rule here rests on: that the person or agent doing the work follows
-it, and that the pull request records enough for anyone to check afterwards.
+The fourth stands, and half of it has since moved. A marker comment can be
+posted by somebody who reviewed nothing: a gate can make forgetting hard and
+cannot make lying hard, and no amount of machinery changes that. But *"a
+command line can be spelt in ways no reader catches"* was a property of asking
+the question on the machine that types the merge, and `inventory-tng-x0jp`
+asked whether it had to be. It did not.
+
+**The review cycle is now held by a required check as well.** The `Review
+cycle` job in `ci.yml` reads the pull request's own comments and reviews and
+refuses when a stage has nothing behind it, and it is required by existing and
+being named — `scripts/repo-settings.sh` derives the contexts from that file's
+job names. What that closes is not the lying: it is every route that never met
+the local gate at all — a different spelling, a different machine, a checkout
+where the hook was never installed, and the GitHub web UI, which the hook
+structurally cannot see.
+
+**It is not un-waivable, and calling it that would be the same overstatement
+this record was written to avoid.** The job checks the branch out and runs
+`scripts/review_cycle.py` *from the pull request under review*, so a change to
+that file in the same pull request decides its own verdict. Removing the check
+from the required list is a deliberate branch-protection change; editing what
+it does is an ordinary diff. What stops that is the same thing that stops a
+forged marker — it is written down where anyone can read it afterwards — and
+not the machinery.
+
+Two things follow that are worth stating plainly rather than discovering.
+
+**The local gate is still there, and is not now redundant.** It refuses before
+a round trip rather than after one, and it holds the bare `git push --force`
+rule from `inventory-tng-614`, which branch protection does not cover because
+protection is on `main` and that rule is about `batch/*`. Deleting it is a
+separate decision, and one nobody should take before the check has been watched
+working.
+
+**The check is deliberately weaker in one respect.** The local receipt ties
+evidence to a head, so any push invalidates it. The check does not: the
+evidence is the pull request, which cannot be moved to another one, and
+`inventory-tng-8nqo` — what makes a review current enough to count — has
+already decided that a re-record after a fix is satisfied by the review already
+there. Requiring the review to name the current commit would refuse the case
+this project has said it wants. If 8nqo settles the other way, this is the
+paragraph that changes.
+
+So the decision still rests on the same thing every other repository rule here
+rests on: that the person or agent doing the work follows it, and that the pull
+request records enough for anyone to check afterwards.
 
 That last part is what makes the trade acceptable rather than reckless. Under
 0017 every review, every triage and every answered finding is already written

@@ -22,6 +22,11 @@
 
 set -uo pipefail
 
+# Where this script and its siblings live, computed once. It was three inline
+# `$(dirname "$(readlink -f ...)")` and two more elsewhere, each a fork, in a
+# file that measures its own common path in fractions of a millisecond.
+SCRIPTS=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+
 # Where the receipts live.
 #
 # This used to be `git rev-parse --show-toplevel || exit 0`, which was a fourth
@@ -47,20 +52,11 @@ RECEIPTS="$REPO_ROOT/.claude/.review-receipts.json"
 # found by `<!-- batch-contents -->` for exactly this reason -- a marker is
 # stable in a way that prose is not, and a comment carrying one is a durable
 # public artifact somebody can go and read afterwards.
-MARK_REVIEW='<!-- review-cycle: code-review -->'
-MARK_SIMPLIFY='<!-- review-cycle: simplify -->'
-
-# THE STAGES A CYCLE HAS, for the two readers that ask a receipt which of them
-# it is short of. They have to agree: `receipt_status` decides what is missing
-# and `status` prints it, so a stage one of them knows about and the other does
-# not is a receipt reported complete and refused, or the reverse.
-#
-# Only those two. `record_receipt` maps each stage to a different expression
-# for what counts as its evidence, and `missing_block` to different advice, so
-# neither is a list of names with the same thing done to each -- and a table
-# that spanned all four would be more machinery than two stable values are
-# worth. This is the pair, not a registry.
-STAGES='code-review simplify'
+# The markers and the stages a cycle has are scripts/review_cycle.py, which is
+# also what the required check reads -- so the gate and the check cannot come
+# to different views of what a complete cycle is. That was the whole point of
+# inventory-tng-x0jp, and two copies of a two-item list is exactly how it would
+# have been lost.
 
 # Where the cycle is written down, rather than the cycle.
 #
@@ -310,14 +306,18 @@ record_receipt() {
   # its own, started to read one field from a document the reader below then
   # parsed again -- 22 ms and a second copy of the `--json` field list to keep in
   # step. The reader has the whole payload, so it says what it found.
-  MARK_REVIEW="$MARK_REVIEW" MARK_SIMPLIFY="$MARK_SIMPLIFY" \
-  RECEIPTS="$RECEIPTS" PR="$pr" \
-    python3 -c '
+  # HERE, so the reader below can import its sibling. The marker rule is
+  # subtle -- posted, not merely present -- and it now has two callers: this,
+  # and the required check inventory-tng-x0jp added. Two copies of it would
+  # drift, and the drift would be invisible: both would still run, and one
+  # would quietly disagree about what counts as a review having happened.
+  RECEIPTS="$RECEIPTS" PR="$pr" HERE="$SCRIPTS" python3 -c '
 import json, os, sys
 
+sys.path.insert(0, os.environ["HERE"])
+import review_cycle
+
 payload = json.load(sys.stdin)
-mark_review = os.environ["MARK_REVIEW"]
-mark_simplify = os.environ["MARK_SIMPLIFY"]
 
 # Before the evidence, because a receipt without a head vouches for nothing and
 # there is no point telling anybody which stage is missing until there is a
@@ -327,97 +327,16 @@ if not head:
     sys.exit("Could not read the head of pull request %s. Is gh authenticated?"
              % os.environ["PR"])
 
-# Both are the first page gh returns rather than every one that exists, and
-# that is left as it is on purpose: a marker this does not see is a stage that
-# looks unevidenced, so truncation can only ever produce a REFUSAL to record.
-# The failure direction is the safe one, and the way out is to post the
-# findings comment again -- which is cheap, and which a paginating reader would
-# be buying at the cost of a second API shape to keep working.
+# WHAT COUNTS IS review_cycle.py, not this file. It carries the marker rule and
+# the argument for it, including which stage submits its own evidence and why
+# truncation can only ever refuse.
 #
-# Since inventory-tng-gfkr that refusal also WRITES, so a truncated page can
+# Since inventory-tng-gfkr this refusal also WRITES, so a truncated page can
 # replace a complete receipt at the same head with a partial one. Still safe --
-# refused either way, and re-running against an untruncated page restores it --
-# but the sentence above used to imply the file was left alone, and it is not.
-comments = payload.get("comments") or []
-reviews = payload.get("reviews") or []
+# refused either way, and re-running against an untruncated page restores it.
+evidence = review_cycle.evidence(payload)
 
-
-def marked(mark):
-    """Comments carrying the marker ON A LINE OF ITS OWN.
-
-    A substring test over the whole body was what this did, and a comment that
-    merely MENTIONED the marker was then evidence that the pass had run --
-    quoted in prose, in backticks, or in a fenced block explaining what the
-    marker is for. That is not a hypothetical: pull request 48 merged with no
-    code-review marker, and the correction comment posted afterwards, the one
-    REPORTING that the receipt was missing, quoted the marker while explaining
-    the omission and thereby became the evidence. A comment reporting an
-    absence created the thing it reported absent. inventory-tng-egh4.1.
-
-    A line of its own is what .agents/skills/pull-requests/SKILL.md has always
-    asked for, so nothing that follows the documentation changes; every
-    accidental mention stops counting. Somebody determined can still put the
-    marker alone on a line, which is a forgery rather than an accident and is
-    not what this closes.
-    """
-    def carries(body):
-        # POSTED, not shown. Two ways a marker appears in a comment without
-        # being one, and both are ordinary: indented four spaces, which is a
-        # Markdown code block, and inside a fence. The refusal message below
-        # prints the marker indented, and the pull-requests skill shows it in a
-        # fence -- so a comment quoting either back would otherwise be evidence
-        # that the pass had run.
-        #
-        # NO APOSTROPHES ANYWHERE IN THIS READER. It is the body of a
-        # single-quoted `python3 -c`, so one closes the quote and takes the
-        # whole gate down with it -- and this file is the PreToolUse hook, so
-        # what it takes down is every command in the session.
-        fenced = False
-        for line in (body or "").splitlines():
-            bare = line.rstrip()
-            if bare.lstrip().startswith(("```", "~~~")):
-                fenced = not fenced
-                continue
-            if fenced:
-                continue
-            # Markdown allows up to three spaces before a construct; the fourth
-            # makes it a code block, which is the marker being displayed.
-            if bare.lstrip() == mark and len(bare) - len(bare.lstrip()) < 4:
-                return True
-        return False
-
-    return [
-        {
-            "kind": "comment",
-            "id": c.get("id"),
-            "author": (c.get("author") or {}).get("login"),
-            "at": c.get("createdAt"),
-            "url": c.get("url"),
-        }
-        for c in comments
-        if carries(c.get("body"))
-    ]
-
-
-# A review submitted through the API is evidence in its own right: it is what
-# `/code-review --comment` leaves behind, and its body is not ours to mark.
-submitted = [
-    {
-        "kind": "review",
-        "id": r.get("id"),
-        "author": (r.get("author") or {}).get("login"),
-        "at": r.get("submittedAt"),
-        "commit": (r.get("commit") or {}).get("oid"),
-    }
-    for r in reviews
-]
-
-evidence = {
-    "code-review": marked(mark_review) + submitted,
-    "simplify": marked(mark_simplify),
-}
-
-missing = [stage for stage, found in evidence.items() if not found]
+missing = review_cycle.missing(evidence)
 if missing:
     for stage in missing:
         print(
@@ -432,7 +351,7 @@ if missing:
         # the marker is only ever typed on the simplify comment -- so the old
         # message contradicted the document it closes by citing, and told an
         # agent to forge exactly what this reader exists to look for.
-        if stage == "code-review":
+        if stage in review_cycle.BY_REVIEW:
             # ABOUT THE ACTOR, NOT THE READER. The stop message a few hundred
             # lines down can say "yours to run" because it is wired as a Stop
             # hook and an agent is the only thing that ever reads it. This is a
@@ -447,7 +366,7 @@ if missing:
         else:
             print("  Post its findings to the pull request with this line in the body:", file=sys.stderr)
             print("", file=sys.stderr)
-            print("      %s" % mark_simplify, file=sys.stderr)
+            print("      %s" % review_cycle.MARKERS[stage], file=sys.stderr)
         print("", file=sys.stderr)
     print(
         "The receipt records what it finds, so a stage with nothing behind it\n"
@@ -460,7 +379,9 @@ if missing:
     # and DEVELOPERS.md "When a branch is ready to merge" says what the Stop
     # hook then went on doing about it. inventory-tng-gfkr.
     #
-    # NO APOSTROPHES IN HERE -- `marked()` above says why.
+    # NO APOSTROPHES IN HERE -- it is the body of a single-quoted python3 -c,
+    # and this file is the PreToolUse hook, so one takes down every command in
+    # the session rather than just this reader.
     #
     # A partial receipt still cannot unblock a merge: the `merge` arm below is
     # all or nothing, and argues it there.
@@ -523,8 +444,10 @@ print("Recorded the review cycle for pull request %s at %s. Merging is unblocked
 # put the missing-stage list into the head and told the merge guard the branch
 # had moved. A non-whitespace separator preserves the empty field.
 receipt_status() {
-  RECEIPTS="$RECEIPTS" PR="$1" STAGES="$STAGES" python3 -c '
+  RECEIPTS="$RECEIPTS" PR="$1" HERE="$SCRIPTS" python3 -c '
 import json, os, sys
+sys.path.insert(0, os.environ["HERE"])
+import review_cycle
 try:
     with open(os.environ["RECEIPTS"]) as fh:
         receipts = json.load(fh)
@@ -539,15 +462,13 @@ evidence = receipt.get("evidence")
 if not isinstance(evidence, dict):
     evidence = {}
 # AN EMPTY STAGE LIST WOULD MEAN "NOTHING IS MISSING", which is the one answer
-# this must never give by accident. The list used to be a literal here and
-# could not be empty; reading it from the environment made that possible, and
-# the merge guard treats an empty `missing` as a complete cycle -- so a
-# mistake in the constant would permit every merge in the repository, silently
-# and in the direction this file says a guard must never fail in.
-stages = os.environ["STAGES"].split()
-if not stages:
-    sys.exit("landing-gate: STAGES is empty, so which stages a cycle has is unknown.")
-missing = [stage for stage in stages if not evidence.get(stage)]
+# this must never give by accident: the merge guard treats an empty `missing`
+# as a complete cycle, so it would permit every merge in the repository,
+# silently and in the direction this file says a guard must never fail in.
+# review_cycle refuses to import at all in that state, which is why there is no
+# guard here -- one stood here and could not be reached.
+stages = review_cycle.STAGES
+missing = review_cycle.missing(evidence)
 print("%s|%s" % (receipt.get("head") or "", ",".join(missing)))
 '
 }
@@ -570,7 +491,7 @@ print("%s|%s" % (receipt.get("head") or "", ",".join(missing)))
 # A stage this does not recognise still prints, with the name and no advice: an
 # unannotated line is a smaller failure than a missing one. That is the `case`
 # falling through rather than an arm, because there is no third stage to reach
-# it -- `receipt_status` builds the list from a hardcoded pair a few lines up.
+# it -- the stages come from review_cycle, which names exactly two.
 missing_block() {
   local pr=$1 stage detail lead='  missing:' stages=()
   IFS=',' read -r -a stages <<<"$2"
@@ -674,18 +595,21 @@ except Exception:
   # that refusal could never fire. The mode failed open correctly anyway and
   # said nothing at all, which is the silent half of exactly what this file was
   # rewritten to remove.
-  scene=$(printf '%s' "$payload" | python3 -c '
-import json, sys
+  scene=$(printf '%s' "$payload" | HERE="$SCRIPTS" python3 -c '
+import json, os, sys
+sys.path.insert(0, os.environ["HERE"])
+import review_cycle
 pr = json.load(sys.stdin)
 rollup = pr.get("statusCheckRollup") or []
-def settled(check):
-    verdict = (check.get("conclusion") or check.get("state") or "").upper()
-    return verdict in ("SUCCESS", "NEUTRAL", "SKIPPED")
+
+# Greenness, and what it reads past, is review_cycle.settled -- shared with the
+# `ready` arm, which asks the identical question and used to answer it with a
+# `--jq` filter of its own.
 print(pr.get("number") or 0,
       pr.get("state") or "",
       "draft" if pr.get("isDraft") else "ready",
       pr.get("headRefOid") or "",
-      "green" if rollup and all(settled(c) for c in rollup) else "not-green")
+      "green" if rollup and all(review_cycle.settled(c) for c in rollup) else "not-green")
 ')
   [[ -n "$scene" ]] || stop_open "could not read what gh said about $branch"
   read -r pr state draft head checks <<<"$scene"
@@ -838,8 +762,10 @@ with open(path, "w") as fh:
       exit 0
     fi
     have python3 || { echo "landing-gate: python3 is needed to read the receipts." >&2; exit 1; }
-    RECEIPTS="$RECEIPTS" STAGES="$STAGES" python3 -c '
+    RECEIPTS="$RECEIPTS" HERE="$SCRIPTS" python3 -c '
 import json, os, sys
+sys.path.insert(0, os.environ["HERE"])
+import review_cycle
 try:
     with open(os.environ["RECEIPTS"]) as fh:
         receipts = json.load(fh)
@@ -852,9 +778,7 @@ except (OSError, ValueError):
 # died on them instead of saying.
 if not isinstance(receipts, dict):
     receipts = {}
-stages = os.environ["STAGES"].split()
-if not stages:
-    sys.exit("landing-gate: STAGES is empty, so which stages a cycle has is unknown.")
+stages = review_cycle.STAGES
 if not receipts:
     print("No receipts. Merging is blocked.")
 for pr, receipt in sorted(receipts.items()):
@@ -1248,9 +1172,32 @@ Run it from a checkout of that repository, where its own gate can answer."
 
   ready)
     have gh || deny_dependency gh "reading whether the checks on this pull request are green"
+    have python3 || deny_dependency python3 "reading whether those checks are green"
     [[ -n "$pr" ]] || pr=$(pr_current) || deny_unavailable "which pull request this branch belongs to" gh
-    failing=$(gh_json pr checks "$pr" --json name,state \
-      --jq '[.[] | select(.state != "SUCCESS" and .state != "SKIPPED")] | length') || failing=""
+    # THE SAME QUESTION THE STOP HOOK ASKS, THROUGH THE SAME READER. Both arms
+    # want "are the checks green, not counting the review-cycle one", and both
+    # used to answer it themselves -- this one as a `--jq` filter, the stop hook
+    # in Python. Two spellings of one rule in two languages in one file, and
+    # they had already drifted: NEUTRAL was green to the stop hook and red here.
+    # review_cycle.settled is now the only copy, and its docstring carries why
+    # the exclusion is there.
+    #
+    # The count is done in the reader rather than by `--jq` for the same reason.
+    # Doing it here meant interpolating a job name into a double-quoted jq
+    # program, and that is a rule the shell was carrying half of.
+    checks=$(gh_json pr checks "$pr" --json name,state) || checks=""
+    failing=$(printf '%s' "$checks" | HERE="$SCRIPTS" python3 -c '
+import json, sys, os
+sys.path.insert(0, os.environ["HERE"])
+import review_cycle
+try:
+    checks = json.load(sys.stdin)
+except ValueError:
+    # Nothing readable is not an answer of "green"; the caller refuses on an
+    # empty capture, the same way it refuses a gh that would not answer.
+    raise SystemExit(1)
+print(sum(1 for c in checks if not review_cycle.settled(c)))
+') || failing=""
     # No checks reported yet is not the same as checks that failed; a run that
     # has not started cannot be green, so this still refuses. Neither is a gh
     # that could not answer: that used to be read as green.
@@ -1348,7 +1295,7 @@ something it has not looked at."
 
     # Its own exit status, not its output: a checker that died has checked
     # nothing, which is the direction this file refuses in everywhere else.
-    checker=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/check-batch.sh
+    checker="$SCRIPTS/check-batch.sh"
     if ! unfinished=$(cd "$REPO_ROOT" && "$checker" origin/main..HEAD 2>&1); then
       deny "Pull request $pr is not finished, so it is not ready to merge.
 

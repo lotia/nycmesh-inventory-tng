@@ -14,7 +14,15 @@
 set -uo pipefail
 . "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/testlib.sh"
 
-GATE=$(readlink -f "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/landing-gate.sh")
+HERE_SCRIPTS=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
+GATE=$(readlink -f "$HERE_SCRIPTS/landing-gate.sh")
+
+# The check the gate reads PAST when it asks whether the others are green, in
+# both of the two places it asks. Taken from review_cycle rather than typed here
+# so that renaming the job in ci.yml fails a case rather than going quiet -- the
+# gate reads it from there too, and a suite carrying its own copy would agree
+# with itself while disagreeing with the file under test.
+REVIEW_CHECK=$(python3 "$HERE_SCRIPTS/review_cycle.py" --check-name)
 
 workspace
 # A batch branch, because that is where the work happens and because the gate
@@ -60,7 +68,11 @@ case "$args" in
   *"isDraft"*)            cat "$GH_FIXTURES/stop.json" ;;
   *"--json headRefOid"*)  cat "$GH_FIXTURES/head" ;;
   *"--json number"*)      cat "$GH_FIXTURES/number" ;;
-  *"pr checks"*)          cat "$GH_FIXTURES/failing" ;;
+  # THE LIST, always, because that is what the gate now asks for: it counts what
+  # is not green through review_cycle.settled rather than through a --jq it
+  # passes here. A stub that answered with a number would be answering a
+  # question the gate no longer asks.
+  *"pr checks"*) cat "$GH_FIXTURES/checks.json" ;;
   *) exit 1 ;;
 esac
 STUB
@@ -71,17 +83,26 @@ mkdir -p "$FIX"
 export GH_FIXTURES=$FIX
 echo "$HEAD_OID" >"$FIX/head"
 echo 7 >"$FIX/number"
-echo 0 >"$FIX/failing"
+# What `gh pr checks` hands back. The gate counts what is not green itself, so
+# this is the list rather than a tally of it -- which is also what lets a case
+# say WHICH checks the count reaches, not just how many.
+checks_are() { printf '%s' "$1" >"$FIX/checks.json"; }
+checks_are '[{"name": "Backend", "state": "SUCCESS"}]'
 echo "{\"headRefOid\":\"$HEAD_OID\",\"comments\":[],\"reviews\":[]}" >"$FIX/pr.json"
 
 # What the stop hook asks about: a ready pull request whose checks are green.
 # Each case below rewrites this to the state it is about.
 stop_scene() {
   STOP_STATE=${1:-OPEN} STOP_DRAFT=${2:-false} STOP_CHECK=${3:-SUCCESS} \
-  STOP_HEAD=${4:-$HEAD_OID} FIX=$FIX python3 -c '
+  STOP_HEAD=${4:-$HEAD_OID} STOP_CHECK_NAME=${STOP_CHECK_NAME:-Backend} \
+  FIX=$FIX python3 -c '
 import json, os
-rollup = ([] if os.environ["STOP_CHECK"] == "none"
-          else [{"conclusion": os.environ["STOP_CHECK"]}])
+# ALWAYS NAMED, because every entry in a real statusCheckRollup carries a `name`
+# or a `context`. The name is what the gate reads past, so the case that pins
+# the exclusion sets it; the default is an ordinary job, which is the scene the
+# rest of the cases are about.
+check = {"conclusion": os.environ["STOP_CHECK"], "name": os.environ["STOP_CHECK_NAME"]}
+rollup = [] if os.environ["STOP_CHECK"] == "none" else [check]
 scene = {"number": 7, "state": os.environ["STOP_STATE"],
          "isDraft": os.environ["STOP_DRAFT"] == "true",
          "headRefOid": os.environ["STOP_HEAD"], "statusCheckRollup": rollup}
@@ -282,10 +303,34 @@ unset GH_FAILS
 
 echo
 echo "marking ready"
-echo 2 >"$FIX/failing"
+checks_are '[{"name": "Backend", "state": "FAILURE"},
+             {"name": "Frontend", "state": "FAILURE"}]'
 case_is "gh pr ready 7"                          "is not green" "a pull request with failing checks is refused"
-echo 0 >"$FIX/failing"
+checks_are '[{"name": "Backend", "state": "SUCCESS"}]'
 case_is "gh pr ready 7"                          PERMIT "a green pull request may be marked ready"
+
+# WHICH checks that question counts. Marking a batch ready is what INVITES the
+# review, so the check that stays red until the review has happened cannot be
+# part of it -- the stop hook reads past the same name for the same reason, and
+# two greenness readers in one file that disagreed was the defect. Both ask
+# review_cycle.settled now, so these cases pin the shared answer.
+checks_are "[{\"name\": \"$REVIEW_CHECK\", \"state\": \"FAILURE\"},
+             {\"name\": \"Backend\", \"state\": \"SUCCESS\"}]"
+case_is "gh pr ready 7"                          PERMIT \
+  "a red review-cycle check does not hold a batch back from the review that would fix it"
+
+checks_are "[{\"name\": \"$REVIEW_CHECK\", \"state\": \"FAILURE\"},
+             {\"name\": \"Backend\", \"state\": \"FAILURE\"}]"
+case_is "gh pr ready 7"                          "is not green" \
+  "and reading past it does not drop the question for every other check"
+
+# THE STATE THE TWO READERS DISAGREED ABOUT while they were two. A neutral check
+# was green to the stop hook and red here, and nothing failed when it was.
+checks_are '[{"name": "Backend", "state": "NEUTRAL"}]'
+case_is "gh pr ready 7"                          PERMIT \
+  "a neutral check is green to this arm, as it always was to the stop hook"
+
+checks_are '[{"name": "Backend", "state": "SUCCESS"}]'
 
 # ---------------------------------------------------------------------------
 # record, and the evidence it stores
@@ -390,26 +435,37 @@ refute "$out" "$status" 0 "Traceback" "rather than raised at them"
 # THE ONE ANSWER THIS MUST NEVER GIVE BY ACCIDENT: an empty stage list, which
 # means nothing is missing. `receipt_status` carries what that costs.
 echo "an empty stage list refuses rather than reporting a clean cycle"
-# A COPY WITH THE CONSTANT EMPTIED, not an environment variable. The gate
-# assigns STAGES unconditionally at the top -- deliberately, so nothing
-# inherited can steer it -- which also means an inherited value proves nothing
-# and a test written that way passes whatever the reader does. What is being
-# tested is the editing mistake, so the edit is what the test makes.
-BROKEN="$WORK/broken-gate.sh"
-sed "s/^STAGES='code-review simplify'$/STAGES=''/" "$GATE" >"$BROKEN"
-chmod +x "$BROKEN"
-grep -q "^STAGES=''$" "$BROKEN" \
-  || fail_case "the fixture did not empty STAGES, so the case below proves nothing"
-# A receipts file has to exist or `status` leaves before reading one, and the
-# case would then pass on the early exit without reaching the guard at all.
+# A COPY WITH THE STAGES EMPTIED, not an environment variable. The gate reads
+# the pair from scripts/review_cycle.py -- which the required check reads too,
+# so the two cannot disagree about what a complete cycle is -- and an inherited
+# value steers neither. A test written that way would pass whatever the reader
+# did, which is what the first version of this case did.
+#
+# BOTH files are copied, because the gate imports its sibling by directory: a
+# copy of the gate alone would fail on the import and pass this case for the
+# wrong reason.
+BROKEN="$WORK/broken"
+mkdir -p "$BROKEN"
+cp "$GATE" "$BROKEN/landing-gate.sh"
+sed 's/^STAGES = ("code-review", "simplify")$/STAGES = ()/' \
+  "$HERE_SCRIPTS/review_cycle.py" >"$BROKEN/review_cycle.py"
+grep -q '^STAGES = ()$' "$BROKEN/review_cycle.py" \
+  || fail_case "the fixture did not empty the stages, so the case below proves nothing"
 printf '{}' >"$RECEIPTS"
 out=$( (cd "$REPO" && env PATH="$(full_path)" GH_FIXTURES="$FIX" \
-  CLAUDE_PROJECT_DIR="$REPO" "$BROKEN" status) 2>&1 ); status=$?
+  CLAUDE_PROJECT_DIR="$REPO" "$BROKEN/landing-gate.sh" status) 2>&1 ); status=$?
 # Non-zero as well as the message, and the two are a pair rather than belt and
 # braces: `status` ended in a flat `exit 0`, so the reader could die, print its
 # complaint, and still report success. This case is what noticed.
-assert "$out" "$status" 1 "STAGES is empty" "an emptied stage list says so and exits non-zero"
+assert "$out" "$status" 1 "names no stages" "an emptied stage list says so and exits non-zero"
 refute "$out" "$status" 1 "nothing found" "rather than reporting on no stages at all"
+# SAID, NOT RAISED. review_cycle refuses to import at all on an empty stage
+# list, and it raises SystemExit to do it -- so the sentence reaches whoever ran
+# this with no caller catching anything, which is why no guard stands here and
+# no `except` stands at the five places that import it. An AssertionError shown
+# to somebody is a reader dying on them instead of telling them, which is the
+# shape the rest of this file is about.
+refute "$out" "$status" 1 "Traceback" "and it is said rather than raised at them"
 rm -f "$RECEIPTS"
 
 pr_json review marker
@@ -685,6 +741,17 @@ forget_nudges
 stop_scene OPEN false FAILURE
 stopped
 refute "$STOP_OUT" "$STOP_STATUS" 0 "decision" "a batch whose checks are red is not refused"
+stop_scene
+forget_nudges
+
+# EXCEPT THE ONE CHECK THAT IS ABOUT THIS. The review-cycle check is red
+# PRECISELY WHILE the cycle has not run, so counting it among the checks that
+# have to be green silenced this nudge for the only state it is registered to
+# catch.
+STOP_CHECK_NAME=$REVIEW_CHECK stop_scene OPEN false FAILURE
+stopped
+assert "$STOP_OUT" "$STOP_STATUS" 0 '"decision":"block"' \
+  "a red review-cycle check does not silence the nudge about the review cycle"
 stop_scene
 forget_nudges
 
