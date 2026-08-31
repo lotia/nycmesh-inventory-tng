@@ -140,13 +140,14 @@ because a limit is one more thing that can refuse a probe.
 - **The open posture must be revisited if the surface grows.** This decision
   holds precisely because the volunteer endpoints append and nothing more. Any
   new endpoint reachable without a credential has to be argued against this
-  record, not added beside it. Part of that is now checked rather than
-  remembered, by an audit in
-  `backend/src/inventory/tests/test_capabilities.py` that fails when an
-  endpoint of this API's is open and unargued. Only part, and that audit's
-  own docstring says which part; `inventory-tng-2hbv` is closing the rest.
-  Until it does, an endpoint reaching this bullet is still one a reader has
-  to notice.
+  record, not added beside it. This is checked rather than remembered, by an
+  audit in `backend/src/inventory/tests/test_capabilities.py` that fails when
+  an endpoint of this API's admits a caller holding no credential and no line
+  says why. It asks whether such a request would be ADMITTED rather than which
+  permission classes a view names, so an endpoint cannot escape it by being
+  spelled differently — which one could, until `inventory-tng-2hbv`. What it
+  still does not reach is a route inside a dependency's own URLconf; the mount
+  itself is argued instead, and that audit's docstring says what that costs.
 
 - **Both halves must be visible in the API.** An endpoint's audience is now part
   of its contract, so the generated schema has to make clear which operations

@@ -277,9 +277,10 @@ API's own description at `/api/schema` and `/api/docs` — and every other one
 needs one, the two a volunteer writes to included. The list is deliberately
 not a count: it was written as one and was wrong twice running. It is also a
 convenience rather than the authority — that is an audit in
-`backend/src/inventory/tests/test_capabilities.py`, which keeps the same set
-with the argument for each entry beside it, and whether an endpoint may join
-them at all is
+`backend/src/inventory/tests/test_capabilities.py`, which asks of every
+endpoint and every method whether an anonymous request would be admitted, and
+holds the answer against a list carrying the argument for each entry. Whether
+an endpoint may join them at all is
 [decision 0012](docs/decisions/0012-two-populations.md). So make an
 account before you expect either half of the app to answer, and sign in at
 `/accounts/login/` on whichever address you are using — that page and the rest

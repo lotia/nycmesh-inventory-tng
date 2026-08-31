@@ -15,7 +15,7 @@ from collections import Counter
 import pytest
 from django.contrib.auth.models import User
 from django.test import Client
-from django.urls import get_resolver, resolve, reverse
+from django.urls import URLResolver, get_resolver, resolve, reverse
 from rest_framework.permissions import SAFE_METHODS
 from rest_framework.views import APIView
 
@@ -23,11 +23,11 @@ from inventory.permissions import (
     RecentlyAuthenticated,
     StaffWrites,
     administrators_only,
-    open_to_anybody,
 )
 from inventory.tests import helpers
 from inventory.tests.helpers import post
 from inventory.views import CAPABILITIES
+from inventory_tng import urls
 
 pytestmark = pytest.mark.django_db
 
@@ -119,11 +119,14 @@ def test_no_administrators_endpoint_is_missing_from_the_answer() -> None:
         view = route.view
         # DRF views only, which is what the `.cls` spelling used to select by
         # accident: DRF's permission machinery is what every assertion below
-        # asks for,
-        # and Django's own views -- the admin's login redirect -- do not have
-        # it. Stated rather than inherited, so that widening this is a decision
-        # somebody makes rather than a crash. Whether it SHOULD widen is
-        # inventory-tng-2hbv.
+        # asks for, and Django's own views -- the admin's login redirect -- do
+        # not have it. It stays narrow deliberately, and inventory-tng-2hbv is
+        # where that was weighed rather than inherited: a capability is a name
+        # the interface renders a control from, and the admin renders its own
+        # controls from Django's permissions, so widening this would demand a
+        # capability per admin view and teach /api/me a vocabulary none of its
+        # callers speak. The audit that HAD to widen is the credential-free
+        # one below, and it did.
         if view is None or not issubclass(view, APIView):
             continue
         # By method, not by view: a capability naming a view's PATCH says
@@ -190,16 +193,23 @@ def test_every_endpoint_asking_nothing_of_its_caller_is_one_the_record_argued() 
     write the next one, and inventory-tng-gnhl is about to ask for several.
 
     WHAT THIS DOES NOT COVER, stated here because this is the only place it
-    belongs and everywhere else cites it. It is not the whole of decision
-    0012's consequence, and neither that record nor DEVELOPERS.md claims it
-    is. Two gaps, both measured, both inventory-tng-2hbv. ``open_to_anybody``
-    reads the permission classes a view names rather than asking what an
-    anonymous request would be admitted to, so a view that keeps
-    ``StaffWrites`` and drops ``IsAuthenticated`` serves every read to
-    anybody and is invisible here. And this walk reads the routes this table
-    declares itself, so the patterns behind ``accounts/`` are out of its
-    sight -- among them the sign-in and sign-up pages, which answer anybody
-    by design and are nobody's decision to make twice.
+    belongs and everywhere else cites it.
+
+    It used to be worse in a way worth recording, because the repair is what
+    this test now is. It asked ``open_to_anybody``, which reads the permission
+    classes a view NAMES, and it asked once per view rather than once per
+    method. So a view that kept ``StaffWrites`` and dropped
+    ``IsAuthenticated`` served every read to anybody and was invisible here --
+    measured, not supposed, and the mutation in inventory-tng-2hbv's log shows
+    the old question passing on exactly that view. Asking whether a request
+    would be ADMITTED is the repair, and ``helpers.admits_anonymously`` is
+    where it is argued.
+
+    What remains uncovered is the other side of the mount: a route inside
+    allauth's URLconf or the admin's that answers a stranger. The mount is
+    asserted about instead, by the test below, and that test's docstring says
+    plainly what that does and does not buy. It is a real gap, it is named,
+    and it is not the shape that was leaking.
     """
     # Keyed by where the class is defined, not by its bare name: half of these
     # are third-party and all of them are called something generic, so a
@@ -222,23 +232,23 @@ def test_every_endpoint_asking_nothing_of_its_caller_is_one_the_record_argued() 
 
     open_to_everybody = set()
     for route in helpers.routes():
-        callback = route.pattern.callback
-        # `cls` first, because that is what the other consumers here read, and
-        # `view_class` after it, because a view that is not DRF's has only
-        # that one -- and one such is in this table. An `include()` mount has
-        # no callback at all and is another URLconf's to audit, which is where
-        # allauth's names go; see the docstring.
-        view = getattr(callback, "cls", None) or getattr(callback, "view_class", None)
+        view = route.view
         if view is None:
             continue
-        # Built the way the URLconf builds it, from the attribute Django's own
-        # `as_view` sets on every view function. `as_view(permission_classes=...)`
-        # is legal and DRF applies it per request, so a route the table opened
-        # on purpose reads as closed if the class is instantiated bare.
-        mounted = getattr(callback, "view_initkwargs", None) or {}
-        # A view that is not DRF's has no permission layer to ask at all, so
-        # it is open by construction rather than by declaration.
-        if not hasattr(view, "get_permissions") or open_to_anybody(view(**mounted)):
+        mounted = getattr(route.pattern.callback, "view_initkwargs", None) or {}
+        # A view that is not DRF's has no permission layer to ask at all, so it
+        # is open by construction rather than by declaration.
+        if not issubclass(view, APIView):
+            open_to_everybody.add(f"{view.__module__}.{view.__qualname__}")
+            continue
+        # ASKED PER METHOD, and of admission rather than of spelling.
+        # `helpers.admits_anonymously` says why the old question was the wrong
+        # one; asking it per method is the other half, because a view is open
+        # if a stranger can reach ANY of what it offers -- and the class-level
+        # question could not see a view that admits every GET and refuses
+        # every POST, which is exactly the shape the defect took.
+        offered = [name.upper() for name in view.http_method_names if hasattr(view, name)]
+        if any(helpers.admits_anonymously(view, method, route.url, mounted) for method in offered):
             open_to_everybody.add(f"{view.__module__}.{view.__qualname__}")
 
     # Two assertions, because the two directions call for opposite edits and
@@ -251,6 +261,50 @@ def test_every_endpoint_asking_nothing_of_its_caller_is_one_the_record_argued() 
     )
     stale = sorted(set(argued) - open_to_everybody)
     assert not stale, f"{stale} no longer answer such a caller; delete the line rather than restore the endpoint"
+
+
+def test_every_mount_this_urlconf_makes_is_one_the_record_argued() -> None:
+    """What is mounted, rather than what is behind it.
+
+    The walk above reads the routes this table declares itself, so the 43
+    patterns behind ``accounts/`` and the 139 behind ``admin/`` are out of its
+    sight: 20 routes audited of 203 that resolve. ``inventory-tng-2hbv``.
+
+    THE ANSWER IS NOT TO WALK THEM, and ``helpers.routes`` carries the reason.
+    The project owner's framing, and it is the right boundary: a dependency's
+    sub-paths are its own business beyond the point where this repository
+    mounts it.
+
+    So the assertion is made AT the mount. Adding an `include()` is a
+    deliberate act, rare, and this repository's own -- it is exactly the kind
+    of thing that should need a sentence. A new one fails here until somebody
+    writes why it is there and what it exposes.
+
+    WHAT THIS DELIBERATELY DOES NOT CATCH, so that nobody reads it as more
+    than it is: a route appearing behind an existing mount, in a dependency
+    upgrade, that answers an anonymous caller. Both mounts here already do so
+    by design -- a sign-in form must -- so the useful question is not "is
+    anything open" but "did this upgrade open something that acts", and
+    answering that means driving requests at a dependency's routes and reading
+    what a refusal looks like in somebody else's framework. That is a larger
+    piece of work than this issue, and pretending otherwise here would be
+    worse than saying so.
+    """
+    mounted = {
+        "admin/": "Django's own admin, which decision 0014 point 4 keeps complete; its own auth guards it",
+        "accounts/": "allauth's sign-in surface, which must answer somebody with no session -- decision 0013",
+    }
+    assert all(mounted.values()), "an entry with no reason is a name, and a name is not an argument"
+
+    found = {str(pattern.pattern) for pattern in urls.urlpatterns if isinstance(pattern, URLResolver)}
+
+    unargued = sorted(found - set(mounted))
+    assert not unargued, (
+        f"{unargued} mount another URLconf into this one, and nothing here says what that exposes: "
+        "argue each and name it above, or take the mount out"
+    )
+    stale = sorted(set(mounted) - found)
+    assert not stale, f"{stale} are no longer mounted; delete the line rather than restore the mount"
 
 
 def test_a_session_that_must_sign_in_again_is_told_which_no_it_is(stale: Client) -> None:
@@ -287,13 +341,7 @@ def test_the_staff_flag_and_a_recent_sign_in_guard_exactly_the_same_operations()
     """
     for route in helpers.routes():
         view = route.view
-        # DRF views only, which is what the `.cls` spelling used to select by
-        # accident: DRF's permission machinery is what every assertion below
-        # asks for,
-        # and Django's own views -- the admin's login redirect -- do not have
-        # it. Stated rather than inherited, so that widening this is a decision
-        # somebody makes rather than a crash. Whether it SHOULD widen is
-        # inventory-tng-2hbv.
+        # DRF views only; the audit above says why that stays narrow.
         if view is None or not issubclass(view, APIView):
             continue
         guards = {type(permission) for permission in view().get_permissions()}

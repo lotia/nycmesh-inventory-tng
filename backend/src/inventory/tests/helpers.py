@@ -251,9 +251,11 @@ def routes() -> list[Route]:
     AN `include` IS NOT WALKED, and that is a boundary rather than an
     oversight: what is behind `accounts/` is allauth's routing and what is
     behind `admin/` is Django's, and asserting about their internals means
-    asserting about somebody else's design. `every_mounted_route` is for the
-    audit that has to look past that, and it asks a different and weaker
-    question for the same reason.
+    asserting about somebody else's design -- an upgrade that renamed a route
+    would fail this build for no reason of ours. So the mount is what gets
+    asserted about instead, at the point where this repository chose it:
+    `test_every_mount_this_urlconf_makes_is_one_the_record_argued` says what
+    that reaches and what it gives up.
     """
     from django.urls import URLPattern, reverse
     from django.urls.converters import get_converters
@@ -290,3 +292,39 @@ def routes() -> list[Route]:
             )
         )
     return found
+
+
+def admits_anonymously(view: type, method: str, url: str, mounted: dict[str, Any] | None = None) -> bool:
+    """Whether every permission class would let an anonymous request through.
+
+    THE QUESTION THE AUDIT USED TO ASK WAS A DIFFERENT ONE.
+    ``permissions.open_to_anybody`` reads the classes a view NAMES and answers
+    True only for ``AllowAny``. That is a fact about spelling, and admission is
+    not spelled: ``StaffWrites.has_permission`` returns True for every safe
+    method from anybody, its own docstring saying reads are left to whatever
+    else guards the endpoint. So ``[StaffWrites, RecentlyAuthenticated]`` --
+    the project default with one class removed -- serves every read to a
+    stranger while that predicate answers False. Measured, not supposed.
+    ``inventory-tng-2hbv``.
+
+    Asked with a REAL request of the method in question, rather than one method
+    substituted onto another's request. ``CurrentUserView._permitted`` does the
+    latter because it has only the caller's own GET to work with and must not
+    invent a body; here there is no caller, so the honest request is the one
+    that would actually arrive.
+
+    Built the way the URLconf builds it: ``as_view(permission_classes=...)`` is
+    legal and DRF applies it per request, so a view instantiated bare reads as
+    closed when the route deliberately opened it.
+    """
+    from django.contrib.auth.models import AnonymousUser
+    from django.test import RequestFactory
+
+    instance = view(**(mounted or {}))
+    request = RequestFactory().generic(method, url)
+    request.user = AnonymousUser()
+    # Both, because a permission class is handed the request and may read the
+    # view, and DRF sets these before any of them is consulted.
+    instance.request = request
+    instance.args, instance.kwargs = (), {}
+    return all(permission.has_permission(request, instance) for permission in instance.get_permissions())
