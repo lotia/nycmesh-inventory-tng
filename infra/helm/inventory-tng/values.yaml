@@ -148,6 +148,11 @@ django:
   # docs/deployment.md#choosing-whether-to-require-a-second-factor, and
   # examples/ carries a starting point for each answer.
   requireSecondFactor: true
+  # What an anonymous caller is told about a person. OFF here, which is the
+  # code's default too. Turning it on is safe only in one narrow case, which
+  # docs/deployment.md#publishing-the-volunteer-roster names --
+  # examples/onboarding.yaml is that case and says so beside the line.
+  publicVolunteerDetails: false
   # The origin printed inside every QR code. Changing it does not change the
   # stickers already on the shelves; see docs/deployment.md.
   labelBaseUrl: "https://inventory.nycmesh.net"

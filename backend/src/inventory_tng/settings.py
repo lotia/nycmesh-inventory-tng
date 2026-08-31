@@ -13,7 +13,7 @@ from typing import Any
 
 from corsheaders.defaults import default_headers
 
-from inventory_tng import database, debugging, devices, forwarded, refusals, second_factor
+from inventory_tng import database, debugging, devices, forwarded, refusals, roster, second_factor
 from inventory_tng.environment import Env
 from inventory_tng.hosts import allowed_hosts
 from inventory_tng.logs import from_environment
@@ -52,6 +52,9 @@ env = Env(
     # the default pointing this way and what turning it off does and does not
     # change.
     REQUIRE_SECOND_FACTOR=(bool, True),
+    # What an anonymous caller is told about a person. `roster` holds the
+    # argument and why the default points where it does.
+    PUBLIC_VOLUNTEER_DETAILS=(bool, False),
 )
 
 # Read the repository-root .env when present -- the same file docker compose
@@ -352,6 +355,14 @@ REQUIRE_SECOND_FACTOR = env("REQUIRE_SECOND_FACTOR")
 _second_factor_announcement = second_factor.announcement(REQUIRE_SECOND_FACTOR)
 if _second_factor_announcement:
     print(_second_factor_announcement, file=sys.stderr)
+
+# What an anonymous caller may read about a person, which is a different
+# question from whether one may write. `roster` says why it is a setting at
+# all, and why this default is the one that costs an operator nothing.
+PUBLIC_VOLUNTEER_DETAILS = env("PUBLIC_VOLUNTEER_DETAILS")
+_roster_announcement = roster.announcement(PUBLIC_VOLUNTEER_DETAILS)
+if _roster_announcement:
+    print(_roster_announcement, file=sys.stderr)
 
 # Provider credentials, all optional. A provider whose client id or secret is
 # absent is not offered, so this application boots with nothing configured and

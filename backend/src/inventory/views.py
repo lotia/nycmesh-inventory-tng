@@ -737,8 +737,16 @@ class VolunteerFilter(FilterSet):
     is a deliberate identification and a whole one, and half an address is
     nobody's: matching a fragment would let a near-miss read as a hit, on
     exactly the field that is there to tell two people apart. Not a privacy
-    measure -- the pick-list already shows every volunteer's identifiers to
-    anybody who may read it.
+    measure: everyone who can reach this endpoint is signed in, and a signed-in
+    caller is shown the identifiers anyway.
+
+    That last clause is now the only thing holding, and it holds because of who
+    may call rather than because of what is returned.
+    ``PUBLIC_VOLUNTEER_DETAILS`` withholds the identifiers from a caller with
+    no account, and an exact lookup on a field nobody is shown is a way to
+    confirm a guess at it. Nobody can do that today, because
+    ``VOLUNTEER_APPEND`` admits nobody anonymous; ``inventory-tng-81f7.6``
+    is that question, to be settled with the work that opens these endpoints.
 
     Only the similarity half uses the GIN trigram index: ``icontains``
     compiles to ``UPPER(display_name) LIKE ...``, which an index on the bare

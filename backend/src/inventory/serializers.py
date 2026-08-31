@@ -52,6 +52,7 @@ import datetime
 import decimal
 from typing import Any
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
@@ -458,11 +459,58 @@ class VolunteerSerializer(serializers.ModelSerializer):
     ``email`` and ``slack_id`` are here because two people called Sean are the
     whole reason this list is searched before anyone adds themselves; without
     something to tell them apart the picker cannot help.
+
+    A caller with no account may be given fewer of them: both contact fields
+    are omitted unless the deployment has chosen to publish them, which is a
+    deployment's answer rather than this endpoint's.
     """
+
+    # Withheld from anonymous callers unless a deployment says otherwise, and
+    # `inventory_tng.roster` is where that choice is argued. Named rather than
+    # inlined so the test and the serializer cannot disagree about which fields
+    # this is about.
+    #
+    # Nothing changes today: every endpoint rendering a volunteer still wants a
+    # session, and `inventory-tng-gnhl` is the work that opens them. Written
+    # ahead of that deliberately, so that opening the door cannot publish a
+    # roster by accident.
+    #
+    # In a comment rather than in the docstring above because drf-spectacular
+    # copies that verbatim into `/api/schema`, which answers anybody who can
+    # reach the port -- an issue key of ours means nothing to whoever fetches
+    # it, and the schema holds no others.
+    PERSONAL = ("email", "slack_id")
 
     class Meta:
         model = Volunteer
         fields = ["id", "display_name", "email", "slack_id"]
+
+    def to_representation(self, instance: Volunteer) -> dict[str, Any]:
+        """The row, minus what an anonymous caller may not have.
+
+        Trimmed here rather than by declaring two serializers, because the
+        difference is one of AUDIENCE rather than of shape: a second class
+        would have to be chosen by every view that renders a volunteer, and the
+        one that forgot would be the one that published.
+
+        NO REQUEST MEANS ANONYMOUS. A serializer used outside a view -- a
+        command, a test, a shell -- cannot be asked who is calling, and not
+        knowing is answered the careful way. Every view that renders a
+        volunteer passes a request, so this costs nothing where it matters.
+        """
+        row: dict[str, Any] = super().to_representation(instance)
+        if self._may_see_contact_details():
+            return row
+        for field in self.PERSONAL:
+            row.pop(field, None)
+        return row
+
+    def _may_see_contact_details(self) -> bool:
+        if settings.PUBLIC_VOLUNTEER_DETAILS:
+            return True
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        return bool(user is not None and user.is_authenticated)
 
 
 class VolunteerConflictSerializer(serializers.Serializer):

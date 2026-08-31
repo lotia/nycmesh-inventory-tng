@@ -24,3 +24,15 @@ django:
   # Do not take this file for an environment holding real stock, whatever it
   # is called.
   requireSecondFactor: false
+
+  # PUBLISHED, and this is the only file in the repository that turns it on.
+  #
+  # What makes that all right is the data and nothing about the design:
+  # seed_demo_data invents every person it writes, so there is no address here
+  # that belongs to anybody. Add one genuine volunteer to this deployment and
+  # the line above stops being true from that day, with nothing in the
+  # software to notice it. The cost, and the narrow case, are
+  # docs/deployment.md#publishing-the-volunteer-roster.
+  #
+  # So do not carry this line across into a values file for anywhere else.
+  publicVolunteerDetails: true
