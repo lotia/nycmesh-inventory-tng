@@ -402,15 +402,34 @@ evidence = {
 missing = [stage for stage, found in evidence.items() if not found]
 if missing:
     for stage in missing:
-        mark = mark_review if stage == "code-review" else mark_simplify
         print(
             "Nothing on pull request %s shows the %s pass ran." % (os.environ["PR"], stage),
             file=sys.stderr,
         )
         print("", file=sys.stderr)
-        print("  Post its findings to the pull request with this line in the body:", file=sys.stderr)
-        print("", file=sys.stderr)
-        print("      %s" % mark, file=sys.stderr)
+        # WHAT TO DO ABOUT IT DIFFERS BY STAGE, and saying otherwise is what
+        # this used to do: it offered the marker for both, so the advice for a
+        # missing review pass was to type the evidence that it had happened.
+        # DEVELOPERS.md "One review pass" says the review submits its own and
+        # the marker is only ever typed on the simplify comment -- so the old
+        # message contradicted the document it closes by citing, and told an
+        # agent to forge exactly what this reader exists to look for.
+        if stage == "code-review":
+            # ABOUT THE ACTOR, NOT THE READER. The stop message a few hundred
+            # lines down can say "yours to run" because it is wired as a Stop
+            # hook and an agent is the only thing that ever reads it. This is a
+            # command anybody may type, so a person running it by hand would be
+            # told the one pass they CAN run is not theirs.
+            print("  An agent cannot run this one; the harness refuses it. A person can:", file=sys.stderr)
+            print("", file=sys.stderr)
+            print("      /code-review %s --comment" % os.environ["PR"], file=sys.stderr)
+            print("", file=sys.stderr)
+            print("  The review it submits is the evidence; there is no marker to type", file=sys.stderr)
+            print("  here, and typing one would be inventing a pass that did not run.", file=sys.stderr)
+        else:
+            print("  Post its findings to the pull request with this line in the body:", file=sys.stderr)
+            print("", file=sys.stderr)
+            print("      %s" % mark_simplify, file=sys.stderr)
         print("", file=sys.stderr)
     print(
         "The receipt records what it finds, so a stage with nothing behind it\n"
@@ -476,6 +495,42 @@ print("%s|%s" % (receipt.get("head") or "", ",".join(missing)))
 '
 }
 
+# What is missing, and WHOSE each one is.
+#
+# Which stage an agent may run and which it must ask for is DEVELOPERS.md "One
+# review pass"; this only has to be enough to act on without going to read it.
+#
+# It said "missing: code-review and simplify" until inventory-tng-d854, which
+# named both stages identically and so said nothing about the only thing an
+# agent needed to decide -- what to do next. What it did next was hand back a
+# batch that was finished and green, both halves of it, when one half was
+# already its own to run.
+#
+# The command is spelled out with the pull request number already in it because
+# a person is going to be asked to type it, and an agent relaying it should not
+# be the step that gets the number wrong.
+#
+# A stage this does not recognise still prints, with the name and no advice: an
+# unannotated line is a smaller failure than a missing one. That is the `case`
+# falling through rather than an arm, because there is no third stage to reach
+# it -- `receipt_status` builds the list from a hardcoded pair a few lines up.
+missing_block() {
+  local pr=$1 stage detail lead='  missing:' stages=()
+  IFS=',' read -r -a stages <<<"$2"
+  for stage in ${stages+"${stages[@]}"}; do
+    detail=
+    case "$stage" in
+      code-review) detail="ask a person to run: /code-review $pr --comment" ;;
+      simplify)    detail="yours to run: /simplify" ;;
+    esac
+    # `%-12s` rather than padding counted into each label by hand, which is
+    # the same column `record_receipt` prints its tally in.
+    printf '%s %-12s %s\n' "$lead" "$stage" "$detail"
+    # As wide as "  missing:", so the second stage lines up under the first.
+    lead='          '
+  done
+}
+
 # ---------------------------------------------------------------------------
 # stop mode: invoked by the Stop hook when a session tries to end a turn
 # ---------------------------------------------------------------------------
@@ -511,7 +566,7 @@ stop_block() {
 }
 
 stop_mode() {
-  local payload branch pr state draft head checks recorded
+  local payload branch pr state draft head checks
   IFS= read -r -d '' payload
 
   # THE BRANCH FIRST, and the order is the point rather than tidiness. This
@@ -614,11 +669,29 @@ with open(path, "w") as fh:
     fh.write("\n")
 ' || exit 0
 
-  [[ -n "$missing" ]] || missing="code-review,simplify"
+  # AN EMPTY LIST HERE IS A DIFFERENT ANSWER, not a default to fill in.
+  #
+  # Reaching this point means the receipt did not satisfy the check, and there
+  # are two ways for that: a stage with nothing behind it, or every stage
+  # evidenced and the head moved since it was recorded -- which is the ordinary
+  # late fixup. The second is not somebody to fetch. It is `record` to run
+  # again, and inventory-tng-8nqo says the review already there still counts.
+  #
+  # It used to fall back to naming both stages, which was merely vague. Once
+  # the stages carry an operator each it becomes wrong: it tells an agent to
+  # interrupt a person over a cycle that has already happened, which is the
+  # hand-off inventory-tng-d854 exists to stop rather than to manufacture.
+  local outstanding
+  if [[ -n "$missing" ]]; then
+    outstanding=$(missing_block "$pr" "$missing")
+  else
+    outstanding="  stale:   the cycle was recorded against an earlier head; record it again"
+  fi
+
   stop_block "Pull request #$pr is ready and green, and its review cycle has not been recorded.
 
   branch:  $branch
-  missing: ${missing//,/ and }
+$outstanding
 
 A batch is finished when it is merged. Stopping here leaves work that looks
 done and is not, which is the state this hook exists to make visible.

@@ -1586,6 +1586,14 @@ the first, so in practice the marker only has to be typed on the simplify
 comment. It is the same device as the `<!-- batch-contents -->` marker CI posts,
 for the same reason: a marker survives rewording and prose does not.
 
+**The two stages do not have the same operator, and an agent has to know which
+is which.** Simplification is an agent's own work and it runs without being
+told to. Reviewing is not: `/code-review` is a built-in carrying
+`disable-model-invocation`, so an agent asking for it is refused, and no
+setting in this repository can grant what the refusal withholds. A batch
+therefore reaches a point where it needs a person and cannot go further alone.
+That pause is the process working.
+
 ### Merging
 
 Squash merge and merge commits are disabled on this repository, so the merge

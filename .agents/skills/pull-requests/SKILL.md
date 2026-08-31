@@ -33,8 +33,25 @@ gh pr ready
 ## Triage before you fix anything
 
 ```bash
-/code-review <pr> --comment
+/code-review <pr> --comment      # a person types this; you cannot
 ```
+
+**Ask for it, and say only that you are asking.** An agent invoking this is
+turned away by the harness rather than by anything here, so there is nothing to
+retry and nothing to configure — see
+[One review pass](../../../DEVELOPERS.md#one-review-pass-findings-filed-per-issue)
+for why. Name the pull request, name the one command, and stop:
+
+> `<pr>` is green and every thread on it is answered. Run
+> `/code-review <pr> --comment` and I will triage, fix and land what comes back.
+
+Do not dress the request up as a failure: that invites a reply about whether
+the batch is in trouble, when it is finished and waiting.
+
+**Never type the marker instead.** Putting
+`<!-- review-cycle: code-review -->` at the left margin having run no pass
+manufactures the evidence the gate exists to look for. It will work, which is
+exactly the problem.
 
 One pass over the whole batch. Now resist the urge to start fixing: the findings
 arrive in the order the reviewer noticed them, and applying them in that order
@@ -82,8 +99,12 @@ of triage was to keep them apart, and a shared working tree undoes it.
 ## Then simplify, the same way
 
 ```bash
-/simplify
+/simplify                        # this one is yours: run it, do not ask for it
 ```
+
+It fans out several review agents of its own and that is what it costs. No
+batch is too small to be worth it: the pass that found the most on PR #80 ran
+over three rows of tracker prose.
 
 `/simplify` has no pull request target and posts nothing itself, so post what it
 found before applying any of it — otherwise the findings exist only in this
@@ -123,8 +144,7 @@ and none of it is yours to weigh.
 
 Two things about that `record` line, because both are easy to get wrong. It
 records the head it saw **and the evidence it found**, so it refuses outright
-when the pull request carries nothing for a stage — but posting a marker is not
-the same as having reviewed, so you are still the one answerable for the cycle.
+when the pull request carries nothing for a stage.
 And anything pushed afterwards moves the head, so the merge is refused until
 you record again: when a late fix means another `fixup!`, the way back in is
 the whole block above, from the rebase down.
