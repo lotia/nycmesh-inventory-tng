@@ -95,6 +95,7 @@ jobs:
           bd import .beads/issues.jsonl
 
       - name: Bring in issues no bead points at
+        id: pull
         env:
           # The token the runner is given already carries issues: read and is
           # scoped to this repository, so nothing has to be configured by hand.
@@ -138,9 +139,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if git diff --quiet -- .beads/issues.jsonl; then
+          # GATED ON WHAT WAS PULLED, NOT ON WHETHER THE FILE CHANGED, and the
+          # difference is not academic. Building the tracker here means
+          # importing the committed export, and that import loses fields --
+          # `defer_until` at least, inventory-tng-oavo -- so exporting again
+          # writes a file that differs whether or not anything arrived. The
+          # first successful run proposed exactly that: three beads silently
+          # un-deferred, by up to eighteen months, and no issue pulled at all.
+          # inventory-tng-wjkd.
+          if [[ "${{ steps.pull.outputs.pulled }}" == "0" ]]; then
             echo "No issue arrived that the tracker did not already have."
             exit 0
+          fi
+
+          # And if something did arrive, the file must have changed. If it has
+          # not, something is wrong upstream of here and a silent success would
+          # hide it.
+          if git diff --quiet -- .beads/issues.jsonl; then
+            echo "::error::${{ steps.pull.outputs.pulled }} issue(s) were pulled and the export did not change."
+            exit 1
           fi
 
           branch="issue-sync/$(date -u +%Y-%m-%dT%H-%M-%SZ)"
