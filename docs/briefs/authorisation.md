@@ -13,6 +13,24 @@ which requires an account on that service; this file is the copy that does not.
 
 ---
 
+## What has been built since, and what it changed
+
+Added 31 August 2026. This brief was written before any of it existed, and three
+of its answers have since become code rather than intentions. The reasoning below
+is unchanged; what follows is where to look for the running version.
+
+| Question | Where it now lives |
+| --- | --- |
+| Q2, two populations | [0012](../decisions/0012-two-populations.md), and `VOLUNTEER_ACCESS` in [access.py](../../backend/src/inventory_tng/access.py) is the switch that makes point 3 true |
+| Q3, administrator sign-in | [0013](../decisions/0013-administrator-sign-in.md) and its 2026-08-30 amendment, which hands the second-factor requirement to the operator |
+| Q4, the volunteer path | Read limits now exist beside the write ones — `AnonymousReadThrottle` in [throttling.py](../../backend/src/inventory/throttling.py) |
+| Q6, where administrators work | [0014](../decisions/0014-one-interface.md), and [0027](../decisions/0027-the-admin-is-meant-to-look-different.md) on why the Django admin is left looking unlike the app |
+
+Two of those settings are marked as debts rather than permanent choices, meaning
+they exist to defer a decision and are meant to be deleted once it is taken.
+Which is which, and what would end each one, is
+[postures.py](../../backend/src/inventory_tng/postures.py).
+
 ## Q1. Can the backend tell our frontend apart from any other client?
 
 **The proposal.** The backend holds a list of allowed origins. If a request
@@ -75,6 +93,14 @@ somebody who already holds it.
 ledger, attribution on every row, and an administrator who can compensate
 anything wrong. Device enrolment follows once the flow is in real use
 (`inventory-tng-jro`).
+
+Built since, and worth stating because the answer above was thinner than it
+reads: the limits this names were on writing only. Safe methods were exempt on
+purpose, since the endpoint taking a volunteer's name is also the list searched
+as somebody types. So an open reading surface was covered by nothing at all
+until `inventory-tng-81f7.1`, which added a limit sized against a different
+attack — asking whether one address belongs to a volunteer, rather than copying
+the roster. `AnonymousReadThrottle` carries that argument.
 
 Rejected alternatives, and why:
 
