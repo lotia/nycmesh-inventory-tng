@@ -209,6 +209,7 @@ ingress's, which would otherwise forward a hostname nothing answers to.
 | `CLIENT_REPORT_RATE` | no | chart (`django.clientReportRate`) | How much a browser may report about its own failures at `POST /api/client-failures`, as `<count>/<period>`. Default `30/min`. A budget of its own rather than a share of the two above, because the app posts here without being asked — once per failing call — so a backend having a bad minute would otherwise spend a volunteer's whole append allowance on reports about it. [`backend/src/inventory/throttling.py`](../backend/src/inventory/throttling.py) argues it |
 | `REAUTHENTICATION_TIMEOUT_SECONDS` | no | chart (`django.reauthenticationTimeoutSeconds`) | How long a sign-in counts as recent enough to make an administrative change; after it, the API answers those writes with `reauthentication_required` and the app offers the sign-in form again. Default `900`. Why there is a second prompt inside a valid session at all is [decision 0014](decisions/0014-one-interface.md) point 5 |
 | `REQUIRE_SECOND_FACTOR` | no | chart (`django.requireSecondFactor`) | Whether an account signing in with a password must set up an authenticator before it can do anything. Default `true`, and turning it off is a supported choice rather than a hole — [Choosing whether to require a second factor](#choosing-whether-to-require-a-second-factor) is what to weigh |
+| `PUBLIC_VOLUNTEER_DETAILS` | no | chart (`django.publicVolunteerDetails`) | Whether a caller with no account may read a volunteer's email address and Slack ID. Default `false`, and safe to turn on **only where every volunteer is invented** — [Publishing the volunteer roster](#publishing-the-volunteer-roster) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | provider Secret | Offers Google sign-in. Absent, or half set, means it is not offered |
 | `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` | no | provider Secret | Offers Slack sign-in, the strongest signal that somebody is actually involved in NYC Mesh |
 | `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_SERVER_URL` | no | provider Secret | Offers a generic OpenID Connect provider. `OIDC_SERVER_URL` is the issuer, the URL whose `/.well-known/openid-configuration` describes the rest. All three are needed |
@@ -744,6 +745,40 @@ What it does *not* change: administrative writes still ask for a recent
 sign-in. That is a different control answering a different threat —
 [decision 0014](decisions/0014-one-interface.md) point 5 — and it works whether
 or not anybody has a second factor.
+
+### Publishing the volunteer roster
+
+`django.publicVolunteerDetails` decides whether a caller with **no account**
+may read a volunteer's email address and Slack ID. It defaults to `false`, and
+a signed-in administrator is unaffected either way.
+
+**Turn it on only where every volunteer is invented.** That is the whole of the
+justification, and it does not generalise. A demonstration seeded by
+`seed_demo_data` holds made-up people, so publishing their details harms
+nobody; the same setting on a deployment holding real volunteers publishes a
+current, checked name-to-address list of a named organisation's members.
+
+[`examples/onboarding.yaml`](../infra/helm/inventory-tng/examples/README.md)
+is the one file that turns it on, and says so beside the line.
+
+**It changes nothing today.** Every endpoint that renders a volunteer still
+requires a session, so there are no anonymous callers yet — that is
+`inventory-tng-gnhl`, and what an anonymous caller *should* be allowed to read
+is still an open question. The setting exists now so that opening those
+endpoints later cannot publish a roster by accident, rather than as a feature
+anybody needs this week.
+
+**The deployment says which it is, every start.** With the roster public the
+backend prints a line on standard error naming the setting — visible in
+`kubectl logs` — for the reason
+[decision 0021](decisions/0021-telemetry-over-otlp.md) point 5 gives about
+adaptation never being silent. There is no line when it is private.
+
+**Two things it does not do.** It does not gate *reading* — anybody may still
+ask, and device enrolment is self-service, so that is no gate either. And it
+does not protect a deployment that starts as a demonstration and quietly
+acquires real people: if one real volunteer is ever added, the setting is wrong
+that day, and nothing in the software will notice.
 
 ## Deploying to CodeNOW
 

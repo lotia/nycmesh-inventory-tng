@@ -17,3 +17,8 @@ django:
   # the difference between this file and onboarding.yaml is visible rather than
   # implied and so that the answer is in the file rather than inherited.
   requireSecondFactor: true
+
+  # WITHHELD, the chart's default again, and spelled out for the same reason as
+  # the line above: two starting points that differ by omission do not show an
+  # operator that there was anything to choose.
+  publicVolunteerDetails: false

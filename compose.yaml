@@ -153,6 +153,12 @@ services:
       # honoured if they do. .env.sample says what the choice means and
       # backend/src/inventory_tng/second_factor.py argues it.
       REQUIRE_SECOND_FACTOR: ${REQUIRE_SECOND_FACTOR:-false}
+      # OFF, and set rather than left out so the intended value is in a file.
+      # A laptop is not a demonstration: nothing here is reachable without a
+      # session anyway, and the value that matters is the one a deployment
+      # would inherit if somebody copied this. .env.sample says when turning
+      # it on is safe.
+      PUBLIC_VOLUNTEER_DETAILS: ${PUBLIC_VOLUNTEER_DETAILS:-false}
       # One proxy in this stack -- nginx in the frontend container -- where a
       # deployed environment has two. See .env.sample.
       NUM_PROXIES: ${NUM_PROXIES:-1}

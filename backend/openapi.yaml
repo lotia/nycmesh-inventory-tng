@@ -2430,6 +2430,10 @@ components:
         ``email`` and ``slack_id`` are here because two people called Sean are the
         whole reason this list is searched before anyone adds themselves; without
         something to tell them apart the picker cannot help.
+
+        A caller with no account may be given fewer of them: both contact fields
+        are omitted unless the deployment has chosen to publish them, which is a
+        deployment's answer rather than this endpoint's.
       properties:
         id:
           type: integer
