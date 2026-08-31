@@ -1,0 +1,137 @@
+name: Issue sync
+
+# scripts/pull-new-issues.sh, run where nobody has to remember to run it.
+#
+# That script says what the gap is and why it exists. What this file adds is
+# only the answer to "who runs it": not a person, and not a git hook either,
+# because the people who would trigger one are exactly the people already using
+# the tracker. `inventory-tng-cwpa.3`.
+#
+# IT PROPOSES, IT DOES NOT PUSH. Three reasons, and the first two were checked
+# rather than assumed:
+#
+#   1. main is protected -- a merge through the interface is refused without
+#      the checks, so a job pushing straight at it would fail anyway.
+#   2. .beads/issues.jsonl is a megabyte on one line per issue. Committing to
+#      main while somebody has local tracker changes is a conflict nobody wants
+#      to resolve by hand.
+#   3. An issue somebody else filed should be SEEN arriving, which is where the
+#      triage in inventory-tng-cwpa.4 happens anyway.
+
+on:
+  # A person, when they want it. Listed first because it is how this should be
+  # tried the first few times.
+  workflow_dispatch:
+  # Somebody filing or reopening an issue is exactly the event this exists for.
+  issues:
+    types: [opened, reopened]
+  # And a sweep, for anything the event missed -- a delivery that failed, or an
+  # issue transferred in, which raises no `opened` here.
+  schedule:
+    - cron: "17 7 * * *"
+
+# One at a time. Two runs racing would both branch from main, both pull the
+# same issues, and open two pull requests proposing the same thing.
+concurrency:
+  group: issue-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: read
+
+jobs:
+  sync:
+    name: Bring new issues into the tracker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      # PINNED, and not @latest. This job runs unattended and writes to the
+      # tracker; a release that changed how a pull maps its fields would do so
+      # without anybody choosing it. v1.1.2 is what the behaviour recorded on
+      # inventory-tng-cwpa was measured against.
+      - name: Install beads
+        run: go install github.com/steveyegge/beads/cmd/bd@v1.1.2
+
+      # The Dolt database is gitignored, so a runner has none. The committed
+      # export is the whole of what is shared, and importing it is how a fresh
+      # clone gets a tracker at all -- checked locally against this repository's
+      # own export before this job was written.
+      - name: Build a tracker from the committed export
+        run: |
+          bd init --prefix inventory-tng
+          bd import .beads/issues.jsonl
+
+      - name: Bring in issues no bead points at
+        env:
+          # The token the runner is given already carries issues: read and is
+          # scoped to this repository, so nothing has to be configured by hand.
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: scripts/pull-new-issues.sh
+
+      # Export explicitly rather than trusting the hook that normally does it:
+      # nothing is committed here, so the hook that exports on commit has not
+      # run, and a proposal built from a stale export would propose nothing.
+      - name: Write the tracker back out
+        run: bd export -o .beads/issues.jsonl
+
+      - name: Propose what arrived
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- .beads/issues.jsonl; then
+            echo "No issue arrived that the tracker did not already have."
+            exit 0
+          fi
+
+          branch="issue-sync/$(date -u +%Y-%m-%dT%H-%M-%SZ)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add .beads/issues.jsonl
+
+          # Written to a file rather than passed inline, because a heredoc is
+          # the one shape that survives this being a YAML block: the block's
+          # indentation is stripped before the shell sees any of it, so the
+          # terminator lands at column zero and the body carries no leading
+          # spaces. Checked by extracting this step and running it. A trailer,
+          # because the
+          # message should be valid by this repository's own rules rather than
+          # exempt from them: no hook runs in a fresh checkout, but the
+          # one-issue-per-commit job DOES run on the pull request this opens,
+          # and `Refs:` is what it wants from a commit advancing an issue
+          # without closing it. `--no-verify` is never the answer -- AGENTS.md.
+          cat > /tmp/sync-message <<'MESSAGE'
+          cwpa.3: Beads for issues filed on GitHub
+
+          Opened by the issue-sync workflow, from issues somebody filed on
+          GitHub -- which bd cannot discover for itself.
+
+          They arrive with a synthetic id, typed task at priority 2, and no
+          parent. inventory-tng-cwpa.4 is the triage that gives them a real
+          identity; read them before merging.
+
+          Refs: inventory-tng-cwpa.3
+          MESSAGE
+          git commit -F /tmp/sync-message
+
+          git push origin "$branch"
+
+          cat > /tmp/sync-body <<'BODY'
+          Beads made from issues filed on GitHub, which `bd` cannot find for itself.
+
+          Each arrives with a synthetic id, typed `task` at priority 2, and no parent.
+          Giving them a real identity is `inventory-tng-cwpa.4`, and it wants a person.
+
+          If this should not be merged, close it — nothing is lost. The next run
+          proposes the same issues again, because closing this records nothing.
+          BODY
+          gh pr create --title "Tracker: issues filed on GitHub" \
+            --body-file /tmp/sync-body --base main --head "$branch"
