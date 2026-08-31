@@ -204,6 +204,30 @@ migrations:
   # talking to a database it does not match.
   enabled: true
 
+# The first administrator, made after the migrations on install and on every
+# upgrade. Why a deployment needs one made for it is documented at
+# docs/deployment.md#the-first-administrator.
+administrator:
+  # NO DEFAULT, and no Job without one. A guessable administrator username is
+  # worse than none, and a deployment managing its own accounts should not have
+  # one made for it. Set this to turn the Job on.
+  username: ""
+  # Optional. Django asks for one; nothing here needs it.
+  email: ""
+  # THE PASSWORD IS NOT HERE and must never be. It is read from
+  # DJANGO_SUPERUSER_PASSWORD in the Secret named by django.existingSecret, for
+  # the reason docs/deployment.md#secrets gives: a values file is committed,
+  # printed by `helm get values` and pasted into issues.
+  #
+  # It is used only when the account is absent. A re-run after the key is
+  # rotated will not reset a password somebody has since changed.
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
 ingress:
   # Off when something in front of this chart already routes to the frontend
   # Service. The application is then reachable only from inside the cluster.

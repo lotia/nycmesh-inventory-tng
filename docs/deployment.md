@@ -322,6 +322,51 @@ kubectl create secret generic inventory-tng-secrets \
   --from-literal=DATABASE_URL='postgres://inventory:CHANGEME@postgres:5432/inventory_tng'
 ```
 
+### The first administrator
+
+A cluster starts with an empty user table, so nobody can reach `/admin/` and
+nobody can be invited — there is nobody to invite them. Set
+`administrator.username` and add a password to the same Secret:
+
+```bash
+kubectl create secret generic inventory-tng-secrets \
+  --namespace inventory-tng \
+  --from-literal=DJANGO_SUPERUSER_PASSWORD='CHANGEME' \
+  ...                                    # alongside the two keys above
+```
+
+```yaml
+administrator:
+  username: ada          # no default: a guessable one is worse than none
+```
+
+A Job then runs `manage.py ensure_administrator` after the migrations, on
+install **and on every upgrade**, creating the account if it is absent and
+reporting success if it is already there. Leave `administrator.username` empty and no Job is created at all.
+
+**It is an ordinary administrator.** Nothing marks it, nothing protects it, and
+it can be deleted like any other — which is deliberate. What protects the
+system is the rule below, not this account.
+
+**A re-run never changes an existing account** — not the password, not the
+flags. So rotating the Secret does not reset a password somebody has since
+changed, and re-running does not re-promote an administrator who was
+deliberately demoted.
+
+### The system always has an administrator
+
+The database refuses the write that would remove the last one. Not deletion
+alone: an administrator also disappears by having their staff flag cleared or
+being deactivated, and demoting yourself is the likelier accident, so all three
+are refused.
+
+It never blocks a handover — add the incoming administrator first and every
+step is allowed. What it refuses is the state nothing could recover from
+through the application.
+
+Two ways back, if it ever happens anyway: re-run the Job above by upgrading the
+release, or create an account directly against the database.
+
 ### The provider Secret
 
 A second Secret, named by `django.providerSecret` and **optional**. Every key

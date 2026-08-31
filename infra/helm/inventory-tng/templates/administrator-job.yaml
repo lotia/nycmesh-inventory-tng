@@ -1,0 +1,88 @@
+{{- if .Values.administrator.username }}
+# The first administrator, so a fresh deployment has somebody who can sign in.
+#
+# This runs `ensure_administrator`, whose docstring says what the problem is
+# and why the command is shaped as it is. What belongs here is only when and
+# how often it runs. `inventory-tng-s8dk`.
+#
+# AFTER THE MIGRATIONS, and the hook weight is what orders it: `auth_user` has
+# to exist, and so does the trigger from migration 0020. -5 is the migrate Job,
+# so -4 is here.
+#
+# IT RUNS ON EVERY UPGRADE, deliberately, and is not a one-off install hook.
+# That is the second half of the owner's requirement: the account is ordinary
+# and may be deleted, so a system CAN reach a state with no administrator if
+# every one of them is removed at the database. Re-running this is the way
+# back, and a way back that only exists at install time is not one.
+#
+# NOTHING IS OVERWRITTEN by a re-run -- not the password, not the flags. See
+# the command's own docstring for why "make sure this exists" must not become
+# "make this match".
+#
+# ABSENT UNLESS ASKED FOR. No username, no Job: a deployment that manages its
+# own accounts should not have one made for it, and there is no default
+# username here because a guessable administrator name is worse than none.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "inventory-tng.fullname" . }}-administrator-{{ .Release.Revision }}
+  labels:
+    {{- include "inventory-tng.labels" . | nindent 4 }}
+    app.kubernetes.io/component: administrator
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-4"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "inventory-tng.labels" . | nindent 8 }}
+        app.kubernetes.io/component: administrator
+    spec:
+      restartPolicy: Never
+      {{- include "inventory-tng.imagePullSecrets" . | nindent 6 }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: administrator
+          image: {{ include "inventory-tng.backendImage" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - python
+            - manage.py
+            - ensure_administrator
+            - --username={{ .Values.administrator.username }}
+            {{- with .Values.administrator.email }}
+            - --email={{ . }}
+            {{- end }}
+          env:
+            {{- include "inventory-tng.backendEnv" . | nindent 12 }}
+            # THE PASSWORD IS NEVER A CHART VALUE. It comes from the same
+            # Secret the database URL and the signing key come from, which is
+            # docs/deployment.md#secrets' rule rather than a new one: a values
+            # file is committed, shown in `helm get values` and pasted into
+            # issues, and a password in one is a password published.
+            #
+            # Only used when the account is absent, so a re-run after the key
+            # is rotated does not reset a password somebody has since changed.
+            - name: DJANGO_SUPERUSER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.django.existingSecret }}
+                  key: DJANGO_SUPERUSER_PASSWORD
+          envFrom:
+            {{- include "inventory-tng.backendEnvFrom" . | nindent 12 }}
+          # Its own figures, for the reason the migrate Job gives about not
+          # sizing a run-once pod like a web process.
+          resources:
+            {{- toYaml .Values.administrator.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+{{- end }}
