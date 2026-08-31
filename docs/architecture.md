@@ -219,9 +219,9 @@ Named here so the gaps are visible rather than surprising:
   this bullet is the standing cost
   [0014](decisions/0014-one-interface.md)'s last consequence names: a model
   added tomorrow reaches the Django admin at once and this interface when
-  somebody builds it. Every API endpoint but the ones
-  [DEVELOPERS.md](../DEVELOPERS.md#signing-in) lists still requires a session,
-  including the two a volunteer needs.
+  somebody builds it. Whether a volunteer needs an account to reach the rest is
+  now a deployment's own answer — [Letting volunteers in without an
+  account](deployment.md#letting-volunteers-in-without-an-account).
 - **Migration from the existing Google Sheet** (52 items, 3,439 submissions).
   It is built: `manage.py stage_sheet` loads an export into the
   staging tables, `manage.py mint_items` and `manage.py import_volunteers` mint

@@ -209,6 +209,7 @@ ingress's, which would otherwise forward a hostname nothing answers to.
 | `CLIENT_REPORT_RATE` | no | chart (`django.clientReportRate`) | How much a browser may report about its own failures at `POST /api/client-failures`, as `<count>/<period>`. Default `30/min`. A budget of its own rather than a share of the two above, because the app posts here without being asked — once per failing call — so a backend having a bad minute would otherwise spend a volunteer's whole append allowance on reports about it. [`backend/src/inventory/throttling.py`](../backend/src/inventory/throttling.py) argues it |
 | `REAUTHENTICATION_TIMEOUT_SECONDS` | no | chart (`django.reauthenticationTimeoutSeconds`) | How long a sign-in counts as recent enough to make an administrative change; after it, the API answers those writes with `reauthentication_required` and the app offers the sign-in form again. Default `900`. Why there is a second prompt inside a valid session at all is [decision 0014](decisions/0014-one-interface.md) point 5 |
 | `REQUIRE_SECOND_FACTOR` | no | chart (`django.requireSecondFactor`) | Whether an account signing in with a password must set up an authenticator before it can do anything. Default `true`, and turning it off is a supported choice rather than a hole — [Choosing whether to require a second factor](#choosing-whether-to-require-a-second-factor) is what to weigh |
+| `VOLUNTEER_ACCESS` | no | chart (`django.volunteerAccess`) | Whether this application answers a caller with no account at all: `session` (the default, and what it has always done) or `open`. [Letting volunteers in without an account](#letting-volunteers-in-without-an-account) |
 | `PUBLIC_VOLUNTEER_DETAILS` | no | chart (`django.publicVolunteerDetails`) | Whether a caller with no account may read a volunteer's email address and Slack ID. Default `false`, and safe to turn on **only where every volunteer is invented** — [Publishing the volunteer roster](#publishing-the-volunteer-roster) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | provider Secret | Offers Google sign-in. Absent, or half set, means it is not offered |
 | `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` | no | provider Secret | Offers Slack sign-in, the strongest signal that somebody is actually involved in NYC Mesh |
@@ -745,6 +746,44 @@ What it does *not* change: administrative writes still ask for a recent
 sign-in. That is a different control answering a different threat —
 [decision 0014](decisions/0014-one-interface.md) point 5 — and it works whether
 or not anybody has a second factor.
+
+### Letting volunteers in without an account
+
+`django.volunteerAccess` decides whether this application answers a caller with
+**no account**. It defaults to `session`, which is what it has always done:
+everything but the index, the two probes and `/api/me` asks for a signed-in
+caller.
+
+Set it to `open` and the endpoints a volunteer actually uses answer anybody:
+the two appends [decision 0012](decisions/0012-two-populations.md) point 3
+names, and the reads without which neither means anything. That decision is
+accepted, and this setting is what implements it.
+
+**Nothing reserved to an administrator opens with it.** Editing the catalogue,
+merging volunteers, revoking labels and minting codes are guarded identically
+whichever way it points, and the generated schema says so per operation.
+
+**Two things to know before turning it on.**
+
+Anonymous reads carry no rate limit yet. What stands in for the credential on
+the two appends exempts reads deliberately — a limit sized for submissions
+would be exhausted by somebody typing into the pick-list — so `open` is a
+posture for a demonstration rather than for a deployment holding real
+volunteers' names. `inventory-tng-81f7.1` is that limit.
+
+Who a caller may learn about is governed elsewhere. `open` alone shows the
+pick-list as names without addresses, because
+`django.publicVolunteerDetails` below defaults to withholding them, and a
+custody location does not name the volunteer holding it whichever way either
+setting points — that one is nobody's to publish until `inventory-tng-81f7` is
+settled.
+
+[`examples/onboarding.yaml`](../infra/helm/inventory-tng/examples/README.md)
+is the one file that sets it to `open`.
+
+**The deployment says which it is, every start**, on standard error, naming
+both the setting and the missing limit — the same reason the roster line below
+exists.
 
 ### Publishing the volunteer roster
 

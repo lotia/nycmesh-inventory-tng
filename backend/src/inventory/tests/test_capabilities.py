@@ -16,6 +16,7 @@ import pytest
 from django.contrib.auth.models import User
 from django.test import Client
 from django.urls import URLResolver, get_resolver, resolve, reverse
+from pytest_django.fixtures import Settings
 from rest_framework.permissions import SAFE_METHODS
 from rest_framework.views import APIView
 
@@ -27,7 +28,7 @@ from inventory.permissions import (
 from inventory.tests import helpers
 from inventory.tests.helpers import post
 from inventory.views import CAPABILITIES
-from inventory_tng import urls
+from inventory_tng import access, urls
 
 pytestmark = pytest.mark.django_db
 
@@ -170,6 +171,25 @@ def test_nothing_but_the_two_volunteer_writes_is_open_to_a_volunteer() -> None:
     }, "a write was opened to volunteers; argue it against decision 0012 before widening this"
 
 
+# Keyed by where the class is defined, not by its bare name: half of these are
+# third-party and all of them are called something generic, so a second
+# HealthCheckView mounted beside the first would be one member of this set and
+# ship unargued. Every other consumer keys on the class itself -- api.py on
+# `self.view`, middleware.py on the resolved one.
+ARGUED = {
+    "inventory.views.ApiRootView": "the index, and the CSRF cookie a browser needs before it can sign in",
+    "inventory.views.HealthCheckView": "the readiness probe; decision 0012 point 3's posture covered this one",
+    "inventory.views.LivenessCheckView": "the second probe, argued in decision 0012 under 'A fourth'",
+    "inventory.views.CurrentUserView": "says what the caller is, so demanding a session makes every load a failure",
+    "inventory.views.ClientFailureView": "argued in decision 0012; the view's own docstring cites the passage",
+    "inventory.views.DebugTraceVerifyView": "the signed token it is handed is the credential; see the view",
+    "inventory.views.DeviceEnrolmentView": "nothing to present until it enrols; the throttle is the guard",
+    "drf_spectacular.views.SpectacularAPIView": "describes this surface rather than being part of it",
+    "drf_spectacular.views.SpectacularSwaggerSplitView": "renders that same description for a person",
+    "django.views.generic.base.RedirectView": "sends the admin's own login form to allauth's; see the route",
+}
+
+
 def test_every_endpoint_asking_nothing_of_its_caller_is_one_the_record_argued() -> None:
     """The audit above sees writes only, which is how ``/api/livez`` slipped past it.
 
@@ -206,23 +226,55 @@ def test_every_endpoint_asking_nothing_of_its_caller_is_one_the_record_argued() 
     plainly what that does and does not buy. It is a real gap, it is named,
     and it is not the shape that was leaking.
     """
-    # Keyed by where the class is defined, not by its bare name: half of these
-    # are third-party and all of them are called something generic, so a
-    # second HealthCheckView mounted beside the first would be one member of
-    # this set and ship unargued. Every other consumer keys on the class
-    # itself -- api.py on `self.view`, middleware.py on the resolved one.
-    argued = {
-        "inventory.views.ApiRootView": "the index, and the CSRF cookie a browser needs before it can sign in",
-        "inventory.views.HealthCheckView": "the readiness probe; decision 0012 point 3's posture covered this one",
-        "inventory.views.LivenessCheckView": "the second probe, argued in decision 0012 under 'A fourth'",
-        "inventory.views.CurrentUserView": "says what the caller is, so demanding a session makes every load a failure",
-        "inventory.views.ClientFailureView": "argued in decision 0012; the view's own docstring cites the passage",
-        "inventory.views.DebugTraceVerifyView": "the signed token it is handed is the credential; see the view",
-        "inventory.views.DeviceEnrolmentView": "nothing to present until it enrols; the throttle is the guard",
-        "drf_spectacular.views.SpectacularAPIView": "describes this surface rather than being part of it",
-        "drf_spectacular.views.SpectacularSwaggerSplitView": "renders that same description for a person",
-        "django.views.generic.base.RedirectView": "sends the admin's own login form to allauth's; see the route",
-    }
+    argued = ARGUED
+    held_against(argued)
+
+
+# The endpoints the `open` posture adds, and nothing else may join them without
+# a sentence here. Kept apart from the list above rather than merged into it
+# because the two are answerable to different things: that list is decision
+# 0012's, settled, and this one is `inventory_tng.access`'s, which exists
+# BECAUSE `inventory-tng-81f7` is not settled. Whoever prunes the setting
+# deletes this dict and moves any survivor up.
+ARGUED_WHEN_OPEN = {
+    "inventory.views.VolunteerListCreateView": "the pick-list, and the append that puts you on it",
+    "inventory.views.StockTransactionCreateView": "the other append of decision 0012 point 3; the ledger a scan writes",
+    "inventory.views.ItemListView": "the catalogue and its balances, which a scanner is mostly made of",
+    "inventory.views.LocationListView": "where a transaction says stock went; the holder is withheld separately",
+    "inventory.views.ItemDetailView": "one item, which a scan falls back to when the map has no name for a code",
+    "inventory.views.LabelListView": "the label map itself, prefetched so a scan needs no round trip per code",
+    "inventory.views.LabelResolveView": "one scanned code, which is the scan",
+}
+
+
+def test_the_open_posture_opens_exactly_what_the_record_names(settings: Settings) -> None:
+    """The same question, asked of the deployment that answers it differently.
+
+    THE REASON THIS TEST EXISTS RATHER THAN THE ONE ABOVE SUFFICING: admission
+    now depends on a SETTING, so a suite that only ever runs one value audits
+    only one of the two applications this repository ships. Everything
+    `inventory-tng-2hbv` repaired would go on being true and still miss the
+    posture where it matters most, because the careful default is the one that
+    exposes nothing.
+
+    It is also the shape that would hide a mistake. `VolunteerReaches` is the
+    project default with `IsAuthenticated` swapped out, so a view given
+    `VOLUNTEER_READ` when it wanted the default reads exactly like its
+    neighbours right up until an operator sets one word.
+    """
+    settings.VOLUNTEER_ACCESS = access.OPEN
+
+    held_against(ARGUED | ARGUED_WHEN_OPEN)
+
+
+def held_against(argued: dict[str, str]) -> None:
+    """Every view a caller with no credential reaches is one on this list.
+
+    Shared by the two tests above because the WALK is the same question and
+    only the expected answer differs; a second copy of it would be the drift
+    `inventory-tng-s047` was about, arriving by the door marked "but this one
+    is for the other posture".
+    """
     assert all(argued.values()), "an entry with no reason is a name, and a name is not an argument"
 
     open_to_everybody = set()

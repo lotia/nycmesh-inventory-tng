@@ -36,3 +36,4 @@ django:
   #
   # So do not carry this line across into a values file for anywhere else.
   publicVolunteerDetails: true
+  volunteerAccess: open

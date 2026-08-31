@@ -661,9 +661,43 @@ class CategorySerializer(TreeSerializer):
 class LocationSerializer(TreeSerializer):
     """Somewhere stock can be, including a volunteer holding it."""
 
+    #: Who is holding stock, which is a fact about a PERSON and not about a
+    #: place: a custody location says "Sean has this, and Sean is somewhere
+    #: with it". `VolunteerSerializer.PERSONAL` above withholds the same class
+    #: of thing for the same reason, and this is the second member of it
+    #: rather than a new idea.
+    PERSONAL = ("held_by",)
+
     class Meta:
         model = Location
         fields = ["id", "name", "kind", "parent", "held_by", "active"]
+
+    def to_representation(self, instance: Location) -> dict[str, Any]:
+        """The row, minus who is holding it when the caller has no account.
+
+        WITHHELD BECAUSE NOBODY HAS DECIDED OTHERWISE, which is a different
+        reason from the one above and worth not conflating. Whether a custody
+        location may be disclosed anonymously is `inventory-tng-81f7`'s second
+        question, it belongs to a consultation rather than to this file, and
+        `VOLUNTEER_ACCESS=open` would have answered it silently by shipping.
+
+        So this is the cautious answer held until somebody gives a considered
+        one, and NOT a claim that the considered one will be the same. It is
+        also not governed by `PUBLIC_VOLUNTEER_DETAILS`: that setting says
+        what a roster may publish about somebody who chose to be on it, and
+        where a named person physically is at this moment is not that.
+
+        Signed-in callers are unaffected, as with the roster, because the
+        administrator reconciling stock needs exactly what they needed before.
+        """
+        row = super().to_representation(instance)
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated:
+            return row
+        for field in self.PERSONAL:
+            row.pop(field, None)
+        return row
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """Mirrors ``location_held_by_iff_custody``, so a client sees a 400.

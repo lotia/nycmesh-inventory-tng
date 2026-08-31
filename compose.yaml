@@ -159,6 +159,7 @@ services:
       # would inherit if somebody copied this. .env.sample says when turning
       # it on is safe.
       PUBLIC_VOLUNTEER_DETAILS: ${PUBLIC_VOLUNTEER_DETAILS:-false}
+      VOLUNTEER_ACCESS: ${VOLUNTEER_ACCESS:-session}
       # One proxy in this stack -- nginx in the frontend container -- where a
       # deployed environment has two. See .env.sample.
       NUM_PROXIES: ${NUM_PROXIES:-1}
