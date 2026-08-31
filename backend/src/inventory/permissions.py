@@ -11,10 +11,11 @@ expressible on the view itself.
 from typing import TYPE_CHECKING, Any
 
 from allauth.account.internal.flows.reauthentication import did_recently_authenticate
-from rest_framework.permissions import SAFE_METHODS, AllowAny, BasePermission, IsAuthenticated
+from django.conf import settings
+from rest_framework.permissions import SAFE_METHODS, AllowAny, BasePermission
 from rest_framework.request import Request
 
-from inventory_tng import devices
+from inventory_tng import access, devices
 
 if TYPE_CHECKING:
     from django.http import HttpRequest
@@ -161,6 +162,36 @@ class DeviceNotRevoked(BasePermission):
         return state != DEVICE_REVOKED
 
 
+class VolunteerReaches(BasePermission):
+    """``IsAuthenticated``, unless this deployment says a volunteer need not be.
+
+    The one class that reads ``VOLUNTEER_ACCESS``, so that the endpoints
+    decision 0012 point 3 opens are a list of views rather than a condition
+    repeated on each of them. `inventory_tng.access` carries the whole
+    argument: why it is a setting, why the default is what this application
+    already did, and what `open` leaves owing.
+
+    IT REPLACES EXACTLY ONE CLASS AND NOTHING ELSE. A view opting into this
+    keeps ``StaffWrites``, the step-up and ``DeviceNotRevoked``, so an
+    administrator's write is guarded identically whichever way the setting
+    points. What changes is only whether a caller with no account gets through
+    the door -- never what they may do once inside.
+
+    THIS IS THE SHAPE ``inventory-tng-2hbv`` WAS ABOUT, deliberately: the
+    project default with ``IsAuthenticated`` swapped out. The audit that used
+    to read permission class NAMES could not have seen this, because the
+    admission depends on a setting rather than on a spelling. It asks about
+    admission now, and `test_capabilities.py` asks it under both settings.
+    """
+
+    message = "This deployment asks a volunteer to sign in; VOLUNTEER_ACCESS is not open."
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        if settings.VOLUNTEER_ACCESS == access.OPEN:
+            return True
+        return bool(request.user and request.user.is_authenticated)
+
+
 # The two endpoints decision 0012 point 3 opens to a volunteer, and the only
 # things in this API that may be written without the staff flag. Named once so
 # that they are one list rather than two identical literals, so that what these
@@ -172,7 +203,7 @@ class DeviceNotRevoked(BasePermission):
 # `DeviceNotRevoked` rides along for the reason it is on the project default
 # too: these two are the writes, so they are the last place a device somebody
 # has cut off should go on being answered.
-VOLUNTEER_APPEND = [IsAuthenticated, DeviceNotRevoked]
+VOLUNTEER_APPEND = [VolunteerReaches, DeviceNotRevoked]
 
 
 def recently_authenticated(request: Request | HttpRequest) -> bool:
@@ -236,6 +267,19 @@ class RecentlyAuthenticated(BasePermission):
         # one `GET /api/me` by a stale administrator emit four refusals for
         # operations nobody attempted, on every page load.
         return request.method in SAFE_METHODS or recently_authenticated(request)
+
+
+# The reads a volunteer needs before either of those writes means anything.
+# Decision 0012's context paragraph already names the state this leaves behind,
+# and `inventory-tng-gnhl`'s whole point is that opening the two appends alone
+# would leave a scanner that can submit and cannot look anything up. Which
+# views are on it is not restated anywhere: test_capabilities.py walks for
+# them and argues each.
+#
+# The project default with one class exchanged, spelled out rather than built
+# by subtraction, because a reader here should not have to hold the default in
+# their head to see what a stranger may reach.
+VOLUNTEER_READ = [VolunteerReaches, StaffWrites, RecentlyAuthenticated, DeviceNotRevoked]
 
 
 def administrators_only(view: APIView, method: str) -> bool:

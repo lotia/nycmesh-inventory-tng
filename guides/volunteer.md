@@ -13,9 +13,9 @@ a laptop and the address of the inventory app. Administrators have
    if you are bringing something back.
 5. Press **Save**. Nothing is recorded until you do.
 
-Everything below is one of those five not going to plan. [Signing
-in](#signing-in) and [the camera](#if-the-camera-will-not-open) are at the
-bottom, out of the way.
+Everything below is one of those five not going to plan. [Being asked to sign
+in](#if-the-app-asks-you-to-sign-in) and [the
+camera](#if-the-camera-will-not-open) are at the bottom, out of the way.
 
 ---
 
@@ -197,12 +197,14 @@ press **Try again** rather than walking away.
 
 ---
 
-## Signing in
+## If the app asks you to sign in
 
-Today the app asks everybody to sign in, volunteers included, so ask an
-administrator for a login if you have none. That is a gap rather than a plan;
-it is listed in
-[what is not built yet](../docs/architecture.md#not-yet-built).
+It may not. Some deployments let a volunteer scan and save with no account at
+all, and if yours does, there is nothing on this page for you to do.
+
+Where it does ask, that is a choice whoever runs it made, and the person who
+set it up is who to ask for a login. It is not a step you are expected to work
+around.
 
 ## If the camera will not open
 

@@ -22,3 +22,4 @@ django:
   # the line above: two starting points that differ by omission do not show an
   # operator that there was anything to choose.
   publicVolunteerDetails: false
+  volunteerAccess: session

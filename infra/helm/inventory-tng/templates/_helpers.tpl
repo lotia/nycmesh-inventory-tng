@@ -158,6 +158,8 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
   value: {{ .Values.django.requireSecondFactor | quote }}
 - name: PUBLIC_VOLUNTEER_DETAILS
   value: {{ .Values.django.publicVolunteerDetails | quote }}
+- name: VOLUNTEER_ACCESS
+  value: {{ .Values.django.volunteerAccess | quote }}
 - name: LABEL_BASE_URL
   value: {{ .Values.django.labelBaseUrl | quote }}
 - name: DATABASE_CONNECT_TIMEOUT_SECONDS

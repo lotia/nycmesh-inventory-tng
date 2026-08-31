@@ -153,6 +153,10 @@ django:
   # docs/deployment.md#publishing-the-volunteer-roster names --
   # examples/onboarding.yaml is that case and says so beside the line.
   publicVolunteerDetails: false
+  # Whether a volunteer needs an account at all: `session` (this application's
+  # long-standing behaviour, and the default) or `open`. What `open` opens, and
+  # what it leaves owing, is backend/src/inventory_tng/access.py.
+  volunteerAccess: session
   # The origin printed inside every QR code. Changing it does not change the
   # stickers already on the shelves; see docs/deployment.md.
   labelBaseUrl: "https://inventory.nycmesh.net"

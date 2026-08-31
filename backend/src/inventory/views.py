@@ -38,6 +38,7 @@ from inventory.models import (
 from inventory.permissions import (
     DEVICE_STATES,
     VOLUNTEER_APPEND,
+    VOLUNTEER_READ,
     is_administrator,
     presented_device,
     recently_authenticated,
@@ -1056,6 +1057,10 @@ class ItemListView(RecordsWhatItCreated, WithdrawnRows, ReadsAndWritesDiffer, Li
     separates them.
     """
 
+    # The catalogue and its balances. The screen a scanner is mostly made of,
+    # so a volunteer with no account reaching this is most of gnhl.
+    permission_classes = VOLUNTEER_READ
+
     filterset_class = ItemFilter
     queryset = OFFERED_ITEMS
     every_row = ITEMS
@@ -1075,6 +1080,11 @@ class ItemDetailView(DetailView):
     [decision 0019](../../../docs/decisions/0019-retired-means-not-offered.md) --
     it stops being offered and stays countable.
     """
+
+    # One item, which `scan/applyCode.ts` falls back to; test_volunteer_flow_
+    # reaches.py says when and why that fallback fires. Its payload is a row of
+    # the list above, which is already open, so this discloses nothing new.
+    permission_classes = VOLUNTEER_READ
 
     serializer_class = ItemDetailSerializer
     every_row = ITEMS
@@ -1096,6 +1106,10 @@ class LocationListView(RecordsWhatItCreated, WithdrawnRows, ListCreateAPIView):
     return nothing. Same shape as the volunteer pick-list, which narrows on a
     queryset rather than advertising `active` either.
     """
+
+    # Where a transaction says stock went. Custody locations are still
+    # rendered without their holder to anybody anonymous -- LocationSerializer.
+    permission_classes = VOLUNTEER_READ
 
     serializer_class = LocationSerializer
     filterset_fields = ["kind", "parent"]
@@ -1161,6 +1175,12 @@ class LabelListView(RecordsWhatItCreated, ReadsAndWritesDiffer, ListCreateAPIVie
     handing it back in pages would make the client stitch them together for no
     benefit at a few hundred rows.
     """
+
+    # THE label map, and the one `scan/labelCache.ts` prefetches. Not
+    # `LabelSheetView`, which lays out stickers for a printer and is the
+    # administrator's; opening that instead is the mistake this comment exists
+    # to stop somebody repeating.
+    permission_classes = VOLUNTEER_READ
 
     pagination_class = None
     queryset = LIVE_LABELS
@@ -1331,6 +1351,9 @@ class LabelResolveView(ReadsAndWritesDiffer, DetailView):
     PATCH of ``revoked``, never a delete: the ledger's history refers to what
     the sticker pointed at.
     """
+
+    # The resolver for one scanned code, which is the scan itself.
+    permission_classes = VOLUNTEER_READ
 
     # A revoked label is still offered here, so there is nothing withdrawn and
     # both querysets are the same one. Its code cannot be changed once printed

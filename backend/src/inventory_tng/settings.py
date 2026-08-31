@@ -13,7 +13,7 @@ from typing import Any
 
 from corsheaders.defaults import default_headers
 
-from inventory_tng import database, debugging, devices, forwarded, refusals, roster, second_factor
+from inventory_tng import access, database, debugging, devices, forwarded, refusals, roster, second_factor
 from inventory_tng.environment import Env
 from inventory_tng.hosts import allowed_hosts
 from inventory_tng.logs import from_environment
@@ -55,6 +55,10 @@ env = Env(
     # What an anonymous caller is told about a person. `roster` holds the
     # argument and why the default points where it does.
     PUBLIC_VOLUNTEER_DETAILS=(bool, False),
+    # Whether a volunteer needs an account before this application answers
+    # them at all. `access` holds the argument, and the default is what this
+    # application did before the setting existed.
+    VOLUNTEER_ACCESS=(str, access.SESSION),
 )
 
 # Read the repository-root .env when present -- the same file docker compose
@@ -363,6 +367,14 @@ PUBLIC_VOLUNTEER_DETAILS = env("PUBLIC_VOLUNTEER_DETAILS")
 _roster_announcement = roster.announcement(PUBLIC_VOLUNTEER_DETAILS)
 if _roster_announcement:
     print(_roster_announcement, file=sys.stderr)
+
+# Whether a volunteer needs an account at all, which is the question decision
+# 0012 point 3 answers and this setting is the switch for. `access` says why it
+# is a setting rather than simply the behaviour, and what `open` leaves owing.
+VOLUNTEER_ACCESS = access.chosen(env("VOLUNTEER_ACCESS"))
+_access_announcement = access.announcement(VOLUNTEER_ACCESS)
+if _access_announcement:
+    print(_access_announcement, file=sys.stderr)
 
 # Provider credentials, all optional. A provider whose client id or secret is
 # absent is not offered, so this application boots with nothing configured and
