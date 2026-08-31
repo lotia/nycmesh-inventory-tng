@@ -22,7 +22,6 @@ removed.
 """
 
 import importlib
-from pathlib import Path
 
 import pyotp
 import pytest
@@ -35,16 +34,10 @@ from pytest_django.fixtures import Settings
 
 from inventory.tests.charts import rendered
 from inventory.tests.conftest import ADMINISTRATOR_PASSWORD as PASSWORD
-from inventory.tests.helpers import activate_totp, shipped, start_local_sign_in, wind_back
+from inventory.tests.helpers import activate_totp, start_local_sign_in, wind_back
 from inventory_tng import second_factor
 
 SETTING = "REQUIRE_SECOND_FACTOR"
-# The same pair test_trusted_origins.py checks, for the reason given there.
-SHIPPED = ("compose.yaml", ".env.sample")
-# Where the chart's two example values files live, and what each is expected to
-# say. They exist so that an operator's starting point states the answer rather
-# than inheriting it, which is worth nothing if they drift from the setting.
-EXAMPLES = {"onboarding.yaml": "false", "real-data.yaml": "true"}
 
 
 # ---------------------------------------------------------------------------
@@ -249,30 +242,6 @@ def test_what_the_environment_says_is_what_the_setting_becomes() -> None:
     )
 
 
-@pytest.mark.parametrize("a_file", SHIPPED)
-def test_every_shipped_configuration_says_so_rather_than_implying_it(a_file: str) -> None:
-    """The local stack's answer is in a file, not inherited from the code."""
-    text = shipped(Path(a_file))
-
-    assert SETTING in text, (
-        f"{a_file} does not mention {SETTING}, so what a fresh clone runs with is whatever the code fell "
-        "back to rather than something this repository chose"
-    )
-
-
-def test_the_chart_renders_it_and_requires_it_by_default() -> None:
-    supplied = rendered()
-
-    assert SETTING in supplied, (
-        f"the chart does not put {SETTING} in the backend's environment, so a cluster has no way to make "
-        "this choice without editing the chart"
-    )
-    assert supplied[SETTING]["value"] == "true", (
-        "the chart's default no longer requires a second factor, so an operator who reads no documentation "
-        "gets the permissive answer"
-    )
-
-
 def test_what_an_operator_sets_is_what_django_would_read() -> None:
     """The chart's rendering and Django's parsing, held to one answer.
 
@@ -288,20 +257,4 @@ def test_what_an_operator_sets_is_what_django_would_read() -> None:
     assert read is False, (
         f"the chart renders {SETTING} in a shape Django does not read back as off, so an operator who "
         f"turned the requirement off still has it on; it read {read!r}"
-    )
-
-
-@pytest.mark.parametrize(("example", "expected"), EXAMPLES.items())
-def test_each_example_states_the_answer_it_is_named_for(example: str, expected: str) -> None:
-    """The two starting points an operator copies, held to differing where they claim to.
-
-    Their whole purpose is that the choice is visible in the file rather than
-    inherited, so an example that stopped setting it -- or that agreed with the
-    other one -- would be worse than not shipping it at all.
-    """
-    text = shipped(Path("infra/helm/inventory-tng/examples") / example)
-
-    assert f"requireSecondFactor: {expected}" in text, (
-        f"{example} no longer says requireSecondFactor: {expected}, so the starting point named for this "
-        "answer does not carry it"
     )

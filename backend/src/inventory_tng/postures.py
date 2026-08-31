@@ -72,6 +72,23 @@ class Posture:
     #: For a provisional flag: what would let it be deleted, naming the issue
     #: that settles it. For a permanent one: why it will not be.
     retirement: str
+    #: The chart value an operator sets, and empty when no chart renders this
+    #: one at all. Recorded rather than derived, because "no chart renders it"
+    #: is a fact about the setting worth being able to read back.
+    chart_value: str = ""
+    #: What the chart's own default renders to. It must be the cautious answer:
+    #: it is what a cluster whose operator read nothing runs with.
+    chart_default: str = ""
+    #: Any value that is NOT the default, used to prove the chart passes an
+    #: operator's answer through rather than hard-coding the safe one. Recorded
+    #: per setting because there is no deriving it: these are booleans, words,
+    #: and one pair (`redacted`/`recorded`) that is neither.
+    chart_probe: str = ""
+    #: What each shipped Helm example is expected to say, by file name. The
+    #: examples exist to make a choice VISIBLE in the file rather than
+    #: inherited, so one that stopped setting a value -- or that agreed with
+    #: the other -- would be worse than not shipping it at all.
+    examples: tuple[tuple[str, str], ...] = ()
 
 
 REGISTER = (
@@ -87,6 +104,10 @@ REGISTER = (
             "delete it the other way and inventory-tng-jro is what replaces it. Either way one "
             "value survives and the setting does not."
         ),
+        chart_value="django.volunteerAccess",
+        chart_default="session",
+        chart_probe="open",
+        examples=(("onboarding.yaml", "open"), ("real-data.yaml", "session")),
     ),
     Posture(
         setting="PUBLIC_VOLUNTEER_DETAILS",
@@ -100,6 +121,10 @@ REGISTER = (
             "entry moves to permanent rather than being deleted. That is a decision, and it has not "
             "been taken."
         ),
+        chart_value="django.publicVolunteerDetails",
+        chart_default="false",
+        chart_probe="true",
+        examples=(("onboarding.yaml", "true"), ("real-data.yaml", "false")),
     ),
     Posture(
         setting="REQUIRE_SECOND_FACTOR",
@@ -112,6 +137,10 @@ REGISTER = (
             "it replaces, and which deployments need one is not this repository's to decide. "
             "Removing the flag would be taking that decision back."
         ),
+        chart_value="django.requireSecondFactor",
+        chart_default="true",
+        chart_probe="false",
+        examples=(("onboarding.yaml", "false"), ("real-data.yaml", "true")),
     ),
     Posture(
         setting="TELEMETRY_PERSONAL_DATA",
@@ -123,6 +152,10 @@ REGISTER = (
             "operator may re-admit for their own debugging is theirs, under the four conditions "
             "that decision puts on it."
         ),
+        chart_value="django.personalData",
+        chart_default="redacted",
+        chart_probe="recorded",
+        examples=(),
     ),
     Posture(
         setting="DJANGO_LOG_LAYOUT",

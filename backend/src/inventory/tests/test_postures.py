@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 import inventory_tng
+from inventory.tests.charts import rendered
 from inventory.tests.helpers import shipped
 from inventory_tng import postures
 
@@ -136,3 +137,99 @@ def test_an_operator_can_find_out_what_each_one_does(entry: postures.Posture) ->
         f"{entry.setting} changes what this application does and neither operator document mentions "
         "it, so the only way to find out is to read the source"
     )
+
+
+# ---------------------------------------------------------------------------
+# Written down in every file that ships, for every posture at once
+# ---------------------------------------------------------------------------
+#
+# ONE COPY, DRIVEN BY THE REGISTER. These four assertions used to live three
+# times over, in test_second_factor.py, test_roster_visibility.py and
+# test_volunteer_access.py, with nothing but the constants differing --
+# inventory-tng-aoji.3. A fourth setting meant a fourth copy, and whoever
+# wrote it would have written two of the four and not noticed the others were
+# missing, because nothing said what the full set was.
+#
+# Now a setting gets this coverage by being REGISTERED, which is the same act
+# that records whether it is a debt. The behaviour tests stay in their own
+# files; what moved is only the family that asks whether a choice is visible
+# in the files this repository ships rather than inherited from the code.
+
+#: The pair that decides what a local stack actually runs with, as opposed to
+#: what a cluster does. test_trusted_origins.py argues why both matter.
+SHIPPED = ("compose.yaml", ".env.sample")
+
+#: The entries a chart renders. `DJANGO_LOG_LAYOUT` is not one: it is a
+#: property of the terminal a process is writing to, decided per process
+#: rather than per deployment, so there is nothing for an operator to set.
+CHARTED = [entry for entry in postures.REGISTER if entry.chart_value]
+
+
+@pytest.mark.parametrize("entry", CHARTED, ids=lambda entry: entry.setting)
+@pytest.mark.parametrize("a_file", SHIPPED)
+def test_every_shipped_configuration_states_each_posture(a_file: str, entry: postures.Posture) -> None:
+    """What a fresh clone runs with is chosen here rather than fallen back to.
+
+    ASKED OF THE CHARTED ONES. `DJANGO_LOG_LAYOUT` is absent from
+    `compose.yaml` correctly: it describes the terminal a process is writing
+    to, and a container has none, so there is nothing for a deployment to say.
+    That it belongs in `.env.sample` at all is check-config's business.
+    """
+    assert entry.setting in shipped(Path(a_file)), (
+        f"{a_file} does not mention {entry.setting}, so what a fresh clone runs with is whatever the "
+        "code fell back to rather than something this repository chose"
+    )
+
+
+@pytest.mark.parametrize("entry", CHARTED, ids=lambda entry: entry.setting)
+def test_the_chart_renders_each_posture_at_its_cautious_default(entry: postures.Posture) -> None:
+    supplied = rendered()
+
+    assert entry.setting in supplied, (
+        f"the chart does not put {entry.setting} in the backend's environment, so a cluster has no way "
+        f"to make this choice without editing the chart"
+    )
+    assert supplied[entry.setting]["value"] == entry.chart_default, (
+        f"the chart's default for {entry.setting} is no longer {entry.chart_default!r}, so a cluster "
+        f"whose operator read nothing runs with {supplied[entry.setting]['value']!r}"
+    )
+
+
+@pytest.mark.parametrize("entry", [e for e in CHARTED if e.chart_probe], ids=lambda entry: entry.setting)
+def test_each_chart_value_carries_the_operator_answer_rather_than_a_constant(entry: postures.Posture) -> None:
+    """A template that hard-coded the cautious value passes the test above.
+
+    That is the shape worth a second render: rendering the safe default and
+    ignoring the operator looks identical to rendering it and honouring them,
+    right up to the deployment that will not do what it was told.
+
+    `chart_probe` rather than a rule for inverting a default, because these
+    are booleans, words, and one pair (`redacted`/`recorded`) that is neither.
+    A rule that guessed wrong would render a value the chart does not accept,
+    and the failure would say nothing about the question being asked.
+    """
+    asked = entry.chart_probe
+
+    supplied = rendered(**{entry.chart_value: asked})
+
+    assert supplied[entry.setting]["value"] == asked, (
+        f"the chart renders {entry.setting} without reading {entry.chart_value}, so an operator's "
+        f"answer never reaches the application; it rendered {supplied[entry.setting]['value']!r}"
+    )
+
+
+@pytest.mark.parametrize("entry", [e for e in CHARTED if e.examples], ids=lambda entry: entry.setting)
+def test_each_example_states_the_answer_it_is_named_for(entry: postures.Posture) -> None:
+    """Both starting points choose, and they choose oppositely.
+
+    An example that dropped a line would inherit the cautious answer and look
+    fine, which is why the assertion is on the words rather than on behaviour.
+    """
+    for example, expected in entry.examples:
+        text = shipped(Path("infra/helm/inventory-tng/examples") / example)
+        leaf = entry.chart_value.split(".")[-1]
+
+        assert f"{leaf}: {expected}" in text, (
+            f"{example} no longer says {leaf}: {expected}, so the starting point named for this answer "
+            "does not carry it"
+        )
