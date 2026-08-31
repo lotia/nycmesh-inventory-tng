@@ -1259,8 +1259,9 @@ fine — see [CONTRIBUTING.md](CONTRIBUTING.md). An issue you open there is mean
 to reach the tracker rather than sit beside it:
 
 ```bash
-scripts/pull-new-issues.sh --dry-run   # which issues no bead points at yet
-scripts/pull-new-issues.sh             # bring them in
+scripts/sync-issues.sh --dry-run   # what would move, in either direction
+scripts/sync-issues.sh             # reconcile the two
+scripts/pull-new-issues.sh         # only the half that brings issues in
 ```
 
 `bd` syncs what it already knows about and enumerates nothing, so without this
@@ -1270,10 +1271,21 @@ recorded in `.beads/issues.jsonl`, and pulls the difference. It reads the
 committed export rather than the local database, so it gives the same answer in
 a fresh clone and in CI.
 
-It needs `gh` authenticated and a `GITHUB_TOKEN`; without them it says so and
-stops rather than reporting that there was nothing to do. Being unable to run it
-does not break anything — the tracker is not made wrong by an unsynced issue,
-only incomplete.
+`sync-issues.sh` does four steps in an order chosen for one reason: it pulls
+first and **shows you what arrived** before it pushes anything. On a conflict
+the more recent side wins, so an edit made on GitHub can replace a bead's
+description — and because the export is committed, that arrives as a git diff
+you can read and `git checkout` away before anything leaves.
+
+Both need `gh` authenticated and a `GITHUB_TOKEN`; without them they say so and
+stop rather than reporting that there was nothing to do. Being unable to run
+them does not break anything — the tracker is not made wrong by an unsynced
+issue, only incomplete.
+
+Neither runs from a git hook, deliberately. Pushing writes `external_ref` onto
+the beads it files issues for, which rewrites the committed export, so a hook on
+`git push` would leave the tracker dirty every time. CI runs it instead, where
+that change is committed rather than abandoned.
 
 **Every bead you write is published.** See
 [0029](docs/decisions/0029-the-issue-tracker-is-public.md) for what that means
