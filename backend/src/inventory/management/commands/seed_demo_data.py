@@ -75,7 +75,7 @@ from typing import Any
 from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
 
-from inventory.management.commands import _report, _seeding, _telemetry
+from inventory.management.commands import _report, _roster, _seeding, _telemetry
 from inventory.models import (
     Category,
     Item,
@@ -186,12 +186,53 @@ def locations(added: Counter[str]) -> dict[str, Location]:
     return made
 
 
-def volunteers(added: Counter[str]) -> dict[str, Volunteer]:
+def volunteers(added: Counter[str], *, with_roster: bool = False) -> dict[str, Volunteer]:
     """The pick-list, by display name. `_seeding` says why this is not a get_or_create."""
     made = {}
     for name in VOLUNTEERS:
         made[name], created = _seeding.selectable_volunteer(name)
         added["volunteers"] += created
+    if with_roster:
+        made.update(demonstration_roster(added))
+    return made
+
+
+def demonstration_roster(added: Counter[str]) -> dict[str, Volunteer]:
+    """The invented crowd behind the two, when asked for.
+
+    NOT `selectable_volunteer`, and finding that out is what this docstring is
+    for. That helper finds a selectable row of the same display name and
+    returns it, which is right everywhere else and wrong here: the two people
+    sharing a name are the entire point, and looked up that way the second
+    collapses into the first. Seeded through it, the roster came out with
+    eighty-six rows, no collisions, and a demonstration with nothing to
+    demonstrate.
+
+    So the count is what is made idempotent rather than the name. For each
+    display name this counts the selectable rows already wearing it and adds
+    only the shortfall, so a second run changes nothing and a name meant to be
+    worn twice ends up worn twice.
+
+    An address is written only where the person has one, so the roughly half
+    with none are stored as null rather than as an empty string -- which is
+    what the pick-list renders as no second line, and is the case the run of
+    show has to be honest about.
+    """
+    made: dict[str, Volunteer] = {}
+    wanted: dict[str, list[_roster.Person]] = {}
+    for person in _roster.roster():
+        wanted.setdefault(person.display_name, []).append(person)
+
+    for name, people in wanted.items():
+        existing = list(Volunteer.objects.selectable().filter(display_name=name))
+        for person in people[len(existing) :]:
+            row = Volunteer.objects.create(display_name=name, email=person.email or None)
+            existing.append(row)
+            added["volunteers"] += 1
+        # By name, so the two sharing one collapse to a single entry here. That
+        # is fine: nothing seeds a transaction against them, and the collision
+        # is meant to be seen in the pick-list rather than used from here.
+        made[name] = existing[0]
     return made
 
 
@@ -262,11 +303,11 @@ def post(
         added["movements"] += 1
 
 
-def seed(added: Counter[str]) -> bool:
+def seed(added: Counter[str], *, with_roster: bool = False) -> bool:
     """Write the scene, returning whether the ledger half of it was written."""
     catalogue = items(categories(added), added)
     places = locations(added)
-    people = volunteers(added)
+    people = volunteers(added, with_roster=with_roster)
     labels(catalogue, places, added)
 
     if not ledger_is_ours():
@@ -301,6 +342,13 @@ HEADING = "Added by this run"
 
 ACKNOWLEDGEMENT = "--i-know-this-writes-invented-data"
 
+# The flag that adds the demonstration pick-list. Off by default, because the
+# path this command exists to smooth is a new contributor's and they do not
+# need eighty-eight invented people to see what the app is. It is on for the
+# consultation, whose every figure is measured against a roster that size --
+# `_roster` says which figures and why they cannot be shown against two rows.
+ROSTER_FLAG = "--with-demo-roster"
+
 
 class Command(BaseCommand):
     help = "Create a small invented catalogue, two places, two volunteers, two labels and some stock."
@@ -317,6 +365,16 @@ class Command(BaseCommand):
             help=(
                 "Admits this on a server where DEBUG is off -- a demo deployment. "
                 "Confirms you meant to write invented data into whatever database DATABASE_URL names."
+            ),
+        )
+        parser.add_argument(
+            ROSTER_FLAG,
+            dest="roster",
+            action="store_true",
+            help=(
+                "Also write the invented pick-list the access consultation is demonstrated against: "
+                f"{_roster.NAMES} made-up people, two names worn by two of them, and the measured "
+                "proportion carrying no address. Everyone in it is fiction."
             ),
         )
 
@@ -337,7 +395,7 @@ class Command(BaseCommand):
             # One transaction: a run that fails half way through would otherwise
             # leave a catalogue with no stock in it and no sign of why.
             with transaction.atomic():
-                posted = seed(added)
+                posted = seed(added, with_roster=options.get("roster", False))
             # Built once and used twice, the way every sibling command does it:
             # what is recorded and what is printed are the same figures, so
             # producing them twice is two chances for them to differ.
