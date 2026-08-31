@@ -235,6 +235,15 @@ class Route:
     view: type | None
     arguments: dict[str, Any]
     url: str
+    # What `as_view(**kwargs)` was called with, and NOT incidental: DRF applies
+    # it per request, so a route that deliberately opened its view -- an
+    # `as_view(permission_classes=...)` -- reads as closed to anybody who
+    # instantiates the class bare. Part of what a route is, so it is decided
+    # here once rather than re-derived, with its `or {}`, by each audit.
+    initkwargs: dict[str, Any]
+    # The function the URLconf actually registered, which is what `resolve`
+    # returns and so what a round-trip has to be held against.
+    callback: Any
     pattern: Any
 
 
@@ -257,7 +266,11 @@ def routes() -> list[Route]:
     `test_every_mount_this_urlconf_makes_is_one_the_record_argued` says what
     that reaches and what it gives up.
     """
-    from django.urls import URLPattern, reverse
+    # Function-local because importing the URLconf at module scope would pull
+    # the whole application in whenever a test imports a helper; the two
+    # `django.urls` names ride along with it rather than being separated from
+    # the thing they are here for.
+    from django.urls import URLPattern
     from django.urls.converters import get_converters
 
     from inventory_tng import urls
@@ -288,13 +301,15 @@ def routes() -> list[Route]:
                 view=getattr(callback, "cls", None) or getattr(callback, "view_class", None),
                 arguments=arguments,
                 url=reverse(pattern.name, kwargs=arguments),
+                initkwargs=getattr(callback, "view_initkwargs", None) or {},
+                callback=callback,
                 pattern=pattern,
             )
         )
     return found
 
 
-def admits_anonymously(view: type, method: str, url: str, mounted: dict[str, Any] | None = None) -> bool:
+def admits_anonymously(route: Route, method: str) -> bool:
     """Whether every permission class would let an anonymous request through.
 
     THE QUESTION THE AUDIT USED TO ASK WAS A DIFFERENT ONE.
@@ -320,11 +335,15 @@ def admits_anonymously(view: type, method: str, url: str, mounted: dict[str, Any
     from django.contrib.auth.models import AnonymousUser
     from django.test import RequestFactory
 
-    instance = view(**(mounted or {}))
-    request = RequestFactory().generic(method, url)
+    assert route.view is not None, f"{route.name} has no view class to ask"
+    instance = route.view(**route.initkwargs)
+    request = RequestFactory().generic(method, route.url)
     request.user = AnonymousUser()
-    # Both, because a permission class is handed the request and may read the
-    # view, and DRF sets these before any of them is consulted.
+    # All three, because a permission class is handed the request and may read
+    # the view, and DRF sets them before any of them is consulted. The
+    # arguments are the ones the URL above was built with: telling the view it
+    # received none, while handing it a URL that carries a pk, is how an
+    # object-level permission would come to raise instead of answer.
     instance.request = request
-    instance.args, instance.kwargs = (), {}
+    instance.args, instance.kwargs = (), dict(route.arguments)
     return all(permission.has_permission(request, instance) for permission in instance.get_permissions())
