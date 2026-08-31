@@ -652,6 +652,8 @@ jobs:
         run: scripts/unsynced.test.sh
       - name: Check the untriaged-arrival reader
         run: scripts/untriaged.test.sh
+      - name: Check the review-cycle reader
+        run: scripts/review-cycle.test.sh
       # And then run it, which none of the above do to their own subject. What
       # it reads here is what a clone is handed before anybody configures
       # anything, so a hook that stopped arriving with the checkout is caught
@@ -660,6 +662,55 @@ jobs:
       # own and nothing here commits; the script's header is why.
       - name: The commit hook this repository ships is intact
         run: scripts/check-setup.sh --shipped-only
+
+  # THE REVIEW CYCLE, HELD WHERE IT CANNOT BE ROUTED AROUND. inventory-tng-x0jp.
+  #
+  # scripts/landing-gate.sh attests the same fact on the machine that types the
+  # merge, which means it can only ever guard the merges it sees: a different
+  # spelling, a different machine, a checkout with no hook installed, or the
+  # GitHub web UI, and the guard is simply not there. A required check does not
+  # care how the merge was spelt or where it came from.
+  #
+  # This becomes REQUIRED by existing and being named -- scripts/repo-settings.sh
+  # derives the required contexts from the job names in this file -- so there is
+  # no second list to keep in step. It takes effect on the next run of that
+  # script, which is a branch-protection change and is a person's to make.
+  #
+  # ONLY ON pull_request, because a push to main has no pull request to read and
+  # a check that reported nothing there would be permanently pending. The other
+  # half of the trigger problem -- evidence posted AFTER the last push, which
+  # this would never see -- is review-cycle.yml, which re-runs this.
+  #
+  # NOT WHILE IT IS A DRAFT, and that is what keeps it from deadlocking the
+  # documented flow. The landing gate refuses `gh pr ready` while a check is
+  # not green, and the skill marks a batch ready BEFORE asking for the review
+  # pass -- so a check that went red the moment a branch existed would refuse
+  # to let anybody invite the review that would make it green. It is also the
+  # objection DEVELOPERS.md makes to readiness questions living in CI at all:
+  # they answer "no" through the whole of building a batch, and a job that
+  # fails on almost every run is one people learn to read past.
+  #
+  # `ready_for_review` is already in this workflow's trigger list, so it starts
+  # asking at the moment the batch is offered for review, which is the moment
+  # the question becomes a real one. A skipped job satisfies a required context.
+  review-cycle:
+    name: Review cycle
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v5
+      # Both lists in one answer, so the two stages are read from the same
+      # moment rather than from two.
+      - name: Both passes have left something behind
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr view "$PR" --json comments,reviews \
+            | python3 scripts/review_cycle.py
 
   history:
     name: One issue per commit
