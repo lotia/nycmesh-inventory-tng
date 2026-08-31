@@ -334,10 +334,22 @@ assert "$out" "$status" 1 "code-review pass ran" "a pull request carrying nothin
 refute "$out" "$status" 1 "Merging is unblocked" "and it does not claim to have recorded anything"
 assert "$([[ -f "$RECEIPTS" ]] && echo exists || echo absent)" 0 0 "absent" "and it writes no receipt"
 
+# WHAT TO DO ABOUT IT DIFFERS BY STAGE. The refusal offered one cure for both
+# until inventory-tng-d854, and `record_receipt` carries the argument for why
+# that was the wrong one. What is pinned here is the pair either half of the
+# fix could quietly undo: the review stage naming the command, and never the
+# marker.
+assert "$out" "$status" 1 "/code-review 7 --comment" \
+  "a missing review pass says to ask a person, with the number filled in"
+refute "$out" "$status" 1 "review-cycle: code-review" \
+  "and never offers the marker for the stage that submits its own evidence"
+
 pr_json review none
 out=$(record); status=$?
 assert "$out" "$status" 1 "simplify pass ran" "a review pass alone is not the whole cycle"
 refute "$out" "$status" 1 "code-review pass ran" "and the stage that did run is not complained about"
+assert "$out" "$status" 1 "review-cycle: simplify" \
+  "a missing simplify pass does still name the marker, which is how it is evidenced"
 
 pr_json review marker
 out=$(record); status=$?
@@ -567,8 +579,20 @@ forget_nudges
 stopped
 assert "$STOP_OUT" "$STOP_STATUS" 0 '"decision":"block"' \
   "a ready, green, unreviewed batch is not allowed to end the turn"
-assert "$STOP_OUT" "$STOP_STATUS" 0 "code-review and simplify" \
-  "the refusal names both missing stages"
+# WHOSE EACH STAGE IS, which is inventory-tng-d854 and the reason the two are
+# no longer printed as one interchangeable list. An agent reading this has to
+# be able to tell the half it must ask for from the half it should already have
+# run, without going to read DEVELOPERS.md first.
+#
+# Whole lines, so the layout is held too. Asserting the stage names alone said
+# nothing the two below do not already say -- `assert` is a substring test, so
+# neither could fail while these pass -- and left the prefix, the label column
+# and the continuation indent untested, which is the half that actually broke
+# while this was being written.
+assert "$STOP_OUT" "$STOP_STATUS" 0 "  missing: code-review  ask a person to run: /code-review 7 --comment" \
+  "the review stage says to ask a person, and carries the pull request number"
+assert "$STOP_OUT" "$STOP_STATUS" 0 "           simplify     yours to run: /simplify" \
+  "the simplify stage says it is the agent's own, lined up under the first"
 
 # ONCE PER HEAD. The refusal above has been spent; a second attempt is allowed
 # through, so that meaning it costs one exchange rather than the session.
@@ -616,22 +640,57 @@ refute "$STOP_OUT" "$STOP_STATUS" 0 "decision" "a branch that is not a batch is 
 
 # A recorded cycle against this head is the whole point, and ends the turn.
 mkdir -p "$REPO/.claude"
+# A receipt for one head, evidencing the stages named -- both when none are.
+#
+# It took a head and nothing else until the half-cycle case below needed one
+# stage evidenced and the other not, and wrote its own copy of this heredoc
+# rather than saying so. The shape of a receipt is then in two places in one
+# file, and a receipt this file gets wrong reads as NO receipt rather than as a
+# broken one -- so the case would go on blocking, go on passing, and assert
+# nothing about the state it was written for.
 receipt_for() {
-  cat >"$REPO/.claude/.review-receipts.json" <<RECEIPT
-{"7": {"head": "$1", "evidence": {"code-review": [{"kind": "comment"}], "simplify": [{"kind": "comment"}]}}}
-RECEIPT
+  local head=$1
+  shift
+  RECEIPT_HEAD="$head" RECEIPT_STAGES="${*:-code-review simplify}" python3 -c '
+import json, os
+print(json.dumps({"7": {
+    "head": os.environ["RECEIPT_HEAD"],
+    "evidence": {s: [{"kind": "comment"}] for s in os.environ["RECEIPT_STAGES"].split()},
+}}))
+' >"$RECEIPTS"
 }
 receipt_for "$HEAD_OID"
 forget_nudges
 stopped
 refute "$STOP_OUT" "$STOP_STATUS" 0 "decision" "a batch that has been through its cycle ends the turn"
 
-# A receipt for a head that has since been pushed over is not a receipt.
+# A receipt for a head that has since been pushed over is not a receipt -- and
+# it is the one state where NO stage is missing, so the stage list must not be
+# printed for it. Both halves are asked of the one refusal rather than of two:
+# the setup is identical, and a second `stopped` here bought two strings at the
+# cost of a whole extra gate run.
 receipt_for cccccccccccccccccccccccccccccccccccccccc
 stopped
 assert "$STOP_OUT" "$STOP_STATUS" 0 '"decision":"block"' \
   "a receipt from a superseded head does not end the turn"
-rm -f "$REPO/.claude/.review-receipts.json"
+assert "$STOP_OUT" "$STOP_STATUS" 0 "recorded against an earlier head" \
+  "and is described as stale rather than as a missing stage"
+refute "$STOP_OUT" "$STOP_STATUS" 0 "ask a person" \
+  "so nobody is sent to fetch a person over a cycle that has already run"
+rm -f "$RECEIPTS"
+forget_nudges
+
+# HALF A CYCLE, which is the shape inventory-tng-d854 is actually about: the
+# agent has run its own pass and only the person's is outstanding. The message
+# must then carry that one stage and NOT the other, because a list naming both
+# is what sent a whole finished batch back.
+receipt_for "$HEAD_OID" simplify
+stopped
+assert "$STOP_OUT" "$STOP_STATUS" 0 "ask a person to run: /code-review 7 --comment" \
+  "with only the review pass outstanding, that is what the refusal asks for"
+refute "$STOP_OUT" "$STOP_STATUS" 0 "yours to run" \
+  "and it does not ask again for the pass that has already run"
+rm -f "$RECEIPTS"
 forget_nudges
 
 # THE DIRECTION THIS MODE FAILS IN, and it is the opposite of every other case
