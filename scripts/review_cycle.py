@@ -121,6 +121,111 @@ def settled(check: dict[str, Any]) -> bool:
     return verdict in ("SUCCESS", "NEUTRAL", "SKIPPED")
 
 
+#: The two tags a body reaches for when it wants markup SHOWN rather than
+#: rendered, which is exactly what somebody documenting the marker rule is
+#: doing. Markdown passes HTML through verbatim and GitHub allows these in a
+#: comment, so a marker inside one was counted as posted -- the third way of
+#: showing code, after the fence and the four-column indent that
+#: ``inventory-tng-1tyo`` made right. ``inventory-tng-ip8b``.
+SHOWN = ("pre", "code")
+
+#: Built once rather than per line; a tuple because ``str.startswith`` takes one.
+OPENS = tuple(f"<{tag}" for tag in SHOWN)
+
+
+def hidden(lines: list[str]) -> set[int]:
+    """Which line numbers are SHOWN rather than posted, by any of the three ways.
+
+    ONE PASS, BECAUSE THE THREE ARE MUTUALLY EXCLUSIVE CONTAINERS and whichever
+    opens first owns the lines until it closes. Two passes cannot express that:
+    running Markdown first made a fence INSIDE a ``<pre>`` close a block that was
+    not open, and running HTML first made a ``<pre>`` shown inside a fence open
+    one that should not be. Both were measured, in both directions.
+
+    Four columns in is an indented code block. Markdown allows up to three
+    before a construct, and COLUMNS RATHER THAN CHARACTERS, because a tab is one
+    character and four columns -- measuring characters read a tab-indented
+    marker as one posted at the margin. ``inventory-tng-1tyo``.
+
+    A FENCE CLOSES ONLY ON ITS OWN TERMS: a run of the SAME character, AT LEAST
+    as long, carrying nothing after it. Toggling on every fence-shaped line made
+    an inner fence end the outer one, and displaying a fenced block requires
+    wrapping it in a longer one -- so the nesting arrives the moment somebody
+    quotes an example. Same bead.
+
+    AN HTML BLOCK IS NARROWER THAN CommonMark, DELIBERATELY. That defines seven
+    kinds with different closing conditions, and half a parser on a REQUIRED
+    check fails in the worse direction: refusing evidence somebody really did
+    post. So two tags, one closing rule, and three guards that keep it from
+    swallowing a marker -- the tag has to OPEN the line, so `wrap it in <code>`
+    in a sentence is prose about a tag; the close has to EXIST, so a stray
+    ``<pre`` hides nothing rather than the rest of the body; and a block that
+    OPENS AND CLOSES ON ONE LINE takes only that line, so ``<pre>a</pre>`` in a
+    body hides itself rather than everything under it.
+    ``inventory-tng-ip8b``.
+
+    WHICHEVER OF THE OPENED TAGS SHUTS FIRST closes the block, and the trade is
+    written where it is made: waiting for the tag that OPENED the line is more
+    faithful to HTML and leaves ``<pre><code>...</code>`` -- the shape this bead
+    measured -- open for ever, hiding nothing.
+    """
+    out: set[int] = set()
+    fence: tuple[str, int] | None = None
+    closes: tuple[str, ...] = ()
+    for number, line in enumerate(lines):
+        low = line.lower()
+        if closes:
+            out.add(number)
+            if any(close in low for close in closes):
+                closes = ()
+            continue
+        content = line.strip()
+        indent = line[: len(line) - len(line.lstrip())]
+        column = len(indent.expandtabs(4))
+        if fence is not None:
+            out.add(number)
+            # A CLOSING FENCE MAY BE INDENTED THREE COLUMNS AND NO MORE. Four in
+            # is ordinary content of the block, and treating it as a close ended
+            # the fence early -- the next line then opened one that never shut,
+            # and a marker below it was refused.
+            char, length = fence
+            if column < 4 and len(content) >= length and not content.strip(char):
+                fence = None
+            continue
+        if column >= 4:
+            out.add(number)
+            continue
+        shape = opens(content)
+        if shape is not None:
+            fence = shape
+            out.add(number)
+            continue
+        head = line.lstrip().lower()
+        if head.startswith(OPENS):
+            # WHICHEVER OF THE OPENED TAGS SHUTS FIRST. `<pre><code>` names two,
+            # and waiting for `</pre>` alone left `<pre><code>...</code>` -- the
+            # shape inventory-tng-ip8b measured as the reachable one -- open for
+            # ever, so it hid nothing and the marker inside it counted.
+            #
+            # What that costs is a marker written between `</code>` and a later
+            # `</pre>`, which is inside the block and is read as posted. Nobody
+            # closes the inner tag, posts a marker, then closes the outer one,
+            # and the alternative breaks the shape people do write.
+            opened = tuple(f"</{t}" for t in SHOWN if f"<{t}" in head)
+            rest = head[len(next(t for t in OPENS if head.startswith(t))) :]
+            if any(w in rest for w in opened):
+                # OPENED AND CLOSED HERE, so it owns this line and no other.
+                # Leaving the block armed instead made a one-line `<pre>a</pre>`
+                # hide every line after it -- the refusal of honest evidence this
+                # rule is written narrow to avoid, and a body opening that way
+                # could post `<!-- do-not-merge -->` below it and stay green.
+                out.add(number)
+            elif any(any(w in later.lower() for w in opened) for later in lines[number + 1 :]):
+                closes = opened
+                out.add(number)
+    return out
+
+
 def opens(content: str) -> tuple[str, int] | None:
     """The delimiter and length of the fence ``content`` is, if it is one.
 
@@ -164,29 +269,11 @@ def carries(body: str | None, marker: str) -> bool:
     nothing. That is a forgery rather than an accident, and it is not what this
     closes -- see docs/decisions/0020-who-merges.md.
     """
-    fence: tuple[str, int] | None = None
-    for line in (body or "").splitlines():
-        # Asked once, for all three of the questions below: four columns in is
-        # an indented code block, which can no more open or close a fence than
-        # it can post a marker.
-        column = len(line[: len(line) - len(line.lstrip())].expandtabs(4))
-        if column >= 4:
-            continue
-        content = line.strip()
-        if fence is not None:
-            # A line of nothing but the open fence's own character, at least as
-            # long as it was, and nothing else. Which character it is needs no
-            # separate test: stripping it away to nothing is what says so.
-            char, length = fence
-            if len(content) >= length and not content.strip(char):
-                fence = None
-            continue
-        fence = opens(content)
-        if fence is not None:
-            continue
-        if content == marker:
-            return True
-    return False
+    lines = (body or "").splitlines()
+    shown = hidden(lines)
+    return any(
+        line.strip() == marker for number, line in enumerate(lines) if number not in shown
+    )
 
 
 def evidence(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:

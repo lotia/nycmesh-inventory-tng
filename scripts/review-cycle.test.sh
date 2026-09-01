@@ -124,6 +124,83 @@ assert "$out" "$status" 1 "code-review" "nor inside a backtick fence nested in a
 out=$(read_comments "$(printf '\t')$REVIEW" "$SIMPLIFY"); status=$?
 assert "$out" "$status" 1 "code-review" "nor one indented by a tab, which is four columns"
 
+# The third way of showing code, which `shown` in the reader argues; the one
+# context it is reached for is writing about markup that would otherwise be
+# eaten, which is what documenting this rule is. inventory-tng-ip8b.
+out=$(read_comments "<pre>
+$REVIEW
+</pre>" "$SIMPLIFY"); status=$?
+assert "$out" "$status" 1 "code-review" "nor one inside a <pre> block"
+
+out=$(read_comments "<pre><code>
+$REVIEW
+</code></pre>" "$SIMPLIFY"); status=$?
+assert "$out" "$status" 1 "code-review" "nor inside <pre><code>, which one closing tag ends"
+
+# WHICHEVER OF THE TWO SHUTS FIRST. Waiting for `</pre>` alone left this open
+# for ever, so it hid nothing and the marker counted -- and this is the shape
+# inventory-tng-ip8b measured, not a contrived one.
+out=$(read_comments "<pre><code>
+$REVIEW
+</code>" "$SIMPLIFY"); status=$?
+assert "$out" "$status" 1 "code-review" "and <pre><code> that closes only the inner tag still hides"
+
+# THE ONE SHAPE THIS GETS WRONG, pinned so it is a known trade rather than a
+# surprise. A marker written between `</code>` and a later `</pre>` is inside
+# the block and is read as posted.
+#
+# The alternative -- waiting for the closing tag of the tag that OPENED the line
+# -- gets this right and breaks the shape people actually write: `<pre><code>`
+# closed only by `</code>` then never closes at all, hides nothing, and the
+# marker inside it counts. That is the shape inventory-tng-ip8b measured. Nobody
+# closes the inner tag, posts a marker, and then closes the outer one.
+out=$(read_comments "<pre><code>
+an example
+</code>
+$REVIEW
+</pre>" "$SIMPLIFY"); status=$?
+assert "$out" "$status" 0 "The review cycle ran" \
+  "a marker between </code> and a later </pre> is read as posted, which is the trade"
+
+echo
+echo "and an HTML block must not swallow a marker somebody posted"
+# Refusing evidence that was really posted is the worse failure of the two, so
+# the narrow rule is guarded on both sides rather than only against fakery.
+
+out=$(read_comments "<pre>
+an example I never closed
+
+$REVIEW" "$SIMPLIFY"); status=$?
+assert "$out" "$status" 0 "The review cycle ran" "a block that is never closed hides nothing"
+
+out=$(read_comments "Wrap it in <code> when you mean it shown.
+
+$REVIEW
+
+Close it with </code> afterwards." "$SIMPLIFY"); status=$?
+assert "$out" "$status" 0 "The review cycle ran" "and a tag inside a sentence is prose, not a block"
+
+out=$(read_comments "<pre>
+an example
+</pre>
+
+$REVIEW" "$SIMPLIFY"); status=$?
+assert "$out" "$status" 0 "The review cycle ran" "and a marker after a block that closed is posted"
+
+# A one-line block owns its own line, and `hidden` says why. What it cost is
+# worth pinning here rather than there: the same reader answers for the
+# do-not-merge marker, so a body opening with a one-line block could post that
+# marker underneath and still be merged.
+out=$(read_comments "<pre>gh pr merge 88 --rebase</pre>
+
+$REVIEW" "$SIMPLIFY"); status=$?
+assert "$out" "$status" 0 "The review cycle ran" "and one that opens and closes on a line hides only it"
+
+out=$(read_comments "<code>scripts/review_cycle.py</code>
+
+$REVIEW" "$SIMPLIFY"); status=$?
+assert "$out" "$status" 0 "The review cycle ran" "the same for a one-line <code>"
+
 # Markdown allows three spaces before a construct and no more, so this side of
 # the boundary is still posted. Both halves are pinned because a reader that
 # got the boundary wrong in the other direction would refuse honest evidence.
