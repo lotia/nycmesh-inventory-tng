@@ -99,11 +99,44 @@ $REVIEW
 ~~~" "$SIMPLIFY"); status=$?
 assert "$out" "$status" 1 "code-review" "nor inside a tilde fence"
 
+# A FENCE CLOSES ONLY ON ITS OWN TERMS, and showing a fenced block is why this
+# matters rather than being a curiosity: displaying one requires wrapping it in
+# a longer fence, and .agents/skills/pull-requests/SKILL.md displays this very
+# marker that way. A reader that toggled on every fence-shaped line ended the
+# outer block at the inner one and counted what followed. inventory-tng-1tyo.
+out=$(read_comments "\`\`\`\`
+\`\`\`
+$REVIEW
+\`\`\`
+\`\`\`\`" "$SIMPLIFY"); status=$?
+assert "$out" "$status" 1 "code-review" "nor inside a fence nested in a longer one"
+
+out=$(read_comments "~~~
+\`\`\`
+$REVIEW
+\`\`\`
+~~~" "$SIMPLIFY"); status=$?
+assert "$out" "$status" 1 "code-review" "nor inside a backtick fence nested in a tilde one"
+
+# THE SAME DEFECT SPELLED WITH WHITESPACE. A tab is one character and four
+# columns, so a reader counting characters called this margin-posted while
+# Markdown renders it as a code block. Same bead.
+out=$(read_comments "$(printf '\t')$REVIEW" "$SIMPLIFY"); status=$?
+assert "$out" "$status" 1 "code-review" "nor one indented by a tab, which is four columns"
+
 # Markdown allows three spaces before a construct and no more, so this side of
 # the boundary is still posted. Both halves are pinned because a reader that
 # got the boundary wrong in the other direction would refuse honest evidence.
 out=$(read_comments "   $REVIEW" "$SIMPLIFY"); status=$?
 assert "$out" "$status" 0 "The review cycle ran" "three spaces is still a posted marker"
+
+out=$(read_comments "\`\`\`
+an example
+\`\`\`
+
+$REVIEW" "$SIMPLIFY"); status=$?
+assert "$out" "$status" 0 "The review cycle ran" \
+  "and a marker after a fence that closed is posted, not swallowed by it"
 
 out=$(read_comments "$REVIEW trailing words" "$SIMPLIFY"); status=$?
 assert "$out" "$status" 1 "code-review" "a marker with anything after it on the line is not alone"
