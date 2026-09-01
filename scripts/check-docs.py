@@ -175,7 +175,38 @@ for name in sys.argv[1:]:
     # not a second copy of itself.
     if path.is_symlink():
         continue
-    text = path.read_text()
+    # WHAT WILL NOT DECODE CANNOT HOLD REPEATED PROSE, and that is the question
+    # actually being asked -- so it is asked of the bytes rather than of the
+    # name. The pattern in check-docs.sh names extensions, and no list of them
+    # is ever complete: a stray trace.pb and a directory of parquet files left
+    # in the root by a profiling run matched none of it, and every run of the
+    # checker then ended in UnicodeDecodeError saying nothing had been checked
+    # at all -- which reads as the guard being broken rather than as a file it
+    # should have stepped over. inventory-tng-2aor.
+    #
+    # utf-8 BY NAME rather than the locale's encoding, so the corpus is the
+    # same file here and in CI. One that decoded under one locale and not the
+    # other would make this answer differently in the two places it runs.
+    #
+    # AND OSError WITH IT, because "cannot be read" is the same answer arriving
+    # by a different route. A file with no read permission raised through the
+    # first version of this guard and took the whole run down with "the reader
+    # failed, so nothing was checked" -- which is the precise failure the bead
+    # above was filed about, left standing by a guard that named only one of
+    # its two causes.
+    #
+    # SAID, NOT SWALLOWED. A skip that prints nothing is this rule quietly
+    # ceasing to apply to a file: a page saved as CP-1252 -- one smart quote is
+    # enough -- would be dropped and the run would still report that no prose is
+    # repeated anywhere. The file three functions up says the same thing about a
+    # malformed allowance, for the same reason. A note rather than a failure,
+    # because a stray binary is not somebody's mistake to fix.
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError) as exc:
+        print(f"note {name} could not be read as utf-8 text, so nothing in it was checked")
+        print(f"note   {type(exc).__name__}: a binary file is expected here; a page is not")
+        continue
     if name.endswith(".md"):
         words = prose(text).split()
     else:

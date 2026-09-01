@@ -339,6 +339,49 @@ mkdir -p frontend
 printf '# %s\n' "$PASSAGE" > frontend/package-lock.json
 expect 0 "No prose repeated" "and a lock file nobody writes by hand is not"
 
+# AND A FILE NO EXTENSION LIST NAMES. What left one lying in the root, and why
+# no list of extensions would ever have named it, is beside the guard in
+# check-docs.py. What it cost is here: the run ended in UnicodeDecodeError and
+# the checker reported that nothing at all had been checked. inventory-tng-2aor.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+printf 'Something else entirely, at length, about a different subject.\n' > two.md
+printf '\xb5\xfe\xff\x00\x01not text at all' > trace.pb
+expect 0 "No prose repeated" "a binary file no exclusion names is stepped over"
+
+# The half that matters more: stepped OVER, not stopped AT. A reader that gave
+# up on the first undecodable file would report this run as clean.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+printf '\xb5\xfe\xff\x00\x01not text at all' > trace.pb
+printf '# Two\n\n%s\n' "$PASSAGE" > two.md
+expect 1 "say the same thing" "and the files after it are still read"
+
+# SAID, NOT SWALLOWED. A skip nobody is told about is this rule quietly ceasing
+# to apply to a file, and the file it will happen to is not a stray binary -- it
+# is a page somebody's editor saved as CP-1252, where one smart quote is enough.
+# Reported green with the page never read is the worst of the three outcomes.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+printf 'Caf\xe9 na\xefve \xe9l\xe8ve, at length, about a different subject entirely.\n' > legacy.md
+expect 0 "legacy.md could not be read as utf-8 text" "a file that is not utf-8 is named, not dropped in silence"
+
+# THE OTHER WAY A FILE CANNOT BE READ. The first version of the guard named
+# UnicodeDecodeError alone, so a file with no read permission still ended the
+# run in "the reader failed, so nothing was checked" -- the precise failure
+# inventory-tng-2aor was filed about, surviving its own fix.
+#
+# Skipped as root, who can read a mode-000 file and would find nothing to test.
+if [[ $EUID -ne 0 ]]; then
+  scene
+  printf '# One\n\n%s\n' "$PASSAGE" > one.md
+  printf '# Two\n\n%s\n' "$PASSAGE" > two.md
+  printf 'unreadable\n' > locked.md
+  chmod 000 locked.md
+  expect 1 "say the same thing" "a file that cannot be read does not take the run down"
+  chmod 644 locked.md
+fi
+
 # The one exclusion that is a path rather than a kind, pinned because it is the
 # exception to the paragraph above and was described for a while as though it
 # did not exist. If a second directory is ever added to the pattern, this is
