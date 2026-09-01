@@ -27,12 +27,22 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from django.conf import settings
 from django.http.request import validate_host
 from django.test import Client, override_settings
 from environ import Env
 
-from inventory.tests.charts import backend_container, environment, manifests, refused, render, rendered, workloads
+from inventory.tests.charts import (
+    backend_container,
+    backend_pod,
+    environment,
+    manifests,
+    refused,
+    render,
+    rendered,
+    workloads,
+)
 from inventory.tests.helpers import BACKEND_DOCKERFILE, shipped
 from inventory_tng import forwarded
 from inventory_tng.database import DEFAULT_CONNECT_TIMEOUT_SECONDS
@@ -447,4 +457,44 @@ def test_the_chart_covers_an_ingress_host_exactly_when_django_would(host: str, l
     assert chart_renders == django_would_answer, (
         f"the chart {'renders' if chart_renders else 'refuses'} ingress.host={host!r} against "
         f"django.allowedHosts={listed!r}, and Django would {'answer' if django_would_answer else 'refuse'} it"
+    )
+
+
+def test_the_chart_grants_the_same_writable_paths_the_compose_stack_does() -> None:
+    """The long-running backend, the two ways it is run, held against each other.
+
+    Both run the same image with a read-only root, so a path granted in one and
+    not the other is a fault that shows only in the half lacking it. Read off
+    the two files rather than listed here, so a third path added to either is a
+    red suite instead of a silent divergence. What each path is for is on
+    compose.yaml's tmpfs list. inventory-tng-pmd.
+
+    THE BACKEND AND NOT EVERY WORKLOAD, which is narrower than the argument
+    above and deliberately so. The migrate and administrator Jobs run the same
+    image with the same read-only root and are granted nothing at all, while
+    compose gives their analogue -- `seed`, one `manage.py` run under the same
+    hardening -- both paths. That asymmetry is real and is NOT this issue: it is
+    about what a run-once `manage.py` needs, where this one is about gunicorn's
+    control socket. `inventory-tng-xiuo` carries it, and widening this to
+    `workloads()` is the first thing that issue should do.
+    """
+    stack = yaml.safe_load(shipped(Path("compose.yaml")))
+    granted = {mount.split(":", 1)[0] for mount in stack["services"]["backend"]["tmpfs"]}
+
+    pod = backend_pod()
+    container = backend_container()
+    mounted = {mount["mountPath"] for mount in container["volumeMounts"]}
+
+    assert container["securityContext"]["readOnlyRootFilesystem"] is True, (
+        "the premise of this test: nothing needs a volume if the root is writable"
+    )
+    assert mounted == granted, "the chart and the compose stack disagree about where the image may write"
+
+    # And each backed by something that exists for this pod alone. A PVC named
+    # `home` mounted at the same path satisfies the assertion above and fails
+    # this one, which is the difference worth holding: a heartbeat file and a
+    # control socket must not outlive a restart or be shared between pods.
+    writable = {volume["name"] for volume in pod["volumes"] if "emptyDir" in volume}
+    assert {mount["name"] for mount in container["volumeMounts"]} <= writable, (
+        "every mount the backend gets is a volume of its own, not a shared or persistent one"
     )

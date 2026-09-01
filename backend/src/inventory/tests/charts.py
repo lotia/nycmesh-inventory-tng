@@ -73,15 +73,20 @@ def manifests(**overrides: str) -> list[dict[str, Any]]:
     return [document for document in yaml.safe_load_all(render(**overrides)) if document]
 
 
-def backend_container(**overrides: str) -> dict[str, Any]:
-    """The one container the probes belong to."""
+def backend_pod(**overrides: str) -> dict[str, Any]:
+    """The pod spec the backend runs in: its container, and what is mounted."""
     deployments = [
         document
         for document in manifests(**overrides)
         if document["kind"] == "Deployment" and document["metadata"]["name"].endswith("-backend")
     ]
     assert len(deployments) == 1, "the chart is expected to render exactly one backend Deployment"
-    containers = deployments[0]["spec"]["template"]["spec"]["containers"]
+    return deployments[0]["spec"]["template"]["spec"]
+
+
+def backend_container(**overrides: str) -> dict[str, Any]:
+    """The one container the probes belong to."""
+    containers = backend_pod(**overrides)["containers"]
     assert len(containers) == 1, "the chart is expected to render exactly one backend container"
     return containers[0]
 

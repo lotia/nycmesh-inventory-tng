@@ -104,7 +104,10 @@ cannot fall behind the chart the way they once did.
 | Frontend image | [`frontend/Dockerfile`](../frontend/Dockerfile) | Built SPA assets served by unprivileged nginx |
 | Helm chart | [`infra/helm/inventory-tng`](../infra/helm/inventory-tng) | Deployments, Services, Ingress, migration Job |
 
-Both images run as non-root. The backend runs with a read-only root filesystem.
+Both images run as non-root. The backend runs with a read-only root
+filesystem, so the paths gunicorn has to write to are mounted as empty
+volumes that live and die with the pod. The chart and `compose.yaml` grant
+the same set, and a test holds one against the other.
 
 ### Publishing a release
 
