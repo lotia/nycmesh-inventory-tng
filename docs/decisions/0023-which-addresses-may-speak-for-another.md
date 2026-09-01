@@ -71,11 +71,19 @@ drift apart quietly.
 
 ## Consequences
 
-**Nothing in the application reads `TRUSTED_PROXIES` yet.** Every endpoint still
-asks for a session, so no admission decision reads an address at all. This is a
-precondition rather than a repair: `inventory-tng-gnhl`, which would admit a
-volunteer by address, is what it exists for, and shipping the mechanism first
-means that issue argues about a posture rather than re-deriving this.
+**`Device.enrolled_from` reads `TRUSTED_PROXIES`, and nothing admits by
+address.** The read is through `client_address`, so a burst of minted devices is
+findable by the address that asked for them — attribution, and not the thing
+this paragraph was written expecting. Admission by address is now foreclosed
+outright: [0030](0030-the-network-is-the-access-control.md) point 1 puts it at
+the network, where no application code decides it.
+
+*Corrected 2026-09-01.* This said nothing read the value, that every endpoint
+asked for a session, and that `inventory-tng-gnhl` was the issue that would
+admit by address. The first two were true when written and have been overtaken;
+the third was a forecast, and `gnhl` shipped `VOLUNTEER_ACCESS=open` without
+admitting anybody by address. `inventory-tng-xwx0` is where each was corrected,
+and the decision above is untouched.
 
 **The value is the cluster's, not the application's**, so it is in the chart
 (`django.trustedProxies`) and in
@@ -88,6 +96,13 @@ import, beside the telemetry settings and for the same reason: a list nobody
 can read is better found by a pod that will not start than by the first request
 that needed it.
 
-**Two readings of one header now exist in this repository**, which is a cost.
-It is paid down when something makes an admission decision and the throttles
-can be moved over behind a value every deployment has by then had to set.
+**Two readings of one header now exist in this repository**, which is a cost,
+and the way out named here cannot arrive: it said the debt is paid down "when
+something makes an admission decision", and decision 0030 means nothing in the
+application ever makes one.
+
+What retires it is a decision about the throttles, and the trade above no longer
+prices it. That trade costs a forged header at one bucket on the premise
+corrected above — that nothing anonymous reaches a throttle — and an open
+posture removes the premise. `inventory-tng-9bzn` owns the question and the
+arithmetic; it is not settled here.

@@ -31,12 +31,17 @@ list is the deployment's own proxies and nothing else, and getting it too wide
 is the failure -- `.env.sample` is where that is put to whoever sets it, and it
 is put there once rather than restated on every reader of the value.
 
-NOTHING IN THIS APPLICATION CALLS THIS YET, and that is deliberate rather than
-an oversight. Nothing here decides who gets in on an address, because a session
-is asked of everything; `inventory-tng-gnhl` is the first issue that would, and
-this is its precondition. The throttles deliberately keep DRF's reading, and
-decision 0023 says what that costs and why it is the right trade for a rate
-limit.
+`Device.enrolled_from` IS THE CALLER, so a burst of minted devices can be found
+afterwards by the address that asked for them -- where the list names this
+deployment's proxies. Empty, as it ships, the mint records the proxy instead
+and the burst is not findable, which is what `.env.sample` puts to whoever sets
+it. Nothing here decides who gets in on an address and nothing ever will, which
+is `docs/decisions/0030-the-network-is-the-access-control.md` point 1 rather
+than this module's to argue.
+
+The throttles deliberately keep DRF's reading, and decision 0023 says what that
+costs -- read its Consequences rather than this line, because what it costs has
+been corrected once already.
 """
 
 from collections.abc import Mapping, Sequence
