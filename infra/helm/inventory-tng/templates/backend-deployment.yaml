@@ -82,9 +82,21 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+          # THE SAME TWO PATHS COMPOSE GRANTS, and what each is for is written
+          # once, on that file's tmpfs list for this image. The root is
+          # read-only here as it is there, so the image needs them named in
+          # both places or it goes without in one of them -- which is what
+          # happened: /home/app was granted under compose and missed here, and
+          # every pod opened with `Control server error: [Errno 30] Read-only
+          # file system: /home/app/.gunicorn`. test_chart.py holds the two
+          # lists against each other. inventory-tng-pmd.
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: home
+              mountPath: /home/app
       volumes:
         - name: tmp
+          emptyDir: {}
+        - name: home
           emptyDir: {}
