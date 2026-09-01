@@ -108,6 +108,15 @@ What you may do on your own, and what you must ask for first:
 | On a `batch/*` branch, without asking | Commit, push, open and update the pull request, post findings to it, reply to and resolve its threads, `push --force-with-lease` when collapsing an issue's own commits |
 | Merging a `batch/*` pull request, without asking | Once it meets [When a branch is ready to merge](DEVELOPERS.md#when-a-branch-is-ready-to-merge): `gh pr merge <pr> --rebase` |
 | Ask first, every time | Anything touching `main` directly, a bare `push --force`, `bd dolt push`, and any change to repository or branch settings |
+| Never, whatever its state | Merging a pull request whose body posts `<!-- do-not-merge -->` on a line of its own |
+
+The last row is here rather than left to the check that enforces it, because an
+agent meeting a red check it has no rule for will set about making it green.
+That is the whole hazard: nothing about such a pull request looks like an
+exception, and marking it ready and merging it is what following the row above
+looks like. What the marker is and how it is read is
+[When a branch is ready to merge](DEVELOPERS.md#when-a-branch-is-ready-to-merge);
+what this row adds is that the answer is never yours to overturn.
 
 The line is what a mistake costs. A batch branch is proposed work: it can be
 rewritten or thrown away and the repository is untouched, and every step of it

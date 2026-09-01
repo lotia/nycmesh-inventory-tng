@@ -1196,13 +1196,32 @@ except ValueError:
     # Nothing readable is not an answer of "green"; the caller refuses on an
     # empty capture, the same way it refuses a gh that would not answer.
     raise SystemExit(1)
-print(sum(1 for c in checks if not review_cycle.settled(c)))
+import do_not_merge
+unsettled = [c for c in checks if not review_cycle.settled(c)]
+marked = any((c.get("name") or c.get("context")) == do_not_merge.CHECK for c in unsettled)
+print(len(unsettled), "marked" if marked else "-")
 ') || failing=""
+read -r failing marked <<<"$failing"
     # No checks reported yet is not the same as checks that failed; a run that
     # has not started cannot be green, so this still refuses. Neither is a gh
     # that could not answer: that used to be read as green.
     if [[ -z "$failing" ]]; then
       deny_unavailable "whether the checks on pull request $pr are green" gh
+    fi
+    # THE ONE RED CHECK THAT IS NOT AN INSTRUCTION TO FIX IT. Told apart before
+    # the ordinary refusal below, because that one says "wait for the checks, or
+    # fix them" -- which, on a pull request that must never merge, points an
+    # agent at making the do-not-merge check green. That is the hazard AGENTS.md
+    # names, reproduced by this repository's own tooling. inventory-tng-g4dh.
+    if [[ "$marked" == "marked" ]]; then
+      deny "Pull request $pr posts the do-not-merge marker in its body.
+
+It is not to be merged, and the check saying so is not one to make green:
+it is a pull request opened to be read. Marking it ready is not refused
+because something needs fixing -- there is nothing here to fix.
+
+If the marker is stale, take the line out of the body and push -- see
+DEVELOPERS.md \"When a branch is ready to merge\"."
     fi
     if [[ "$failing" != "0" ]]; then
       deny "Pull request $pr is not green, so it is not ready to be reviewed.
@@ -1230,6 +1249,59 @@ linter would have said is a review wasted. Wait for the checks, or fix them.
       both=$(gh_json pr view --json number,headRefOid --jq '"\(.number) \(.headRefOid)"') \
         || deny_unavailable "which pull request this branch belongs to" gh
       read -r pr current <<<"$both"
+    fi
+
+    # A PULL REQUEST THAT SAYS DO NOT MERGE, ASKED LOCALLY AS WELL. The required
+    # check in ci.yml is the enforcement and this is not a second copy of it:
+    # scripts/do_not_merge.py is the one reader, and this arm hands it the body.
+    #
+    # WORTH ASKING HERE DESPITE THE CHECK, because this is the only layer that
+    # reads the body LIVE. ci.yml cannot see a body edited since the last run --
+    # inventory-tng-qe31 -- so a green, ready pull request marked after its last
+    # push is one GitHub would still merge. That is precisely the path this
+    # guard sits on: an agent typing the merge. It also lets the refusal explain
+    # itself, where GitHub's is a generic protection error.
+    #
+    # BEFORE the receipt and the head, so a marked pull request is told what is
+    # wrong with it rather than being sent to run a review cycle it must not
+    # need. inventory-tng-g4dh.
+    #
+    # AND IT IS A SECOND ROUND TRIP, which the comment above says this arm does
+    # not make. It should not: `body` belongs in the calls already being made,
+    # and folding it in is inventory-tng-f8r8 -- filed rather than done here
+    # because it removes the separate head fetch that makes "gh could not name
+    # the head" a distinguishable refusal, which inventory-tng-3sp is pinned on.
+    body=$(gh_json pr view "$pr" --json body) \
+      || deny_unavailable "whether pull request $pr says do not merge" gh
+    # THE STATUS, RATHER THAN MERELY NON-ZERO. The reader answers 1 for a pull
+    # request that posts the marker and 2 for an answer it could not read, and
+    # anything else is the reader itself failing -- review_cycle.py gone from
+    # beside it, a python that will not import it. Collapsing those into the
+    # refusal below, with the output sent to /dev/null, made a broken reader say
+    # by name that a body posts a line it does not carry, and sent whoever read
+    # that to go and delete a line that is not there.
+    marker_said=$(printf '%s' "$body" | python3 "$SCRIPTS/do_not_merge.py" 2>&1)
+    marker_status=$?
+    if [[ "$marker_status" -gt 1 ]]; then
+      deny "The landing gate could not read whether pull request $pr says do not merge,
+so it is refusing this.
+
+  scripts/do_not_merge.py exited $marker_status:
+$marker_said
+
+That is the reader failing rather than the pull request objecting, and the two
+are not the same answer. Fix the reader rather than going looking for a marker
+in the body on the strength of this."
+    fi
+    if [[ "$marker_status" -eq 1 ]]; then
+      deny "Pull request $pr posts the do-not-merge marker in its body.
+
+It is not to be merged, whatever else is green and whatever state it is
+in. AGENTS.md says so in the row that has no exceptions, and this is not
+a check to make green: it is a pull request opened to be read.
+
+If the marker is stale, take the line out of the body and push -- see
+DEVELOPERS.md \"When a branch is ready to merge\"."
     fi
 
     # THE FINISHED QUESTION, asked here because this is the only moment it is
