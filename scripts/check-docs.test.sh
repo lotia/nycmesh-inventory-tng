@@ -91,6 +91,27 @@ printf '# One\n\n%s\n' "$PASSAGE" > one.md
 ln -s one.md copy.md
 expect 0 "No prose repeated" "a symlink is not a second copy of its target"
 
+# NOR IS A FILE A SECOND COPY OF ITSELF. What names one twice without anybody
+# asking, and why it fired at the worst moment, is beside the guard in
+# check-docs.py. What it cost is here: every passage in the file was reported
+# against itself, and the command line offers the same door as the enumeration
+# does. inventory-tng-7okn.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+output=$(staged_check one.md one.md)
+status=$?
+assert "$output" "$status" 0 "No prose repeated" "the same file named twice is read once"
+
+# And named twice in two spellings, which is the door the guard lives in the
+# reader to cover: the enumeration emits one spelling per file, a caller need
+# not. A key on the string was exact against the first and an approximation
+# against the second.
+scene
+printf '# One\n\n%s\n' "$PASSAGE" > one.md
+output=$(staged_check ./one.md one.md)
+status=$?
+assert "$output" "$status" 0 "No prose repeated" "and spelled two ways it is still one file"
+
 scene
 printf '# One\n\n%s\n' "$PASSAGE" > one.md
 printf '# Two\n\n%s\n' "$PASSAGE" > two.md

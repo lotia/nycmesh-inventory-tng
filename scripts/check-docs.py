@@ -167,6 +167,8 @@ hits: dict[tuple[str, str], list[tuple[int, int]]] = {}
 where: dict[str, list[str]] = {}
 shingles: dict[str, set[str]] = {}
 
+read: set[pathlib.Path] = set()
+
 for name in sys.argv[1:]:
     path = pathlib.Path(name)
     if not path.is_file():
@@ -175,6 +177,36 @@ for name in sys.argv[1:]:
     # not a second copy of itself.
     if path.is_symlink():
         continue
+    # NOR IS IT A SECOND COPY OF ITSELF WHEN IT IS NAMED TWICE. `seen` is keyed
+    # on the run and `shingles[name]` is re-initialised per occurrence, so a
+    # path read a second time collided with its own first pass and every
+    # passage in it was reported as "a.md and a.md say the same thing" -- an
+    # objection nobody can act on, burying whatever real one shared the run.
+    #
+    # `git ls-files` prints one row per unmerged stage, so a conflicted merge
+    # or rebase names every conflicted path two or three times. That is the
+    # moment this fired, which is the moment least able to spare the attention.
+    # scripts/check-setup.sh takes `head -n1` against the same rows.
+    #
+    # HERE RATHER THAN IN THE ENUMERATION, because check-docs.sh takes paths on
+    # the command line too, and a caller repeating one there is the same fault
+    # arriving by the other door. inventory-tng-7okn.
+    #
+    # ON THE FILE RATHER THAN ITS SPELLING, and that is the whole reason this is
+    # a resolved path and not `name`. The enumeration emits one spelling per
+    # file, so a string key is exact against it and an approximation against the
+    # command line -- which is the door this guard was put here to cover, so a
+    # key that only worked for the other one would be deepest where it was not
+    # needed. `./a.md a.md` named the same file and collided. Resolving also
+    # covers one reached through a symlinked directory, which is the same class
+    # the check above cares about.
+    #
+    # Before the two stat calls above would be cheaper, but they are what say
+    # this is a file at all, and one of them is what `resolve` would follow.
+    here = path.resolve()
+    if here in read:
+        continue
+    read.add(here)
     # WHAT WILL NOT DECODE CANNOT HOLD REPEATED PROSE, and that is the question
     # actually being asked -- so it is asked of the bytes rather than of the
     # name. The pattern in check-docs.sh names extensions, and no list of them
