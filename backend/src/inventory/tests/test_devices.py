@@ -247,7 +247,7 @@ def test_enrolling_again_after_a_revocation_is_a_new_row_and_works(client: Clien
 
 
 def test_carrying_nothing_at_all_is_never_a_refusal(client: Client) -> None:
-    """Attribution is offered, not demanded. The network does admission."""
+    """Attribution is offered, not demanded. The network does admission (0030)."""
     assert client.get(VOLUNTEERS_URL).status_code == 200
     assert add_volunteer(client, "Ada Lovelace").status_code == 201
 

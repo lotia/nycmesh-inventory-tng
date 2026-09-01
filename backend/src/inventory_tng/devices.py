@@ -3,14 +3,15 @@
 WHAT THIS IS FOR, and the ceiling on it, first -- because everything below is
 worth having and none of it is a control.
 
-The network does admission. This deployment sits on hosts whose routing and
-firewall rules will not carry traffic originating outside the mesh to the
-application at all, and the project owner controls those hosts
-(`inventory-tng-2jzx`). So a device credential is not how anybody gets in. It
-is ATTRIBUTION: an opaque name a request carries, which is then the rate-limit
-bucket, the thing every log line about that request is correlated by, and the
-handle a revocation acts on. The owner's words for what that buys are "weakly
-guard against in-network bad actors", and that is the whole of the claim.
+The network does admission -- decision 0030, which is the posture, what it is
+worth, and what may never be justified by it. A device credential is therefore
+not how anybody gets in.
+
+It is ATTRIBUTION: an opaque name a request carries, which is then the
+rate-limit bucket, the thing every log line about that request is correlated by,
+and the handle a revocation acts on. That list is the ceiling as well as the
+purpose, and decision 0030 point 4 is where the ceiling is quoted in the words
+of whoever set it.
 
 WHAT SIGNING BUYS AND WHAT IT DOES NOT, because getting this wrong is the
 entire risk. A signature stops a token being INVENTED. It does not stop one

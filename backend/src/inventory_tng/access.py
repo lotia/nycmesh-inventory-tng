@@ -45,6 +45,13 @@ are different questions with different answers.
 
 ## What stands in for the credential
 
+NOT THIS FILE, and not the throttles below either. Admission is the
+deployment's, at the network, and decision 0030 is where that is argued and
+bounded. The bound is what matters here: nothing in this module is sized or
+justified on the assumption that the network already stopped somebody. Decision
+0030 point 2 is the rule, and its Consequences say why it is a rule rather than
+a reassurance.
+
 `AnonymousReadThrottle` counts what a caller with no account reads, and
 `AppendThrottle` counts what they write. The two are separate buckets on
 purpose: a volunteer who has spent an allowance searching for their own name

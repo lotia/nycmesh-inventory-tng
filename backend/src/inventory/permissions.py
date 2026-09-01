@@ -137,7 +137,7 @@ class DeviceNotRevoked(BasePermission):
 
     This is the whole of what revocation buys, and it is deliberately the only
     thing a device credential decides. Carrying no token is not a refusal --
-    the network does admission (`inventory-tng-2jzx`) and this is attribution
+    the network does admission (decision 0030) and this is attribution
     -- so the state that refuses is `DEVICE_REVOKED` and nothing else.
 
     ITS OWN REASON ON THE WIRE. "You may not" and "this device was removed"
