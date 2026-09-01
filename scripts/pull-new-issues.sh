@@ -7,11 +7,22 @@
 # happened. `inventory-tng-cwpa.1`, and the argument for the whole arrangement
 # is on `inventory-tng-cwpa`.
 #
-# Usage: pull-new-issues.sh [--dry-run] [<repository>]
+# Usage: pull-new-issues.sh [--dry-run | --check] [<repository>]
+#
+# --dry-run says what would be brought in and brings nothing.
+# --check does the same and REFUSES when anything is waiting, which is what a
+# scheduled job wants: red for as long as the answer is yes, green the moment
+# the rows are committed. Both answer from the committed export alone.
+#
+# Writes `pulled=<count>` to GITHUB_OUTPUT on every path that exits 0, the
+# paths where the count is zero included: a step reading a missing one gets an
+# empty string, and a caller that branched on it would read that as neither
+# number. Nothing reads it today -- issue-sync.yml gates on `--check`'s exit
+# status instead -- so this is the shape a caller would need, not one in use.
 #
 # The repository defaults to GITHUB_REPOSITORY, then to whatever `gh` resolves
-# for the checkout. Needs `gh` authenticated and `bd` on the path; both are
-# refused loudly rather than worked around.
+# for the checkout. Needs `gh` authenticated, and `bd` on the path unless this
+# is a dry run; both are refused loudly rather than worked around.
 
 set -uo pipefail
 
@@ -22,16 +33,28 @@ REPO_ROOT=$(git -C "$HERE" rev-parse --show-toplevel) || exit 1
 EXPORT="$REPO_ROOT/.beads/issues.jsonl"
 
 dry_run=false
+check=false
 repository="${GITHUB_REPOSITORY:-}"
 for argument in "$@"; do
   case "$argument" in
     --dry-run) dry_run=true ;;
+    # `--check` is a dry run that refuses. Nothing is pulled either way, so it
+    # needs no more than a dry run does.
+    --check) dry_run=true; check=true ;;
     -*) echo "pull-new-issues: unknown flag $argument" >&2; exit 2 ;;
     *) repository="$argument" ;;
   esac
 done
 
-for tool in gh bd python3; do
+# `bd` ONLY WHEN SOMETHING WILL ACTUALLY BE PULLED. A dry run answers from the
+# committed export through unsynced.py and never invokes it, so demanding it
+# refused a question this script can answer on its own -- and refused it in the
+# one place the answer is wanted WITHOUT a tracker to write to, which is CI.
+# The workflow asks exactly that question and got exit 2 for it.
+# inventory-tng-qnxb.
+tools=(gh python3)
+[[ "$dry_run" == true ]] || tools+=(bd)
+for tool in "${tools[@]}"; do
   command -v "$tool" >/dev/null 2>&1 || {
     echo "pull-new-issues: $tool is needed and is not on the path." >&2
     exit 2
@@ -108,6 +131,22 @@ note "$count issue(s) on GitHub that no bead points at: $(printf '%s' "$new" | t
 # that difference proposed its own churn. inventory-tng-wjkd.
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   echo "pulled=$count" >> "$GITHUB_OUTPUT"
+fi
+
+# THE REFUSAL LIVES HERE RATHER THAN IN THE WORKFLOW THAT WANTS IT, which is
+# the whole of why `--check` exists. A job whose only behaviour is fifteen lines
+# of inline shell is a job whose behaviour nothing tests, and the wording somebody
+# acts on could then only be checked by dispatching it. scripts/settings.yml is
+# the precedent: the workflow is one `run:` line and the script's exit status is
+# the signal. inventory-tng-qnxb.
+if [[ "$check" == true ]]; then
+  fail "$count issue(s) on GitHub have no bead, and nothing here brings them in."
+  note "Landing them is a person's job -- see DEVELOPERS.md#issue-tracking:"
+  note "  scripts/pull-new-issues.sh"
+  note "  scripts/untriaged.py .beads/issues.jsonl"
+  note "This goes green by itself once those rows are committed, with nothing to close."
+  verdict "unreachable: --check only gets here with something waiting" \
+    "the tracker has heard of every issue"
 fi
 
 if [[ "$dry_run" == true ]]; then

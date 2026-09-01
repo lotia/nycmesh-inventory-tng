@@ -91,34 +91,12 @@ if [[ "$CHECK" -eq 0 ]]; then
     -F delete_branch_on_merge=true >/dev/null || exit 1
 fi
 
-# --- what a workflow may do ------------------------------------------------
-#
-# The issue-sync workflow opens a pull request, and GitHub refuses that unless
-# the repository allows it. It is off by default, so this is a setting the
-# automation depends on and nothing declared -- meaning the workflow failed at
-# its last step every run and only the workflow knew. inventory-tng-pmw2.
-#
-# default_workflow_permissions is deliberately not declared. It reads "read",
-# and issue-sync.yml asks for contents: write in its own permissions block,
-# which demonstrably works -- every refused run still pushed its branch.
-# Declaring the repository default would assert something nothing depends on.
-
-echo
-echo "What a workflow may do:"
-approve=$(gh api "repos/$REPO/actions/permissions/workflow" --jq '.can_approve_pull_request_reviews' 2>/dev/null)
-
-if [[ -z "$approve" ]]; then
-  note "this token cannot read the workflow permissions, so they were not checked"
-  note "  a token with Administration access can"
-else
-  compare "$approve" true "actions may open pull requests" \
-    "actions may NOT open pull requests, so the issue-sync workflow cannot propose one"
-fi
-
-if [[ "$CHECK" -eq 0 ]]; then
-  gh api -X PUT "repos/$REPO/actions/permissions/workflow" \
-    -F can_approve_pull_request_reviews=true >/dev/null || exit 1
-fi
+# "Actions may create and approve pull requests" was asserted here until
+# inventory-tng-qnxb, because issue-sync.yml opened one. It reports instead now
+# and nothing else in this repository opens a pull request, so the setting is
+# one nothing depends on -- and this file's own rule about
+# `default_workflow_permissions` applies to it in turn. If a workflow is given a
+# pull request to open again, inventory-tng-pmw2 is why saying so goes back.
 
 # --- what main accepts -----------------------------------------------------
 #
