@@ -21,7 +21,7 @@ from typing import Any
 import pytest
 from django.conf import settings
 
-from inventory_tng import console
+from inventory_tng import console, redaction
 
 RECORD: dict[str, Any] = {
     "timestamp": "2026-08-23T14:32:07.412-04:00",
@@ -406,11 +406,95 @@ def test_a_timestamp_written_by_something_else_does_not_ragged_the_columns() -> 
 
 
 def test_a_stack_goes_under_the_record_like_a_traceback() -> None:
-    """`stack_info=True` produced one enormous line with literal escapes in it."""
-    drawn = console.render({**RECORD, "stack": "Stack (most recent call last):\n  File ..."}, console.FULL)
+    """`stack_info=True` produced one enormous line with literal escapes in it.
+
+    UNDER THE KEY THAT IS ACTUALLY WRITTEN, which this pinned wrongly for as
+    long as it existed: `ProcessorFormatter` writes `stack_info`, and the case
+    said `stack` -- a key nothing produces -- so it passed while a real
+    captured stack went on arriving as one escaped line. inventory-tng-0qys.
+    """
+    drawn = console.render({**RECORD, "stack_info": "Stack (most recent call last):\n  File ..."}, console.FULL)
 
     assert drawn.splitlines()[0].endswith("rows=12")
     assert drawn.splitlines()[1].startswith("Stack")
+
+
+def test_a_stack_asked_for_and_never_captured_is_drawn_as_the_pair_it_is() -> None:
+    """The regression the first fix for 0qys introduced.
+
+    Why `UNDER` is decided on the value rather than the name is on `UNDER`
+    itself, and why the boolean is there at all is `inventory-tng-dke1`. What
+    this pins is the consequence: the drawing was worse than before the fix,
+    and worse only for the loggers this project actually uses.
+    """
+    drawn = console.render({**RECORD, "stack_info": True}, console.FULL)
+
+    assert len(drawn.splitlines()) == 1, "a boolean is not a block to draw underneath"
+    assert "stack_info=True" in drawn, "and it says what it is rather than appearing as a bare True"
+
+
+def test_every_structural_key_is_one_the_field_contract_allows() -> None:
+    """The guard that would have caught 0qys nine days earlier.
+
+    `console.STRUCTURAL` and `redaction.ALLOWED_LOG_KEYS` are two hand-written
+    lists of the same field contract, and they have already drifted once: the
+    console's `stack` arrived with inventory-tng-nb8.1 and redaction's
+    `stack_info` four commits later with nb8.5, and nothing noticed for nine
+    days because nothing asked them the same question.
+
+    Held as a test rather than an import, because console.py's reader half runs
+    against a saved stream with no Django and no structlog, and redaction is on
+    the writing side. This asks at build time what the module must not ask at
+    run time.
+
+    `positional_args` is the one deliberate exception, and is why this is a
+    subset rather than an equality: it is structlog machinery the formatter
+    removes, so the contract must NOT allow it to be written, while the console
+    still hides it from a stream that predates the formatter. STRUCTURAL's own
+    comment names that third category.
+    """
+    machinery = {"positional_args"}
+    known = console.STRUCTURAL | set(console.UNDER)
+
+    assert known - machinery <= redaction.ALLOWED_LOG_KEYS, (
+        "the console handles a key that the field contract does not carry"
+    )
+    assert machinery.isdisjoint(redaction.ALLOWED_LOG_KEYS), (
+        "positional_args is machinery: it is hidden on read and never allowed on write"
+    )
+
+
+def test_the_key_nothing_writes_is_no_longer_drawn_as_a_stack() -> None:
+    """The other side of it, so the two names cannot both work by accident.
+
+    `stack` is an ordinary word a caller may bind, and once it stopped being
+    structural it has to be drawn as `key=value` like any other.
+    """
+    drawn = console.render({**RECORD, "stack": "not a captured stack"}, console.FULL)
+
+    assert len(drawn.splitlines()) == 1, "nothing is drawn underneath for a key nothing captures"
+    assert "stack='not a captured stack'" in drawn
+
+
+def test_a_saved_stream_carrying_a_stack_is_redrawn_with_it(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """scripts/pretty-logs over a saved stream, which is the other half of 0qys.
+
+    Reached through `main` rather than `render`, because the acceptance
+    criterion names what a person runs over a file of JSON and not the function
+    underneath it. That is also why the near-duplicate assertion is worth its
+    line: the two halves failed together and have to be seen to pass together.
+    """
+    record = {**RECORD, "stack_info": 'Stack (most recent call last):\n  File "a.py", line 1'}
+    monkeypatch.setenv("DJANGO_LOG_LAYOUT", "full")
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(record) + "\n"))
+
+    console.main()
+
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[1].startswith("Stack"), "the stack is drawn under the record"
+    assert 'File "a.py", line 1' in lines[2], "and its newlines survive as newlines"
 
 
 def test_a_key_the_writer_recorded_as_inherited_is_hidden_and_the_rest_is_not() -> None:
