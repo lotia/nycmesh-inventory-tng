@@ -1588,11 +1588,22 @@ when you mean it.
 
 They are what [the landing gate](#when-a-branch-is-ready-to-merge) reads as
 evidence that a pass happened, and they are the reason it can record what it
-found rather than what it was told. A review submitted through GitHub's review
-API — which is what `/code-review --comment` leaves behind — already counts for
-the first, so in practice the marker only has to be typed on the simplify
-comment. It is the same device as the `<!-- batch-contents -->` marker CI posts,
-for the same reason: a marker survives rewording and prose does not.
+found rather than what it was told. A review that **said something** counts for
+the first on its own, so in practice the marker only has to be typed on the
+simplify comment. Said something means one of two things: a review submitted
+with prose in its body, or an inline comment that opens a thread — which is what
+`/code-review --comment` leaves behind.
+
+**Answering a finding is not making one.** Replying to a review thread creates
+an entry indistinguishable from a finding in everything the pull request reports
+about reviews — same state, same empty body, same author — and replying is what
+[the procedure](.agents/skills/pull-requests/SKILL.md) tells you to do with
+findings. So the stage was satisfiable by working through a review that had
+never happened. What separates them is whether the comment opens a thread or
+answers one, and that is what is read.
+
+It is the same device as the `<!-- batch-contents -->` marker CI posts, for the
+same reason: a marker survives rewording and prose does not.
 
 **The two stages do not have the same operator, and an agent has to know which
 is which.** Simplification is an agent's own work and it runs without being
