@@ -275,7 +275,7 @@ pr_current() { gh_json pr view --json number --jq .number; }
 # it can no longer do is believe a stage ran when the pull request carries
 # nothing whatsoever -- which is the case it was actually failing in.
 record_receipt() {
-  local pr=$1 payload
+  local pr=$1 payload findings
   have python3 || { echo "landing-gate: python3 is needed to read the pull request." >&2; return 1; }
   have gh || { echo "landing-gate: gh is needed to read the pull request." >&2; return 1; }
   [[ -n "$REPO_ROOT" ]] || {
@@ -296,6 +296,21 @@ record_receipt() {
     return 1
   }
 
+  # A SECOND CALL, for what the first cannot carry. `evidence` in
+  # scripts/review_cycle.py says what that is and why it decides the stage.
+  # inventory-tng-bahi.
+  #
+  # `--slurp` because `--paginate` alone emits each page as its own document,
+  # and WRITTEN TO A FILE because the reader takes it that way -- so this and
+  # ci.yml hand over the same two documents rather than each stitching them,
+  # which is where two spellings of one merge had already drifted apart.
+  findings=$(mktemp) || return 1
+  gh_json api "repos/{owner}/{repo}/pulls/$pr/comments" --paginate --slurp >"$findings" || {
+    rm -f "$findings"
+    echo "Could not read the review comments on pull request $pr." >&2
+    return 1
+  }
+
   # The directory, but NOT the file: an empty receipts file written before the
   # evidence is weighed is a receipt that exists for a cycle that did not run,
   # which is a smaller version of the bug this whole change is about. The
@@ -311,13 +326,18 @@ record_receipt() {
   # and the required check inventory-tng-x0jp added. Two copies of it would
   # drift, and the drift would be invisible: both would still run, and one
   # would quietly disagree about what counts as a review having happened.
-  RECEIPTS="$RECEIPTS" PR="$pr" HERE="$SCRIPTS" python3 -c '
+  RECEIPTS="$RECEIPTS" PR="$pr" HERE="$SCRIPTS" FINDINGS="$findings" python3 -c '
 import json, os, sys
 
 sys.path.insert(0, os.environ["HERE"])
 import review_cycle
 
 payload = json.load(sys.stdin)
+# THROUGH THE READER, not stitched here. `review_cycle.findings` knows that
+# `--paginate --slurp` hands back pages rather than a list, and it is the only
+# thing that knows -- this file and ci.yml having each had a merge of their own,
+# which disagreed.
+payload["review_comments"] = review_cycle.findings(os.environ["FINDINGS"])
 
 # Before the evidence, because a receipt without a head vouches for nothing and
 # there is no point telling anybody which stage is missing until there is a
@@ -426,7 +446,12 @@ if missing:
 
 print("Recorded the review cycle for pull request %s at %s. Merging is unblocked."
       % (os.environ["PR"], head))
-' <<<"$payload" || return 1
+' <<<"$payload"
+  local read_status=$?
+  # The findings file is this function's own scratch, so it goes whichever way
+  # the reader went.
+  rm -f "$findings"
+  [[ "$read_status" -eq 0 ]] || return 1
 }
 
 # What the receipts say about one pull request: its head, and which stages have
@@ -1241,9 +1266,13 @@ linter would have said is a review wasted. Wait for the checks, or fix them.
     # Two questions, one round trip. When the command names no pull request this
     # arm needs both its number and its head, and asking `gh pr view` twice
     # spends a second GH_DEADLINE window out of the hook's timeout for an answer
-    # the first call could have carried -- the consolidation `record` already
-    # makes, for the same reason. `current` stays empty when the command named
-    # its pull request, and the comparison below fetches the head then.
+    # the first call could have carried. `current` stays empty when the command
+    # named its pull request, and the comparison below fetches the head then.
+    #
+    # `record` used to be the exemplar here and no longer is: it asks twice now,
+    # for a field `gh pr view` cannot return at all. It is not on this path --
+    # the hook routes to `check` and `stop` -- so it spends no budget this arm
+    # has to keep.
     current=""
     if [[ -z "$pr" ]]; then
       both=$(gh_json pr view --json number,headRefOid --jq '"\(.number) \(.headRefOid)"') \

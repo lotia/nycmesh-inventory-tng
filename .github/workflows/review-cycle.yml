@@ -43,10 +43,12 @@ on:
     types: [created, edited]
   pull_request_review:
     types: [submitted, edited]
-  # THE THIRD KIND OF COMMENT, and it is evidence. A review body arrives under
-  # `reviews`, and so does an inline diff comment -- as an entry with an empty
-  # body, which review_cycle.py counts. Without this trigger a reviewer who
-  # leaves only inline findings has evidenced the stage and nothing re-reads it.
+  # THE THIRD KIND OF COMMENT, and it is evidence -- now more than before. An
+  # inline diff comment is what review_cycle.py reads to decide the stage at
+  # all: the entry it makes under `reviews` is indistinguishable from a reply,
+  # so the comment itself is what counts. inventory-tng-bahi. Without this
+  # trigger a reviewer who leaves only inline findings has evidenced the stage
+  # and nothing re-reads it.
   #
   # Whether a standalone inline comment ALSO fires pull_request_review is
   # undocumented and did not settle under measurement, so both are listened for

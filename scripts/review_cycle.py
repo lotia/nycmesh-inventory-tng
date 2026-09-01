@@ -14,10 +14,12 @@ the predicate would earn a module of its own.
 ## What counts
 
 A stage is evidenced by a comment whose body carries its marker ON A LINE OF
-ITS OWN, and ``code-review`` is additionally evidenced by any review submitted
-through GitHub's review API, which is what ``/code-review --comment`` leaves
-behind. DEVELOPERS.md "One review pass, findings filed per issue" is where the
-rule lives; this is the reader for it.
+ITS OWN, and ``code-review`` is additionally evidenced by a review that SAID
+SOMETHING -- one submitted with prose in its body, or an inline comment opening
+a thread, which is what ``/code-review --comment`` leaves behind. Any review at
+all used to count, and ``evidence`` says what that let through. DEVELOPERS.md
+"One review pass, findings filed per issue" is where the rule lives; this is
+the reader for it.
 
 ## What is deliberately not checked
 
@@ -79,11 +81,6 @@ if not STAGES:
 #: type. The review IS the artifact, and asking for a marker beside it would be
 #: asking somebody to write down that a pass had happened -- which is the thing
 #: a marker exists to avoid having to trust.
-#:
-#: ANY review, including the empty-bodied ones GitHub creates to carry a single
-#: inline diff comment. That is deliberate: an inline finding is a review pass
-#: leaving evidence, and on one recent pull request six of seven entries here
-#: were that shape.
 BY_REVIEW = ("code-review",)
 
 
@@ -276,6 +273,36 @@ def carries(body: str | None, marker: str) -> bool:
     )
 
 
+def findings(path: str) -> list[dict[str, Any]]:
+    """The review comments in ``path``, flattened out of their pages.
+
+    ONE IMPLEMENTATION, because two callers need it and they had one each: the
+    required check and the landing gate stitched this together separately, in
+    two languages, and the two disagreed. `gh api --paginate --slurp` wraps
+    each page in an outer array, so a merge that assumed one array kept only
+    the first page -- silently in the check, and as an outright refusal in the
+    gate. Past thirty comments on a pull request, which is the size the feature
+    is for. ``scripts/say-batch.sh`` flattens the same shape with `jq '.[][]'`.
+    """
+    with open(path) as handle:
+        pages = json.load(handle)
+    # SHAPE CHECKED HERE, AND RAISED AS ValueError, because that is what the
+    # caller already catches to say a sentence and exit 2. A file holding
+    # something that parses but is not comments -- gh saving an error object
+    # into it, say -- otherwise reached `evidence` as a list of strings and
+    # came out as a traceback, where every other unreadable input in this
+    # module says what it could not read.
+    if not isinstance(pages, list):
+        raise ValueError(f"{path} holds {type(pages).__name__}, not pages of review comments")
+    out = []
+    for page in pages:
+        for item in page if isinstance(page, list) else [page]:
+            if not isinstance(item, dict):
+                raise ValueError(f"{path} holds {type(item).__name__} where a review comment goes")
+            out.append(item)
+    return out
+
+
 def evidence(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     """What each stage has behind it, as artifacts somebody can go and read.
 
@@ -293,6 +320,7 @@ def evidence(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     """
     comments = payload.get("comments") or []
     reviews = payload.get("reviews") or []
+    threads = payload.get("review_comments") or []
 
     found: dict[str, list[dict[str, Any]]] = {}
     for stage in STAGES:
@@ -309,6 +337,16 @@ def evidence(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
             if carries(c.get("body"), marker)
         ]
         if stage in BY_REVIEW:
+            # A REVIEW THAT SAID SOMETHING, which used to be ANY review at all.
+            # `reviews` cannot tell a finding from a reply: measured on pull
+            # request 87, all eight entries read `state=COMMENTED`, empty body,
+            # same author -- four of them findings and four of them replies this
+            # session typed while answering the findings. So the stage was
+            # satisfiable by following the documented procedure with no review
+            # pass having run. `inventory-tng-bahi`.
+            #
+            # A BODY IS ONE ANSWER: a review submitted with prose said something
+            # on its own, whoever wrote it.
             found[stage] += [
                 {
                     "kind": "review",
@@ -318,6 +356,28 @@ def evidence(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
                     "commit": (r.get("commit") or {}).get("oid"),
                 }
                 for r in reviews
+                if (r.get("body") or "").strip()
+            ]
+            # AND A FINDING IS THE OTHER, told from a reply by the one field
+            # that separates them. `in_reply_to_id` is absent on the comment
+            # that opens a thread and set on every answer to it, so this counts
+            # the findings and ignores the conversation about them.
+            #
+            # NOT BY AUTHOR, which is the discriminator that looks strongest and
+            # is wrong here: this project has one active maintainer who is
+            # usually also the author, so refusing a self-review would refuse
+            # every real one. Not by state either -- `/code-review --comment`
+            # submits COMMENTED, so that would refuse the tool the rule names.
+            found[stage] += [
+                {
+                    "kind": "finding",
+                    "id": c.get("id"),
+                    "author": (c.get("user") or {}).get("login"),
+                    "at": c.get("created_at"),
+                    "path": c.get("path"),
+                }
+                for c in threads
+                if not c.get("in_reply_to_id")
             ]
     return found
 
@@ -347,6 +407,18 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="print the name the review-cycle check reports under, and exit",
     )
+    # THE SECOND DOCUMENT, TAKEN HERE RATHER THAN STITCHED BY EACH CALLER. What
+    # decides the code-review stage lives in two API answers -- `gh pr view`
+    # cannot say whether a review entry is a finding or a reply -- and the two
+    # callers were merging them separately, in two languages, which is the drift
+    # this module exists to prevent one layer up. They now hand over two files.
+    #
+    # `findings` above is what reads it, and says why the pages matter.
+    parser.add_argument(
+        "--findings",
+        metavar="FILE",
+        help="the review comments, as `gh api .../pulls/N/comments --paginate --slurp`",
+    )
     args = parser.parse_args(argv)
 
     if args.check_name:
@@ -366,6 +438,13 @@ def main(argv: list[str] | None = None) -> int:
     if not isinstance(payload, dict):
         print("Expected an object from gh, with comments and reviews in it.", file=sys.stderr)
         return 2
+
+    if args.findings:
+        try:
+            payload["review_comments"] = findings(args.findings)
+        except (OSError, ValueError) as exc:
+            print(f"Could not read the review comments: {exc}", file=sys.stderr)
+            return 2
 
     found = evidence(payload)
     short = missing(found)

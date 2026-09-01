@@ -72,6 +72,10 @@ case "$args" in
   # a bare integer.
   *"isDraft"*)            cat "$GH_FIXTURES/stop.json" ;;
   *"--json headRefOid"*)  cat "$GH_FIXTURES/head" ;;
+  # The review comments the record arm reads for `in_reply_to_id`, which is the
+  # only field that tells a finding from a reply. Default is none; a case that
+  # is about a review pass says what it left behind.
+  *"/comments"*)          cat "$GH_FIXTURES/findings.json" ;;
   # The body the merge arm reads before anything else, so that a pull request
   # saying do-not-merge is refused for that rather than for its receipt. Each
   # case that is about the marker rewrites this; the default is a body without
@@ -99,6 +103,14 @@ echo 7 >"$FIX/number"
 checks_are() { printf '%s' "$1" >"$FIX/checks.json"; }
 checks_are '[{"name": "Backend", "state": "SUCCESS"}]'
 echo "{\"headRefOid\":\"$HEAD_OID\",\"comments\":[],\"reviews\":[]}" >"$FIX/pr.json"
+echo '[]' >"$FIX/findings.json"
+
+# What `gh api .../pulls/N/comments` hands back. A comment with no
+# `in_reply_to_id` OPENS a thread and is a finding; one with it is an answer to
+# a finding, and the pair is the whole of what this has to tell apart.
+a_finding='{"id": 1, "user": {"login": "someone"}, "created_at": "2026-08-31T10:00:00Z", "path": "a.py"}'
+a_reply='{"id": 2, "in_reply_to_id": 1, "user": {"login": "someone"}, "created_at": "2026-08-31T10:00:00Z", "path": "a.py"}'
+findings_are() { printf '[%s]\n' "$1" >"$FIX/findings.json"; }
 
 # What `gh pr view --json body` hands back. A body, through json.dumps, so a
 # case can put a marker on a line of its own without the shell touching it.
@@ -359,6 +371,15 @@ RECEIPTS="$REPO/.claude/.review-receipts.json"
 record() { in_repo "" "" record "${1:-7}"; }
 
 pr_json() { # <code-review evidence?> <simplify evidence?>
+  # THE TWO SHAPES A REVIEW PASS REALLY LEAVES, which `evidence` in
+  # scripts/review_cycle.py argues; the empty-bodied review that used to stand
+  # for one is neither. inventory-tng-bahi.
+  #
+  #   review   a review submitted with prose in it
+  #   finding  an inline comment opening a thread, which is what
+  #            `/code-review --comment` actually leaves
+  echo '[]' >"$FIX/findings.json"
+  [[ "$1" == "finding" ]] && findings_are "$a_finding"
   # The head goes in the same document, because `record` now reads all three
   # fields from one answer rather than asking twice.
   CR=$1 SIMP=$2 HEAD_NOW="$(cat "$FIX/head")" python3 -c '
@@ -367,7 +388,8 @@ comments, reviews = [], []
 if os.environ["CR"] == "review":
     reviews.append({"id": "R_1", "author": {"login": "someone"},
                     "submittedAt": "2026-08-24T10:00:00Z",
-                    "commit": {"oid": "b" * 40}, "state": "COMMENTED"})
+                    "commit": {"oid": "b" * 40}, "state": "COMMENTED",
+                    "body": "Two things below, and the rest looks sound."})
 elif os.environ["CR"] == "quoted":
     comments.append({"id": "C_3", "author": {"login": "someone"},
                      "createdAt": "2026-08-24T10:00:00Z", "url": "http://x/3",
@@ -493,6 +515,29 @@ assert "$(cat "$RECEIPTS")" 0 0 '"head"' "the receipt names the head"
 assert "$(cat "$RECEIPTS")" 0 0 "R_1" "the receipt names the review it found"
 assert "$(cat "$RECEIPTS")" 0 0 "C_2" "the receipt names the comment it found"
 refute "$(cat "$RECEIPTS")" 0 0 '"stages"' "and stores no hardcoded stage list"
+
+# THE OTHER SHAPE, and the one `/code-review --comment` actually leaves: an
+# inline comment opening a thread. Held separately because a bodied review and
+# an inline finding reach the stage by different halves of the rule.
+#
+# AFTER the assertions above rather than between them: `record` rewrites the
+# receipts file, so a case wedged into that group left them reading a receipt
+# written by a different scenario than the one they name.
+pr_json finding marker
+record >/dev/null 2>&1
+assert "$(cat "$RECEIPTS")" 0 0 "finding" "and an inline finding is evidence in its own right"
+
+# AND THE HAZARD, which is the whole of inventory-tng-bahi: answering findings
+# is what the documented procedure tells an agent to do, and doing it must not
+# be mistaken for the pass that made them.
+#
+# `findings_are` AFTER `pr_json`, which rewrites the same file: written the
+# other way round, the reply never reached the reader and this case pinned an
+# empty pull request instead of the hazard it names.
+pr_json none marker
+findings_are "$a_reply"
+out=$(record 2>&1); status=$?
+assert "$out" "$status" 1 "code-review" "a reply to a finding is not a finding"
 
 pr_json marker marker
 out=$(record); status=$?

@@ -719,13 +719,30 @@ jobs:
       - uses: actions/checkout@v5
       # Both lists in one answer, so the two stages are read from the same
       # moment rather than from two.
+      #
+      # AND THE REVIEW COMMENTS SEPARATELY, because `gh pr view` cannot answer
+      # the question that decides the stage. `evidence` in scripts/review_cycle.py
+      # says which question and why. inventory-tng-bahi.
       - name: Both passes have left something behind
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        #
+        # HANDED OVER AS TWO DOCUMENTS. The reader stitches them, so this and
+        # scripts/landing-gate.sh cannot disagree about how -- and they did:
+        # written as two separate merges, one dropped every page of comments
+        # after the first and the other refused outright.
+        #
+        # NOTHING AT COLUMN ZERO in this block, which is not a style
+        # preference: scripts/ci-check-names.py parses this file by indentation
+        # to derive what `main` requires, so an inlined program starting a line
+        # there ends the jobs list. Written that way first, and three job names
+        # vanished.
         run: |
+          gh api "repos/$REPO/pulls/$PR/comments" --paginate --slurp > "$RUNNER_TEMP/findings.json"
           gh pr view "$PR" --json comments,reviews \
-            | python3 scripts/review_cycle.py
+            | python3 scripts/review_cycle.py --findings "$RUNNER_TEMP/findings.json"
 
   # A PULL REQUEST THAT SAYS DO NOT MERGE, AND IS BELIEVED. What the marker is
   # and why prose could not hold it is DEVELOPERS.md "When a branch is ready to

@@ -14,6 +14,7 @@ set -uo pipefail
 HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 READER="$HERE/review_cycle.py"
 . "$HERE/testlib.sh"
+workspace
 
 REVIEW='<!-- review-cycle: code-review -->'
 SIMPLIFY='<!-- review-cycle: simplify -->'
@@ -35,13 +36,27 @@ print(json.dumps({"comments": [
 }
 
 # A pull request carrying a submitted review and nothing else.
+#
+# WITH A BODY, because an empty one is no longer evidence. What `reviews` cannot
+# tell apart, and why that mattered, is on BY_REVIEW in the reader.
+# inventory-tng-bahi.
 read_review() {
   python3 -c '
 import json
 print(json.dumps({"comments": [], "reviews": [
     {"id": "R_1", "author": {"login": "someone"},
      "submittedAt": "2026-08-31T10:00:00Z", "commit": {"oid": "a" * 40},
-     "state": "COMMENTED"}]}))' | python3 "$READER" 2>&1
+     "state": "COMMENTED", "body": "Two things below."}]}))' | python3 "$READER" 2>&1
+}
+
+# read_findings <json> -- what `gh api .../pulls/N/comments` hands back, which
+# is the only place `in_reply_to_id` appears.
+read_findings() {
+  FINDINGS=$1 python3 -c '
+import json, os
+print(json.dumps({"comments": [], "reviews": [],
+                  "review_comments": json.loads(os.environ["FINDINGS"])}))' \
+    | python3 "$READER" 2>&1
 }
 
 both() { read_comments "$REVIEW" "$SIMPLIFY"; }
@@ -65,7 +80,7 @@ out=$( (python3 -c '
 import json
 print(json.dumps({"comments": [{"body": "'"$SIMPLIFY"'", "id": "C_1",
     "author": {"login": "someone"}, "createdAt": "t", "url": "u"}],
-  "reviews": [{"id": "R_1", "author": {"login": "someone"},
+  "reviews": [{"id": "R_1", "author": {"login": "someone"}, "body": "Two things below.",
     "submittedAt": "t", "commit": {"oid": "a"}, "state": "COMMENTED"}]}))' \
   | python3 "$READER") 2>&1 ); status=$?
 assert "$out" "$status" 0 "The review cycle ran" \
@@ -73,6 +88,57 @@ assert "$out" "$status" 0 "The review cycle ran" \
 
 out=$(read_review); status=$?
 assert "$out" "$status" 1 "simplify" "but a review alone does not evidence simplify"
+
+echo
+echo "a finding is evidence; answering one is not"
+# inventory-tng-bahi. The documented procedure tells an agent to reply to
+# findings, and `reviews` cannot tell those replies from the findings they
+# answer -- so the stage was satisfiable with no pass having run.
+
+out=$(read_findings '[{"id": 1, "user": {"login": "someone"}, "created_at": "t", "path": "a.py"}]')
+status=$?
+assert "$out" "$status" 1 "simplify" "an inline finding evidences code-review"
+assert "$out" "$status" 1 "code-review  1 on the pull request" "and is counted, not merely not-missing"
+
+out=$(read_findings '[{"id": 2, "in_reply_to_id": 1, "user": {"login": "someone"}, "created_at": "t", "path": "a.py"}]')
+status=$?
+assert "$out" "$status" 1 "code-review" "a reply to a finding is not one"
+
+# THE HALF THAT USED TO BE THE WHOLE RULE, and which every other case here now
+# gives a body to -- so without this one, deleting the body test leaves the
+# suite green.
+out=$( (python3 -c '
+import json
+print(json.dumps({"comments": [], "reviews": [
+    {"id": "R_1", "author": {"login": "someone"}, "body": "",
+     "submittedAt": "t", "commit": {"oid": "a"}, "state": "COMMENTED"}]}))' \
+  | python3 "$READER") 2>&1 ); status=$?
+assert "$out" "$status" 1 "/code-review <pr> --comment" \
+  "an empty-bodied review no longer stands in for the pass"
+
+# `gh api --paginate --slurp` hands back PAGES, not a list, and a merge that
+# assumed one array kept only the first -- silently in the check and as a
+# refusal in the gate, past thirty comments.
+pages=$WORK/pages.json
+printf '%s' '[[{"id": 1, "user": {"login": "a"}, "created_at": "t", "path": "a.py"}],
+              [{"id": 2, "in_reply_to_id": 1, "user": {"login": "a"}, "created_at": "t", "path": "a.py"}]]' >"$pages"
+out=$(printf '%s' '{"comments": [], "reviews": []}' | python3 "$READER" --findings "$pages" 2>&1); status=$?
+assert "$out" "$status" 1 "code-review  1 on the pull request" \
+  "a finding on the second page is read, and the reply beside it is not"
+
+out=$(printf '%s' '{"comments": [], "reviews": []}' | python3 "$READER" --findings /nowhere 2>&1); status=$?
+assert "$out" "$status" 2 "Could not read the review comments" \
+  "and findings it cannot read refuse, rather than counting none"
+
+# READABLE JSON OF THE WRONG SHAPE IS STILL UNREADABLE, and it has to refuse
+# the same way. An error object saved to the file reached `evidence` as a list
+# of strings and came back as a traceback.
+wrong=$WORK/wrong.json
+printf '%s' '{"message": "Not Found"}' >"$wrong"
+out=$(printf '%s' '{"comments": [], "reviews": []}' | python3 "$READER" --findings "$wrong" 2>&1); status=$?
+assert "$out" "$status" 2 "Could not read the review comments" \
+  "and findings of the wrong shape refuse too"
+refute "$out" "$status" 2 "Traceback" "said rather than raised, as every other unreadable input is"
 
 echo
 echo "quoting a marker is not posting one"
