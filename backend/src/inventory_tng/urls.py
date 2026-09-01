@@ -79,9 +79,17 @@ urlpatterns = [
     path("api/categories", CategoryListView.as_view(), name="categories"),
     path("api/categories/<int:pk>", CategoryDetailView.as_view(), name="category-detail"),
     path("api/labels", LabelListView.as_view(), name="labels"),
-    # Before the code route below, which would otherwise swallow it. Nothing
-    # depends on that ordering -- a code is ten characters and "sheet" is five
-    # -- but relying on that would be relying on the code format from here.
+    # BEFORE the code route below, and the ordering is REQUIRED rather than
+    # tidiness. StringConverter matches [^/]+, so "sheet" is a code as far as
+    # the router can tell and the route below would answer it: swap the two and
+    # ten tests in test_label_printing.py fail, /api/labels/sheet resolving by
+    # route='api/labels/<str:code>' to a 403.
+    #
+    # What the ordering costs is that this literal hides any code equal to it,
+    # and today there is none -- a code is CODE_LENGTH characters and "sheet" is
+    # five. That half DOES rest on the code format, which is why it is written
+    # down rather than assumed: shorten CODE_LENGTH to five and this line would
+    # start swallowing a label instead of the other way round.
     path("api/labels/sheet", LabelSheetView.as_view(), name="label-sheet"),
     # By code, not by id: the code is what is printed on the sticker, and it is
     # how a label is both resolved and revoked. See LabelResolveView.
