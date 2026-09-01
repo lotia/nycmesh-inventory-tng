@@ -406,9 +406,10 @@ def test_an_address_nobody_names_is_still_flagged_when_it_is_not_a_name() -> Non
 def test_the_address_key_is_folded_the_way_the_name_key_is() -> None:
     """Rule 5 keys on this answer too, so a fold written inline in both
     modules is two of them deciding separately whether two addresses are one.
-    `lower` rather than `casefold`, matching the database's own column.
+    Why it is `lower` and not `casefold` is on `addressed`, along with what
+    that choice does NOT rest on.
     """
     assert addressed(" ADA@example.net ".strip()) == "ada@example.net"
-    # casefold() maps this to `ss` and lower() does not; the identifier
-    # tables say they are two.
+    # casefold() maps this to `ss` and lower() does not, so these two stay two.
+    # Pinned here because it is the only place the choice is visible.
     assert addressed("STRASSE@example.net") != addressed("Straße@example.net")

@@ -134,12 +134,20 @@ def addressed(email: str) -> str:
     written inline in both places is two modules quietly deciding separately
     whether two addresses are one address.
 
-    `lower` rather than `casefold`, matching `spelled`. It used to say this
-    also matched the column the identifier tables normalise with, which was
-    true of `Lower(Trim())` and is not true of what replaced it. Whether the
-    wider claim behind that -- that this fold has a database counterpart at
-    all -- was ever right is `inventory-tng-xvp1`; `Volunteer.email` has a
-    plain case-sensitive unique index and no generated column.
+    `lower` rather than `casefold`, matching `spelled`, and NOT because either
+    matches a database column. NEITHER KEY HAS ONE. `Volunteer.email` and
+    `Volunteer.sheet_key` carry plain partial unique constraints on the bare
+    column -- case-sensitive, nothing generated in between -- so this fold is
+    Python's alone and there is no counterpart for it to drift from.
+
+    It said otherwise until `inventory-tng-xvp1`, naming a column on the
+    identifier tables that these keys never touch.
+
+    The reason for `lower` stands without the parity. It is the fold this
+    codebase answers "are these two strings one" with wherever it asks --
+    `identifiers.Canonical` ends in SQL's `lower` and `identifiers.normalised`
+    in Python's -- and `casefold` is a third answer again, mapping the German
+    ss where neither of the others does.
     """
     return email.lower()
 
