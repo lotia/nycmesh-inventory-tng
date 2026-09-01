@@ -65,6 +65,10 @@ scene() {
   new_repo "$WORK/repo"
   mkdir -p "$WORK/repo/scripts" "$WORK/repo/backend" "$WORK/repo/.beads/hooks"
   cp "$HERE/bootstrap-dev.sh" "$WORK/repo/scripts/bootstrap-dev.sh"
+  # Sourced by the script under test rather than stubbed, because where the
+  # hooks are and whether git is pointed at them is exactly what half of this
+  # suite is about. scripts/check-setup.sh sources the same file.
+  cp "$HERE/hooks-path.sh" "$WORK/repo/scripts/hooks-path.sh"
   # What the hook is meant to lead to. A stub, because the step under test
   # asks whether the link reaches something git could run, not what it says.
   printf '#!/usr/bin/env bash\n' > "$WORK/repo/scripts/check-commit.sh"
@@ -163,13 +167,28 @@ expect 0 "already there" "a hook that arrived with the clone is left as it is"
 # decision, and only one such directory can be in force -- so overwriting it
 # would turn theirs off without saying so.
 scene mise docker uv
+mkdir -p "$WORK/repo/.githooks"
 git -C "$WORK/repo" config --local core.hooksPath .githooks
 expect 1 "will not overwrite yours" "a hooks directory somebody else chose stops the run"
 
 scene mise docker uv
+mkdir -p "$WORK/repo/.githooks"
 git -C "$WORK/repo" config --local core.hooksPath .githooks
 bootstrap > /dev/null 2>&1
 assert "$(hooks_path)" 0 0 ".githooks" "and it is still theirs afterwards"
+
+# A REFUSAL OF ITS OWN when the directory they named is not there, and not the
+# one above: telling somebody to move what they keep in a directory that does
+# not exist is advice they cannot take. scripts/check-setup.sh reports the same
+# state, and the two have to agree that neither will repair it for them.
+scene mise docker uv
+git -C "$WORK/repo" config --local core.hooksPath .githooks
+expect 1 "there is no such directory" "a hooks path leading nowhere is refused on its own terms"
+
+scene mise docker uv
+git -C "$WORK/repo" config --local core.hooksPath .githooks
+bootstrap > /dev/null 2>&1
+assert "$(hooks_path)" 0 0 ".githooks" "and it is still theirs afterwards too"
 
 # A hook git cannot run is a hook git reports as a failed commit, with nothing
 # said about why -- so both ways of getting there are answered here instead.
