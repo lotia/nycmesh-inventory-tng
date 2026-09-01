@@ -667,6 +667,8 @@ jobs:
         run: scripts/review-cycle.test.sh
       - name: Check the do-not-merge reader
         run: scripts/do-not-merge.test.sh
+      - name: Check the issue puller
+        run: scripts/pull-new-issues.test.sh
       # And then run it, which none of the above do to their own subject. What
       # it reads here is what a clone is handed before anybody configures
       # anything, so a hook that stopped arriving with the checkout is caught

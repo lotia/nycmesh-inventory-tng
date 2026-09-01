@@ -24,8 +24,10 @@
 # leave the tracker dirty immediately after every push, which is precisely how
 # tracker state gets stranded and lost. It would also make every contributor
 # need a GitHub token and slow every push for the benefit of promptness alone.
-# `inventory-tng-cwpa.3` runs this in CI instead, where the export change is
-# committed rather than abandoned.
+# Nor does CI run it. What CI does is NOTICE -- `inventory-tng-cwpa.3`, and the
+# workflow says why at length -- because a tracker built in a runner is thrown
+# away, so the only thing that could persist was a commit, and that commit could
+# never merge. `inventory-tng-qnxb`.
 #
 # Usage: sync-issues.sh [--dry-run] [--no-push]
 
@@ -46,6 +48,18 @@ for argument in "$@"; do
     *) echo "sync-issues: unknown argument $argument" >&2; exit 2 ;;
   esac
 done
+
+# `bd` IS THIS SCRIPT'S OWN REQUIREMENT, and asking for it here is a repair.
+# Steps 2 and 4 invoke it directly, but nothing checked: pull-new-issues.sh
+# refused without it on every path, so step 1 did the refusing. It no longer
+# does on a dry run -- that question is answered from the committed export --
+# which left `sync-issues.sh --dry-run` walking all four steps on a machine with
+# no `bd` at all and ending "The tracker and the issue list agree."
+# inventory-tng-qnxb.
+command -v bd >/dev/null 2>&1 || {
+  echo "sync-issues: bd is needed and is not on the path." >&2
+  exit 2
+}
 
 run() {
   if [[ "$dry_run" == true ]]; then

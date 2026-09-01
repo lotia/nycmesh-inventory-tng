@@ -32,7 +32,6 @@ case "$*" in
     ;;
   *"repo view"*) echo "someone/somewhere" ;;
   *".permissions.admin"*) cat "$STUBS/admin" ;;
-  *"actions/permissions/workflow"*) cat "$STUBS/approve" ;;
   *)
     # repos/<x> with a --jq that selects the four merge flags as TSV
     cat "$STUBS/merge.tsv"
@@ -45,9 +44,6 @@ export STUBS="$WORK"
 
 merge() { printf '%s\n' "$1" > "$WORK/merge.tsv"; }
 admin() { printf '%s\n' "$1" > "$WORK/admin"; }
-# Whether actions may open a pull request. Empty stands for a token that could
-# not read it, which must report as unchecked rather than as wrong.
-approve() { printf '%s\n' "$1" > "$WORK/approve"; }
 RIGHT=$'false\tfalse\ttrue\ttrue'
 protection() { cat > "$WORK/protection.json"; }
 unprotected() { : > "$WORK/protection.json"; }
@@ -72,7 +68,6 @@ echo "repo-settings.sh"
 
 admin true
 merge "$RIGHT"
-approve true
 protection <<<"$GOOD"
 expect 0 "Settings are as this repository expects" "settings that match are accepted"
 
@@ -103,17 +98,6 @@ expect 1 "squash merge is ON" "squash merge being back is noticed"
 merge $'false\ttrue\ttrue\ttrue'
 protection <<<"$GOOD"
 expect 1 "merge commits are ON" "merge commits being back are noticed"
-
-# The setting the issue-sync workflow depends on. It was off, undeclared, and
-# so the only thing that noticed was the workflow failing -- inventory-tng-pmw2.
-merge "$RIGHT"
-approve false
-expect 1 "may NOT open pull requests" "actions being unable to open a pull request is noticed"
-
-approve ""
-expect 0 "cannot read the workflow permissions" "a token that cannot read them is told so, not alarmed"
-
-approve true
 
 merge "$RIGHT"
 protection <<<"${GOOD/\"enforce_admins\": \{\"enabled\": true\}/\"enforce_admins\": \{\"enabled\": false\}}"

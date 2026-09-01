@@ -1,222 +1,93 @@
 name: Issue sync
 
-# scripts/pull-new-issues.sh, run where nobody has to remember to run it.
+# Say when a GitHub issue exists that the tracker has never heard of.
 #
-# That script says what the gap is and why it exists. What this file adds is
-# only the answer to "who runs it": not a person, and not a git hook either,
-# because the people who would trigger one are exactly the people already using
-# the tracker. `inventory-tng-cwpa.3`.
+# What that gap is, and why `bd` cannot close it alone, is on
+# scripts/pull-new-issues.sh, which is the part that finds them. This file is
+# the answer to "who notices", because the people who would run that by hand
+# are exactly the people already using the tracker. `inventory-tng-cwpa.3`.
 #
-# IT PROPOSES, IT DOES NOT PUSH. Three reasons, and the first two were checked
-# rather than assumed:
+# IT REPORTS, IT DOES NOT PROPOSE, and it used to do the opposite. It built a
+# tracker in the runner, pulled what was missing, pushed a branch and opened a
+# pull request -- which could never merge, because GitHub starts no workflow run
+# for a push made with GITHUB_TOKEN, so every required context on that branch
+# stayed "Expected -- waiting for status to be reported" for ever. Nothing
+# announced that: the job reported success and the pull request looked ordinary.
+# `inventory-tng-qnxb` measured it and settled the shape.
 #
-#   1. main is protected -- a merge through the interface is refused without
-#      the checks, so a job pushing straight at it would fail anyway.
-#   2. .beads/issues.jsonl is a megabyte on one line per issue. Committing to
-#      main while somebody has local tracker changes is a conflict nobody wants
-#      to resolve by hand.
-#   3. An issue somebody else filed should be SEEN arriving, which is where the
-#      triage in inventory-tng-cwpa.4 happens anyway.
+# WHY A RED CHECK RATHER THAN A PULL REQUEST, which is the decision rather than
+# the mechanism. "There are issues bd has not heard of" is a STATE, not an
+# event. A pull request announces an event once and then rots: if nobody acts,
+# nothing raises it again, and it sits in the list looking like work in
+# progress. A job that is red while the thing is true and green when it stops
+# being true re-raises itself every morning and needs no cleaning up -- it
+# clears the moment somebody runs the script, with nothing to close.
+#
+# AND IT LANDS NOTHING, deliberately. Pulling in a runner writes to a database
+# that is thrown away, so the only thing that ever persisted was the commit --
+# which is what could not merge. Landing tracker rows stays a person's job,
+# through the command named in the failure below and in
+# DEVELOPERS.md#issue-tracking.
+#
+# NOT IN ci.yml, and that is load-bearing: scripts/repo-settings.sh derives
+# main's required contexts from the job names there, so a job put in that file
+# becomes required -- and this one must not be. It answers a question about the
+# repository rather than about a branch, so it would sit red on every pull
+# request anybody opened while an issue was waiting. Same reason
+# review-cycle.yml is its own file.
 
 on:
-  # A person, when they want it. Listed first because it is how this should be
-  # tried the first few times.
+  # A person, when they want it.
   workflow_dispatch:
   # Somebody filing or reopening an issue is exactly the event this exists for.
   issues:
     types: [opened, reopened]
-  # And a sweep, for anything the event missed -- a delivery that failed, or an
-  # issue transferred in, which raises no `opened` here.
+  # And a sweep, which is what makes this a standing signal rather than a
+  # notification: it asks again every morning for as long as the answer is yes,
+  # and it catches what the event missed -- a delivery that failed, or an issue
+  # transferred in, which raises no `opened` here.
   schedule:
     - cron: "17 7 * * *"
 
-# One at a time. Two runs racing would both branch from main, both pull the
-# same issues, and open two pull requests proposing the same thing.
+# One at a time. Nothing here writes, so a race would only waste a runner --
+# but two reds saying the same thing is two people going to look.
 concurrency:
   group: issue-sync
   cancel-in-progress: false
 
+# READ ONLY, and it is worth saying what that costs: this cannot bring an issue
+# in, and is not meant to. The old version needed `contents: write` and
+# `pull-requests: write` to push a branch and open the pull request that could
+# not merge.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
   issues: read
 
 jobs:
-  sync:
-    name: Bring new issues into the tracker
+  unsynced:
+    name: Issues the tracker has not heard of
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
-      # THE PUBLISHED BINARY, NOT `go install`. The first version compiled from
-      # source, which builds the whole of Dolt to get a CLI, and the first run
-      # of this workflow died verifying one of its modules against
-      # sum.golang.org. That failure was transient; needing a healthy checksum
-      # database and a full database-engine build on every run is not.
-      # `inventory-tng-t3w9`.
+      # NO `bd`, which is most of what this file used to be. Installing it meant
+      # a pinned release, a checksum, moving .beads/config.yaml aside so `bd
+      # init` did not try to clone a remote the runner has no key for, and a
+      # `git reset --hard` afterwards to undo what it scaffolded --
+      # inventory-tng-t3w9, -65ij, -rbvb and -y466, every one of them a repair
+      # to machinery that existed only to build a commit nothing could land.
       #
-      # PINNED, and not the latest release. This job runs unattended and writes
-      # to the tracker, so a version that changed how a pull maps its fields
-      # would do so without anybody choosing it. v1.1.2 is the version every
-      # behaviour recorded on inventory-tng-cwpa was measured against.
+      # `--check` needs none of it: scripts/unsynced.py compares the URLs GitHub
+      # gives against the `external_ref`s in the committed export, and the
+      # export is in the checkout. It did not always say so -- the script
+      # demanded `bd` on the path for a question it answers from that export
+      # alone, so the first dispatch of this rewrite exited 2 before asking
+      # anything.
       #
-      # VERIFIED AGAINST THE PUBLISHED CHECKSUM rather than trusted, because
-      # what is being installed then writes to the tracker.
-      - name: Install beads
+      # ONE `run:` LINE, and the script decides. Why the refusal lives there
+      # rather than here is on `--check` itself; settings.yml is the same shape.
+      - name: Ask which issues no bead points at
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: 1.1.2
-        run: |
-          gh release download "v$VERSION" --repo steveyegge/beads \
-            --pattern "beads_${VERSION}_linux_amd64.tar.gz" --pattern checksums.txt
-          grep " beads_${VERSION}_linux_amd64.tar.gz\$" checksums.txt | sha256sum --check --strict
-          tar -xzf "beads_${VERSION}_linux_amd64.tar.gz" bd
-          install -m 755 bd /usr/local/bin/bd
-          rm -f "beads_${VERSION}_linux_amd64.tar.gz" checksums.txt bd
-          bd version
-
-      # The Dolt database is gitignored, so a runner has none. The committed
-      # export is the whole of what is shared, and importing it is how a fresh
-      # workspace gets a tracker at all.
-      #
-      # THE CONFIG IS MOVED ASIDE FIRST, and without that this does not run.
-      # .beads/config.yaml is committed and names a sync remote over SSH, so
-      # `bd init` does not initialise a local database -- it tries to CLONE
-      # that remote, and a runner has no key. `inventory-tng-65ij`.
-      #
-      # A runner needs nothing the file holds: the prefix is given below,
-      # export.auto means nothing to a job that exports explicitly, and the
-      # remote is for a developer's machine pushing Dolt history. Nothing
-      # commits it either -- the step that commits names issues.jsonl alone.
-      - name: Build a tracker from the committed export
-        run: |
-          mv .beads/config.yaml /tmp/beads-config.yaml
-          bd init --prefix inventory-tng --non-interactive --skip-agents
-          bd import .beads/issues.jsonl
-
-      - name: Bring in issues no bead points at
-        id: pull
-        env:
-          # The token the runner is given already carries issues: read and is
-          # scoped to this repository, so nothing has to be configured by hand.
-          GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: scripts/pull-new-issues.sh
-
-      # Export explicitly rather than trusting the hook that normally does it:
-      # nothing is committed here, so the hook that exports on commit has not
-      # run, and a proposal built from a stale export would propose nothing.
-      #
-      # THEN PUT EVERYTHING ELSE BACK. `bd init` scaffolds a workspace -- it
-      # rewrites its hooks and config, and without --skip-agents it appends to
-      # AGENTS.md and rewrites .claude/settings.json too. A run before this
-      # existed pushed a branch holding ten files, including eighty new lines
-      # on this repository's agent instructions. `inventory-tng-rbvb`.
-      #
-      # Restoring wholesale rather than naming what to undo, so that whatever a
-      # future version of bd decides to scaffold is undone as well.
-      - name: Write the tracker back out, and put everything else back
-        run: |
-          bd export -o .beads/issues.jsonl
-          cp .beads/issues.jsonl "$RUNNER_TEMP/synced.jsonl"
-          # `git reset --hard`, and NOT `git checkout -- .`, which was the
-          # first attempt and did nothing. bd STAGES what it rewrites, and a
-          # working-tree checkout takes its content from the index -- so it
-          # restored the staged copies faithfully and left them staged. Eight
-          # files reached the next commit. `inventory-tng-y466`.
-          git reset --hard HEAD
-          git clean -fd
-          cp "$RUNNER_TEMP/synced.jsonl" .beads/issues.jsonl
-          # bd set this; a fresh checkout has none, and CI has never run hooks.
-          # Returning the runner to that state, rather than stepping over a
-          # guard: what installed beads' pre-commit hook here was bd init, and
-          # that hook stages the whole .beads directory, which is how ten files
-          # reached a commit that adds one by name.
-          git config --unset core.hooksPath || true
-          git status --short
-
-      - name: Propose what arrived
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # GATED ON WHAT WAS PULLED, NOT ON WHETHER THE FILE CHANGED, and the
-          # difference is not academic. Building the tracker here means
-          # importing the committed export, and that import loses fields --
-          # `defer_until` at least, inventory-tng-oavo -- so exporting again
-          # writes a file that differs whether or not anything arrived. The
-          # first successful run proposed exactly that: three beads silently
-          # un-deferred, by up to eighteen months, and no issue pulled at all.
-          # inventory-tng-wjkd.
-          if [[ "${{ steps.pull.outputs.pulled }}" == "0" ]]; then
-            echo "No issue arrived that the tracker did not already have."
-            exit 0
-          fi
-
-          # And if something did arrive, the file must have changed. If it has
-          # not, something is wrong upstream of here and a silent success would
-          # hide it.
-          if git diff --quiet -- .beads/issues.jsonl; then
-            echo "::error::${{ steps.pull.outputs.pulled }} issue(s) were pulled and the export did not change."
-            exit 1
-          fi
-
-          branch="issue-sync/$(date -u +%Y-%m-%dT%H-%M-%SZ)"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$branch"
-          git add .beads/issues.jsonl
-
-          # Written to a file rather than passed inline, because a heredoc is
-          # the one shape that survives this being a YAML block: the block's
-          # indentation is stripped before the shell sees any of it, so the
-          # terminator lands at column zero and the body carries no leading
-          # spaces. Checked by extracting this step and running it. A trailer,
-          # because the
-          # message should be valid by this repository's own rules rather than
-          # exempt from them: no hook runs in a fresh checkout, but the
-          # one-issue-per-commit job DOES run on the pull request this opens,
-          # and `Refs:` is what it wants from a commit advancing an issue
-          # without closing it. `--no-verify` is never the answer -- AGENTS.md.
-          cat > /tmp/sync-message <<'MESSAGE'
-          cwpa.3: Beads for issues filed on GitHub
-
-          Opened by the issue-sync workflow, from issues somebody filed on
-          GitHub -- which bd cannot discover for itself.
-
-          They arrive with a synthetic id, typed task at priority 2, and no
-          parent. inventory-tng-cwpa.4 is the triage that gives them a real
-          identity; read them before merging.
-
-          Refs: inventory-tng-cwpa.3
-          MESSAGE
-          git commit -F /tmp/sync-message
-
-          git push origin "$branch"
-
-          cat > /tmp/sync-body <<'BODY'
-          Beads made from issues filed on GitHub, which `bd` cannot find for itself.
-
-          Each arrives with a synthetic id, typed `task` at priority 2, and no parent.
-          Giving them a real name is a person's job, and `scripts/untriaged.py` lists
-          what is waiting and spells out the commands. DEVELOPERS.md, under Issue
-          tracking, says what each step is for.
-
-          If this should not be merged, close it — nothing is lost. The next run
-          proposes the same issues again, because closing this records nothing.
-          BODY
-          # NOT PERMITTED IS A REAL ANSWER, not a crash. "Allow GitHub Actions
-          # to create and approve pull requests" is off by default, and only
-          # the repository owner can turn it on -- Settings, Actions, General,
-          # Workflow permissions. Until they do, the branch is still pushed, so
-          # nothing is lost and a person can open the pull request themselves.
-          # Said plainly and failed loudly, because a job that silently stopped
-          # proposing would look exactly like a job with nothing to propose.
-          if ! gh pr create --title "Tracker: issues filed on GitHub" \
-            --body-file /tmp/sync-body --base main --head "$branch"; then
-            echo "::error::Could not open the pull request. If this says Actions are"
-            echo "::error::not permitted to create them, enable that in Settings ->"
-            echo "::error::Actions -> General -> Workflow permissions. The branch"
-            echo "::error::$branch is pushed, so open it by hand meanwhile:"
-            echo "::error::https://github.com/$GITHUB_REPOSITORY/compare/$branch?expand=1"
-            exit 1
-          fi
+        run: scripts/pull-new-issues.sh --check

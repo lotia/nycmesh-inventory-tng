@@ -1286,8 +1286,14 @@ issue, only incomplete.
 
 Neither runs from a git hook, deliberately. Pushing writes `external_ref` onto
 the beads it files issues for, which rewrites the committed export, so a hook on
-`git push` would leave the tracker dirty every time. CI runs it instead, where
-that change is committed rather than abandoned.
+`git push` would leave the tracker dirty every time.
+
+Neither runs *in* CI either. What CI does is **notice**: a scheduled job asks
+whether any issue has no bead and goes red for as long as the answer is yes, so
+the question comes back every morning until somebody runs the command above. It
+brings nothing in, because a tracker built in a runner is thrown away and the
+commit that used to carry one out could never merge — the workflow says why at
+length, and `inventory-tng-qnxb` is where that was measured.
 
 An issue pulled in this way becomes a bead named for the moment it arrived —
 `inventory-tng-1788200756998-1-26030a28` — typed `task` at priority 2, with no
@@ -1604,12 +1610,9 @@ each commit onto `main` individually. Why it is arranged that way rather than
 left to discipline is
 [0017](docs/decisions/0017-review-through-pull-requests.md).
 
-That setting, what `main` accepts, and whether Actions may open a pull request
-are GitHub's rather than the repository's, so they are written down as
-`scripts/repo-settings.sh` rather than left as something somebody once clicked.
-The last of those is what lets the issue-sync workflow propose the beads it
-makes from GitHub issues; with it off that job fails at its final step, and
-before it was declared here the only thing that noticed was the job itself. `--check` reports what has drifted;
+That setting and what `main` accepts are GitHub's rather than the repository's,
+so they are written down as `scripts/repo-settings.sh` rather than left as
+something somebody once clicked. `--check` reports what has drifted;
 running it without puts it back, which is what to do after adding or renaming a
 job in CI that ought to be required. A weekly job runs `--check` and reports,
 so drift is found rather than remembered — and it runs on any pull request that
