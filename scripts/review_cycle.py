@@ -118,6 +118,19 @@ def settled(check: dict[str, Any]) -> bool:
     return verdict in ("SUCCESS", "NEUTRAL", "SKIPPED")
 
 
+def opens(content: str) -> tuple[str, int] | None:
+    """The delimiter and length of the fence ``content`` is, if it is one.
+
+    ``content`` is a line with its indentation already removed, so the caller
+    owns the question of how far in it started.
+    """
+    for char in ("`", "~"):
+        run = len(content) - len(content.lstrip(char))
+        if run >= 3:
+            return char, run
+    return None
+
+
 def carries(body: str | None, marker: str) -> bool:
     """Whether ``body`` POSTS ``marker``, rather than merely showing it.
 
@@ -126,24 +139,49 @@ def carries(body: str | None, marker: str) -> bool:
     a comment that only mentioned the marker stand as evidence.
 
     So it has to be alone on its line and outside any fence. Markdown allows up
-    to three spaces before a construct; a fourth makes it a code block, which is
-    the marker being displayed rather than applied. Both refusals below print
+    to three columns before a construct; a fourth makes it a code block, which
+    is the marker being displayed rather than applied. Both refusals below print
     the marker indented for exactly that reason, and would otherwise be evidence
     that the pass they are complaining about had run.
+
+    COLUMNS RATHER THAN CHARACTERS, because a tab is one character and four
+    columns. Measuring characters read a tab-indented marker -- which Markdown
+    renders as a code block -- as one posted at the margin. ``inventory-tng-
+    1tyo``.
+
+    AND A FENCE CLOSES ONLY ON ITS OWN TERMS. A run of three or more backticks
+    or tildes opens a block that only a run of the SAME character, AT LEAST as
+    long, and carrying nothing after it, closes. Toggling on every fence-shaped
+    line instead made an inner fence end the outer one, so a marker shown inside
+    a nested block was read as posted. Nothing adversarial is needed to reach
+    that: DISPLAYING a fenced block requires wrapping it in a longer fence, so
+    the nesting arrives the moment somebody quotes an example of one. Same bead.
 
     Somebody determined can still put the marker alone on a line having run
     nothing. That is a forgery rather than an accident, and it is not what this
     closes -- see docs/decisions/0020-who-merges.md.
     """
-    fenced = False
+    fence: tuple[str, int] | None = None
     for line in (body or "").splitlines():
-        bare = line.rstrip()
-        if bare.lstrip().startswith(("```", "~~~")):
-            fenced = not fenced
+        # Asked once, for all three of the questions below: four columns in is
+        # an indented code block, which can no more open or close a fence than
+        # it can post a marker.
+        column = len(line[: len(line) - len(line.lstrip())].expandtabs(4))
+        if column >= 4:
             continue
-        if fenced:
+        content = line.strip()
+        if fence is not None:
+            # A line of nothing but the open fence's own character, at least as
+            # long as it was, and nothing else. Which character it is needs no
+            # separate test: stripping it away to nothing is what says so.
+            char, length = fence
+            if len(content) >= length and not content.strip(char):
+                fence = None
             continue
-        if bare.lstrip() == marker and len(bare) - len(bare.lstrip()) < 4:
+        fence = opens(content)
+        if fence is not None:
+            continue
+        if content == marker:
             return True
     return False
 
