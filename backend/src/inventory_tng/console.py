@@ -66,9 +66,24 @@ BOUND_KEYS = "bound"
 
 # Never drawn as `key=value`: each one has a column of its own, is drawn under
 # the record rather than beside it, or is machinery.
-STRUCTURAL = frozenset(
-    {"timestamp", "level", "logger", "event", "exception", "stack", "positional_args", BOUND_KEYS, "depth"}
-)
+STRUCTURAL = frozenset({"timestamp", "level", "logger", "event", "exception", "positional_args", BOUND_KEYS, "depth"})
+
+# Drawn UNDER the record rather than beside it, when they carry text. A
+# traceback and a captured stack are many lines each.
+#
+# `stack_info` is not in STRUCTURAL with them, and that is the whole subtlety.
+# Whether it is a block depends on its VALUE, not on its name: a stdlib record
+# through `ProcessorFormatter` arrives with the formatted stack as a string,
+# and a structlog logger -- which is every logger this application uses --
+# leaves `stack_info=True` in the event dict, because `StackInfoRenderer` is
+# deliberately absent from the chain (`logs.FROM_LIBRARIES` says why). Naming
+# it structural drew that boolean as a bare line reading `True`, having removed
+# the `stack_info=True` pair that at least said what it was.
+#
+# So the string is a block, and anything else is an ordinary pair.
+# inventory-tng-0qys, and inventory-tng-dke1 for the stack that is never
+# captured at all.
+UNDER = ("stack_info", "exception")
 
 # Everything a terminal acts on rather than shows: escape sequences move the
 # cursor, recolour, and clear the screen, and a carriage return overwrites the
@@ -340,19 +355,24 @@ def render(record: dict[str, Any], layout: Layout, colour: bool = False, context
     # logged, which is the one property the whole arrangement exists to hold.
     inherited = record.get(BOUND_KEYS)
     hidden: frozenset[str] | set[str] = BOUND if inherited is None else set(inherited)
-    rest = {key: value for key, value in record.items() if key not in STRUCTURAL and (context or key not in hidden)}
+    blocks = {key: record[key] for key in UNDER if isinstance(record.get(key), str) and record[key]}
+    rest = {
+        key: value
+        for key, value in record.items()
+        if key not in STRUCTURAL and key not in blocks and (context or key not in hidden)
+    }
     if rest:
         drawn = pairs(rest)
         body += " " + (f"{DIM}{drawn}{RESET}" if colour else drawn)
 
     lines = [" ".join([*columns, body])]
 
-    # A traceback, and a captured stack, are many lines each and belong under
-    # the record they explain rather than squeezed into a column beside it.
-    for under in ("stack", "exception"):
-        text = record.get(under)
-        if text:
-            lines.append(safe(str(text)))
+    # `stack_info` AND NOT `stack`, which `redaction.ALLOWED_LOG_KEYS` says why
+    # of and was corrected first. What is this file's own is the cost of having
+    # had it wrong: a captured stack was drawn neither underneath nor as
+    # `key=value` under its real name, and arrived as one escaped line in the
+    # column beside the message. `UNDER` above is the rest of it.
+    lines.extend(safe(text) for text in blocks.values())
     return "\n".join(lines)
 
 
