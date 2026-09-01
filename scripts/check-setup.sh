@@ -33,6 +33,7 @@ REPO_ROOT=$(git rev-parse --show-toplevel) || exit 1
 cd "$REPO_ROOT" || exit 1
 
 . "$HERE/report.sh"
+. "$HERE/hooks-path.sh"
 
 SHIPPED_ONLY=0
 # Every argument, not the leading flags alone: this script takes no positional,
@@ -51,9 +52,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-HOOKS=.beads/hooks
-HOOK=$HOOKS/commit-msg
-CHECKER=scripts/check-commit.sh
 BOOTSTRAP="scripts/bootstrap-dev.sh, or mise run setup"
 
 # One chain rather than four questions asked in a row, because these are four
@@ -98,32 +96,26 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 if [[ "$SHIPPED_ONLY" -eq 0 ]]; then
-  # In a linked worktree the path git holds names the main checkout's hooks,
-  # for the reason scripts/bootstrap-dev.sh gives at its own copy of this
-  # question -- and those hooks are this repository's own and do run, so a
-  # worktree is wired when it names either.
-  MAIN_HOOKS=$(dirname "$(readlink -f "$(git rev-parse --git-common-dir)")")/$HOOKS
-
-  # Every scope. A value set globally is a value git is holding, and reading
-  # only the local one would report a clone as unwired while its hooks ran, or
-  # as wired while somebody's global setting overrode ours.
-  configured=$(git config --get core.hooksPath || true)
-  scope=$(git config --show-scope --get core.hooksPath 2>/dev/null | cut -f1)
-  if [[ -z "$configured" ]]; then
-    fail "git has not been told where this clone keeps its hooks, so none of them run."
-    note "Run $BOOTSTRAP. It is safe over a clone you are already working in."
-  elif [[ "$configured" -ef "$HOOKS" || "$configured" -ef "$MAIN_HOOKS" ]]; then
-    :
-  elif [[ ! -d "$configured" ]]; then
-    # Said as what it is. Two identical spellings compare unequal under -ef
-    # when neither can be stat'd, and calling that a clash between a path and
-    # itself explained a conflict that was not there.
-    fail "core.hooksPath names $configured${scope:+, in your $scope configuration}, and there is no such directory."
-    note "Nothing runs out of a directory that is not there. Run $BOOTSTRAP."
-  else
-    fail "core.hooksPath names $configured${scope:+, in your $scope configuration}, and the hooks are in $HOOKS."
-    note "Only one of the two can be in force, and it is the one git is holding."
-  fi
+  # Which of the four this is, and how it was worked out, is scripts/hooks-path.sh.
+  # This end of it only says what each one means to somebody checking a clone.
+  hooks_state
+  case "$HOOKS_STATE" in
+    unset)
+      fail "git has not been told where this clone keeps its hooks, so none of them run."
+      note "Run $BOOTSTRAP. It is safe over a clone you are already working in."
+      ;;
+    ours) ;;
+    missing)
+      fail "core.hooksPath names $HOOKS_CONFIGURED${HOOKS_SCOPE:+, in your $HOOKS_SCOPE configuration}, and there is no such directory."
+      note "Nothing runs out of a directory that is not there, and $BOOTSTRAP will"
+      note "not change a setting of yours for you. Point it here with:"
+      note "  git config --local core.hooksPath $HOOKS"
+      ;;
+    *)
+      fail "core.hooksPath names $HOOKS_CONFIGURED${HOOKS_SCOPE:+, in your $HOOKS_SCOPE configuration}, and the hooks are in $HOOKS."
+      note "Only one of the two can be in force, and it is the one git is holding."
+      ;;
+  esac
 fi
 
 verdict "A commit made here is read before it becomes one." "committing"
