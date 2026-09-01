@@ -52,8 +52,8 @@ if [[ ${#paths[@]} -eq 0 ]]; then
   # is explaining things were the two nothing read. Three commits pasted prose
   # into `.env.sample` before a review noticed.
   #
-  # So the corpus is stated as a subtraction, and the pattern below is the whole
-  # of it. What keeps a file out is that its prose is nobody's here, which comes
+  # So the corpus is stated as a subtraction, and the pattern below is most of
+  # it. What keeps a file out is that its prose is nobody's here, which comes
   # out as three clauses rather than one tidy rule -- extensions, for what is
   # not text; two names, for the lock files a resolver writes; and one
   # directory. The directory is the tracker's: the exports are data, the five
@@ -62,6 +62,13 @@ if [[ ${#paths[@]} -eq 0 ]]; then
   # the only path excluded for where it is, and it is worth being uneasy about
   # -- a `.beads/` holding something of ours would go unread and say nothing.
   # DEVELOPERS.md#1-one-topic-one-place puts that in words.
+  #
+  # THE EXTENSIONS ARE A HINT AND NOT THE GUARD. No list of them is ever
+  # complete, and while this was the only thing keeping binary out, the file it
+  # failed to name took the whole checker down rather than being skipped --
+  # inventory-tng-2aor. check-docs.py now steps over whatever will not decode,
+  # which is the question this clause was always approximating. What it is
+  # still worth is not reading a megabyte of font to find that out.
   #
   # `--others --exclude-standard` alongside `--cached` is what makes the answer
   # here the answer CI gives. A bare `git ls-files` enumerates the index, so a
