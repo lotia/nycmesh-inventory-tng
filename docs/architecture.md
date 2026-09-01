@@ -140,10 +140,11 @@ honouring one of them.
 
 It is **attribution and not admission**, and the distinction is the whole of
 what may be claimed for it — the network is what keeps anybody out
-([decision 0012](decisions/0012-two-populations.md) is the population, and
-`inventory-tng-2jzx` is the posture). Carrying nothing is never a refusal;
-carrying a credential somebody has withdrawn is. What it does not buy, and
-why signing it stops it being invented but not being asked for, is in
+([decision 0012](decisions/0012-two-populations.md) is the population and
+[decision 0030](decisions/0030-the-network-is-the-access-control.md) the
+posture). Carrying nothing is never a refusal; carrying a credential somebody
+has withdrawn is. What it does not buy, and why signing it stops it being
+invented but not being asked for, is in
 [`backend/src/inventory_tng/devices.py`](../backend/src/inventory_tng/devices.py).
 
 ## Frontend

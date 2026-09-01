@@ -37,6 +37,12 @@ Eleven steps, in this order, each linking to the section that explains it. Steps
 and 7 — install, then check — are the two you run again on every release; the
 rest happen once for the life of an environment.
 
+**Before step 1**, settle what may reach this at all —
+[Where this is reachable from](#where-this-is-reachable-from). It is not a step
+because nothing in this chart does it and no command here can check it, which is
+exactly why it is easy to skip: the NYC Mesh instance is admitted at the network
+and the application is written as though it were not.
+
 1. **Get a database.** This chart deploys none, for the reason
    [Database](#database) gives, so the URL of one is an input rather than an
    output.
@@ -263,7 +269,7 @@ A browser that has enrolled carries an opaque name in an `X-Device` header, and
 that name is what a rate limit counts against and what every log record of its
 requests is stamped with. What it is for and what it deliberately does not buy
 — it is attribution, never admission, and the network is what keeps anybody out
-— is in
+([decision 0030](decisions/0030-the-network-is-the-access-control.md)) — is in
 [`backend/src/inventory_tng/devices.py`](../backend/src/inventory_tng/devices.py).
 
 **One device** is stopped from `/admin/inventory/device/`: find the name, set
@@ -458,21 +464,57 @@ service mesh — set `ingress.tls.terminatedElsewhere=true`. That stops the
 Ingress asking for a certificate; it does not make plain HTTP to the browser
 supported, because the camera still needs a secure context.
 
+### Where this is reachable from
+
+**Nothing in this chart decides who may reach the application, and nothing in
+it can.** The NYC Mesh instance is admitted at the network instead:
+its hosts' routing and firewall rules do not carry traffic originating outside
+the mesh to it, and the mesh's road-warrior WireGuard VPN is how a volunteer on
+mobile data is inside that boundary rather than an exception to it. Arranging
+that is the deployer's, on infrastructure this chart never sees.
+[Decision 0030](decisions/0030-the-network-is-the-access-control.md) is what it
+is worth and — the part worth reading — the list of things that may never be
+justified by it.
+
+Two things follow for whoever is standing one of these up.
+
+**It is a precondition, not a feature.** No value here turns it on and no check
+anywhere reports it missing; [Administrative access](#administrative-access)
+below says what that costs, because the narrower boundary it describes has the
+same shape. If you are putting this somewhere reachable from the open internet,
+you are running a different posture from the one decision 0030 records, and the
+settings under
+[Letting volunteers in without an account](#letting-volunteers-in-without-an-account)
+and [Publishing the volunteer roster](#publishing-the-volunteer-roster) are
+then the only thing between a stranger and the data.
+
+**The application is written as though it were not there**, so nothing in it
+relaxes because of this and nothing in it should. That is decision 0030 point 2,
+and it is the half of the record that constrains this repository rather than
+the environment.
+
 ### Administrative access
 
 [Decision 0013](decisions/0013-administrator-sign-in.md) point 6 restricts the
 routes only an administrator uses to a network volunteers do not need: the mesh,
 a VPN, or an identity-aware proxy. Administrators are few and their locations
-predictable, so this costs them very little, and it is the one place a network
-boundary fits without excluding a volunteer on a phone wherever the stock
-happens to be.
+predictable, so this costs them very little.
+
+**It is the narrower of two, not the only one.** Point 6 describes itself as the
+only place such a boundary fits;
+[decision 0030](decisions/0030-the-network-is-the-access-control.md) records why
+that half of it no longer holds and what point 6 still buys, which is a second
+gate in front of the paths listed below rather than in front of everything. What
+matters here is that
+[Where this is reachable from](#where-this-is-reachable-from) above is never a
+reason to leave this one off — decision 0030 point 2.
 
 **It is off unless a deployer turns it on, and nothing in the application can
 tell.** The restriction decides whose packets arrive, not what a request says,
 so a deployment that skips it behaves exactly like one that honoured it —
 right up until somebody who should not have reached `/admin` does. That is why
-it is stated here as a precondition rather than checked in code, the same shape
-as the requirement below.
+it is stated here as a precondition rather than checked in code — the same
+shape as the broader one above and as the requirement below.
 
 While it is off, `/admin` and `/accounts` are reachable from anywhere the
 ingress is, and the only thing between an anonymous request and the

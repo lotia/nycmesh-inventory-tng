@@ -9,8 +9,10 @@
  *
  * IT COSTS NO SCREEN AND NO GESTURE. Minted silently on first use, the way
  * `telemetry/flag.ts` stores its own flag, because friction here would buy
- * nothing: the network is what keeps anybody out, so asking a volunteer to do
- * something would be asking them to prove a thing that is not being checked.
+ * nothing: the network is what keeps anybody out (decision 0030), so asking a
+ * volunteer to do something would be asking them to prove a thing that is not
+ * being checked. That decision is also what bounds this reasoning -- it may
+ * justify asking for no gesture, and may never justify guarding less.
  *
  * AND NOTHING WAITS FOR IT. `enrol()` is called once from `main.tsx` and is
  * not awaited; `api/client.ts` reads what is stored and sends it if there is

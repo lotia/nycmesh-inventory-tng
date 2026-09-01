@@ -104,9 +104,17 @@ the roster. `AnonymousReadThrottle` carries that argument.
 
 Rejected alternatives, and why:
 
-- **Network gating for volunteers** — the strongest boundary, but it excludes a
-  phone on a mobile network in a basement, which is the device this project is
-  designed around. It is applied to the administrative surface instead.
+- **Network gating for volunteers, as something the application checks** — the
+  strongest boundary, and rejected here on reasoning that has since been
+  corrected twice. It was taken to exclude a phone on a mobile network, which is
+  the device this project is designed around; the road-warrior VPN is how that
+  phone is on the network, and volunteers run it. And what is in force is not an
+  application check at all:
+  [decision 0030](../decisions/0030-the-network-is-the-access-control.md) is
+  the posture, and it applies to the whole deployment rather than to the
+  administrative surface alone. So what stays rejected is the check and not the
+  boundary. What survives of the objection is narrow and real — a profile that
+  is installed is not a profile that is switched on.
 - **A shared secret in the frontend** — a secret shipped to every user is not a
   secret.
 - **Anonymous attestation** (Privacy Pass) — real, standardised, and
