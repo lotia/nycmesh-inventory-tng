@@ -49,13 +49,18 @@ class CountingThrottle(UserRateThrottle):
         batch can exhaust what the room needs. A device identifier is per
         browser, so it separates them.
 
-        AND ALMOST NOTHING REACHES IT YET, which is worth knowing before
+        WHAT REACHES IT DEPENDS ON A SETTING, which is worth knowing before
         believing the paragraph above about a running deployment.
         `UserRateThrottle` consults this only for a caller it found no account
-        for. Every endpoint but one asks for a session, so for those the bucket
-        is still the account and this is a precondition rather than a repair --
-        the way `TRUSTED_PROXIES` is one under decision 0023, and
-        `inventory-tng-gnhl` is what makes it reachable.
+        for. Where `VOLUNTEER_ACCESS` holds its default every endpoint
+        throttled by this class but one asks for a session, so the bucket is
+        the account and almost nothing arrives here. Under `open` the views
+        carrying `VolunteerReaches` do, with an address for a bucket -- that
+        class is the list, so it does not get counted a second time here.
+
+        THAT MAKES DRF'S READING OF THE ADDRESS LOAD-BEARING IN A WAY IT WAS
+        NOT, and decision 0023 priced it before it was. `inventory-tng-9bzn` is
+        the decision that follows and is not this module's to take.
 
         THE ONE is `ClientFailureView`, which names `AllowAny` and carries
         `ReportThrottle` below. It reaches this and gets no benefit from it,
