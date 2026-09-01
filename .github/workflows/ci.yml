@@ -27,8 +27,18 @@ jobs:
           POSTGRES_USER: inventory
           POSTGRES_PASSWORD: inventory
         ports: ["5432:5432"]
+        # -U AND -d, and the same two values the service is given above. Why a
+        # probe missing them passes anyway is on compose.yaml's healthcheck,
+        # which had the same fault in its -d half and was fixed first.
+        #
+        # What is different here is the -U half: a bare pg_isready defaults it
+        # to the OS user it runs as, which in this image is `postgres` -- a role
+        # the entrypoint never creates, because initdb runs with
+        # --username="$POSTGRES_USER". Measured against postgres:18: every probe
+        # was answered `FATAL: role "postgres" does not exist` and the container
+        # reported healthy regardless. inventory-tng-0kgq.
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U inventory -d inventory_tng"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 5
@@ -95,8 +105,9 @@ jobs:
           POSTGRES_USER: inventory
           POSTGRES_PASSWORD: inventory
         ports: ["5432:5432"]
+        # -U and -d for the reason the Backend job's service gives above.
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U inventory -d inventory_tng"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 5
