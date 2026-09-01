@@ -665,6 +665,8 @@ jobs:
         run: scripts/untriaged.test.sh
       - name: Check the review-cycle reader
         run: scripts/review-cycle.test.sh
+      - name: Check the do-not-merge reader
+        run: scripts/do-not-merge.test.sh
       # And then run it, which none of the above do to their own subject. What
       # it reads here is what a clone is handed before anybody configures
       # anything, so a hook that stopped arriving with the checkout is caught
@@ -722,6 +724,57 @@ jobs:
         run: |
           gh pr view "$PR" --json comments,reviews \
             | python3 scripts/review_cycle.py
+
+  # A PULL REQUEST THAT SAYS DO NOT MERGE, AND IS BELIEVED. What the marker is
+  # and why prose could not hold it is DEVELOPERS.md "When a branch is ready to
+  # merge". inventory-tng-g4dh.
+  #
+  # HERE RATHER THAN A LABEL OR A LOCAL HOOK. `enforce_admins` is on, so a
+  # required context binds the owner too; it covers the GitHub web interface,
+  # which no hook on anybody's machine can see; and it cannot be routed around
+  # by spelling the merge differently. A label would need `labeled`/`unlabeled`
+  # in the triggers above, and with `cancel-in-progress` set that would restart
+  # and cancel the whole suite every time somebody tagged a pull request.
+  #
+  # ON DRAFTS TOO, unlike the job above. That one is skipped while a branch is
+  # being built because it would otherwise answer "no" throughout and teach
+  # people to read past it. This one answers "no" only when somebody has asked
+  # it to, so there is nothing to read past -- and a spike is usually a draft,
+  # which is exactly when the marker most needs to already be in force.
+  #
+  # NO `edited` TRIGGER, AND THAT IS A GAP RATHER THAN A DECISION. A pull
+  # request marked at the moment it is opened is held from its first run, and a
+  # pull request already blocked cannot slip past: the only two ways it becomes
+  # mergeable are being marked ready and being pushed to, and both are listed
+  # above. What is NOT covered is the other direction -- a green, ready pull
+  # request whose body is edited to ADD the marker re-runs nothing, so the last
+  # green verdict stands and GitHub permits the merge. Removing one is covered
+  # by more than a push -- review-cycle.yml re-runs the FAILED jobs on a head,
+  # and a marked pull request's copy of this job is one of them -- but that
+  # asymmetry is the gap rather than a cure for it: a job that PASSED is not
+  # re-run by anything.
+  #
+  # `edited` cannot simply be added here: with `cancel-in-progress` on this
+  # workflow, a title typo would restart and cancel the browser suite. The shape
+  # that fits is the one review-cycle.yml already uses for its own staleness --
+  # a separate, non-required workflow that re-runs this job -- and it is
+  # `inventory-tng-qe31`. Until then scripts/landing-gate.sh reads the body
+  # itself at merge time, which covers the path this was built for.
+  do-not-merge:
+    name: Not marked do-not-merge
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: The body does not post the marker
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr view "$PR" --json body | python3 scripts/do_not_merge.py
 
   history:
     name: One issue per commit

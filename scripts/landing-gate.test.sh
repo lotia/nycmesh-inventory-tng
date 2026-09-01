@@ -58,6 +58,11 @@ cat >"$BIN/gh" <<'STUB'
 #!/usr/bin/env bash
 [[ -n "${GH_FAILS:-}" ]] && exit 1
 args="$*"
+# A gh that answers everything EXCEPT the head. GH_FAILS above fails the first
+# question the merge arm asks, which is now the body, so it can no longer reach
+# the head comparison -- and that comparison being SKIPPED when gh could not
+# answer is one of the three silent failures this suite exists for.
+[[ -n "${GH_FAILS_HEAD:-}" && "$args" == *"--json headRefOid"* ]] && exit 1
 case "$args" in
   # The combined form first: `record` asks for all three at once, so that the
   # head and the evidence come from the same moment.
@@ -67,6 +72,11 @@ case "$args" in
   # a bare integer.
   *"isDraft"*)            cat "$GH_FIXTURES/stop.json" ;;
   *"--json headRefOid"*)  cat "$GH_FIXTURES/head" ;;
+  # The body the merge arm reads before anything else, so that a pull request
+  # saying do-not-merge is refused for that rather than for its receipt. Each
+  # case that is about the marker rewrites this; the default is a body without
+  # one, which is what every other case here is about.
+  *"--json body"*)        cat "$GH_FIXTURES/body.json" ;;
   *"--json number"*)      cat "$GH_FIXTURES/number" ;;
   # THE LIST, always, because that is what the gate now asks for: it counts what
   # is not green through review_cycle.settled rather than through a --jq it
@@ -89,6 +99,13 @@ echo 7 >"$FIX/number"
 checks_are() { printf '%s' "$1" >"$FIX/checks.json"; }
 checks_are '[{"name": "Backend", "state": "SUCCESS"}]'
 echo "{\"headRefOid\":\"$HEAD_OID\",\"comments\":[],\"reviews\":[]}" >"$FIX/pr.json"
+
+# What `gh pr view --json body` hands back. A body, through json.dumps, so a
+# case can put a marker on a line of its own without the shell touching it.
+body_is() { BODY=${1-} python3 -c '
+import json, os, sys
+sys.stdout.write(json.dumps({"body": os.environ["BODY"]}))' >"$FIX/body.json"; }
+body_is "An ordinary batch."
 
 # What the stop hook asks about: a ready pull request whose checks are green.
 # Each case below rewrites this to the state it is about.
@@ -156,7 +173,8 @@ in_repo() {
   local repo=${1:-$REPO} path=${2:-$(full_path)}
   shift 2
   (cd "$repo" && env PATH="$path" GH_FIXTURES="$FIX" CLAUDE_PROJECT_DIR="$repo" \
-    GH_DEADLINE=5 ${GH_FAILS:+GH_FAILS=1} "$GATE" "$@") 2>&1
+    GH_DEADLINE=5 ${GH_FAILS:+GH_FAILS=1} ${GH_FAILS_HEAD:+GH_FAILS_HEAD=1} \
+    "$GATE" "$@") 2>&1
 }
 
 # A hook payload written out by hand, for the envelopes `payload` cannot make.
@@ -524,8 +542,70 @@ case_is "gh pr merge 7 --rebase"                 "has moved since it was reviewe
 
 GH_FAILS=1
 out=$(decision "$(gate "gh pr merge 7 --rebase")")
-assert "$out" 0 0 "could not find out" "a gh that cannot name the current head refuses, rather than skipping the comparison"
-assert "$out" 0 0 "to check it is what was reviewed" "and it says which question went unanswered"
+assert "$out" 0 0 "could not find out" "a gh that answers nothing refuses, rather than skipping what it could not ask"
+# The FIRST question the merge arm asks is the body, so that is the one a gh
+# answering nothing at all leaves unanswered.
+assert "$out" 0 0 "says do not merge" "and it says which question went unanswered"
+GH_FAILS=
+
+# THE HEAD COMPARISON'S OWN UNAVAILABILITY, which a gh that fails everything can
+# no longer reach: it is refused at the body first. So this one answers the body
+# and refuses only the head, which is the shape inventory-tng-3sp was -- the
+# comparison SKIPPED because gh could not answer, letting a receipt from a
+# superseded head permit the merge.
+GH_FAILS_HEAD=1
+out=$(decision "$(gate "gh pr merge 7 --rebase")")
+assert "$out" 0 0 "to check it is what was reviewed" "a gh that cannot name the current head refuses, rather than skipping the comparison"
+unset GH_FAILS_HEAD
+
+echo
+echo "a pull request that says do not merge"
+# What this asks, and why it asks it here when a required check already does,
+# is on the merge arm. inventory-tng-g4dh.
+body_is "A spike, kept for the meeting.
+
+<!-- do-not-merge -->"
+case_is "gh pr merge 7 --rebase"                 "posts the do-not-merge marker" "a marked pull request is refused at the merge"
+case_is "gh pr merge 7 --rebase"                 "opened to be read" "and is told not to try making the check green"
+
+# Before the receipt, which is the ordering the merge arm explains. The file is
+# REMOVED rather than rewritten: putting a valid receipt back is the state every
+# case around this one is already in, so the case would have asserted nothing
+# about the ordering it names.
+rm -f "$RECEIPTS"
+case_is "gh pr merge 7 --rebase"                 "posts the do-not-merge marker" "even with no receipt, the marker is the answer"
+printf '%s' "$RECEIPTS_OLD" >"$RECEIPTS"
+
+# A READER THAT COULD NOT READ IS NOT A PULL REQUEST THAT OBJECTED. Any
+# non-zero used to be reported as the marker being posted, so a gh answering
+# something unparseable -- or a review_cycle.py gone from beside the reader --
+# accused a body by name of carrying a line it does not have.
+printf 'not json' >"$FIX/body.json"
+case_is "gh pr merge 7 --rebase"                 "could not read whether" "a reader that cannot answer refuses as itself, not as the marker"
+body_is "An ordinary batch."
+
+echo
+echo "and the same pull request offered for review"
+# `gh pr ready` refused it before this, but with "wait for the checks, or fix
+# them" -- which points an agent at making the do-not-merge check green, the one
+# check that must never be. Told apart by name rather than by counting.
+checks_are '[{"name": "Backend", "state": "SUCCESS"},
+             {"name": "Not marked do-not-merge", "state": "FAILURE"}]'
+case_is "gh pr ready 7"                          "posts the do-not-merge marker" "a marked pull request is not told to go and fix it"
+refute "$(decision "$(gate "gh pr ready 7")")" 0 0 "Wait for the checks" \
+  "and is not sent to make the one check that must stay red go green"
+
+# An ordinary red check still says what it always said.
+checks_are '[{"name": "Backend", "state": "FAILURE"}]'
+case_is "gh pr ready 7"                          "Wait for the checks" "an ordinary failing check still is"
+checks_are '[{"name": "Backend", "state": "SUCCESS"}]'
+refute "$(decision "$(gate "gh pr merge 7 --rebase")")" 0 0 "posts the do-not-merge marker" \
+  "and does not say the body posts a marker nobody read"
+
+body_is "Writing about the marker is free: I removed the \`<!-- do-not-merge -->\` line."
+refute "$(decision "$(gate "gh pr merge 7 --rebase")")" 0 0 "posts the do-not-merge marker" \
+  "and a body that only mentions it is not refused for it"
+body_is "An ordinary batch."
 unset GH_FAILS
 cp -f "$FIX/head.keep" "$FIX/head"
 

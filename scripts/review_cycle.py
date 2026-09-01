@@ -1,12 +1,15 @@
 """What a pull request carries as evidence that its review cycle ran.
 
-One implementation of a question two very different things ask. The landing
-gate asks it locally, before writing a receipt; a required CI check asks it on
+One implementation of a question several different things ask. The landing gate
+asks it locally, before writing a receipt; a required CI check asks it on
 GitHub's side, where no command spelling can route around the answer. They must
 not be able to disagree, and the marker rule is subtle enough that two copies
 would -- see ``carries`` for what "posted" means and why it is not "present".
 
-``inventory-tng-x0jp`` is why the second caller exists.
+``inventory-tng-x0jp`` is why the second caller exists. ``carries`` itself has
+since grown a third reader in ``do_not_merge``, which asks the same question of
+a different marker; that file says why it imports rather than copying, and when
+the predicate would earn a module of its own.
 
 ## What counts
 

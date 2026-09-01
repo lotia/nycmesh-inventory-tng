@@ -1647,13 +1647,33 @@ reviewed beside it.
 
 ### When a branch is ready to merge
 
-Four of these `main` enforces itself, and there is no way to merge without
+Five of these `main` enforces itself, and there is no way to merge without
 them:
 
 - every required check green **on the head being merged**
 - the branch not behind `main`
 - every review conversation resolved
 - a linear history, which is why the merge is `--rebase`
+- no `<!-- do-not-merge -->` posted on a line of its own in the pull request
+  body
+
+That last one is how a pull request opened to be **read** rather than merged
+says so in a way something enforces. A spike built for a meeting is the case it
+exists for: it can be green, rebased, reviewed and on a `batch/*` branch — every
+condition for merging — and still be work that must not land. Prose cannot hold
+that, because merging it is what following the documented flow looks like.
+
+Posting the marker is the whole of it; writing *about* it is free. It counts
+only on a line of its own and outside any fenced block, by the same rule as the
+[review-cycle markers](#one-review-pass-findings-filed-per-issue) and the same
+reader, so a body may explain at length why it is blocked, quote the marker in a
+sentence, or display it in a fence, without disarming itself.
+
+Removing it needs the check to **look again**, which editing the body does not
+by itself cause. A push always does. So does anything that re-runs the failed
+job — a review comment, through
+[the nudge](#one-review-pass-findings-filed-per-issue) — because the check
+re-reads the body live when it runs. A push is the reliable one.
 
 Two it cannot see, and they are the ones a person has to hold to:
 
