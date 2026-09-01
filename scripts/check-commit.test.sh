@@ -48,6 +48,23 @@ Closes: inventory-tng-aaa
 MSG
 }
 
+# THE ORDINARY TRACKER for a commit that closes aaa: aaa closed, bbb still in
+# progress, and a row closed long before any of this. Twenty cases wanted
+# exactly these three rows and each wrote them out, which is sixty lines of
+# identical JSON standing between a reader and what each case is actually
+# about.
+#
+# A case that varies a row keeps its own heredoc rather than parameterising
+# this one. The difference is then the thing on the page, instead of something
+# to be found by diffing two near-identical blocks. inventory-tng-rjga.
+closes_aaa() {
+  tracker <<'JSONL'
+{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
+{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
+{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
+JSONL
+}
+
 check "$CHECK" "$WORK/repo/message"
 
 echo "check-commit.sh"
@@ -81,11 +98,7 @@ good_message
 expect 0 "Nothing to object to" "raising a follow-up alongside one closure is allowed"
 
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 message <<'MSG'
 Extract the decode loop into its own module
 
@@ -99,11 +112,7 @@ good_message
 expect 1 "nothing staged closes inventory-tng-aaa" "a trailer with nothing staged is refused"
 
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 message <<'MSG'
 Refactored the decode loop so that it could be tested properly.
 The body starts here with no blank line, and runs on well past seventy-two columns.
@@ -129,11 +138,7 @@ refute "$output" $? 1 "not the imperative" "\"Read\" is left alone"
 # Replacing the last commit: what lands is the staged changes and that one's,
 # so a closure it already carries still counts, exactly once.
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 git -C "$WORK/repo" commit -q -m landed
 good_message
 expect 1 "nothing staged closes inventory-tng-aaa" "an amend rewriting the summary is refused"
@@ -148,11 +153,7 @@ expect --amend 0 "closes inventory-tng-aaa" "an amend sees the closure its commi
 
 # The plain shape: nothing staged at all, because the index already equals HEAD.
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 git -C "$WORK/repo" commit -q -m "aaa: Extract the decode loop into its own module"
 good_message
 expect 0 "amends the commit that closed inventory-tng-aaa" "an amend whose summary is HEAD's is read as one"
@@ -162,11 +163,7 @@ expect 0 "amends the commit that closed inventory-tng-aaa" "an amend whose summa
 # and closes nothing. The refusal that produced was "issues.jsonl is staged but
 # does not close inventory-tng-614", on the commit that had closed it.
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 git -C "$WORK/repo" commit -q -m "aaa: Extract the decode loop into its own module"
 tracker <<'JSONL'
 {"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
@@ -181,11 +178,7 @@ expect 0 "amends the commit that closed inventory-tng-aaa" "and so is one whose 
 # made. Indistinguishable from a reword on the evidence available, so both are
 # refused rather than the rule being weakened to admit one of them.
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 git -C "$WORK/repo" commit -q -m "aaa: Extract the decode loop into its own module"
 message <<'MSG'
 aaa: Tidy up after the decode loop extraction
@@ -201,11 +194,7 @@ expect 1 "--fixup=reword:" "and the refusal names the spelling that changes a su
 # nothing handed to a commit-msg hook can separate the two, and check-batch.sh
 # is what refuses the pair over the range.
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 git -C "$WORK/repo" commit -q -m "aaa: Extract the decode loop into its own module"
 echo "work of an entirely different kind" > "$WORK/repo/elsewhere.txt"
 git -C "$WORK/repo" add -A
@@ -234,11 +223,7 @@ expect 1 "nothing staged closes inventory-tng-aaa" "a matching summary alone is 
 # exits non-zero stands for both.
 
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 good_message
 expect 0 "closes inventory-tng-aaa" "with a working python3 the closure is read"
 
@@ -264,11 +249,7 @@ assert "$output" $? 1 "nothing staged closes" "a commit staging no tracker chang
 # same discard, in the same file, as the one above. A broken interpreter made
 # an honest amend look like a commit that closed nothing.
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 git -C "$WORK/repo" commit -q -m "aaa: Extract the decode loop into its own module"
 good_message
 output=$(PATH="$WORK/broken:$PATH" "$CHECK" "$WORK/repo/message" 2>&1)
@@ -383,11 +364,7 @@ MSG
 expect 1 "found none" "a summary that merely begins with the word is still somebody's message"
 
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 message <<'MSG'
 Extract the decode loop into its own module
 
@@ -396,11 +373,7 @@ MSG
 expect 0 "not a bead" "a GitHub issue is accepted without a tracker to check"
 
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 message <<'MSG'
 Extract the decode loop into its own module
 
@@ -411,11 +384,7 @@ expect 1 "found none" "a message naming no issue is refused"
 # --- the identifier in the summary, and issues that take more than one commit
 
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 message <<'MSG'
 aaa: Extract the decode loop into its own module
 
@@ -433,11 +402,7 @@ expect 1 "over 50" "a prefix no trailer confirms is prose, and is charged for"
 # is under the limit when it names the issue it belongs to and over it when it
 # names something else, which is the whole distinction in one pair of cases.
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 message <<'MSG'
 aaa: Extract the decode loop into its own new module
 
@@ -446,11 +411,7 @@ MSG
 expect 0 "Nothing to object to" "a prefix its trailer confirms is not charged for"
 
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 message <<'MSG'
 bbb: Extract the decode loop into its own new module
 
@@ -459,11 +420,7 @@ MSG
 expect 1 "over 50" "a prefix naming another issue is prose, and is charged for"
 
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 message <<'MSG'
 aaa: Extract the decode loop into a module that is far too long to fit
 
@@ -482,11 +439,7 @@ MSG
 expect 0 "names inventory-tng-aaa without closing it" "Refs advances an issue without closing it"
 
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 message <<'MSG'
 aaa: Move the loop before rewriting it
 
@@ -495,11 +448,7 @@ MSG
 expect 1 "closes nothing but the staged tracker closes" "Refs while the tracker closes something is refused"
 
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 message <<'MSG'
 aaa: Extract the decode loop
 
@@ -547,11 +496,7 @@ fi
 scene
 ln -sfn "$CHECK" "$WORK/repo/hooked"
 good_message
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 output=$("$WORK/repo/hooked" "$WORK/repo/message" 2>&1)
 assert "$output" $? 0 "Nothing to object to" "it works through a symlink, as the hook install makes it"
 
@@ -560,11 +505,7 @@ assert "$output" $? 0 "Nothing to object to" "it works through a symlink, as the
 # See trailers.sh for what git requires and DEVELOPERS.md#commits for why.
 
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 message <<'MSG'
 aaa: Extract the decode loop
 
@@ -586,11 +527,7 @@ refute "$output" 1 1 "found none" "and is not mistaken for no trailer at all"
 
 # What the rule is for: git itself must agree that it is a trailer.
 scene
-tracker <<'JSONL'
-{"_type":"issue","id":"inventory-tng-aaa","title":"one","status":"closed"}
-{"_type":"issue","id":"inventory-tng-bbb","title":"two","status":"in_progress"}
-{"_type":"issue","id":"inventory-tng-old","title":"done long ago","status":"closed"}
-JSONL
+closes_aaa
 good_message
 if [[ "$(git interpret-trailers --parse < "$WORK/repo/message")" == "Closes: inventory-tng-aaa" ]]; then
   pass "git interpret-trailers agrees the message carries the trailer"
