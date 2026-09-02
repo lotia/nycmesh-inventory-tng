@@ -160,11 +160,13 @@ refute "$out" "$status" 2 "in step" "and never claims the two lists agree"
 
 echo
 echo "a listing cut short is not agreement"
-# THE SILENCE READS AS A YES, which is the whole hazard and which the script
-# spells out at its own LIMIT guard. What is pinned here is that a full page is
-# refused rather than reported as agreement.
+# THE SILENCE READS AS A YES, which is the whole hazard and which
+# repository.sh's `listing_cut_short` spells out. What is pinned here is that a
+# full page is refused rather than reported as agreement.
 scene "60:OPEN" "inventory-tng-aaa:open:60"
-for n in {1..1000}; do printf '%s\t%s/issues/%s\tOPEN\n' "$n" "$OURS" "$n"; done > "$GH_LIVE"
+for n in $(seq 1 "$(issue_limit)"); do
+  printf '%s\t%s/issues/%s\tOPEN\n' "$n" "$OURS" "$n"
+done > "$GH_LIVE"
 out=$(sync --check); status=$?
 assert "$out" "$status" 2 "cut short" "a listing filling the limit is refused, not read as agreement"
 refute "$out" "$status" 2 "in step" "and the run never claims the two lists agree"

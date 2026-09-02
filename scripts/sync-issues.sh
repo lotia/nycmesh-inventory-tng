@@ -41,12 +41,6 @@ HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 REPO_ROOT=$(git -C "$HERE" rev-parse --show-toplevel) || exit 1
 EXPORT=".beads/issues.jsonl"
 
-#: How many issues `gh issue list` is asked for at once, named so the guard
-#: below can compare against it. export-issues.sh says why it is named rather
-#: than written twice. That both scripts now need one is inventory-tng-cwpa.13's
-#: case for a single listing they share.
-LIMIT=1000
-
 dry_run=false
 push=true
 check=false
@@ -124,14 +118,14 @@ if [[ "$check" == true ]]; then
   # worked out it could not see the end of.
   unusable=""
   full_page=false
-  if ! live=$(gh issue list --repo "$REPOSITORY" --state all --limit "$LIMIT" \
+  if ! live=$(gh issue list --repo "$REPOSITORY" --state all --limit "$ISSUE_LIMIT" \
     --json number,url,state --jq '.[] | "\(.number)\t\(.url)\t\(.state)"' 2>"$gaps"); then
     # tail -2, as everywhere else here: `gh` usually fails in two lines, and on
     # a scheduled run this note is the whole debugging surface.
     fail "GitHub could not be listed:"
     note "$(tail -2 "$gaps")"
     unusable="GitHub would not give the listing (above)."
-  elif [[ "$(count_lines "$live")" -ge "$LIMIT" ]]; then
+  elif listing_cut_short "$live"; then
     full_page=true
     unusable="the listing filled the limit, so it stops short of the end (see 3)."
   # ONE COLUMN PAIR IS A FILE because --listing takes a path; the other stays a
@@ -177,17 +171,13 @@ if [[ "$check" == true ]]; then
     fail "whether the two sides disagree could not be asked: $unusable"
     unanswerable=1
   elif [[ "$full_page" == true ]]; then
-    # A LISTING CUT SHORT READS AS AGREEMENT, which is why this cannot be left
-    # to be noticed. drifted.py passes over a bead whose issue is not in the
-    # listing -- it has no state to compare -- so every issue past the limit is
-    # silently declared in step, and the run goes green over the part it never
-    # looked at. export-issues.sh guards its own listing the same way.
-    #
-    # Decided where the listing is fetched, because question 1 reads the same
-    # one and must not answer from it either.
-    fail "GitHub returned the full $LIMIT issues, so the comparison would be cut short."
+    # WHAT IT COSTS HERE, the rule itself being repository.sh's: drifted.py has
+    # no state to compare for a bead whose issue is not in the listing, so it
+    # passes over it, and everything past the limit is declared in step by a run
+    # that never looked at it.
+    fail "GitHub returned the full $ISSUE_LIMIT issues, so the comparison would be cut short."
     note "Everything past that would be passed over and reported as agreeing."
-    note "Raise LIMIT in this script and re-run."
+    note "$ISSUE_LIMIT_ADVICE"
     unanswerable=1
   # THE REPOSITORY IS HANDED OVER, because the listing arrives as numbers and
   # states with nothing in it to say whose. drifted.py reads a number out of

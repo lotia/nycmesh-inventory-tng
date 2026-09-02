@@ -659,6 +659,8 @@ jobs:
         run: scripts/landing-gate.test.sh
       - name: Check the configuration checker
         run: scripts/check-config.test.sh
+      - name: Check the repository preconditions
+        run: scripts/repository.test.sh
       - name: Check the unsynced-issue reader
         run: scripts/unsynced.test.sh
       - name: Check the untriaged-arrival reader

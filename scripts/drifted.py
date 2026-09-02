@@ -43,8 +43,14 @@ against open on GitHub is the one that keeps happening -- see above -- but open
 here against closed on GitHub is the same disagreement seen from the other end,
 and each is named with which way round it runs.
 
+HOW BIG A PAGE TO ASK FOR IS NOT WRITTEN HERE, and the example below says
+`$ISSUE_LIMIT` rather than a number for that reason: this reader has no way to
+tell a listing that fits from one `gh` stopped part way through, and a number
+copied out of an example goes stale the day the real one is raised. Both the
+number and the refusal are scripts/repository.sh's -- `listing_cut_short`.
+
 Usage:
-    gh issue list --state all --limit 1000 \\
+    gh issue list --state all --limit "$ISSUE_LIMIT" \\
         --json number,state --jq '.[] | "\\(.number)\\t\\(.state)"' |
         drifted.py .beads/issues.jsonl lotia/nycmesh-inventory-tng
 """

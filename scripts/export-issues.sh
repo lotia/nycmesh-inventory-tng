@@ -61,12 +61,6 @@ HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 REPO_ROOT=$(git -C "$HERE" rev-parse --show-toplevel) || exit 1
 EXPORT="$REPO_ROOT/.beads/issues.jsonl"
 
-#: How many issues `gh issue list` is asked for at once. Named rather than
-#: written twice, because the guard below compares against it -- a limit and
-#: the number it is checked against drifting apart is how that guard would
-#: stop working silently.
-LIMIT=1000
-
 confirm=false
 check=false
 batch=25
@@ -266,7 +260,7 @@ echo "5. Closing the ones that are closed here"
 # STDERR KEPT OUT OF THE VALUE. On the failure path it is the message; on the
 # success path a warning `gh` printed would otherwise become a line in
 # $open_now, which the closing loop reads as an issue number.
-if ! open_now=$(gh issue list --repo "$repository" --state open --limit "$LIMIT" \
+if ! open_now=$(gh issue list --repo "$repository" --state open --limit "$ISSUE_LIMIT" \
   --json number --jq '.[].number' 2>"$gaps"); then
   fail "could not ask which issues are open, so none were closed:"
   note "$(tail -2 "$gaps")"
@@ -274,23 +268,21 @@ if ! open_now=$(gh issue list --repo "$repository" --state open --limit "$LIMIT"
   stop exporting
 fi
 
-# A FULL PAGE IS NOT AN ANSWER. `gh` stops at --limit and says nothing about it,
-# so a list exactly that long is one that may have been cut off -- and a closed
-# bead whose issue fell off the end is silently left open. Refused rather than
-# guessed at, because the failure is invisible from the output.
-open_count=0
+# WHAT A FULL PAGE COSTS HERE, the rule itself being repository.sh's: a closed
+# bead whose issue fell off the end is silently left open, and the run reports
+# the closing pass as done.
+if listing_cut_short "$open_now"; then
+  fail "GitHub returned the full $ISSUE_LIMIT open issues, so the list may be cut short."
+  note "The issues are filed, and the closing pass did not run."
+  note "$ISSUE_LIMIT_ADVICE"
+  stop exporting
+fi
+
 declare -A still_open=()
 while IFS= read -r number; do
   [[ -n "$number" ]] || continue
   still_open[$number]=1
-  open_count=$((open_count + 1))
 done <<<"$open_now"
-
-if [[ "$open_count" -ge "$LIMIT" ]]; then
-  fail "GitHub returned the full $LIMIT open issues, so the list may be cut short."
-  note "The issues are filed. Raise LIMIT in this script and re-run to close them."
-  stop exporting
-fi
 
 # Membership from the map built above, for the reason step 4's own history
 # gives: a `grep` per issue is a process per issue and a scan of the whole list

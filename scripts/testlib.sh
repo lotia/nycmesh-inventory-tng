@@ -134,6 +134,23 @@ catch_up() {
   git -C "$1" fetch -q origin && git -C "$1" reset -q --hard origin/main
 }
 
+# issue_limit -- how big a page repository.sh asks GitHub for.
+#
+# THREE SUITES HAD THE NUMBER WRITTEN OUT, which is the thing
+# inventory-tng-cwpa.14 moved it into one file to stop -- and then the suites
+# pinning that guard were the copies left behind. A case that says "a page
+# filling the limit" and means 1000 stops being about the limit the day it is
+# raised: it goes red, and until somebody hand-edits three files the boundary
+# cases are about a boundary nothing has any more.
+#
+# READ OUT OF A SUBSHELL rather than by sourcing the two files here, and that is
+# not caution: report.sh defines `verdict` and so does this file, so a suite
+# that read it in would lose its own ending to the thing it is testing.
+issue_limit() {
+  bash -c '. "$1/report.sh"; . "$1/repository.sh"; printf %s "$ISSUE_LIMIT"' _ \
+    "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+}
+
 # borrow <directory> <tool>... -- a PATH holding exactly the named programs.
 #
 # Five suites built one of these, in four spellings. What they are for is the

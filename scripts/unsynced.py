@@ -25,8 +25,14 @@ fresh clone and in a CI runner that has never seen a database, which is what
 `inventory-tng-cwpa.3` needs it to do.
 
 Usage:
-    gh issue list --state all --json number,url --jq '.[] | "\\(.number)\\t\\(.url)"' |
+    gh issue list --state all --limit "$ISSUE_LIMIT" \\
+        --json number,url --jq '.[] | "\\(.number)\\t\\(.url)"' |
         unsynced.py .beads/issues.jsonl lotia/nycmesh-inventory-tng
+
+`--limit` is not decoration and the number is not written here: without it `gh`
+answers with thirty issues and says nothing about the rest, and this reader
+cannot tell that from a repository holding thirty. Asking is the shell caller's
+job, and scripts/repository.sh holds both the number and the guard for it.
 """
 
 import json
