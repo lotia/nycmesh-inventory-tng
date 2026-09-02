@@ -663,6 +663,8 @@ jobs:
         run: scripts/repository.test.sh
       - name: Check the unsynced-issue reader
         run: scripts/unsynced.test.sh
+      - name: Check the unsaid-fields reader
+        run: scripts/unsaid.test.sh
       - name: Check the untriaged-arrival reader
         run: scripts/untriaged.test.sh
       - name: Check the review-cycle reader
