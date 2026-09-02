@@ -28,7 +28,7 @@ unset GITHUB_OUTPUT GITHUB_REPOSITORY
 # "bd is absent" only means something if the list is honest. Checked against the
 # script rather than guessed -- `tail` is in the pull loop, and `sed`, `grep`
 # and `cat` are not used at all. `command` is a bash builtin and needs nothing.
-BORROWED=(bash readlink dirname git wc tr tail python3)
+BORROWED=(bash readlink dirname git wc tr tail mktemp rm python3)
 
 BIN="$WORK/bin"
 REPO="$WORK/repo"
@@ -65,6 +65,10 @@ borrow "$BIN" "${BORROWED[@]}"
 # scene had to grant and the script never asks for.
 cat > "$BIN/gh" <<'STUB'
 #!/usr/bin/env bash
+# $GH_NOISE makes it chatty on stderr while still SUCCEEDING, which is what the
+# real thing does with a new-release notice. A stub tidier than reality tests a
+# program that does not exist.
+[[ -n "${GH_NOISE:-}" ]] && echo "$GH_NOISE" >&2
 case "$*" in
   *"repo view"*)   echo "o/r" ;;
   *"issue list"*)  printf '%s\n' "$(<"$GH_ISSUES")" ;;
@@ -143,6 +147,19 @@ expect 2 "bd is needed" "a pull that would write refuses without bd"
 with_bd
 issues_are "1"
 expect 0 "already linked" "and is content once bd is there"
+
+echo
+echo "a gh that talks while it works"
+# inventory-tng-p8q4.1. Folding stderr into the listing made a new-release
+# notice a line unsynced.py had to parse, and it refused a listing that was fine.
+
+issues_are "1 2"
+export GH_NOISE="A new release of gh is available: 2.40.0"
+expect --dry-run -- 0 "no bead points at: 2" "a warning on stderr does not become an issue record"
+refute "$(pull --dry-run)" 0 0 "new release" "and never reaches the reader as data"
+issues_are "1"
+expect --dry-run -- 0 "already linked" "and a clean listing is still read correctly"
+unset GH_NOISE
 
 echo
 echo "a checkout that is not current"

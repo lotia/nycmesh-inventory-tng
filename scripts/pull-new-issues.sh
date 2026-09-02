@@ -86,10 +86,20 @@ repository="$REPOSITORY"
 # `--state all`, so an issue somebody filed and closed before anybody synced
 # still becomes a bead. It is a record either way, and a closed one that never
 # arrived is the shape nobody goes looking for.
-offered=$(gh issue list ${repository:+--repo "$repository"} --state all --limit 1000 \
-  --json number,url --jq '.[] | "\(.number)\t\(.url)"' 2>&1)
-if [[ $? -ne 0 ]]; then
-  refuse "could not list issues:" "$offered"
+#
+# STDERR KEPT OUT OF THE VALUE. `gh` writes to stderr on calls that SUCCEED --
+# a new-release notice, an authentication advisory -- and folding those in made
+# them lines of what unsynced.py reads as `number<TAB>url` records. It refuses a
+# line it cannot parse, so a perfectly good listing stopped the run, on a
+# scheduled job, where a red check sends somebody looking for a sync problem
+# that does not exist. export-issues.sh has carried the same arrangement since
+# it was reviewed for it. inventory-tng-p8q4.1.
+gaps=$(mktemp) || exit 2
+trap 'rm -f "$gaps"' EXIT
+
+if ! offered=$(gh issue list ${repository:+--repo "$repository"} --state all --limit 1000 \
+  --json number,url --jq '.[] | "\(.number)\t\(.url)"' 2>"$gaps"); then
+  refuse "could not list issues:" "$(tail -2 "$gaps")"
 fi
 
 # THE GUARD THAT MATTERS. An empty list is indistinguishable from a repository
