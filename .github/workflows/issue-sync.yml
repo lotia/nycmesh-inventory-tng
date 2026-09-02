@@ -1,6 +1,6 @@
 name: Issue sync
 
-# Say when a GitHub issue exists that the tracker has never heard of.
+# Say when the tracker and the GitHub issue list are holding different work.
 #
 # The arrangement this belongs to -- how the two lists of work relate, and why
 # noticing is CI's whole part in it -- is
@@ -69,7 +69,7 @@ permissions:
 
 jobs:
   unsynced:
-    name: Issues the tracker has not heard of
+    name: The tracker and the issue list disagree
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -95,3 +95,26 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: scripts/pull-new-issues.sh --check
+
+      # THE SAME QUESTION FROM THE OTHER END, and until inventory-tng-cwpa.9 it
+      # was not asked at all: a bead created on somebody's machine and committed
+      # was filed nowhere, and nothing said so -- not on the next commit, not on
+      # the next morning, not ever.
+      #
+      # RUN EVEN WHEN THE STEP ABOVE FAILED, which is the whole of why this is a
+      # second STEP rather than a second JOB. One red check is one thing to go
+      # and look at, and the two halves are one concern. But a step that fails
+      # stops the job, so without this the push half would go unasked for as
+      # long as the pull half was red -- somebody fixes one, and learns about
+      # the other tomorrow.
+      #
+      # `!cancelled()` rather than `always()`: a failed step is what this has to
+      # survive, and a CANCELLED run is not. `always()` runs on cancellation
+      # too, which turns "somebody stopped this" into a report about the
+      # tracker, made from a checkout that may not have finished.
+      #
+      # It reaches for nothing: no token, no `gh`, no `bd`. That is what lets it
+      # sit here rather than needing a runner of its own -- see the script.
+      - name: Ask which beads have no issue
+        if: ${{ !cancelled() }}
+        run: scripts/export-issues.sh --check
