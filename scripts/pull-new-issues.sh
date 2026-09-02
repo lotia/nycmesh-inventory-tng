@@ -42,7 +42,7 @@ for argument in "$@"; do
     # `--check` is a dry run that refuses. Nothing is pulled either way, so it
     # needs no more than a dry run does.
     --check) dry_run=true; check=true ;;
-    -*) echo "pull-new-issues: unknown flag $argument" >&2; exit 2 ;;
+    -*) refuse "unknown flag $argument" ;;
     *) repository="$argument" ;;
   esac
 done
@@ -62,6 +62,22 @@ need_tools "${tools[@]}"
 resolve_repository "$repository"
 repository="$REPOSITORY"
 
+# === AND THE CHECKOUT HAS TO BE CURRENT BEFORE ANYTHING IS PULLED ===
+#
+# The other half of inventory-tng-cwpa.10: a checkout that has not fetched
+# somebody else's `external_ref` cannot see that the issue is already linked, so
+# unsynced.py offers it and this makes a SECOND bead for work that has one. The
+# guard is repository.sh's, and 0031 has the reasoning, including why the export
+# side was done first.
+#
+# WORSE HERE THAN THERE IN ONE RESPECT, which is why nothing else caught it: the
+# export at least refuses when GitHub holds an issue no bead points at, and on a
+# stale checkout that precondition passes precisely because the ref it is
+# missing is the one that would have failed it.
+#
+# Only a run that writes is held to it, for the reason 0031 gives.
+[[ "$dry_run" == true ]] || require_current_checkout "$REPO_ROOT"
+
 
 # `gh issue list` and not the REST collection, because /issues returns pull
 # requests too and they share the number space. Pulling a pull request as an
@@ -73,9 +89,7 @@ repository="$REPOSITORY"
 offered=$(gh issue list ${repository:+--repo "$repository"} --state all --limit 1000 \
   --json number,url --jq '.[] | "\(.number)\t\(.url)"' 2>&1)
 if [[ $? -ne 0 ]]; then
-  echo "pull-new-issues: could not list issues:" >&2
-  echo "$offered" >&2
-  exit 2
+  refuse "could not list issues:" "$offered"
 fi
 
 # THE GUARD THAT MATTERS. An empty list is indistinguishable from a repository
@@ -98,7 +112,7 @@ if [[ -z "$new" ]]; then
   verdict "Nothing to pull." pulling
 fi
 
-count=$(printf '%s\n' "$new" | wc -l | tr -d ' ')
+count=$(count_lines "$new")
 note "$count issue(s) on GitHub that no bead points at: $(printf '%s' "$new" | tr '\n' ' ')"
 
 # SAID IN A FORM A CALLER CAN READ, because "did anything arrive" is not

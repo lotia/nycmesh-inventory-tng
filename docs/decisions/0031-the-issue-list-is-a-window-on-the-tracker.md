@@ -172,8 +172,8 @@ for its own reasons. Nothing further is installed for the GitHub half: the link
 is a field in a file that is already being pulled. What a second machine needs
 is a `gh` login and a token, and only at the moment it wants to *act*.
 
-**"Every clone has a complete map" means as of that clone's last pull, and the
-export enforces that rather than asking for it.** Two machines that both file
+**"Every clone has a complete map" means as of that clone's last pull, and both
+halves enforce that rather than asking for it.** Two machines that both file
 while one is behind the other would file the same bead twice — the stale side
 cannot see a reference that exists only in a commit it has not fetched. The
 guard against the mirror-image failure is no help, and looking at why is what
@@ -182,13 +182,20 @@ side, so the unlinked-issue precondition finds nothing waiting and is content.
 It would go further and offer that issue as unpulled, and honestly acting on
 that makes a second bead — one stale checkout, duplication in both directions.
 
-So `scripts/export-issues.sh --confirm` fetches and refuses while the checkout
-is behind its upstream, or while it tracks nothing at all. A dry run is not
-refused: it files nothing, so being behind costs a stale count rather than a
+So a run that writes — `export-issues.sh --confirm`, or `pull-new-issues.sh`
+bringing anything in — fetches and refuses while the checkout is behind its
+upstream, or while it tracks nothing at all. A run that only asks is not
+refused: it changes nothing, so being behind costs a stale count rather than a
 duplicate, and `--check` runs in CI where the head is a pull request's and has
 no upstream to be behind. A fetch that fails refuses too, and that trade turns
-out not to be one — an export that cannot reach the git remote was never going
-to reach the GitHub API a moment later.
+out not to be one — a run that cannot reach the git remote was never going to
+reach the GitHub API a moment later.
+
+The export half was built first, because the two costs are not equal: an
+ordinary token cannot delete a GitHub issue, so a duplicate there is permanent,
+while a duplicate bead can be deleted. That asymmetry justified doing one
+first. It does not justify leaving the other undone, and the guard lives in
+`scripts/repository.sh` so that both halves call it rather than copy it.
 
 **The standing signal runs both ways, and cheaply.** CI is red while GitHub
 holds an issue no bead points at, and equally while the tracker holds a bead

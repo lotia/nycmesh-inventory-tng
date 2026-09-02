@@ -31,7 +31,7 @@ for argument in "$@"; do
   case "$argument" in
     --dry-run) dry_run=true ;;
     --no-push) push=false ;;
-    *) echo "sync-issues: unknown argument $argument" >&2; exit 2 ;;
+    *) refuse "unknown argument $argument" ;;
   esac
 done
 
@@ -56,7 +56,22 @@ echo "1. Issues nobody here has heard of"
 if [[ "$dry_run" == true ]]; then
   "$HERE/pull-new-issues.sh" --dry-run || exit $?
 else
-  "$HERE/pull-new-issues.sh" || note "pull-new-issues reported a problem; carrying on to say what changed"
+  # A PROBLEM IS CARRIED ON FROM; A REFUSAL IS NOT, and the two were one branch
+  # until the pull half grew a stale-checkout guard. Exit 1 is "a pull failed",
+  # and step 3 still has something worth printing. EXIT 2 is "it could not look
+  # at all" -- an unreachable remote, or a checkout behind its upstream -- and
+  # carrying on from that walks into step 4, which pushes: `bd github sync
+  # --push-only` files an issue for every bead carrying no `external_ref`, and
+  # on a stale checkout that is precisely the set whose refs are in a commit
+  # this clone has not fetched. That is the duplicate the guard exists to stop,
+  # made permanent, because an ordinary token cannot delete a GitHub issue.
+  "$HERE/pull-new-issues.sh"
+  pulled=$?
+  if [[ $pulled -eq 2 ]]; then
+    refuse "the pull half could not run, so nothing here may push. Nothing was done."
+  fi
+  [[ $pulled -eq 0 ]] ||
+    note "pull-new-issues reported a problem; carrying on to say what changed"
 fi
 
 echo
