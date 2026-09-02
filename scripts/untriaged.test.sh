@@ -12,17 +12,6 @@ workspace
 
 URL="https://github.com/lotia/nycmesh-inventory-tng/issues"
 
-# bead <id> <title> [external_ref] [status]
-bead() {
-  python3 - "$@" <<'PY'
-import json, sys
-row = {"_type": "issue", "id": sys.argv[1], "title": sys.argv[2], "status": sys.argv[4] if len(sys.argv) > 4 else "open"}
-if len(sys.argv) > 3 and sys.argv[3]:
-    row["external_ref"] = sys.argv[3]
-print(json.dumps(row))
-PY
-}
-
 export EXPORT="$WORK/issues.jsonl"
 check() { python3 "$HERE/untriaged.py" "$EXPORT"; }
 
@@ -31,9 +20,9 @@ check() { python3 "$HERE/untriaged.py" "$EXPORT"; }
 ARRIVED=inventory-tng-1788200756998-1-26030a28
 
 {
-  bead "$ARRIVED" "The catalogue search is slow on my phone" "$URL/76"
-  bead inventory-tng-nz6t "Take django-cors-headers out" "$URL/60"
-  bead inventory-tng-abc "An ordinary bead nobody pulled" ""
+  bead "$ARRIVED" "" "$URL/76" "The catalogue search is slow on my phone"
+  bead inventory-tng-nz6t "" "$URL/60" "Take django-cors-headers out"
+  bead inventory-tng-abc "" "" "An ordinary bead nobody pulled"
 } >"$EXPORT"
 
 out=$(check)
@@ -47,13 +36,13 @@ assert "$out" 0 0 "bd rename $ARRIVED" "the rename is spelled out with the id fi
 # THE MARKER IS THE NAME, so triage needs no state of its own: renaming is what
 # takes a bead off this list, and nothing has to be set or cleared.
 {
-  bead inventory-tng-slowsearch "The catalogue search is slow on my phone" "$URL/76"
+  bead inventory-tng-slowsearch "" "$URL/76" "The catalogue search is slow on my phone"
 } >"$EXPORT"
 assert "$(check)" 0 0 "Nothing is waiting" "renaming alone takes a bead off the list"
 
 # A closed arrival is nobody's work, whatever it is called.
 {
-  bead "$ARRIVED" "Filed and withdrawn" "$URL/76" closed
+  bead "$ARRIVED" closed "$URL/76" "Filed and withdrawn"
 } >"$EXPORT"
 assert "$(check)" 0 0 "Nothing is waiting" "a closed arrival is not waiting to be triaged"
 
@@ -62,7 +51,7 @@ assert "$(check)" 0 0 "Nothing is waiting" "a closed arrival is not waiting to b
 # ---------------------------------------------------------------------------
 
 {
-  bead "$ARRIVED" "The catalogue search is slow on my phone" "$URL/76"
+  bead "$ARRIVED" "" "$URL/76" "The catalogue search is slow on my phone"
 } >"$EXPORT"
 out=$(check)
 assert "$out" 0 0 "bd search catalogue" "a long, specific word is offered as a search"
@@ -71,7 +60,7 @@ refute "$out" 0 0 "bd search on" "a short word is not offered"
 
 # A title with nothing specific in it offers no searches rather than bad ones.
 {
-  bead "$ARRIVED" "It does not work" "$URL/76"
+  bead "$ARRIVED" "" "$URL/76" "It does not work"
 } >"$EXPORT"
 out=$(check)
 assert "$out" 0 0 "$ARRIVED" "an arrival with a vague title is still listed"

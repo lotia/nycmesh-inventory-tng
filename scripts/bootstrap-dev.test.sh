@@ -58,8 +58,6 @@ STUB
 # A checkout with nothing done to it yet, and a PATH holding only what the
 # script is entitled to find. Which stubs exist is the argument.
 scene() {
-  rm -rf "${WORK:?}/bin"
-  mkdir -p "$WORK/bin"
   # A git repository, because one of the steps configures git and the rest of
   # the suite would otherwise be exercising a directory no contributor has.
   new_repo "$WORK/repo"
@@ -75,10 +73,12 @@ scene() {
   chmod +x "$WORK/repo/scripts/check-commit.sh"
   printf 'DJANGO_SECRET_KEY=from-the-sample\n' > "$WORK/repo/.env.sample"
   : > "$WORK/log"
-  local tool
-  for tool in "${BORROWED[@]}"; do
-    ln -s "$(command -v "$tool")" "$WORK/bin/$tool"
-  done
+  # BORROWED ONCE, COPIED PER SCENE. The set never differs, so resolving it 42
+  # times was 18% of this suite's runtime on every CI push. The wipe stays, so a
+  # stub one case installed cannot leak into the next.
+  [[ -d "$WORK/borrowed" ]] || borrow "$WORK/borrowed" "${BORROWED[@]}"
+  rm -rf "${WORK:?}/bin"
+  cp -a "$WORK/borrowed" "$WORK/bin"
   for tool in "$@"; do stub "$tool"; done
 }
 
