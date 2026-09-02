@@ -20,6 +20,7 @@ set -uo pipefail
 
 HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 . "$HERE/report.sh"
+. "$HERE/repository.sh"
 
 REPO_ROOT=$(git -C "$HERE" rev-parse --show-toplevel) || exit 1
 EXPORT=".beads/issues.jsonl"
@@ -41,10 +42,7 @@ done
 # which left `sync-issues.sh --dry-run` walking all four steps on a machine with
 # no `bd` at all and ending "The tracker and the issue list agree."
 # inventory-tng-qnxb.
-command -v bd >/dev/null 2>&1 || {
-  echo "sync-issues: bd is needed and is not on the path." >&2
-  exit 2
-}
+need_tools bd
 
 run() {
   if [[ "$dry_run" == true ]]; then

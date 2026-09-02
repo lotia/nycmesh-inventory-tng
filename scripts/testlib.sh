@@ -59,6 +59,26 @@ new_repo() {
   git -C "$dir" config user.name Test
 }
 
+# bead <id> [<status>] [<external_ref>] -- one line of a `bd export`.
+#
+# Here rather than in each suite because the shape of an export row -- `_type`,
+# `id`, `title`, `status`, `external_ref` -- reached five copies across four
+# files, and it is precisely the shape unsynced.py stops the world over when it
+# changes. Five fixtures that quietly kept an old shape would go green against
+# a reader that no longer accepts it, which is the failure the refusal exists to
+# make loud.
+#
+# The status and the ref are optional because a bead really can lack either, and
+# a reader that treats a missing one differently from an empty one is a reader
+# worth being able to test.
+bead() {
+  local id=$1 status=${2:-} ref=${3:-}
+  printf '{"_type":"issue","id":"%s","title":"t"' "$id"
+  [[ -n "$status" ]] && printf ',"status":"%s"' "$status"
+  [[ -n "$ref" ]] && printf ',"external_ref":"%s"' "$ref"
+  printf '}\n'
+}
+
 # pass/fail_case <what this case is called> [<what was got>]
 pass() {
   printf '  ok   %s\n' "$1"

@@ -28,6 +28,7 @@ set -uo pipefail
 
 HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 . "$HERE/report.sh"
+. "$HERE/repository.sh"
 
 REPO_ROOT=$(git -C "$HERE" rev-parse --show-toplevel) || exit 1
 EXPORT="$REPO_ROOT/.beads/issues.jsonl"
@@ -54,36 +55,12 @@ done
 # inventory-tng-qnxb.
 tools=(gh python3)
 [[ "$dry_run" == true ]] || tools+=(bd)
-for tool in "${tools[@]}"; do
-  command -v "$tool" >/dev/null 2>&1 || {
-    echo "pull-new-issues: $tool is needed and is not on the path." >&2
-    exit 2
-  }
-done
+need_tools "${tools[@]}"
 
-# BD IS CONFIGURED SEPARATELY FROM GH, and finding that out by running it is
-# how this was discovered: `gh` reads the checkout to know which repository it
-# is in, and `bd github pull` does not -- it wants github.owner and
-# github.repo, or GITHUB_REPOSITORY, and refuses per issue without them.
-# Resolved once here and exported, so a caller needs only an authenticated
-# `gh` and a token.
-#
-# ONE ANSWER FOR BOTH, and that is the repair rather than the design. This
-# resolved bd's repository only when GITHUB_REPOSITORY was unset, while
-# `gh issue list` always honoured the argument -- so passing an argument while
-# that variable named something else listed one repository's issues and pulled
-# them from another, linking beads to whatever wore that number there.
-if [[ -n "$repository" ]]; then
-  resolved="$repository"
-else
-  resolved=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)
-fi
-if [[ -z "$resolved" ]]; then
-  echo "pull-new-issues: could not work out which repository to use." >&2
-  exit 2
-fi
-repository="$resolved"
-export GITHUB_REPOSITORY="$resolved"
+# One answer for both tools, settled in repository.sh, which says why they
+# cannot each be left to work it out.
+resolve_repository "$repository"
+repository="$REPOSITORY"
 
 
 # `gh issue list` and not the REST collection, because /issues returns pull
@@ -145,8 +122,7 @@ if [[ "$check" == true ]]; then
   note "  scripts/pull-new-issues.sh"
   note "  scripts/untriaged.py .beads/issues.jsonl"
   note "This goes green by itself once those rows are committed, with nothing to close."
-  verdict "unreachable: --check only gets here with something waiting" \
-    "the tracker has heard of every issue"
+  stop "the tracker has heard of every issue"
 fi
 
 if [[ "$dry_run" == true ]]; then
