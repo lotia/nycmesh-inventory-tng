@@ -30,6 +30,14 @@ open work by any reading, and GitHub has only two states, so the tracker's four
 are read as closed-or-not and nothing else: `deferred` against an open issue is
 agreement, not drift.
 
+AND NEITHER IS ANOTHER REPOSITORY'S ISSUE, which is why the repository has to
+be named on the command line rather than carried in the listing. This iterates
+every row of the export, so it is the first reader for which "the ref is ours"
+is not true by construction -- and it compared the number it read out of one
+against a listing fetched with `--repo`, which is exactly the bug `unsynced.py`
+had once and says so in its own header. `unsynced.issue_of` is the pairing that
+makes reading a number out of a ref safe. inventory-tng-cwpa.12.
+
 BOTH DIRECTIONS COUNT, once the two sides are read that way. Closed here
 against open on GitHub is the one that keeps happening -- see above -- but open
 here against closed on GitHub is the same disagreement seen from the other end,
@@ -38,13 +46,13 @@ and each is named with which way round it runs.
 Usage:
     gh issue list --state all --limit 1000 \\
         --json number,state --jq '.[] | "\\(.number)\\t\\(.state)"' |
-        drifted.py .beads/issues.jsonl
+        drifted.py .beads/issues.jsonl lotia/nycmesh-inventory-tng
 """
 
 import sys
 from pathlib import Path
 
-from unsynced import number_of, offered, ref_of, rows
+from unsynced import issue_of, offered, ref_of, rows
 
 
 def states(text: str) -> dict[str, str]:
@@ -66,7 +74,7 @@ def states(text: str) -> dict[str, str]:
     return out
 
 
-def drifted(export: Path, live: dict[str, str]) -> list[tuple[str, str, bool]]:
+def drifted(export: Path, live: dict[str, str], repository: str) -> list[tuple[str, str, bool]]:
     """`(bead id, issue number, closed here)` for every pair that disagrees.
 
     Data, not a sentence. `unsynced.py` and `unexported.py` both hand back rows
@@ -76,15 +84,20 @@ def drifted(export: Path, live: dict[str, str]) -> list[tuple[str, str, bool]]:
 
     A bead whose issue GitHub has never heard of is skipped rather than
     reported. That is not drift -- it is a reference to an issue that does not
-    exist, which would be corruption or a repository this is not looking at,
-    and neither is answerable here.
+    exist, and it is not answerable here.
+
+    SO IS A BEAD POINTING AT ANOTHER REPOSITORY, and it is skipped by the same
+    line: `issue_of` hands back no number for a ref the listing's repository did
+    not issue, so there is nothing to look up. Skipped rather than refused
+    because a bead may perfectly well name somebody else's issue -- it is a
+    reference to work elsewhere, which this reader has no opinion about.
     """
     out = []
     for number, row in rows(export.read_text()):
         ref = ref_of(row, export, number)
         if ref is None:
             continue
-        issue = number_of(ref)
+        issue = issue_of(ref, repository)
         if issue is None or issue not in live:
             continue
         closed_here = row.get("status") == "closed"
@@ -102,13 +115,17 @@ def drifted(export: Path, live: dict[str, str]) -> list[tuple[str, str, bool]]:
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        raise SystemExit(f"usage: gh issue list ... | {Path(sys.argv[0]).name} <issues.jsonl>")
-    export = Path(sys.argv[1])
+    if len(sys.argv) != 3:
+        raise SystemExit(
+            f"usage: gh issue list ... | {Path(sys.argv[0]).name} "
+            "<issues.jsonl> <owner/repository>"
+        )
+    export, repository = Path(sys.argv[1]), sys.argv[2]
     if not export.exists():
         raise SystemExit(f"{export} does not exist, so nothing here knows what the tracker says")
 
-    for identifier, issue, closed_here in drifted(export, states(sys.stdin.read())):
+    live = states(sys.stdin.read())
+    for identifier, issue, closed_here in drifted(export, live, repository):
         side = "closed here, open on GitHub" if closed_here else "open here, closed on GitHub"
         print(f"{identifier}\t#{issue}\t{side}")
     return 0

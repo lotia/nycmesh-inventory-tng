@@ -39,6 +39,13 @@ EXPORT="$REPO/.beads/issues.jsonl"
 # number, url and state together: the script asks once and cuts the two columns
 # each question reads out of the one answer, so a stub with two listings in it
 # would be answering a question this no longer asks.
+#
+# AND IT HANDS BACK THE COLUMNS IT WAS ASKED FOR. The reconciling half fetches
+# its own listing, with `--json number,url`, and a stub that answered that with
+# a state column glued onto every URL was handing the reader a URL no bead could
+# ever match -- which read as "no bead points at this" and went green. The real
+# `gh` prints what the `--jq` asked for; a stub tidier or sloppier than reality
+# tests a program that does not exist. inventory-tng-cwpa.12.
 cat > "$BIN/gh" <<'STUB'
 #!/usr/bin/env bash
 # EVERY KNOB IS A FILE THE SCENE OWNS, like the two listings, so that `scene`
@@ -54,7 +61,14 @@ case "$*" in *"repo view"*) echo "o/r"; exit 0 ;; esac
 cat "$GH_NOISE" >&2
 [[ -s "$GH_DEAD" ]] && exit 1
 case "$*" in
-  *"issue list"*) echo "issue list" >> "$GH_CALLS"; cat "$GH_LIVE" ;;
+  *"issue list"*)
+    echo "issue list" >> "$GH_CALLS"
+    case "$*" in
+      *number,url,state*) cut -f1,2,3 "$GH_LIVE" ;;
+      *number,url*)       cut -f1,2   "$GH_LIVE" ;;
+      *)                  cut -f1     "$GH_LIVE" ;;
+    esac
+    ;;
   *) exit 1 ;;
 esac
 STUB

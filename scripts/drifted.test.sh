@@ -15,7 +15,8 @@ HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 
 workspace
 
-OURS="https://github.com/lotia/nycmesh-inventory-tng"
+REPOSITORY="lotia/nycmesh-inventory-tng"
+OURS="https://github.com/$REPOSITORY"
 
 # live <number> <state>...: what `gh issue list` is asked to print, in pairs.
 live() {
@@ -27,7 +28,7 @@ live() {
 }
 
 EXPORT="$WORK/issues.jsonl"
-check() { python3 "$HERE/drifted.py" "$EXPORT" <"$WORK/live"; }
+check() { python3 "$HERE/drifted.py" "$EXPORT" "$REPOSITORY" <"$WORK/live"; }
 
 echo "the disagreement itself"
 
@@ -68,10 +69,30 @@ bead inventory-tng-fff closed "$OURS/issues/9999" >"$EXPORT"
 live 60 OPEN
 assert "<$(check)>" 0 0 "<>" "a ref to an issue GitHub did not return is passed over rather than guessed at"
 
-# A pull request shares the number space, and number_of does not read one.
+# A pull request shares the number space, and issue_of does not read one.
 bead inventory-tng-ggg closed "$OURS/pull/60" >"$EXPORT"
 live 60 OPEN
 assert "<$(check)>" 0 0 "<>" "a bead linked to a pull request does not claim the issue of that number"
+
+# inventory-tng-cwpa.12, and the reader's own header says why it is the first
+# one that had to ask. What is pinned here is the answer: a bead wearing
+# somebody else's #60 is not this listing's #60.
+bead inventory-tng-lll closed "https://github.com/someone/else/issues/60" >"$EXPORT"
+live 60 OPEN
+assert "<$(check)>" 0 0 "<>" "another repository's issue of the same number is not this listing's"
+
+# And the same bead against the same listing IS drift once the repository it
+# names is the one being compared -- which is what pins the skip above on the
+# repository rather than on the ref being unreadable.
+assert "$(python3 "$HERE/drifted.py" "$EXPORT" someone/else <"$WORK/live")" 0 0 \
+  "closed here, open on GitHub" "and is drift when that repository is the one asked about"
+
+# Case is not part of a repository's identity -- `issue_of` says why. What it
+# would cost HERE is a disagreement nobody hears about.
+bead inventory-tng-mmm closed "$OURS/issues/60" >"$EXPORT"
+live 60 OPEN
+assert "$(python3 "$HERE/drifted.py" "$EXPORT" "LOTIA/NYCMesh-Inventory-TNG" <"$WORK/live")" 0 0 \
+  "inventory-tng-mmm" "a repository named in another casing is still the same repository"
 
 echo
 echo "states GitHub does not have"
@@ -91,10 +112,10 @@ echo
 echo "refusing rather than guessing"
 
 bead inventory-tng-jjj closed "$OURS/issues/60" >"$EXPORT"
-outcome=$(printf '60\tMERGED\n' | python3 "$HERE/drifted.py" "$EXPORT" 2>&1)
+outcome=$(printf '60\tMERGED\n' | python3 "$HERE/drifted.py" "$EXPORT" "$REPOSITORY" 2>&1)
 assert "$outcome" "$?" 1 "OPEN|CLOSED" "a state it does not recognise is refused, not read as not-closed"
 
-outcome=$(printf 'sixty\tOPEN\n' | python3 "$HERE/drifted.py" "$EXPORT" 2>&1)
+outcome=$(printf 'sixty\tOPEN\n' | python3 "$HERE/drifted.py" "$EXPORT" "$REPOSITORY" 2>&1)
 assert "$outcome" "$?" 1 "number<TAB>" "a number that is not a number is refused"
 
 # Reached through to unsynced.ref_of, whose refusal is the thing that stops a
@@ -104,7 +125,7 @@ live 60 OPEN
 outcome=$(check 2>&1)
 assert "$outcome" "$?" 1 "does not recognise" "an unrecognised ref stops it rather than being skipped"
 
-outcome=$(python3 "$HERE/drifted.py" "$WORK/absent.jsonl" <"$WORK/live" 2>&1)
+outcome=$(python3 "$HERE/drifted.py" "$WORK/absent.jsonl" "$REPOSITORY" <"$WORK/live" 2>&1)
 assert "$outcome" "$?" 1 "does not exist" "a missing export is refused rather than read as empty"
 
 # A row nothing can name is refused rather than reported under a made-up one --
