@@ -23,13 +23,25 @@ unset GITHUB_OUTPUT GITHUB_REPOSITORY
 
 BIN="$WORK/bin"
 REPO="$WORK/repo"
+REMOTE="$WORK/remote"
 OURS="https://github.com/o/r"
 
 # What the script itself reaches for, checked against the file rather than
 # guessed: `mapfile` and `printf` are builtins, and `sed` is not used.
 BORROWED=(bash readlink dirname git wc tr cut awk grep tail mktemp rm cat python3)
 
+# A REMOTE THE SCENE CAN MOVE. The guard added for inventory-tng-cwpa.10 refuses
+# to file from a checkout that is behind, so every --confirm case needs a
+# checkout that is legitimately current -- which means a real upstream rather
+# than a stub, since the question is asked of git itself.
+new_repo "$REMOTE"
+(cd "$REMOTE" && git commit -q --allow-empty -m "root") || exit 1
+
 new_repo "$REPO"
+git -C "$REPO" remote add origin "$REMOTE"
+git -C "$REPO" fetch -q origin
+git -C "$REPO" reset -q --hard origin/main
+git -C "$REPO" branch -q --set-upstream-to=origin/main main
 mkdir -p "$REPO/scripts" "$REPO/.beads"
 cp "$HERE/export-issues.sh" "$HERE/pull-new-issues.sh" "$HERE/unsynced.py" \
    "$HERE/unexported.py" "$HERE/issue-numbers.py" "$HERE/report.sh" \
@@ -88,6 +100,14 @@ cp "$BIN/bd" "$WORK/bd.keep"
 # which also joins the list of issues GitHub reports as open -- because an
 # issue bd has just created IS open, which is the whole reason step 4 exists.
 scene() {
+  # HOW FAR BEHIND THE CHECKOUT IS is a fixture too, since inventory-tng-cwpa.10
+  # made --confirm refuse from a stale one. Left to hand-restoration it was one
+  # forgotten line away from silently mis-configuring the next case: the tool
+  # check runs before the upstream guard, so the case after would still pass and
+  # nothing would be red.
+  git -C "$REPO" fetch -q origin
+  git -C "$REPO" reset -q --hard origin/main
+  git -C "$REPO" branch -q --set-upstream-to=origin/main main 2>/dev/null
   : > "$GH_ISSUES"; : > "$GH_OPEN"; : > "$GH_CLOSED"
   : > "$BD_PUSHED"; : > "$EXPORT"; : > "$BD_EXPORT"
   rm -f "$BD_REFUSE"
@@ -115,6 +135,14 @@ scene() {
     bead "$id" "$status" "$OURS/issues/$number" >> "$BD_EXPORT"
   done
 }
+
+# fall_behind: a commit on the remote that this checkout has not fetched.
+fall_behind() {
+  (cd "$REMOTE" && git commit -q --allow-empty -m "somebody else's work")
+}
+# The script under test fetches immediately before this runs, so the reset alone
+# is enough to be current again.
+catch_up() { git -C "$REPO" reset -q --hard origin/main; }
 
 export_issues() { (cd "$REPO" && PATH="$BIN" ./scripts/export-issues.sh "$@") 2>&1; }
 check export_issues
@@ -233,6 +261,43 @@ touch "$BD_REFUSE"
 out=$(export_issues --confirm); status=$?
 assert "$out" "$status" 1 "did not file" "a batch that fails is reported"
 assert "$out" "$status" 1 "Re-run to carry on" "and the recovery is named, because it is not obvious"
+
+echo
+echo "a checkout that is not current"
+# inventory-tng-cwpa.10. Why this cannot be left to the precondition above, and
+# why only a run that files is held to it, are on the script and in 0031.
+
+scene "60" "inventory-tng-aaa:open:60 inventory-tng-bbb:open"
+with_bd
+fall_behind
+out=$(export_issues --confirm); status=$?
+assert "$out" "$status" 2 "behind origin/main" "a checkout behind its upstream refuses to file"
+assert "$out" "$status" 2 "export-issues.sh:" "and the refusal names the command that was run, not the file it lives in"
+assert "$out" "$status" 2 "duplicate what they did" "and says what acting from here would do"
+assert "$out" "$status" 2 "git pull --ff-only" "and names the way out"
+assert "<$(cat "$BD_PUSHED")>" 0 0 "<>" "nothing reached bd"
+
+# The precondition that exists cannot stand in for this one: it is satisfied,
+# because a stale checkout does not know about the other side's issue either.
+refute "$out" "$status" 2 "bring those in first" "and it is not the unlinked-issue guard doing the work"
+
+catch_up
+expect --confirm -- 0 "view of the tracker" "and it files once the checkout catches up"
+
+# The half that must NOT refuse: refusing a question that files nothing would be
+# refusing to answer it.
+fall_behind
+no_bd
+expect 0 "have never been filed" "a dry run is not refused for being behind"
+
+catch_up
+scene "60" "inventory-tng-aaa:open:60 inventory-tng-bbb:open"
+with_bd
+git -C "$REPO" branch -q --unset-upstream
+out=$(export_issues --confirm); status=$?
+assert "$out" "$status" 2 "tracks nothing" "a branch with no upstream refuses rather than assuming it is current"
+assert "<$(cat "$BD_PUSHED")>" 0 0 "<>" "and files nothing"
+git -C "$REPO" branch -q --set-upstream-to=origin/main main
 
 echo
 echo "arguments"

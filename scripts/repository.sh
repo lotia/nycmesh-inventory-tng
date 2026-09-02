@@ -38,6 +38,66 @@ need_tools() {
   done
 }
 
+# refuse <first line> [<more lines>...]
+#
+# Stops at exit 2, the code this family uses for "it could not look" as against
+# "it looked and objected". Named because the guards below spell the same four
+# lines of `echo ... >&2` each, and report.sh's `fail`/`stop` are the wrong
+# vocabulary here: those exit 1.
+refuse() {
+  # BASH_SOURCE[-1] is the outermost script -- the one somebody typed -- rather
+  # than [1], which inside a helper called by another helper in this same file
+  # is this file. A refusal has to name the command that was run.
+  printf '%s: %s\n' "${BASH_SOURCE[-1]##*/}" "$1" >&2
+  shift
+  [[ $# -gt 0 ]] && printf '%s\n' "$@" >&2
+  exit 2
+}
+
+# require_current_checkout <path inside the checkout>
+#
+# Refuses unless the checkout has fetched and is level with its upstream.
+#
+# HERE RATHER THAN IN THE ONE SCRIPT THAT CALLS IT TODAY, because the hazard is
+# the family's. 0031 records it as running in both directions: a checkout that
+# has not fetched somebody else's `external_ref` will file a second ISSUE if it
+# exports, and pull-new-issues.sh will make a second BEAD if it pulls, because
+# unsynced.py offers an issue it cannot see a link for. Only the export half is
+# guarded so far -- an ordinary token cannot delete a GitHub issue, while a
+# duplicate bead can be deleted, so the two are not equally urgent -- but the
+# guard has to sit where the other half can call it rather than copy it.
+# inventory-tng-cwpa.10.
+require_current_checkout() {
+  local root=$1 fetched upstream behind
+
+  if ! fetched=$(git -C "$root" fetch --quiet 2>&1); then
+    refuse "could not fetch, so it cannot be said whether this checkout is current." \
+      "Nothing was done." "$fetched"
+  fi
+
+  if ! upstream=$(git -C "$root" rev-parse --abbrev-ref '@{upstream}' 2>/dev/null); then
+    refuse "this branch tracks nothing, so nothing here can say whether the" \
+      "tracker is current. Nothing was done." \
+      "  git branch --set-upstream-to=origin/<branch>"
+  fi
+
+  # COUNTED, OR REFUSED. Defaulting a rev-list that could not answer -- an
+  # unborn HEAD, a remote-tracking ref that went away between the two commands
+  # -- reads "it could not look" as "nothing to look at", which is the one
+  # direction this must never fail in.
+  if ! behind=$(git -C "$root" rev-list --count "HEAD..@{upstream}" 2>&1); then
+    refuse "could not count what $upstream is ahead by, so it cannot be said" \
+      "whether this checkout is current. Nothing was done." "$behind"
+  fi
+
+  if [[ "$behind" -ne 0 ]]; then
+    refuse "$behind commit(s) behind $upstream, so .beads/issues.jsonl may not" \
+      "know about issues somebody else has already filed. Acting from here would" \
+      "duplicate what they did. Nothing was done." \
+      "  git pull --ff-only"
+  fi
+}
+
 # resolve_repository [<owner/name>]
 #
 # Takes what the caller was told, falls back to GITHUB_REPOSITORY, then to what
