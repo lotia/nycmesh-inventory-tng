@@ -12,15 +12,6 @@ workspace
 
 OURS="https://github.com/lotia/nycmesh-inventory-tng"
 
-# bead <id> [external_ref]: one line of an export, as bd writes it.
-bead() {
-  if [[ -n "${2:-}" ]]; then
-    printf '{"_type":"issue","id":"%s","title":"t","external_ref":"%s"}\n' "$1" "$2"
-  else
-    printf '{"_type":"issue","id":"%s","title":"t"}\n' "$1"
-  fi
-}
-
 # offer <number>...: what `gh issue list` is asked to print, for our repository.
 offer() {
   local n
@@ -29,9 +20,9 @@ offer() {
 
 export EXPORT="$WORK/issues.jsonl"
 {
-  bead inventory-tng-aaa "$OURS/issues/60"
+  bead inventory-tng-aaa "" "$OURS/issues/60"
   bead inventory-tng-bbb
-  bead inventory-tng-ccc "$OURS/issues/12"
+  bead inventory-tng-ccc "" "$OURS/issues/12"
 } >"$EXPORT"
 
 check() { python3 "$HERE/unsynced.py" "$EXPORT"; }
@@ -53,12 +44,12 @@ assert "$(offer 99 | check)" 0 0 "99" "a bead with no external_ref links nothing
 
 # Issue numbers are per repository. An earlier version matched a pattern that
 # accepted any repository's issue, so another project's 7 hid ours.
-printf '%s' "$(bead inventory-tng-ddd 'https://github.com/someone/else/issues/7')" >"$WORK/other.jsonl"
+printf '%s' "$(bead inventory-tng-ddd "" 'https://github.com/someone/else/issues/7')" >"$WORK/other.jsonl"
 assert "$(offer 7 | python3 "$HERE/unsynced.py" "$WORK/other.jsonl")" 0 0 "7" \
   "another repository's issue number does not mask ours"
 
 # A pull request shares the number space with issues, and its URL is different.
-printf '%s' "$(bead inventory-tng-eee "$OURS/pull/60")" >"$WORK/pr.jsonl"
+printf '%s' "$(bead inventory-tng-eee "" "$OURS/pull/60")" >"$WORK/pr.jsonl"
 assert "$(offer 60 | python3 "$HERE/unsynced.py" "$WORK/pr.jsonl")" 0 0 "60" \
   "a bead linked to a pull request does not claim the issue of the same number"
 
@@ -68,7 +59,7 @@ assert "$(offer 60 | python3 "$HERE/unsynced.py" "$WORK/pr.jsonl")" 0 0 "60" \
 
 # The failure that would duplicate everything: bd changing how it records a
 # link, so no ref matches any URL and every issue reads as never pulled.
-printf '%s' "$(bead inventory-tng-fff 'lotia/nycmesh-inventory-tng#60')" >"$WORK/shorthand.jsonl"
+printf '%s' "$(bead inventory-tng-fff "" 'lotia/nycmesh-inventory-tng#60')" >"$WORK/shorthand.jsonl"
 outcome=$(offer 60 | python3 "$HERE/unsynced.py" "$WORK/shorthand.jsonl" 2>&1)
 assert "$outcome" "$?" 1 "does not recognise" "a ref that is not a GitHub URL stops it rather than being skipped"
 

@@ -669,6 +669,12 @@ jobs:
         run: scripts/do-not-merge.test.sh
       - name: Check the issue puller
         run: scripts/pull-new-issues.test.sh
+      - name: Check the unfiled-bead reader
+        run: scripts/unexported.test.sh
+      - name: Check the issue-number reader
+        run: scripts/issue-numbers.test.sh
+      - name: Check the one-time exporter
+        run: scripts/export-issues.test.sh
       # And then run it, which none of the above do to their own subject. What
       # it reads here is what a clone is handed before anybody configures
       # anything, so a hook that stopped arriving with the checkout is caught

@@ -86,6 +86,22 @@ relay() {
   dispatch "$findings"
 }
 
+# stop <what the fixing is before>
+#
+# For where a failure has just been counted and there is no all-clear left to
+# print. `verdict` takes the sentence for the good case first, so a caller with
+# nothing to say there had to invent one and assert it could never be reached --
+# which spelled a SUCCESS sentence, and exit 0, onto the failure path of scripts
+# that must not report success over an unfinished job. Six call sites did that,
+# in three different wordings.
+#
+# Having no zero-problems branch is the whole point: the invariant is the
+# function's rather than each caller's to argue.
+stop() {
+  problems=$((problems > 0 ? problems : 1))
+  verdict "unreachable: stop is only called having already failed" "$1"
+}
+
 # verdict <sentence when there is nothing wrong> <what the fixing is before>
 verdict() {
   echo

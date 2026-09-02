@@ -1266,6 +1266,22 @@ scripts/sync-issues.sh             # reconcile the two
 scripts/pull-new-issues.sh         # only the half that brings issues in
 ```
 
+The reverse trip — every bead that has never had an issue filed for it — is
+`scripts/export-issues.sh`, which mirrored the tracker into GitHub once and
+has had nothing to do since:
+
+```bash
+scripts/export-issues.sh             # what it would file, and files nothing
+scripts/export-issues.sh --confirm   # actually file it
+```
+
+It only ever *creates*. A bead that already points at an issue is not in its
+list, so it cannot reach the call that would rewrite that issue's body — and
+it refuses to start at all while GitHub is holding an issue no bead points at,
+because filing across one of those makes a duplicate nothing can later tell
+apart. Stopping half way through is safe: re-running picks up exactly what is
+left, and nothing is filed twice.
+
 `sync-issues.sh` runs four steps and the middle one is the one to read: it
 brings issues in, **prints what arrived**, and only then sends anything out.
 Look at that diff. It is where an edit made on GitHub becomes visible before it

@@ -25,7 +25,9 @@ Usage:
 """
 
 import json
+import re
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 #: What every `external_ref` this project makes begins with. Not used to parse
@@ -36,32 +38,81 @@ from pathlib import Path
 #: would file a second bead for every one of them.
 GITHUB = "https://github.com/"
 
+#: Where an issue's number sits in a ref this project recognises. See
+#: `number_of`, which is the only thing that may read one.
+ISSUE_NUMBER = re.compile(r"/issues/(\d+)$")
 
-def linked(export: Path) -> set[str]:
-    """Every GitHub URL some bead already points at.
+
+def rows(text: str) -> Iterator[tuple[int, dict]]:
+    """Each bead in an export, with the line it came from for a message to cite.
+
+    TAKES THE TEXT, NOT THE PATH, because the third reader of this format has
+    `bd export` on stdin rather than a file. Cut the other way round, the shared
+    unit was a file opener, and the one caller that could not use it wrote its
+    own JSON loop and -- the part that mattered -- its own second opinion about
+    what a reference looks like.
+    """
+    for number, line in enumerate(text.splitlines(), start=1):
+        if line.strip():
+            yield number, json.loads(line)
+
+
+def ref_of(row: dict, export: Path, number: int) -> str | None:
+    """The GitHub URL this bead points at, or None when it points at nothing.
 
     REFUSES A REF THAT IS NOT A GITHUB URL rather than passing over it. A ref
     means a bead IS linked, and one this cannot recognise is either corruption
-    or `bd` having changed how it records the link. Treating it as absent would
-    pull the issue again and make a second bead for it, which is the one
-    failure the mapping exists to prevent.
+    or `bd` having changed how it records the link. Treating it as absent is
+    what duplicates: this reader would pull the issue a second time, and
+    unexported.py would file a second issue for the bead. One definition,
+    because both directions fail the same way and neither may be the lenient
+    one.
     """
-    found = set()
-    for number, line in enumerate(export.read_text().splitlines(), start=1):
-        if not line.strip():
-            continue
-        ref = json.loads(line).get("external_ref")
-        if not ref:
-            continue
-        if not ref.startswith(GITHUB):
-            raise SystemExit(
-                f"{export}:{number} carries an external_ref this does not recognise: {ref!r}\n"
-                f"Everything bd has written begins {GITHUB!r}. If that has changed, this would "
-                "read every issue as unpulled and file a second bead for each one, so it stops "
-                "instead. Teach it the new shape."
-            )
-        found.add(ref)
-    return found
+    ref = row.get("external_ref")
+    if not ref:
+        return None
+    if not ref.startswith(GITHUB):
+        raise SystemExit(
+            f"{export}:{number} carries an external_ref this does not recognise: {ref!r}\n"
+            f"Everything bd has written begins {GITHUB!r}. If that has changed, this would "
+            "read every issue as unpulled and file a second bead for each one, so it stops "
+            "instead. Teach it the new shape."
+        )
+    return ref
+
+
+def number_of(ref: str) -> str | None:
+    r"""The issue number a reference names, or None when it names none.
+
+    BESIDE `ref_of` BECAUSE THEY ARE ONE VOCABULARY. `ref_of` says which refs
+    are recognised and stops on the rest; this says how to read a recognised
+    one. Kept apart, the two drifted within a single run: one accepted a shape
+    the other refused outright, so a suite pinned a branch the pipeline could
+    never reach.
+
+    ANCHORED TO `/issues/`, and that is the whole of the care here. A bare
+    trailing `(\d+)` takes the last run of digits anywhere in the string, so a
+    repository URL ending in a digit, or one carrying an `#issuecomment-123`
+    fragment, yields a plausible number -- and the caller closes an unrelated
+    issue that happens to wear it. None is the safe answer, and callers report
+    it rather than guessing.
+
+    Matching an issue to a bead is NOT what this is for -- `linked` does that,
+    on whole URLs, because issue numbers repeat across repositories. This is
+    only ever asked of a bead already known to be ours.
+    """
+    found = ISSUE_NUMBER.search(ref)
+    return found.group(1) if found else None
+
+
+def linked(export: Path) -> set[str]:
+    """Every GitHub URL some bead already points at."""
+    text = export.read_text()
+    return {
+        ref
+        for number, row in rows(text)
+        if (ref := ref_of(row, export, number)) is not None
+    }
 
 
 def unseen(offered: list[tuple[int, str]], already: set[str]) -> list[int]:
