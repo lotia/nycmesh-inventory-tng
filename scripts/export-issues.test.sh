@@ -232,12 +232,12 @@ assert "$out" "$?" 0 "view of the tracker" "and a run where nothing was passed o
 
 echo
 echo "a page that may have been cut short"
-# The guard the script argues for at $LIMIT, exercised: a page returned exactly
-# full is one this cannot trust, and trusting it loses the closes that fell off
-# the end.
+# The guard repository.sh argues for, exercised at this caller: a page returned
+# exactly full is one this cannot trust, and trusting it loses the closes that
+# fell off the end.
 
 scene "60" "inventory-tng-aaa:open:60 inventory-tng-ccc:closed"
-seq 1 1000 > "$GH_OPEN"
+seq 1 "$(issue_limit)" > "$GH_OPEN"
 with_bd
 out=$(export_issues --confirm)
 assert "$out" "$?" 1 "may be cut short" "a full page refuses rather than closing from it"

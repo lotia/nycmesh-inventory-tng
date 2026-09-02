@@ -133,9 +133,29 @@ if [[ -n "$listing" ]]; then
   # inventory-tng-cwpa.12.
   [[ -f "$listing" && -r "$listing" ]] || refuse "cannot read the listing it was handed: $listing"
   offered=$(<"$listing")
-elif ! offered=$(gh issue list ${repository:+--repo "$repository"} --state all --limit 1000 \
-  --json number,url --jq '.[] | "\(.number)\t\(.url)"' 2>"$gaps"); then
-  refuse "could not list issues:" "$(tail -2 "$gaps")"
+else
+  if ! offered=$(gh issue list ${repository:+--repo "$repository"} --state all \
+    --limit "$ISSUE_LIMIT" --json number,url --jq '.[] | "\(.number)\t\(.url)"' 2>"$gaps"); then
+    refuse "could not list issues:" "$(tail -2 "$gaps")"
+  fi
+
+  # AND ONLY WHERE IT IS FETCHED. The rule is repository.sh's -- see
+  # `listing_cut_short` -- and what it costs here is that an issue past the
+  # limit is one no bead is ever checked against: it is not offered, and the run
+  # ends "every issue on GitHub is already linked to a bead" about a page it
+  # never saw the end of. A listing handed in has been counted by whoever
+  # fetched it, and sync-issues.sh refuses before it delegates.
+  #
+  # A REFUSAL RATHER THAN A COUNTED FAILURE, unlike the other two callers: those
+  # have already done something worth reporting by the time they ask, and this
+  # has not. It could not look, which is exit 2 -- and the caller that reads
+  # that status is `sync-issues.sh --check`, where 2 is "the question could not
+  # be asked" and 1 would mean it was asked and answered.
+  if listing_cut_short "$offered"; then
+    refuse "GitHub returned the full $ISSUE_LIMIT issues, so the listing may stop short." \
+      "Everything past that would be passed over as though a bead already pointed at it." \
+      "$ISSUE_LIMIT_ADVICE"
+  fi
 fi
 
 # THE GUARD THAT MATTERS. An empty list is indistinguishable from a repository

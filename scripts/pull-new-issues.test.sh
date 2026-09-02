@@ -81,6 +81,18 @@ issues_are() {
   done
 }
 
+# issues_up_to <count> -- the same, numbered 1..count, for the cases about a
+# page that came back exactly full. Through `issues_are` rather than beside it,
+# so what a record of this stub looks like has one definition: a second copy
+# four lines down is how the URLs stop matching the beads, which this suite has
+# already watched read as a green "no bead points at this".
+issues_up_to() { issues_are "$(seq 1 "$1")"; }
+
+# WHAT repository.sh ASKS GitHub FOR, not the number it currently is. The cases
+# below are about the boundary, and written out they would stop being about it
+# the day the limit is raised. testlib's, and it says why the suites had copies.
+LIMIT=$(issue_limit)
+
 with_bd() { printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/bd"; chmod +x "$BIN/bd"; }
 no_bd() { rm -f "$BIN/bd"; }
 
@@ -160,6 +172,25 @@ out=$(pull --check --listing "$WORK/cased" O/R); status=$?
 assert "$out" "$status" 0 "already linked" \
   "a repository named in another casing is still the same repository"
 refute "$out" "$status" 0 "not an issue of" "and its own listing is not refused as somebody else's"
+
+echo
+echo "a page that came back exactly full"
+# inventory-tng-cwpa.14. The rule is repository.sh's, and what is pinned here is
+# that the third of the three fetch sites keeps it: `gh` stops at --limit and
+# says nothing, so a listing exactly that long is one whose end nothing has
+# seen -- and this script's all-clear is a sentence about every issue there is.
+
+no_bd
+issues_up_to "$LIMIT"
+out=$(pull --check); status=$?
+assert "$out" "$status" 2 "may stop short" "a page filling the limit refuses rather than answering from it"
+refute "$out" "$status" 2 "already linked" "and never says the tracker has heard of everything"
+assert "$out" "$status" 2 "Raise ISSUE_LIMIT" "and repository.sh's advice reaches the person reading it"
+
+# ONE UNDER IS AN ANSWER, which is what makes the case above about the boundary
+# rather than about there being a lot of issues.
+issues_up_to $((LIMIT - 1))
+expect --check -- 1 "have no bead" "and a page one short of it is answered as before"
 
 echo
 echo "a checkout that is not current"
