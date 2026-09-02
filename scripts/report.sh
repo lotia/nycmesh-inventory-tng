@@ -71,19 +71,56 @@ dispatch() {
 # environments to their readers and `env VAR=value ...` in the argument list is
 # how they say so.
 #
-# The caller is not asked its own name. `BASH_SOURCE[1]` inside a function
-# defined in this sourced file is the script that called it, so a checker does
-# not write its own filename out a second time -- which is the same literal,
-# and the same way of going stale, that `ReportingCommand.named` exists to
-# abolish on the Python side.
+# The caller is not asked its own name, and it is not written here either:
+# `refuse` below already prefixes the script somebody ran, so naming it a
+# second time in the sentence handed to it printed the filename twice.
 relay() {
-  local name findings
-  name=${BASH_SOURCE[1]##*/}
-  findings=$("$@") || {
-    echo "$name: the reader failed, so nothing was checked." >&2
-    exit 2
-  }
+  local findings
+  findings=$("$@") || refuse "the reader failed, so nothing was checked."
   dispatch "$findings"
+}
+
+# refuse <first line> [<more lines>...]
+#
+# === THE TWO WAYS A CHECKER STOPS, AND THEY ARE NOT THE SAME ANSWER ===
+#
+# EXIT 1 -- `stop` below -- means it looked and objected. EXIT 2, here, means it
+# could not look at all: a program missing, a remote unreachable, a flag that
+# makes no sense. Four scripts and a workflow now branch on the difference, so
+# it is stated here once and linked to rather than restated.
+#
+# Believing the two are interchangeable is how a run goes green the moment the
+# thing it could not reach comes back clean.
+#
+# Here rather than beside the repository helpers, where this started: `relay`
+# below already hand-rolls this exact stop, and a function whose comment
+# explained itself by contrast with THIS file was a function in the wrong one.
+refuse() {
+  # BASH_SOURCE[-1] is the outermost script -- the one somebody typed -- rather
+  # than [1], which inside a helper called by another helper in this same file
+  # is this file. A refusal has to name the command that was run.
+  printf '%s: %s\n' "${BASH_SOURCE[-1]##*/}" "$1" >&2
+  shift
+  [[ $# -gt 0 ]] && printf '%s\n' "$@" >&2
+  exit 2
+}
+
+# count_lines <text>
+#
+# How many lines a body of output holds, with nothing around the number. Four
+# call sites spelled `printf '%s\n' "$x" | wc -l | tr -d ' '`, and the `tr` is
+# not decoration -- `wc` pads on some platforms, and a padded number read into a
+# message says "  3 issue(s)".
+count_lines() {
+  # EMPTY IS NOUGHT, and saying so is the whole reason this needs a branch:
+  # `printf '%s\n' ""` still emits a newline, so `wc -l` answers 1 for nothing
+  # at all. Three of the four call sites are reached only after an explicit
+  # empty check and never notice; the fourth counts a filtered subset that is
+  # routinely empty, and reported one closed bead where there were none.
+  [[ -n "$1" ]] || { printf '0'; return; }
+  local n
+  n=$(printf '%s\n' "$1" | wc -l)
+  printf '%s' "${n//[[:space:]]/}"
 }
 
 # stop <what the fixing is before>

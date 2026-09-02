@@ -162,6 +162,14 @@ no_bd
 out=$(export_issues); status=$?
 assert "$out" "$status" 0 "2 bead(s) have never been filed" "a dry run counts what is waiting, with no bd on the path"
 assert "$out" "$status" 0 "1 are closed" "and says how many will need closing again afterwards"
+
+# NOUGHT IS A COUNT TOO. count_lines is handed a filtered subset here, and an
+# empty one used to report 1 -- `printf '%s\n' ""` emits a newline, so `wc -l`
+# counts it. The case above cannot catch that, because its scene has a closed
+# bead in it.
+scene "60" "inventory-tng-aaa:open:60 inventory-tng-bbb:open"
+out=$(export_issues); status=$?
+assert "$out" "$status" 0 "of which 0 are closed" "and says nought when none of them are closed"
 assert "$out" "$status" 0 "dry run" "and files nothing"
 assert "<$(cat "$BD_PUSHED")>" 0 0 "<>" "nothing reached bd"
 

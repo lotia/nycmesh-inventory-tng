@@ -1281,8 +1281,9 @@ list, so it cannot reach the call that would rewrite that issue's body. It
 refuses to start at all in two cases, both of which would otherwise duplicate
 something: while GitHub is holding an issue no bead points at, and while your
 checkout is behind its upstream — somebody else may have filed from a commit
-you have not pulled. Stopping half way through is safe: re-running picks up
-exactly what is left, and nothing is filed twice.
+you have not pulled. `pull-new-issues.sh` refuses on that second one too, for
+the mirror of the same reason. Stopping half way through is safe: re-running
+picks up exactly what is left, and nothing is filed twice.
 
 `sync-issues.sh` runs four steps and the middle one is the one to read: it
 brings issues in, **prints what arrived**, and only then sends anything out.

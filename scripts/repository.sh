@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# Which repository the GitHub scripts are talking to.
+# What has to be true before a script here can talk to GitHub.
+#
+# Three preconditions: the tools are on the path, the checkout is current, and
+# everything agrees which repository is meant. Each refuses rather than
+# returning, because a caller that got past one of these without it holding
+# would be asking GitHub a question it has no business asking.
 #
 # Sourced, never run. Two tools have to agree on the answer and they disagree
 # about how to find it: `gh` reads the checkout and works it out for itself,
@@ -11,11 +16,24 @@
 # So the answer is settled once and exported, and a caller needs only an
 # authenticated `gh`.
 #
-# Sourced the way report.sh is, from the directory the caller is in:
+# Sourced AFTER report.sh, from the directory the caller is in:
 #
+#   . "$HERE/report.sh"
 #   . "$HERE/repository.sh"
 #   resolve_repository "$argument"     # "" when nobody named one
 #   # $REPOSITORY and $GITHUB_REPOSITORY are now the same string
+
+# THE ORDER IS CHECKED RATHER THAN ASKED FOR, because getting it wrong fails
+# OPEN. `require_current_checkout` says no by calling report.sh's `refuse`, and
+# an undefined `refuse` does not stop a function -- it prints "command not
+# found" and the next line runs, so every one of that guard's four refusals
+# becomes a no-op and a stale checkout is waved through. That is the one
+# direction these guards must never fail in, so the dependency is a guard of
+# its own.
+declare -F refuse >/dev/null || {
+  echo "repository.sh: source report.sh before this file; its guards need refuse." >&2
+  exit 2
+}
 
 # need_tools <tool>...
 #
@@ -36,22 +54,6 @@ need_tools() {
       exit 2
     }
   done
-}
-
-# refuse <first line> [<more lines>...]
-#
-# Stops at exit 2, the code this family uses for "it could not look" as against
-# "it looked and objected". Named because the guards below spell the same four
-# lines of `echo ... >&2` each, and report.sh's `fail`/`stop` are the wrong
-# vocabulary here: those exit 1.
-refuse() {
-  # BASH_SOURCE[-1] is the outermost script -- the one somebody typed -- rather
-  # than [1], which inside a helper called by another helper in this same file
-  # is this file. A refusal has to name the command that was run.
-  printf '%s: %s\n' "${BASH_SOURCE[-1]##*/}" "$1" >&2
-  shift
-  [[ $# -gt 0 ]] && printf '%s\n' "$@" >&2
-  exit 2
 }
 
 # require_current_checkout <path inside the checkout>

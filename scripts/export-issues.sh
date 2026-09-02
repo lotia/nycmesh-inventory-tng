@@ -83,22 +83,18 @@ while [[ $# -gt 0 ]]; do
     # of calling this wrongly exits 2, and a caller that reads 1 as "it looked
     # and objected" would take a missing value for a refusal.
     --batch)
-      [[ $# -ge 2 ]] || {
-        echo "export-issues: --batch needs a number" >&2
-        exit 2
-      }
+      [[ $# -ge 2 ]] || refuse "--batch needs a number"
       batch=$2
       shift
       ;;
-    -*) echo "export-issues: unknown flag $1" >&2; exit 2 ;;
+    -*) refuse "unknown flag $1" ;;
     *) repository="$1" ;;
   esac
   shift
 done
 
 if ! [[ "$batch" =~ ^[1-9][0-9]*$ ]]; then
-  echo "export-issues: --batch takes a positive number, not $batch" >&2
-  exit 2
+  refuse "--batch takes a positive number, not $batch"
 fi
 
 # One asks and files, the other asks and refuses. Taken together they cannot
@@ -107,8 +103,7 @@ fi
 # Refused rather than silently resolved, on the same terms as every other way of
 # calling this wrongly.
 if [[ "$check" == true && "$confirm" == true ]]; then
-  echo "export-issues: --check and --confirm are opposites; --check files nothing." >&2
-  exit 2
+  refuse "--check and --confirm are opposites; --check files nothing."
 fi
 
 # === IS THE TRACKER HOLDING WORK GITHUB HAS NEVER HEARD OF? ===
@@ -128,7 +123,7 @@ if [[ "$check" == true ]]; then
   if [[ -z "$waiting" ]]; then
     verdict "Every bead has an issue." exporting
   fi
-  count=$(printf '%s\n' "$waiting" | wc -l | tr -d ' ')
+  count=$(count_lines "$waiting")
   fail "$count bead(s) have no GitHub issue, and nothing here files them."
   note "Filing them is a person's job -- see DEVELOPERS.md#issue-tracking:"
   note "  scripts/export-issues.sh --confirm"
@@ -164,8 +159,7 @@ echo "1. Is anything on GitHub still unlinked?"
 "$HERE/pull-new-issues.sh" --check "$repository"
 waiting=$?
 if [[ $waiting -eq 2 ]]; then
-  echo "export-issues: could not find out what GitHub is holding, so nothing was filed." >&2
-  exit 2
+  refuse "could not find out what GitHub is holding, so nothing was filed."
 fi
 if [[ $waiting -ne 0 ]]; then
   echo
@@ -182,8 +176,8 @@ if [[ -z "$pending" ]]; then
   verdict "Every bead already has an issue. Nothing to export." exporting
 fi
 
-total=$(printf '%s\n' "$pending" | wc -l | tr -d ' ')
-shut=$(printf '%s\n' "$pending" | awk -F'\t' '$2 == "closed"' | wc -l | tr -d ' ')
+total=$(count_lines "$pending")
+shut=$(count_lines "$(printf '%s\n' "$pending" | awk -F'\t' '$2 == "closed"')")
 note "$total bead(s) have never been filed, of which $shut are closed and will be closed again on GitHub."
 
 if [[ "$confirm" == false ]]; then
