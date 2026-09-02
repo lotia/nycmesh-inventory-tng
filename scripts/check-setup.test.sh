@@ -70,17 +70,18 @@ expect --shipped-only -- 0 "read before it becomes one" "a checkout nobody commi
 # exit 1 this asserts was two failures rather than the one it names. The
 # `refute` below is what holds the list complete: drop either program and the
 # spurious objection comes back and the case says so.
+# Sets NO_PYTHON rather than printing it, because `borrow` reports a program it
+# cannot find and a function whose output is captured has no way to say so.
 no_python() {
-  local dir="$WORK/no-python" p
-  mkdir -p "$dir"
-  for p in git bash sed grep readlink dirname basename cat rm mkdir chmod ln head cut; do
-    ln -sf "$(command -v "$p" 2>/dev/null)" "$dir/$p" 2>/dev/null
-  done
-  printf '%s' "$dir"
+  NO_PYTHON="$WORK/no-python"
+  # python3 is absent by being left out of the list, which says so, rather than
+  # by a lookup that was allowed to fail quietly.
+  borrow "$NO_PYTHON" git bash sed grep readlink dirname basename cat rm mkdir chmod ln head cut
 }
 
 scene
-output=$(PATH="$(no_python)" "$CHECK" 2>&1)
+no_python
+output=$(PATH="$NO_PYTHON" "$CHECK" 2>&1)
 status=$?
 assert "$output" "$status" 1 "python3 is not on this PATH" "a wired hook with no interpreter is still reported"
 refute "$output" "$status" 1 "is not tracked" "and the interpreter is the only thing it is missing"

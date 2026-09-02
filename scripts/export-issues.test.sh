@@ -30,11 +30,11 @@ OURS="https://github.com/o/r"
 BORROWED=(bash readlink dirname git wc tr cut awk grep tail mktemp rm cat python3)
 
 new_repo "$REPO"
-mkdir -p "$BIN" "$REPO/scripts" "$REPO/.beads"
+mkdir -p "$REPO/scripts" "$REPO/.beads"
 cp "$HERE/export-issues.sh" "$HERE/pull-new-issues.sh" "$HERE/unsynced.py" \
    "$HERE/unexported.py" "$HERE/issue-numbers.py" "$HERE/report.sh" \
    "$HERE/repository.sh" "$REPO/scripts/"
-for tool in "${BORROWED[@]}"; do ln -sf "$(command -v "$tool")" "$BIN/$tool"; done
+borrow "$BIN" "${BORROWED[@]}"
 
 EXPORT="$REPO/.beads/issues.jsonl"
 

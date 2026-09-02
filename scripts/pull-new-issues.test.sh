@@ -36,14 +36,14 @@ REPO="$WORK/repo"
 # The scripts have to live INSIDE the checkout they read: pull-new-issues.sh
 # resolves the export from its own location, not the caller's directory.
 new_repo "$REPO"
-mkdir -p "$BIN" "$REPO/scripts" "$REPO/.beads"
+mkdir -p "$REPO/scripts" "$REPO/.beads"
 cp "$HERE/pull-new-issues.sh" "$HERE/unsynced.py" "$HERE/report.sh" \
    "$HERE/repository.sh" "$REPO/scripts/"
 # One bead, linked to issue 1, so "everything is already linked" is the answer
 # unless a case says otherwise.
 printf '%s\n' '{"_type":"issue","id":"inventory-tng-aaa","external_ref":"https://github.com/o/r/issues/1"}' \
   > "$REPO/.beads/issues.jsonl"
-for tool in "${BORROWED[@]}"; do ln -sf "$(command -v "$tool")" "$BIN/$tool"; done
+borrow "$BIN" "${BORROWED[@]}"
 
 # A `gh` that reads its answer from a file, the way repo-settings.test.sh and
 # landing-gate.test.sh do theirs. Written once; the cases rewrite the fixture.

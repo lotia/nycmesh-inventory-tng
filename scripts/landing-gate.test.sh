@@ -144,20 +144,27 @@ stop_scene
 # `env -i` is not used: the gate shells out to git, which wants a HOME.
 full_path() { printf '%s:%s' "$BIN" "$REAL_PATH"; }
 
+# Sets WITHOUT rather than printing it, for the reason on `borrow`: a function
+# whose output is captured cannot report a program the machine does not have.
+# Built once per dropped tool -- the contents never differ for a given one.
 without() {
   local drop=$1
-  local dir="$WORK/without-$drop"
-  mkdir -p "$dir"
-  local p
-  for p in git bash sed grep cat mktemp dirname readlink rm mkdir printf python3 gh; do
-    [[ "$p" == "$drop" ]] && continue
-    if [[ "$p" == gh ]]; then
-      ln -sf "$BIN/gh" "$dir/gh"
-    else
-      ln -sf "$(command -v "$p" 2>/dev/null)" "$dir/$p" 2>/dev/null
-    fi
+  WITHOUT="$WORK/without-$drop"
+  [[ -d "$WITHOUT" ]] && return 0
+  local dir=$WITHOUT
+  # Real programs first, then the `gh` stub over the top -- `gh` is not in the
+  # borrowed list because this scene never wants the one on the machine, and
+  # naming it there would make the suite depend on a program it deliberately
+  # replaces.
+  # No `printf`: it is a shell builtin, so the gate uses its own whatever this
+  # directory holds, and borrowing it only ever made a symlink to itself.
+  local wanted=(git bash sed grep cat mktemp dirname readlink rm mkdir python3)
+  local keep=() p
+  for p in "${wanted[@]}"; do
+    [[ "$p" == "$drop" ]] || keep+=("$p")
   done
-  printf '%s' "$dir"
+  borrow "$dir" "${keep[@]}"
+  [[ "$drop" == gh ]] || ln -sf "$BIN/gh" "$dir/gh"
 }
 
 # ---------------------------------------------------------------------------
@@ -307,16 +314,19 @@ case_is "gh pr merge 7 -R other/repo"            "names another repository" "and
 echo
 echo
 echo "every dependency that goes missing refuses rather than permits"
-case_is "gh pr merge 7" "missing: python3" "no python3 refuses a merge" "" "$(without python3)"
-case_is "ls -la" PERMIT "no python3 still permits what the gate does not guard" "" "$(without python3)"
-case_is "gh pr merge 7" "missing: gh" "no gh refuses a merge" "" "$(without gh)"
-case_is "gh pr ready 7" "missing: gh" "no gh refuses marking a pull request ready" "" "$(without gh)"
+without python3
+case_is "gh pr merge 7" "missing: python3" "no python3 refuses a merge" "" "$WITHOUT"
+case_is "ls -la" PERMIT "no python3 still permits what the gate does not guard" "" "$WITHOUT"
+without gh
+case_is "gh pr merge 7" "missing: gh" "no gh refuses a merge" "" "$WITHOUT"
+case_is "gh pr ready 7" "missing: gh" "no gh refuses marking a pull request ready" "" "$WITHOUT"
 
 # Not a --force push: that one is refused by reading the command line alone and
 # never needs git. This is the arm that has to ASK git which branch the push
 # lands on, so a missing git leaves it unable to tell -- and it must refuse.
+without git
 case_is "git push origin batch/x" "missing: git" \
-  "no git refuses a push, rather than permitting every command" "" "$(without git)"
+  "no git refuses a push, rather than permitting every command" "" "$WITHOUT"
 
 # The matcher's own failure, which used to be `except Exception: sys.exit(0)`
 # and therefore a permit. The envelope carries the words the prefilter looks
@@ -967,7 +977,8 @@ forget_nudges
 # failing closed here leaves a session that cannot stop and cannot fix what
 # would release it, because fixing it also ends in stopping.
 for missing in python3 gh; do
-  stopped '{"stop_hook_active":false}' "$REPO" "$(without "$missing")"
+  without "$missing"
+  stopped '{"stop_hook_active":false}' "$REPO" "$WITHOUT"
   refute "$STOP_OUT" "$STOP_STATUS" 0 "decision" \
     "a missing $missing lets the turn end rather than trapping the session"
   assert "$STOP_OUT" "$STOP_STATUS" 0 "not checking the review cycle" \

@@ -71,12 +71,78 @@ new_repo() {
 # The status and the ref are optional because a bead really can lack either, and
 # a reader that treats a missing one differently from an empty one is a reader
 # worth being able to test.
+#
+# THE VALUES ARE ESCAPED, because the title is now free text a case chooses --
+# untriaged.test.sh's titles are sentences -- and the copy this replaced built
+# its row with `json.dumps`. Interpolating a `"` or a `\` straight in emits a
+# line no reader can parse, and the case fails somewhere else entirely.
+#
+# TWO SUBSTITUTIONS RATHER THAN A CALL TO PYTHON, and the honest limit of that:
+# a control character in a value would still emit an invalid row. No fixture
+# carries one -- these are ids, statuses, URLs and titles a case chose -- and it
+# would fail loudly at the reader rather than quietly. A case that genuinely
+# needs one should build its row the way landing-gate.test.sh's `body_is` does,
+# through `json.dumps`. Done in-place because `bead` is called several hundred
+# times in a full run, and a command substitution per field is a fork per field.
+json_escape_into() {
+  local -n out=$1
+  out=${2//\\/\\\\}
+  out=${out//\"/\\\"}
+}
+
 bead() {
-  local id=$1 status=${2:-} ref=${3:-}
-  printf '{"_type":"issue","id":"%s","title":"t"' "$id"
+  local id status ref title
+  json_escape_into id "$1"
+  json_escape_into status "${2:-}"
+  json_escape_into ref "${3:-}"
+  json_escape_into title "${4:-t}"
+  printf '{"_type":"issue","id":"%s","title":"%s"' "$id" "$title"
   [[ -n "$status" ]] && printf ',"status":"%s"' "$status"
   [[ -n "$ref" ]] && printf ',"external_ref":"%s"' "$ref"
   printf '}\n'
+}
+
+# borrow <directory> <tool>... -- a PATH holding exactly the named programs.
+#
+# Five suites built one of these, in four spellings. What they are for is the
+# assertion a stub cannot make: "this script reaches for exactly these", so a
+# dependency added without being thought about is caught by the suite rather
+# than by somebody's laptop.
+#
+# REFUSES A TOOL IT CANNOT FIND rather than linking nothing and carrying on.
+# Three of the four spellings suppressed that with `2>/dev/null`, which is the
+# same shape as every other guard in this repository that turned out to fail
+# open: a scene silently missing a program does not fail, it passes for the
+# wrong reason -- or worse, exercises the "that program is absent" path while
+# claiming to exercise the ordinary one.
+#
+# A scene that WANTS something absent leaves it out of the list, which says so.
+# Overriding one with a stub is `ln -sf` over the top afterwards, which also
+# says so.
+#
+# THE REFUSAL COUNTS, which needs `borrow` NOT to be run in a subshell. Two
+# callers used to build the directory inside `$(...)` and print its path, so the
+# FAIL landed inside the captured PATH and the count was thrown away with the
+# subshell -- both failures silent, which is the thing this exists to stop. They
+# set a variable instead now: bash's ordinary way of returning a string, and the
+# one that does not put a function's reporting on its return channel.
+borrow() {
+  local dir=$1 tool found
+  shift
+  mkdir -p "$dir"
+  for tool in "$@"; do
+    found=$(command -v "$tool") || found=""
+    # AN ABSOLUTE PATH OR NOTHING. `command -v printf` answers `printf`, because
+    # the shell has one of its own, and `ln -s printf "$dir/printf"` is a link
+    # to itself -- a scene missing the program while looking as though it holds
+    # it. A builtin does not belong in a borrowed list at all: the shell under
+    # test uses its own whatever the PATH says.
+    if [[ "$found" != /* ]]; then
+      fail_case "the scene needs $tool and this machine has no such program"
+      continue
+    fi
+    ln -sf "$found" "$dir/$tool"
+  done
 }
 
 # pass/fail_case <what this case is called> [<what was got>]
