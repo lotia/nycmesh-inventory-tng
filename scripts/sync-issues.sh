@@ -8,26 +8,11 @@
 #   3. SHOW WHAT ARRIVED
 #   4. push what is only here                                 (bd, push half)
 #
-# WHY STEP 3 IS THE PROTECTION. The conflict policy is `--prefer-newer`, so an
-# edit made on GitHub replaces the bead's description when it is the more
-# recent of the two. That is the project owner's choice while it is still
-# unknown whether people will use beads, and it is safe here for a reason that
-# has nothing to do with the flag: `.beads/issues.jsonl` is committed, so
-# anything arriving from GitHub lands as a reviewable git diff before this
-# pushes anything, and `git checkout .beads/issues.jsonl` undoes it whole. The
-# tracker has version history. Pulling first and looking is what turns that
-# from a property into a practice.
-#
-# NOT A PRE-PUSH HOOK, and that was tried before it was rejected. Pushing sets
-# `external_ref` on every bead it creates an issue for, which rewrites the
-# committed export -- measured, not supposed. So a hook on `git push` would
-# leave the tracker dirty immediately after every push, which is precisely how
-# tracker state gets stranded and lost. It would also make every contributor
-# need a GitHub token and slow every push for the benefit of promptness alone.
-# Nor does CI run it. What CI does is NOTICE -- `inventory-tng-cwpa.3`, and the
-# workflow says why at length -- because a tracker built in a runner is thrown
-# away, so the only thing that could persist was a commit, and that commit could
-# never merge. `inventory-tng-qnxb`.
+# WHY STEP 3 IS THE PROTECTION, and why nothing invokes this on a schedule, are
+# both settled in ../docs/decisions/0031-the-issue-list-is-a-window-on-the-tracker.md
+# -- points 6 and 7. In one line each so that reading this file is enough to run
+# it: the flag is not what makes the conflict policy survivable, the committed
+# export is; and a hook or a CI job would each break in its own way.
 #
 # Usage: sync-issues.sh [--dry-run] [--no-push]
 

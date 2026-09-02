@@ -1266,34 +1266,23 @@ scripts/sync-issues.sh             # reconcile the two
 scripts/pull-new-issues.sh         # only the half that brings issues in
 ```
 
-`bd` syncs what it already knows about and enumerates nothing, so without this
-an issue filed by somebody who has never run `bd` is invisible to it. The script
-asks GitHub what exists, compares each issue's URL against the links already
-recorded in `.beads/issues.jsonl`, and pulls the difference. It reads the
-committed export rather than the local database, so it gives the same answer in
-a fresh clone and in CI.
-
-`sync-issues.sh` does four steps in an order chosen for one reason: it pulls
-first and **shows you what arrived** before it pushes anything. On a conflict
-the more recent side wins, so an edit made on GitHub can replace a bead's
-description — and because the export is committed, that arrives as a git diff
-you can read and `git checkout` away before anything leaves.
+`sync-issues.sh` runs four steps and the middle one is the one to read: it
+brings issues in, **prints what arrived**, and only then sends anything out.
+Look at that diff. It is where an edit made on GitHub becomes visible before it
+can travel any further, and `git checkout .beads/issues.jsonl` is how you
+refuse it.
 
 Both need `gh` authenticated and a `GITHUB_TOKEN`; without them they say so and
 stop rather than reporting that there was nothing to do. Being unable to run
 them does not break anything — the tracker is not made wrong by an unsynced
 issue, only incomplete.
 
-Neither runs from a git hook, deliberately. Pushing writes `external_ref` onto
-the beads it files issues for, which rewrites the committed export, so a hook on
-`git push` would leave the tracker dirty every time.
-
-Neither runs *in* CI either. What CI does is **notice**: a scheduled job asks
-whether any issue has no bead and goes red for as long as the answer is yes, so
-the question comes back every morning until somebody runs the command above. It
-brings nothing in, because a tracker built in a runner is thrown away and the
-commit that used to carry one out could never merge — the workflow says why at
-length, and `inventory-tng-qnxb` is where that was measured.
+Nothing does any of this for you. No git hook fires it, and CI does not run it;
+what CI does is ask every morning whether GitHub is holding an issue no bead
+points at, and stay red until somebody commits the rows. Why it is arranged that
+way, why the correspondence between the two lists reaches every clone for free,
+and what a GitHub reader is and is not looking at, are
+[0031](docs/decisions/0031-the-issue-list-is-a-window-on-the-tracker.md).
 
 An issue pulled in this way becomes a bead named for the moment it arrived —
 `inventory-tng-1788200756998-1-26030a28` — typed `task` at priority 2, with no

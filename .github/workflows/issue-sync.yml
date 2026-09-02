@@ -2,6 +2,10 @@ name: Issue sync
 
 # Say when a GitHub issue exists that the tracker has never heard of.
 #
+# The arrangement this belongs to -- how the two lists of work relate, and why
+# noticing is CI's whole part in it -- is
+# docs/decisions/0031-the-issue-list-is-a-window-on-the-tracker.md.
+#
 # What that gap is, and why `bd` cannot close it alone, is on
 # scripts/pull-new-issues.sh, which is the part that finds them. This file is
 # the answer to "who notices", because the people who would run that by hand
