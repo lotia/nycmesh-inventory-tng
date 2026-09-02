@@ -28,7 +28,8 @@ export EXPORT="$WORK/issues.jsonl"
 check() { python3 "$HERE/unsynced.py" "$EXPORT"; }
 
 assert "$(offer 60 61 12 62 | check)" 0 0 "61" "an issue no bead points at is offered"
-assert "$(offer 60 12 | check)" 0 0 "" "issues already linked are not offered again"
+out=$(offer 60 12 | check)
+assert "<$out>" "$?" 0 "<>" "issues already linked are not offered again"
 
 out=$(offer 60 61 12 62 | check)
 assert "$out" 0 0 "62" "every unlinked issue is offered, not just the first"
@@ -72,6 +73,7 @@ assert "$outcome" "$?" 1 "number<TAB>url" "a line with no URL is refused rather 
 outcome=$(offer 60 | python3 "$HERE/unsynced.py" "$WORK/absent.jsonl" 2>&1)
 assert "$outcome" "$?" 1 "does not exist" "a missing export is refused rather than read as empty"
 
-assert "$(printf '' | check)" 0 0 "" "no input offers nothing, and does not fail"
+out=$(printf '' | check)
+assert "<$out>" "$?" 0 "<>" "no input offers nothing, and does not fail"
 
 verdict

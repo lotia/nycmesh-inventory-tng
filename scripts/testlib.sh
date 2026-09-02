@@ -92,6 +92,47 @@ fail_case() {
   return 0
 }
 
+# refuse_empty <the substring> <case name>
+#
+# THE DETERMINISTIC HALF OF inventory-tng-twew, and the reason it is here rather
+# than in a review checklist. `assert` matches with `== *"$want_text"*`, which is
+# true of every string when the substring is empty, and `refute` is then false of
+# every string. Neither is ever what somebody meant: an assertion that cannot
+# fail passes over the very thing it was written to catch, and one that cannot
+# pass is noticed immediately.
+#
+# It reached four files before anything spotted it, including a case whose own
+# comment called it "the case that matters" and which would have stayed green
+# with the guard it named deleted. A rule written down would have been read by
+# whoever was already being careful.
+#
+# Checking only the exit status is a real thing to want -- `exits` below is how
+# to say it, and saying it that way makes the intent legible instead of hiding
+# it in an argument that looks like an oversight.
+refuse_empty() {
+  [[ -n "$1" ]] && return 0
+  # Which function is being misused is not asked for: FUNCNAME[1] inside a
+  # function called by `assert` is `assert`, the same trick report.sh's `relay`
+  # uses so that a caller does not write its own name out a second time.
+  fail_case "$2" "$(printf '       %s was given an empty substring, so it could not fail. Use `exits`\n       if only the exit status is meant to be checked.' "${FUNCNAME[1]}")"
+  return 1
+}
+
+# exits <status> <want-status> <name>
+#
+# For a case whose subject produces no output worth reading -- a `grep -q`, a
+# command run for its exit status alone. Separate from `assert` so that "there
+# is nothing to match here" is written rather than expressed as an empty
+# expectation, which is indistinguishable from having forgotten one.
+exits() {
+  local status=$1 want_status=$2 name=$3
+  if [[ "$status" -eq "$want_status" ]]; then
+    pass "$name"
+  else
+    fail_case "$name" "$(printf '       wanted exit %s, got exit %s' "$want_status" "$status")"
+  fi
+}
+
 # assert <output> <status> <want-status> <want-substring> <name>
 #
 # For a case whose command does not fit the shape `check` describes -- a second
@@ -99,6 +140,7 @@ fail_case() {
 # instead of being hand-rolled.
 assert() {
   local output=$1 status=$2 want_status=$3 want_text=$4 name=$5
+  refuse_empty "$want_text" "$name" || return 0
   if [[ "$status" -eq "$want_status" && "$output" == *"$want_text"* ]]; then
     pass "$name"
   else
@@ -143,6 +185,7 @@ expect() {
 # opposite branches from the third.
 refute() {
   local output=$1 status=$2 want_status=$3 unwanted=$4 name=$5
+  refuse_empty "$unwanted" "$name" || return 0
   if [[ "$status" -eq "$want_status" && "$output" != *"$unwanted"* ]]; then
     pass "$name"
   else

@@ -100,10 +100,10 @@ echo "the marker is the one the documentation tells people to post"
 # so a count of 1 was satisfied by 10 through 19 as well, and the case did not
 # hold what its name said. It also has to survive a second, legitimate mention.
 grep -qF -- "$MARKER" "$HERE/../AGENTS.md"; status=$?
-assert "" "$status" 0 "" "AGENTS.md names the marker the check looks for"
+exits "$status" 0 "AGENTS.md names the marker the check looks for"
 
 grep -qF -- "$MARKER" "$HERE/../DEVELOPERS.md"; status=$?
-assert "" "$status" 0 "" "and so does the document that defines it"
+exits "$status" 0 "and so does the document that defines it"
 
 echo
 echo "the name the check reports under is a job that exists"
@@ -114,6 +114,6 @@ named=$(python3 "$READER" --check-name); status=$?
 assert "$named" "$status" 0 "Not marked do-not-merge" "the reader answers for the name"
 
 grep -q "name: $named\$" "$HERE/../.github/workflows/ci.yml"; status=$?
-assert "" "$status" 0 "" "and ci.yml has a job with exactly that name"
+exits "$status" 0 "and ci.yml has a job with exactly that name"
 
 verdict
