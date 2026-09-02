@@ -1264,6 +1264,7 @@ to reach the tracker rather than sit beside it:
 scripts/sync-issues.sh --check     # is anything out of step? (refuses if so)
 scripts/sync-issues.sh --dry-run   # what would move, in either direction
 scripts/sync-issues.sh             # reconcile the two
+scripts/sync-issues.sh --no-say    # that, without the last step
 scripts/pull-new-issues.sh         # only the half that brings issues in
 ```
 
@@ -1286,11 +1287,29 @@ you have not pulled. `pull-new-issues.sh` refuses on that second one too, for
 the mirror of the same reason. Stopping half way through is safe: re-running
 picks up exactly what is left, and nothing is filed twice.
 
-`sync-issues.sh` runs four steps and the middle one is the one to read: it
+`sync-issues.sh` runs five steps and the middle one is the one to read: it
 brings issues in, **prints what arrived**, and only then sends anything out.
 Look at that diff. It is where an edit made on GitHub becomes visible before it
 can travel any further, and `git checkout .beads/issues.jsonl` is how you
 refuse it.
+
+The last step is `scripts/say-bead.sh`, which puts what an issue body cannot
+hold — a bead's design, its acceptance criteria, its notes and every dependency
+it declares — on the issue as a comment it rewrites in place. Why it is a
+comment, and why it runs there rather than beside this, are in
+[0031](docs/decisions/0031-the-issue-list-is-a-window-on-the-tracker.md).
+
+```bash
+scripts/say-bead.sh --dry-run        # what would change, and change nothing
+scripts/say-bead.sh --only <bead>    # one of them, to read the wording first
+scripts/say-bead.sh --confirm        # allow a pass that creates hundreds
+```
+
+It keeps up with ordinary work unasked, and **refuses a pass that would create
+more comments than somebody could watch go past** — which the first one, on a
+tracker that has never had them, always would. Until that has been run
+deliberately, the reconciliation says so at its last step and reconciles
+everything else.
 
 Both need `gh` authenticated and a `GITHUB_TOKEN`; without them they say so and
 stop rather than reporting that there was nothing to do. Being unable to run

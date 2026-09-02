@@ -24,13 +24,18 @@ REPO="$WORK/repo"
 OURS="https://github.com/o/r"
 
 # What --check reaches for, checked against the scripts rather than guessed.
-BORROWED=(bash readlink dirname git wc tr tail cut awk grep mktemp rm cat python3)
+# `jq`, `head` and `sleep` are step 5's, through say-bead.sh.
+BORROWED=(bash readlink dirname git wc tr tail cut awk grep mktemp rm cat python3 jq head sleep)
 
-new_repo "$REPO"
+# A CHECKOUT WITH AN UPSTREAM, because the reconciling half is held to one:
+# pull-new-issues.sh calls require_current_checkout before it pulls, and a
+# branch tracking nothing is refused there -- so without this no case could
+# reach step 4 or step 5 at all.
+tracking_repo "$REPO" "$WORK/remote"
 mkdir -p "$REPO/scripts" "$REPO/.beads"
 cp "$HERE/sync-issues.sh" "$HERE/pull-new-issues.sh" "$HERE/export-issues.sh" \
-   "$HERE/unsynced.py" "$HERE/unexported.py" "$HERE/drifted.py" \
-   "$HERE/report.sh" "$HERE/repository.sh" "$REPO/scripts/"
+   "$HERE/unsynced.py" "$HERE/unexported.py" "$HERE/drifted.py" "$HERE/unsaid.py" \
+   "$HERE/say-bead.sh" "$HERE/report.sh" "$HERE/repository.sh" "$REPO/scripts/"
 borrow "$BIN" "${BORROWED[@]}"
 
 EXPORT="$REPO/.beads/issues.jsonl"
@@ -69,6 +74,11 @@ case "$*" in
       *)                  cut -f1     "$GH_LIVE" ;;
     esac
     ;;
+  # Step 5's one listing, empty, and shaped the way say-bead.test.sh's own
+  # `already` helper describes. What say-bead.sh does with what it finds is that
+  # suite's subject; what is pinned here is only that the step is reached at all,
+  # with a repository to name.
+  *"issues/comments"*) echo '[[]]' ;;
   *) exit 1 ;;
 esac
 STUB
@@ -180,13 +190,17 @@ refute "$out" "$status" 2 "have no bead" "so it never reports on the part it cou
 echo
 echo "a pull half that could not look stops the run"
 # EXIT 1 IS CARRIED ON FROM; EXIT 2 IS NOT, and what step 4 would do from a
-# stale checkout is on the script at that branch. This scene's checkout tracks
-# nothing, which is one of the two things the pull half's guard refuses on.
+# stale checkout is on the script at that branch. A commit on the remote this
+# checkout has not got is the second of the two things the pull half's guard
+# refuses on, and the one this suite can stage now that its checkout tracks
+# something.
 with_bd
 scene "60:OPEN" "inventory-tng-aaa:open:60"
+fall_behind "$WORK/remote"
 out=$(sync); status=$?
 assert "$out" "$status" 2 "nothing here may push" "a refusal from step 1 stops the run"
 refute "$out" "$status" 2 "Pushing what is only here" "so step 4 is never reached"
+catch_up "$REPO"
 
 echo
 echo "one listing, handed to the question that reads it"
@@ -213,8 +227,41 @@ expect --check -- 0 "in step" "asking needs no bd on the path at all"
 
 with_bd
 expect --dry-run -- 0 "would run" "while reconciling still does"
+
+# STEP 5 IS PART OF THE RECONCILIATION, not something run beside it. It is
+# there so the comment saying what a body cannot hold is written in the same
+# pass that wrote the body -- inventory-tng-cwpa.15 -- and a dry run naming it
+# is what says the wiring exists at all.
+# THE ONE STEP THE DRY RUN REALLY ASKS. Steps 1 to 4 delegate to `bd`, which has
+# nothing to ask, so they are named; step 5's delegate has a dry run of its own
+# that names every comment it would create, which is what somebody deciding
+# whether to type --confirm needs to see.
+out=$(sync --dry-run)
+assert "$out" "$?" 0 "5. And what a body cannot carry" "and the last step is asked for too"
+assert "$out" 0 0 "this was a dry run" "which is asked rather than named, because it has an answer"
+
+# AND IT CAN BE LEFT OUT, which is what makes step 5 a part of the
+# reconciliation rather than a condition of it.
+out=$(sync --dry-run --no-say)
+assert "$out" "$?" 0 "Left out, as asked" "--no-say reconciles without the last step"
+refute "$out" 0 0 "would run: $REPO/scripts/say-bead.sh" "and does not reach for it at all"
 no_bd
 expect --dry-run -- 2 "bd is needed" "and refuses without it"
+
+echo
+echo "reconciling for real"
+# A DRY RUN CANNOT REACH STEP 5, and that is why this case exists rather than
+# resting on the two above: the dry-run branch only NAMES say-bead.sh, while the
+# branch that invokes it hands a repository down. The script's own comment at
+# `resolve_repository` says what an unresolved one does there and at what point
+# in the run -- and a dry run is blind to all of it. inventory-tng-cwpa.15.
+
+with_bd
+scene "60:OPEN" "inventory-tng-aaa:open:60"
+out=$(sync); status=$?
+refute "$out" "$status" 0 "unbound variable" "a run that reconciles knows which repository it means"
+assert "$out" "$status" 0 "5. And what a body cannot carry" "and reaches the last step"
+assert "$out" "$status" 0 "The tracker and the issue list agree" "and finishes having run it"
 
 echo
 echo "arguments"

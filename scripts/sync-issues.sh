@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # The tracker and the GitHub issue list, reconciled in the safe order.
 #
-# Four steps, and the order is the point:
+# Five steps, and the order is the point:
 #
 #   1. find issues nobody local has heard of, and pull them   (pull-new-issues.sh)
 #   2. refresh the ones already linked                        (bd, pull half)
 #   3. SHOW WHAT ARRIVED
 #   4. push what is only here                                 (bd, push half)
+#   5. say what a body cannot carry                           (say-bead.sh)
+#
+# --no-say leaves step 5 out, for a reconciliation somebody wants without it.
 #
 # WHY STEP 3 IS THE PROTECTION, and why nothing invokes this on a schedule, are
 # both settled in ../docs/decisions/0031-the-issue-list-is-a-window-on-the-tracker.md
@@ -14,7 +17,7 @@
 # it: the flag is not what makes the conflict policy survivable, the committed
 # export is; and a hook or a CI job would each break in its own way.
 #
-# Usage: sync-issues.sh [--dry-run] [--no-push]
+# Usage: sync-issues.sh [--dry-run] [--no-push] [--no-say]
 #        sync-issues.sh --check
 #
 # --check RECONCILES NOTHING. It asks the three questions that together mean
@@ -43,11 +46,13 @@ EXPORT=".beads/issues.jsonl"
 
 dry_run=false
 push=true
+say=true
 check=false
 for argument in "$@"; do
   case "$argument" in
     --dry-run) dry_run=true ;;
     --no-push) push=false ;;
+    --no-say) say=false ;;
     --check) check=true ;;
     *) refuse "unknown argument $argument" ;;
   esac
@@ -222,7 +227,16 @@ fi
 # which left `sync-issues.sh --dry-run` walking all four steps on a machine with
 # no `bd` at all and ending "The tracker and the issue list agree."
 # inventory-tng-qnxb.
-need_tools bd
+need_tools bd gh
+
+# AND THE REPOSITORY IS SETTLED HERE TOO, not only in the --check branch above,
+# which returns before ever reaching this half. Step 5 hands the answer down --
+# one resolution rather than one per script, which is what repository.sh's
+# header is for -- and `set -u` does not let an unresolved one degrade: it ends
+# the run at the last step with "unbound variable", AFTER step 4 has pushed. So
+# it is asked before anything is written, where a repository nobody can name is
+# a refusal rather than a half-finished reconciliation.
+resolve_repository ""
 
 run() {
   if [[ "$dry_run" == true ]]; then
@@ -278,6 +292,33 @@ fi
 echo
 echo "4. Pushing what is only here"
 run bd github sync --push-only --prefer-newer || fail "the push half did not finish"
+
+echo
+echo "5. And what a body cannot carry"
+# HERE RATHER THAN ANYWHERE ELSE. Step 4 has just written every bead's
+# description onto its issue, and this writes what that description cannot hold
+# onto the same issue in the same pass -- which is the whole of why it is a step
+# of this script rather than a command beside it. 0031's amendment argues it;
+# say-bead.sh says what it costs and why it has no --check.
+#
+# A PROBLEM HERE IS NOT A REASON TO DISOWN THE PUSH. Step 4 has already changed
+# GitHub by the time this runs, so a failure is counted and reported rather than
+# refused over -- the run still has to say what it did.
+if [[ "$say" == false ]]; then
+  note "Left out, as asked. The comments are whatever the last run made them."
+elif [[ "$dry_run" == true ]]; then
+  # ASKED RATHER THAN NAMED, unlike the steps above. Those delegate to `bd`,
+  # which has nothing to ask; this one has a dry run of its own that costs about
+  # five requests, writes nothing, and names every comment it would create --
+  # which is the number somebody deciding whether to type --confirm needs.
+  "$HERE/say-bead.sh" --dry-run "$REPOSITORY" || fail "the last step could not say what it would do"
+else
+  # NOT --confirm, EVER, FROM HERE. That flag exists so that mirroring the whole
+  # tracker onto a public repository is something a person types, and passing it
+  # on their behalf would be this script deciding it for them. A first run
+  # refuses and says what to type; every run after it has nothing to ask about.
+  "$HERE/say-bead.sh" "$REPOSITORY" || fail "not every issue could be told what its bead holds"
+fi
 
 echo
 note "Pushing writes external_ref onto every bead it files an issue for, so"

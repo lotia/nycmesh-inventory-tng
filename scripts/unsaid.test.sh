@@ -19,24 +19,6 @@ REPOSITORY="lotia/nycmesh-inventory-tng"
 OURS="https://github.com/$REPOSITORY"
 EXPORT="$WORK/issues.jsonl"
 
-# `bead` cannot carry design, acceptance criteria, notes or dependencies -- it
-# is testlib's row for the readers that only ever look at id, status and ref --
-# so this suite builds its own rows through json.dumps. The fields under test
-# are exactly the ones that shape is missing.
-#
-# rich <id> <json object of extra fields> [<external_ref>]
-rich() {
-  python3 - "$1" "$2" "${3:-}" <<'PY'
-import json, sys
-identifier, extra, ref = sys.argv[1], json.loads(sys.argv[2]), sys.argv[3]
-row = {"_type": "issue", "id": identifier, "title": "t"}
-if ref:
-    row["external_ref"] = ref
-row.update(extra)
-print(json.dumps(row))
-PY
-}
-
 # say [<bead>] -- the reader, against whatever $EXPORT currently holds.
 say() { python3 "$HERE/unsaid.py" "$EXPORT" "$REPOSITORY" "$@"; }
 
@@ -46,7 +28,17 @@ rich inventory-tng-aaa '{"acceptance_criteria":"The suite is green on main."}' "
 out=$(say inventory-tng-aaa)
 assert "$out" 0 0 "Done when" "acceptance criteria are titled for the question they answer"
 assert "$out" 0 0 "The suite is green on main." "and the text itself is carried over"
-assert "$out" 0 0 "<!-- bead-fields -->" "with the marker that lets a second run rewrite this one"
+assert "$out" 0 0 "<!-- bead-fields " "with the marker that lets a second run rewrite this one"
+
+# THE DIGEST IS WHAT MAKES THE MARKER CHEAP TO COMPARE, so it has to be stable
+# for the same body and different for a different one -- see `stamped`. A
+# constant would make every comment look current for ever, which is the failure
+# nothing else here would notice.
+first=$(say inventory-tng-aaa | head -1)
+assert "$(say inventory-tng-aaa | head -1)" 0 0 "$first" "and the same bead stamps the same digest twice running"
+rich inventory-tng-aaa '{"acceptance_criteria":"Something else entirely."}' "$OURS/issues/60" >"$EXPORT"
+refute "$(say inventory-tng-aaa | head -1)" 0 0 "$first" "and a bead that changed stamps a different one"
+rich inventory-tng-aaa '{"acceptance_criteria":"The suite is green on main."}' "$OURS/issues/60" >"$EXPORT"
 assert "$out" 0 0 "inventory-tng-aaa" "and the bead it was written from, so a reader can go and look"
 
 rich inventory-tng-bbb '{"design":"A predicate, not a wrapper.","notes":"Measured on 2026-09-02."}' \
@@ -75,8 +67,8 @@ rich inventory-tng-ccc '{}' "$OURS/issues/62" >"$EXPORT"
 out=$(say inventory-tng-ccc)
 assert "<$out>" "$?" 0 "<>" "a bead whose issue already says everything gets no comment at all"
 
-assert "$(say)" 0 0 "$(printf 'inventory-tng-ccc\t62\tsilent')" \
-  "and the poster is told it is silent, so it can take a stale comment down"
+assert "$(say)" 0 0 "$(printf 'inventory-tng-ccc\t62\t')" \
+  "and its row carries no marker, which is how the poster knows to take a stale comment down"
 
 echo
 echo "what the tracker holds and an issue body cannot"
@@ -93,9 +85,16 @@ assert "$out" 0 0 "Part of** #64" "a child says what it is part of, as this repo
 out=$(say inventory-tng-eee)
 assert "$out" 0 0 "Holds** #63" "and the parent lists what it holds, which its own row does not say"
 
+# THE DIRECTION IS THE OPPOSITE OF THE TYPE'S NAME, and rendering it the other
+# way put the reverse of the truth on a public issue. `bd dep add <a> <b>`
+# stores a `blocks` row on `a` meaning "a is blocked by b" -- its help calls
+# --blocked-by and --depends-on aliases -- so the bead carrying the row is the
+# one that is stuck, not the one doing the stopping.
 rich inventory-tng-fff '{"dependencies":[{"type":"blocks","issue_id":"inventory-tng-fff","depends_on_id":"inventory-tng-eee"}]}' "$OURS/issues/65" >"$EXPORT"
 rich inventory-tng-eee '{}' "$OURS/issues/64" >>"$EXPORT"
-assert "$(say inventory-tng-fff)" 0 0 "Blocks** #64" "a blocking dependency is named too"
+out=$(say inventory-tng-fff)
+assert "$out" 0 0 "Blocked by** #64" "a bead waiting on another says which one it waits for"
+refute "$out" 0 0 "Blocks*" "and never claims to be the one doing the blocking"
 
 echo
 echo "a number is only ever ours"
@@ -125,19 +124,26 @@ echo "which beads have something to say"
   rich inventory-tng-mmm '{}' "$OURS/issues/69"
 } >"$EXPORT"
 out=$(say)
-assert "$out" 0 0 "$(printf 'inventory-tng-kkk\t68\tsay')" \
-  "a bead with an issue and something to say is offered, with its number"
+assert "$out" 0 0 "$(printf 'inventory-tng-kkk\t68\t<!-- bead-fields ')" \
+  "a bead with something to say is offered with its number and its marker"
 refute "$out" 0 0 "inventory-tng-lll" "a bead with no issue is not -- there is nowhere to put a comment"
-assert "$out" 0 0 "$(printf 'inventory-tng-mmm\t69\tsilent')" \
-  "and one with nothing to say is listed as silent rather than left out"
+assert "$out" 0 0 "$(printf 'inventory-tng-mmm\t69\t\n')" \
+  "and one with nothing to say is listed with an empty marker rather than left out"
+
+# THE MARKER IN THE ROW IS THE ONE THE COMMENT OPENS WITH, which is the whole
+# reason the caller can decide without asking again: composing the comment is
+# how this knows there is anything to say, so throwing the body away made the
+# caller re-render every bead in a fresh interpreter.
+assert "$(say)" 0 0 "$(say inventory-tng-kkk | head -1)" \
+  "and it is the same line the rendering itself opens with"
 
 # WHY SILENT IS LISTED AT ALL, which is the case nothing else would catch: the
 # fields a bead carries can be taken away, and the comment on its issue then
 # says something the tracker no longer does. A caller that only ever heard about
 # the talkative ones could not learn such an issue existed.
 rich inventory-tng-kkk '{}' "$OURS/issues/68" >"$EXPORT"
-assert "$(say)" 0 0 "$(printf 'inventory-tng-kkk\t68\tsilent')" \
-  "a bead that loses what it had is offered again, as silent"
+assert "$(say)" 0 0 "$(printf 'inventory-tng-kkk\t68\t\n')" \
+  "a bead that loses what it had is offered again, with nothing in the marker column"
 
 echo
 echo "refusing rather than guessing"
