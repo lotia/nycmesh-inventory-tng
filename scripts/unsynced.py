@@ -126,7 +126,11 @@ def unseen(offered: list[tuple[int, str]], already: set[str]) -> list[int]:
 
 
 def offered(text: str) -> list[tuple[int, str]]:
-    """`number<TAB>url` per line, as `gh issue list` is asked to print it.
+    """`number<TAB>value` per line, as `gh issue list` is asked to print it.
+
+    The value is a URL to this reader and a state to `drifted.py`; what both
+    need is the same refusal on a line that is not a number and a value, which
+    is why the split lives here rather than in each of them.
 
     The number is carried alongside the URL because it is what
     `bd github pull` takes: `#62` and the full URL are both rejected by its

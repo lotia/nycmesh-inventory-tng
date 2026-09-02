@@ -6,10 +6,12 @@ name: Issue sync
 # noticing is CI's whole part in it -- is
 # docs/decisions/0031-the-issue-list-is-a-window-on-the-tracker.md.
 #
-# What that gap is, and why `bd` cannot close it alone, is on
-# scripts/pull-new-issues.sh, which is the part that finds them. This file is
-# the answer to "who notices", because the people who would run that by hand
-# are exactly the people already using the tracker. `inventory-tng-cwpa.3`.
+# THREE QUESTIONS, ONE ANSWER, and all three are scripts/sync-issues.sh's to
+# ask: issues no bead points at, beads no issue was filed for, and -- the one
+# nothing asked until `inventory-tng-cwpa.11` -- work both sides know about and
+# describe differently. This file is the answer to "who notices", because the
+# people who would run those by hand are exactly the people already using the
+# tracker. `inventory-tng-cwpa.3`.
 #
 # IT REPORTS, IT DOES NOT PROPOSE, and it used to do the opposite. It built a
 # tracker in the runner, pulled what was missing, pushed a branch and opened a
@@ -88,33 +90,15 @@ jobs:
       # alone, so the first dispatch of this rewrite exited 2 before asking
       # anything.
       #
-      # ONE `run:` LINE, and the script decides. Why the refusal lives there
-      # rather than here is on `--check` itself; settings.yml is the same shape.
-      - name: Ask which issues no bead points at
+      # ONE `run:` LINE, and the script decides. Why all three questions are asked
+      # there rather than as three steps here is on `--check` itself, and in
+      # docs/decisions/0031-the-issue-list-is-a-window-on-the-tracker.md.
+      # settings.yml is the same shape.
+      #
+      # NO `bd` AND NO WRITE TOKEN: every one of the three is answered from the
+      # committed export and a listing GitHub gives for the asking.
+      - name: Ask whether the two lists are in step
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: scripts/pull-new-issues.sh --check
-
-      # THE SAME QUESTION FROM THE OTHER END, and until inventory-tng-cwpa.9 it
-      # was not asked at all: a bead created on somebody's machine and committed
-      # was filed nowhere, and nothing said so -- not on the next commit, not on
-      # the next morning, not ever.
-      #
-      # RUN EVEN WHEN THE STEP ABOVE FAILED, which is the whole of why this is a
-      # second STEP rather than a second JOB. One red check is one thing to go
-      # and look at, and the two halves are one concern. But a step that fails
-      # stops the job, so without this the push half would go unasked for as
-      # long as the pull half was red -- somebody fixes one, and learns about
-      # the other tomorrow.
-      #
-      # `!cancelled()` rather than `always()`: a failed step is what this has to
-      # survive, and a CANCELLED run is not. `always()` runs on cancellation
-      # too, which turns "somebody stopped this" into a report about the
-      # tracker, made from a checkout that may not have finished.
-      #
-      # It reaches for nothing: no token, no `gh`, no `bd`. That is what lets it
-      # sit here rather than needing a runner of its own -- see the script.
-      - name: Ask which beads have no issue
-        if: ${{ !cancelled() }}
-        run: scripts/export-issues.sh --check
+        run: scripts/sync-issues.sh --check
