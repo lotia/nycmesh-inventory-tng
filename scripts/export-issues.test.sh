@@ -63,6 +63,12 @@ case "$*" in
 esac
 STUB
 chmod +x "$BIN/gh"
+# Saved and restored the way `bd` is below, rather than by re-running the
+# heredoc: one case takes `gh` off the path to show that --check never wanted
+# it, and this file already had an idiom for that.
+cp "$BIN/gh" "$WORK/gh.keep"
+no_gh() { rm -f "$BIN/gh"; }
+with_gh() { cp "$WORK/gh.keep" "$BIN/gh"; chmod +x "$BIN/gh"; }
 export GH_ISSUES="$WORK/issues" GH_OPEN="$WORK/open" GH_CLOSED="$WORK/closed"
 
 # A `bd` that records every set of ids it was asked to push, and answers
@@ -263,6 +269,35 @@ assert "$out" "$status" 1 "did not file" "a batch that fails is reported"
 assert "$out" "$status" 1 "Re-run to carry on" "and the recovery is named, because it is not obvious"
 
 echo
+echo "--check, which is what a scheduled job asks"
+# inventory-tng-cwpa.9. The signal ran one way only: CI was red while GitHub
+# held an issue no bead pointed at, and silent while the tracker held a bead
+# GitHub had never heard of.
+
+scene "60" "inventory-tng-aaa:open:60 inventory-tng-bbb:open"
+no_bd
+out=$(export_issues --check); status=$?
+assert "$out" "$status" 1 "1 bead(s) have no GitHub issue" "a bead with no issue refuses"
+assert "$out" "$status" 1 "export-issues.sh --confirm" "and the refusal names what to do about it"
+assert "$out" "$status" 1 "nothing to close" "and says it clears itself, because a person will wonder"
+assert "<$(cat "$BD_PUSHED")>" 0 0 "<>" "and nothing is filed by asking"
+
+scene "60" "inventory-tng-aaa:open:60"
+expect --check -- 0 "Every bead has an issue" "and it is green once they all have one"
+
+# THE PROPERTY THAT MAKES IT CHEAP ENOUGH TO ASK EVERY MORNING: the question is
+# about the tracker, so it is answered from the committed export and reaches for
+# nothing else. A runner with no token, no `bd` and no `gh` can ask it -- which
+# is what lets it sit beside the opposite question in one job.
+scene "60 61" "inventory-tng-aaa:open:60 inventory-tng-bbb:open"
+no_gh
+no_bd
+out=$(export_issues --check); status=$?
+assert "$out" "$status" 1 "have no GitHub issue" "it needs neither gh nor bd on the path"
+refute "$out" "$status" 1 "bring those in first" "and does not run the filing precondition, which guards nothing here"
+with_gh
+
+echo
 echo "a checkout that is not current"
 # inventory-tng-cwpa.10. Why this cannot be left to the precondition above, and
 # why only a run that files is held to it, are on the script and in 0031.
@@ -309,6 +344,10 @@ expect --batch nought -- 2 "positive number" "--batch refuses something that is 
 # which a caller reads as "it looked and objected".
 expect --batch -- 2 "--batch needs a number" "--batch with no value at all is refused the same way"
 expect --nonsense -- 2 "unknown flag" "an unknown flag is refused rather than read as a repository"
+# The two flags are opposites, and `--check` returning early would silently file
+# nothing for somebody who typed --confirm. Refused rather than resolved.
+expect --check --confirm -- 2 "opposites" "--check and --confirm together are refused"
+assert "<$(cat "$BD_PUSHED")>" 0 0 "<>" "and that refusal files nothing either"
 no_bd
 expect --confirm -- 2 "bd is needed" "a confirmed run refuses without bd rather than half-doing it"
 

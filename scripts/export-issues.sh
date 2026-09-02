@@ -9,7 +9,10 @@
 # The arrangement, and the reasoning for every rule below, is
 # ../docs/decisions/0031-the-issue-list-is-a-window-on-the-tracker.md.
 #
-# Usage: export-issues.sh [--confirm] [--batch N] [<repository>]
+# Usage: export-issues.sh [--confirm | --check] [--batch N] [<repository>]
+#
+# --check asks only whether anything is waiting and REFUSES when it is, which is
+# what a scheduled job wants. It answers from the committed export alone.
 #
 # A DRY RUN UNLESS `--confirm` IS PASSED, which is the wrong way round for most
 # scripts here and the right way round for this one: the ordinary invocation is
@@ -65,11 +68,14 @@ EXPORT="$REPO_ROOT/.beads/issues.jsonl"
 LIMIT=1000
 
 confirm=false
+check=false
 batch=25
 repository="${GITHUB_REPOSITORY:-}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --confirm) confirm=true ;;
+    # A dry run that REFUSES, the mirror of pull-new-issues.sh's own --check.
+    --check) check=true ;;
     # How many ids go into one `bd github sync --issues`. Small enough that a
     # failure names a short list rather than the whole tracker, large enough
     # that the run is not four hundred process starts.
@@ -93,6 +99,41 @@ done
 if ! [[ "$batch" =~ ^[1-9][0-9]*$ ]]; then
   echo "export-issues: --batch takes a positive number, not $batch" >&2
   exit 2
+fi
+
+# One asks and files, the other asks and refuses. Taken together they cannot
+# both be meant, and the answer -- `--check` returns before anything is filed --
+# is the opposite of what somebody who typed `--confirm` expects to happen.
+# Refused rather than silently resolved, on the same terms as every other way of
+# calling this wrongly.
+if [[ "$check" == true && "$confirm" == true ]]; then
+  echo "export-issues: --check and --confirm are opposites; --check files nothing." >&2
+  exit 2
+fi
+
+# === IS THE TRACKER HOLDING WORK GITHUB HAS NEVER HEARD OF? ===
+#
+# inventory-tng-cwpa.9. Answered here and returned early, because it needs
+# NOTHING but the committed export -- no token, no `gh`, no repository to
+# resolve, no `bd`. That is the whole reason it is cheap enough to ask on a
+# schedule, and it is the same property that lets `unsynced.py` answer the
+# opposite question in a runner with no database.
+#
+# It does not run step 1. That precondition exists so that FILING cannot make a
+# duplicate, and this files nothing; asking it here would make a question about
+# the tracker depend on reaching GitHub, which is exactly what this avoids.
+if [[ "$check" == true ]]; then
+  need_tools python3
+  waiting=$(python3 "$HERE/unexported.py" "$EXPORT") || exit 2
+  if [[ -z "$waiting" ]]; then
+    verdict "Every bead has an issue." exporting
+  fi
+  count=$(printf '%s\n' "$waiting" | wc -l | tr -d ' ')
+  fail "$count bead(s) have no GitHub issue, and nothing here files them."
+  note "Filing them is a person's job -- see DEVELOPERS.md#issue-tracking:"
+  note "  scripts/export-issues.sh --confirm"
+  note "This goes green by itself once they are filed, with nothing to close."
+  stop exporting
 fi
 
 # `bd` only when something will actually be filed, the same division

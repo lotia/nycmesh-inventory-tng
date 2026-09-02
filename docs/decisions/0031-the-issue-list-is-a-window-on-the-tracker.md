@@ -190,12 +190,16 @@ no upstream to be behind. A fetch that fails refuses too, and that trade turns
 out not to be one — an export that cannot reach the git remote was never going
 to reach the GitHub API a moment later.
 
-**The standing signal runs one way only.** CI is red while GitHub holds an
-issue no bead points at, and silent while the tracker holds a bead GitHub has
-never heard of — so work created on a second machine can sit unfiled with
-nothing saying so. That was a limit of what could be asked cheaply, and
-`unexported.py` removed it: the question is now answerable from the committed
-export alone, on the same terms as the other direction. `inventory-tng-cwpa.9`.
+**The standing signal runs both ways, and cheaply.** CI is red while GitHub
+holds an issue no bead points at, and equally while the tracker holds a bead
+GitHub has never heard of — the second of which went unasked until
+`unexported.py` made it answerable from the committed export alone. Two steps
+of one job rather than two jobs: the halves are one concern and one thing to go
+and look at, and the second runs even when the first failed, so that fixing one
+direction does not hide the other until tomorrow. It is guarded on the run not
+having been cancelled rather than on `always()` — a failed sibling step is what
+it has to survive, and somebody stopping the run is not. Neither brings anything in or sends
+anything out; that stays a person running the commands above.
 
 **Two credentials are needed to act, and they are configured separately.** `gh`
 works out which repository it is in by reading the checkout; `bd` does not, and

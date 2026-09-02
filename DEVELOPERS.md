@@ -1273,6 +1273,7 @@ has had nothing to do since:
 ```bash
 scripts/export-issues.sh             # what it would file, and files nothing
 scripts/export-issues.sh --confirm   # actually file it
+scripts/export-issues.sh --check     # only: is anything waiting? (refuses if so)
 ```
 
 It only ever *creates*. A bead that already points at an issue is not in its
@@ -1295,8 +1296,10 @@ them does not break anything — the tracker is not made wrong by an unsynced
 issue, only incomplete.
 
 Nothing does any of this for you. No git hook fires it, and CI does not run it;
-what CI does is ask every morning whether GitHub is holding an issue no bead
-points at, and stay red until somebody commits the rows. Why it is arranged that
+what CI does is ask every morning, in both directions — is GitHub holding an
+issue no bead points at, and is the tracker holding a bead GitHub has never
+heard of — and stay red until somebody commits the rows. One check, both
+answers, and it clears itself with nothing to close. Why it is arranged that
 way, why the correspondence between the two lists reaches every clone for free,
 and what a GitHub reader is and is not looking at, are
 [0031](docs/decisions/0031-the-issue-list-is-a-window-on-the-tracker.md).
