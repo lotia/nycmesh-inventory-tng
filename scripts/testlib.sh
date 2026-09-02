@@ -102,6 +102,38 @@ bead() {
   printf '}\n'
 }
 
+# tracking_repo <checkout> <remote> -- a checkout that is level with an upstream.
+#
+# Two suites built this, because two scripts refuse to write from a checkout
+# behind its remote and the question is asked of git itself, so a stub cannot
+# answer it. The copies had already diverged in `catch_up` -- one fetched and
+# one did not -- which is how a copy stops being noticed: neither was wrong.
+#
+# `catch_up` FETCHES, which settles that difference the smaller way. One caller
+# does not need it, because the script under test has just fetched; against a
+# local file remote the extra round trip is not worth a flag to turn off.
+#
+# Sets nothing and prints nothing: the caller already knows both paths, and a
+# function whose output is captured cannot report a failure -- see `borrow`.
+tracking_repo() {
+  local checkout=$1 remote=$2
+  new_repo "$remote"
+  (cd "$remote" && git commit -q --allow-empty -m "root") || return 1
+  new_repo "$checkout"
+  git -C "$checkout" remote add origin "$remote"
+  git -C "$checkout" fetch -q origin
+  git -C "$checkout" reset -q --hard origin/main
+  git -C "$checkout" branch -q --set-upstream-to=origin/main main
+}
+
+# fall_behind <remote> -- a commit on the remote the checkout has not fetched.
+fall_behind() { (cd "$1" && git commit -q --allow-empty -m "somebody else's work"); }
+
+# catch_up <checkout> -- level with the upstream again.
+catch_up() {
+  git -C "$1" fetch -q origin && git -C "$1" reset -q --hard origin/main
+}
+
 # borrow <directory> <tool>... -- a PATH holding exactly the named programs.
 #
 # Five suites built one of these, in four spellings. What they are for is the
