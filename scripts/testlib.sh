@@ -199,6 +199,23 @@ exits() {
   fi
 }
 
+# equals <got> <want> <name>
+#
+# For a case whose subject is a number rather than output -- a count of how many
+# times a stub was called, most of the time. `assert` cannot do it: it matches a
+# substring, so "1" passes for 11, 10 and 21. `exits` can, and was used for it,
+# but then a genuine regression reports "wanted exit 1, got exit 3" about a
+# count nothing exited with -- an assertion whose failure does not describe what
+# it checked, which is the same fault `refuse_empty` guards one level up.
+equals() {
+  local got=$1 want=$2 name=$3
+  if [[ "$got" == "$want" ]]; then
+    pass "$name"
+  else
+    fail_case "$name" "$(printf '       wanted %s, got %s' "$want" "$got")"
+  fi
+}
+
 # assert <output> <status> <want-status> <want-substring> <name>
 #
 # For a case whose command does not fit the shape `check` describes -- a second

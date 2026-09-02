@@ -73,8 +73,12 @@ if [[ "$check" == true ]]; then
   # a line of what is read as data, and drifted.py would refuse a listing that
   # was actually fine. export-issues.sh carries the same arrangement, and for
   # the same reason.
+  # One trap over all of them: a second `trap ... EXIT` REPLACES the first, so
+  # two of them thirty lines apart is one list that silently leaks whatever was
+  # added to the wrong one.
   gaps=$(mktemp) || exit 2
-  trap 'rm -f "$gaps"' EXIT
+  urls=$(mktemp) || exit 2
+  trap 'rm -f "$gaps" "$urls"' EXIT
 
   # A QUESTION THAT COULD NOT BE ASKED IS NOT A QUESTION ANSWERED "NO", and the
   # difference is what this variable carries to the end. It is not derivable
@@ -95,6 +99,51 @@ if [[ "$check" == true ]]; then
     esac
   }
 
+  # ONE LISTING, ASKED FOR ONCE. Questions 1 and 3 both want what GitHub is
+  # holding; asked separately that was two round trips for one extra JSON field
+  # -- measured at 2.6s of a 5.9s run, on the daily schedule.
+  #
+  # THE BETTER REASON IS NOT SPEED. Two listings are two snapshots, and an issue
+  # closed between them is described by one and not the other, with nothing to
+  # say which. One fetch means the three questions are answered about the same
+  # GitHub. inventory-tng-cwpa.13.
+# AND FAILING TO GET IT DOES NOT END THE RUN. Questions 1 and 3 read this
+  # listing and question 2 does not -- it needs no `gh`, no token and no network
+  # -- so an unreachable GitHub must not take it down with the other two. That
+  # is the same rule the three questions already follow among themselves.
+  #
+  # ONE REASON, NOT TWO FLAGS. Whether the listing can be used, and why it
+  # cannot, are one fact: as two booleans they had an unreachable combination a
+  # reader had to rule out at each of two sites, and a failed SPLIT reported
+  # itself as GitHub not answering -- which it had, perfectly well.
+  #
+  # AND CUT SHORT IS SETTLED HERE, NOT AT THE ONE QUESTION THAT USED TO NOTICE.
+  # A page filling the limit is now read by TWO questions, so leaving the guard
+  # at question 3 had question 1 say "every issue on GitHub is already linked"
+  # as a fact, under its own heading, about a listing this script had already
+  # worked out it could not see the end of.
+  unusable=""
+  full_page=false
+  if ! live=$(gh issue list --repo "$REPOSITORY" --state all --limit "$LIMIT" \
+    --json number,url,state --jq '.[] | "\(.number)\t\(.url)\t\(.state)"' 2>"$gaps"); then
+    # tail -2, as everywhere else here: `gh` usually fails in two lines, and on
+    # a scheduled run this note is the whole debugging surface.
+    fail "GitHub could not be listed:"
+    note "$(tail -2 "$gaps")"
+    unusable="GitHub would not give the listing (above)."
+  elif [[ "$(count_lines "$live")" -ge "$LIMIT" ]]; then
+    full_page=true
+    unusable="the listing filled the limit, so it stops short of the end (see 3)."
+  # ONE COLUMN PAIR IS A FILE because --listing takes a path; the other stays a
+  # pipe, which is what it always was. A split that did not happen would leave
+  # an empty file, and an empty listing reads as "GitHub is holding nothing" --
+  # the silent green every other guard in this family exists to stop -- so the
+  # one that IS a file is checked.
+  elif ! printf '%s\n' "$live" | cut -f1,2 > "$urls"; then
+    unusable="the listing could not be split into the columns each question reads."
+    note "$unusable"
+  fi
+
   # NUMBERED, because two of the three answers come from scripts that report in
   # their own voice and end with their own verdict. Without a heading over each,
   # "One thing to fix before exporting" lands in the middle of this one's report
@@ -106,8 +155,13 @@ if [[ "$check" == true ]]; then
   # unreachable GitHub must not take it down with question 1. A bare `$?` on its
   # own line, because `cmd || [[ $? -eq 1 ]]` reads the status of the test.
   echo "1. Issues on GitHub that no bead points at"
-  "$HERE/pull-new-issues.sh" --check "$REPOSITORY"
-  unpulled=$?
+  if [[ -n "$unusable" ]]; then
+    note "Not asked: $unusable"
+    unpulled=2
+  else
+    "$HERE/pull-new-issues.sh" --check --listing "$urls" "$REPOSITORY"
+    unpulled=$?
+  fi
 
   echo
   echo "2. Beads with no issue on GitHub"
@@ -119,22 +173,23 @@ if [[ "$check" == true ]]; then
   # inventory-tng-cwpa.11. The third question, and the one nothing asked: the
   # first two are about work one side has never heard of. drifted.py says why it
   # reports rather than fixes.
-  if ! live=$(gh issue list --repo "$REPOSITORY" --state all --limit "$LIMIT" \
-    --json number,state --jq '.[] | "\(.number)\t\(.state)"' 2>"$gaps"); then
-    fail "could not ask GitHub what state its issues are in:"
-    note "$(tail -2 "$gaps")"
+  if [[ -n "$unusable" && "$full_page" == false ]]; then
+    fail "whether the two sides disagree could not be asked: $unusable"
     unanswerable=1
-  elif [[ "$(count_lines "$live")" -ge "$LIMIT" ]]; then
+  elif [[ "$full_page" == true ]]; then
     # A LISTING CUT SHORT READS AS AGREEMENT, which is why this cannot be left
     # to be noticed. drifted.py passes over a bead whose issue is not in the
     # listing -- it has no state to compare -- so every issue past the limit is
     # silently declared in step, and the run goes green over the part it never
     # looked at. export-issues.sh guards its own listing the same way.
+    #
+    # Decided where the listing is fetched, because question 1 reads the same
+    # one and must not answer from it either.
     fail "GitHub returned the full $LIMIT issues, so the comparison would be cut short."
     note "Everything past that would be passed over and reported as agreeing."
     note "Raise LIMIT in this script and re-run."
     unanswerable=1
-  elif ! disagreeing=$(printf '%s\n' "$live" \
+  elif ! disagreeing=$(printf '%s\n' "$live" | cut -f1,3 \
     | python3 "$HERE/drifted.py" "$REPO_ROOT/$EXPORT" 2>"$gaps"); then
     fail "could not compare the two sides:"
     note "$(tail -2 "$gaps")"

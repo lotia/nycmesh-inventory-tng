@@ -161,6 +161,16 @@ issues_are "1"
 expect --dry-run -- 0 "already linked" "and a clean listing is still read correctly"
 unset GH_NOISE
 
+# The owner and the repository are case-insensitive on GitHub, and the URLs it
+# returns are canonically cased, so a repository named in another casing is the
+# same repository -- refusing its own listing would be the guard firing on what
+# it exists to permit.
+printf '%s\t%s\n' 1 "https://github.com/o/r/issues/1" > "$WORK/cased"
+out=$(pull --check --listing "$WORK/cased" O/R); status=$?
+assert "$out" "$status" 0 "already linked" \
+  "a repository named in another casing is still the same repository"
+refute "$out" "$status" 0 "not an issue of" "and its own listing is not refused as somebody else's"
+
 echo
 echo "a checkout that is not current"
 # The other half of inventory-tng-cwpa.10. A stale checkout cannot see that an
@@ -183,5 +193,39 @@ expect --check -- 1 "have no bead" "and neither is --check, which files nothing 
 catch_up
 issues_are "1"
 expect 0 "already linked" "and a current checkout pulls as before"
+
+echo
+echo "a listing handed in rather than fetched"
+# inventory-tng-cwpa.13. The flag's own suite, and under the borrowed PATH above
+# -- which is the assertion that matters here as much as the answers: a listing
+# read with `cat` would need a program this scene does not grant, and the read
+# failing left `offered` empty, which this script reports as "GitHub has no
+# issues" and exits 0 for.
+
+# Neither `gh` nor `bd` is reached on this path, so nothing stubs them: the
+# listing is the whole input.
+printf '1\t%s\n2\t%s\n' "https://github.com/o/r/issues/1" "https://github.com/o/r/issues/2" \
+  > "$WORK/listing"
+out=$(pull --check --listing "$WORK/listing"); status=$?
+assert "$out" "$status" 1 "no bead points at: 2" "the answer comes from the file, not from gh"
+
+# A LISTING THAT COULD NOT BE READ IS NOT AN EMPTY ONE. `-r` alone is true of a
+# directory, and every unread listing looks exactly like a repository with no
+# issues -- which this reports as nothing to pull, and exits 0 for.
+out=$(pull --check --listing "$WORK"); status=$?
+assert "$out" "$status" 2 "cannot read the listing" "a directory is refused rather than read as an empty listing"
+refute "$out" "$status" 2 "Nothing to pull" "and it never reports success over a listing it did not read"
+
+out=$(pull --check --listing "$WORK/never-written"); status=$?
+assert "$out" "$status" 2 "cannot read the listing" "and so is a file that is not there"
+
+# THE GUARD FIRING, which only its own suite can pin: handed another repository's
+# listing, this would offer their issues as unpulled and make beads pointing at
+# somebody else's work. Only the negative was asserted here before, so nothing
+# said the refusal happened at all.
+printf '%s\t%s\n' 99 "https://github.com/someone/else/issues/99" > "$WORK/stray"
+out=$(pull --check --listing "$WORK/stray"); status=$?
+assert "$out" "$status" 2 "not an issue of o/r" "a listing from another repository is refused, not read"
+refute "$out" "$status" 2 "no bead points at" "and none of it is offered for pulling"
 
 verdict
