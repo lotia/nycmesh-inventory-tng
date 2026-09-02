@@ -172,14 +172,23 @@ for its own reasons. Nothing further is installed for the GitHub half: the link
 is a field in a file that is already being pulled. What a second machine needs
 is a `gh` login and a token, and only at the moment it wants to *act*.
 
-**"Every clone has a complete map" means as of that clone's last pull, and
-there is a sharp edge on it.** Two machines that both file issues while one is
-behind the other will file the same bead twice — the stale side cannot see a
-reference that exists only in a commit it has not fetched. Nothing currently
-refuses that, and the guard against the mirror-image failure does not help,
-because a stale checkout is equally unaware of the issue on the other side.
-`inventory-tng-cwpa.10` is the mechanism that would make it impossible rather
-than merely discouraged; until it lands, pull before exporting.
+**"Every clone has a complete map" means as of that clone's last pull, and the
+export enforces that rather than asking for it.** Two machines that both file
+while one is behind the other would file the same bead twice — the stale side
+cannot see a reference that exists only in a commit it has not fetched. The
+guard against the mirror-image failure is no help, and looking at why is what
+shaped the fix: a stale checkout is equally unaware of the issue on the *other*
+side, so the unlinked-issue precondition finds nothing waiting and is content.
+It would go further and offer that issue as unpulled, and honestly acting on
+that makes a second bead — one stale checkout, duplication in both directions.
+
+So `scripts/export-issues.sh --confirm` fetches and refuses while the checkout
+is behind its upstream, or while it tracks nothing at all. A dry run is not
+refused: it files nothing, so being behind costs a stale count rather than a
+duplicate, and `--check` runs in CI where the head is a pull request's and has
+no upstream to be behind. A fetch that fails refuses too, and that trade turns
+out not to be one — an export that cannot reach the git remote was never going
+to reach the GitHub API a moment later.
 
 **The standing signal runs one way only.** CI is red while GitHub holds an
 issue no bead points at, and silent while the tracker holds a bead GitHub has

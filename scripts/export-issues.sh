@@ -105,6 +105,16 @@ need_tools "${tools[@]}"
 resolve_repository "$repository"
 repository="$REPOSITORY"
 
+# === THE CHECKOUT HAS TO BE CURRENT BEFORE ANYTHING IS FILED ===
+#
+# inventory-tng-cwpa.10. The guard is repository.sh's, because the hazard is the
+# whole family's; the reasoning is 0031's paragraph on what "every clone has a
+# complete map" is worth, including why the unlinked-issue precondition below
+# cannot stand in for this one.
+#
+# ONLY A RUN THAT FILES is held to it, for the reason 0031 gives.
+[[ "$confirm" == true ]] && require_current_checkout "$REPO_ROOT"
+
 echo "1. Is anything on GitHub still unlinked?"
 # Asked by running the script that owns the question rather than by repeating
 # it. Exit 1 means something is waiting, and it has already said which; exit 2
