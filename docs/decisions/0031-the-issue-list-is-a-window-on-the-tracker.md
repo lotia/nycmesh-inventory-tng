@@ -197,16 +197,26 @@ while a duplicate bead can be deleted. That asymmetry justified doing one
 first. It does not justify leaving the other undone, and the guard lives in
 `scripts/repository.sh` so that both halves call it rather than copy it.
 
-**The standing signal runs both ways, and cheaply.** CI is red while GitHub
-holds an issue no bead points at, and equally while the tracker holds a bead
-GitHub has never heard of — the second of which went unasked until
-`unexported.py` made it answerable from the committed export alone. Two steps
-of one job rather than two jobs: the halves are one concern and one thing to go
-and look at, and the second runs even when the first failed, so that fixing one
-direction does not hide the other until tomorrow. It is guarded on the run not
-having been cancelled rather than on `always()` — a failed sibling step is what
-it has to survive, and somebody stopping the run is not. Neither brings anything in or sends
-anything out; that stays a person running the commands above.
+**The standing signal asks three questions, and only ever reports.** CI is red
+while GitHub holds an issue no bead points at, while the tracker holds a bead
+GitHub has never heard of, and while the two describe work they *both* know
+differently. The second went unasked until `unexported.py` made it answerable
+from the committed export alone; the third until `drifted.py` did, after it had
+been found by hand three batches running.
+
+One job and one `run:` line, with `scripts/sync-issues.sh --check` asking all
+three — because a step that fails stops the job, so as three workflow steps the
+later questions would go unasked for as long as an earlier one was red. None of
+the three brings anything in or sends anything out.
+
+**The third will not be automated, and that is a decision rather than an
+omission.** Closing an issue to match a closed bead would be right almost every
+time, and the exception is the whole reason not to: an issue may be open because
+somebody *reopened* it, saying the work is not done after all. A schedule that
+overruled them would be doing exactly what point 5 forbids an export from doing,
+and what `--prefer-newer` exists to leave to a person looking at a diff. So the
+check names what disagrees, and settling it stays a person running
+`sync-issues.sh`.
 
 **Two credentials are needed to act, and they are configured separately.** `gh`
 works out which repository it is in by reading the checkout; `bd` does not, and

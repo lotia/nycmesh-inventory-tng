@@ -1261,6 +1261,7 @@ fine — see [CONTRIBUTING.md](CONTRIBUTING.md). An issue you open there is mean
 to reach the tracker rather than sit beside it:
 
 ```bash
+scripts/sync-issues.sh --check     # is anything out of step? (refuses if so)
 scripts/sync-issues.sh --dry-run   # what would move, in either direction
 scripts/sync-issues.sh             # reconcile the two
 scripts/pull-new-issues.sh         # only the half that brings issues in
@@ -1297,10 +1298,15 @@ them does not break anything — the tracker is not made wrong by an unsynced
 issue, only incomplete.
 
 Nothing does any of this for you. No git hook fires it, and CI does not run it;
-what CI does is ask every morning, in both directions — is GitHub holding an
-issue no bead points at, and is the tracker holding a bead GitHub has never
-heard of — and stay red until somebody commits the rows. One check, both
-answers, and it clears itself with nothing to close. Why it is arranged that
+what CI does is ask every morning whether the two lists are out of step, which
+is three questions — is GitHub holding an issue no bead points at, is the
+tracker holding a bead GitHub has never heard of, and do the two disagree about
+work they *both* know. It stays red until somebody has acted, and clears itself
+with nothing to close.
+
+That third one it will only ever *report*, never fix — reconciling it is
+`sync-issues.sh` and a person, for the reason
+[0031](docs/decisions/0031-the-issue-list-is-a-window-on-the-tracker.md) gives. Why it is arranged that
 way, why the correspondence between the two lists reaches every clone for free,
 and what a GitHub reader is and is not looking at, are
 [0031](docs/decisions/0031-the-issue-list-is-a-window-on-the-tracker.md).

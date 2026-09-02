@@ -675,6 +675,10 @@ jobs:
         run: scripts/issue-numbers.test.sh
       - name: Check the one-time exporter
         run: scripts/export-issues.test.sh
+      - name: Check the disagreement reader
+        run: scripts/drifted.test.sh
+      - name: Check the reconciliation checker
+        run: scripts/sync-issues.test.sh
       # And then run it, which none of the above do to their own subject. What
       # it reads here is what a clone is handed before anybody configures
       # anything, so a hook that stopped arriving with the checkout is caught
