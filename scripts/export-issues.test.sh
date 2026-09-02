@@ -31,17 +31,10 @@ OURS="https://github.com/o/r"
 BORROWED=(bash readlink dirname git wc tr cut awk grep tail mktemp rm cat python3)
 
 # A REMOTE THE SCENE CAN MOVE. The guard added for inventory-tng-cwpa.10 refuses
-# to file from a checkout that is behind, so every --confirm case needs a
-# checkout that is legitimately current -- which means a real upstream rather
-# than a stub, since the question is asked of git itself.
-new_repo "$REMOTE"
-(cd "$REMOTE" && git commit -q --allow-empty -m "root") || exit 1
-
-new_repo "$REPO"
-git -C "$REPO" remote add origin "$REMOTE"
-git -C "$REPO" fetch -q origin
-git -C "$REPO" reset -q --hard origin/main
-git -C "$REPO" branch -q --set-upstream-to=origin/main main
+# to file from a checkout that is behind, so every --confirm case needs one that
+# is legitimately current. testlib's, because pull-new-issues.test.sh needs the
+# same thing and the two copies had already drifted.
+tracking_repo "$REPO" "$REMOTE" || exit 1
 mkdir -p "$REPO/scripts" "$REPO/.beads"
 cp "$HERE/export-issues.sh" "$HERE/pull-new-issues.sh" "$HERE/unsynced.py" \
    "$HERE/unexported.py" "$HERE/issue-numbers.py" "$HERE/report.sh" \
@@ -141,14 +134,6 @@ scene() {
     bead "$id" "$status" "$OURS/issues/$number" >> "$BD_EXPORT"
   done
 }
-
-# fall_behind: a commit on the remote that this checkout has not fetched.
-fall_behind() {
-  (cd "$REMOTE" && git commit -q --allow-empty -m "somebody else's work")
-}
-# The script under test fetches immediately before this runs, so the reset alone
-# is enough to be current again.
-catch_up() { git -C "$REPO" reset -q --hard origin/main; }
 
 export_issues() { (cd "$REPO" && PATH="$BIN" ./scripts/export-issues.sh "$@") 2>&1; }
 check export_issues
@@ -312,7 +297,7 @@ echo "a checkout that is not current"
 
 scene "60" "inventory-tng-aaa:open:60 inventory-tng-bbb:open"
 with_bd
-fall_behind
+fall_behind "$REMOTE"
 out=$(export_issues --confirm); status=$?
 assert "$out" "$status" 2 "behind origin/main" "a checkout behind its upstream refuses to file"
 assert "$out" "$status" 2 "export-issues.sh:" "and the refusal names the command that was run, not the file it lives in"
@@ -324,16 +309,16 @@ assert "<$(cat "$BD_PUSHED")>" 0 0 "<>" "nothing reached bd"
 # because a stale checkout does not know about the other side's issue either.
 refute "$out" "$status" 2 "bring those in first" "and it is not the unlinked-issue guard doing the work"
 
-catch_up
+catch_up "$REPO"
 expect --confirm -- 0 "view of the tracker" "and it files once the checkout catches up"
 
 # The half that must NOT refuse: refusing a question that files nothing would be
 # refusing to answer it.
-fall_behind
+fall_behind "$REMOTE"
 no_bd
 expect 0 "have never been filed" "a dry run is not refused for being behind"
 
-catch_up
+catch_up "$REPO"
 scene "60" "inventory-tng-aaa:open:60 inventory-tng-bbb:open"
 with_bd
 git -C "$REPO" branch -q --unset-upstream

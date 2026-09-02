@@ -34,19 +34,13 @@ BIN="$WORK/bin"
 REPO="$WORK/repo"
 REMOTE="$WORK/remote"
 
-# A REMOTE THE SCENE CAN MOVE, because a run that writes now refuses from a
-# checkout that is behind -- and the question is asked of git itself, so a stub
-# would not answer it.
-new_repo "$REMOTE"
-(cd "$REMOTE" && git commit -q --allow-empty -m "root") || exit 1
-
+# A REMOTE THE SCENE CAN MOVE, because a run that writes refuses from a checkout
+# that is behind and the question is asked of git itself. testlib's, shared with
+# export-issues.test.sh.
+#
 # The scripts have to live INSIDE the checkout they read: pull-new-issues.sh
 # resolves the export from its own location, not the caller's directory.
-new_repo "$REPO"
-git -C "$REPO" remote add origin "$REMOTE"
-git -C "$REPO" fetch -q origin
-git -C "$REPO" reset -q --hard origin/main
-git -C "$REPO" branch -q --set-upstream-to=origin/main main
+tracking_repo "$REPO" "$REMOTE" || exit 1
 mkdir -p "$REPO/scripts" "$REPO/.beads"
 cp "$HERE/pull-new-issues.sh" "$HERE/unsynced.py" "$HERE/report.sh" \
    "$HERE/repository.sh" "$REPO/scripts/"
@@ -89,10 +83,6 @@ issues_are() {
 
 with_bd() { printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/bd"; chmod +x "$BIN/bd"; }
 no_bd() { rm -f "$BIN/bd"; }
-
-# fall_behind: a commit on the remote this checkout has not fetched.
-fall_behind() { (cd "$REMOTE" && git commit -q --allow-empty -m "somebody else's work"); }
-catch_up() { git -C "$REPO" fetch -q origin && git -C "$REPO" reset -q --hard origin/main; }
 
 pull() { (cd "$REPO" && PATH="$BIN" ./scripts/pull-new-issues.sh "$@") 2>&1; }
 check pull
@@ -180,7 +170,7 @@ echo "a checkout that is not current"
 
 with_bd
 issues_are "1 2"
-fall_behind
+fall_behind "$REMOTE"
 out=$(pull); status=$?
 assert "$out" "$status" 2 "behind origin/main" "a pull that would write refuses from a stale checkout"
 assert "$out" "$status" 2 "pull-new-issues.sh:" "and the refusal names the command that was run"
@@ -190,7 +180,7 @@ assert "$out" "$status" 2 "pull-new-issues.sh:" "and the refusal names the comma
 expect --dry-run -- 0 "no bead points at: 2" "a dry run is not refused for being behind"
 expect --check -- 1 "have no bead" "and neither is --check, which files nothing either"
 
-catch_up
+catch_up "$REPO"
 issues_are "1"
 expect 0 "already linked" "and a current checkout pulls as before"
 
