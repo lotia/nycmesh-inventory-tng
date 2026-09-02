@@ -102,6 +102,36 @@ bead() {
   printf '}\n'
 }
 
+# rich <id> <extra fields as JSON> [<external_ref>] -- an export row carrying
+# the fields `bead` cannot.
+#
+# HERE FOR THE REASON `bead` GIVES ABOUT ITSELF. `bead` covers id, status and
+# ref, which is everything the readers that only look at those need; the readers
+# of `design`, `acceptance_criteria`, `notes` and `dependencies` need a row with
+# those in it, and two suites wrote a byte-identical copy of this before it was
+# moved. Both feed `unsynced.rows` and `ref_of`, which stop the world over a
+# shape they do not recognise -- so the day that shape moves, one definition
+# moves with it and two copies would not.
+#
+# THROUGH `json.dumps` RATHER THAN IN PLACE, which is the other way round from
+# `bead` and deliberately: the values here are whole prose sections a case
+# chose, newlines and quotation marks included, and `bead`'s two substitutions
+# are what its own header calls the honest limit. This is called a few dozen
+# times rather than several hundred, so a fork per row costs nothing.
+rich() {
+  python3 - "$1" "$2" "${3:-}" <<'ROW'
+import json
+import sys
+
+identifier, extra, ref = sys.argv[1], json.loads(sys.argv[2]), sys.argv[3]
+row = {"_type": "issue", "id": identifier, "title": "t"}
+if ref:
+    row["external_ref"] = ref
+row.update(extra)
+print(json.dumps(row))
+ROW
+}
+
 # tracking_repo <checkout> <remote> -- a checkout that is level with an upstream.
 #
 # Two suites built this, because two scripts refuse to write from a checkout

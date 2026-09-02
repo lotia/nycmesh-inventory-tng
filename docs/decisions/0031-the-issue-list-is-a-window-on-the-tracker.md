@@ -154,6 +154,75 @@ again tomorrow, it needs nothing closed or cleaned up, and it goes green by
 itself when somebody commits the rows. A pull request would have announced the
 same fact once and then rotted.
 
+### The window is wider than point 2 said, and a comment is why
+
+Amended 2026-09-02, for `inventory-tng-cwpa.15`. Point 2 above says what stays
+behind — design, acceptance criteria, notes, every dependency — and calls that
+asymmetry "accepted rather than regretted". The acceptance stands; the size of
+it does not, and this is what changed.
+
+**What the acceptance was actually against.** Point 2 gives one reason:
+inventing a dependency graph "out of labels and checklists would produce a
+second half-tracker to keep in step". That is an argument against a
+*representation GitHub could be edited through* — a checklist somebody ticks, a
+label somebody removes — because two writable copies of one fact is the thing
+nothing can keep true. It is not an argument against a reader being able to see
+what a piece of work depends on, which is a different question and had been
+answered by accident.
+
+**What it cost.** 367 of the 435 beads with an issue carry something the body
+does not say. A contributor reading on GitHub — which is everybody who has
+never run `bd`, and the whole reason
+[the tracker is public](0029-the-issue-tracker-is-public.md) — cannot see what
+would make a piece of work done, and an epic reads as a description with
+nothing under it.
+
+**The body was not available.** The obvious fix is to write more into the
+description before pushing it, and that fix is unsafe here for the reason point
+6 gives: reconciliation runs `--prefer-newer`, so a body newer than its bead
+replaces that bead's description. Anything written into a body comes back on
+the next pull and *becomes* the bead. That is not a window growing; it is the
+copy overwriting the original.
+
+**And not GitHub's own relations, which is the other thing to rule out.**
+Sub-issues and issue dependencies are the features built for the symptom this
+opens with, and they are the natural reach. Two reasons they are not it. They
+are **editable in the UI and never read back**, which makes them precisely the
+writable second copy point 2 refused — unless a pass reconciled them wholesale,
+which means silently deleting a link a contributor added by hand. And they carry
+two of the four relation types and **none** of `design`, `acceptance_criteria`
+or `notes` — so adopting them buys a nicer rendering of part of the content at
+the price of running two mechanisms. Worth revisiting only if the second ever
+stops being true.
+
+**So it is a comment, and the comment is generated.** `bd` reads and writes no
+issue comments in either direction — checked, not assumed — so a comment is the
+one place text can sit beside a body without travelling back.
+`scripts/unsaid.py` renders it from the committed export and
+`scripts/say-bead.sh` puts it there, rewriting the one it left rather than
+adding another, and taking it down when the bead stops having anything to say.
+
+**This does not create the thing point 2 refused.** Nothing ever reads the
+comment back. It is overwritten wholesale from the export on every pass, it is
+marked as generated and says where the record is, and no decision is ever made
+from it. A projection that is rewritten from its source is not a second copy to
+keep in step — it is the same argument that makes `external_ref` in a committed
+file safe. **An issue is still a summary, and the bead is still the thing.**
+
+**It runs as step 5 of the reconciliation**, in the same pass that pushes the
+bodies, so a comment and the body it sits under are never one run apart. It is
+deliberately not part of the standing signal in point 7: asking whether every
+comment is current costs one request per issue, every morning, to notice
+something the next ordinary run repairs.
+
+**But mirroring and keeping up are not the same act, and only one of them is
+automatic.** Writing a comment onto every issue that has never had one is the
+same kind of thing point 4 makes `export-issues.sh` ask for `--confirm` before
+doing, and being a step of a script does not make it smaller. So the ordinary
+case — the few that moved — runs unasked, and a pass that would create more
+than a handful refuses and says what to type. `--no-say` reconciles without the
+step at all.
+
 ## Consequences
 
 **Anybody can answer "is this in step?" offline.** The comparison is between

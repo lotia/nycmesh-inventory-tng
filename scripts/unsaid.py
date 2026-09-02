@@ -30,16 +30,28 @@ padding. A bead whose last dependency or acceptance criterion is removed stops
 having anything to say -- and the comment already sitting on its issue then
 says something the tracker no longer does. Listing only the talkative ones left
 the caller no way to learn that such an issue exists, so the stale comment would
-stay for ever. The caller writes for `say` and removes for `silent`.
+stay for ever.
+
+THE LISTING HANDS BACK THE MARKER LINE, NOT A WORD ABOUT IT. Composing a comment
+is how this knows whether a bead has anything to say at all, so the listing has
+rendered every one of them by the time it prints a row. Printing `say` and
+throwing the body away made the caller ask again, once per bead, in a fresh
+interpreter that re-read this whole file -- 8.5 seconds and 367 parses on a pass
+that usually writes nothing, which is the same shape `say-bead.sh` spends
+fifteen lines explaining why it does not do to GitHub. The marker is one line,
+carries the digest the caller compares against, and cannot hold a tab, so it
+travels in the row. An empty third column is a bead with nothing to say.
 
 Usage:
     unsaid.py .beads/issues.jsonl lotia/nycmesh-inventory-tng
-        id<TAB>issue number<TAB>say|silent, for every bead with an issue of ours
+        id<TAB>issue number<TAB>marker line, for every bead with an issue of
+        ours, the marker empty when the bead has nothing to add
 
     unsaid.py .beads/issues.jsonl lotia/nycmesh-inventory-tng inventory-tng-abc
         the comment body for that one bead, or nothing at all
 """
 
+import hashlib
 import sys
 from pathlib import Path
 
@@ -50,7 +62,41 @@ from unsynced import issue_of, ref_of, rows
 #: arrangement for the same reason; this is a different marker because the two
 #: live on different things and a script must never edit the other's comment.
 #: Invisible in the rendered page, so it costs a reader nothing.
-MARKER = "<!-- bead-fields -->"
+MARKER = "<!-- bead-fields"
+
+#: How many characters of the digest go in the marker. Eight is not a security
+#: margin and is not meant as one -- see `stamped`.
+FINGERPRINT = 8
+
+
+def stamped(body: str) -> str:
+    """`body` with a marker naming it, so a caller can tell it from what is posted.
+
+    WHAT THIS IS FOR, because the word "hash" invites the wrong reading: it is
+    cache invalidation, and nothing else. The poster has to decide whether the
+    comment already on an issue says what this run would say, and the cheap way
+    to ask GitHub is to list every comment in the repository at once -- five
+    requests rather than one per issue. That listing gives whole bodies, and
+    comparing 367 of them through the shell means either encoding each one or
+    reading them back one issue at a time, which is the cost the listing was
+    there to avoid. A short digest on the first line is a token the shell can
+    compare with `==`.
+
+    AND NOT `updated_at`, WHICH IS THE OBVIOUS PLAINER SIGNAL AND CANNOT WORK.
+    A bead's own timestamp does not move when the thing rendered about it does:
+    a parent's comment changes when a CHILD is added, a link's rendering changes
+    when the OTHER bead gains an `external_ref`, and a change to the wording here
+    or to the decision URL must rewrite all of them while no bead has moved at
+    all. The digest covers three cases a timestamp covers none of.
+
+    NOTHING IS BEING AUTHENTICATED. Nobody is kept out by this and nothing is
+    trusted because of it: the worst a collision does is skip one rewrite, which
+    the next change to that bead undoes. `hashlib` is the standard library's, per
+    AGENTS.md's first route, and there is no construction here to get wrong --
+    the digest is used exactly as `hashlib` hands it over.
+    """
+    digest = hashlib.sha256(body.encode()).hexdigest()[:FINGERPRINT]
+    return f"{MARKER} {digest} -->\n{body}"
 
 #: The prose a bead carries and an issue body does not, and what to call each on
 #: GitHub. `acceptance_criteria` is titled for the question it answers rather
@@ -66,8 +112,15 @@ PROSE = (
 #: is handled separately because it is the only one that reads differently from
 #: each end -- the child says what it is part of, the parent lists what it
 #: holds.
+#:
+#: `blocks` READS BACKWARDS FROM ITS NAME, and getting that wrong put the
+#: reverse of the truth on a public issue. `bd dep add <a> <b>` stores the row on
+#: `a` and means "a is blocked by b" -- its own help says `--blocked-by` and
+#: `--depends-on` are aliases for the same thing, and `bd show` prints it under
+#: DEPENDS ON. So the row this reads names the bead being WAITED ON, and the
+#: bead carrying it is the one that is stuck.
 RELATIONS = {
-    "blocks": "Blocks",
+    "blocks": "Blocked by",
     "related": "Related to",
     "discovered-from": "Discovered from",
 }
@@ -106,6 +159,18 @@ def indexed(text: str, export: Path) -> tuple[dict[str, dict], dict[str, list[st
     return by_id, children
 
 
+def numbered(row: dict | None, repository: str) -> str | None:
+    """The issue number a bead's row names, when that issue is `repository`'s.
+
+    Both callers had this three-line derivation written out, guard and all --
+    and it is the one `issue_of`'s docstring spends three paragraphs saying must
+    have exactly one spelling, because the failure is a number that means
+    somebody else's work.
+    """
+    ref = row.get("external_ref") if row else None
+    return issue_of(ref, repository) if ref else None
+
+
 def names(identifier: str, by_id: dict[str, dict], repository: str) -> str:
     """How to write another bead down: `#41` when GitHub has it, else its id.
 
@@ -121,9 +186,7 @@ def names(identifier: str, by_id: dict[str, dict], repository: str) -> str:
     wear that number -- `inventory-tng-cwpa.12` is the whole argument, and this
     is a caller that would have made the same mistake.
     """
-    row = by_id.get(identifier)
-    ref = row.get("external_ref") if row else None
-    number = issue_of(ref, repository) if ref else None
+    number = numbered(by_id.get(identifier), repository)
     return f"#{number} (`{identifier}`)" if number else f"`{identifier}`"
 
 
@@ -140,10 +203,10 @@ def comment(identifier: str, by_id: dict[str, dict], children: dict[str, list[st
     if row is None:
         raise SystemExit(f"no bead in the export is called {identifier}")
 
-    parts: list[str] = []
+    out: list[str] = []
     for field, title in PROSE:
-        if row.get(field):
-            parts += [f"**{title}**", "", str(row[field]).strip(), ""]
+        if value := row.get(field):
+            out += [f"**{title}**", "", str(value).strip(), ""]
 
     links: list[str] = []
     for dep in row.get("dependencies") or []:
@@ -159,13 +222,13 @@ def comment(identifier: str, by_id: dict[str, dict], children: dict[str, list[st
     if held:
         links.append("**Holds** " + ", ".join(names(c, by_id, repository) for c in held))
 
-    if not parts and not links:
-        return ""
-
-    out = [MARKER, "### What the tracker holds that this issue does not", ""]
-    out += parts
     if links:
         out += [*links, ""]
+
+    if not out:
+        return ""
+
+    out = ["### What the tracker holds that this issue does not", "", *out]
     # AN ABSOLUTE URL, because a relative one is resolved against the page a
     # comment is rendered on rather than against the repository, and the
     # repository is a thing this already knows.
@@ -177,7 +240,7 @@ def comment(identifier: str, by_id: dict[str, dict], children: dict[str, list[st
         f"Written from `.beads/issues.jsonl` for `{identifier}`, which is the record; this is a "
         f"copy of part of it. [Why it is a comment and not the description]({decision})."
     ]
-    return "\n".join(out)
+    return stamped("\n".join(out))
 
 
 def main() -> int:
@@ -196,12 +259,11 @@ def main() -> int:
         return 0
 
     for identifier, row in by_id.items():
-        ref = row.get("external_ref")
-        number = issue_of(ref, repository) if ref else None
+        number = numbered(row, repository)
         if not number:
             continue
-        said = "say" if comment(identifier, by_id, children, repository) else "silent"
-        print(f"{identifier}\t{number}\t{said}")
+        body = comment(identifier, by_id, children, repository)
+        print(f"{identifier}\t{number}\t{body.splitlines()[0] if body else ''}")
     return 0
 
 
