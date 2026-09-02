@@ -783,7 +783,7 @@ case_is "gh pr merge 7 --rebase" "not finished" \
 (cd "$REPO" && git reset -q --hard HEAD~1)
 head_is "$HEAD_OID"
 record >/dev/null
-case_is "gh pr merge 7 --rebase" "" "a collapsed branch with a receipt merges"
+case_is "gh pr merge 7 --rebase" PERMIT "a collapsed branch with a receipt merges"
 
 # THE HOLE THE REVIEW FOUND. `gh pr merge <n>` will merge a pull request that is
 # not what is checked out, and a tidy branch elsewhere has nothing waiting to be
