@@ -7,7 +7,13 @@
 # happened. `inventory-tng-cwpa.1`, and the argument for the whole arrangement
 # is on `inventory-tng-cwpa`.
 #
-# Usage: pull-new-issues.sh [--dry-run | --check] [<repository>]
+# Usage: pull-new-issues.sh [--dry-run | --check] [--listing <file>] [<repository>]
+#
+# --listing takes the `number<TAB>url` records this would otherwise fetch, so a
+# caller that has already asked GitHub does not make it ask again. It changes
+# where the bytes come from and nothing else: the comparison, the refusal and
+# its wording all stay here, which is what made delegating to this script worth
+# doing. inventory-tng-cwpa.13.
 #
 # --dry-run says what would be brought in and brings nothing.
 # --check does the same and REFUSES when anything is waiting, which is what a
@@ -35,16 +41,23 @@ EXPORT="$REPO_ROOT/.beads/issues.jsonl"
 
 dry_run=false
 check=false
+listing=""
 repository="${GITHUB_REPOSITORY:-}"
-for argument in "$@"; do
-  case "$argument" in
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --listing)
+      [[ $# -ge 2 ]] || refuse "--listing needs a file"
+      listing=$2
+      shift
+      ;;
     --dry-run) dry_run=true ;;
     # `--check` is a dry run that refuses. Nothing is pulled either way, so it
     # needs no more than a dry run does.
     --check) dry_run=true; check=true ;;
-    -*) refuse "unknown flag $argument" ;;
-    *) repository="$argument" ;;
+    -*) refuse "unknown flag $1" ;;
+    *) repository="$1" ;;
   esac
+  shift
 done
 
 # `bd` ONLY WHEN SOMETHING WILL ACTUALLY BE PULLED. A dry run answers from the
@@ -97,7 +110,41 @@ repository="$REPOSITORY"
 gaps=$(mktemp) || exit 2
 trap 'rm -f "$gaps"' EXIT
 
-if ! offered=$(gh issue list ${repository:+--repo "$repository"} --state all --limit 1000 \
+if [[ -n "$listing" ]]; then
+  # A FILE, AND READ BY THE SHELL ITSELF. `-r` alone is true of a DIRECTORY, and
+  # the read that followed was not checked: `cat` failed, `offered` came back
+  # empty, and the guard below reported "GitHub has no issues" and exited 0 --
+  # a listing nothing ever read, answering the question green, which is the one
+  # failure that guard exists to stop. `-f` settles it before the read.
+  #
+  # `$(<file)` rather than `cat`, because the read is then bash's and the script
+  # reaches for no program it did not already need. That list is an assertion
+  # pull-new-issues.test.sh makes with `borrow`, and `cat` was not in it: under
+  # that PATH the read failed and the run went green for the same reason.
+  [[ -f "$listing" && -r "$listing" ]] || refuse "cannot read the listing it was handed: $listing"
+  offered=$(<"$listing")
+
+  # A LISTING HANDED IN IS A NEW WAY TO BE WRONG, and this is the guard for it.
+  # Fetched here, `--repo` makes the records ours by construction; handed in,
+  # nothing says so, and another repository's issues would be offered as
+  # unpulled and become beads pointing at somebody else's work.
+  #
+  # A PREFIX, NOT A PARSE. unsynced.py matches whole URLs on purpose and this
+  # does not weaken that: it asks only whether each record is an issue of the
+  # repository this run resolved, and leaves the matching alone.
+  #
+  # COMPARED WITHOUT CASE, because GitHub's owner and repository names are not
+  # case-sensitive and the URLs it returns are canonically cased. A repository
+  # typed by hand in another casing is the same repository, and refusing its own
+  # listing would be this guard firing on the thing it exists to permit.
+  ours="https://github.com/$repository/issues/"
+  ours=${ours,,}
+  while IFS=$'\t' read -r _ url; do
+    [[ -z "$url" ]] && continue
+    [[ "${url,,}" == "$ours"* ]] && continue
+    refuse "the listing holds $url, which is not an issue of $repository."
+  done <<<"$offered"
+elif ! offered=$(gh issue list ${repository:+--repo "$repository"} --state all --limit 1000 \
   --json number,url --jq '.[] | "\(.number)\t\(.url)"' 2>"$gaps"); then
   refuse "could not list issues:" "$(tail -2 "$gaps")"
 fi

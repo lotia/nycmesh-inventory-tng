@@ -35,10 +35,10 @@ borrow "$BIN" "${BORROWED[@]}"
 
 EXPORT="$REPO/.beads/issues.jsonl"
 
-# A `gh` answering both listings from files the cases rewrite. The two differ:
-# --json number,url for the unlinked question, --json number,state for the
-# disagreement one, and a stub that returned one shape for both would let a
-# reader pass on input it will never actually see.
+# A `gh` answering from files the cases rewrite. ONE listing now, carrying
+# number, url and state together: the script asks once and cuts the two columns
+# each question reads out of the one answer, so a stub with two listings in it
+# would be answering a question this no longer asks.
 cat > "$BIN/gh" <<'STUB'
 #!/usr/bin/env bash
 # EVERY KNOB IS A FILE THE SCENE OWNS, like the two listings, so that `scene`
@@ -54,13 +54,12 @@ case "$*" in *"repo view"*) echo "o/r"; exit 0 ;; esac
 cat "$GH_NOISE" >&2
 [[ -s "$GH_DEAD" ]] && exit 1
 case "$*" in
-  *"number,state"*) cat "$GH_STATES" ;;
-  *"issue list"*)   cat "$GH_ISSUES" ;;
+  *"issue list"*) echo "issue list" >> "$GH_CALLS"; cat "$GH_LIVE" ;;
   *) exit 1 ;;
 esac
 STUB
 chmod +x "$BIN/gh"
-export GH_ISSUES="$WORK/issues" GH_STATES="$WORK/states"
+export GH_LIVE="$WORK/live" GH_CALLS="$WORK/calls"
 export GH_NOISE="$WORK/noise" GH_DEAD="$WORK/dead"
 
 # `bd` must not be needed. It exists only so a case can prove that.
@@ -72,12 +71,11 @@ no_bd
 
 # scene <"issues as number:state"> <"beads as id:status[:number]">
 scene() {
-  : > "$GH_ISSUES"; : > "$GH_STATES"; : > "$EXPORT"; : > "$GH_NOISE"; : > "$GH_DEAD"
+  : > "$GH_LIVE"; : > "$EXPORT"; : > "$GH_NOISE"; : > "$GH_DEAD"; : > "$GH_CALLS"
   local entry n state id status number
   for entry in $1; do
     IFS=: read -r n state <<<"$entry"
-    printf '%s\t%s/issues/%s\n' "$n" "$OURS" "$n" >> "$GH_ISSUES"
-    printf '%s\t%s\n' "$n" "$state" >> "$GH_STATES"
+    printf '%s\t%s/issues/%s\t%s\n' "$n" "$OURS" "$n" "$state" >> "$GH_LIVE"
   done
   for entry in $2; do
     IFS=: read -r id status number <<<"$entry"
@@ -152,10 +150,16 @@ echo "a listing cut short is not agreement"
 # spells out at its own LIMIT guard. What is pinned here is that a full page is
 # refused rather than reported as agreement.
 scene "60:OPEN" "inventory-tng-aaa:open:60"
-for n in {1..1000}; do printf '%s\tOPEN\n' "$n"; done > "$GH_STATES"
+for n in {1..1000}; do printf '%s\t%s/issues/%s\tOPEN\n' "$n" "$OURS" "$n"; done > "$GH_LIVE"
 out=$(sync --check); status=$?
 assert "$out" "$status" 2 "cut short" "a listing filling the limit is refused, not read as agreement"
 refute "$out" "$status" 2 "in step" "and the run never claims the two lists agree"
+# AND NEITHER QUESTION MAY ANSWER FROM IT. One listing is now read twice, so the
+# guard belongs where it is fetched: question 1 answering "every issue is already
+# linked" from a page this script knows stops short is the same false green one
+# heading up.
+assert "$out" "$status" 2 "stops short of the end" "and question 1 is not answered from it either"
+refute "$out" "$status" 2 "have no bead" "so it never reports on the part it could not see"
 
 echo
 echo "a pull half that could not look stops the run"
@@ -167,6 +171,22 @@ scene "60:OPEN" "inventory-tng-aaa:open:60"
 out=$(sync); status=$?
 assert "$out" "$status" 2 "nothing here may push" "a refusal from step 1 stops the run"
 refute "$out" "$status" 2 "Pushing what is only here" "so step 4 is never reached"
+
+echo
+echo "one listing, handed to the question that reads it"
+# inventory-tng-cwpa.13. Questions 1 and 3 both want what GitHub is holding, and
+# asking twice was two round trips and, worse, two snapshots.
+
+scene "60:OPEN 61:OPEN" "inventory-tng-aaa:open:60"
+out=$(sync --check); status=$?
+assert "$out" "$status" 1 "no bead points at: 61" "the pull half answers from the listing it was handed"
+# COUNTED, NOT MATCHED. `assert` looks for a substring, and "1" is a substring
+# of 11 and of 21 -- an assertion about a number that a bigger number satisfies.
+equals "$(grep -c "issue list" "$GH_CALLS")" 1 "and GitHub is asked exactly once for the whole run"
+
+# What the flag itself refuses is pull-new-issues.test.sh's to say, under the
+# borrowed PATH that suite keeps deliberately narrow. What belongs here is only
+# that the listing is handed over at all, which is the two cases above.
 
 echo
 echo "what asking needs"
