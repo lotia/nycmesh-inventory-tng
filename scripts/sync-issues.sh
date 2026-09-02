@@ -189,8 +189,12 @@ if [[ "$check" == true ]]; then
     note "Everything past that would be passed over and reported as agreeing."
     note "Raise LIMIT in this script and re-run."
     unanswerable=1
+  # THE REPOSITORY IS HANDED OVER, because the listing arrives as numbers and
+  # states with nothing in it to say whose. drifted.py reads a number out of
+  # every ref in the export to look it up here, and a number means nothing until
+  # the ref it came from is known to be this repository's. inventory-tng-cwpa.12.
   elif ! disagreeing=$(printf '%s\n' "$live" | cut -f1,3 \
-    | python3 "$HERE/drifted.py" "$REPO_ROOT/$EXPORT" 2>"$gaps"); then
+    | python3 "$HERE/drifted.py" "$REPO_ROOT/$EXPORT" "$REPOSITORY" 2>"$gaps"); then
     fail "could not compare the two sides:"
     note "$(tail -2 "$gaps")"
     unanswerable=1

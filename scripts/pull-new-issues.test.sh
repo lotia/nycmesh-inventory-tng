@@ -209,13 +209,18 @@ refute "$out" "$status" 2 "Nothing to pull" "and it never reports success over a
 out=$(pull --check --listing "$WORK/never-written"); status=$?
 assert "$out" "$status" 2 "cannot read the listing" "and so is a file that is not there"
 
-# THE GUARD FIRING, which only its own suite can pin: handed another repository's
-# listing, this would offer their issues as unpulled and make beads pointing at
-# somebody else's work. Only the negative was asserted here before, so nothing
-# said the refusal happened at all.
+# THE GUARD FIRING. The rule is unsynced.py's, and unsynced.test.sh pins both
+# its wording and what it costs to skip. What this case pins is the wiring: a
+# file handed in through --listing is actually put past it, on the one path
+# where nothing else has settled whose issues these are.
+# inventory-tng-cwpa.12.
 printf '%s\t%s\n' 99 "https://github.com/someone/else/issues/99" > "$WORK/stray"
 out=$(pull --check --listing "$WORK/stray"); status=$?
 assert "$out" "$status" 2 "not an issue of o/r" "a listing from another repository is refused, not read"
 refute "$out" "$status" 2 "no bead points at" "and none of it is offered for pulling"
+# AND IT SAYS WHOSE REFUSAL IT IS. The rule is python's and prints a bare
+# sentence; under sync-issues.sh --check that lands beneath a numbered heading
+# with three scripts running under it and nothing saying which one objected.
+assert "$out" "$status" 2 "pull-new-issues.sh:" "and the refusal names the command that was run"
 
 verdict

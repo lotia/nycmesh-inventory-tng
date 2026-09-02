@@ -11,9 +11,11 @@
 #
 # --listing takes the `number<TAB>url` records this would otherwise fetch, so a
 # caller that has already asked GitHub does not make it ask again. It changes
-# where the bytes come from and nothing else: the comparison, the refusal and
-# its wording all stay here, which is what made delegating to this script worth
-# doing. inventory-tng-cwpa.13.
+# where the bytes come from and nothing else: the comparison and the wording of
+# what is waiting stay here, which is what made delegating to this script worth
+# doing. inventory-tng-cwpa.13. What it does add is a way to be handed another
+# repository's issues, and unsynced.py refuses those -- see the flag's own
+# branch below.
 #
 # --dry-run says what would be brought in and brings nothing.
 # --check does the same and REFUSES when anything is waiting, which is what a
@@ -121,29 +123,16 @@ if [[ -n "$listing" ]]; then
   # reaches for no program it did not already need. That list is an assertion
   # pull-new-issues.test.sh makes with `borrow`, and `cat` was not in it: under
   # that PATH the read failed and the run went green for the same reason.
+  #
+  # WHOSE ISSUES THEY ARE IS NOT ASKED HERE, and that is deliberate rather than
+  # missing. This flag is the one way records reach the reader without `--repo`
+  # having settled that question first, so somebody has to ask it -- but what a
+  # GitHub URL looks like is unsynced.py's to know, and a second opinion about
+  # it written in shell is how the two come to disagree. `refuse_foreign` there
+  # holds the whole rule, and says what reading somebody else's would cost.
+  # inventory-tng-cwpa.12.
   [[ -f "$listing" && -r "$listing" ]] || refuse "cannot read the listing it was handed: $listing"
   offered=$(<"$listing")
-
-  # A LISTING HANDED IN IS A NEW WAY TO BE WRONG, and this is the guard for it.
-  # Fetched here, `--repo` makes the records ours by construction; handed in,
-  # nothing says so, and another repository's issues would be offered as
-  # unpulled and become beads pointing at somebody else's work.
-  #
-  # A PREFIX, NOT A PARSE. unsynced.py matches whole URLs on purpose and this
-  # does not weaken that: it asks only whether each record is an issue of the
-  # repository this run resolved, and leaves the matching alone.
-  #
-  # COMPARED WITHOUT CASE, because GitHub's owner and repository names are not
-  # case-sensitive and the URLs it returns are canonically cased. A repository
-  # typed by hand in another casing is the same repository, and refusing its own
-  # listing would be this guard firing on the thing it exists to permit.
-  ours="https://github.com/$repository/issues/"
-  ours=${ours,,}
-  while IFS=$'\t' read -r _ url; do
-    [[ -z "$url" ]] && continue
-    [[ "${url,,}" == "$ours"* ]] && continue
-    refuse "the listing holds $url, which is not an issue of $repository."
-  done <<<"$offered"
 elif ! offered=$(gh issue list ${repository:+--repo "$repository"} --state all --limit 1000 \
   --json number,url --jq '.[] | "\(.number)\t\(.url)"' 2>"$gaps"); then
   refuse "could not list issues:" "$(tail -2 "$gaps")"
@@ -159,9 +148,20 @@ if [[ -z "$offered" ]]; then
   verdict "Nothing to pull." pulling
 fi
 
-# unsynced.py needs no repository: the URL GitHub returns is compared whole
-# against the URL bd stored, so it is carried in the string being matched.
-new=$(printf '%s\n' "$offered" | python3 "$HERE/unsynced.py" "$EXPORT") || exit 2
+# THE MATCHING NEEDS NO REPOSITORY -- the URL GitHub returns is compared whole
+# against the URL bd stored, so it is carried in the string being matched. The
+# repository is handed over for the other thing unsynced.py does with it: it
+# refuses a record that is not an issue of this repository, which is what a
+# listing handed in through --listing has nothing else to say.
+#
+# AND ITS REFUSAL IS FRAMED HERE, because unsynced.py prints a bare sentence and
+# a bare sentence names no command. Every other refusal in this file goes through
+# `refuse`, which prefixes what somebody typed -- report.sh says why that is not
+# decoration -- and the guard this replaced did too, until the rule moved into
+# python. One wording covers all of them: a missing export, a line it could not
+# parse and a record from somewhere else are each "it could not be read".
+new=$(printf '%s\n' "$offered" | python3 "$HERE/unsynced.py" "$EXPORT" "$repository") ||
+  refuse "the listing could not be read against the tracker (above). Nothing was pulled."
 
 if [[ -z "$new" ]]; then
   note "Every issue on GitHub is already linked to a bead."
