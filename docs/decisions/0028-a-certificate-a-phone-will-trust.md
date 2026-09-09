@@ -217,6 +217,45 @@ warned about is the same defect as a camera that fails silently — it teaches t
 reader that this project is broken, at the moment they are deciding whether to
 keep going.
 
+## Measured, 2026-09-09 — clicking through does give a secure context
+
+The one claim this record made and did not test is now tested, on a real
+device, and the answer is **yes**.
+
+**Safari on iOS 26**, against this repository's own `tls` compose profile
+serving a self-signed certificate on port 8443 at a LAN address. The
+interstitial appeared as expected — *This Connection Is Not Private* — and
+after **Show Details → visit this website → Visit Website** the camera worked:
+`navigator.mediaDevices` was present and the scanner opened.
+
+**What that settles, in the terms the amendment set out.** Self-signed is the
+right default. The local authority is an optional comfort rather than the
+answer, and it stays documented as the route for somebody who wants no warning,
+who is demonstrating to people who should not be taught to dismiss security
+dialogs, or whose camera refuses. Nothing above changes.
+
+**What it does not settle**, and this is why the version is written down rather
+than the result alone:
+
+- **Only Safari was measured.** Chrome on iOS is WebKit and is expected to
+  agree; expected is not measured.
+- **Only iOS 26.** Whether a manually-overridden certificate yields a
+  potentially-trustworthy origin has changed between browser releases before,
+  which is exactly why this record refused to rest on it. A future release may
+  answer differently, and this line is what tells the next person which
+  release the answer was true for rather than making them measure it again to
+  find out.
+- **Nothing about Android or desktop**, neither of which was ever in doubt.
+
+**One thing found while measuring it, which is not about certificates at all.**
+The stack was reachable from the machine itself and not from the phone, and the
+cause was a host firewall. It is worth naming here because it presents exactly
+like the failure this record is about — the app appears broken, from the device
+the feature is for, for a reason nothing in the application says — and because
+`curl` from the machine goes over loopback and never meets the rule, so the
+obvious check passes while the phone still cannot connect. What to do about it
+is in DEVELOPERS.md beside the rest of the walkthrough.
+
 ## References
 
 - [Decision 0011](0011-qr-batch-scanning.md) — the camera, the secure-context
