@@ -259,14 +259,31 @@ jobs:
           tags: inventory-tng-frontend
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      # Pre-built for the same reason the two above are, and cached the same
+      # way. It is a far smaller image -- one `apk add` and two copies -- so
+      # this saves seconds rather than minutes; it is here because an image
+      # built cold beside two that are not is the kind of inconsistency that
+      # gets copied. `compose --profile tls up --build` finds this tag.
+      - name: Build the TLS proxy image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./infra/tls
+          load: true
+          tags: inventory-tng-tls
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       # If compose ever calls them something else, the two builds above were a
       # waste and `up` below would silently build its own -- slower, and this
       # job's whole reason for pre-building gone with no sign of it. So the
       # convention is asserted rather than trusted.
       - name: The names above are the ones compose looks for
         run: |
-          compose_wants=$(docker compose config --images)
-          for image in inventory-tng-backend inventory-tng-frontend; do
+          # The profile is selected for this question ONLY, so that the tls
+          # image is in the list to be checked. It changes nothing about what
+          # `up` below starts, and it works with TLS_HOST unset because the
+          # variable is no longer required at interpolation time.
+          compose_wants=$(docker compose --profile tls config --images)
+          for image in inventory-tng-backend inventory-tng-frontend inventory-tng-tls; do
             if ! printf '%s\n' "$compose_wants" | grep -qx "$image"; then
               echo "::error::compose does not look for $image; it wants:"
               printf '%s\n' "$compose_wants"
@@ -275,6 +292,19 @@ jobs:
           done
       - name: Bring the whole stack up
         run: docker compose up -d
+      # IT STAYS OPTIONAL, which is one of the standing requirements on
+      # inventory-tng-dzwu.2 and the thing a profile is for. Everything below
+      # would still pass if `tls` had quietly become part of the ordinary
+      # stack -- it serves the same app -- so the absence is asserted rather
+      # than inferred. A contributor working on the ledger must not have to
+      # know this exists.
+      - name: And `compose up` alone did not start the TLS profile
+        run: |
+          if [ -n "$(docker compose ps -aq tls)" ]; then
+            echo "::error::compose up started the tls service; it is meant to be behind its profile"
+            docker compose ps -a
+            exit 1
+          fi
       # --retry-all-errors, not just --retry-connrefused: the ports are
       # published the moment the containers start, so a request arriving before
       # gunicorn is listening is answered by an empty reply rather than
@@ -496,6 +526,60 @@ jobs:
               exit 1
             fi
           done
+      # THE TLS PROFILE, WHICH IS THE ONE THING A CONTRIBUTOR CANNOT CHECK FOR
+      # THEMSELVES BEFORE THEY NEED IT. Everything above runs over plain HTTP,
+      # which is what `compose up` gives; this is the opt-in profile of
+      # decision 0028, and the reason it exists is that a browser hands the
+      # camera only to a secure origin. So the assertions are: the profile
+      # comes up at all on a machine that is not the author's, it serves the
+      # app over HTTPS, and Django is told the scheme -- which is the half
+      # that fails silently, because a stack whose address bar says https
+      # while Django believes http refuses every write with a CSRF error.
+      #
+      # The address is the loopback rather than a LAN one. A runner has no
+      # phone on it and the certificate names 127.0.0.1 for exactly this
+      # reason: what is being proved here is that the machinery runs, not that
+      # any particular network works.
+      - name: The TLS profile comes up and serves HTTPS
+        env:
+          TLS_HOST: 127.0.0.1
+        run: |
+          docker compose --profile tls up -d --build tls
+          # --insecure, because the certificate is self-signed BY DESIGN and
+          # that is the whole of decision 0028 as amended. A run that started
+          # trusting it would be proving something this project deliberately
+          # does not claim.
+          curl -sfk --retry 30 --retry-delay 2 --retry-all-errors \
+            https://127.0.0.1:8443/ | grep -q 'id="root"'
+      - name: And Django is told the scheme, so writes are not refused
+        run: |
+          curl -sfk --retry 10 --retry-delay 2 --retry-all-errors \
+            https://127.0.0.1:8443/api | tee /dev/stderr \
+            | grep -q '"health":"https://127.0.0.1:8443/api/healthz"'
+      # A second start must not make a second certificate: a phone that has
+      # accepted one is asked again every time it changes, and `compose up`
+      # twice is an ordinary thing to do. certificate.test.sh holds the rule
+      # itself; this holds that the rule survives being wired into an image, a
+      # volume and an entrypoint, which is where it would actually break.
+      - name: Bringing it up again reuses the certificate
+        env:
+          TLS_HOST: 127.0.0.1
+        run: |
+          docker compose --profile tls up -d --force-recreate tls
+          # POLLED RATHER THAN READ ONCE. `up -d` returns when the container has
+          # started, not when its entrypoint has decided anything, so reading
+          # the log straight away reports the reuse rule broken when it is only
+          # a second behind -- a flake on the one step whose whole job is to say
+          # the rule survived being wired into an image and a volume.
+          for _ in $(seq 30); do
+            if docker compose logs --no-color tls | grep -q 'reusing the certificate'; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::the tls container never said it was reusing the certificate"
+          docker compose logs --no-color tls
+          exit 1
       - name: What the services said
         if: failure()
         run: docker compose logs --no-color --tail 200
@@ -657,6 +741,8 @@ jobs:
         run: scripts/check-setup.test.sh
       - name: Check the landing gate
         run: scripts/landing-gate.test.sh
+      - name: Check the TLS certificate generator
+        run: infra/tls/certificate.test.sh
       - name: Check the configuration checker
         run: scripts/check-config.test.sh
       - name: Check the repository preconditions

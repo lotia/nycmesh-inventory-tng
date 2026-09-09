@@ -173,43 +173,13 @@ container, one on your machine — so whichever starts second fails to bind.
 bringing the stack up. PostgreSQL is not a clash: both use the same compose
 service, and starting it twice starts it once.
 
-**The camera does not work from your phone yet, and the failure is silent.**
-All three serve plain HTTP — 8080 for A and C, 5173 for B's dev server — so
-scanning works on your own machine and stops the moment you open the same stack
-at that port on a LAN address from a phone.
-[Decision 0011](docs/decisions/0011-qr-batch-scanning.md#consequences) has the
-rule that causes it and why the refusal looks like a bug in the app rather than
-a missing certificate.
-
-Fixing that is [decision 0028](docs/decisions/0028-a-certificate-a-phone-will-trust.md)
-and `inventory-tng-dzwu.2`. **When it lands the certificate will be self-signed,
-so your browser will warn you** — that is expected, not a fault, and the setup
-steps will say so where you meet it. Until then, the camera is testable on your
-own machine and on a deployment, and not from a phone against a checkout.
-
-**Everything else on that phone does work, and needs two settings.** The
-camera is one feature; the rest of the application — the item list, the
-volunteer picker, the typed-code path that exists precisely for a dead label —
-is worth exercising on the device it is used from, and until this landed it
-could not be, because the stack refused the address before any of it was
-reached. In your `.env`:
-
-**`DJANGO_ALLOWED_HOSTS` takes your machine's LAN address**, alongside the
-loopback names already there. Without it Django answers `400 DisallowedHost` to
-every proxied path, which reads as the application being broken rather than as
-a name it was never told about.
-
-**`LABEL_BASE_URL` takes the same address and port you are opening.** The QR
-payload is built from it when a label is printed, so left at its default a
-sticker off the seeded catalogue sends the phone's *camera app* to production
-instead of to your checkout. The in-app scanner is unaffected — it reads the
-code out of the payload rather than following the URL — so this bites exactly
-the path a person tries first.
-
-Find the address with `ip addr` or `ipconfig getifaddr en0`, and use the port
-your own browser does — 8080 under A and C, 5173 under B, as above. Both
-variables are read by all three ways of running this; `.env.sample` says what
-each one is.
+**The camera works from your phone, and it is behind a profile.** All three
+options above serve plain HTTP, which is not enough for the camera anywhere but
+your own machine —
+[decision 0011](docs/decisions/0011-qr-batch-scanning.md#consequences) has the
+rule and why the refusal used to read as a bug in the app. Turning that into a
+working camera is one command, written down once in
+[Using the camera from a phone](#using-the-camera-from-a-phone) below.
 
 ### Option A — everything in Docker
 
@@ -291,6 +261,93 @@ origin and you will not hit CORS locally.
 [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json) gives you
 the toolchain with nothing installed on your host. Open the repo in VS Code and
 choose *Reopen in Container*, or run `devcontainer up --workspace-folder .`.
+
+### Using the camera from a phone
+
+Scanning a code at a shelf is what this application is for, and the camera is
+the one feature you cannot exercise on your own machine in the way a volunteer
+will. This is how to get it working against a checkout, and it is opt-in: if
+you are not touching the scanner you never need any of it, and `compose up`
+behaves exactly as it does above.
+
+**One command, after finding your machine's address on the network:**
+
+```bash
+ip addr                          # Linux
+ipconfig getifaddr en0           # macOS, on wi-fi
+
+TLS_HOST=<that address> podman compose --profile tls up -d --build
+```
+
+Then open `https://<that address>:8443` on the phone. Note the **s** and the
+port: this is a second way in, beside the plain `:8080` one, and only this one
+gives the camera.
+
+Put `TLS_HOST` in your `.env` to stop typing it. Two other settings matter and
+are described in [`.env.sample`](.env.sample): `DJANGO_ALLOWED_HOSTS` needs your
+address adding or Django answers `400 DisallowedHost`, and `NUM_PROXIES` should
+be `2` while this profile is up, because it adds a second proxy in front of the
+one the frontend already runs.
+
+**Your browser will warn you, and that is the expected outcome.** Nothing has
+gone wrong. The certificate was made by a container on your own machine a
+moment ago, for an address you typed yourself, and no browser has any reason to
+trust it. Decision 0028 chose this deliberately: the alternative is a
+per-device trust ritual, and the audience for a local stack is developers rather
+than volunteers.
+
+What you will see, and what to press:
+
+| Where | What it says | What to press |
+| --- | --- | --- |
+| Safari, iOS and macOS | **This Connection Is Not Private** | **Show Details**, then **visit this website**, then **Visit Website** |
+| Chrome and Edge | **Your connection is not private**, `NET::ERR_CERT_AUTHORITY_INVALID` | **Advanced**, then **Proceed to … (unsafe)** |
+| Firefox | **Warning: Potential Security Risk Ahead** | **Advanced…**, then **Accept the Risk and Continue** |
+
+You are asked once per device, and the certificate is kept in a volume, so
+`compose down` and up again does not ask you a second time. It is regenerated —
+and you are asked again — when your machine's address changes or the
+certificate is close to expiring, and the container says so in its log when
+that happens.
+
+If the warning is not one of the above and offers you no way through, the
+certificate does not cover the address you dialled: check that `TLS_HOST` is
+what is in the browser's bar. That is the failure
+`infra/tls/certificate.sh` regenerates to avoid, and it says why there.
+
+**If the phone cannot connect at all**, the stack can be perfectly healthy and
+still be unreachable, because the request now arrives from another machine for
+the first time. In order of how
+often it is the answer:
+
+- **A firewall on your own machine.** This is the common one, and it is easy to
+  misdiagnose because `curl` from the machine itself still works — that traffic
+  goes over the loopback interface and never meets the rules. Allow the port
+  from your own network rather than from everywhere: on `ufw` that is
+  `sudo ufw allow from <your network>/24 to any port 8443 proto tcp`. A blanket
+  `allow 8443` opens a stack holding seeded data on every network you ever join.
+- **The phone is not on the same network.** Cellular, or a guest SSID that is
+  not the one this machine is on.
+- **Client isolation on the access point.** Common on guest and some ISP
+  networks; it blocks device-to-device traffic outright, so nothing you change
+  here will help. The tell is that plain `http://<address>:8080` fails too. A
+  tunnel is the way through, and decision 0028 point 7 says why it is the
+  documented alternative rather than the default.
+
+To tell a TLS problem from a network one, try `http://<address>:8080` first —
+plain HTTP, no certificate in the way. If that fails as well, the problem is
+not TLS.
+
+**Somebody who wants no warning at all is not served yet, and that is worth
+saying plainly.** Decision 0028 keeps a local certificate authority as the
+route for anybody demonstrating the app to people who should not be taught to
+dismiss security dialogs. Nothing here implements it: there is no flag and no
+second profile, and the only way to get such a certificate today is to type
+`openssl` commands, which is exactly what this is meant to spare you. It is
+filed rather than hidden — until it exists, the choices are to accept the
+warning above, or to use a tunnel, which decision 0028 point 7 describes and
+which gives a publicly-trusted name at the price of an account and the traffic
+leaving your machine.
 
 ### Signing in
 
