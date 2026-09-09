@@ -140,7 +140,53 @@ services:
       TELEMETRY_PERSONAL_DATA: ${TELEMETRY_PERSONAL_DATA:-redacted}
       DEBUG_TRACE_LIFETIME_SECONDS: ${DEBUG_TRACE_LIFETIME_SECONDS:-3600}
       DEBUG_TRACE_RATE: ${DEBUG_TRACE_RATE:-60/min}
-      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      # The names this stack answers to, and the one variable somebody testing
+      # from a phone has to add to.
+      #
+      # A LITERAL HERE IS WHAT MADE A PHONE UNREACHABLE, and it read as the
+      # application being broken rather than as configuration. nginx forwards
+      # the browser's own Host verbatim -- see the `map` in
+      # frontend/nginx.conf.template, which explains why the port has to
+      # survive -- so opening this stack at http://10.0.0.5:8080 hands Django a
+      # name it does not admit and every proxied path answers 400
+      # DisallowedHost. Not the camera failing, which has its own separate wall
+      # in decision 0011: the whole application failing before the camera is
+      # reached.
+      #
+      # Add your machine's LAN address in .env to reach this from anything but
+      # your own browser, and see .env.sample, which says what else that same
+      # journey needs.
+      #
+      # THE DEFAULT HERE IS THE SHIPPED INTENT AND NOT A GUARANTEE, which is
+      # worth saying because the two look identical. It matches .env.sample for
+      # the reason every other value in this block states itself, which is
+      # decision 0021 point 11. It is not what keeps the loopback names
+      # working: a `.env` that sets this variable replaces the default
+      # wholesale, so the line below is the only one that guarantees them.
+      # Change this and you change what a fresh clone starts with; you do not
+      # change what the stack can still be reached by.
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      # The names this arrangement supplies for itself, which is this stack's
+      # equivalent of the pod address a cluster supplies -- names only the
+      # running arrangement knows, and exactly what settings.py says this
+      # second variable is for. They were in the literal above until the line
+      # became a passthrough, and leaving them there would mean every .env
+      # written before that change quietly narrowed what the stack answers to.
+      # Added rather than substituted, so a developer's own list keeps working.
+      #
+      # THE LOOPBACK NAMES ARE HERE AND NOT ONLY IN THE DEFAULT ABOVE, because
+      # a default is only what an unset variable falls back to. This
+      # container's own healthcheck dials http://127.0.0.1:8000/api/healthz
+      # every five seconds, so an .env that sets DJANGO_ALLOWED_HOSTS to a LAN
+      # address alone -- the exact edit the comment above sends somebody to
+      # make -- would earn the probe a 400, leave this service permanently
+      # unhealthy, and stop the `seed` service that waits on its health from
+      # ever running. The probe's address is not the developer's to supply.
+      #
+      # Whatever .env sets is appended rather than dropped, so this variable
+      # is passed through like every other one here; entries() discards the
+      # trailing blank when it is unset.
+      DJANGO_EXTRA_ALLOWED_HOSTS: backend,localhost,127.0.0.1,${DJANGO_EXTRA_ALLOWED_HOSTS:-}
       # Empty on purpose, and set rather than left out so that the intended
       # value is in a file. nginx forwards the browser's own host, so Django
       # computes the origin the browser claims and needs nothing admitted on
