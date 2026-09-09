@@ -402,6 +402,67 @@ services:
     ports:
       - "8080:8080"
 
+  # HTTPS, so the camera works on the device this application is for.
+  #
+  # Not started by `compose up`: it is behind a profile, exactly as the
+  # collector is, so a contributor working on the ledger never meets it.
+  #
+  #   TLS_HOST=<your LAN address> podman compose --profile tls up -d --build
+  #
+  # WHAT THIS IS ACTUALLY FOR, because "HTTPS locally" undersells it: without
+  # it the camera does not work on a phone, and it fails by looking like a bug
+  # in the app. Decision 0011's consequences record that trap and decision 0028
+  # decides this answer to it; neither argument is repeated here. DEVELOPERS.md
+  # has the walkthrough, including the browser warning, which is expected
+  # rather than a fault.
+  tls:
+    profiles: [tls]
+    build:
+      context: ./infra/tls
+    <<: *hardened
+    # nginx-unprivileged's own uid, and the one infra/tls/Dockerfile gives the
+    # certificate directory so the volume below is writable.
+    user: "101:101"
+    tmpfs:
+      # The same three the frontend needs, for the same reasons its own service
+      # lists them: the rendered configuration, the spool for a request too
+      # large to hold in memory, and this image's pid file.
+      - /etc/nginx/conf.d:mode=1777
+      - /var/cache/nginx:mode=1777
+      - /tmp:mode=1777
+    depends_on:
+      - frontend
+    environment:
+      # The address a phone will dial, which is the one thing this cannot work
+      # out for itself and the one thing that must be in the certificate. A
+      # certificate for the wrong address produces a warning that cannot be
+      # clicked past, so it is compulsory -- but the refusal belongs to the
+      # container, not to this line. DEVELOPERS.md says how to find it and
+      # infra/tls/certificate.sh is what refuses without it.
+      #
+      # NOT `${TLS_HOST:?...}`, which is where this started and which broke
+      # every other thing in this file. Compose interpolates the whole document
+      # before it looks at a profile, so a required variable in a service
+      # nobody asked for is required of `compose up`, `compose config`,
+      # `compose ps` and `scripts/bootstrap-dev.sh` alike -- the profile stops
+      # the container starting and does not stop the variable being read. A
+      # fresh clone doing what the quickstart says, `cp .env.sample .env`, got
+      # `required variable TLS_HOST is missing a value` and no stack at all,
+      # which is the opposite of the opt-in this profile exists to be.
+      TLS_HOST: ${TLS_HOST:-}
+      # The frontend container, by service name, resolved per request.
+      UPSTREAM_ORIGIN: http://frontend:8080
+    ports:
+      # 8443 rather than 443 because rootless Podman cannot bind a privileged
+      # port here. infra/tls/Dockerfile says why that costs the camera nothing.
+      - "${TLS_PORT:-8443}:8443"
+    volumes:
+      # Named, so the certificate outlives `compose down` and a phone that has
+      # been told to trust it is not asked again. `compose down -v` forgets it
+      # and the next start makes a new one.
+      - tls_certificate:/certificate
+
 volumes:
   postgres_data:
   collector_data:
+  tls_certificate:
