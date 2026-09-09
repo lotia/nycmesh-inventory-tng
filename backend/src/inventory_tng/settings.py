@@ -78,9 +78,10 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 
 DEBUG = env("DJANGO_DEBUG")
 
-# DJANGO_EXTRA_ALLOWED_HOSTS is for addresses only the running deployment
-# knows -- in Kubernetes, the pod's own, which is what a probe asks for and
-# what nobody could have written in a values file. Why that matters, and what
+# DJANGO_EXTRA_ALLOWED_HOSTS is the list a deployment adds to the one above
+# rather than one anybody configures. There are two kinds of entry and they
+# arrive for opposite reasons; `hosts.allowed_hosts` is where both are argued,
+# and it is the only place they are. Why that matters, and what
 # it costs when the list is wrong, is docs/deployment.md#health-checks; why a
 # comma-separated variable needs trimming before use is on
 # `environment.entries`, which every list cast in this file now goes through.

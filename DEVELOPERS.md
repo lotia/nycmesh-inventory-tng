@@ -187,6 +187,30 @@ so your browser will warn you** — that is expected, not a fault, and the setup
 steps will say so where you meet it. Until then, the camera is testable on your
 own machine and on a deployment, and not from a phone against a checkout.
 
+**Everything else on that phone does work, and needs two settings.** The
+camera is one feature; the rest of the application — the item list, the
+volunteer picker, the typed-code path that exists precisely for a dead label —
+is worth exercising on the device it is used from, and until this landed it
+could not be, because the stack refused the address before any of it was
+reached. In your `.env`:
+
+**`DJANGO_ALLOWED_HOSTS` takes your machine's LAN address**, alongside the
+loopback names already there. Without it Django answers `400 DisallowedHost` to
+every proxied path, which reads as the application being broken rather than as
+a name it was never told about.
+
+**`LABEL_BASE_URL` takes the same address and port you are opening.** The QR
+payload is built from it when a label is printed, so left at its default a
+sticker off the seeded catalogue sends the phone's *camera app* to production
+instead of to your checkout. The in-app scanner is unaffected — it reads the
+code out of the payload rather than following the URL — so this bites exactly
+the path a person tries first.
+
+Find the address with `ip addr` or `ipconfig getifaddr en0`, and use the port
+your own browser does — 8080 under A and C, 5173 under B, as above. Both
+variables are read by all three ways of running this; `.env.sample` says what
+each one is.
+
 ### Option A — everything in Docker
 
 Best for a first run, or when you only care about one half of the stack. It is

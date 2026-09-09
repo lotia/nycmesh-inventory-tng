@@ -14,9 +14,18 @@ from inventory_tng.environment import entries
 def allowed_hosts(listed: list[str], extra: list[str]) -> list[str]:
     """The hostnames to accept, from the configured list and the deployment's.
 
-    `extra` is what only the running deployment can know: addresses assigned
-    to it that nobody could have listed in advance. Empty everywhere but a
-    cluster. docs/deployment.md#health-checks says what fills it and why.
+    `extra` is what the arrangement supplies for itself rather than what an
+    operator chose, and there are two kinds of that. In a cluster it is the
+    address assigned to the pod, which nobody could have listed in advance --
+    docs/deployment.md#health-checks says what fills it and why. Under compose
+    it is the opposite case and reaches here for the same reason: names that
+    are perfectly well known in advance, but that must survive a developer
+    narrowing the list beside them, because one of them is the address the
+    container's own healthcheck dials.
+
+    What both have in common is the only property this argument relies on: it
+    is ADDED, never substituted. A caller may reduce `listed` to nothing and
+    the deployment still answers to what it needs to answer to.
 
     Both lists are put through `environment.entries`, which is where the
     trimming and its argument live. Called here rather than relied upon,
