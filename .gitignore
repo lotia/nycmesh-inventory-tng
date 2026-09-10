@@ -35,7 +35,6 @@ playwright-report/
 *.db
 .beads-credential-key
 .beads/proxieddb/
-.beads.gate.lock
 
 # Local scratch space: source material for the migration (exports of the
 # existing Google Sheet, reference screenshots) that is not ours to publish.
@@ -71,4 +70,9 @@ ignored/
 # state files local programs to ignore
 .perles/
 
+# The lock the landing gate takes while it reads a receipt, wherever it is
+# written. One pattern here rather than a specific name beside .beads/ above
+# and a copy in .beads/.gitignore: a root pattern already applies to nested
+# paths, and .beads/.gitignore may not carry a negation that would exempt one,
+# so a second copy is only a second thing to keep in step.
 *.gate.lock*
