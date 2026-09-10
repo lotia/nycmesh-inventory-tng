@@ -128,13 +128,22 @@ Everything is reachable on **<http://localhost:8080>**, which is the one to
 open: it serves the app and forwards the API, the admin and the sign-in pages
 to Django, so signing in there returns you to the app afterwards.
 
-Go to <http://localhost:8080/accounts/login/> and use the account
-`createsuperuser` just made. The password is all it asks for here, because this
-stack ships with `REQUIRE_SECOND_FACTOR=false` — a deployment defaults to the
-opposite, and how administrators sign in is
+**Sign in** is in the top corner of the app, and it brings you back to the
+page you were on. <http://localhost:8080/accounts/login/> is the same form if
+you would rather type it. Use the account `createsuperuser` just made.
+
+The password is all it asks for here, because this stack ships with
+`REQUIRE_SECOND_FACTOR=false` — a deployment defaults to the opposite, and how
+administrators sign in is
 [decision 0013](docs/decisions/0013-administrator-sign-in.md).
 [Signing in](DEVELOPERS.md#signing-in) is how to turn it on locally and when
 you would want to.
+
+**Signing in is not the same as being an administrator**, which is why
+`createsuperuser` above is what makes the first one. The app says which you
+are rather than leaving you to wonder, and the
+[administrator guide](guides/administrator.md) explains what to do when it
+says you are not.
 
 Once you are in:
 
