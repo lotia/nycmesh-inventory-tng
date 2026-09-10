@@ -182,6 +182,7 @@ Read these only when the task needs them. Do not load them pre-emptively.
 | Landing work — what one commit holds, and its message | `.agents/skills/commits/SKILL.md` |
 | Running a batch through review, and merging it | `.agents/skills/pull-requests/SKILL.md` |
 | Why something is built a certain way | [docs/decisions/](docs/decisions/) |
+| A tool writing into this repository — its hooks, its managed blocks, the config it rewrites | [0032](docs/decisions/0032-a-tools-defaults-are-not-this-projects-rules.md) |
 
 `CLAUDE.md`, `CODEX.md`, and `GEMINI.md` are symlinks to this file. Edit this
 one.
