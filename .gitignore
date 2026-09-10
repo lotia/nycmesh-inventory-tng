@@ -35,6 +35,7 @@ playwright-report/
 *.db
 .beads-credential-key
 .beads/proxieddb/
+.beads.gate.lock
 
 # Local scratch space: source material for the migration (exports of the
 # existing Google Sheet, reference screenshots) that is not ours to publish.
@@ -66,3 +67,7 @@ ignored/
 
 # Agent worktrees: separate checkouts, never part of a commit.
 .claude/worktrees/
+
+# state files local programs to ignore
+.perles/
+

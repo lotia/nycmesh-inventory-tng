@@ -68,9 +68,18 @@ export function submit(page: Page) {
  * Waits for the session to actually exist. Without that, a test asserting a
  * refusal cannot tell "rejected for a missing CSRF token" from "rejected for
  * not being signed in yet".
+ *
+ * @param alreadyThere skip the navigation, for a caller that reached the form
+ * by pressing something in the app rather than by typing its URL. What that
+ * caller is testing is the journey, so navigating here would step over the
+ * half it came to see. Such a caller must have pressed it from `/`, because
+ * the app composes `next` from the page it was on and the wait below is for
+ * that one.
  */
-export async function signIn(page: Page) {
-  await page.goto("/accounts/login/");
+export async function signIn(page: Page, { alreadyThere = false } = {}) {
+  if (!alreadyThere) {
+    await page.goto("/accounts/login/");
+  }
   await page.locator(USERNAME_FIELD).fill(seeded("username"));
   await page.locator(PASSWORD_FIELD).fill(seeded("password"));
   await submit(page).click();

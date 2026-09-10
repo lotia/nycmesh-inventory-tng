@@ -4,6 +4,7 @@ import Typography from "@mui/material/Typography";
 import { useEffect } from "react";
 import { SessionProvider } from "./admin/SessionProvider";
 import { StaleSession } from "./admin/StepUp";
+import { NotAnAdministrator, WhoYouAre } from "./admin/WhoYouAre";
 import { Outbox } from "./batch/Outbox";
 import { SubmitBar } from "./batch/SubmitBar";
 import { CartProvider } from "./cart/CartProvider";
@@ -43,9 +44,21 @@ export default function App() {
       <CartProvider>
         <Container maxWidth="sm" sx={{ py: 4 }}>
           <Stack spacing={3}>
-            <Typography variant="h4" component="h1">
-              NYC Mesh Inventory
-            </Typography>
+            {/* The heading and the way in share a row: the app's name is what
+                a volunteer needs from the top of this screen, and signing in
+                is what nobody but an administrator needs at all. See
+                admin/WhoYouAre.tsx for why that control is as quiet as it is. */}
+            <Stack
+              direction="row"
+              spacing={2}
+              sx={{ justifyContent: "space-between", alignItems: "center" }}
+            >
+              <Typography variant="h4" component="h1">
+                NYC Mesh Inventory
+              </Typography>
+              <WhoYouAre />
+            </Stack>
+            <NotAnAdministrator />
             {/* Once, at the top, rather than in place of each control it
                 removed: a stale session takes every administrative control
                 away at the same moment, and one prompt is what fixes all of

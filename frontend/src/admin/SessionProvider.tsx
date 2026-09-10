@@ -8,18 +8,54 @@
 import { createContext, type ReactNode, useContext } from "react";
 import { type Me, useSession } from "../api/capabilities";
 
-const SessionContext = createContext<Me | null>(null);
+/**
+ * The answer, and whether it has arrived yet.
+ *
+ * THE SECOND HALF EXISTS BECAUSE THE SAFE DEFAULT RUNS BOTH WAYS, which is not
+ * obvious and cost a rewrite to notice. For a capability, "not known yet" and
+ * "no" want the same treatment: draw nothing, because the server would refuse
+ * the operation anyway -- so `useCan` never needs to tell them apart and this
+ * flag is deliberately not offered to it.
+ *
+ * For a way IN, they are opposites. "Not signed in" is not the absence of a
+ * control, it is a control reading Sign in, so treating the gap before the
+ * answer as "nobody" would show an administrator the wrong control on every
+ * page load and then swap it under them. Only a screen with that problem reads
+ * `settled`.
+ */
+interface Session {
+  me: Me;
+  settled: boolean;
+}
+
+const SessionContext = createContext<Session | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   return <SessionContext value={useSession()}>{children}</SessionContext>;
 }
 
-export function useCurrentSession(): Me {
+/** The context, or a complaint naming the provider that is missing. */
+function useSessionContext(): Session {
   const value = useContext(SessionContext);
   if (value === null) {
-    throw new Error("useCurrentSession must be called inside a <SessionProvider>");
+    throw new Error("The session hooks must be called inside a <SessionProvider>");
   }
   return value;
+}
+
+export function useCurrentSession(): Me {
+  return useSessionContext().me;
+}
+
+/**
+ * Whether `/api/me` has answered, however it answered.
+ *
+ * False covers both "still in flight" and "could not be read". A screen that
+ * would otherwise guess wrong draws nothing in both cases, which is the honest
+ * answer to a question this client has not had answered.
+ */
+export function useSessionSettled(): boolean {
+  return useSessionContext().settled;
 }
 
 /**

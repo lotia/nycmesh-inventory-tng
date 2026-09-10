@@ -16,6 +16,30 @@ async function whoami(page: Page) {
   return page.evaluate(async () => (await fetch("/api/me")).json());
 }
 
+test("the app's own control reaches the sign-in form and brings you back", async ({ page }) => {
+  // WHAT ONLY THIS SUITE CAN SEE. The unit tests assert the href this control
+  // carries; they cannot follow it. Between the two ends sit Django's own
+  // pages, `LOGIN_REDIRECT_URL`, the `next` this app composes, and a proxy
+  // that has to forward `/accounts/` at all -- and a break in any of them
+  // leaves an administrator on a Django page with no way back to the app,
+  // which is the interruption decision 0014 point 5 is trying to keep small.
+  await page.goto("/");
+  await page.getByRole("link", { name: /^sign in$/i }).click();
+
+  await expect(page.locator(USERNAME_FIELD)).toBeVisible();
+
+  await signIn(page, { alreadyThere: true });
+
+  // Back on the app, and the control now says who you are rather than
+  // offering the way in again.
+  await expect(page.getByRole("heading", { name: /nyc mesh inventory/i })).toBeVisible();
+  // `exact`, because the seeded volunteer is called "Integration Tester" and
+  // the account is called "integration": a substring match finds both and
+  // Playwright refuses the ambiguity rather than picking one.
+  await expect(page.getByText(seeded("username"), { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^sign in$/i })).toHaveCount(0);
+});
+
 test("the local password path signs an administrator in", async ({ page }) => {
   await signIn(page);
 

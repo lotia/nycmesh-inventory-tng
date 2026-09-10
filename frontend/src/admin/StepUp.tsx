@@ -15,6 +15,7 @@ import AlertTitle from "@mui/material/AlertTitle";
 import Button from "@mui/material/Button";
 import { useState } from "react";
 import { type ApiError, refusalBody } from "../api/client";
+import { accountsPage } from "./accounts";
 
 /** The code the server puts on this refusal and no other. See inventory/api.py. */
 const REAUTHENTICATION = "reauthentication_required";
@@ -29,23 +30,16 @@ export function needsSecondLook(error: ApiError): boolean {
   return refusalBody<{ code: string }>(error, (body) => body.code === REAUTHENTICATION) !== null;
 }
 
-/**
- * Where allauth's re-authentication form lives, told where to come back to.
- *
- * The current URL, so the volunteer returns to the screen they were on. The
- * app has no router, so "the screen they were on" is the page itself.
- */
-function reauthenticateAt(): string {
-  return `/accounts/reauthenticate/?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
-}
-
 export function StepUp({ onDismiss }: { onDismiss: () => void }) {
   return (
     <Alert severity="info" onClose={onDismiss}>
       <AlertTitle>Sign in again to make this change</AlertTitle>
       Editing the catalogue, merging volunteers, revoking labels and printing new ones ask once
       more, even inside a session that is already signed in.
-      <Button size="small" href={reauthenticateAt()}>
+      {/* Told where to come back to, so the administrator returns to the screen
+          they were on -- which, with no router, is the page itself. What that
+          composition is and why it is shared is admin/accounts.ts. */}
+      <Button size="small" href={accountsPage("reauthenticate/")}>
         Sign in again
       </Button>
     </Alert>

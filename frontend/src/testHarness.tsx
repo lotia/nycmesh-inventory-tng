@@ -39,6 +39,21 @@ export const ADMINISTRATOR = {
   capabilities: Object.fromEntries(Object.keys(VOLUNTEER.capabilities).map((name) => [name, true])),
 };
 
+/**
+ * Signed in, and not an administrator.
+ *
+ * The state decision 0013 point 5 creates on purpose -- identity proves who
+ * you are and authority is granted separately -- and the one this app rendered
+ * identically to two others until `WhoYouAre` said which it was. A fixture
+ * rather than an inline literal because it is a population, not a special
+ * case: every account is this until somebody says otherwise.
+ */
+export const SIGNED_IN = {
+  ...VOLUNTEER,
+  authenticated: true,
+  username: "newcomer",
+};
+
 /** An administrator whose session is no longer recent enough to change things. */
 export const STALE_ADMINISTRATOR = {
   ...ADMINISTRATOR,

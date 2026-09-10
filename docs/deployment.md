@@ -524,6 +524,25 @@ That is a real defence and it is not this one. Turning it on is the difference
 between one credential and one credential that can only be offered from a
 network you control.
 
+**Volunteers now see a `Sign in` control, and on a restricted deployment it
+leads somewhere they cannot go.** It sits in the corner of the app, it is drawn
+for anybody who is not signed in, and it points at `/accounts/login/` — which is
+one of the paths below. A volunteer who presses it out of curiosity meets
+whatever the ingress answers with rather than a form, and the back button is
+their way out of it.
+
+That is accepted rather than worked around, and the reason is
+[decision 0030](decisions/0030-the-network-is-the-access-control.md) point 2.
+Hiding the control on a restricted deployment would mean the application
+modelling a boundary it cannot see: nothing in a request tells it whether the
+restriction is on, so it would be guessing — and a guess that is wrong the
+other way hides the way in from an administrator who has every right to it.
+An application written as though the network were not there draws the same
+control everywhere, and the network decides who reaches the other end. What
+this costs is one confusing moment for somebody who had no reason to press it;
+what the alternative costs is the administrative surface being decided in two
+places that can disagree.
+
 #### Which paths are restricted
 
 | Path | Restricted | Why |

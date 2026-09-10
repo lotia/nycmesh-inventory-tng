@@ -12,6 +12,8 @@
  * is what tells the two apart -- one is a control to hide, the other a prompt
  * to show somebody who is entitled to it.
  */
+import { useMemo } from "react";
+
 import { useResource } from "./useResource";
 
 export interface Me {
@@ -36,16 +38,34 @@ const ANONYMOUS: Me = {
  *
  * No way to re-read, deliberately: the only thing that changes this answer is
  * signing in or signing in again, both of which are allauth's own pages and
- * both of which come back as a fresh load of the app. Returned as the answer
- * itself rather than wrapped, so the value a context carries is stable between
- * renders and a consumer re-renders when the session changes rather than
- * whenever its provider does.
+ * both of which come back as a fresh load of the app.
+ *
+ * `settled` is carried beside the answer rather than folded into it, because
+ * "nobody, as far as we know so far" and "nobody, and we asked" are the same
+ * answer to a capability and opposite answers to a way in. SessionProvider
+ * argues which screens may read it.
+ *
+ * MEMOISED, which the single value this used to return got for free. A context
+ * whose value is a fresh object on every render tells every consumer it
+ * changed whenever the provider re-renders for any reason at all, so the
+ * identity has to track the answer rather than the render.
+ *
+ * The cost is small today and that is worth being honest about rather than
+ * inventing a bigger one: SessionProvider sits ABOVE CartProvider, so a scan
+ * updates state below it and re-renders downward without reaching it. What
+ * this guards is the other direction -- anything that re-renders the provider
+ * would otherwise notify every consumer beneath it that the session changed
+ * when it had not.
  */
-export function useSession(): Me {
+export function useSession(): { me: Me; settled: boolean } {
   // `useResource` already owns the abort race and the three states; what is
   // different here is only what a failure means. Null covers both "not read
   // yet" and "could not be read", and nobody is the right answer to both: no
   // control is drawn, and the server would refuse one anyway.
-  const { data } = useResource<Me>("/api/me");
-  return data ?? ANONYMOUS;
+  const { data, loading } = useResource<Me>("/api/me");
+
+  // A failure settles the question as much as an answer does: the app is not
+  // going to ask again, so a control waiting for certainty would wait for ever
+  // rather than fall back to what an anonymous caller sees.
+  return useMemo(() => ({ me: data ?? ANONYMOUS, settled: !loading }), [data, loading]);
 }
