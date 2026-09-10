@@ -741,6 +741,14 @@ jobs:
         run: scripts/check-setup.test.sh
       - name: Check the landing gate
         run: scripts/landing-gate.test.sh
+      - name: Check the beads-state checker
+        run: scripts/check-beads-state.test.sh
+      # The checker itself, against this checkout. The suite above proves it
+      # can fail; this proves the tree it is about currently passes -- which is
+      # the half that catches a state directory arriving with a bd upgrade
+      # rather than with a change anybody made here.
+      - name: Nothing under .beads can reach a commit by accident
+        run: scripts/check-beads-state.sh
       - name: Check the TLS certificate generator
         run: infra/tls/certificate.test.sh
       - name: Check the configuration checker
