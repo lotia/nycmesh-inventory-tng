@@ -35,9 +35,14 @@ A branch that does not meet the bar is one to finish. It is never one to ask
 an exception for, which is the reading that would otherwise turn a standing
 permission into a way around the gate.
 
-Everything else an agent asks about is unchanged: `main` directly, a bare
-`push --force`, `bd dolt push`, repository settings, and merging any branch
-that is not a `batch/*` branch.
+Everything else is unchanged in what it permits, and has since changed in what
+does the permitting. `main` directly, a bare `push --force`, publishing the
+tracker and writing repository settings were all things an agent was asked to
+stop and ask about; they are now refused by
+[`scripts/landing-gate.sh`](../../scripts/landing-gate.sh) and, for the first
+two, by branch protection behind it. Merging a branch that is not a `batch/*`
+branch is still nobody's to do on their own. What this record settles is
+untouched by that: the change is who remembers, not what is allowed.
 
 ## Consequences
 

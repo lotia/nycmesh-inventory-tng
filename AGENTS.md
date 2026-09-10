@@ -101,13 +101,12 @@ touches a person, a credential, or a weakness nothing has fixed yet.
 Work reaches `main` the way [Pull requests](DEVELOPERS.md#pull-requests)
 describes. Read it before starting a batch; do not reconstruct it from here.
 
-What you may do on your own, and what you must ask for first:
+What you may do on your own, and the one thing you may never do:
 
 | | |
 | --- | --- |
 | On a `batch/*` branch, without asking | Commit, push, open and update the pull request, post findings to it, reply to and resolve its threads, `push --force-with-lease` when collapsing an issue's own commits |
 | Merging a `batch/*` pull request, without asking | Once it meets [When a branch is ready to merge](DEVELOPERS.md#when-a-branch-is-ready-to-merge): `gh pr merge <pr> --rebase` |
-| Ask first, every time | Anything touching `main` directly, a bare `push --force`, `bd dolt push`, and any change to repository or branch settings |
 | Never, whatever its state | Merging a pull request whose body posts `<!-- do-not-merge -->` on a line of its own |
 
 The last row is here rather than left to the check that enforces it, because an
@@ -122,10 +121,23 @@ The line is what a mistake costs. A batch branch is proposed work: it can be
 rewritten or thrown away and the repository is untouched, and every step of it
 is visible in the pull request as it happens. `--force-with-lease` is on the
 free side because the lease is the guard — it refuses if anything arrived since
-you last fetched, so it cannot overwrite work you have not seen. A bare
-`--force` has no such guard and so it asks, and `scripts/landing-gate.sh`
-refuses it rather than leaving the row to be remembered — see
-[When a branch is ready to merge](DEVELOPERS.md#when-a-branch-is-ready-to-merge).
+you last fetched, so it cannot overwrite work you have not seen.
+
+**There used to be a third row here, listing four things to ask about first.**
+It is gone, and nothing it protected is less protected. Each of the four is now
+refused by something rather than remembered by somebody:
+
+| What | What refuses it |
+| --- | --- |
+| A push to `main` | GitHub — `enforce_admins`, required reviews, thirteen required contexts. `scripts/landing-gate.sh` refuses it first, so the message names the `batch/*` workflow instead of a protection rule |
+| A bare `push --force` | `scripts/landing-gate.sh`, and `allow_force_pushes: false` behind it |
+| `bd dolt push` | `scripts/landing-gate.sh`. It publishes the tracker, and [0029](docs/decisions/0029-the-issue-tracker-is-public.md) makes that public the moment it runs |
+| Writing branch protection | `scripts/landing-gate.sh`. `scripts/repo-settings.sh --check` compares and reports, and is free; writing is what is refused, because that script sets the protections the first two rows rest on |
+
+That is the trade this file prefers wherever it can be had: a rule nobody has
+to keep. What a row bought was an agent stopping to ask; what a refusal buys is
+an agent that cannot proceed and is told why, including on the day nobody read
+this file.
 
 Merging is on the free side for a different reason: none of the bar is yours to
 judge, and most of it `main` will not let you waive. The part nothing enforces
@@ -134,8 +146,16 @@ is that the review cycle ran, so that one is on your honour —
 costs.
 
 So the rule is narrow on purpose. A pull request that is not mergeable is one
-to finish, never one to ask an exception for; and anything that is not a
-`batch/*` branch asks, whatever its state.
+to finish, never one to ask an exception for. Anything a refusal above names is
+a person's to authorise, and the refusal says so when it happens rather than
+depending on this paragraph being read first.
+
+**One thing is still asked rather than refused**, and it is written here
+because nothing else will say it: merging a pull request whose branch is not a
+`batch/*` branch. `scripts/landing-gate.sh` reads the pull request number, the
+review-cycle receipt and the do-not-merge marker, and never the branch name, so
+this is the one row of the old table with no machinery behind it.
+[0020](docs/decisions/0020-who-merges.md) is where it was decided.
 
 **Never `git commit --no-verify`.** It is the one way past the commit-msg hook,
 and a guard that is stepped over the moment it refuses something is not a
@@ -165,59 +185,3 @@ Read these only when the task needs them. Do not load them pre-emptively.
 
 `CLAUDE.md`, `CODEX.md`, and `GEMINI.md` are symlinks to this file. Edit this
 one.
-
-<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:46cd31e7 -->
-## Beads Issue Tracker
-
-This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
-
-### Quick Reference
-
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work
-bd close <id>         # Complete work
-```
-
-### Rules
-
-- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
-- Run `bd prime` for detailed command reference and session close protocol
-- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
-
-**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/core-concepts/sync-concepts.md for details and anti-patterns.
-
-## Agent Context Profiles
-
-The managed Beads block is task-tracking guidance, not permission to override repository, user, or orchestrator instructions.
-
-- **Conservative (default)**: Use `bd` for task tracking. Do not run git commits, git pushes, or Dolt remote sync unless explicitly asked. At handoff, report changed files, validation, and suggested next commands.
-- **Minimal**: Keep tool instruction files as pointers to `bd prime`; use the same conservative git policy unless active instructions say otherwise.
-- **Team-maintainer**: Only when the repository explicitly opts in, agents may close beads, run quality gates, commit, and push as part of session close. A current "do not commit" or "do not push" instruction still wins.
-
-## Session Completion
-
-This protocol applies when ending a Beads implementation workflow. It is subordinate to explicit user, repository, and orchestrator instructions.
-
-1. **File issues for remaining work** - Create beads for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **Handle git/sync by active profile**:
-   ```bash
-   # Conservative/minimal/default: report status and proposed commands; wait for approval.
-   git status
-
-   # Team-maintainer opt-in only, unless current instructions forbid it:
-   git pull --rebase
-   bd dolt push
-   git push
-   git status
-   ```
-5. **Hand off** - Summarize changes, validation, issue status, and any blocked sync/commit/push step
-
-**Critical rules:**
-- Explicit user or orchestrator instructions override this Beads block.
-- Do not commit or push without clear authority from the active profile or the current user request.
-- If a required sync or push is blocked, stop and report the exact command and error.
-<!-- END BEADS INTEGRATION -->

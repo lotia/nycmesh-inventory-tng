@@ -1337,6 +1337,25 @@ bd update <id> --claim   # claim it
 bd close <id>            # done (see Definition of Done first)
 ```
 
+**Where the tracker keeps its database, and why a checker watches it.** beads
+stores issues in a Dolt database under `.beads/`, and which directory depends
+on the backend mode it is running — `.beads/dolt` under the proxied server this
+project uses, `.beads/embeddeddolt` under the in-process engine. None of it is
+committed: it is tens of thousands of files, and this repository is public.
+
+`scripts/check-beads-state.sh` is what keeps that true. It asserts the
+invariant rather than a list of names — every directory under `.beads/` is
+either tracked on purpose, like the `hooks/` symlinks, or ignored on purpose —
+so a directory a future bd version invents is caught by a rule that never heard
+of it. It also checks that the mode named in `.beads/metadata.json` has storage
+to go with it, because a mismatch does not make bd fail: it opens an empty
+database and says so only as a warning, which reads as an empty tracker rather
+than a broken one. CI runs it, and you can run it yourself.
+
+`.beads/metadata.json` is deliberately not committed. It is bd's local pointer
+at that database, and `bd dolt show` describes it as local; it must not be
+deleted, only left untracked.
+
 You do not have to use beads to contribute. GitHub issues and pull requests work
 fine — see [CONTRIBUTING.md](CONTRIBUTING.md). An issue you open there is meant
 to reach the tracker rather than sit beside it:

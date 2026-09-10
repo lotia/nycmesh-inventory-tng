@@ -236,6 +236,38 @@ case_is "bd create --title='gh pr merge 7 fails'" PERMIT "the words inside a quo
 case_is "git push --force origin batch/x"        "bare --force" "a bare --force is refused"
 case_is "git push -f origin batch/x"             "bare --force" "-f is the same flag and is refused with it"
 case_is "git push --follow-tags"                 PERMIT "a flag that merely contains -f is not it"
+
+# The two arms that used to be a row in AGENTS.md saying "ask first". They are
+# here because a rule kept only by whoever remembers it is not kept, and
+# because both guard something the rest of this gate leans on: one publishes a
+# tracker to a public repository, the other writes the branch protection that
+# makes the push arms above true.
+case_is "bd dolt push"                           "publishes the issue tracker" "publishing the tracker is refused"
+case_is "timeout 60 bd dolt push"                "publishes the issue tracker" "and is still refused behind a wrapper"
+case_is "bd sync"                                "publishes the issue tracker" "so is bd sync, whose fourth step is that push"
+case_is "bd sync --dry-run"                      "publishes the issue tracker" "and a flag does not make it a different command"
+case_is "uv sync"                                PERMIT "uv sync is a different program and reaches the matcher only to be let through"
+case_is "bd federation sync"                     "publishes the issue tracker" "and federation sync, which pushes to peers"
+case_is "bd federation sync --peer x"            "publishes the issue tracker" "with a peer named or not"
+# The two commands repo-settings.sh itself runs. The refusal names that script,
+# so a reader who wants to know what was refused is handed its bypass.
+case_is "gh api -X PUT repos/o/r/branches/main/protection --input -" "writes the protections" "the protection endpoint, typed out"
+case_is "gh repo edit o/r --enable-squash-merge" "writes the protections" "and gh repo edit, a third spelling for the same settings"
+case_is "gh api repos/o/r/branches/main/protection" PERMIT "reading that endpoint is not writing it"
+case_is "gh api -X GET repos/o/r"                PERMIT "and an explicit read stays free"
+case_is "bd dolt pull"                           PERMIT "reading from the remote is free"
+case_is "bd dolt commit"                         PERMIT "so is committing locally, which publishes nothing"
+case_is "bd list"                                PERMIT "and an ordinary bd call is not this at all"
+case_is "scripts/repo-settings.sh"               "writes the protections" "writing branch protection is refused"
+case_is "./scripts/repo-settings.sh --apply"     "writes the protections" "however the path is spelt"
+case_is "scripts/repo-settings.sh --check"       PERMIT "--check only compares, and the Settings workflow runs it"
+case_is "scripts/repo-settings.sh --check | tee drift.log" PERMIT "and stays free when its output is kept"
+# The way anybody actually acts on drift: look, then put it back. One --check
+# on the line must not vouch for the invocation beside it that writes.
+case_is "scripts/repo-settings.sh --check && scripts/repo-settings.sh" \
+                                                 "writes the protections" "a --check beside a write does not excuse the write"
+case_is "bash scripts/repo-settings.sh"          "writes the protections" "and an interpreter in front of it is still running it"
+case_is "grep repo-settings.sh scripts/*.sh"     PERMIT "merely naming the script is not running it"
 case_is "gh pr merge 7 --rebase"                 "No review cycle" "an unrecorded merge is refused"
 
 echo

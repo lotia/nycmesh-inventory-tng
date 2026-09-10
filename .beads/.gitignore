@@ -75,20 +75,24 @@ bd.db
 # config.yaml is tracked by git: it holds this project's settings and every
 # clone needs the same ones.
 #
-# metadata.json is NOT, and that is a deliberate correction rather than the
-# default. `bd dolt show` describes it as "(local, gitignored)" while git was
-# tracking it, and the two cannot both be right. It is bd's local pointer at a
-# database that is itself gitignored -- so a fresh clone behaves identically
-# with and without it, and either way has to run `bd init`. What tracking
-# bought was identity continuity across clones, which needs Dolt remotes this
-# project does not have. See inventory-tng-yb3n.3.
+# metadata.json is NOT, and that is a correction rather than the default --
+# inventory-tng-yb3n.3 carries the measurement it rests on. In short: bd
+# describes this file as local while git was tracking it, and only one of those
+# can be true.
 #
-# IT MUST NOT BE DELETED, only untracked: with the file absent and a database
-# present, bd does not error -- it falls back to a database named "beads" and
-# reports an empty tracker with a warning.
+# IT MUST NOT BE DELETED, only untracked. With the file absent or naming the
+# wrong mode, bd does not error: it opens a database named "beads", or refuses
+# the workspace as legacy, and either way the tracker reads as empty or broken.
+# Untracking also means git will not put it back, which is the cost of the
+# correction and is why this note is here rather than only on the bead.
 metadata.json
 
-# Added by bd (missing required patterns)
+# Added by bd, and left as bd wrote it: this block is rewritten when bd
+# decides a pattern is missing, so a hand edit here does not survive. What each
+# covers -- a runtime lock, a pull marker, and the generated server config --
+# is the sort of thing bd owns rather than this project. `*.gate.lock*` is
+# also covered by the root .gitignore and is redundant here; it is left rather
+# than removed because removing it invites bd to add it back on the next run.
 *.gate.lock*
 last_pull
 dolt-server-config.yaml

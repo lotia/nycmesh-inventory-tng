@@ -872,7 +872,21 @@ IFS= read -r -d '' payload
 # deliberately NOT a word character here: it costs nothing to let a hyphen-
 # adjacent spelling through to the matcher, and the error to avoid on this line
 # is only ever the one that lets a command past unread.
-if [[ ! "$payload" =~ (^|[^A-Za-z0-9_])(gh|push)([^A-Za-z0-9_]|$) ]]; then
+# `repo-settings` joins the two words for the arm that refuses writing branch
+# protection. It is a long, distinctive token rather than a common English
+# fragment, so it costs the prefilter nothing measurable -- unlike `gh` and
+# `push`, whose false-positive rate is what the paragraph above is about. It is
+# matched on the hyphenated name rather than on `settings`, which appears in
+# every path under .claude/ and would put the 18.1% straight back.
+#
+# `sync` is here for `bd sync`, whose fourth step is a push to the Dolt remote
+# -- so it publishes the tracker exactly as `bd dolt push` does, and a guard
+# with a spelling that walks around it is not a guard. It is the one token
+# added here that has a common collision: `uv sync` builds the backend
+# environment and will now reach the matcher. That is one 27 ms hit on a
+# command nobody runs in a loop, against a hole in the only thing standing
+# between an unread bead and a public repository.
+if [[ ! "$payload" =~ (^|[^A-Za-z0-9_])(gh|push|repo-settings|sync)([^A-Za-z0-9_]|$) ]]; then
   exit 0
 fi
 
@@ -957,6 +971,10 @@ def prog(name):
 # as a separate word. `git -C /tmp/repo push --force` was not recognised as a
 # push at all, because `(?:-\S+\s+)*` eats `-C ` and then has to match `push`
 # against `/tmp/repo`. Same shape for `git -c user.name=x push`.
+# Flags between a program and its subcommand, wherever one is allowed.
+FLAGS = r"(?:-\S+\s+)*"
+
+
 GIT_FLAGS = r"(?:-[cC]\s+\S+\s+|--(?:git-dir|work-tree|namespace|exec-path)(?:=|\s+)\S+\s+|-\S+\s+)*"
 
 
@@ -1027,6 +1045,67 @@ def classify(raw):
     # nothing about: the receipts are keyed by number within THIS repository, so
     # a receipt for 7 here would vouch for 7 somewhere else.
     elsewhere = re.search(r"(?:^|\s)(?:-R|--repo)(?:=|\s+)\S+", cmd) is not None
+
+    # PUBLISHING THE TRACKER, however it is spelt. `bd dolt push` is the plain
+    # form; `bd sync` runs that push as step 4 of its own cycle; `bd federation
+    # sync` pushes to peer towns. All three put beads where other people can
+    # read them, and decision 0029 makes this repository public -- so they are
+    # one action with one refusal, and one pattern rather than three that can
+    # drift apart.
+    #
+    # This used to live in AGENTS.md as a row saying "ask first". It is here
+    # instead because a rule that is only written down is kept only by whoever
+    # remembers it, and this repository prefers the other thing.
+    if runs(prog("bd") + r"\s+" + FLAGS
+            + r"(?:dolt\s+" + FLAGS + r"push|(?:federation\s+" + FLAGS + r")?sync)\b"):
+        return "dolt-push"
+
+    # CHANGING THE PROTECTIONS THAT MAKE EVERYTHING ELSE SAFE.
+    # `scripts/repo-settings.sh` is what sets `enforce_admins`,
+    # `allow_force_pushes: false`, the required reviews and the required
+    # contexts on `main`. Every other refusal in this file leans on those --
+    # the `push` arm below says so in as many words -- so an agent free to run
+    # this without asking is an agent that can switch off its own guards and
+    # then do the thing they were guarding.
+    #
+    # `--check` only compares and reports, so it is left alone: it is what the
+    # Settings workflow runs, and refusing it would break the check that
+    # notices drift.
+    #
+    # ASKED OF EACH INVOCATION, not of the command line. The first spelling
+    # searched the whole payload for `repo-settings.sh ... --check` and
+    # exempted everything when it found one, so the natural way to act on
+    # drift -- `repo-settings.sh --check && repo-settings.sh` -- read as
+    # checked and wrote the protections unrefused. Splitting on the separators
+    # first is what makes "--check" a fact about the invocation carrying it.
+    #
+    # The interpreter prefix is here for the same reason: `bash
+    # scripts/repo-settings.sh` runs the script as surely as naming it does,
+    # and `bash` is not one of the WRAPPERS above -- only the `sh -c '...'`
+    # spelling was already covered, by shell_payloads.
+    # THE SAME WRITE, TYPED OUT. repo-settings.sh makes its changes with
+    # `gh api -X PATCH repos/OWNER/REPO` and `gh api -X PUT
+    # repos/OWNER/REPO/branches/BRANCH/protection`, and the refusal below names
+    # that script -- so anybody who reads it to learn what was refused finds
+    # the two commands that walk around the refusal. A guard whose own message
+    # points at its bypass is worse than none, because it looks enforced.
+    # `gh repo edit` is a third spelling for repository settings.
+    #
+    # Only a writing method matches, so reads stay free: `gh api repos/x/y`
+    # and an explicit `-X GET` are not this.
+    if runs(prog("gh") + r"\s+api\b") and re.search(
+            r"-X\s*(?:PUT|PATCH|POST|DELETE)\b", cmd, flags=re.I):
+        if re.search(r"/branches/[^/\s]+/protection\b", cmd):
+            return "repo-settings"
+
+    if runs(prog("gh") + r"\s+repo\s+edit\b"):
+        return "repo-settings"
+
+    RUNS_IT = (SEP + WRAP + r"(?:(?:ba|z|k|da)?sh\s+(?:-\S+\s+)*)?"
+               + prog("repo-settings.sh"))
+    for segment in re.split(r"[;&|]", cmd):
+        if re.search(RUNS_IT, segment, flags=re.M) and not re.search(r"--check\b", segment):
+            return "repo-settings"
 
     if runs(prog("git") + r"\s+" + GIT_FLAGS + r"push\b"):
         # A bare --force has no lease, so it overwrites whatever arrived while
@@ -1117,6 +1196,38 @@ pr=$rest
 
 
 case "$action" in
+  dolt-push)
+    deny "\`bd dolt push\` publishes the issue tracker, and this repository is public.
+
+Every bead in it becomes readable by anybody the moment this runs, and stays in
+the history afterwards. That is deliberate --
+docs/decisions/0029-the-issue-tracker-is-public.md -- and it is why that record
+names four things that must never go in a bead.
+
+So the step this refuses is not the push. It is reading what is about to be
+published, which is a person's job rather than this script's:
+
+  bd list --status open        # what is about to become public
+  git diff .beads/issues.jsonl # what changed since the last publish
+
+Then ask for it, and say what you checked."
+    ;;
+
+  repo-settings)
+    deny "scripts/repo-settings.sh writes the protections the rest of this gate relies on.
+
+It sets enforce_admins, allow_force_pushes: false, the required reviews and the
+required contexts on main. This file refuses a push to main and a bare --force
+partly because GitHub would refuse them anyway -- and this script is what makes
+that true. Running it unasked is the one action that can quietly remove the
+guards around every other one.
+
+  scripts/repo-settings.sh --check
+
+compares and reports without writing, and is not refused. Writing is a person's
+to authorise, with the diff that --check prints in front of them."
+    ;;
+
   push-force)
     deny "A bare --force overwrites whatever arrived while you were not looking.
 
