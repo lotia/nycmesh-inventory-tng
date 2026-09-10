@@ -41,3 +41,4 @@ to ask "why is it like this?". Number them sequentially.
 | [0029](0029-the-issue-tracker-is-public.md) | The issue tracker is public, on purpose, and what may never go in a bead |
 | [0030](0030-the-network-is-the-access-control.md) | The network is the access control, and the application is defence in depth |
 | [0031](0031-the-issue-list-is-a-window-on-the-tracker.md) | The issue list is a window on the tracker, and the mapping travels in the repository |
+| [0032](0032-a-tools-defaults-are-not-this-projects-rules.md) | A tool's defaults are not this project's rules |
