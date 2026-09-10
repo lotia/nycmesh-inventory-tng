@@ -22,6 +22,7 @@ scene() {
   mkdir -p "$WORK/repo/.beads/dolt" "$WORK/repo/.beads/hooks"
   printf 'dolt/\nembeddeddolt/\nproxieddb/\nbackup/\n' >"$WORK/repo/.beads/.gitignore"
   printf '{\n  "dolt_mode": "proxied-server"\n}\n' >"$WORK/repo/.beads/metadata.json"
+  printf 'export.auto: true\nsync:\n    remote: "git+ssh://example.invalid/x.git"\n' >"$WORK/repo/.beads/config.yaml"
   : >"$WORK/repo/.beads/hooks/commit-msg"
   git -C "$WORK/repo" add -A >/dev/null 2>&1
   git -C "$WORK/repo" commit -qm "scene" >/dev/null 2>&1
@@ -86,6 +87,56 @@ echo "what a failure says"
 
 # `verdict` takes the good sentence AND what the fixing is before; a caller
 # that omits the second dies on `set -u` and never prints the count at all.
+
+echo
+echo "the setting that keeps the committed export honest"
+
+# bd deleted this once already, and nothing noticed but a person who happened
+# to be looking. check-batch.sh reads the file it keeps current.
+# THE SHAPES bd ACCEPTS, all three of them. The four failure cases below could
+# not have caught a check that was too narrow -- they only ever assert that a
+# wrong config is refused -- and the first version of this check matched the
+# flat spelling alone while bd's own template documents the nested one.
+scene
+printf 'sync:\n    remote: "x"\nexport:\n    auto: true\n' >"$WORK/repo/.beads/config.yaml"
+out=$(check); status=$?
+assert "$out" "$status" 0 "where git cannot publish it" "the nested form bd's template documents"
+
+scene
+printf 'sync:\n    remote: "x"\nexport: {auto: true}\n' >"$WORK/repo/.beads/config.yaml"
+out=$(check); status=$?
+assert "$out" "$status" 0 "where git cannot publish it" "and the flow mapping"
+
+scene
+printf 'sync:\n    remote: "x"\nother: 1\nexport:\n    auto: true\n    path: issues.jsonl\nmore: 2\n' >"$WORK/repo/.beads/config.yaml"
+out=$(check); status=$?
+assert "$out" "$status" 0 "where git cannot publish it" "and a block with neighbours on both sides"
+
+scene
+printf 'sync:\n    remote: "x"\n' >"$WORK/repo/.beads/config.yaml"
+out=$(check); status=$?
+assert "$out" "$status" 1 "does not set export.auto" "a config without it is refused"
+assert "$out" "$status" 1 "check-batch" "and the refusal says what reads the file that goes stale"
+
+scene
+printf 'sync:\n    remote: "x"\nexport.auto: false\n' >"$WORK/repo/.beads/config.yaml"
+out=$(check); status=$?
+assert "$out" "$status" 1 "does not set export.auto" "and so is one that turns it off"
+
+scene
+printf 'sync:\n    remote: "x"\n#export.auto: true\n' >"$WORK/repo/.beads/config.yaml"
+out=$(check); status=$?
+assert "$out" "$status" 1 "does not set export.auto" "a commented-out setting is not the setting"
+
+scene
+printf 'export.auto: true\n' >"$WORK/repo/.beads/config.yaml"
+out=$(check); status=$?
+assert "$out" "$status" 1 "names no sync remote" "the other setting that run deleted is checked too"
+
+scene
+rm -f "$WORK/repo/.beads/config.yaml"
+out=$(check); status=$?
+assert "$out" "$status" 1 "config.yaml is missing" "and a workspace that has lost the file altogether"
 
 echo
 echo "not every repository has one"

@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # Can anything under .beads/ reach a public repository by accident?
 #
-# TWO QUESTIONS, and the first one is the reason this exists: whether the
-# directories bd has decided to keep its state in are ones git will publish.
-# The second is narrower and local -- whether the mode the metadata names has
-# storage to go with it -- and it is here because it is the same file, the
-# same one-line read, and the failure it catches is silent in the same way.
+# THREE QUESTIONS, and what they share is the failure rather than the subject:
+# each is a way for the tracker's state to be wrong while everything looks
+# fine.
+#
+# The first is the reason this exists -- whether the directories bd keeps its
+# state in are ones git will publish. The second is whether the mode the
+# metadata names has storage to go with it. The third is whether the committed
+# export is still being kept current, because a file that quietly stopped
+# updating is state that misleads a commit as surely as one that should never
+# have been in it.
 #
 # What this deliberately does NOT ask is whether beads is configured well. bd
 # answers that for itself and changes its mind between versions.
@@ -106,4 +111,69 @@ fi
 # The second argument is not decoration: `verdict` prints "N things to fix
 # before <this>" on the failure path, and under `set -u` a caller that omits it
 # dies with "$2: unbound variable" instead of ever saying what is wrong.
+# THE COMMITTED EXPORT HAS TO STILL BE TRUE. `.beads/issues.jsonl` is the one
+# piece of tracker state this repository does commit, and
+# scripts/check-batch.sh reads it to decide whether every issue a batch claims
+# to close is closed. `export.auto` is what keeps it current; with that off the
+# file keeps whatever it last said, and the landing gate answers from a record
+# that has stopped moving.
+#
+# It fails in both directions and neither mentions the export: a finished batch
+# refused because the file has not caught up, or an unfinished one passed
+# because the file still shows work that has since been reopened.
+#
+# This is here rather than left to a comment beside the setting because
+# `bd init` deleted it once already, and it was noticed only because somebody
+# happened to be watching that file. Decision 0032 point 3 is the rule; this is
+# the assertion it asks for.
+# WHICHEVER SHAPE IT IS WRITTEN IN, and this is not fussiness. bd accepts the
+# flat `export.auto: true`, the nested block, and the flow mapping, and
+# `bd config get export.auto` answers `true` for all three -- measured against
+# the binary rather than assumed. The nested form is the one bd's own commented
+# template in this file documents, so a check that matched only the flat
+# spelling would refuse a configuration bd considers correct, and refuse it in
+# CI, on the documented shape.
+#
+# That is the doc-versus-behaviour gap decision 0032 point 4 is about, which
+# would have been an unhappy thing to build into the check point 3 cites.
+export_auto_is_on() {
+  local file=$1
+  grep -qE '^[[:space:]]*export\.auto:[[:space:]]*true([[:space:]]|$)' "$file" && return 0
+  grep -qE '^[[:space:]]*export:[[:space:]]*\{[^}]*auto:[[:space:]]*true' "$file" && return 0
+  # The block form: an `export:` at the start of a line, then `auto: true`
+  # indented under it, ending at the next line that is not indented.
+  awk '
+    /^export:[[:space:]]*$/ { inblock = 1; next }
+    inblock && /^[^[:space:]#]/ { inblock = 0 }
+    inblock && /^[[:space:]]+auto:[[:space:]]*true([[:space:]]|$)/ { found = 1 }
+    END { exit found ? 0 : 1 }
+  ' "$file"
+}
+
+if [[ -f .beads/config.yaml ]]; then
+  if ! export_auto_is_on .beads/config.yaml; then
+    fail ".beads/config.yaml does not set export.auto: true"
+    note "  .beads/issues.jsonl then stops being refreshed, and check-batch.sh reads it"
+  fi
+  # BOTH SETTINGS THAT RUN DELETED, not just the one whose loss was noticed.
+  # `bd init --proxied-server` took `export.auto` and `sync.remote` together,
+  # and checking only the first would be the "fix each instance and move on"
+  # habit decision 0032 exists to break -- reproduced inside the check that
+  # record cites, which would be a poor joke to leave in the tree.
+  #
+  # This one fails less quietly: `bd sync` errors without a remote. Less
+  # quietly is not loudly, because nothing runs `bd sync` on a schedule here,
+  # so the gap between losing it and finding out is however long it is until
+  # somebody tries to publish.
+  if ! grep -qE '^[[:space:]]*(sync\.)?remote:' .beads/config.yaml; then
+    fail ".beads/config.yaml names no sync remote"
+    note "  the tracker then has nowhere to publish to, and says so only when asked"
+  fi
+elif [[ -f .beads/metadata.json ]]; then
+  # A workspace with a database but no config is one bd has rewritten or one
+  # somebody trimmed; either way the setting cannot be there to find.
+  fail ".beads/config.yaml is missing from an initialised workspace"
+  note "  export.auto lives there, and without it the committed export goes stale"
+fi
+
 verdict "The tracker keeps its state where git cannot publish it." "committing"
