@@ -23,6 +23,12 @@
 # Default actor for audit trails (overridden by BEADS_ACTOR or --actor)
 # actor: ""
 
+# Optional JSONL sidecar for explicit agent/tool interaction audit records.
+# Issue history is always recorded in the database and is visible with
+# bd history <id> --events; this only controls .beads/interactions.jsonl.
+# audit:
+#   enabled: false
+
 # Export events (audit trail) to .beads/events.jsonl on each flush/sync
 # When enabled, new events are appended incrementally using a high-water mark.
 # Use 'bd export --events' to trigger manually regardless of this setting.
@@ -65,6 +71,16 @@
 # - linear.api_key  → use LINEAR_API_KEY env var instead
 # - github.token    → use GITHUB_TOKEN env var instead
 
+# Restored after `bd init --proxied-server` rewrote this file and dropped both
+# of these. Neither is cosmetic:
+#
+# export.auto keeps .beads/issues.jsonl fresh, and that file is what
+# scripts/check-batch.sh reads to decide whether a batch's issues are closed.
+# With it off the landing gate reads a stale export and either refuses a
+# finished batch or passes an unfinished one.
+#
+# sync.remote is where the tracker's own history goes. DEVELOPERS.md and the
+# sync workflow both assume it.
 export.auto: true
 sync:
     remote: "git+ssh://git@github.com/lotia/nycmesh-inventory-tng.git"
