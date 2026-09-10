@@ -71,3 +71,4 @@ ignored/
 # state files local programs to ignore
 .perles/
 
+*.gate.lock*

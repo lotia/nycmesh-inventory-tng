@@ -72,5 +72,23 @@ db.sqlite
 bd.db
 # NOTE: Do NOT add negation patterns here.
 # They would override fork protection in .git/info/exclude.
-# Config files (metadata.json, config.yaml) are tracked by git by default
-# since no pattern above ignores them.
+# config.yaml is tracked by git: it holds this project's settings and every
+# clone needs the same ones.
+#
+# metadata.json is NOT, and that is a deliberate correction rather than the
+# default. `bd dolt show` describes it as "(local, gitignored)" while git was
+# tracking it, and the two cannot both be right. It is bd's local pointer at a
+# database that is itself gitignored -- so a fresh clone behaves identically
+# with and without it, and either way has to run `bd init`. What tracking
+# bought was identity continuity across clones, which needs Dolt remotes this
+# project does not have. See inventory-tng-yb3n.3.
+#
+# IT MUST NOT BE DELETED, only untracked: with the file absent and a database
+# present, bd does not error -- it falls back to a database named "beads" and
+# reports an empty tracker with a warning.
+metadata.json
+
+# Added by bd (missing required patterns)
+*.gate.lock*
+last_pull
+dolt-server-config.yaml
