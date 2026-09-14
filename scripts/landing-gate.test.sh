@@ -58,12 +58,38 @@ cat >"$BIN/gh" <<'STUB'
 #!/usr/bin/env bash
 [[ -n "${GH_FAILS:-}" ]] && exit 1
 args="$*"
-# A gh that answers everything EXCEPT the head. GH_FAILS above fails the first
-# question the merge arm asks, which is now the body, so it can no longer reach
-# the head comparison -- and that comparison being SKIPPED when gh could not
-# answer is one of the three silent failures this suite exists for.
+# Every question, when a case asks to count them: the budget an arm spends is
+# a GH_DEADLINE window per call, and inventory-tng-f8r8 is the merge arm
+# spending two where its own comment said one.
+[[ -n "${GH_CALLS:-}" ]] && printf '%s\n' "$args" >>"$GH_CALLS"
+# A gh that answers everything EXCEPT the head. GH_FAILS above fails the one
+# question the merge arm asks, so it can no longer reach the head comparison
+# -- and that comparison being SKIPPED when gh could not answer is one of the
+# three silent failures this suite exists for. The merge arm now learns the
+# head from the same answer as the body, so for it this is not a failed call
+# but an answer with a null head -- see the combined arm below. `record` and
+# anything else asking for the head on its own still gets the failed call.
 [[ -n "${GH_FAILS_HEAD:-}" && "$args" == *"--json headRefOid"* ]] && exit 1
 case "$args" in
+  # The merge arm's one question: number, head and body from the same moment.
+  # Composed from the same fixtures the separate arms below answer from, so a
+  # case that rewrites the body or the head is answered by both shapes alike.
+  # A body fixture that is not JSON is handed over as it stands: that case is
+  # about the reader being given something it cannot read.
+  *"--json number,headRefOid,body"*)
+    NO_HEAD="${GH_FAILS_HEAD:-}" python3 -c '
+import json, os, sys
+fix = sys.argv[1]
+raw = open(fix + "/body.json").read()
+try:
+    body = json.loads(raw)["body"]
+except ValueError:
+    sys.stdout.write(raw)
+    raise SystemExit
+head = None if os.environ["NO_HEAD"] else open(fix + "/head").read().strip()
+number = int(open(fix + "/number").read().strip())
+print(json.dumps({"number": number, "headRefOid": head, "body": body}))' "$GH_FIXTURES"
+    ;;
   # The combined form first: `record` asks for all three at once, so that the
   # head and the evidence come from the same moment.
   *"--json headRefOid,comments,reviews"*) cat "$GH_FIXTURES/pr.json" ;;
@@ -76,11 +102,6 @@ case "$args" in
   # only field that tells a finding from a reply. Default is none; a case that
   # is about a review pass says what it left behind.
   *"/comments"*)          cat "$GH_FIXTURES/findings.json" ;;
-  # The body the merge arm reads before anything else, so that a pull request
-  # saying do-not-merge is refused for that rather than for its receipt. Each
-  # case that is about the marker rewrites this; the default is a body without
-  # one, which is what every other case here is about.
-  *"--json body"*)        cat "$GH_FIXTURES/body.json" ;;
   *"--json number"*)      cat "$GH_FIXTURES/number" ;;
   # THE LIST, always, because that is what the gate now asks for: it counts what
   # is not green through review_cycle.settled rather than through a --jq it
@@ -112,7 +133,10 @@ a_finding='{"id": 1, "user": {"login": "someone"}, "created_at": "2026-08-31T10:
 a_reply='{"id": 2, "in_reply_to_id": 1, "user": {"login": "someone"}, "created_at": "2026-08-31T10:00:00Z", "path": "a.py"}'
 findings_are() { printf '[%s]\n' "$1" >"$FIX/findings.json"; }
 
-# What `gh pr view --json body` hands back. A body, through json.dumps, so a
+# The body the merge arm reads before anything else, so that a pull request
+# saying do-not-merge is refused for that rather than for its receipt. Each
+# case that is about the marker rewrites this; the default is a body without
+# one, which is what every other case here is about. Through json.dumps, so a
 # case can put a marker on a line of its own without the shell touching it.
 body_is() { BODY=${1-} python3 -c '
 import json, os, sys
@@ -193,7 +217,17 @@ in_repo() {
   shift 2
   (cd "$repo" && env PATH="$path" GH_FIXTURES="$FIX" CLAUDE_PROJECT_DIR="$repo" \
     GH_DEADLINE=5 ${GH_FAILS:+GH_FAILS=1} ${GH_FAILS_HEAD:+GH_FAILS_HEAD=1} \
-    "$GATE" "$@") 2>&1
+    ${GH_CALLS:+GH_CALLS="$GH_CALLS"} "$GATE" "$@") 2>&1
+}
+
+# calls_made <command> <want> <name> -- how many questions the gate put to gh
+# for that command, whatever it decided.
+calls_made() {
+  GH_CALLS="$WORK/gh-calls"
+  : >"$GH_CALLS"
+  gate "$1" >/dev/null
+  equals "$(wc -l <"$GH_CALLS")" "$2" "$3"
+  unset GH_CALLS
 }
 
 # A hook payload written out by hand, for the envelopes `payload` cannot make.
@@ -380,6 +414,19 @@ checks_are '[{"name": "Backend", "state": "FAILURE"},
 case_is "gh pr ready 7"                          "is not green" "a pull request with failing checks is refused"
 checks_are '[{"name": "Backend", "state": "SUCCESS"}]'
 case_is "gh pr ready 7"                          PERMIT "a green pull request may be marked ready"
+
+# ONE QUESTION, whether or not the command named its pull request: `gh pr
+# checks` finds the current branch's on its own, and asking `gh pr view` for
+# the number first was a second GH_DEADLINE window spent on a name for the
+# refusal. inventory-tng-f8r8.
+calls_made "gh pr ready 7"   1 "and it asked gh once to find out"
+calls_made "gh pr ready"     1 "once too when the command did not name the pull request"
+case_is "gh pr ready"                            PERMIT "which is still marked ready when green"
+checks_are '[{"name": "Backend", "state": "FAILURE"}]'
+case_is "gh pr ready"                            "The pull request for this branch is not green" \
+  "and refused by description, having no number to refuse it by"
+case_is "gh pr ready"                            "gh pr checks --watch" "with advice that also names no number"
+checks_are '[{"name": "Backend", "state": "SUCCESS"}]'
 
 # WHICH checks that question counts. Marking a batch ready is what INVITES the
 # review, so the check that stays red until the review has happened cannot be
@@ -610,6 +657,13 @@ echo "the head the receipt was written against"
 pr_json review marker
 record >/dev/null
 case_is "gh pr merge 7 --rebase"                 PERMIT "a merge at the recorded head is permitted"
+
+# ONE QUESTION for the number, the head and the body together. Each `gh pr
+# view` is a GH_DEADLINE window out of the hook's timeout, and two of them left
+# the refusal 14 seconds of 30 to say itself in. inventory-tng-f8r8.
+calls_made "gh pr merge 7 --rebase"  1 "and it asked gh once for the head and the body"
+calls_made "gh pr merge --rebase"    1 "once too when the number has to come from the same answer"
+case_is "gh pr merge --rebase"                   PERMIT "and that merge is permitted at the recorded head"
 
 # The shape the gate itself used to write: a head, and stages as a literal
 # with nothing behind them. It has to be refused, or every receipt already on

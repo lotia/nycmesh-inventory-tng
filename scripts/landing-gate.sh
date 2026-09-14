@@ -253,11 +253,6 @@ gh_json() {
   printf '%s' "$out"
 }
 
-pr_head() { gh_json pr view "$1" --json headRefOid --jq .headRefOid; }
-
-# The number of the pull request for the current branch, when a command did not
-# name one.
-pr_current() { gh_json pr view --json number --jq .number; }
 
 # ---------------------------------------------------------------------------
 # record / status / clear
@@ -1316,7 +1311,16 @@ Run it from a checkout of that repository, where its own gate can answer."
   ready)
     have gh || deny_dependency gh "reading whether the checks on this pull request are green"
     have python3 || deny_dependency python3 "reading whether those checks are green"
-    [[ -n "$pr" ]] || pr=$(pr_current) || deny_unavailable "which pull request this branch belongs to" gh
+    # ONE ROUND TRIP HERE TOO. `gh pr checks` resolves the current branch's
+    # pull request itself when given no number, so asking `gh pr view` for the
+    # number first spent a second GH_DEADLINE window to learn something the
+    # refusals below only use to name it. The merge arm says what a window
+    # costs. inventory-tng-f8r8.
+    if [[ -n "$pr" ]]; then
+      subject="Pull request $pr"
+    else
+      subject="The pull request for this branch"
+    fi
     # THE SAME QUESTION THE STOP HOOK ASKS, THROUGH THE SAME READER. Both arms
     # want "are the checks green, not counting the review-cycle one", and both
     # used to answer it themselves -- this one as a `--jq` filter, the stop hook
@@ -1328,7 +1332,7 @@ Run it from a checkout of that repository, where its own gate can answer."
     # The count is done in the reader rather than by `--jq` for the same reason.
     # Doing it here meant interpolating a job name into a double-quoted jq
     # program, and that is a rule the shell was carrying half of.
-    checks=$(gh_json pr checks "$pr" --json name,state) || checks=""
+    checks=$(gh_json pr checks ${pr:+"$pr"} --json name,state) || checks=""
     failing=$(printf '%s' "$checks" | HERE="$SCRIPTS" python3 -c '
 import json, sys, os
 sys.path.insert(0, os.environ["HERE"])
@@ -1349,7 +1353,7 @@ read -r failing marked <<<"$failing"
     # has not started cannot be green, so this still refuses. Neither is a gh
     # that could not answer: that used to be read as green.
     if [[ -z "$failing" ]]; then
-      deny_unavailable "whether the checks on pull request $pr are green" gh
+      deny_unavailable "whether the checks on ${subject,} are green" gh
     fi
     # THE ONE RED CHECK THAT IS NOT AN INSTRUCTION TO FIX IT. Told apart before
     # the ordinary refusal below, because that one says "wait for the checks, or
@@ -1357,7 +1361,7 @@ read -r failing marked <<<"$failing"
     # agent at making the do-not-merge check green. That is the hazard AGENTS.md
     # names, reproduced by this repository's own tooling. inventory-tng-g4dh.
     if [[ "$marked" == "marked" ]]; then
-      deny "Pull request $pr posts the do-not-merge marker in its body.
+      deny "$subject posts the do-not-merge marker in its body.
 
 It is not to be merged, and the check saying so is not one to make green:
 it is a pull request opened to be read. Marking it ready is not refused
@@ -1366,12 +1370,12 @@ because something needs fixing -- there is nothing here to fix.
 $STALE_MARKER"
     fi
     if [[ "$failing" != "0" ]]; then
-      deny "Pull request $pr is not green, so it is not ready to be reviewed.
+      deny "$subject is not green, so it is not ready to be reviewed.
 
 Marking it ready is what invites the review, and a review spent on what a
 linter would have said is a review wasted. Wait for the checks, or fix them.
 
-  gh pr checks $pr --watch"
+  gh pr checks ${pr:+$pr }--watch"
     fi
     exit 0
     ;;
@@ -1380,22 +1384,43 @@ linter would have said is a review wasted. Wait for the checks, or fix them.
     have gh || deny_dependency gh "reading the head this merge would land"
     have python3 || deny_dependency python3 "reading the recorded review cycle"
     [[ -n "$REPO_ROOT" ]] || deny_unavailable "where this repository is" "git and CLAUDE_PROJECT_DIR"
-    # Two questions, one round trip. When the command names no pull request this
-    # arm needs both its number and its head, and asking `gh pr view` twice
-    # spends a second GH_DEADLINE window out of the hook's timeout for an answer
-    # the first call could have carried. `current` stays empty when the command
-    # named its pull request, and the comparison below fetches the head then.
+    # THREE QUESTIONS, ONE ROUND TRIP. This arm needs the pull request's number
+    # when the command did not name it, its head, and its body, and every
+    # `gh pr view` it makes spends a GH_DEADLINE window out of the hook's
+    # timeout -- 8 of 30 seconds each, before check-batch.sh and the receipt
+    # read have had any. Two windows was 16, and the budget a refusal has to
+    # say itself in is what is left. inventory-tng-f8r8.
+    #
+    # THE HEAD IS GUARDED ON THE FIELD, NOT THE CALL. One call means "gh could
+    # not name the head" no longer has an exit status of its own, and that
+    # refusal has to stay distinguishable: the comparison being SKIPPED when gh
+    # could not answer is inventory-tng-3sp, and a receipt from a superseded
+    # head permitted a merge through exactly that hole. So the head's absence is
+    # refused by name below, whatever the call's status was.
     #
     # `record` used to be the exemplar here and no longer is: it asks twice now,
     # for a field `gh pr view` cannot return at all. It is not on this path --
     # the hook routes to `check` and `stop` -- so it spends no budget this arm
     # has to keep.
-    current=""
-    if [[ -z "$pr" ]]; then
-      both=$(gh_json pr view --json number,headRefOid --jq '"\(.number) \(.headRefOid)"') \
-        || deny_unavailable "which pull request this branch belongs to" gh
-      read -r pr current <<<"$both"
-    fi
+    view=$(gh_json pr view ${pr:+"$pr"} --json number,headRefOid,body) \
+      || deny_unavailable "whether pull request ${pr:-for this branch} says do not merge, and its head" gh
+
+    # The number and the head, out of that one answer. A number gh did not give
+    # is refused now, because every refusal below names it. Neither being there
+    # is gh not having answered, whatever else it said; an answer that is not
+    # an object fails the same way, and the reader below says so about it.
+    #
+    # `|` between them rather than a space, the way receipt_status writes its
+    # answer: `read` drops leading whitespace, so a missing number would have
+    # put the head into the number's slot.
+    fields=$(printf '%s' "$view" | python3 -c '
+import json, sys
+answer = json.load(sys.stdin)
+print(answer.get("number") or "", answer.get("headRefOid") or "", sep="|")
+' 2>/dev/null) || fields=""
+    IFS="|" read -r number current <<<"$fields"
+    [[ -n "$pr" ]] || pr=$number
+    [[ -n "$pr" ]] || deny_unavailable "which pull request this branch belongs to" gh
 
     # A PULL REQUEST THAT SAYS DO NOT MERGE, ASKED LOCALLY AS WELL. The required
     # check in ci.yml is the enforcement and this is not a second copy of it:
@@ -1414,13 +1439,9 @@ linter would have said is a review wasted. Wait for the checks, or fix them.
     # wrong with it rather than being sent to run a review cycle it must not
     # need. inventory-tng-g4dh.
     #
-    # AND IT IS A SECOND ROUND TRIP, which the comment above says this arm does
-    # not make. It should not: `body` belongs in the calls already being made,
-    # and folding it in is inventory-tng-f8r8 -- filed rather than done here
-    # because it removes the separate head fetch that makes "gh could not name
-    # the head" a distinguishable refusal, which inventory-tng-3sp is pinned on.
-    body=$(gh_json pr view "$pr" --json body) \
-      || deny_unavailable "whether pull request $pr says do not merge" gh
+    # The reader is handed everything gh said: it reads the one field it is
+    # about and passes over the rest.
+    #
     # THE STATUS, RATHER THAN MERELY NON-ZERO. The reader answers 1 for a pull
     # request that posts the marker and 2 for an answer it could not read, and
     # anything else is the reader itself failing -- review_cycle.py gone from
@@ -1428,7 +1449,7 @@ linter would have said is a review wasted. Wait for the checks, or fix them.
     # refusal below, with the output sent to /dev/null, made a broken reader say
     # by name that a body posts a line it does not carry, and sent whoever read
     # that to go and delete a line that is not there.
-    marker_said=$(printf '%s' "$body" | python3 "$SCRIPTS/do_not_merge.py" 2>&1)
+    marker_said=$(printf '%s' "$view" | python3 "$SCRIPTS/do_not_merge.py" 2>&1)
     marker_status=$?
     if [[ "$marker_status" -gt 1 ]]; then
       deny "The landing gate could not read whether pull request $pr says do not merge,
@@ -1450,6 +1471,13 @@ a check to make green: it is a pull request opened to be read.
 
 $STALE_MARKER"
     fi
+
+    # The head, guarded here rather than where the number was: after the marker,
+    # so that a marked pull request is refused for the marker whatever else gh
+    # left out, and before the receipt, so that a head gh did not name is never
+    # compared with anything.
+    [[ -n "$current" ]] || deny_unavailable \
+      "the head of pull request $pr, to check it is what was reviewed" gh
 
     # THE FINISHED QUESTION, asked here because this is the only moment it is
     # the right question. CI asks the structural half on every push and stays
@@ -1481,9 +1509,6 @@ $CYCLE"
 
     # The comparison the old gate SKIPPED when gh could not answer, which let a
     # receipt from a superseded head permit the merge.
-    [[ -n "$current" ]] || current=$(pr_head "$pr") || deny_unavailable \
-      "the head of pull request $pr, to check it is what was reviewed" gh
-
     if [[ "$recorded" != "$current" ]]; then
       deny "Pull request $pr has moved since it was reviewed, so what is about to
 merge is not what was reviewed.
