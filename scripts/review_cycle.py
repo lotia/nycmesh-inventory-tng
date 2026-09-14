@@ -56,6 +56,19 @@ MARKERS = {
 #: nudge for the one state it exists to catch.
 CHECK = "Review cycle"
 
+#: The other name the greenness question reads past, for a different reason.
+#: ``Repository settings`` is settings.yml's job, and on a pull request it
+#: compares main's branch protection with the contexts ci.yml names -- so a
+#: branch that adds a job is red on it from its first push, and nothing on the
+#: branch can turn it green: what does is a person running
+#: scripts/repo-settings.sh after the merge. Counted as an ordinary failure,
+#: that was a branch that could not be marked ready, so could not merge, so
+#: could never have its job required. ``inventory-tng-sdtb``. It is not a
+#: required context, and settings.yml runs the same comparison on main itself,
+#: so nothing it held is loosened. DEVELOPERS.md "Merging" is the step it is
+#: asking for.
+SETTINGS_CHECK = "Repository settings"
+
 #: The stages a cycle has, in the order a person runs them.
 STAGES = ("code-review", "simplify")
 
@@ -96,8 +109,11 @@ def settled(check: dict[str, Any]) -> bool:
     turns it green, so the same exclusion is what lets a pull request put back
     into draft be offered again without a commit pushed to satisfy a checker.
 
+    ``SETTINGS_CHECK`` is read past as well, and its own note says why: it
+    answers about the repository, and a branch cannot make it green.
+
     The rest of the list still has to be green: a branch whose tests are
-    failing has nothing to review yet, which is why this reads past one name
+    failing has nothing to review yet, which is why this reads past two names
     rather than dropping the question.
 
     HERE RATHER THAN IN ITS TWO CALLERS, which is the whole point. The stop
@@ -112,7 +128,7 @@ def settled(check: dict[str, Any]) -> bool:
     ``name``/``conclusion`` for a check run, and ``gh pr checks --json`` says
     ``name``/``state``.
     """
-    if (check.get("name") or check.get("context") or "") == CHECK:
+    if (check.get("name") or check.get("context") or "") in (CHECK, SETTINGS_CHECK):
         return True
     verdict = (check.get("conclusion") or check.get("state") or "").upper()
     return verdict in ("SUCCESS", "NEUTRAL", "SKIPPED")
@@ -407,6 +423,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="print the name the review-cycle check reports under, and exit",
     )
+    parser.add_argument(
+        "--settings-check-name",
+        action="store_true",
+        help="print the name of the other check settled() reads past, and exit",
+    )
     # THE SECOND DOCUMENT, TAKEN HERE RATHER THAN STITCHED BY EACH CALLER. What
     # decides the code-review stage lives in two API answers -- `gh pr view`
     # cannot say whether a review entry is a finding or a reply -- and the two
@@ -423,6 +444,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.check_name:
         print(CHECK)
+        return 0
+    if args.settings_check_name:
+        print(SETTINGS_CHECK)
         return 0
 
     # UNREADABLE INPUT REFUSES. A check that could not see is not a check with

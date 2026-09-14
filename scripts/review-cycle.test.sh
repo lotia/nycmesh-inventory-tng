@@ -327,6 +327,29 @@ else
     "$(printf '       %q is not among the job names ci.yml reports under:\n%s' "$CHECK" "$JOBS")"
 fi
 
+# THE SECOND NAME READ PAST, pinned to the file it lives in. settings.yml is
+# not ci.yml, so ci-check-names.py cannot answer for it; a plain grep of the
+# job's `name:` line is what joins the two. inventory-tng-sdtb.
+SETTINGS=$(python3 "$READER" --settings-check-name)
+grep -q "^    name: $SETTINGS\$" "$HERE/../.github/workflows/settings.yml"; status=$?
+exits "$status" 0 "review_cycle.SETTINGS_CHECK names the job in settings.yml"
+
+echo
+echo "what settled reads past"
+# Asked of the function directly, because its two callers each pin their own
+# scene and this is the shared answer both of those rest on.
+settled() {
+  python3 -c 'import json, sys; sys.path.insert(0, sys.argv[1]); import review_cycle
+print("settled" if review_cycle.settled(json.loads(sys.argv[2])) else "unsettled")' "$HERE" "$1"
+}
+# `equals`, not `assert`: "settled" is a substring of "unsettled".
+equals "$(settled '{"name": "Backend", "state": "FAILURE"}')" unsettled "an ordinary red check is not settled"
+equals "$(settled '{"name": "Backend", "state": "SUCCESS"}')" settled "and a green one is"
+equals "$(settled "{\"name\": \"$CHECK\", \"state\": \"FAILURE\"}")" settled "the review-cycle check is settled whatever it says"
+equals "$(settled "{\"name\": \"$SETTINGS\", \"state\": \"FAILURE\"}")" settled \
+  "and so is the settings check, which a branch cannot turn green"
+equals "$(settled "{\"context\": \"$SETTINGS\", \"state\": \"FAILURE\"}")" settled "under either spelling gh reports"
+
 echo
 echo "the machine-readable form agrees with the report"
 out=$(printf '{}' | python3 "$READER" --json 2>&1); status=$?
