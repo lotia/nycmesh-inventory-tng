@@ -767,6 +767,8 @@ jobs:
         run: scripts/review-cycle.test.sh
       - name: Check the do-not-merge reader
         run: scripts/do-not-merge.test.sh
+      - name: Check the look-again nudge
+        run: scripts/look-again.test.sh
       - name: Check the issue puller
         run: scripts/pull-new-issues.test.sh
       - name: Check the unfiled-bead reader
@@ -871,24 +873,19 @@ jobs:
   # it to, so there is nothing to read past -- and a spike is usually a draft,
   # which is exactly when the marker most needs to already be in force.
   #
-  # NO `edited` TRIGGER, AND THAT IS A GAP RATHER THAN A DECISION. A pull
+  # NO `edited` TRIGGER HERE, and it is look-again.yml that carries it. A pull
   # request marked at the moment it is opened is held from its first run, and a
   # pull request already blocked cannot slip past: the only two ways it becomes
   # mergeable are being marked ready and being pushed to, and both are listed
-  # above. What is NOT covered is the other direction -- a green, ready pull
-  # request whose body is edited to ADD the marker re-runs nothing, so the last
-  # green verdict stands and GitHub permits the merge. Removing one is covered
-  # by more than a push -- review-cycle.yml re-runs the FAILED jobs on a head,
-  # and a marked pull request's copy of this job is one of them -- but that
-  # asymmetry is the gap rather than a cure for it: a job that PASSED is not
-  # re-run by anything.
+  # above. What those do not cover is a body edited AFTER the last push, in
+  # either direction, and `edited` cannot simply be added above: with
+  # `cancel-in-progress` on this workflow, a title typo would restart and
+  # cancel the browser suite. So a separate workflow watches for the edit and
+  # re-runs this job by name -- by name, because the verdict it is replacing
+  # may be green. Its header is the rest of the argument. inventory-tng-qe31.
   #
-  # `edited` cannot simply be added here: with `cancel-in-progress` on this
-  # workflow, a title typo would restart and cancel the browser suite. The shape
-  # that fits is the one review-cycle.yml already uses for its own staleness --
-  # a separate, non-required workflow that re-runs this job -- and it is
-  # `inventory-tng-qe31`. Until then scripts/landing-gate.sh reads the body
-  # itself at merge time, which covers the path this was built for.
+  # scripts/landing-gate.sh reads the body itself at merge time as well, and
+  # says at that arm why that stays worth doing with the nudge in place.
   do-not-merge:
     name: Not marked do-not-merge
     runs-on: ubuntu-latest

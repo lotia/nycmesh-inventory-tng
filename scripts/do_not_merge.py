@@ -74,8 +74,8 @@ def main() -> int:
     print("  check is here so that the rule does not rest on being read.", file=sys.stderr)
     print("", file=sys.stderr)
     print("  If the work is finished and the marker is stale, take the line", file=sys.stderr)
-    print("  out of the body and PUSH. Editing it away does not by itself", file=sys.stderr)
-    print("  make this look again, and the last verdict is what stands.", file=sys.stderr)
+    print("  out of the body: look-again.yml re-runs this when a body changes.", file=sys.stderr)
+    print("  If it has not within a few minutes, PUSH, which always does.", file=sys.stderr)
     return 1
 
 
