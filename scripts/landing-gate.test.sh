@@ -23,6 +23,7 @@ GATE=$(readlink -f "$HERE_SCRIPTS/landing-gate.sh")
 # gate reads it from there too, and a suite carrying its own copy would agree
 # with itself while disagreeing with the file under test.
 REVIEW_CHECK=$(python3 "$HERE_SCRIPTS/review_cycle.py" --check-name)
+SETTINGS_CHECK=$(python3 "$HERE_SCRIPTS/review_cycle.py" --settings-check-name)
 
 workspace
 # A batch branch, because that is where the work happens and because the gate
@@ -442,6 +443,17 @@ checks_are "[{\"name\": \"$REVIEW_CHECK\", \"state\": \"FAILURE\"},
              {\"name\": \"Backend\", \"state\": \"FAILURE\"}]"
 case_is "gh pr ready 7"                          "is not green" \
   "and reading past it does not drop the question for every other check"
+
+# THE OTHER NAME READ PAST, for the reason on review_cycle.SETTINGS_CHECK.
+# inventory-tng-sdtb.
+checks_are "[{\"name\": \"$SETTINGS_CHECK\", \"state\": \"FAILURE\"},
+             {\"name\": \"Backend\", \"state\": \"SUCCESS\"}]"
+case_is "gh pr ready 7"                          PERMIT \
+  "a red settings check does not hold back the branch that will make it right"
+checks_are "[{\"name\": \"$SETTINGS_CHECK\", \"state\": \"FAILURE\"},
+             {\"name\": \"Backend\", \"state\": \"FAILURE\"}]"
+case_is "gh pr ready 7"                          "is not green" \
+  "and is not a licence for the rest to be red"
 
 # THE STATE THE TWO READERS DISAGREED ABOUT while they were two. A neutral check
 # was green to the stop hook and red here, and nothing failed when it was.

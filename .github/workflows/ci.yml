@@ -801,7 +801,9 @@ jobs:
   # This becomes REQUIRED by existing and being named -- scripts/repo-settings.sh
   # derives the required contexts from the job names in this file -- so there is
   # no second list to keep in step. It takes effect on the next run of that
-  # script, which is a branch-protection change and is a person's to make.
+  # script, which is a branch-protection change and is a person's to make, and
+  # is made AFTER the merge -- review_cycle.SETTINGS_CHECK is why it cannot be
+  # before, and DEVELOPERS.md "Merging" is the step itself.
   #
   # ONLY ON pull_request, because a push to main has no pull request to read and
   # a check that reported nothing there would be permanently pending. The other

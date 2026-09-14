@@ -1764,6 +1764,13 @@ job in CI that ought to be required. A weekly job runs `--check` and reports,
 so drift is found rather than remembered — and it runs on any pull request that
 touches CI's job names, because those decide what `main` requires.
 
+So a pull request that adds or renames a job is red on `Repository settings`
+until it has merged, and `scripts/landing-gate.sh` reads past that one check
+when asking whether a branch is green — `scripts/review_cycle.py` says why,
+beside the name. The step it is asking for comes **after** the merge: run
+`scripts/repo-settings.sh` then. Every other red check still means what it
+says.
+
 One setting is not checked and cannot be: GitHub answers with the merge methods
 only for a token holding `contents:write`, which is not a thing to hand a
 scheduled job in order to detect a settings change. Merge commits are covered
