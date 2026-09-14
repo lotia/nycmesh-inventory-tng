@@ -46,8 +46,10 @@ out=$(body "   $MARKER"); status=$?
 assert "$out" "$status" 1 "posts the do-not-merge marker" "three spaces is still posted, as Markdown has it"
 
 # The refusal has to say what to do next, or the next person edits the body,
-# sees nothing change, and concludes the check is broken.
-assert "$out" "$status" 1 "PUSH" "and it says that removing the line needs a push"
+# waits, and concludes the check is broken. Both halves: the nudge that reads
+# an edit, and the push that works when the nudge has not.
+assert "$out" "$status" 1 "look-again.yml" "and it names what re-runs it when the line is removed"
+assert "$out" "$status" 1 "PUSH" "and the push that does so regardless"
 
 echo
 echo "writing about the marker is not posting it"

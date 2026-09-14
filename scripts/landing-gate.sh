@@ -235,6 +235,13 @@ own_source_is_mid_conflict() {
 # behind it.
 GH_DEADLINE=${GH_DEADLINE:-8}
 
+# What a marked pull request is told to do, in the ready arm and the merge arm
+# alike. One string, because the two copies were edited in lockstep once and
+# would drift the next time.
+STALE_MARKER='If the marker is stale, take the line out of the body; the check looks
+again on its own, and a push makes sure -- see DEVELOPERS.md "When a
+branch is ready to merge".'
+
 gh_json() {
   local out
   if have timeout; then
@@ -1356,8 +1363,7 @@ It is not to be merged, and the check saying so is not one to make green:
 it is a pull request opened to be read. Marking it ready is not refused
 because something needs fixing -- there is nothing here to fix.
 
-If the marker is stale, take the line out of the body and push -- see
-DEVELOPERS.md \"When a branch is ready to merge\"."
+$STALE_MARKER"
     fi
     if [[ "$failing" != "0" ]]; then
       deny "Pull request $pr is not green, so it is not ready to be reviewed.
@@ -1396,9 +1402,11 @@ linter would have said is a review wasted. Wait for the checks, or fix them.
     # scripts/do_not_merge.py is the one reader, and this arm hands it the body.
     #
     # WORTH ASKING HERE DESPITE THE CHECK, because this is the only layer that
-    # reads the body LIVE. ci.yml cannot see a body edited since the last run --
-    # inventory-tng-qe31 -- so a green, ready pull request marked after its last
-    # push is one GitHub would still merge. That is precisely the path this
+    # reads the body LIVE. ci.yml cannot see a body edited since the last run;
+    # look-again.yml re-runs the check when that happens -- inventory-tng-qe31
+    # -- but a nudge takes seconds to minutes to land and is not itself
+    # required, so a merge typed inside that window, or after a nudge that
+    # died, is one GitHub would still permit. That is precisely the path this
     # guard sits on: an agent typing the merge. It also lets the refusal explain
     # itself, where GitHub's is a generic protection error.
     #
@@ -1440,8 +1448,7 @@ It is not to be merged, whatever else is green and whatever state it is
 in. AGENTS.md says so in the row that has no exceptions, and this is not
 a check to make green: it is a pull request opened to be read.
 
-If the marker is stale, take the line out of the body and push -- see
-DEVELOPERS.md \"When a branch is ready to merge\"."
+$STALE_MARKER"
     fi
 
     # THE FINISHED QUESTION, asked here because this is the only moment it is

@@ -1818,11 +1818,12 @@ only on a line of its own and outside any fenced block, by the same rule as the
 reader, so a body may explain at length why it is blocked, quote the marker in a
 sentence, or display it in a fence, without disarming itself.
 
-Removing it needs the check to **look again**, which editing the body does not
-by itself cause. A push always does. So does anything that re-runs the failed
-job — a review comment, through
-[the nudge](#one-review-pass-findings-filed-per-issue) — because the check
-re-reads the body live when it runs. A push is the reliable one.
+Posting it or removing it is done by editing the body, and that is enough:
+`.github/workflows/look-again.yml` re-runs the check whenever a body changes,
+because a check that has already answered would otherwise stand on what it read
+last — green, if the marker was added after the fact. Its header says why that
+lives in its own file. A push also re-runs it, and is the thing to do if the
+nudge has not, since the check re-reads the body live whenever it runs.
 
 Two it cannot see, and they are the ones a person has to hold to:
 

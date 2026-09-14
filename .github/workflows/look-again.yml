@@ -1,0 +1,63 @@
+# Ask the do-not-merge check to look again when the body it reads has changed.
+#
+# `Not marked do-not-merge` in ci.yml reads the pull request BODY, and ci.yml
+# runs on pushes and on being marked ready -- so a body edited after the last
+# push is one that check has never seen. A pull request marked when it is
+# opened is held from its first run; one marked AFTER a review found a problem
+# ("park this") stayed green, and GitHub permitted the merge. That is the
+# direction a hold is most likely to be applied in. inventory-tng-qe31.
+#
+# THE SAME SHAPE AS review-cycle.yml: a separate workflow, with its own
+# concurrency group, that decides nothing and re-runs the job that does. Why
+# `edited` cannot go in ci.yml's own triggers is on the do-not-merge job
+# there; why a nudge must be its own file rather than a job in ci.yml is
+# review-cycle.yml's header.
+#
+# WHAT IS DIFFERENT is that the check this re-runs may have PASSED. review-
+# cycle.yml's staleness fails red and `gh run rerun --failed` reaches it; a
+# marker added after the fact leaves a green verdict, and nothing re-runs a
+# job that passed unless it is named. scripts/look-again.sh names it.
+#
+# THE PULL REQUEST COPY RUNS. `pull_request` is not on the list of events that
+# only fire from the default branch, so a change to this file is exercised by
+# editing the body of the pull request that carries it -- unlike the
+# `issue_comment` half of review-cycle.yml, which cannot be tested until it has
+# merged.
+name: Look again
+
+on:
+  pull_request:
+    types: [edited]
+
+# One re-run per pull request. A second edit while the first is being handled
+# -- or waited for, since scripts/look-again.sh waits for a run in progress --
+# supersedes it rather than queuing a second re-run of the same job.
+concurrency:
+  group: look-again-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  rerun:
+    name: Ask CI again about the marker
+    runs-on: ubuntu-latest
+    # `edited` also fires for the title and the base branch, and neither is
+    # anything the check reads. `changes.body` is present exactly when the body
+    # changed.
+    if: github.event.changes.body != null
+    permissions:
+      # The same three as review-cycle.yml, and its permissions block says why
+      # `contents: read` is not idle.
+      contents: read
+      actions: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: Re-run the check against the body as it now stands
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        # The job name comes from the reader rather than being spelt a third
+        # time: do_not_merge.py is where it lives, and do-not-merge.test.sh
+        # pins it to ci.yml.
+        run: scripts/look-again.sh "$PR" "$(python3 scripts/do_not_merge.py --check-name)"
