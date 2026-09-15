@@ -6,7 +6,7 @@ name: inventory-tng
 
 # What every service in this stack is denied, in one place because it is one
 # decision: no container may gain a privilege, none holds a capability, and
-# none may write to its own root filesystem. DEVELOPERS.md "Option A" says so
+# none may write to its own root filesystem. docs/local-development.md "The Docker stack" says so
 # in prose and the `Compose stack` job in CI finds out whether it is true.
 #
 # The uid each runs as and the directories each genuinely writes to are not
@@ -310,7 +310,7 @@ services:
       # The command refuses outright with this off, which is deliberate: it
       # ships inside the backend image and is one wrong context away from a
       # production pod. Turning it off in .env therefore turns the seeding off
-      # too, and the stack still comes up -- see DEVELOPERS.md "Option A".
+      # too, and the stack still comes up -- see docs/local-development.md "The Docker stack".
       DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
       DATABASE_URL: *database-url
     # Once, and not again if it fails. `restart: no` is compose's default and

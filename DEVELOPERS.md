@@ -1,16 +1,17 @@
 # Developer Guide
 
-Everything you need to set up a development environment and work on
-inventory-tng. If you are new to the project, read
-[CONTRIBUTING.md](CONTRIBUTING.md) first — it explains how work gets picked up
-and reviewed. For what the project *is*, see [README.md](README.md); for how it
-is put together, see [docs/architecture.md](docs/architecture.md).
+From a clean machine to a running application, in the order you will type it,
+and then [a table of where everything else lives](#everything-else). If you
+are new to the project, read [CONTRIBUTING.md](CONTRIBUTING.md) first — it is
+how work gets picked up and reviewed. For what the project *is*, see
+[README.md](README.md); for how it is put together,
+[docs/architecture.md](docs/architecture.md).
 
 **This guide is expected to work.** If a command here fails on a clean machine,
 that is a bug in the guide — please open an issue or fix it in your next pull
-request. See [Definition of Done](CONTRIBUTING.md#definition-of-done). CI runs the setup below
-on a clean machine every push, so that expectation is checked rather than
-hoped for: [What CI proves](docs/ci.md#what-ci-proves).
+request. CI runs the setup below on a clean machine every push, so that
+expectation is checked rather than hoped for:
+[What CI proves](docs/ci.md).
 
 ---
 
@@ -30,7 +31,7 @@ because they are **not** what running the application needs:
 | Tool | Why an agent session needs it |
 | --- | --- |
 | `git` | Every guardrail in `scripts/` reads the repository through it. |
-| `python3` | The commit checker and [the landing gate](docs/pull-requests.md#when-a-branch-is-ready-to-merge) both read through it. |
+| `python3` | The commit checker and [the landing gate](docs/pull-requests.md#the-landing-gate) both read through it. |
 | [`gh`](https://cli.github.com/), authenticated | The landing gate asks GitHub what a pull request's head is and what has been posted to it. `gh auth login` once. |
 
 **A shim is not enough for these three, and that is the whole reason they are
@@ -40,7 +41,7 @@ terminal where mise was never activated are all real cases. `mise.toml` pins a
 Python for the project rather than installing one globally, so `python3` can be
 absent exactly there. The checkers refuse rather than pass when one of these is
 missing — that is deliberate, and
-[the landing gate](docs/pull-requests.md#when-a-branch-is-ready-to-merge) explains why — so the
+[the landing gate](docs/pull-requests.md#the-landing-gate) explains why — so the
 symptom is a command that will not run and a message naming the program, not a
 guard that quietly stopped guarding.
 
@@ -48,7 +49,7 @@ guard that quietly stopped guarding.
 git --version && python3 --version && gh auth status
 ```
 
-### Podman
+## Podman
 
 [Podman](https://podman.io/) works too, and the two are interchangeable
 everywhere in this project — substitute `podman compose` for `docker compose`
@@ -69,12 +70,7 @@ systemctl --user enable --now podman.socket
 `enable --now` starts it and keeps it across logins; plain `start` lasts only
 until you log out.
 
-### Pinned versions
-
-Every version this project uses is pinned in [`mise.toml`](mise.toml). That file
-is the single source of truth for the toolchain — CI installs from it too.
-
-### Activate mise, then open a new shell
+## Activate mise, then open a new shell
 
 **Do this before typing anything else.** The installer above only puts a binary
 in `~/.local/bin`; it changes no shell of yours. Its last lines print the one
@@ -87,7 +83,7 @@ eval "$(~/.local/bin/mise activate bash)"      # or zsh, or fish
 Add the line it printed — to `~/.bashrc`, `~/.zshrc`, or
 `~/.config/fish/config.fish` — and then **open a new shell**, because a running
 one will not pick it up. Everything after this point in this guide, and in the
-two documents it links to, assumes an activated shell.
+pages it links to, assumes an activated shell.
 
 Until it is activated, `mise` may not be found at all, and `uv`, `python`,
 `node`, `npm` and `helm` certainly are not: this project installs none of them
@@ -99,12 +95,14 @@ mise --version
 mise doctor       # "activated: yes" is the line that matters
 ```
 
-Three of the names mise brings recur throughout, so they are worth having
+Every version this project uses is pinned in [`mise.toml`](mise.toml), which
+is the single source of truth for the toolchain — CI installs from it too.
+Three of the names it brings recur throughout, so they are worth having
 straight now: **uv** manages the backend's Python environment, and `uv run
 <command>` is how every backend command is run inside it; **ty** is the Python
 type checker; **helm** renders the deployment chart.
 
-### Clone and bootstrap
+## Clone and bootstrap
 
 ```bash
 git clone https://github.com/lotia/nycmesh-inventory-tng.git
@@ -113,8 +111,7 @@ scripts/bootstrap-dev.sh
 ```
 
 That URL is public and read-only, and needs no GitHub account and no SSH key.
-Where a remote you can push to matters is [Pull requests](docs/pull-requests.md#pull-requests).
-
+Where a remote you can push to matters is [Pull requests](docs/pull-requests.md).
 `mise run setup` is the same script under the name mise lists it by, so
 `mise tasks` in a fresh clone answers "what am I supposed to run?" without your
 having found this page first.
@@ -123,79 +120,37 @@ having found this page first.
 installs the toolchain, writes `.env` from [`.env.sample`](.env.sample) if you
 have none, points git at the hooks that check a commit as you make one, starts
 PostgreSQL, applies the migrations, and puts an invented catalogue in the
-database so that no screen you open is blank. It composes the
-commands the rest of this guide describes and invents nothing of its own, so
-nothing here is out of reach if you would rather type them. Run it as often as
-you like; it writes no file it has written already, and it will not touch a
-`.env` you have edited.
+database so that no screen you open is blank. It composes commands you could
+type yourself — [Local development](docs/local-development.md#what-bootstrap-does-by-hand)
+lists them — and invents nothing of its own. Run it as often as you like; it
+writes no file it has written already, and it will not touch a `.env` you have
+edited. If it stops on a port that is already taken, or on anything else,
+[Troubleshooting](docs/local-development.md#troubleshooting) names the fix.
 
-If it stops on a port that is already taken, or on anything else,
-[Troubleshooting](docs/local-development.md#troubleshooting) is two sections down and names the fix for
-each of them.
-
-It stops short of two things, and says both as it finishes rather than leaving
-you to find them here. `createsuperuser` asks for a password at a terminal, so
-it cannot run unattended. And the first sign-in of the account it makes needs
-[a second factor](docs/local-development.md#signing-in), which means having an authenticator app to
-hand.
-
-The last thing it prints is what to do with it: the two label codes the seed
-made, and the order to start the servers in. Read the end of its output rather
-than scrolling past it — those codes are the stickers a scanner resolves, and
+It stops short of one thing, and says so as it finishes: `createsuperuser`
+asks for a password at a terminal, so it cannot run unattended. The last thing
+it prints is what to do next — the two label codes the seed made, and the
+order to start the servers in. Read the end of its output rather than
+scrolling past it: those codes are the stickers a scanner resolves, and
 nothing else prints them.
-
-`.env` holds your local configuration. It is git-ignored, and
-[`.env.sample`](.env.sample) documents every variable. Setting the toolchain
-and that file up by hand, if you would rather, is three commands:
-
-```bash
-mise trust      # allow mise to use this repo's mise.toml
-mise install    # installs Python, Node, uv, Helm at the pinned versions
-cp .env.sample .env
-```
-
-`mise trust` is a one-off confirmation that you meant to run the versions this
-repository asks for: mise refuses to read a `mise.toml` it has not been told
-about, so that a checkout cannot pick your toolchain for you unnoticed.
 
 ---
 
 ## Running it
 
-Three ways. Everything in Docker is below, and is the quickstart. The other
-two — the native servers, which the bootstrap script above has just prepared
-and which reload as you edit, and a devcontainer, with nothing installed on
-your host — are in [Local development](docs/local-development.md#running-it-one-way-at-a-time),
+Three ways, and this is the first: everything in Docker, which is the
+quickstart, so the commands live in [README](README.md#quickstart) rather than
+a second time here. Frontend on <http://localhost:8080>, API on
+<http://localhost:8000>, and migrations run automatically on start. The other
+two — the native servers the bootstrap script has just prepared, which reload
+as you edit, and a devcontainer — are
+[Local development](docs/local-development.md#running-it-one-way-at-a-time),
 which also says why you run one way at a time.
 
-**The camera works from your phone, and it is behind a profile.** Every way of
-running it serves plain HTTP, which is not enough for the camera anywhere but
-your own machine —
-[decision 0011](docs/decisions/0011-qr-batch-scanning.md#consequences) has the
-rule and why the refusal used to read as a bug in the app. Turning that into a
-working camera is one command:
-[Using the camera from a phone](docs/local-development.md#using-the-camera-from-a-phone).
-
-### Option A — everything in Docker
-
-Best for a first run, or when you only care about one half of the stack. It is
-the quickstart, so the commands live in
-[README](README.md#quickstart) rather than a second time here. Frontend on
-<http://localhost:8080>, API on <http://localhost:8000>, and migrations run
-automatically on start.
-
-**It seeds itself, so no screen you open is blank.** A one-shot `seed` service
-runs [`seed_demo_data`](docs/working-in-the-code.md#common-tasks) once the backend is answering, which is
-also once migrations have finished. It is idempotent, so bringing the stack up
-again changes nothing, and it will not invent stock on top of a ledger holding
-anything it did not write — [decision 0016](docs/decisions/0016-invariants-for-every-writer.md)
-makes those rows unremovable, so that guard is what makes seeding unattended
-safe.
-
-**What it does not give you is a login.** `createsuperuser` asks for a password
-at a terminal, so Option A cannot make one for you and
-[README](README.md#quickstart) hands it to you as a step. That is the one thing
-this option leaves you to do by hand.
+**It seeds itself, so no screen you open is blank**: a one-shot `seed`
+service runs `seed_demo_data` once migrations have finished, and is
+idempotent. **What it does not give you is a login**, for the reason above,
+and [README](README.md#quickstart) hands you that step.
 
 Three more worth knowing once it is up:
 
@@ -205,27 +160,18 @@ docker compose logs -f backend | scripts/pretty-logs           # tail logs
 docker compose down -v                                         # stop, wipe database
 ```
 
-The first is there because the seed prints its label codes once, in
-`docker compose logs seed`, and those codes are what you type into the box
-marked **Scan or type a code**. Nothing else in the application shows them, so
-ask for them whenever you need them rather than scrolling for them.
+The first is there because the seed prints its label codes only once, and
+they are what you type into the box marked **Scan or type a code**. What the
+stack does when seeding is turned off, and the restraints every service in it
+runs under, are [The Docker stack](docs/local-development.md#the-docker-stack).
 
-`DJANGO_DEBUG=false` in your `.env` turns the seeding off, because the command
-refuses to run without it. The stack still comes up and still serves; it comes
-up empty, and `docker compose ps` shows the `seed` service exited non-zero with
-the refusal in its log. That is the refusal working, not the stack failing.
-
-Every service in [`compose.yaml`](compose.yaml) names the non-root uid it runs
-as, drops all capabilities, refuses to gain privileges, and runs with a
-read-only root filesystem — with a `tmpfs` for each directory that service
-genuinely writes to, and no others. Those are stated in the file rather than
-claimed in a comment, and none of them needs anything added under rootless
-Podman.
-
-**If something did not start**, the port, the missing `.env` and the shell
-that cannot find `uv` are each a line in
-[Troubleshooting](docs/local-development.md#troubleshooting). A stack you
-had running before August 2026 needs
+**The camera works from your phone, and it is behind a profile**, because
+plain HTTP is not enough for it anywhere but your own machine —
+[decision 0011](docs/decisions/0011-qr-batch-scanning.md#consequences) is why.
+[Using the camera from a phone](docs/local-development.md#using-the-camera-from-a-phone)
+is the one command. **If something did not start**,
+[Troubleshooting](docs/local-development.md#troubleshooting) names the fix; a
+stack from before August 2026 needs
 [one command first](docs/local-development.md#if-you-had-this-stack-running-before-august-2026).
 
 ## Signing in
