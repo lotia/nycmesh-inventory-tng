@@ -25,6 +25,15 @@ to go with it, because a mismatch does not make bd fail: it opens an empty
 database and says so only as a warning, which reads as an empty tracker rather
 than a broken one. CI runs it, and you can run it yourself.
 
+`.beads/config.yaml` is committed, and two of its settings are held by the
+same checker: `export.auto`, so that the committed export is what the tracker
+holds, and `dolt.auto-push: false`, so that the tracker never publishes its
+history to the remote on a timer. bd ships that push on a five-minute
+debounce after any write, and a push on a timer is one no command-text guard
+can see — so the landing gate's refusal of `bd dolt push`, which exists so a
+person reads what is about to become public first, is only true while the
+timer is off.
+
 `.beads/metadata.json` is deliberately not committed. It is bd's local pointer
 at that database, and `bd dolt show` describes it as local; it must not be
 deleted, only left untracked.

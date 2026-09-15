@@ -22,7 +22,7 @@ scene() {
   mkdir -p "$WORK/repo/.beads/dolt" "$WORK/repo/.beads/hooks"
   printf 'dolt/\nembeddeddolt/\nproxieddb/\nbackup/\n' >"$WORK/repo/.beads/.gitignore"
   printf '{\n  "dolt_mode": "proxied-server"\n}\n' >"$WORK/repo/.beads/metadata.json"
-  printf 'export.auto: true\nsync:\n    remote: "git+ssh://example.invalid/x.git"\n' >"$WORK/repo/.beads/config.yaml"
+  printf 'export.auto: true\nsync:\n    remote: "git+ssh://example.invalid/x.git"\ndolt.auto-push: false\n' >"$WORK/repo/.beads/config.yaml"
   : >"$WORK/repo/.beads/hooks/commit-msg"
   git -C "$WORK/repo" add -A >/dev/null 2>&1
   git -C "$WORK/repo" commit -qm "scene" >/dev/null 2>&1
@@ -98,17 +98,17 @@ echo "the setting that keeps the committed export honest"
 # wrong config is refused -- and the first version of this check matched the
 # flat spelling alone while bd's own template documents the nested one.
 scene
-printf 'sync:\n    remote: "x"\nexport:\n    auto: true\n' >"$WORK/repo/.beads/config.yaml"
+printf 'sync:\n    remote: "x"\nexport:\n    auto: true\ndolt.auto-push: false\n' >"$WORK/repo/.beads/config.yaml"
 out=$(check); status=$?
 assert "$out" "$status" 0 "where git cannot publish it" "the nested form bd's template documents"
 
 scene
-printf 'sync:\n    remote: "x"\nexport: {auto: true}\n' >"$WORK/repo/.beads/config.yaml"
+printf 'sync:\n    remote: "x"\nexport: {auto: true}\ndolt.auto-push: false\n' >"$WORK/repo/.beads/config.yaml"
 out=$(check); status=$?
 assert "$out" "$status" 0 "where git cannot publish it" "and the flow mapping"
 
 scene
-printf 'sync:\n    remote: "x"\nother: 1\nexport:\n    auto: true\n    path: issues.jsonl\nmore: 2\n' >"$WORK/repo/.beads/config.yaml"
+printf 'sync:\n    remote: "x"\nother: 1\nexport:\n    auto: true\n    path: issues.jsonl\nmore: 2\ndolt.auto-push: false\n' >"$WORK/repo/.beads/config.yaml"
 out=$(check); status=$?
 assert "$out" "$status" 0 "where git cannot publish it" "and a block with neighbours on both sides"
 
@@ -132,6 +132,23 @@ scene
 printf 'export.auto: true\n' >"$WORK/repo/.beads/config.yaml"
 out=$(check); status=$?
 assert "$out" "$status" 1 "names no sync remote" "the other setting that run deleted is checked too"
+
+# THE TIMER. bd's auto-push publishes the tracker some minutes after a write,
+# and no command-text guard sees it; the setting that keeps it off is held here.
+scene
+printf 'sync:\n    remote: "x"\nexport.auto: true\ndolt:\n    auto-push: true\n' >"$WORK/repo/.beads/config.yaml"
+out=$(check); status=$?
+assert "$out" "$status" 1 "does not set dolt.auto-push: false" "and so is one that turns it on"
+
+scene
+printf 'sync:\n    remote: "x"\nexport.auto: true\ndolt.auto-push: false\n' >"$WORK/repo/.beads/config.yaml"
+out=$(check); status=$?
+assert "$out" "$status" 0 "where git cannot publish it" "the flat spelling turns it off"
+
+scene
+printf 'sync:\n    remote: "x"\nexport.auto: true\ndolt: {auto-push: false}\n' >"$WORK/repo/.beads/config.yaml"
+out=$(check); status=$?
+assert "$out" "$status" 0 "where git cannot publish it" "and the flow mapping"
 
 scene
 rm -f "$WORK/repo/.beads/config.yaml"
