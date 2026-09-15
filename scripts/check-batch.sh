@@ -6,7 +6,7 @@
 # branch closed the same issue twice, interleaved two issues' commits, or landed
 # work nobody put in the batch. That is what this reads.
 #
-# The rules are in DEVELOPERS.md "Pull requests" and docs/commits.md "Commits".
+# The rules are in docs/pull-requests.md and docs/commits.md "Commits".
 #
 # Usage: check-batch.sh [<range>] [--epic <id>] [--unfinished] [--list] [--squashed]
 #
@@ -23,7 +23,7 @@
 # commits waiting to be folded in, and issues in the batch that have not landed
 # yet. Everything structural is still refused, because none of it is ever
 # temporarily true. Where the finished question is asked instead is
-# DEVELOPERS.md "When a branch is ready to merge".
+# docs/pull-requests.md "When a branch is ready to merge".
 
 set -uo pipefail
 
@@ -41,7 +41,7 @@ while [[ $# -gt 0 ]]; do
       EPIC=${2:?--epic needs an id}
       shift 2
       ;;
-    # See DEVELOPERS.md#merging on why a branch under review is different.
+    # See docs/pull-requests.md#merging on why a branch under review is different.
     --unfinished)
       UNFINISHED=1
       shift

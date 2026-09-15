@@ -42,7 +42,7 @@ Closes: inventory-tng-abc
 - **The body says what changed**, wrapped at 72 columns. It is not a diary:
   how the work was done, what was tried first and what a review said are not
   what a reader of the history needs. A review's findings belong in the
-  [pull request](../DEVELOPERS.md#pull-requests). *Why* something is built the way it is
+  [pull request](pull-requests.md). *Why* something is built the way it is
   belongs in [docs/decisions/](decisions/), and is linked rather than
   retold.
 - **A trailer naming that same issue in full** — `Closes: inventory-tng-abc` on
@@ -90,7 +90,7 @@ needs.
 
 Work them one at a time on a batch branch and land each as it is finished. The
 pull request is the unit of review; the commit stays the unit of work. See
-[Pull requests](../DEVELOPERS.md#pull-requests).
+[Pull requests](pull-requests.md).
 
 ## Before you stage
 

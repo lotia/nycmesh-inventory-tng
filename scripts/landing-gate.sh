@@ -6,7 +6,7 @@
 # reviewed it.
 #
 # Which commands it refuses, what it needs installed, how the receipt is
-# recorded and what it does not claim to be are all DEVELOPERS.md "When a
+# recorded and what it does not claim to be are all docs/pull-requests.md "When a
 # branch is ready to merge". None of that is repeated here. What follows is
 # only what a reader of this file needs and that document does not carry.
 #
@@ -67,7 +67,7 @@ RECEIPTS="$REPO_ROOT/.claude/.review-receipts.json"
 # AGENTS.md says "collapsing an issue's own commits". check-docs.sh missed it
 # because the run is under twelve words, which is the rule failing exactly
 # where it was meant to bite.
-CYCLE='The cycle is DEVELOPERS.md "One review pass, findings filed per issue",
+CYCLE='The cycle is docs/pull-requests.md "One review pass, findings filed per issue",
 and .agents/skills/pull-requests/SKILL.md is the procedure for running it. It
 ends with:
 
@@ -239,7 +239,7 @@ GH_DEADLINE=${GH_DEADLINE:-8}
 # alike. One string, because the two copies were edited in lockstep once and
 # would drift the next time.
 STALE_MARKER='If the marker is stale, take the line out of the body; the check looks
-again on its own, and a push makes sure -- see DEVELOPERS.md "When a
+again on its own, and a push makes sure -- see docs/pull-requests.md "When a
 branch is ready to merge".'
 
 gh_json() {
@@ -270,7 +270,7 @@ gh_json() {
 # submissions that are on the pull request, by id, author and timestamp, so the
 # receipt points at artifacts anybody can go and read. Since inventory-tng-gfkr
 # a short cycle is written down too rather than dropped; the write below says
-# why, and DEVELOPERS.md "When a branch is ready to merge" says what it means.
+# why, and docs/pull-requests.md "When a branch is ready to merge" says what it means.
 #
 # This is still a guardrail. Somebody determined to merge unreviewed work can
 # post an empty comment carrying the marker, and the gate will believe it. What
@@ -369,10 +369,11 @@ if missing:
         # WHAT TO DO ABOUT IT DIFFERS BY STAGE, and saying otherwise is what
         # this used to do: it offered the marker for both, so the advice for a
         # missing review pass was to type the evidence that it had happened.
-        # DEVELOPERS.md "One review pass" says the review submits its own and
-        # the marker is only ever typed on the simplify comment -- so the old
-        # message contradicted the document it closes by citing, and told an
-        # agent to forge exactly what this reader exists to look for.
+        # docs/pull-requests.md "One review pass, findings filed per issue" says
+        # the review submits its own and the marker is only ever typed on the
+        # simplify comment -- so the old message contradicted the document it
+        # closes by citing, and told an agent to forge exactly what this reader
+        # exists to look for.
         if stage in review_cycle.BY_REVIEW:
             # ABOUT THE ACTOR, NOT THE READER. The stop message a few hundred
             # lines down can say "yours to run" because it is wired as a Stop
@@ -398,7 +399,7 @@ if missing:
 
     # WHAT IT FOUND IS WORTH KEEPING EVEN WHEN IT IS NOT ENOUGH, so this used
     # to exit here and no longer does. A half-run cycle left NOTHING on disk,
-    # and DEVELOPERS.md "When a branch is ready to merge" says what the Stop
+    # and docs/pull-requests.md "When a branch is ready to merge" says what the Stop
     # hook then went on doing about it. inventory-tng-gfkr.
     #
     # NO APOSTROPHES IN HERE -- it is the body of a single-quoted python3 -c,
@@ -502,8 +503,9 @@ print("%s|%s" % (receipt.get("head") or "", ",".join(missing)))
 
 # What is missing, and WHOSE each one is.
 #
-# Which stage an agent may run and which it must ask for is DEVELOPERS.md "One
-# review pass"; this only has to be enough to act on without going to read it.
+# Which stage an agent may run and which it must ask for is docs/pull-requests.md
+# "One review pass, findings filed per issue"; this only has to be enough to
+# act on without going to read it.
 #
 # It said "missing: code-review and simplify" until inventory-tng-d854, which
 # named both stages identically and so said nothing about the only thing an
@@ -663,7 +665,7 @@ print(pr.get("number") or 0,
 
   # ONCE PER HEAD, keyed on the commit rather than the pull request. Why that
   # bound is here, and why this mode is a nudge where `check` is a lock, is
-  # DEVELOPERS.md "When a branch is ready to merge" with the rest of what this
+  # docs/pull-requests.md "When a branch is ready to merge" with the rest of what this
   # gate refuses.
   [[ -d "$REPO_ROOT/.claude" ]] || mkdir -p "$REPO_ROOT/.claude"
   NUDGES="$NUDGES" PR="$pr" HEAD_SHA="$head" python3 -c '
@@ -739,7 +741,7 @@ case "${1:-check}" in
     # page cannot be silent about a refusal that exists.
     #
     # The one-line summaries here are the whole of what the page carries; the
-    # refusals themselves say more, and DEVELOPERS.md "When a branch is ready
+    # refusals themselves say more, and docs/pull-requests.md "When a branch is ready
     # to merge" is the argument.
     # The two names the ready arm reads past are review_cycle.py's, read from
     # it here for the reason check-commit.sh --describe reads its limits from
@@ -781,7 +783,7 @@ print(review_cycle.CHECK, review_cycle.SETTINGS_CHECK, sep="\t")
       # the same coercion would be the unsafe one -- it would REWRITE a file
       # nobody could read, discarding whatever was in it, and say it had cleared
       # one pull request's receipt. So this refuses instead and names the file;
-      # DEVELOPERS.md "When a branch is ready to merge" says what to do about it.
+      # docs/pull-requests.md "When a branch is ready to merge" says what to do about it.
       RECEIPTS="$RECEIPTS" PR="$2" python3 -c '
 import json, os, sys
 path, pr = os.environ["RECEIPTS"], os.environ["PR"]

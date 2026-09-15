@@ -38,7 +38,7 @@ You are not required to use beads. Nothing in this project should be workable
 5. Open a pull request describing what changed and why.
 
 Review happens on the pull request, and everything reaches `main` through one.
-Read [Pull requests](DEVELOPERS.md#pull-requests) before you start — it changes
+Read [Pull requests](docs/pull-requests.md) before you start — it changes
 how you will want to arrange your commits.
 
 Small pull requests get reviewed faster than large ones. A change that only
@@ -60,7 +60,7 @@ only when a task needs it.
 Everything an agent is asked to do — tests, linting, documentation currency —
 is exactly what a human contributor is asked to do. There is one standard, and
 it includes who may merge —
-[When a branch is ready to merge](DEVELOPERS.md#when-a-branch-is-ready-to-merge).
+[When a branch is ready to merge](docs/pull-requests.md#when-a-branch-is-ready-to-merge).
 
 ## Questions
 

@@ -109,7 +109,7 @@ what runs for you.
 
 They exist to hold an agent to the same bar as a person without asking anybody:
 the argument, and what the gate does and does not claim to cover, is
-[When a branch is ready to merge](../DEVELOPERS.md#when-a-branch-is-ready-to-merge).
+[When a branch is ready to merge](pull-requests.md#when-a-branch-is-ready-to-merge).
 What follows is rendered the same way as the table above, from the settings
 file and from the script's own account of itself.
 

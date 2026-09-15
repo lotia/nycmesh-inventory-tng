@@ -98,7 +98,7 @@ touches a person, a credential, or a weakness nothing has fixed yet.
 
 ## Git
 
-Work reaches `main` the way [Pull requests](DEVELOPERS.md#pull-requests)
+Work reaches `main` the way [Pull requests](docs/pull-requests.md)
 describes. Read it before starting a batch; do not reconstruct it from here.
 
 What you may do on your own, and the one thing you may never do:
@@ -106,7 +106,7 @@ What you may do on your own, and the one thing you may never do:
 | | |
 | --- | --- |
 | On a `batch/*` branch, without asking | Commit, push, open and update the pull request, post findings to it, reply to and resolve its threads, `push --force-with-lease` when collapsing an issue's own commits |
-| Merging a `batch/*` pull request, without asking | Once it meets [When a branch is ready to merge](DEVELOPERS.md#when-a-branch-is-ready-to-merge): `gh pr merge <pr> --rebase` |
+| Merging a `batch/*` pull request, without asking | Once it meets [When a branch is ready to merge](docs/pull-requests.md#when-a-branch-is-ready-to-merge): `gh pr merge <pr> --rebase` |
 | Never, whatever its state | Merging a pull request whose body posts `<!-- do-not-merge -->` on a line of its own |
 
 The last row is here rather than left to the check that enforces it, because an
@@ -114,7 +114,7 @@ agent meeting a red check it has no rule for will set about making it green.
 That is the whole hazard: nothing about such a pull request looks like an
 exception, and marking it ready and merging it is what following the row above
 looks like. What the marker is and how it is read is
-[When a branch is ready to merge](DEVELOPERS.md#when-a-branch-is-ready-to-merge);
+[When a branch is ready to merge](docs/pull-requests.md#when-a-branch-is-ready-to-merge);
 what this row adds is that the answer is never yours to overturn.
 
 The line is what a mistake costs. A batch branch is proposed work: it can be

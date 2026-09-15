@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The repository settings this project's workflow depends on, as code.
 #
-# What they are and why is DEVELOPERS.md "Pull requests"; the reasoning is ADR
+# What they are and why is docs/pull-requests.md; the reasoning is ADR
 # 0017. This applies them, and with --check reports what has drifted. It is
 # idempotent.
 #
@@ -9,7 +9,7 @@
 #
 #   --check   report what differs and change nothing (exit 1 if anything does)
 #
-# Needs a token with Administration: write. See DEVELOPERS.md#pull-requests.
+# Needs a token with Administration: write. See docs/pull-requests.md.
 
 set -uo pipefail
 
