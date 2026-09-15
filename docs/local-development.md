@@ -1,9 +1,10 @@
 # Local development
 
-[The guide](../DEVELOPERS.md) is the shortest route from a clean machine to a
-running application, and stops there. This page is the rest of running one on
-your own machine: the two other ways to run it, the camera from a phone,
-signing in, and what to do when something does not start.
+The rest of running it on your own machine, after
+[the guide](../DEVELOPERS.md) has got it running: what the Docker stack does
+beyond serving, the two other ways to run it, what the bootstrap script does
+if you would rather type it, the camera from a phone, signing in, and what to
+do when something does not start.
 
 ## Running it, one way at a time
 
@@ -17,6 +18,24 @@ Django on port 8000 — one in a container, one on your machine — so whichever
 starts second fails to bind. `docker compose down` before starting the native
 servers, or stop those before bringing the stack up. PostgreSQL is not a clash:
 both use the same compose service, and starting it twice starts it once.
+
+## The Docker stack
+
+`DJANGO_DEBUG=false` in your `.env` turns the seeding off, because the command
+refuses to run without it. The stack still comes up and still serves; it comes
+up empty, and `docker compose ps` shows the `seed` service exited non-zero with
+the refusal in its log. That is the refusal working, not the stack failing.
+With it on, the seed will not invent stock on top of a ledger holding anything
+it did not write —
+[decision 0016](decisions/0016-invariants-for-every-writer.md) makes those
+rows unremovable, so that guard is what makes seeding unattended safe.
+
+Every service in [`compose.yaml`](../compose.yaml) names the non-root uid it
+runs as, drops all capabilities, refuses to gain privileges, and runs with a
+read-only root filesystem — with a `tmpfs` for each directory that service
+genuinely writes to, and no others. Those are stated in the file rather than
+claimed in a comment, and none of them needs anything added under rootless
+Podman.
 
 ## Option B — native, with only PostgreSQL in Docker
 
@@ -52,6 +71,27 @@ origin and you will not hit CORS locally.
 [`.devcontainer/devcontainer.json`](../.devcontainer/devcontainer.json) gives you
 the toolchain with nothing installed on your host. Open the repo in VS Code and
 choose *Reopen in Container*, or run `devcontainer up --workspace-folder .`.
+
+## What bootstrap does by hand
+
+`.env` holds your local configuration. It is git-ignored, and
+[`.env.sample`](../.env.sample) documents every variable. Setting the
+toolchain and that file up yourself, rather than through
+`scripts/bootstrap-dev.sh`, is three commands:
+
+```bash
+mise trust      # allow mise to use this repo's mise.toml
+mise install    # installs Python, Node, uv, Helm at the pinned versions
+cp .env.sample .env
+```
+
+`mise trust` is a one-off confirmation that you meant to run the versions this
+repository asks for: mise refuses to read a `mise.toml` it has not been told
+about, so that a checkout cannot pick your toolchain for you unnoticed. The
+rest of what the script does — starting PostgreSQL, migrating, seeding — is
+[Option B](#option-b--native-with-only-postgresql-in-docker) and
+`manage.py seed_demo_data` from
+[Common tasks](working-in-the-code.md#common-tasks).
 
 ## Using the camera from a phone
 
