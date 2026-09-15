@@ -756,6 +756,7 @@ print(review_cycle.CHECK, review_cycle.SETTINGS_CHECK, sep="\t")
       stop "ending a turn" "Blocks the turn once, when the current branch's pull request is ready and green and its review cycle has not been recorded against this head -- a batch that looks finished and is not." \
       dolt-push "bd dolt push, bd sync, bd federation sync" "Refused: it publishes the issue tracker, and this repository is public (decision 0029). A person reads what is about to become public and runs it." \
       repo-settings "scripts/repo-settings.sh without --check; gh api writing branch protection or repository settings" "Refused: it writes the protections every other refusal here relies on. --check compares and is free; writing is a person's to authorise." \
+      add-all "git add -A, --all, -u, --update, . or :/, and git commit -a, in the shared checkout" "Refused: git status there lists what anybody did, and a sweep staged a colleague's edit into another issue's commit. Stage by path, or work in a worktree of your own, where it is free." \
       push-force "git push --force, -f" "Refused: use --force-with-lease, which refuses if the remote moved since you fetched. Breaking a lease is a person's call." \
       push "git push to main" "Refused before GitHub gets to, so the refusal names the batch/* workflow rather than a protection rule." \
       ready "gh pr ready" "Refused while any check other than $review_check and $settings_check is not green, and refused differently for a pull request whose body posts the do-not-merge marker." \
@@ -922,7 +923,12 @@ IFS= read -r -d '' payload
 # environment and will now reach the matcher. That is one 27 ms hit on a
 # command nobody runs in a loop, against a hole in the only thing standing
 # between an unread bead and a public repository.
-if [[ ! "$payload" =~ (^|[^A-Za-z0-9_])(gh|push|repo-settings|sync)([^A-Za-z0-9_]|$) ]]; then
+#
+# `add` and `commit` are here for a sweep of the shared checkout
+# (inventory-tng-16ad). Measured over 6,463 of this project's own Bash calls:
+# `add` takes the matcher from 28% to 33% of them, two thirds of that `git add`
+# itself, at 27 ms a hit.
+if [[ ! "$payload" =~ (^|[^A-Za-z0-9_])(gh|push|repo-settings|sync|add|commit)([^A-Za-z0-9_]|$) ]]; then
   exit 0
 fi
 
@@ -951,16 +957,23 @@ have python3 || deny_dependency python3 "reading what a command actually runs"
 # spellings than a reader has patterns, and DEVELOPERS.md says so plainly.
 verdict=$(printf '%s' "$payload" | python3 -c '
 import json, re, sys
+# NO APOSTROPHES ANYWHERE IN THIS PROGRAM: it is the body of a single-quoted
+# python3 -c, and one ends it.
 
 # Exit 2, never 0. A payload this cannot read is a command it cannot judge, and
 # printing nothing is what the shell below reads as "nothing to guard" -- the
 # same silent fail-open as the 2>/dev/null this file was rewritten to remove,
 # and the last one left in it. The caller turns a non-zero exit into a refusal.
-# This is past the prefilter, so only a command mentioning gh or push gets here.
+# This is past the prefilter, so only a command mentioning a guarded word gets here.
 try:
-    cmd = json.load(sys.stdin)["tool_input"]["command"]
+    payload = json.load(sys.stdin)
+    cmd = payload["tool_input"]["command"]
 except Exception:
     sys.exit(2)
+# Where the command runs, which the harness sends and which is not the
+# project directory once a session works in a worktree. Emitted after the
+# verdict for the arms that ask git something about it.
+cwd = payload.get("cwd") or ""
 
 QUOTED = re.compile(r"\x27([^\x27]*)\x27|\"([^\"]*)\"")
 SHELL_C = re.compile(r"\b(?:ba|z|k|da)?sh\s+(?:-\w+\s+)*-\w*c\w*\s+")
@@ -1051,51 +1064,42 @@ def shell_payloads(text):
 SEP = r"(?:^|[;&|(){]|\b(?:then|else|elif|do|in)\s)\s*"
 
 
-# The pull request a gh subcommand names, which is the first bare number after
-# it rather than the word immediately following it.
-#
-# `gh pr merge --rebase 7` used to yield no number at all, and the shell then
-# fell back to "the pull request of the current branch" -- so on a branch with
-# a valid receipt of its own, that command merged an unreviewed pull request 7.
-# Found by the review of PR #30. Returning None here means "named none", which
-# is the only case the fallback is for.
-def numbered(cmd, after):
+# The words after a match, up to the next command: a separator a shell may
+# glue to a word ends the command -- gh pr merge 7; names 7, and 7&&echo names
+# 7 too -- and what follows it belongs to the next command. A redirection is
+# not an argument, and the value a flag takes is not one either: --help 2>&1
+# names nothing, and --subject x 7 names 7. The value-taking flags are the
+# ones gh pr merge and gh pr ready document; a new one reads its value as a
+# branch and is refused, which is the direction to be wrong in.
+VALUED = {"-b", "--body", "-F", "--body-file", "-t", "--subject", "-A", "--author-email",
+          "--match-head-commit", "-R", "--repo"}
+
+
+def tokens_after(cmd, m):
+    out, skip = [], False
+    for word in re.split(r"[;&|)}]", cmd[m.end():], maxsplit=1)[0].split():
+        if skip:
+            skip = False
+        elif "<" not in word and ">" not in word:
+            out.append(word)
+            skip = word in VALUED
+    return out
+
+
+# The first bare argument a gh subcommand takes, or None for none. A number
+# names a pull request. Anything else is a URL or a branch, which gh accepts
+# and this gate does not: it keys everything by number, and read as naming
+# none such a command was judged against the checked-out pull request instead
+# (inventory-tng-zplm). `gh pr merge --rebase 7` yielding none was the review
+# of PR #30; the fallback to the current branch is for that case only.
+def first_argument(cmd, after):
     m = re.search(after, cmd)
     if not m:
         return None
     for token in tokens_after(cmd, m):
-        if token.isdigit():
+        if not token.startswith("-"):
             return token
-        if not token.startswith("-"):
-            return None
     return None
-
-
-# The words after a match, less the separator a shell may glue to the last of
-# them: `gh pr merge 7;` names 7, and `7;` is not a digit.
-def tokens_after(cmd, m):
-    return [t.rstrip(";&|)}") for t in cmd[m.end():].split() if t.rstrip(";&|)}")]
-
-
-# Whether the subcommand names its pull request some way other than a number:
-# a URL, or a branch. gh accepts both, and this gate keys everything -- the
-# receipt, the head it was recorded against, the checkout it compares with --
-# by number. Read as "named none", such a command was judged against the
-# CHECKED-OUT pull request, whose receipt then vouched for the merge of a
-# different one. inventory-tng-zplm. Refused outright rather than resolved:
-# asking gh which number a URL means is one more round trip out of the budget
-# a hook has, and naming it by number costs the caller nothing. (No
-# apostrophes in this comment: it sits inside a single-quoted python3 -c.)
-def named_otherwise(cmd, after):
-    m = re.search(after, cmd)
-    if not m:
-        return False
-    for token in tokens_after(cmd, m):
-        if token.isdigit():
-            return False
-        if not token.startswith("-"):
-            return True
-    return False
 
 
 def classify(raw):
@@ -1170,6 +1174,33 @@ def classify(raw):
         if re.search(RUNS_IT, segment, flags=re.M) and not re.search(r"--check\b", segment):
             return "repo-settings"
 
+    # STAGING WHAT WAS NOT NAMED, in the shared checkout: git add -A, -u,
+    # --all, --update, . or :/, and git commit -a, which stages every tracked
+    # change on its way. The arm asks git whether the checkout is the shared
+    # one; in a worktree of its own a session may sweep. inventory-tng-16ad.
+    #
+    # READ FROM THE git add THAT MATCHED, not from the first add in the
+    # command: bd dep add a b && git add -A has two.
+    m = re.search(SEP + WRAP + prog("git") + r"\s+(" + GIT_FLAGS + r")(add|commit)\b", cmd, flags=re.M)
+    if m:
+        words = tokens_after(cmd, m)
+        flags = [w for w in words if w.startswith("-")]
+        paths = [w for w in words if not w.startswith("-")]
+        short = "".join(f[1:] for f in flags if not f.startswith("--"))
+        if m.group(2) == "add":
+            sweeping = "A" in short or "u" in short or {"--all", "--update"} & set(flags)
+            everything = (paths and all(p in (".", "./", ":/", "*") for p in paths)) or (not paths and sweeping)
+        else:
+            everything = "a" in short or "--all" in flags
+        if everything:
+            # Where it stages: git -C <dir>, or a cd earlier in the same
+            # command, on top of where the command runs. The arm asks that
+            # directory which checkout it is.
+            where = re.search(r"-C\s+(\S+)", m.group(1))
+            if not where:
+                where = re.search(r"(?:^|[;&|(]\s*)cd\s+([^\s;&|]+)[\s;&|]*$", cmd[: m.start()], flags=re.M)
+            return "add-all " + (where.group(1) if where else "")
+
     if runs(prog("git") + r"\s+" + GIT_FLAGS + r"push\b"):
         # A bare --force has no lease, so it overwrites whatever arrived while
         # you were not looking. -f is the same flag and is caught with it.
@@ -1195,9 +1226,10 @@ def classify(raw):
     if runs(prog("gh") + r"\s+pr\s+merge\b"):
         if elsewhere:
             return "merge-elsewhere"
-        if named_otherwise(cmd, r"pr\s+merge\b"):
+        named = first_argument(cmd, r"pr\s+merge\b")
+        if named and not named.isdigit():
             return "merge-named"
-        return "merge " + (numbered(cmd, r"pr\s+merge\b") or "")
+        return "merge " + (named or "")
 
     # The REST spelling of the same thing: gh api -X PUT .../pulls/N/merge.
     #
@@ -1221,9 +1253,10 @@ def classify(raw):
     if runs(prog("gh") + r"\s+pr\s+ready\b"):
         if elsewhere:
             return "merge-elsewhere"
-        if named_otherwise(cmd, r"pr\s+ready\b"):
+        named = first_argument(cmd, r"pr\s+ready\b")
+        if named and not named.isdigit():
             return "merge-named"
-        return "ready " + (numbered(cmd, r"pr\s+ready\b") or "")
+        return "ready " + (named or "")
 
     return None
 
@@ -1232,6 +1265,7 @@ for candidate in [cmd] + shell_payloads(cmd):
     found = classify(candidate)
     if found:
         print(found)
+        print(cwd)
         break
 ') || {
   # Two causes, one refusal: python3 vanished between the check above and here,
@@ -1258,7 +1292,7 @@ for candidate in [cmd] + shell_payloads(cmd):
 # line and leaves `rest` empty for a bare action, which four lines of `${...%%}`
 # and `${...#}` were doing by hand -- one of them (`rest=${rest# }`) unable to
 # fire at all, since `classify` never emits a double space at the split.
-read -r action rest <<<"$verdict"
+{ read -r action rest; read -r cwd; } <<<"$verdict"
 pr=$rest
 
 
@@ -1293,6 +1327,31 @@ guards around every other one.
 
 compares and reports without writing, and is not refused. Writing is a person's
 to authorise, with the diff that --check prints in front of them."
+    ;;
+
+  add-all)
+    # ONLY IN THE SHARED CHECKOUT. A linked worktree has a git directory of its
+    # own under the common one, and nobody else edits it. Asked of the
+    # directory the command stages in: where it runs, which the harness sends
+    # as cwd, under any -C or cd the command itself named -- `rest` -- and
+    # `git -C` stacks, so both are one call.
+    [[ -n "$REPO_ROOT" ]] || deny_unavailable "where this repository is" "git and CLAUDE_PROJECT_DIR"
+    { read -r own; read -r common; } < <(git -C "${cwd:-$REPO_ROOT}" -C "${rest:-.}" rev-parse --git-dir --git-common-dir 2>/dev/null) \
+      || deny_unavailable "which checkout ${rest:-this} is" git
+    if [[ "$own" == "$common" ]]; then
+      deny "This stages everything in the shared checkout, and git status here lists
+what anybody did, not what you did.
+
+A colleague's edit swept in this way landed on main inside another issue's
+commit (inventory-tng-16ad), and nothing downstream can tell the two apart.
+
+Stage by path:  git add <the paths this issue touched>
+Or work in a worktree of your own, where sweeping stages only your edits:
+  git worktree add .claude/worktrees/<name> <branch>
+
+See docs/commits.md \"Staging\"."
+    fi
+    exit 0
     ;;
 
   push-force)
@@ -1373,7 +1432,7 @@ this was judged against the checked-out branch's pull request, and that
 branch's receipt vouched for the merge of a different one. It refuses rather
 than guess.
 
-Name the pull request by number: gh pr merge <n> --rebase."
+Name the pull request by number: gh pr merge <n> --rebase, or gh pr ready <n>."
     ;;
 
   merge-elsewhere)
