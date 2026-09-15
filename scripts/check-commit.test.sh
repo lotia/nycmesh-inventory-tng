@@ -508,7 +508,7 @@ assert "$output" $? 0 "Nothing to object to" "it works through a symlink, as the
 
 # --- a trailer git can read ------------------------------------------------
 #
-# See trailers.sh for what git requires and DEVELOPERS.md#commits for why.
+# See trailers.sh for what git requires and docs/commits.md for why.
 
 scene
 closes_aaa

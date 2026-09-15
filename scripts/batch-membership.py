@@ -54,7 +54,7 @@ def main() -> None:
             issue = json.loads(line)
         except ValueError:
             continue  # a blank line, or an export half-written
-        # DEVELOPERS.md#the-message: an epic does no work of its own, so it is
+        # docs/commits.md#the-message: an epic does no work of its own, so it is
         # not one of the issues a batch holds and never needs an epic above it.
         if issue.get("issue_type") == "epic" and issue.get("id"):
             epics.add(issue["id"])

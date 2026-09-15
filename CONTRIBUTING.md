@@ -34,7 +34,7 @@ You are not required to use beads. Nothing in this project should be workable
    The documentation item is not optional — if your change makes any instruction
    in this repository wrong, fix that instruction in the same pull request.
 4. Land it as one issue's worth of work, with a message written the way
-   [Commits](DEVELOPERS.md#commits) describes.
+   [Commits](docs/commits.md) describes.
 5. Open a pull request describing what changed and why.
 
 Review happens on the pull request, and everything reaches `main` through one.

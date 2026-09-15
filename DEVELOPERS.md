@@ -271,7 +271,7 @@ Where each topic lives:
 | API schema and how it stays current | [The API schema](docs/working-in-the-code.md#the-api-schema) |
 | Reading logs while developing | [Reading the logs while you work](docs/working-in-the-code.md#reading-the-logs-while-you-work) |
 | Issue tracking: bd, where its database lives, and the GitHub mirror | [docs/issue-tracking.md](docs/issue-tracking.md) |
-| What one commit contains, and its message | [Commits](#commits) |
+| What one commit contains, its message, and how to land it | [docs/commits.md](docs/commits.md) |
 | The git hooks: what runs, what each refuses, how they are installed | [docs/git-hooks.md](docs/git-hooks.md) |
 | How work is reviewed and reaches `main` | [Pull requests](#pull-requests) |
 | How to contribute | [CONTRIBUTING.md](CONTRIBUTING.md) |
@@ -415,114 +415,6 @@ next person to read them will be misled.
 
 ---
 
-## Commits
-
-**One issue per commit.** A commit contains work from exactly one issue and
-nothing else, so that it can be read, reviewed, reverted and bisected as the
-unit of work it claims to be. An issue may take more than one commit where that
-genuinely reads better; no commit may ever take more than one issue.
-
-That rule settles the awkward cases too:
-
-- Documentation the change itself made wrong is part of the change — that is
-  the [Definition of Done](#definition-of-done), not a separate concern.
-- A fault you noticed on the way but did not cause is its own issue and its own
-  commit, however small and however tempting. A one-line fix riding along is
-  the commonest way a commit stops being one thing.
-- A defect a review finds in the change is part of the change. A defect it
-  finds in code the change did not touch is not.
-
-### The message
-
-```
-abc: Summarise the change in the imperative
-
-What changed, what was added, what was removed — in enough detail that
-somebody reading the history a year from now knows what this did to the
-repository, and no more.
-
-Closes: inventory-tng-abc
-```
-
-- **The summary line names its issue, then says what changed in at most 50
-  characters**, in the imperative mood ("Extract the decode loop", not
-  "Extracted" or "Extracting"), with no full stop. The 50 is measured on the
-  prose after the `abc: ` prefix, because it is a size check as much as a
-  title: work that cannot be summarised in 50 characters is usually more than
-  one issue, and the answer is to split the issue rather than to lengthen the
-  line. Only the distinguishing part of a bead ID is used, for the reason
-  [0017](docs/decisions/0017-review-through-pull-requests.md) gives.
-- **The body says what changed**, wrapped at 72 columns. It is not a diary:
-  how the work was done, what was tried first and what a review said are not
-  what a reader of the history needs. A review's findings belong in the
-  [pull request](#pull-requests). *Why* something is built the way it is
-  belongs in [docs/decisions/](docs/decisions/), and is linked rather than
-  retold.
-- **A trailer naming that same issue in full** — `Closes: inventory-tng-abc` on
-  the commit that completes it, `Refs: inventory-tng-abc` on one that only
-  advances it. The colon is not decoration: git parses `Key: value` and nothing
-  else, so without it `git log --format='%(trailers)'` finds nothing and only a
-  bespoke script can answer "what did this issue do?". GitHub accepts the colon
-  for its own closing keywords, so `Closes: #123` names a GitHub issue, because
-  [beads is not required to contribute](docs/issue-tracking.md). Every trailer on a
-  message names the *same* issue, and at most one closes it; that is what makes
-  "one issue per commit" something a machine can check. Follow-up issues raised
-  along the way may be created in the same commit — noticing work is honest
-  work — but only one issue may be *closed* by it. An epic does not count: it
-  groups a batch and does no work of its own, so it finishes when its children
-  do and its closure rides with the last of them.
-
-### Several issues at once
-
-Work them one at a time on a batch branch and land each as it is finished. The
-pull request is the unit of review; the commit stays the unit of work. See
-[Pull requests](#pull-requests).
-
-### Checking it
-
-Write the message to a file and hand it over, so that what is checked is what
-will land:
-
-```bash
-scripts/check-commit.sh <message-file>
-scripts/check-commit.sh --amend <message-file>   # replacing the last one
-```
-
-It objects if more than one issue is closed by what is staged, if the message
-and the tracker disagree about which, or if the summary line breaks the rules
-above. A guardrail rather than a gate.
-
-**Amending is recognised, within one limit.** The flag above is for running it
-by hand; as a hook it is told nothing about how git was invoked, so it works the
-shape out instead — `HEAD` already closed the issue the message names, *and* the
-summary line is still `HEAD`'s. Both, because either alone would also describe a
-fresh commit claiming a closure that the one before it made. So amending to
-revise a body, or to fold in work you forgot to stage, passes; amending to
-rewrite the summary is refused, and so is a reword during a rebase.
-
-That pair narrows the shape; it does not pin it down. A brand new commit whose
-subject repeats `HEAD`'s word for word, closing nothing itself, is read as an
-amend and accepted — and nothing given to a hook run against one message could
-decide otherwise. `scripts/check-batch.sh` is what covers it, by reading the
-whole range instead: an issue closed twice is an objection there, and a branch
-carrying one does not merge.
-
-To change a summary, reach for `git commit --fixup=reword:<commit>`, which puts
-the new one in an `amend!` for `git rebase --autosquash` to fold in. The
-`reword:` is the part that matters — a plain `--fixup` throws its own message
-away and the old summary survives the fold.
-
-It also runs on every commit you make, as the `commit-msg` hook. Which hooks
-run, what each can refuse and how they come to be installed is
-[docs/git-hooks.md](docs/git-hooks.md).
-
-It can be skipped, and that page says how and why that is safe.
-
-History before this section predates it, and is not the example to follow:
-several commits close five issues each.
-
----
-
 ## Pull requests
 
 Nothing reaches `main` except through a pull request, and `main` is protected so
@@ -561,7 +453,7 @@ Each issue is finished to the [Definition of Done](#definition-of-done) and
 published before anything is reviewed. Nothing is reviewed that has not already
 passed its own checks:
 
-1. Land the issue as its own commit — see [Commits](#commits).
+1. Land the issue as its own commit — see [Commits](docs/commits.md#commits).
 2. Push to the batch branch. The first push opens the pull request as a draft,
    so CI runs per issue rather than once at the end.
 3. Repeat for the next issue in the batch.
