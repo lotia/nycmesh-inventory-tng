@@ -197,10 +197,15 @@ without() {
 # ---------------------------------------------------------------------------
 
 # The hook payload a Bash tool call arrives as.
+# payload <command> [<cwd>] -- what the harness sends: the command, and where
+# it runs. The cwd is what the gate asks git about for a sweep.
 payload() {
-  PAYLOAD_CMD=$1 python3 -c '
+  PAYLOAD_CMD=$1 PAYLOAD_CWD=${2:-} python3 -c '
 import json, os
-print(json.dumps({"tool_input": {"command": os.environ["PAYLOAD_CMD"]}}))'
+sent = {"tool_input": {"command": os.environ["PAYLOAD_CMD"]}}
+if os.environ["PAYLOAD_CWD"]:
+    sent["cwd"] = os.environ["PAYLOAD_CWD"]
+print(json.dumps(sent))'
 }
 
 # in_repo [repo] [PATH] -- <args to the gate>  -> everything it printed
@@ -236,8 +241,8 @@ payload_raw() { printf '%s' "$1" | in_repo "" "" check; }
 
 # gate <command line> [PATH] [repo]  -> what the hook printed
 gate() {
-  local cmd=$1 path=${2:-} repo=${3:-$REPO}
-  printf '%s' "$(payload "$cmd" | in_repo "$repo" "$path" check)"
+  local cmd=$1 path=${2:-} repo=${3:-$REPO} cwd=${4:-}
+  printf '%s' "$(payload "$cmd" "$cwd" | in_repo "$repo" "$path" check)"
 }
 
 # The decision, as a word, so a case reads as what it means.
@@ -271,6 +276,42 @@ case_is "bd create --title='gh pr merge 7 fails'" PERMIT "the words inside a quo
 case_is "git push --force origin batch/x"        "bare --force" "a bare --force is refused"
 case_is "git push -f origin batch/x"             "bare --force" "-f is the same flag and is refused with it"
 case_is "git push --follow-tags"                 PERMIT "a flag that merely contains -f is not it"
+
+# STAGING EVERYTHING IN THE SHARED CHECKOUT. The scene repository is a main
+# checkout, so these are refused; the worktree block below is where the same
+# commands are free. inventory-tng-16ad.
+case_is "git add -A"                             "stages everything in the shared checkout" "git add -A is refused in the main checkout"
+case_is "git add --all"                          "stages everything in the shared checkout" "and --all with it"
+case_is "git add -u"                             "stages everything in the shared checkout" "and -u, which sweeps every tracked change"
+case_is "git add ."                              "stages everything in the shared checkout" "and . as the only path"
+case_is "git add -A && git commit -m x"          "stages everything in the shared checkout" "and one chained before a commit"
+case_is "git remote add x y; git add -A"         "stages everything in the shared checkout" "and one after another command's add, git's own included"
+case_is "git add -Av"                            "stages everything in the shared checkout" "and -A run together with another flag"
+case_is "git add ./"                             "stages everything in the shared checkout" "and ./ as the path"
+case_is "git add :/"                             "stages everything in the shared checkout" "and :/, the whole tree by name"
+case_is "git commit -am x"                       "stages everything in the shared checkout" "and git commit -a, which stages every tracked change on its way"
+case_is "git commit --all -m x"                  "stages everything in the shared checkout" "spelt out"
+case_is "git commit -m x"                        PERMIT "a commit of what was staged is free"
+case_is "git add scripts/x.sh docs/y.md"         PERMIT "staging by path is free"
+case_is "git add -A -- scripts/"                 PERMIT "and so is -A narrowed to a path"
+case_is "git add -p"                             PERMIT "and so is choosing hunks"
+case_is "bd create --title='git add -A swept it'" PERMIT "the words inside a quoted string are data here too"
+
+# In a worktree of its own, the same sweep is free: git status there lists
+# only what this session did.
+WT="$WORK/worktree"
+git -C "$REPO" worktree add -q "$WT" -b in-a-worktree 2>/dev/null
+assert "$(decision "$(gate "git add -A" "" "$WT")")" 0 0 PERMIT "git add -A in a linked worktree is free"
+# And reached from the main checkout, which is what the refusal tells the
+# caller to do: the directory the command stages in is what is asked.
+assert "$(decision "$(gate "git -C $WT add -A")")" 0 0 PERMIT "so is git -C <worktree> add -A from the main checkout"
+assert "$(decision "$(gate "cd $WT && git add -A")")" 0 0 PERMIT "and cd <worktree> && git add -A"
+# And a session that has moved into the worktree, as the harness reports it:
+# the command runs there, the project directory is still the main checkout.
+assert "$(decision "$(gate "git add -A" "" "$REPO" "$WT")")" 0 0 PERMIT "and a sweep whose cwd is the worktree, whatever the project directory is"
+assert "$(decision "$(gate "git commit -am x" "" "$REPO" "$WT")")" 0 0 PERMIT "commit -a there too"
+git -C "$REPO" worktree remove --force "$WT" 2>/dev/null
+git -C "$REPO" branch -q -D in-a-worktree 2>/dev/null
 
 # The two arms that used to be a row in AGENTS.md saying "ask first". They are
 # here because a rule kept only by whoever remembers it is not kept, and
@@ -311,6 +352,10 @@ case_is "gh pr merge https://github.com/lotia/nycmesh-inventory-tng/pull/28 --re
 case_is "gh pr merge batch/other --rebase"       "by URL or by branch" "and one naming it by branch"
 case_is "gh pr ready batch/other"                "by URL or by branch" "and so is marking one ready that way"
 case_is "gh pr merge --rebase 7"                 "No review cycle" "a number after the flags is still a number"
+case_is "gh pr merge --subject 'x' 7 --rebase"   "No review cycle" "and so is one after a flag that takes a value"
+case_is "gh pr merge --match-head-commit abc123 7" "No review cycle" "whose value could pass for a branch"
+case_is "gh pr merge 7&&echo done"               "No review cycle" "and a number with the next command glued on"
+case_is "gh pr merge --help 2>&1"                "No review cycle" "a redirection is not read as a branch, so this is the ordinary refusal"
 
 echo
 echo "the prefilter matches words, not substrings"

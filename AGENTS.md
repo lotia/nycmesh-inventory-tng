@@ -106,7 +106,13 @@ refuses so that nobody has to remember to ask, and why whoever finishes a
 mergeable batch merges it — agent or not — are all there and in
 [0020](docs/decisions/0020-who-merges.md).
 
-Two things are said here because nothing else will say them to you.
+Three things are said here because nothing else will say them to you.
+
+**The main checkout is shared, so work in a worktree of your own.** Every
+session on this machine sees the same working tree, and `git status` there
+lists what anybody did. In the shared checkout the gate refuses staging that
+names no path; how to make a worktree, and why staging by path is the rule
+anyway, is [Staging](docs/commits.md#staging).
 
 **A pull request whose body posts `<!-- do-not-merge -->` on a line of its own
 is never merged, whatever its state, and the answer is never yours to

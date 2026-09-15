@@ -114,7 +114,14 @@ git add <the paths that issue touched>
 ```
 
 `git add -A` is only safe when you have just read `git status` and every line of
-it belongs to the issue in hand. It is how the unrelated fix gets in.
+it belongs to the issue in hand. It is how the unrelated fix gets in — and on
+a checkout shared between sessions, where `git status` lists what anybody did,
+the landing gate refuses it, and `git commit -a` with it. A worktree of your
+own has only your edits in it, and there a sweep is free:
+
+```bash
+git worktree add .claude/worktrees/<name> <branch>   # the directory is ignored
+```
 
 ## When work has already bled across two issues
 
