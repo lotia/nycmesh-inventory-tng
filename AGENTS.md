@@ -13,7 +13,7 @@ either here.
 **1. One topic, one place.** Every piece of documentation lives in exactly one
 file; everywhere else links to it. Never paste an explanation into a second
 location — link instead. Canonical locations are listed in
-[Documentation rules](DEVELOPERS.md#documentation-rules).
+[Documentation rules](CONTRIBUTING.md#documentation-rules).
 
 **2. Docs change with the code.** An issue must not be closed while
 documentation contradicts the code. Before closing anything, check whether the
@@ -61,7 +61,7 @@ only job it has.
 ## Definition of Done
 
 Use the checklist in
-[DEVELOPERS.md](DEVELOPERS.md#definition-of-done). It is the same standard human
+[CONTRIBUTING.md](CONTRIBUTING.md#definition-of-done). It is the same standard human
 contributors are held to. Nothing in this repository should be workable only by
 an agent.
 

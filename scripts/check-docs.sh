@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # One topic, one place -- the part of it a machine can see.
 #
-# What this reads and why is DEVELOPERS.md#1-one-topic-one-place. How it does
-# it: cut each file's prose into overlapping runs of words and report any run
-# that turns up in two of them.
+# The rule is CONTRIBUTING.md#one-topic-one-place. What is read and why is
+# said beside the enumeration below, and this file is where that lives. How it
+# does it: cut each file's prose into overlapping runs of words and report any
+# run that turns up in two of them.
 #
 # Usage: check-docs.sh [--words N] [<path>...]
 #        check-docs.sh --budget
@@ -62,7 +63,7 @@ if [[ ${#paths[@]} -eq 0 ]]; then
   # decision record gets paraphrased. What that costs is that a docstring
   # beside the invariant it enforces looks the same to a machine, so the
   # judgement moves into check-docs.allow. See
-  # DEVELOPERS.md#1-one-topic-one-place.
+  # CONTRIBUTING.md#one-topic-one-place.
   #
   # It said that and then listed seven extensions, which is the same mistake
   # one layer down: `.env.sample` is where every configuration variable in this
@@ -80,7 +81,6 @@ if [[ ${#paths[@]} -eq 0 ]]; then
   # repetitions nothing here can fix, and the README came with the tool. It is
   # the only path excluded for where it is, and it is worth being uneasy about
   # -- a `.beads/` holding something of ours would go unread and say nothing.
-  # DEVELOPERS.md#1-one-topic-one-place puts that in words.
   #
   # THE EXTENSIONS ARE A HINT AND NOT THE GUARD. No list of them is ever
   # complete, and while this was the only thing keeping binary out, the file it

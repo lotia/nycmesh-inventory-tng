@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Code that changes something and says nothing about it.
 #
-# The rule is DEVELOPERS.md#definition-of-done: work after the telemetry sweep
+# The rule is CONTRIBUTING.md#definition-of-done: work after the telemetry sweep
 # is expected to be logged and instrumented, and a line in a checklist will not
 # hold that any more than it held the documentation rule. check-telemetry.py is
 # the reader and says what it reads and what it deliberately does not.

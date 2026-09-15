@@ -8,7 +8,7 @@ is put together, see [docs/architecture.md](docs/architecture.md).
 
 **This guide is expected to work.** If a command here fails on a clean machine,
 that is a bug in the guide — please open an issue or fix it in your next pull
-request. See [Definition of Done](#definition-of-done). CI runs the setup below
+request. See [Definition of Done](CONTRIBUTING.md#definition-of-done). CI runs the setup below
 on a clean machine every push, so that expectation is checked rather than
 hoped for: [What CI proves](docs/ci.md#what-ci-proves).
 
@@ -240,41 +240,29 @@ a database wipe are [Signing in](docs/local-development.md#signing-in).
 
 ---
 
-## Documentation rules
+## Everything else
 
-Two rules govern documentation in this repository. They exist because NYC Mesh
-is a volunteer community: stale or scattered setup docs are the single biggest
-thing standing between a willing volunteer and a first contribution.
+This guide stops at a running application. Every other topic has one page,
+and this table is where each lives; [CONTRIBUTING.md](CONTRIBUTING.md) is the
+rule that keeps it to one, and the checks that hold the table to the
+`docs/` directory in both directions.
 
-### 1. One topic, one place
-
-Every piece of documentation lives in exactly **one** file. Everything else
-links to it with a relative Markdown link.
-
-If you find yourself explaining something that is already explained elsewhere,
-delete your copy and link instead. Two copies of an instruction means one of
-them is wrong within a month, and the reader has no way to tell which.
-
-Where each topic lives:
-
-| Topic | Canonical location |
+| Topic | Where |
 | --- | --- |
-| What the project is, quickstart | [README.md](README.md) |
+| What the project is, and the quickstart | [README.md](README.md) |
 | Using the app to move stock | [guides/volunteer.md](guides/volunteer.md) |
 | Running the catalogue, the people and the labels | [guides/administrator.md](guides/administrator.md) |
-| Testing and coverage, and how the guides' pictures are made | [docs/testing.md](docs/testing.md) |
-| Which documents CI executes, and how far | [docs/ci.md](docs/ci.md) |
-| Development setup and workflow | This file |
+| How to contribute: the Definition of Done, and the documentation rules | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | The other ways to run it, the camera from a phone, signing in, troubleshooting | [docs/local-development.md](docs/local-development.md) |
 | Repository layout, common tasks, the database, the logs, the API schema | [docs/working-in-the-code.md](docs/working-in-the-code.md) |
 | Code style and typing — `uv run ruff check --fix . && uv run ruff format .`, `npm run lint:fix` | [docs/code-style.md](docs/code-style.md) |
-| API schema and how it stays current | [The API schema](docs/working-in-the-code.md#the-api-schema) |
-| Reading logs while developing | [Reading the logs while you work](docs/working-in-the-code.md#reading-the-logs-while-you-work) |
+| Testing and coverage, and how the guides' pictures are made | [docs/testing.md](docs/testing.md) |
+| Which documents CI executes, and how far | [docs/ci.md](docs/ci.md) |
 | Issue tracking: bd, where its database lives, and the GitHub mirror | [docs/issue-tracking.md](docs/issue-tracking.md) |
+| Triaging an issue somebody else filed | [docs/triage.md](docs/triage.md) |
 | What one commit contains, its message, and how to land it | [docs/commits.md](docs/commits.md) |
 | The git hooks: what runs, what each refuses, how they are installed | [docs/git-hooks.md](docs/git-hooks.md) |
-| How work is reviewed and reaches `main`, and merged | [docs/pull-requests.md](docs/pull-requests.md) |
-| How to contribute | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| How work is reviewed, reaches `main`, and is merged | [docs/pull-requests.md](docs/pull-requests.md) |
 | Architecture and technology choices | [docs/architecture.md](docs/architecture.md) |
 | Inventory data model | [docs/data-model.md](docs/data-model.md) |
 | Deployment | [docs/deployment.md](docs/deployment.md) |
@@ -284,133 +272,3 @@ Where each topic lives:
 | Rules for AI coding agents | [AGENTS.md](AGENTS.md) |
 | Configuration variables | [.env.sample](.env.sample) |
 | Toolchain versions | [mise.toml](mise.toml) |
-
-Four checks in CI keep that arrangement from rotting, and each can be run by
-hand:
-
-```bash
-scripts/check-docs.sh          # the same passage in two files
-scripts/check-docs.sh --words 8   # stricter, if you are hunting one down
-scripts/check-docs.sh --budget    # this file and CONTRIBUTING.md, within their budgets
-scripts/check-anchors.sh       # a heading named outside Markdown that is not there
-scripts/check-config.sh        # a configuration value nobody explained
-```
-
-One topic, one place says nothing about how long the place may be, and this
-guide grew to two thousand lines under it. `--budget` is the other half: the
-page a newcomer is sent to first stays one they can finish, and
-[`scripts/check-docs.budget`](scripts/check-docs.budget) is where each number
-is set and argued.
-
-A link checker catches a link whose target you renamed, fragment included, in
-every Markdown file. `check-anchors.sh` asks the same of every `<page>.md#<anchor>`
-written anywhere else — a docstring, a shell comment, a refusal message, a
-workflow — which a link checker never reads and a reader meets at the moment
-something has just refused them. `check-docs.sh` catches
-the other half — an explanation pasted into a second file rather than linked to
-— by comparing prose in runs of twelve words. Code blocks, tables, headings and
-link text are not prose and are left out, so a repeated command or a repeated
-citation is not reported.
-
-It reads every Markdown file **and the comments of everything else** — scripts,
-workflows, the chart's templates, and the application's own docstrings and
-comments. Those are documentation of how this repository works, and a docstring
-is the easiest place of all to re-derive a decision record.
-
-`check-config.sh` holds the row above it — that configuration variables are
-documented where they are declared. Every value in
-[`.env.sample`](.env.sample), [`compose.yaml`](compose.yaml) and the chart's
-`values.yaml` must have prose beside it, and every variable the chart renders
-into a container must appear in
-[deployment](docs/deployment.md#environment-variables). That last rule is the
-one worth having: it is what found a rate limit an operator could set, the
-chart would honour, and the document listing what may be set had never heard
-of.
-
-What counts as documented is what a reader uses rather than what is easy to
-check — a comment above the *group* a value belongs to, and in YAML a comment
-on an enclosing key covering what is nested beneath it. Grouping related values
-under one comment is the better way to write these files, so a checker that
-demanded one comment per line would be arguing against the house style. What it
-cannot judge is whether the prose is any good; `scripts/check-config.allow` is
-for the few values that genuinely need none, and an entry there wants a reason
-like every other allowlist here.
-
-The corpus is every file in your checkout that git will admit to — committed or
-not, so long as `.gitignore` does not cover it — less the ones whose prose
-nobody here writes:
-images, fonts, a compiled module, a spreadsheet, the two lock files a resolver
-produces, and `.beads/` entire — the tracker's exports are data, its five git
-hooks are generated and repeat a banner between themselves, and its `README.md`
-arrived with the tool. That last one is the only thing kept out for *where* it
-sits, and it is the only directory anybody here does not author; everywhere
-else a file added or moved under a directory already read is read by default,
-whatever it is called. The rule is stated as a subtraction on purpose.
-It was once a list of seven extensions, and the files whose whole job is
-explaining something — `.env.sample`, the chart's `_helpers.tpl`, the
-Dockerfiles, `nginx.conf.template`, the extensionless programs under `scripts/`
-— were precisely the ones it left out. What is left out *within* a file is not
-prose: fenced blocks and
-tables in Markdown, and in code, anything a file *uses* rather than *says* — a
-string handed to `RunSQL` is a value however much of it reads like a sentence.
-Addressing is left out too, wherever it appears: a Markdown link, a bare path
-or URL in a comment, and a bare "decision 0016" all name a thing rather than
-explain it, and two files naming the same thing are obeying the rule.
-
-The judgement this leaves is real and is per passage. A docstring beside the
-invariant it enforces is the code explaining itself, which is a different thing
-from a topic having two homes; when it is the first, the fix is usually still
-to state the rule here and cite the record rather than reproduce its argument.
-
-When it objects, the fix is almost always to delete one copy and link to the
-other. `scripts/check-docs.allow` exists for the rare passage that is genuinely
-meant to appear twice; its own header says how an entry is written and when one
-is warranted. An allowance covers a named pair of files, so a third copy is
-still reported, and one that stops matching anything is reported too — a
-baseline cannot outlive the repetition it recorded.
-
-### 2. Docs change with the code that invalidates them
-
-Documentation is updated in the **same** change as the code, not afterwards.
-This is part of [Definition of Done](#definition-of-done) below.
-
----
-
-## Definition of Done
-
-A change is not finished — and an issue must not be closed — until all of these
-hold:
-
-- [ ] Tests and coverage thresholds pass (`uv run pytest`, `npm test`) —
-      see [Testing and coverage](docs/testing.md#testing-and-coverage)
-- [ ] Lint, format, and type checks pass — see [Code style](docs/code-style.md#code-style)
-- [ ] Every function you added or changed is annotated — see [Typing](docs/code-style.md#typing)
-- [ ] New behaviour has a test. If you added code that coverage counts, it is
-      covered; if you excluded something, the exclusion is justified in the
-      pull request
-- [ ] **Code that changes something says so.** Run
-      `scripts/check-telemetry.sh`: its header states what it reads and what it
-      leaves alone, and `scripts/check-telemetry.allow` is where a module that
-      is right to stay quiet is argued. What is worth recording, and what may
-      never be recorded at all, is
-      [docs/observability.md](docs/observability.md)
-- [ ] **Documentation is consistent with the change.** If the change alters
-      setup steps, commands, environment variables, architecture, the API
-      surface, or the deployment procedure, the canonical document for that
-      topic is updated in the same pull request.
-- [ ] **The two guides still describe this app.** Weigh the change against
-      [guides/volunteer.md](guides/volunteer.md) and
-      [guides/administrator.md](guides/administrator.md): neither may name a
-      role the app has dropped, nor omit one of its flows. This is the part no
-      checker sees — [What CI proves](docs/ci.md#what-ci-proves) is the part that is seen
-- [ ] A decision that future readers would ask "why?" about has a record in
-      [docs/decisions/](docs/decisions/)
-- [ ] **No cryptography was written.** An established library, or a thin
-      wrapper over one's public API, or the work stopped and asked — see
-      [rule 3 in AGENTS.md](AGENTS.md#three-rules-that-are-not-negotiable)
-
-The documentation item is not a formality and not a follow-up ticket. A change
-that leaves the docs describing the old behaviour is incomplete, because the
-next person to read them will be misled.
-
----
