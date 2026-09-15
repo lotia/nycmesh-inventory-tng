@@ -125,7 +125,7 @@ deny_dependency() {
 
 This refuses rather than permits deliberately. A guard that fails open is
 worse than no guard, because the rule that rests on it goes on being believed
--- see AGENTS.md \"Git\" and DEVELOPERS.md \"When a branch is ready to merge\".
+-- see docs/pull-requests.md \"The landing gate\" and docs/decisions/0020-who-merges.md.
 
 Install $1, or make it reachable from the PATH this session started with.
 Nothing else in this repository is blocked: only the commands this gate
@@ -154,8 +154,8 @@ network, or a pull request whose checks have not been reported yet.
   gh auth status
 
 This refuses rather than permits deliberately: a guard that cannot see is not
-a guard that has nothing to object to. See DEVELOPERS.md \"When a branch is
-ready to merge\"."
+a guard that has nothing to object to. See docs/pull-requests.md \"The
+landing gate\"."
 }
 
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -393,7 +393,7 @@ if missing:
         print("", file=sys.stderr)
     print(
         "The receipt records what it finds, so a stage with nothing behind it\n"
-        "does not unblock the merge. See DEVELOPERS.md \"Pull requests\".",
+        "does not unblock the merge. See docs/pull-requests.md \"The landing gate\".",
         file=sys.stderr,
     )
 
@@ -1245,7 +1245,7 @@ for candidate in [cmd] + shell_payloads(cmd):
   if own_source_is_mid_conflict; then
     echo "landing-gate: this file is mid-conflict, so the gate is standing down" >&2
     echo "  until the markers are gone. Finish or abort the rebase; nothing is guarded" >&2
-    echo "  meanwhile. See DEVELOPERS.md \"When a branch is ready to merge\"." >&2
+    echo "  meanwhile. See docs/pull-requests.md \"The landing gate\"." >&2
     exit 0
   fi
   deny_unavailable "a reading of what this command runs" "the matcher"
@@ -1306,7 +1306,8 @@ whole reason AGENTS.md puts one on the free row and the other behind an ask.
 
 If the lease genuinely has to be broken -- somebody else pushed, and you have
 agreed with them that their commits go -- then that is the ask, and it is a
-person's to answer rather than yours. See AGENTS.md \"Git\"."
+person's to answer rather than yours. See docs/pull-requests.md \"The landing
+gate\"."
     ;;
 
   push)
@@ -1357,7 +1358,7 @@ branch protection would refuse this anyway.
   this push lands on: $target
 
 Publish to a batch/* branch and open a pull request instead. See
-DEVELOPERS.md \"Pull requests\"."
+docs/pull-requests.md."
     fi
     exit 0
     ;;
