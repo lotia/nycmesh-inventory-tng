@@ -136,19 +136,26 @@ fi
 #
 # That is the doc-versus-behaviour gap decision 0032 point 4 is about, which
 # would have been an unhappy thing to build into the check point 3 cites.
-export_auto_is_on() {
-  local file=$1
-  grep -qE '^[[:space:]]*export\.auto:[[:space:]]*true([[:space:]]|$)' "$file" && return 0
-  grep -qE '^[[:space:]]*export:[[:space:]]*\{[^}]*auto:[[:space:]]*true' "$file" && return 0
-  # The block form: an `export:` at the start of a line, then `auto: true`
-  # indented under it, ending at the next line that is not indented.
-  awk '
-    /^export:[[:space:]]*$/ { inblock = 1; next }
+yaml_setting_is() {
+  local file=$1 section=$2 key=$3 value=$4
+  grep -qE "^[[:space:]]*$section\.$key:[[:space:]]*$value([[:space:]]|\$)" "$file" && return 0
+  grep -qE "^[[:space:]]*$section:[[:space:]]*\{[^}]*$key:[[:space:]]*$value" "$file" && return 0
+  # The block form: the section at the start of a line, then the key indented
+  # under it, ending at the next line that is not indented.
+  awk -v section="$section" -v key="$key" -v value="$value" '
+    $0 ~ "^" section ":[[:space:]]*$" { inblock = 1; next }
     inblock && /^[^[:space:]#]/ { inblock = 0 }
-    inblock && /^[[:space:]]+auto:[[:space:]]*true([[:space:]]|$)/ { found = 1 }
+    inblock && $0 ~ "^[[:space:]]+" key ":[[:space:]]*" value "([[:space:]]|$)" { found = 1 }
     END { exit found ? 0 : 1 }
   ' "$file"
 }
+
+export_auto_is_on() { yaml_setting_is "$1" export auto true; }
+
+# THE TRACKER MUST NOT PUBLISH ITSELF. bd carries a timed auto-push to the Dolt
+# remote, which no command-text guard can see; docs/issue-tracking.md says why
+# it is held off here. inventory-tng-ol66.
+dolt_auto_push_is_off() { yaml_setting_is "$1" dolt auto-push false; }
 
 if [[ -f .beads/config.yaml ]]; then
   if ! export_auto_is_on .beads/config.yaml; then
@@ -168,6 +175,10 @@ if [[ -f .beads/config.yaml ]]; then
   if ! grep -qE '^[[:space:]]*(sync\.)?remote:' .beads/config.yaml; then
     fail ".beads/config.yaml names no sync remote"
     note "  the tracker then has nowhere to publish to, and says so only when asked"
+  fi
+  if ! dolt_auto_push_is_off .beads/config.yaml; then
+    fail ".beads/config.yaml does not set dolt.auto-push: false"
+    note "  bd then publishes the tracker on a timer, where the landing gate cannot see it"
   fi
 elif [[ -f .beads/metadata.json ]]; then
   # A workspace with a database but no config is one bd has rewritten or one

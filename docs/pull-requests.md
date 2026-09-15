@@ -354,12 +354,12 @@ What it refuses:
 
 | Command | Refused when |
 | --- | --- |
-| `gh pr merge` | no review cycle is recorded against the exact head being merged; or the branch is not finished — commits still waiting to be folded in, or an issue in the batch epic that has not landed. A pull request named by URL or by branch rather than by number is refused outright: the gate keys everything by number, and read as naming none such a command was judged against the checked-out branch's pull request instead |
+| `gh pr merge` | no review cycle is recorded against the exact head being merged; or the branch is not finished — commits still waiting to be folded in, or an issue in the batch epic that has not landed; or it names the pull request by URL or branch rather than by number |
 | `gh pr ready` | the checks are not green |
 | `git push` | it would land on `main` — asked of git, so `git push origin HEAD` from a checked-out `main` is refused and a branch called `batch/main-fix` is not. GitHub refuses it behind the gate too, with `enforce_admins`, required reviews and the required contexts; the gate goes first so the message names the `batch/*` workflow rather than a protection rule |
-| `git add -A`, `--all`, `-u`, `.` | in the shared main checkout, where `git status` lists what anybody did and a sweep once staged a colleague's edit into another issue's commit. In a linked worktree it is free, because only that session's edits are there |
+| `git add -A`, `-u`, `.`, `:/`; `git commit -a` | in the shared main checkout, where `git status` lists what anybody did; free in a linked worktree — [Staging](commits.md#staging) |
 | `git push --force`, `-f` | always, and `allow_force_pushes: false` stands behind it. `--force-with-lease` is free because the lease is the guard: it refuses if anything arrived since you last fetched, so it cannot overwrite work you have not seen |
-| `bd dolt push` | always: it publishes the tracker, and [0029](decisions/0029-the-issue-tracker-is-public.md) makes that public the moment it runs |
+| `bd dolt push` | always: it publishes the tracker, and [0029](decisions/0029-the-issue-tracker-is-public.md) makes that public the moment it runs. bd's timed auto-push is held off too — [Issue tracking](issue-tracking.md) says how |
 | `scripts/repo-settings.sh` writing | always; `--check` compares and reports, and is free. Writing is refused because that script sets the protections the rows above rest on |
 | ending a turn | the branch is `batch/*`, its pull request is ready and green, and no cycle is recorded — a nudge rather than a lock: it asks once per head, drafts and red checks are exempt, and it fails open where everything else fails closed |
 

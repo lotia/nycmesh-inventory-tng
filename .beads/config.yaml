@@ -84,3 +84,8 @@
 export.auto: true
 sync:
     remote: "git+ssh://git@github.com/lotia/nycmesh-inventory-tng.git"
+
+# Held false by scripts/check-beads-state.sh; docs/issue-tracking.md says why.
+# inventory-tng-ol66.
+dolt:
+    auto-push: false
