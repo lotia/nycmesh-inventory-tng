@@ -170,7 +170,7 @@ jobs:
     # no cluster to install into. All of them here rather than some of them
     # here and some in the setup job: the variants differ from the plain render
     # by a flag or two, and a chart that has stopped rendering should say so
-    # once. See DEVELOPERS.md#what-ci-proves.
+    # once. See docs/ci.md.
     steps:
       - uses: actions/checkout@v5
       - uses: azure/setup-helm@v4
@@ -593,7 +593,7 @@ jobs:
     # A clean machine, following the two setup documents rather than testing
     # the code they set up. DEVELOPERS.md promises that a command in it works
     # on one of these and calls a command that does not a bug in the guide;
-    # this is where that is found out. See DEVELOPERS.md#what-ci-proves.
+    # this is where that is found out. See docs/ci.md.
     #
     # Every command below is typed the way that guide prints it -- bare `uv`,
     # bare `npm`. The prefix this job used to wear was the tell

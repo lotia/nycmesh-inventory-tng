@@ -4,7 +4,7 @@
 How to run the suites, what the integration suite can see that the unit suites
 cannot, how the guides' pictures are made, and what the coverage threshold is
 for. Which of this repository's documents CI executes, and how far, is
-[What CI proves](../DEVELOPERS.md#what-ci-proves) rather than this page.
+[What CI proves](ci.md) rather than this page.
 
 ## How to run them
 
