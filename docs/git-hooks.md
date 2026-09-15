@@ -60,6 +60,35 @@ the commit checker reads the tracker through `python3`. So a perfectly wired
 clone can still refuse every commit that stages the tracker; the refusal names
 the program rather than blaming the commit.
 
+## Skipping them
+
+You can. The rules `commit-msg` enforces are enforced again on every pull
+request — CI's `One issue per commit` job runs `scripts/check-batch.sh` over
+the whole range — so a hook skipped locally moves a refusal to the pull
+request; it never gets past it. The local hook is there to tell you sooner,
+not to be the gate. Skip it when it is in your way, and expect the same
+answer from CI if the message was wrong.
+
+git's own switches are the ones to use; there is nothing of this repository's
+to learn:
+
+```bash
+git commit --no-verify                    # this commit: no pre-commit, no commit-msg
+git push --no-verify                      # this push: no pre-push
+git -c core.hooksPath=/dev/null <command> # this command: no hooks at all
+git config --unset core.hooksPath         # this clone: no hooks, until bootstrap runs again
+```
+
+The last one is undone by `scripts/bootstrap-dev.sh`, which sets the pointer
+whenever it finds it unset, and `scripts/check-setup.sh` will report the clone
+as unwired in the meantime. `BEADS_HOOK_TIMEOUT` (seconds, default 300) bounds
+how long any of beads' shims may take before git carries on without it.
+
+**If you are an agent, the rule is different**, and [AGENTS.md](../AGENTS.md#git)
+says so and says why: never `--no-verify`. An agent that learns the switch will
+reach for it in place of the fix. A person reading a refusal is trusted to know
+which is which.
+
 ## What the Claude Code hooks are not
 
 `scripts/landing-gate.sh` is registered in `.claude/settings.json` as a Claude

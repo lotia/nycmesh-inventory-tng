@@ -159,7 +159,8 @@ this is the one row of the old table with no machinery behind it.
 
 **Never `git commit --no-verify`.** It is the one way past the commit-msg hook,
 and a guard that is stepped over the moment it refuses something is not a
-guard. A refusal is the work; fix what it named.
+guard. A refusal is the work; fix what it named. A person may skip the hooks,
+and [docs/git-hooks.md](docs/git-hooks.md) says how; that page is not for you.
 
 When finishing, report changed files, what you validated, and the commands you
 would run next.

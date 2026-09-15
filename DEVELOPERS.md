@@ -1564,8 +1564,7 @@ It also runs on every commit you make, as the `commit-msg` hook. Which hooks
 run, what each can refuse and how they come to be installed is
 [docs/git-hooks.md](docs/git-hooks.md).
 
-There is one way past all of it, `git commit --no-verify`, and the rule about
-using it is in [AGENTS.md](AGENTS.md#git).
+It can be skipped, and that page says how and why that is safe.
 
 History before this section predates it, and is not the example to follow:
 several commits close five issues each.
