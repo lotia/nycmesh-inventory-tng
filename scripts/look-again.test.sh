@@ -39,7 +39,13 @@ case "$1 $2" in
     fi
     ;;
   "run list")  cat "$SCENE/runs" ;;
-  "run view")  cat "$SCENE/jobs" ;;
+  "run view")
+    if [[ -e "$SCENE/view-refused" ]]; then
+      cat "$SCENE/view-refused" >&2
+      exit 1
+    fi
+    cat "$SCENE/jobs"
+    ;;
   "run watch") ;;
   "run rerun")
     if [[ -e "$SCENE/rerun-refused" ]]; then
@@ -77,7 +83,8 @@ unasked() { refute "$(cat "$SCENE/calls")" 0 0 "$1" "$2"; }
 
 DONE='[{"databaseId": 41, "status": "completed"}]'
 GOING='[{"databaseId": 41, "status": "in_progress"}]'
-JOBS='{"jobs": [{"name": "Backend", "databaseId": 900}, {"name": "Not marked do-not-merge", "databaseId": 901}]}'
+JOBS='{"jobs": [{"name": "Backend", "databaseId": 900}, {"name": "Not marked do-not-merge", "databaseId": 901, "conclusion": "failure"}]}'
+PASSED='{"jobs": [{"name": "Backend", "databaseId": 900}, {"name": "Not marked do-not-merge", "databaseId": 901, "conclusion": "success"}]}'
 
 echo "the ordinary case"
 
@@ -102,6 +109,25 @@ scene abc123 "$DONE" '{"jobs": [{"name": "Backend", "databaseId": 900}]}'
 out=$(run 7 "$JOB"); status=$?
 assert "$out" "$status" 0 "carries no job named 'Not marked do-not-merge'" "a run without the job"
 unasked "run rerun" "re-runs nothing either"
+
+# The marker in a body can change either way, so a job that passed is asked
+# again like one that failed -- unless the caller says it is not worth it.
+scene abc123 "$DONE" "$PASSED"
+out=$(run 7 "$JOB"); status=$?
+assert "$out" "$status" 0 "job 901 of run 41" "a job that passed is asked again by default"
+
+echo
+echo "--unless-passed, for evidence that only ever arrives"
+
+scene abc123 "$DONE" "$PASSED"
+out=$(run --unless-passed 7 "$JOB"); status=$?
+assert "$out" "$status" 0 "already passed on run 41" "a job that passed is left alone"
+unasked "run rerun" "and nothing is re-run"
+
+scene abc123 "$DONE" "$JOBS"
+out=$(run --unless-passed 7 "$JOB"); status=$?
+assert "$out" "$status" 0 "job 901 of run 41" "one that failed is asked again"
+asked "run rerun --job 901" "by job id, as ever"
 
 echo
 echo "a run still going is waited for"
@@ -140,6 +166,14 @@ out=$(run 7 "$JOB"); status=$?
 assert "$out" "$status" 1 "::error::could not ask CI again" "a refused re-run is the nudge being dead, and fails"
 assert "$out" "$status" 1 "Resource not accessible" "saying what gh said"
 
+# And so is gh failing to answer what the run holds: read as "no such job" that
+# was a quiet exit 0 over a nudge that could not see.
+scene abc123 "$DONE" "$JOBS"
+printf 'HTTP 401: Bad credentials\n' >"$SCENE/view-refused"
+out=$(run 7 "$JOB"); status=$?
+assert "$out" "$status" 1 "Bad credentials" "a gh that cannot list the jobs fails rather than finding none"
+unasked "run rerun" "and re-runs nothing"
+
 echo
 echo "what it is given"
 
@@ -155,5 +189,8 @@ echo "the job it is pointed at exists"
 # pins the workflow to the reader.
 grep -q 'do_not_merge.py --check-name' "$HERE/../.github/workflows/look-again.yml"; status=$?
 exits "$status" 0 "look-again.yml takes the job name from the reader rather than spelling it"
+grep -q 'look-again.sh --unless-passed "$PR" "$(python3 scripts/review_cycle.py --check-name)"' \
+  "$HERE/../.github/workflows/review-cycle.yml"; status=$?
+exits "$status" 0 "and review-cycle.yml runs this script with its reader's name, rather than a copy"
 
 verdict
