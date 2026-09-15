@@ -1087,6 +1087,13 @@ keeps every other check green. A couple of them genuinely want no write-up, and
 header says how an entry is written, and an entry that stops being needed is
 reported rather than left lying.
 
+**And every page under `docs/` has a row in this guide's outline.** The same
+file reads the table headed *Everything else* and holds it
+against the directory in both directions: a page with no row is a topic with a
+home nobody is told about, and a row whose page has moved is the outline
+lying. The decision records and the briefs are indexed on their own and are
+not held to it.
+
 **And CI activates mise with the line printed above.** The `Setup instructions`
 job's whole claim is that it types what this guide prints, which rests on the
 one line in

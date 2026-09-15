@@ -16,9 +16,12 @@ adds are also held against the documents -- with an allow-list, because a
 couple of them genuinely want no write-up and saying which is a decision worth
 recording rather than a gap worth living with.
 
-One more thing is held together from here, and it is not a command: the line
-that turns mise on. CI has to activate it the way the guide says to, and the
-line was retyped rather than shared, so the two are compared.
+Two more things are held together from here, and neither is a command. The
+line that turns mise on: CI has to activate it the way the guide says to, and
+the line was retyped rather than shared, so the two are compared. And the
+guide's outline: DEVELOPERS.md ends in a table of where every other topic
+lives, and a page under `docs/` that the table does not name is a topic with a
+home nobody is told about, so the two are compared in both directions.
 
 Every failure below names the token and the line it was read from, because a
 checker that says only "something is out of date" leaves the reader doing the
@@ -69,6 +72,11 @@ CHART_VALUE = re.compile(r"`([^`]+)`|--set[ \t]+'?([^\s'=]+)")
 # Whatever a shell is told to evaluate to bring mise up, wherever it is
 # written. See `test_ci_activates_mise_with_the_line_the_guide_prints`.
 ACTIVATION = re.compile(r'eval "\$\([^"]*mise activate [^"]*\)"')
+
+# The section of the guide that is the outline, and a link in one of its rows.
+# See `test_every_page_under_docs_is_in_the_guides_outline`.
+OUTLINE = "Everything else"
+LINK = re.compile(r"\]\(([^)#]*)(?:#[^)]*)?\)")
 
 # A Kubernetes object as `kubectl` is told to address it: a kind, a slash, and
 # the name the chart rendered. See
@@ -282,6 +290,59 @@ def test_ci_activates_mise_with_the_line_the_guide_prints() -> None:
     guide = DEVELOPERS.read_text()
     adrift = [line for line in activations if line not in guide]
     assert not adrift, "CI activates mise with a line DEVELOPERS.md does not print:\n" + "\n".join(adrift)
+
+
+def outline() -> list[tuple[str, str]]:
+    """Every target the guide's outline links to, each with the line it was read from.
+
+    The outline is the table under the `Everything else` heading, read to the
+    next heading of the same level. A link with no path is the guide pointing
+    at itself, which is a row the outline is allowed while a topic is still
+    on its way out, and resolves to the guide.
+    """
+    lines = DEVELOPERS.read_text().split("\n")
+    rows: list[tuple[str, str]] = []
+    inside = False
+    for number, line in enumerate(lines, start=1):
+        if line.startswith("## "):
+            inside = line[3:].strip() == OUTLINE
+            continue
+        if not inside or not line.startswith("|"):
+            continue
+        for target in LINK.findall(line):
+            rows.append((target or "DEVELOPERS.md", f"DEVELOPERS.md:{number}"))
+    assert rows, f"DEVELOPERS.md has no table under a '## {OUTLINE}' heading, which is the outline"
+    return rows
+
+
+def pages_under_docs() -> list[str]:
+    """Every page under docs/, as the outline would write it."""
+    paths = (path.relative_to(REPO_ROOT).as_posix() for path in documents())
+    return [path for path in paths if path.startswith("docs/")]
+
+
+def test_every_page_under_docs_is_in_the_guides_outline() -> None:
+    """A page nothing points a newcomer at is a topic with a home nobody is told about.
+
+    The guide is meant to be a path to a running application and then an
+    outline of everything else; a page added under `docs/` without a row in
+    that outline leaves every other check green and the page findable only
+    by somebody who already knows it is there. A row that names a directory
+    -- the decision records, the briefs -- covers what is under it, because
+    those have an index of their own and the row is where the outline says so.
+    """
+    linked = {target for target, _ in outline()}
+    covered = tuple(target for target in linked if target.endswith("/"))
+    unlisted = [page for page in pages_under_docs() if page not in linked and not page.startswith(covered)]
+    assert not unlisted, f"pages under docs/ with no row in the guide's '{OUTLINE}' table:\n" + "\n".join(unlisted)
+
+
+def test_every_row_of_the_guides_outline_resolves_to_a_page() -> None:
+    """The other direction: a row pointing at a page that has moved is the outline lying."""
+    complain(
+        [f"{where}: {target}" for target, where in outline() if not (REPO_ROOT / target).exists()],
+        "rows of the guide's outline naming a page",
+    )
 
 
 def rendered() -> set[str]:
