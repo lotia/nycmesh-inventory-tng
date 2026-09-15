@@ -140,6 +140,11 @@ stop() {
 }
 
 # verdict <sentence when there is nothing wrong> <what the fixing is before>
+#         [<line printed after a refusal>]
+#
+# The third is for a checker that runs as a hook: whoever is reading a refusal
+# there found it by being refused, not by reading the hook, so the refusal is
+# where the documentation has to be named. A pass says nothing extra.
 verdict() {
   echo
   if [[ "$problems" -eq 0 ]]; then
@@ -151,5 +156,6 @@ verdict() {
   else
     echo "$problems things to fix before $2."
   fi
+  [[ -n "${3:-}" ]] && echo "$3"
   exit 1
 }
