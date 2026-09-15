@@ -8,7 +8,7 @@ docs/data-model.md, docs/decisions/0008-stock-ledger-transfer-graph.md and
 docs/decisions/0016-invariants-for-every-writer.md.
 
 For the ``# ty: ignore[unresolved-attribute]`` comment below, see
-DEVELOPERS.md#typing.
+docs/code-style.md#typing.
 """
 
 import datetime

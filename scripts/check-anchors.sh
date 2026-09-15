@@ -2,11 +2,12 @@
 # A heading a comment points at has to exist.
 #
 # lychee holds every Markdown link to its target, fragment included, and reads
-# nothing else. The references that live outside Markdown -- `DEVELOPERS.md#typing`
-# in a docstring, a refusal message, a workflow comment, an editor setting --
-# are the same promise with nothing holding it, and they outnumber the ones in
-# pages. check-anchors.py is the reader and says how a heading becomes an
-# anchor.
+# nothing else. The references that live outside Markdown -- `docs/code-style.md#typing`
+# in a docstring, `DEVELOPERS.md "Commits"` in a refusal message, either in a
+# workflow comment or an editor setting -- are the same promise with nothing
+# holding it, and they outnumber the ones in pages. check-anchors.py is the
+# reader and says how a heading becomes an anchor, and what a quoted heading
+# may stand for.
 #
 # Usage: check-anchors.sh [<path>...]
 

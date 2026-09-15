@@ -136,7 +136,7 @@ The parts most likely to actually move:
   changes to `STORAGES` land here.
 - **`ty` and the stubs.** New Django means new stubs means possibly new or
   newly-unnecessary suppressions — see
-  [`Typing`](../../DEVELOPERS.md#what-the-checker-cannot-see) and bead
+  [`Typing`](../code-style.md#what-the-checker-cannot-see) and bead
   `inventory-tng-61b`.
 - **The Python floor.** [`mise.toml`](../../mise.toml) pins Python 3.14. Confirm
   6.2's supported Python versions when its release notes appear; Django

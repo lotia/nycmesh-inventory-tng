@@ -107,7 +107,7 @@ ENDPOINTS = {
 
 
 # ty reads django-stubs' signature for method_decorator, which does not
-# describe a decorator this generic. See DEVELOPERS.md#typing.
+# describe a decorator this generic. See docs/code-style.md#typing.
 @method_decorator(ensure_csrf_cookie, name="get")  # ty: ignore[invalid-argument-type]
 class ApiRootView(APIView):
     """Where this API starts.

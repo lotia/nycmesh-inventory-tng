@@ -97,7 +97,7 @@ select = [
     "C4",   # comprehension clarity
     "SIM",  # simplifiable code
     "DJ",   # Django-specific checks
-    "ANN",  # type annotations are required -- see DEVELOPERS.md "Typing"
+    "ANN",  # type annotations are required -- see docs/code-style.md "Typing"
     "RUF",  # ruff's own rules
 ]
 

@@ -7,7 +7,7 @@ description: Use when working in frontend/ on the inventory-tng React single-pag
 
 Commands (dev server, build, lint, test) are in
 [Common tasks](../../../docs/working-in-the-code.md#frontend), style rules in
-[Code style](../../../DEVELOPERS.md#code-style), and test and coverage
+[Code style](../../../docs/code-style.md#code-style), and test and coverage
 requirements in
 [Testing and coverage](../../../DEVELOPERS.md#testing-and-coverage). Stack rationale is in
 [docs/decisions/0002-frontend-stack.md](../../../docs/decisions/0002-frontend-stack.md).

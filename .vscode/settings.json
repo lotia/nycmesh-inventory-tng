@@ -1,7 +1,7 @@
 {
   // Editor defaults for this repository. The devcontainer installs the matching
   // extensions; see .devcontainer/devcontainer.json for that list.
-  // Typing requirements and the commands behind them: DEVELOPERS.md#typing
+  // Typing requirements and the commands behind them: docs/code-style.md#typing
 
   // ty is the type checker (docs/decisions/0004-python-tooling.md). Its
   // language server surfaces inferred types while you type, which is the point

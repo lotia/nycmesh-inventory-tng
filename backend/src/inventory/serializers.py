@@ -242,7 +242,7 @@ class StockTransactionCreateSerializer(serializers.ModelSerializer):
     """
 
     # max_length reaches the ListSerializer many=True builds, which the stubs
-    # for the wrapped serializer do not describe. See DEVELOPERS.md#typing.
+    # for the wrapped serializer do not describe. See docs/code-style.md#typing.
     movements = StockMovementInputSerializer(
         many=True,
         allow_empty=False,

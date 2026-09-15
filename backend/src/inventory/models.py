@@ -437,7 +437,7 @@ class ItemIdentifier(models.Model):
 
     def __str__(self) -> str:
         # Kind(self.kind).label rather than get_kind_display(): Django generates
-        # the latter at runtime, so `ty` cannot see it. See DEVELOPERS.md#typing.
+        # the latter at runtime, so `ty` cannot see it. See docs/code-style.md#typing.
         return f"{self.value} ({self.Kind(self.kind).label})"
 
 

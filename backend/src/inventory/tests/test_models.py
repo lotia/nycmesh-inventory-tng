@@ -8,7 +8,7 @@ stayed above the API is
 docs/decisions/0016-invariants-for-every-writer.md.
 
 For the ``ty: ignore[unresolved-attribute]`` comments below, see
-DEVELOPERS.md#typing.
+docs/code-style.md#typing.
 """
 
 import datetime

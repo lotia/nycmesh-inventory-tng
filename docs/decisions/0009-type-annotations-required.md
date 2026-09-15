@@ -34,7 +34,7 @@ Require annotations. Do not require them to be precise.
    expressible. `def f(rows: Any) -> Any` passes.
 3. **Generated migrations are exempt**, because nobody writes them by hand.
 4. **Tightening a type is review feedback, never a blocker.** This is stated
-   in [DEVELOPERS.md](../../DEVELOPERS.md#typing) so that reviewers and
+   in [Typing](../code-style.md#typing) so that reviewers and
    contributors read the same rule.
 5. **Deterministic help is provided rather than assumed**: a command that lists
    what is missing, a command that fills in the obvious cases, and
@@ -56,5 +56,5 @@ Require annotations. Do not require them to be precise.
   pushing.
 - `--fix --unsafe-fixes` is documented as an annotation-specific command rather
   than being added to the general fixer, so the blanket
-  `ruff check --fix` in [Code style](../../DEVELOPERS.md#code-style) keeps its
+  `ruff check --fix` in [Code style](../code-style.md#code-style) keeps its
   current safety properties.

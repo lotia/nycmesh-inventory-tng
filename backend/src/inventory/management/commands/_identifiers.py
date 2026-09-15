@@ -312,7 +312,7 @@ def mint(sheet: Sheet) -> Minted:
         # distinct identifiers there are, and this figure claims to be that.
         answered.add(held.value_normalised)
         # item_id rather than item, so that a row already in the table is not
-        # re-fetched to compare a key it already holds. See DEVELOPERS.md#typing
+        # re-fetched to compare a key it already holds. See docs/code-style.md#typing
         # for why the checker cannot see it.
         if held.item_id != item.pk:  # ty: ignore[unresolved-attribute]
             elsewhere += 1
