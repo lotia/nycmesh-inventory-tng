@@ -21,7 +21,7 @@ Two trackers, and you may use either:
   scoped to be approachable without deep context.
 - **beads** (`bd ready`) — a CLI tracker used for day-to-day work, especially by
   contributors working with AI agents. See
-  [DEVELOPERS.md](DEVELOPERS.md#issue-tracking).
+  [Issue tracking](docs/issue-tracking.md).
 
 You are not required to use beads. Nothing in this project should be workable
 *only* by an AI agent — if you hit something that seems to assume one, say so.

@@ -33,7 +33,7 @@ name: Issue sync
 # that is thrown away, so the only thing that ever persisted was the commit --
 # which is what could not merge. Landing tracker rows stays a person's job,
 # through the command named in the failure below and in
-# DEVELOPERS.md#issue-tracking.
+# docs/issue-tracking.md.
 #
 # NOT IN ci.yml, and that is load-bearing: scripts/repo-settings.sh derives
 # main's required contexts from the job names there, so a job put in that file
