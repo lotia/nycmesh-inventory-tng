@@ -41,6 +41,15 @@ literals that are right are excused by name in scripts/check-config.allow,
 whose header says how, so each is a decision somebody wrote down rather than
 a line nobody read the punctuation of.
 
+AND THE NAME INSIDE THE BRACES HAS TO BE ONE .env.sample DECLARES, or the
+shape is right and the knob still reaches nothing: `${DJANGO_ALLOWED_HOST}`
+reproduces w5r7 with one letter missing. Declared means an assignment, or one
+commented out -- `#DJANGO_LOG_FORMAT=console` is how that file documents a
+knob it deliberately leaves unset -- because either is where a reader finds
+it, and either is held to the comment rule above, so a dead line with nothing
+over it documents nothing. There is no excuse for this one: the fix is always
+a line in .env.sample, which is where every variable is documented.
+
 WHAT THIS DELIBERATELY DOES NOT READ. Whether the prose is any good. It cannot,
 and a checker that pretended to would be worse than one that admits the limit:
 a line saying "# the port" above `port:` passes here and helps nobody. What it
@@ -51,8 +60,13 @@ import re
 import sys
 from pathlib import Path
 
-# `KEY=value`, which is every assignment in an environment file.
-ENV_ASSIGNMENT = re.compile(r"^([A-Z][A-Z0-9_]*)=")
+# `KEY=value`, which is every assignment in an environment file -- or
+# `#KEY=value`, a knob the file documents and deliberately leaves unset. Both
+# are declarations, so both need the prose the rule below asks for, and both
+# are names a compose value may reach.
+ENV_ASSIGNMENT = re.compile(r"^#?([A-Z][A-Z0-9_]*)=")
+# Every name a compose value interpolates, `${NAME...}` or `$NAME`.
+INTERPOLATED = re.compile(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)")
 # An environment entry inside compose.yaml's six-space `environment:` blocks.
 COMPOSE_ENTRY = re.compile(r"^\s{6}([A-Z][A-Z0-9_]*):\s")
 # A YAML key with a value on the same line: a leaf rather than a parent.
@@ -190,10 +204,9 @@ def reachable(value: str) -> bool:
     brace that closes it is the last character. A bare `$NAME` and an alias
     to an anchor count too. Quotes around the whole are stripped first,
     because YAML demands them the moment a default holds `: ` or ` #`, and
-    compose interpolates inside them exactly as it does outside; so is a
-    trailing comment.
+    compose interpolates inside them exactly as it does outside.
     """
-    value = value.split(" #")[0].strip()
+    value = value.strip()
     if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
         value = value[1:-1]
     if re.fullmatch(r"\$[A-Za-z_]\w*|\*[A-Za-z_][\w-]*", value):
@@ -261,8 +274,10 @@ def main() -> int:
         print(f"fail {where}:{number}  {name} {detail}")
 
     surfaces: list[tuple[str, list[tuple[str, int, bool]]]] = []
-    env_sample = root / ".env.sample"
-    surfaces.append((".env.sample", flat_values(readable(env_sample, root).splitlines(), ENV_ASSIGNMENT)))
+    env_sample = readable(root / ".env.sample", root).splitlines()
+    env_entries = flat_values(env_sample, ENV_ASSIGNMENT)
+    surfaces.append((".env.sample", env_entries))
+    declared = {name for name, _, _ in env_entries}
     compose = readable(root / "compose.yaml", root).splitlines()
     compose_entries = flat_values(compose, COMPOSE_ENTRY)
     surfaces.append(("compose.yaml", compose_entries))
@@ -275,11 +290,18 @@ def main() -> int:
                 continue
             report(where, name, number, "is set with nothing saying what it is for")
 
-    # The third fault in the header: a value .env cannot reach.
+    # The third fault in the header: a value .env cannot reach, by its shape
+    # or by naming a variable .env.sample has never heard of.
     for name, number, _ in compose_entries:
-        if reachable(compose[number - 1].split(":", 1)[1]) or f"compose.yaml:{name}=literal" in excused:
-            continue
-        report("compose.yaml", name, number, "is a literal .env cannot reach")
+        # The trailing comment is prose, not the value: a `$` in it reads nothing.
+        value = compose[number - 1].split(":", 1)[1].split(" #")[0]
+        if not reachable(value) and f"compose.yaml:{name}=literal" not in excused:
+            report("compose.yaml", name, number, "is a literal .env cannot reach")
+        # Every name, in an excused literal's tail too. `$$` is a literal
+        # dollar and reads nothing.
+        for read in INTERPOLATED.findall(value.replace("$$", "")):
+            if read not in declared:
+                report("compose.yaml", name, number, f"reads ${{{read}}}, which .env.sample never declares")
 
     # The rule that matters to somebody deploying rather than somebody reading.
     helper = root / "infra" / "helm" / "inventory-tng" / "templates" / "_helpers.tpl"

@@ -107,26 +107,39 @@ def test_the_stack_that_ships_names_no_host_only_a_profile_creates() -> None:
     the frontend container of the ordinary quickstart did not start at all.
 
     Written against every default in the file rather than against that one
-    variable, because the mistake is the shape and not the name.
+    variable, because the mistake is the shape and not the name. And against
+    every live line of `.env.sample` too, because bootstrap copies that file
+    to `.env` and compose interpolates from it: `COLLECTOR_ORIGIN` is
+    commented out there for exactly this reason, and one deleted `#` would
+    re-break the quickstart with nothing else to say so.
     """
     import re
 
     import yaml
 
-    compose = yaml.safe_load((Path(settings.BASE_DIR).parent.parent / "compose.yaml").read_text())
+    root = Path(settings.BASE_DIR).parent.parent
+    compose = yaml.safe_load((root / "compose.yaml").read_text())
     optional = {name for name, service in compose["services"].items() if service.get("profiles")}
     assert optional, "no service is behind a profile any more; this test is asserting nothing"
+
+    def refuse(where: str, value: str) -> None:
+        host = urlsplit(value).hostname
+        assert host not in optional, (
+            f"{where} names {host!r}, which only the {compose['services'][host]['profiles']} profile creates"
+        )
 
     for name, service in compose["services"].items():
         for variable, value in (service.get("environment") or {}).items():
             # `${VAR:-fallback}`: the fallback is what a stack nobody
             # configured actually runs with.
             fallback = re.fullmatch(r"\$\{[A-Z_]+:-(.*)\}", str(value))
-            host = urlsplit(fallback.group(1)).hostname if fallback else None
-            assert host not in optional, (
-                f"{name}.{variable} falls back to {host!r}, which only the "
-                f"{compose['services'][host]['profiles']} profile creates"
-            )
+            if fallback:
+                refuse(f"{name}.{variable} falls back to a value that", fallback.group(1))
+
+    for line in (root / ".env.sample").read_text().splitlines():
+        live = re.fullmatch(r"([A-Z][A-Z0-9_]*)=(.*)", line)
+        if live:
+            refuse(f".env.sample's {live.group(1)}", live.group(2))
 
 
 @pytest.mark.parametrize("ratio", ["1.0", "0", "0.25"])
