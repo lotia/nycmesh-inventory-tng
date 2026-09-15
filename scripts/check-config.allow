@@ -7,3 +7,15 @@
 # Expect this file to stay short. A value that genuinely needs no prose is
 # rarer than it feels while writing one -- `port` looks obvious until somebody
 # asks which side of the container it is on.
+#
+# A compose value that is right to be a literal, rather than something .env
+# can reach, is `compose.yaml:NAME=literal: why`. The `=literal` is what tells
+# the two excuses apart: a value may have prose and still be a knob nobody can
+# turn, which is the fault check-config.py's header names third.
+
+compose.yaml:DJANGO_EXTRA_ALLOWED_HOSTS=literal: a fixed prefix for the names the probe dials, with the interpolation .env reaches after it; the comment above it argues it.
+compose.yaml:BACKEND_ORIGIN=literal: compose-network wiring, the backend by service name; the comment above it says why it is resolved rather than written.
+compose.yaml:UPSTREAM_ORIGIN=literal: the same wiring, the frontend by service name, for the TLS proxy.
+compose.yaml:GF_AUTH_ANONYMOUS_ENABLED=literal: a decision about the telemetry profile, not a knob; the comment above it says why.
+compose.yaml:GF_AUTH_ANONYMOUS_ORG_ROLE=literal: the same decision.
+compose.yaml:GF_AUTH_DISABLE_LOGIN_FORM=literal: the same decision.

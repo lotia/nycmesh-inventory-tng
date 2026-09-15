@@ -124,6 +124,71 @@ printf '.env.sample:EXCUSED\n' >>"$WORK/repo/scripts/check-config.allow"
 expect 1 "EXCUSED" "an allowlist line with no reason excuses nothing"
 
 # --------------------------------------------------------------------------
+# A compose value .env cannot reach
+# --------------------------------------------------------------------------
+# The third fault in check-config.py's header.
+
+scene
+printf '# The hosts Django admits.\n      HOSTS: localhost,127.0.0.1\n' >>"$WORK/repo/compose.yaml"
+expect 1 "HOSTS is a literal .env cannot reach" "a literal is refused, however well it is explained"
+
+scene
+printf '# Explained.\n      HOSTS: backend,${HOSTS:-}\n' >>"$WORK/repo/compose.yaml"
+expect 1 "HOSTS is a literal" "and so is a literal with an interpolation after it"
+
+scene
+printf '# Explained.\n      QUOTED: "true"\n' >>"$WORK/repo/compose.yaml"
+expect 1 "QUOTED is a literal" "a quoted literal is one too"
+
+scene
+cat >>"$WORK/repo/compose.yaml" <<'YAML'
+      # Every spelling compose gives an interpolation.
+      DEFAULTED: ${DEFAULTED:-x}
+      DEFAULTED_UNSET: ${DEFAULTED_UNSET-x}
+      REQUIRED: ${REQUIRED:?set it}
+      REQUIRED_UNSET: ${REQUIRED?set it}
+      ALTERNATIVE: ${ALTERNATIVE:+set}
+      ALTERNATIVE_UNSET: ${ALTERNATIVE_UNSET+set}
+      NESTED: ${NESTED:-${OTHER:-${DEEPER:-x}}-suffix}
+      BARE: ${BARE}
+      DOLLAR: $DOLLAR
+      ALIASED: *database-url
+      TRAILING: ${TRAILING:-x}   # a comment after it is not a literal
+YAML
+expect 0 "says what it is for" "a whole-value interpolation, in any spelling, or an alias is reachable"
+
+# YAML forces quotes on a default that holds `: ` or ` #`; compose interpolates
+# inside them all the same, so the quotes are not what makes a literal.
+scene
+cat >>"$WORK/repo/compose.yaml" <<'YAML'
+      # Quoted because of the colon, and reachable all the same.
+      LEVELS: "${LEVELS:-django.request: WARNING}"
+      SINGLE: '${SINGLE:-x}'
+YAML
+expect 0 "says what it is for" "a quoted whole-value interpolation is reachable"
+
+scene
+printf '# Explained.\n      TAIL: "${TAIL}-suffix"\n' >>"$WORK/repo/compose.yaml"
+expect 1 "TAIL is a literal" "quotes do not turn a literal tail into an interpolation"
+
+scene
+printf '# Wiring, not a setting.\n      ORIGIN: http://backend:8000\n' >>"$WORK/repo/compose.yaml"
+printf 'compose.yaml:ORIGIN=literal: the backend by service name, dialled by nothing outside the network.\n' \
+  >>"$WORK/repo/scripts/check-config.allow"
+expect 0 "says what it is for" "a literal excused by name, with a reason, is left alone"
+
+# The two excuses are different decisions, so one does not stand for the other.
+scene
+printf '      ORIGIN: http://backend:8000\n' >>"$WORK/repo/compose.yaml"
+printf 'compose.yaml:ORIGIN: obvious enough.\n' >>"$WORK/repo/scripts/check-config.allow"
+expect 1 "ORIGIN is a literal" "an excuse from prose does not excuse a literal"
+
+scene
+printf '      ORIGIN: http://backend:8000\n' >>"$WORK/repo/compose.yaml"
+printf 'compose.yaml:ORIGIN=literal: wiring.\n' >>"$WORK/repo/scripts/check-config.allow"
+expect 1 "ORIGIN is set with nothing saying what it is for" "nor does an excuse for a literal excuse it from prose"
+
+# --------------------------------------------------------------------------
 # The ways this could stop guarding without saying so
 # --------------------------------------------------------------------------
 

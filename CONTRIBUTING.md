@@ -120,8 +120,9 @@ twice, and its own header says when that is.
 
 `check-config.sh` holds that configuration is documented where it is declared:
 every value in `.env.sample`, `compose.yaml` and the chart's `values.yaml` has
-prose beside it, and every variable the chart renders into a container is in
-[deployment](docs/deployment.md#environment-variables). `--budget` holds the
+prose beside it, every variable the chart renders into a container is in
+[deployment](docs/deployment.md#environment-variables), and every value
+`compose.yaml` sets is one `.env` can reach. `--budget` holds the
 guide and this file to a size a newcomer can finish;
 [`scripts/check-docs.budget`](scripts/check-docs.budget) sets each number and
 says why.

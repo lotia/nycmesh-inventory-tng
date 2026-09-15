@@ -21,7 +21,7 @@ from pathlib import Path
 from inventory.tests.helpers import shipped
 from inventory_tng.hosts import allowed_hosts
 
-#: The file the two compose tests below read.
+#: The file the compose test below reads.
 COMPOSE = Path("compose.yaml")
 
 
@@ -59,27 +59,6 @@ def test_nothing_blank_is_ever_allowed() -> None:
     reaches here as one blank element rather than as no elements.
     """
     assert allowed_hosts(["", "  ", "inventory.nycmesh.net"], ["", " "]) == ["inventory.nycmesh.net"]
-
-
-def test_compose_reads_the_allowed_hosts_variable_rather_than_carrying_a_literal() -> None:
-    """The one arrangement where setting this used to do nothing.
-
-    `compose.yaml` named three hosts outright, so the value a reader put in
-    `.env` was overridden by the file and a phone on the LAN was answered with
-    `400 DisallowedHost` -- before TLS, before the camera, before anything the
-    scanning work is actually about. Every route to a device changes the Host
-    Django sees, so this is refused first whichever one is taken.
-
-    Asserted against the text rather than through `yaml.safe_load`, which is
-    what the other shipped-configuration tests in this suite do: it is the
-    interpolation itself that is under test, and parsing the file resolves it
-    away.
-    """
-    assert "DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}" in shipped(COMPOSE), (
-        "compose.yaml does not pass DJANGO_ALLOWED_HOSTS through with the loopback default, so a value in "
-        ".env is overridden by the file and a LAN address cannot be added; testing from a phone is then "
-        "refused with 400 DisallowedHost before TLS or the camera is reached at all"
-    )
 
 
 def test_compose_supplies_the_names_a_narrowed_list_would_otherwise_lose() -> None:
