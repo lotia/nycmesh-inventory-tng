@@ -619,6 +619,30 @@ MSG
 expect --message-only 1 "one body line is over 72" "one is singular"
 
 echo
+echo "a refusal names the page"
+# A developer meets this as a hook, so the documentation has to be found from
+# the failure. Pinned the way do-not-merge.test.sh pins its advice: the string,
+# and that the file it names exists.
+scene
+message <<'MSG'
+aaa: A summary that is going to be far too long for anybody to accept
+
+Closes: inventory-tng-aaa
+MSG
+expect 1 "docs/git-hooks.md says what this hook checks, and how to skip it." \
+  "every refusal ends by naming docs/git-hooks.md"
+[[ -f "$HERE/../docs/git-hooks.md" ]]; status=$?
+exits "$status" 0 "and that page exists"
+message <<'MSG'
+aaa: Short and right
+
+Closes: inventory-tng-aaa
+MSG
+closes_aaa
+out=$("$CHECK" "$WORK/repo/message" 2>&1); status=$?
+refute "$out" "$status" 0 "docs/git-hooks.md" "a pass does not"
+
+echo
 echo "--describe"
 # What docs/git-hooks.md prints for this hook, through scripts/hooks-doc.sh.
 # The numbers have to be the rules' own: a description that typed them would be

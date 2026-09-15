@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # One issue, one commit -- read what is staged and say whether it is that.
 #
-# The rules are in DEVELOPERS.md "Commits", which also says how to run this and
-# how to have it run every time. This only enforces the parts a machine can see.
+# The rules are in DEVELOPERS.md "Commits", which also says how to run this;
+# docs/git-hooks.md says how it comes to run on every commit, and how to skip
+# it. This only enforces the parts a machine can see.
 #
 # Usage: check-commit.sh [--amend] [--message-only] <message-file>
 #        check-commit.sh --describe
@@ -45,6 +46,9 @@ while [[ "${1:-}" == --* ]]; do
   esac
 done
 ISSUES=".beads/issues.jsonl"
+# Named on every refusal, because a developer meets this as a hook and finds
+# the page from the failure rather than the other way round.
+PAGE_HINT="docs/git-hooks.md says what this hook checks, and how to skip it."
 
 # Where git keeps the two files that say a commit is one of its own.
 #
@@ -60,9 +64,6 @@ ISSUES=".beads/issues.jsonl"
 # -- and it answers correctly in a main checkout, in a linked worktree, and
 # under a relocated GIT_DIR. It also fails outside a repository, which is the
 # guard `--show-toplevel` used to provide here.
-MERGE_HEAD_PATH=$(git rev-parse --git-path MERGE_HEAD) || exit 1
-CHERRY_PICK_HEAD_PATH=$(git rev-parse --git-path CHERRY_PICK_HEAD) || exit 1
-
 # readlink -f first: .beads/hooks/commit-msg is a symlink to this file and is
 # how this normally runs, and bash reports the link's own path here rather than
 # the file's, so "beside me" would be the hooks directory.
@@ -80,6 +81,11 @@ if [[ "$DESCRIBE" -eq 1 ]]; then
   exit 0
 fi
 MESSAGE=${1:?usage: check-commit.sh [--amend] [--message-only] <message-file>}
+
+# Below --describe, which needs neither and would otherwise fail outside a
+# checkout -- where a documentation renderer might reasonably be run.
+MERGE_HEAD_PATH=$(git rev-parse --git-path MERGE_HEAD) || exit 1
+CHERRY_PICK_HEAD_PATH=$(git rev-parse --git-path CHERRY_PICK_HEAD) || exit 1
 
 # Comments are dropped by message-rules.sh, so that this script and
 # check-batch.sh see the same message; read here only for the summary line the
@@ -154,6 +160,7 @@ tracker_unreadable() {
   echo "check-commit.sh: python3 could not read $ISSUES, so nothing was checked." >&2
   echo "  It is one of the three programs an agent session needs, and" >&2
   echo "  DEVELOPERS.md 'Prerequisites' says why a shim is not enough." >&2
+  echo "$PAGE_HINT" >&2
   exit 2
 }
 
@@ -324,4 +331,4 @@ if [[ "$MESSAGE_TRAILER_COUNT" -gt 0 && "$MESSAGE_CLOSES_COUNT" -le 1 ]]; then
   fi
 fi
 
-verdict "One issue, one commit. Nothing to object to." landing
+verdict "One issue, one commit. Nothing to object to." landing "$PAGE_HINT"
