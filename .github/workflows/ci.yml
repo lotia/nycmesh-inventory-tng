@@ -769,6 +769,8 @@ jobs:
         run: scripts/do-not-merge.test.sh
       - name: Check the look-again nudge
         run: scripts/look-again.test.sh
+      - name: Check the hooks-page renderer
+        run: scripts/hooks-doc.test.sh
       - name: Check the issue puller
         run: scripts/pull-new-issues.test.sh
       - name: Check the unfiled-bead reader
@@ -976,6 +978,9 @@ jobs:
           fail: true
       - name: Check for duplicated prose
         run: scripts/check-docs.sh
+      # Rendered by scripts/hooks-doc.sh; its header says why.
+      - name: The git hooks page describes the hooks that run
+        run: scripts/hooks-doc.sh --check
       # And the configuration, for the same reason: a value added without a
       # word about it is caught on the push that added it.
       - name: Every configuration value says what it is for

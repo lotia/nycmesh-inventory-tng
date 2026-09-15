@@ -12,6 +12,12 @@ set -uo pipefail
 HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 CHECK="$HERE/check-commit.sh"
 . "$HERE/testlib.sh"
+# For the --describe cases at the end: the limits the description has to carry,
+# read out of a subshell for the reason testlib's `issue_limit` gives --
+# report.sh, which message-rules.sh needs, defines a `verdict` of its own.
+read -r SUMMARY_LIMIT BODY_LIMIT < <(bash -c '
+  . "$1/report.sh"; . "$1/trailers.sh"; . "$1/message-rules.sh"
+  printf "%s %s\n" "$SUMMARY_LIMIT" "$BODY_LIMIT"' _ "$HERE")
 workspace
 
 # A repository holding two issues in progress and one closed long ago, so that
@@ -611,5 +617,16 @@ Only this one body line is far too long to fit inside the limit that is set.
 Closes: inventory-tng-aaa
 MSG
 expect --message-only 1 "one body line is over 72" "one is singular"
+
+echo
+echo "--describe"
+# What docs/git-hooks.md prints for this hook, through scripts/hooks-doc.sh.
+# The numbers have to be the rules' own: a description that typed them would be
+# the page saying a limit this script no longer enforces.
+out=$("$CHECK" --describe 2>&1); status=$?
+assert "$out" "$status" 0 "Refuses a commit" "it says what it refuses, and exits 0 with no message"
+assert "$out" "$status" 0 "over $SUMMARY_LIMIT characters" "naming the summary limit message-rules.sh sets"
+assert "$out" "$status" 0 "over $BODY_LIMIT columns" "and the body limit"
+equals "$(printf '%s' "$out" | wc -l)" 0 "on one line, since it is a table cell"
 
 verdict
