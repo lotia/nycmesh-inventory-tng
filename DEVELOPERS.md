@@ -1209,15 +1209,22 @@ Where each topic lives:
 | Configuration variables | [.env.sample](.env.sample) |
 | Toolchain versions | [mise.toml](mise.toml) |
 
-Three checks in CI keep that arrangement from rotting, and each can be run by
+Four checks in CI keep that arrangement from rotting, and each can be run by
 hand:
 
 ```bash
 scripts/check-docs.sh          # the same passage in two files
 scripts/check-docs.sh --words 8   # stricter, if you are hunting one down
+scripts/check-docs.sh --budget    # this file and CONTRIBUTING.md, within their budgets
 scripts/check-anchors.sh       # a heading named outside Markdown that is not there
 scripts/check-config.sh        # a configuration value nobody explained
 ```
+
+One topic, one place says nothing about how long the place may be, and this
+guide grew to two thousand lines under it. `--budget` is the other half: the
+page a newcomer is sent to first stays one they can finish, and
+[`scripts/check-docs.budget`](scripts/check-docs.budget) is where each number
+is set and argued.
 
 A link checker catches a link whose target you renamed, fragment included, in
 every Markdown file. `check-anchors.sh` asks the same of every `<page>.md#<anchor>`

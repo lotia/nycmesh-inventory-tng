@@ -6,9 +6,15 @@
 # that turns up in two of them.
 #
 # Usage: check-docs.sh [--words N] [<path>...]
+#        check-docs.sh --budget
 #
 # scripts/check-docs.allow holds the repetitions that are meant to be there.
 # Its own header says how an entry is written.
+#
+# --budget asks the other half of the same rule, of two named pages: that the
+# page a reader is sent to first is one they can finish. budget.py is the
+# reader and scripts/check-docs.budget is the table, with a sentence on why
+# each number is what it is.
 
 set -uo pipefail
 
@@ -19,9 +25,14 @@ HERE=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 . "$HERE/report.sh"
 
 WORDS=12
+BUDGET=0
 paths=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --budget)
+      BUDGET=1
+      shift
+      ;;
     --words)
       WORDS=${2:?--words needs a number}
       shift 2
@@ -32,6 +43,14 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "$BUDGET" -eq 1 ]]; then
+  # A different reader over a different table, so the other options have no
+  # meaning here and are refused rather than dropped.
+  [[ "$WORDS" -eq 12 && ${#paths[@]} -eq 0 ]] || refuse "--budget takes no other argument."
+  relay env BUDGET="$REPO_ROOT/scripts/check-docs.budget" python3 "$HERE/budget.py"
+  verdict "Every page with a budget is within it." "a page grows past what it is for"
+fi
 
 if [[ ${#paths[@]} -eq 0 ]]; then
   # Stated as what is *not* read, so a file added or moved is read by default.

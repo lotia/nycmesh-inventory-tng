@@ -1,0 +1,25 @@
+# The pages that have a size budget, and what it is.
+#
+# One line per page: the path, the most lines it may run to, and -- for a page
+# that is meant to be an outline -- the most lines any one section may hold,
+# where a section is an H2 heading and everything under it to the next one,
+# its subsections included. `scripts/check-docs.sh --budget` reads this and
+# the Documentation job runs it, so a section pasted back in is red on the day
+# it is pasted. Each number carries a sentence on why it is that number and
+# not a larger one; raising one is a decision about who the page is for.
+
+# The guide is a path from a clean machine to a running application, and then
+# an outline of where everything else is. 300 lines is what that path takes
+# when every other topic is a link; the guide was 1,981 lines when only the
+# first 520 were the path, and the rest was where a newcomer stopped reading.
+# 40 lines a section is what keeps each step something a reader can see whole
+# on one screen -- a section that needs more is a topic, and a topic has its
+# own page.
+DEVELOPERS.md 300 40
+
+# The contract a contributor signs: the Definition of Done, the documentation
+# rules, and how a change reaches main. A long CONTRIBUTING turns away exactly
+# the people it is for, so 150 is a ceiling rather than a target: a page at
+# it has no room for the next sentence, and the answer when one is needed is
+# to shorten something or link out, never to raise this.
+CONTRIBUTING.md 150
