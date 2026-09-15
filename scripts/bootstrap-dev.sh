@@ -241,7 +241,7 @@ none of them is a step that was forgotten -- each needs a person.
      cd backend && ${via}uv run python src/manage.py createsuperuser
 
    You need one even to look at the volunteer's half today, which
-   DEVELOPERS.md "Signing in" explains and is not how it is meant to end up.
+   docs/local-development.md "Signing in" explains and is not how it is meant to end up.
 
 2. Find an authenticator app before you sign in -- a phone app, or any TOTP
    tool. Your first sign-in stops and makes you enrol one, with no way past

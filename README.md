@@ -136,7 +136,7 @@ The password is all it asks for here, because this stack ships with
 `REQUIRE_SECOND_FACTOR=false` — a deployment defaults to the opposite, and how
 administrators sign in is
 [decision 0013](docs/decisions/0013-administrator-sign-in.md).
-[Signing in](DEVELOPERS.md#signing-in) is how to turn it on locally and when
+[Signing in](docs/local-development.md#signing-in) is how to turn it on locally and when
 you would want to.
 
 **Signing in is not the same as being an administrator**, which is why
