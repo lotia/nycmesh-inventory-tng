@@ -119,7 +119,7 @@ if [[ "$check" == true ]]; then
   fi
   count=$(count_lines "$waiting")
   fail "$count bead(s) have no GitHub issue, and nothing here files them."
-  note "Filing them is a person's job -- see DEVELOPERS.md#issue-tracking:"
+  note "Filing them is a person's job -- see docs/issue-tracking.md:"
   note "  scripts/export-issues.sh --confirm"
   note "This goes green by itself once they are filed, with nothing to close."
   stop exporting

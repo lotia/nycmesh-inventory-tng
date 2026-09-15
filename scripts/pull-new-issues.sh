@@ -209,7 +209,7 @@ fi
 # the signal. inventory-tng-qnxb.
 if [[ "$check" == true ]]; then
   fail "$count issue(s) on GitHub have no bead, and nothing here brings them in."
-  note "Landing them is a person's job -- see DEVELOPERS.md#issue-tracking:"
+  note "Landing them is a person's job -- see docs/issue-tracking.md:"
   note "  scripts/pull-new-issues.sh"
   note "  scripts/untriaged.py .beads/issues.jsonl"
   note "This goes green by itself once those rows are committed, with nothing to close."

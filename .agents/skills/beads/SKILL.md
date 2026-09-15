@@ -7,6 +7,8 @@ description: Use when working in a repository that uses bd or Beads for durable 
 
 Use Beads as the shared project task system. Local plans, scratch files, and personal memories are useful, but they are not the durable source of truth for project work.
 
+What is particular to this repository -- where the tracker keeps its database and the checker that watches it, the GitHub mirror and how an issue filed there reaches the tracker, and that every bead is published -- is [Issue tracking](../../../docs/issue-tracking.md), and is not restated here.
+
 ## First Step
 
 Run:

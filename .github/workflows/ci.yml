@@ -928,7 +928,7 @@ jobs:
       #
       # The membership check needs the beads tracker and simply sits out when
       # there is none, so a contributor working from GitHub issues is held to
-      # the structural rules and nothing else. See DEVELOPERS.md#issue-tracking
+      # the structural rules and nothing else. See docs/issue-tracking.md
       # ALWAYS --unfinished, and the reason is the whole of inventory-tng-ee2c.
       #
       # It was --draft, passed only while the pull request was a GitHub draft,
