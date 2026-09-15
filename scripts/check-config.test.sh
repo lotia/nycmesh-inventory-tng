@@ -141,6 +141,8 @@ printf '# Explained.\n      QUOTED: "true"\n' >>"$WORK/repo/compose.yaml"
 expect 1 "QUOTED is a literal" "a quoted literal is one too"
 
 scene
+printf '# Each declared here, as the rule below asks.\nDEFAULTED=\nDEFAULTED_UNSET=\nREQUIRED=\nREQUIRED_UNSET=\nALTERNATIVE=\nALTERNATIVE_UNSET=\nNESTED=\nOTHER=\nDEEPER=\nBARE=\nDOLLAR=\nTRAILING=\n' \
+  >>"$WORK/repo/.env.sample"
 cat >>"$WORK/repo/compose.yaml" <<'YAML'
       # Every spelling compose gives an interpolation.
       DEFAULTED: ${DEFAULTED:-x}
@@ -160,6 +162,7 @@ expect 0 "says what it is for" "a whole-value interpolation, in any spelling, or
 # YAML forces quotes on a default that holds `: ` or ` #`; compose interpolates
 # inside them all the same, so the quotes are not what makes a literal.
 scene
+printf '# Declared.\nLEVELS=\nSINGLE=\n' >>"$WORK/repo/.env.sample"
 cat >>"$WORK/repo/compose.yaml" <<'YAML'
       # Quoted because of the colon, and reachable all the same.
       LEVELS: "${LEVELS:-django.request: WARNING}"
@@ -187,6 +190,47 @@ scene
 printf '      ORIGIN: http://backend:8000\n' >>"$WORK/repo/compose.yaml"
 printf 'compose.yaml:ORIGIN=literal: wiring.\n' >>"$WORK/repo/scripts/check-config.allow"
 expect 1 "ORIGIN is set with nothing saying what it is for" "nor does an excuse for a literal excuse it from prose"
+
+# The name inside the braces: w5r7 with one letter missing has the right shape
+# and reaches nothing.
+scene
+printf '# Explained.\nHOSTS=\n' >>"$WORK/repo/.env.sample"
+printf '# Explained.\n      HOSTS: ${HOST:-localhost}\n' >>"$WORK/repo/compose.yaml"
+printf 'compose.yaml:HOSTS=literal: not what this is.\ncompose.yaml:HOSTS: nor this.\n' >>"$WORK/repo/scripts/check-config.allow"
+expect 1 'HOSTS reads ${HOST}, which .env.sample never declares' "a name .env.sample never declares is refused, however well shaped, and neither excuse reaches it"
+
+scene
+printf '# Explained, and left unset on purpose.\n#FORMAT=console\n' >>"$WORK/repo/.env.sample"
+printf '# Explained.\n      FORMAT: ${FORMAT:-json}\n' >>"$WORK/repo/compose.yaml"
+expect 0 "says what it is for" "a declaration commented out is still a declaration"
+
+scene
+printf 'EXPLAINED=1\n\n#FORMAT=console\n' >>"$WORK/repo/.env.sample"
+expect 1 "FORMAT is set with nothing saying what it is for" "and is held to the comment rule like a live one"
+
+scene
+printf '# Explained.\nOUTER=\n' >>"$WORK/repo/.env.sample"
+printf '# Explained.\n      OUTER: ${OUTER:-${INNER:-x}}\n' >>"$WORK/repo/compose.yaml"
+expect 1 'reads ${INNER}' "every name in a nested default is held to it"
+
+
+scene
+printf '# Explained.\nEXTRA=\n' >>"$WORK/repo/.env.sample"
+printf '# Explained.\n      EXTRA: backend,${EXTRAA:-}\n' >>"$WORK/repo/compose.yaml"
+printf 'compose.yaml:EXTRA=literal: a prefix, with the interpolation after it.\n' >>"$WORK/repo/scripts/check-config.allow"
+expect 1 'EXTRA reads ${EXTRAA}' "a literal excused for its prefix is still held to the name after it"
+
+# What is not a name: compose spells a literal dollar `$$`, and a trailing
+# comment is prose.
+scene
+printf '# Explained.\nSECRET=\nHOSTS=\n' >>"$WORK/repo/.env.sample"
+cat >>"$WORK/repo/compose.yaml" <<'YAML'
+      # A literal dollar in the default.
+      SECRET: ${SECRET:-pa$$word}
+      # A dollar in the comment.
+      HOSTS: ${HOSTS:-localhost} # was $OLD_HOSTS
+YAML
+expect 0 "says what it is for" "an escaped dollar and one in a trailing comment read nothing"
 
 # --------------------------------------------------------------------------
 # The ways this could stop guarding without saying so
