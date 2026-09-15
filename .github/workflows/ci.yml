@@ -985,6 +985,11 @@ jobs:
       # checker never reads. check-anchors.py says how a heading is read.
       - name: Check anchors referenced outside Markdown
         run: scripts/check-anchors.sh
+      # The other half of one-topic-one-place, which says nothing about how
+      # long the one place may be. scripts/check-docs.budget has the numbers
+      # and why.
+      - name: The guide and CONTRIBUTING.md are within their budgets
+        run: scripts/check-docs.sh --budget
       # Rendered by scripts/hooks-doc.sh; its header says why.
       - name: The git hooks page describes the hooks that run
         run: scripts/hooks-doc.sh --check

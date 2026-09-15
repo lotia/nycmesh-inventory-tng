@@ -413,6 +413,73 @@ mkdir -p .beads
 printf '# %s\n' "$PASSAGE" > .beads/README.md
 expect 0 "No prose repeated" "and neither is the tracker's own directory"
 
+# --- --budget: a page with a size, held to it -------------------------------
+#
+# Every scene writes its own table, so nothing here is about this repository's
+# numbers; scripts/check-docs.budget is where those are set and argued.
+
+# A page of N lines: a title, and then N-1 lines of filler.
+page() {
+  local n=$1 title=$2
+  printf '# %s\n' "$title"
+  for ((i = 1; i < n; i++)); do printf 'line %s\n' "$i"; done
+}
+
+scene
+page 20 Guide > GUIDE.md
+printf 'GUIDE.md 30\n' > scripts/check-docs.budget
+expect --budget 0 "Every page with a budget is within it" "a page within its budget passes"
+
+scene
+page 40 Guide > GUIDE.md
+printf 'GUIDE.md 30\n' > scripts/check-docs.budget
+expect --budget 1 "GUIDE.md runs to 40 lines; its budget is 30" "a page past its budget is reported with both numbers"
+
+scene
+{ page 5 Guide; printf '## Short\n\ntext\n\n## Long\n'; page 30 x | tail -n +2; } > GUIDE.md
+printf 'GUIDE.md 300 20\n' > scripts/check-docs.budget
+expect --budget 1 '"Long" runs to 30 lines; a section there may hold 20' "a section past the section budget is named"
+
+scene
+{ page 5 Guide; printf '## Short\n\ntext\n\n## Long\n'; page 30 x | tail -n +2; } > GUIDE.md
+printf 'GUIDE.md 300\n' > scripts/check-docs.budget
+expect --budget 0 "Every page" "a page with no section budget has its sections left alone"
+
+scene
+{ page 5 Guide; printf '## Long\n\n### Part one\n'; page 12 x | tail -n +2; printf '### Part two\n'; page 12 x | tail -n +2; } > GUIDE.md
+printf 'GUIDE.md 300 20\n' > scripts/check-docs.budget
+expect --budget 1 '"Long" runs to' "subsections count toward the section they are under"
+
+scene
+{ page 5 Guide; printf '## Long\n\n```bash\n## not a heading\n```\n'; page 30 x | tail -n +2; } > GUIDE.md
+printf 'GUIDE.md 300 20\n' > scripts/check-docs.budget
+expect --budget 1 '"Long" runs to 34 lines' "a heading inside a fenced block does not start a section"
+
+scene
+{ page 30 Guide; printf '## After\n\ntext\n'; } > GUIDE.md
+printf 'GUIDE.md 300 20\n' > scripts/check-docs.budget
+expect --budget 1 '"before the first section" runs to 30 lines' "what comes before the first section is measured too"
+
+scene
+printf 'GUIDE.md 300\n' > scripts/check-docs.budget
+expect --budget 1 "GUIDE.md has a budget and is not there" "a page in the table that does not exist is reported"
+
+scene
+page 40 Guide > GUIDE.md
+printf 'GUIDE.md many\nGUIDE.md 30\n' > scripts/check-docs.budget
+expect --budget 1 "not in the documented form" "a row that is not a path and numbers is refused, not stepped over"
+expect --budget 1 "GUIDE.md runs to 40 lines" "and the rows after it are still read"
+
+scene
+page 5 Guide > GUIDE.md
+printf 'GUIDE.md 30\n' > scripts/check-docs.budget
+expect --budget --words 8 -- 2 "takes no other argument" "--budget with another option is refused rather than the option dropped"
+
+scene
+page 40 Guide > GUIDE.md
+printf 'GUIDE.md 30\n' > scripts/check-docs.budget
+expect 0 "No prose repeated" "the ordinary run does not ask about budgets"
+
 # --- the corpus is the checkout, not the index ----------------------------
 #
 # inventory-tng-hoc6. Every case above stages before it looks, which is what the
