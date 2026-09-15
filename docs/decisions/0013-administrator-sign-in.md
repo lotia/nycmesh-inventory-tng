@@ -90,7 +90,7 @@ offering several providers, and grant authority separately.**
   third party, so the browser suite authenticates through point 1's local
   password and its second factor; provider paths get allauth's own test
   helpers. See
-  [Integration tests](../../DEVELOPERS.md#integration-tests).
+  [Integration tests](../testing.md#integration-tests).
 
 - **Volunteer flows need no authentication in tests at all**, under
   [decision 0012](0012-two-populations.md). The browser suite signs in today

@@ -5,7 +5,7 @@ import { seeded, signIn } from "./sign-in";
  * Can a browser actually use this API?
  *
  * Nothing else in the project can answer that; the reasoning, and the setup
- * these tests need, are in DEVELOPERS.md "Integration tests".
+ * these tests need, are in docs/testing.md "Integration tests".
  *
  * The session these tests need comes from the application's own sign-in now
  * that it has one -- see sign-in.ts and

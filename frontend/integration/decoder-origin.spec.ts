@@ -28,7 +28,7 @@ import { FAKE_CAMERA } from "./camera";
  * `https://fastly.jsdelivr.net/npm/zxing-wasm@.../zxing_reader.wasm` in the
  * list, which is `zxing-wasm`'s own default and the regression that matters.
  * What it cannot catch is narrower and worth writing down: this suite runs the
- * Vite dev server (see DEVELOPERS.md "Integration tests"), which serves the
+ * Vite dev server (see docs/testing.md "Integration tests"), which serves the
  * ponyfill chunk from this origin, so an override replaced by an empty object
  * -- no `locateFile` at all -- leaves Emscripten resolving against that chunk's
  * own URL and still lands here. In the built image that path resolves to an

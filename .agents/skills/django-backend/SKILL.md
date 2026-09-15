@@ -9,7 +9,7 @@ Commands (runserver, pytest, ruff, ty, migrations, `uv add`) are documented in
 [Common tasks](../../../docs/working-in-the-code.md#backend), style rules in
 [Code style](../../../docs/code-style.md#code-style), annotation requirements in
 [Typing](../../../docs/code-style.md#typing), and test and coverage requirements in
-[Testing and coverage](../../../DEVELOPERS.md#testing-and-coverage). The overall design is in
+[Testing and coverage](../../../docs/testing.md#testing-and-coverage). The overall design is in
 [docs/architecture.md](../../../docs/architecture.md). This file covers only
 conventions you cannot infer from those.
 

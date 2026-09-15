@@ -9,7 +9,7 @@ Commands (dev server, build, lint, test) are in
 [Common tasks](../../../docs/working-in-the-code.md#frontend), style rules in
 [Code style](../../../docs/code-style.md#code-style), and test and coverage
 requirements in
-[Testing and coverage](../../../DEVELOPERS.md#testing-and-coverage). Stack rationale is in
+[Testing and coverage](../../../docs/testing.md#testing-and-coverage). Stack rationale is in
 [docs/decisions/0002-frontend-stack.md](../../../docs/decisions/0002-frontend-stack.md).
 Below is only what those do not already say.
 
@@ -41,13 +41,13 @@ needing more than that is a decision worth recording in
 ## Tests
 
 Framework, file location, and the coverage threshold `npm test` enforces are in
-[Testing and coverage](../../../DEVELOPERS.md#testing-and-coverage); the
+[Testing and coverage](../../../docs/testing.md#testing-and-coverage); the
 frontend thresholds and exclusions themselves live in
 `frontend/vite.config.ts`. Two things that are not written down there:
 
 `npm test` does not run everything. The scanner is additionally covered by a
 Playwright suite in `frontend/integration/`, under its own command — see
-[Integration tests](../../../DEVELOPERS.md#integration-tests). It is the only
+[Integration tests](../../../docs/testing.md#integration-tests). It is the only
 thing that can see a camera which decodes nothing, and it has already caught
 one.
 

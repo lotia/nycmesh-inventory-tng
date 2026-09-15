@@ -27,7 +27,7 @@ Three things together:
    describes code that implements behaviour.
 
 The exclusions and their justifications are documented in
-[DEVELOPERS.md](../../DEVELOPERS.md#testing-and-coverage), which is the single
+[Testing and coverage](../testing.md#testing-and-coverage), which is the single
 place they are explained.
 
 ## Consequences

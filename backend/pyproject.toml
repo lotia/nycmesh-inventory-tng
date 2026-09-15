@@ -118,7 +118,7 @@ ignore = [
 
 # --------------------------------------------------------------------------
 # Tests. Coverage is always on, so a local run and a CI run enforce the same
-# rules. See DEVELOPERS.md "Testing and coverage".
+# rules. See docs/testing.md "Testing and coverage".
 # --------------------------------------------------------------------------
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "inventory_tng.settings"

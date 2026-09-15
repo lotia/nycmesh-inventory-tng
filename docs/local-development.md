@@ -190,7 +190,7 @@ to do while developing, and with the requirement on it takes the account and
 its authenticator with it. Rather than enrolling again each time, use the login
 the integration suite's seed makes — the command is in
 [Common tasks](working-in-the-code.md#common-tasks), and what its acknowledgement flag is for is
-[Integration tests](../DEVELOPERS.md#integration-tests).
+[Integration tests](testing.md#integration-tests).
 
 The part worth knowing here is that **its TOTP secret is fixed rather than
 generated**. Scan it into a phone once and the same codes keep working after

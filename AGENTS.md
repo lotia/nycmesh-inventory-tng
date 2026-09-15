@@ -70,7 +70,7 @@ code to satisfy them rather than discovering them in CI:
 
 - **Every change that adds code adds tests.** Coverage thresholds are part of
   the ordinary test command — see
-  [Testing and coverage](DEVELOPERS.md#testing-and-coverage). Do not add a
+  [Testing and coverage](docs/testing.md#testing-and-coverage). Do not add a
   coverage exclusion to make a build pass; excluding a file is a decision that
   needs justifying.
 - **Style is enforced, not advisory.** See
