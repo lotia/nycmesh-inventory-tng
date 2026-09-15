@@ -3,17 +3,16 @@
 What runs when you commit, check out, pull or push in this repository; what
 each of it can refuse; and how to get past it when you need to.
 
-The short version: **one hook refuses anything**, `commit-msg`, and the rule it
-enforces is checked again on every pull request by CI. Everything else is
-beads' own plumbing and refuses nothing of its own.
+The short version: in a shell, only `commit-msg` refuses anything, and the
+rules it applies to the message are checked again on every pull request by CI.
+The rest of the git hooks are beads' own plumbing. An agent session meets two
+more, which are not git hooks and are [at the end](#the-claude-code-hooks).
 
 ## What runs
 
-The table below is not typed. `scripts/hooks-doc.sh` renders it from the hooks
-directory and from each checker's own account of itself, and CI fails when the
-page differs from that render — so a hook added, renamed or changed reddens the
-build until somebody runs the script again. It cannot describe hooks that are
-no longer there, or numbers a checker no longer enforces.
+The table below is not typed: `scripts/hooks-doc.sh` writes it, from the hooks
+directory and from what each checker says about itself, and CI checks the page
+against a fresh render. The script's header says why.
 
 <!-- hooks-doc: begin -->
 <!-- Rendered by scripts/hooks-doc.sh from .beads/hooks. Do not edit between the markers; run the script. -->
@@ -27,20 +26,24 @@ no longer there, or numbers a checker no longer enforces.
 | `post-merge` | beads shim v1.0.5: `bd hooks run post-merge` | Never refuses on its own: hands off to beads, which runs any hooks it was told to chain after a pull or merge, and passes the exit status of `bd` through. |
 <!-- hooks-doc: end -->
 
-`.beads/hooks` is where they live, and `core.hooksPath` is what points git at
-it. That directory is beads' own and holds its five shims; a second directory
-is not an option, because `core.hooksPath` is one path and beads' git
-integration goes quiet the moment it names anywhere else. So one pointer arms
-all six: the commit checker this repository wrote, and beads' five.
+`commit-msg` is the one to know. How it reads the staged tracker, how it
+recognises an amend and what it cannot tell from one message, and the way to
+reword a summary it refuses, are
+[Checking it](../DEVELOPERS.md#checking-it); the rules it applies are
+[Commits](../DEVELOPERS.md#commits).
 
-Beads' five stay armed, and that is a decision rather than an accident
+`.beads/hooks` is where they live, and `core.hooksPath` is what points git at
+it. That directory is beads' own and holds its shims; a second directory is not
+an option, because `core.hooksPath` is one path and beads' git integration goes
+quiet the moment it names anywhere else. So one pointer arms all of them: the
+commit checker this repository wrote, and beads' own.
+
+Beads' shims stay armed, and that is a decision rather than an accident
 (`inventory-tng-hn6w`): beads is a core part of how this project is worked,
-and its hooks are not something to undo. What they cost is measured there —
-about a tenth of a second on a commit, a twentieth on a checkout or a pull —
-and judged worth it. What is bounded is how long one may *hang*:
-`mise.toml` sets `BEADS_HOOK_TIMEOUT` to five seconds for every shell in this
-directory, so a wedged `bd` makes a slow commit that says so, not a five-minute
-one that does not.
+and its hooks are not something to undo. What they cost is measured there and
+judged worth it. What is bounded is how long one may *hang*: `mise.toml` sets
+`BEADS_HOOK_TIMEOUT` for any shell that has activated mise here, and its
+comment says why that value.
 
 Anything you keep in git's default `.git/hooks` stops running once that pointer
 is set — `pre-commit`, husky, a hook of your own — so move what you want kept
@@ -49,18 +52,11 @@ them off quietly.
 
 ## How they get there
 
-`.beads/hooks/commit-msg` is a symlink committed to the repository, so every
-clone has it and it follows `scripts/check-commit.sh` wherever that goes.
-`core.hooksPath` is written into `.git/config` by
-[bootstrap](../DEVELOPERS.md#clone-and-bootstrap), and no clone copies that
-file — which is why bootstrap is a step and not a default.
-
-Two ways a hook can be absent, both of which say so rather than passing
-silently. A clone that never ran bootstrap has the hook and no
-`core.hooksPath`, and `scripts/check-setup.sh` tells you which of the two is
-missing. A checkout that lost the link fails CI, where the same script runs as
-`--shipped-only` — its header says why the halves are split and which one a
-runner can be asked.
+The hook is committed and the pointer is not:
+[bootstrap](../DEVELOPERS.md#clone-and-bootstrap) writes `core.hooksPath`, and
+`scripts/check-setup.sh` reports a clone where either half is missing — its
+header is where the two halves are explained, and why CI can only ask about
+one of them.
 
 A hook inherits whatever `PATH` invoked it rather than an activated shell's, and
 the commit checker reads the tracker through `python3`. So a perfectly wired
@@ -69,12 +65,20 @@ the program rather than blaming the commit.
 
 ## Skipping them
 
-You can. The rules `commit-msg` enforces are enforced again on every pull
-request — CI's `One issue per commit` job runs `scripts/check-batch.sh` over
-the whole range — so a hook skipped locally moves a refusal to the pull
-request; it never gets past it. The local hook is there to tell you sooner,
-not to be the gate. Skip it when it is in your way, and expect the same
-answer from CI if the message was wrong.
+You can. The rules `commit-msg` applies to the message are enforced again on
+every pull request — CI's `One issue per commit` job runs
+`scripts/check-batch.sh` over the whole range — so a hook skipped locally
+moves that refusal to the pull request; it never gets past it. The local hook
+is there to tell you sooner, not to be the gate. Skip it when it is in your
+way, and expect the same answer from CI if the message was wrong.
+
+The other half of what it checks is the hook's alone: that the staged tracker
+closes the issue the message names, and no other. That reads a staged diff,
+which a commit that has already landed no longer has, so CI does not repeat
+it; what CI reads instead is whether every issue the branch closes belongs to
+the batch. So a commit that stages `.beads/issues.jsonl` is the one kind to
+skip the hook on with some care — a closure the message does not name is what
+it would have caught, and nothing later reads the two side by side.
 
 git's own switches are the ones to use; there is nothing of this repository's
 to learn:
@@ -95,9 +99,37 @@ says so and says why: never `--no-verify`. An agent that learns the switch will
 reach for it in place of the fix. A person reading a refusal is trusted to know
 which is which.
 
-## What the Claude Code hooks are not
+## The Claude Code hooks
 
-`scripts/landing-gate.sh` is registered in `.claude/settings.json` as a Claude
-Code hook, not a git one. It runs when an agent session is about to type a
-guarded command, and never when a person does. If you are in a shell, the table
-above is the whole of what runs.
+These are not git hooks. `.claude/settings.json` registers them with Claude
+Code, and they run inside an agent session: once before every shell command the
+agent is about to type, and once when it tries to end its turn. A person in a
+shell never meets them, and if you are one, the table above is the whole of
+what runs for you.
+
+They exist to hold an agent to the same bar as a person without asking anybody:
+the argument, and what the gate does and does not claim to cover, is
+[When a branch is ready to merge](../DEVELOPERS.md#when-a-branch-is-ready-to-merge).
+What follows is rendered the same way as the table above, from the settings
+file and from the script's own account of itself.
+
+<!-- claude-hooks: begin -->
+<!-- Rendered by scripts/hooks-doc.sh from .claude/settings.json and the scripts it names. Do not edit between the markers; run the script. -->
+| Event | Only for | Command | Timeout |
+| --- | --- | --- | --- |
+| `PreToolUse` | Bash | `"$CLAUDE_PROJECT_DIR"/scripts/landing-gate.sh check` | 30s |
+| `Stop` | every one | `"$CLAUDE_PROJECT_DIR"/scripts/landing-gate.sh stop` | 30s |
+
+What [`scripts/landing-gate.sh`](../scripts/landing-gate.sh) refuses, in its own words:
+
+| On | What it refuses, or asks |
+| --- | --- |
+| ending a turn | Blocks the turn once, when the current branch's pull request is ready and green and its review cycle has not been recorded against this head -- a batch that looks finished and is not. |
+| bd dolt push, bd sync, bd federation sync | Refused: it publishes the issue tracker, and this repository is public (decision 0029). A person reads what is about to become public and runs it. |
+| scripts/repo-settings.sh without --check; gh api writing branch protection or repository settings | Refused: it writes the protections every other refusal here relies on. --check compares and is free; writing is a person's to authorise. |
+| git push --force, -f | Refused: use --force-with-lease, which refuses if the remote moved since you fetched. Breaking a lease is a person's call. |
+| git push to main | Refused before GitHub gets to, so the refusal names the batch/* workflow rather than a protection rule. |
+| gh pr ready | Refused while any check other than Review cycle and Repository settings is not green, and refused differently for a pull request whose body posts the do-not-merge marker. |
+| gh pr merge --repo pointing at another repository | Refused: the receipts are keyed by pull request number within this repository, so a cycle recorded for #7 here cannot vouch for #7 anywhere else. Run it from a checkout of that repository. |
+| gh pr merge, and the API spellings of it | Refused unless the pull request does not post the do-not-merge marker, its review cycle is recorded against the exact head being merged, that head is what is checked out, and check-batch.sh is clean over the range. |
+<!-- claude-hooks: end -->

@@ -730,6 +730,37 @@ case "${1:-check}" in
     stop_mode
     exit 0
     ;;
+  --describe)
+    # One row per thing this gate can refuse, tab-separated: the action name
+    # the check arm dispatches on, what a person would have typed, and what is
+    # refused or asked. scripts/hooks-doc.sh renders these into
+    # docs/git-hooks.md, and landing-gate.test.sh holds this list to the case
+    # arms below -- an arm added without a row here fails that suite, so the
+    # page cannot be silent about a refusal that exists.
+    #
+    # The one-line summaries here are the whole of what the page carries; the
+    # refusals themselves say more, and DEVELOPERS.md "When a branch is ready
+    # to merge" is the argument.
+    # The two names the ready arm reads past are review_cycle.py's, read from
+    # it here for the reason check-commit.sh --describe reads its limits from
+    # message-rules.sh: a name typed here would outlive a rename there.
+    IFS=$'\t' read -r review_check settings_check < <(HERE="$SCRIPTS" python3 -c '
+import os, sys
+sys.path.insert(0, os.environ["HERE"])
+import review_cycle
+print(review_cycle.CHECK, review_cycle.SETTINGS_CHECK, sep="\t")
+') || { echo "landing-gate: python3 could not read review_cycle.py, so this cannot describe itself." >&2; exit 2; }
+    printf '%s\t%s\t%s\n' \
+      stop "ending a turn" "Blocks the turn once, when the current branch's pull request is ready and green and its review cycle has not been recorded against this head -- a batch that looks finished and is not." \
+      dolt-push "bd dolt push, bd sync, bd federation sync" "Refused: it publishes the issue tracker, and this repository is public (decision 0029). A person reads what is about to become public and runs it." \
+      repo-settings "scripts/repo-settings.sh without --check; gh api writing branch protection or repository settings" "Refused: it writes the protections every other refusal here relies on. --check compares and is free; writing is a person's to authorise." \
+      push-force "git push --force, -f" "Refused: use --force-with-lease, which refuses if the remote moved since you fetched. Breaking a lease is a person's call." \
+      push "git push to main" "Refused before GitHub gets to, so the refusal names the batch/* workflow rather than a protection rule." \
+      ready "gh pr ready" "Refused while any check other than $review_check and $settings_check is not green, and refused differently for a pull request whose body posts the do-not-merge marker." \
+      merge-elsewhere "gh pr merge --repo pointing at another repository" "Refused: the receipts are keyed by pull request number within this repository, so a cycle recorded for #7 here cannot vouch for #7 anywhere else. Run it from a checkout of that repository." \
+      merge "gh pr merge, and the API spellings of it" "Refused unless the pull request does not post the do-not-merge marker, its review cycle is recorded against the exact head being merged, that head is what is checked out, and check-batch.sh is clean over the range."
+    exit 0
+    ;;
   record)
     pr=${2:?usage: landing-gate.sh record <pr-number>}
     record_receipt "$pr"
