@@ -14,7 +14,7 @@ setting.
 
 Reading a log stream in a terminal is documented where it is done rather than
 repeated here — while developing in
-[DEVELOPERS.md](../DEVELOPERS.md#reading-the-logs-while-you-work), and from a
+[working-in-the-code.md](working-in-the-code.md#reading-the-logs-while-you-work), and from a
 cluster in [deployment.md](deployment.md#reading-the-logs), which is also where
 a deployment's own settings are listed. Why the arrangement is what it is, in
 every case, is [decision 0021](decisions/0021-telemetry-over-otlp.md).

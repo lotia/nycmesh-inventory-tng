@@ -48,7 +48,7 @@ the images has to preserve them. Each is explained once, where it belongs:
 
 `helm lint` and `helm template` both run without a cluster, so run them on every
 chart change — the commands are in
-[DEVELOPERS.md](../../../DEVELOPERS.md#deployment-chart). They are not the whole
+[Common tasks](../../../docs/working-in-the-code.md#deployment-chart). They are not the whole
 test: a chart change also runs `cd backend && uv run pytest`, because
 `backend/src/inventory/tests/test_chart.py` holds what the chart renders against
 the application it configures. What that catches and `helm lint` cannot is

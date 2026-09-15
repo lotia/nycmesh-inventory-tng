@@ -4,7 +4,7 @@
  * Hand-written rather than generated, and deliberately partial: this file
  * describes what the app reads, not everything `backend/openapi.yaml`
  * documents. That document is the contract these must agree with -- see
- * DEVELOPERS.md "The API schema" -- and the integration suite is what catches
+ * docs/working-in-the-code.md "The API schema" -- and the integration suite is what catches
  * a disagreement, because a type cannot.
  *
  * Decimals arrive as strings. DRF renders them that way on purpose: a decimal

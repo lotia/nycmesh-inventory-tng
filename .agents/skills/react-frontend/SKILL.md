@@ -6,7 +6,7 @@ description: Use when working in frontend/ on the inventory-tng React single-pag
 # Frontend conventions
 
 Commands (dev server, build, lint, test) are in
-[DEVELOPERS.md](../../../DEVELOPERS.md#frontend), style rules in
+[Common tasks](../../../docs/working-in-the-code.md#frontend), style rules in
 [Code style](../../../DEVELOPERS.md#code-style), and test and coverage
 requirements in
 [Testing and coverage](../../../DEVELOPERS.md#testing-and-coverage). Stack rationale is in
