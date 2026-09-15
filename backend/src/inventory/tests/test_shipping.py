@@ -11,6 +11,7 @@ request's log lines findable from its trace, and it is the only part of this
 that is not obvious from reading the JSON.
 """
 
+import errno
 import io
 import json
 import os
@@ -38,6 +39,10 @@ A_RECORD = {
 
 
 A_RESOURCE = {"service.name": "inventory-tng-backend"}
+
+# The largest payload any test here puts through a pipe: the burst test's
+# sixty lines. The capacity test measures this rather than a copy of it.
+SIXTY_LINES = "".join(f"{json.dumps(A_RECORD)}\n" for _ in range(60)).encode()
 
 
 def a_line(record: dict[str, Any]) -> str:
@@ -74,6 +79,15 @@ def a_line(record: dict[str, Any]) -> str:
 # over ALL of a user's pipes -- so a greedy request is refused on exactly the
 # loaded machine this is for. 256 KiB was tried and refused there; twice the
 # payload is granted.
+#
+# AND SOMETIMES EVEN THAT IS REFUSED. F_SETPIPE_SZ answers EPERM to an
+# unprivileged user already over the soft page limit, and the thirty-odd pipes
+# this module opens, several grown, are enough to put a busy machine there by
+# the time this one asks. inventory-tng-mcjf. The refusal is safe --
+# `filled_with` falls back to the writer thread, weaker and not hung -- and
+# the one test that asks whether the strong path was available skips rather
+# than fails, because a red assertion there says something true about the
+# machine's load at that instant and nothing about the code.
 PAGE = 4096
 
 
@@ -96,14 +110,29 @@ def pipe_capacity(descriptor: int) -> int | None:
     return int(fcntl.fcntl(descriptor, GET_PIPE_SIZE))
 
 
+def grown(writing_end: int, data: bytes) -> OSError | None:
+    """Ask the kernel for a pipe that holds `data`; the refusal, if it gave one.
+
+    EPERM is its answer to a user over `fs.pipe-user-pages-soft` -- the
+    comment above `PAGE` says why that is ordinary here. None where the
+    question cannot be asked at all, which is any platform but Linux.
+    """
+    try:
+        import fcntl
+    except ImportError:
+        return None
+    try:
+        fcntl.fcntl(writing_end, SET_PIPE_SIZE, room_for(data))
+    except OSError as refused:
+        return refused
+    return None
+
+
 def filled_with(data: bytes) -> int:
     """The reading end of a pipe holding all of `data`, with the writer closed.
 
-    The capacity is asked for rather than assumed. Growing is allowed up to
-    `fs.pipe-max-size` -- a megabyte by default -- and, unlike the size a new
-    pipe is given, it is not reduced when a user is over the soft page limit.
-    So this holds on the busy machine that found the bug as well as the quiet
-    one that did not.
+    The capacity is asked for rather than assumed, so this holds on the busy
+    machine that found the bug as well as the quiet one that did not.
 
     A kernel that refuses is not worth failing over here: the write below
     would then block exactly as it used to, which is the deadlock. Rather than
@@ -112,12 +141,7 @@ def filled_with(data: bytes) -> int:
     weaker test beats a suite that stops.
     """
     reading_end, writing_end = os.pipe()
-    try:
-        import fcntl
-
-        fcntl.fcntl(writing_end, SET_PIPE_SIZE, room_for(data))
-    except (ImportError, OSError):  # Linux, and there it grows
-        pass
+    grown(writing_end, data)
 
     held = pipe_capacity(writing_end)
     if held is not None and held < len(data):
@@ -278,9 +302,7 @@ def test_a_burst_arriving_in_one_write_is_one_post_rather_than_sixty() -> None:
     undecoded remainder itself, so the question is asked only when the stream
     has genuinely gone quiet.
     """
-    burst = "".join(f"{json.dumps(A_RECORD)}\n" for _ in range(60)).encode()
-
-    with os.fdopen(filled_and_then_quiet(burst), "rb") as stream:
+    with os.fdopen(filled_and_then_quiet(SIXTY_LINES), "rb") as stream:
         lines = list(shipping.reading(stream, shipping.waiting))
 
     assert [len(batch) for batch in shipped(lines)] == [60]
@@ -298,20 +320,91 @@ def test_the_pipe_holds_everything_these_tests_put_through_it() -> None:
     thing it is for.
 
     So the capacity is held against the real payload rather than a remembered
-    number, and this is what goes red if `ROOM` is lowered, if the grow stops
-    working, or if the records here get longer.
+    number, and this is what goes red if `room_for` is lowered or if the
+    records here get longer.
+
+    It SKIPS, and does not fail, on EPERM: that is the machine's pipe-page
+    load and not the code, as the comment above `PAGE` says. Any other
+    refusal is `room_for` asking wrongly, and stays red.
     """
-    largest = "".join(f"{json.dumps(A_RECORD)}\n" for _ in range(60)).encode()
-    reading_end = filled_with(largest)
+    reading_end, writing_end = os.pipe()
     try:
-        held = pipe_capacity(reading_end)
+        refused = grown(writing_end, SIXTY_LINES)
+        held = pipe_capacity(writing_end)
     finally:
+        os.close(writing_end)
         os.close(reading_end)
 
-    assert held is None or held >= len(largest), (
-        f"the pipe holds {held} bytes and the largest payload here is {len(largest)}, so filling it "
-        "before reading blocks and the suite hangs rather than fails -- inventory-tng-nre8 exactly"
+    if refused is not None and refused.errno == errno.EPERM:
+        raise pytest.skip.Exception(
+            f"F_SETPIPE_SZ refused {room_for(SIXTY_LINES)} bytes with EPERM: over fs.pipe-user-pages-soft, "
+            "which is this machine's load and not the code -- inventory-tng-mcjf"
+        )
+    assert refused is None, (
+        f"F_SETPIPE_SZ refused {room_for(SIXTY_LINES)} bytes ({refused}), and that is not the soft page "
+        "limit: room_for is asking for something the kernel cannot grant"
     )
+    assert held is None or held >= len(SIXTY_LINES), (
+        f"a pipe grown for {len(SIXTY_LINES)} bytes holds {held}: room_for asks for too little"
+    )
+
+
+def refusing(error: OSError, seeing: int | None = None) -> Any:
+    """A stand-in for `fcntl.fcntl` whose grow fails with `error`.
+
+    `seeing`, when given, is what it reports the pipe to hold -- the two
+    pages the kernel hands out over the limit, so that `filled_with` takes
+    its fallback for a payload that would otherwise fit the real pipe.
+    """
+    import fcntl
+
+    real = fcntl.fcntl
+
+    def shim(descriptor: int, request: int, argument: Any = 0) -> Any:
+        if request == SET_PIPE_SIZE:
+            raise error
+        if request == GET_PIPE_SIZE and seeing is not None:
+            return seeing
+        return real(descriptor, request, argument)
+
+    return shim
+
+
+def test_a_refused_grow_is_a_skip_and_not_a_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The busy-machine case, made to happen rather than waited for.
+
+    EPERM from F_SETPIPE_SZ is what the kernel says to a user over the soft
+    page limit, and nothing in this repository can make it say so on demand.
+    So the refusal is arranged here, and what the test above does with it is
+    held: it stops with a skip that names the limit, and `filled_with`, on its
+    writer-thread fallback, still hands back a pipe with everything in it.
+    """
+    import fcntl
+
+    monkeypatch.setattr(
+        fcntl, "fcntl", refusing(PermissionError(errno.EPERM, "Operation not permitted"), seeing=2 * PAGE)
+    )
+
+    with pytest.raises(pytest.skip.Exception, match=r"fs\.pipe-user-pages-soft"):
+        test_the_pipe_holds_everything_these_tests_put_through_it()
+
+    with os.fdopen(filled_with(SIXTY_LINES), "rb") as stream:
+        assert list(shipping.reading(stream)) == [json.dumps(A_RECORD)] * 60
+
+
+def test_a_refusal_that_is_not_the_soft_limit_is_the_code_and_stays_red(monkeypatch: pytest.MonkeyPatch) -> None:
+    """EINVAL is what the kernel says to a size it cannot make sense of.
+
+    That is `room_for` asking wrongly and nothing to do with the machine, so
+    the skip above must not swallow it: the capacity test is the one thing
+    that goes red when `room_for` breaks, and a skip there is silence.
+    """
+    import fcntl
+
+    monkeypatch.setattr(fcntl, "fcntl", refusing(OSError(errno.EINVAL, "Invalid argument")))
+
+    with pytest.raises(AssertionError, match=r"not the soft page limit"):
+        test_the_pipe_holds_everything_these_tests_put_through_it()
 
 
 def test_a_line_still_arriving_when_the_stream_ends_is_not_lost() -> None:
