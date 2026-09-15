@@ -15,7 +15,7 @@ this made would already be written into every ledger row imported against it,
 and nothing can take that back. So the row count this produces is the top of the
 range and an administrator can only walk it down. Both ends, and why the rule
 errs generously, are
-[§6 of the brief](../../../../docs/briefs/sheet-classifiers.md#6-person-to-volunteer).
+[§6 of the brief](../../../../../docs/briefs/sheet-classifiers.md#6-person-to-volunteer).
 
 ## A doubt is a field, not a log line
 
@@ -66,7 +66,7 @@ is no volunteer to mint for them and none to attribute them to. Nothing is
 minted, and the ledger import (`inventory-tng-24q.4`) does not post them.
 
 A stand-in row to hang them on is what
-[data-model.md](../../../../docs/data-model.md#migrating-the-existing-sheet)
+[data-model.md](../../../../../docs/data-model.md#migrating-the-existing-sheet)
 once proposed, and the `stock_transaction_actor_selectable` trigger refuses
 it -- that record now says why. The short of it: making one would put a way to
 move stock anonymously into the pick-list, to record seven rows nobody can

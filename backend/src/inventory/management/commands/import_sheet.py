@@ -4,7 +4,7 @@ The one command a contributor runs. It reads an exported workbook, stages it,
 mints the catalogue and the volunteers those rows name, posts the ledger they
 describe, and prints each step's own section -- so a run is reviewed from what
 it printed rather than by querying afterwards. What the whole thing is for is
-[data-model.md](../../../../docs/data-model.md#migrating-the-existing-sheet).
+[data-model.md](../../../../../docs/data-model.md#migrating-the-existing-sheet).
 
 ## It composes the four steps rather than replacing them
 

@@ -5,7 +5,7 @@ leading underscore, and being here rather than beside the models, are for the
 reason `_staging.py` gives about itself.
 
 What the six rules each contribute, and what a trip becomes, is
-[data-model.md](../../../../docs/data-model.md#migrating-the-existing-sheet).
+[data-model.md](../../../../../docs/data-model.md#migrating-the-existing-sheet).
 Rule 3 is the one whose answer is deliberately not acted on, and the reason is
 below rather than there, because it is a decision this module made.
 
@@ -138,7 +138,7 @@ have moved stock through -- and only by name where no run has used one yet.
 The reading this must *not* take is a custody location per volunteer, `held_by`
 naming them as `location_held_by_iff_custody` requires. Whether volunteers are
 to be asked to track custody at all is the open question in
-[decision 0008](../../../../docs/decisions/0008-stock-ledger-transfer-graph.md#open-question-for-stakeholders),
+[decision 0008](../../../../../docs/decisions/0008-stock-ledger-transfer-graph.md#open-question-for-stakeholders),
 and minting seventy of those rows would answer it before the meeting.
 
 Nothing is lost by waiting: every note is imported verbatim onto its
