@@ -94,6 +94,6 @@ shadow; this fails on the change that would actually mislead somebody.
 
 What none of it can see is whether a guide has gone on describing a job nobody
 does any more, or stayed quiet about one that has appeared. Somebody has to
-read them, which is why that is in the [Definition of Done](../DEVELOPERS.md#definition-of-done)
+read them, which is why that is in the [Definition of Done](../CONTRIBUTING.md#definition-of-done)
 instead.
 

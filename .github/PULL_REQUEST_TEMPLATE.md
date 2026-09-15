@@ -6,7 +6,7 @@
 
 ## Definition of Done
 
-See [DEVELOPERS.md](../DEVELOPERS.md#definition-of-done).
+See [the Definition of Done](../CONTRIBUTING.md#definition-of-done).
 
 - [ ] Tests and coverage thresholds pass (`uv run pytest`, `npm test`)
 - [ ] Lint, format, and type checks pass

@@ -23,7 +23,7 @@ every case, is [decision 0021](decisions/0021-telemetry-over-otlp.md).
 checked rather than remembered: `scripts/check-telemetry.sh` fails the build on
 a view or a management command that changes something and records nothing. The
 rule it enforces is one line of the
-[Definition of Done](../DEVELOPERS.md#definition-of-done).
+[Definition of Done](../CONTRIBUTING.md#definition-of-done).
 
 ## Somewhere to send it, on a laptop
 

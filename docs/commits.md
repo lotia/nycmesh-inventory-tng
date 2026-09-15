@@ -12,7 +12,7 @@ genuinely reads better; no commit may ever take more than one issue.
 That rule settles the awkward cases too:
 
 - Documentation the change itself made wrong is part of the change — that is
-  the [Definition of Done](../DEVELOPERS.md#definition-of-done), not a separate concern.
+  the [Definition of Done](../CONTRIBUTING.md#definition-of-done), not a separate concern.
 - A fault you noticed on the way but did not cause is its own issue and its own
   commit, however small and however tempting. A one-line fix riding along is
   the commonest way a commit stops being one thing.
@@ -129,7 +129,7 @@ git stash push --keep-index --include-untracked    # park the rest out of the wa
 ```
 
 The working tree is now that issue and nothing else. Work the
-[Definition of Done](../DEVELOPERS.md#definition-of-done) against it
+[Definition of Done](../CONTRIBUTING.md#definition-of-done) against it
 *here*: that is the point of splitting, and a commit that only passes because of
 the work you stashed is not a commit that stands alone. Then land it, restore
 the rest with `git stash pop`, and repeat.

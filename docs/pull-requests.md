@@ -36,7 +36,7 @@ piece of work is *about* is a label.
 
 ## Finish, then publish, then review
 
-Each issue is finished to the [Definition of Done](../DEVELOPERS.md#definition-of-done) and
+Each issue is finished to the [Definition of Done](../CONTRIBUTING.md#definition-of-done) and
 published before anything is reviewed. Nothing is reviewed that has not already
 passed its own checks:
 

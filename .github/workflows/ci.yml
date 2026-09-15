@@ -972,7 +972,7 @@ jobs:
       # in one file and everything else links to it. The first two steps are
       # what stop that arrangement rotting: the first when a link's target
       # moves, the second when an explanation is pasted into a second file
-      # instead of being linked to. See DEVELOPERS.md#documentation-rules
+      # instead of being linked to. See CONTRIBUTING.md#documentation-rules
       - name: Check Markdown links
         uses: lycheeverse/lychee-action@v2
         with:
@@ -1000,6 +1000,6 @@ jobs:
       # The third is the same kind of rule about code rather than prose: work
       # that changes something has to say so. It sits here because it is
       # enforcement of a written rule, and because like check-docs.sh it needs
-      # nothing but a checkout. See DEVELOPERS.md#definition-of-done
+      # nothing but a checkout. See CONTRIBUTING.md#definition-of-done
       - name: Check for silent changes
         run: scripts/check-telemetry.sh

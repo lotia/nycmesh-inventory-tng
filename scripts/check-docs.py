@@ -1,6 +1,6 @@
 """Find prose that lives in two files, and report each pair once.
 
-The rule is DEVELOPERS.md#1-one-topic-one-place; check-docs.sh is the entry
+The rule is CONTRIBUTING.md#one-topic-one-place; check-docs.sh is the entry
 point and says what is read and why. This is the reader.
 
 A file of its own rather than a heredoc inside that script, because this is
