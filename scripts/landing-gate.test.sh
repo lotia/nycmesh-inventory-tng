@@ -304,6 +304,13 @@ case_is "scripts/repo-settings.sh --check && scripts/repo-settings.sh" \
 case_is "bash scripts/repo-settings.sh"          "writes the protections" "and an interpreter in front of it is still running it"
 case_is "grep repo-settings.sh scripts/*.sh"     PERMIT "merely naming the script is not running it"
 case_is "gh pr merge 7 --rebase"                 "No review cycle" "an unrecorded merge is refused"
+# NAMED BY URL OR BRANCH, which numbered() read as naming none, so the merge of
+# pull request 28 was judged against whatever branch was checked out and its
+# receipt. inventory-tng-zplm. Refused whatever the receipt says.
+case_is "gh pr merge https://github.com/lotia/nycmesh-inventory-tng/pull/28 --rebase" "by URL or by branch" "a merge naming its pull request by URL is refused outright"
+case_is "gh pr merge batch/other --rebase"       "by URL or by branch" "and one naming it by branch"
+case_is "gh pr ready batch/other"                "by URL or by branch" "and so is marking one ready that way"
+case_is "gh pr merge --rebase 7"                 "No review cycle" "a number after the flags is still a number"
 
 echo
 echo "the prefilter matches words, not substrings"

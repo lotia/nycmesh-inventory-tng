@@ -759,6 +759,7 @@ print(review_cycle.CHECK, review_cycle.SETTINGS_CHECK, sep="\t")
       push-force "git push --force, -f" "Refused: use --force-with-lease, which refuses if the remote moved since you fetched. Breaking a lease is a person's call." \
       push "git push to main" "Refused before GitHub gets to, so the refusal names the batch/* workflow rather than a protection rule." \
       ready "gh pr ready" "Refused while any check other than $review_check and $settings_check is not green, and refused differently for a pull request whose body posts the do-not-merge marker." \
+      merge-named "gh pr merge or gh pr ready naming the pull request by URL or branch" "Refused: the gate keys receipts and heads by number, and read as naming none such a command was judged against the checked-out branch's pull request. Name it by number." \
       merge-elsewhere "gh pr merge --repo pointing at another repository" "Refused: the receipts are keyed by pull request number within this repository, so a cycle recorded for #7 here cannot vouch for #7 anywhere else. Run it from a checkout of that repository." \
       merge "gh pr merge, and the API spellings of it" "Refused unless the pull request does not post the do-not-merge marker, its review cycle is recorded against the exact head being merged, that head is what is checked out, and check-batch.sh is clean over the range."
     exit 0
@@ -1062,12 +1063,39 @@ def numbered(cmd, after):
     m = re.search(after, cmd)
     if not m:
         return None
-    for token in cmd[m.end():].split():
+    for token in tokens_after(cmd, m):
         if token.isdigit():
             return token
         if not token.startswith("-"):
             return None
     return None
+
+
+# The words after a match, less the separator a shell may glue to the last of
+# them: `gh pr merge 7;` names 7, and `7;` is not a digit.
+def tokens_after(cmd, m):
+    return [t.rstrip(";&|)}") for t in cmd[m.end():].split() if t.rstrip(";&|)}")]
+
+
+# Whether the subcommand names its pull request some way other than a number:
+# a URL, or a branch. gh accepts both, and this gate keys everything -- the
+# receipt, the head it was recorded against, the checkout it compares with --
+# by number. Read as "named none", such a command was judged against the
+# CHECKED-OUT pull request, whose receipt then vouched for the merge of a
+# different one. inventory-tng-zplm. Refused outright rather than resolved:
+# asking gh which number a URL means is one more round trip out of the budget
+# a hook has, and naming it by number costs the caller nothing. (No
+# apostrophes in this comment: it sits inside a single-quoted python3 -c.)
+def named_otherwise(cmd, after):
+    m = re.search(after, cmd)
+    if not m:
+        return False
+    for token in tokens_after(cmd, m):
+        if token.isdigit():
+            return False
+        if not token.startswith("-"):
+            return True
+    return False
 
 
 def classify(raw):
@@ -1167,6 +1195,8 @@ def classify(raw):
     if runs(prog("gh") + r"\s+pr\s+merge\b"):
         if elsewhere:
             return "merge-elsewhere"
+        if named_otherwise(cmd, r"pr\s+merge\b"):
+            return "merge-named"
         return "merge " + (numbered(cmd, r"pr\s+merge\b") or "")
 
     # The REST spelling of the same thing: gh api -X PUT .../pulls/N/merge.
@@ -1191,6 +1221,8 @@ def classify(raw):
     if runs(prog("gh") + r"\s+pr\s+ready\b"):
         if elsewhere:
             return "merge-elsewhere"
+        if named_otherwise(cmd, r"pr\s+ready\b"):
+            return "merge-named"
         return "ready " + (numbered(cmd, r"pr\s+ready\b") or "")
 
     return None
@@ -1328,6 +1360,19 @@ Publish to a batch/* branch and open a pull request instead. See
 DEVELOPERS.md \"Pull requests\"."
     fi
     exit 0
+    ;;
+
+  merge-named)
+    deny "This names its pull request by URL or by branch, and the landing gate
+reads only a number.
+
+Its receipts, the head each was recorded against and the checkout it compares
+with are all keyed by pull request number. Read as naming none, a command like
+this was judged against the checked-out branch's pull request, and that
+branch's receipt vouched for the merge of a different one. It refuses rather
+than guess.
+
+Name the pull request by number: gh pr merge <n> --rebase."
     ;;
 
   merge-elsewhere)

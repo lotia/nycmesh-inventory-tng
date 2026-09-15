@@ -130,6 +130,7 @@ What [`scripts/landing-gate.sh`](../scripts/landing-gate.sh) refuses, in its own
 | git push --force, -f | Refused: use --force-with-lease, which refuses if the remote moved since you fetched. Breaking a lease is a person's call. |
 | git push to main | Refused before GitHub gets to, so the refusal names the batch/* workflow rather than a protection rule. |
 | gh pr ready | Refused while any check other than Review cycle and Repository settings is not green, and refused differently for a pull request whose body posts the do-not-merge marker. |
+| gh pr merge or gh pr ready naming the pull request by URL or branch | Refused: the gate keys receipts and heads by number, and read as naming none such a command was judged against the checked-out branch's pull request. Name it by number. |
 | gh pr merge --repo pointing at another repository | Refused: the receipts are keyed by pull request number within this repository, so a cycle recorded for #7 here cannot vouch for #7 anywhere else. Run it from a checkout of that repository. |
 | gh pr merge, and the API spellings of it | Refused unless the pull request does not post the do-not-merge marker, its review cycle is recorded against the exact head being merged, that head is what is checked out, and check-batch.sh is clean over the range. |
 <!-- claude-hooks: end -->
