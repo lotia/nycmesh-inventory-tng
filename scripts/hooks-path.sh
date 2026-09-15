@@ -19,9 +19,8 @@
 # Reads git's configuration and the filesystem, and writes neither.
 
 #: .beads/hooks, because beads already owns that directory and already keeps
-#: five hooks of its own in it. DEVELOPERS.md#checking-it says why a second
-#: directory is not an option, and says that those five start running too --
-#: one pointer is what arms all six.
+#: hooks of its own in it. docs/git-hooks.md says why a second directory is
+#: not an option, and lists what one pointer arms.
 HOOKS=.beads/hooks
 
 #: The hook itself, and what it must lead to. Here for the same reason HOOKS is:

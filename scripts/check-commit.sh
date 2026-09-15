@@ -5,6 +5,7 @@
 # how to have it run every time. This only enforces the parts a machine can see.
 #
 # Usage: check-commit.sh [--amend] [--message-only] <message-file>
+#        check-commit.sh --describe
 #
 # --amend when you are replacing the last commit rather than adding one: what
 # lands is then the staged changes *and* that commit's, and the issue it closes
@@ -12,11 +13,17 @@
 #
 # --message-only for a caller reading a commit that has already landed, which
 # has no staged diff for the tracker half to read. check-batch.sh asks for it.
+#
+# --describe prints one line saying what this refuses, with the limits read
+# from message-rules.sh rather than typed, and exits. scripts/hooks-doc.sh
+# puts that line in docs/git-hooks.md, so the page cannot say a number this
+# script no longer enforces.
 
 set -uo pipefail
 
 BASE=HEAD
 MESSAGE_ONLY=0
+DESCRIBE=0
 while [[ "${1:-}" == --* ]]; do
   case "$1" in
     --amend)
@@ -27,13 +34,16 @@ while [[ "${1:-}" == --* ]]; do
       MESSAGE_ONLY=1
       shift
       ;;
+    --describe)
+      DESCRIBE=1
+      shift
+      ;;
     *)
       echo "unknown option: $1" >&2
       exit 2
       ;;
   esac
 done
-MESSAGE=${1:?usage: check-commit.sh [--amend] [--message-only] <message-file>}
 ISSUES=".beads/issues.jsonl"
 
 # Where git keeps the two files that say a commit is one of its own.
@@ -62,6 +72,14 @@ _here=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 # The rules themselves, so that check-batch.sh can apply the same ones without
 # reading this script's output. SUMMARY_LIMIT and BODY_LIMIT come from there.
 . "$_here/message-rules.sh"
+
+# After the rules are sourced, so the numbers are theirs; before the message is
+# required, because this call has none.
+if [[ "$DESCRIBE" -eq 1 ]]; then
+  echo "Refuses a commit whose message breaks the rules in DEVELOPERS.md \"Commits\" -- a summary over $SUMMARY_LIMIT characters after its issue prefix, a body line over $BODY_LIMIT columns, or trailers that do not name exactly one issue -- or whose staged tracker closes more than one issue, or a different one from the message's."
+  exit 0
+fi
+MESSAGE=${1:?usage: check-commit.sh [--amend] [--message-only] <message-file>}
 
 # Comments are dropped by message-rules.sh, so that this script and
 # check-batch.sh see the same message; read here only for the summary line the

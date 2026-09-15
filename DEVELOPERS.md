@@ -1196,6 +1196,7 @@ Where each topic lives:
 | Testing and coverage requirements | [Testing and coverage](#testing-and-coverage) |
 | Reading logs while developing | [Reading the logs while you work](#reading-the-logs-while-you-work) |
 | What one commit contains, and its message | [Commits](#commits) |
+| The git hooks: what runs, what each refuses, how they are installed | [docs/git-hooks.md](docs/git-hooks.md) |
 | How work is reviewed and reaches `main` | [Pull requests](#pull-requests) |
 | How to contribute | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Architecture and technology choices | [docs/architecture.md](docs/architecture.md) |
@@ -1559,32 +1560,9 @@ the new one in an `amend!` for `git rebase --autosquash` to fold in. The
 `reword:` is the part that matters — a plain `--fixup` throws its own message
 away and the old summary survives the fold.
 
-It also runs on every commit you make, without your arranging anything:
-`.beads/hooks/commit-msg` is a link to it that arrives with the clone, and
-[bootstrap](#clone-and-bootstrap) points git at the directory holding it. That
-directory is beads' own, and it holds five hooks of beads' making — a second
-one is not an option, because `core.hooksPath` is one path and beads' git
-integration goes quiet the moment it names anywhere else.
-
-Two consequences of that pointer being one path, both worth knowing before you
-are surprised by them. Beads' own five start running too, so a commit, a
-checkout and a pull each cost a fraction of a second more than they did. And
-anything you keep in git's default `.git/hooks` stops running — `pre-commit`,
-husky, a hook of your own — so move what you want kept into `.beads/hooks`;
-bootstrap says so when it finds any, rather than switching them off quietly.
-
-Two ways it can be absent, both of which say so rather than passing silently.
-A clone that never ran bootstrap has the hook and no `core.hooksPath`, and
-`scripts/check-setup.sh` tells you which of the two is missing. A checkout that
-lost the link fails CI, where the same script runs as `--shipped-only` — its
-header says why the halves are split and which one a runner can be asked.
-
-It asks a third thing, because a hook that runs and an interpreter it can reach
-are not the same question: the checker reads the tracker through `python3`, and
-a hook inherits whatever `PATH` invoked it rather than an activated shell's. So
-a perfectly wired clone can still refuse every commit that stages the tracker,
-and the refusal, like the others, names the program rather than blaming the
-commit.
+It also runs on every commit you make, as the `commit-msg` hook. Which hooks
+run, what each can refuse and how they come to be installed is
+[docs/git-hooks.md](docs/git-hooks.md).
 
 There is one way past all of it, `git commit --no-verify`, and the rule about
 using it is in [AGENTS.md](AGENTS.md#git).
