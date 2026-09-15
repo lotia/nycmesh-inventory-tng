@@ -29,6 +29,18 @@ them. `check-docs.py` and `check-telemetry.py` beside this are stdlib-only for
 the same reason, and a future reader who notices PyYAML is available in the
 backend's tests has an obvious-looking simplification that does not work here.
 
+A THIRD FAULT, IN compose.yaml ALONE: a value written as a literal where its
+neighbours are `${VAR:-default}`. `DJANGO_ALLOWED_HOSTS` was one, with a good
+comment above it, so the comment rule passed it throughout; the knob was in
+`.env.sample`, the reader was told to set it, and the file overrode whatever
+they set. A phone on the LAN was answered `400 DisallowedHost` on every path,
+which names nothing -- inventory-tng-w5r7. So every entry in a service's
+`environment:` has to be one `.env` can reach: a single `${...}` spanning the
+whole value, or a YAML alias, which is built from interpolations itself. The
+literals that are right are excused by name in scripts/check-config.allow,
+whose header says how, so each is a decision somebody wrote down rather than
+a line nobody read the punctuation of.
+
 WHAT THIS DELIBERATELY DOES NOT READ. Whether the prose is any good. It cannot,
 and a checker that pretended to would be worse than one that admits the limit:
 a line saying "# the port" above `port:` passes here and helps nobody. What it
@@ -169,6 +181,34 @@ def outer_key(lines: list[str], line: int, indent: int) -> int | None:
     return None
 
 
+def reachable(value: str) -> bool:
+    """Whether .env can reach a compose value: one expansion spans the whole of it.
+
+    Shape rather than grammar. Compose spells an expansion seven ways and lets
+    a default hold another, so a pattern that lists them is a parser nobody
+    will finish; what the rule needs is that the value opens `${` and the
+    brace that closes it is the last character. A bare `$NAME` and an alias
+    to an anchor count too. Quotes around the whole are stripped first,
+    because YAML demands them the moment a default holds `: ` or ` #`, and
+    compose interpolates inside them exactly as it does outside; so is a
+    trailing comment.
+    """
+    value = value.split(" #")[0].strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        value = value[1:-1]
+    if re.fullmatch(r"\$[A-Za-z_]\w*|\*[A-Za-z_][\w-]*", value):
+        return True
+    if not value.startswith("${"):
+        return False
+    depth = 0
+    for at, char in enumerate(value[1:], start=1):
+        depth += char == "{"
+        depth -= char == "}"
+        if depth == 0:
+            return at == len(value) - 1
+    return False
+
+
 def allowed(root: Path) -> dict[str, str]:
     """Values excused from needing prose, and the reason each was excused.
 
@@ -223,8 +263,9 @@ def main() -> int:
     surfaces: list[tuple[str, list[tuple[str, int, bool]]]] = []
     env_sample = root / ".env.sample"
     surfaces.append((".env.sample", flat_values(readable(env_sample, root).splitlines(), ENV_ASSIGNMENT)))
-    compose = root / "compose.yaml"
-    surfaces.append(("compose.yaml", flat_values(readable(compose, root).splitlines(), COMPOSE_ENTRY)))
+    compose = readable(root / "compose.yaml", root).splitlines()
+    compose_entries = flat_values(compose, COMPOSE_ENTRY)
+    surfaces.append(("compose.yaml", compose_entries))
     values = root / "infra" / "helm" / "inventory-tng" / "values.yaml"
     surfaces.append((str(values.relative_to(root)), yaml_values(readable(values, root).splitlines())))
 
@@ -233,6 +274,12 @@ def main() -> int:
             if explained or f"{where}:{name}" in excused:
                 continue
             report(where, name, number, "is set with nothing saying what it is for")
+
+    # The third fault in the header: a value .env cannot reach.
+    for name, number, _ in compose_entries:
+        if reachable(compose[number - 1].split(":", 1)[1]) or f"compose.yaml:{name}=literal" in excused:
+            continue
+        report("compose.yaml", name, number, "is a literal .env cannot reach")
 
     # The rule that matters to somebody deploying rather than somebody reading.
     helper = root / "infra" / "helm" / "inventory-tng" / "templates" / "_helpers.tpl"
@@ -259,7 +306,7 @@ def main() -> int:
     # printed over a clean run is noise that teaches people to skim the output.
     if objected:
         print("note scripts/check-config.allow is for the few that genuinely need no prose,")
-        print("note and its header says how an entry is written.")
+        print("note or are right to be a literal; its header says how an entry is written.")
     return 0
 
 
