@@ -354,7 +354,7 @@ What it refuses:
 
 | Command | Refused when |
 | --- | --- |
-| `gh pr merge` | no review cycle is recorded against the exact head being merged; or the branch is not finished — commits still waiting to be folded in, or an issue in the batch epic that has not landed |
+| `gh pr merge` | no review cycle is recorded against the exact head being merged; or the branch is not finished — commits still waiting to be folded in, or an issue in the batch epic that has not landed. A pull request named by URL or by branch rather than by number is refused outright: the gate keys everything by number, and read as naming none such a command was judged against the checked-out branch's pull request instead |
 | `gh pr ready` | the checks are not green |
 | `git push` | it would land on `main` — asked of git, so `git push origin HEAD` from a checked-out `main` is refused and a branch called `batch/main-fix` is not. GitHub refuses it behind the gate too, with `enforce_admins`, required reviews and the required contexts; the gate goes first so the message names the `batch/*` workflow rather than a protection rule |
 | `git push --force`, `-f` | always, and `allow_force_pushes: false` stands behind it. `--force-with-lease` is free because the lease is the guard: it refuses if anything arrived since you last fetched, so it cannot overwrite work you have not seen |
