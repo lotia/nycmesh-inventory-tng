@@ -2,11 +2,19 @@
 # Ask one job of a pull request's CI run to run again.
 #
 # For a check whose answer depends on something other than the code, so that
-# a change to that something is looked at without a push. Which check, and
-# why it has to be re-run by NAME rather than with `gh run rerun --failed`, is
-# the header of .github/workflows/look-again.yml, its one caller.
+# a change to that something is looked at without a push. Two workflows call
+# it: look-again.yml, for the do-not-merge marker in a body, whose header says
+# why the job has to be re-run by NAME rather than with `gh run rerun
+# --failed`; and review-cycle.yml, for the review evidence a pull request
+# gathers, which used to carry its own copy of this -- inventory-tng-gte4.
 #
-# Usage: scripts/look-again.sh <pull request number> <job name>
+# Usage: scripts/look-again.sh [--unless-passed] <pull request number> <job name>
+#
+# --unless-passed leaves a job that already passed alone. look-again.yml asks
+# about a marker in the body, which can change either way, so a green verdict
+# is worth re-reading; review-cycle.yml asks about evidence that only ever
+# arrives, so a green verdict stays green and re-running it spends a runner to
+# reach the same answer.
 #
 # gh reads the repository from GH_REPO and its credential from GH_TOKEN, the
 # way it does in a workflow; nothing here names either.
@@ -19,7 +27,12 @@
 # thing worth going red over.
 set -euo pipefail
 
-usage="usage: look-again.sh <pull request number> <job name>"
+usage="usage: look-again.sh [--unless-passed] <pull request number> <job name>"
+unless_passed=0
+if [[ "${1:-}" == "--unless-passed" ]]; then
+  unless_passed=1
+  shift
+fi
 pr=${1:?$usage}
 job=${2:?$usage}
 
@@ -66,10 +79,19 @@ fi
 
 # jq with --arg rather than gh's own --jq, because that would mean writing the
 # job name into a jq program by string interpolation, and a name is free text.
-jobid=$(gh run view "$id" --json jobs \
-          | jq -r --arg job "$job" '[.jobs[] | select(.name == $job)][0].databaseId')
+#
+# The call is its own line, so that gh failing -- a bad token, no network --
+# is what it always was under `set -e`: red, as the nudge being dead. Folding
+# it into the `read` below made that failure read as "no such job", exit 0.
+jobs=$(gh run view "$id" --json jobs)
+read -r jobid conclusion < <(printf '%s' "$jobs" \
+          | jq -r --arg job "$job" '[.jobs[] | select(.name == $job)][0] | "\(.databaseId) \(.conclusion)"')
 if [[ -z "$jobid" || "$jobid" == "null" ]]; then
   echo "Run $id carries no job named '$job', so there is nothing to ask again."
+  exit 0
+fi
+if [[ "$unless_passed" -eq 1 && "$conclusion" == "success" ]]; then
+  echo "'$job' already passed on run $id, so there is nothing to ask again."
   exit 0
 fi
 

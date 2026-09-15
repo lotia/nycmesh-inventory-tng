@@ -84,73 +84,13 @@ jobs:
       actions: write
       pull-requests: read
     steps:
+      - uses: actions/checkout@v5
       - name: Re-run the checks against the evidence that just arrived
         env:
           GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
+          GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.issue.number || github.event.pull_request.number }}
-        run: |
-          set -euo pipefail
-
-          head=$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
-
-          # The most recent CI run for this head. `--json` rather than parsing
-          # the table, and the head is what ties it to this pull request rather
-          # than to whatever ran last.
-          run=$(gh run list --repo "$REPO" --workflow ci.yml --commit "$head" \
-                  --limit 1 --json databaseId --jq '.[0]')
-
-          if [[ -z "$run" || "$run" == "null" ]]; then
-            echo "No CI run for $head yet, so there is nothing to ask again."
-            exit 0
-          fi
-
-          id=$(printf '%s' "$run" | jq -r .databaseId)
-
-          # THE JOB, NOT THE RUN, and the difference is the whole window this
-          # exists for. `Review cycle` finishes in seconds; the run it belongs
-          # to takes minutes, because the browser tests are in it. Asking about
-          # the run meant that a comment posted in between -- which is the
-          # normal order, since fixes are pushed and then the findings posted --
-          # found an in-progress run, declined, and logged that the evidence
-          # would be read by a job that had already read nothing and failed.
-          conclusion=$(gh run view "$id" --repo "$REPO" --json jobs \
-                         --jq '[.jobs[] | select(.name == "Review cycle")][0].conclusion')
-
-          # NULL IS TWO ANSWERS, and the message has to cover both: a job that
-          # is still running -- which will read this evidence itself, so there
-          # is nothing to ask again -- and a job that is not in this run at all,
-          # which is what an older run looks like and what a run cancelled
-          # before its jobs were created looks like. Neither is re-runnable, so
-          # both leave; saying only the first would state something untrue about
-          # the second.
-          if [[ "$conclusion" == "null" || -z "$conclusion" ]]; then
-            echo "Run $id has no finished review-cycle job to ask again:"
-            echo "it is either still running, and will read this evidence itself,"
-            echo "or it does not carry that job at all."
-            exit 0
-          fi
-          if [[ "$conclusion" == "success" ]]; then
-            echo "The review cycle was already satisfied on run $id."
-            exit 0
-          fi
-
-          # `--failed` rather than the whole run: everything else on that head
-          # already passed and re-running it would spend several minutes of
-          # somebody else's queue to reach the same answer.
-          #
-          # THE TWO NON-ZERO EXITS ARE NOT THE SAME ANSWER, and collapsing them
-          # was the bug. Nothing-to-re-run is success -- the cycle is already
-          # green. Anything else is this nudge being dead: the token losing
-          # `actions: write`, the run past its 30-day re-run window or its 50
-          # re-run limit, Actions disabled. Reported as "nothing failed", that
-          # is a guard which cannot see saying it has nothing to object to, and
-          # every pull request afterwards sits red with no explanation anywhere.
-          if ! out=$(gh run rerun "$id" --repo "$REPO" --failed 2>&1); then
-            if printf %s "$out" | grep -qi "cannot be rerun"; then
-              echo "Nothing failed on run $id, so the cycle is already green."
-            else
-              echo "::error::could not ask CI again about run $id: $out"
-              exit 1
-            fi
-          fi
+        # The procedure look-again.yml runs, from the same script
+        # (inventory-tng-gte4). --unless-passed: evidence only ever arrives,
+        # so a green job stays green. The name is the reader's.
+        run: scripts/look-again.sh --unless-passed "$PR" "$(python3 scripts/review_cycle.py --check-name)"
