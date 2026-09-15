@@ -21,7 +21,8 @@ TWO SPELLINGS. `<page>.md#<anchor>` is the one a link would use, and it is
 held to the anchor rule above. `<page>.md "Heading"` -- or with single quotes
 -- is how a shell comment and a refusal message cite a section, because a
 heading is easier to find on a page than an anchor is, and it is held to the
-heading's text, backticks aside. A quoted heading may break across two comment
+heading's text, backticks aside; the quotes may be backslashed, as they are
+inside a double-quoted shell string. A quoted heading may break across two comment
 lines, and the comment's own prefix on the second is not part of it.
 
 WHERE THE PAGE IS. A reference that starts with `./` or `../` is relative to
@@ -53,9 +54,12 @@ import sys
 from review_cycle import hidden
 
 # A page, then either `#anchor` or a quoted heading.
+# The quote may carry a backslash: a refusal message inside a double-quoted
+# shell string spells a citation `docs/commits.md \"Checking it\"`, and six
+# of those went unread through a move -- inventory-tng-uhge.1.
 REFERENCE = re.compile(
     r"(?<![\w/.-])((?:\.{1,2}/)?[\w./-]*\w\.md)"
-    r"(?:#([\w-]+)| ([\"'])([^\"'\n]+(?:\n[^\"'\n]+)?)\3)"
+    r"(?:#([\w-]+)| \\?([\"'])([^\"'\\\n]+(?:\n[^\"'\\\n]+)?)\\?\3)"
 )
 CONTINUATION = re.compile(r"\n[ \t]*(?:#+|//|\*)?[ \t]*")
 HEADING = re.compile(r"^#{1,6}[ \t]+(.*?)[ \t]*#*[ \t]*$")

@@ -138,6 +138,11 @@ printf '%s\n' "  # What it refuses is $G \"When a" "  # branch is ready to marge
 expect 1 "scripts/thing.sh:1: no heading" "and is reported on the line it starts"
 
 scene
+printf '# Guide\n\n## Signing in\n' > GUIDE.md
+printf '%s\n' "deny \"See $G \\\"Signing on\\\" first.\"" > scripts/thing.sh
+expect 1 'is titled "Signing on"' "a citation whose quotes are backslashed inside a shell string is read too"
+
+scene
 printf '# Guide\n\n## The `manage.py` commands\n' > GUIDE.md
 printf '%s\n' "# See $G \"The manage.py commands\"" > scripts/thing.sh
 expect 0 "Every heading" "inline code in a heading is quoted without its backticks"
