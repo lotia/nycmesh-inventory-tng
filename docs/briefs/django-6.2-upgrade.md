@@ -85,7 +85,7 @@ wait:
 
 1. **`drf-spectacular`** — the worst lag by a wide margin, and the project's
    OpenAPI schema is asserted by a test
-   ([`The API schema`](../../DEVELOPERS.md#the-api-schema)), so a version bump
+   ([`The API schema`](../working-in-the-code.md#the-api-schema)), so a version bump
    here is visible whether or not Django changed.
 2. **`django-simple-history`** — generates a parallel model and migration for
    every audited model. Django model-internals changes land here first.
@@ -128,7 +128,7 @@ The parts most likely to actually move:
 - **The committed OpenAPI schema.** `backend/openapi.yaml` is asserted equal to
   generated output. A `drf-spectacular` bump alone can change it; regenerate and
   read the diff rather than accepting it. See
-  [`The API schema`](../../DEVELOPERS.md#the-api-schema).
+  [`The API schema`](../working-in-the-code.md#the-api-schema).
 - **Migrations.** `django-simple-history` upgrades have historically produced
   historical-model migrations. `manage.py makemigrations --check --dry-run`
   after the bump, and read anything it wants to write.

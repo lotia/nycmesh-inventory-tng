@@ -576,7 +576,7 @@ class WithdrawnRows:
 
     #: For the schema, since nothing generates a parameter a view reads by hand
     #: -- and an undocumented parameter is a contract no client can discover.
-    #: Applied as @WITHDRAWN_SCHEMA below. See DEVELOPERS.md#the-api-schema.
+    #: Applied as @WITHDRAWN_SCHEMA below. See docs/working-in-the-code.md#the-api-schema.
     WITHDRAWN_PARAMETER = OpenApiParameter(
         name="withdrawn",
         type=OpenApiTypes.BOOL,

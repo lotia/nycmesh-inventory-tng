@@ -69,7 +69,7 @@ export function mismatch(pinned: string | null, running: string): string | null 
   }
   return (
     `note: this repository pins node ${pinned} and you are running ${running}. ` +
-    "See DEVELOPERS.md#frontend if the suite behaves oddly."
+    "See docs/working-in-the-code.md#frontend if the suite behaves oddly."
   );
 }
 

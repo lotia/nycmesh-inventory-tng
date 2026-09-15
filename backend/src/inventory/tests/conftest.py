@@ -28,7 +28,7 @@ from inventory_tng import redaction, telemetry
 ADMINISTRATOR_PASSWORD = "not-a-real-password"
 
 # The generated schema, committed so it can be read without running anything.
-# See DEVELOPERS.md#the-api-schema.
+# See docs/working-in-the-code.md#the-api-schema.
 SCHEMA_PATH = Path(settings.BASE_DIR).parent / "openapi.yaml"
 
 # Where the fixtures below pretend a collector is. Nothing listens on it: the
