@@ -1209,15 +1209,21 @@ Where each topic lives:
 | Configuration variables | [.env.sample](.env.sample) |
 | Toolchain versions | [mise.toml](mise.toml) |
 
-Two jobs in CI keep that arrangement from rotting, and both can be run by hand:
+Three checks in CI keep that arrangement from rotting, and each can be run by
+hand:
 
 ```bash
 scripts/check-docs.sh          # the same passage in two files
 scripts/check-docs.sh --words 8   # stricter, if you are hunting one down
+scripts/check-anchors.sh       # a heading named outside Markdown that is not there
 scripts/check-config.sh        # a configuration value nobody explained
 ```
 
-A link checker catches a link whose target you renamed. `check-docs.sh` catches
+A link checker catches a link whose target you renamed, fragment included, in
+every Markdown file. `check-anchors.sh` asks the same of every `<page>.md#<anchor>`
+written anywhere else — a docstring, a shell comment, a refusal message, a
+workflow — which a link checker never reads and a reader meets at the moment
+something has just refused them. `check-docs.sh` catches
 the other half — an explanation pasted into a second file rather than linked to
 — by comparing prose in runs of twelve words. Code blocks, tables, headings and
 link text are not prose and are left out, so a repeated command or a repeated

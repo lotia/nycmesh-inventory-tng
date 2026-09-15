@@ -729,6 +729,8 @@ jobs:
         run: scripts/check-batch.test.sh
       - name: Check the duplication checker
         run: scripts/check-docs.test.sh
+      - name: Check the anchor checker
+        run: scripts/check-anchors.test.sh
       - name: Check the telemetry checker
         run: scripts/check-telemetry.test.sh
       - name: Check the settings checker
@@ -978,6 +980,11 @@ jobs:
           fail: true
       - name: Check for duplicated prose
         run: scripts/check-docs.sh
+      # And the same promise made outside Markdown -- a heading named in a
+      # docstring, a shell comment or a refusal message -- which the link
+      # checker never reads. check-anchors.py says how a heading is read.
+      - name: Check anchors referenced outside Markdown
+        run: scripts/check-anchors.sh
       # Rendered by scripts/hooks-doc.sh; its header says why.
       - name: The git hooks page describes the hooks that run
         run: scripts/hooks-doc.sh --check
