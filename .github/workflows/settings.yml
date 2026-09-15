@@ -8,12 +8,12 @@ name: Settings
 # deliberate act, and one that wants a person to have read what drifted first.
 #
 # One setting cannot be read at all, so squash merge is watched for by its
-# effect on main instead. See DEVELOPERS.md#pull-requests.
+# effect on main instead. See docs/pull-requests.md.
 #
 # The settings that cannot be enforced from inside the repository at all --
 # enforce_admins, allow_force_pushes, required_linear_history -- are the ones
 # whose silent loss costs the most, which is the whole reason for the schedule.
-# See DEVELOPERS.md#pull-requests
+# See docs/pull-requests.md
 
 on:
   schedule:

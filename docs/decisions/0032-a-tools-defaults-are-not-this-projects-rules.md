@@ -68,7 +68,7 @@ machinery can hold it.**
    router; this says the same thing to the tools that would grow it back.
 
 2. **A tool may not commit on this repository's behalf.** Work reaches `main`
-   the way [Pull requests](../../DEVELOPERS.md#pull-requests) describes, in
+   the way [Pull requests](../pull-requests.md) describes, in
    commits that name an issue. A commit a tool made while doing something else
    satisfies none of that, and is to be unwound rather than kept — by whoever
    is entitled to rewrite the branch it landed on, which where that branch is

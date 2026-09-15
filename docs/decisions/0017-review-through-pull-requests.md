@@ -33,7 +33,7 @@ was written is noise to them.
 **Move the review onto a GitHub pull request. The batch becomes the branch, the
 issue stays the commit, and the review commentary stays in the pull request.**
 
-The full procedure is [Pull requests](../../DEVELOPERS.md#pull-requests); this
+The full procedure is [Pull requests](../pull-requests.md); this
 records why it is shaped the way it is.
 
 ### Finished and published before reviewed

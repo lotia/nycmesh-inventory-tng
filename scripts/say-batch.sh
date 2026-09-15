@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Post what a pull request's batch holds, read off the commits.
 #
-# Why it is said rather than typed is DEVELOPERS.md#pull-requests. This
+# Why it is said rather than typed is docs/pull-requests.md. This
 # rewrites its own comment rather than adding one per push.
 #
 # Usage: say-batch.sh          with RANGE, PR and GH_TOKEN in the environment

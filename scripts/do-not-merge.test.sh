@@ -104,7 +104,7 @@ echo "the marker is the one the documentation tells people to post"
 grep -qF -- "$MARKER" "$HERE/../AGENTS.md"; status=$?
 exits "$status" 0 "AGENTS.md names the marker the check looks for"
 
-grep -qF -- "$MARKER" "$HERE/../DEVELOPERS.md"; status=$?
+grep -qF -- "$MARKER" "$HERE/../docs/pull-requests.md"; status=$?
 exits "$status" 0 "and so does the document that defines it"
 
 echo

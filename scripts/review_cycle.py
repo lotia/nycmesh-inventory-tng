@@ -65,7 +65,7 @@ CHECK = "Review cycle"
 #: that was a branch that could not be marked ready, so could not merge, so
 #: could never have its job required. ``inventory-tng-sdtb``. It is not a
 #: required context, and settings.yml runs the same comparison on main itself,
-#: so nothing it held is loosened. DEVELOPERS.md "Merging" is the step it is
+#: so nothing it held is loosened. docs/pull-requests.md "Merging" is the step it is
 #: asking for.
 SETTINGS_CHECK = "Repository settings"
 
@@ -255,10 +255,10 @@ def opens(content: str) -> tuple[str, int] | None:
 def carries(body: str | None, marker: str) -> bool:
     """Whether ``body`` POSTS ``marker``, rather than merely showing it.
 
-    The distinction is the whole of this function, and DEVELOPERS.md "One
-    review pass, findings filed per issue" carries what it cost to learn --
-    under "Quoting one is not posting one": a substring test let
-    a comment that only mentioned the marker stand as evidence.
+    The distinction is the whole of this function, and docs/pull-requests.md
+    "One review pass, findings filed per issue" carries what it cost to learn:
+    a substring test let a comment that only mentioned the marker stand as
+    evidence.
 
     So it has to be alone on its line and outside any fence. Markdown allows up
     to three columns before a construct; a fourth makes it a code block, which
@@ -507,7 +507,7 @@ def main(argv: list[str] | None = None) -> int:
         print("", file=sys.stderr)
 
     print(
-        'See DEVELOPERS.md "One review pass, findings filed per issue".',
+        'See docs/pull-requests.md "One review pass, findings filed per issue".',
         file=sys.stderr,
     )
     return 1

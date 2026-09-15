@@ -12,7 +12,7 @@ for agents the answer had been "ask a human, every time".
 That was the right default when nothing mechanical checked anything. It stopped
 being right once `main` grew branch protection. Most of the conditions on a
 merge are now enforced by GitHub and cannot be waived from a terminal;
-[When a branch is ready to merge](../../DEVELOPERS.md#when-a-branch-is-ready-to-merge)
+[When a branch is ready to merge](../pull-requests.md#when-a-branch-is-ready-to-merge)
 is the list, and which of them nobody enforces.
 
 So the approval step had become a question with one available answer. It cost a
@@ -28,7 +28,7 @@ they did not compute. Naming that honestly is worth more than the ritual.
 
 **Whoever finished a `batch/*` branch merges it, agent or not, once it is
 mergeable.** The bar is
-[When a branch is ready to merge](../../DEVELOPERS.md#when-a-branch-is-ready-to-merge),
+[When a branch is ready to merge](../pull-requests.md#when-a-branch-is-ready-to-merge),
 written once and identical for both.
 
 A branch that does not meet the bar is one to finish. It is never one to ask
@@ -112,3 +112,110 @@ Not adopted: requiring a second GitHub review before merge. It would be real
 oversight, and for a volunteer project with one active maintainer it would mean
 work waiting on nobody — the failure this decision exists to remove, with more
 ceremony.
+
+## Amendment (2026-09-15) — what the gate refuses, and why
+
+The procedure — the five conditions `main` enforces, the two a person holds
+to, and the gate's commands — is
+[When a branch is ready to merge](../pull-requests.md#when-a-branch-is-ready-to-merge).
+The reasoning behind each refusal used to sit beside it in the guide, and is
+here now because this is the record it belongs to.
+
+### The marker a spike posts
+
+A spike built to be shown at a meeting can be green, rebased, reviewed and on
+a `batch/*` branch — every condition for merging — and still be work that must
+not land. Prose cannot hold that, because merging it is what following the
+documented flow looks like. So the body carries `<!-- do-not-merge -->`, and
+something reads it.
+
+Posting the marker is the whole of it; writing *about* it is free. Only the
+left margin, outside a fence, counts — the rule the review-cycle markers
+already keep, and
+[One review pass](../pull-requests.md#one-review-pass-findings-filed-per-issue)
+says what it cost to learn.
+
+`.github/workflows/look-again.yml` re-runs the check whenever a body changes,
+because a check that has already answered would otherwise stand on what it
+read last — green, if the marker was added after the fact. Its header says why
+that lives in its own file.
+
+### What the gate refuses, and why
+
+**A merge of a branch that is not finished** — commits still waiting to be
+folded in, or an issue in the batch epic that has not landed. Those two
+questions used to be asked by CI on every push, which meant they were answered
+"no" through the whole of building and reviewing a batch: the job failed on
+48% of this repository's pull request runs, every one of them the documented
+flow doing what it is told. They are questions about whether a branch is
+*ready*, so they are asked once, at the merge, where that is the thing being
+decided. CI still asks everything structural, and still holds a fork's pull
+request to it where no local hook runs.
+
+**Ending a turn** on a `batch/*` branch whose pull request is ready, green,
+and has no recorded cycle. That one is registered as a `Stop` hook rather than
+on a command, because the failure it answers is not a command at all: it is a
+session deciding the work is finished and writing a summary instead of running
+the cycle. Ending the turn is what gets refused, so the summary cannot be
+written in place of the work. Three things about it are deliberate and are not
+how the rest of the gate behaves:
+
+- **It fails open.** Every other refusal fails closed, because letting an
+  unreviewed merge through is worse than being unable to merge. Ending a turn
+  is the opposite: a session that cannot stop also cannot fix whatever is
+  stopping it, because fixing it ends in stopping too. So a missing `python3`,
+  an unauthenticated `gh`, a rate limit or no network all let the turn end and
+  say on stderr that nothing was checked.
+- **It asks once per head.** A refusal that repeated every time you meant it
+  would be a session nobody could end, so it is remembered against the commit
+  it was about. Push anything and it asks again, which is right — what was
+  reviewed is no longer what is there.
+- **Drafts and red checks are exempt.** A batch under construction is a draft
+  by the flow above, and stopping in the middle of one is ordinary.
+
+That makes it a nudge rather than a lock, on purpose. The lock is the merge
+refusal, which does not forget and cannot be spent.
+
+**Every other refusal fails closed.** When `python3` or `gh` is absent, or
+`gh` answers unauthenticated or rate-limited, the gate refuses the command and
+names the program it could not use. It used to fail open in exactly those
+three ways, which is worse than having no gate at all: the rule goes on being
+believed while nothing is checking it, and nothing announces that the guard
+has stopped working. A `gh` that is merely *slow* is the same case, and needs
+its own deadline rather than the hook's: a hook killed for exceeding its
+timeout prints no verdict, and no verdict is read as permission. So the gate
+gives `gh` a shorter deadline than the timeout registered in
+`.claude/settings.json` and refuses in time to say so. The one place the same
+reasoning points the other way is `clear <pr>`: rather than treat a receipts
+file it cannot parse as empty and rewrite it, it refuses and leaves the file
+alone.
+
+**With one exception, and it is the gate's own source.** If a rebase stops on
+a conflict *in `scripts/landing-gate.sh` itself*, the half-written file cannot
+judge anything, and every command it guards would then be refused over
+something that has nothing to do with the command. The gate stands down there,
+saying so on stderr, and it takes three things at once: the matcher has
+already failed, git reports an operation actually in flight, and the file
+carries conflict markers. Any two of the three leave it guarding as usual.
+
+Deliberate, and worth less than it first looks. Whether the guarded verbs
+appear at all is settled before the matcher is consulted, so anything without
+`gh` or `push` in it never needed this file to be readable: continuing or
+abandoning the rebase was never prevented. What the stand-down releases is the
+guarded pair themselves, the force-with-lease that ends a collapse and a merge
+that nothing is checking. The break that really does take a session down is
+markers in the *shell* half, where bash exits with the status the harness
+reads as *blocked* before any of this runs — out of reach from inside the
+file, and `inventory-tng-ghqk` records both the measurement and what it would
+take to cover.
+
+**What `record` buys.** It stores what it found on the pull request whether or
+not that is everything, and a partial receipt refuses a merge as firmly as
+none. What it buys is a truthful nudge, since the stop hook reads the receipt
+rather than the pull request and would otherwise go on naming a pass that had
+already run. Finding nothing at all still writes nothing.
+
+None of it is a security boundary. It reads a command line, and a command line
+has more spellings than any reader has patterns; the enforcement that matters
+is the rules `main` holds itself, and this record is the decision about what
+may rest on a guardrail against forgetting.

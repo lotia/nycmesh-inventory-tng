@@ -83,7 +83,7 @@ def main() -> None:
             return
         if not batches:
             # A single issue shipping on its own belongs to no batch and needs
-            # no epic. Several landing together do: DEVELOPERS.md#pull-requests
+            # no epic. Several landing together do: docs/pull-requests.md
             # wants what belongs to a batch recorded rather than remembered, and
             # silence here is how a batch skips that without anything noticing.
             if len(landed) > 1 and landed_commits > 1:

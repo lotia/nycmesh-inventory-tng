@@ -5,7 +5,7 @@ on:
     branches: [main]
   pull_request:
     # ready_for_review is not one of the defaults, and the history job below
-    # reads draft state. See DEVELOPERS.md#merging.
+    # reads draft state. See docs/pull-requests.md#merging.
     types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
@@ -807,7 +807,7 @@ jobs:
   # no second list to keep in step. It takes effect on the next run of that
   # script, which is a branch-protection change and is a person's to make, and
   # is made AFTER the merge -- review_cycle.SETTINGS_CHECK is why it cannot be
-  # before, and DEVELOPERS.md "Merging" is the step itself.
+  # before, and docs/pull-requests.md "Merging" is the step itself.
   #
   # ONLY ON pull_request, because a push to main has no pull request to read and
   # a check that reported nothing there would be permanently pending. The other
@@ -863,7 +863,7 @@ jobs:
             | python3 scripts/review_cycle.py --findings "$RUNNER_TEMP/findings.json"
 
   # A PULL REQUEST THAT SAYS DO NOT MERGE, AND IS BELIEVED. What the marker is
-  # and why prose could not hold it is DEVELOPERS.md "When a branch is ready to
+  # and why prose could not hold it is docs/pull-requests.md "When a branch is ready to
   # merge". inventory-tng-g4dh.
   #
   # HERE RATHER THAN A LABEL OR A LOCAL HOOK. `enforce_admins` is on, so a
@@ -924,7 +924,7 @@ jobs:
           fetch-depth: 0
       # No commit may hold work from two issues -- the rule this repository is
       # arranged around, and the one a tidy-looking branch breaks most easily.
-      # See DEVELOPERS.md#pull-requests
+      # See docs/pull-requests.md
       #
       # The membership check needs the beads tracker and simply sits out when
       # there is none, so a contributor working from GitHub issues is held to
@@ -946,7 +946,7 @@ jobs:
       # holding a fork's pull request to where no local hook runs.
       #
       # The finished question is asked once, by scripts/landing-gate.sh, at the
-      # merge. See DEVELOPERS.md#when-a-branch-is-ready-to-merge.
+      # merge. See docs/pull-requests.md#when-a-branch-is-ready-to-merge.
       - name: Check the commits in this pull request
         run: |
           scripts/check-batch.sh --unfinished \
