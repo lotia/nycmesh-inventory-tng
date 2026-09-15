@@ -8,7 +8,7 @@
 #
 #     manage.py migrate inventory 0008
 #
-# docs/deployment.md#rolling-back allows either backward compatibility or an
+# docs/deployment.md#rollback allows either backward compatibility or an
 # explicit plan; this is the plan. Forward is safe on its own: the migration is
 # atomic, so AddConstraint holds ACCESS EXCLUSIVE and an old pod's insert waits
 # for the commit rather than landing inside the window the backfill opens.

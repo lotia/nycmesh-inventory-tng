@@ -18,7 +18,7 @@ migration too:
 
     manage.py migrate inventory 0009
 
-This is the explicit plan docs/deployment.md#rolling-back asks for.
+This is the explicit plan docs/deployment.md#rollback asks for.
 """
 
 from django.db import migrations

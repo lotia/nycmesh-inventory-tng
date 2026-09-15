@@ -255,8 +255,9 @@ def opens(content: str) -> tuple[str, int] | None:
 def carries(body: str | None, marker: str) -> bool:
     """Whether ``body`` POSTS ``marker``, rather than merely showing it.
 
-    The distinction is the whole of this function, and DEVELOPERS.md "Quoting
-    one is not posting one" carries what it cost to learn: a substring test let
+    The distinction is the whole of this function, and DEVELOPERS.md "One
+    review pass, findings filed per issue" carries what it cost to learn --
+    under "Quoting one is not posting one": a substring test let
     a comment that only mentioned the marker stand as evidence.
 
     So it has to be alone on its line and outside any fence. Markdown allows up
