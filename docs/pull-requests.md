@@ -53,9 +53,9 @@ typed, so the list is the one that was checked.
 
 Not when the commits are pushed, not when the checks go green, and not when the
 pull request is marked ready. Those are the middle of it.
-[AGENTS.md](../AGENTS.md#git) already says merging a mergeable `batch/*` pull
-request needs nobody's permission and that whoever finished it merges it; this
-is the consequence, which had never been written down.
+[0020](decisions/0020-who-merges.md) settles that merging a mergeable
+`batch/*` pull request needs nobody's permission and that whoever finished it
+merges it; this is the consequence.
 
 So there are two honest ways to leave a batch, and a ready-but-unreviewed pull
 request is neither:
@@ -356,9 +356,26 @@ What it refuses:
 | --- | --- |
 | `gh pr merge` | no review cycle is recorded against the exact head being merged; or the branch is not finished — commits still waiting to be folded in, or an issue in the batch epic that has not landed |
 | `gh pr ready` | the checks are not green |
-| `git push` | it would land on `main` — asked of git, so `git push origin HEAD` from a checked-out `main` is refused and a branch called `batch/main-fix` is not |
-| `git push --force`, `-f` | always; `--force-with-lease` is free, and [AGENTS.md](../AGENTS.md#git) says why the two are on opposite sides of that line |
+| `git push` | it would land on `main` — asked of git, so `git push origin HEAD` from a checked-out `main` is refused and a branch called `batch/main-fix` is not. GitHub refuses it behind the gate too, with `enforce_admins`, required reviews and the required contexts; the gate goes first so the message names the `batch/*` workflow rather than a protection rule |
+| `git push --force`, `-f` | always, and `allow_force_pushes: false` stands behind it. `--force-with-lease` is free because the lease is the guard: it refuses if anything arrived since you last fetched, so it cannot overwrite work you have not seen |
+| `bd dolt push` | always: it publishes the tracker, and [0029](decisions/0029-the-issue-tracker-is-public.md) makes that public the moment it runs |
+| `scripts/repo-settings.sh` writing | always; `--check` compares and reports, and is free. Writing is refused because that script sets the protections the rows above rest on |
 | ending a turn | the branch is `batch/*`, its pull request is ready and green, and no cycle is recorded — a nudge rather than a lock: it asks once per head, drafts and red checks are exempt, and it fails open where everything else fails closed |
+
+Each of those used to be a thing an agent was asked to stop and ask about.
+What a rule bought was an agent stopping to ask; what a refusal buys is one
+that cannot proceed and is told why, including on the day nobody read the
+rule. The one thing still asked rather than refused is merging a pull request
+whose branch is not a `batch/*` branch: the gate reads the pull request
+number, the receipt and the marker, never the branch name, so nothing stands
+behind that one but [0020](decisions/0020-who-merges.md).
+
+On a `batch/*` branch, then, nothing needs asking: commit, push, open and
+update the pull request, post findings to it, reply to and resolve its
+threads, `push --force-with-lease` when collapsing an issue's own commits, and
+merge once it clears the bar above. A batch branch is proposed work: it can be
+rewritten or thrown away and the repository is untouched, and every step of it
+is visible in the pull request as it happens.
 
 Why each of those is drawn where it is — the questions CI stopped asking on
 every push, the turn that may not end on a summary, and the one place the gate

@@ -98,64 +98,23 @@ touches a person, a credential, or a weakness nothing has fixed yet.
 
 ## Git
 
-Work reaches `main` the way [Pull requests](docs/pull-requests.md)
-describes. Read it before starting a batch; do not reconstruct it from here.
+Work reaches `main` the way [Pull requests](docs/pull-requests.md) describes,
+and that page is written for people: read it before starting a batch, and do
+not reconstruct it from here. What you may do on a `batch/*` branch without
+asking, what [the landing gate](docs/pull-requests.md#the-landing-gate)
+refuses so that nobody has to remember to ask, and why whoever finishes a
+mergeable batch merges it — agent or not — are all there and in
+[0020](docs/decisions/0020-who-merges.md).
 
-What you may do on your own, and the one thing you may never do:
+Two things are said here because nothing else will say them to you.
 
-| | |
-| --- | --- |
-| On a `batch/*` branch, without asking | Commit, push, open and update the pull request, post findings to it, reply to and resolve its threads, `push --force-with-lease` when collapsing an issue's own commits |
-| Merging a `batch/*` pull request, without asking | Once it meets [When a branch is ready to merge](docs/pull-requests.md#when-a-branch-is-ready-to-merge): `gh pr merge <pr> --rebase` |
-| Never, whatever its state | Merging a pull request whose body posts `<!-- do-not-merge -->` on a line of its own |
-
-The last row is here rather than left to the check that enforces it, because an
-agent meeting a red check it has no rule for will set about making it green.
-That is the whole hazard: nothing about such a pull request looks like an
-exception, and marking it ready and merging it is what following the row above
-looks like. What the marker is and how it is read is
-[When a branch is ready to merge](docs/pull-requests.md#when-a-branch-is-ready-to-merge);
-what this row adds is that the answer is never yours to overturn.
-
-The line is what a mistake costs. A batch branch is proposed work: it can be
-rewritten or thrown away and the repository is untouched, and every step of it
-is visible in the pull request as it happens. `--force-with-lease` is on the
-free side because the lease is the guard — it refuses if anything arrived since
-you last fetched, so it cannot overwrite work you have not seen.
-
-**There used to be a third row here, listing four things to ask about first.**
-It is gone, and nothing it protected is less protected. Each of the four is now
-refused by something rather than remembered by somebody:
-
-| What | What refuses it |
-| --- | --- |
-| A push to `main` | GitHub — `enforce_admins`, required reviews, thirteen required contexts. `scripts/landing-gate.sh` refuses it first, so the message names the `batch/*` workflow instead of a protection rule |
-| A bare `push --force` | `scripts/landing-gate.sh`, and `allow_force_pushes: false` behind it |
-| `bd dolt push` | `scripts/landing-gate.sh`. It publishes the tracker, and [0029](docs/decisions/0029-the-issue-tracker-is-public.md) makes that public the moment it runs |
-| Writing branch protection | `scripts/landing-gate.sh`. `scripts/repo-settings.sh --check` compares and reports, and is free; writing is what is refused, because that script sets the protections the first two rows rest on |
-
-That is the trade this file prefers wherever it can be had: a rule nobody has
-to keep. What a row bought was an agent stopping to ask; what a refusal buys is
-an agent that cannot proceed and is told why, including on the day nobody read
-this file.
-
-Merging is on the free side for a different reason: none of the bar is yours to
-judge, and most of it `main` will not let you waive. The part nothing enforces
-is that the review cycle ran, so that one is on your honour —
-[0020](docs/decisions/0020-who-merges.md) is why that trade is made and what it
-costs.
-
-So the rule is narrow on purpose. A pull request that is not mergeable is one
-to finish, never one to ask an exception for. Anything a refusal above names is
-a person's to authorise, and the refusal says so when it happens rather than
-depending on this paragraph being read first.
-
-**One thing is still asked rather than refused**, and it is written here
-because nothing else will say it: merging a pull request whose branch is not a
-`batch/*` branch. `scripts/landing-gate.sh` reads the pull request number, the
-review-cycle receipt and the do-not-merge marker, and never the branch name, so
-this is the one row of the old table with no machinery behind it.
-[0020](docs/decisions/0020-who-merges.md) is where it was decided.
+**A pull request whose body posts `<!-- do-not-merge -->` on a line of its own
+is never merged, whatever its state, and the answer is never yours to
+overturn.** An agent meeting a red check it has no rule for will set about
+making it green, and nothing about such a pull request looks like an
+exception: marking it ready and merging it is what following the documented
+flow looks like. What the marker is and how it is read is
+[When a branch is ready to merge](docs/pull-requests.md#when-a-branch-is-ready-to-merge).
 
 **Never `git commit --no-verify`.** It is the one way past the commit-msg hook,
 and a guard that is stepped over the moment it refuses something is not a
@@ -179,9 +138,11 @@ Read these only when the task needs them. Do not load them pre-emptively.
 | `backend/` — Django, DRF, models, migrations | `.agents/skills/django-backend/SKILL.md` |
 | `frontend/` — React, MUI, Vite | `.agents/skills/react-frontend/SKILL.md` |
 | Images, Helm chart, Kubernetes, CodeNOW | `.agents/skills/deploy/SKILL.md` |
-| beads workflow detail | `.agents/skills/beads/SKILL.md` |
-| Landing work — what one commit holds, and its message | `.agents/skills/commits/SKILL.md` |
-| Running a batch through review, and merging it | `.agents/skills/pull-requests/SKILL.md` |
+| beads workflow detail | `.agents/skills/beads/SKILL.md`, then [docs/issue-tracking.md](docs/issue-tracking.md) |
+| Landing work — what one commit holds, its message, and the split | [docs/commits.md](docs/commits.md); `.agents/skills/commits/SKILL.md` holds the one agent-only habit |
+| Running a batch through review, and merging it | [docs/pull-requests.md](docs/pull-requests.md); `.agents/skills/pull-requests/SKILL.md` holds what is an agent's alone |
+| Code style and typing, and the commands that fix what can be fixed | [docs/code-style.md](docs/code-style.md) |
+| Running the suites, and what CI executes | [docs/testing.md](docs/testing.md), [docs/ci.md](docs/ci.md) |
 | Why something is built a certain way | [docs/decisions/](docs/decisions/) |
 | A tool writing into this repository — its hooks, its managed blocks, the config it rewrites | [0032](docs/decisions/0032-a-tools-defaults-are-not-this-projects-rules.md) |
 
