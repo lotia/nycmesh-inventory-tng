@@ -245,7 +245,7 @@ def test_the_lengths_this_refuses_at_are_the_columns_own() -> None:
     """
     # Annotated `Any` because `get_field` types as a field that may carry no
     # length at all, which is the very reason the module writes the numbers
-    # out. See DEVELOPERS.md#typing.
+    # out. See docs/code-style.md#typing.
     columns: list[Any] = [Item._meta.get_field("name"), ItemIdentifier._meta.get_field("value")]
 
     assert [column.max_length for column in columns] == [LONGEST_NAME, LONGEST_VALUE]

@@ -55,7 +55,7 @@ jobs:
       # depending on that would make an unrelated job fail the day it stops.
       - uses: azure/setup-helm@v4
       - run: uv sync --locked
-      # Commands mirror DEVELOPERS.md "Code style" and "Testing and coverage".
+      # Commands mirror docs/code-style.md "Code style" and DEVELOPERS.md "Testing and coverage".
       # Thresholds and rules live in backend/pyproject.toml, not here, so a
       # local run and this job enforce identical rules.
       - name: Lint
@@ -81,7 +81,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
-      # Commands mirror DEVELOPERS.md "Code style" and "Testing and coverage".
+      # Commands mirror docs/code-style.md "Code style" and DEVELOPERS.md "Testing and coverage".
       # Rules and thresholds live in frontend/biome.json and
       # frontend/vite.config.ts, not here.
       - name: Lint and format check

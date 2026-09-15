@@ -7,8 +7,8 @@ description: Use when working in backend/ on the inventory-tng Django REST Frame
 
 Commands (runserver, pytest, ruff, ty, migrations, `uv add`) are documented in
 [Common tasks](../../../docs/working-in-the-code.md#backend), style rules in
-[Code style](../../../DEVELOPERS.md#code-style), annotation requirements in
-[Typing](../../../DEVELOPERS.md#typing), and test and coverage requirements in
+[Code style](../../../docs/code-style.md#code-style), annotation requirements in
+[Typing](../../../docs/code-style.md#typing), and test and coverage requirements in
 [Testing and coverage](../../../DEVELOPERS.md#testing-and-coverage). The overall design is in
 [docs/architecture.md](../../../docs/architecture.md). This file covers only
 conventions you cannot infer from those.
@@ -80,7 +80,7 @@ the previous release, because a rollback does not revert it
 ## Typing
 
 The rules, the commands that tell you what is missing, and the Django patterns
-`ty` cannot see are all in [Typing](../../../DEVELOPERS.md#typing). Two things
+`ty` cannot see are all in [Typing](../../../docs/code-style.md#typing). Two things
 that are Django-specific and not there:
 
 - A view's `request` is `rest_framework.request.Request`, not Django's

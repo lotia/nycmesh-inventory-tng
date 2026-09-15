@@ -32,7 +32,7 @@ def at(minutes: float, **fields: object) -> Submission:
     # The suppression is on `**fields`: `sheets.submission` is keyword-only
     # with a field per column, and ty checks an unpacked dict against the
     # narrowest of those types rather than against each parameter it lands on.
-    # DEVELOPERS.md#typing asks a suppression to say which stub is narrow than
+    # docs/code-style.md#typing asks a suppression to say which stub is narrow than
     # the thing it describes, and this is ty itself rather than a stub.
     return submission(row=2 + int(minutes * 60), at=AT + minutes * MINUTE, **fields)  # ty: ignore[invalid-argument-type]
 

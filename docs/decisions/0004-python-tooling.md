@@ -38,7 +38,7 @@ libraries and are not tied to any particular checker.
 - **`ty` is pre-1.0** and moving quickly. It currently type checks this codebase
   cleanly, including Django and DRF via their stub packages. If it regresses,
   mypy remains a drop-in fallback: the stubs are already present and only the
-  command in [DEVELOPERS.md](../../DEVELOPERS.md#code-style) and CI would change.
+  command in [Code style](../code-style.md#code-style) and CI would change.
   This is a deliberate, reversible bet on tooling that is improving rapidly.
 - Adopting `ty` meant writing the health check as a class-based DRF view rather
   than an `@api_view` function, because the decorated function's type does not
