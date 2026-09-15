@@ -31,9 +31,16 @@ no longer there, or numbers a checker no longer enforces.
 it. That directory is beads' own and holds its five shims; a second directory
 is not an option, because `core.hooksPath` is one path and beads' git
 integration goes quiet the moment it names anywhere else. So one pointer arms
-all six: the commit checker this repository wrote, and beads' five, which cost
-a commit, a checkout and a pull each a fraction of a second more than they did
-— `inventory-tng-hn6w` is where what that is worth gets decided.
+all six: the commit checker this repository wrote, and beads' five.
+
+Beads' five stay armed, and that is a decision rather than an accident
+(`inventory-tng-hn6w`): beads is a core part of how this project is worked,
+and its hooks are not something to undo. What they cost is measured there —
+about a tenth of a second on a commit, a twentieth on a checkout or a pull —
+and judged worth it. What is bounded is how long one may *hang*:
+`mise.toml` sets `BEADS_HOOK_TIMEOUT` to five seconds for every shell in this
+directory, so a wedged `bd` makes a slow commit that says so, not a five-minute
+one that does not.
 
 Anything you keep in git's default `.git/hooks` stops running once that pointer
 is set — `pre-commit`, husky, a hook of your own — so move what you want kept
@@ -81,8 +88,7 @@ git config --unset core.hooksPath         # this clone: no hooks, until bootstra
 
 The last one is undone by `scripts/bootstrap-dev.sh`, which sets the pointer
 whenever it finds it unset, and `scripts/check-setup.sh` will report the clone
-as unwired in the meantime. `BEADS_HOOK_TIMEOUT` (seconds, default 300) bounds
-how long any of beads' shims may take before git carries on without it.
+as unwired in the meantime.
 
 **If you are an agent, the rule is different**, and [AGENTS.md](../AGENTS.md#git)
 says so and says why: never `--no-verify`. An agent that learns the switch will
