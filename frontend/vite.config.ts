@@ -54,7 +54,7 @@ export default defineConfig(({ mode }) => ({
     sourcemap: true,
   },
   // Coverage runs on every `npm test`, for the reason the backend's
-  // `pyproject.toml` gives about its own. See DEVELOPERS.md "Testing and
+  // `pyproject.toml` gives about its own. See docs/testing.md "Testing and
   // coverage".
   test: {
     environment: "jsdom",
@@ -62,7 +62,7 @@ export default defineConfig(({ mode }) => ({
     setupFiles: ["./src/test-setup.ts"],
     // Unit tests only, and only where they live: next to the code. Vitest's
     // default glob would otherwise collect the Playwright suite, which has its
-    // own runner and command -- see DEVELOPERS.md "Integration tests".
+    // own runner and command -- see docs/testing.md "Integration tests".
     //
     // `capture/` is here for its own arithmetic and its own list of pictures,
     // both of which are ordinary units. The driver beside them is a Playwright
