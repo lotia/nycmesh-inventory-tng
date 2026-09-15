@@ -1,6 +1,6 @@
 # Commands this repository has that no document names, and why each is right
 # to leave unwritten. Read by test_documented_commands.py, which fails on any
-# other one. See DEVELOPERS.md#what-ci-proves.
+# other one. See docs/ci.md.
 #
 # One paragraph per allowance: the comment saying why nobody should write it
 # up, then the command on a line of its own, spelled as a document would spell

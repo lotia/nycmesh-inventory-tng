@@ -29,7 +29,7 @@ down — those it runs on every push, along with a check that every chart value
 quoted here is one the chart really has. Nothing that installs, applies or
 execs has been tried for you, and the first time any of it runs will be when
 you run it. What that leaves covered elsewhere is
-[What CI proves](../DEVELOPERS.md#what-ci-proves).
+[What CI proves](ci.md).
 
 ## From an empty cluster to a first sign-in
 

@@ -52,7 +52,7 @@ chart change — the commands are in
 test: a chart change also runs `cd backend && uv run pytest`, because
 `backend/src/inventory/tests/test_chart.py` holds what the chart renders against
 the application it configures. What that catches and `helm lint` cannot is
-[What CI proves](../../../DEVELOPERS.md#what-ci-proves).
+[What CI proves](../../../docs/ci.md).
 
 Between them that is everything: CodeNOW builds the same Dockerfiles and applies
 the same chart, so there is no second deployment path to exercise
