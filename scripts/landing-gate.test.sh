@@ -763,6 +763,26 @@ unset GH_FAILS
 cp -f "$FIX/head.keep" "$FIX/head"
 
 echo
+echo "describe"
+# What docs/git-hooks.md carries about this hook, through scripts/hooks-doc.sh.
+# Held to the source: every arm the check mode dispatches on has a row, and
+# every row is an arm, so the page cannot be silent about a refusal that
+# exists or describe one that does not. `stop` is the other hook this script
+# is registered as, and has a row for the same reason.
+out=$(in_repo "" "" --describe); status=$?
+described=$(printf '%s\n' "$out" | cut -f1 | sort)
+arms=$({ awk '/^case "\$action" in$/ { inside = 1; next }
+              inside && /^esac$/ { exit }
+              inside && /^  [a-z-]+\)$/ { sub(/^  /, ""); sub(/\)$/, ""); print }' "$GATE"
+         echo stop; } | sort)
+equals "$described" "$arms" "describe names exactly the actions the check arm dispatches on, and stop"
+assert "$out" "$status" 0 "do-not-merge marker" "and each row says what is refused"
+equals "$(printf '%s\n' "$out" | awk -F'\t' 'NF != 3' | wc -l)" 0 "in three tab-separated fields"
+# The two names the ready row carries are review_cycle.py's, not typed here.
+assert "$out" "$status" 0 "other than $REVIEW_CHECK and $SETTINGS_CHECK is not green" \
+  "the ready row names the two checks read past, as review_cycle.py spells them"
+
+echo
 echo "status and clear"
 out=$(in_repo "" "" status)
 assert "$out" 0 0 "code-review" "status names the evidence behind each receipt"

@@ -31,7 +31,20 @@ CHECKER
   chmod +x "$WORK/repo/scripts/check-thing.sh"
   ln -sf ../../scripts/check-thing.sh "$WORK/repo/.beads/hooks/commit-msg"
   shim "$WORK/repo/.beads/hooks/pre-commit" pre-commit
-  printf '# Hooks\n\nProse before.\n\n<!-- hooks-doc: begin -->\n<!-- hooks-doc: end -->\n\nProse after.\n' \
+  # The Claude Code half: a settings file registering one script twice, and
+  # the script answering `describe` with two tab-separated rows.
+  mkdir -p "$WORK/repo/.claude"
+  cat >"$WORK/repo/.claude/settings.json" <<'JSON'
+{"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/gate.sh check", "timeout": 30}]}],
+           "Stop": [{"hooks": [{"type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/gate.sh stop", "timeout": 30}]}]}}
+JSON
+  cat >"$WORK/repo/scripts/gate.sh" <<'GATE'
+#!/usr/bin/env bash
+[[ "${1:-}" == --describe ]] && printf 'stop\tending a turn\tBlocks once.\nmerge\tgh pr merge\tRefused unless recorded.\n'
+exit 0
+GATE
+  chmod +x "$WORK/repo/scripts/gate.sh"
+  printf '# Hooks\n\nProse before.\n\n<!-- hooks-doc: begin -->\n<!-- hooks-doc: end -->\n\nProse between.\n\n<!-- claude-hooks: begin -->\n<!-- claude-hooks: end -->\n\nProse after.\n' \
     >"$WORK/repo/docs/git-hooks.md"
 }
 
@@ -48,7 +61,7 @@ echo "the render"
 
 scene
 out=$(run); status=$?
-assert "$out" "$status" 0 "Wrote the hooks table" "the table is written into the page"
+assert "$out" "$status" 0 "Wrote the hooks tables" "the tables are written into the page"
 assert "$(page)" 0 0 "Prose before." "the prose before the block is kept"
 assert "$(page)" 0 0 "Prose after." "and the prose after it"
 assert "$(page)" 0 0 '| `commit-msg` | [`scripts/check-thing.sh`](../scripts/check-thing.sh) | Refuses a thing that is wrong, over 7 of them. |' \
@@ -56,21 +69,57 @@ assert "$(page)" 0 0 '| `commit-msg` | [`scripts/check-thing.sh`](../scripts/che
 assert "$(page)" 0 0 '| `pre-commit` | beads shim v9.9.9: `bd hooks run pre-commit` |' \
   "a beads shim is described as one, with its version"
 # pre-commit fires before commit-msg, and the table says so by its order.
-first=$(grep -n '^| `pre-commit`' "$WORK/repo/docs/git-hooks.md" | cut -d: -f1)
-second=$(grep -n '^| `commit-msg`' "$WORK/repo/docs/git-hooks.md" | cut -d: -f1)
-if [[ -n "$first" && -n "$second" && "$first" -lt "$second" ]]; then
-  pass "rows are in the order git fires them"
-else
-  fail_case "rows are in the order git fires them" "$(page)"
-fi
+equals "$(grep -oE '^\| `[a-z-]+`' "$WORK/repo/docs/git-hooks.md" | paste -sd' ')" \
+  '| `pre-commit` | `commit-msg`' "rows are in the order git fires them"
 
 out=$(run); status=$?
-assert "$out" "$status" 0 "Wrote the hooks table" "rendering again is a no-op"
+assert "$out" "$status" 0 "Wrote the hooks tables" "rendering again is a no-op"
 equals "$(grep -c 'hooks-doc: begin' "$WORK/repo/docs/git-hooks.md")" 1 "and leaves one block, not two"
+
+echo
+echo "the Claude Code hooks"
+assert "$(page)" 0 0 "Prose between." "the prose between the two blocks is kept"
+assert "$(page)" 0 0 '| `PreToolUse` | Bash | `"$CLAUDE_PROJECT_DIR"/scripts/gate.sh check` | 30s |' \
+  "a registration is a row: event, matcher, command, timeout"
+assert "$(page)" 0 0 '| `Stop` | every one | `"$CLAUDE_PROJECT_DIR"/scripts/gate.sh stop` | 30s |' \
+  "and a registration without a matcher says so"
+assert "$(page)" 0 0 '| gh pr merge | Refused unless recorded. |' "each describe row is a row"
+equals "$(grep -c 'What \[`scripts/gate.sh`\](../scripts/gate.sh) refuses' "$WORK/repo/docs/git-hooks.md")" 1 \
+  "and a script registered twice is described once"
+
+sed -i 's/Refused unless recorded/Refused unless RECORDED/' "$WORK/repo/scripts/gate.sh"
+out=$(run --check); status=$?
+assert "$out" "$status" 1 "+| gh pr merge | Refused unless RECORDED. |" "a gate that changed its account fails the check"
+run >/dev/null
+
+scene
+printf '#!/usr/bin/env bash\nexit 0\n' >"$WORK/repo/scripts/gate.sh"
+out=$(run); status=$?
+assert "$out" "$status" 1 "does not answer --describe" "a registered script that cannot describe itself is refused"
+
+scene
+rm -f "$WORK/repo/scripts/gate.sh"
+out=$(run); status=$?
+assert "$out" "$status" 1 "not an executable here" "a registration naming a script that is not there is refused"
+
+scene
+printf '# Hooks\n\n<!-- hooks-doc: begin -->\n<!-- hooks-doc: end -->\n' >"$WORK/repo/docs/git-hooks.md"
+out=$(run); status=$?
+assert "$out" "$status" 2 "claude-hooks: begin" "a page with only the first block is refused, naming the marker it lacks"
+
+# A checker's words are its own, backslashes included: `\n` in a description
+# is two characters on the page, not a line break. awk -v would have made it
+# one, and the check would have passed the mangled page.
+scene
+sed -i 's/over 7 of them\./over 7 of them, or a literal \\\\n in one./' "$WORK/repo/scripts/check-thing.sh"
+run >/dev/null
+assert "$(page)" 0 0 'or a literal \n in one. |' "a backslash in a description reaches the page as typed"
 
 echo
 echo "--check"
 
+scene
+run >/dev/null
 out=$(run --check); status=$?
 assert "$out" "$status" 0 "describes the hooks that run" "a page matching the render passes"
 
@@ -116,15 +165,12 @@ printf '#!/usr/bin/env bash\nexit 0\n' >"$WORK/repo/scripts/check-thing.sh"
 out=$(run); status=$?
 assert "$out" "$status" 1 "does not answer --describe" "a linked checker that cannot describe itself is refused"
 
+# Could not look, as opposed to looked and objected: report.sh's refuse, and
+# its exit 2, for the reason its header gives.
 scene
 rm -f "$WORK/repo/docs/git-hooks.md"
 out=$(run); status=$?
-assert "$out" "$status" 1 "does not exist" "a missing page is refused rather than invented"
-
-scene
-printf '# Hooks\n\nNo block here.\n' >"$WORK/repo/docs/git-hooks.md"
-out=$(run); status=$?
-assert "$out" "$status" 1 "has no" "a page without the block is refused"
+assert "$out" "$status" 2 "does not exist" "a missing page is refused rather than invented"
 
 out=$(run --bogus); status=$?
 assert "$out" "$status" 2 "usage" "an unknown flag is refused"
