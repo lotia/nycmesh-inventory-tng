@@ -18,6 +18,24 @@
 [settings]
 activate_aggressive = true
 
+# THE SHELL'S ENVIRONMENT, NOT THE APPLICATION'S. What goes here is exported
+# into every process started from a shell that has entered this directory --
+# git and the hooks it spawns included -- and is the same for everybody, so it
+# is committed. Secrets and per-machine values are .env: gitignored, copied
+# from .env.sample, and read as a FILE by compose, Django and Vite, never
+# exported. The two are not merged on purpose: loading .env here would put
+# DJANGO_SECRET_KEY into every process and give each variable two sources with
+# the shell winning silently.
+[env]
+# How long git waits for one of beads' hooks before carrying on without it,
+# and the one bound this project puts on them (inventory-tng-hn6w: the shims
+# themselves stay as beads ships them). The shims default to 300, so a wedged
+# bd held a commit for five minutes with no word of why; at 5 it is a slow
+# commit that says so, and bd healthy takes ~45 ms. Reaches only a shell that
+# has activated mise here, which the setup requires; an IDE's own git gets the
+# default. docs/git-hooks.md is where the hooks are written up.
+BEADS_HOOK_TIMEOUT = "5"
+
 [tools]
 python = "3.14"        # backend runtime
 uv = "latest"          # backend package manager
