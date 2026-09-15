@@ -7,7 +7,7 @@
 # belongs to.
 
 # The colon, and the trailers being the last paragraph, are what git requires;
-# DEVELOPERS.md#commits says why. The colonless form is still read here,
+# docs/commits.md says why. The colonless form is still read here,
 # because history before that convention is full of it and `git log` should not
 # go blind halfway back.
 

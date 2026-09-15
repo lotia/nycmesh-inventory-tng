@@ -18,7 +18,7 @@ Each of those is five issues. That costs three things at once. `git bisect`
 cannot land between them, so a regression is attributed to five issues rather
 than one. Reverting one means reverting all five. And the summary line is not a
 summary — 61 characters listing two unrelated subjects — because
-[Commits](../../DEVELOPERS.md#commits) asks for a 50-character description of
+[Commits](../commits.md) asks for a 50-character description of
 one thing and it was being handed five.
 
 The review was the reason. A batch is reviewed once, so the fixes it produced

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One issue, one commit -- read what is staged and say whether it is that.
 #
-# The rules are in DEVELOPERS.md "Commits", which also says how to run this;
+# The rules are in docs/commits.md, which also says how to run this;
 # docs/git-hooks.md says how it comes to run on every commit, and how to skip
 # it. This only enforces the parts a machine can see.
 #
@@ -77,7 +77,7 @@ _here=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 # After the rules are sourced, so the numbers are theirs; before the message is
 # required, because this call has none.
 if [[ "$DESCRIBE" -eq 1 ]]; then
-  echo "Refuses a commit whose message breaks the rules in DEVELOPERS.md \"Commits\" -- a summary over $SUMMARY_LIMIT characters after its issue prefix, a body line over $BODY_LIMIT columns, or trailers that do not name exactly one issue -- or whose staged tracker closes more than one issue, or a different one from the message's."
+  echo "Refuses a commit whose message breaks the rules in docs/commits.md -- a summary over $SUMMARY_LIMIT characters after its issue prefix, a body line over $BODY_LIMIT columns, or trailers that do not name exactly one issue -- or whose staged tracker closes more than one issue, or a different one from the message's."
   exit 0
 fi
 MESSAGE=${1:?usage: check-commit.sh [--amend] [--message-only] <message-file>}
@@ -112,7 +112,7 @@ fi
 # closure would refuse an honest commit for touching history. So both sides of
 # the diff are read and the ones already closed are taken back out.
 #
-# An epic is not counted at all; DEVELOPERS.md#the-message says why. Without
+# An epic is not counted at all; docs/commits.md#the-message says why. Without
 # that, the only ways out were to leave an epic open after its batch merged, or
 # to give its closure a commit whose trailer named something nobody built.
 closed=()
@@ -278,7 +278,7 @@ if [[ "$MESSAGE_ONLY" -eq 0 ]]; then
 
   if [[ ${#closed[@]} -gt 1 ]]; then
     fail "${#closed[@]} issues are closed here. One issue, one commit."
-    note "  DEVELOPERS.md 'Commits' has the rule; .agents/skills/commits has the split."
+    note "  docs/commits.md has the rule, and the split."
   fi
 fi
 

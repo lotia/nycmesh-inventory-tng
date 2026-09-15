@@ -20,7 +20,7 @@ against a fresh render. The script's header says why.
 | --- | --- | --- |
 | `pre-commit` | beads shim v1.0.5: `bd hooks run pre-commit` | Never refuses on its own: hands off to beads, which runs any hooks it was told to chain before a commit, and passes the exit status of `bd` through. |
 | `prepare-commit-msg` | beads shim v1.0.5: `bd hooks run prepare-commit-msg` | Never refuses on its own: hands off to beads, which adds an agent-identity trailer to the message for forensics, and passes the exit status of `bd` through. |
-| `commit-msg` | [`scripts/check-commit.sh`](../scripts/check-commit.sh) | Refuses a commit whose message breaks the rules in DEVELOPERS.md "Commits" -- a summary over 50 characters after its issue prefix, a body line over 72 columns, or trailers that do not name exactly one issue -- or whose staged tracker closes more than one issue, or a different one from the message's. |
+| `commit-msg` | [`scripts/check-commit.sh`](../scripts/check-commit.sh) | Refuses a commit whose message breaks the rules in docs/commits.md -- a summary over 50 characters after its issue prefix, a body line over 72 columns, or trailers that do not name exactly one issue -- or whose staged tracker closes more than one issue, or a different one from the message's. |
 | `pre-push` | beads shim v1.0.5: `bd hooks run pre-push` | Never refuses on its own: hands off to beads, which runs any hooks it was told to chain before a push, and passes the exit status of `bd` through. |
 | `post-checkout` | beads shim v1.0.5: `bd hooks run post-checkout` | Never refuses on its own: hands off to beads, which runs any hooks it was told to chain after a checkout, and passes the exit status of `bd` through. |
 | `post-merge` | beads shim v1.0.5: `bd hooks run post-merge` | Never refuses on its own: hands off to beads, which runs any hooks it was told to chain after a pull or merge, and passes the exit status of `bd` through. |
@@ -29,8 +29,8 @@ against a fresh render. The script's header says why.
 `commit-msg` is the one to know. How it reads the staged tracker, how it
 recognises an amend and what it cannot tell from one message, and the way to
 reword a summary it refuses, are
-[Checking it](../DEVELOPERS.md#checking-it); the rules it applies are
-[Commits](../DEVELOPERS.md#commits).
+[Checking it](commits.md#checking-it); the rules it applies are
+[Commits](commits.md).
 
 `.beads/hooks` is where they live, and `core.hooksPath` is what points git at
 it. That directory is beads' own and holds its shims; a second directory is not

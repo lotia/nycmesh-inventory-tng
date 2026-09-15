@@ -6,7 +6,7 @@
 # branch closed the same issue twice, interleaved two issues' commits, or landed
 # work nobody put in the batch. That is what this reads.
 #
-# The rules are in DEVELOPERS.md "Pull requests" and "Commits".
+# The rules are in DEVELOPERS.md "Pull requests" and docs/commits.md "Commits".
 #
 # Usage: check-batch.sh [<range>] [--epic <id>] [--unfinished] [--list] [--squashed]
 #
