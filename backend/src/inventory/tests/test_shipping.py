@@ -85,9 +85,11 @@ def a_line(record: dict[str, Any]) -> str:
 # this module opens, several grown, are enough to put a busy machine there by
 # the time this one asks. inventory-tng-mcjf. The refusal is safe --
 # `filled_with` falls back to the writer thread, weaker and not hung -- and
-# the one test that asks whether the strong path was available skips rather
-# than fails, because a red assertion there says something true about the
-# machine's load at that instant and nothing about the code.
+# the two tests whose question needs the strong path skip rather than fail:
+# the capacity test below, and the burst test, whose helper declines a pipe
+# it could not grow (inventory-tng-9cau). A red assertion in either would say
+# something true about the machine's load at that instant and nothing about
+# the code.
 PAGE = 4096
 
 
@@ -128,23 +130,31 @@ def grown(writing_end: int, data: bytes) -> OSError | None:
     return None
 
 
-def filled_with(data: bytes) -> int:
-    """The reading end of a pipe holding all of `data`, with the writer closed.
+def grown_for(data: bytes) -> tuple[int, int, bool]:
+    """A pipe asked to hold `data`: both ends, and whether it now does.
 
-    The capacity is asked for rather than assumed, so this holds on the busy
-    machine that found the bug as well as the quiet one that did not.
-
-    A kernel that refuses is not worth failing over here: the write below
-    would then block exactly as it used to, which is the deadlock. Rather than
-    leave that possible, the refusal falls back to a writer thread -- weaker,
-    because a descriptor still being written to always looks readable, but a
-    weaker test beats a suite that stops.
+    The capacity is asked for rather than assumed, so the helpers below hold
+    on the busy machine that found the bug as well as the quiet one that did
+    not. Where the question cannot be asked at all -- any platform but Linux
+    -- the default is taken to fit, as it did before any of this.
     """
     reading_end, writing_end = os.pipe()
     grown(writing_end, data)
-
     held = pipe_capacity(writing_end)
-    if held is not None and held < len(data):
+    return reading_end, writing_end, held is None or held >= len(data)
+
+
+def filled_with(data: bytes) -> int:
+    """The reading end of a pipe holding all of `data`, with the writer closed.
+
+    A kernel that refuses to grow it is not worth failing over here: the
+    write below would then block exactly as it used to, which is the deadlock.
+    Rather than leave that possible, the refusal falls back to a writer thread
+    -- weaker, because a descriptor still being written to always looks
+    readable, but a weaker test beats a suite that stops.
+    """
+    reading_end, writing_end, fits = grown_for(data)
+    if not fits:
 
         def fill() -> None:
             try:
@@ -179,23 +189,42 @@ def filled_and_then_quiet(data: bytes) -> int:
     that has drained the pipe now genuinely finds nothing, which is the
     question the test means to ask.
 
-    It costs a fifth of a second. That is what asking a timeout-based question
+    It costs twice `QUIET`. That is what asking a timeout-based question
     honestly costs, and the alternative is an assertion that cannot fail.
+
+    AND THE DATA IS WRITTEN BEFORE THE READER STARTS, from this thread, into
+    a pipe grown to hold it -- the premise the burst test states. Written
+    from the waiting thread instead, as it was, a two-page pipe on a loaded
+    machine blocked that thread mid-payload and the reader met a descriptor
+    still being filled, which is the arrangement the comment above `PAGE`
+    says hides the defect (inventory-tng-9cau).
+
+    A REFUSED GROW IS A SKIP HERE, NOT A FALLBACK. `filled_with` falls back
+    to a writer thread because its callers do not ask about the quiet
+    boundary, so a weaker pipe still answers them. This helper has one
+    caller, and a pipe being filled from a thread cannot ask that caller's
+    question at all: the burst test would be green by arrangement, which is
+    the failure 9cau was filed about. So the question is declined rather
+    than answered wrongly, for the machine-load reason the capacity test
+    skips.
     """
-    reading_end, writing_end = os.pipe()
+    reading_end, writing_end, fits = grown_for(data)
+    if not fits:
+        os.close(writing_end)
+        os.close(reading_end)
+        raise pytest.skip.Exception(
+            "the pipe could not be grown to hold the payload, so the burst question cannot be asked "
+            "here: over fs.pipe-user-pages-soft -- inventory-tng-mcjf"
+        )
+    os.write(writing_end, data)
 
-    def fill_and_wait() -> None:
-        try:
-            os.write(writing_end, data)
-            # Long enough that the reader's `select` expires while the writer
-            # is still open, and not so long that the suite notices.
-            time.sleep(shipping.QUIET * 2)
-        except BrokenPipeError:  # the reader stopped early
-            pass
-        finally:
-            os.close(writing_end)
+    def wait_and_close() -> None:
+        # Long enough that the reader's `select` expires while the writer is
+        # still open, and not so long that the suite notices.
+        time.sleep(shipping.QUIET * 2)
+        os.close(writing_end)
 
-    threading.Thread(target=fill_and_wait, daemon=True).start()
+    threading.Thread(target=wait_and_close, daemon=True).start()
     return reading_end
 
 
@@ -390,6 +419,10 @@ def test_a_refused_grow_is_a_skip_and_not_a_failure(monkeypatch: pytest.MonkeyPa
 
     with os.fdopen(filled_with(SIXTY_LINES), "rb") as stream:
         assert list(shipping.reading(stream)) == [json.dumps(A_RECORD)] * 60
+    # And the quiet helper declines rather than answering weakly, since a
+    # pipe filled from a thread cannot ask its one caller's question.
+    with pytest.raises(pytest.skip.Exception, match=r"fs\.pipe-user-pages-soft"):
+        filled_and_then_quiet(SIXTY_LINES)
 
 
 def test_a_refusal_that_is_not_the_soft_limit_is_the_code_and_stays_red(monkeypatch: pytest.MonkeyPatch) -> None:
