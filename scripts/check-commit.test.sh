@@ -272,6 +272,44 @@ scene
 good_message
 expect --message-only 0 "Nothing to object to" "the message rules pass with nothing staged"
 
+# A GitHub issue named the way GitHub writes it, which git's editor would
+# drop as a comment: refused as that, naming the form that survives.
+scene
+message <<'MSG'
+#456: Ignore the editor swap files
+
+Body.
+
+Closes: #456
+MSG
+output=$("$CHECK" --message-only "$WORK/repo/message" 2>&1); status=$?
+assert "$output" "$status" 1 "begins with #, which git drops as a comment" "a #456: summary is refused as a comment, not as empty"
+assert "$output" "$status" 1 'for GitHub issue 456 write "456: ..."' "and the form that survives is named, with the number that was written"
+refute "$output" "$status" 1 "summary line is empty" "without also calling it empty"
+refute "$output" "$status" 1 "line after the summary must be blank" "and without objecting to the blank line that was written"
+
+# A # line with no number is still a comment, and is told nothing it did not
+# write.
+scene
+message <<'MSG'
+# Please enter the commit message for your changes.
+
+Closes: #456
+MSG
+output=$("$CHECK" --message-only "$WORK/repo/message" 2>&1); status=$?
+assert "$output" "$status" 1 "begins with #" "a # line with no number is refused as a comment"
+refute "$output" "$status" 1 "for GitHub issue" "and is not told a number it did not write"
+
+scene
+message <<'MSG'
+456: Ignore the editor swap files
+
+Body.
+
+Closes: #456
+MSG
+expect --message-only 0 "Nothing to object to" "the form it names passes"
+
 scene
 message <<'MSG'
 Extracted the decode loop

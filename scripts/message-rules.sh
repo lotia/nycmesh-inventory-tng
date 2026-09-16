@@ -53,12 +53,17 @@ message_is_git_own() {
 # MESSAGE_TRAILER_COUNT for the caller.
 message_rules() {
   local text=$1
-  # Comments are git's own and never reach the stored message. Dropped here
-  # rather than by each caller: check-commit.sh reads a file that still has
-  # them and check-batch.sh reads %B that never did, so a rule applied before
-  # this line would give the two opposite verdicts on the same commit -- which
-  # is the divergence this file exists to remove.
-  text=$(printf '%s\n' "$text" | grep -v '^#')
+  # Comments are git's own, and dropped here rather than by each caller so
+  # that check-commit.sh, which reads a file, and check-batch.sh, which reads
+  # a stored message, give one verdict. Not because a stored message cannot
+  # hold one: `-m` and `-F` keep a # line where the editor drops it, and
+  # neither caller can tell which way a message arrived, so both apply git's
+  # strictest reading. Every line but the first: the summary is judged as
+  # written, by the rule below, rather than removed and then found missing --
+  # which also shifted every later rule onto the wrong line.
+  local first=${text%%$'\n'*} rest=${text#*$'\n'}
+  [[ "$rest" == "$text" ]] && rest=""
+  text=$first$'\n'$(printf '%s\n' "$rest" | grep -v '^#')
   # Trailing blank lines are how the message was stored, not something the
   # author wrote: git's %B ends in a newline and a file ends in one too. Left
   # on, they make the trailers stop being the last paragraph.
@@ -112,6 +117,17 @@ message_rules() {
 
   if [[ "$summary" == *. ]]; then
     fail "the summary line ends in a full stop"
+  fi
+
+  # A GitHub issue written the way GitHub writes it. The number is echoed so
+  # the form named is the person's to paste rather than an example to adapt;
+  # a # line with no number is refused for the same reason and told nothing
+  # it did not write.
+  if [[ "$summary" == \#* ]]; then
+    fail "the summary line begins with #, which git drops as a comment when the message is edited, and this check always does"
+    if [[ "$summary" =~ ^#([0-9]+) ]]; then
+      note "  for GitHub issue ${BASH_REMATCH[1]} write \"${BASH_REMATCH[1]}: ...\" and close it with \"Closes: #${BASH_REMATCH[1]}\""
+    fi
   fi
 
   # Imperative mood, as far as a machine can tell: the past tense and the gerund

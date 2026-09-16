@@ -166,6 +166,11 @@ answers one, and that is what is read.
 It is the same device as the `<!-- batch-contents -->` marker CI posts, for the
 same reason: a marker survives rewording and prose does not.
 
+**Both passes run on every pull request**, a maintainer's own and a one-line
+change included: a marker typed with an honest note in place of a pass is the
+very thing the markers exist to distinguish from. The few minutes are the price
+of the record meaning what it says.
+
 **The two stages do not have the same operator, and an agent has to know which
 is which.** Simplification is an agent's own work and it runs without being
 told to. Reviewing is not: `/code-review` is a built-in carrying
