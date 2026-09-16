@@ -399,6 +399,13 @@ whose branch is not a `batch/*` branch: the gate reads the pull request
 number, the receipt and the marker, never the branch name, so nothing stands
 behind that one but [0020](decisions/0020-who-merges.md).
 
+**The refusals are a floor, not a fence.** They cover the spellings this
+project uses: `curl -X PUT` at the branch-protection endpoint, or `gh` behind
+an alias, walks past them, and a spelling list is a spelling list. Why that is
+a limit and not a defect, and which one refusal has nothing behind it but the
+rule, is the end of [0020](decisions/0020-who-merges.md); the rule is
+[AGENTS.md](../AGENTS.md#git).
+
 On a `batch/*` branch, then, nothing needs asking: commit, push, open and
 update the pull request, post findings to it, reply to and resolve its
 threads, `push --force-with-lease` when collapsing an issue's own commits, and

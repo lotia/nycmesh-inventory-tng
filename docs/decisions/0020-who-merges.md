@@ -244,4 +244,8 @@ already run. Finding nothing at all still writes nothing.
 None of it is a security boundary. It reads a command line, and a command line
 has more spellings than any reader has patterns; the enforcement that matters
 is the rules `main` holds itself, and this record is the decision about what
-may rest on a guardrail against forgetting.
+may rest on a guardrail against forgetting. One refusal has nothing behind it
+but the rule: the request that rewrites those protections, which is the one
+thing they cannot refuse. The gate names the spellings it knows for that one,
+and the rest is `inventory-tng-278r` — an agent told in AGENTS.md that another
+client for a refused request is `--no-verify` under another name.

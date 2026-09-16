@@ -126,7 +126,7 @@ What [`scripts/landing-gate.sh`](../scripts/landing-gate.sh) refuses, in its own
 | --- | --- |
 | ending a turn | Blocks the turn once, when the current branch's pull request is ready and green and its review cycle has not been recorded against this head -- a batch that looks finished and is not. |
 | bd dolt push, bd sync, bd federation sync | Refused: it publishes the issue tracker, and this repository is public (decision 0029). A person reads what is about to become public and runs it. |
-| scripts/repo-settings.sh without --check; gh api writing branch protection or repository settings | Refused: it writes the protections every other refusal here relies on. --check compares and is free; writing is a person's to authorise. |
+| scripts/repo-settings.sh without --check; gh api writing branch protection or repository settings | Refused: it writes the protections every other refusal here relies on. --check compares and is free; writing is a person's to authorise. The spellings named are the ones it knows; another route to the same endpoint is --no-verify under another name. |
 | git commit, in the shared checkout | Refused: that checkout is the person's, git status there lists what anybody did, and even a path-named add stages a colleague's hunk in that file. Work in a worktree of your own -- the EnterWorktree tool -- where a commit is free. |
 | git push --force, -f | Refused: use --force-with-lease, which refuses if the remote moved since you fetched. Breaking a lease is a person's call. |
 | git push to main | Refused before GitHub gets to, so the refusal names the batch/* workflow rather than a protection rule. |
