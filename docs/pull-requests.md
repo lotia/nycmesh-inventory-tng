@@ -16,8 +16,7 @@ git remote set-url origin git@github.com:lotia/nycmesh-inventory-tng.git
 ```
 
 — or keep the HTTPS remote and let `gh auth login` install a credential helper
-for it. Contributors without write access push to a fork instead;
-[CONTRIBUTING.md](../CONTRIBUTING.md) is that path.
+for it. Without write access, see [From a fork](#from-a-fork).
 
 **One batch, one branch, one pull request.** A batch is the set of issues you
 mean to ship together. Branch from `main` as `batch/<name>`; if the batch is
@@ -48,6 +47,25 @@ passed its own checks:
 Mark the pull request ready when the batch is complete and CI is green. What
 the batch holds is posted there as a comment, read off the commits rather than
 typed, so the list is the one that was checked.
+
+## From a fork
+
+Without write access you push to a fork and open the pull request from there,
+and most of this page is then a maintainer's rather than yours. Yours:
+[Finish, then publish](#finish-then-publish-then-review) and
+[Commits](commits.md), with an issue named by its GitHub number. Not yours:
+
+- **Nothing to run before opening it.** The batch epic, `bd` and
+  [the landing gate](#the-landing-gate) are an agent's; what runs for you is
+  the hooks, and [git hooks](git-hooks.md) says what each asks.
+- **The `Review cycle` check is red until a maintainer runs both passes.**
+  Red means that has not happened yet, not that the change is wrong; every
+  other check answers about your commits, which are yours to make green.
+- **CI does not post the batch comment.** A fork's workflow run holds a
+  read-only token, so `<!-- batch-contents -->` is not written and the run
+  says so as a warning.
+- **A maintainer merges**, being whoever finished it —
+  [When a branch is ready to merge](#when-a-branch-is-ready-to-merge).
 
 ## A batch is done when it is merged
 

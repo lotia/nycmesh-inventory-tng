@@ -37,9 +37,10 @@ You are not required to use beads. Nothing in this project should be workable
 
 Review happens on the pull request, and everything reaches `main` through one.
 Read [Pull requests](docs/pull-requests.md) before you start — it changes how
-you will want to arrange your commits. Small pull requests get reviewed faster
-than large ones, and one that only fixes a confusing sentence is a genuinely
-useful contribution.
+you will want to arrange your commits, and its [From a fork](docs/pull-requests.md#from-a-fork)
+is the half that applies without write access. Small pull requests get reviewed
+faster than large ones, and one that only fixes a confusing sentence is a
+genuinely useful contribution.
 
 ## Definition of Done
 
