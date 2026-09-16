@@ -20,10 +20,12 @@ committed: it is tens of thousands of files, and this repository is public.
 invariant rather than a list of names — every directory under `.beads/` is
 either tracked on purpose, like the `hooks/` symlinks, or ignored on purpose —
 so a directory a future bd version invents is caught by a rule that never heard
-of it. It also checks that the mode named in `.beads/metadata.json` has storage
-to go with it, because a mismatch does not make bd fail: it opens an empty
-database and says so only as a warning, which reads as an empty tracker rather
-than a broken one. CI runs it, and you can run it yourself.
+of it. The mirror question is asked too: is any of that state *already*
+tracked, which no ignore rule can undo. It also checks that the mode named in
+`.beads/metadata.json` has storage to go with it, because a mismatch does not
+make bd fail: it opens an empty database and says so only as a warning, which
+reads as an empty tracker rather than a broken one. CI runs it, and you can
+run it yourself.
 
 `.beads/config.yaml` is committed, and two of its settings are held by the
 same checker: `export.auto`, so that the committed export is what the tracker
