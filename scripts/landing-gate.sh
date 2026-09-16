@@ -773,7 +773,7 @@ print(review_cycle.CHECK, review_cycle.SETTINGS_CHECK, sep="\t")
     printf '%s\t%s\t%s\n' \
       stop "ending a turn" "Blocks the turn once, when the current branch's pull request is ready and green and its review cycle has not been recorded against this head -- a batch that looks finished and is not." \
       dolt-push "bd dolt push, bd sync, bd federation sync" "Refused: it publishes the issue tracker, and this repository is public (decision 0029). A person reads what is about to become public and runs it." \
-      repo-settings "scripts/repo-settings.sh without --check; gh api writing branch protection or repository settings" "Refused: it writes the protections every other refusal here relies on. --check compares and is free; writing is a person's to authorise." \
+      repo-settings "scripts/repo-settings.sh without --check; gh api writing branch protection or repository settings" "Refused: it writes the protections every other refusal here relies on. --check compares and is free; writing is a person's to authorise. The spellings named are the ones it knows; another route to the same endpoint is --no-verify under another name." \
       commit "git commit, in the shared checkout" "Refused: that checkout is the person's, git status there lists what anybody did, and even a path-named add stages a colleague's hunk in that file. Work in a worktree of your own -- the EnterWorktree tool -- where a commit is free." \
       push-force "git push --force, -f" "Refused: use --force-with-lease, which refuses if the remote moved since you fetched. Breaking a lease is a person's call." \
       push "git push to main" "Refused before GitHub gets to, so the refusal names the batch/* workflow rather than a protection rule." \
@@ -1332,7 +1332,12 @@ guards around every other one.
   scripts/repo-settings.sh --check
 
 compares and reports without writing, and is not refused. Writing is a person's
-to authorise, with the diff that --check prints in front of them."
+to authorise, with the diff that --check prints in front of them.
+
+This refuses the spellings it knows, and there is no second one: reaching the
+same endpoint by another route is --no-verify under another name, and
+AGENTS.md's rule on that is what stands here. See docs/pull-requests.md
+\"The landing gate\"."
     ;;
 
   commit)

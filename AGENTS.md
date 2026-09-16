@@ -123,10 +123,13 @@ exception: marking it ready and merging it is what following the documented
 flow looks like. What the marker is and how it is read is
 [When a branch is ready to merge](docs/pull-requests.md#when-a-branch-is-ready-to-merge).
 
-**Never `git commit --no-verify`.** It is the one way past the commit-msg hook,
-and a guard that is stepped over the moment it refuses something is not a
-guard. A refusal is the work; fix what it named. A person may skip the hooks,
-and [docs/git-hooks.md](docs/git-hooks.md) says how; that page is not for you.
+**Never `git commit --no-verify` — nor another spelling or client for what the
+landing gate just refused.** Either is the one way past a guard, and a guard
+that is stepped over the moment it refuses something is not a guard. A refusal
+is the work; fix what it named. That the gate cannot see every spelling is
+[a floor, not a fence](docs/pull-requests.md#the-landing-gate), and this rule
+is what stands where it ends. A person may skip the hooks, and
+[docs/git-hooks.md](docs/git-hooks.md) says how; that page is not for you.
 
 When finishing, report changed files, what you validated, and the commands you
 would run next.
