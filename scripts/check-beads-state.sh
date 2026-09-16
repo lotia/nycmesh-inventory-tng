@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # Can anything under .beads/ reach a public repository by accident?
 #
-# THREE QUESTIONS, and what they share is the failure rather than the subject:
+# FOUR QUESTIONS, and what they share is the failure rather than the subject:
 # each is a way for the tracker's state to be wrong while everything looks
 # fine.
 #
 # The first is the reason this exists -- whether the directories bd keeps its
-# state in are ones git will publish. The second is whether the mode the
-# metadata names has storage to go with it. The third is whether the committed
-# export is still being kept current, because a file that quietly stopped
-# updating is state that misleads a commit as surely as one that should never
-# have been in it.
+# state in are ones git will publish. The second is its mirror: whether any
+# of that state is already published, tracked by a git that no ignore rule
+# can reach. The third is whether the mode the metadata names has storage to
+# go with it. The fourth is whether the committed export is still being kept
+# current, because a file that quietly stopped updating is state that
+# misleads a commit as surely as one that should never have been in it.
 #
 # What this deliberately does NOT ask is whether beads is configured well. bd
 # answers that for itself and changes its mind between versions.
@@ -74,6 +75,45 @@ while IFS= read -r dir; do
   fail "$dir is neither tracked nor ignored, so a commit here would publish it"
   note "  add it to .beads/.gitignore, or track it if it is meant to travel"
 done < <(find .beads -mindepth 1 -maxdepth 1 -type d | sort)
+
+# AND NOTHING ALREADY TRACKED IS STATE. "Tracked" passes above, rightly for
+# hooks/, but an ignore rule has no say over a path git already tracks. `git
+# add` refuses an ignored path without -f, so the case this catches is the
+# retrospective one: a path tracked first and judged local later, which is
+# exactly what happened to metadata.json (inventory-tng-yb3n.3), and what
+# would leave a database in the history of a public repository for ever
+# (inventory-tng-lffz). The question is asked of the ignore files rather than
+# of a list of storage directories: bd names every directory and runtime file
+# it keeps in .beads/.gitignore, mode by mode, and the root .gitignore carries
+# `.dolt/`, which is what every mode stores a database as; `--no-index` asks
+# them about a path regardless of tracking.
+#
+# ONLY THE REPOSITORY'S OWN RULES COUNT. `check-ignore` also reads
+# `.git/info/exclude` and the user's `core.excludesFile`, and neither says
+# anything about what this repository publishes: bd's fork protection writes
+# `.beads/` into `info/exclude` on purpose, and a global `*.jsonl` is
+# somebody's habit. Either would have every tracked path here reported as a
+# database in the history, on a clean tree, with advice to untrack it. So the
+# match is asked for verbosely and kept only when its source is an ignore file
+# the repository carries -- a relative path that is not under `.git/`.
+#
+# Reported per directory under .beads/ with a count, not per path: a tracked
+# database is tens of thousands of paths, and one line names it. What to do
+# about the history it is in is docs/decisions/0029-the-issue-tracker-is-public.md.
+declare -A tracked_count=() tracked_rule=()
+while IFS=$'\t' read -r rule path; do
+  source=${rule%%:*}
+  [[ "$source" == /* || "$source" == .git/* ]] && continue
+  rest=${path#.beads/}
+  group=.beads/${rest%%/*}
+  tracked_count[$group]=$((${tracked_count[$group]:-0} + 1))
+  tracked_rule[$group]=$rule
+done < <(git ls-files .beads | git -c core.quotePath=false check-ignore --no-index -v --stdin 2>/dev/null)
+while IFS= read -r group; do
+  [[ -n "$group" ]] || continue
+  fail "$group is tracked (${tracked_count[$group]} paths), and ${tracked_rule[$group]%%:*} says it must not be: it is in the history"
+  note "  git rm -r --cached it; the history is a person's call, and 0029 says whose"
+done < <(printf '%s\n' "${!tracked_count[@]}" | sort)
 
 # And the mode's own directory has to be there at all. A workspace whose
 # metadata names a mode whose storage is missing is one where bd will either
