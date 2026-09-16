@@ -232,8 +232,8 @@ cat <<DONE
 == Over to you
 
 The database is up, its schema is current, and there is a catalogue, a
-warehouse, two volunteers and some stock in it. Three things are left, and
-none of them is a step that was forgotten -- each needs a person.
+warehouse, two volunteers and some stock in it. Two things are left, and
+neither is a step that was forgotten -- each needs a person.
 
 1. Make yourself an account. It asks for a name and a password at the
    terminal, so it cannot be run for you:
@@ -243,18 +243,18 @@ none of them is a step that was forgotten -- each needs a person.
    You need one even to look at the volunteer's half today, which
    docs/local-development.md "Signing in" explains and is not how it is meant to end up.
 
-2. Find an authenticator app before you sign in -- a phone app, or any TOTP
-   tool. Your first sign-in stops and makes you enrol one, with no way past
-   it and no setting that turns it off:
-   docs/decisions/0013-administrator-sign-in.md is why. This is the wall
-   people hit when nobody told them.
-
-3. Start the two servers, in two terminals of your own:
+2. Start the two servers, in two terminals of your own:
 
      cd backend  && ${via}uv run python src/manage.py runserver
      cd frontend && ${via}npm install && ${via}npm run dev
 
-   Then sign in at http://localhost:5173/accounts/login/.
+   Then sign in at http://localhost:5173/accounts/login/. Whether that
+   sign-in stops to enrol an authenticator app is REQUIRE_SECOND_FACTOR in
+   your .env: .env.sample sets it false, so a fresh checkout asks for a
+   password and nothing else, and a .env without the line gets the code's
+   default, which is true. Turn it on only to work on the sign-in flow
+   itself; docs/local-development.md "Signing in" is why, and has the
+   seeded login whose codes survive a database wipe.
 
 DONE
 
