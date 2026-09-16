@@ -38,7 +38,10 @@ Closes: inventory-tng-abc
   title: work that cannot be summarised in 50 characters is usually more than
   one issue, and the answer is to split the issue rather than to lengthen the
   line. Only the distinguishing part of a bead ID is used, for the reason
-  [0017](decisions/0017-review-through-pull-requests.md) gives.
+  [0017](decisions/0017-review-through-pull-requests.md) gives. A GitHub
+  issue is named by its number alone — `123: Summarise the change` — and
+  never as `#123:`, because a line beginning with `#` is a comment to git and
+  is dropped, so a summary written that way is refused as one.
 - **The body says what changed**, wrapped at 72 columns. It is not a diary:
   how the work was done, what was tried first and what a review said are not
   what a reader of the history needs. A review's findings belong in the
@@ -57,7 +60,9 @@ Closes: inventory-tng-abc
   along the way may be created in the same commit — noticing work is honest
   work — but only one issue may be *closed* by it. An epic does not count: it
   groups a batch and does no work of its own, so it finishes when its children
-  do and its closure rides with the last of them.
+  do and its closure rides with the last of them. Housekeeping — a dependency
+  bumped, a line in `.gitignore` — need not be given an issue of its own: it
+  `Refs:` the issue it serves, as above. What it may not do is name none.
 
 What it looks like kept, and not kept:
 
@@ -91,6 +96,23 @@ needs.
 Work them one at a time on a batch branch and land each as it is finished. The
 pull request is the unit of review; the commit stays the unit of work. See
 [Pull requests](pull-requests.md).
+
+## Commit as you go, tidy before the pull request
+
+The rules are about what lands, not how often you commit on the way. A
+checkpoint called `wip` is a legitimate thing to make, and the `commit-msg`
+hook will refuse it; for a person, `git commit --no-verify` is the answer, and
+[git hooks](git-hooks.md#skipping-them) says so and what CI checks again. Before
+the pull request is opened — or, on a branch already pushed, before it is
+marked ready — fold the checkpoints into one commit per issue and give each
+the message it deserves:
+
+```bash
+git rebase -i origin/main                    # squash the checkpoints, reword the survivor
+scripts/check-batch.sh origin/main..HEAD     # what will land, read as a whole
+```
+
+The hook runs on each message the rebase asks you to write.
 
 ## Before you stage
 

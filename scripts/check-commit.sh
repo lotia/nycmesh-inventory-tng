@@ -88,10 +88,10 @@ MERGE_HEAD_PATH=$(git rev-parse --git-path MERGE_HEAD) || exit 1
 CHERRY_PICK_HEAD_PATH=$(git rev-parse --git-path CHERRY_PICK_HEAD) || exit 1
 
 # Comments are dropped by message-rules.sh, so that this script and
-# check-batch.sh see the same message; read here only for the summary line the
-# report prints and the merge/revert guard below.
-mapfile -t lines < <(grep -v '^#' "$MESSAGE")
-summary=${lines[0]:-}
+# check-batch.sh see the same message, and the rules get the file as written.
+# The first line is read here only for the report and the merge/revert guard
+# below; the rules judge it as written too, comment or not.
+IFS= read -r summary < "$MESSAGE" || summary=""
 
 # A merge, a revert and a cherry-pick are not somebody's issue being landed:
 # git writes their messages itself, and as a commit-msg hook this would refuse
@@ -287,7 +287,7 @@ fi
 echo "Message:"
 note "\"$summary\""
 
-message_rules "$(printf '%s\n' "${lines[@]}")"
+message_rules "$(cat "$MESSAGE")"
 
 named=$MESSAGE_TRAILER_ISSUE
 if [[ "$MESSAGE_TRAILER_COUNT" -gt 0 && "$MESSAGE_CLOSES_COUNT" -le 1 ]]; then
