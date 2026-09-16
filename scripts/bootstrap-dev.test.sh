@@ -255,8 +255,19 @@ expect 0 "beads' five hooks run from here too" "and what else this pointer arms 
 scene mise docker uv
 expect 0 "createsuperuser" "it says how to make an administrator"
 
+# Whether the first sign-in stops for an authenticator is the .env's to say,
+# and the script keeps an existing .env, so the message cannot assert either
+# answer: it used to say the sign-in stops and nothing turns that off, which
+# .env.sample's REQUIRE_SECOND_FACTOR=false made false for every fresh
+# checkout. Now it names the setting, what the sample and the code's default
+# each give, and where the choice is argued -- true for any .env, so no case
+# here writes one.
 scene mise docker uv
-expect 0 "authenticator app" "it says the first sign-in needs a second factor"
+output=$(bootstrap); status=$?
+assert "$output" "$status" 0 "is REQUIRE_SECOND_FACTOR in" "it names the setting that decides whether the first sign-in stops"
+assert "$output" "$status" 0 ".env.sample sets it false" "and what the sample gives"
+assert "$output" "$status" 0 "gets the code's" "and what a .env without the line gets"
+refute "$output" "$status" 0 "no way past it" "it no longer says the first sign-in demands an authenticator"
 
 scene mise docker uv
 expect 0 "http://localhost:5173" "it says where to look"
