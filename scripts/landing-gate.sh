@@ -36,13 +36,30 @@ SCRIPTS=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 # could merge anything. It also made the gate depend on the working directory
 # of whatever ran the command rather than on the project it guards.
 #
-# $CLAUDE_PROJECT_DIR is set by the harness that registers this hook and is the
-# right answer when it is there. git is the fallback for a person running the
-# script by hand. Failing to resolve either is not decided here -- `check` mode
-# refuses the commands it guards, and the subcommands below say so themselves --
-# because refusing at this line would refuse every command in the session.
-REPO_ROOT=${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}
-RECEIPTS="$REPO_ROOT/.claude/.review-receipts.json"
+# $CLAUDE_PROJECT_DIR is set by the harness that registers this hook and names
+# the project; the cwd is what a person running the script by hand has. Either
+# way the answer is THE SHARED CHECKOUT of that repository -- the one whose
+# .git is every worktree's common directory -- because a receipt written from a
+# worktree and read from the shared checkout were two files, and `record` from
+# one satisfied nothing at the merge (inventory-tng-dg7k). Resolved the way
+# scripts/hooks-path.sh resolves it, symlinks and all, so the two agree on
+# which directory that is; $CLAUDE_PROJECT_DIR stands in when git cannot say.
+# Failing to resolve anything is not decided here -- `check` mode refuses the
+# commands it guards, and the subcommands below say so themselves -- because
+# refusing here would refuse every command in the session.
+#
+# CALLED, NOT RUN AT LOAD. This file runs before every command a session
+# types and lets most of them through on a prefilter without forking once;
+# a git at the top would have been a fork on every one of them for a value
+# only the merge arm, the receipts and the stop hook read.
+locate_repo() {
+  local common
+  common=$(git -C "${CLAUDE_PROJECT_DIR:-.}" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+    && REPO_ROOT=$(dirname "$(readlink -f "$common")") \
+    || REPO_ROOT=${CLAUDE_PROJECT_DIR:-}
+  RECEIPTS="$REPO_ROOT/.claude/.review-receipts.json"
+  NUDGES="$REPO_ROOT/.claude/.stop-nudges.json"
+}
 
 # The markers the review cycle leaves on a pull request, and the only thing
 # `record` will accept as evidence that a stage ran. Named here rather than
@@ -542,8 +559,8 @@ missing_block() {
 # stop mode: invoked by the Stop hook when a session tries to end a turn
 # ---------------------------------------------------------------------------
 
-# Where a nudge is remembered, so that it is a nudge and not a wall.
-NUDGES="$REPO_ROOT/.claude/.stop-nudges.json"
+# Where a nudge is remembered, so that it is a nudge and not a wall, is
+# $NUDGES, set beside the receipts by locate_repo.
 
 # THIS ONE FAILS OPEN, AND IT IS THE ONLY MODE THAT MAY.
 #
@@ -595,6 +612,7 @@ stop_mode() {
     || stop_open "git could not say which branch this is"
   [[ "$branch" == batch/* ]] || exit 0
 
+  locate_repo
   have python3 || stop_open "python3 is not on the PATH"
 
   # ALREADY NUDGED IN THIS STOP SEQUENCE. The harness sets this when the
@@ -756,21 +774,23 @@ print(review_cycle.CHECK, review_cycle.SETTINGS_CHECK, sep="\t")
       stop "ending a turn" "Blocks the turn once, when the current branch's pull request is ready and green and its review cycle has not been recorded against this head -- a batch that looks finished and is not." \
       dolt-push "bd dolt push, bd sync, bd federation sync" "Refused: it publishes the issue tracker, and this repository is public (decision 0029). A person reads what is about to become public and runs it." \
       repo-settings "scripts/repo-settings.sh without --check; gh api writing branch protection or repository settings" "Refused: it writes the protections every other refusal here relies on. --check compares and is free; writing is a person's to authorise." \
-      add-all "git add -A, --all, -u, --update, . or :/, and git commit -a, in the shared checkout" "Refused: git status there lists what anybody did, and a sweep staged a colleague's edit into another issue's commit. Stage by path, or work in a worktree of your own, where it is free." \
+      commit "git commit, in the shared checkout" "Refused: that checkout is the person's, git status there lists what anybody did, and even a path-named add stages a colleague's hunk in that file. Work in a worktree of your own -- the EnterWorktree tool -- where a commit is free." \
       push-force "git push --force, -f" "Refused: use --force-with-lease, which refuses if the remote moved since you fetched. Breaking a lease is a person's call." \
       push "git push to main" "Refused before GitHub gets to, so the refusal names the batch/* workflow rather than a protection rule." \
       ready "gh pr ready" "Refused while any check other than $review_check and $settings_check is not green, and refused differently for a pull request whose body posts the do-not-merge marker." \
       merge-named "gh pr merge or gh pr ready naming the pull request by URL or branch" "Refused: the gate keys receipts and heads by number, and read as naming none such a command was judged against the checked-out branch's pull request. Name it by number." \
       merge-elsewhere "gh pr merge --repo pointing at another repository" "Refused: the receipts are keyed by pull request number within this repository, so a cycle recorded for #7 here cannot vouch for #7 anywhere else. Run it from a checkout of that repository." \
-      merge "gh pr merge, and the API spellings of it" "Refused unless the pull request does not post the do-not-merge marker, its review cycle is recorded against the exact head being merged, that head is what is checked out, and check-batch.sh is clean over the range."
+      merge "gh pr merge, and the API spellings of it" "Refused unless the pull request does not post the do-not-merge marker, its review cycle is recorded against the exact head being merged, its branch is checked out somewhere in this repository at that head, and check-batch.sh is clean over the range there."
     exit 0
     ;;
   record)
     pr=${2:?usage: landing-gate.sh record <pr-number>}
+    locate_repo
     record_receipt "$pr"
     exit $?
     ;;
   clear)
+    locate_repo
     have python3 || { echo "landing-gate: python3 is needed to edit the receipts." >&2; exit 1; }
     if [[ -n "${2:-}" ]]; then
       # The success line used to print whatever happened, because the exit
@@ -819,6 +839,7 @@ with open(path, "w") as fh:
     exit 0
     ;;
   status)
+    locate_repo
     if [[ ! -f "$RECEIPTS" ]]; then
       echo "No receipts. Merging is blocked."
       exit 0
@@ -924,14 +945,14 @@ IFS= read -r -d '' payload
 # command nobody runs in a loop, against a hole in the only thing standing
 # between an unread bead and a public repository.
 #
-# `add` and `commit` are here for a sweep of the shared checkout
-# (inventory-tng-16ad). Measured over 6,463 of this project's own Bash calls:
-# `add` takes the matcher from 28% to 33% of them, two thirds of that `git add`
-# itself, at 27 ms a hit.
-if [[ ! "$payload" =~ (^|[^A-Za-z0-9_])(gh|push|repo-settings|sync|add|commit)([^A-Za-z0-9_]|$) ]]; then
+# `commit` is here for a commit in the shared checkout (inventory-tng-dg7k).
+# `add` was beside it for 16ad's sweep arm and cost 5% of all commands a
+# matcher run; nothing reads a `git add` now.
+if [[ ! "$payload" =~ (^|[^A-Za-z0-9_])(gh|push|repo-settings|sync|commit)([^A-Za-z0-9_]|$) ]]; then
   exit 0
 fi
 
+locate_repo
 have python3 || deny_dependency python3 "reading what a command actually runs"
 
 # What the command actually runs, as opposed to what it merely mentions.
@@ -1174,32 +1195,17 @@ def classify(raw):
         if re.search(RUNS_IT, segment, flags=re.M) and not re.search(r"--check\b", segment):
             return "repo-settings"
 
-    # STAGING WHAT WAS NOT NAMED, in the shared checkout: git add -A, -u,
-    # --all, --update, . or :/, and git commit -a, which stages every tracked
-    # change on its way. The arm asks git whether the checkout is the shared
-    # one; in a worktree of its own a session may sweep. inventory-tng-16ad.
-    #
-    # READ FROM THE git add THAT MATCHED, not from the first add in the
-    # command: bd dep add a b && git add -A has two.
-    m = re.search(SEP + WRAP + prog("git") + r"\s+(" + GIT_FLAGS + r")(add|commit)\b", cmd, flags=re.M)
-    if m:
-        words = tokens_after(cmd, m)
-        flags = [w for w in words if w.startswith("-")]
-        paths = [w for w in words if not w.startswith("-")]
-        short = "".join(f[1:] for f in flags if not f.startswith("--"))
-        if m.group(2) == "add":
-            sweeping = "A" in short or "u" in short or {"--all", "--update"} & set(flags)
-            everything = (paths and all(p in (".", "./", ":/", "*") for p in paths)) or (not paths and sweeping)
-        else:
-            everything = "a" in short or "--all" in flags
-        if everything:
-            # Where it stages: git -C <dir>, or a cd earlier in the same
-            # command, on top of where the command runs. The arm asks that
-            # directory which checkout it is.
-            where = re.search(r"-C\s+(\S+)", m.group(1))
-            if not where:
-                where = re.search(r"(?:^|[;&|(]\s*)cd\s+([^\s;&|]+)[\s;&|]*$", cmd[: m.start()], flags=re.M)
-            return "add-all " + (where.group(1) if where else "")
+    # A COMMIT, and the arm asks git whether the directory the session is in
+    # is the shared checkout. Every spelling of one -- --amend, --fixup, -a --
+    # is this; neither what it holds nor where the command line says it goes
+    # is read. Where the session stands is the whole question: a worktree
+    # reached by cd or -C inside a command is not one the harness entered,
+    # and the rest of this gate reads the wrong checkout there (docs/commits.md
+    # "Staging"), so it is not a place a commit may be steered to either.
+    # inventory-tng-dg7k; docs/decisions/0020-who-merges.md has the reasoning.
+    # `(?!-)`: commit-tree and commit-graph are plumbing, not a commit.
+    if runs(prog("git") + r"\s+" + GIT_FLAGS + r"commit\b(?!-)"):
+        return "commit"
 
     if runs(prog("git") + r"\s+" + GIT_FLAGS + r"push\b"):
         # A bare --force has no lease, so it overwrites whatever arrived while
@@ -1329,27 +1335,29 @@ compares and reports without writing, and is not refused. Writing is a person's
 to authorise, with the diff that --check prints in front of them."
     ;;
 
-  add-all)
+  commit)
     # ONLY IN THE SHARED CHECKOUT. A linked worktree has a git directory of its
-    # own under the common one, and nobody else edits it. Asked of the
-    # directory the command stages in: where it runs, which the harness sends
-    # as cwd, under any -C or cd the command itself named -- `rest` -- and
-    # `git -C` stacks, so both are one call.
-    [[ -n "$REPO_ROOT" ]] || deny_unavailable "where this repository is" "git and CLAUDE_PROJECT_DIR"
-    { read -r own; read -r common; } < <(git -C "${cwd:-$REPO_ROOT}" -C "${rest:-.}" rev-parse --git-dir --git-common-dir 2>/dev/null) \
-      || deny_unavailable "which checkout ${rest:-this} is" git
+    # own under the common one, and nobody else edits it. Asked of where the
+    # session stands: the cwd the harness sends, or this process's own. NOT
+    # $REPO_ROOT, which is the shared checkout by construction and would
+    # refuse every worktree; and not anywhere the command line steers the
+    # commit, for the reason the matcher gives. Why the checkout is refused
+    # at all is docs/decisions/0020-who-merges.md, under inventory-tng-dg7k.
+    have git || deny_dependency git "reading which checkout this commits in"
+    { read -r own; read -r common; } < <(git -C "${cwd:-.}" rev-parse --git-dir --git-common-dir 2>/dev/null) \
+      || deny_unavailable "which checkout this is" git
     if [[ "$own" == "$common" ]]; then
-      deny "This stages everything in the shared checkout, and git status here lists
-what anybody did, not what you did.
+      deny "This commits in the shared checkout, which is the person's: git status here
+lists what anybody did, and a path-named add stages every hunk in that file,
+a colleague's included (inventory-tng-16ad, inventory-tng-dg7k).
 
-A colleague's edit swept in this way landed on main inside another issue's
-commit (inventory-tng-16ad), and nothing downstream can tell the two apart.
+Work in a worktree of your own, where a commit holds only your edits. The
+EnterWorktree tool makes one under .claude/worktrees/ and moves this session
+into it; merging from there needs nothing checked out here. If the branch
+you need is checked out here already, git will not check it out twice: ask
+for this checkout to be put back on main first.
 
-Stage by path:  git add <the paths this issue touched>
-Or work in a worktree of your own, where sweeping stages only your edits:
-  git worktree add .claude/worktrees/<name> <branch>
-
-See docs/commits.md \"Staging\"."
+See AGENTS.md \"Git\" and docs/commits.md \"Staging\"."
     fi
     exit 0
     ;;
@@ -1540,13 +1548,14 @@ linter would have said is a review wasted. Wait for the checks, or fix them.
     # for a field `gh pr view` cannot return at all. It is not on this path --
     # the hook routes to `check` and `stop` -- so it spends no budget this arm
     # has to keep.
-    view=$(gh_json pr view ${pr:+"$pr"} --json number,headRefOid,body) \
+    view=$(gh_json pr view ${pr:+"$pr"} --json number,headRefOid,headRefName,body) \
       || deny_unavailable "whether pull request ${pr:-for this branch} says do not merge, and its head" gh
 
-    # The number and the head, out of that one answer. A number gh did not give
-    # is refused now, because every refusal below names it. Neither being there
-    # is gh not having answered, whatever else it said; an answer that is not
-    # an object fails the same way, and the reader below says so about it.
+    # The number, the head and its branch, out of that one answer. A number gh
+    # did not give is refused now, because every refusal below names it.
+    # Neither being there is gh not having answered, whatever else it said; an
+    # answer that is not an object fails the same way, and the reader below
+    # says so about it.
     #
     # `|` between them rather than a space, the way receipt_status writes its
     # answer: `read` drops leading whitespace, so a missing number would have
@@ -1554,9 +1563,9 @@ linter would have said is a review wasted. Wait for the checks, or fix them.
     fields=$(printf '%s' "$view" | python3 -c '
 import json, sys
 answer = json.load(sys.stdin)
-print(answer.get("number") or "", answer.get("headRefOid") or "", sep="|")
+print(answer.get("number") or "", answer.get("headRefOid") or "", answer.get("headRefName") or "", sep="|")
 ' 2>/dev/null) || fields=""
-    IFS="|" read -r number current <<<"$fields"
+    IFS="|" read -r number current branch <<<"$fields"
     [[ -n "$pr" ]] || pr=$number
     [[ -n "$pr" ]] || deny_unavailable "which pull request this branch belongs to" gh
 
@@ -1657,28 +1666,50 @@ merge is not what was reviewed.
 $CYCLE"
     fi
 
-    # ASKED OF THE BRANCH BEING MERGED, not the one that happens to be checked
-    # out. `gh pr merge <n>` takes a number and will merge a pull request that
-    # is not what you are standing on -- and a tidy local `main` has nothing
-    # waiting to be folded in and no half-landed epic, so the checker would
-    # pass and this would permit a merge it never looked at. That is the
-    # direction this file may not fail in.
-    checked_out=$(cd "$REPO_ROOT" && git rev-parse HEAD 2>/dev/null) \
-      || deny_unavailable "which commit is checked out" git
+    # ASKED OF THE BRANCH BEING MERGED, wherever it is checked out. `gh pr
+    # merge <n>` takes a number and will merge a pull request that is not what
+    # you are standing on -- and a tidy local `main` has nothing waiting to be
+    # folded in and no half-landed epic, so a checker run where the command
+    # happens to run would pass and permit a merge it never looked at. That is
+    # the direction this file may not fail in. So the branch's own checkout is
+    # asked of git, which keeps a branch to at most one and names it with the
+    # branch -- %(worktreepath) -- and the two questions are put there,
+    # whether that is the shared checkout, a worktree of this session's, or
+    # somebody else's. The tip is the branch's own, which is HEAD wherever it
+    # is checked out. This used to read $REPO_ROOT's HEAD, which from a
+    # worktree is always somebody else's branch (inventory-tng-dg7k).
+    [[ -n "$branch" ]] || deny_unavailable "which branch pull request $pr is from" gh
+    have git || deny_dependency git "finding where $branch is checked out"
+    found=$(git -C "$REPO_ROOT" for-each-ref --format='%(worktreepath)%09%(objectname)' "refs/heads/$branch" 2>/dev/null) \
+      || deny_unavailable "where $branch is checked out" git
+    IFS=$'\t' read -r at checked_out <<<"$found"
+    # A worktree whose directory is gone is still named until pruned, and a
+    # checker cannot run in it.
+    [[ -d "$at" ]] || at=""
+    if [[ -z "$at" ]]; then
+      deny "Pull request $pr is from $branch, which is not checked out anywhere in this
+repository, so its readiness cannot be checked.
+
+Check the branch out in a worktree of your own -- the EnterWorktree tool, then
+git checkout $branch there -- and merge from it. This refuses rather than
+merging something it has not looked at."
+    fi
     if [[ "$checked_out" != "$current" ]]; then
-      deny "Pull request $pr is not what is checked out, so its readiness cannot be checked here.
+      deny "Pull request $pr is not what is checked out on $branch, so its readiness
+cannot be checked.
 
   pull request $pr: $current
   checked out:      $checked_out
+  at:               $at
 
-Check out the branch you are merging. This refuses rather than merging
-something it has not looked at."
+Bring that checkout to the pull request's head. This refuses rather than
+merging something it has not looked at."
     fi
 
     # Its own exit status, not its output: a checker that died has checked
     # nothing, which is the direction this file refuses in everywhere else.
     checker="$SCRIPTS/check-batch.sh"
-    if ! unfinished=$(cd "$REPO_ROOT" && "$checker" origin/main..HEAD 2>&1); then
+    if ! unfinished=$(cd "$at" && "$checker" origin/main..HEAD 2>&1); then
       deny "Pull request $pr is not finished, so it is not ready to merge.
 
 $unfinished

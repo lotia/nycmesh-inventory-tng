@@ -136,14 +136,29 @@ git add <the paths that issue touched>
 ```
 
 `git add -A` is only safe when you have just read `git status` and every line of
-it belongs to the issue in hand. It is how the unrelated fix gets in — and on
-a checkout shared between sessions, where `git status` lists what anybody did,
-the landing gate refuses it, and `git commit -a` with it. A worktree of your
-own has only your edits in it, and there a sweep is free:
+it belongs to the issue in hand. It is how the unrelated fix gets in.
+
+On a checkout shared between sessions, where `git status` lists what anybody
+did, even a path-named `git add` is not safe: it stages every hunk in that
+file, a colleague's included, and nothing downstream can tell the two apart.
+So the landing gate refuses `git commit` there to an agent — that checkout is
+the person's — and the answer is a worktree of your own, which has only your
+edits in it and where a sweep is free:
 
 ```bash
-git worktree add .claude/worktrees/<name> <branch>   # the directory is ignored
+git worktree add .claude/worktrees/<name> <branch>   # a person; the directory is ignored
 ```
+
+An agent uses the harness's `EnterWorktree` tool instead, which makes the same
+worktree and moves the session into it. A worktree reached by `cd` or `-C`
+inside a command is not one the harness entered — the gate's push and stop
+arms then read the wrong checkout — so the gate does not read those either:
+where the session stands decides, and a commit steered from the shared
+checkout into a worktree is refused with the rest. Merging works from the
+worktree too; [Then merge](pull-requests.md#then-merge) says how. The one
+thing a worktree cannot do is hold a branch the shared checkout already has:
+git keeps a branch to one checkout, so a batch begun there is finished there
+by a person, or the shared checkout is put back on `main` first.
 
 ## When work has already bled across two issues
 

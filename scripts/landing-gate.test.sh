@@ -72,12 +72,12 @@ args="$*"
 # anything else asking for the head on its own still gets the failed call.
 [[ -n "${GH_FAILS_HEAD:-}" && "$args" == *"--json headRefOid"* ]] && exit 1
 case "$args" in
-  # The merge arm's one question: number, head and body from the same moment.
-  # Composed from the same fixtures the separate arms below answer from, so a
-  # case that rewrites the body or the head is answered by both shapes alike.
-  # A body fixture that is not JSON is handed over as it stands: that case is
-  # about the reader being given something it cannot read.
-  *"--json number,headRefOid,body"*)
+  # The merge arm's one question: number, head, branch and body from the same
+  # moment. Composed from the same fixtures the separate arms below answer
+  # from, so a case that rewrites the body or the head is answered by both
+  # shapes alike. A body fixture that is not JSON is handed over as it stands:
+  # that case is about the reader being given something it cannot read.
+  *"--json number,headRefOid,headRefName,body"*)
     NO_HEAD="${GH_FAILS_HEAD:-}" python3 -c '
 import json, os, sys
 fix = sys.argv[1]
@@ -89,7 +89,8 @@ except ValueError:
     raise SystemExit
 head = None if os.environ["NO_HEAD"] else open(fix + "/head").read().strip()
 number = int(open(fix + "/number").read().strip())
-print(json.dumps({"number": number, "headRefOid": head, "body": body}))' "$GH_FIXTURES"
+branch = open(fix + "/branch").read().strip()
+print(json.dumps({"number": number, "headRefOid": head, "headRefName": branch, "body": body}))' "$GH_FIXTURES"
     ;;
   # The combined form first: `record` asks for all three at once, so that the
   # head and the evidence come from the same moment.
@@ -119,6 +120,9 @@ mkdir -p "$FIX"
 export GH_FIXTURES=$FIX
 echo "$HEAD_OID" >"$FIX/head"
 echo 7 >"$FIX/number"
+# The branch the pull request is from, which the merge arm now looks for among
+# the repository's checkouts rather than assuming it is the one in hand.
+echo batch/test >"$FIX/branch"
 # What `gh pr checks` hands back. The gate counts what is not green itself, so
 # this is the list rather than a tally of it -- which is also what lets a case
 # say WHICH checks the count reaches, not just how many.
@@ -214,10 +218,11 @@ print(json.dumps(sent))'
 # the five dependency cases -- the ones this suite exists for -- were the ones
 # written the long way.
 #
-# CLAUDE_PROJECT_DIR is set explicitly rather than inherited: the gate prefers
-# it over `git rev-parse`, and a suite that let the surrounding session's value
-# through would quietly test against the real repository. `status` and `clear`
-# never reach gh, so the gh variables are harmless to them.
+# CLAUDE_PROJECT_DIR is set explicitly rather than inherited: the gate resolves
+# the shared checkout from it before it looks at the cwd, and a suite that let
+# the surrounding session's value through would quietly test against the real
+# repository. `status` and `clear` never reach gh, so the gh variables are
+# harmless to them.
 in_repo() {
   local repo=${1:-$REPO} path=${2:-$(full_path)}
   shift 2
@@ -277,39 +282,42 @@ case_is "git push --force origin batch/x"        "bare --force" "a bare --force 
 case_is "git push -f origin batch/x"             "bare --force" "-f is the same flag and is refused with it"
 case_is "git push --follow-tags"                 PERMIT "a flag that merely contains -f is not it"
 
-# STAGING EVERYTHING IN THE SHARED CHECKOUT. The scene repository is a main
-# checkout, so these are refused; the worktree block below is where the same
-# commands are free. inventory-tng-16ad.
-case_is "git add -A"                             "stages everything in the shared checkout" "git add -A is refused in the main checkout"
-case_is "git add --all"                          "stages everything in the shared checkout" "and --all with it"
-case_is "git add -u"                             "stages everything in the shared checkout" "and -u, which sweeps every tracked change"
-case_is "git add ."                              "stages everything in the shared checkout" "and . as the only path"
-case_is "git add -A && git commit -m x"          "stages everything in the shared checkout" "and one chained before a commit"
-case_is "git remote add x y; git add -A"         "stages everything in the shared checkout" "and one after another command's add, git's own included"
-case_is "git add -Av"                            "stages everything in the shared checkout" "and -A run together with another flag"
-case_is "git add ./"                             "stages everything in the shared checkout" "and ./ as the path"
-case_is "git add :/"                             "stages everything in the shared checkout" "and :/, the whole tree by name"
-case_is "git commit -am x"                       "stages everything in the shared checkout" "and git commit -a, which stages every tracked change on its way"
-case_is "git commit --all -m x"                  "stages everything in the shared checkout" "spelt out"
-case_is "git commit -m x"                        PERMIT "a commit of what was staged is free"
-case_is "git add scripts/x.sh docs/y.md"         PERMIT "staging by path is free"
-case_is "git add -A -- scripts/"                 PERMIT "and so is -A narrowed to a path"
-case_is "git add -p"                             PERMIT "and so is choosing hunks"
-case_is "bd create --title='git add -A swept it'" PERMIT "the words inside a quoted string are data here too"
+# A COMMIT IN THE SHARED CHECKOUT. The scene repository is a main checkout, so
+# every spelling of one is refused there; the worktree block below is where
+# the same commands are free. What is staged is not read: this used to refuse
+# a sweep and let a path-named add through, and a path-named add carries a
+# colleague's hunk in that file just the same. inventory-tng-16ad, dg7k.
+case_is "git commit -m x"                        "commits in the shared checkout" "git commit is refused in the main checkout"
+case_is "git commit -am x"                       "commits in the shared checkout" "and commit -a with it"
+case_is "git commit --amend --no-edit"           "commits in the shared checkout" "and an amend, which is a commit"
+case_is "git commit --fixup abc123"              "commits in the shared checkout" "and a fixup"
+case_is "git add -A && git commit -m x"          "commits in the shared checkout" "and one chained after a sweep"
+case_is "bd dep add a b && git commit -F msg"    "commits in the shared checkout" "and one after another command, bd's included"
+case_is "git add -A"                             PERMIT "staging is free: it is the commit that carries the hunk"
+case_is "git add scripts/x.sh docs/y.md"         PERMIT "by path too"
+case_is "git status && git diff"                 PERMIT "and reading the shared checkout is free"
+case_is "bd create --title='git commit swept it'" PERMIT "the words inside a quoted string are data here too"
+case_is "bd dolt commit"                         PERMIT "bd's own commit is not git's"
 
-# In a worktree of its own, the same sweep is free: git status there lists
-# only what this session did.
+# In a worktree of its own, a commit holds only what this session did, and it
+# is free -- sweeps included.
 WT="$WORK/worktree"
 git -C "$REPO" worktree add -q "$WT" -b in-a-worktree 2>/dev/null
-assert "$(decision "$(gate "git add -A" "" "$WT")")" 0 0 PERMIT "git add -A in a linked worktree is free"
-# And reached from the main checkout, which is what the refusal tells the
-# caller to do: the directory the command stages in is what is asked.
-assert "$(decision "$(gate "git -C $WT add -A")")" 0 0 PERMIT "so is git -C <worktree> add -A from the main checkout"
-assert "$(decision "$(gate "cd $WT && git add -A")")" 0 0 PERMIT "and cd <worktree> && git add -A"
+assert "$(decision "$(gate "git commit -m x" "" "$WT")")" 0 0 PERMIT "git commit in a linked worktree is free"
+assert "$(decision "$(gate "git add -A && git commit -am x" "" "$WT")")" 0 0 PERMIT "and so is a sweep there"
 # And a session that has moved into the worktree, as the harness reports it:
 # the command runs there, the project directory is still the main checkout.
-assert "$(decision "$(gate "git add -A" "" "$REPO" "$WT")")" 0 0 PERMIT "and a sweep whose cwd is the worktree, whatever the project directory is"
-assert "$(decision "$(gate "git commit -am x" "" "$REPO" "$WT")")" 0 0 PERMIT "commit -a there too"
+assert "$(decision "$(gate "git commit -m x" "" "$REPO" "$WT")")" 0 0 PERMIT "and a commit whose cwd is the worktree, whatever the project directory is"
+# WHERE THE SESSION STANDS IS THE WHOLE QUESTION. A worktree reached inside the
+# command -- cd, -C -- is not one the harness entered, and the push and stop
+# arms read the wrong checkout from such a session; so a commit steered into
+# one from the shared checkout is refused, and told to enter the worktree.
+# The simplify pass on PR #544 took out a reading of cd, pushd, -C, --git-dir
+# and GIT_DIR= that existed to permit exactly this.
+assert "$(decision "$(gate "git -C $WT commit -m x")")" 0 0 "commits in the shared checkout" "git -C <worktree> commit from the shared checkout is refused: the session is still there"
+assert "$(decision "$(gate "cd $WT && git commit -m x")")" 0 0 "commits in the shared checkout" "and so is cd <worktree> && git commit"
+assert "$(decision "$(gate "git -C $REPO commit -m x" "" "$REPO" "$WT")")" 0 0 PERMIT "and the other way round is not read either: the harness refuses it before this does"
+case_is "git commit-tree HEAD^{tree} -m x"       PERMIT "commit-tree is plumbing, not a commit"
 git -C "$REPO" worktree remove --force "$WT" 2>/dev/null
 git -C "$REPO" branch -q -D in-a-worktree 2>/dev/null
 
@@ -975,6 +983,41 @@ record >/dev/null
 case_is "gh pr merge 7 --rebase" "is not what is checked out" \
   "a pull request that is not the branch in hand is refused rather than judged elsewhere"
 (cd "$REPO" && git reset -q --hard "$HEAD_OID")
+
+# WHEREVER THE BRANCH IS CHECKED OUT. The arm used to read the project
+# directory's HEAD, which from a worktree is always somebody else's branch, so a
+# session that had done its work where AGENTS.md tells it to could not merge
+# (inventory-tng-dg7k). Now the pull request's branch is found among the
+# repository's checkouts and judged there, whichever directory the command runs
+# in.
+WT="$WORK/merging-from"
+git -C "$REPO" worktree add -q "$WT" -b another-branch 2>/dev/null
+record >/dev/null
+assert "$(decision "$(gate "gh pr merge 7 --rebase" "" "$REPO" "$WT")")" 0 0 PERMIT \
+  "a merge typed in a worktree on another branch is judged where the pull request's branch is checked out"
+assert "$(decision "$(gate "gh pr merge 7 --rebase" "" "$WT")")" 0 0 PERMIT \
+  "and a session whose project directory is that worktree reads the same receipt, since it lives with the shared checkout"
+# The receipt's home: one file, with the shared checkout, whichever checkout
+# `record` ran from.
+(cd "$WT" && env PATH="$(full_path)" GH_FIXTURES="$FIX" GH_DEADLINE=5 CLAUDE_PROJECT_DIR="$WT" "$GATE" record 7 >/dev/null 2>&1)
+assert "$([[ -e "$WT/.claude/.review-receipts.json" ]] && echo separate || echo shared)" 0 0 shared \
+  "record run from a worktree writes the shared checkout's receipts, not a file of the worktree's own"
+# The branch checked out nowhere: not judged, and told where to put it.
+echo batch/elsewhere >"$FIX/branch"
+case_is "gh pr merge 7 --rebase" "not checked out anywhere" \
+  "a pull request whose branch no checkout holds is refused rather than judged on another branch"
+echo batch/test >"$FIX/branch"
+# A stale entry for a directory that is gone is not a checkout the checker can
+# run in.
+git -C "$REPO" worktree add -q "$WORK/vanished" -b batch/vanished 2>/dev/null
+rm -rf "$WORK/vanished"
+echo batch/vanished >"$FIX/branch"
+case_is "gh pr merge 7 --rebase" "not checked out anywhere" "nor is a worktree whose directory has gone"
+echo batch/test >"$FIX/branch"
+git -C "$REPO" worktree prune 2>/dev/null
+git -C "$REPO" branch -q -D batch/vanished 2>/dev/null
+git -C "$REPO" worktree remove --force "$WT" 2>/dev/null
+git -C "$REPO" branch -q -D another-branch 2>/dev/null
 
 # Put the receipts back as they were found. The stop-mode cases below are about
 # a batch with NO recorded cycle, and a receipt left here would satisfy them.

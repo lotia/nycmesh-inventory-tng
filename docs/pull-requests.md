@@ -265,6 +265,11 @@ scripts/landing-gate.sh record <pr>
 gh pr merge <pr> --rebase
 ```
 
+All of it from the worktree the batch was built in. The receipt lives with the
+shared checkout whichever checkout `record` ran from, and the merge is judged
+wherever the branch is checked out, so the shared checkout stays on `main`
+throughout.
+
 The merge does not ask. The bar it has to clear is
 [When a branch is ready to merge](#when-a-branch-is-ready-to-merge), and none
 of it is yours to weigh.
@@ -377,10 +382,10 @@ What it refuses:
 
 | Command | Refused when |
 | --- | --- |
-| `gh pr merge` | no review cycle is recorded against the exact head being merged; or the branch is not finished — commits still waiting to be folded in, or an issue in the batch epic that has not landed; or it names the pull request by URL or branch rather than by number |
+| `gh pr merge` | no review cycle is recorded against the exact head being merged; or the pull request's branch is not checked out anywhere in this repository at that head — it is judged wherever it is checked out, not where the command runs; or the branch is not finished — commits still waiting to be folded in, or an issue in the batch epic that has not landed; or it names the pull request by URL or branch rather than by number |
 | `gh pr ready` | the checks are not green |
 | `git push` | it would land on `main` — asked of git, so `git push origin HEAD` from a checked-out `main` is refused and a branch called `batch/main-fix` is not. GitHub refuses it behind the gate too, with `enforce_admins`, required reviews and the required contexts; the gate goes first so the message names the `batch/*` workflow rather than a protection rule |
-| `git add -A`, `-u`, `.`, `:/`; `git commit -a` | in the shared main checkout, where `git status` lists what anybody did; free in a linked worktree — [Staging](commits.md#staging) |
+| `git commit` | the session stands in the shared main checkout, which is the person's; free in a worktree the session has entered — [Staging](commits.md#staging) |
 | `git push --force`, `-f` | always, and `allow_force_pushes: false` stands behind it. `--force-with-lease` is free because the lease is the guard: it refuses if anything arrived since you last fetched, so it cannot overwrite work you have not seen |
 | `bd dolt push` | always: it publishes the tracker, and [0029](decisions/0029-the-issue-tracker-is-public.md) makes that public the moment it runs. bd's timed auto-push is held off too — [Issue tracking](issue-tracking.md) says how |
 | `scripts/repo-settings.sh` writing | always; `--check` compares and reports, and is free. Writing is refused because that script sets the protections the rows above rest on |

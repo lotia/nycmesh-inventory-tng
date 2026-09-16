@@ -176,6 +176,32 @@ how the rest of the gate behaves:
 That makes it a nudge rather than a lock, on purpose. The lock is the merge
 refusal, which does not forget and cannot be spent.
 
+**A commit in the shared checkout** (2026-09-16, `inventory-tng-dg7k`). Every
+session on a machine sees the same working tree there, and a colleague's edit
+was swept into another issue's commit by `git add -A` (`inventory-tng-16ad`).
+The first answer refused the sweeping spellings and let a path-named add
+through, which was a spelling list — and a path-named add stages every hunk in
+that file, the colleague's included, so it closed the common case and not the
+fault. The fault is *where* the commit is made, and git can say that in one
+call, by whether the checkout's git directory is the common one. So the gate
+refuses `git commit` in the shared checkout outright, to an agent — the hook
+fires only under the harness, and a person's shell never meets it — and the
+checkout becomes the person's. Asked of where the session stands, not of any
+directory the command names: a worktree reached by `cd` inside a command is
+not one the harness entered, and reading it would only permit that route.
+Two things had to move for that to be
+livable rather than a wall. The receipt lives with the shared checkout
+whichever checkout `record` ran from, because `REPO_ROOT` is resolved through
+git's common directory rather than taken from the working directory. And the
+merge is judged wherever the pull request's branch is checked out, found among
+`git worktree list`, rather than at the project directory's `HEAD` — which
+from a worktree was always somebody else's branch, and the reason the first
+two batches built in a worktree ended with the branch checked out in the
+shared checkout to merge, the very thing the refusal exists to stop. Refusing
+`git checkout` there as well was considered and deferred: an agent with a
+working merge has no reason left to switch that branch, and telling a branch
+switch from a path restore is another spelling question.
+
 **Every other refusal fails closed.** When `python3` or `gh` is absent, or
 `gh` answers unauthenticated or rate-limited, the gate refuses the command and
 names the program it could not use. It used to fail open in exactly those
