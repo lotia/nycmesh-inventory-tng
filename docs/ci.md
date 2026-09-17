@@ -86,8 +86,9 @@ the volunteer's to the app, the administrator's to the app and to `/admin/`,
 because its first section says it is about the two of them. Pooling them would
 let a field on a Django page answer for a button a volunteer is told to press.
 The walk has to work for its names — a menu's choices exist only while the menu
-is open, and the box asking who you are is gone the moment you answer it — so
-it opens what it must and harvests before it moves on.
+is open, the box asking who you are is gone the moment you answer it, and the
+way in is offered only to somebody not yet signed in — so it looks at the app
+before it signs in, opens what it must, and harvests before it moves on.
 
 Comparing regenerated PNGs would catch more and would also fail on a font or a
 shadow; this fails on the change that would actually mislead somebody.
