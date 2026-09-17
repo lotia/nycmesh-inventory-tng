@@ -32,7 +32,7 @@ Two places, and they are one system.
   record this system stores has a page there. The one that does not is the one
   the last section is about: how much of an item is on a particular shelf.
 
-Start from the app's own heading row, which offers it and returns you here
+Start from **Sign in** in the app's own heading row, which returns you here
 afterwards, or go straight to `/accounts/login/`. Either reaches the same form,
 and it wants the *username* the account was made under —
 not the email address you know yourself by. On most deployments a password
@@ -42,9 +42,9 @@ whether yours asks is a choice whoever runs it made. If it does not, you can
 still set one up from `/accounts/`, and it is worth doing: the account you are
 signing into can change what the organisation believes it owns.
 
-Once you are in, the corner says who you are. If it also says the account is
-not an administrator, nothing has gone wrong: authority is granted by somebody
-who already has it, rather than by signing in
+Once you are in, the corner says who you are, beside **Sign out**. If it also
+says the account is not an administrator, nothing has gone wrong: authority is
+granted by somebody who already has it, rather than by signing in
 ([decision 0013](../docs/decisions/0013-administrator-sign-in.md) point 5), so
 that is who to ask.
 

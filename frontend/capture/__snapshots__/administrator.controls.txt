@@ -3,6 +3,8 @@ Add an item
 New category
 New place
 Offered in the pick-list
+Sign in
+Sign out
 Merged into
 Active
 Delete

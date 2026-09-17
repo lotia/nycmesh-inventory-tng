@@ -129,6 +129,26 @@ test("the app still offers every control the guides name", async ({ page }) => {
   };
 
   await page.setViewportSize(PHONE);
+
+  // ---- The app before anybody has signed in ------------------------------
+
+  // Signed out first, because signing in is what takes the way in away: the
+  // corner offers it to nobody but a stranger, and every later harvest is of
+  // a screen that has swapped it for a name. The signed-out screen is also
+  // the first one a new administrator meets, and the guide's words for it are
+  // read by somebody with nothing else to go on. Waited for by the corner's
+  // shape -- the one link beside the heading -- rather than by what it says,
+  // which is one of the names being checked; the corner draws nothing until
+  // the server has said who the caller is, so the heading alone is too early.
+  await page.goto("/");
+  const heading = page.getByRole("heading", { level: 1 });
+  await expect(heading.locator("..").getByRole("link")).toBeVisible();
+  await harvest("app");
+
+  // The union above is a union rather than a replacement on purpose: what the
+  // signed-out screen offers is added to what the signed-in one does, so a
+  // control that exists only for somebody signed in still has to be found
+  // there, and one that exists only for a stranger only here.
   await signIn(page);
 
   // ---- The volunteer's half, walked as the guide walks it ---------------
