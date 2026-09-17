@@ -229,8 +229,10 @@ test("the app still offers every control the guides name", async ({ page }) => {
 
   // And the item's own editor, which is the only screen in this app carrying
   // the word an item and a place are both retired by. The guide names it, and
-  // Django's admin calls the same column something else.
-  await page.getByRole("button", { name: `Edit ${itemName}` }).click();
+  // Django's admin calls the same column something else. Exact, because
+  // `seed_demo_data` puts "LiteBeam AC Gen2" in the same catalogue and the
+  // documented setup runs it against this database too -- see the capture run.
+  await page.getByRole("button", { name: `Edit ${itemName}`, exact: true }).click();
   const correcting = page.getByRole("dialog");
   await expect(correcting).toBeVisible();
   await harvest("app");
