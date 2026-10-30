@@ -23,7 +23,15 @@ is, read [README.md](README.md).
    then fix what it finds. Then a simplification pass, then fix again. Push
    only after both. In Claude Code, run `/code-review` and then `/simplify`
    yourself. In another harness, use its equivalents, or ask the person.
-6. **Grow documentation deliberately.** Change an existing doc rather than
+6. **Code you write logs what it does**, at the level that fits:
+   - `debug` for the detail you need when tracing a problem;
+   - `info` for what an operator wants to see;
+   - `warning` for something unexpected that was handled;
+   - `error` for a failure.
+
+   Never log secrets or personal data. The package and the conventions are
+   being chosen in `inventory-tng-8i4.28`; code beads wait for it.
+7. **Grow documentation deliberately.** Change an existing doc rather than
    adding one, and add a new file only when an issue asks for it.
 
 ## More guidance
