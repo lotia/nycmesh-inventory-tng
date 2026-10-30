@@ -1,0 +1,27 @@
+# Development only; production runs on Kubernetes with Helm.
+# Works with `docker compose` and `podman compose`.
+name: inventory-tng
+
+services:
+  db:
+    image: docker.io/library/postgres:18
+    environment:
+      POSTGRES_DB: inventory
+      POSTGRES_USER: inventory
+      POSTGRES_PASSWORD: inventory
+    ports:
+      # Why 5433, and how to change it: CONTRIBUTING.md.
+      - "127.0.0.1:${INVENTORY_DB_PORT:-5433}:5432"
+    volumes:
+      - db:/var/lib/postgresql
+    healthcheck:
+      # -h, so it asks over TCP: on first start the image runs a setup server
+      # on the socket only, and that one must not count. -U and -d only stop
+      # each probe logging an error about a role that does not exist.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "inventory", "-d", "inventory"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  db:

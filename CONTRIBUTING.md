@@ -33,3 +33,35 @@ bd sync
 
 Then push a branch and open a pull request: `git push -u origin <branch>`, or
 `jj git push --change @` with jj.
+
+## Running the checks
+
+You need [uv](https://docs.astral.sh/uv/) and a container runtime with compose,
+such as Docker or Podman. uv installs the Python version the backend asks for.
+
+```sh
+docker compose up -d --wait db   # or: podman compose up -d --wait db
+cd backend
+
+# Optional: let the tools fix what they can. Neither changes behaviour.
+uv run ruff check --fix
+uv run ruff format
+
+# Then check, in this order.
+uv run ty check                  # types
+uv run ruff check                # lint
+uv run ruff format --check       # formatting
+uv run pytest                    # tests, against the database started above
+```
+
+Only the tests need the database; the other three take about a second. With
+the virtualenv activated (`source backend/.venv/bin/activate`), drop the
+`uv run`.
+If you use [mise](https://mise.jdx.dev/), `mise run fix` runs the two fixes
+and `mise run check` runs the four checks; start the database first.
+
+The database listens on port 5433, so it can run beside MeshDB's. If that port
+is taken, put `INVENTORY_DB_PORT=5434` (or any free port) in a `.env` file at
+the top of the repository; compose and the tests both read it. Each test run
+creates a throwaway database and drops it at the end. Write tests in pytest
+style.
