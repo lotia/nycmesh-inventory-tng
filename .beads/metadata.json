@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "inventory_tng",
+  "project_id": "c08948a9-dfe6-4ae8-9439-6f0fae2010b4"
+}
