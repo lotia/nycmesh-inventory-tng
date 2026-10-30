@@ -19,7 +19,11 @@ is, read [README.md](README.md).
    stop and say so. Do not prototype it.
 4. **Run the checks before closing an issue that changed code.** See
    [Running the checks](CONTRIBUTING.md#running-the-checks).
-5. **Grow documentation deliberately.** Change an existing doc rather than
+5. **Review, then simplify, before pushing code.** First a review for bugs,
+   then fix what it finds. Then a simplification pass, then fix again. Push
+   only after both. In Claude Code, run `/code-review` and then `/simplify`
+   yourself. In another harness, use its equivalents, or ask the person.
+6. **Grow documentation deliberately.** Change an existing doc rather than
    adding one, and add a new file only when an issue asks for it.
 
 ## More guidance
