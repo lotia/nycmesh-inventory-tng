@@ -1,0 +1,17 @@
+# Optional shortcuts for the commands in CONTRIBUTING.md. The Python version
+# comes from backend/pyproject.toml.
+
+[tasks.check]
+description = "Type check, lint, format check and test the backend"
+dir = "backend"
+run = [
+  "uv run ty check",
+  "uv run ruff check",
+  "uv run ruff format --check",
+  "uv run pytest",
+]
+
+[tasks.fix]
+description = "Fix what ruff can fix, and format"
+dir = "backend"
+run = ["uv run ruff check --fix", "uv run ruff format"]

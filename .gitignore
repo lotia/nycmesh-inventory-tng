@@ -10,3 +10,12 @@
 
 # Personal VS Code workspaces; shared settings go in .vscode/settings.json
 *.code-workspace
+
+# Python
+__pycache__/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Local settings
+.env

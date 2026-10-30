@@ -1,0 +1,66 @@
+[project]
+name = "inventory-tng"
+version = "0.1.0"
+description = "Inventory tracking for NYC Mesh"
+authors = [
+    { name = "Ali Asad Lotia", email = "ali.asad.lotia@gmail.com" }
+]
+requires-python = ">=3.15"
+dependencies = [
+    "alembic>=1.20.1",
+    "fastapi>=0.162.0",
+    "psycopg[binary]>=3.3.6",
+    "sqlalchemy>=2.1.6",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.16.0",
+    "pytest>=9.2.0",
+    "python-dotenv>=1.2.4",
+    "ruff>=0.17.3",
+    "ty>=0.0.95",
+]
+
+[tool.alembic]
+script_location = "%(here)s/migrations"
+# Dated, so files sort in the order they were written.
+file_template = "%%(year)d%%(month).2d%%(day).2d_%%(rev)s_%%(slug)s"
+
+# New migrations come out lint-clean and formatted.
+[[tool.alembic.post_write_hooks]]
+name = "ruff_fix"
+type = "module"
+module = "ruff"
+options = "check --fix REVISION_SCRIPT_FILENAME"
+
+[[tool.alembic.post_write_hooks]]
+name = "ruff_format"
+type = "module"
+module = "ruff"
+options = "format REVISION_SCRIPT_FILENAME"
+
+[tool.ruff.lint]
+extend-select = [
+    "ANN",  # every function is annotated
+    "B",    # likely bugs
+    "FAST", # FastAPI
+    "I",    # import order
+    "PT",   # pytest style
+    "RUF",
+    "SIM",
+    "TID",  # banned APIs, below
+    "UP",   # modern syntax for the Python version in requires-python
+]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"unittest.TestCase".msg = "Write tests in pytest style: plain functions, fixtures and assert."
+
+[tool.pytest]
+testpaths = ["tests"]
+strict = true
+filterwarnings = ["error"]

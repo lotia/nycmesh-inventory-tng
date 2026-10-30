@@ -17,7 +17,9 @@ is, read [README.md](README.md).
 3. **Never write cryptography.** Use an established library, or a thin wrapper
    that only arranges its public calls. If neither reaches what is needed,
    stop and say so. Do not prototype it.
-4. **Grow documentation deliberately.** Change an existing doc rather than
+4. **Run the checks before closing an issue that changed code.** See
+   [Running the checks](CONTRIBUTING.md#running-the-checks).
+5. **Grow documentation deliberately.** Change an existing doc rather than
    adding one, and add a new file only when an issue asks for it.
 
 ## More guidance
