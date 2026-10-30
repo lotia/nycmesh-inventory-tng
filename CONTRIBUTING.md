@@ -54,6 +54,8 @@ uv run ruff format --check       # formatting
 uv run pytest                    # tests, against the database started above
 ```
 
+CI runs these checks, in this order, on pushes to `main` and on pull requests.
+
 Only the tests need the database; the other three take about a second. With
 the virtualenv activated (`source backend/.venv/bin/activate`), drop the
 `uv run`.

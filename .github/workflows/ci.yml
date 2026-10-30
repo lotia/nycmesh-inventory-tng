@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # setup-uv publishes full version tags only, so this one is exact.
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          cache-python: true
+      # Started now, so the database comes up while the checks before it run.
+      - run: docker compose up -d db
+        working-directory: .
+      - run: uv sync --locked
+      - run: uv run ty check
+      - run: uv run ruff check
+      - run: uv run ruff format --check
+      - run: docker compose up -d --wait db
+        working-directory: .
+      - run: uv run pytest
