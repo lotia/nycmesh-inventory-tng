@@ -23,15 +23,14 @@ is, read [README.md](README.md).
    then fix what it finds. Then a simplification pass, then fix again. Push
    only after both. In Claude Code, run `/code-review` and then `/simplify`
    yourself. In another harness, use its equivalents, or ask the person.
-6. **Code you write logs what it does**, at the level that fits:
-   - `debug` for the detail you need when tracing a problem;
-   - `info` for what an operator wants to see;
-   - `warning` for something unexpected that was handled;
-   - `error` for a failure.
-
-   Never log secrets or personal data. The package and the conventions are
-   being chosen in `inventory-tng-8i4.28`; code beads wait for it.
-7. **Grow documentation deliberately.** Change an existing doc rather than
+6. **Code you write logs what it does**, at the right level, and never logs
+   secrets or personal data. See [Logging](CONTRIBUTING.md#logging).
+7. **Code you write is measured where it matters.** When you add something a
+   volunteer does (a save, a move, a scan), add an `inventory.*` counter or
+   histogram, named and given units per OpenTelemetry's conventions, with a
+   test that reads it. Metric attributes take a few fixed values only: never
+   names, ids, addresses or free text. Don't add spans (0006).
+8. **Grow documentation deliberately.** Change an existing doc rather than
    adding one, and add a new file only when an issue asks for it.
 
 ## More guidance
