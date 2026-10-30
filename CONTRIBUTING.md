@@ -67,3 +67,11 @@ is taken, put `INVENTORY_DB_PORT=5434` (or any free port) in a `.env` file at
 the top of the repository; compose and the tests both read it. Each test run
 creates a throwaway database and drops it at the end. Write tests in pytest
 style.
+
+## Logging
+
+Use `debug` for detail you need when tracing a problem, `info` for what an
+operator wants to see, `warning` for something unexpected that was handled,
+and `error` for a failure, with its exception. Never log secrets (passwords,
+tokens, cookies, connection strings) or personal data: log a volunteer's id,
+not their name or email.
