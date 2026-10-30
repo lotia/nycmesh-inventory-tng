@@ -4,3 +4,9 @@
 .beads-credential-key
 .beads/proxieddb/
 *.gate.lock*
+
+# Issues live in Dolt (.beads/dolt) and sync with `bd sync`; see CONTRIBUTING.md
+.beads/issues.jsonl
+
+# Personal VS Code workspaces; shared settings go in .vscode/settings.json
+*.code-workspace

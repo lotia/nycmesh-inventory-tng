@@ -1,0 +1,7 @@
+# This repository uses jj; see AGENTS.md.
+prefix_rule(
+    pattern = ["git"],
+    decision = "forbidden",
+    match = ["git status", "git commit -m x"],
+    not_match = ["jj git push"],
+)
