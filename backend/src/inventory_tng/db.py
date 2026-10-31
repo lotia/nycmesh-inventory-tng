@@ -4,7 +4,7 @@ from collections.abc import Iterator
 from typing import Annotated
 
 from fastapi import Depends, Request
-from sqlalchemy import Engine, MetaData, create_engine
+from sqlalchemy import Engine, MetaData, create_engine, exc
 from sqlalchemy.orm import DeclarativeBase, Session
 
 
@@ -26,8 +26,15 @@ class Base(DeclarativeBase):
 
 def make_engine(url: str) -> Engine:
     # A database that drops packets fails a request in seconds instead of
-    # holding a worker until the operating system gives up.
-    return create_engine(url, pool_pre_ping=True, connect_args={"connect_timeout": 5})
+    # holding a worker until the operating system gives up. Parameters are
+    # hidden from SQLAlchemy's log lines and messages, because they can hold
+    # personal data.
+    return create_engine(
+        url,
+        pool_pre_ping=True,
+        connect_args={"connect_timeout": 5},
+        hide_parameters=True,
+    )
 
 
 def get_session(request: Request) -> Iterator[Session]:
@@ -36,3 +43,16 @@ def get_session(request: Request) -> Iterator[Session]:
 
 
 DbSession = Annotated[Session, Depends(get_session)]
+
+
+def describe_error(error: exc.SQLAlchemyError) -> dict[str, str]:
+    """What may be logged about a database error. Never its message:
+    PostgreSQL's text can quote values, as a unique violation names the
+    duplicate."""
+    orig = getattr(error, "orig", None)
+    fields = {"error": type(orig or error).__name__}
+    if sqlstate := getattr(orig, "sqlstate", None):
+        fields["sqlstate"] = sqlstate
+    if constraint := getattr(getattr(orig, "diag", None), "constraint_name", None):
+        fields["constraint"] = constraint
+    return fields
