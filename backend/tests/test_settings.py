@@ -28,3 +28,17 @@ def test_refuses_a_missing_or_empty_database_url(environ: dict[str, str]) -> Non
 def test_refuses_anything_but_postgresql(value: str) -> None:
     with pytest.raises(SettingsError, match="DATABASE_URL"):
         Settings.from_environ({"DATABASE_URL": value})
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"), [("", True), ("true", True), ("ON", True), ("0", False)]
+)
+def test_reads_whether_to_log_client_addresses(value: str, expected: bool) -> None:
+    environ = {"DATABASE_URL": "postgresql://db/x", "LOG_CLIENT_ADDRESS": value}
+    assert Settings.from_environ(environ).logging.client_address is expected
+
+
+def test_refuses_an_unclear_client_address_setting() -> None:
+    environ = {"DATABASE_URL": "postgresql://db/x", "LOG_CLIENT_ADDRESS": "maybe"}
+    with pytest.raises(SettingsError, match="LOG_CLIENT_ADDRESS"):
+        Settings.from_environ(environ)

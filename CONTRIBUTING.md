@@ -72,6 +72,24 @@ style.
 
 Use `debug` for detail you need when tracing a problem, `info` for what an
 operator wants to see, `warning` for something unexpected that was handled,
-and `error` for a failure, with its exception. Never log secrets (passwords,
-tokens, cookies, connection strings) or personal data: log a volunteer's id,
-not their name or email.
+and `error` for a failure, with its exception.
+
+Log ids, which only an administrator can look up, rather than anything that
+names a person:
+
+| | In logs | In metric attributes |
+| --- | --- | --- |
+| Ids (volunteer, admin user, item, location, label, transaction), install numbers, admin usernames | yes | no |
+| The client's address | only if `LOG_CLIENT_ADDRESS` is on (the default; turn it off in Kubernetes, where the ingress keeps it) | no |
+| Volunteer names, emails, phone numbers, street addresses | no | no |
+| Free text (notes, reasons, searches), request bodies, database error messages | no | no |
+| Secrets (passwords, tokens, cookies, sessions, TOTP, connection strings) | never | never |
+
+Metric attributes take values from a fixed list in code. For a database error,
+log `describe_error(error)`: its class, code and constraint, never its message,
+which can quote values.
+
+Logs are colourised by default. `LOG_LEVEL=DEBUG` turns on debug logs,
+`LOG_LEVELS` sets single loggers' levels (`sqlalchemy.engine=INFO` shows SQL,
+with its parameters hidden), and `LOG_FORMAT=json` prints the JSON that
+production emits. In tests, check log lines with structlog's `capture_logs()`.

@@ -1,12 +1,14 @@
 """Each test run gets a database of its own, created on the compose PostgreSQL
 server and dropped when the run ends. Each test's writes are rolled back."""
 
+import logging
 import os
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+import structlog
 from alembic import command
 from alembic.config import Config
 from dotenv import dotenv_values
@@ -17,7 +19,32 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.app import create_app
 from inventory_tng.db import get_session, make_engine
+from inventory_tng.logs import configure_structlog
 from inventory_tng.settings import Settings
+
+# structlog's lines go through the standard library, where caplog sees them.
+configure_structlog()
+log = structlog.get_logger(__name__)
+
+
+@pytest.fixture
+def restore_logging() -> Iterator[None]:
+    """For tests that call configure_logging(), which takes over the root and
+    named loggers: put every logger back, so later tests keep caplog."""
+    manager = logging.Logger.manager
+    loggers = [logging.getLogger()]
+    loggers += [
+        lg for lg in manager.loggerDict.values() if isinstance(lg, logging.Logger)
+    ]
+    saved = [
+        (lg, lg.handlers[:], lg.level, lg.propagate, lg.disabled) for lg in loggers
+    ]
+    yield
+    for lg, handlers, level, propagate, disabled in saved:
+        lg.handlers[:] = handlers
+        lg.level, lg.propagate, lg.disabled = level, propagate, disabled
+    configure_structlog()
+
 
 PYPROJECT = Path(__file__).parents[1] / "pyproject.toml"
 
@@ -41,6 +68,7 @@ def database_url() -> Iterator[str]:
     try:
         with server.connect() as connection:
             connection.execute(text(f'CREATE DATABASE "{name}"'))
+        log.info("created test database", database=name)
     except OperationalError as error:
         pytest.exit(
             f"Cannot reach PostgreSQL at {make_url(SERVER_URL)}. Start it with "
@@ -53,6 +81,7 @@ def database_url() -> Iterator[str]:
     finally:
         with server.connect() as connection:
             connection.execute(text(f'DROP DATABASE "{name}" WITH (FORCE)'))
+        log.info("dropped test database", database=name)
         server.dispose()
 
 

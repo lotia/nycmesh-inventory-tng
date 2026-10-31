@@ -23,13 +23,14 @@ is, read [README.md](README.md).
    then fix what it finds. Then a simplification pass, then fix again. Push
    only after both. In Claude Code, run `/code-review` and then `/simplify`
    yourself. In another harness, use its equivalents, or ask the person.
-6. **Code you write logs what it does**, at the right level, and never logs
-   secrets or personal data. See [Logging](CONTRIBUTING.md#logging).
+6. **Code you write logs what it does**, at the right level. Log ids, not
+   names, emails, free text, request bodies or database error messages; never
+   secrets. The table in [Logging](CONTRIBUTING.md#logging) is the rule.
 7. **Code you write is measured where it matters.** When you add something a
    volunteer does (a save, a move, a scan), add an `inventory.*` counter or
    histogram, named and given units per OpenTelemetry's conventions, with a
-   test that reads it. Metric attributes take a few fixed values only: never
-   names, ids, addresses or free text. Don't add spans (0006).
+   test that reads it. Metric attributes take values from a fixed list in
+   code: never names, ids, addresses or free text. Don't add spans (0006).
 8. **Grow documentation deliberately.** Change an existing doc rather than
    adding one, and add a new file only when an issue asks for it.
 
