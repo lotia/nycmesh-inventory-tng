@@ -18,8 +18,8 @@ being replaced is small: about 135 items and 1,000–1,900 movements a year.
 - **FastAPI** with **pydantic v2** for routes and their inputs and outputs.
 - **SQLAlchemy 2**, typed with `Mapped[...]`, and **Alembic** for migrations.
 - **PostgreSQL**, reached through **psycopg 3**.
-- **Sync throughout.** Run with gunicorn and uvicorn workers. At this size,
-  sync code is simpler and fast enough.
+- **Sync throughout,** run by uvicorn (0007). At this size, sync code is
+  simpler and fast enough.
 - **Guards are plain values** passed to routes as dependencies. `/api/me`
   reads one capabilities table.
 - **No generic admin**, neither Django's nor sqladmin. Admin screens are

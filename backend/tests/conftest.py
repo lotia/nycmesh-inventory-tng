@@ -11,7 +11,6 @@ import pytest
 import structlog
 from alembic import command
 from alembic.config import Config
-from dotenv import dotenv_values
 from fastapi.testclient import TestClient
 from sqlalchemy import Connection, Engine, make_url, text
 from sqlalchemy.exc import OperationalError
@@ -19,12 +18,23 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.app import create_app
 from inventory_tng.db import get_session, make_engine
+from inventory_tng.local_env import local_env_values
 from inventory_tng.logs import configure_structlog
 from inventory_tng.settings import Settings
 
 # structlog's lines go through the standard library, where caplog sees them.
 configure_structlog()
 log = structlog.get_logger(__name__)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def no_telemetry_from_the_shell() -> Iterator[None]:
+    """A developer's OTEL_* settings must not reach the tests. Session-scoped,
+    so it runs before every module-scoped fixture too."""
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        for name in [name for name in os.environ if name.startswith("OTEL_")]:
+            monkeypatch.delenv(name)
+        yield
 
 
 @pytest.fixture
@@ -48,15 +58,13 @@ def restore_logging() -> Iterator[None]:
 
 PYPROJECT = Path(__file__).parents[1] / "pyproject.toml"
 
-# The port compose uses, from the shell or the .env compose reads, so the tests
-# find the database however they are run.
-PORT = (
-    os.environ.get("INVENTORY_DB_PORT")
-    or dotenv_values(Path(__file__).parents[2] / ".env").get("INVENTORY_DB_PORT")
-    or "5433"
-)
+# The database compose starts: from the shell, else the repository's .env
+# (CONTRIBUTING.md, Local settings), else compose's default port.
+LOCAL = local_env_values()
+PORT = os.environ.get("INVENTORY_DB_PORT") or LOCAL.get("INVENTORY_DB_PORT") or "5433"
 SERVER_URL = Settings(
     database_url=os.environ.get("DATABASE_URL")
+    or LOCAL.get("DATABASE_URL")
     or f"postgresql://inventory:inventory@localhost:{PORT}/inventory"
 ).database_url
 

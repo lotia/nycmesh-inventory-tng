@@ -88,3 +88,23 @@ def test_the_client_address_is_logged_only_when_asked(
         client.get("/api/healthz")
     (line,) = [entry for entry in logs if entry["event"] == "request"]
     assert ("client" in line) is on
+
+
+@pytest.mark.parametrize(("on", "level"), [(True, "info"), (False, "debug")])
+def test_successful_health_checks_can_be_quietened(
+    database_url: str, on: bool, level: str
+) -> None:
+    settings = Settings(database_url=database_url, logging=LogConfig(health_checks=on))
+    with TestClient(create_app(settings)) as client, capture_logs() as logs:
+        client.get("/api/healthz")
+    (line,) = [entry for entry in logs if entry["event"] == "request"]
+    assert line["log_level"] == level
+
+
+def test_a_failing_health_check_always_shows() -> None:
+    url = "postgresql+psycopg://u:p@127.0.0.1:1/x"
+    settings = Settings(database_url=url, logging=LogConfig(health_checks=False))
+    with TestClient(create_app(settings)) as client, capture_logs() as logs:
+        client.get("/api/healthz")
+    (line,) = [entry for entry in logs if entry["event"] == "request"]
+    assert (line["status"], line["log_level"]) == (503, "info")

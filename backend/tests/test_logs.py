@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 import pytest
 import structlog
@@ -96,3 +97,19 @@ def test_json_tracebacks_are_text(capsys: pytest.CaptureFixture[str]) -> None:
     line = json.loads(capsys.readouterr().out)
     assert isinstance(line["exception"], str)
     assert "ValueError: boom" in line["exception"]
+
+
+@pytest.mark.usefixtures("restore_logging")
+def test_no_colour_codes_when_not_a_terminal(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    configure()
+    structlog.get_logger("inventory_tng.test").info("plain")
+    assert "\x1b[" not in capsys.readouterr().out
+
+
+@pytest.mark.usefixtures("restore_logging")
+def test_every_line_names_its_process(capsys: pytest.CaptureFixture[str]) -> None:
+    configure(LOG_FORMAT="json")
+    logging.getLogger("some.library").warning("which process?")
+    assert json.loads(capsys.readouterr().out)["process"] == os.getpid()

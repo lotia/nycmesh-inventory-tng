@@ -34,10 +34,43 @@ bd sync
 Then push a branch and open a pull request: `git push -u origin <branch>`, or
 `jj git push --change @` with jj.
 
-## Running the checks
+## Requirements
 
-You need [uv](https://docs.astral.sh/uv/) and a container runtime with compose,
-such as Docker or Podman. uv installs the Python version the backend asks for.
+- [uv](https://docs.astral.sh/uv/). It installs the Python version the backend
+  asks for and every dependency; every command below runs through `uv run`.
+- A container runtime with compose, such as Docker or Podman, for the database.
+- Optional: [mise](https://mise.jdx.dev/), for two shortcuts.
+
+## Local settings
+
+```sh
+cp .env.example .env
+```
+
+`.env` holds your local settings: the database's port and URL, and any logging
+or telemetry settings you want. Git ignores it, so it never reaches a commit;
+change `.env.example` only to change what everyone starts from. Compose, the
+run command and migrations read `.env`, and the tests read its database
+settings. A value set in your shell wins over the file.
+
+The database listens on port 5433, so it can run beside MeshDB's. If that port
+is taken, change `INVENTORY_DB_PORT` in `.env`; `DATABASE_URL` follows it.
+
+## Running the app
+
+```sh
+docker compose up -d --wait db           # or: podman compose up -d --wait db
+cd backend
+uv run alembic upgrade head              # create or update the schema
+uv run python -m inventory_tng --reload  # http://127.0.0.1:8000/api/docs
+```
+
+`--reload` restarts the server when you save a file. `--host`, `--port` and
+`--workers` are there too (`--help` lists them). The run command starts uvicorn
+itself; uvicorn's own logging flags are not used, the `LOG_*` settings are
+(Logging, below).
+
+## Running the checks
 
 ```sh
 docker compose up -d --wait db   # or: podman compose up -d --wait db
@@ -57,16 +90,9 @@ uv run pytest                    # tests, against the database started above
 CI runs these checks, in this order, on pushes to `main` and on pull requests.
 
 Only the tests need the database; the other three take about a second. With
-the virtualenv activated (`source backend/.venv/bin/activate`), drop the
-`uv run`.
-If you use [mise](https://mise.jdx.dev/), `mise run fix` runs the two fixes
-and `mise run check` runs the four checks; start the database first.
-
-The database listens on port 5433, so it can run beside MeshDB's. If that port
-is taken, put `INVENTORY_DB_PORT=5434` (or any free port) in a `.env` file at
-the top of the repository; compose and the tests both read it. Each test run
-creates a throwaway database and drops it at the end. Write tests in pytest
-style.
+mise, `mise run fix` runs the two fixes and `mise run check` runs the four
+checks; start the database first. Each test run creates a throwaway database
+and drops it at the end. Write tests in pytest style.
 
 ## Logging
 
@@ -89,7 +115,23 @@ Metric attributes take values from a fixed list in code. For a database error,
 log `describe_error(error)`: its class, code and constraint, never its message,
 which can quote values.
 
-Logs are colourised by default. `LOG_LEVEL=DEBUG` turns on debug logs,
+Logs are colourised on a terminal. `LOG_LEVEL=DEBUG` turns on debug logs,
 `LOG_LEVELS` sets single loggers' levels (`sqlalchemy.engine=INFO` shows SQL,
 with its parameters hidden), and `LOG_FORMAT=json` prints the JSON that
-production emits. In tests, check log lines with structlog's `capture_logs()`.
+production emits. Every request is logged once, health checks included;
+`LOG_HEALTH_CHECKS=false` moves successful ones to `debug`. In tests, check
+log lines with structlog's `capture_logs()`.
+
+Exporting logs and metrics over OpenTelemetry stays off unless
+`OTEL_EXPORTER_OTLP_ENDPOINT` is set (or a signal's own endpoint, such as
+`OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`). Export is OTLP over HTTP (port 4318),
+not gRPC. Of the other standard variables, `OTEL_SERVICE_NAME`,
+`OTEL_RESOURCE_ATTRIBUTES` and the SDK's timing settings apply, and
+`OTEL_LOGS_EXPORTER=none` or `OTEL_METRICS_EXPORTER=none` stops one signal.
+To see telemetry locally, start the dashboard, run the server with
+`OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`, and open
+<http://localhost:18888>:
+
+```sh
+docker compose --profile telemetry up -d dashboard   # or: podman compose
+```

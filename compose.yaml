@@ -23,5 +23,17 @@ services:
       timeout: 3s
       retries: 15
 
+  # Optional: `docker compose --profile telemetry up -d dashboard`, then
+  # http://localhost:18888. It receives OTLP on localhost:4318.
+  dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.6.2
+    profiles: [telemetry]
+    environment:
+      # Local only, so no login.
+      ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+    ports:
+      - "127.0.0.1:18888:18888"
+      - "127.0.0.1:4318:18890"
+
 volumes:
   db:
