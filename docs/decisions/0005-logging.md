@@ -5,7 +5,7 @@
 ## Context
 
 Developers want colourised, readable logs, and Kubernetes collects JSON from
-the app's output. uvicorn, gunicorn, SQLAlchemy and Alembic all log through
+the app's output. uvicorn, SQLAlchemy and Alembic all log through
 Python's standard `logging`, and their lines must look like ours. Levels come
 from the environment. We want the code small and typed, with few
 dependencies.

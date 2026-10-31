@@ -16,6 +16,8 @@ from inventory_tng.settings import Settings
 
 log = structlog.get_logger(__name__)
 
+API = "/api"
+
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_environ()
@@ -38,6 +40,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url=None,
     )
     app.state.engine = engine
-    app.add_middleware(RequestLogging, client_address=settings.logging.client_address)
-    app.include_router(health.router, prefix="/api")
+    app.add_middleware(
+        RequestLogging,
+        client_address=settings.logging.client_address,
+        # LOG_HEALTH_CHECKS=false quietens successful health checks.
+        quiet_paths=frozenset()
+        if settings.logging.health_checks
+        else frozenset({API + health.PATH}),
+    )
+    app.include_router(health.router, prefix=API)
     return app

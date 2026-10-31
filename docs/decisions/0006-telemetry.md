@@ -6,7 +6,7 @@
 
 The app should be well instrumented, and its data should reach Datadog or
 any other OpenTelemetry backend. It is one small service with one database
-and no outbound calls, run under gunicorn with several workers per pod, and
+and no outbound calls, run as one uvicorn process per container (0007), and
 behind an ingress proxy that may emit traces of its own. The old attempt was
 judged too heavy, especially in the browser: about 1,000 lines and 9 packages.
 

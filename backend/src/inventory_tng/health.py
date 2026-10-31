@@ -11,13 +11,15 @@ log = structlog.get_logger(__name__)
 
 router = APIRouter()
 
+PATH = "/healthz"
+
 
 class Health(BaseModel):
     status: str
 
 
 @router.get(
-    "/healthz",
+    PATH,
     responses={503: {"model": Health, "description": "The database is unreachable"}},
 )
 def healthz(session: DbSession, response: Response) -> Health:

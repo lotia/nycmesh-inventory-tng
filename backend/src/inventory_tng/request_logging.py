@@ -38,9 +38,16 @@ class RequestLogging:
     therefore never see it; this app registers none.
     """
 
-    def __init__(self, app: ASGIApp, *, client_address: bool) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        client_address: bool,
+        quiet_paths: frozenset[str],
+    ) -> None:
         self.app = app
         self.client_address = client_address
+        self.quiet_paths = quiet_paths
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -75,7 +82,11 @@ class RequestLogging:
                 error = PlainTextResponse("Internal Server Error", status_code=500)
                 await error(scope, receive, send_with_id)
                 return
-            log.info("request", **details, status=status, duration_ms=_ms(started))
+            # Successful requests to quiet paths go to debug, where
+            # LOG_LEVEL=DEBUG still shows them. Failures always show.
+            quiet = scope["path"] in self.quiet_paths and status == 200
+            emit = log.debug if quiet else log.info
+            emit("request", **details, status=status, duration_ms=_ms(started))
 
 
 def _ms(started: float) -> float:

@@ -23,6 +23,8 @@ class LogConfig:
     format: Literal["console", "json"] = "console"
     # The client's address on each request line (CONTRIBUTING.md, Logging).
     client_address: bool = True
+    # Successful health checks at info (True) or demoted to debug (False).
+    health_checks: bool = True
 
     @classmethod
     def from_environ(cls, environ: Mapping[str, str] = os.environ) -> Self:
@@ -32,6 +34,7 @@ class LogConfig:
             levels=_levels(environ.get("LOG_LEVELS") or ""),
             format=_format(environ.get("LOG_FORMAT") or default.format),
             client_address=_flag(environ, "LOG_CLIENT_ADDRESS", default.client_address),
+            health_checks=_flag(environ, "LOG_HEALTH_CHECKS", default.health_checks),
         )
 
 
