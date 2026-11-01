@@ -12,7 +12,7 @@ import structlog
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import Connection, Engine, make_url, text
+from sqlalchemy import Connection, Engine, exc, make_url, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
@@ -137,3 +137,18 @@ def client(database_url: str, session: Session) -> Iterator[TestClient]:
     app.dependency_overrides[get_session] = lambda: session
     with TestClient(app) as client:
         yield client
+
+
+# In a constant, because tracebacks show the code line that raised, and code
+# lines are not masked.
+QUOTING_QUERY = "SELECT 'jane@example.org'::int"
+
+
+@pytest.fixture
+def database_error(engine: Engine) -> Iterator[exc.DBAPIError]:
+    """A real database error whose message quotes a value, as PostgreSQL's
+    do: `invalid input syntax for type integer: "jane@example.org"`."""
+    with engine.connect() as connection:
+        with pytest.raises(exc.DBAPIError) as raised:
+            connection.execute(text(QUOTING_QUERY))
+        yield raised.value

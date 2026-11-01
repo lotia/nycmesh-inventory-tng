@@ -38,6 +38,7 @@ from opentelemetry.util.types import AnyValue
 from sqlalchemy import Engine
 
 from inventory_tng.logs import ADDED_FIELDS
+from inventory_tng.masking import Masker
 
 SERVICE_NAME = "inventory-tng"
 
@@ -148,10 +149,13 @@ class Telemetry:
         )
         observe_pool(self.meter_provider, engine)
 
-    def attach_logs(self) -> None:
-        """Send every log line, ours and the libraries', over OTLP as well."""
+    def attach_logs(self, masker: Masker) -> None:
+        """Send every log line, ours and the libraries', over OTLP as well,
+        masked as stdout's are."""
         if self.logger_provider:
-            self._handler = StructlogBridge(logger_provider=self.logger_provider)
+            self._handler = StructlogBridge(
+                logger_provider=self.logger_provider, masker=masker
+            )
             logging.getLogger().addHandler(self._handler)
 
     def make_global(self) -> None:
@@ -217,8 +221,15 @@ class StructlogBridge(LoggingHandler):
     body and the rest become attributes. Fields are never copied onto the
     record, where a name like `args` or `msg` would break it. The request id
     and other context variables reach the standard library's records too.
-    Like any handler, it never raises into the code that logged.
+    Like any handler, it never raises into the code that logged. The context
+    and exception text are masked here: the standard library's records never
+    pass through structlog's processors, and OpenTelemetry formats exceptions
+    itself.
     """
+
+    def __init__(self, *, logger_provider: LoggerProvider, masker: Masker) -> None:
+        super().__init__(logger_provider=logger_provider)
+        self._masker = masker
 
     def filter(self, record: logging.LogRecord) -> bool:
         return not record.name.startswith(EXPORTER_LOGGERS) and bool(
@@ -238,13 +249,13 @@ class StructlogBridge(LoggingHandler):
             record.msg, record.args = str(message.get("event", "")), ()
             if exc_info := _exc_info(message.get("exc_info")):
                 record.exc_info = exc_info
-            fields = message
+            fields = message  # Masked already, by structlog's processors.
         else:
-            fields = structlog.contextvars.get_contextvars()
+            # The standard library's: only the context is added, so only it
+            # needs masking.
+            fields = self._masker.fields(structlog.contextvars.get_contextvars())
         record.__dict__["_fields"] = {
-            str(key): value
-            for key, value in fields.items()
-            if key not in NOT_ATTRIBUTES
+            key: value for key, value in fields.items() if key not in NOT_ATTRIBUTES
         }
         return record
 
@@ -258,6 +269,13 @@ class StructlogBridge(LoggingHandler):
         for name in [name for name in attributes if name.startswith("_")]:
             del attributes[name]
         attributes.pop("color_message", None)
+        if record.exc_info and (error := record.exc_info[1]):
+            for name, scrub in (
+                ("exception.message", self._masker.exception_message),
+                ("exception.stacktrace", self._masker.traceback),
+            ):
+                if isinstance(text := attributes.get(name), str):
+                    attributes[name] = scrub(text, error)
         if isinstance(fields, dict):
             attributes.update({key: _attribute(value) for key, value in fields.items()})
         return attributes, event_name

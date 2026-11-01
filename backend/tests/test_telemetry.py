@@ -7,8 +7,10 @@ import structlog
 from fastapi.testclient import TestClient
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+from sqlalchemy import exc
 
 from inventory_tng.app import create_app
+from inventory_tng.masking import MASK, Masker
 from inventory_tng.settings import Settings
 from inventory_tng.telemetry import Telemetry, enabled
 
@@ -83,7 +85,7 @@ def recorded(database_url: str) -> Iterator[Recorded]:
     telemetry.make_global()
     app = create_app(Settings(database_url=database_url))
     telemetry.instrument(app, app.state.engine)
-    telemetry.attach_logs()
+    telemetry.attach_logs(Masker())
     root = logging.getLogger()
     level = root.level
     root.setLevel(logging.INFO)
@@ -142,11 +144,37 @@ def test_exports_structlog_lines_as_bodies_and_attributes(recorded: Recorded) ->
     assert checked.severity_text == "WARN"
 
 
+def test_exported_lines_are_masked(
+    recorded: Recorded, database_error: exc.DBAPIError
+) -> None:
+    _, telemetry, _, exporter = recorded
+    exporter.clear()
+    with structlog.contextvars.bound_contextvars(session_id="sess-ctx"):
+        structlog.get_logger("inventory_tng.test").error(
+            "masked",
+            password="hunter2",
+            email="jane2@example.org",
+            exc_info=database_error,
+        )
+        logging.getLogger("some.library").warning("theirs")
+    flush(telemetry)
+    logs = {e.log_record.body: e.log_record for e in exporter.get_finished_logs()}
+    ours, theirs = logs["masked"].attributes, logs["theirs"].attributes
+    assert ours is not None
+    assert theirs is not None
+    assert (ours["password"], ours["email"], ours["session_id"]) == (MASK, MASK, MASK)
+    assert theirs["session_id"] == MASK
+    assert ours["exception.type"] == "DataError"
+    for name in ("exception.message", "exception.stacktrace"):
+        assert "jane@example.org" not in str(ours[name])
+        assert MASK in str(ours[name])
+
+
 def test_logged_fields_never_break_the_record(recorded: Recorded) -> None:
     _, telemetry, _, exporter = recorded
     exporter.clear()
     structlog.get_logger("inventory_tng.test").warning(
-        "odd names", args="a", created="c", msg="m", name="n"
+        "odd names", args="a", created="c", msg="m", module="n"
     )
     flush(telemetry)
     (entry,) = [
@@ -154,7 +182,7 @@ def test_logged_fields_never_break_the_record(recorded: Recorded) -> None:
     ]
     attributes = entry.log_record.attributes
     assert attributes is not None
-    assert (attributes["args"], attributes["msg"], attributes["name"]) == (
+    assert (attributes["args"], attributes["msg"], attributes["module"]) == (
         "a",
         "m",
         "n",
