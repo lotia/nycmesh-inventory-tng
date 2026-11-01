@@ -58,9 +58,11 @@ to one origin in one browser.
   - Biome to lint and format, Vitest for unit tests, Playwright for the
     browser.
   - Search starts as plain substring matching; Fuse.js if that falls short.
-- **No cryptography in the page** (AGENTS.md rule 3). The idempotency key
-  comes from `crypto.randomUUID()`; the cookie is `HttpOnly`; phrases are
-  hashed on the server. Biome refuses `crypto.subtle` in `frontend/`.
+- **No cryptography of our own in the page** (AGENTS.md rule 3). The
+  idempotency key comes from `crypto.randomUUID()`; the cookie is `HttpOnly`;
+  phrases are
+  hashed on the server. Any cryptography the page needs later comes from a
+  library or the browser's Web Crypto API, never code of our own.
 
 We rejected React (about ten times Preact's size, for one page), MUI and
 Emotion (heavy, and not shared with the Jinja pages, which use one plain

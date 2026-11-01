@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} · NYC Mesh Inventory</title>
+  {% for href in tags.styles %}
+  <link rel="stylesheet" href="{{ href }}">
+  {% endfor %}
+  {% for href in tags.preloads %}
+  <link rel="modulepreload" href="{{ href }}">
+  {% endfor %}
+  {% for src in tags.scripts %}
+  <script type="module" src="{{ src }}"></script>
+  {% endfor %}
+</head>
+<body>
+  <div id="app"></div>
+  <noscript>This page needs JavaScript.</noscript>
+</body>
+</html>

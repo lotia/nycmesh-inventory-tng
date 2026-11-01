@@ -1,0 +1,20 @@
+# Kept out of the build context, which is the repository's root. Docker and
+# Podman both read this file. Local settings, version control and issues
+# never belong in an image.
+.env
+.git/
+.jj/
+.beads/
+.claude/
+.codex/
+.cursor/
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+frontend/node_modules/
+frontend/dist/
+# Not needed to build the bundle, so editing them does not rebuild it.
+frontend/**/*.test.ts
+frontend/**/*.test.tsx
+frontend/biome.json

@@ -1,7 +1,19 @@
 # The backend's image for compose, which says how to run it (CONTRIBUTING.md,
 # Running the app in a container). Production's image: inventory-tng-8i4.18.
+# Built from the repository's root, so it can build frontend/ too.
+
+# The scan page's bundle (docs/decisions/0010). Node is needed to build it,
+# never to run it, so it stays in this stage.
+# On the build machine's own platform: its output runs anywhere.
+FROM --platform=$BUILDPLATFORM docker.io/library/node:26.12.1-trixie-slim AS frontend
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci
+COPY frontend ./
+RUN npm run build
+
 # uv is pinned, so every build reads uv.lock the same way.
-FROM docker.io/astral/uv:0.13.6-python3.15-trixie-slim
+FROM docker.io/astral/uv:0.13.6-python3.15-trixie-slim AS deps
 
 # The virtualenv lives outside /app, so bind-mounting the source over /app/src
 # leaves it alone. uv uses the image's Python and never downloads one.
@@ -10,19 +22,34 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     PATH=/opt/venv/bin:$PATH \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    FRONTEND_DIST=/app/static
 
 WORKDIR /app
 
 # Dependencies first, in a layer of their own, so a change to the code does not
 # reinstall them. uv's download cache is mounted, so it stays out of the image.
-COPY pyproject.toml uv.lock ./
+COPY backend/pyproject.toml backend/uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-install-project
+
+# The bundle, with a Brotli and a gzip copy of each file (docs/decisions/0010),
+# compressed in a stage of its own: the image takes only the result, and
+# COPY --from keys the cache on the bundle's contents. servestatic exits 0
+# even when compressing fails, so its output is checked.
+FROM deps AS bundle
+COPY --from=frontend /frontend/dist /tmp/dist
+RUN servestatic /tmp/dist /app/static --compress --no-zstd \
+    && test -n "$(find /app/static/assets -name '*.br' -print -quit)"
+
+FROM deps
 
 # The project is installed editable, so a bind-mounted src/ is what runs.
 # Compose mounts migrations/ too. Bytecode was compiled with the dependencies:
 # compiling here would do the whole virtualenv again.
-COPY src ./src
+COPY backend/src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     UV_COMPILE_BYTECODE=0 uv sync --locked --no-dev
+
+# Last, so a change to the scan page rebuilds only this layer.
+COPY --from=bundle /app/static /app/static

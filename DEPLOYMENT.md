@@ -11,6 +11,8 @@ There is no production container image or Helm chart yet
 - PostgreSQL. Development and the tests use 18.
 - [uv](https://docs.astral.sh/uv/), which installs the Python version the
   backend asks for.
+- Node, at the version in `mise.toml`, to build the scan page. It is needed
+  only to build, not to run.
 - HTTPS in front of it, from a reverse proxy or ingress. Outside development
   the device cookie is `Secure`: over plain http a browser never keeps it,
   so no device stays registered.
@@ -31,18 +33,46 @@ Set these in the environment. Only `DATABASE_URL` is required.
 - `LOG_HEALTH_CHECKS`: `false` logs successful health checks at debug.
 - `OTEL_EXPORTER_OTLP_ENDPOINT`: sends logs and metrics over OTLP/HTTP; off
   when unset.
+- `FRONTEND_DIST`: the folder holding the compressed scan page (below). It
+  defaults to the checkout's `frontend/dist`.
+- `VITE_DEV_SERVER`: never in production; the app refuses to start with it.
 
 What each logging setting does is in
 [CONTRIBUTING.md](CONTRIBUTING.md#logging).
 
 ## Installing, migrating and starting
 
+`UV_NO_DEV=1` keeps the development tools out: every `uv` command below
+would otherwise install them.
+
+Build the scan page into a new folder for each version, for example one
+named after its commit, with a Brotli and a gzip copy beside each file.
+`servestatic` reports success even when compressing fails, so check that it
+wrote the copies:
+
 ```sh
-cd backend
-uv sync --locked --no-dev
+export UV_NO_DEV=1
+cd frontend
+npm ci
+npm run build
+cd ../backend
+uv sync --locked
+uv run servestatic ../frontend/dist /srv/inventory/static-<commit> --compress --no-zstd
+test -n "$(find /srv/inventory/static-<commit>/assets -name '*.br' -print -quit)"
+```
+
+Then point `FRONTEND_DIST` at the new folder, migrate and restart:
+
+```sh
 uv run alembic upgrade head    # before starting a new version
 uv run python -m inventory_tng --host 0.0.0.0 --port 8000 --workers 2
 ```
+
+The app reads the scan page's build once, at startup, so it serves a new
+build only after a restart. Delete the previous version's folder once the
+restarted app is serving. Until there is a build, `/scan` and `/register`
+answer 503 and the app logs a warning. Its `frontend` log line at startup
+says which folder it serves.
 
 `GET /api/healthz` answers 200 when the app can reach the database, and 503
 when it cannot. Use it as a readiness check, not a liveness check: a

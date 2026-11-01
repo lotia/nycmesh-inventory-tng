@@ -38,9 +38,11 @@ Then push a branch and open a pull request: `git push -u origin <branch>`, or
 
 - [uv](https://docs.astral.sh/uv/). It installs the Python version the backend
   asks for and every dependency; every command below runs through `uv run`.
+- [Node.js](https://nodejs.org/), at the version in `mise.toml`, for the scan
+  page in `frontend/`. With mise, `mise install` fetches it.
 - A container runtime with compose, such as Docker or Podman, for the database
   (and, if you want it, the app).
-- Optional: [mise](https://mise.jdx.dev/), for two shortcuts.
+- Optional: [mise](https://mise.jdx.dev/), for Node and a few shortcuts.
 
 ## Local settings
 
@@ -71,6 +73,33 @@ uv run python -m inventory_tng --reload  # http://127.0.0.1:8000/api/docs
 itself; uvicorn's own logging flags are not used, the `LOG_*` settings are
 (Logging, below).
 
+### The scan page
+
+The scan page and the registration page are TypeScript, in `frontend/`
+(docs/decisions/0010). The backend serves them at `/scan` and `/register`,
+and answers 503 until they are built. Build them once, or run Vite's dev
+server while you work on them:
+
+```sh
+cd frontend
+npm ci                   # once, and after package-lock.json changes
+npm run build            # into frontend/dist, which the backend serves
+npm run dev              # or: the dev server, http://localhost:5173
+```
+
+With the build, open <http://127.0.0.1:8000/scan>. A new build is picked up
+without restarting the backend when `APP_ENV=development`.
+
+To have edits show as you save, set `VITE_DEV_SERVER=http://localhost:5173`
+in `.env`, restart the backend and run `npm run dev`. The page still comes
+from the backend, so the device cookie and the API work as in production;
+its scripts come from Vite. The port is required. Each server says where its
+pages' scripts come from in its `frontend` log line at startup:
+`source=build` or `source=dev_server`.
+
+The camera and Save work only over HTTPS or on `localhost`, so a phone on
+your network cannot use them yet; inventory-tng-8i4.13.2 is for that.
+
 ### Registering a device
 
 Pages that record anything need a registered device (docs/decisions/0009).
@@ -93,18 +122,22 @@ docker compose logs -f app
 ```
 
 This runs the backend the way production does, in a container beside the
-database, for when you want to check that it behaves the same there. It does
-not replace uv: the checks, new migrations and your editor still use it. The
-container migrates the database when it starts, then serves with `--reload`.
+database, for when you want to check that it behaves the same there. The
+image builds the scan page too, and serves Brotli and gzip copies of its
+files, as production will. It does not replace uv: the checks, new
+migrations and your editor still use it. The container migrates the
+database when it starts, then serves with `--reload`.
 Your `backend/src` and `backend/migrations` are mounted into it, so it picks
-up your edits. Pass `--build` again after changing dependencies.
+up your edits. Pass `--build` again after changing dependencies or
+`frontend/`.
 
 It reads your `.env`, except `DATABASE_URL` and `OTEL_EXPORTER_OTLP_ENDPOINT`,
-because inside the container `localhost` is the container. To send its
-telemetry to the dashboard, start the dashboard (Logging, below) and set
-`INVENTORY_APP_OTLP_ENDPOINT=http://dashboard:18890`. It takes port 8000, as
-the run command does; `INVENTORY_APP_PORT` moves it. The client address it
-logs is the container network's, not your browser's.
+because inside the container `localhost` is the container, and
+`VITE_DEV_SERVER` and `FRONTEND_DIST`, so it serves the bundle it built.
+To send its telemetry to the dashboard, start the dashboard (Logging, below)
+and set `INVENTORY_APP_OTLP_ENDPOINT=http://dashboard:18890`. It takes
+port 8000, as the run command does; `INVENTORY_APP_PORT` moves it. The
+client address it logs is the container network's, not your browser's.
 
 ## Running the checks
 
@@ -123,11 +156,22 @@ uv run ruff format --check       # formatting
 uv run pytest                    # tests, against the database started above
 ```
 
-CI runs these checks, in this order, on pushes to `main` and on pull requests.
+For the frontend:
 
-Only the tests need the database; the other three take about a second. With
-mise, `mise run fix` runs the two fixes and `mise run check` runs the four
-checks; start the database first. Each test run creates a throwaway database
+```sh
+cd frontend
+npm run fix                      # optional: Biome's fixes and formatting
+npm run typecheck                # types
+npm run lint                     # Biome: lint and formatting
+npm test                         # Vitest
+```
+
+CI runs these checks, in this order, on pushes to `main` and on pull requests,
+and builds the frontend.
+
+Only the backend's tests need the database; the other checks take about a
+second each. With mise, `mise run fix` runs the fixes and `mise run check`
+runs every check; start the database first. Each test run creates a throwaway database
 and drops it at the end. Write tests in pytest style.
 
 ## Documentation
