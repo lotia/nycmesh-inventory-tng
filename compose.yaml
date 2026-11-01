@@ -23,6 +23,53 @@ services:
       timeout: 3s
       retries: 15
 
+  # The backend in a container (CONTRIBUTING.md, Running the app in a container).
+  app:
+    build:
+      context: ./backend
+      dockerfile: Containerfile
+    # Migrate, then serve with reload. A reload does not migrate again.
+    command:
+      - sh
+      - -c
+      - alembic upgrade head && exec python -m inventory_tng --host 0.0.0.0 --reload
+    # An init process as PID 1, to pass on signals and reap the reloader's
+    # children.
+    init: true
+    # A terminal, so the logs keep their colour.
+    tty: true
+    # Your settings, if you have a .env (CONTRIBUTING.md, Local settings)...
+    env_file:
+      - path: .env
+        required: false
+    # ...except where they name localhost, which inside the container is the
+    # container.
+    environment:
+      DATABASE_URL: postgresql://inventory:inventory@db:5432/inventory
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${INVENTORY_APP_OTLP_ENDPOINT:-}
+      # The health check runs every 5 s: at debug, unless .env says otherwise.
+      LOG_HEALTH_CHECKS: ${LOG_HEALTH_CHECKS:-false}
+    # Read-only bind mounts, so --reload sees your edits and nothing in the
+    # container can change them. :z relabels them for SELinux.
+    volumes:
+      - ./backend/src:/app/src:ro,z
+      - ./backend/migrations:/app/migrations:ro,z
+    ports:
+      - "127.0.0.1:${INVENTORY_APP_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    # Here, not in the Containerfile: podman build drops HEALTHCHECK. Every
+    # 5 s, so --wait returns soon: Podman ignores start_interval.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import sys, urllib.request; sys.exit(urllib.request.urlopen('http://127.0.0.1:8000/api/healthz', timeout=3).status != 200)"
+      interval: 5s
+      start_period: 30s
+
   # Optional: `docker compose --profile telemetry up -d dashboard`, then
   # http://localhost:18888. It receives OTLP on localhost:4318.
   dashboard:
