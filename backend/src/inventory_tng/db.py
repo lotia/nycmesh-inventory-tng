@@ -51,17 +51,20 @@ DbSession = Annotated[Session, Depends(get_session)]
 # Read by the history trigger (migration 0002, which writes the name out):
 # who made this transaction's changes.
 ACTOR_SETTING = "inventory.actor"
-# Also catalogue_history's check constraint (models.py).
-ACTOR_PATTERN = "(admin|volunteer):[0-9]+"
+# Also catalogue_history's check constraint (models.py, migration 0003).
+# system:<name> is anything that is not a person, such as the command line.
+CLI_ACTOR = "system:cli"
+ACTOR_PATTERN = "(admin|volunteer):[0-9]+|system:[a-z_]+"
 ACTOR = re.compile(ACTOR_PATTERN)
 
 
 def set_actor(session: Session, actor: str) -> None:
-    """Name who is making this transaction's changes: "admin:3" or
-    "volunteer:7", ids and never names, so history holds no personal data
-    through it. Lasts until the transaction ends."""
+    """Name who is making this transaction's changes: "admin:3",
+    "volunteer:7", or "system:cli" for something that is not a person; ids
+    and never names, so history holds no personal data through it. Lasts
+    until the transaction ends."""
     if not ACTOR.fullmatch(actor):
-        raise ValueError("an actor is admin:<id> or volunteer:<id>")
+        raise ValueError("an actor is admin:<id>, volunteer:<id> or system:<name>")
     session.execute(select(func.set_config(ACTOR_SETTING, actor, True)))
     log.debug("actor set", actor=actor)
 

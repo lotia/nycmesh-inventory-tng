@@ -4,13 +4,14 @@ server and dropped when the run ends. Each test's writes are rolled back."""
 import logging
 import os
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
 import structlog
 from alembic import command
 from alembic.config import Config
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Connection, Engine, exc, make_url, text
 from sqlalchemy.exc import OperationalError
@@ -20,7 +21,7 @@ from inventory_tng.app import create_app
 from inventory_tng.db import get_session, make_engine
 from inventory_tng.local_env import local_env_values
 from inventory_tng.logs import configure_structlog
-from inventory_tng.settings import Settings
+from inventory_tng.settings import LogConfig, Settings
 
 # structlog's lines go through the standard library, where caplog sees them.
 configure_structlog()
@@ -132,10 +133,21 @@ def session(engine: Engine) -> Iterator[Session]:
 
 
 @pytest.fixture
-def client(database_url: str, session: Session) -> Iterator[TestClient]:
-    app = create_app(Settings(database_url=database_url))
-    app.dependency_overrides[get_session] = lambda: session
-    with TestClient(app) as client:
+def make_app(database_url: str, session: Session) -> Callable[..., FastAPI]:
+    """Apps on the test database, whose requests use the test's session."""
+
+    def make(logging: LogConfig | None = None) -> FastAPI:
+        settings = Settings(database_url=database_url, logging=logging or LogConfig())
+        app = create_app(settings)
+        app.dependency_overrides[get_session] = lambda: session
+        return app
+
+    return make
+
+
+@pytest.fixture
+def client(make_app: Callable[..., FastAPI]) -> Iterator[TestClient]:
+    with TestClient(make_app()) as client:
         yield client
 
 

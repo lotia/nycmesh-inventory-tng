@@ -13,6 +13,7 @@ import sys
 import structlog
 from structlog.typing import EventDict, Processor
 
+from inventory_tng import request_logging
 from inventory_tng.masking import Masker
 from inventory_tng.settings import LogConfig
 
@@ -32,6 +33,7 @@ def add_process(_logger: object, _method: str, event: EventDict) -> EventDict:
 # masker; ADDED_FIELDS are the fields they add.
 SHARED: list[Processor] = [
     structlog.contextvars.merge_contextvars,
+    request_logging.merge_request_fields,
     structlog.stdlib.add_log_level,
     structlog.stdlib.add_logger_name,
     structlog.processors.TimeStamper(fmt="iso", utc=True),

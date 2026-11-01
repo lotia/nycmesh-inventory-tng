@@ -5,16 +5,48 @@ import re
 import secrets
 import time
 from collections.abc import Iterable
+from contextvars import ContextVar
 
 import structlog
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from structlog.typing import EventDict
 
 log = structlog.get_logger(__name__)
 
+# Fields bound during a request, the request line's included. One mutable
+# dict per request: a copy of the context (a sync dependency, a thread) holds
+# the same dict, so what it binds is still seen afterwards.
+_fields: ContextVar[dict[str, object] | None] = ContextVar(
+    "inventory_request_fields", default=None
+)
+
 REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{1,64}")
 TRACEPARENT = re.compile(r"[0-9a-f]{2}-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}")
+
+
+def bind(**fields: object) -> None:
+    """Put fields on every later line of this request, the request line
+    included, from anywhere in it. structlog's own bind_contextvars() does not
+    reach the request line: something between this middleware and the route
+    runs in a copy of the context. Outside a request, it is that."""
+    current = _fields.get()
+    if current is None:
+        structlog.contextvars.bind_contextvars(**fields)
+    else:
+        current.update(fields)
+
+
+def request_fields() -> dict[str, object]:
+    return dict(_fields.get() or {})
+
+
+def merge_request_fields(_logger: object, _method: str, event: EventDict) -> EventDict:
+    """A structlog processor (logs.SHARED): the fields bind() added."""
+    for key, value in (_fields.get() or {}).items():
+        event.setdefault(key, value)
+    return event
 
 
 def request_id(headers: Iterable[tuple[bytes, bytes]]) -> str:
@@ -64,29 +96,34 @@ class RequestLogging:
                 MutableHeaders(scope=message).append("x-request-id", rid)
             await send(message)
 
-        with structlog.contextvars.bound_contextvars(request_id=rid):
-            details = {"method": scope["method"], "path": scope["path"]}
-            if self.client_address and scope.get("client"):
-                details["client"] = scope["client"][0]
-            try:
-                await self.app(scope, receive, send_with_id)
-            except Exception:
-                log.exception(
-                    "request failed",
-                    **details,
-                    status=status or 500,
-                    duration_ms=_ms(started),
-                )
-                if status is not None:
-                    raise  # The response has begun; there is no 500 to send.
-                error = PlainTextResponse("Internal Server Error", status_code=500)
-                await error(scope, receive, send_with_id)
-                return
-            # Successful requests to quiet paths go to debug, where
-            # LOG_LEVEL=DEBUG still shows them. Failures always show.
-            quiet = scope["path"] in self.quiet_paths and status == 200
-            emit = log.debug if quiet else log.info
-            emit("request", **details, status=status, duration_ms=_ms(started))
+        fields = _fields.set({})
+        try:
+            with structlog.contextvars.bound_contextvars(request_id=rid):
+                details = {"method": scope["method"], "path": scope["path"]}
+                if self.client_address and scope.get("client"):
+                    details["client"] = scope["client"][0]
+                try:
+                    await self.app(scope, receive, send_with_id)
+                except Exception:
+                    log.exception(
+                        "request failed",
+                        **details,
+                        status=status or 500,
+                        duration_ms=_ms(started),
+                    )
+                    if status is not None:
+                        raise  # The response has begun; there is no 500 to send.
+                    error = PlainTextResponse("Internal Server Error", status_code=500)
+                    await error(scope, receive, send_with_id)
+                    return
+                # Successful requests to quiet paths go to debug, where
+                # LOG_LEVEL=DEBUG still shows them. Failures always show.
+                quiet = scope["path"] in self.quiet_paths and status == 200
+                emit = log.debug if quiet else log.info
+                emit("request", **details, status=status, duration_ms=_ms(started))
+
+        finally:
+            _fields.reset(fields)
 
 
 def _ms(started: float) -> float:

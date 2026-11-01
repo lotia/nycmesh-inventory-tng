@@ -37,6 +37,7 @@ from opentelemetry.sdk.trace.sampling import DEFAULT_OFF
 from opentelemetry.util.types import AnyValue
 from sqlalchemy import Engine
 
+from inventory_tng import request_logging
 from inventory_tng.logs import ADDED_FIELDS
 from inventory_tng.masking import Masker
 
@@ -253,7 +254,12 @@ class StructlogBridge(LoggingHandler):
         else:
             # The standard library's: only the context is added, so only it
             # needs masking.
-            fields = self._masker.fields(structlog.contextvars.get_contextvars())
+            fields = self._masker.fields(
+                {
+                    **structlog.contextvars.get_contextvars(),
+                    **request_logging.request_fields(),
+                }
+            )
         record.__dict__["_fields"] = {
             key: value for key, value in fields.items() if key not in NOT_ATTRIBUTES
         }

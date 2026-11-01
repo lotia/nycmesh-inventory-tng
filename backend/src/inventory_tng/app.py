@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 
-from inventory_tng import health
+from inventory_tng import devices, health
 from inventory_tng.db import make_engine
 from inventory_tng.request_logging import RequestLogging
 from inventory_tng.settings import Settings
@@ -40,6 +40,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url=None,
     )
     app.state.engine = engine
+    app.state.settings = settings
     app.add_middleware(
         RequestLogging,
         client_address=settings.logging.client_address,
@@ -49,4 +50,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         else frozenset({API + health.PATH}),
     )
     app.include_router(health.router, prefix=API)
+    app.include_router(devices.router, prefix=API)
+    devices.install(app)
     return app
