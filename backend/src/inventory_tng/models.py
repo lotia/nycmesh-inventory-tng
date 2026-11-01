@@ -1,10 +1,11 @@
-"""The catalogue, locations, volunteers and labels (inventory-tng-8i4.10), and
-registered devices (inventory-tng-8i4.42).
+"""The catalogue, locations, volunteers and labels (inventory-tng-8i4.10),
+registered devices (inventory-tng-8i4.42) and the ledger (inventory-tng-8i4.11).
 
 Every mapped class registers here; migrations/env.py imports this module, so
-autogenerate sees every table. The ledger is separate (inventory-tng-8i4.11).
+autogenerate sees every table.
 
-Conventions, on every table:
+Conventions, on every table but the ledger's, which is append-only and is its
+own history (LedgerTransaction):
 
 - An integer id and `created_at`, set by the database.
 - Nothing is deleted. A row is retired (`retired_at`; NULL means current) and
@@ -20,6 +21,7 @@ in the migration that creates these tables. Both raise check violations
 """
 
 import secrets
+import uuid
 from datetime import datetime
 from decimal import Decimal
 from ipaddress import IPv4Address, IPv6Address
@@ -50,6 +52,9 @@ MONEY = Numeric(10, 2)
 
 UNITS = ("each", "m", "ft")
 LOCATION_KINDS = ("store", "area", "vehicle", "custody")
+# What a transaction is. A count or an adjustment fixes the records, with
+# stock found (NULL to a location) or lost (a location to NULL).
+TRANSACTION_KINDS = ("move", "receipt", "install", "count", "adjustment")
 
 # Label codes: no 0/O, 1/I/L or U, so a code read aloud or off a smudged label
 # is not misread. 30^10 codes, about 5.9e14.
@@ -390,3 +395,60 @@ class Device(Base):
     # A name an administrator gives it, such as "Store tablet".
     label: Mapped[str | None] = mapped_column(Text)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class LedgerTransaction(Base):
+    """One batch: everything one volunteer moved from one place to another at
+    once (docs/decisions/0003). A NULL side is outside the system: a delivery
+    coming in, an install going out. Its movements are written with it, all or
+    none, and neither is ever changed or deleted: a mistake is fixed by a
+    count or an adjustment. The rules are in migration 0004."""
+
+    __tablename__ = "ledger_transaction"
+    __table_args__ = (
+        CheckConstraint(_one_of("kind", TRANSACTION_KINDS), name="kind"),
+        CheckConstraint("from_location_id <> to_location_id", name="two_places"),
+        CheckConstraint(
+            "CASE kind"
+            " WHEN 'move' THEN num_nulls(from_location_id, to_location_id) = 0"
+            " WHEN 'receipt' THEN from_location_id IS NULL"
+            " AND to_location_id IS NOT NULL"
+            " WHEN 'install' THEN from_location_id IS NOT NULL"
+            " AND to_location_id IS NULL"
+            " ELSE num_nulls(from_location_id, to_location_id) = 1 END",
+            name="sides",
+        ),
+        CheckConstraint("install_number > 0", name="install_number"),
+        CheckConstraint(
+            "install_number IS NULL OR kind = 'install'",
+            name="install_number_on_install",
+        ),
+    )
+
+    id: Mapped[IntId]
+    # The server's clock, always: a trigger sets it, whatever was sent.
+    created_at: Mapped[CreatedAt]
+    # The client's, so a batch sent twice is written once.
+    idempotency_key: Mapped[uuid.UUID] = mapped_column(unique=True)
+    kind: Mapped[str] = mapped_column(Text)
+    from_location_id: Mapped[int | None] = _reference("location.id")
+    to_location_id: Mapped[int | None] = _reference("location.id")
+    # MeshDB's, for stock going up on a roof.
+    install_number: Mapped[int | None]
+    # The name picked, and the device that sent it (docs/decisions/0009).
+    # NULL for what no volunteer did, such as an import.
+    volunteer_id: Mapped[int | None] = _reference("volunteer.id")
+    device_id: Mapped[int | None] = _reference("device.id")
+
+
+class Movement(Base):
+    """One line of a transaction: an item and how much of it, in the item's
+    unit."""
+
+    __tablename__ = "movement"
+    __table_args__ = (CheckConstraint("quantity > 0", name="quantity"),)
+
+    id: Mapped[IntId]
+    transaction_id: Mapped[int] = _reference("ledger_transaction.id")
+    item_id: Mapped[int] = _reference("item.id")
+    quantity: Mapped[Decimal] = mapped_column(QUANTITY)

@@ -14,6 +14,8 @@ from opentelemetry.sdk.metrics.export import (
 )
 from sqlalchemy import exc
 from sqlalchemy.orm import Session
+from test_devices import new_device
+from test_ledger import Place
 
 from inventory_tng import devices
 from inventory_tng.app import create_app
@@ -262,3 +264,26 @@ def test_counts_registrations_and_refusals(recorded: Recorded) -> None:
 
 def needs_a_device(device: RegisteredDevice) -> int:
     return device.id
+
+
+def test_counts_batches_written_replayed_and_refused(recorded: Recorded) -> None:
+    client, _, reader, _ = recorded
+    engine = client.app.state.engine  # ty: ignore[unresolved-attribute]
+    with Session(engine, expire_on_commit=False) as session, session.begin():
+        place = Place(session)
+        _, token = new_device(session)
+    client.cookies.set(devices.COOKIE, token)
+    batch = place.batch()
+    assert client.post("/api/transactions", json=batch).status_code == 201
+    assert client.post("/api/transactions", json=batch).status_code == 200
+    unknown = place.batch(lines=[{"item_id": 999999, "quantity": "1"}])
+    assert client.post("/api/transactions", json=unknown).status_code == 422
+    client.cookies.clear()
+
+    kind = (("kind", "move"),)
+    assert counted(reader, "inventory.transactions.recorded")[kind] >= 1
+    assert counted(reader, "inventory.transactions.replayed")[kind] >= 1
+    assert (
+        counted(reader, "inventory.transactions.refused")[(("reason", "invalid"),)] >= 1
+    )
+    assert "inventory.transaction.lines" in metric_names(reader)

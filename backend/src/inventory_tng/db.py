@@ -5,7 +5,8 @@ from collections.abc import Iterator
 from typing import Annotated
 
 import structlog
-from fastapi import Depends, Request
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import Engine, MetaData, create_engine, exc, func, select
 from sqlalchemy.orm import DeclarativeBase, Session
 
@@ -80,3 +81,33 @@ def describe_error(error: exc.SQLAlchemyError) -> dict[str, str]:
     if constraint := getattr(getattr(orig, "diag", None), "constraint_name", None):
         fields["constraint"] = constraint
     return fields
+
+
+# OperationalErrors that trying again can cure. Any other is a bug, and
+# stays a 500: retrying it forever would hide it.
+RETRYABLE_SQLSTATES = (
+    "08",  # The connection failed or was lost.
+    "40001",  # Serialization failure.
+    "40P01",  # Deadlock.
+    "53300",  # Too many connections.
+    "57014",  # A statement timed out.
+    "57P01",  # The server is shutting down...
+    "57P02",
+    "57P03",  # ...or is not accepting connections yet.
+)
+
+
+def install(app: FastAPI) -> None:
+    """A database the app cannot reach, or that cannot answer just now, is a
+    503 on any route, so a client such as the scan page's outbox knows to try
+    again."""
+
+    @app.exception_handler(exc.OperationalError)
+    @app.exception_handler(exc.TimeoutError)
+    def unavailable(_request: Request, error: exc.SQLAlchemyError) -> JSONResponse:
+        sqlstate = getattr(getattr(error, "orig", None), "sqlstate", None)
+        # No sqlstate: the server never answered, as when it is down.
+        if sqlstate and not sqlstate.startswith(RETRYABLE_SQLSTATES):
+            raise error
+        log.warning("database unavailable", **describe_error(error))
+        return JSONResponse({"reason": "database_unavailable"}, status_code=503)
