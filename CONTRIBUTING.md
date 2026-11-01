@@ -130,6 +130,23 @@ mise, `mise run fix` runs the two fixes and `mise run check` runs the four
 checks; start the database first. Each test run creates a throwaway database
 and drops it at the end. Write tests in pytest style.
 
+## Documentation
+
+README.md, CONTRIBUTING.md and DEPLOYMENT.md are for people setting up,
+running and working on the app. Keep them:
+
+- **Current.** They describe what the code on `main` needs, nothing more. A
+  change that alters a step, a command, a setting or a behaviour a doc
+  describes updates that doc in the same change.
+- **Free of history.** Why something is the way it is, what it replaced and
+  what was rejected go in a decision record under `docs/decisions/`. Link to
+  it when a reader needs the reason.
+- **Short and clear.** Steps a reader can follow in order, in plain words.
+  Cut what the reader does not need to do the task.
+
+Change an existing doc rather than adding one, and add a new file only when
+an issue asks for it.
+
 ## Logging
 
 Use `debug` for detail you need when tracing a problem, `info` for what an

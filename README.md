@@ -9,10 +9,12 @@ into one batch, and send the whole batch at once. Every movement is recorded,
 from shelf to volunteer to install, so the counts can be trusted and corrected
 without editing history.
 
-## Status
+Nothing is usable by volunteers yet.
 
-Just started. This is a rewrite of an earlier attempt. Nothing is usable yet.
+## Documentation
 
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+- **[CONTRIBUTING.md](CONTRIBUTING.md)**, for developers: setting up, running
+  the app on your computer, the checks, and how we work.
+- **[DEPLOYMENT.md](DEPLOYMENT.md)**, for running it on a server: what it
+  needs, its settings, and how to start it.
+- **[docs/decisions](docs/decisions/)**: why it is built the way it is.

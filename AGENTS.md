@@ -14,8 +14,11 @@ is, read [README.md](README.md).
    for people and agents alike, so follow it as written.
 2. **Track work in beads (`bd`)**, not in TODO lists or a harness's own task
    tool. Run `bd prime` if beads context is missing.
-3. **Never write cryptography.** Use an established library, or a thin wrapper
-   that only arranges its public calls. If neither reaches what is needed,
+3. **Never implement cryptography.** No hashing, encryption, signing, key
+   derivation, MAC or random-number algorithm written by hand, however
+   small, and none copied in. Always call an established library or a
+   platform API (Web Crypto, `hashlib`, `secrets`, `cryptography`), or a thin
+   wrapper that only arranges its public calls. If none does what is needed,
    stop and say so. Do not prototype it.
 4. **Run the checks before closing an issue that changed code.** See
    [Running the checks](CONTRIBUTING.md#running-the-checks).
@@ -31,8 +34,18 @@ is, read [README.md](README.md).
    histogram, named and given units per OpenTelemetry's conventions, with a
    test that reads it. Metric attributes take values from a fixed list in
    code: never names, ids, addresses or free text. Don't add spans (0006).
-8. **Grow documentation deliberately.** Change an existing doc rather than
+8. **Keep documentation short, clear and current.** Follow
+   [Documentation](CONTRIBUTING.md#documentation). In short: docs for people
+   describe only what the current code needs, history goes in a decision
+   record, and a change that alters what a doc says updates that doc in the
+   same change, without being asked. Change an existing doc rather than
    adding one, and add a new file only when an issue asks for it.
+9. **Lint every Markdown file you write or change, and fix everything it
+   finds.** The linter is markdownlint; inventory-tng-pkm sets it up and
+   cleans up the existing files. Until it lands, run
+   `npx markdownlint-cli2@0.24.0 <files>` from the repository's root, where
+   `.markdownlint-cli2.jsonc` is. Never disable, relax or work around a rule
+   (config, inline comments, ignores) without asking the person first.
 
 ## More guidance
 
