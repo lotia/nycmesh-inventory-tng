@@ -1,0 +1,8 @@
+// markdownlint (AGENTS.md rule 9). Every rule is on; a change here is agreed
+// with the maintainers first.
+{
+  "config": {
+    // Table rows cannot wrap, and a table reads best as a grid.
+    "MD013": { "tables": false }
+  }
+}
