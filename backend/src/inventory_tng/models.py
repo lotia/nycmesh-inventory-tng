@@ -1,4 +1,5 @@
-"""The catalogue, locations, volunteers and labels (inventory-tng-8i4.10).
+"""The catalogue, locations, volunteers and labels (inventory-tng-8i4.10), and
+registered devices (inventory-tng-8i4.42).
 
 Every mapped class registers here; migrations/env.py imports this module, so
 autogenerate sees every table. The ledger is separate (inventory-tng-8i4.11).
@@ -21,6 +22,7 @@ in the migration that creates these tables. Both raise check violations
 import secrets
 from datetime import datetime
 from decimal import Decimal
+from ipaddress import IPv4Address, IPv6Address
 from typing import Annotated, Any
 
 from sqlalchemy import (
@@ -32,12 +34,13 @@ from sqlalchemy import (
     ForeignKey,
     Identity,
     Index,
+    LargeBinary,
     Numeric,
     Text,
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import INET, JSONB
 from sqlalchemy.orm import Mapped, MappedColumn, mapped_column
 
 from inventory_tng.db import ACTOR_PATTERN, Base
@@ -327,7 +330,7 @@ class CatalogueHistory(Base):
     __table_args__ = (
         CheckConstraint("action IN ('insert', 'update', 'delete')", name="action"),
         # Ids, never names, whoever sets it (db.set_actor checks it first).
-        CheckConstraint(f"actor ~ '^{ACTOR_PATTERN}$'", name="actor"),
+        CheckConstraint(f"actor ~ '^({ACTOR_PATTERN})$'", name="actor"),
     )
 
     # bigint: one row per change to any table above.
@@ -342,3 +345,48 @@ class CatalogueHistory(Base):
     )
     old_row: Mapped[dict[str, object] | None] = mapped_column(JSONB)
     new_row: Mapped[dict[str, object] | None] = mapped_column(JSONB)
+
+
+class RegistrationCode(Base):
+    """Lets devices register, and nothing else (docs/decisions/0009). Shown as
+    a QR code in the room and as a phrase of words for remote volunteers: one
+    code, two spellings. Only the phrase's hash is kept."""
+
+    __tablename__ = "registration_code"
+    __table_args__ = (
+        CheckConstraint("max_uses > 0", name="max_uses"),
+        CheckConstraint("uses BETWEEN 0 AND max_uses", name="uses"),
+    )
+
+    id: Mapped[IntId]
+    created_at: Mapped[CreatedAt]
+    # SHA-256 of the normalised phrase (devices.normalise_phrase).
+    phrase_hash: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
+    # Where it is for, such as "Hub open day"; for administrators.
+    label: Mapped[str | None] = mapped_column(Text)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    max_uses: Mapped[int]
+    uses: Mapped[int] = mapped_column(server_default="0")
+    # Stops new registrations. Devices already registered with it stay so.
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Device(Base):
+    """One registered browser, told apart by a cookie (docs/decisions/0009).
+    Holds no person: who did what is on the ledger, which records the device
+    beside the volunteer picked. Only the cookie's hash is kept."""
+
+    __tablename__ = "device"
+
+    id: Mapped[IntId]
+    created_at: Mapped[CreatedAt]
+    token_hash: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
+    registration_code_id: Mapped[int] = _reference("registration_code.id")
+    # The client address uvicorn resolved (FORWARDED_ALLOW_IPS), if it was one.
+    first_seen_from: Mapped[IPv4Address | IPv6Address | None] = mapped_column(INET)
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    # A name an administrator gives it, such as "Store tablet".
+    label: Mapped[str | None] = mapped_column(Text)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

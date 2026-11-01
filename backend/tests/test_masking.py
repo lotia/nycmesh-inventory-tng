@@ -37,6 +37,7 @@ SECRETS = {
     "pwd": "pwd-1",
     "jwt": "eyJ.jwt",
     "user_pass": "pass-1",
+    "registration_phrase": "abacus-abdomen-tulip",
 }
 PERSONAL = {
     "email": "jane@example.org",

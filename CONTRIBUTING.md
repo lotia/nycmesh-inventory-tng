@@ -71,6 +71,20 @@ uv run python -m inventory_tng --reload  # http://127.0.0.1:8000/api/docs
 itself; uvicorn's own logging flags are not used, the `LOG_*` settings are
 (Logging, below).
 
+### Registering a device
+
+Pages that record anything need a registered device (docs/decisions/0009).
+Until administrator pages exist, make a code from the command line:
+
+```sh
+uv run python -m inventory_tng.registration_codes create --uses 1 --days 1
+```
+
+It prints a phrase, once, to send to `POST /api/devices` as `{"code": ...}`.
+With `--base-url http://<your-laptop>:8000` it also prints the link and a QR
+code for a phone. With `APP_ENV=development` the cookie works over plain http.
+`revoke`, `devices` and `revoke-device` do the rest; `--help` lists them.
+
 ### Running the app in a container
 
 ```sh

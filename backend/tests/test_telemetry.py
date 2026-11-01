@@ -1,15 +1,23 @@
 import logging
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
+from datetime import timedelta
 
 import pytest
 import structlog
 from fastapi.testclient import TestClient
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
-from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+from opentelemetry.sdk.metrics.export import (
+    InMemoryMetricReader,
+    Metric,
+    NumberDataPoint,
+)
 from sqlalchemy import exc
+from sqlalchemy.orm import Session
 
+from inventory_tng import devices
 from inventory_tng.app import create_app
+from inventory_tng.devices import RegisteredDevice
 from inventory_tng.masking import MASK, Masker
 from inventory_tng.settings import Settings
 from inventory_tng.telemetry import Telemetry, enabled
@@ -102,15 +110,16 @@ def flush(telemetry: Telemetry) -> None:
     telemetry.logger_provider.force_flush()
 
 
-def metric_names(reader: InMemoryMetricReader) -> set[str]:
+def metrics_in(reader: InMemoryMetricReader) -> Iterator[Metric]:
     data = reader.get_metrics_data()
     assert data is not None
-    return {
-        metric.name
-        for resource in data.resource_metrics
-        for scope in resource.scope_metrics
-        for metric in scope.metrics
-    }
+    for resource in data.resource_metrics:
+        for scope in resource.scope_metrics:
+            yield from scope.metrics
+
+
+def metric_names(reader: InMemoryMetricReader) -> set[str]:
+    return {metric.name for metric in metrics_in(reader)}
 
 
 def test_measures_requests_queries_and_the_pool(recorded: Recorded) -> None:
@@ -216,3 +225,40 @@ def test_a_signal_with_its_own_endpoint_starts_alone() -> None:
     with created(environ) as traces_only:
         assert traces_only.tracer_provider is not None
         assert traces_only.logger_provider is None
+
+
+def counted(reader: InMemoryMetricReader, name: str) -> dict[tuple[object, ...], int]:
+    """A counter's totals, by its attributes' values."""
+    return {
+        tuple(sorted((point.attributes or {}).items())): int(point.value)
+        for metric in metrics_in(reader)
+        if metric.name == name
+        for point in metric.data.data_points
+        if isinstance(point, NumberDataPoint)
+    }
+
+
+def test_counts_registrations_and_refusals(recorded: Recorded) -> None:
+    client, _, reader, _ = recorded
+    devices._limiter.storage.reset()
+    with Session(client.app.state.engine) as session, session.begin():  # ty: ignore[unresolved-attribute]
+        _, phrase = devices.create_code(
+            session, max_uses=1, lifetime=timedelta(hours=1)
+        )
+    assert client.post("/api/devices", json={"code": phrase}).status_code == 201
+    assert client.post("/api/devices", json={"code": phrase}).status_code == 400
+    client.app.add_api_route("/api/needs-a-device", needs_a_device)  # ty: ignore[unresolved-attribute]
+    assert client.get("/api/needs-a-device").status_code == 403
+
+    assert sum(counted(reader, "inventory.devices.registered").values()) >= 1
+    assert (
+        counted(reader, "inventory.registrations.rejected")[(("reason", "used_up"),)]
+        >= 1
+    )
+    assert (
+        counted(reader, "inventory.devices.refused")[(("reason", "unregistered"),)] >= 1
+    )
+
+
+def needs_a_device(device: RegisteredDevice) -> int:
+    return device.id
