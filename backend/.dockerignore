@@ -1,3 +1,0 @@
-# Kept out of the build context. Docker and Podman both read this file.
-.venv/
-**/__pycache__/

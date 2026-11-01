@@ -3,13 +3,18 @@
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal, Self
+from urllib.parse import urlsplit
 
 from sqlalchemy import make_url
 from sqlalchemy.exc import ArgumentError
 
+from inventory_tng.local_env import CLONE
+
 LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 ENVIRONMENTS = ("development", "production")
+DEFAULT_PORTS = {"http": 80, "https": 443}
 
 
 class SettingsError(Exception):
@@ -55,21 +60,81 @@ class LogConfig:
         )
 
 
+# frontend/dist in a clone; the container sets FRONTEND_DIST.
+CLONE_DIST = CLONE / "frontend" / "dist"
+
+
+@dataclass(frozen=True)
+class FrontendConfig:
+    """Where the scan page's bundle is (docs/decisions/0010)."""
+
+    # What `vite build` wrote, or the container's compressed copy of it.
+    dist: Path = CLONE_DIST
+    # Vite's dev server, such as http://localhost:5173: pages load the bundle
+    # from it instead of dist. Development only.
+    dev_server: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.dev_server is not None:
+            object.__setattr__(self, "dev_server", _dev_server(self.dev_server))
+
+    @classmethod
+    def from_environ(cls, environ: Mapping[str, str] = os.environ) -> Self:
+        dist = environ.get("FRONTEND_DIST", "").strip()
+        return cls(
+            dist=Path(dist) if dist else cls.dist,
+            dev_server=environ.get("VITE_DEV_SERVER", "").strip() or None,
+        )
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str
     logging: LogConfig = field(default_factory=LogConfig)
+    frontend: FrontendConfig = field(default_factory=FrontendConfig)
 
     def __post_init__(self) -> None:
         # Every Settings passes through here, however it was built.
         object.__setattr__(self, "database_url", _database_url(self.database_url))
+        # A page loading scripts from a developer's laptop is no production
+        # page.
+        if self.frontend.dev_server and not self.logging.development:
+            raise SettingsError("VITE_DEV_SERVER works only with APP_ENV=development")
 
     @classmethod
     def from_environ(cls, environ: Mapping[str, str] = os.environ) -> Self:
         return cls(
             database_url=environ.get("DATABASE_URL", ""),
             logging=LogConfig.from_environ(environ),
+            frontend=FrontendConfig.from_environ(environ),
         )
+
+
+def _dev_server(value: str) -> str:
+    url = urlsplit(value)
+    if (
+        url.scheme not in {"http", "https"}
+        or not url.hostname
+        or url.username is not None
+        or url.path not in {"", "/"}
+        or url.query
+        or url.fragment
+    ):
+        raise SettingsError(
+            f"VITE_DEV_SERVER must look like http://localhost:5173, not {value!r}"
+        )
+    try:
+        port = url.port
+    except ValueError:
+        port = None
+    # vite.config.ts requires a port too, and, as browsers do, does not count
+    # a scheme's default one, so both always agree on the address.
+    if not port or port == DEFAULT_PORTS[url.scheme]:
+        raise SettingsError(
+            f"VITE_DEV_SERVER needs a port, such as http://localhost:5173, not {value!r}"
+        )
+    # Without a trailing slash; netloc keeps an IPv6 address's brackets.
+    return f"{url.scheme}://{url.netloc}"
 
 
 def _database_url(value: str) -> str:

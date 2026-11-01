@@ -5,8 +5,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 from dotenv.main import DotEnv
 
-# backend/src/inventory_tng/ -> the repository root.
-ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
+# backend/src/inventory_tng/ -> the repository root, in a clone.
+CLONE = Path(__file__).resolve().parents[3]
+ENV_FILE = CLONE / ".env"
 
 
 def load_local_env() -> None:

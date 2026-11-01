@@ -26,8 +26,9 @@ services:
   # The backend in a container (CONTRIBUTING.md, Running the app in a container).
   app:
     build:
-      context: ./backend
-      dockerfile: Containerfile
+      # The root, so the image can build frontend/ as well.
+      context: .
+      dockerfile: backend/Containerfile
     # Migrate, then serve with reload. A reload does not migrate again.
     command:
       - sh
@@ -47,6 +48,10 @@ services:
     environment:
       DATABASE_URL: postgresql://inventory:inventory@db:5432/inventory
       OTEL_EXPORTER_OTLP_ENDPOINT: ${INVENTORY_APP_OTLP_ENDPOINT:-}
+      # The container serves the bundle it built, as production will, even
+      # when .env points your own server at Vite's or at another folder.
+      VITE_DEV_SERVER: ""
+      FRONTEND_DIST: /app/static
       # The health check runs every 5 s: at debug, unless .env says otherwise.
       LOG_HEALTH_CHECKS: ${LOG_HEALTH_CHECKS:-false}
     # Read-only bind mounts, so --reload sees your edits and nothing in the

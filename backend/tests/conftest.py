@@ -21,7 +21,7 @@ from inventory_tng.app import create_app
 from inventory_tng.db import get_session, make_engine
 from inventory_tng.local_env import local_env_values
 from inventory_tng.logs import configure_structlog
-from inventory_tng.settings import LogConfig, Settings
+from inventory_tng.settings import FrontendConfig, LogConfig, Settings
 
 # structlog's lines go through the standard library, where caplog sees them.
 configure_structlog()
@@ -133,11 +133,21 @@ def session(engine: Engine) -> Iterator[Session]:
 
 
 @pytest.fixture
-def make_app(database_url: str, session: Session) -> Callable[..., FastAPI]:
-    """Apps on the test database, whose requests use the test's session."""
+def make_app(
+    database_url: str, session: Session, tmp_path: Path
+) -> Callable[..., FastAPI]:
+    """Apps on the test database, whose requests use the test's session. Their
+    bundle is an empty directory unless a test gives one, so no test depends
+    on whether this clone has a build."""
 
-    def make(logging: LogConfig | None = None) -> FastAPI:
-        settings = Settings(database_url=database_url, logging=logging or LogConfig())
+    def make(
+        logging: LogConfig | None = None, frontend: FrontendConfig | None = None
+    ) -> FastAPI:
+        settings = Settings(
+            database_url=database_url,
+            logging=logging or LogConfig(),
+            frontend=frontend or FrontendConfig(dist=tmp_path / "no-build"),
+        )
         app = create_app(settings)
         app.dependency_overrides[get_session] = lambda: session
         return app

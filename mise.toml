@@ -1,7 +1,14 @@
 # Optional shortcuts for the commands in CONTRIBUTING.md. The Python version
-# comes from backend/pyproject.toml.
+# comes from backend/pyproject.toml. Node's is here, for mise and for CI.
+
+[tools]
+node = "26.12.1"
 
 [tasks.check]
+description = "Check the backend and the frontend"
+depends = ["check-backend", "check-frontend"]
+
+[tasks.check-backend]
 description = "Type check, lint, format check and test the backend"
 dir = "backend"
 run = [
@@ -11,7 +18,21 @@ run = [
   "uv run pytest",
 ]
 
+[tasks.check-frontend]
+description = "Type check, lint, format check and test the frontend"
+dir = "frontend"
+run = ["npm run typecheck", "npm run lint", "npm test"]
+
 [tasks.fix]
-description = "Fix what ruff can fix, and format"
+description = "Fix what ruff and Biome can fix, and format"
+depends = ["fix-backend", "fix-frontend"]
+
+[tasks.fix-backend]
+description = "Fix what ruff can fix, and format the backend"
 dir = "backend"
 run = ["uv run ruff check --fix", "uv run ruff format"]
+
+[tasks.fix-frontend]
+description = "Fix what Biome can fix, and format the frontend"
+dir = "frontend"
+run = "npm run fix"
