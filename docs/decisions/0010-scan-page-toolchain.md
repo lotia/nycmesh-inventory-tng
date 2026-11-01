@@ -24,14 +24,26 @@ to one origin in one browser.
   it shares the API client and can resend the outbox the moment the device
   is registered, in the browser that holds it.
 - **Vite builds it** into files whose names carry a hash of their contents,
-  plus a manifest. FastAPI serves them under `/static`. The Jinja templates
-  for `/scan` and `/register` write the script and style tags from the
-  manifest (Vite's backend integration). In development they point at
-  Vite's dev server instead.
+  plus a manifest. The Jinja templates for `/scan` and `/register` write the
+  script and style tags from the manifest (Vite's backend integration). In
+  development they point at Vite's dev server instead.
 - **Same origin as the API.** No CORS, and the device cookie is sent with
   every save without the page touching it.
-- **Caching follows the hashes.** Hashed files are cached for a year as
-  immutable; HTML is never cached, so a deploy is new HTML naming new files.
+- **Compressed once, at build.** ServeStatic's command line writes a Brotli
+  (`.br`, at its highest quality) and a gzip (`.gz`, level 9) copy beside
+  each built file. ServeStatic, wrapping the ASGI app, serves `/static`: it
+  picks the smallest copy the browser's `Accept-Encoding` allows, sets
+  `Content-Encoding` and `Vary: Accept-Encoding`, and keeps the original's
+  type, `application/wasm` included. Starlette's `StaticFiles` serves only
+  the file a URL names, so it cannot do this.
+- **Caching follows the hashes.** Everything under `/static/assets/` is
+  cached for a year as immutable. ServeStatic's own test for hashed names
+  does not match Vite's, so it is told which files are immutable. HTML is
+  never cached, so a deploy is new HTML naming new files.
+- **HTML and JSON are not compressed**, for now. They are small, and
+  compressing a response that holds a secret beside text an attacker can
+  influence leaks the secret through its size (BREACH). Revisit with the
+  sign-in pages (inventory-tng-8i4.12) if size matters.
 - **Node runs at build time only.** The container builds the bundle in a
   stage of its own and copies the files into the Python image. CI runs the
   frontend's checks beside the backend's.
@@ -54,8 +66,12 @@ We rejected React (about ten times Preact's size, for one page), MUI and
 Emotion (heavy, and not shared with the Jinja pages, which use one plain
 stylesheet), plain DOM code or Lit (the cart and outbox state gets fiddly by
 hand), a service worker (clients are assumed online, 0002), IndexedDB
-(`localStorage` holds a few batches easily, 0009), and serving the bundle
-from another origin (it would need CORS and break the cookie's simplicity).
+(`localStorage` holds a few batches easily, 0009), serving the bundle
+from another origin (it would need CORS and break the cookie's simplicity),
+compressing at the ingress (work on every uncached response, at the lower
+levels that allows; nothing compresses in compose; and it would compress
+pages holding secrets), and a `StaticFiles` subclass of our own that picks
+the compressed copy (fiddly header code ServeStatic already gets right).
 
 ## Consequences
 
@@ -65,8 +81,12 @@ from another origin (it would need CORS and break the cookie's simplicity).
   has. The page treats a failed lazy import as a reason to keep the cart and
   reload. The cart and outbox keep a versioned storage format that a new
   build must read, so a deploy never strands a queued batch.
-- The `.wasm` decoder is about a megabyte uncompressed, so it is served
-  pre-compressed or compressed by the ingress.
+- Compression behaves the same in compose and in Kubernetes, because the
+  app serves the compressed files itself. The image holds three copies of
+  each file; the bundle is small, so that costs little.
+- ServeStatic is a younger fork of WhiteNoise, made to add ASGI. If it
+  stalls, a server such as Caddy or nginx, which serves the same `.br` and
+  `.gz` files, can replace it without changing the build.
 - The Content-Security-Policy allows `'wasm-unsafe-eval'` for the decoder.
 - Testing the camera on a phone in development needs HTTPS for the dev
   server, or a tunnel.
