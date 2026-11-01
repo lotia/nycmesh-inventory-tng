@@ -338,7 +338,9 @@ def test_every_table_records_history(engine: Engine) -> None:
         watched = {(table, trigger) for table, trigger in rows}
     assert watched == {
         (table, trigger)
-        for table in set(Base.metadata.tables) - {"catalogue_history"}
+        # The ledger is append-only, so it is its own history.
+        for table in set(Base.metadata.tables)
+        - {"catalogue_history", "ledger_transaction", "movement"}
         for trigger in ("record_history", "record_history_update")
     }
 

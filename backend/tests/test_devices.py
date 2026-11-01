@@ -84,13 +84,18 @@ def device_history(session: Session, device_id: int) -> list[str]:
     )
 
 
+def new_device(session: Session) -> tuple[Device, str]:
+    """A registered device and its cookie, for tests of what needs one."""
+    _, phrase = devices.create_code(session, max_uses=1, lifetime=timedelta(days=1))
+    return devices.register(session, phrase, ADDRESS)
+
+
 @pytest.fixture
 def committed_cookie(engine: Engine) -> tuple[int, str]:
     """A device committed to the database, for what runs in a transaction of
     its own, such as recording when it was last seen."""
     with Session(engine) as session, session.begin():
-        _, phrase = devices.create_code(session, max_uses=1, lifetime=timedelta(days=1))
-        device, token = devices.register(session, phrase, ADDRESS)
+        device, token = new_device(session)
         device_id = device.id
     return device_id, token
 
