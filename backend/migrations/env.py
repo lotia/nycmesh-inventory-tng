@@ -4,6 +4,8 @@ tests do), or else on DATABASE_URL."""
 from alembic import context
 from sqlalchemy import Connection
 
+# Imported for its mapped classes, so autogenerate sees every table.
+from inventory_tng import models  # noqa: F401
 from inventory_tng.db import Base, make_engine
 from inventory_tng.local_env import load_local_env
 from inventory_tng.logs import configure_logging
