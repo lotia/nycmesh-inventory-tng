@@ -38,7 +38,8 @@ Then push a branch and open a pull request: `git push -u origin <branch>`, or
 
 - [uv](https://docs.astral.sh/uv/). It installs the Python version the backend
   asks for and every dependency; every command below runs through `uv run`.
-- A container runtime with compose, such as Docker or Podman, for the database.
+- A container runtime with compose, such as Docker or Podman, for the database
+  (and, if you want it, the app).
 - Optional: [mise](https://mise.jdx.dev/), for two shortcuts.
 
 ## Local settings
@@ -69,6 +70,27 @@ uv run python -m inventory_tng --reload  # http://127.0.0.1:8000/api/docs
 `--workers` are there too (`--help` lists them). The run command starts uvicorn
 itself; uvicorn's own logging flags are not used, the `LOG_*` settings are
 (Logging, below).
+
+### Running the app in a container
+
+```sh
+docker compose up -d --build --wait app  # or: podman compose; http://127.0.0.1:8000/api/docs
+docker compose logs -f app
+```
+
+This runs the backend the way production does, in a container beside the
+database, for when you want to check that it behaves the same there. It does
+not replace uv: the checks, new migrations and your editor still use it. The
+container migrates the database when it starts, then serves with `--reload`.
+Your `backend/src` and `backend/migrations` are mounted into it, so it picks
+up your edits. Pass `--build` again after changing dependencies.
+
+It reads your `.env`, except `DATABASE_URL` and `OTEL_EXPORTER_OTLP_ENDPOINT`,
+because inside the container `localhost` is the container. To send its
+telemetry to the dashboard, start the dashboard (Logging, below) and set
+`INVENTORY_APP_OTLP_ENDPOINT=http://dashboard:18890`. It takes port 8000, as
+the run command does; `INVENTORY_APP_PORT` moves it. The client address it
+logs is the container network's, not your browser's.
 
 ## Running the checks
 
