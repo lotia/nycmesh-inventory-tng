@@ -1,11 +1,15 @@
 """The database: one engine per app, one session per request."""
 
+import re
 from collections.abc import Iterator
 from typing import Annotated
 
+import structlog
 from fastapi import Depends, Request
-from sqlalchemy import Engine, MetaData, create_engine, exc
+from sqlalchemy import Engine, MetaData, create_engine, exc, func, select
 from sqlalchemy.orm import DeclarativeBase, Session
+
+log = structlog.get_logger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -43,6 +47,23 @@ def get_session(request: Request) -> Iterator[Session]:
 
 
 DbSession = Annotated[Session, Depends(get_session)]
+
+# Read by the history trigger (migration 0002, which writes the name out):
+# who made this transaction's changes.
+ACTOR_SETTING = "inventory.actor"
+# Also catalogue_history's check constraint (models.py).
+ACTOR_PATTERN = "(admin|volunteer):[0-9]+"
+ACTOR = re.compile(ACTOR_PATTERN)
+
+
+def set_actor(session: Session, actor: str) -> None:
+    """Name who is making this transaction's changes: "admin:3" or
+    "volunteer:7", ids and never names, so history holds no personal data
+    through it. Lasts until the transaction ends."""
+    if not ACTOR.fullmatch(actor):
+        raise ValueError("an actor is admin:<id> or volunteer:<id>")
+    session.execute(select(func.set_config(ACTOR_SETTING, actor, True)))
+    log.debug("actor set", actor=actor)
 
 
 def describe_error(error: exc.SQLAlchemyError) -> dict[str, str]:
