@@ -9,6 +9,7 @@ from sqlalchemy import make_url
 from sqlalchemy.exc import ArgumentError
 
 LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+ENVIRONMENTS = ("development", "production")
 
 
 class SettingsError(Exception):
@@ -25,6 +26,20 @@ class LogConfig:
     client_address: bool = True
     # Successful health checks at info (True) or demoted to debug (False).
     health_checks: bool = True
+    # APP_ENV=development. Anything else is production, so forgetting it is
+    # safe (docs/decisions/0008).
+    development: bool = False
+    # Secrets in logs and telemetry, for debugging. Development only.
+    unmask_secrets: bool = False
+
+    def __post_init__(self) -> None:
+        if self.unmask_secrets and not self.development:
+            raise SettingsError("UNMASK_SECRETS works only with APP_ENV=development")
+
+    @property
+    def redact(self) -> bool:
+        """Mask personal data, and database values in exception text."""
+        return not self.development
 
     @classmethod
     def from_environ(cls, environ: Mapping[str, str] = os.environ) -> Self:
@@ -35,6 +50,8 @@ class LogConfig:
             format=_format(environ.get("LOG_FORMAT") or default.format),
             client_address=_flag(environ, "LOG_CLIENT_ADDRESS", default.client_address),
             health_checks=_flag(environ, "LOG_HEALTH_CHECKS", default.health_checks),
+            development=_environment(environ.get("APP_ENV") or "") == "development",
+            unmask_secrets=_flag(environ, "UNMASK_SECRETS", default.unmask_secrets),
         )
 
 
@@ -92,6 +109,15 @@ def _levels(value: str) -> dict[str, str]:
             )
         levels[logger] = _level(level, f"LOG_LEVELS for {logger}")
     return levels
+
+
+def _environment(value: str) -> str:
+    value = value.strip().lower() or "production"
+    if value not in ENVIRONMENTS:
+        raise SettingsError(
+            f"APP_ENV must be one of {', '.join(ENVIRONMENTS)}, not {value!r}"
+        )
+    return value
 
 
 def _format(value: str) -> Literal["console", "json"]:

@@ -24,28 +24,32 @@ SHUTDOWN_SECONDS = 10
 
 def create_server() -> FastAPI:
     settings = Settings.from_environ()
-    configure_logging(settings.logging)
+    masker = configure_logging(settings.logging)
     database = make_url(settings.database_url)
     telemetry_on = enabled()
-    log.info(
-        "starting",
-        log_level=settings.logging.level,
-        log_format=settings.logging.format,
-        log_health_checks=settings.logging.health_checks,
-        database_host=database.host,
-        database_port=database.port,
-        database_name=database.database,
-        telemetry=telemetry_on,
-    )
     app = create_app(settings)
     if telemetry_on:
         # Here and not in create_app(): providers belong to the process
         # (docs/decisions/0007).
         telemetry = Telemetry.create()
         telemetry.make_global()
-        telemetry.attach_logs()
+        telemetry.attach_logs(masker)
         telemetry.instrument(app, app.state.engine)
         flush_when_stopped(app, telemetry.shutdown)
+    # After telemetry, so the line reaches OTLP too. A warning while secrets
+    # are shown, which is how a dashboard tells.
+    (log.warning if settings.logging.unmask_secrets else log.info)(
+        "starting",
+        log_level=settings.logging.level,
+        log_format=settings.logging.format,
+        log_health_checks=settings.logging.health_checks,
+        log_redaction=settings.logging.redact,
+        log_unmasked=settings.logging.unmask_secrets,
+        database_host=database.host,
+        database_port=database.port,
+        database_name=database.database,
+        telemetry=telemetry_on,
+    )
     return app
 
 
