@@ -192,8 +192,12 @@ and builds the frontend.
 
 Only the backend's tests need the database; the other checks take about a
 second each. With mise, `mise run fix` runs the fixes and `mise run check`
-runs every check; start the database first. Each test run creates a throwaway database
-and drops it at the end. Write tests in pytest style.
+runs every check; start the database first. Each test run creates a
+database of its own on that server and drops it at the end; a run that was
+killed before it could is dropped by a later one. During the tests,
+`DATABASE_URL` points nowhere, so nothing reaches your own data: a test that
+needs the database takes the `database_url` fixture. Write tests in pytest
+style.
 
 ## Documentation
 
