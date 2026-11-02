@@ -9,7 +9,7 @@ Then type the passwords you gave again: passwords are never kept in a page.{% en
   {% endfor %}
   {% if uses_totp %}
   <label>Code <span class="hint">from your authenticator, or a recovery code</span>
-    <input name="{{ field }}" autocomplete="one-time-code" maxlength="16" required autofocus>
+    <input name="{{ field }}" autocomplete="one-time-code" maxlength="{{ limits.code_max }}" required autofocus>
   </label>
   {% else %}
   <label>Your password

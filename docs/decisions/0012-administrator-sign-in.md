@@ -55,7 +55,10 @@ without a deployment.
   open, the key may go into as many apps as wanted. A saved key is never
   shown again: anyone in a signed-in session could copy it.
 - **Ten recovery codes** are shown once, when TOTP is first set up. Each works
-  once in place of a code. Making new ones voids the old.
+  once in place of a code. Making new ones voids the old. Each is 20
+  characters, about 98 bits, so the SHA-256 kept of it cannot be guessed
+  back from a stolen database, as a shorter code's could. The ten-character
+  codes made at first were voided (migration 0008).
 
 ### Sessions
 
@@ -113,7 +116,8 @@ deployment settings, where administrators could not change it.
   catalogue for a week, unless ended from the account page.
 - Any administrator can take over another's account with a reset link. The
   history shows who made it.
-- Anyone who reads the database can copy the TOTP keys.
+- Anyone who reads the database can copy the TOTP keys, until they are
+  encrypted at rest (inventory-tng-8i4.48).
 - The page's words never reveal that a password was right, but its timing
   can: a right password goes on to a few more database queries. What that
   tells an attacker is worth at most ten code guesses every 15 minutes.

@@ -13,6 +13,6 @@ It isn't shown again once saved.</p>
   {% with name = "authenticator_name" %}{% include "_field_problem.html" %}{% endwith %}
 </label>
 <label>The 6-digit code it shows{% if totp_optional %} <span class="hint">leave blank to sign in with your password alone</span>{% endif %}
-  <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" {% if not totp_optional %}required{% endif %}>
+  <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="{{ limits.totp_code_max }}" {% if not totp_optional %}required{% endif %}>
   {% with name = "code" %}{% include "_field_problem.html" %}{% endwith %}
 </label>

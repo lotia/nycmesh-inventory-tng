@@ -21,6 +21,7 @@ from inventory_tng.models import (
     Label,
     Location,
     Volunteer,
+    mint_code,
     mint_label_code,
 )
 
@@ -145,6 +146,12 @@ def test_nothing_is_deleted_out_from_under_a_reference(
     new_item()
     with violates(session, "fk_item_category_id_category"):
         session.execute(delete(Category).where(Category.id == category.id))
+
+
+def test_codes_of_any_length_come_from_the_alphabet() -> None:
+    code = mint_code(40)
+    assert len(code) == 40
+    assert set(code) <= set(LABEL_ALPHABET)
 
 
 def test_minted_codes_pass_the_check(session: Session, store: Location) -> None:

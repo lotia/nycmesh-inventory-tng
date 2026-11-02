@@ -9,7 +9,7 @@
     <input name="password" type="password" autocomplete="current-password" required>
   </label>
   <label>Code <span class="hint">from your authenticator, or a recovery code; leave blank if you don't use one</span>
-    <input name="code" autocomplete="one-time-code" maxlength="16">
+    <input name="code" autocomplete="one-time-code" maxlength="{{ limits.code_max }}">
   </label>
   <button>Sign in</button>
 </form>
