@@ -28,13 +28,19 @@ configure_structlog()
 log = structlog.get_logger(__name__)
 
 
+# The app's settings a developer may export, which would change what tests
+# see. DATABASE_URL stays: the tests read it themselves (below).
+FROM_THE_SHELL = ("APP_ENV", "UNMASK_SECRETS", "VITE_DEV_SERVER", "FRONTEND_DIST")
+
+
 @pytest.fixture(scope="session", autouse=True)
-def no_telemetry_from_the_shell() -> Iterator[None]:
-    """A developer's OTEL_* settings must not reach the tests. Session-scoped,
-    so it runs before every module-scoped fixture too."""
+def no_settings_from_the_shell() -> Iterator[None]:
+    """A developer's OTEL_*, LOG_* and app settings must not reach the tests.
+    Session-scoped, so it runs before every module-scoped fixture too."""
     with pytest.MonkeyPatch.context() as monkeypatch:
-        for name in [name for name in os.environ if name.startswith("OTEL_")]:
-            monkeypatch.delenv(name)
+        for name in list(os.environ):
+            if name.startswith(("OTEL_", "LOG_")) or name in FROM_THE_SHELL:
+                monkeypatch.delenv(name)
         yield
 
 
@@ -141,10 +147,14 @@ def make_app(
     on whether this clone has a build."""
 
     def make(
-        logging: LogConfig | None = None, frontend: FrontendConfig | None = None
+        logging: LogConfig | None = None,
+        frontend: FrontendConfig | None = None,
+        *,
+        development: bool = False,
     ) -> FastAPI:
         settings = Settings(
             database_url=database_url,
+            development=development,
             logging=logging or LogConfig(),
             frontend=frontend or FrontendConfig(dist=tmp_path / "no-build"),
         )

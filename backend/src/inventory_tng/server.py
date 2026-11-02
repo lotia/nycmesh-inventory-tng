@@ -24,7 +24,7 @@ SHUTDOWN_SECONDS = 10
 
 def create_server() -> FastAPI:
     settings = Settings.from_environ()
-    masker = configure_logging(settings.logging)
+    masker = configure_logging(settings)
     database = make_url(settings.database_url)
     telemetry_on = enabled()
     app = create_app(settings)
@@ -38,13 +38,13 @@ def create_server() -> FastAPI:
         flush_when_stopped(app, telemetry.shutdown)
     # After telemetry, so the line reaches OTLP too. A warning while secrets
     # are shown, which is how a dashboard tells.
-    (log.warning if settings.logging.unmask_secrets else log.info)(
+    (log.info if masker.secrets else log.warning)(
         "starting",
         log_level=settings.logging.level,
         log_format=settings.logging.format,
         log_health_checks=settings.logging.health_checks,
-        log_redaction=settings.logging.redact,
-        log_unmasked=settings.logging.unmask_secrets,
+        log_redaction=masker.redact,
+        log_unmasked=not masker.secrets,
         database_host=database.host,
         database_port=database.port,
         database_name=database.database,

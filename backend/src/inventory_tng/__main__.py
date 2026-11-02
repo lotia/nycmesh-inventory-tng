@@ -14,7 +14,7 @@ import uvicorn
 
 from inventory_tng.local_env import load_local_env
 from inventory_tng.logs import configure_logging
-from inventory_tng.settings import LogConfig
+from inventory_tng.settings import Settings
 
 PACKAGE = Path(__file__).parent
 
@@ -36,8 +36,10 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     load_local_env()
     # This process's own lines (the reloader, the worker supervisor) take our
-    # format too. Each worker sets itself up again in create_server().
-    configure_logging(LogConfig.from_environ())
+    # format too. Each worker sets itself up again in create_server(). Read
+    # every setting, so a bad one stops the server here, once, and secrets are
+    # unmasked here only where a worker would unmask them.
+    configure_logging(Settings.from_environ())
     uvicorn.run(
         "inventory_tng.server:create_server",
         factory=True,

@@ -23,8 +23,9 @@ Set these in the environment. Only `DATABASE_URL` is required.
 
 - `DATABASE_URL`: `postgresql://user:password@host:port/database`.
 - `APP_ENV`: leave unset in production. `development` is for local work
-  only: it stops masking personal data in logs and lets the cookie travel
-  over http.
+  only: it stops masking personal data in logs, lets the cookie travel over
+  http, re-reads the scan page's build on every page, and allows
+  `UNMASK_SECRETS` and `VITE_DEV_SERVER`.
 - `FORWARDED_ALLOW_IPS`: behind a proxy, the proxy's address, so the client
   address and scheme come from its headers.
 - `LOG_FORMAT`: `json` for a log collector; the default is `console`.

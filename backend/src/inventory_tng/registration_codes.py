@@ -54,7 +54,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     load_local_env()
     settings = Settings.from_environ()
-    configure_logging(settings.logging)
+    configure_logging(settings)
     engine = make_engine(settings.database_url)
     try:
         with Session(engine) as session, session.begin():

@@ -21,7 +21,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy import exc
 from structlog.typing import EventDict, ExcInfo
 
-from inventory_tng.settings import LogConfig
+from inventory_tng.settings import Settings
 
 MASK = "[masked]"
 
@@ -106,8 +106,11 @@ class Masker:
     secrets: bool = True
 
     @classmethod
-    def from_config(cls, config: LogConfig) -> Self:
-        return cls(redact=config.redact, secrets=not config.unmask_secrets)
+    def from_settings(cls, settings: Settings) -> Self:
+        return cls(
+            redact=not settings.development,
+            secrets=not settings.logging.unmask_secrets,
+        )
 
     def __call__(self, _logger: object, _method: str, event: EventDict) -> EventDict:
         return self.fields(event)
