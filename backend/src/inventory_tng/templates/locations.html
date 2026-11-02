@@ -1,0 +1,55 @@
+{% extends "admin_base.html" %}
+{% macro branch(places) %}
+<ul>
+  {% for place in places %}
+  <li><a href="{{ request.url.path }}/{{ place.location.id }}">{{ place.location.name }}</a>
+    <span class="hint">{{ kinds.get(place.location.kind, "") if place.location.kind != "area" else "" }}</span>
+    {% if place.areas %}{{ branch(place.areas) }}{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}
+{% block main %}
+<section>
+  {% if tree %}{{ branch(tree) }}{% else %}<p>None yet.</p>{% endif %}
+</section>
+
+<section>
+  <h2>Add a location</h2>
+  <form method="post" action="{{ request.url.path }}">
+    <label>Name
+      <input name="name" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required>
+      {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <label>What it is
+      <select name="kind" required>
+        {% for kind, label in kinds.items() %}<option value="{{ kind }}" {% if values.get('kind') == kind %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      {% with name = "kind" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <label>Inside <span class="hint">for an area only</span>
+      <select name="parent_id">
+        <option value="">Nowhere</option>
+        {% for parent in parents %}<option value="{{ parent.id }}" {% if values.get('parent_id') == parent.id | string %}selected{% endif %}>{{ parent.name }}</option>{% endfor %}
+      </select>
+      {% with name = "parent_id" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <button>Add</button>
+  </form>
+</section>
+
+{% if custody %}
+<section>
+  <h2>Held by volunteers</h2>
+  <p class="hint">Made and retired with the volunteer.</p>
+  <ul>{% for location, volunteer in custody %}<li>{{ location.name }} <span class="hint">{{ volunteer }}</span></li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% if retired %}
+<section class="retired">
+  <h2>Retired</h2>
+  <ul>{% for location in retired %}<li><a href="{{ request.url.path }}/{{ location.id }}">{{ location.name }}</a></li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% endblock %}
