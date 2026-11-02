@@ -17,10 +17,12 @@ from inventory_tng import (
     devices,
     health,
     ledger,
+    resets,
     sign_in,
 )
 from inventory_tng.cross_site import CrossSiteRefusal
 from inventory_tng.db import make_engine
+from inventory_tng.mail import SmtpMailer
 from inventory_tng.request_logging import RequestLogging
 from inventory_tng.settings import Settings
 
@@ -52,6 +54,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.engine = engine
     app.state.settings = settings
+    # mail.get_mailer hands it to routes.
+    app.state.mailer = SmtpMailer(settings.mail) if settings.mail else None
     app.add_middleware(CrossSiteRefusal)
     app.add_middleware(
         RequestLogging,
@@ -68,6 +72,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(bundle.router)
     app.include_router(sign_in.router)
     app.include_router(account.router)
+    app.include_router(resets.router)
     bundle.install(app, settings)
     db.install(app)
     devices.install(app)

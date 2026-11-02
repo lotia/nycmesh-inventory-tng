@@ -1,0 +1,18 @@
+{% extends "admin_base.html" %}
+{% block main %}
+{% if not mail_on %}
+<p>Resetting a password by email isn't set up here. Ask another
+administrator to make you a reset link.</p>
+{% elif not notice %}
+<p>If your account has an email address, we'll send a link to choose a new
+password. If it doesn't, ask another administrator to make you a reset
+link.</p>
+<form method="post" action="{{ paths.forgot }}">
+  <label>Username
+    <input name="username" autocomplete="username" maxlength="{{ limits.username_max }}" required autofocus>
+  </label>
+  <button>Send the link</button>
+</form>
+{% endif %}
+<p><a href="{{ paths.sign_in }}">Back to sign in</a></p>
+{% endblock %}

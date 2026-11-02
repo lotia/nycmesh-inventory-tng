@@ -52,6 +52,8 @@ services:
       # when .env points your own server at Vite's or at another folder.
       VITE_DEV_SERVER: ""
       FRONTEND_DIST: /app/static
+      # Mailpit, when .env sends mail to it on localhost.
+      MAIL_HOST: ${INVENTORY_APP_MAIL_HOST:-}
       # The health check runs every 5 s: at debug, unless .env says otherwise.
       LOG_HEALTH_CHECKS: ${LOG_HEALTH_CHECKS:-false}
     # Read-only bind mounts, so --reload sees your edits and nothing in the
@@ -86,6 +88,16 @@ services:
     ports:
       - "127.0.0.1:18888:18888"
       - "127.0.0.1:4318:18890"
+
+  # Optional: `docker compose --profile mail up -d mail`, then
+  # http://localhost:8025. It catches mail sent to localhost:1025, and sends
+  # nothing on (CONTRIBUTING.md, Mail).
+  mail:
+    image: docker.io/axllent/mailpit:v1.31.6
+    profiles: [mail]
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
 
 volumes:
   db:

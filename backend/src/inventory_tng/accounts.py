@@ -10,7 +10,7 @@ codes for the database. Comparing the setup token is secrets.compare_digest.
 import re
 import secrets
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Literal, NoReturn
 
 import pyotp
@@ -18,7 +18,7 @@ import segno
 import structlog
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
-from limits import RateLimitItemPerMinute
+from limits import RateLimitItemPerHour, RateLimitItemPerMinute
 from markupsafe import Markup
 from opentelemetry import metrics
 from sqlalchemy import ColumnElement, func, select, text, update
@@ -32,6 +32,7 @@ from inventory_tng.models import (
     AdminSession,
     Authenticator,
     RecoveryCode,
+    ResetLink,
     SignInSettings,
     mint_label_code,
 )
@@ -51,6 +52,7 @@ EMAIL_MAX = 254
 AUTHENTICATOR_NAME_MAX = 64
 RECOVERY_CODES = 10
 TOTP_CODE = re.compile(r"\d{6}")
+TOTP_INTERVAL = pyotp.TOTP(pyotp.random_base32()).interval
 # What authenticator apps show beside the account.
 ISSUER = "NYC Mesh Inventory"
 # How often a session's last use is written: often enough for the account
@@ -182,6 +184,39 @@ def _current(admin_id: int) -> tuple[ColumnElement[bool], ...]:
     return (Authenticator.admin_id == admin_id, Authenticator.retired_at.is_(None))
 
 
+def _unused_codes(admin_id: int) -> tuple[ColumnElement[bool], ...]:
+    return (
+        RecoveryCode.admin_id == admin_id,
+        RecoveryCode.used_at.is_(None),
+        RecoveryCode.voided_at.is_(None),
+    )
+
+
+def _live(now: datetime) -> tuple[ColumnElement[bool], ...]:
+    """A session still going."""
+    return (AdminSession.ended_at.is_(None), AdminSession.expires_at > now)
+
+
+def _usable_links() -> tuple[ColumnElement[bool], ...]:
+    return (ResetLink.used_at.is_(None), ResetLink.voided_at.is_(None))
+
+
+def step_time(step: int) -> datetime:
+    """When a TOTP time step began: pyotp's steps are 30 seconds."""
+    return datetime.fromtimestamp(step * TOTP_INTERVAL, UTC)
+
+
+def retire(authenticator: Authenticator, now: datetime) -> None:
+    """Removed, its key wiped: every path that removes one comes here."""
+    authenticator.totp_key, authenticator.retired_at = None, now
+
+
+def authenticator_name_problem(name: str) -> str | None:
+    if not 1 <= len(name) <= AUTHENTICATOR_NAME_MAX:
+        return f"Give it a name of up to {AUTHENTICATOR_NAME_MAX} characters."
+    return None
+
+
 def uses_totp(session: Session, admin_id: int) -> bool:
     return exists_where(session, *_current(admin_id))
 
@@ -264,10 +299,7 @@ def check_second_factor(
     recovery = session.scalar(
         select(RecoveryCode)
         .where(
-            RecoveryCode.admin_id == admin_id,
-            RecoveryCode.code_hash == _recovery_digest(typed),
-            RecoveryCode.used_at.is_(None),
-            RecoveryCode.voided_at.is_(None),
+            *_unused_codes(admin_id), RecoveryCode.code_hash == _recovery_digest(typed)
         )
         .with_for_update()
     )
@@ -297,18 +329,19 @@ def sign_in(
     password: str,
     code: str,
     *,
-    address: str | None,
+    address: str,
     user_agent: str | None,
     now: datetime,
-) -> tuple[AdminSession, str]:
-    """Check all three at once and start a session, or SignInRefused. The
-    caller commits, and only on success.
+) -> tuple[AdminSession, str, Factor]:
+    """Check all three at once and start a session, or SignInRefused. Returns
+    the session, its token and the second factor used. The caller commits,
+    and only on success.
 
     Every attempt counts against its address before anything is checked, so
     a burst sent at once cannot all slip under the limit. Codes count
     against the account too, but only once its password was right: someone
     without the password cannot lock its administrator out."""
-    if not limiter.hit(PER_ADDRESS, "sign_in", address or "unknown"):
+    if not limiter.hit(PER_ADDRESS, "sign_in", address):
         _refuse_sign_in("rate_limited", None)
     admin = session.scalar(
         select(Admin).where(
@@ -327,10 +360,10 @@ def sign_in(
         factor = check_second_factor(session, admin.id, authenticators, code, now)
     if factor is None:
         _refuse_sign_in("bad_code", admin)
-    row, token = _start_session(session, admin.id, user_agent, now)
+    row, token = start_session(session, admin.id, user_agent, now)
     sign_ins.add(1, {"outcome": "signed_in", "factor": factor})
     log.info("signed in", admin_id=admin.id, sign_in_id=row.id, factor=factor)
-    return row, token
+    return row, token, factor
 
 
 def _refuse_sign_in(reason: Reason, admin: Admin | None) -> NoReturn:
@@ -339,16 +372,32 @@ def _refuse_sign_in(reason: Reason, admin: Admin | None) -> NoReturn:
     raise SignInRefused(reason)
 
 
-def _start_session(
+def _new_token() -> tuple[str, bytes]:
+    """A cookie's or a link's token, and the hash that is all that is kept."""
+    token = secrets.token_urlsafe(32)
+    return token, digest(token)
+
+
+def _set_password(
+    session: Session, admin_id: int, password: str, now: datetime
+) -> None:
+    stored = session.get(AdminPassword, admin_id)
+    if stored is None:
+        session.add(AdminPassword(id=admin_id, password_hash=hash_password(password)))
+    else:
+        stored.password_hash, stored.changed_at = hash_password(password), now
+
+
+def start_session(
     session: Session, admin_id: int, user_agent: str | None, now: datetime
 ) -> tuple[AdminSession, str]:
     """A new session, counted as just confirmed: both factors, or the
     password without TOTP, were just typed."""
-    token = secrets.token_urlsafe(32)
+    token, token_hash = _new_token()
     days = sign_in_settings(session).session_days
     row = AdminSession(
         admin_id=admin_id,
-        token_hash=digest(token),
+        token_hash=token_hash,
         expires_at=now + timedelta(days=days),
         last_seen_at=now,
         confirmed_at=now,
@@ -370,8 +419,7 @@ def find_session(
         .join(Admin, Admin.id == AdminSession.admin_id)
         .where(
             AdminSession.token_hash == digest(token),
-            AdminSession.ended_at.is_(None),
-            AdminSession.expires_at > now,
+            *_live(now),
             Admin.retired_at.is_(None),
         )
     ).one_or_none()
@@ -403,22 +451,23 @@ Confirmation = Literal["confirmed", "refused", "rate_limited"]
 
 def confirm(
     session: Session, row: AdminSession, typed: str, now: datetime
-) -> Confirmation:
+) -> tuple[Confirmation, Factor | None]:
     """A code (or, without TOTP, the password) for sensitive actions. Every
     attempt counts against the administrator's codes, shared with signing
-    in, so a stolen session cannot guess them."""
+    in, so a stolen session cannot guess them. Returns the outcome and the
+    factor used."""
     if not limiter.hit(PER_ACCOUNT, "code", str(row.admin_id)):
-        return _confirmation(row, "rate_limited")
+        return _confirmation(row, "rate_limited"), None
     set_actor(session, f"admin:{row.admin_id}")
+    factor: Factor | None = None
     if authenticators := locked_authenticators(session, row.admin_id):
         factor = check_second_factor(session, row.admin_id, authenticators, typed, now)
-        ok = factor is not None
-    else:
-        ok = check_password(session, row.admin_id, typed)
-    if not ok:
-        return _confirmation(row, "refused")
+    elif check_password(session, row.admin_id, typed):
+        factor = "password"
+    if factor is None:
+        return _confirmation(row, "refused"), None
     row.confirmed_at, row.last_sensitive_at = now, None
-    return _confirmation(row, "confirmed")
+    return _confirmation(row, "confirmed"), factor
 
 
 def note_sensitive(row: AdminSession, now: datetime) -> None:
@@ -453,9 +502,9 @@ def setup_open(session: Session) -> bool:
     return not exists_where(session, Admin.id.is_not(None))
 
 
-def check_setup_token(expected: str, typed: str, address: str | None) -> None:
+def check_setup_token(expected: str, typed: str, address: str) -> None:
     # Counted before it is compared, so a burst cannot slip under the limit.
-    if not limiter.hit(PER_ADDRESS, "setup", address or "unknown"):
+    if not limiter.hit(PER_ADDRESS, "setup", address):
         _refuse_setup("rate_limited")
     if not secrets.compare_digest(typed.strip().encode(), expected.encode()):
         _refuse_setup("bad_token")
@@ -499,36 +548,37 @@ def create_first_admin(
     admin = Admin(username=username, email=email or None)
     session.add(admin)
     session.flush()
-    session.add(AdminPassword(id=admin.id, password_hash=hash_password(password)))
+    _set_password(session, admin.id, password, now)
     codes: list[str] = []
     if step is not None:
         add_authenticator(session, admin.id, authenticator_name, totp_key, step)
         codes = make_recovery_codes(session, admin.id, now)
-    row, token = _start_session(session, admin.id, user_agent, now)
+    row, token = start_session(session, admin.id, user_agent, now)
     log.info("first administrator set up", admin_id=admin.id, sign_in_id=row.id)
     return FirstAdmin(admin, row, token, codes)
 
 
-# One's own account (sign_in.py's account pages)
+# One's own account (account.py's page)
 
 
 def change_password(
     session: Session, row: AdminSession, password: str, now: datetime
-) -> int:
-    """A new password; every other session of theirs ends, and how many is
-    returned. The caller has checked it (password_problem) and commits."""
-    stored = session.get_one(AdminPassword, row.admin_id)
-    stored.password_hash, stored.changed_at = hash_password(password), now
+) -> None:
+    """A new password; every other session of theirs ends, and any unused
+    reset link. The caller has checked it (password_problem) and commits."""
+    _set_password(session, row.admin_id, password, now)
     ended = end_sessions(session, row.admin_id, now, keep=row.id)
+    void_reset_links(session, row.admin_id, now)
     log.info("password changed", admin_id=row.admin_id, sessions_ended=ended)
-    return ended
 
 
-def change_email(session: Session, admin: Admin, email: str | None) -> None:
-    """Checked by email_problem; a clash with another administrator's is an
-    IntegrityError on flush."""
+def change_email(session: Session, admin: Admin, email: str, now: datetime) -> None:
+    """Checked by email_problem; "" removes it. A clash with another
+    administrator's is an IntegrityError on flush. Links already mailed to
+    the old address stop working."""
     admin.email = email or None
     session.flush()
+    void_reset_links(session, admin.id, now)
     log.info("email changed", admin_id=admin.id, has_email=admin.email is not None)
 
 
@@ -542,21 +592,16 @@ def authenticators(session: Session, admin_id: int) -> list[Authenticator]:
     )
 
 
-def _own_authenticator(
-    session: Session, admin_id: int, authenticator_id: int
-) -> Authenticator | None:
-    found = session.get(Authenticator, authenticator_id, with_for_update=True)
-    if found is None or found.admin_id != admin_id or found.retired_at is not None:
-        return None
-    return found
-
-
 def rename_authenticator(
     session: Session, admin_id: int, authenticator_id: int, name: str
 ) -> bool:
     """False if it is not one of theirs. A name they already use is an
     IntegrityError on flush."""
-    found = _own_authenticator(session, admin_id, authenticator_id)
+    found = session.scalar(
+        select(Authenticator)
+        .where(*_current(admin_id), Authenticator.id == authenticator_id)
+        .with_for_update()
+    )
     if found is None:
         return False
     found.name = name
@@ -565,7 +610,7 @@ def rename_authenticator(
     return True
 
 
-Removal = Literal["removed", "missing", "last_required"]
+Removal = Literal["removed", "totp_off", "missing", "last_required"]
 
 
 def remove_authenticator(
@@ -578,42 +623,28 @@ def remove_authenticator(
     found = next((a for a in current if a.id == authenticator_id), None)
     if found is None:
         return "missing"
-    if len(current) == 1 and sign_in_settings(session).totp_policy == "required":
+    last = len(current) == 1
+    if last and sign_in_settings(session).totp_policy == "required":
         return "last_required"
-    found.totp_key, found.retired_at = None, now
-    if len(current) == 1:
+    retire(found, now)
+    if last:
         _void_recovery_codes(session, admin_id, now)
     log.info(
         "authenticator removed",
         admin_id=admin_id,
         authenticator_id=found.id,
-        totp_off=len(current) == 1,
+        totp_off=last,
     )
-    return "removed"
+    return "totp_off" if last else "removed"
 
 
 def recovery_codes_left(session: Session, admin_id: int) -> int:
-    return (
-        session.scalar(
-            select(func.count()).where(
-                RecoveryCode.admin_id == admin_id,
-                RecoveryCode.used_at.is_(None),
-                RecoveryCode.voided_at.is_(None),
-            )
-        )
-        or 0
-    )
+    return session.scalar(select(func.count()).where(*_unused_codes(admin_id))) or 0
 
 
 def _void_recovery_codes(session: Session, admin_id: int, now: datetime) -> None:
     session.execute(
-        update(RecoveryCode)
-        .where(
-            RecoveryCode.admin_id == admin_id,
-            RecoveryCode.used_at.is_(None),
-            RecoveryCode.voided_at.is_(None),
-        )
-        .values(voided_at=now)
+        update(RecoveryCode).where(*_unused_codes(admin_id)).values(voided_at=now)
     )
 
 
@@ -624,11 +655,7 @@ def current_sessions(
     return list(
         session.scalars(
             select(AdminSession)
-            .where(
-                AdminSession.admin_id == admin_id,
-                AdminSession.ended_at.is_(None),
-                AdminSession.expires_at > now,
-            )
+            .where(AdminSession.admin_id == admin_id, *_live(now))
             .order_by(AdminSession.last_seen_at.desc(), AdminSession.id.desc())
         )
     )
@@ -654,3 +681,150 @@ def end_sessions(
     if ended:
         log.info("sessions ended", admin_id=admin_id, count=len(ended))
     return len(ended)
+
+
+# Reset links (docs/decisions/0012)
+
+# An emailed link, which only the mailbox's owner should have, lasts an hour.
+EMAILED_LINK_LIFETIME = timedelta(hours=1)
+# Emailed links asked for, per account, whoever asks: enough for someone who
+# lost the first mail, too few to fill a mailbox.
+EMAILED_PER_ACCOUNT = RateLimitItemPerHour(3)
+
+
+def make_reset_link(
+    session: Session,
+    admin_id: int,
+    now: datetime,
+    *,
+    made_by_id: int | None,
+    resets_password: bool,
+    resets_authenticators: bool,
+    lifetime: timedelta,
+) -> str:
+    """A one-use link's token, the only time it is known. It voids earlier
+    links of the same kind still unused, so the newest works: an emailed one
+    voids only emailed ones, so asking by mail, which anyone may do, never
+    undoes a link another administrator made."""
+    void_reset_links(session, admin_id, now, emailed_only=made_by_id is None)
+    token, token_hash = _new_token()
+    link = ResetLink(
+        admin_id=admin_id,
+        made_by_id=made_by_id,
+        token_hash=token_hash,
+        resets_password=resets_password,
+        resets_authenticators=resets_authenticators,
+        expires_at=now + lifetime,
+    )
+    session.add(link)
+    session.flush()
+    log.info(
+        "reset link made",
+        admin_id=admin_id,
+        reset_link_id=link.id,
+        made_by_id=made_by_id,
+    )
+    return token
+
+
+def void_reset_links(
+    session: Session, admin_id: int, now: datetime, *, emailed_only: bool = False
+) -> None:
+    query = update(ResetLink).where(ResetLink.admin_id == admin_id, *_usable_links())
+    if emailed_only:
+        query = query.where(ResetLink.made_by_id.is_(None))
+    session.execute(query.values(voided_at=now))
+
+
+@dataclass(frozen=True)
+class EmailedReset:
+    admin_id: int
+    email: str
+    token: str
+
+
+def may_ask_for_reset(address: str) -> bool:
+    """Asking by mail, per address, counted before anything else."""
+    return limiter.hit(PER_ADDRESS, "forgot", address)
+
+
+def emailed_reset(
+    session: Session, username: str, now: datetime
+) -> EmailedReset | None:
+    """For a current administrator with an email: a new emailed link, which
+    resets the password only. None for anyone else, who is told the same."""
+    admin = session.scalar(
+        select(Admin).where(
+            func.lower(Admin.username) == username.strip().lower(),
+            Admin.retired_at.is_(None),
+            Admin.email.is_not(None),
+        )
+    )
+    if admin is None or admin.email is None:
+        log.info("emailed reset not made", reason="no_such_address")
+        return None
+    if not limiter.hit(EMAILED_PER_ACCOUNT, "emailed_reset", str(admin.id)):
+        log.warning("emailed reset not made", reason="rate_limited", admin_id=admin.id)
+        return None
+    set_actor(session, f"admin:{admin.id}")
+    token = make_reset_link(
+        session,
+        admin.id,
+        now,
+        made_by_id=None,
+        resets_password=True,
+        resets_authenticators=False,
+        lifetime=EMAILED_LINK_LIFETIME,
+    )
+    return EmailedReset(admin.id, admin.email, token)
+
+
+def may_use_reset_link(address: str) -> bool:
+    return limiter.hit(PER_ADDRESS, "reset", address)
+
+
+def find_reset_link(
+    session: Session, token: str, now: datetime, *, lock: bool = False
+) -> tuple[ResetLink, Admin] | None:
+    """The link with this token, if it can still be used, and its current
+    administrator; locked when it is about to be used, so it is used once."""
+    query = (
+        select(ResetLink, Admin)
+        .join(Admin, Admin.id == ResetLink.admin_id)
+        .where(
+            ResetLink.token_hash == digest(token),
+            *_usable_links(),
+            ResetLink.expires_at > now,
+            Admin.retired_at.is_(None),
+        )
+    )
+    found = session.execute(
+        query.with_for_update(of=ResetLink) if lock else query
+    ).one_or_none()
+    return None if found is None else (found[0], found[1])
+
+
+def use_reset_link(
+    session: Session, link: ResetLink, password: str | None, now: datetime
+) -> None:
+    """Does what the link was made for: a new password (checked by the caller
+    with password_problem), and its authenticators and recovery codes gone,
+    so a new one is set up at sign-in while TOTP is required. Every session
+    of theirs ends. The caller commits."""
+    set_actor(session, f"admin:{link.admin_id}")
+    if link.resets_password:
+        if password is None:
+            raise ValueError("this link resets the password: give one")
+        _set_password(session, link.admin_id, password, now)
+    if link.resets_authenticators:
+        for authenticator in locked_authenticators(session, link.admin_id):
+            retire(authenticator, now)
+        _void_recovery_codes(session, link.admin_id, now)
+    link.used_at = now
+    ended = end_sessions(session, link.admin_id, now)
+    log.info(
+        "reset link used",
+        admin_id=link.admin_id,
+        reset_link_id=link.id,
+        sessions_ended=ended,
+    )

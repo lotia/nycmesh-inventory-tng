@@ -6,6 +6,7 @@ from datetime import timedelta
 import pyotp
 import pytest
 import structlog
+from conftest import FailingMail, SentMail
 from fastapi.testclient import TestClient
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 from opentelemetry.sdk.metrics.export import (
@@ -19,7 +20,7 @@ from test_devices import new_device
 from test_ledger import Place
 from test_sign_in import PASSWORD, new_admin
 
-from inventory_tng import devices
+from inventory_tng import devices, mail
 from inventory_tng.app import create_app
 from inventory_tng.db import get_session
 from inventory_tng.devices import RegisteredDevice
@@ -292,7 +293,9 @@ def test_counts_sign_ins_and_confirmations(
     form["code"] = pyotp.TOTP(key).now()
     signed_in = client.post("/admin/sign-in", data=form, follow_redirects=False)
     assert signed_in.status_code == 303
-    assert client.post("/admin/confirm", data={"code": "nope"}).status_code == 400
+    assert (
+        client.post("/admin/confirm", data={"confirm_code": "nope"}).status_code == 400
+    )
 
     sign_ins = counted(reader, "inventory.admin.sign_ins")
     assert sign_ins[(("outcome", "refused"), ("reason", "bad_code"))] >= 1
@@ -326,3 +329,14 @@ def test_counts_batches_written_replayed_and_refused(recorded: Recorded) -> None
         counted(reader, "inventory.transactions.refused")[(("reason", "invalid"),)] >= 1
     )
     assert "inventory.transaction.lines" in metric_names(reader)
+
+
+def test_counts_mail_sent_and_failed(recorded: Recorded) -> None:
+    _, _, reader, _ = recorded
+
+    message = mail.password_changed("ada@example.org", 1)
+    mail.deliver(SentMail(), message)
+    mail.deliver(FailingMail(TimeoutError()), message)
+    sent = counted(reader, "inventory.mail.sent")
+    assert sent[(("kind", "password_changed"), ("outcome", "sent"))] >= 1
+    assert sent[(("kind", "password_changed"), ("outcome", "failed"))] >= 1

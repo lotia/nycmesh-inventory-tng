@@ -13,4 +13,5 @@
   </label>
   <button>Sign in</button>
 </form>
+{% if mail_on %}<p><a href="{{ paths.forgot }}">Forgot your password?</a></p>{% endif %}
 {% endblock %}

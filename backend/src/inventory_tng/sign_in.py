@@ -23,11 +23,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from inventory_tng import accounts, request_logging
-from inventory_tng.db import DbSession, record_last_seen, set_actor
+from inventory_tng import accounts, mail, request_logging
+from inventory_tng.db import DbSession, act_as, record_last_seen
+from inventory_tng.mail import Notify
+from inventory_tng.masking import is_secret_name
 from inventory_tng.models import Admin, AdminSession, SignInSettings
-from inventory_tng.pages import page, redirect, templates
-from inventory_tng.web import client_address, set_private_cookie
+from inventory_tng.pages import not_found, page, redirect, templates
+from inventory_tng.web import rate_key, set_private_cookie
 
 router = APIRouter(include_in_schema=False)
 
@@ -39,6 +41,8 @@ SIGN_OUT = "/admin/sign-out"
 CONFIRM = "/admin/confirm"
 NEW_AUTHENTICATOR = "/admin/authenticators/new"
 ACCOUNT = "/admin/account"
+FORGOT = "/admin/forgot"
+RESET = "/admin/reset"
 
 # What the templates link to and limit, from here, so neither drifts.
 # Jinja types its globals by its own defaults' types; any value will do.
@@ -51,6 +55,8 @@ cast(dict[str, Any], templates.env.globals).update(
         "confirm": CONFIRM,
         "new_authenticator": NEW_AUTHENTICATOR,
         "account": ACCOUNT,
+        "forgot": FORGOT,
+        "reset": RESET,
     },
     limits={
         "password_min": accounts.PASSWORD_MIN,
@@ -87,10 +93,6 @@ def _set_cookie(
     set_private_cookie(
         request, response, COOKIE, token, expires=row.expires_at.astimezone(UTC)
     )
-
-
-def _not_found() -> HTMLResponse:
-    return HTMLResponse("Not found", status_code=404)
 
 
 # What administrator pages depend on
@@ -138,6 +140,8 @@ def signed_in(request: Request, session: DbSession) -> SignedIn:
     # sign_in_id, not admin_session_id: the masker hides any field naming a
     # session, as a session id usually is the secret cookie.
     request_logging.bind(admin_id=admin.id, sign_in_id=row.id)
+    # Every change this request makes is theirs, in the history.
+    act_as(session, f"admin:{admin.id}")
     return SignedIn(
         admin=admin,
         row=row,
@@ -158,7 +162,7 @@ def admin_signed_in(signed: AnySignedIn) -> SignedIn:
 AdminSignedIn = Annotated[SignedIn, Depends(admin_signed_in)]
 
 
-# The field a form carries its code in, when it comes back asking for one.
+# The field a confirmation's code comes in, which no form uses for itself.
 CONFIRM_FIELD = "confirm_code"
 
 
@@ -179,7 +183,7 @@ class ConfirmHere(Exception):
 
 
 async def confirmed(
-    request: Request, signed: AnySignedIn, session: DbSession
+    request: Request, signed: AnySignedIn, session: DbSession, notify: Notify
 ) -> SignedIn:
     """Within the window, goes on; viewing a page keeps nothing open. A page
     asked for once it has closed sends the browser to confirm first. A form
@@ -198,30 +202,41 @@ async def confirmed(
     typed = form.get(CONFIRM_FIELD)
     if not isinstance(typed, str):
         raise ConfirmHere(signed, carried)
-    outcome = await run_in_threadpool(_confirm_now, session, signed, typed)
-    if outcome == "confirmed":
-        return signed
-    raise ConfirmHere(
-        signed,
-        carried,
-        _refused(outcome, signed),
-        429 if outcome == "rate_limited" else 400,
-    )
+    # Its queries, and argon2's work, off the event loop.
+    outcome = await run_in_threadpool(_confirm, session, signed, typed, notify)
+    if outcome != "confirmed":
+        raise ConfirmHere(signed, carried, _refused(outcome, signed), _status(outcome))
+    return signed
 
 
-def _confirm_now(
-    session: Session, signed: SignedIn, typed: str
+def _confirm(
+    session: Session, signed: SignedIn, typed: str, notify: Notify
 ) -> accounts.Confirmation:
-    outcome = accounts.confirm(session, signed.row, typed, _now())
+    """Confirm, keep it, and tell the owner if a recovery code did it."""
+    outcome, factor = accounts.confirm(session, signed.row, typed, _now())
     if outcome == "confirmed":
         session.commit()
+        _after_second_factor(session, signed.admin, factor, notify)
     return outcome
+
+
+def _after_second_factor(
+    session: Session, admin: Admin, factor: accounts.Factor | None, notify: Notify
+) -> None:
+    """A recovery code used is told to its owner, in case it was not them."""
+    if factor == "recovery":
+        left = accounts.recovery_codes_left(session, admin.id)
+        notify.tell(admin.email, admin.id, mail.recovery_code_used(left))
 
 
 def _refused(outcome: accounts.Confirmation, signed: SignedIn) -> str:
     if outcome == "rate_limited":
         return TOO_MANY
     return "That didn't match." if signed.uses_totp else "That isn't your password."
+
+
+def _status(outcome: accounts.Confirmation) -> int:
+    return 429 if outcome == "rate_limited" else 400
 
 
 # Setting up TOTP comes before AdminSignedIn lets anyone in, so its pages
@@ -236,6 +251,48 @@ def confirmed_admin(signed: ConfirmedAny) -> SignedIn:
 ConfirmedAdmin = Annotated[SignedIn, Depends(confirmed_admin)]
 
 
+def changed(signed: SignedIn, session: Session) -> None:
+    """After a sensitive change: counted for the confirmation window, and
+    committed."""
+    accounts.note_sensitive(signed.row, _now())
+    session.commit()
+
+
+def signed_out() -> Response:
+    response = redirect(SIGN_IN)
+    response.delete_cookie(COOKIE)
+    return response
+
+
+def _confirm_page(
+    request: Request,
+    signed: SignedIn,
+    *,
+    action: str,
+    carried: list[tuple[str, str]],
+    alert: str | None = None,
+    status_code: int = 200,
+) -> HTMLResponse:
+    """Asks for a code, then sends `carried` on to `action`. Fields whose
+    names say they are secret, as the log masker reads them (masking.py), are
+    never written into the page: they are asked for again, empty."""
+    return page(
+        request,
+        "confirm.html",
+        {
+            "title": "Confirm it's you",
+            "uses_totp": signed.uses_totp,
+            "admin": signed.admin,
+            "alert": alert,
+            "action": action,
+            "carried": [(n, v) for n, v in carried if not is_secret_name(n)],
+            "retype": list(dict.fromkeys(n for n, _ in carried if is_secret_name(n))),
+            "field": CONFIRM_FIELD,
+        },
+        status_code,
+    )
+
+
 def install(app: FastAPI) -> None:
     @app.exception_handler(Redirect)
     def redirected(_request: Request, error: Redirect) -> Response:
@@ -243,22 +300,13 @@ def install(app: FastAPI) -> None:
 
     @app.exception_handler(ConfirmHere)
     def confirm_here(request: Request, error: ConfirmHere) -> Response:
-        # Passwords are never written into a page: those are typed again.
-        kept = [(n, v) for n, v in error.carried if "password" not in n]
-        return page(
+        return _confirm_page(
             request,
-            "confirm.html",
-            {
-                "title": "Confirm it's you",
-                "uses_totp": error.signed.uses_totp,
-                "admin": error.signed.admin,
-                "alert": error.alert,
-                "action": request.url.path,
-                "carried": kept,
-                "retype_password": len(kept) < len(error.carried),
-                "field": CONFIRM_FIELD,
-            },
-            error.status_code,
+            error.signed,
+            action=request.url.path,
+            carried=error.carried,
+            alert=error.alert,
+            status_code=error.status_code,
         )
 
 
@@ -309,7 +357,7 @@ def _totp_optional(session: DbSession) -> bool:
 @router.get(SETUP)
 def setup_form(request: Request, session: DbSession) -> Response:
     if not accounts.setup_open(session):
-        return _not_found()
+        return not_found()
     if request.app.state.settings.setup_token is None:
         return _setup_off(request)
     return _setup_page(request, optional=_totp_optional(session))
@@ -329,7 +377,7 @@ def setup(
     code: Annotated[str, Form()] = "",
 ) -> Response:
     if not accounts.setup_open(session):
-        return _not_found()
+        return not_found()
     expected = request.app.state.settings.setup_token
     if expected is None:
         return _setup_off(request)
@@ -343,7 +391,7 @@ def setup(
     }
     optional = _totp_optional(session)
     try:
-        accounts.check_setup_token(expected, token, client_address(request))
+        accounts.check_setup_token(expected, token, rate_key(request))
     except accounts.SetupRefused as refused:
         limited = refused.reason == "rate_limited"
         return _setup_page(
@@ -393,7 +441,7 @@ def setup(
         )
     except accounts.SetupRefused:
         # Someone else finished setting up first, while this waited.
-        return _not_found()
+        return not_found()
     session.commit()
     if first.recovery_codes:
         response: Response = _recovery_codes_page(
@@ -409,10 +457,8 @@ def _authenticator_problems(name: str, step: int | None) -> dict[str, str]:
     """A new authenticator's name, and the step its code was for: None if
     the code did not match."""
     problems = {}
-    if not 1 <= len(name) <= accounts.AUTHENTICATOR_NAME_MAX:
-        problems["authenticator_name"] = (
-            f"Give it a name of up to {accounts.AUTHENTICATOR_NAME_MAX} characters."
-        )
+    if problem := accounts.authenticator_name_problem(name):
+        problems["authenticator_name"] = problem
     if step is None:
         problems["code"] = (
             "That code didn't match. Check the app shows NYC Mesh Inventory, "
@@ -450,6 +496,8 @@ def _sign_in_page(
             "next": _local(next),
             "username": username,
             "alert": alert,
+            # Offered only where mail can be sent.
+            "mail_on": request.app.state.settings.mail is not None,
         },
         status_code,
     )
@@ -464,18 +512,19 @@ def sign_in_form(request: Request, next: str = HOME) -> Response:
 def sign_in(
     request: Request,
     session: DbSession,
+    notify: Notify,
     username: Annotated[str, Form()] = "",
     password: Annotated[str, Form()] = "",
     code: Annotated[str, Form()] = "",
     next: Annotated[str, Form()] = HOME,
 ) -> Response:
     try:
-        row, token = accounts.sign_in(
+        row, token, factor = accounts.sign_in(
             session,
             username,
             password,
             code,
-            address=client_address(request),
+            address=rate_key(request),
             user_agent=request.headers.get("user-agent"),
             now=_now(),
         )
@@ -492,6 +541,8 @@ def sign_in(
         )
     session.commit()
     request_logging.bind(admin_id=row.admin_id, sign_in_id=row.id)
+    admin = session.get_one(Admin, row.admin_id)  # Loaded: no query.
+    _after_second_factor(session, admin, factor, notify)
     response = redirect(_local(next))
     _set_cookie(request, response, token, row)
     return response
@@ -501,39 +552,16 @@ def sign_in(
 def sign_out(signed: AnySignedIn, session: DbSession) -> Response:
     accounts.end_session(signed.row, _now())
     session.commit()
-    response = redirect(SIGN_IN)
-    response.delete_cookie(COOKIE)
-    return response
+    return signed_out()
 
 
 # Confirming a sensitive action
 
 
-def _confirm_page(
-    request: Request,
-    signed: SignedIn,
-    next: str,
-    *,
-    alert: str | None = None,
-    status_code: int = 200,
-) -> HTMLResponse:
-    return page(
-        request,
-        "confirm.html",
-        {
-            "title": "Confirm it's you",
-            "next": _local(next),
-            "uses_totp": signed.uses_totp,
-            "admin": signed.admin,
-            "alert": alert,
-        },
-        status_code,
-    )
-
-
 @router.get(CONFIRM)
 def confirm_form(request: Request, signed: AnySignedIn, next: str = HOME) -> Response:
-    return _confirm_page(request, signed, next)
+    carried = [("next", _local(next))]
+    return _confirm_page(request, signed, action=CONFIRM, carried=carried)
 
 
 @router.post(CONFIRM)
@@ -541,16 +569,20 @@ def confirm(
     request: Request,
     signed: AnySignedIn,
     session: DbSession,
-    code: Annotated[str, Form()] = "",
+    notify: Notify,
+    confirm_code: Annotated[str, Form()] = "",
     next: Annotated[str, Form()] = HOME,
 ) -> Response:
-    outcome = accounts.confirm(session, signed.row, code, _now())
+    outcome = _confirm(session, signed, confirm_code, notify)
     if outcome == "confirmed":
-        session.commit()
         return redirect(_local(next))
-    status_code = 429 if outcome == "rate_limited" else 400
     return _confirm_page(
-        request, signed, next, alert=_refused(outcome, signed), status_code=status_code
+        request,
+        signed,
+        action=CONFIRM,
+        carried=[("next", _local(next))],
+        alert=_refused(outcome, signed),
+        status_code=_status(outcome),
     )
 
 
@@ -623,7 +655,6 @@ def new_authenticator(
     first = not accounts.uses_totp(session, admin_id)
     if not problems:
         assert step is not None  # A wrong code is a problem.
-        set_actor(session, f"admin:{admin_id}")
         try:
             # A savepoint: PostgreSQL may compare names its own way.
             with session.begin_nested():
@@ -636,8 +667,7 @@ def new_authenticator(
             request, signed, key=key, name=name, problems=problems, status_code=400
         )
     codes = accounts.make_recovery_codes(session, admin_id, now) if first else []
-    accounts.note_sensitive(signed.row, now)
-    session.commit()
+    changed(signed, session)
     if codes:
         return _recovery_codes_page(request, signed.admin, codes)
     return redirect(HOME)

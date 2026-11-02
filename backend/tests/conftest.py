@@ -1,12 +1,14 @@
 """Each test run gets a database of its own, created on the compose PostgreSQL
 server and dropped when the run ends. Each test's writes are rolled back."""
 
+import dataclasses
 import logging
 import os
 import re
 import time
 import uuid
 from collections.abc import Callable, Iterator
+from contextlib import nullcontext
 from datetime import timedelta
 from pathlib import Path
 
@@ -22,11 +24,12 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import devices
 from inventory_tng.app import create_app
-from inventory_tng.db import get_session, make_engine
+from inventory_tng.db import get_session, get_session_factory, make_engine
 from inventory_tng.local_env import local_env_values
 from inventory_tng.logs import configure_structlog
+from inventory_tng.mail import Message, get_mailer
 from inventory_tng.rate_limits import limiter
-from inventory_tng.settings import FrontendConfig, LogConfig, Settings
+from inventory_tng.settings import FrontendConfig, LogConfig, MailConfig, Settings
 
 # structlog's lines go through the standard library, where caplog sees them.
 configure_structlog()
@@ -41,6 +44,7 @@ FROM_THE_SHELL = (
     "VITE_DEV_SERVER",
     "FRONTEND_DIST",
     "SETUP_TOKEN",
+    "SITE_URL",
 )
 
 
@@ -50,7 +54,7 @@ def no_settings_from_the_shell() -> Iterator[None]:
     Session-scoped, so it runs before every module-scoped fixture too."""
     with pytest.MonkeyPatch.context() as monkeypatch:
         for name in list(os.environ):
-            if name.startswith(("OTEL_", "LOG_")) or name in FROM_THE_SHELL:
+            if name.startswith(("OTEL_", "LOG_", "MAIL_")) or name in FROM_THE_SHELL:
                 monkeypatch.delenv(name)
         # Code that reads DATABASE_URL itself, such as a command's main(),
         # finds no database at all rather than the developer's: a test that
@@ -205,6 +209,7 @@ def make_app(
         *,
         development: bool = False,
         setup_token: str | None = None,
+        mailer: SentMail | None = None,
     ) -> FastAPI:
         settings = Settings(
             database_url=database_url,
@@ -213,11 +218,75 @@ def make_app(
             logging=logging or LogConfig(),
             frontend=frontend or FrontendConfig(dist=tmp_path / "no-build"),
         )
+        if mailer is not None:
+            settings = dataclasses.replace(settings, mail=SITE_MAIL)
         app = create_app(settings)
         app.dependency_overrides[get_session] = lambda: session
+        # Work after the reply uses the test's session too, so it is rolled
+        # back with the rest.
+        app.dependency_overrides[get_session_factory] = lambda: (
+            lambda: nullcontext(session)
+        )
+        app.dependency_overrides[get_mailer] = lambda: mailer
         return app
 
     return make
+
+
+# Mail as a site sets it up, for apps given a mailer. Links start here.
+SITE_MAIL = MailConfig(
+    host="smtp.example.org",
+    site_url="https://inventory.example.org",
+    sender="inventory@example.org",
+)
+
+
+class SentMail(list[Message]):
+    """A stand-in mailer: what would have gone out."""
+
+    def send(self, message: Message) -> None:
+        self.append(message)
+
+
+class FailingMail:
+    """A stand-in mailer whose every send fails with `error`."""
+
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+
+    def send(self, message: Message) -> None:
+        raise self.error
+
+
+@pytest.fixture
+def make_client(
+    make_app: Callable[..., FastAPI],
+) -> Iterator[Callable[..., TestClient]]:
+    """Clients over https, as production is, for the Secure cookies, not
+    following redirects, which are what is tested. `address` is where the
+    request seems to come from, for rate limits by address."""
+    clients: list[TestClient] = []
+
+    def make(
+        app: FastAPI | None = None, *, address: str = "192.0.2.1", **app_kwargs: object
+    ) -> TestClient:
+        client = TestClient(
+            app or make_app(**app_kwargs),
+            base_url="https://testserver",
+            follow_redirects=False,
+            client=(address, 50000),
+        )
+        clients.append(client.__enter__())
+        return client
+
+    yield make
+    for client in clients:
+        client.__exit__(None, None, None)
+
+
+@pytest.fixture
+def sent_mail() -> SentMail:
+    return SentMail()
 
 
 @pytest.fixture
