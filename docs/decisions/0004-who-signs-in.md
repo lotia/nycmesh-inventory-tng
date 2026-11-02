@@ -1,6 +1,7 @@
 # 0004 — Who signs in
 
-**Status:** accepted · 2026-10-30
+**Status:** accepted · 2026-10-30 · amended by 0012 (TOTP may be
+optional; sign-in in detail)
 
 ## Context
 

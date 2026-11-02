@@ -1,0 +1,388 @@
+"""administrator sign-in (docs/decisions/0012)
+
+Administrators, their passwords, authenticators, recovery codes, sessions and
+reset links, and the one-row sign_in_settings, made here with its defaults.
+Changes go to catalogue_history, except sessions', which change on every
+request. The history function now leaves out the columns its trigger names,
+models.SECRET_COLUMNS, so no secret is ever copied into history.
+
+Revision ID: 0006
+Revises: 0005
+Create Date: 2026-11-02 11:56:26.535957
+"""
+
+from collections.abc import Sequence
+
+import sqlalchemy as sa
+from alembic import op
+
+revision: str = "0006"
+down_revision: str | Sequence[str] | None = "0005"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
+# 0002's record_catalogue_history(), now leaving out the columns its trigger
+# names. Its triggers name none, and TG_ARGV is then NULL: hence coalesce,
+# so they record whole rows as before. One function writes all history.
+HISTORY_FUNCTION = r"""
+CREATE OR REPLACE FUNCTION record_catalogue_history() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO catalogue_history (table_name, row_id, action, actor, old_row, new_row)
+    VALUES (
+        TG_TABLE_NAME,
+        CASE WHEN TG_OP = 'DELETE' THEN OLD.id ELSE NEW.id END,
+        lower(TG_OP),
+        nullif(current_setting('inventory.actor', true), ''),
+        CASE WHEN TG_OP <> 'INSERT' THEN to_jsonb(OLD) - coalesce(TG_ARGV, '{}') END,
+        CASE WHEN TG_OP <> 'DELETE' THEN to_jsonb(NEW) - coalesce(TG_ARGV, '{}') END
+    );
+    RETURN NULL;
+END
+$$;
+"""
+
+# 0002's, as it was, for the downgrade.
+HISTORY_FUNCTION_0002 = r"""
+CREATE OR REPLACE FUNCTION record_catalogue_history() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO catalogue_history (table_name, row_id, action, actor, old_row, new_row)
+    VALUES (
+        TG_TABLE_NAME,
+        CASE WHEN TG_OP = 'DELETE' THEN OLD.id ELSE NEW.id END,
+        lower(TG_OP),
+        nullif(current_setting('inventory.actor', true), ''),
+        CASE WHEN TG_OP <> 'INSERT' THEN to_jsonb(OLD) END,
+        CASE WHEN TG_OP <> 'DELETE' THEN to_jsonb(NEW) END
+    );
+    RETURN NULL;
+END
+$$;
+"""
+
+# For every one-row settings table from here on: refuses deleting the row,
+# naming the table in its error and constraint.
+KEPT = r"""
+CREATE FUNCTION settings_row_kept() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'the % row is changed, never deleted', TG_TABLE_NAME
+        USING ERRCODE = 'check_violation', CONSTRAINT = TG_TABLE_NAME || '_kept';
+END
+$$;
+CREATE TRIGGER sign_in_settings_kept BEFORE DELETE ON sign_in_settings
+    FOR EACH ROW EXECUTE FUNCTION settings_row_kept();
+CREATE TRIGGER sign_in_settings_kept_truncate BEFORE TRUNCATE ON sign_in_settings
+    FOR EACH STATEMENT EXECUTE FUNCTION settings_row_kept();
+"""
+
+# Each table with history, the columns left out of it, and when an update is
+# worth recording: an authenticator's last step moves at every sign-in.
+HISTORY = (
+    ("admin", (), "OLD IS DISTINCT FROM NEW"),
+    ("sign_in_settings", (), "OLD IS DISTINCT FROM NEW"),
+    ("admin_password", ("password_hash",), "OLD IS DISTINCT FROM NEW"),
+    (
+        "authenticator",
+        ("totp_key",),
+        "(to_jsonb(OLD) - 'last_step') IS DISTINCT FROM (to_jsonb(NEW) - 'last_step')",
+    ),
+    ("recovery_code", ("code_hash",), "OLD IS DISTINCT FROM NEW"),
+    ("reset_link", ("token_hash",), "OLD IS DISTINCT FROM NEW"),
+)
+
+
+def history_triggers(table: str, secret: tuple[str, ...], changed: str) -> None:
+    arguments = ", ".join(f"'{column}'" for column in secret)
+    function = f"record_catalogue_history({arguments})"
+    op.execute(
+        f"CREATE TRIGGER record_history AFTER INSERT OR DELETE ON {table} "
+        f"FOR EACH ROW EXECUTE FUNCTION {function}"
+    )
+    op.execute(
+        f"CREATE TRIGGER record_history_update AFTER UPDATE ON {table} "
+        f"FOR EACH ROW WHEN ({changed}) EXECUTE FUNCTION {function}"
+    )
+
+
+def upgrade() -> None:
+    op.create_table(
+        "admin",
+        sa.Column("id", sa.Integer(), sa.Identity(always=True), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("username", sa.Text(), nullable=False),
+        sa.Column("email", sa.Text(), nullable=True),
+        sa.Column("retired_at", sa.DateTime(timezone=True), nullable=True),
+        sa.CheckConstraint(
+            "email ~ '^[^@[:space:]]+@[^@[:space:]]+$' AND length(email) <= 254",
+            name=op.f("ck_admin_email"),
+        ),
+        sa.CheckConstraint(
+            "username ~ '^[A-Za-z0-9._-]{1,64}$'", name=op.f("ck_admin_username")
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_admin")),
+    )
+    op.create_index(
+        "uq_admin_email",
+        "admin",
+        [sa.literal_column("lower(email)")],
+        unique=True,
+        postgresql_where=sa.text("email IS NOT NULL"),
+    )
+    op.create_index(
+        "uq_admin_username",
+        "admin",
+        [sa.literal_column("lower(username)")],
+        unique=True,
+    )
+    op.create_table(
+        "sign_in_settings",
+        sa.Column("id", sa.Integer(), server_default=sa.text("1"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("totp_policy", sa.Text(), server_default="required", nullable=False),
+        sa.Column(
+            "session_days", sa.Integer(), server_default=sa.text("7"), nullable=False
+        ),
+        sa.Column(
+            "confirm_hours", sa.Integer(), server_default=sa.text("24"), nullable=False
+        ),
+        sa.Column(
+            "confirm_idle_minutes",
+            sa.Integer(),
+            server_default=sa.text("60"),
+            nullable=False,
+        ),
+        sa.CheckConstraint(
+            "totp_policy IN ('required', 'optional')",
+            name=op.f("ck_sign_in_settings_totp_policy"),
+        ),
+        sa.CheckConstraint(
+            "confirm_hours > 0", name=op.f("ck_sign_in_settings_confirm_hours")
+        ),
+        sa.CheckConstraint(
+            "confirm_idle_minutes > 0",
+            name=op.f("ck_sign_in_settings_confirm_idle_minutes"),
+        ),
+        sa.CheckConstraint("id = 1", name=op.f("ck_sign_in_settings_one_row")),
+        sa.CheckConstraint(
+            "session_days BETWEEN 1 AND 400",
+            name=op.f("ck_sign_in_settings_session_days"),
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_sign_in_settings")),
+    )
+    op.create_table(
+        "admin_password",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("password_hash", sa.Text(), nullable=False),
+        sa.Column(
+            "changed_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["id"],
+            ["admin.id"],
+            name=op.f("fk_admin_password_id_admin"),
+            ondelete="RESTRICT",
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_admin_password")),
+    )
+    op.create_table(
+        "admin_session",
+        sa.Column("id", sa.Integer(), sa.Identity(always=True), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("admin_id", sa.Integer(), nullable=False),
+        sa.Column("token_hash", sa.LargeBinary(), nullable=False),
+        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column(
+            "last_seen_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("confirmed_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("last_sensitive_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("user_agent", sa.Text(), nullable=True),
+        sa.Column("ended_at", sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(
+            ["admin_id"],
+            ["admin.id"],
+            name=op.f("fk_admin_session_admin_id_admin"),
+            ondelete="RESTRICT",
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_admin_session")),
+        sa.UniqueConstraint("token_hash", name=op.f("uq_admin_session_token_hash")),
+    )
+    op.create_index(
+        op.f("ix_admin_session_admin_id"), "admin_session", ["admin_id"], unique=False
+    )
+    op.create_table(
+        "authenticator",
+        sa.Column("id", sa.Integer(), sa.Identity(always=True), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("admin_id", sa.Integer(), nullable=False),
+        sa.Column("name", sa.Text(), nullable=False),
+        sa.Column("totp_key", sa.Text(), nullable=True),
+        sa.Column("last_step", sa.BigInteger(), nullable=True),
+        sa.Column("retired_at", sa.DateTime(timezone=True), nullable=True),
+        sa.CheckConstraint(
+            "(totp_key IS NULL) = (retired_at IS NOT NULL)",
+            name=op.f("ck_authenticator_key_until_retired"),
+        ),
+        sa.CheckConstraint(
+            "length(name) BETWEEN 1 AND 64", name=op.f("ck_authenticator_name")
+        ),
+        sa.ForeignKeyConstraint(
+            ["admin_id"],
+            ["admin.id"],
+            name=op.f("fk_authenticator_admin_id_admin"),
+            ondelete="RESTRICT",
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_authenticator")),
+    )
+    op.create_index(
+        op.f("ix_authenticator_admin_id"), "authenticator", ["admin_id"], unique=False
+    )
+    op.create_index(
+        "uq_authenticator_name",
+        "authenticator",
+        [sa.literal_column("admin_id"), sa.literal_column("lower(name)")],
+        unique=True,
+        postgresql_where=sa.text("retired_at IS NULL"),
+    )
+    op.create_table(
+        "recovery_code",
+        sa.Column("id", sa.Integer(), sa.Identity(always=True), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("admin_id", sa.Integer(), nullable=False),
+        sa.Column("code_hash", sa.LargeBinary(), nullable=False),
+        sa.Column("used_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("voided_at", sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(
+            ["admin_id"],
+            ["admin.id"],
+            name=op.f("fk_recovery_code_admin_id_admin"),
+            ondelete="RESTRICT",
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_recovery_code")),
+        sa.UniqueConstraint("code_hash", name=op.f("uq_recovery_code_code_hash")),
+    )
+    op.create_index(
+        op.f("ix_recovery_code_admin_id"), "recovery_code", ["admin_id"], unique=False
+    )
+    op.create_table(
+        "reset_link",
+        sa.Column("id", sa.Integer(), sa.Identity(always=True), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("admin_id", sa.Integer(), nullable=False),
+        sa.Column("made_by_id", sa.Integer(), nullable=True),
+        sa.Column("token_hash", sa.LargeBinary(), nullable=False),
+        sa.Column("resets_password", sa.Boolean(), nullable=False),
+        sa.Column("resets_authenticators", sa.Boolean(), nullable=False),
+        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("used_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("voided_at", sa.DateTime(timezone=True), nullable=True),
+        sa.CheckConstraint(
+            "made_by_id <> admin_id", name=op.f("ck_reset_link_not_made_for_oneself")
+        ),
+        sa.CheckConstraint(
+            "made_by_id IS NOT NULL OR NOT resets_authenticators",
+            name=op.f("ck_reset_link_emailed_resets_password_only"),
+        ),
+        sa.CheckConstraint(
+            "resets_password OR resets_authenticators",
+            name=op.f("ck_reset_link_resets"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["admin_id"],
+            ["admin.id"],
+            name=op.f("fk_reset_link_admin_id_admin"),
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["made_by_id"],
+            ["admin.id"],
+            name=op.f("fk_reset_link_made_by_id_admin"),
+            ondelete="RESTRICT",
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_reset_link")),
+        sa.UniqueConstraint("token_hash", name=op.f("uq_reset_link_token_hash")),
+    )
+    op.create_index(
+        op.f("ix_reset_link_admin_id"), "reset_link", ["admin_id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_reset_link_made_by_id"), "reset_link", ["made_by_id"], unique=False
+    )
+    op.execute(HISTORY_FUNCTION)
+    for table, secret, changed in HISTORY:
+        history_triggers(table, secret, changed)
+    op.execute(KEPT)
+    op.execute("SELECT set_config('inventory.actor', 'system:migration', true)")
+    op.execute("INSERT INTO sign_in_settings DEFAULT VALUES")
+
+
+def downgrade() -> None:
+    # Their triggers go with them; their history stays.
+    op.drop_index(op.f("ix_reset_link_made_by_id"), table_name="reset_link")
+    op.drop_index(op.f("ix_reset_link_admin_id"), table_name="reset_link")
+    op.drop_table("reset_link")
+    op.drop_index(op.f("ix_recovery_code_admin_id"), table_name="recovery_code")
+    op.drop_table("recovery_code")
+    op.drop_index(
+        "uq_authenticator_name",
+        table_name="authenticator",
+        postgresql_where=sa.text("retired_at IS NULL"),
+    )
+    op.drop_index(op.f("ix_authenticator_admin_id"), table_name="authenticator")
+    op.drop_table("authenticator")
+    op.drop_index(op.f("ix_admin_session_admin_id"), table_name="admin_session")
+    op.drop_table("admin_session")
+    op.drop_table("admin_password")
+    op.drop_table("sign_in_settings")
+    op.drop_index("uq_admin_username", table_name="admin")
+    op.drop_index(
+        "uq_admin_email",
+        table_name="admin",
+        postgresql_where=sa.text("email IS NOT NULL"),
+    )
+    op.drop_table("admin")
+    op.execute("DROP FUNCTION settings_row_kept()")
+    op.execute(HISTORY_FUNCTION_0002)
