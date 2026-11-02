@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import devices
 from inventory_tng.command import run_command
 from inventory_tng.db import CLI_ACTOR, set_actor
+from inventory_tng.local_time import show, site_zone
 
 # Where the QR code's link goes: the registration page (inventory-tng-8i4.13).
 REGISTER_PATH = "/register"
@@ -74,7 +75,7 @@ def run(session: Session, args: argparse.Namespace) -> int:
                 lifetime=timedelta(days=args.days),
                 label=args.label,
             )
-            print(f"Code {code.id}, until {code.expires_at:%Y-%m-%d %H:%M %Z}")
+            print(f"Code {code.id}, until {show(code.expires_at, site_zone(session))}")
             print(f"Phrase: {phrase}")
             if args.base_url:
                 link = args.base_url.rstrip("/") + REGISTER_PATH
@@ -90,11 +91,12 @@ def run(session: Session, args: argparse.Namespace) -> int:
             listed = devices.devices_registered_with(session, args.code_id)
             if listed is None:
                 return _done(False, "code")
+            zone = site_zone(session)
             for device, before in listed:
                 when = f"{before} before revocation" if before is not None else ""
                 state = "revoked" if device.revoked_at else "current"
                 print(
-                    f"{device.id}\t{device.created_at:%Y-%m-%d %H:%M}\t{state}\t"
+                    f"{device.id}\t{show(device.created_at, zone)}\t{state}\t"
                     f"{device.first_seen_from or ''}\t{when}"
                 )
             return 0

@@ -25,6 +25,7 @@ dependencies = [
     "servestatic[brotli]>=4.4.0",
     "sqlalchemy>=2.1.6",
     "structlog>=26.1.0",
+    "tzdata>=2026.6",
     "uvicorn>=0.54.0",
 ]
 

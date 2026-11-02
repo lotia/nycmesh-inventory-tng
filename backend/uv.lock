@@ -367,6 +367,7 @@ dependencies = [
     { name = "servestatic", extra = ["brotli"] },
     { name = "sqlalchemy" },
     { name = "structlog" },
+    { name = "tzdata" },
     { name = "uvicorn" },
 ]
 
@@ -398,6 +399,7 @@ requires-dist = [
     { name = "servestatic", extras = ["brotli"], specifier = ">=4.4.0" },
     { name = "sqlalchemy", specifier = ">=2.1.6" },
     { name = "structlog", specifier = ">=26.1.0" },
+    { name = "tzdata", specifier = ">=2026.6" },
     { name = "uvicorn", specifier = ">=0.54.0" },
 ]
 
