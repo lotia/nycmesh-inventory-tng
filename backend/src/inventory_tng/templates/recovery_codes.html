@@ -1,0 +1,10 @@
+{% extends "admin_base.html" %}
+{% block main %}
+<p>If you lose your authenticator, each of these codes signs you in once in
+place of a code. Print them or keep them in a password manager. <strong>They
+are not shown again.</strong></p>
+<ol class="codes">
+  {% for code in codes %}<li>{{ code }}</li>{% endfor %}
+</ol>
+<p><a href="{{ paths.home }}">I've kept them: carry on</a></p>
+{% endblock %}

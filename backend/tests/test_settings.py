@@ -4,6 +4,8 @@ import pytest
 
 from inventory_tng.settings import FrontendConfig, Settings, SettingsError
 
+URL = "postgresql://u:p@db/x"
+
 
 @pytest.mark.parametrize(
     "scheme", ["postgres", "postgresql", "postgres+psycopg", "postgresql+psycopg"]
@@ -102,3 +104,13 @@ def test_app_env_decides_development(value: str, development: bool) -> None:
         {"DATABASE_URL": "postgresql://db/x", "APP_ENV": value}
     )
     assert settings.development is development
+
+
+def test_a_setup_token_is_long_and_never_shown() -> None:
+    token = "s" * 40
+    settings = Settings.from_environ({"DATABASE_URL": URL, "SETUP_TOKEN": f" {token} "})
+    assert settings.setup_token == token
+    assert token not in repr(settings)
+    assert Settings.from_environ({"DATABASE_URL": URL}).setup_token is None
+    with pytest.raises(SettingsError, match="SETUP_TOKEN must be at least 32"):
+        Settings.from_environ({"DATABASE_URL": URL, "SETUP_TOKEN": "short"})

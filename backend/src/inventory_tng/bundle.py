@@ -15,16 +15,15 @@ from typing import cast
 import structlog
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import PlainTextResponse, Response
-from fastapi.templating import Jinja2Templates
 from servestatic import ServeStaticASGI
 from starlette.types import ASGIApp
 
+from inventory_tng.pages import templates
 from inventory_tng.settings import FrontendConfig, Settings
 
 log = structlog.get_logger(__name__)
 
 router = APIRouter()
-templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 STATIC = "/static/"
 ASSETS = STATIC + "assets/"

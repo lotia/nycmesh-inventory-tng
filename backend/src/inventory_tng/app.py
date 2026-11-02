@@ -9,7 +9,8 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 
-from inventory_tng import bundle, catalogue, db, devices, health, ledger
+from inventory_tng import bundle, catalogue, db, devices, health, ledger, sign_in
+from inventory_tng.cross_site import CrossSiteRefusal
 from inventory_tng.db import make_engine
 from inventory_tng.request_logging import RequestLogging
 from inventory_tng.settings import Settings
@@ -42,6 +43,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.engine = engine
     app.state.settings = settings
+    app.add_middleware(CrossSiteRefusal)
     app.add_middleware(
         RequestLogging,
         client_address=settings.logging.client_address,
@@ -55,8 +57,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(ledger.router, prefix=API)
     app.include_router(catalogue.router, prefix=API)
     app.include_router(bundle.router)
+    app.include_router(sign_in.router)
     bundle.install(app, settings)
     db.install(app)
     devices.install(app)
     ledger.install(app)
+    sign_in.install(app)
     return app

@@ -15,6 +15,9 @@ from inventory_tng.local_env import CLONE
 LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 ENVIRONMENTS = ("development", "production")
 DEFAULT_PORTS = {"http": 80, "https": 443}
+# A setup token shorter than this could be guessed; secrets.token_urlsafe()
+# gives 43 characters.
+SETUP_TOKEN_LENGTH = 32
 
 
 class SettingsError(Exception):
@@ -83,10 +86,17 @@ class Settings:
     development: bool = False
     logging: LogConfig = field(default_factory=LogConfig)
     frontend: FrontendConfig = field(default_factory=FrontendConfig)
+    # What /setup asks for before making the first administrator
+    # (docs/decisions/0012); without it, setup is off.
+    setup_token: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         # Every Settings passes through here, however it was built.
         object.__setattr__(self, "database_url", _database_url(self.database_url))
+        if self.setup_token is not None and len(self.setup_token) < SETUP_TOKEN_LENGTH:
+            raise SettingsError(
+                f"SETUP_TOKEN must be at least {SETUP_TOKEN_LENGTH} characters"
+            )
         if not self.development:
             _refuse_development_only(self)
 
@@ -97,6 +107,7 @@ class Settings:
             development=_environment(environ.get("APP_ENV") or "") == "development",
             logging=LogConfig.from_environ(environ),
             frontend=FrontendConfig.from_environ(environ),
+            setup_token=environ.get("SETUP_TOKEN", "").strip() or None,
         )
 
 

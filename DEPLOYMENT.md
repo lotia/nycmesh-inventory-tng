@@ -14,8 +14,9 @@ There is no production container image or Helm chart yet
 - Node, at the version in `mise.toml`, to build the scan page. It is needed
   only to build, not to run.
 - HTTPS in front of it, from a reverse proxy or ingress. Outside development
-  the device cookie is `Secure`: over plain http a browser never keeps it,
-  so no device stays registered.
+  the device and sign-in cookies are `Secure`: over plain http a browser
+  never keeps them, so no device stays registered and nobody stays signed
+  in.
 
 ## Settings
 
@@ -26,6 +27,8 @@ Set these in the environment. Only `DATABASE_URL` is required.
   only: it stops masking personal data in logs, lets the cookie travel over
   http, re-reads the scan page's build on every page, and allows
   `UNMASK_SECRETS` and `VITE_DEV_SERVER`.
+- `SETUP_TOKEN`: lets the first administrator set up (below); at least 32
+  characters. Remove it once they have.
 - `FORWARDED_ALLOW_IPS`: behind a proxy, the proxy's address, so the client
   address and scheme come from its headers.
 - `LOG_FORMAT`: `json` for a log collector; the default is `console`.
@@ -79,8 +82,23 @@ says which folder it serves.
 when it cannot. Use it as a readiness check, not a liveness check: a
 database outage should take the app out of rotation, not restart it.
 
-The limit on guessing registration phrases is kept per process, so each
-worker allows its own ten attempts a minute per address.
+The limits on guessing registration phrases, passwords and codes are kept
+per process, so each worker allows its own attempts.
+
+## The first administrator
+
+Administrators do everything else in the browser, so the first one sets up
+there too. Make a token, set it as `SETUP_TOKEN` and restart:
+
+```sh
+uv run python -c "import secrets; print(secrets.token_urlsafe())"
+```
+
+Give it to the first administrator, who opens `/setup`, types it, and
+chooses a username, a password and an authenticator app. Once any
+administrator exists, `/setup` is gone for good; remove `SETUP_TOKEN` and
+restart. Later administrators are invited from the administrator pages
+(docs/decisions/0012).
 
 ## Registering devices
 

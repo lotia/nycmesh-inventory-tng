@@ -3,6 +3,7 @@ from collections.abc import Generator, Iterator
 from contextlib import contextmanager
 from datetime import timedelta
 
+import pyotp
 import pytest
 import structlog
 from fastapi.testclient import TestClient
@@ -16,9 +17,11 @@ from sqlalchemy import exc
 from sqlalchemy.orm import Session
 from test_devices import new_device
 from test_ledger import Place
+from test_sign_in import PASSWORD, new_admin
 
 from inventory_tng import devices
 from inventory_tng.app import create_app
+from inventory_tng.db import get_session
 from inventory_tng.devices import RegisteredDevice
 from inventory_tng.masking import MASK, Masker
 from inventory_tng.settings import Settings
@@ -100,7 +103,8 @@ def recorded(database_url: str) -> Iterator[Recorded]:
     level = root.level
     root.setLevel(logging.INFO)
     try:
-        with TestClient(app) as client:
+        # Over https, so the sign-in cookie comes back.
+        with TestClient(app, base_url="https://testserver") as client:
             yield client, telemetry, reader, exporter
     finally:
         root.setLevel(level)
@@ -242,7 +246,6 @@ def counted(reader: InMemoryMetricReader, name: str) -> dict[tuple[object, ...],
 
 def test_counts_registrations_and_refusals(recorded: Recorded) -> None:
     client, _, reader, _ = recorded
-    devices._limiter.storage.reset()
     with Session(client.app.state.engine) as session, session.begin():  # ty: ignore[unresolved-attribute]
         _, phrase = devices.create_code(
             session, max_uses=1, lifetime=timedelta(hours=1)
@@ -250,6 +253,7 @@ def test_counts_registrations_and_refusals(recorded: Recorded) -> None:
     assert client.post("/api/devices", json={"code": phrase}).status_code == 201
     assert client.post("/api/devices", json={"code": phrase}).status_code == 400
     client.app.add_api_route("/api/needs-a-device", needs_a_device)  # ty: ignore[unresolved-attribute]
+    client.cookies.clear()  # The registration's cookie came back.
     assert client.get("/api/needs-a-device").status_code == 403
 
     assert sum(counted(reader, "inventory.devices.registered").values()) >= 1
@@ -260,6 +264,41 @@ def test_counts_registrations_and_refusals(recorded: Recorded) -> None:
     assert (
         counted(reader, "inventory.devices.refused")[(("reason", "unregistered"),)] >= 1
     )
+
+
+@pytest.fixture
+def rolled_back(recorded: Recorded, session: Session) -> Iterator[Recorded]:
+    """The recorded app on the test's session, so what it writes is rolled
+    back, as with make_app: an administrator left behind would close setup
+    for every later test."""
+    client = recorded[0]
+    overrides = client.app.dependency_overrides  # ty: ignore[unresolved-attribute]
+    overrides[get_session] = lambda: session
+    try:
+        yield recorded
+    finally:
+        overrides.pop(get_session)
+        client.cookies.clear()
+
+
+def test_counts_sign_ins_and_confirmations(
+    rolled_back: Recorded, session: Session
+) -> None:
+    client, _, reader, _ = rolled_back
+    _, key = new_admin(session)
+    assert key is not None
+    form = {"username": "ada", "password": PASSWORD, "code": ""}
+    assert client.post("/admin/sign-in", data=form).status_code == 400
+    form["code"] = pyotp.TOTP(key).now()
+    signed_in = client.post("/admin/sign-in", data=form, follow_redirects=False)
+    assert signed_in.status_code == 303
+    assert client.post("/admin/confirm", data={"code": "nope"}).status_code == 400
+
+    sign_ins = counted(reader, "inventory.admin.sign_ins")
+    assert sign_ins[(("outcome", "refused"), ("reason", "bad_code"))] >= 1
+    assert sign_ins[(("factor", "totp"), ("outcome", "signed_in"))] >= 1
+    confirmations = counted(reader, "inventory.admin.confirmations")
+    assert confirmations[(("outcome", "refused"),)] >= 1
 
 
 def needs_a_device(device: RegisteredDevice) -> int:
