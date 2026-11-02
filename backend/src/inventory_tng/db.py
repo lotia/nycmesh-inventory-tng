@@ -14,12 +14,14 @@ from sqlalchemy import (
     Engine,
     MetaData,
     create_engine,
+    event,
     exc,
     exists,
     func,
     select,
     update,
 )
+from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import DeclarativeBase, Session
 
 log = structlog.get_logger(__name__)
@@ -46,12 +48,25 @@ def make_engine(url: str) -> Engine:
     # holding a worker until the operating system gives up. Parameters are
     # hidden from SQLAlchemy's log lines and messages, because they can hold
     # personal data.
-    return create_engine(
+    engine = create_engine(
         url,
         pool_pre_ping=True,
         connect_args={"connect_timeout": 5},
         hide_parameters=True,
     )
+    event.listen(engine, "connect", _in_utc)
+    return engine
+
+
+def _in_utc(connection: DBAPIConnection, _record: object) -> None:
+    """Times come back in UTC whatever the server's own zone
+    (docs/decisions/0013). Set as each connection opens, rather than as a
+    startup option, which would replace any options DATABASE_URL gives and
+    which connection poolers such as PgBouncer refuse."""
+    cursor = connection.cursor()
+    cursor.execute("SET TIME ZONE 'UTC'")
+    cursor.close()
+    connection.commit()
 
 
 def get_session(request: Request) -> Iterator[Session]:

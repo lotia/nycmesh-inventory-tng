@@ -652,3 +652,19 @@ class SignInSettings(Base):
     # long, so long as each comes within confirm_idle_minutes of the last.
     confirm_hours: Mapped[int] = mapped_column(server_default=text("24"))
     confirm_idle_minutes: Mapped[int] = mapped_column(server_default=text("60"))
+
+
+class SiteSettings(Base):
+    """Settings for the whole site, which administrators set. One row, id 1,
+    made by its migration and never deleted. Changes are history like
+    everything else."""
+
+    __tablename__ = "site_settings"
+    __table_args__ = (CheckConstraint("id = 1", name="one_row"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, server_default=text("1"))
+    created_at: Mapped[CreatedAt]
+    # The IANA zone times are shown in (docs/decisions/0013). Every time is
+    # stored and compared in UTC; this is only for people reading them. A
+    # trigger refuses a zone PostgreSQL does not know.
+    time_zone: Mapped[str] = mapped_column(Text, server_default="America/New_York")
