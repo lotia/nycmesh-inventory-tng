@@ -1,0 +1,41 @@
+{% extends "admin_base.html" %}
+{% block main %}
+<p>A phone or computer must be registered before it can record anything.
+Make a code, then show its QR code in the room, or send its phrase to
+someone remote. Making one asks for a fresh code.</p>
+
+<section>
+  <h2>Make a registration code</h2>
+  <form method="post" action="{{ request.url.path }}/codes">
+    <label>What it's for <span class="hint">optional, such as "Hub open day"</span>
+      <input name="label" value="{{ values.get('label', '') }}" maxlength="{{ name_max }}">
+    </label>
+    <label>Devices it may register <span class="hint">keep it small</span>
+      <input name="uses" type="number" min="1" max="{{ max_uses }}" value="{{ values.get('uses', '1') }}" required>
+      {% with name = "uses" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <label>Days it lasts
+      <input name="days" type="number" min="1" max="{{ max_days }}" value="{{ values.get('days', '1') }}" required>
+      {% with name = "days" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <button>Make a code</button>
+  </form>
+</section>
+
+<section>
+  <h2>Codes</h2>
+  <table>
+    <tr><th>Code</th><th>State</th><th>Used</th><th>Until</th></tr>
+    {% for code, state, registered in codes %}
+    <tr>
+      <td><a href="{{ request.url.path }}/codes/{{ code.id }}">{{ code.label or "Code " ~ code.id }}</a></td>
+      <td>{{ state }}</td>
+      <td>{{ code.uses }} of {{ code.max_uses }}</td>
+      <td>{{ code.expires_at | when(zone) }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4">None yet.</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endblock %}

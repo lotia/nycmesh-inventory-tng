@@ -290,6 +290,8 @@ class DeviceRefusedReply(BaseModel):
 
 
 PATH = "/devices"
+# The page a registration code's link and QR code open (bundle.PAGES).
+REGISTER_PATH = "/register"
 
 
 @router.post(

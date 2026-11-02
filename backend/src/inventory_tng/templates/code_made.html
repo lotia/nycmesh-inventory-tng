@@ -1,0 +1,12 @@
+{% extends "admin_base.html" %}
+{% block main %}
+<p><strong>Shown only now.</strong> It registers up to {{ code.max_uses }}
+device{{ "s" if code.max_uses != 1 else "" }}, until {{ code.expires_at | when(zone) }}.</p>
+<h2>Scan this with the phone's camera</h2>
+<div class="qr">{{ qr }}</div>
+<h2>Or type this phrase</h2>
+<p class="key">{{ phrase }}</p>
+<p class="hint">at <a href="{{ link }}">the registration page</a>, in the browser the
+volunteer will use for the scan page.</p>
+<p><a href="{{ request.url.path.rsplit('/', 1)[0] }}">All codes</a></p>
+{% endblock %}

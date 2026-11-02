@@ -1,5 +1,5 @@
-"""Registration codes and devices, from the command line, until administrator
-pages exist (inventory-tng-8i4.14):
+"""Registration codes and devices, from the command line: the operator's
+fallback, as administrators use the Devices page (admin/devices.py):
 
     uv run python -m inventory_tng.registration_codes create --uses 1 --days 1
     uv run python -m inventory_tng.registration_codes revoke CODE_ID
@@ -23,9 +23,6 @@ from inventory_tng import devices
 from inventory_tng.command import run_command
 from inventory_tng.db import CLI_ACTOR, set_actor
 from inventory_tng.local_time import show, site_zone
-
-# Where the QR code's link goes: the registration page (inventory-tng-8i4.13).
-REGISTER_PATH = "/register"
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -78,7 +75,7 @@ def run(session: Session, args: argparse.Namespace) -> int:
             print(f"Code {code.id}, until {show(code.expires_at, site_zone(session))}")
             print(f"Phrase: {phrase}")
             if args.base_url:
-                link = args.base_url.rstrip("/") + REGISTER_PATH
+                link = args.base_url.rstrip("/") + devices.REGISTER_PATH
                 link += "?" + urlencode({"code": phrase})
                 print(f"Link: {link}")
                 segno.make(link).terminal(compact=True)
