@@ -20,6 +20,8 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from inventory_tng import accounts, request_logging
 from inventory_tng.db import DbSession, record_last_seen, set_actor
@@ -36,6 +38,7 @@ SIGN_IN = "/admin/sign-in"
 SIGN_OUT = "/admin/sign-out"
 CONFIRM = "/admin/confirm"
 NEW_AUTHENTICATOR = "/admin/authenticators/new"
+ACCOUNT = "/admin/account"
 
 # What the templates link to and limit, from here, so neither drifts.
 # Jinja types its globals by its own defaults' types; any value will do.
@@ -47,6 +50,7 @@ cast(dict[str, Any], templates.env.globals).update(
         "sign_out": SIGN_OUT,
         "confirm": CONFIRM,
         "new_authenticator": NEW_AUTHENTICATOR,
+        "account": ACCOUNT,
     },
     limits={
         "password_min": accounts.PASSWORD_MIN,
@@ -154,11 +158,70 @@ def admin_signed_in(signed: AnySignedIn) -> SignedIn:
 AdminSignedIn = Annotated[SignedIn, Depends(admin_signed_in)]
 
 
-def confirmed(request: Request, signed: AnySignedIn) -> SignedIn:
-    """Only checks: viewing a page keeps nothing open."""
-    if not accounts.confirmation_open(signed.row, signed.settings, _now()):
+# The field a form carries its code in, when it comes back asking for one.
+CONFIRM_FIELD = "confirm_code"
+
+
+class ConfirmHere(Exception):
+    """A form sent once the window had closed: shown again as a code field,
+    carrying what was typed, so it goes on once the code is accepted."""
+
+    def __init__(
+        self,
+        signed: SignedIn,
+        carried: list[tuple[str, str]],
+        alert: str | None = None,
+        status_code: int = 403,
+    ) -> None:
+        super().__init__()
+        self.signed, self.carried = signed, carried
+        self.alert, self.status_code = alert, status_code
+
+
+async def confirmed(
+    request: Request, signed: AnySignedIn, session: DbSession
+) -> SignedIn:
+    """Within the window, goes on; viewing a page keeps nothing open. A page
+    asked for once it has closed sends the browser to confirm first. A form
+    sent once it has closed is asked for a code there and then (ConfirmHere),
+    and goes on when one comes with it."""
+    if accounts.confirmation_open(signed.row, signed.settings, _now()):
+        return signed
+    if request.method == "GET":
         raise Redirect(_then(CONFIRM, request))
-    return signed
+    form = await request.form()
+    carried = [
+        (name, value)
+        for name, value in form.multi_items()
+        if isinstance(value, str) and name != CONFIRM_FIELD
+    ]
+    typed = form.get(CONFIRM_FIELD)
+    if not isinstance(typed, str):
+        raise ConfirmHere(signed, carried)
+    outcome = await run_in_threadpool(_confirm_now, session, signed, typed)
+    if outcome == "confirmed":
+        return signed
+    raise ConfirmHere(
+        signed,
+        carried,
+        _refused(outcome, signed),
+        429 if outcome == "rate_limited" else 400,
+    )
+
+
+def _confirm_now(
+    session: Session, signed: SignedIn, typed: str
+) -> accounts.Confirmation:
+    outcome = accounts.confirm(session, signed.row, typed, _now())
+    if outcome == "confirmed":
+        session.commit()
+    return outcome
+
+
+def _refused(outcome: accounts.Confirmation, signed: SignedIn) -> str:
+    if outcome == "rate_limited":
+        return TOO_MANY
+    return "That didn't match." if signed.uses_totp else "That isn't your password."
 
 
 # Setting up TOTP comes before AdminSignedIn lets anyone in, so its pages
@@ -177,6 +240,26 @@ def install(app: FastAPI) -> None:
     @app.exception_handler(Redirect)
     def redirected(_request: Request, error: Redirect) -> Response:
         return redirect(error.location)
+
+    @app.exception_handler(ConfirmHere)
+    def confirm_here(request: Request, error: ConfirmHere) -> Response:
+        # Passwords are never written into a page: those are typed again.
+        kept = [(n, v) for n, v in error.carried if "password" not in n]
+        return page(
+            request,
+            "confirm.html",
+            {
+                "title": "Confirm it's you",
+                "uses_totp": error.signed.uses_totp,
+                "admin": error.signed.admin,
+                "alert": error.alert,
+                "action": request.url.path,
+                "carried": kept,
+                "retype_password": len(kept) < len(error.carried),
+                "field": CONFIRM_FIELD,
+            },
+            error.status_code,
+        )
 
 
 # The first administrator
@@ -465,14 +548,10 @@ def confirm(
     if outcome == "confirmed":
         session.commit()
         return redirect(_local(next))
-    if outcome == "rate_limited":
-        alert = TOO_MANY
-    elif signed.uses_totp:
-        alert = "That didn't match."
-    else:
-        alert = "That isn't your password."
     status_code = 429 if outcome == "rate_limited" else 400
-    return _confirm_page(request, signed, next, alert=alert, status_code=status_code)
+    return _confirm_page(
+        request, signed, next, alert=_refused(outcome, signed), status_code=status_code
+    )
 
 
 # Pages

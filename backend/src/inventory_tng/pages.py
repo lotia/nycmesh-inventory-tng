@@ -9,7 +9,12 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from inventory_tng.local_time import show
+
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
+# {{ moment | when(zone) }}: a stored UTC time as people read it
+# (docs/decisions/0013).
+templates.env.filters["when"] = show
 
 
 def page(
