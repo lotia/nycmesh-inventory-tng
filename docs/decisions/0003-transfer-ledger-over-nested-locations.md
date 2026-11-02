@@ -1,6 +1,6 @@
 # 0003 — A transfer ledger over nested locations
 
-**Status:** accepted · 2026-10-30
+**Status:** accepted · 2026-10-30 · amended 2026-11-03 (retired items)
 
 ## Context
 
@@ -30,6 +30,10 @@ while. So we need more than one location from the start.
   minimum. An item with a negative balance shows on reorder as "count first".
 - **The rules live in PostgreSQL**, as constraints and triggers, so every
   writer obeys them.
+- **Nothing is deleted: retiring is the soft delete**, and bringing back
+  undoes it. A retired item that still has stock is never received again,
+  but volunteers may take what is left, until it runs out (Ali,
+  2026-11-03).
 
 We rejected keeping one quantity per item, because it cannot say where stock
 is or how it got there.

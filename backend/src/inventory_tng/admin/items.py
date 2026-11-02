@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.common import ADMIN, name_problem, now, quantity, section
 from inventory_tng.db import DbSession, unique
+from inventory_tng.ledger import balance
 from inventory_tng.models import UNITS, Category, Item, ItemPackage, Movement
 from inventory_tng.pages import NOTICES, not_found, page, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
@@ -83,6 +84,14 @@ def _list_page(
     )
 
 
+def _in_stock(session: Session, item_id: int) -> Decimal:
+    """How much of it there is, everywhere together."""
+    total = session.scalar(
+        select(func.sum(balance.c.quantity)).where(balance.c.item_id == item_id)
+    )
+    return Decimal(total or 0)
+
+
 def _moved(session: Session, item_id: int) -> bool:
     return bool(session.scalar(select(exists().where(Movement.item_id == item_id))))
 
@@ -113,6 +122,7 @@ def _item_page(
             "categories": _categories(session),
             "units": UNITS,
             "unit_fixed": _moved(session, item.id),
+            "in_stock": _in_stock(session, item.id),
             "problems": problems or {},
             "values": values or {},
         },

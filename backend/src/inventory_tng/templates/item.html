@@ -1,7 +1,11 @@
 {% extends "admin_base.html" %}
 {% block main %}
 {% set here = request.url.path %}
-{% if item.retired_at %}<p>Retired: nobody can pick it.</p>{% endif %}
+{% if item.retired_at %}
+<p>Retired: it can't be received.{% if in_stock > 0 %} Volunteers can still
+take the {{ in_stock | amount }} {{ item.unit }} left, until it runs out.{% else %}
+None is left, so nobody can pick it.{% endif %}</p>
+{% endif %}
 <form method="post" action="{{ here }}">
   <label>Name
     <input name="name" value="{{ values.get('name', item.name) }}" maxlength="{{ name_max }}" required>

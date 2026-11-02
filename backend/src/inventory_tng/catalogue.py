@@ -10,11 +10,12 @@ from decimal import Decimal
 import structlog
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import DbSession
 from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
+from inventory_tng.ledger import balance
 from inventory_tng.models import (
     Category,
     Item,
@@ -66,6 +67,8 @@ class ItemEntry(BaseModel):
     part_number: str | None
     old_code: str | None
     packages: list[PackageEntry]
+    # Retired, but with stock left: it may be taken, never received.
+    retired: bool
 
 
 class LabelEntry(Entry):
@@ -110,10 +113,16 @@ def catalogue(session: Session) -> Catalogue:
         packages.setdefault(package.item_id, []).append(
             PackageEntry.model_validate(package)
         )
+    # A retired item stays while it has stock, so what is left can be taken.
+    in_stock = (
+        select(balance.c.item_id)
+        .group_by(balance.c.item_id)
+        .having(func.sum(balance.c.quantity) > 0)
+    )
     items = session.execute(
         select(Item, Category.name)
         .join(Category, Category.id == Item.category_id)
-        .where(Item.retired_at.is_(None))
+        .where(or_(Item.retired_at.is_(None), Item.id.in_(in_stock)))
         .order_by(Item.name)
     )
     labels = session.scalars(select(Label).where(Label.revoked_at.is_(None)))
@@ -128,6 +137,7 @@ def catalogue(session: Session) -> Catalogue:
             part_number=item.part_number,
             old_code=item.old_code,
             packages=packages.get(item.id, []),
+            retired=item.retired_at is not None,
         )
         for item, category in items
     ]

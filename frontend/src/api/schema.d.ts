@@ -167,6 +167,8 @@ export interface components {
       old_code: string | null;
       /** Packages */
       packages: components["schemas"]["PackageEntry"][];
+      /** Retired */
+      retired: boolean;
     };
     /** KeyReusedReply */
     KeyReusedReply: {

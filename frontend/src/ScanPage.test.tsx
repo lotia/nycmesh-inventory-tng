@@ -188,6 +188,20 @@ describe("filling and saving a cart", () => {
     expect(saves(sent)).toEqual([]);
   });
 
+  test("a retired item says it can only be taken", async () => {
+    const retired = {
+      ...CATALOGUE,
+      items: CATALOGUE.items.map((item) =>
+        item.id === 101 ? { ...item, retired: true } : item,
+      ),
+    };
+    const { api } = answering(() => json(retired, 200));
+    open(api);
+    await ready();
+    find("cable");
+    expect(screen.getByText(/retired: taking only/)).toBeDefined();
+  });
+
   test("an install asks for its number and has no To", async () => {
     open();
     await ready();

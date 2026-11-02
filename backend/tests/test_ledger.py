@@ -391,3 +391,27 @@ def test_the_server_clock_decides_when(session: Session, place: Place) -> None:
     )
     session.refresh(transaction)
     assert transaction.created_at > long_ago + timedelta(days=365)
+
+
+def test_a_retired_item_is_taken_never_received(
+    client: TestClient, session: Session, place: Place
+) -> None:
+    """What is left of it may go out; nothing more comes in."""
+    write(
+        session,
+        place,
+        kind="receipt",
+        from_location_id=None,
+        to_location_id=place.store.id,
+    )
+    place.item.retired_at = datetime.now(UTC)
+    session.flush()
+    receipt = place.batch(
+        kind="receipt", from_location_id=None, to_location_id=place.store.id
+    )
+    refused = client.post(URL, json=receipt)
+    assert refused.status_code == 422
+    assert [(p["loc"], p["type"]) for p in refused.json()["detail"]] == [
+        (["body", "lines", 0, "item_id"], "retired")
+    ]
+    assert client.post(URL, json=place.batch()).status_code == 201

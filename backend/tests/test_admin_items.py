@@ -211,3 +211,21 @@ def test_unknown_items_and_others_packages_are_not_found(
 )
 def test_quantities_typed(typed: str, positive: bool, parsed: object) -> None:
     assert quantity(typed, positive=positive) == parsed
+
+
+def test_a_retired_item_says_what_is_left(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios)
+    store = add(session, Location(name="Hub", kind="store"))
+    batch = add(
+        session,
+        LedgerTransaction(
+            idempotency_key=uuid.uuid4(), kind="receipt", to_location_id=store.id
+        ),
+    )
+    add(session, Movement(transaction_id=batch.id, item_id=item.id, quantity=3))
+    admin_client.post(f"{ITEMS}/{item.id}/retire")
+    page = text(admin_client.get(f"{ITEMS}/{item.id}"))
+    assert "can't be received" in page
+    assert "take the 3 each left, until it runs out" in page

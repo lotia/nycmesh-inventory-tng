@@ -10,6 +10,7 @@ export const radio: Item = {
   part_number: "LBE-5AC-Gen2",
   old_code: "LB5",
   packages: [{ id: 1000, name: "Box", size: "4.000" }],
+  retired: false,
 };
 
 export const cable: Item = {
@@ -21,6 +22,7 @@ export const cable: Item = {
   part_number: null,
   old_code: null,
   packages: [{ id: 1001, name: "Spool", size: "305.000" }],
+  retired: false,
 };
 
 export const CATALOGUE: Catalogue = {
