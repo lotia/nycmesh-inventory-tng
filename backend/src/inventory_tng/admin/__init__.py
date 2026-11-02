@@ -14,6 +14,7 @@ from inventory_tng.admin import (
     home,
     items,
     locations,
+    stock,
     volunteers,
 )
 
@@ -24,3 +25,4 @@ router.include_router(categories.router)
 router.include_router(locations.router)
 router.include_router(volunteers.router)
 router.include_router(devices.router)
+router.include_router(stock.router)
