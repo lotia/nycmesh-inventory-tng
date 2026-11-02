@@ -2,14 +2,43 @@
 {% block main %}
 <section>
   <h2>Scan page</h2>
-  <form method="post" action="{{ request.url.path }}/scan">
+  <form method="post" action="{{ here }}/scan">
     <label>Ask whose name it is after <span class="hint">minutes a phone sits unused; 0 never asks</span>
-      <input name="name_check_minutes" type="number" min="0" max="{{ name_check_max }}" value="{{ name_check_minutes }}" required>
+      <input name="name_check_minutes" type="number" min="0" max="{{ name_check_max }}" value="{{ values.name_check_minutes }}" required>
       {% with name = "name_check_minutes" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <button>Save</button>
   </form>
   <p class="hint">After that long, the page asks "Are you …?" before the next
   save, so a shared phone isn't used under someone else's name.</p>
+</section>
+<section>
+  <h2>Reasons for an adjustment</h2>
+  <p class="hint">Offered when stock is found or written off on the Counts page.</p>
+  <table>
+    {% for reason in reasons %}
+    {% set field = "reason_" ~ reason.id %}
+    <tr {% if reason.retired_at %}class="retired"{% endif %}>
+      <td>
+        <form method="post" action="{{ here }}/reasons/{{ reason.id }}" class="actions">
+          <input name="name" value="{{ reason.name }}" maxlength="{{ name_max }}" aria-label="Reason" required>
+          <button name="action" value="rename">Rename</button>
+          {% if reason.retired_at %}
+          <button name="action" value="restore">Bring back</button>
+          {% else %}
+          <button name="action" value="retire">Retire</button>
+          {% endif %}
+        </form>
+        {% with name = field %}{% include "_field_problem.html" %}{% endwith %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  <form method="post" action="{{ here }}/reasons" class="actions">
+    <label>New reason <input name="name" maxlength="{{ name_max }}" required>
+      {% with name = "reason" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <button>Add</button>
+  </form>
 </section>
 {% endblock %}

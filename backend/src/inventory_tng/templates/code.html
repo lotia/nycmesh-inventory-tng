@@ -1,10 +1,9 @@
 {% extends "admin_base.html" %}
 {% block main %}
-{% set devices_path = request.url.path.rsplit('/', 2)[0] %}
 <p>{{ state | capitalize }}: {{ code.uses }} of {{ code.max_uses }} used,
 until {{ code.expires_at | when(zone) }}.</p>
 {% if not code.revoked_at %}
-<form method="post" action="{{ request.url.path }}/revoke"><button>Revoke</button></form>
+<form method="post" action="{{ here }}/revoke"><button>Revoke</button></form>
 <p class="hint">Revoking stops new registrations. Devices it registered stay
 registered; revoke any that look wrong below.</p>
 {% endif %}
@@ -20,7 +19,7 @@ registered; revoke any that look wrong below.</p>
       <td>{{ device.last_seen_at | when(zone) }}</td>
       <td>{{ device.first_seen_from or "" }}</td>
       <td>{% if device.revoked_at %}revoked{% else %}
-        <form method="post" action="{{ devices_path }}/{{ device.id }}/revoke"><button>Revoke</button></form>
+        <form method="post" action="{{ list }}/{{ device.id }}/revoke"><button>Revoke</button></form>
       {% endif %}</td>
     </tr>
     {% else %}
@@ -28,5 +27,5 @@ registered; revoke any that look wrong below.</p>
     {% endfor %}
   </table>
 </section>
-<p><a href="{{ devices_path }}">All codes</a></p>
+<p><a href="{{ list }}">All codes</a></p>
 {% endblock %}

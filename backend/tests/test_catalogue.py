@@ -206,3 +206,32 @@ def test_a_retired_item_stays_while_it_has_stock(
     )
     items = by_id(registered_client.get(URL).json()["items"])
     assert place.item.id not in items
+
+
+def test_a_retired_item_counts_stock_where_there_is_some(
+    registered_client: TestClient, session: Session
+) -> None:
+    """Four at the store and four short at the van make nothing in all, but
+    four are on a shelf to take."""
+    from test_ledger import Place, write
+
+    place = Place(session)
+    write(
+        session,
+        place,
+        kind="receipt",
+        from_location_id=None,
+        to_location_id=place.store.id,
+        lines=[{"item_id": place.item.id, "quantity": "4"}],
+    )
+    write(
+        session,
+        place,
+        kind="install",
+        from_location_id=place.van.id,
+        to_location_id=None,
+        lines=[{"item_id": place.item.id, "quantity": "4"}],
+    )
+    place.item.retired_at = datetime.now(UTC)
+    session.flush()
+    assert place.item.id in by_id(registered_client.get(URL).json()["items"])

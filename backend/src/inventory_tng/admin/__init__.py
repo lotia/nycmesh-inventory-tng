@@ -1,15 +1,21 @@
 """Administrators' pages for the catalogue, places, volunteers and devices
 (inventory-tng-8i4.14): server-rendered forms, signed in (sign_in.py), each
-change recorded in the history as the administrator who made it.
+change recorded in the history as the administrator who made it, and logged
+by id.
 
 Every catalogue page follows one pattern: a list with a form to add, a page
-per row to rename it, retire it (nothing is deleted) and bring it back.
+per row to change it, retire it (nothing is deleted) and bring it back. A
+page passes its own paths to its templates, so a page shown again after a
+refused form still links where it should.
 """
+
+from typing import Any, cast
 
 from fastapi import APIRouter
 
 from inventory_tng.admin import (
     categories,
+    counts,
     devices,
     home,
     items,
@@ -18,13 +24,31 @@ from inventory_tng.admin import (
     stock,
     volunteers,
 )
+from inventory_tng.pages import templates
+
+# The sections, in the order the navigation shows them.
+SECTIONS = (
+    (items.ITEMS, "Items"),
+    (categories.CATEGORIES, "Categories"),
+    (locations.LOCATIONS, "Locations"),
+    (volunteers.VOLUNTEERS, "Volunteers"),
+    (stock.STOCK, "Stock"),
+    (counts.COUNTS, "Counts"),
+    (devices.DEVICES, "Devices"),
+    (settings.SETTINGS, "Settings"),
+)
+cast(dict[str, Any], templates.env.globals)["sections"] = SECTIONS
 
 router = APIRouter(include_in_schema=False)
-router.include_router(home.router)
-router.include_router(items.router)
-router.include_router(categories.router)
-router.include_router(locations.router)
-router.include_router(volunteers.router)
-router.include_router(devices.router)
-router.include_router(stock.router)
-router.include_router(settings.router)
+for module in (
+    home,
+    items,
+    categories,
+    locations,
+    volunteers,
+    stock,
+    counts,
+    devices,
+    settings,
+):
+    router.include_router(module.router)

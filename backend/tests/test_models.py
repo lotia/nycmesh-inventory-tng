@@ -5,6 +5,7 @@ from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from sqlalchemy import Engine, delete, exc, select, text, update
@@ -43,6 +44,12 @@ def add[T: Base](session: Session, row: T) -> T:
     session.add(row)
     session.flush()
     return row
+
+
+def named[T: Base](session: Session, model: type[T], name: str) -> T:
+    """The one row of `model` with this name."""
+    table: Any = model
+    return session.scalars(select(model).where(table.name == name)).one()
 
 
 def change(session: Session, row: Base, **values: object) -> None:

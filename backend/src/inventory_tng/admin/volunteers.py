@@ -5,38 +5,38 @@ ledger keeps its rows, which readers follow forward. The rules are the
 database's (migration 0002); this page says them in words."""
 
 from collections.abc import Mapping
-from decimal import Decimal
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.accounts import email_problem
-from inventory_tng.admin.common import ADMIN, name_problem, now, section
+from inventory_tng.admin.common import (
+    ADMIN,
+    admin_page,
+    chosen,
+    holds_stock,
+    name_problem,
+    now,
+    rule_words,
+)
 from inventory_tng.db import DbSession, attempt
-from inventory_tng.ledger import balance
 from inventory_tng.models import Location, Volunteer
-from inventory_tng.pages import NOTICES, not_found, page, redirect
+from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
+
+log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
-VOLUNTEERS = section(f"{ADMIN}/volunteers", "Volunteers")
-RULES = {
-    "unique": "Another current volunteer already has that name or email.",
-    "location_custody_volunteer": "Stop them holding stock first.",
-    "volunteer_merge_target": "Others are merged into them: merge those elsewhere "
-    "first, or pick a current volunteer to merge into.",
-}
+VOLUNTEERS = f"{ADMIN}/volunteers"
+TAKEN = "Another current volunteer already has that name or email."
 
 NOTICES.update(
     {
-        "volunteer_added": "Volunteer added.",
-        "volunteer_saved": "Saved.",
-        "volunteer_retired": "Retired. Bring them back from the list if you need to.",
-        "volunteer_restored": "Brought back.",
         "volunteer_merged": "Merged. Their past records now count as the other's.",
         "custody_on": "They can hold stock now.",
         "custody_off": "They no longer hold stock.",
@@ -54,17 +54,6 @@ def _custody(session: Session, volunteer_id: int) -> Location | None:
     )
 
 
-def _holding(session: Session, location_id: int) -> Decimal:
-    """Everything still at a location, all items together: zero when
-    empty."""
-    held = session.scalar(
-        select(func.coalesce(func.sum(func.abs(balance.c.quantity)), 0)).where(
-            balance.c.location_id == location_id
-        )
-    )
-    return Decimal(held or 0)
-
-
 def _list_page(
     request: Request,
     session: Session,
@@ -72,7 +61,6 @@ def _list_page(
     *,
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
-    status_code: int = 200,
 ) -> HTMLResponse:
     rows = session.scalars(select(Volunteer).order_by(func.lower(Volunteer.name))).all()
     holders = set(
@@ -82,21 +70,21 @@ def _list_page(
             )
         )
     )
-    names = {v.id: v.name for v in rows}
-    return page(
+    return admin_page(
         request,
+        signed,
         "volunteers.html",
         {
             "title": "Volunteers",
-            "admin": signed.admin,
+            "here": VOLUNTEERS,
             "current": [v for v in rows if v.retired_at is None],
             "retired": [v for v in rows if v.retired_at is not None],
             "holders": holders,
-            "names": names,
-            "problems": problems or {},
-            "values": values or {},
+            "names": {v.id: v.name for v in rows},
+            "problems": problems,
+            "values": values,
         },
-        status_code,
+        400 if problems else 200,
     )
 
 
@@ -108,7 +96,6 @@ def _volunteer_page(
     *,
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
-    status_code: int = 200,
 ) -> HTMLResponse:
     others = session.scalars(
         select(Volunteer)
@@ -120,20 +107,22 @@ def _volunteer_page(
         if volunteer.merged_into_id
         else None
     )
-    return page(
+    return admin_page(
         request,
+        signed,
         "volunteer.html",
         {
             "title": volunteer.name,
-            "admin": signed.admin,
+            "here": f"{VOLUNTEERS}/{volunteer.id}",
+            "list": VOLUNTEERS,
             "volunteer": volunteer,
             "custody": _custody(session, volunteer.id),
             "merged_into": merged_into,
             "others": others,
-            "problems": problems or {},
-            "values": values or {},
+            "problems": problems,
+            "values": values,
         },
-        status_code,
+        400 if problems else 200,
     )
 
 
@@ -143,21 +132,11 @@ def _refused(
     signed: SignedIn,
     volunteer: Volunteer,
     problem: str,
-    values: Mapping[str, str] | None = None,
 ) -> HTMLResponse:
+    """Their page again, saying why that was not done."""
     return _volunteer_page(
-        request,
-        session,
-        signed,
-        volunteer,
-        problems={"volunteer": problem},
-        values=values,
-        status_code=400,
+        request, session, signed, volunteer, problems={"volunteer": problem}
     )
-
-
-def _find(session: Session, volunteer_id: int) -> Volunteer | None:
-    return session.get(Volunteer, volunteer_id, with_for_update=True)
 
 
 def _checked(name: str, email: str) -> dict[str, str]:
@@ -186,14 +165,13 @@ def add_volunteer(
     problems = _checked(name, email)
     volunteer = Volunteer(name=name, email=email or None)
     if not problems and (broken := attempt(session, lambda: session.add(volunteer))):
-        problems["name"] = RULES.get(broken, broken)
+        problems["name"] = rule_words(broken, TAKEN)
     if problems:
         values = {"name": name, "email": email}
-        return _list_page(
-            request, session, signed, problems=problems, values=values, status_code=400
-        )
+        return _list_page(request, session, signed, problems=problems, values=values)
     session.commit()
-    return redirect(f"{VOLUNTEERS}/{volunteer.id}", notice="volunteer_added")
+    log.info("volunteer added", volunteer_id=volunteer.id)
+    return redirect(f"{VOLUNTEERS}/{volunteer.id}", notice="added")
 
 
 @router.get(f"{VOLUNTEERS}/{{volunteer_id}}")
@@ -215,7 +193,7 @@ def save_volunteer(
     name: Annotated[str, Form()] = "",
     email: Annotated[str, Form()] = "",
 ) -> Response:
-    found = _find(session, volunteer_id)
+    found = session.get(Volunteer, volunteer_id, with_for_update=True)
     if found is None:
         return not_found()
     name, email = name.strip(), email.strip()
@@ -229,34 +207,36 @@ def save_volunteer(
             custody.name = name
 
     if not problems and (broken := attempt(session, save)):
-        problems["name"] = RULES.get(broken, broken)
+        problems["name"] = rule_words(broken, TAKEN)
     if problems:
         values = {"name": name, "email": email}
         return _volunteer_page(
-            request,
-            session,
-            signed,
-            found,
-            problems=problems,
-            values=values,
-            status_code=400,
+            request, session, signed, found, problems=problems, values=values
         )
     session.commit()
-    return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="volunteer_saved")
+    log.info("volunteer saved", volunteer_id=volunteer_id)
+    return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="saved")
+
+
+def _current(session: Session, volunteer_id: int) -> Volunteer | None:
+    """A current volunteer, locked."""
+    found = session.get(Volunteer, volunteer_id, with_for_update=True)
+    return None if found is None or found.retired_at is not None else found
 
 
 @router.post(f"{VOLUNTEERS}/{{volunteer_id}}/custody")
 def hold_stock(
     request: Request, signed: AdminSignedIn, session: DbSession, volunteer_id: int
 ) -> Response:
-    found = _find(session, volunteer_id)
-    if found is None or found.retired_at is not None:
+    found = _current(session, volunteer_id)
+    if found is None:
         return not_found()
     if _custody(session, found.id) is None:
         custody = Location(name=found.name, kind="custody", volunteer_id=found.id)
         if broken := attempt(session, lambda: session.add(custody)):
-            return _refused(request, session, signed, found, RULES.get(broken, broken))
+            return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
+    log.info("custody started", volunteer_id=volunteer_id)
     return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="custody_on")
 
 
@@ -264,15 +244,16 @@ def hold_stock(
 def stop_holding_stock(
     request: Request, signed: AdminSignedIn, session: DbSession, volunteer_id: int
 ) -> Response:
-    found = _find(session, volunteer_id)
+    found = session.get(Volunteer, volunteer_id, with_for_update=True)
     custody = _custody(session, volunteer_id) if found else None
     if found is None or custody is None:
         return not_found()
-    if _holding(session, custody.id):
+    if holds_stock(session, custody.id):
         problem = "They still hold stock: move it back to a store first."
         return _refused(request, session, signed, found, problem)
     custody.retired_at = now()
     session.commit()
+    log.info("custody ended", volunteer_id=volunteer_id)
     return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="custody_off")
 
 
@@ -280,17 +261,18 @@ def stop_holding_stock(
 def retire_volunteer(
     request: Request, signed: AdminSignedIn, session: DbSession, volunteer_id: int
 ) -> Response:
-    found = _find(session, volunteer_id)
-    if found is None or found.retired_at is not None:
+    found = _current(session, volunteer_id)
+    if found is None:
         return not_found()
 
     def retire() -> None:
         found.retired_at = now()
 
     if broken := attempt(session, retire):
-        return _refused(request, session, signed, found, RULES.get(broken, broken))
+        return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
-    return redirect(VOLUNTEERS, notice="volunteer_retired")
+    log.info("volunteer retired", volunteer_id=volunteer_id)
+    return redirect(VOLUNTEERS, notice="retired")
 
 
 @router.post(f"{VOLUNTEERS}/{{volunteer_id}}/merge")
@@ -302,19 +284,20 @@ def merge_volunteer(
     into_id: Annotated[str, Form()] = "",
 ) -> Response:
     """This one is a duplicate of `into_id`: retired, pointing at it."""
-    found = _find(session, volunteer_id)
-    if found is None or found.retired_at is not None:
+    found = _current(session, volunteer_id)
+    if found is None:
         return not_found()
-    into = session.get(Volunteer, int(into_id)) if into_id.isdigit() else None
-    if into is None or into.id == found.id or into.retired_at is not None:
+    into = chosen(session, Volunteer, into_id)
+    if into is None or into.id == found.id:
         return _refused(request, session, signed, found, "Pick who they duplicate.")
 
     def merge() -> None:
         found.merged_into_id, found.retired_at = into.id, now()
 
     if broken := attempt(session, merge):
-        return _refused(request, session, signed, found, RULES.get(broken, broken))
+        return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
+    log.info("volunteer merged", volunteer_id=volunteer_id, merged_into_id=into.id)
     return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="volunteer_merged")
 
 
@@ -322,7 +305,7 @@ def merge_volunteer(
 def restore_volunteer(
     request: Request, signed: AdminSignedIn, session: DbSession, volunteer_id: int
 ) -> Response:
-    found = _find(session, volunteer_id)
+    found = session.get(Volunteer, volunteer_id, with_for_update=True)
     if found is None or found.retired_at is None:
         return not_found()
 
@@ -331,6 +314,7 @@ def restore_volunteer(
         found.retired_at, found.merged_into_id = None, None
 
     if broken := attempt(session, restore):
-        return _refused(request, session, signed, found, RULES.get(broken, broken))
+        return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
-    return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="volunteer_restored")
+    log.info("volunteer restored", volunteer_id=volunteer_id)
+    return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="restored")

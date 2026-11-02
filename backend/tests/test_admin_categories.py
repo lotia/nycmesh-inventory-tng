@@ -1,27 +1,18 @@
 """Categories, and the pattern every catalogue page follows (admin/)."""
 
-import html
 from collections.abc import Callable
 
 import pytest
 from fastapi.testclient import TestClient
-from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from test_models import add, history
+from test_models import add, history, named
+from test_sign_in import text
 
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.models import Admin, Category, Item
 
 pytestmark = pytest.mark.usefixtures("admin_client")
-
-
-def text(response: Response) -> str:
-    return html.unescape(response.text)
-
-
-def by_name(session: Session, name: str) -> Category:
-    return session.scalars(select(Category).where(Category.name == name)).one()
 
 
 def test_the_pages_need_signing_in(make_client: Callable[..., TestClient]) -> None:
@@ -37,13 +28,13 @@ def test_adding_a_category_is_recorded_as_the_admin(
     admin_client: TestClient, session: Session
 ) -> None:
     done = admin_client.post(CATEGORIES, data={"name": " Radios "})
-    assert done.headers["location"] == f"{CATEGORIES}?notice=category_added"
-    radios = by_name(session, "Radios")
+    assert done.headers["location"] == f"{CATEGORIES}?notice=added"
+    radios = named(session, Category, "Radios")
     (added,) = history(session, "category", radios.id)
     ada = session.scalars(select(Admin)).one()
     assert added.actor == f"admin:{ada.id}"
     page = text(admin_client.get(done.headers["location"]))
-    assert "Category added." in page
+    assert "Added." in page
     assert "Radios" in page
 
 
@@ -110,3 +101,17 @@ def test_retiring_and_bringing_back(admin_client: TestClient, session: Session) 
 def test_an_unknown_category_is_not_found(admin_client: TestClient) -> None:
     assert admin_client.get(f"{CATEGORIES}/999999").status_code == 404
     assert admin_client.post(f"{CATEGORIES}/999999/retire").status_code == 404
+
+
+def test_a_page_shown_again_after_a_refusal_still_links_right(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Shown at the refused form's own address, it must not build its links
+    from that address."""
+    radios = add(session, Category(name="Radios"))
+    add(session, Item(name="LiteBeam", category_id=radios.id))
+    refused = admin_client.post(f"{CATEGORIES}/{radios.id}/retire")
+    assert refused.status_code == 400
+    page = refused.text
+    assert f'action="{CATEGORIES}/{radios.id}/name"' in page
+    assert f'href="{CATEGORIES}">All categories' in page

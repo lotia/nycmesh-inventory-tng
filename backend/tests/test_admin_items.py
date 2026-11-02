@@ -1,15 +1,14 @@
 """Items and their packages (admin/items.py)."""
 
-import html
 import uuid
 from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from test_models import add, history
+from test_models import add, history, named
+from test_sign_in import text
 
 from inventory_tng.admin.common import quantity
 from inventory_tng.admin.items import ITEMS
@@ -23,10 +22,6 @@ from inventory_tng.models import (
 )
 
 
-def text(response: Response) -> str:
-    return html.unescape(response.text)
-
-
 @pytest.fixture
 def radios(session: Session) -> Category:
     return add(session, Category(name="Radios"))
@@ -34,10 +29,6 @@ def radios(session: Session) -> Category:
 
 def new_item(session: Session, category: Category, name: str = "LiteBeam") -> Item:
     return add(session, Item(name=name, category_id=category.id))
-
-
-def by_name(session: Session, name: str) -> Item:
-    return session.scalars(select(Item).where(Item.name == name)).one()
 
 
 def test_adding_an_item(
@@ -53,8 +44,8 @@ def test_adding_an_item(
             "part_number": "LBE-5AC",
         },
     )
-    item = by_name(session, "LiteBeam 5AC")
-    assert done.headers["location"] == f"{ITEMS}/{item.id}?notice=item_added"
+    item = named(session, Item, "LiteBeam 5AC")
+    assert done.headers["location"] == f"{ITEMS}/{item.id}?notice=added"
     assert (item.manufacturer, item.part_number) == ("Ubiquiti", "LBE-5AC")
     assert (history(session, "item", item.id)[0].actor or "").startswith("admin:")
     assert "LiteBeam 5AC" in text(admin_client.get(ITEMS))
@@ -125,7 +116,7 @@ def test_editing_every_field(
         "ordering_notes": "Buy by the reel",
     }
     done = admin_client.post(f"{ITEMS}/{item.id}", data=form)
-    assert done.headers["location"] == f"{ITEMS}/{item.id}?notice=item_saved"
+    assert done.headers["location"] == f"{ITEMS}/{item.id}?notice=saved"
     assert (item.name, item.category_id, item.unit) == ("Cat6 cable", cables.id, "m")
     assert (item.old_code, item.minimum, item.manufacturer) == (
         "NYCM-0042",
@@ -229,3 +220,31 @@ def test_a_retired_item_says_what_is_left(
     page = text(admin_client.get(f"{ITEMS}/{item.id}"))
     assert "can't be received" in page
     assert "take the 3 each left, until it runs out" in page
+
+
+def test_an_item_comes_back_only_into_a_current_category(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios)
+    admin_client.post(f"{ITEMS}/{item.id}/retire")
+    radios.retired_at = radios.created_at
+    session.flush()
+    refused = admin_client.post(f"{ITEMS}/{item.id}/restore")
+    assert refused.status_code == 400
+    assert "Its category is retired" in text(refused)
+    assert item.retired_at is not None
+
+
+def test_changes_are_logged_by_id(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    from structlog.testing import capture_logs
+
+    with capture_logs() as logs:
+        admin_client.post(
+            ITEMS,
+            data={"name": "Radio X", "category_id": str(radios.id), "unit": "each"},
+        )
+    (line,) = [line for line in logs if line["event"] == "item added"]
+    assert line["item_id"] == named(session, Item, "Radio X").id
+    assert "Radio X" not in str(line)

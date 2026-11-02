@@ -17,16 +17,16 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import devices
 from inventory_tng.accounts import qr_svg
-from inventory_tng.admin.common import ADMIN, now, section
+from inventory_tng.admin.common import ADMIN, admin_page, now
 from inventory_tng.db import DbSession
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import Device, RegistrationCode
-from inventory_tng.pages import NOTICES, not_found, page, redirect
+from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 
 router = APIRouter(include_in_schema=False)
 
-DEVICES = section(f"{ADMIN}/devices", "Devices")
+DEVICES = f"{ADMIN}/devices"
 CODES = f"{DEVICES}/codes"
 MAX_USES = 500
 MAX_DAYS = 90
@@ -59,7 +59,6 @@ def _list_page(
     *,
     problems: dict[str, str] | None = None,
     values: dict[str, str] | None = None,
-    status_code: int = 200,
 ) -> HTMLResponse:
     codes = session.scalars(
         select(RegistrationCode).order_by(RegistrationCode.created_at.desc())
@@ -72,22 +71,24 @@ def _list_page(
         ).all()
     )
     at = now()
-    return page(
+    return admin_page(
         request,
+        signed,
         "devices.html",
         {
             "title": "Devices",
-            "admin": signed.admin,
+            "here": DEVICES,
+            "codes_path": CODES,
             "codes": [
                 (code, state(code, at), counts.get(code.id, 0)) for code in codes
             ],
             "zone": site_zone(session),
             "max_uses": MAX_USES,
             "max_days": MAX_DAYS,
-            "problems": problems or {},
-            "values": values or {},
+            "problems": problems,
+            "values": values,
         },
-        status_code,
+        400 if problems else 200,
     )
 
 
@@ -118,9 +119,7 @@ def make_code(
     if lifetime is None:
         problems["days"] = f"From 1 to {MAX_DAYS} days."
     if max_uses is None or lifetime is None:
-        return _list_page(
-            request, session, signed, problems=problems, values=form, status_code=400
-        )
+        return _list_page(request, session, signed, problems=problems, values=form)
     code, phrase = devices.create_code(
         session,
         max_uses=max_uses,
@@ -133,12 +132,13 @@ def make_code(
     mail = request.app.state.settings.mail
     site = mail.site_url if mail else str(request.base_url).rstrip("/")
     link = f"{site}{devices.REGISTER_PATH}?{urlencode({'code': phrase})}"
-    return page(
+    return admin_page(
         request,
+        signed,
         "code_made.html",
         {
             "title": "A new registration code",
-            "admin": signed.admin,
+            "list": DEVICES,
             "code": code,
             "phrase": phrase,
             "link": link,
@@ -156,12 +156,14 @@ def code(
     registered = devices.devices_registered_with(session, code_id)
     if found is None or registered is None:
         return not_found()
-    return page(
+    return admin_page(
         request,
+        signed,
         "code.html",
         {
             "title": found.label or f"Code {found.id}",
-            "admin": signed.admin,
+            "here": f"{CODES}/{found.id}",
+            "list": DEVICES,
             "code": found,
             "state": state(found, now()),
             "devices": registered,

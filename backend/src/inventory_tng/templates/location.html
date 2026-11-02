@@ -1,6 +1,5 @@
 {% extends "admin_base.html" %}
 {% block main %}
-{% set here = request.url.path %}
 <p>{{ kind }}{% if location.retired_at %}, retired: nobody can pick it{% endif %}.</p>
 {% if location.kind == "custody" %}
 <p>A volunteer's custody: change it with the volunteer.</p>
@@ -25,7 +24,7 @@
 {% if areas %}
 <section>
   <h2>Areas inside</h2>
-  <ul>{% for area in areas %}<li><a href="{{ here.rsplit('/', 1)[0] }}/{{ area.id }}">{{ area.name }}</a></li>{% endfor %}</ul>
+  <ul>{% for area in areas %}<li><a href="{{ list }}/{{ area.id }}">{{ area.name }}</a></li>{% endfor %}</ul>
 </section>
 {% endif %}
 
@@ -37,6 +36,6 @@
   <form method="post" action="{{ here }}/retire"><button>Retire</button></form>
   {% endif %}
   {% endif %}
-  <a href="{{ here.rsplit('/', 1)[0] }}">All locations</a>
+  <a href="{{ list }}">All locations</a>
 </section>
 {% endblock %}

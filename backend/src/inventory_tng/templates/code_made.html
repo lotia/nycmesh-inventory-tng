@@ -8,5 +8,5 @@ device{{ "s" if code.max_uses != 1 else "" }}, until {{ code.expires_at | when(z
 <p class="key">{{ phrase }}</p>
 <p class="hint">at <a href="{{ link }}">the registration page</a>, in the browser the
 volunteer will use for the scan page.</p>
-<p><a href="{{ request.url.path.rsplit('/', 1)[0] }}">All codes</a></p>
+<p><a href="{{ list }}">All codes</a></p>
 {% endblock %}

@@ -1,0 +1,38 @@
+{% extends "admin_base.html" %}
+{% block main %}
+<p>Type what is really there. Leave a line as it is if it's right, or blank
+if you didn't count it. Anything else here, add below.</p>
+<form method="post" action="{{ here }}">
+  <input type="hidden" name="key" value="{{ key }}">
+  <input type="hidden" name="as_of" value="{{ as_of }}">
+  <table>
+    <tr><th>Item</th><th>Records say</th><th>Counted</th></tr>
+    {% for item, amount in rows %}
+    {% set field = "counted_" ~ item.id %}
+    <tr>
+      <td>{{ item.name }}</td>
+      <td>{{ amount | amount }} {{ item.unit }}{% if amount < 0 %} <strong>less than nothing</strong>{% endif %}</td>
+      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, amount | amount if amount > 0 else '0') }}" aria-label="{{ item.name }} counted">
+        {% with name = field %}{% include "_field_problem.html" %}{% endwith %}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="3">The records say nothing is here.</td></tr>
+    {% endfor %}
+  </table>
+  <fieldset>
+    <legend>Something else here</legend>
+    <label>Item
+      <select name="extra_item_id">
+        <option value="">Nothing else</option>
+        {% for item in others %}<option value="{{ item.id }}" {% if values.get('extra_item_id') == item.id | string %}selected{% endif %}>{{ item.name }} ({{ item.unit }})</option>{% endfor %}
+      </select>
+    </label>
+    <label>How much
+      <input name="extra_quantity" inputmode="decimal" value="{{ values.get('extra_quantity', '') }}">
+      {% with name = "extra_quantity" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+  </fieldset>
+  <button>Save the count</button>
+</form>
+<p><a href="{{ list }}">Back</a></p>
+{% endblock %}

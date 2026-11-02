@@ -10,12 +10,15 @@ Two choices that keep a volunteer's work from being lost:
 
 - Retired items, locations and volunteers are still accepted. A batch can
   wait in the outbox while an administrator retires or merges something, and
-  readers follow a merged volunteer forward.
+  readers follow a merged volunteer forward. The one exception: a retired
+  item is never received (docs/decisions/0003), so a receipt of one is
+  refused, and the outbox says so.
 - The server's clock decides when a batch happened, not the phone's: a batch
   resent from the outbox is recorded when it arrives.
 """
 
 import uuid
+from collections.abc import Mapping
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -24,7 +27,17 @@ from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from opentelemetry import metrics
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import Column, Integer, MetaData, Table, insert, select
+from sqlalchemy import (
+    Column,
+    Integer,
+    MetaData,
+    Select,
+    Table,
+    any_,
+    func,
+    insert,
+    select,
+)
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -53,6 +66,45 @@ balance = Table(
     Column("location_id", Integer),
     Column("quantity", QUANTITY),
 )
+
+
+def retired_in_stock() -> Select[tuple[int]]:
+    """The ids of retired items with some left at a current place: what
+    volunteers may still take, and administrators write off. The retired ids
+    go to the view as an array, which PostgreSQL pushes down to the movement
+    index, so only their balances are summed, however long the ledger."""
+    retired = func.array(
+        select(Item.id).where(Item.retired_at.is_not(None)).scalar_subquery()
+    )
+    return (
+        select(balance.c.item_id)
+        .join(Location, Location.id == balance.c.location_id)
+        .where(
+            Location.retired_at.is_(None),
+            balance.c.quantity > 0,
+            balance.c.item_id == any_(retired),
+        )
+        .distinct()
+    )
+
+
+def whole_enough(unit: str, amount: Decimal) -> bool:
+    """An item counted in each moves in whole units (migration 0004's
+    movement_whole_units, said where a person can fix it)."""
+    return unit != "each" or amount == amount.to_integral_value()
+
+
+def expected(session: Session, location_id: int) -> dict[int, Decimal]:
+    """What the records say is at a place, by item: only what is not zero."""
+    return {
+        item_id: amount
+        for item_id, amount in session.execute(
+            select(balance.c.item_id, balance.c.quantity).where(
+                balance.c.location_id == location_id, balance.c.quantity != 0
+            )
+        )
+    }
+
 
 # What a volunteer records. Counts and adjustments are an administrator's
 # (inventory-tng-8i4.14). Whether each kind has a from side and a to side; the
@@ -159,26 +211,47 @@ def record(
         refused.add(1, {"reason": "invalid"})
         log.info("batch refused", problems=sorted({kind for _, kind in problems}))
         raise BatchRefused(problems)
-    # A concurrent request with the same key waits here for that one to
-    # commit, then finds its row.
-    transaction = session.scalar(
-        pg_insert(LedgerTransaction)
-        .values(idempotency_key=batch.key, device_id=device_id, **_header(batch))
-        .on_conflict_do_nothing(index_elements=["idempotency_key"])
-        .returning(LedgerTransaction)
+    transaction = insert_transaction(
+        session,
+        batch.key,
+        {"device_id": device_id, **_header(batch)},
+        {line.item_id: line.quantity for line in batch.lines},
     )
     if transaction is None:
         written = _replay(session, batch)
         assert written is not None  # The conflict was on this key.
         return written, False
-    session.execute(
-        insert(Movement),
-        [
-            {"transaction_id": transaction.id, **line.model_dump()}
-            for line in batch.lines
-        ],
-    )
     return transaction, True
+
+
+def insert_transaction(
+    session: Session,
+    key: uuid.UUID,
+    header: Mapping[str, object],
+    lines: Mapping[int, Decimal],
+) -> LedgerTransaction | None:
+    """A transaction and its movements, unless its key is written already:
+    None then. A concurrent request with the same key waits here for that
+    one to commit, then writes nothing."""
+    transaction = session.scalar(
+        pg_insert(LedgerTransaction)
+        .values(idempotency_key=key, **header)
+        .on_conflict_do_nothing(index_elements=["idempotency_key"])
+        .returning(LedgerTransaction)
+    )
+    if transaction is not None and lines:
+        session.execute(
+            insert(Movement),
+            [
+                {
+                    "transaction_id": transaction.id,
+                    "item_id": item_id,
+                    "quantity": amount,
+                }
+                for item_id, amount in lines.items()
+            ],
+        )
+    return transaction
 
 
 def _problems(session: Session, batch: Batch) -> list[Problem]:
@@ -200,12 +273,87 @@ def _problems(session: Session, batch: Batch) -> list[Problem]:
         if item is None:
             problems.append((("lines", number, "item_id"), "not_found"))
             continue
-        if item.unit == "each" and line.quantity != line.quantity.to_integral_value():
+        if not whole_enough(item.unit, line.quantity):
             problems.append((("lines", number, "quantity"), "not_whole"))
         # Retired: what is left goes, nothing more comes in.
         if item.retired_at is not None and batch.kind == "receipt":
             problems.append((("lines", number, "item_id"), "retired"))
     return problems
+
+
+# Counts and adjustments: an administrator's, from admin/counts.py
+
+counted = meter.create_counter(
+    "inventory.counts.recorded",
+    unit="{transaction}",
+    description="Counts and adjustments written, by kind",
+)
+
+
+def _correct(
+    session: Session,
+    key: uuid.UUID,
+    kind: Literal["count", "adjustment"],
+    header: Mapping[str, object],
+    lines: Mapping[int, Decimal],
+) -> None:
+    transaction = insert_transaction(session, key, {"kind": kind, **header}, lines)
+    if transaction is None:
+        return
+    counted.add(1, {"kind": kind})
+    log.info(
+        f"{kind} recorded",
+        ledger_transaction_id=transaction.id,
+        admin_id=header["admin_id"],
+        lines=len(lines),
+    )
+
+
+def record_count(
+    session: Session,
+    key: uuid.UUID,
+    admin_id: int,
+    location_id: int,
+    counted_at: Mapping[int, Decimal],
+    was: Mapping[int, Decimal],
+) -> bool:
+    """Put the records right for what was counted at a place, given what
+    they said (`was`, from expected()): True if anything differed. Items not
+    counted are left as they are. Found more, or nothing differed, is a count
+    into the place under the key; found less, a count out of it under a key
+    made from it, so sending it twice writes it once."""
+    found: dict[int, Decimal] = {}
+    lost: dict[int, Decimal] = {}
+    for item_id, amount in counted_at.items():
+        difference = amount - was.get(item_id, Decimal(0))
+        if difference > 0:
+            found[item_id] = difference
+        elif difference < 0:
+            lost[item_id] = -difference
+    if found or not lost:
+        header = {"admin_id": admin_id, "to_location_id": location_id}
+        _correct(session, key, "count", header, found)
+    if lost:
+        header = {"admin_id": admin_id, "from_location_id": location_id}
+        _correct(session, uuid.uuid5(key, "lost"), "count", header, lost)
+    return bool(found or lost)
+
+
+def record_adjustment(
+    session: Session,
+    key: uuid.UUID,
+    admin_id: int,
+    location_id: int,
+    item_id: int,
+    amount: Decimal,
+    *,
+    found: bool,
+    reason_id: int,
+) -> None:
+    """Stock found at a place, or written off from it, for a reason."""
+    side = "to_location_id" if found else "from_location_id"
+    header = {"admin_id": admin_id, "reason_id": reason_id, side: location_id}
+    _correct(session, key, "adjustment", header, {item_id: amount})
 
 
 def _header(batch: Batch) -> dict[str, object]:

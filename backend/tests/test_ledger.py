@@ -57,6 +57,20 @@ class Place:
         } | fields
 
 
+def stocked(session: Session, quantity: str = "5") -> Place:
+    """A Place with `quantity` radios received into its store."""
+    place = Place(session)
+    write(
+        session,
+        place,
+        kind="receipt",
+        from_location_id=None,
+        to_location_id=place.store.id,
+        lines=[{"item_id": place.item.id, "quantity": quantity}],
+    )
+    return place
+
+
 @pytest.fixture
 def place(session: Session) -> Place:
     return Place(session)
@@ -304,10 +318,11 @@ def test_movements_are_never_added_to_a_recorded_transaction(
 
 
 def test_a_transaction_has_movements(session: Session, place: Place) -> None:
+    """All but a count, which may find what the records say (migration 0009)."""
     session.add(
         LedgerTransaction(
             idempotency_key=uuid.uuid4(),
-            kind="count",
+            kind="receipt",
             to_location_id=place.store.id,
         )
     )
@@ -323,7 +338,7 @@ def test_a_transaction_has_movements(session: Session, place: Place) -> None:
     [
         ({"kind": "move", "to_location_id": None}, "ck_ledger_transaction_sides"),
         ({"kind": "receipt"}, "ck_ledger_transaction_sides"),
-        ({"kind": "adjustment"}, "ck_ledger_transaction_sides"),
+        ({"kind": "install"}, "ck_ledger_transaction_sides"),
         ({"install_number": 12}, "ck_ledger_transaction_install_number_on_install"),
         (
             {"kind": "install", "to_location_id": None, "install_number": 0},
@@ -384,7 +399,7 @@ def test_the_server_clock_decides_when(session: Session, place: Place) -> None:
         session,
         LedgerTransaction(
             idempotency_key=uuid.uuid4(),
-            kind="count",
+            kind="receipt",
             to_location_id=place.store.id,
             created_at=long_ago,
         ),
@@ -415,3 +430,21 @@ def test_a_retired_item_is_taken_never_received(
         (["body", "lines", 0, "item_id"], "retired")
     ]
     assert client.post(URL, json=place.batch()).status_code == 201
+
+
+def test_the_database_never_receives_a_retired_item(
+    session: Session, place: Place
+) -> None:
+    """Whoever writes it: not only the batch endpoint."""
+    place.item.retired_at = datetime.now(UTC)
+    session.flush()
+    receipt = add(
+        session,
+        LedgerTransaction(
+            idempotency_key=uuid.uuid4(), kind="receipt", to_location_id=place.store.id
+        ),
+    )
+    with violates(session, "receipt_retired_item"):
+        session.add(
+            Movement(transaction_id=receipt.id, item_id=place.item.id, quantity=1)
+        )

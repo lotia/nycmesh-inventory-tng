@@ -1,6 +1,5 @@
 {% extends "admin_base.html" %}
 {% block main %}
-{% set here = request.url.path %}
 {% if item.retired_at %}
 <p>Retired: it can't be received.{% if in_stock > 0 %} Volunteers can still
 take the {{ in_stock | amount }} {{ item.unit }} left, until it runs out.{% else %}
@@ -78,6 +77,6 @@ None is left, so nobody can pick it.{% endif %}</p>
   {% else %}
   <form method="post" action="{{ here }}/retire"><button>Retire</button></form>
   {% endif %}
-  <a href="{{ here.rsplit('/', 1)[0] }}">All items</a>
+  <a href="{{ list }}">All items</a>
 </section>
 {% endblock %}

@@ -1,23 +1,12 @@
 """Locations: stores, areas and vehicles (admin/locations.py)."""
 
-import html
-
 from fastapi.testclient import TestClient
-from httpx2 import Response
-from sqlalchemy import select
 from sqlalchemy.orm import Session
-from test_models import add, history
+from test_models import add, history, named
+from test_sign_in import text
 
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.models import Location, Volunteer
-
-
-def text(response: Response) -> str:
-    return html.unescape(response.text)
-
-
-def by_name(session: Session, name: str) -> Location:
-    return session.scalars(select(Location).where(Location.name == name)).one()
 
 
 def place(
@@ -33,12 +22,12 @@ def test_adding_a_store_and_an_area_inside_it(
     admin_client: TestClient, session: Session
 ) -> None:
     admin_client.post(LOCATIONS, data={"name": "Hub", "kind": "store"})
-    hub = by_name(session, "Hub")
+    hub = named(session, Location, "Hub")
     assert (history(session, "location", hub.id)[0].actor or "").startswith("admin:")
     admin_client.post(
         LOCATIONS, data={"name": "Shelf A", "kind": "area", "parent_id": str(hub.id)}
     )
-    assert by_name(session, "Shelf A").parent_id == hub.id
+    assert named(session, Location, "Shelf A").parent_id == hub.id
     page = text(admin_client.get(LOCATIONS))
     assert page.index("Hub") < page.index("Shelf A")
 
@@ -107,12 +96,12 @@ def test_retiring_needs_its_areas_gone_first(
     shelf = place(session, "Shelf", "area", hub)
     refused = admin_client.post(f"{LOCATIONS}/{hub.id}/retire")
     assert refused.status_code == 400
-    assert "Retire or move the areas inside it first." in text(refused)
+    assert "places are still inside it" in text(refused)
     admin_client.post(f"{LOCATIONS}/{shelf.id}/retire")
     assert admin_client.post(f"{LOCATIONS}/{hub.id}/retire").status_code == 303
     # Bringing the area back first is refused: its store is retired.
     back = admin_client.post(f"{LOCATIONS}/{shelf.id}/restore")
-    assert "bring that back first" in text(back)
+    assert "Its place is retired" in text(back)
     admin_client.post(f"{LOCATIONS}/{hub.id}/restore")
     assert admin_client.post(f"{LOCATIONS}/{shelf.id}/restore").status_code == 303
     assert shelf.retired_at is None
@@ -132,3 +121,17 @@ def test_custody_is_shown_but_changed_with_the_volunteer(
     assert admin_client.post(path, data={"name": "Mine"}).status_code == 404
     assert admin_client.post(f"{path}/retire").status_code == 404
     assert "change it with the volunteer" in text(admin_client.get(path))
+
+
+def test_a_place_holding_stock_is_not_retired(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Once retired it could be neither counted nor adjusted."""
+    from test_ledger import Place, write
+
+    stock = Place(session)
+    write(session, stock)  # Three into the van.
+    refused = admin_client.post(f"{LOCATIONS}/{stock.van.id}/retire")
+    assert refused.status_code == 400
+    assert "Move what is here elsewhere, or count it, first." in text(refused)
+    assert stock.van.retired_at is None

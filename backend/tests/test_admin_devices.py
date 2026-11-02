@@ -1,6 +1,5 @@
 """Registration codes and devices from the browser (admin/devices.py)."""
 
-import html
 import re
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -10,14 +9,11 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from test_models import history
+from test_sign_in import text
 
 from inventory_tng import devices
 from inventory_tng.admin.devices import CODES, DEVICES
 from inventory_tng.models import AdminSession, RegistrationCode
-
-
-def text(response: Response) -> str:
-    return html.unescape(response.text)
 
 
 def make_code(client: TestClient, **form: str) -> tuple[Response, str]:

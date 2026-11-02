@@ -6,7 +6,7 @@ someone remote. Making one asks for a fresh code.</p>
 
 <section>
   <h2>Make a registration code</h2>
-  <form method="post" action="{{ request.url.path }}/codes">
+  <form method="post" action="{{ codes_path }}">
     <label>What it's for <span class="hint">optional, such as "Hub open day"</span>
       <input name="label" value="{{ values.get('label', '') }}" maxlength="{{ name_max }}">
     </label>
@@ -28,7 +28,7 @@ someone remote. Making one asks for a fresh code.</p>
     <tr><th>Code</th><th>State</th><th>Used</th><th>Until</th></tr>
     {% for code, state, registered in codes %}
     <tr>
-      <td><a href="{{ request.url.path }}/codes/{{ code.id }}">{{ code.label or "Code " ~ code.id }}</a></td>
+      <td><a href="{{ codes_path }}/{{ code.id }}">{{ code.label or "Code " ~ code.id }}</a></td>
       <td>{{ state }}</td>
       <td>{{ code.uses }} of {{ code.max_uses }}</td>
       <td>{{ code.expires_at | when(zone) }}</td>

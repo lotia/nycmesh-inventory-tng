@@ -2,7 +2,7 @@
 {% macro branch(places) %}
 <ul>
   {% for place in places %}
-  <li><a href="{{ request.url.path }}/{{ place.location.id }}">{{ place.location.name }}</a>
+  <li><a href="{{ here }}/{{ place.location.id }}">{{ place.location.name }}</a>
     <span class="hint">{{ kinds.get(place.location.kind, "") if place.location.kind != "area" else "" }}</span>
     {% if place.areas %}{{ branch(place.areas) }}{% endif %}
   </li>
@@ -16,7 +16,7 @@
 
 <section>
   <h2>Add a location</h2>
-  <form method="post" action="{{ request.url.path }}">
+  <form method="post" action="{{ here }}">
     <label>Name
       <input name="name" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required>
       {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
@@ -49,7 +49,7 @@
 {% if retired %}
 <section class="retired">
   <h2>Retired</h2>
-  <ul>{% for location in retired %}<li><a href="{{ request.url.path }}/{{ location.id }}">{{ location.name }}</a></li>{% endfor %}</ul>
+  <ul>{% for location in retired %}<li><a href="{{ here }}/{{ location.id }}">{{ location.name }}</a></li>{% endfor %}</ul>
 </section>
 {% endif %}
 {% endblock %}

@@ -12,17 +12,19 @@ from contextlib import nullcontext
 from datetime import timedelta
 from pathlib import Path
 
+import argon2.profiles
 import pytest
 import structlog
 from alembic import command
 from alembic.config import Config
+from argon2 import PasswordHasher
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Connection, Engine, exc, make_url, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from inventory_tng import devices
+from inventory_tng import accounts, devices
 from inventory_tng.app import create_app
 from inventory_tng.db import get_session, get_session_factory, make_engine
 from inventory_tng.local_env import local_env_values
@@ -60,6 +62,18 @@ def no_settings_from_the_shell() -> Iterator[None]:
         # finds no database at all rather than the developer's: a test that
         # needs one takes database_url, the run's own.
         monkeypatch.setenv("DATABASE_URL", NO_DATABASE)
+        yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cheap_password_hashing() -> Iterator[None]:
+    """argon2-cffi's cheapest parameters, so the tests that sign in do not
+    spend most of the suite hashing. Still the library, only its settings
+    (AGENTS.md rule 3)."""
+    cheap = PasswordHasher.from_parameters(argon2.profiles.CHEAPEST)
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(accounts, "_hasher", cheap)
+        monkeypatch.setattr(accounts, "_DUMMY_HASH", cheap.hash("not a password"))
         yield
 
 

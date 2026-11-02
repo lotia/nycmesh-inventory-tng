@@ -1,17 +1,11 @@
 """What is where (admin/stock.py)."""
 
-import html
-
 from fastapi.testclient import TestClient
-from httpx2 import Response
 from sqlalchemy.orm import Session
-from test_ledger import Place, write
+from test_ledger import Place, stocked, write
+from test_sign_in import text
 
 from inventory_tng.admin.stock import STOCK
-
-
-def text(response: Response) -> str:
-    return html.unescape(response.text)
 
 
 def test_nothing_yet(admin_client: TestClient) -> None:
@@ -19,15 +13,7 @@ def test_nothing_yet(admin_client: TestClient) -> None:
 
 
 def test_by_place_and_by_item(admin_client: TestClient, session: Session) -> None:
-    place = Place(session)
-    write(
-        session,
-        place,
-        kind="receipt",
-        from_location_id=None,
-        to_location_id=place.store.id,
-        lines=[{"item_id": place.item.id, "quantity": "5"}],
-    )
+    place = stocked(session)
     write(session, place)  # Three of them to the van.
     by_place = text(admin_client.get(STOCK))
     store_part = by_place[by_place.index(place.store.name) :]

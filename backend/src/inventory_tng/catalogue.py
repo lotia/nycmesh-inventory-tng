@@ -10,12 +10,12 @@ from decimal import Decimal
 import structlog
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import DbSession
 from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
-from inventory_tng.ledger import balance
+from inventory_tng.ledger import retired_in_stock
 from inventory_tng.models import (
     Category,
     Item,
@@ -114,15 +114,10 @@ def catalogue(session: Session) -> Catalogue:
             PackageEntry.model_validate(package)
         )
     # A retired item stays while it has stock, so what is left can be taken.
-    in_stock = (
-        select(balance.c.item_id)
-        .group_by(balance.c.item_id)
-        .having(func.sum(balance.c.quantity) > 0)
-    )
     items = session.execute(
         select(Item, Category.name)
         .join(Category, Category.id == Item.category_id)
-        .where(or_(Item.retired_at.is_(None), Item.id.in_(in_stock)))
+        .where(or_(Item.retired_at.is_(None), Item.id.in_(retired_in_stock())))
         .order_by(Item.name)
     )
     labels = session.scalars(select(Label).where(Label.revoked_at.is_(None)))
