@@ -3,7 +3,10 @@
  * `@ts-expect-error` must meet an error, or the check fails: so these prove
  * that the generated types reach TypeScript and refuse what the API would.
  */
+import type * as v from "valibot";
+import type { BatchBody } from "../outbox";
 import { makeApi, type Schemas } from "./client";
+import type * as replies_ from "./replies";
 
 const api = makeApi();
 
@@ -56,3 +59,30 @@ export async function saving(): Promise<void> {
     body: { key: "k", kind: "move", volunteer_id: 1 },
   });
 }
+
+/** True only when A and B are the same type, in both directions. */
+type Same<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+    ? true
+    : false;
+type Checked<S extends v.GenericSchema> = v.InferOutput<S>;
+
+// Each reply schema says exactly what the generated type says: a field
+// added, dropped or retyped on the server fails here until replies.ts
+// follows.
+export const replies: [
+  Same<Checked<typeof replies_.Registered>, Schemas["Registered"]>,
+  Same<Checked<typeof replies_.CodeRefusedReply>, Schemas["CodeRefusedReply"]>,
+  Same<Checked<typeof replies_.RateLimitedReply>, Schemas["RateLimitedReply"]>,
+  Same<
+    Checked<typeof replies_.DeviceRefusedReply>,
+    Schemas["DeviceRefusedReply"]
+  >,
+  Same<Checked<typeof replies_.KeyReusedReply>, Schemas["KeyReusedReply"]>,
+  Same<Checked<typeof replies_.Saved>, Schemas["Saved"]>,
+  Same<Checked<typeof replies_.Catalogue>, Schemas["Catalogue"]>,
+  // What the outbox keeps is exactly what the endpoint takes.
+  Same<Checked<typeof BatchBody>, Schemas["Batch"]>,
+] = [true, true, true, true, true, true, true, true];
+// @ts-expect-error a schema missing a field is caught
+export const caught: Same<{ id: number }, Schemas["VolunteerEntry"]> = true;

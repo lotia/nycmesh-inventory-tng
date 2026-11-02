@@ -32,18 +32,15 @@ describe("register", () => {
     expect(await register(api, "x")).toEqual({ kind: "unavailable" });
   });
 
-  test("a 503 from a proxy is too", async () => {
+  test.each([502, 503, 504])("a %i from a proxy is too", async (status) => {
     const { api } = answering(
-      () => new Response("<html>Service Unavailable</html>", { status: 503 }),
+      () => new Response("<html>Bad gateway</html>", { status }),
     );
     expect(await register(api, "x")).toEqual({ kind: "unavailable" });
   });
 
   test.each([
-    [
-      "a proxy's error page",
-      () => new Response("<html>502</html>", { status: 502 }),
-    ],
+    ["a server error", () => new Response("<html>500</html>", { status: 500 })],
     [
       "a reason this build does not know",
       () => json({ reason: "frozen" }, 400),
