@@ -14,6 +14,7 @@ import {
   indexOf,
   type Line,
   quantityOf,
+  RETIRED,
   SIDES,
   search,
   toBatch,
@@ -455,6 +456,7 @@ function CartLine({
   return (
     <li>
       <strong>{item.name}</strong>
+      {item.retired && <small> {RETIRED}</small>}
       {item.packages.map((pack) => (
         <label key={pack.id} class="amount">
           {pack.name} ({decimal(thousandths(pack.size) ?? 0)} {item.unit})
@@ -546,7 +548,12 @@ function Finder({
               {item.name}
             </button>{" "}
             <small>
-              {[item.category, item.manufacturer, item.part_number]
+              {[
+                item.retired ? RETIRED : null,
+                item.category,
+                item.manufacturer,
+                item.part_number,
+              ]
                 .filter(Boolean)
                 .join(" · ")}
             </small>

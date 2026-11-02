@@ -141,6 +141,7 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
         "manufacturer": "Ubiquiti",
         "part_number": rows.cable.part_number,
         "old_code": rows.cable.old_code,
+        "retired": False,
     }
 
     labels = {label["code"]: label for label in reply["labels"]}
@@ -173,3 +174,35 @@ def test_names_stay_out_of_the_logs(registered_client: TestClient, rows: Rows) -
     assert rows.volunteer.name not in repr(logs)
     (line,) = [line for line in logs if line["event"] == "catalogue sent"]
     assert line["volunteers"] >= 1
+
+
+def test_a_retired_item_stays_while_it_has_stock(
+    registered_client: TestClient, session: Session
+) -> None:
+    from test_ledger import Place, write
+
+    place = Place(session)
+    write(
+        session,
+        place,
+        kind="receipt",
+        from_location_id=None,
+        to_location_id=place.store.id,
+    )
+    for item in (place.item, place.cable):
+        item.retired_at = datetime.now(UTC)
+    session.flush()
+    items = by_id(registered_client.get(URL).json()["items"])
+    # The radio has stock left; the cable never had any.
+    assert items[place.item.id]["retired"] is True
+    assert place.cable.id not in items
+    # Once it is all taken, it is gone from the page.
+    write(
+        session,
+        place,
+        kind="install",
+        from_location_id=place.store.id,
+        to_location_id=None,
+    )
+    items = by_id(registered_client.get(URL).json()["items"])
+    assert place.item.id not in items

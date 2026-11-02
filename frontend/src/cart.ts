@@ -349,6 +349,9 @@ const KINDS: Record<Kind, string> = {
  * and in words for the outbox; or what still needs doing before it can be
  * saved.
  */
+/** What the page says beside a retired item. */
+export const RETIRED = "retired: taking only";
+
 export function toBatch(
   filled: Cart,
   catalogue: Catalogue,
@@ -386,6 +389,10 @@ export function toBatch(
       problems.push(
         "An item in the cart is no longer in the catalogue. Remove it.",
       );
+      continue;
+    }
+    if (item.retired && cart.kind === "receipt") {
+      problems.push(`${item.name}: ${RETIRED}, so it can't be received.`);
       continue;
     }
     const quantity = quantityOf(line, item);

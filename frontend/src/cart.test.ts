@@ -135,6 +135,24 @@ describe("turning a cart into a batch", () => {
     expect("draft" in install && install.draft.to_location_id).toBe(undefined);
   });
 
+  test("a retired item can be taken but not received", () => {
+    const retired = {
+      ...CATALOGUE,
+      items: CATALOGUE.items.map((item) =>
+        item.id === 100 ? { ...item, retired: true } : item,
+      ),
+    };
+    const lines = [{ itemId: 100, packages: {}, loose: "1" }];
+    expect(toBatch(cart({ kind: "receipt", lines }), retired)).toEqual({
+      problems: [
+        "LiteBeam 5AC: retired: taking only, so it can't be received.",
+      ],
+    });
+    expect(toBatch(cart({ lines }), retired)).toMatchObject({
+      what: "Move: 1 item from Hub to Van",
+    });
+  });
+
   test("lines with nothing in them are left out", () => {
     const lines = [
       { itemId: 100, packages: {}, loose: "1" },

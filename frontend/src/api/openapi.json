@@ -438,6 +438,10 @@
             },
             "type": "array",
             "title": "Packages"
+          },
+          "retired": {
+            "type": "boolean",
+            "title": "Retired"
           }
         },
         "type": "object",
@@ -449,7 +453,8 @@
           "manufacturer",
           "part_number",
           "old_code",
-          "packages"
+          "packages",
+          "retired"
         ],
         "title": "ItemEntry"
       },

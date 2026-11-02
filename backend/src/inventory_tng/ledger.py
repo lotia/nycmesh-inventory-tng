@@ -126,10 +126,11 @@ class Batch(BaseModel):
 
 
 # Where in the batch, as pydantic gives it ("lines", 2, "item_id"), and what.
-Problem = tuple[tuple[str | int, ...], Literal["not_found", "not_whole"]]
+Problem = tuple[tuple[str | int, ...], Literal["not_found", "not_whole", "retired"]]
 MESSAGES = {
     "not_found": "There is no such row",
     "not_whole": "This item is counted in whole units",
+    "retired": "This item is retired: what is left may be taken, never received",
 }
 
 
@@ -188,19 +189,22 @@ def _problems(session: Session, batch: Batch) -> list[Problem]:
         location_id = getattr(batch, field)
         if location_id is not None and session.get(Location, location_id) is None:
             problems.append(((field,), "not_found"))
-    units = dict(
-        session.execute(
-            select(Item.id, Item.unit).where(
-                Item.id.in_({line.item_id for line in batch.lines})
-            )
-        ).all()
-    )
+    items = {
+        item.id: item
+        for item in session.scalars(
+            select(Item).where(Item.id.in_({line.item_id for line in batch.lines}))
+        )
+    }
     for number, line in enumerate(batch.lines):
-        unit = units.get(line.item_id)
-        if unit is None:
+        item = items.get(line.item_id)
+        if item is None:
             problems.append((("lines", number, "item_id"), "not_found"))
-        elif unit == "each" and line.quantity != line.quantity.to_integral_value():
+            continue
+        if item.unit == "each" and line.quantity != line.quantity.to_integral_value():
             problems.append((("lines", number, "quantity"), "not_whole"))
+        # Retired: what is left goes, nothing more comes in.
+        if item.retired_at is not None and batch.kind == "receipt":
+            problems.append((("lines", number, "item_id"), "retired"))
     return problems
 
 
