@@ -1,0 +1,79 @@
+{% extends "admin_base.html" %}
+{% block main %}
+{% set here = request.url.path %}
+{% if item.retired_at %}<p>Retired: nobody can pick it.</p>{% endif %}
+<form method="post" action="{{ here }}">
+  <label>Name
+    <input name="name" value="{{ values.get('name', item.name) }}" maxlength="{{ name_max }}" required>
+    {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  <label>Category
+    <select name="category_id" required>
+      {% set chosen = values.get('category_id', item.category_id | string) %}
+      {% for category in categories %}
+      <option value="{{ category.id }}" {% if chosen == category.id | string %}selected{% endif %}>{{ category.name }}</option>
+      {% endfor %}
+    </select>
+    {% with name = "category_id" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  <label>Unit
+    {% if unit_fixed %}
+    <span class="hint">{{ item.unit }}: fixed, as stock has moved in it</span>
+    {% else %}
+    <select name="unit">
+      {% for unit in units %}<option {% if values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
+    </select>
+    {% endif %}
+  </label>
+  {% for name, label, hint in [
+    ("manufacturer", "Manufacturer", ""),
+    ("part_number", "Part number", ""),
+    ("old_code", "Old code", "the sheet's NYCM- code"),
+    ("minimum", "Reorder at", "total across stores, in " ~ item.unit ~ "; blank never reorders"),
+    ("notes", "Notes", ""),
+    ("ordering_notes", "Ordering notes", ""),
+  ] %}
+  <label>{{ label }}{% if hint %} <span class="hint">{{ hint }}</span>{% endif %}
+    {% set stored = item[name] | amount if name == "minimum" else item[name] %}
+    <input name="{{ name }}" value="{{ values.get(name, stored if stored is not none else '') }}">
+    {% include "_field_problem.html" %}
+  </label>
+  {% endfor %}
+  <button>Save</button>
+</form>
+
+<section>
+  <h2>Packages</h2>
+  <p class="hint">Sizes it comes in, so one scan or pick counts the whole package.</p>
+  <table>
+    {% for package in packages %}
+    <tr {% if package.retired_at %}class="retired"{% endif %}>
+      <td>{{ package.name }}</td><td>{{ package.size | amount }} {{ item.unit }}</td>
+      <td>{% if not package.retired_at %}
+        <form method="post" action="{{ here }}/packages/{{ package.id }}/retire"><button>Retire</button></form>
+      {% else %}retired{% endif %}</td>
+    </tr>
+    {% else %}
+    <tr><td>None.</td></tr>
+    {% endfor %}
+  </table>
+  <form method="post" action="{{ here }}/packages" class="actions">
+    <label>Package <input name="package_name" value="{{ values.get('package_name', '') }}" placeholder="Box" required>
+      {% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <label>Holds <input name="size" value="{{ values.get('size', '') }}" inputmode="decimal" required>
+      {% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <button>Add package</button>
+  </form>
+</section>
+
+<section class="actions">
+  {% if item.retired_at %}
+  <form method="post" action="{{ here }}/restore"><button>Bring back</button></form>
+  {% else %}
+  <form method="post" action="{{ here }}/retire"><button>Retire</button></form>
+  {% endif %}
+  <a href="{{ here.rsplit('/', 1)[0] }}">All items</a>
+</section>
+{% endblock %}

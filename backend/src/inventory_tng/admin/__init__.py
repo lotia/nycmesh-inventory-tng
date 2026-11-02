@@ -8,8 +8,9 @@ per row to rename it, retire it (nothing is deleted) and bring it back.
 
 from fastapi import APIRouter
 
-from inventory_tng.admin import categories, home
+from inventory_tng.admin import categories, home, items
 
 router = APIRouter(include_in_schema=False)
 router.include_router(home.router)
+router.include_router(items.router)
 router.include_router(categories.router)

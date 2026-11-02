@@ -1,0 +1,65 @@
+{% extends "admin_base.html" %}
+{% block main %}
+<form method="get" action="{{ request.url.path }}" class="actions">
+  <label>Find <input name="q" value="{{ search }}" type="search"></label>
+  <button>Find</button>
+  {% if search %}<a href="{{ request.url.path }}">All items</a>{% endif %}
+</form>
+
+<section>
+  <table>
+    <tr><th>Item</th><th>Category</th><th>Unit</th><th>Part</th></tr>
+    {% for item in current %}
+    <tr>
+      <td><a href="{{ request.url.path }}/{{ item.id }}">{{ item.name }}</a></td>
+      <td>{{ category_names.get(item.category_id, "") }}</td>
+      <td>{{ item.unit }}</td>
+      <td>{{ item.manufacturer or "" }} {{ item.part_number or "" }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4">{{ "Nothing matches." if search else "None yet." }}</td></tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section>
+  <h2>Add an item</h2>
+  {% if not categories %}
+  <p>Add a <a href="{{ categories_path }}">category</a> first: every item has one.</p>
+  {% endif %}
+  <form method="post" action="{{ request.url.path }}">
+    <label>Name
+      <input name="name" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required>
+      {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <label>Category
+      <select name="category_id" required>
+        <option value="">Pick one</option>
+        {% for category in categories %}
+        <option value="{{ category.id }}" {% if values.get('category_id') == category.id | string %}selected{% endif %}>{{ category.name }}</option>
+        {% endfor %}
+      </select>
+      {% with name = "category_id" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <label>Unit <span class="hint">what it is counted in</span>
+      <select name="unit">
+        {% for unit in units %}<option {% if values.get('unit', 'each') == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Manufacturer <span class="hint">optional</span>
+      <input name="manufacturer" value="{{ values.get('manufacturer', '') }}">
+    </label>
+    <label>Part number <span class="hint">optional</span>
+      <input name="part_number" value="{{ values.get('part_number', '') }}">
+    </label>
+    <button>Add</button>
+  </form>
+</section>
+
+{% if retired %}
+<section class="retired">
+  <h2>Retired</h2>
+  <ul>{% for item in retired %}<li><a href="{{ request.url.path }}/{{ item.id }}">{{ item.name }}</a></li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% endblock %}
