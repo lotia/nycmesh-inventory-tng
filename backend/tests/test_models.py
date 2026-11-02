@@ -50,6 +50,16 @@ def change(session: Session, row: Base, **values: object) -> None:
     session.execute(update(model).where(model.id == row.id).values(**values))  # ty: ignore[unresolved-attribute]
 
 
+def history(
+    session: Session, table: str, row_id: int | None = None
+) -> list[CatalogueHistory]:
+    """A table's history, or one row's, oldest first."""
+    query = select(CatalogueHistory).where(CatalogueHistory.table_name == table)
+    if row_id is not None:
+        query = query.where(CatalogueHistory.row_id == row_id)
+    return list(session.scalars(query.order_by(CatalogueHistory.id)))
+
+
 def merge(session: Session, duplicate: Volunteer, into: Volunteer) -> None:
     change(session, duplicate, merged_into_id=into.id, retired_at=NOW)
 
@@ -338,9 +348,10 @@ def test_every_table_records_history(engine: Engine) -> None:
         watched = {(table, trigger) for table, trigger in rows}
     assert watched == {
         (table, trigger)
-        # The ledger is append-only, so it is its own history.
+        # The ledger is append-only, so it is its own history; sessions
+        # change on every request.
         for table in set(Base.metadata.tables)
-        - {"catalogue_history", "ledger_transaction", "movement"}
+        - {"catalogue_history", "ledger_transaction", "movement", "admin_session"}
         for trigger in ("record_history", "record_history_update")
     }
 

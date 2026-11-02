@@ -1,11 +1,13 @@
 """The catalogue, locations, volunteers and labels (inventory-tng-8i4.10),
-registered devices (inventory-tng-8i4.42) and the ledger (inventory-tng-8i4.11).
+registered devices (inventory-tng-8i4.42), the ledger (inventory-tng-8i4.11)
+and administrators' sign-in (docs/decisions/0012).
 
 Every mapped class registers here; migrations/env.py imports this module, so
 autogenerate sees every table.
 
 Conventions, on every table but the ledger's, which is append-only and is its
-own history (LedgerTransaction):
+own history (LedgerTransaction), and administrators' sessions, which change
+on every request and are only ever ended (AdminSession):
 
 - An integer id and `created_at`, set by the database.
 - Nothing is deleted. A row is retired (`retired_at`; NULL means current) and
@@ -13,7 +15,8 @@ own history (LedgerTransaction):
 - Quantities are numeric(12,3); money is numeric(10,2).
 - Names are unique, ignoring case, among current rows.
 - Every insert, update and delete is written to `catalogue_history` by a
-  trigger, with the actor the request set (db.set_actor).
+  trigger, with the actor the request set (db.set_actor). Secret columns,
+  such as a password's hash, are left out of it (SECRET_COLUMNS).
 
 The rules a single row can show are check constraints; the rest are triggers,
 in the migration that creates these tables. Both raise check violations
@@ -51,6 +54,7 @@ QUANTITY = Numeric(12, 3)
 MONEY = Numeric(10, 2)
 
 UNITS = ("each", "m", "ft")
+TOTP_POLICIES = ("required", "optional")
 LOCATION_KINDS = ("store", "area", "vehicle", "custody")
 # What a transaction is. A count or an adjustment fixes the records, with
 # stock found (NULL to a location) or lost (a location to NULL).
@@ -471,3 +475,180 @@ class ScanSettings(Base):
     # Unused this many minutes, the page asks whether the name chosen is still
     # the person holding the phone. 0 never asks.
     name_check_minutes: Mapped[int] = mapped_column(server_default=text("15"))
+
+
+# Columns history leaves out, by table: what would let someone sign in, or
+# copy a second factor (docs/decisions/0012). Migration 0006 writes the same
+# lists into each table's history trigger.
+SECRET_COLUMNS = {
+    "admin_password": ("password_hash",),
+    "authenticator": ("totp_key",),
+    "recovery_code": ("code_hash",),
+    "reset_link": ("token_hash",),
+}
+
+
+class Admin(Base):
+    """Someone who signs in to change things (docs/decisions/0004, 0012).
+    Their password, authenticators and sessions are rows of their own, so
+    this row's history holds no secret."""
+
+    __tablename__ = "admin"
+    __table_args__ = (
+        # Never reused, even once retired, so a name always means one person.
+        Index("uq_admin_username", text("lower(username)"), unique=True),
+        Index(
+            "uq_admin_email",
+            text("lower(email)"),
+            unique=True,
+            postgresql_where=text("email IS NOT NULL"),
+        ),
+        CheckConstraint("username ~ '^[A-Za-z0-9._-]{1,64}$'", name="username"),
+        CheckConstraint(
+            "email ~ '^[^@[:space:]]+@[^@[:space:]]+$' AND length(email) <= 254",
+            name="email",
+        ),
+    )
+
+    id: Mapped[IntId]
+    created_at: Mapped[CreatedAt]
+    username: Mapped[str] = mapped_column(Text)
+    # Optional: only for password resets and notices.
+    email: Mapped[str | None] = mapped_column(Text)
+    retired_at: Mapped[RetiredAt]
+
+
+class AdminPassword(Base):
+    """An administrator's password, as argon2-cffi hashed it, keyed by their
+    id. No row means they were invited and have not chosen one yet."""
+
+    __tablename__ = "admin_password"
+
+    id: Mapped[int] = mapped_column(
+        ForeignKey("admin.id", ondelete="RESTRICT"), primary_key=True
+    )
+    created_at: Mapped[CreatedAt]
+    password_hash: Mapped[str] = mapped_column(Text)
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Authenticator(Base):
+    """One TOTP app an administrator signs in with. Its key is wiped when it
+    is removed. An administrator uses TOTP if they have a current one."""
+
+    __tablename__ = "authenticator"
+    __table_args__ = (
+        _unique_current_name("authenticator", "admin_id"),
+        CheckConstraint(
+            "(totp_key IS NULL) = (retired_at IS NOT NULL)", name="key_until_retired"
+        ),
+        CheckConstraint("length(name) BETWEEN 1 AND 64", name="name"),
+    )
+
+    id: Mapped[IntId]
+    created_at: Mapped[CreatedAt]
+    admin_id: Mapped[int] = _reference("admin.id")
+    # What the administrator calls it, such as "Pixel".
+    name: Mapped[str] = mapped_column(Text)
+    # pyotp's base32 key.
+    totp_key: Mapped[str | None] = mapped_column(Text)
+    # The last time step a code was accepted for: that one and earlier ones
+    # are refused, so a code cannot be used twice.
+    last_step: Mapped[int | None] = mapped_column(BigInteger)
+    retired_at: Mapped[RetiredAt]
+
+
+class RecoveryCode(Base):
+    """One of an administrator's one-use codes, for when their authenticator
+    is lost. Only its hash is kept."""
+
+    __tablename__ = "recovery_code"
+
+    id: Mapped[IntId]
+    created_at: Mapped[CreatedAt]
+    admin_id: Mapped[int] = _reference("admin.id")
+    code_hash: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Set on the codes still unused when new ones are made.
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AdminSession(Base):
+    """One signed-in browser, told apart by a cookie whose hash is kept, as a
+    device's is (docs/decisions/0009)."""
+
+    __tablename__ = "admin_session"
+
+    id: Mapped[IntId]
+    created_at: Mapped[CreatedAt]
+    admin_id: Mapped[int] = _reference("admin.id")
+    token_hash: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
+    # Set at sign-in from the session length then; used or not, it ends here.
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    # When a code (or the password, without TOTP) was last typed for a
+    # sensitive action, and when the last sensitive action was done.
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_sensitive_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The browser's User-Agent, to tell sessions apart on the account page.
+    user_agent: Mapped[str | None] = mapped_column(Text)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ResetLink(Base):
+    """A one-use link that resets an administrator's password, authenticators
+    or both. Made by another administrator, or emailed to the administrator
+    themselves (made_by_id NULL), which resets the password only."""
+
+    __tablename__ = "reset_link"
+    __table_args__ = (
+        CheckConstraint("resets_password OR resets_authenticators", name="resets"),
+        CheckConstraint(
+            "made_by_id IS NOT NULL OR NOT resets_authenticators",
+            name="emailed_resets_password_only",
+        ),
+        CheckConstraint("made_by_id <> admin_id", name="not_made_for_oneself"),
+    )
+
+    id: Mapped[IntId]
+    created_at: Mapped[CreatedAt]
+    admin_id: Mapped[int] = _reference("admin.id")
+    made_by_id: Mapped[int | None] = _reference("admin.id")
+    token_hash: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
+    resets_password: Mapped[bool]
+    resets_authenticators: Mapped[bool]
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Set when a newer link for the same administrator replaces it.
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SignInSettings(Base):
+    """How signing in works, which administrators set (docs/decisions/0012).
+    One row, id 1, made by its migration and never deleted. Changes are
+    history like everything else."""
+
+    __tablename__ = "sign_in_settings"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="one_row"),
+        CheckConstraint(_one_of("totp_policy", TOTP_POLICIES), name="totp_policy"),
+        # A session's cookie lasts as long, and browsers keep one 400 days.
+        CheckConstraint("session_days BETWEEN 1 AND 400", name="session_days"),
+        CheckConstraint("confirm_hours > 0", name="confirm_hours"),
+        CheckConstraint("confirm_idle_minutes > 0", name="confirm_idle_minutes"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, server_default=text("1"))
+    created_at: Mapped[CreatedAt]
+    # "required", or "optional": then each administrator chooses.
+    totp_policy: Mapped[str] = mapped_column(Text, server_default="required")
+    # How long a session lasts, used or not.
+    session_days: Mapped[int] = mapped_column(server_default=text("7"))
+    # A code typed for a sensitive action covers the next ones for this
+    # long, so long as each comes within confirm_idle_minutes of the last.
+    confirm_hours: Mapped[int] = mapped_column(server_default=text("24"))
+    confirm_idle_minutes: Mapped[int] = mapped_column(server_default=text("60"))
