@@ -38,6 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url="/api/schema",
         docs_url="/api/docs",
         redoc_url=None,
+        responses=db.UNAVAILABLE,
     )
     app.state.engine = engine
     app.state.settings = settings

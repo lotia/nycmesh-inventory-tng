@@ -1,0 +1,13 @@
+{
+  "name": "inventory-tng-openapi-generator",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "generate": "openapi-typescript ../../src/api/openapi.json --output ../../src/api/schema.d.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

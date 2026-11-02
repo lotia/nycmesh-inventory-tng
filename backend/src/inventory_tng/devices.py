@@ -53,7 +53,9 @@ LAST_SEEN_EVERY = timedelta(hours=1)
 # process: with 64-bit phrases that is still far more than enough.
 ATTEMPTS = RateLimitItemPerMinute(10)
 
-Rejection = Literal["unknown", "expired", "used_up", "revoked", "rate_limited"]
+# Why a code does not register: the phrase, or the address trying too often.
+BadCode = Literal["unknown", "expired", "used_up", "revoked"]
+Rejection = BadCode | Literal["rate_limited"]
 Refusal = Literal["unregistered", "revoked"]
 
 registered = meter.create_counter(
@@ -286,8 +288,16 @@ class Registered(BaseModel):
     device_id: int
 
 
-class Refused(BaseModel):
-    reason: str
+class CodeRefusedReply(BaseModel):
+    reason: BadCode
+
+
+class RateLimitedReply(BaseModel):
+    reason: Literal["rate_limited"]
+
+
+class DeviceRefusedReply(BaseModel):
+    reason: Refusal
 
 
 PATH = "/devices"
@@ -297,8 +307,11 @@ PATH = "/devices"
     PATH,
     status_code=201,
     responses={
-        400: {"model": Refused, "description": "The code is not one that registers"},
-        429: {"model": Refused, "description": "Too many attempts from here"},
+        400: {
+            "model": CodeRefusedReply,
+            "description": "The code is not one that registers",
+        },
+        429: {"model": RateLimitedReply, "description": "Too many attempts from here"},
     },
 )
 def register_device(
@@ -325,11 +338,15 @@ def install(app: FastAPI) -> None:
 
     @app.exception_handler(DeviceRefused)
     def device_refused(_request: Request, error: DeviceRefused) -> JSONResponse:
-        return JSONResponse({"reason": error.reason}, status_code=403)
+        body = DeviceRefusedReply(reason=error.reason)
+        return JSONResponse(body.model_dump(), status_code=403)
 
     @app.exception_handler(RegistrationRejected)
     def registration_rejected(
         _request: Request, error: RegistrationRejected
     ) -> JSONResponse:
-        status = 429 if error.reason == "rate_limited" else 400
-        return JSONResponse({"reason": error.reason}, status_code=status)
+        if error.reason == "rate_limited":
+            body = RateLimitedReply(reason=error.reason).model_dump()
+            return JSONResponse(body, status_code=429)
+        body = CodeRefusedReply(reason=error.reason).model_dump()
+        return JSONResponse(body, status_code=400)

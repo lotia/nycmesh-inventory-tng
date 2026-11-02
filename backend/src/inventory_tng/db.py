@@ -2,11 +2,12 @@
 
 import re
 from collections.abc import Iterator
-from typing import Annotated
+from typing import Annotated, Any, Literal
 
 import structlog
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from sqlalchemy import Engine, MetaData, create_engine, exc, func, select
 from sqlalchemy.orm import DeclarativeBase, Session
 
@@ -97,6 +98,19 @@ RETRYABLE_SQLSTATES = (
 )
 
 
+class UnavailableReply(BaseModel):
+    reason: Literal["database_unavailable"]
+
+
+# Declared for every route, since any of them can meet it (app.py).
+UNAVAILABLE: dict[int | str, dict[str, Any]] = {
+    503: {
+        "model": UnavailableReply,
+        "description": "The database cannot answer; try again",
+    }
+}
+
+
 def install(app: FastAPI) -> None:
     """A database the app cannot reach, or that cannot answer just now, is a
     503 on any route, so a client such as the scan page's outbox knows to try
@@ -110,4 +124,5 @@ def install(app: FastAPI) -> None:
         if sqlstate and not sqlstate.startswith(RETRYABLE_SQLSTATES):
             raise error
         log.warning("database unavailable", **describe_error(error))
-        return JSONResponse({"reason": "database_unavailable"}, status_code=503)
+        body = UnavailableReply(reason="database_unavailable")
+        return JSONResponse(body.model_dump(), status_code=503)

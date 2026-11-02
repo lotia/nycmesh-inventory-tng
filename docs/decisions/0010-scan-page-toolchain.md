@@ -50,7 +50,13 @@ to one origin in one browser.
 - **Well-maintained libraries over code of our own:**
   - Preact with signals for the UI: React's model at a fraction of the size.
   - openapi-typescript and openapi-fetch, generated from FastAPI's schema,
-    so a change to the API that breaks the page fails the type check.
+    so a change to the API that breaks the page fails the type check. The
+    schema and the generated types are committed, and checked in CI.
+    openapi-typescript 7.13 needs TypeScript 5's compiler API, which
+    TypeScript 7 does not have (openapi-typescript issue #2841), so it runs
+    from `frontend/tools/openapi/` with its own TypeScript 5.9.3. The pages
+    type-check with TypeScript 7. Fold the generator back into `frontend/`
+    once a release supports TypeScript 7.
   - Valibot to check what comes out of storage and off the network.
   - The barcode-detector ponyfill over zxing-wasm, served from this origin
     and loaded only when the camera opens: many browsers have no native
@@ -63,6 +69,10 @@ to one origin in one browser.
   phrases are
   hashed on the server. Any cryptography the page needs later comes from a
   library or the browser's Web Crypto API, never code of our own.
+
+For the generator we also rejected orval, which works with TypeScript 7
+but commits a copy of its fetch code into every endpoint's function, and
+whose status types claim a reply can only have a status the schema lists.
 
 We rejected React (about ten times Preact's size, for one page), MUI and
 Emotion (heavy, and not shared with the Jinja pages, which use one plain
