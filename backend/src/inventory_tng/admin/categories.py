@@ -117,7 +117,6 @@ def add_category(
     ):
         problem = TAKEN
     if problem is not None:
-        session.rollback()
         return _list_page(
             request,
             session,
@@ -160,7 +159,6 @@ def rename_category(
     if problem is None and not unique(session, rename):
         problem = TAKEN
     if problem is not None:
-        session.rollback()
         return _category_page(
             request, session, signed, found, problem=problem, status_code=400
         )
@@ -176,7 +174,6 @@ def retire_category(
     if found is None or found.retired_at is not None:
         return not_found()
     if _items(session).get(found.id):
-        session.rollback()
         problem = "Move or retire its items first."
         return _category_page(
             request, session, signed, found, problem=problem, status_code=400
@@ -198,7 +195,6 @@ def restore_category(
         found.retired_at = None
 
     if not unique(session, restore):
-        session.rollback()
         problem = (
             f"A current category is already called {found.name}: rename one first."
         )
