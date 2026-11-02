@@ -1,0 +1,42 @@
+{% extends "admin_base.html" %}
+{% block main %}
+{% set here = request.url.path %}
+<p>{{ kind }}{% if location.retired_at %}, retired: nobody can pick it{% endif %}.</p>
+{% if location.kind == "custody" %}
+<p>A volunteer's custody: change it with the volunteer.</p>
+{% else %}
+<form method="post" action="{{ here }}">
+  <label>Name
+    <input name="name" value="{{ values.get('name', location.name) }}" maxlength="{{ name_max }}" required>
+    {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  {% if location.kind == "area" %}
+  <label>Inside
+    <select name="parent_id" required>
+      {% set chosen = values.get('parent_id', location.parent_id | string) %}
+      {% for parent in parents %}<option value="{{ parent.id }}" {% if chosen == parent.id | string %}selected{% endif %}>{{ parent.name }}</option>{% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  <button>Save</button>
+</form>
+{% endif %}
+
+{% if areas %}
+<section>
+  <h2>Areas inside</h2>
+  <ul>{% for area in areas %}<li><a href="{{ here.rsplit('/', 1)[0] }}/{{ area.id }}">{{ area.name }}</a></li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+<section class="actions">
+  {% if location.kind != "custody" %}
+  {% if location.retired_at %}
+  <form method="post" action="{{ here }}/restore"><button>Bring back</button></form>
+  {% else %}
+  <form method="post" action="{{ here }}/retire"><button>Retire</button></form>
+  {% endif %}
+  {% endif %}
+  <a href="{{ here.rsplit('/', 1)[0] }}">All locations</a>
+</section>
+{% endblock %}

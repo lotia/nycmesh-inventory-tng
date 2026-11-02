@@ -152,22 +152,38 @@ def record_last_seen(
         )
 
 
-def unique(session: Session, change: Callable[[], object]) -> bool:
-    """Run `change` in a savepoint; False if it broke a unique index, as
-    PostgreSQL compares names (ignoring case, among current rows), with
-    nothing of it kept. Any other failure is raised."""
+def attempt(session: Session, change: Callable[[], object]) -> str | None:
+    """Run `change` in a savepoint, with nothing of it kept if it breaks a
+    rule. Returns None if it held, "unique" if it broke a unique index (as
+    PostgreSQL compares names, ignoring case among current rows), or the
+    name of the check constraint or trigger rule it broke, so a page can say
+    why in its own words. Any other failure is raised."""
     try:
         with session.begin_nested():
             change()
             session.flush()
     except exc.IntegrityError as error:
-        if getattr(error.orig, "sqlstate", None) != UNIQUE_VIOLATION:
-            raise
-        return False
-    return True
+        sqlstate = getattr(error.orig, "sqlstate", None)
+        if sqlstate == UNIQUE_VIOLATION:
+            return "unique"
+        constraint = describe_error(error).get("constraint")
+        if sqlstate == CHECK_VIOLATION and constraint:
+            return constraint
+        raise
+    return None
+
+
+def unique(session: Session, change: Callable[[], object]) -> bool:
+    """attempt(), for a change only a unique index can refuse: False if it
+    did."""
+    broken = attempt(session, change)
+    if broken not in {None, "unique"}:
+        raise ValueError(f"refused by {broken}, not a unique index")
+    return broken is None
 
 
 UNIQUE_VIOLATION = "23505"
+CHECK_VIOLATION = "23514"
 
 
 def describe_error(error: exc.SQLAlchemyError) -> dict[str, str]:
