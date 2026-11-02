@@ -127,19 +127,15 @@ nobody is shown it.
 
 ## Registering devices
 
-Every phone or computer that records anything must be registered. Until
-there are administrator pages, make a registration code on the server:
+Every phone or computer that records anything must be registered.
+Administrators make registration codes, and revoke codes and devices, on the
+Devices page. Links in its QR codes start with `SITE_URL` when mail is set
+up; otherwise with the address the administrator reached the site at, so
+behind a proxy set `FORWARDED_ALLOW_IPS`, or the link may say http.
 
-```sh
-cd backend
-uv run python -m inventory_tng.registration_codes create --uses 5 --days 1 \
-    --base-url https://<your host>
-```
-
-It prints a phrase, a link and a QR code, once. The link and the QR code
-open the registration page with the phrase filled in; the phrase can also be
-typed there, at `/register`. `revoke`, `devices` and `revoke-device` manage
-codes and devices; `--help` lists them.
+If no administrator can, the operator can make one on the server:
+`uv run python -m inventory_tng.registration_codes create --uses 5 --days 1
+--base-url https://<your host>` (`--help` lists the rest).
 
 ## Scan page settings
 

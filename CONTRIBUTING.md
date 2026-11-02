@@ -117,23 +117,16 @@ first, which has its own TypeScript 5 (docs/decisions/0010).
 
 ### Registering a device
 
-Pages that record anything need a registered device (docs/decisions/0009).
-Until administrator pages exist, make a code from the command line:
-
-```sh
-uv run python -m inventory_tng.registration_codes create --uses 1 --days 1
-```
-
-It prints a phrase, once. Enter it at <http://127.0.0.1:8000/register>.
-With `--base-url http://<your-laptop>:8000` it also prints a link and a QR
-code that open that page with the phrase filled in. With
-`APP_ENV=development` the cookie works over plain http.
-`revoke`, `devices` and `revoke-device` do the rest; `--help` lists them.
-
 Administrator pages need someone signed in. To make the first administrator,
 set `SETUP_TOKEN` in `.env` to any 32 characters or more, restart, and open
-<http://127.0.0.1:8000/setup>. With `APP_ENV=development` the sign-in cookie
-works over plain http too.
+<http://127.0.0.1:8000/setup>. With `APP_ENV=development` the cookies work
+over plain http.
+
+Pages that record anything need a registered device (docs/decisions/0009).
+Make a registration code on the Devices page, signed in, and enter its
+phrase at <http://127.0.0.1:8000/register>, or scan its QR code with a phone.
+`uv run python -m inventory_tng.registration_codes` does the same from the
+command line.
 
 ### Mail
 
