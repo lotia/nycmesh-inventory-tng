@@ -34,7 +34,7 @@ from inventory_tng.models import (
     RecoveryCode,
     ResetLink,
     SignInSettings,
-    mint_label_code,
+    mint_code,
 )
 from inventory_tng.rate_limits import limiter
 
@@ -51,6 +51,16 @@ EMAIL = re.compile(r"[^@\s]+@[^@\s]+")
 EMAIL_MAX = 254
 AUTHENTICATOR_NAME_MAX = 64
 RECOVERY_CODES = 10
+# From LABEL_ALPHABET's 30 hard-to-misread characters: about 98 bits, so,
+# like a session cookie, a stolen database's SHA-256 of one cannot be
+# guessed back (docs/decisions/0012).
+RECOVERY_CODE_LENGTH = 20
+RECOVERY_CODE_GROUP = 5
+# What a code field takes, and the most a code typed may be: a recovery code
+# shown with its separators, and a few stray spaces. TOTP-only fields take a
+# six-digit code, also with room for spaces.
+CODE_FIELD_MAX = RECOVERY_CODE_LENGTH + RECOVERY_CODE_LENGTH // RECOVERY_CODE_GROUP + 4
+TOTP_FIELD_MAX = 8
 TOTP_CODE = re.compile(r"\d{6}")
 TOTP_INTERVAL = pyotp.TOTP(pyotp.random_base32()).interval
 # What authenticator apps show beside the account.
@@ -149,9 +159,14 @@ def qr_svg(link: str) -> Markup:
     return Markup(segno.make(link, error="m").svg_inline(scale=5, border=2))
 
 
+def grouped(text: str, size: int, separator: str) -> str:
+    """ "ABCD EFGH ...": easier to read out and type than one long run."""
+    return separator.join(text[i : i + size] for i in range(0, len(text), size))
+
+
 def key_for_typing(key: str) -> str:
-    """ "ABCD EFGH ...", for apps that cannot scan."""
-    return " ".join(key[i : i + 4] for i in range(0, len(key), 4))
+    """For apps that cannot scan."""
+    return grouped(key, 4, " ")
 
 
 def _totp_code(typed: str) -> str | None:
@@ -258,22 +273,22 @@ def add_authenticator(
 
 
 def _recovery_digest(typed: str) -> bytes:
-    """ "abcde-fghjk" and "ABCDEFGHJK" are one code."""
+    """ "abcde-fghjk-..." and "ABCDEFGHJK..." are one code."""
     return digest(re.sub(r"[^A-Z0-9]", "", typed.upper()))
 
 
 def make_recovery_codes(session: Session, admin_id: int, now: datetime) -> list[str]:
     """New codes, which void any still unused: the only time they are
-    known. Label codes' alphabet, which is hard to misread."""
+    known."""
     _void_recovery_codes(session, admin_id, now)
-    codes = [mint_label_code() for _ in range(RECOVERY_CODES)]
+    codes = [mint_code(RECOVERY_CODE_LENGTH) for _ in range(RECOVERY_CODES)]
     session.add_all(
         RecoveryCode(admin_id=admin_id, code_hash=_recovery_digest(code))
         for code in codes
     )
     session.flush()
     log.info("recovery codes made", admin_id=admin_id)
-    return [f"{code[:5]}-{code[5:]}" for code in codes]
+    return [grouped(code, RECOVERY_CODE_GROUP, "-") for code in codes]
 
 
 def check_second_factor(
@@ -294,7 +309,7 @@ def check_second_factor(
         if step is not None:
             authenticator.last_step = step
             return "totp"
-    if _totp_code(typed) is not None:
+    if _totp_code(typed) is not None or len(typed) > CODE_FIELD_MAX:
         return None
     recovery = session.scalar(
         select(RecoveryCode)

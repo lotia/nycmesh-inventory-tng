@@ -3,6 +3,7 @@ form, sessions, a new authenticator and confirming sensitive actions."""
 
 import html
 import itertools
+import math
 import re
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
@@ -23,6 +24,7 @@ from inventory_tng import accounts, sign_in
 from inventory_tng.cross_site import cross_site
 from inventory_tng.masking import Masker
 from inventory_tng.models import (
+    LABEL_ALPHABET,
     Admin,
     AdminPassword,
     AdminSession,
@@ -32,6 +34,10 @@ from inventory_tng.models import (
 )
 
 TOKEN = "t" * 40
+# A recovery code as the page shows it, in groups.
+_GROUP = f"[A-Z0-9]{{{accounts.RECOVERY_CODE_GROUP}}}"
+_MORE = accounts.RECOVERY_CODE_LENGTH // accounts.RECOVERY_CODE_GROUP - 1
+RECOVERY_CODE = rf"<li>({_GROUP}(?:-{_GROUP}){{{_MORE}}})</li>"
 PASSWORD = "correct horse battery staple"
 NOW = datetime(2026, 11, 2, 12, tzinfo=UTC)
 
@@ -119,7 +125,7 @@ def test_setup_makes_the_first_admin_signed_in_with_recovery_codes(
     key = hidden_key(client.get(sign_in.SETUP))
     response = client.post(sign_in.SETUP, data=setup_form(key))
     assert response.status_code == 200
-    codes = re.findall(r"<li>([A-Z0-9]{5}-[A-Z0-9]{5})</li>", response.text)
+    codes = re.findall(RECOVERY_CODE, response.text)
     assert len(codes) == accounts.RECOVERY_CODES
     assert response.headers["cache-control"] == "no-store"
     admin = session.scalars(select(Admin)).one()
@@ -312,6 +318,17 @@ def test_a_recovery_code_signs_in_once(client: TestClient, session: Session) -> 
     client.cookies.clear()
     assert sign_in_with(client, code=codes[0]).status_code == 400
     assert sign_in_with(client, code=codes[1]).status_code == 303
+
+
+def test_recovery_codes_are_long_and_easy_to_read(session: Session) -> None:
+    """About 98 bits each, so their SHA-256 in a stolen database cannot be
+    guessed back, from the label alphabet, which has no 0/O or 1/I/L."""
+    admin, _ = new_admin(session)
+    codes = accounts.make_recovery_codes(session, admin.id, NOW)
+    assert len(set(codes)) == accounts.RECOVERY_CODES
+    assert math.log2(len(LABEL_ALPHABET)) * accounts.RECOVERY_CODE_LENGTH > 96
+    for shown in codes:
+        assert len(shown.replace("-", "")) == accounts.RECOVERY_CODE_LENGTH
 
 
 def test_new_recovery_codes_void_the_old(session: Session) -> None:

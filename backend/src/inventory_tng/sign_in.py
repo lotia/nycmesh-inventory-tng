@@ -62,6 +62,8 @@ cast(dict[str, Any], templates.env.globals).update(
         "password_min": accounts.PASSWORD_MIN,
         "username_max": accounts.USERNAME_MAX,
         "authenticator_name_max": accounts.AUTHENTICATOR_NAME_MAX,
+        "code_max": accounts.CODE_FIELD_MAX,
+        "totp_code_max": accounts.TOTP_FIELD_MAX,
     },
 )
 

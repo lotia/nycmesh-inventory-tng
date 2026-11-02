@@ -66,10 +66,15 @@ LABEL_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ"
 LABEL_LENGTH = 10
 
 
+def mint_code(length: int) -> str:
+    """A code `length` long in LABEL_ALPHABET, which is hard to misread, from
+    the secrets module, so codes cannot be guessed from one another. Labels
+    use it, and administrators' recovery codes (accounts.py)."""
+    return "".join(secrets.choice(LABEL_ALPHABET) for _ in range(length))
+
+
 def mint_label_code() -> str:
-    """A new label code, from the secrets module, so codes cannot be guessed
-    from one another."""
-    return "".join(secrets.choice(LABEL_ALPHABET) for _ in range(LABEL_LENGTH))
+    return mint_code(LABEL_LENGTH)
 
 
 IntId = Annotated[int, mapped_column(Identity(always=True), primary_key=True)]

@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from test_sign_in import (
     PASSWORD,
+    RECOVERY_CODE,
     code,
     new_admin,
     other_session,
@@ -208,7 +209,7 @@ def test_new_recovery_codes(
     ada: tuple[Admin, str],
 ) -> None:
     made = client.post(f"{ACCOUNT}/recovery-codes")
-    codes = re.findall(r"<li>([A-Z0-9]{5}-[A-Z0-9]{5})</li>", made.text)
+    codes = re.findall(RECOVERY_CODE, made.text)
     assert len(codes) == accounts.RECOVERY_CODES
     assert made.headers["cache-control"] == "no-store"
     assert accounts.recovery_codes_left(session, ada[0].id) == accounts.RECOVERY_CODES
