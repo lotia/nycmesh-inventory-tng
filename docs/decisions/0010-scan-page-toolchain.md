@@ -65,10 +65,13 @@ to one origin in one browser.
     browser.
   - Search starts as plain substring matching; Fuse.js if that falls short.
 - **No cryptography of our own in the page** (AGENTS.md rule 3). The
-  idempotency key comes from `crypto.randomUUID()`; the cookie is `HttpOnly`;
-  phrases are
-  hashed on the server. Any cryptography the page needs later comes from a
-  library or the browser's Web Crypto API, never code of our own.
+  idempotency key comes from the `uuid` library, which uses
+  `crypto.randomUUID()` where the page is secure and
+  `crypto.getRandomValues()` where it is not, such as a phone on plain http
+  in development; `randomUUID` alone would leave Save broken there. The
+  cookie is `HttpOnly`; phrases are hashed on the server. Any cryptography
+  the page needs later comes from a library or the browser's Web Crypto
+  API, never code of our own.
 
 For the generator we also rejected orval, which works with TypeScript 7
 but commits a copy of its fetch code into every endpoint's function, and

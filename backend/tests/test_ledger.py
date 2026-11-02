@@ -12,10 +12,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, delete, exc, insert, select, text, update
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
-from test_devices import new_device
 from test_models import add, violates
 
-from inventory_tng import devices
 from inventory_tng.db import describe_error, set_actor
 from inventory_tng.ledger import Batch, balance, record
 from inventory_tng.models import (
@@ -65,11 +63,9 @@ def place(session: Session) -> Place:
 
 
 @pytest.fixture
-def client(client: TestClient, session: Session) -> TestClient:
-    """The app's client, as a registered device."""
-    _, token = new_device(session)
-    client.cookies.set(devices.COOKIE, token)
-    return client
+def client(registered_client: TestClient) -> TestClient:
+    """Every request here is from a registered device."""
+    return registered_client
 
 
 def write(session: Session, place: Place, **fields: object) -> LedgerTransaction:

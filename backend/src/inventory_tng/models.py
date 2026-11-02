@@ -452,3 +452,22 @@ class Movement(Base):
     transaction_id: Mapped[int] = _reference("ledger_transaction.id")
     item_id: Mapped[int] = _reference("item.id")
     quantity: Mapped[Decimal] = mapped_column(QUANTITY)
+
+
+class ScanSettings(Base):
+    """How the scan page behaves, which administrators set. One row, id 1,
+    made by its migration; changed with `python -m inventory_tng.scan_settings`
+    until the administrator pages (inventory-tng-8i4.14). Changes are history
+    like everything else."""
+
+    __tablename__ = "scan_settings"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="one_row"),
+        CheckConstraint("name_check_minutes >= 0", name="name_check_minutes"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, server_default=text("1"))
+    created_at: Mapped[CreatedAt]
+    # Unused this many minutes, the page asks whether the name chosen is still
+    # the person holding the phone. 0 never asks.
+    name_check_minutes: Mapped[int] = mapped_column(server_default=text("15"))

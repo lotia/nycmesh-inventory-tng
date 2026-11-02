@@ -97,8 +97,9 @@ its scripts come from Vite. The port is required. Each server says where its
 pages' scripts come from in its `frontend` log line at startup:
 `source=build` or `source=dev_server`.
 
-The camera and Save work only over HTTPS or on `localhost`, so a phone on
-your network cannot use them yet; inventory-tng-8i4.13.2 is for that.
+The scan page needs a registered device, and some catalogue rows to choose
+from. The camera will work only over HTTPS or on `localhost`, so a phone on
+your network cannot use it; inventory-tng-8i4.13.2 is for that.
 
 The pages call the API through types generated from its schema. After you
 change an endpoint, regenerate both, and commit `frontend/src/api/`:

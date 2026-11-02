@@ -97,3 +97,18 @@ It prints a phrase, a link and a QR code, once. The link and the QR code
 open the registration page with the phrase filled in; the phrase can also be
 typed there, at `/register`. `revoke`, `devices` and `revoke-device` manage
 codes and devices; `--help` lists them.
+
+## Scan page settings
+
+Administrators set how the scan page behaves; the settings live in the
+database. Until there are administrator pages, change them on the server:
+
+```sh
+cd backend
+uv run python -m inventory_tng.scan_settings show
+uv run python -m inventory_tng.scan_settings set --name-check-minutes 20
+```
+
+`--name-check-minutes` is how long a phone goes unused before the page asks
+whether the name chosen is still the person holding it; 0 never asks
+(docs/decisions/0011).

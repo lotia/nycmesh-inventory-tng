@@ -7,12 +7,11 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
-from test_devices import new_device
 from test_models import add
 
-from inventory_tng import devices
 from inventory_tng.models import (
     Category,
     Item,
@@ -77,18 +76,22 @@ class Rows:
         )
         self.shelf_label = add(session, Label(location_id=self.shelf.id))
         self.revoked = add(session, Label(item_id=self.cable.id, revoked_at=NOW))
+        reel = session.scalars(
+            select(ItemPackage).where(
+                ItemPackage.item_id == self.cable.id, ItemPackage.name == "Reel"
+            )
+        ).one()
+        # Labels left on what has since been retired.
+        self.on_retired = [
+            add(session, Label(item_id=self.cable.id, package_id=reel.id)),
+            add(session, Label(item_id=self.retired_item.id)),
+            add(session, Label(location_id=self.closed.id)),
+        ]
 
 
 @pytest.fixture
 def rows(session: Session) -> Rows:
     return Rows(session)
-
-
-@pytest.fixture
-def registered(client: TestClient, session: Session) -> TestClient:
-    _, token = new_device(session)
-    client.cookies.set(devices.COOKIE, token)
-    return client
 
 
 def by_id(entries: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
@@ -100,8 +103,8 @@ def test_an_unregistered_device_is_refused(client: TestClient) -> None:
     assert (response.status_code, response.json()) == (403, {"reason": "unregistered"})
 
 
-def test_holds_whats_current(registered: TestClient, rows: Rows) -> None:
-    reply = registered.get(URL).json()
+def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
+    reply = registered_client.get(URL).json()
     volunteers = by_id(reply["volunteers"])
     assert volunteers[rows.volunteer.id] == {
         "id": rows.volunteer.id,
@@ -149,18 +152,24 @@ def test_holds_whats_current(registered: TestClient, rows: Rows) -> None:
     }
     assert labels[rows.shelf_label.code]["location_id"] == rows.shelf.id
     assert rows.revoked.code not in labels
+    for label in rows.on_retired:
+        assert label.code not in labels
 
 
-def test_lists_come_in_name_order(registered: TestClient, rows: Rows) -> None:
-    reply = registered.get(URL).json()
+def test_holds_the_scan_settings(registered_client: TestClient) -> None:
+    assert registered_client.get(URL).json()["settings"] == {"name_check_minutes": 15}
+
+
+def test_lists_come_in_name_order(registered_client: TestClient, rows: Rows) -> None:
+    reply = registered_client.get(URL).json()
     for name in ("volunteers", "locations", "items"):
         names = [entry["name"] for entry in reply[name]]
         assert names == sorted(names), name
 
 
-def test_names_stay_out_of_the_logs(registered: TestClient, rows: Rows) -> None:
+def test_names_stay_out_of_the_logs(registered_client: TestClient, rows: Rows) -> None:
     with capture_logs() as logs:
-        registered.get(URL)
+        registered_client.get(URL)
     assert rows.volunteer.name not in repr(logs)
     (line,) = [line for line in logs if line["event"] == "catalogue sent"]
     assert line["volunteers"] >= 1

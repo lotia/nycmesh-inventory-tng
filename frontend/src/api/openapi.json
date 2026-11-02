@@ -297,6 +297,9 @@
       },
       "Catalogue": {
         "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/Settings"
+          },
           "volunteers": {
             "items": {
               "$ref": "#/components/schemas/VolunteerEntry"
@@ -327,7 +330,7 @@
           }
         },
         "type": "object",
-        "required": ["volunteers", "locations", "items", "labels"],
+        "required": ["settings", "volunteers", "locations", "items", "labels"],
         "title": "Catalogue"
       },
       "CodeRefusedReply": {
@@ -625,6 +628,18 @@
         "type": "object",
         "required": ["transaction_id"],
         "title": "Saved"
+      },
+      "Settings": {
+        "properties": {
+          "name_check_minutes": {
+            "type": "integer",
+            "title": "Name Check Minutes"
+          }
+        },
+        "type": "object",
+        "required": ["name_check_minutes"],
+        "title": "Settings",
+        "description": "How the page behaves, as administrators set it (models.ScanSettings)."
       },
       "UnavailableReply": {
         "properties": {
