@@ -28,16 +28,16 @@ import structlog
 from fastapi import APIRouter, Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from limits import RateLimitItemPerMinute
-from limits.storage import MemoryStorage
-from limits.strategies import MovingWindowRateLimiter
 from opentelemetry import metrics
 from pydantic import BaseModel
-from sqlalchemy import Engine, select, update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from inventory_tng import request_logging
-from inventory_tng.db import DbSession
+from inventory_tng.db import DbSession, record_last_seen
 from inventory_tng.models import Device, RegistrationCode
+from inventory_tng.rate_limits import limiter
+from inventory_tng.web import client_address, set_private_cookie
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -73,8 +73,6 @@ refused = meter.create_counter(
     unit="{request}",
     description="Requests refused for want of a registered device, by reason",
 )
-
-_limiter = MovingWindowRateLimiter(MemoryStorage())
 
 
 @functools.cache
@@ -134,12 +132,12 @@ def register(session: Session, phrase: str, address: str | None) -> tuple[Device
     attempts count towards the limit, so a room of phones behind one address
     can all register with a good code."""
     bucket = address or "unknown"
-    if not _limiter.test(ATTEMPTS, "register", bucket):
+    if not limiter.test(ATTEMPTS, "register", bucket):
         _reject("rate_limited", None)
     try:
         code = _usable_code(session, phrase)
     except RegistrationRejected:
-        _limiter.hit(ATTEMPTS, "register", bucket)
+        limiter.hit(ATTEMPTS, "register", bucket)
         raise
     code.uses += 1
     token = secrets.token_urlsafe(16)
@@ -263,17 +261,8 @@ def current_device(request: Request, session: DbSession) -> Device:
     request_logging.bind(device_id=device.id)
     now = datetime.now(UTC)
     if device.last_seen_at <= now - LAST_SEEN_EVERY:
-        _seen(request.app.state.engine, device.id, now)
+        record_last_seen(request.app.state.engine, Device, device.id, now)
     return device
-
-
-def _seen(engine: Engine, device_id: int, now: datetime) -> None:
-    """In a transaction of its own, so a request that saves nothing still
-    counts, and the route's own transaction is left alone."""
-    with Session(engine) as session, session.begin():
-        session.execute(
-            update(Device).where(Device.id == device_id).values(last_seen_at=now)
-        )
 
 
 RegisteredDevice = Annotated[Device, Depends(current_device)]
@@ -318,17 +307,9 @@ def register_device(
     registration: Registration, request: Request, response: Response, session: DbSession
 ) -> Registered:
     """Register this browser with a code, and give it its cookie."""
-    address = request.client.host if request.client else None
-    device, token = register(session, registration.code, address)
+    device, token = register(session, registration.code, client_address(request))
     session.commit()
-    response.set_cookie(
-        COOKIE,
-        token,
-        max_age=COOKIE_MAX_AGE,
-        httponly=True,
-        secure=not request.app.state.settings.development,
-        samesite="lax",
-    )
+    set_private_cookie(request, response, COOKIE, token, max_age=COOKIE_MAX_AGE)
     return Registered(device_id=device.id)
 
 

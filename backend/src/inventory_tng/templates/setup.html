@@ -1,0 +1,37 @@
+{% extends "admin_base.html" %}
+{% block main %}
+{% if off %}
+<p>Setup is off. Whoever runs the server turns it on by setting
+<code>SETUP_TOKEN</code> in the deployment's settings, then gives you that
+token.</p>
+{% else %}
+<p>There are no administrators yet. Make the first one: you. Later ones are
+invited from the administrator pages.</p>
+<form method="post" action="{{ paths.setup }}">
+  <label>Setup token <span class="hint">from whoever runs the server</span>
+    <input name="token" value="{{ values.get('token', '') }}" autocomplete="off" required>
+    {% with name = "token" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  <label>Username
+    <input name="username" value="{{ values.get('username', '') }}" autocomplete="username" maxlength="{{ limits.username_max }}" required>
+    {% with name = "username" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  <label>Email <span class="hint">optional: lets you reset your own password</span>
+    <input name="email" type="email" value="{{ values.get('email', '') }}" autocomplete="email">
+    {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  <label>Password <span class="hint">at least {{ limits.password_min }} characters</span>
+    <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required>
+    {% with name = "password" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  <label>Password again
+    <input name="password_again" type="password" autocomplete="new-password" required>
+  </label>
+  <fieldset>
+    <legend>Authenticator{% if totp_optional %} (optional){% endif %}</legend>
+    {% include "_totp_fields.html" %}
+  </fieldset>
+  <button>Set up</button>
+</form>
+{% endif %}
+{% endblock %}

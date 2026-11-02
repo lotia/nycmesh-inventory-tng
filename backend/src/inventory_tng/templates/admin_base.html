@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>{{ title }} · NYC Mesh Inventory</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.4; }
+    body { max-width: 34rem; margin: 2rem auto; padding: 0 1rem; }
+    label { display: block; margin-top: 1rem; font-weight: 600; }
+    .hint { font-weight: normal; font-size: 0.9em; opacity: 0.8; }
+    input { display: block; width: 100%; box-sizing: border-box; padding: 0.5rem; font-size: 1rem; margin-top: 0.25rem; }
+    button { margin-top: 1.25rem; padding: 0.5rem 1.25rem; font-size: 1rem; }
+    .problem { color: #b00020; font-weight: normal; }
+    [role=alert] { border-left: 4px solid #b00020; padding: 0.5rem 0.75rem; }
+    .key, .codes { font-family: ui-monospace, monospace; font-size: 1.1em; letter-spacing: 0.05em; }
+    .codes { columns: 2; padding-left: 1.5rem; }
+    .qr svg { background: #fff; display: block; margin: 0.5rem 0; }
+    fieldset { margin-top: 1.5rem; border: 1px solid #8888; padding: 0 1rem 1rem; }
+    header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+    header form button { margin: 0; }
+  </style>
+</head>
+<body>
+  {% if admin %}
+  <header>
+    <span>Signed in as <strong>{{ admin.username }}</strong></span>
+    <form method="post" action="{{ paths.sign_out }}"><button>Sign out</button></form>
+  </header>
+  {% endif %}
+  <main>
+    <h1>{{ title }}</h1>
+    {% if alert %}<p role="alert">{{ alert }}</p>{% endif %}
+    {% block main %}{% endblock %}
+  </main>
+</body>
+</html>

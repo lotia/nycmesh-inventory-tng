@@ -2,13 +2,24 @@
 
 import re
 from collections.abc import Iterator
+from datetime import datetime
 from typing import Annotated, Any, Literal
 
 import structlog
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sqlalchemy import Engine, MetaData, create_engine, exc, func, select
+from sqlalchemy import (
+    ColumnElement,
+    Engine,
+    MetaData,
+    create_engine,
+    exc,
+    exists,
+    func,
+    select,
+    update,
+)
 from sqlalchemy.orm import DeclarativeBase, Session
 
 log = structlog.get_logger(__name__)
@@ -44,7 +55,9 @@ def make_engine(url: str) -> Engine:
 
 
 def get_session(request: Request) -> Iterator[Session]:
-    with Session(request.app.state.engine) as session:
+    # Rows stay loaded after a commit: a page that commits then shows them
+    # does not read them all again.
+    with Session(request.app.state.engine, expire_on_commit=False) as session:
         yield session
 
 
@@ -69,6 +82,23 @@ def set_actor(session: Session, actor: str) -> None:
         raise ValueError("an actor is admin:<id>, volunteer:<id> or system:<name>")
     session.execute(select(func.set_config(ACTOR_SETTING, actor, True)))
     log.debug("actor set", actor=actor)
+
+
+def exists_where(session: Session, *criteria: ColumnElement[bool]) -> bool:
+    """Whether any row matches, as one EXISTS query."""
+    return bool(session.scalar(select(exists().where(*criteria))))
+
+
+def record_last_seen(
+    engine: Engine, model: type[Any], row_id: int, now: datetime
+) -> None:
+    """Set a row's last_seen_at in a transaction of its own, so a request
+    that saves nothing still counts, and the route's own transaction is left
+    alone. A row the route has not committed is not seen, which is fine."""
+    with Session(engine) as session, session.begin():
+        session.execute(
+            update(model).where(model.id == row_id).values(last_seen_at=now)
+        )
 
 
 def describe_error(error: exc.SQLAlchemyError) -> dict[str, str]:

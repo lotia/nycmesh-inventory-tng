@@ -22,11 +22,6 @@ from inventory_tng.settings import LogConfig, Settings
 ADDRESS = "192.0.2.10"
 
 
-@pytest.fixture(autouse=True)
-def fresh_rate_limit() -> None:
-    devices._limiter.storage.reset()
-
-
 def whoami(device: RegisteredDevice) -> dict[str, int]:
     return {"device_id": device.id}
 
@@ -41,8 +36,7 @@ def app(make_app: Callable[..., FastAPI]) -> FastAPI:
 
 @pytest.fixture
 def client(app: FastAPI) -> Iterator[TestClient]:
-    """Over https, because the cookie is Secure and would not come back over
-    plain http."""
+    """Over https, as conftest's client is, with the whoami route."""
     with TestClient(app, base_url="https://testserver") as client:
         yield client
 

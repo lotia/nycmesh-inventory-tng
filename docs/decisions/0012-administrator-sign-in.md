@@ -32,10 +32,13 @@ without a deployment.
   wrong, and the code field is shown to everyone, so the page never reveals
   that a password was right or which accounts use TOTP. An unknown username
   is checked against a dummy hash, so it takes as long as a known one.
-- **Failed attempts are rate limited** per address and per username, per
-  process, as registration is (0009).
-- **Cross-site form posts are refused** using the browser's `Sec-Fetch-Site`
-  header, or `Origin` where that is missing, instead of CSRF tokens.
+- **Attempts are rate limited**, per process, as registration is (0009):
+  every attempt per address, and codes per administrator, counted only once
+  the password was right. Without the password, nobody can lock an
+  administrator out by their username.
+- **Requests from another site's page are refused**, on every route that
+  changes something, using the browser's `Sec-Fetch-Site` header, or
+  `Origin` where that is missing, instead of CSRF tokens.
 
 ### TOTP
 
@@ -60,11 +63,12 @@ without a deployment.
   stored, as devices are (0009). They last a week by default, used or not,
   with no idle limit.
 - **Sensitive actions need a recent code** (or the password, without TOTP):
-  within 24 hours, and within an hour of the last sensitive action. When the
-  window has closed, the page asks for a code and carries on; it never signs
-  anyone out. Sensitive actions are anything about administrators, one's own
-  password, email, authenticators and recovery codes, the sign-in settings,
-  registration codes and revoking devices.
+  within 24 hours, and within an hour of the last sensitive action done
+  (viewing a page does not count). When the window has closed, the page
+  asks for a code and carries on; it never signs anyone out. Sensitive
+  actions are anything about administrators, one's own password, email,
+  authenticators and recovery codes, the sign-in settings, registration
+  codes and revoking devices.
 - **An administrator can see their sessions** and end any or all of them.
   Changing a password, a reset, or being retired ends them all.
 
@@ -106,5 +110,8 @@ deployment settings, where administrators could not change it.
 - Any administrator can take over another's account with a reset link. The
   history shows who made it.
 - Anyone who reads the database can copy the TOTP keys.
+- The page's words never reveal that a password was right, but its timing
+  can: a right password goes on to a few more database queries. What that
+  tells an attacker is worth at most ten code guesses every 15 minutes.
 - An administrator who could change the TOTP policy could weaken it; the
   history and the email to every administrator are what make that visible.

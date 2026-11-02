@@ -22,6 +22,7 @@ from inventory_tng.app import create_app
 from inventory_tng.db import get_session, make_engine
 from inventory_tng.local_env import local_env_values
 from inventory_tng.logs import configure_structlog
+from inventory_tng.rate_limits import limiter
 from inventory_tng.settings import FrontendConfig, LogConfig, Settings
 
 # structlog's lines go through the standard library, where caplog sees them.
@@ -31,7 +32,13 @@ log = structlog.get_logger(__name__)
 
 # The app's settings a developer may export, which would change what tests
 # see. DATABASE_URL stays: the tests read it themselves (below).
-FROM_THE_SHELL = ("APP_ENV", "UNMASK_SECRETS", "VITE_DEV_SERVER", "FRONTEND_DIST")
+FROM_THE_SHELL = (
+    "APP_ENV",
+    "UNMASK_SECRETS",
+    "VITE_DEV_SERVER",
+    "FRONTEND_DIST",
+    "SETUP_TOKEN",
+)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -43,6 +50,12 @@ def no_settings_from_the_shell() -> Iterator[None]:
             if name.startswith(("OTEL_", "LOG_")) or name in FROM_THE_SHELL:
                 monkeypatch.delenv(name)
         yield
+
+
+@pytest.fixture(autouse=True)
+def fresh_rate_limits() -> None:
+    """Every test starts with no attempts counted against it."""
+    limiter.storage.reset()
 
 
 @pytest.fixture
@@ -152,10 +165,12 @@ def make_app(
         frontend: FrontendConfig | None = None,
         *,
         development: bool = False,
+        setup_token: str | None = None,
     ) -> FastAPI:
         settings = Settings(
             database_url=database_url,
             development=development,
+            setup_token=setup_token,
             logging=logging or LogConfig(),
             frontend=frontend or FrontendConfig(dist=tmp_path / "no-build"),
         )
@@ -168,7 +183,9 @@ def make_app(
 
 @pytest.fixture
 def client(make_app: Callable[..., FastAPI]) -> Iterator[TestClient]:
-    with TestClient(make_app()) as client:
+    """Over https, as production is: the app's cookies are Secure, and would
+    not come back over plain http."""
+    with TestClient(make_app(), base_url="https://testserver") as client:
         yield client
 
 

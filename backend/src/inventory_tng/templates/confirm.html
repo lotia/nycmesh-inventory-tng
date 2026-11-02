@@ -1,0 +1,18 @@
+{% extends "admin_base.html" %}
+{% block main %}
+<p>This changes something that matters, so it needs a fresh
+{{ "code" if uses_totp else "password" }}.</p>
+<form method="post" action="{{ paths.confirm }}">
+  <input type="hidden" name="next" value="{{ next }}">
+  {% if uses_totp %}
+  <label>Code <span class="hint">from your authenticator, or a recovery code</span>
+    <input name="code" autocomplete="one-time-code" maxlength="16" required autofocus>
+  </label>
+  {% else %}
+  <label>Your password
+    <input name="code" type="password" autocomplete="current-password" required autofocus>
+  </label>
+  {% endif %}
+  <button>Confirm</button>
+</form>
+{% endblock %}

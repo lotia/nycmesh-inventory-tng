@@ -130,6 +130,11 @@ code that open that page with the phrase filled in. With
 `APP_ENV=development` the cookie works over plain http.
 `revoke`, `devices` and `revoke-device` do the rest; `--help` lists them.
 
+Administrator pages need someone signed in. To make the first administrator,
+set `SETUP_TOKEN` in `.env` to any 32 characters or more, restart, and open
+<http://127.0.0.1:8000/setup>. With `APP_ENV=development` the sign-in cookie
+works over plain http too.
+
 ### Running the app in a container
 
 ```sh

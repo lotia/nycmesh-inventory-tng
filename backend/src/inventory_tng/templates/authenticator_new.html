@@ -1,0 +1,11 @@
+{% extends "admin_base.html" %}
+{% block main %}
+{% if required %}
+<p>Signing in here needs an authenticator app as well as your password. Set
+one up to carry on.</p>
+{% endif %}
+<form method="post" action="{{ paths.new_authenticator }}">
+  {% include "_totp_fields.html" %}
+  <button>Save</button>
+</form>
+{% endblock %}

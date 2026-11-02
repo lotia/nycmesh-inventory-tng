@@ -1,0 +1,517 @@
+"""Administrators' accounts: passwords, TOTP, recovery codes, sessions and
+the first administrator (docs/decisions/0012). The pages are in sign_in.py.
+
+Only established calls here (AGENTS.md rule 3): argon2-cffi hashes and
+checks passwords, pyotp makes TOTP keys and checks codes, `secrets` makes
+tokens, and devices.digest (hashlib's SHA-256) hashes tokens and recovery
+codes for the database. Comparing the setup token is secrets.compare_digest.
+"""
+
+import re
+import secrets
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Literal, NoReturn
+
+import pyotp
+import segno
+import structlog
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerificationError
+from limits import RateLimitItemPerMinute
+from markupsafe import Markup
+from opentelemetry import metrics
+from sqlalchemy import ColumnElement, func, select, text, update
+from sqlalchemy.orm import Session
+
+from inventory_tng.db import exists_where, set_actor
+from inventory_tng.devices import digest
+from inventory_tng.models import (
+    Admin,
+    AdminPassword,
+    AdminSession,
+    Authenticator,
+    RecoveryCode,
+    SignInSettings,
+    mint_label_code,
+)
+from inventory_tng.rate_limits import limiter
+
+log = structlog.get_logger(__name__)
+meter = metrics.get_meter(__name__)
+
+# NIST SP 800-63B-4's least for a password used alone, which it may be while
+# TOTP is optional. No other rules about what is in it.
+PASSWORD_MIN = 15
+PASSWORD_MAX = 256
+USERNAME_MAX = 64
+USERNAME = re.compile(rf"[A-Za-z0-9._-]{{1,{USERNAME_MAX}}}")
+EMAIL = re.compile(r"[^@\s]+@[^@\s]+")
+EMAIL_MAX = 254
+AUTHENTICATOR_NAME_MAX = 64
+RECOVERY_CODES = 10
+TOTP_CODE = re.compile(r"\d{6}")
+# What authenticator apps show beside the account.
+ISSUER = "NYC Mesh Inventory"
+# How often a session's last use is written: often enough for the account
+# page's list, not on every request.
+SEEN_EVERY = timedelta(minutes=5)
+USER_AGENT_MAX = 300
+
+# Every attempt per address, and codes per administrator once their
+# password was right.
+PER_ADDRESS = RateLimitItemPerMinute(10)
+PER_ACCOUNT = RateLimitItemPerMinute(10, 15)
+
+Reason = Literal["unknown_user", "bad_password", "bad_code", "rate_limited"]
+Factor = Literal["totp", "recovery", "password"]
+
+sign_ins = meter.create_counter(
+    "inventory.admin.sign_ins",
+    unit="{attempt}",
+    description="Administrators' sign-in attempts, by outcome",
+)
+confirmations = meter.create_counter(
+    "inventory.admin.confirmations",
+    unit="{attempt}",
+    description="Codes typed to confirm a sensitive action, by outcome",
+)
+
+_hasher = PasswordHasher()
+# Checked against when there is no account, so an unknown username takes as
+# long as a wrong password. Made at import, so no request pays for it.
+_DUMMY_HASH = _hasher.hash(secrets.token_urlsafe())
+
+
+# Passwords
+
+
+def hash_password(password: str) -> str:
+    return _hasher.hash(password)
+
+
+def check_password(session: Session, admin_id: int | None, password: str) -> bool:
+    row = session.get(AdminPassword, admin_id) if admin_id is not None else None
+    try:
+        _hasher.verify(row.password_hash if row else _DUMMY_HASH, password)
+    except VerificationError, InvalidHashError:
+        return False
+    if row is None:
+        return False
+    # argon2-cffi's parameters have moved on since this hash was made.
+    if _hasher.check_needs_rehash(row.password_hash):
+        row.password_hash = _hasher.hash(password)
+    return True
+
+
+def username_problem(username: str) -> str | None:
+    if not USERNAME.fullmatch(username):
+        return f"Use 1 to {USERNAME_MAX} letters, digits, dots, dashes or underscores."
+    return None
+
+
+def email_problem(email: str) -> str | None:
+    if email and (not EMAIL.fullmatch(email) or len(email) > EMAIL_MAX):
+        return "That doesn't look like an email address."
+    return None
+
+
+def password_problem(password: str, again: str) -> str | None:
+    if len(password) < PASSWORD_MIN:
+        return f"Use at least {PASSWORD_MIN} characters. A few words make a good one."
+    if len(password) > PASSWORD_MAX:
+        return f"Use at most {PASSWORD_MAX} characters."
+    if password != again:
+        return "The two passwords are different."
+    return None
+
+
+# TOTP
+
+
+def new_totp_key() -> str:
+    return pyotp.random_base32()
+
+
+def is_totp_key(key: str) -> bool:
+    """A key as new_totp_key() makes them, sent back by a form."""
+    return re.fullmatch(r"[A-Z2-7]{32}", key) is not None
+
+
+def totp_link(key: str, username: str) -> str:
+    """The otpauth:// link an authenticator app reads from the QR code."""
+    return pyotp.TOTP(key).provisioning_uri(name=username, issuer_name=ISSUER)
+
+
+def qr_svg(link: str) -> Markup:
+    return Markup(segno.make(link, error="m").svg_inline(scale=5, border=2))
+
+
+def key_for_typing(key: str) -> str:
+    """ "ABCD EFGH ...", for apps that cannot scan."""
+    return " ".join(key[i : i + 4] for i in range(0, len(key), 4))
+
+
+def _totp_code(typed: str) -> str | None:
+    """The six digits, if that is what was typed, spaces aside; else it may
+    be a recovery code."""
+    code = re.sub(r"\s", "", typed)
+    return code if TOTP_CODE.fullmatch(code) else None
+
+
+def accepted_step(
+    key: str, typed: str, last_step: int | None, now: datetime
+) -> int | None:
+    """The time step `typed` is the code for, within one step either side of
+    now and later than last_step; None if none."""
+    code = _totp_code(typed)
+    if code is None:
+        return None
+    totp = pyotp.TOTP(key)
+    for offset in (-1, 0, 1):
+        at = now + timedelta(seconds=offset * totp.interval)
+        step = totp.timecode(at)
+        if last_step is not None and step <= last_step:
+            continue
+        if totp.verify(code, for_time=at):
+            return step
+    return None
+
+
+def _current(admin_id: int) -> tuple[ColumnElement[bool], ...]:
+    return (Authenticator.admin_id == admin_id, Authenticator.retired_at.is_(None))
+
+
+def uses_totp(session: Session, admin_id: int) -> bool:
+    return exists_where(session, *_current(admin_id))
+
+
+def authenticator_named(session: Session, admin_id: int, name: str) -> bool:
+    return exists_where(
+        session, *_current(admin_id), func.lower(Authenticator.name) == name.lower()
+    )
+
+
+def locked_authenticators(session: Session, admin_id: int) -> list[Authenticator]:
+    """The administrator's current authenticators, locked, so two requests
+    cannot both accept one code. None: they do not use TOTP."""
+    return list(
+        session.scalars(
+            select(Authenticator)
+            .where(*_current(admin_id))
+            .order_by(Authenticator.id)
+            .with_for_update()
+        )
+    )
+
+
+def add_authenticator(
+    session: Session, admin_id: int, name: str, key: str, step: int
+) -> Authenticator:
+    authenticator = Authenticator(
+        admin_id=admin_id, name=name, totp_key=key, last_step=step
+    )
+    session.add(authenticator)
+    session.flush()
+    log.info(
+        "authenticator added", admin_id=admin_id, authenticator_id=authenticator.id
+    )
+    return authenticator
+
+
+# Recovery codes
+
+
+def _recovery_digest(typed: str) -> bytes:
+    """ "abcde-fghjk" and "ABCDEFGHJK" are one code."""
+    return digest(re.sub(r"[^A-Z0-9]", "", typed.upper()))
+
+
+def make_recovery_codes(session: Session, admin_id: int, now: datetime) -> list[str]:
+    """New codes, which void any still unused: the only time they are
+    known. Label codes' alphabet, which is hard to misread."""
+    session.execute(
+        update(RecoveryCode)
+        .where(
+            RecoveryCode.admin_id == admin_id,
+            RecoveryCode.used_at.is_(None),
+            RecoveryCode.voided_at.is_(None),
+        )
+        .values(voided_at=now)
+    )
+    codes = [mint_label_code() for _ in range(RECOVERY_CODES)]
+    session.add_all(
+        RecoveryCode(admin_id=admin_id, code_hash=_recovery_digest(code))
+        for code in codes
+    )
+    session.flush()
+    log.info("recovery codes made", admin_id=admin_id)
+    return [f"{code[:5]}-{code[5:]}" for code in codes]
+
+
+def check_second_factor(
+    session: Session,
+    admin_id: int,
+    authenticators: list[Authenticator],
+    typed: str,
+    now: datetime,
+) -> Factor | None:
+    """A code from one of the administrator's authenticators (from
+    locked_authenticators), or one of their recovery codes, used up as it is
+    accepted."""
+    for authenticator in authenticators:
+        assert authenticator.totp_key is not None  # Current ones keep theirs.
+        step = accepted_step(
+            authenticator.totp_key, typed, authenticator.last_step, now
+        )
+        if step is not None:
+            authenticator.last_step = step
+            return "totp"
+    if _totp_code(typed) is not None:
+        return None
+    recovery = session.scalar(
+        select(RecoveryCode)
+        .where(
+            RecoveryCode.admin_id == admin_id,
+            RecoveryCode.code_hash == _recovery_digest(typed),
+            RecoveryCode.used_at.is_(None),
+            RecoveryCode.voided_at.is_(None),
+        )
+        .with_for_update()
+    )
+    if recovery is None:
+        return None
+    recovery.used_at = now
+    log.warning("recovery code used", admin_id=admin_id, recovery_code_id=recovery.id)
+    return "recovery"
+
+
+# Sessions
+
+
+def sign_in_settings(session: Session) -> SignInSettings:
+    return session.get_one(SignInSettings, 1)
+
+
+class SignInRefused(Exception):
+    def __init__(self, reason: Reason) -> None:
+        super().__init__(reason)
+        self.reason: Reason = reason
+
+
+def sign_in(
+    session: Session,
+    username: str,
+    password: str,
+    code: str,
+    *,
+    address: str | None,
+    user_agent: str | None,
+    now: datetime,
+) -> tuple[AdminSession, str]:
+    """Check all three at once and start a session, or SignInRefused. The
+    caller commits, and only on success.
+
+    Every attempt counts against its address before anything is checked, so
+    a burst sent at once cannot all slip under the limit. Codes count
+    against the account too, but only once its password was right: someone
+    without the password cannot lock its administrator out."""
+    if not limiter.hit(PER_ADDRESS, "sign_in", address or "unknown"):
+        _refuse_sign_in("rate_limited", None)
+    admin = session.scalar(
+        select(Admin).where(
+            func.lower(Admin.username) == username.strip().lower(),
+            Admin.retired_at.is_(None),
+        )
+    )
+    if not check_password(session, admin.id if admin else None, password):
+        _refuse_sign_in("unknown_user" if admin is None else "bad_password", admin)
+    assert admin is not None  # check_password is False without one.
+    set_actor(session, f"admin:{admin.id}")
+    factor: Factor | None = "password"
+    if authenticators := locked_authenticators(session, admin.id):
+        if not limiter.hit(PER_ACCOUNT, "code", str(admin.id)):
+            _refuse_sign_in("rate_limited", admin)
+        factor = check_second_factor(session, admin.id, authenticators, code, now)
+    if factor is None:
+        _refuse_sign_in("bad_code", admin)
+    row, token = _start_session(session, admin.id, user_agent, now)
+    sign_ins.add(1, {"outcome": "signed_in", "factor": factor})
+    log.info("signed in", admin_id=admin.id, sign_in_id=row.id, factor=factor)
+    return row, token
+
+
+def _refuse_sign_in(reason: Reason, admin: Admin | None) -> NoReturn:
+    sign_ins.add(1, {"outcome": "refused", "reason": reason})
+    log.warning("sign-in refused", reason=reason, admin_id=admin.id if admin else None)
+    raise SignInRefused(reason)
+
+
+def _start_session(
+    session: Session, admin_id: int, user_agent: str | None, now: datetime
+) -> tuple[AdminSession, str]:
+    """A new session, counted as just confirmed: both factors, or the
+    password without TOTP, were just typed."""
+    token = secrets.token_urlsafe(32)
+    days = sign_in_settings(session).session_days
+    row = AdminSession(
+        admin_id=admin_id,
+        token_hash=digest(token),
+        expires_at=now + timedelta(days=days),
+        last_seen_at=now,
+        confirmed_at=now,
+        user_agent=user_agent[:USER_AGENT_MAX] if user_agent else None,
+    )
+    session.add(row)
+    session.flush()
+    return row, token
+
+
+def find_session(
+    session: Session, token: str, now: datetime
+) -> tuple[AdminSession, Admin] | None:
+    """The current session with this cookie, and its administrator, if
+    current, in one query. Reads only: the caller records its use
+    (db.record_last_seen) once SEEN_EVERY has passed."""
+    found = session.execute(
+        select(AdminSession, Admin)
+        .join(Admin, Admin.id == AdminSession.admin_id)
+        .where(
+            AdminSession.token_hash == digest(token),
+            AdminSession.ended_at.is_(None),
+            AdminSession.expires_at > now,
+            Admin.retired_at.is_(None),
+        )
+    ).one_or_none()
+    return None if found is None else (found[0], found[1])
+
+
+def end_session(row: AdminSession, now: datetime) -> None:
+    row.ended_at = now
+    log.info("signed out", admin_id=row.admin_id, sign_in_id=row.id)
+
+
+def confirmation_open(
+    row: AdminSession, settings: SignInSettings, now: datetime
+) -> bool:
+    """Whether a sensitive action may go ahead without asking for a code:
+    within confirm_hours of the code, and within confirm_idle_minutes of it
+    or of the last sensitive action."""
+    if row.confirmed_at is None:
+        return False
+    if now >= row.confirmed_at + timedelta(hours=settings.confirm_hours):
+        return False
+    # Confirming clears last_sensitive_at, so it is always the later.
+    last = row.last_sensitive_at or row.confirmed_at
+    return now < last + timedelta(minutes=settings.confirm_idle_minutes)
+
+
+Confirmation = Literal["confirmed", "refused", "rate_limited"]
+
+
+def confirm(
+    session: Session, row: AdminSession, typed: str, now: datetime
+) -> Confirmation:
+    """A code (or, without TOTP, the password) for sensitive actions. Every
+    attempt counts against the administrator's codes, shared with signing
+    in, so a stolen session cannot guess them."""
+    if not limiter.hit(PER_ACCOUNT, "code", str(row.admin_id)):
+        return _confirmation(row, "rate_limited")
+    set_actor(session, f"admin:{row.admin_id}")
+    if authenticators := locked_authenticators(session, row.admin_id):
+        factor = check_second_factor(session, row.admin_id, authenticators, typed, now)
+        ok = factor is not None
+    else:
+        ok = check_password(session, row.admin_id, typed)
+    if not ok:
+        return _confirmation(row, "refused")
+    row.confirmed_at, row.last_sensitive_at = now, None
+    return _confirmation(row, "confirmed")
+
+
+def note_sensitive(row: AdminSession, now: datetime) -> None:
+    """A sensitive action was done: the idle time counts from now."""
+    row.last_sensitive_at = now
+
+
+def _confirmation(row: AdminSession, outcome: Confirmation) -> Confirmation:
+    confirmations.add(1, {"outcome": outcome})
+    fields = {"admin_id": row.admin_id, "sign_in_id": row.id}
+    if outcome == "confirmed":
+        log.info("confirmed", **fields)
+    else:
+        log.warning("confirmation refused", outcome=outcome, **fields)
+    return outcome
+
+
+# The first administrator
+
+
+SetupRefusal = Literal["closed", "rate_limited", "bad_token"]
+
+
+class SetupRefused(Exception):
+    def __init__(self, reason: SetupRefusal) -> None:
+        super().__init__(reason)
+        self.reason: SetupRefusal = reason
+
+
+def setup_open(session: Session) -> bool:
+    """Until any administrator exists, retired ones included."""
+    return not exists_where(session, Admin.id.is_not(None))
+
+
+def check_setup_token(expected: str, typed: str, address: str | None) -> None:
+    # Counted before it is compared, so a burst cannot slip under the limit.
+    if not limiter.hit(PER_ADDRESS, "setup", address or "unknown"):
+        _refuse_setup("rate_limited")
+    if not secrets.compare_digest(typed.strip().encode(), expected.encode()):
+        _refuse_setup("bad_token")
+
+
+def _refuse_setup(reason: SetupRefusal) -> NoReturn:
+    log.warning("setup refused", reason=reason)
+    raise SetupRefused(reason)
+
+
+@dataclass(frozen=True)
+class FirstAdmin:
+    admin: Admin
+    row: AdminSession
+    token: str
+    # Empty without TOTP.
+    recovery_codes: list[str]
+
+
+def create_first_admin(
+    session: Session,
+    *,
+    username: str,
+    email: str | None,
+    password: str,
+    authenticator_name: str,
+    totp_key: str,
+    step: int | None,
+    user_agent: str | None,
+    now: datetime,
+) -> FirstAdmin:
+    """The first administrator, signed in, with their authenticator and
+    recovery codes if a code from it was accepted (`step`, the time step it
+    was for; None without TOTP). Refused once any administrator exists,
+    checked under a lock so two setups cannot both make one. The caller
+    commits."""
+    session.execute(text("LOCK TABLE admin IN SHARE ROW EXCLUSIVE MODE"))
+    if not setup_open(session):
+        _refuse_setup("closed")
+    set_actor(session, "system:setup")
+    admin = Admin(username=username, email=email or None)
+    session.add(admin)
+    session.flush()
+    session.add(AdminPassword(id=admin.id, password_hash=hash_password(password)))
+    codes: list[str] = []
+    if step is not None:
+        add_authenticator(session, admin.id, authenticator_name, totp_key, step)
+        codes = make_recovery_codes(session, admin.id, now)
+    row, token = _start_session(session, admin.id, user_agent, now)
+    log.info("first administrator set up", admin_id=admin.id, sign_in_id=row.id)
+    return FirstAdmin(admin, row, token, codes)

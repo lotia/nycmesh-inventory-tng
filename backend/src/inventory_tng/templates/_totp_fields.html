@@ -1,0 +1,18 @@
+{# A new authenticator: the QR code, the same key to type, its name and a
+   code from it. `key` goes back in a hidden field, so a mistake elsewhere
+   on the form does not mean scanning again. #}
+<p>Scan this with an authenticator app, such as Aegis, 2FAS, Google
+Authenticator or a password manager:</p>
+<div class="qr">{{ qr }}</div>
+<p>Can't scan? Type this key instead:<br><span class="key">{{ key_for_typing }}</span></p>
+<p class="hint">You can put the key into more than one app now, as a spare.
+It isn't shown again once saved.</p>
+<input type="hidden" name="key" value="{{ key }}">
+<label>Name for it <span class="hint">such as the phone or app</span>
+  <input name="authenticator_name" value="{{ values.get('authenticator_name', 'Phone') }}" maxlength="{{ limits.authenticator_name_max }}" required>
+  {% with name = "authenticator_name" %}{% include "_field_problem.html" %}{% endwith %}
+</label>
+<label>The 6-digit code it shows{% if totp_optional %} <span class="hint">leave blank to sign in with your password alone</span>{% endif %}
+  <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" {% if not totp_optional %}required{% endif %}>
+  {% with name = "code" %}{% include "_field_problem.html" %}{% endwith %}
+</label>
