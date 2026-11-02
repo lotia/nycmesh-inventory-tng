@@ -1,11 +1,11 @@
 """An administrator's own account page (docs/decisions/0012)."""
 
 import re
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from fastapi import FastAPI
+from conftest import SentMail
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,26 +13,29 @@ from test_sign_in import (
     PASSWORD,
     code,
     new_admin,
+    other_session,
     policy,
+    reset_link,
     sign_in_with,
     text,
 )
 
 from inventory_tng import accounts, sign_in
-from inventory_tng.models import Admin, AdminPassword, AdminSession, Authenticator
+from inventory_tng.models import (
+    Admin,
+    AdminPassword,
+    AdminSession,
+    Authenticator,
+    ResetLink,
+)
 
 ACCOUNT = sign_in.ACCOUNT
 NEW_PASSWORD = "a different long passphrase"
 
 
 @pytest.fixture
-def client(make_app: Callable[..., FastAPI]) -> Iterator[TestClient]:
-    """Over https, for the Secure cookie, and without following redirects,
-    which are what is tested."""
-    with TestClient(
-        make_app(), base_url="https://testserver", follow_redirects=False
-    ) as client:
-        yield client
+def client(make_client: Callable[..., TestClient]) -> TestClient:
+    return make_client()
 
 
 @pytest.fixture
@@ -45,6 +48,7 @@ def ada(client: TestClient, session: Session) -> tuple[Admin, str]:
 
 
 def this_row(session: Session) -> AdminSession:
+    """The one session still going."""
     return session.scalars(
         select(AdminSession).where(AdminSession.ended_at.is_(None))
     ).one()
@@ -80,7 +84,7 @@ def test_changing_the_email(
 ) -> None:
     admin, _ = ada
     done = client.post(f"{ACCOUNT}/email", data={"email": "ada@example.org"})
-    assert done.headers["location"] == f"{ACCOUNT}?done=email"
+    assert done.headers["location"] == f"{ACCOUNT}?notice=email"
     assert admin.email == "ada@example.org"
     assert client.post(f"{ACCOUNT}/email", data={"email": ""}).status_code == 303
     assert admin.email is None
@@ -105,10 +109,10 @@ def test_changing_the_password_ends_the_other_sessions(
 ) -> None:
     admin, _ = ada
     mine = this_row(session)
-    other, _ = accounts._start_session(session, admin.id, None, datetime.now(UTC))
+    other = other_session(session, admin)
     form = {"password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
     done = client.post(f"{ACCOUNT}/password", data=form)
-    assert done.headers["location"] == f"{ACCOUNT}?done=password"
+    assert done.headers["location"] == f"{ACCOUNT}?notice=password"
     assert other.ended_at is not None
     assert mine.ended_at is None
     stored = session.get_one(AdminPassword, admin.id)
@@ -175,7 +179,7 @@ def test_removing_one_of_two_wipes_its_key(
         session, admin.id, "Spare", accounts.new_totp_key(), 0
     )
     done = client.post(f"{ACCOUNT}/authenticators/{spare.id}/remove")
-    assert done.headers["location"] == f"{ACCOUNT}?done=removed"
+    assert done.headers["location"] == f"{ACCOUNT}?notice=removed"
     assert spare.retired_at is not None
     assert spare.totp_key is None
     assert accounts.uses_totp(session, admin.id)
@@ -191,7 +195,7 @@ def test_removing_the_last_while_optional_turns_totp_off(
     accounts.make_recovery_codes(session, admin.id, datetime.now(UTC))
     (authenticator,) = accounts.authenticators(session, admin.id)
     done = client.post(f"{ACCOUNT}/authenticators/{authenticator.id}/remove")
-    assert done.headers["location"] == f"{ACCOUNT}?done=totp_off"
+    assert done.headers["location"] == f"{ACCOUNT}?notice=totp_off"
     assert not accounts.uses_totp(session, admin.id)
     assert accounts.recovery_codes_left(session, admin.id) == 0
     client.cookies.clear()
@@ -217,10 +221,10 @@ def test_ending_another_session_and_this_one(
 ) -> None:
     admin, _ = ada
     mine = this_row(session)
-    other, _ = accounts._start_session(session, admin.id, "Firefox", datetime.now(UTC))
+    other = other_session(session, admin, "Firefox")
     assert "Firefox" in text(client.get(ACCOUNT))
     done = client.post(f"{ACCOUNT}/sessions/{other.id}/end")
-    assert done.headers["location"] == f"{ACCOUNT}?done=session"
+    assert done.headers["location"] == f"{ACCOUNT}?notice=session"
     assert other.ended_at is not None
     out = client.post(f"{ACCOUNT}/sessions/{mine.id}/end")
     assert out.headers["location"] == sign_in.SIGN_IN
@@ -233,10 +237,7 @@ def test_signing_out_everywhere_else(
     ada: tuple[Admin, str],
 ) -> None:
     admin, _ = ada
-    others = [
-        accounts._start_session(session, admin.id, None, datetime.now(UTC))[0]
-        for _ in range(2)
-    ]
+    others = [other_session(session, admin) for _ in range(2)]
     client.post(f"{ACCOUNT}/sessions/end-others")
     assert all(row.ended_at is not None for row in others)
     assert this_row(session).ended_at is None
@@ -248,7 +249,7 @@ def test_another_admins_session_is_not_found(
     ada: tuple[Admin, str],
 ) -> None:
     ben, _ = new_admin(session, "ben")
-    theirs, _ = accounts._start_session(session, ben.id, None, datetime.now(UTC))
+    theirs = other_session(session, ben)
     assert client.post(f"{ACCOUNT}/sessions/{theirs.id}/end").status_code == 404
     assert theirs.ended_at is None
 
@@ -281,7 +282,7 @@ def test_a_late_form_asks_for_a_code_and_keeps_what_was_typed(
         f"{ACCOUNT}/email",
         data={"email": "ada@example.org", sign_in.CONFIRM_FIELD: later},
     )
-    assert done.headers["location"] == f"{ACCOUNT}?done=email"
+    assert done.headers["location"] == f"{ACCOUNT}?notice=email"
     assert admin.email == "ada@example.org"
 
 
@@ -295,7 +296,11 @@ def test_a_late_password_form_never_writes_the_password_into_the_page(
     asked = client.post(f"{ACCOUNT}/password", data=form)
     assert asked.status_code == 403
     assert NEW_PASSWORD not in asked.text
-    assert "type the new password again" in text(asked)
+    page = text(asked)
+    assert "type the passwords you gave again" in page
+    # Asked for again under their own names, empty.
+    assert 'name="password" type="password"' in page
+    assert 'name="password_again" type="password"' in page
 
 
 def test_a_late_new_authenticator_keeps_its_key(
@@ -348,3 +353,26 @@ def test_the_old_password_stops_working(
     form = {"password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
     client.post(f"{ACCOUNT}/password", data=form)
     assert not accounts.check_password(session, ada[0].id, PASSWORD)
+
+
+def test_changing_the_email_voids_reset_links_and_tells_the_old_address(
+    make_client: Callable[..., TestClient], session: Session, sent_mail: SentMail
+) -> None:
+    client = make_client(mailer=sent_mail)
+    admin, key = new_admin(session, email="old@example.org")
+    sign_in_with(client, code=code(key))
+    reset_link(session, admin)
+    client.post(f"{ACCOUNT}/email", data={"email": "new@example.org"})
+    (link,) = session.scalars(select(ResetLink)).all()
+    assert link.voided_at is not None
+    assert [(m.kind, m.to) for m in sent_mail] == [("email_changed", "old@example.org")]
+
+
+def test_changing_the_password_voids_reset_links(
+    client: TestClient, session: Session, ada: tuple[Admin, str]
+) -> None:
+    reset_link(session, ada[0])
+    form = {"password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
+    client.post(f"{ACCOUNT}/password", data=form)
+    (link,) = session.scalars(select(ResetLink)).all()
+    assert link.voided_at is not None

@@ -1,0 +1,28 @@
+{% extends "admin_base.html" %}
+{% block main %}
+{% if not link %}
+<p>This link doesn't work any more: it has been used, a newer one replaced
+it, or its time ran out. <a href="{{ paths.forgot }}">Ask for a new one</a>,
+or ask another administrator.</p>
+{% else %}
+<form method="post" action="{{ paths.reset }}">
+  <input type="hidden" name="token" value="{{ token }}">
+  {% if link.resets_authenticators %}
+  <p>This removes your authenticators and recovery codes. Set up a new
+  authenticator when you next sign in.</p>
+  {% endif %}
+  {% if link.resets_password %}
+  <label>New password <span class="hint">at least {{ limits.password_min }} characters</span>
+    <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required autofocus>
+    {% with name = "password" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  <label>New password again
+    <input name="password_again" type="password" autocomplete="new-password" required>
+  </label>
+  {% endif %}
+  <button>Reset</button>
+</form>
+<p class="hint">This signs you out everywhere.{% if not link.resets_authenticators %}
+If you use an authenticator, signing in still asks for its code.{% endif %}</p>
+{% endif %}
+{% endblock %}

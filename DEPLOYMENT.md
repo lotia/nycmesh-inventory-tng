@@ -29,6 +29,8 @@ Set these in the environment. Only `DATABASE_URL` is required.
   `UNMASK_SECRETS` and `VITE_DEV_SERVER`.
 - `SETUP_TOKEN`: lets the first administrator set up (below); at least 32
   characters. Remove it once they have.
+- `MAIL_HOST`, and with it `MAIL_FROM` and `SITE_URL`: mail to
+  administrators (below). Without `MAIL_HOST`, none is sent.
 - `FORWARDED_ALLOW_IPS`: behind a proxy, the proxy's address, so the client
   address and scheme come from its headers.
 - `LOG_FORMAT`: `json` for a log collector; the default is `console`.
@@ -99,6 +101,29 @@ chooses a username, a password and an authenticator app. Once any
 administrator exists, `/setup` is gone for good; remove `SETUP_TOKEN` and
 restart. Later administrators are invited from the administrator pages
 (docs/decisions/0012).
+
+## Mail
+
+The app mails administrators reset links they ask for, and tells them when
+their password changes or a recovery code is used. It sends through a
+provider's authenticated SMTP, such as Mailgun's or Gmail's:
+
+- `MAIL_HOST`, such as `smtp.mailgun.org`.
+- `MAIL_FROM`: the sender, such as `inventory@nycmesh.net`. Its domain needs
+  the SPF, DKIM and DMARC records the provider asks for, or mail lands in
+  spam.
+- `MAIL_USERNAME`, `MAIL_PASSWORD`: the provider's SMTP login. Gmail needs an
+  app password, on an account with 2-step verification.
+- `MAIL_SECURITY`: `starttls` (the default, port 587) or `tls` (port 465).
+- `MAIL_PORT`: only if the provider uses another.
+- `SITE_URL`: where people reach the site, over https, such as
+  `https://inventory.nycmesh.net`. Links in mail start with it, never with
+  what a request says its host is.
+
+Mail is sent after each reply, on port 587 or 465: check the host lets
+those out. At most three reset links an hour go to any one account. A
+failure is logged as `mail not sent` and counted in `inventory.mail.sent`;
+nobody is shown it.
 
 ## Registering devices
 

@@ -193,6 +193,12 @@ def _mask_quoted(line: str, quote: str) -> str:
 
 
 @functools.lru_cache(maxsize=4096)
+def is_secret_name(name: str) -> bool:
+    """Whether a field by this name holds a secret: the masker's own rule,
+    so pages and logs agree on what never to show."""
+    return _classify(name)[0]
+
+
 def _classify(key: str) -> tuple[bool, bool]:
     """Whether a field name means a secret, and whether it means personal
     data. Cached: the same few names recur on every line."""

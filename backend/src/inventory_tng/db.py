@@ -1,7 +1,8 @@
 """The database: one engine per app, one session per request."""
 
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
@@ -11,6 +12,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import (
     ColumnElement,
+    Connection,
     Engine,
     MetaData,
     create_engine,
@@ -61,12 +63,13 @@ def make_engine(url: str) -> Engine:
 def _in_utc(connection: DBAPIConnection, _record: object) -> None:
     """Times come back in UTC whatever the server's own zone
     (docs/decisions/0013). Set as each connection opens, rather than as a
-    startup option, which would replace any options DATABASE_URL gives and
-    which connection poolers such as PgBouncer refuse."""
+    startup option, which would replace any options DATABASE_URL gives. In
+    autocommit, so it is one round trip and outlasts every transaction."""
+    connection.autocommit = True
     cursor = connection.cursor()
     cursor.execute("SET TIME ZONE 'UTC'")
     cursor.close()
-    connection.commit()
+    connection.autocommit = False
 
 
 def get_session(request: Request) -> Iterator[Session]:
@@ -78,6 +81,18 @@ def get_session(request: Request) -> Iterator[Session]:
 
 DbSession = Annotated[Session, Depends(get_session)]
 
+# Opens a session of its own: for work after the reply, when the request's
+# has closed.
+SessionFactory = Callable[[], AbstractContextManager[Session]]
+
+
+def get_session_factory(request: Request) -> SessionFactory:
+    engine = request.app.state.engine
+    return lambda: Session(engine, expire_on_commit=False)
+
+
+Sessions = Annotated[SessionFactory, Depends(get_session_factory)]
+
 # Read by the history trigger (migration 0002, which writes the name out):
 # who made this transaction's changes.
 ACTOR_SETTING = "inventory.actor"
@@ -86,6 +101,27 @@ ACTOR_SETTING = "inventory.actor"
 CLI_ACTOR = "system:cli"
 ACTOR_PATTERN = "(admin|volunteer):[0-9]+|system:[a-z_]+"
 ACTOR = re.compile(ACTOR_PATTERN)
+# Where act_as() keeps a session's actor.
+ACTOR_INFO = "inventory.actor"
+
+
+def act_as(session: Session, actor: str) -> None:
+    """Name who makes every change this session writes, in this transaction
+    and every later one, as set_actor does for one: a signed-in request's
+    session, so no route need remember to."""
+    if not ACTOR.fullmatch(actor):
+        raise ValueError("an actor is admin:<id>, volunteer:<id> or system:<name>")
+    session.info[ACTOR_INFO] = actor
+    if session.in_transaction():
+        set_actor(session, actor)
+
+
+@event.listens_for(Session, "after_begin")
+def _actor_for_each_transaction(
+    session: Session, _transaction: object, connection: Connection
+) -> None:
+    if actor := session.info.get(ACTOR_INFO):
+        connection.execute(select(func.set_config(ACTOR_SETTING, actor, True)))
 
 
 def set_actor(session: Session, actor: str) -> None:

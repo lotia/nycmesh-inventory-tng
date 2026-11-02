@@ -1,10 +1,10 @@
 """An administrator's own account page (docs/decisions/0012): email,
 password, authenticators, recovery codes and sessions. Viewing it is not
-sensitive; every change is (sign_in.ConfirmedAdmin). The rules are in
-accounts.py.
+sensitive; every change is (sign_in.ConfirmedAdmin), and is recorded as
+theirs (db.act_as). The rules are in accounts.py.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -13,32 +13,34 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts
-from inventory_tng.db import DbSession, set_actor
+from inventory_tng import accounts, mail
+from inventory_tng.db import DbSession
 from inventory_tng.local_time import site_zone
-from inventory_tng.pages import page, redirect
+from inventory_tng.mail import Notify
+from inventory_tng.pages import NOTICES, not_found, page, redirect
 from inventory_tng.sign_in import (
     ACCOUNT,
-    COOKIE,
     NAME_TAKEN,
-    SIGN_IN,
     AdminSignedIn,
     ConfirmedAdmin,
     SignedIn,
+    changed,
+    signed_out,
 )
 
 router = APIRouter(include_in_schema=False)
 
-# What a change says once done, by the ?done= the page is sent back with.
-DONE = {
-    "email": "Your email is changed.",
-    "password": "Your password is changed. Your other sessions have ended.",
-    "renamed": "Renamed.",
-    "removed": "Removed.",
-    "totp_off": "TOTP is off: your password alone signs you in.",
-    "session": "That session has ended.",
-    "others": "Your other sessions have ended.",
-}
+NOTICES.update(
+    {
+        "email": "Your email is changed.",
+        "password": "Your password is changed. Your other sessions have ended.",
+        "renamed": "Renamed.",
+        "removed": "Removed.",
+        "totp_off": "TOTP is off: your password alone signs you in.",
+        "session": "That session has ended.",
+        "others": "Your other sessions have ended.",
+    }
+)
 
 
 def _now() -> datetime:
@@ -50,12 +52,12 @@ def _account_page(
     session: Session,
     signed: SignedIn,
     *,
-    done: str | None = None,
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
     admin_id = signed.admin.id
+    authenticators = accounts.authenticators(session, admin_id)
     return page(
         request,
         "account.html",
@@ -63,15 +65,17 @@ def _account_page(
             "title": "Your account",
             "admin": signed.admin,
             "zone": site_zone(session),
-            "notice": DONE.get(done or ""),
             "problems": problems or {},
             "values": values or {},
             "totp_optional": signed.settings.totp_policy == "optional",
             "authenticators": [
-                (a, _last_used(a.last_step))
-                for a in accounts.authenticators(session, admin_id)
+                (a, accounts.step_time(a.last_step) if a.last_step else None)
+                for a in authenticators
             ],
-            "recovery_codes_left": accounts.recovery_codes_left(session, admin_id),
+            # Shown only with an authenticator.
+            "recovery_codes_left": accounts.recovery_codes_left(session, admin_id)
+            if authenticators
+            else 0,
             "sessions": accounts.current_sessions(session, admin_id, _now()),
             "this_session": signed.row.id,
         },
@@ -79,27 +83,45 @@ def _account_page(
     )
 
 
-def _last_used(step: int | None) -> datetime | None:
-    """When a code from it was last accepted, to the 30-second step."""
-    return None if step is None else datetime.fromtimestamp(step * 30, UTC)
+def _refused(
+    request: Request,
+    session: Session,
+    signed: SignedIn,
+    field: str,
+    problem: str,
+    values: Mapping[str, str] | None = None,
+) -> HTMLResponse:
+    """The page again, with what was wrong, and nothing of the change kept."""
+    session.rollback()
+    return _account_page(
+        request,
+        session,
+        signed,
+        problems={field: problem},
+        values=values,
+        status_code=400,
+    )
 
 
-def _done(what: str) -> Response:
-    return redirect(f"{ACCOUNT}?done={what}")
+def _unique(change: Callable[[], object], session: Session) -> bool:
+    """Run `change` in a savepoint; False if it clashed with a unique name or
+    address, as PostgreSQL compares them."""
+    try:
+        with session.begin_nested():
+            change()
+    except IntegrityError:
+        return False
+    return True
 
 
-def _changed(signed: SignedIn, session: Session) -> None:
-    """After a sensitive change: counted for the confirmation window, and
-    committed."""
-    accounts.note_sensitive(signed.row, _now())
-    session.commit()
+def _done(signed: SignedIn, session: Session, notice: str) -> Response:
+    changed(signed, session)
+    return redirect(ACCOUNT, notice=notice)
 
 
 @router.get(ACCOUNT)
-def account(
-    request: Request, signed: AdminSignedIn, session: DbSession, done: str = ""
-) -> Response:
-    return _account_page(request, session, signed, done=done)
+def account(request: Request, signed: AdminSignedIn, session: DbSession) -> Response:
+    return _account_page(request, session, signed)
 
 
 @router.post(f"{ACCOUNT}/email")
@@ -107,29 +129,25 @@ def change_email(
     request: Request,
     signed: ConfirmedAdmin,
     session: DbSession,
+    notify: Notify,
     email: Annotated[str, Form()] = "",
 ) -> Response:
     email = email.strip()
-    problem = accounts.email_problem(email)
-    if problem is None:
-        set_actor(session, f"admin:{signed.admin.id}")
-        try:
-            with session.begin_nested():
-                accounts.change_email(session, signed.admin, email)
-        except IntegrityError:
-            problem = "Another administrator uses that address."
-    if problem is not None:
-        session.rollback()
-        return _account_page(
-            request,
-            session,
-            signed,
-            problems={"email": problem},
-            values={"email": email},
-            status_code=400,
-        )
-    _changed(signed, session)
-    return _done("email")
+    admin, old = signed.admin, signed.admin.email
+    values = {"email": email}
+    if problem := accounts.email_problem(email):
+        return _refused(request, session, signed, "email", problem, values)
+    if not _unique(
+        lambda: accounts.change_email(session, admin, email, _now()), session
+    ):
+        taken = "Another administrator uses that address."
+        return _refused(request, session, signed, "email", taken, values)
+    response = _done(signed, session, "email")
+    # Told at the old address, in case it was not them: someone with their
+    # session could otherwise take resets over unseen.
+    if old and old.lower() != email.lower():
+        notify.tell(old, admin.id, mail.email_changed)
+    return response
 
 
 @router.post(f"{ACCOUNT}/password")
@@ -137,18 +155,16 @@ def change_password(
     request: Request,
     signed: ConfirmedAdmin,
     session: DbSession,
+    notify: Notify,
     password: Annotated[str, Form()] = "",
     password_again: Annotated[str, Form()] = "",
 ) -> Response:
-    problem = accounts.password_problem(password, password_again)
-    if problem is not None:
-        return _account_page(
-            request, session, signed, problems={"password": problem}, status_code=400
-        )
-    set_actor(session, f"admin:{signed.admin.id}")
+    if problem := accounts.password_problem(password, password_again):
+        return _refused(request, session, signed, "password", problem)
     accounts.change_password(session, signed.row, password, _now())
-    _changed(signed, session)
-    return _done("password")
+    response = _done(signed, session, "password")
+    notify.tell(signed.admin.email, signed.admin.id, mail.password_changed)
+    return response
 
 
 @router.post(f"{ACCOUNT}/authenticators/{{authenticator_id}}/name")
@@ -160,59 +176,40 @@ def rename_authenticator(
     authenticator_name: Annotated[str, Form()] = "",
 ) -> Response:
     name = authenticator_name.strip()
-    problem = None
-    if not 1 <= len(name) <= accounts.AUTHENTICATOR_NAME_MAX:
-        problem = f"Use 1 to {accounts.AUTHENTICATOR_NAME_MAX} characters."
-    else:
-        set_actor(session, f"admin:{signed.admin.id}")
-        try:
-            with session.begin_nested():
-                found = accounts.rename_authenticator(
-                    session, signed.admin.id, authenticator_id, name
-                )
-        except IntegrityError:
-            problem = NAME_TAKEN
-        else:
-            if not found:
-                return _not_yours()
-    if problem is not None:
-        session.rollback()
-        return _account_page(
-            request,
-            session,
-            signed,
-            problems={f"authenticator_{authenticator_id}": problem},
-            status_code=400,
+    field = f"authenticator_{authenticator_id}"
+    if problem := accounts.authenticator_name_problem(name):
+        return _refused(request, session, signed, field, problem)
+    found: list[bool] = []
+    admin_id = signed.admin.id
+
+    def rename() -> None:
+        found.append(
+            accounts.rename_authenticator(session, admin_id, authenticator_id, name)
         )
-    _changed(signed, session)
-    return _done("renamed")
+
+    if not _unique(rename, session):
+        return _refused(request, session, signed, field, NAME_TAKEN)
+    if not found[0]:
+        return not_found()  # Someone else's, or gone: ids reveal nothing.
+    return _done(signed, session, "renamed")
 
 
 @router.post(f"{ACCOUNT}/authenticators/{{authenticator_id}}/remove")
 def remove_authenticator(
     request: Request, signed: ConfirmedAdmin, session: DbSession, authenticator_id: int
 ) -> Response:
-    set_actor(session, f"admin:{signed.admin.id}")
     outcome = accounts.remove_authenticator(
         session, signed.admin.id, authenticator_id, _now()
     )
     if outcome == "missing":
-        return _not_yours()
+        return not_found()
     if outcome == "last_required":
-        session.rollback()
-        return _account_page(
-            request,
-            session,
-            signed,
-            problems={
-                "authenticators": "TOTP is required here, so your last "
-                "authenticator stays. Add another first to replace it."
-            },
-            status_code=400,
+        problem = (
+            "TOTP is required here, so your last authenticator stays. "
+            "Add another first to replace it."
         )
-    totp_off = not accounts.uses_totp(session, signed.admin.id)
-    _changed(signed, session)
-    return _done("totp_off" if totp_off else "removed")
+        return _refused(request, session, signed, "authenticators", problem)
+    return _done(signed, session, outcome)
 
 
 @router.post(f"{ACCOUNT}/recovery-codes")
@@ -220,16 +217,10 @@ def new_recovery_codes(
     request: Request, signed: ConfirmedAdmin, session: DbSession
 ) -> Response:
     if not signed.uses_totp:
-        return _account_page(
-            request,
-            session,
-            signed,
-            problems={"recovery_codes": "Recovery codes come with an authenticator."},
-            status_code=400,
-        )
-    set_actor(session, f"admin:{signed.admin.id}")
+        problem = "Recovery codes come with an authenticator."
+        return _refused(request, session, signed, "recovery_codes", problem)
     codes = accounts.make_recovery_codes(session, signed.admin.id, _now())
-    _changed(signed, session)
+    changed(signed, session)
     return page(
         request,
         "recovery_codes.html",
@@ -242,22 +233,14 @@ def end_session(
     signed: ConfirmedAdmin, session: DbSession, session_id: int
 ) -> Response:
     if not accounts.end_sessions(session, signed.admin.id, _now(), only=session_id):
-        return _not_yours()
-    _changed(signed, session)
+        return not_found()
     if session_id == signed.row.id:
-        response = redirect(SIGN_IN)
-        response.delete_cookie(COOKIE)
-        return response
-    return _done("session")
+        session.commit()
+        return signed_out()
+    return _done(signed, session, "session")
 
 
 @router.post(f"{ACCOUNT}/sessions/end-others")
 def end_other_sessions(signed: ConfirmedAdmin, session: DbSession) -> Response:
     accounts.end_sessions(session, signed.admin.id, _now(), keep=signed.row.id)
-    _changed(signed, session)
-    return _done("others")
-
-
-def _not_yours() -> HTMLResponse:
-    """Someone else's, or gone: the same answer, so ids reveal nothing."""
-    return HTMLResponse("Not found", status_code=404)
+    return _done(signed, session, "others")

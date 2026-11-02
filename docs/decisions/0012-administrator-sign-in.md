@@ -70,7 +70,9 @@ without a deployment.
   authenticators and recovery codes, the sign-in settings, registration
   codes and revoking devices.
 - **An administrator can see their sessions** and end any or all of them.
-  Changing a password, a reset, or being retired ends them all.
+  Changing their password ends their other sessions; a reset, or being
+  retired, ends them all. Changing the password or email also voids any
+  unused reset link, and an email change is told to the old address.
 
 ### Settings and resets
 
@@ -83,6 +85,8 @@ without a deployment.
   however they like. Using it ends the account's sessions.
 - **An administrator with an email can reset their own password** from the
   sign-in page. The page answers the same whether or not a mail was sent.
+  At most three are sent an hour per account, and asking never voids a link
+  another administrator made.
   The link works once, lasts an hour and resets the password only: TOTP is
   still asked for. Mail is sent after the reply, so its timing reveals
   nothing.

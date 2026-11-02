@@ -77,6 +77,49 @@ class FrontendConfig:
         )
 
 
+MailSecurity = Literal["starttls", "tls", "none"]
+DEFAULT_MAIL_PORTS: dict[MailSecurity, int] = {"starttls": 587, "tls": 465, "none": 25}
+
+
+@dataclass(frozen=True)
+class MailConfig:
+    """A provider's authenticated SMTP, such as Mailgun's or Gmail's
+    (docs/decisions/0012). Without MAIL_HOST, no mail is sent."""
+
+    host: str
+    # Links in mail start here, never at the request's own Host header,
+    # which whoever sends the request chooses.
+    site_url: str
+    sender: str
+    port: int = 587
+    username: str | None = None
+    password: str | None = field(default=None, repr=False)
+    # starttls on 587, tls on 465; none only in development, for Mailpit.
+    security: MailSecurity = "starttls"
+
+    @classmethod
+    def from_environ(cls, environ: Mapping[str, str] = os.environ) -> Self | None:
+        host = environ.get("MAIL_HOST", "").strip()
+        if not host:
+            return None
+        security = _mail_security(
+            environ.get("MAIL_SECURITY", "").strip() or "starttls"
+        )
+        port = environ.get("MAIL_PORT", "").strip()
+        sender = environ.get("MAIL_FROM", "").strip()
+        if not sender:
+            raise SettingsError("MAIL_FROM is needed with MAIL_HOST")
+        return cls(
+            host=host,
+            site_url=_site_url(environ.get("SITE_URL", "")),
+            sender=sender,
+            port=_port(port) if port else DEFAULT_MAIL_PORTS[security],
+            username=environ.get("MAIL_USERNAME", "").strip() or None,
+            password=environ.get("MAIL_PASSWORD") or None,
+            security=security,
+        )
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str
@@ -89,6 +132,8 @@ class Settings:
     # What /setup asks for before making the first administrator
     # (docs/decisions/0012); without it, setup is off.
     setup_token: str | None = field(default=None, repr=False)
+    # Password resets and notices by mail; None sends none.
+    mail: MailConfig | None = None
 
     def __post_init__(self) -> None:
         # Every Settings passes through here, however it was built.
@@ -108,6 +153,7 @@ class Settings:
             logging=LogConfig.from_environ(environ),
             frontend=FrontendConfig.from_environ(environ),
             setup_token=environ.get("SETUP_TOKEN", "").strip() or None,
+            mail=MailConfig.from_environ(environ),
         )
 
 
@@ -118,6 +164,15 @@ def _refuse_development_only(settings: Settings) -> None:
     # A page loading scripts from a developer's laptop is no production page.
     if settings.frontend.dev_server:
         raise SettingsError("VITE_DEV_SERVER works only with APP_ENV=development")
+    if mail := settings.mail:
+        # Mail in the clear, with a password in it, is for Mailpit on a laptop.
+        if mail.security == "none":
+            raise SettingsError(
+                "MAIL_SECURITY=none works only with APP_ENV=development"
+            )
+        # Reset links over plain http could be read on the way.
+        if not mail.site_url.startswith("https://"):
+            raise SettingsError("SITE_URL must be https outside APP_ENV=development")
 
 
 def _dev_server(value: str) -> str:
@@ -145,6 +200,39 @@ def _dev_server(value: str) -> str:
         )
     # Without a trailing slash; netloc keeps an IPv6 address's brackets.
     return f"{url.scheme}://{url.netloc}"
+
+
+def _mail_security(value: str) -> MailSecurity:
+    for security in DEFAULT_MAIL_PORTS:
+        if value.lower() == security:
+            return security
+    raise SettingsError(
+        f"MAIL_SECURITY must be one of {', '.join(DEFAULT_MAIL_PORTS)}, not {value!r}"
+    )
+
+
+def _port(value: str) -> int:
+    if not value.isdigit() or not 0 < int(value) < 65536:
+        raise SettingsError(f"MAIL_PORT must be a port number, not {value!r}")
+    return int(value)
+
+
+def _site_url(value: str) -> str:
+    """The site's address, as people reach it: http(s), a host, no query."""
+    value = value.strip()
+    url = urlsplit(value)
+    if (
+        url.scheme not in {"http", "https"}
+        or not url.hostname
+        or url.username is not None
+        or url.query
+        or url.fragment
+    ):
+        raise SettingsError(
+            "SITE_URL is needed with MAIL_HOST, and looks like "
+            f"https://inventory.example.org, not {value!r}"
+        )
+    return value.rstrip("/")
 
 
 def _database_url(value: str) -> str:

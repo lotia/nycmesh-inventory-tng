@@ -21,8 +21,13 @@ DEFAULT_ZONE = "America/New_York"
 
 
 def is_time_zone(name: str) -> bool:
-    """An IANA zone such as America/New_York, not a path or an offset."""
-    return name in zoneinfo.available_timezones()
+    """An IANA zone such as America/New_York that these rules know, as
+    site_zone reads it: what a form setting the zone checks first."""
+    try:
+        ZoneInfo(name)
+    except zoneinfo.ZoneInfoNotFoundError, ValueError:
+        return False
+    return True
 
 
 def site_zone(session: Session) -> ZoneInfo:

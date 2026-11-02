@@ -135,6 +135,23 @@ set `SETUP_TOKEN` in `.env` to any 32 characters or more, restart, and open
 <http://127.0.0.1:8000/setup>. With `APP_ENV=development` the sign-in cookie
 works over plain http too.
 
+### Mail
+
+To see the mail the app sends, start Mailpit, which catches it all and sends
+nothing on: `docker compose --profile mail up -d mail`. Set these in `.env`
+and restart, then read the mail at <http://localhost:8025>:
+
+```sh
+MAIL_HOST=localhost
+MAIL_PORT=1025
+MAIL_SECURITY=none
+MAIL_FROM=inventory@localhost
+SITE_URL=http://127.0.0.1:8000
+```
+
+`MAIL_SECURITY=none` works only with `APP_ENV=development`. For the app
+container, set `INVENTORY_APP_MAIL_HOST=mail` too.
+
 ### Running the app in a container
 
 ```sh

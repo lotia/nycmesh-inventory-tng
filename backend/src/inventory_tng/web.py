@@ -6,9 +6,15 @@ from fastapi import Request, Response
 
 
 def client_address(request: Request) -> str | None:
-    """The address uvicorn resolved (FORWARDED_ALLOW_IPS), which rate limits
-    are kept by; None from a test client or a Unix socket."""
+    """The address uvicorn resolved (FORWARDED_ALLOW_IPS); None over a Unix
+    socket."""
     return request.client.host if request.client else None
+
+
+def rate_key(request: Request) -> str:
+    """What rate limits by address count under: the address, or one shared
+    "unknown" for requests without one."""
+    return client_address(request) or "unknown"
 
 
 def set_private_cookie(

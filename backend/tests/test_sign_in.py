@@ -2,6 +2,7 @@
 form, sessions, a new authenticator and confirming sensitive actions."""
 
 import html
+import itertools
 import re
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
@@ -29,7 +30,6 @@ from inventory_tng.models import (
     RecoveryCode,
     SignInSettings,
 )
-from inventory_tng.rate_limits import limiter
 
 TOKEN = "t" * 40
 PASSWORD = "correct horse battery staple"
@@ -37,22 +37,19 @@ NOW = datetime(2026, 11, 2, 12, tzinfo=UTC)
 
 
 @pytest.fixture
-def client(make_app: Callable[..., FastAPI]) -> Iterator[TestClient]:
-    # Redirects are what is tested, so they are not followed. Over https, or
-    # the Secure cookie is never sent back.
-    with TestClient(
-        make_app(setup_token=TOKEN),
-        base_url="https://testserver",
-        follow_redirects=False,
-    ) as client:
-        yield client
+def client(make_client: Callable[..., TestClient]) -> TestClient:
+    return make_client(setup_token=TOKEN)
 
 
 def new_admin(
-    session: Session, username: str = "ada", *, totp: bool = True
+    session: Session,
+    username: str = "ada",
+    *,
+    totp: bool = True,
+    email: str | None = None,
 ) -> tuple[Admin, str | None]:
     """An administrator with PASSWORD, and their authenticator's key."""
-    admin = Admin(username=username)
+    admin = Admin(username=username, email=email)
     session.add(admin)
     session.flush()
     session.add(
@@ -261,7 +258,13 @@ def test_an_unknown_name_is_checked_against_a_password_all_the_same(
     monkeypatch.setattr(PasswordHasher, "verify", spy)
     with pytest.raises(accounts.SignInRefused):
         accounts.sign_in(
-            session, "nobody", PASSWORD, "", address=None, user_agent=None, now=NOW
+            session,
+            "nobody",
+            PASSWORD,
+            "",
+            address="192.0.2.1",
+            user_agent=None,
+            now=NOW,
         )
     assert len(checked) == 1
 
@@ -349,35 +352,35 @@ def test_required_totp_sends_an_admin_without_it_to_set_it_up(
     assert client.get(sign_in.HOME).status_code == 200
 
 
-def new_address() -> None:
-    """As if the next request came from somewhere else: the test client's
-    address starts afresh."""
-    limiter.clear(accounts.PER_ADDRESS, "sign_in", "testclient")
+def from_many_addresses(
+    make_client: Callable[..., TestClient], client: TestClient
+) -> Iterator[TestClient]:
+    """Clients of the same app, each from an address of its own."""
+    for n in itertools.count(10):
+        yield make_client(client.app, address=f"192.0.2.{n}")
 
 
 def test_wrong_passwords_never_lock_an_admin_out(
-    client: TestClient, session: Session
+    client: TestClient, session: Session, make_client: Callable[..., TestClient]
 ) -> None:
     """From many addresses, as an attacker would: only the address is
     limited, never the account."""
     _, key = new_admin(session)
+    clients = from_many_addresses(make_client, client)
     for _ in range(20):
-        new_address()
-        sign_in_with(client, password="wrong password here")
-    new_address()
-    assert sign_in_with(client, code=code(key)).status_code == 303
+        sign_in_with(next(clients), password="wrong password here")
+    assert sign_in_with(next(clients), code=code(key)).status_code == 303
 
 
 def test_wrong_codes_after_a_right_password_are_limited(
-    client: TestClient, session: Session
+    client: TestClient, session: Session, make_client: Callable[..., TestClient]
 ) -> None:
     _, key = new_admin(session)
     wrong = "000000" if code(key) != "000000" else "111111"
+    clients = from_many_addresses(make_client, client)
     for _ in range(10):
-        new_address()
-        sign_in_with(client, code=wrong)
-    new_address()
-    limited = sign_in_with(client, code=code(key))
+        sign_in_with(next(clients), code=wrong)
+    limited = sign_in_with(next(clients), code=code(key))
     assert limited.status_code == 429
     assert "Too many tries" in alert(limited)
 
@@ -406,6 +409,33 @@ def test_a_page_sends_someone_signed_out_to_sign_in_and_back(
 ) -> None:
     response = client.get("/admin?page=2")
     assert response.headers["location"] == "/admin/sign-in?next=/admin%3Fpage%3D2"
+
+
+def reset_link(
+    session: Session,
+    admin: Admin,
+    *,
+    made_by: Admin | None = None,
+    password: bool = True,
+    authenticators: bool = False,
+) -> str:
+    """A reset link's token: emailed, unless another administrator made it."""
+    return accounts.make_reset_link(
+        session,
+        admin.id,
+        datetime.now(UTC),
+        made_by_id=made_by.id if made_by else None,
+        resets_password=password,
+        resets_authenticators=authenticators,
+        lifetime=timedelta(hours=1 if made_by is None else 24),
+    )
+
+
+def other_session(
+    session: Session, admin: Admin, user_agent: str | None = None
+) -> AdminSession:
+    """Another session of theirs, as if signed in elsewhere."""
+    return accounts.start_session(session, admin.id, user_agent, datetime.now(UTC))[0]
 
 
 def signed_in_row(client: TestClient, session: Session) -> AdminSession:
@@ -497,10 +527,13 @@ def test_a_sensitive_page_asks_for_a_code_then_carries_on(
     )
     # A wrong code is refused; the next step's code goes on.
     later = code(key, datetime.now(UTC) + timedelta(seconds=30))
-    wrong = client.post(sign_in.CONFIRM, data={"code": "12345", "next": "/x"})
+    wrong = client.post(
+        sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "12345", "next": "/x"}
+    )
     assert wrong.status_code == 400
     done = client.post(
-        sign_in.CONFIRM, data={"code": later, "next": sign_in.NEW_AUTHENTICATOR}
+        sign_in.CONFIRM,
+        data={sign_in.CONFIRM_FIELD: later, "next": sign_in.NEW_AUTHENTICATOR},
     )
     assert done.headers["location"] == sign_in.NEW_AUTHENTICATOR
     assert client.get(sign_in.NEW_AUTHENTICATOR).status_code == 200
@@ -516,9 +549,12 @@ def test_without_totp_the_password_confirms(
     row.confirmed_at = datetime.now(UTC) - timedelta(hours=2)
     session.flush()
     assert "Your password" in client.get(sign_in.CONFIRM).text
-    wrong = client.post(sign_in.CONFIRM, data={"code": "nope"})
+    wrong = client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "nope"})
     assert alert(wrong) == "That isn't your password."
-    assert client.post(sign_in.CONFIRM, data={"code": PASSWORD}).status_code == 303
+    assert (
+        client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: PASSWORD}).status_code
+        == 303
+    )
     assert row.confirmed_at is not None
     assert row.confirmed_at > datetime.now(UTC) - timedelta(minutes=1)
 
@@ -616,8 +652,8 @@ def test_a_rate_limited_confirmation_says_so(
 ) -> None:
     signed_in_row(client, session)
     for _ in range(10):
-        client.post(sign_in.CONFIRM, data={"code": "nope"})
-    limited = client.post(sign_in.CONFIRM, data={"code": "nope"})
+        client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "nope"})
+    limited = client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "nope"})
     assert limited.status_code == 429
     assert "Too many tries" in alert(limited)
 
