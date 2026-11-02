@@ -19,7 +19,7 @@ from fastapi.templating import Jinja2Templates
 from servestatic import ServeStaticASGI
 from starlette.types import ASGIApp
 
-from inventory_tng.settings import FrontendConfig
+from inventory_tng.settings import FrontendConfig, Settings
 
 log = structlog.get_logger(__name__)
 
@@ -129,8 +129,9 @@ for path, (title, entry) in PAGES.items():
     )
 
 
-def install(app: FastAPI, config: FrontendConfig, *, development: bool) -> None:
+def install(app: FastAPI, settings: Settings) -> None:
     """Load the build's tags, and serve its files at /static/assets/."""
+    config, development = settings.frontend, settings.development
     bundle = app.state.bundle = Bundle(config, development=development)
     # Said once, where it is decided: VITE_DEV_SERVER is honoured by a server
     # you run yourself, and blanked in the app container.

@@ -28,7 +28,7 @@ else:
     # (docs/decisions/0007). The tests pass a connection and keep their own.
     load_local_env()
     settings = Settings.from_environ()
-    configure_logging(settings.logging)
+    configure_logging(settings)
     engine = make_engine(settings.database_url)
     try:
         with engine.connect() as connection:

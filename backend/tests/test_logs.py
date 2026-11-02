@@ -6,11 +6,13 @@ import pytest
 import structlog
 
 from inventory_tng.logs import configure_logging
-from inventory_tng.settings import LogConfig, SettingsError
+from inventory_tng.settings import LogConfig, Settings, SettingsError
 
 
 def configure(**environ: str) -> None:
-    configure_logging(LogConfig.from_environ(environ))
+    configure_logging(
+        Settings.from_environ({"DATABASE_URL": "postgresql://db/x", **environ})
+    )
 
 
 def test_defaults_to_colour_at_info() -> None:

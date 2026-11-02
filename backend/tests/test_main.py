@@ -3,12 +3,14 @@ from pathlib import Path
 import pytest
 
 from inventory_tng import __main__, local_env
+from inventory_tng.settings import SettingsError
 
 
 @pytest.fixture
 def runs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> dict[str, object]:
     """Stub uvicorn.run and point .env at a file that does not exist."""
     calls: dict[str, object] = {}
+    monkeypatch.setenv("DATABASE_URL", "postgresql://db/x")
 
     def run(app: str, **kwargs: object) -> None:
         calls.update(app=app, **kwargs)
@@ -35,3 +37,13 @@ def test_reload_watches_only_the_package(runs: dict[str, object]) -> None:
     assert runs["reload"] is True
     assert runs["reload_dirs"] == [str(Path(__main__.__file__).parent)]
     assert runs["port"] == 9000
+
+
+@pytest.mark.usefixtures("restore_logging")
+def test_a_bad_setting_stops_it_before_uvicorn_starts(
+    runs: dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("UNMASK_SECRETS", "true")
+    with pytest.raises(SettingsError, match="UNMASK_SECRETS"):
+        __main__.main([])
+    assert runs == {}

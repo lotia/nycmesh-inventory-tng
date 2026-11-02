@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from servestatic.compress import Compressor
 
 from inventory_tng.bundle import MANIFEST, Bundle, Tags
-from inventory_tng.settings import FrontendConfig, LogConfig
+from inventory_tng.settings import FrontendConfig
 
 # The shape `vite build` writes: two entries sharing a chunk that carries the
 # stylesheet, and a chunk only the scan page imports.
@@ -116,8 +116,8 @@ def test_the_log_says_where_the_pages_scripts_come_from(
 ) -> None:
     with structlog.testing.capture_logs() as logs:
         make_app(
-            logging=LogConfig(development=True),
             frontend=FrontendConfig(dist=tmp_path, dev_server=dev_server),
+            development=True,
         )
     (line,) = [line for line in logs if line["event"] == "frontend"]
     assert line["source"] == source
@@ -221,9 +221,7 @@ def test_outside_development_the_build_is_the_one_at_startup(
 def test_development_serves_each_new_build(
     make_app: Callable[..., FastAPI], tmp_path: Path
 ) -> None:
-    app = make_app(
-        logging=LogConfig(development=True), frontend=FrontendConfig(dist=tmp_path)
-    )
+    app = make_app(frontend=FrontendConfig(dist=tmp_path), development=True)
     with TestClient(app) as client:
         assert client.get("/scan").status_code == 503
         build(tmp_path)

@@ -91,3 +91,14 @@ def test_a_dev_server_keeps_only_its_origin() -> None:
     assert FrontendConfig(dev_server="http://[::1]:5173/").dev_server == (
         "http://[::1]:5173"
     )
+
+
+@pytest.mark.parametrize(
+    ("value", "development"),
+    [("", False), ("production", False), ("Development", True)],
+)
+def test_app_env_decides_development(value: str, development: bool) -> None:
+    settings = Settings.from_environ(
+        {"DATABASE_URL": "postgresql://db/x", "APP_ENV": value}
+    )
+    assert settings.development is development

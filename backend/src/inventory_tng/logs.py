@@ -15,7 +15,7 @@ from structlog.typing import EventDict, Processor
 
 from inventory_tng import request_logging
 from inventory_tng.masking import Masker
-from inventory_tng.settings import LogConfig
+from inventory_tng.settings import Settings
 
 log = structlog.get_logger(__name__)
 
@@ -61,10 +61,12 @@ def configure_structlog(masker: Masker | None = None) -> None:
     )
 
 
-def configure_logging(config: LogConfig) -> Masker:
-    """Make every logger in the process write one format to stdout. Returns
-    the masker, for the OTLP bridge to mask the same way."""
-    masker = Masker.from_config(config)
+def configure_logging(settings: Settings) -> Masker:
+    """Make every logger in the process write one format to stdout. Takes all
+    the settings, not only the logging ones, because what is masked depends on
+    APP_ENV. Returns the masker, for the OTLP bridge to mask the same way."""
+    config = settings.logging
+    masker = Masker.from_settings(settings)
     renderer: Processor
     if config.format == "json":
         # Tracebacks as plain text: structured ones carry local variables,

@@ -53,7 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(devices.router, prefix=API)
     app.include_router(ledger.router, prefix=API)
     app.include_router(bundle.router)
-    bundle.install(app, settings.frontend, development=settings.logging.development)
+    bundle.install(app, settings)
     db.install(app)
     devices.install(app)
     ledger.install(app)

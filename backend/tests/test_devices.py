@@ -17,7 +17,7 @@ from inventory_tng import devices, registration_codes
 from inventory_tng.devices import COOKIE, RegisteredDevice, RegistrationRejected
 from inventory_tng.logs import configure_logging
 from inventory_tng.models import CatalogueHistory, Device, RegistrationCode
-from inventory_tng.settings import LogConfig
+from inventory_tng.settings import LogConfig, Settings
 
 ADDRESS = "192.0.2.10"
 
@@ -178,7 +178,7 @@ def test_the_endpoint_sets_a_cookie_only_the_server_can_read(
 def test_development_lets_the_cookie_travel_over_http(
     make_app: Callable[..., FastAPI], phrase: str
 ) -> None:
-    with TestClient(make_app(LogConfig(development=True))) as client:
+    with TestClient(make_app(development=True)) as client:
         response = client.post("/api/devices", json={"code": phrase})
     assert "secure" not in response.headers["set-cookie"].lower()
 
@@ -204,7 +204,9 @@ def test_the_request_line_carries_the_device(
     client: TestClient, phrase: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
     device_id = client.post("/api/devices", json={"code": phrase}).json()["device_id"]
-    configure_logging(LogConfig(format="json"))
+    configure_logging(
+        Settings(database_url="postgresql://db/x", logging=LogConfig(format="json"))
+    )
     client.get("/api/whoami")
     lines = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     (request,) = [line for line in lines if line["event"] == "request"]

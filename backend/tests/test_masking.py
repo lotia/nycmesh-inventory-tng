@@ -10,7 +10,7 @@ from sqlalchemy import exc
 from inventory_tng.logs import configure_logging
 from inventory_tng.masking import MASK, Masker, scrub_database_message
 from inventory_tng.server import create_server
-from inventory_tng.settings import LogConfig, SettingsError
+from inventory_tng.settings import Settings, SettingsError
 
 # Written out, not read from masking.py, so shrinking a list fails a test.
 SECRETS = {
@@ -69,7 +69,11 @@ def lines(capsys: pytest.CaptureFixture[str]) -> list[dict[str, object]]:
 
 
 def configure(**environ: str) -> None:
-    configure_logging(LogConfig.from_environ({"LOG_FORMAT": "json", **environ}))
+    configure_logging(settings(**{"LOG_FORMAT": "json", **environ}))
+
+
+def settings(**environ: str) -> Settings:
+    return Settings.from_environ({"DATABASE_URL": "postgresql://db/x", **environ})
 
 
 @pytest.mark.usefixtures("restore_logging")
@@ -95,7 +99,7 @@ def test_production_masks_every_secret_and_personal_field(
 
 
 def test_production_is_the_default() -> None:
-    assert Masker.from_config(LogConfig.from_environ({})) == Masker()
+    assert Masker.from_settings(settings()) == Masker()
 
 
 @pytest.mark.usefixtures("restore_logging")
@@ -126,12 +130,12 @@ def test_unmask_secrets_is_refused_outside_development(
     environ: dict[str, str],
 ) -> None:
     with pytest.raises(SettingsError, match="UNMASK_SECRETS"):
-        LogConfig.from_environ({**environ, "UNMASK_SECRETS": "true"})
+        settings(**environ, UNMASK_SECRETS="true")
 
 
 def test_refuses_an_unknown_environment() -> None:
     with pytest.raises(SettingsError, match="APP_ENV"):
-        LogConfig.from_environ({"APP_ENV": "staging"})
+        settings(APP_ENV="staging")
 
 
 @pytest.mark.usefixtures("restore_logging")

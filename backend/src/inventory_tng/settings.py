@@ -31,20 +31,8 @@ class LogConfig:
     client_address: bool = True
     # Successful health checks at info (True) or demoted to debug (False).
     health_checks: bool = True
-    # APP_ENV=development. Anything else is production, so forgetting it is
-    # safe (docs/decisions/0008).
-    development: bool = False
     # Secrets in logs and telemetry, for debugging. Development only.
     unmask_secrets: bool = False
-
-    def __post_init__(self) -> None:
-        if self.unmask_secrets and not self.development:
-            raise SettingsError("UNMASK_SECRETS works only with APP_ENV=development")
-
-    @property
-    def redact(self) -> bool:
-        """Mask personal data, and database values in exception text."""
-        return not self.development
 
     @classmethod
     def from_environ(cls, environ: Mapping[str, str] = os.environ) -> Self:
@@ -55,7 +43,6 @@ class LogConfig:
             format=_format(environ.get("LOG_FORMAT") or default.format),
             client_address=_flag(environ, "LOG_CLIENT_ADDRESS", default.client_address),
             health_checks=_flag(environ, "LOG_HEALTH_CHECKS", default.health_checks),
-            development=_environment(environ.get("APP_ENV") or "") == "development",
             unmask_secrets=_flag(environ, "UNMASK_SECRETS", default.unmask_secrets),
         )
 
@@ -90,24 +77,36 @@ class FrontendConfig:
 @dataclass(frozen=True)
 class Settings:
     database_url: str
+    # APP_ENV=development. Anything else is production, so forgetting it is
+    # safe (docs/decisions/0008). What it changes is listed under APP_ENV in
+    # DEPLOYMENT.md; the code reads it only from here.
+    development: bool = False
     logging: LogConfig = field(default_factory=LogConfig)
     frontend: FrontendConfig = field(default_factory=FrontendConfig)
 
     def __post_init__(self) -> None:
         # Every Settings passes through here, however it was built.
         object.__setattr__(self, "database_url", _database_url(self.database_url))
-        # A page loading scripts from a developer's laptop is no production
-        # page.
-        if self.frontend.dev_server and not self.logging.development:
-            raise SettingsError("VITE_DEV_SERVER works only with APP_ENV=development")
+        if not self.development:
+            _refuse_development_only(self)
 
     @classmethod
     def from_environ(cls, environ: Mapping[str, str] = os.environ) -> Self:
         return cls(
             database_url=environ.get("DATABASE_URL", ""),
+            development=_environment(environ.get("APP_ENV") or "") == "development",
             logging=LogConfig.from_environ(environ),
             frontend=FrontendConfig.from_environ(environ),
         )
+
+
+def _refuse_development_only(settings: Settings) -> None:
+    """The settings that work only with APP_ENV=development, all checked here."""
+    if settings.logging.unmask_secrets:
+        raise SettingsError("UNMASK_SECRETS works only with APP_ENV=development")
+    # A page loading scripts from a developer's laptop is no production page.
+    if settings.frontend.dev_server:
+        raise SettingsError("VITE_DEV_SERVER works only with APP_ENV=development")
 
 
 def _dev_server(value: str) -> str:

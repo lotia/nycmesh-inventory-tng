@@ -313,7 +313,7 @@ def register_device(
         token,
         max_age=COOKIE_MAX_AGE,
         httponly=True,
-        secure=not request.app.state.settings.logging.development,
+        secure=not request.app.state.settings.development,
         samesite="lax",
     )
     return Registered(device_id=device.id)
