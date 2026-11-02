@@ -10,16 +10,15 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from sqlalchemy import func, select
 
-from inventory_tng.admin.common import ADMIN, section
+from inventory_tng.admin.common import ADMIN, admin_page
 from inventory_tng.db import DbSession
 from inventory_tng.ledger import balance
 from inventory_tng.models import Item, Location
-from inventory_tng.pages import page
 from inventory_tng.sign_in import AdminSignedIn
 
 router = APIRouter(include_in_schema=False)
 
-STOCK = section(f"{ADMIN}/stock", "Stock")
+STOCK = f"{ADMIN}/stock"
 
 
 @dataclass
@@ -69,12 +68,12 @@ def stock(
         heading = holding.location if by == "place" else holding.item
         groups.setdefault(heading.id, Group(heading)).rows.append(holding)
     ordered = sorted(groups.values(), key=lambda g: g.heading.name.lower())
-    return page(
+    return admin_page(
         request,
+        signed,
         "stock.html",
         {
             "title": "Stock",
-            "admin": signed.admin,
             "by": by,
             "groups": ordered,
             "needing_count": sum(group.needs_count for group in ordered),

@@ -1,9 +1,8 @@
 {% extends "admin_base.html" %}
 {% block main %}
-{% set here = request.url.path %}
 {% with name = "volunteer" %}{% if problems.get(name) %}<p role="alert">{{ problems[name] }}</p>{% endif %}{% endwith %}
 {% if merged_into %}
-<p>A duplicate, merged into <a href="{{ here.rsplit('/', 1)[0] }}/{{ merged_into.id }}">{{ merged_into.name }}</a>: their past records count as theirs.</p>
+<p>A duplicate, merged into <a href="{{ list }}/{{ merged_into.id }}">{{ merged_into.name }}</a>: their past records count as theirs.</p>
 {% elif volunteer.retired_at %}
 <p>Retired: the scan page doesn't offer them.</p>
 {% endif %}
@@ -54,6 +53,6 @@
   {% else %}
   <form method="post" action="{{ here }}/retire"><button>Retire</button></form>
   {% endif %}
-  <a href="{{ here.rsplit('/', 1)[0] }}">All volunteers</a>
+  <a href="{{ list }}">All volunteers</a>
 </section>
 {% endblock %}

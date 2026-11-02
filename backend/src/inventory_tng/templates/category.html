@@ -1,6 +1,5 @@
 {% extends "admin_base.html" %}
 {% block main %}
-{% set here = request.url.path %}
 {% if category.retired_at %}
 <p>Retired: nobody can pick it.</p>
 {% endif %}
@@ -27,6 +26,6 @@
   {% else %}
   <form method="post" action="{{ here }}/retire"><button>Retire</button></form>
   {% endif %}
-  <a href="{{ here.rsplit('/', 1)[0] }}">All categories</a>
+  <a href="{{ list }}">All categories</a>
 </section>
 {% endblock %}

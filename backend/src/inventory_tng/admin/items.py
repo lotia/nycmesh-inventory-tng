@@ -1,27 +1,38 @@
 """Items and the packages they come in. An item's unit is fixed once stock
-has moved in it: the ledger's quantities are in that unit."""
+has moved in it: the ledger's quantities are in that unit. A retired item
+with stock left may still be taken, never received (docs/decisions/0003)."""
 
 from collections.abc import Mapping
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Form, Request
+import structlog
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy import exists, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.admin.categories import CATEGORIES
-from inventory_tng.admin.common import ADMIN, name_problem, now, quantity, section
-from inventory_tng.db import DbSession, unique
+from inventory_tng.admin.common import (
+    ADMIN,
+    admin_page,
+    chosen,
+    name_problem,
+    now,
+    quantity,
+    text_form,
+)
+from inventory_tng.db import DbSession, exists_where, unique
 from inventory_tng.ledger import balance
 from inventory_tng.models import UNITS, Category, Item, ItemPackage, Movement
-from inventory_tng.pages import NOTICES, not_found, page, redirect
+from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
+
+log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
-ITEMS = section(f"{ADMIN}/items", "Items")
-# The fields an item's form sends, beyond its name.
+ITEMS = f"{ADMIN}/items"
 TEXT_FIELDS = ("manufacturer", "part_number", "old_code", "notes", "ordering_notes")
 TAKEN = (
     "Another item already has that name, that manufacturer and part number, "
@@ -30,24 +41,17 @@ TAKEN = (
 
 NOTICES.update(
     {
-        "item_added": "Item added.",
-        "item_saved": "Saved.",
-        "item_retired": "Retired. Bring it back from the list if you need it.",
-        "item_restored": "Brought back.",
         "package_added": "Package added.",
         "package_retired": "Package retired.",
     }
 )
 
+TextForm = Annotated[dict[str, str], Depends(text_form)]
+
 
 def _categories(session: Session) -> list[Category]:
-    return list(
-        session.scalars(
-            select(Category)
-            .where(Category.retired_at.is_(None))
-            .order_by(func.lower(Category.name))
-        )
-    )
+    """Every category, by name: the current ones are offered."""
+    return list(session.scalars(select(Category).order_by(func.lower(Category.name))))
 
 
 def _list_page(
@@ -58,29 +62,30 @@ def _list_page(
     search: str = "",
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
-    status_code: int = 200,
 ) -> HTMLResponse:
     query = select(Item).order_by(func.lower(Item.name))
     if search:
         query = query.where(Item.matches(search))
     rows = session.scalars(query).all()
-    return page(
+    categories = _categories(session)
+    return admin_page(
         request,
+        signed,
         "items.html",
         {
             "title": "Items",
-            "admin": signed.admin,
+            "here": ITEMS,
+            "categories_path": CATEGORIES,
             "search": search,
             "current": [i for i in rows if i.retired_at is None],
             "retired": [i for i in rows if i.retired_at is not None],
-            "categories": _categories(session),
-            "categories_path": CATEGORIES,
-            "category_names": {c.id: c.name for c in session.scalars(select(Category))},
+            "categories": [c for c in categories if c.retired_at is None],
+            "category_names": {c.id: c.name for c in categories},
             "units": UNITS,
-            "problems": problems or {},
-            "values": values or {},
+            "problems": problems,
+            "values": values,
         },
-        status_code,
+        400 if problems else 200,
     )
 
 
@@ -93,7 +98,7 @@ def _in_stock(session: Session, item_id: int) -> Decimal:
 
 
 def _moved(session: Session, item_id: int) -> bool:
-    return bool(session.scalar(select(exists().where(Movement.item_id == item_id))))
+    return exists_where(session, Movement.item_id == item_id)
 
 
 def _item_page(
@@ -104,51 +109,45 @@ def _item_page(
     *,
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
-    status_code: int = 200,
 ) -> HTMLResponse:
     packages = session.scalars(
         select(ItemPackage)
         .where(ItemPackage.item_id == item.id)
         .order_by(ItemPackage.retired_at.is_not(None), ItemPackage.size)
     ).all()
-    return page(
+    return admin_page(
         request,
+        signed,
         "item.html",
         {
             "title": item.name,
-            "admin": signed.admin,
+            "here": f"{ITEMS}/{item.id}",
+            "list": ITEMS,
             "item": item,
             "packages": packages,
-            "categories": _categories(session),
+            "categories": [c for c in _categories(session) if c.retired_at is None],
             "units": UNITS,
             "unit_fixed": _moved(session, item.id),
             "in_stock": _in_stock(session, item.id),
-            "problems": problems or {},
-            "values": values or {},
+            "problems": problems,
+            "values": values,
         },
-        status_code,
+        400 if problems else 200,
     )
-
-
-def _find(session: Session, item_id: int) -> Item | None:
-    return session.get(Item, item_id, with_for_update=True)
 
 
 def _fields(
     session: Session, form: Mapping[str, str], *, unit_fixed: bool = False
 ) -> tuple[dict[str, object], dict[str, str]]:
-    """An item form's values, checked: what to set, and what is wrong."""
+    """What to set, and what is wrong."""
     values: dict[str, object] = {"name": form.get("name", "").strip()}
     problems: dict[str, str] = {}
     if problem := name_problem(str(values["name"])):
         problems["name"] = problem
     for field in TEXT_FIELDS:
         values[field] = form.get(field, "").strip() or None
-    category_id = form.get("category_id", "")
-    category = (
-        session.get(Category, int(category_id)) if category_id.isdigit() else None
-    )
-    if category is None or category.retired_at is not None:
+    category = chosen(session, Category, form.get("category_id", ""))
+    if category is None:
         problems["category_id"] = "Pick a category."
     else:
         values["category_id"] = category.id
@@ -165,9 +164,6 @@ def _fields(
     return values, problems
 
 
-ItemForm = Annotated[str, Form()]
-
-
 @router.get(ITEMS)
 def items(
     request: Request, signed: AdminSignedIn, session: DbSession, q: str = ""
@@ -177,32 +173,17 @@ def items(
 
 @router.post(ITEMS)
 def add_item(
-    request: Request,
-    signed: AdminSignedIn,
-    session: DbSession,
-    name: ItemForm = "",
-    category_id: ItemForm = "",
-    unit: ItemForm = "each",
-    manufacturer: ItemForm = "",
-    part_number: ItemForm = "",
+    request: Request, signed: AdminSignedIn, session: DbSession, form: TextForm
 ) -> Response:
-    form = {
-        "name": name,
-        "category_id": category_id,
-        "unit": unit,
-        "manufacturer": manufacturer,
-        "part_number": part_number,
-    }
     values, problems = _fields(session, form)
     item = Item(**values)
     if not problems and not unique(session, lambda: session.add(item)):
         problems["name"] = TAKEN
     if problems:
-        return _list_page(
-            request, session, signed, problems=problems, values=form, status_code=400
-        )
+        return _list_page(request, session, signed, problems=problems, values=form)
     session.commit()
-    return redirect(f"{ITEMS}/{item.id}", notice="item_added")
+    log.info("item added", item_id=item.id)
+    return redirect(f"{ITEMS}/{item.id}", notice="added")
 
 
 @router.get(f"{ITEMS}/{{item_id}}")
@@ -216,22 +197,14 @@ def item(
 
 
 @router.post(f"{ITEMS}/{{item_id}}")
-async def save_item(
-    request: Request, signed: AdminSignedIn, session: DbSession, item_id: int
-) -> Response:
-    # Every field at once; the form is small and all of it is text.
-    form = {k: v for k, v in (await request.form()).items() if isinstance(v, str)}
-    return _save_item(request, signed, session, item_id, form)
-
-
-def _save_item(
+def save_item(
     request: Request,
-    signed: SignedIn,
-    session: Session,
+    signed: AdminSignedIn,
+    session: DbSession,
     item_id: int,
-    form: dict[str, str],
+    form: TextForm,
 ) -> Response:
-    found = _find(session, item_id)
+    found = session.get(Item, item_id, with_for_update=True)
     if found is None:
         return not_found()
     values, problems = _fields(session, form, unit_fixed=_moved(session, item_id))
@@ -244,35 +217,34 @@ def _save_item(
         problems["name"] = TAKEN
     if problems:
         return _item_page(
-            request,
-            session,
-            signed,
-            found,
-            problems=problems,
-            values=form,
-            status_code=400,
+            request, session, signed, found, problems=problems, values=form
         )
     session.commit()
-    return redirect(f"{ITEMS}/{item_id}", notice="item_saved")
+    log.info("item saved", item_id=item_id)
+    return redirect(f"{ITEMS}/{item_id}", notice="saved")
 
 
 @router.post(f"{ITEMS}/{{item_id}}/retire")
 def retire_item(signed: AdminSignedIn, session: DbSession, item_id: int) -> Response:
-    found = _find(session, item_id)
+    found = session.get(Item, item_id, with_for_update=True)
     if found is None or found.retired_at is not None:
         return not_found()
     found.retired_at = now()
     session.commit()
-    return redirect(ITEMS, notice="item_retired")
+    log.info("item retired", item_id=item_id)
+    return redirect(ITEMS, notice="retired")
 
 
 @router.post(f"{ITEMS}/{{item_id}}/restore")
 def restore_item(
     request: Request, signed: AdminSignedIn, session: DbSession, item_id: int
 ) -> Response:
-    found = _find(session, item_id)
+    found = session.get(Item, item_id, with_for_update=True)
     if found is None or found.retired_at is None:
         return not_found()
+    if chosen(session, Category, str(found.category_id)) is None:
+        problem = "Its category is retired: bring that back, or pick another, first."
+        return _item_page(request, session, signed, found, problems={"name": problem})
 
     def restore() -> None:
         found.retired_at = None
@@ -281,11 +253,10 @@ def restore_item(
         problem = (
             "A current item already has its name or part number: change one first."
         )
-        return _item_page(
-            request, session, signed, found, problems={"name": problem}, status_code=400
-        )
+        return _item_page(request, session, signed, found, problems={"name": problem})
     session.commit()
-    return redirect(f"{ITEMS}/{item_id}", notice="item_restored")
+    log.info("item restored", item_id=item_id)
+    return redirect(f"{ITEMS}/{item_id}", notice="restored")
 
 
 @router.post(f"{ITEMS}/{{item_id}}/packages")
@@ -294,37 +265,31 @@ def add_package(
     signed: AdminSignedIn,
     session: DbSession,
     item_id: int,
-    package_name: ItemForm = "",
-    size: ItemForm = "",
+    package_name: Annotated[str, Form()] = "",
+    size: Annotated[str, Form()] = "",
 ) -> Response:
-    found = _find(session, item_id)
+    found = session.get(Item, item_id, with_for_update=True)
     if found is None:
         return not_found()
     name = package_name.strip()
     problems: dict[str, str] = {}
     if problem := name_problem(name):
         problems["package_name"] = problem
-    parsed = quantity(size, positive=True)
-    if parsed is None or isinstance(parsed, str):
-        problems["size"] = parsed or "How many of the item's unit it holds."
-    package = ItemPackage(
-        item_id=item_id, name=name, size=parsed if isinstance(parsed, Decimal) else 1
+    parsed = quantity(
+        size, positive=True, required="How many of the item's unit it holds."
     )
-    if not problems and not unique(session, lambda: session.add(package)):
+    if isinstance(parsed, str):
+        problems["size"] = parsed
+    if not problems:
+        assert isinstance(parsed, Decimal)  # Checked above; narrows the type.
+        package = ItemPackage(item_id=item_id, name=name, size=parsed)
+        if unique(session, lambda: session.add(package)):
+            session.commit()
+            log.info("package added", item_package_id=package.id)
+            return redirect(f"{ITEMS}/{item_id}", notice="package_added")
         problems["package_name"] = "It already has a package by that name."
-    if problems:
-        values = {"package_name": name, "size": size}
-        return _item_page(
-            request,
-            session,
-            signed,
-            found,
-            problems=problems,
-            values=values,
-            status_code=400,
-        )
-    session.commit()
-    return redirect(f"{ITEMS}/{item_id}", notice="package_added")
+    values = {"package_name": name, "size": size}
+    return _item_page(request, session, signed, found, problems=problems, values=values)
 
 
 @router.post(f"{ITEMS}/{{item_id}}/packages/{{package_id}}/retire")
@@ -336,4 +301,5 @@ def retire_package(
         return not_found()
     package.retired_at = now()
     session.commit()
+    log.info("package retired", item_package_id=package_id)
     return redirect(f"{ITEMS}/{item_id}", notice="package_retired")

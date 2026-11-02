@@ -428,6 +428,16 @@ class LedgerTransaction(Base):
             name="sides",
         ),
         CheckConstraint("install_number > 0", name="install_number"),
+        # Counts and adjustments are an administrator's; an adjustment says
+        # why.
+        CheckConstraint(
+            "(kind IN ('count', 'adjustment')) = (admin_id IS NOT NULL)",
+            name="admin_counts",
+        ),
+        CheckConstraint(
+            "(kind = 'adjustment') = (reason_id IS NOT NULL)",
+            name="adjustment_reason",
+        ),
         CheckConstraint(
             "install_number IS NULL OR kind = 'install'",
             name="install_number_on_install",
@@ -448,6 +458,9 @@ class LedgerTransaction(Base):
     # NULL for what no volunteer did, such as an import.
     volunteer_id: Mapped[int | None] = _reference("volunteer.id")
     device_id: Mapped[int | None] = _reference("device.id")
+    # Who recorded a count or adjustment, and why an adjustment was made.
+    admin_id: Mapped[int | None] = _reference("admin.id")
+    reason_id: Mapped[int | None] = _reference("adjustment_reason.id")
 
 
 class Movement(Base):
@@ -672,3 +685,17 @@ class SiteSettings(Base):
     # stored and compared in UTC; this is only for people reading them. A
     # trigger refuses a zone PostgreSQL does not know.
     time_zone: Mapped[str] = mapped_column(Text, server_default="America/New_York")
+
+
+class AdjustmentReason(Base):
+    """Why stock was written off or found outside a count. Administrators
+    extend the list (admin/settings.py); its first entries come with its
+    migration."""
+
+    __tablename__ = "adjustment_reason"
+    __table_args__ = (_unique_current_name("adjustment_reason"),)
+
+    id: Mapped[IntId]
+    created_at: Mapped[CreatedAt]
+    name: Mapped[str] = mapped_column(Text)
+    retired_at: Mapped[RetiredAt]

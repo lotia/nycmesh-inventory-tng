@@ -1,13 +1,12 @@
 """Volunteers, holding stock and merging duplicates (admin/volunteers.py)."""
 
-import html
 import uuid
 
 from fastapi.testclient import TestClient
-from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from test_models import add, history
+from test_models import add, history, named
+from test_sign_in import text
 
 from inventory_tng.admin.volunteers import VOLUNTEERS
 from inventory_tng.models import (
@@ -18,14 +17,6 @@ from inventory_tng.models import (
     Movement,
     Volunteer,
 )
-
-
-def text(response: Response) -> str:
-    return html.unescape(response.text)
-
-
-def by_name(session: Session, name: str) -> Volunteer:
-    return session.scalars(select(Volunteer).where(Volunteer.name == name)).one()
 
 
 def custody_of(session: Session, volunteer: Volunteer) -> Location | None:
@@ -53,7 +44,7 @@ def give(session: Session, location: Location) -> None:
 
 def test_adding_a_volunteer(admin_client: TestClient, session: Session) -> None:
     admin_client.post(VOLUNTEERS, data={"name": "Ada", "email": "ada@example.org"})
-    ada = by_name(session, "Ada")
+    ada = named(session, Volunteer, "Ada")
     assert ada.email == "ada@example.org"
     assert (history(session, "volunteer", ada.id)[0].actor or "").startswith("admin:")
     assert "Ada" in text(admin_client.get(VOLUNTEERS))

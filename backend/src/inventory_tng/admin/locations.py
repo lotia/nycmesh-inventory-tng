@@ -7,37 +7,35 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import ADMIN, name_problem, now, section
+from inventory_tng.admin.common import (
+    ADMIN,
+    admin_page,
+    chosen,
+    current_rows,
+    holds_stock,
+    name_problem,
+    now,
+    rule_words,
+)
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.models import Location, Volunteer
-from inventory_tng.pages import NOTICES, not_found, page, redirect
+from inventory_tng.pages import not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
+
+log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
-LOCATIONS = section(f"{ADMIN}/locations", "Locations")
+LOCATIONS = f"{ADMIN}/locations"
 # What an administrator makes here; custody comes with a volunteer.
 KINDS = {"store": "Store", "area": "Area inside another", "vehicle": "Vehicle"}
-# The database's rules, by the name it gives when one is broken, in words.
-RULES = {
-    "unique": "Another place beside it already has that name.",
-    "location_area_parent": "An area goes inside a store or another area.",
-    "location_no_cycle": "That would put it inside itself.",
-}
-
-NOTICES.update(
-    {
-        "location_added": "Location added.",
-        "location_saved": "Saved.",
-        "location_retired": "Retired. Bring it back from the list if you need it.",
-        "location_restored": "Brought back.",
-    }
-)
+TAKEN = "Another place beside it already has that name."
 
 
 @dataclass
@@ -57,21 +55,11 @@ def _tree(locations: list[Location]) -> list[Place]:
     return roots
 
 
-def _current(session: Session) -> list[Location]:
-    return list(
-        session.scalars(
-            select(Location)
-            .where(Location.retired_at.is_(None))
-            .order_by(func.lower(Location.name))
-        )
-    )
-
-
-def _parents(session: Session, moving: Location | None = None) -> list[Location]:
+def _parents(current: list[Location], moving: Location | None = None) -> list[Location]:
     """Where an area may go: current stores and areas, but not itself."""
     return [
         location
-        for location in _current(session)
+        for location in current
         if location.kind in {"store", "area"}
         and (moving is None or location.id != moving.id)
     ]
@@ -84,33 +72,36 @@ def _list_page(
     *,
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
-    status_code: int = 200,
 ) -> HTMLResponse:
-    current = _current(session)
-    volunteers = {v.id: v.name for v in session.scalars(select(Volunteer))}
-    return page(
+    current = current_rows(session, Location)
+    custody = [loc for loc in current if loc.kind == "custody"]
+    volunteers = dict(
+        session.execute(
+            select(Volunteer.id, Volunteer.name).where(
+                Volunteer.id.in_([loc.volunteer_id for loc in custody])
+            )
+        ).all()
+    )
+    return admin_page(
         request,
+        signed,
         "locations.html",
         {
             "title": "Locations",
-            "admin": signed.admin,
+            "here": LOCATIONS,
             "tree": _tree([loc for loc in current if loc.kind != "custody"]),
-            "custody": [
-                (loc, volunteers.get(loc.volunteer_id or 0, ""))
-                for loc in current
-                if loc.kind == "custody"
-            ],
+            "custody": [(loc, volunteers.get(loc.volunteer_id, "")) for loc in custody],
             "retired": session.scalars(
                 select(Location)
                 .where(Location.retired_at.is_not(None))
                 .order_by(func.lower(Location.name))
             ).all(),
             "kinds": KINDS,
-            "parents": _parents(session),
-            "problems": problems or {},
-            "values": values or {},
+            "parents": _parents(current),
+            "problems": problems,
+            "values": values,
         },
-        status_code,
+        400 if problems else 200,
     )
 
 
@@ -119,35 +110,31 @@ def _location_page(
     session: Session,
     signed: SignedIn,
     location: Location,
-    *,
     problem: str | None = None,
     values: Mapping[str, str] | None = None,
-    status_code: int = 200,
 ) -> HTMLResponse:
     areas = session.scalars(
         select(Location)
         .where(Location.parent_id == location.id, Location.retired_at.is_(None))
         .order_by(func.lower(Location.name))
     ).all()
-    return page(
+    return admin_page(
         request,
+        signed,
         "location.html",
         {
             "title": location.name,
-            "admin": signed.admin,
+            "here": f"{LOCATIONS}/{location.id}",
+            "list": LOCATIONS,
             "location": location,
             "kind": KINDS.get(location.kind, "Volunteer's custody"),
             "areas": areas,
-            "parents": _parents(session, location),
-            "problems": {"name": problem} if problem else {},
-            "values": values or {},
+            "parents": _parents(current_rows(session, Location), location),
+            "problems": {"name": problem} if problem else None,
+            "values": values,
         },
-        status_code,
+        400 if problem else 200,
     )
-
-
-def _parent(session: Session, parent_id: str) -> Location | None:
-    return session.get(Location, int(parent_id)) if parent_id.isdigit() else None
 
 
 @router.get(LOCATIONS)
@@ -171,18 +158,17 @@ def add_location(
         problems["name"] = problem
     if kind not in KINDS:
         problems["kind"] = "Pick what it is."
-    parent = _parent(session, parent_id) if kind == "area" else None
-    if kind == "area" and (parent is None or parent.retired_at is not None):
+    parent = chosen(session, Location, parent_id) if kind == "area" else None
+    if kind == "area" and parent is None:
         problems["parent_id"] = "Pick where it is."
     location = Location(name=name, kind=kind, parent_id=parent.id if parent else None)
     if not problems and (broken := attempt(session, lambda: session.add(location))):
-        problems["name"] = RULES.get(broken, "That breaks a rule of the tree.")
+        problems["name"] = rule_words(broken, TAKEN)
     if problems:
-        return _list_page(
-            request, session, signed, problems=problems, values=form, status_code=400
-        )
+        return _list_page(request, session, signed, problems=problems, values=form)
     session.commit()
-    return redirect(f"{LOCATIONS}/{location.id}", notice="location_added")
+    log.info("location added", location_id=location.id)
+    return redirect(f"{LOCATIONS}/{location.id}", notice="added")
 
 
 @router.get(f"{LOCATIONS}/{{location_id}}")
@@ -195,6 +181,12 @@ def location(
     return _location_page(request, session, signed, found)
 
 
+def _changeable(session: Session, location_id: int) -> Location | None:
+    """A location this page changes, locked: not a volunteer's custody."""
+    found = session.get(Location, location_id, with_for_update=True)
+    return None if found is None or found.kind == "custody" else found
+
+
 @router.post(f"{LOCATIONS}/{{location_id}}")
 def save_location(
     request: Request,
@@ -204,13 +196,13 @@ def save_location(
     name: Annotated[str, Form()] = "",
     parent_id: Annotated[str, Form()] = "",
 ) -> Response:
-    found = session.get(Location, location_id, with_for_update=True)
-    if found is None or found.kind == "custody":
+    found = _changeable(session, location_id)
+    if found is None:
         return not_found()
     name = name.strip()
     problem = name_problem(name)
-    parent = _parent(session, parent_id) if found.kind == "area" else None
-    if found.kind == "area" and (parent is None or parent.retired_at is not None):
+    parent = chosen(session, Location, parent_id) if found.kind == "area" else None
+    if found.kind == "area" and parent is None:
         problem = "Pick where it is."
 
     def save() -> None:
@@ -219,61 +211,55 @@ def save_location(
             found.parent_id = parent.id
 
     if problem is None and (broken := attempt(session, save)):
-        problem = RULES.get(broken, "That breaks a rule of the tree.")
+        problem = rule_words(broken, TAKEN)
     if problem is not None:
         values = {"name": name, "parent_id": parent_id}
-        return _location_page(
-            request,
-            session,
-            signed,
-            found,
-            problem=problem,
-            values=values,
-            status_code=400,
-        )
+        return _location_page(request, session, signed, found, problem, values)
     session.commit()
-    return redirect(f"{LOCATIONS}/{location_id}", notice="location_saved")
+    log.info("location saved", location_id=location_id)
+    return redirect(f"{LOCATIONS}/{location_id}", notice="saved")
 
 
 @router.post(f"{LOCATIONS}/{{location_id}}/retire")
 def retire_location(
     request: Request, signed: AdminSignedIn, session: DbSession, location_id: int
 ) -> Response:
-    found = session.get(Location, location_id, with_for_update=True)
-    if found is None or found.retired_at is not None or found.kind == "custody":
+    found = _changeable(session, location_id)
+    if found is None or found.retired_at is not None:
         return not_found()
+    # Once retired, a place cannot be counted or adjusted, so nothing at it
+    # could be put right.
+    if holds_stock(session, found.id):
+        problem = "Move what is here elsewhere, or count it, first."
+        return _location_page(request, session, signed, found, problem)
 
     def retire() -> None:
         found.retired_at = now()
 
-    if attempt(session, retire):
-        problem = "Retire or move the areas inside it first."
-        return _location_page(
-            request, session, signed, found, problem=problem, status_code=400
-        )
+    if broken := attempt(session, retire):
+        problem = rule_words(broken, TAKEN)
+        return _location_page(request, session, signed, found, problem)
     session.commit()
-    return redirect(LOCATIONS, notice="location_retired")
+    log.info("location retired", location_id=location_id)
+    return redirect(LOCATIONS, notice="retired")
 
 
 @router.post(f"{LOCATIONS}/{{location_id}}/restore")
 def restore_location(
     request: Request, signed: AdminSignedIn, session: DbSession, location_id: int
 ) -> Response:
-    found = session.get(Location, location_id, with_for_update=True)
-    if found is None or found.retired_at is None or found.kind == "custody":
+    found = _changeable(session, location_id)
+    if found is None or found.retired_at is None:
         return not_found()
 
     def restore() -> None:
         found.retired_at = None
 
     if broken := attempt(session, restore):
-        problem = (
-            "Its parent is retired: bring that back first, or move it."
-            if broken == "location_parent_current"
-            else "A current place beside it already has its name: rename one first."
-        )
+        taken = "A current place beside it already has its name: rename one first."
         return _location_page(
-            request, session, signed, found, problem=problem, status_code=400
+            request, session, signed, found, rule_words(broken, taken)
         )
     session.commit()
-    return redirect(f"{LOCATIONS}/{location_id}", notice="location_restored")
+    log.info("location restored", location_id=location_id)
+    return redirect(f"{LOCATIONS}/{location_id}", notice="restored")

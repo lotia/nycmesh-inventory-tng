@@ -1,6 +1,6 @@
 # 0003 — A transfer ledger over nested locations
 
-**Status:** accepted · 2026-10-30 · amended 2026-11-03 (retired items)
+**Status:** accepted · 2026-10-30 · amended 2026-11-03 (counts, retired items)
 
 ## Context
 
@@ -30,6 +30,12 @@ while. So we need more than one location from the start.
   minimum. An item with a negative balance shows on reorder as "count first".
 - **The rules live in PostgreSQL**, as constraints and triggers, so every
   writer obeys them.
+- **Counts and adjustments are an administrator's**, and record whose. A
+  count of a place writes what differs, found or lost, and a count that
+  matches is written with no lines, so when a place was last counted is
+  known. An adjustment gives a reason from a list administrators extend,
+  seeded with Damaged, Lost or stolen, Found, Used for testing and Records
+  were wrong (Ali, 2026-11-03).
 - **Nothing is deleted: retiring is the soft delete**, and bringing back
   undoes it. A retired item that still has stock is never received again,
   but volunteers may take what is left, until it runs out (Ali,

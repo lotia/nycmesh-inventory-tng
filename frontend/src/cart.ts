@@ -344,14 +344,14 @@ const KINDS: Record<Kind, string> = {
   install: "Install",
 };
 
+/** What the page says beside a retired item. */
+export const RETIRED = "retired: taking only";
+
 /**
  * The cart as the batch endpoint takes it, less the key the outbox adds,
  * and in words for the outbox; or what still needs doing before it can be
  * saved.
  */
-/** What the page says beside a retired item. */
-export const RETIRED = "retired: taking only";
-
 export function toBatch(
   filled: Cart,
   catalogue: Catalogue,

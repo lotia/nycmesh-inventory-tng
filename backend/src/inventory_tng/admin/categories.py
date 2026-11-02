@@ -4,34 +4,28 @@ left in a category nobody can pick."""
 
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import ADMIN, name_problem, now, section
+from inventory_tng.admin.common import ADMIN, admin_page, name_problem, now
 from inventory_tng.db import DbSession, unique
 from inventory_tng.models import Category, Item
-from inventory_tng.pages import NOTICES, not_found, page, redirect
+from inventory_tng.pages import not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
+
+log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
-CATEGORIES = section(f"{ADMIN}/categories", "Categories")
+CATEGORIES = f"{ADMIN}/categories"
 TAKEN = "There is already a category by that name."
-
-NOTICES.update(
-    {
-        "category_added": "Category added.",
-        "category_renamed": "Renamed.",
-        "category_retired": "Retired. Bring it back from the list if you need it.",
-        "category_restored": "Brought back.",
-    }
-)
 
 
 def _items(session: Session) -> dict[int, int]:
-    """Each category's current items, by category id."""
+    """How many current items each category has."""
     rows = session.execute(
         select(Item.category_id, func.count())
         .where(Item.retired_at.is_(None))
@@ -44,25 +38,24 @@ def _list_page(
     request: Request,
     session: Session,
     signed: SignedIn,
-    *,
-    problems: dict[str, str] | None = None,
-    values: dict[str, str] | None = None,
-    status_code: int = 200,
+    problem: str | None = None,
+    name: str | None = None,
 ) -> HTMLResponse:
     rows = session.scalars(select(Category).order_by(func.lower(Category.name))).all()
-    return page(
+    return admin_page(
         request,
+        signed,
         "categories.html",
         {
             "title": "Categories",
-            "admin": signed.admin,
+            "here": CATEGORIES,
             "current": [c for c in rows if c.retired_at is None],
             "retired": [c for c in rows if c.retired_at is not None],
             "items": _items(session),
-            "problems": problems or {},
-            "values": values or {},
+            "problems": {"name": problem} if problem else None,
+            "values": {"name": name} if name is not None else None,
         },
-        status_code,
+        400 if problem else 200,
     )
 
 
@@ -71,31 +64,27 @@ def _category_page(
     session: Session,
     signed: SignedIn,
     category: Category,
-    *,
     problem: str | None = None,
-    status_code: int = 200,
 ) -> HTMLResponse:
     items = session.scalars(
         select(Item)
         .where(Item.category_id == category.id, Item.retired_at.is_(None))
         .order_by(func.lower(Item.name))
     ).all()
-    return page(
+    return admin_page(
         request,
+        signed,
         "category.html",
         {
             "title": category.name,
-            "admin": signed.admin,
+            "here": f"{CATEGORIES}/{category.id}",
+            "list": CATEGORIES,
             "category": category,
             "items": items,
-            "problems": {"name": problem} if problem else {},
+            "problems": {"name": problem} if problem else None,
         },
-        status_code,
+        400 if problem else 200,
     )
-
-
-def _find(session: Session, category_id: int) -> Category | None:
-    return session.get(Category, category_id, with_for_update=True)
 
 
 @router.get(CATEGORIES)
@@ -111,22 +100,15 @@ def add_category(
     name: Annotated[str, Form()] = "",
 ) -> Response:
     name = name.strip()
+    added = Category(name=name)
     problem = name_problem(name)
-    if problem is None and not unique(
-        session, lambda: session.add(Category(name=name))
-    ):
+    if problem is None and not unique(session, lambda: session.add(added)):
         problem = TAKEN
     if problem is not None:
-        return _list_page(
-            request,
-            session,
-            signed,
-            problems={"name": problem},
-            values={"name": name},
-            status_code=400,
-        )
+        return _list_page(request, session, signed, problem, name)
     session.commit()
-    return redirect(CATEGORIES, notice="category_added")
+    log.info("category added", category_id=added.id)
+    return redirect(CATEGORIES, notice="added")
 
 
 @router.get(f"{CATEGORIES}/{{category_id}}")
@@ -147,7 +129,7 @@ def rename_category(
     category_id: int,
     name: Annotated[str, Form()] = "",
 ) -> Response:
-    found = _find(session, category_id)
+    found = session.get(Category, category_id, with_for_update=True)
     if found is None:
         return not_found()
     name = name.strip()
@@ -159,35 +141,33 @@ def rename_category(
     if problem is None and not unique(session, rename):
         problem = TAKEN
     if problem is not None:
-        return _category_page(
-            request, session, signed, found, problem=problem, status_code=400
-        )
+        return _category_page(request, session, signed, found, problem)
     session.commit()
-    return redirect(f"{CATEGORIES}/{category_id}", notice="category_renamed")
+    log.info("category renamed", category_id=category_id)
+    return redirect(f"{CATEGORIES}/{category_id}", notice="saved")
 
 
 @router.post(f"{CATEGORIES}/{{category_id}}/retire")
 def retire_category(
     request: Request, signed: AdminSignedIn, session: DbSession, category_id: int
 ) -> Response:
-    found = _find(session, category_id)
+    found = session.get(Category, category_id, with_for_update=True)
     if found is None or found.retired_at is not None:
         return not_found()
     if _items(session).get(found.id):
         problem = "Move or retire its items first."
-        return _category_page(
-            request, session, signed, found, problem=problem, status_code=400
-        )
+        return _category_page(request, session, signed, found, problem)
     found.retired_at = now()
     session.commit()
-    return redirect(CATEGORIES, notice="category_retired")
+    log.info("category retired", category_id=category_id)
+    return redirect(CATEGORIES, notice="retired")
 
 
 @router.post(f"{CATEGORIES}/{{category_id}}/restore")
 def restore_category(
     request: Request, signed: AdminSignedIn, session: DbSession, category_id: int
 ) -> Response:
-    found = _find(session, category_id)
+    found = session.get(Category, category_id, with_for_update=True)
     if found is None or found.retired_at is None:
         return not_found()
 
@@ -198,8 +178,7 @@ def restore_category(
         problem = (
             f"A current category is already called {found.name}: rename one first."
         )
-        return _category_page(
-            request, session, signed, found, problem=problem, status_code=400
-        )
+        return _category_page(request, session, signed, found, problem)
     session.commit()
-    return redirect(f"{CATEGORIES}/{category_id}", notice="category_restored")
+    log.info("category restored", category_id=category_id)
+    return redirect(f"{CATEGORIES}/{category_id}", notice="restored")

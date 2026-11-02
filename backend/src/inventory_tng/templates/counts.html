@@ -1,0 +1,76 @@
+{% extends "admin_base.html" %}
+{% block main %}
+<section>
+  <h2>Count a place</h2>
+  <p class="hint">See what the records say is there, and put right what isn't.</p>
+  <form method="get" action="{{ here }}/place" class="actions">
+    <label>Place
+      <select name="location_id" required>
+        <option value="">Pick one</option>
+        {% for place in places %}<option value="{{ place.id }}">{{ place.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <button>Count it</button>
+  </form>
+</section>
+
+<section>
+  <h2>Found or written off</h2>
+  <form method="post" action="{{ here }}/adjustments">
+    <input type="hidden" name="key" value="{{ values.get('key', key) }}">
+    <label>Place
+      <select name="location_id" required>
+        <option value="">Pick one</option>
+        {% for place in places %}<option value="{{ place.id }}" {% if values.get('location_id') == place.id | string %}selected{% endif %}>{{ place.name }}</option>{% endfor %}
+      </select>
+      {% with name = "location_id" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <label>Item
+      <select name="item_id" required>
+        <option value="">Pick one</option>
+        {% for item in items %}<option value="{{ item.id }}" {% if values.get('item_id') == item.id | string %}selected{% endif %}>{{ item.name }} ({{ item.unit }})</option>{% endfor %}
+      </select>
+      {% with name = "item_id" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <label>How much
+      <input name="amount" inputmode="decimal" value="{{ values.get('amount', '') }}" required>
+      {% with name = "amount" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <fieldset>
+      <legend>It was</legend>
+      <label><input type="radio" name="direction" value="found" {% if values.get('direction') == 'found' %}checked{% endif %} required> found there</label>
+      <label><input type="radio" name="direction" value="off" {% if values.get('direction') == 'off' %}checked{% endif %}> written off from there</label>
+      {% with name = "direction" %}{% include "_field_problem.html" %}{% endwith %}
+    </fieldset>
+    <label>Why <span class="hint">the list is on the <a href="{{ settings_path }}">Settings</a> page</span>
+      <select name="reason_id" required>
+        <option value="">Pick one</option>
+        {% for reason in reasons %}<option value="{{ reason.id }}" {% if values.get('reason_id') == reason.id | string %}selected{% endif %}>{{ reason.name }}</option>{% endfor %}
+      </select>
+      {% with name = "reason_id" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <button>Record it</button>
+  </form>
+</section>
+
+<section>
+  <h2>Recently</h2>
+  <table>
+    <tr><th>When</th><th>What</th><th>Where</th><th>By</th></tr>
+    {% for entry in recent %}
+    {% set t = entry.transaction %}
+    <tr>
+      <td>{{ t.created_at | when(zone) }}</td>
+      <td>
+        {% if t.kind == "count" %}Count{% else %}{{ entry.reason }}{% endif %}:
+        {% for item, amount in entry.lines %}{{ "+" if entry.found else "-" }}{{ amount | amount }} {{ item.unit }} {{ item.name }}{{ ", " if not loop.last }}{% else %}as the records said{% endfor %}
+      </td>
+      <td>{{ entry.place }}</td>
+      <td>{{ entry.admin }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4">None yet.</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endblock %}
