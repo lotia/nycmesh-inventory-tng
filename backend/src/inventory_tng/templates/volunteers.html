@@ -1,0 +1,37 @@
+{% extends "admin_base.html" %}
+{% block main %}
+<section>
+  <table>
+    <tr><th>Volunteer</th><th>Holds stock</th></tr>
+    {% for volunteer in current %}
+    <tr><td><a href="{{ request.url.path }}/{{ volunteer.id }}">{{ volunteer.name }}</a></td>
+      <td>{{ "yes" if volunteer.id in holders else "" }}</td></tr>
+    {% else %}
+    <tr><td colspan="2">None yet.</td></tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section>
+  <h2>Add a volunteer</h2>
+  <form method="post" action="{{ request.url.path }}">
+    <label>Name <span class="hint">as they pick it on the scan page</span>
+      <input name="name" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required>
+      {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <label>Email <span class="hint">optional</span>
+      <input name="email" type="email" value="{{ values.get('email', '') }}">
+      {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <button>Add</button>
+  </form>
+</section>
+
+{% if retired %}
+<section class="retired">
+  <h2>Retired</h2>
+  <ul>{% for volunteer in retired %}<li><a href="{{ request.url.path }}/{{ volunteer.id }}">{{ volunteer.name }}</a>
+    {% if volunteer.merged_into_id %}<span class="hint">merged into {{ names.get(volunteer.merged_into_id, "") }}</span>{% endif %}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% endblock %}
