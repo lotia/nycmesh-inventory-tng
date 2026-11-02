@@ -15,7 +15,9 @@
   "dependencies": {
     "@preact/signals": "2.11.4",
     "openapi-fetch": "0.17.0",
-    "preact": "11.1.1"
+    "preact": "11.1.1",
+    "uuid": "14.0.3",
+    "valibot": "1.5.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.4",

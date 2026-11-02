@@ -7,4 +7,6 @@ afterEach(() => {
   cleanup();
   // A test that opens a page at an address must not leave it to the next.
   window.history.replaceState(null, "", "/");
+  // Nor its cart, or its outbox.
+  localStorage.clear();
 });

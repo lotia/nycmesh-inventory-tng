@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
+import { Outbox } from "./outbox";
 import { RegisterPage } from "./RegisterPage";
 import { REFUSALS } from "./registration";
 import { answering, deferred, json } from "./test-fetch";
@@ -121,4 +122,35 @@ test.each([
   render(<RegisterPage api={api} />);
   fireEvent.submit(button());
   expect((await screen.findByRole("alert")).textContent).toContain(words);
+});
+
+test("registering sends the batches that waited for it", async () => {
+  const { api, sent } = answering((request) =>
+    new URL(request.url).pathname === "/api/devices"
+      ? json({ device_id: 4 }, 201)
+      : json({ transaction_id: 12 }, 201),
+  );
+  const waiting = {
+    body: {
+      key: "0b6c4c5e-7d1a-4c55-9f4e-2f4a8d3c1b2a",
+      kind: "receipt",
+      volunteer_id: 1,
+      to_location_id: 2,
+      lines: [{ item_id: 5, quantity: "1" }],
+    },
+    what: "Receipt: 1 item",
+    queuedAt: 1,
+    state: "waiting",
+    waitingFor: "registration",
+    note: "Waiting for this browser to be registered.",
+    transactionId: null,
+  };
+  localStorage.setItem("inventory.outbox.v1", JSON.stringify([waiting]));
+  const outbox = new Outbox(api);
+  openAt("/register?code=a-b-c-d-e");
+  render(<RegisterPage api={api} outbox={outbox} />);
+  fireEvent.submit(button());
+  await screen.findByText("The batch waiting on this browser is being sent.");
+  await vi.waitFor(() => expect(outbox.entries.value[0]?.state).toBe("saved"));
+  expect(await sent[1]?.json()).toEqual(waiting.body);
 });

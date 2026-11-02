@@ -1,6 +1,7 @@
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren, TargetedSubmitEvent } from "preact";
 import { type Api, makeApi } from "./api/client";
+import { type Outbox, sharedOutbox } from "./outbox";
 import { type Outcome, REFUSALS, register } from "./registration";
 
 const CODE = "code";
@@ -25,12 +26,20 @@ function problem(outcome: Outcome | null): string | null {
 }
 
 /** The page a registration QR code opens: /register?code=<phrase>. */
-export function RegisterPage({ api = API }: { api?: Api }) {
+export function RegisterPage({
+  api = API,
+  outbox = sharedOutbox(),
+}: {
+  api?: Api;
+  outbox?: Outbox;
+}) {
   const code = useSignal(
     new URLSearchParams(window.location.search).get(CODE) ?? "",
   );
   const sending = useSignal(false);
   const outcome = useSignal<Outcome | null>(null);
+  // Batches saved here before registering, sent now (decision 0009).
+  const waiting = useSignal(0);
 
   async function submit(event: TargetedSubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,6 +58,10 @@ export function RegisterPage({ api = API }: { api?: Api }) {
       const url = new URL(window.location.href);
       url.searchParams.delete(CODE);
       window.history.replaceState(null, "", url);
+      waiting.value = outbox.entries.value.filter(
+        (entry) => entry.state === "waiting",
+      ).length;
+      void outbox.send();
     }
   }
 
@@ -56,6 +69,13 @@ export function RegisterPage({ api = API }: { api?: Api }) {
     return (
       <Page>
         <p role="status">This browser is registered.</p>
+        {waiting.value > 0 && (
+          <p>
+            {waiting.value === 1
+              ? "The batch waiting on this browser is being sent."
+              : `The ${waiting.value} batches waiting on this browser are being sent.`}
+          </p>
+        )}
         <p>
           <a href="/scan">Go to the scan page</a>
         </p>
