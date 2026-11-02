@@ -1,0 +1,59 @@
+{% extends "admin_base.html" %}
+{% block main %}
+{% set here = request.url.path %}
+{% with name = "volunteer" %}{% if problems.get(name) %}<p role="alert">{{ problems[name] }}</p>{% endif %}{% endwith %}
+{% if merged_into %}
+<p>A duplicate, merged into <a href="{{ here.rsplit('/', 1)[0] }}/{{ merged_into.id }}">{{ merged_into.name }}</a>: their past records count as theirs.</p>
+{% elif volunteer.retired_at %}
+<p>Retired: the scan page doesn't offer them.</p>
+{% endif %}
+
+<form method="post" action="{{ here }}">
+  <label>Name
+    <input name="name" value="{{ values.get('name', volunteer.name) }}" maxlength="{{ name_max }}" required>
+    {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  <label>Email <span class="hint">optional</span>
+    <input name="email" type="email" value="{{ values.get('email', volunteer.email or '') }}">
+    {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  <button>Save</button>
+</form>
+
+{% if not volunteer.retired_at %}
+<section>
+  <h2>Holding stock</h2>
+  {% if custody %}
+  <p>They can hold stock: it shows as theirs, wherever they take it.</p>
+  <form method="post" action="{{ here }}/custody/end"><button>Stop</button></form>
+  {% else %}
+  <p>They don't hold stock: what they take goes straight to an install or another place.</p>
+  <form method="post" action="{{ here }}/custody"><button>Let them hold stock</button></form>
+  {% endif %}
+</section>
+
+{% if others %}
+<section>
+  <h2>A duplicate?</h2>
+  <form method="post" action="{{ here }}/merge" class="actions">
+    <label>Merge into
+      <select name="into_id" required>
+        <option value="">Pick who they duplicate</option>
+        {% for other in others %}<option value="{{ other.id }}">{{ other.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <button>Merge</button>
+  </form>
+</section>
+{% endif %}
+{% endif %}
+
+<section class="actions">
+  {% if volunteer.retired_at %}
+  <form method="post" action="{{ here }}/restore"><button>Bring back</button></form>
+  {% else %}
+  <form method="post" action="{{ here }}/retire"><button>Retire</button></form>
+  {% endif %}
+  <a href="{{ here.rsplit('/', 1)[0] }}">All volunteers</a>
+</section>
+{% endblock %}
