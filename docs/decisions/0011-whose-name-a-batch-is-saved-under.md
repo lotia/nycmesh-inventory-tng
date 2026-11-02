@@ -30,11 +30,10 @@ makes everyone pick their name again for every batch.
   not stop anyone saving.
 - **Administrators set the time**, in the database, not in the server's
   configuration: `scan_settings.name_check_minutes`, 15 minutes to begin
-  with, where 0 never asks. Changes are recorded with who made them, like
-  any catalogue change. Until the administrator pages exist
-  (inventory-tng-8i4.14), `python -m inventory_tng.scan_settings` changes it.
-  The page reads it with the catalogue, which a page left open fetches
-  again every ten minutes, so a change reaches even a hub tablet that is
+  with, where 0 never asks, changed on the administrators' Settings page.
+  Changes are recorded with who made them, like any catalogue change. The
+  page reads it with the catalogue, which a page left open fetches again
+  every ten minutes, so a change reaches even a hub tablet that is
   never reloaded.
 
 ## Options weighed

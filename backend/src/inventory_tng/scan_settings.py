@@ -1,5 +1,5 @@
-"""How the scan page behaves, from the command line, until administrator pages
-exist (inventory-tng-8i4.14):
+"""How the scan page behaves, from the command line: the operator's fallback,
+as administrators use the Settings page (admin/settings.py):
 
     uv run python -m inventory_tng.scan_settings show
     uv run python -m inventory_tng.scan_settings set --name-check-minutes 20

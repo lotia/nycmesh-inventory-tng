@@ -139,15 +139,7 @@ If no administrator can, the operator can make one on the server:
 
 ## Scan page settings
 
-Administrators set how the scan page behaves; the settings live in the
-database. Until there are administrator pages, change them on the server:
-
-```sh
-cd backend
-uv run python -m inventory_tng.scan_settings show
-uv run python -m inventory_tng.scan_settings set --name-check-minutes 20
-```
-
-`--name-check-minutes` is how long a phone goes unused before the page asks
-whether the name chosen is still the person holding it; 0 never asks
-(docs/decisions/0011).
+Administrators set how the scan page behaves on the Settings page; the
+settings live in the database (docs/decisions/0011). If no administrator
+can, the operator can on the server: `uv run python -m
+inventory_tng.scan_settings set --name-check-minutes 20`.
