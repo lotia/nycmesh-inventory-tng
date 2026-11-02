@@ -1,0 +1,102 @@
+{% extends "admin_base.html" %}
+{% block main %}
+<section>
+  <h2>Email</h2>
+  <form method="post" action="{{ paths.account }}/email">
+    <label>Email <span class="hint">optional: lets you reset your own password</span>
+      <input name="email" type="email" value="{{ values.get('email', admin.email or '') }}" autocomplete="email">
+      {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <button>Save email</button>
+  </form>
+</section>
+
+<section>
+  <h2>Password</h2>
+  <form method="post" action="{{ paths.account }}/password">
+    <label>New password <span class="hint">at least {{ limits.password_min }} characters</span>
+      <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required>
+      {% with name = "password" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <label>New password again
+      <input name="password_again" type="password" autocomplete="new-password" required>
+    </label>
+    <button>Change password</button>
+  </form>
+  <p class="hint">Changing it signs you out everywhere else.</p>
+</section>
+
+<section>
+  <h2>Authenticators</h2>
+  {% with name = "authenticators" %}{% include "_field_problem.html" %}{% endwith %}
+  {% if authenticators %}
+  <table>
+    <tr><th>Name</th><th>Added</th><th>Last used</th><th></th></tr>
+    {% for authenticator, last_used in authenticators %}
+    <tr>
+      <td>
+        <form method="post" action="{{ paths.account }}/authenticators/{{ authenticator.id }}/name" class="inline">
+          <input name="authenticator_name" value="{{ authenticator.name }}" maxlength="{{ limits.authenticator_name_max }}" aria-label="Name" required>
+          <button>Rename</button>
+        </form>
+        {% with name = "authenticator_" ~ authenticator.id %}{% include "_field_problem.html" %}{% endwith %}
+      </td>
+      <td>{{ authenticator.created_at | when(zone) }}</td>
+      <td>{{ last_used | when(zone) if last_used else "never" }}</td>
+      <td>
+        <form method="post" action="{{ paths.account }}/authenticators/{{ authenticator.id }}/remove">
+          <button>Remove</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if totp_optional and authenticators | length == 1 %}
+  <p class="hint">Removing your only one turns TOTP off: your password alone
+  will sign you in.</p>
+  {% endif %}
+  <p><a href="{{ paths.new_authenticator }}">Add another</a>, such as a new
+  phone, before removing the old one.</p>
+  {% else %}
+  <p>You sign in with your password alone.
+  <a href="{{ paths.new_authenticator }}">Set up an authenticator</a> to need
+  a code as well.</p>
+  {% endif %}
+</section>
+
+{% if authenticators %}
+<section>
+  <h2>Recovery codes</h2>
+  {% with name = "recovery_codes" %}{% include "_field_problem.html" %}{% endwith %}
+  <p>{{ recovery_codes_left }} left{% if recovery_codes_left < 4 %}: make new ones
+  soon{% endif %}. Making new ones voids the old.</p>
+  <form method="post" action="{{ paths.account }}/recovery-codes">
+    <button>Make new recovery codes</button>
+  </form>
+</section>
+{% endif %}
+
+<section>
+  <h2>Where you're signed in</h2>
+  <table>
+    <tr><th>Browser</th><th>Signed in</th><th>Last used</th><th></th></tr>
+    {% for row in sessions %}
+    <tr>
+      <td>{{ (row.user_agent or "Unknown") | truncate(60) }}{% if row.id == this_session %} <strong>(this one)</strong>{% endif %}</td>
+      <td>{{ row.created_at | when(zone) }}</td>
+      <td>{{ row.last_seen_at | when(zone) }}</td>
+      <td>
+        <form method="post" action="{{ paths.account }}/sessions/{{ row.id }}/end">
+          <button>{{ "Sign out" if row.id == this_session else "End" }}</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if sessions | length > 1 %}
+  <form method="post" action="{{ paths.account }}/sessions/end-others">
+    <button>Sign out everywhere else</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

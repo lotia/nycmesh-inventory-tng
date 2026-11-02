@@ -20,18 +20,26 @@
     fieldset { margin-top: 1.5rem; border: 1px solid #8888; padding: 0 1rem 1rem; }
     header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
     header form button { margin: 0; }
+    section { margin-top: 2rem; }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { text-align: left; padding: 0.35rem 0.5rem 0.35rem 0; vertical-align: top; }
+    td form, td button { margin: 0; display: inline; }
+    .inline { display: flex; gap: 0.5rem; align-items: end; }
+    .inline input { margin: 0; }
+    [role=status] { border-left: 4px solid #2e7d32; padding: 0.5rem 0.75rem; }
   </style>
 </head>
 <body>
   {% if admin %}
   <header>
-    <span>Signed in as <strong>{{ admin.username }}</strong></span>
+    <span>Signed in as <a href="{{ paths.account }}"><strong>{{ admin.username }}</strong></a></span>
     <form method="post" action="{{ paths.sign_out }}"><button>Sign out</button></form>
   </header>
   {% endif %}
   <main>
     <h1>{{ title }}</h1>
     {% if alert %}<p role="alert">{{ alert }}</p>{% endif %}
+    {% if notice %}<p role="status">{{ notice }}</p>{% endif %}
     {% block main %}{% endblock %}
   </main>
 </body>

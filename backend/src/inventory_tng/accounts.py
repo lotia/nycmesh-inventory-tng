@@ -230,15 +230,7 @@ def _recovery_digest(typed: str) -> bytes:
 def make_recovery_codes(session: Session, admin_id: int, now: datetime) -> list[str]:
     """New codes, which void any still unused: the only time they are
     known. Label codes' alphabet, which is hard to misread."""
-    session.execute(
-        update(RecoveryCode)
-        .where(
-            RecoveryCode.admin_id == admin_id,
-            RecoveryCode.used_at.is_(None),
-            RecoveryCode.voided_at.is_(None),
-        )
-        .values(voided_at=now)
-    )
+    _void_recovery_codes(session, admin_id, now)
     codes = [mint_label_code() for _ in range(RECOVERY_CODES)]
     session.add_all(
         RecoveryCode(admin_id=admin_id, code_hash=_recovery_digest(code))
@@ -515,3 +507,150 @@ def create_first_admin(
     row, token = _start_session(session, admin.id, user_agent, now)
     log.info("first administrator set up", admin_id=admin.id, sign_in_id=row.id)
     return FirstAdmin(admin, row, token, codes)
+
+
+# One's own account (sign_in.py's account pages)
+
+
+def change_password(
+    session: Session, row: AdminSession, password: str, now: datetime
+) -> int:
+    """A new password; every other session of theirs ends, and how many is
+    returned. The caller has checked it (password_problem) and commits."""
+    stored = session.get_one(AdminPassword, row.admin_id)
+    stored.password_hash, stored.changed_at = hash_password(password), now
+    ended = end_sessions(session, row.admin_id, now, keep=row.id)
+    log.info("password changed", admin_id=row.admin_id, sessions_ended=ended)
+    return ended
+
+
+def change_email(session: Session, admin: Admin, email: str | None) -> None:
+    """Checked by email_problem; a clash with another administrator's is an
+    IntegrityError on flush."""
+    admin.email = email or None
+    session.flush()
+    log.info("email changed", admin_id=admin.id, has_email=admin.email is not None)
+
+
+def authenticators(session: Session, admin_id: int) -> list[Authenticator]:
+    return list(
+        session.scalars(
+            select(Authenticator)
+            .where(*_current(admin_id))
+            .order_by(Authenticator.created_at, Authenticator.id)
+        )
+    )
+
+
+def _own_authenticator(
+    session: Session, admin_id: int, authenticator_id: int
+) -> Authenticator | None:
+    found = session.get(Authenticator, authenticator_id, with_for_update=True)
+    if found is None or found.admin_id != admin_id or found.retired_at is not None:
+        return None
+    return found
+
+
+def rename_authenticator(
+    session: Session, admin_id: int, authenticator_id: int, name: str
+) -> bool:
+    """False if it is not one of theirs. A name they already use is an
+    IntegrityError on flush."""
+    found = _own_authenticator(session, admin_id, authenticator_id)
+    if found is None:
+        return False
+    found.name = name
+    session.flush()
+    log.info("authenticator renamed", admin_id=admin_id, authenticator_id=found.id)
+    return True
+
+
+Removal = Literal["removed", "missing", "last_required"]
+
+
+def remove_authenticator(
+    session: Session, admin_id: int, authenticator_id: int, now: datetime
+) -> Removal:
+    """Its key is wiped. The last one goes only while TOTP is optional, and
+    takes the recovery codes with it: TOTP is then off."""
+    # Locked in order, so two removals cannot each leave the other's last.
+    current = locked_authenticators(session, admin_id)
+    found = next((a for a in current if a.id == authenticator_id), None)
+    if found is None:
+        return "missing"
+    if len(current) == 1 and sign_in_settings(session).totp_policy == "required":
+        return "last_required"
+    found.totp_key, found.retired_at = None, now
+    if len(current) == 1:
+        _void_recovery_codes(session, admin_id, now)
+    log.info(
+        "authenticator removed",
+        admin_id=admin_id,
+        authenticator_id=found.id,
+        totp_off=len(current) == 1,
+    )
+    return "removed"
+
+
+def recovery_codes_left(session: Session, admin_id: int) -> int:
+    return (
+        session.scalar(
+            select(func.count()).where(
+                RecoveryCode.admin_id == admin_id,
+                RecoveryCode.used_at.is_(None),
+                RecoveryCode.voided_at.is_(None),
+            )
+        )
+        or 0
+    )
+
+
+def _void_recovery_codes(session: Session, admin_id: int, now: datetime) -> None:
+    session.execute(
+        update(RecoveryCode)
+        .where(
+            RecoveryCode.admin_id == admin_id,
+            RecoveryCode.used_at.is_(None),
+            RecoveryCode.voided_at.is_(None),
+        )
+        .values(voided_at=now)
+    )
+
+
+def current_sessions(
+    session: Session, admin_id: int, now: datetime
+) -> list[AdminSession]:
+    """Their sessions still going, most recently used first."""
+    return list(
+        session.scalars(
+            select(AdminSession)
+            .where(
+                AdminSession.admin_id == admin_id,
+                AdminSession.ended_at.is_(None),
+                AdminSession.expires_at > now,
+            )
+            .order_by(AdminSession.last_seen_at.desc(), AdminSession.id.desc())
+        )
+    )
+
+
+def end_sessions(
+    session: Session,
+    admin_id: int,
+    now: datetime,
+    *,
+    only: int | None = None,
+    keep: int | None = None,
+) -> int:
+    """End their sessions: just `only`, or all but `keep`. How many ended."""
+    query = update(AdminSession).where(
+        AdminSession.admin_id == admin_id, AdminSession.ended_at.is_(None)
+    )
+    if only is not None:
+        query = query.where(AdminSession.id == only)
+    if keep is not None:
+        query = query.where(AdminSession.id != keep)
+    ended = session.execute(query.values(ended_at=now).returning(AdminSession.id)).all()
+    if ended:
+        log.info("sessions ended", admin_id=admin_id, count=len(ended))
+    return len(ended)

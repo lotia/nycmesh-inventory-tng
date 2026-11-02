@@ -9,7 +9,16 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 
-from inventory_tng import bundle, catalogue, db, devices, health, ledger, sign_in
+from inventory_tng import (
+    account,
+    bundle,
+    catalogue,
+    db,
+    devices,
+    health,
+    ledger,
+    sign_in,
+)
 from inventory_tng.cross_site import CrossSiteRefusal
 from inventory_tng.db import make_engine
 from inventory_tng.request_logging import RequestLogging
@@ -58,6 +67,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(catalogue.router, prefix=API)
     app.include_router(bundle.router)
     app.include_router(sign_in.router)
+    app.include_router(account.router)
     bundle.install(app, settings)
     db.install(app)
     devices.install(app)

@@ -230,7 +230,7 @@ def test_signing_in_with_all_three(client: TestClient, session: Session) -> None
     assert "SameSite=lax" in cookie
     page = client.get(sign_in.HOME)
     assert page.status_code == 200
-    assert "Signed in as <strong>ada</strong>" in page.text
+    assert "<strong>ada</strong>" in page.text
 
 
 def test_every_refusal_says_the_same(client: TestClient, session: Session) -> None:

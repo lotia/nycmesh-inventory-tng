@@ -1,16 +1,34 @@
 {% extends "admin_base.html" %}
 {% block main %}
 <p>This changes something that matters, so it needs a fresh
-{{ "code" if uses_totp else "password" }}.</p>
+{{ "code" if uses_totp else "password" }}.{% if retype_password %} Then
+type the new password again: passwords are never kept in a page.{% endif %}</p>
+{% if action %}
+{# A form sent once the window had closed: what was typed goes on with the code. #}
+<form method="post" action="{{ action }}">
+  {% for name, value in carried %}
+  <input type="hidden" name="{{ name }}" value="{{ value }}">
+  {% endfor %}
+{% else %}
 <form method="post" action="{{ paths.confirm }}">
   <input type="hidden" name="next" value="{{ next }}">
+{% endif %}
+  {% set name = field or "code" %}
   {% if uses_totp %}
   <label>Code <span class="hint">from your authenticator, or a recovery code</span>
-    <input name="code" autocomplete="one-time-code" maxlength="16" required autofocus>
+    <input name="{{ name }}" autocomplete="one-time-code" maxlength="16" required autofocus>
   </label>
   {% else %}
   <label>Your password
-    <input name="code" type="password" autocomplete="current-password" required autofocus>
+    <input name="{{ name }}" type="password" autocomplete="current-password" required autofocus>
+  </label>
+  {% endif %}
+  {% if retype_password %}
+  <label>New password
+    <input name="password" type="password" autocomplete="new-password" required>
+  </label>
+  <label>New password again
+    <input name="password_again" type="password" autocomplete="new-password" required>
   </label>
   {% endif %}
   <button>Confirm</button>
