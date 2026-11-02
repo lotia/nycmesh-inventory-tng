@@ -259,6 +259,20 @@ class FailingMail:
 
 
 @pytest.fixture
+def admin_client(
+    make_client: Callable[..., TestClient], session: Session
+) -> TestClient:
+    """A client signed in as an administrator, Ada, with the confirmation
+    window open."""
+    from test_sign_in import code, new_admin, sign_in_with
+
+    client = make_client()
+    _, key = new_admin(session)
+    assert sign_in_with(client, code=code(key)).status_code == 303
+    return client
+
+
+@pytest.fixture
 def make_client(
     make_app: Callable[..., FastAPI],
 ) -> Iterator[Callable[..., TestClient]]:

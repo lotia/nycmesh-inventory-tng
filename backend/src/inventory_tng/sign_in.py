@@ -591,13 +591,6 @@ def confirm(
 # Pages
 
 
-@router.get(HOME)
-def home(request: Request, signed: AdminSignedIn) -> Response:
-    return page(
-        request, "admin_home.html", {"title": "Inventory", "admin": signed.admin}
-    )
-
-
 def _new_authenticator_page(
     request: Request,
     signed: SignedIn,

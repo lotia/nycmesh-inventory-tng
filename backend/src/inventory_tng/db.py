@@ -152,6 +152,24 @@ def record_last_seen(
         )
 
 
+def unique(session: Session, change: Callable[[], object]) -> bool:
+    """Run `change` in a savepoint; False if it broke a unique index, as
+    PostgreSQL compares names (ignoring case, among current rows), with
+    nothing of it kept. Any other failure is raised."""
+    try:
+        with session.begin_nested():
+            change()
+            session.flush()
+    except exc.IntegrityError as error:
+        if getattr(error.orig, "sqlstate", None) != UNIQUE_VIOLATION:
+            raise
+        return False
+    return True
+
+
+UNIQUE_VIOLATION = "23505"
+
+
 def describe_error(error: exc.SQLAlchemyError) -> dict[str, str]:
     """What may be logged about a database error. Never its message:
     PostgreSQL's text can quote values, as a unique violation names the
