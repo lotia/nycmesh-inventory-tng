@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 
-from inventory_tng import bundle, db, devices, health, ledger
+from inventory_tng import bundle, catalogue, db, devices, health, ledger
 from inventory_tng.db import make_engine
 from inventory_tng.request_logging import RequestLogging
 from inventory_tng.settings import Settings
@@ -53,6 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router, prefix=API)
     app.include_router(devices.router, prefix=API)
     app.include_router(ledger.router, prefix=API)
+    app.include_router(catalogue.router, prefix=API)
     app.include_router(bundle.router)
     bundle.install(app, settings)
     db.install(app)

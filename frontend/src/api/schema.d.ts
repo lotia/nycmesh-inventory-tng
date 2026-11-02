@@ -64,6 +64,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/catalogue": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Catalogue
+     * @description Everything current that a cart can hold, and who can fill one.
+     */
+    get: operations["get_catalogue_api_catalogue_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -91,6 +111,17 @@ export interface components {
       /** Lines */
       lines: components["schemas"]["Line"][];
     };
+    /** Catalogue */
+    Catalogue: {
+      /** Volunteers */
+      volunteers: components["schemas"]["VolunteerEntry"][];
+      /** Locations */
+      locations: components["schemas"]["LocationEntry"][];
+      /** Items */
+      items: components["schemas"]["ItemEntry"][];
+      /** Labels */
+      labels: components["schemas"]["LabelEntry"][];
+    };
     /** CodeRefusedReply */
     CodeRefusedReply: {
       /**
@@ -117,6 +148,25 @@ export interface components {
       /** Status */
       status: string;
     };
+    /** ItemEntry */
+    ItemEntry: {
+      /** Id */
+      id: number;
+      /** Name */
+      name: string;
+      /** Unit */
+      unit: string;
+      /** Category */
+      category: string;
+      /** Manufacturer */
+      manufacturer: string | null;
+      /** Part Number */
+      part_number: string | null;
+      /** Old Code */
+      old_code: string | null;
+      /** Packages */
+      packages: components["schemas"]["PackageEntry"][];
+    };
     /** KeyReusedReply */
     KeyReusedReply: {
       /**
@@ -125,12 +175,46 @@ export interface components {
        */
       reason: "key_reused";
     };
+    /**
+     * LabelEntry
+     * @description A printed code, and the one thing it names.
+     */
+    LabelEntry: {
+      /** Code */
+      code: string;
+      /** Item Id */
+      item_id: number | null;
+      /** Package Id */
+      package_id: number | null;
+      /** Location Id */
+      location_id: number | null;
+    };
     /** Line */
     Line: {
       /** Item Id */
       item_id: number;
       /** Quantity */
       quantity: number | string;
+    };
+    /** LocationEntry */
+    LocationEntry: {
+      /** Id */
+      id: number;
+      /** Name */
+      name: string;
+      /** Kind */
+      kind: string;
+      /** Parent Id */
+      parent_id: number | null;
+    };
+    /** PackageEntry */
+    PackageEntry: {
+      /** Id */
+      id: number;
+      /** Name */
+      name: string;
+      /** Size */
+      size: string;
     };
     /** RateLimitedReply */
     RateLimitedReply: {
@@ -175,6 +259,13 @@ export interface components {
       input?: unknown;
       /** Context */
       ctx?: Record<string, never>;
+    };
+    /** VolunteerEntry */
+    VolunteerEntry: {
+      /** Id */
+      id: number;
+      /** Name */
+      name: string;
     };
   };
   responses: never;
@@ -330,6 +421,44 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description The database cannot answer; try again */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["UnavailableReply"];
+        };
+      };
+    };
+  };
+  get_catalogue_api_catalogue_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Catalogue"];
+        };
+      };
+      /** @description This device is not registered */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DeviceRefusedReply"];
         };
       };
       /** @description The database cannot answer; try again */

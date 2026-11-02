@@ -181,6 +181,45 @@
           }
         }
       }
+    },
+    "/api/catalogue": {
+      "get": {
+        "summary": "Get Catalogue",
+        "description": "Everything current that a cart can hold, and who can fill one.",
+        "operationId": "get_catalogue_api_catalogue_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Catalogue"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database cannot answer; try again",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnavailableReply"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This device is not registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRefusedReply"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -256,6 +295,41 @@
         "required": ["key", "kind", "volunteer_id", "lines"],
         "title": "Batch"
       },
+      "Catalogue": {
+        "properties": {
+          "volunteers": {
+            "items": {
+              "$ref": "#/components/schemas/VolunteerEntry"
+            },
+            "type": "array",
+            "title": "Volunteers"
+          },
+          "locations": {
+            "items": {
+              "$ref": "#/components/schemas/LocationEntry"
+            },
+            "type": "array",
+            "title": "Locations"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemEntry"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/LabelEntry"
+            },
+            "type": "array",
+            "title": "Labels"
+          }
+        },
+        "type": "object",
+        "required": ["volunteers", "locations", "items", "labels"],
+        "title": "Catalogue"
+      },
       "CodeRefusedReply": {
         "properties": {
           "reason": {
@@ -304,6 +378,78 @@
         "required": ["status"],
         "title": "Health"
       },
+      "ItemEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "manufacturer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer"
+          },
+          "part_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Part Number"
+          },
+          "old_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Code"
+          },
+          "packages": {
+            "items": {
+              "$ref": "#/components/schemas/PackageEntry"
+            },
+            "type": "array",
+            "title": "Packages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "unit",
+          "category",
+          "manufacturer",
+          "part_number",
+          "old_code",
+          "packages"
+        ],
+        "title": "ItemEntry"
+      },
       "KeyReusedReply": {
         "properties": {
           "reason": {
@@ -315,6 +461,51 @@
         "type": "object",
         "required": ["reason"],
         "title": "KeyReusedReply"
+      },
+      "LabelEntry": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Id"
+          },
+          "package_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Id"
+          },
+          "location_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Id"
+          }
+        },
+        "type": "object",
+        "required": ["code", "item_id", "package_id", "location_id"],
+        "title": "LabelEntry",
+        "description": "A printed code, and the one thing it names."
       },
       "Line": {
         "properties": {
@@ -340,6 +531,55 @@
         "type": "object",
         "required": ["item_id", "quantity"],
         "title": "Line"
+      },
+      "LocationEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          }
+        },
+        "type": "object",
+        "required": ["id", "name", "kind", "parent_id"],
+        "title": "LocationEntry"
+      },
+      "PackageEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "size": {
+            "type": "string",
+            "title": "Size"
+          }
+        },
+        "type": "object",
+        "required": ["id", "name", "size"],
+        "title": "PackageEntry"
       },
       "RateLimitedReply": {
         "properties": {
@@ -433,6 +673,21 @@
         "type": "object",
         "required": ["loc", "msg", "type"],
         "title": "ValidationError"
+      },
+      "VolunteerEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": ["id", "name"],
+        "title": "VolunteerEntry"
       }
     }
   }
