@@ -3,8 +3,11 @@ server and dropped when the run ends. Each test's writes are rolled back."""
 
 import logging
 import os
+import re
+import time
 import uuid
 from collections.abc import Callable, Iterator
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -31,7 +34,7 @@ log = structlog.get_logger(__name__)
 
 
 # The app's settings a developer may export, which would change what tests
-# see. DATABASE_URL stays: the tests read it themselves (below).
+# see. DATABASE_URL is replaced, below.
 FROM_THE_SHELL = (
     "APP_ENV",
     "UNMASK_SECRETS",
@@ -49,6 +52,10 @@ def no_settings_from_the_shell() -> Iterator[None]:
         for name in list(os.environ):
             if name.startswith(("OTEL_", "LOG_")) or name in FROM_THE_SHELL:
                 monkeypatch.delenv(name)
+        # Code that reads DATABASE_URL itself, such as a command's main(),
+        # finds no database at all rather than the developer's: a test that
+        # needs one takes database_url, the run's own.
+        monkeypatch.setenv("DATABASE_URL", NO_DATABASE)
         yield
 
 
@@ -90,11 +97,43 @@ SERVER_URL = Settings(
 ).database_url
 
 
+# What DATABASE_URL is during the tests: nothing listens on port 1.
+NO_DATABASE = "postgresql://nobody@127.0.0.1:1/use_the_database_url_fixture"
+
+# Each run's database is named for when it began, so a run that never got to
+# drop its own (killed, or crashed) is dropped by a later one.
+TEST_DATABASE = re.compile(r"test_(\d+)_[0-9a-f]{8}")
+LEFT_BEHIND = timedelta(hours=1)
+
+
+def drop_left_behind(server: Engine, now: float) -> list[str]:
+    """Test databases from runs that began over an hour ago and that nothing
+    is connected to: never a run still going."""
+    with server.connect() as connection:
+        idle = connection.scalars(
+            text(
+                "SELECT datname FROM pg_database WHERE datname LIKE 'test\\_%' "
+                "AND datname NOT IN (SELECT datname FROM pg_stat_activity "
+                "WHERE datname IS NOT NULL)"
+            )
+        ).all()
+        dropped = []
+        for name in idle:
+            match = TEST_DATABASE.fullmatch(name)
+            if match and now - int(match.group(1)) > LEFT_BEHIND.total_seconds():
+                connection.execute(text(f'DROP DATABASE IF EXISTS "{name}"'))
+                dropped.append(name)
+    if dropped:
+        log.info("dropped test databases left behind", databases=dropped)
+    return dropped
+
+
 @pytest.fixture(scope="session")
 def database_url() -> Iterator[str]:
-    name = f"test_{uuid.uuid4().hex[:12]}"
+    name = f"test_{int(time.time())}_{uuid.uuid4().hex[:8]}"
     server = make_engine(SERVER_URL).execution_options(isolation_level="AUTOCOMMIT")
     try:
+        drop_left_behind(server, time.time())
         with server.connect() as connection:
             connection.execute(text(f'CREATE DATABASE "{name}"'))
         log.info("created test database", database=name)
