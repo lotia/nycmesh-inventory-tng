@@ -464,10 +464,9 @@ class Movement(Base):
 
 
 class ScanSettings(Base):
-    """How the scan page behaves, which administrators set. One row, id 1,
-    made by its migration; changed with `python -m inventory_tng.scan_settings`
-    until the administrator pages (inventory-tng-8i4.14). Changes are history
-    like everything else."""
+    """How the scan page behaves, which administrators set on the Settings
+    page (admin/settings.py). One row, id 1, made by its migration. Changes
+    are history like everything else."""
 
     __tablename__ = "scan_settings"
     __table_args__ = (
