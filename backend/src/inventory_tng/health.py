@@ -15,7 +15,7 @@ class Health(BaseModel):
     status: str
 
 
-@router.get(PATH, responses={503: {"description": "The database is unreachable"}})
+@router.get(PATH)
 def healthz(session: DbSession) -> Health:
     """Answers once the database does. db.install() makes a failure a 503."""
     session.execute(text("SELECT 1"))

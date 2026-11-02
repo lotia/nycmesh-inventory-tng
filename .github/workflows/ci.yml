@@ -52,8 +52,14 @@ jobs:
         with:
           node-version-file: mise.toml
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: |
+            frontend/package-lock.json
+            frontend/tools/openapi/package-lock.json
       - run: npm ci
+      # The generated API types must match the committed schema.
+      - run: npm run api
+      # New files count too: intent-to-add puts them in the diff.
+      - run: git add --intent-to-add src/api && git diff --exit-code -- src/api
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test

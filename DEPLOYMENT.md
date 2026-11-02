@@ -93,5 +93,7 @@ uv run python -m inventory_tng.registration_codes create --uses 5 --days 1 \
     --base-url https://<your host>
 ```
 
-It prints a phrase, a link and a QR code, once. `revoke`, `devices` and
-`revoke-device` manage codes and devices; `--help` lists them.
+It prints a phrase, a link and a QR code, once. The link and the QR code
+open the registration page with the phrase filled in; the phrase can also be
+typed there, at `/register`. `revoke`, `devices` and `revoke-device` manage
+codes and devices; `--help` lists them.

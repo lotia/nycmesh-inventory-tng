@@ -9,10 +9,12 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "fix": "biome check --write .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "api": "npm ci --prefix tools/openapi --no-audit --no-fund && npm run --prefix tools/openapi generate && biome format --write src/api"
   },
   "dependencies": {
     "@preact/signals": "2.11.4",
+    "openapi-fetch": "0.17.0",
     "preact": "11.1.1"
   },
   "devDependencies": {

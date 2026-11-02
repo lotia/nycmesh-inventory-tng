@@ -5,3 +5,20 @@ body {
   max-width: 40rem;
   padding: 1rem;
 }
+
+label {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+input,
+button {
+  font: inherit;
+  padding: 0.5rem 0.75rem;
+}
+
+input {
+  box-sizing: border-box;
+  margin-bottom: 0.75rem;
+  width: 100%;
+}

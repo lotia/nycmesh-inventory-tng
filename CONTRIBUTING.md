@@ -100,6 +100,20 @@ pages' scripts come from in its `frontend` log line at startup:
 The camera and Save work only over HTTPS or on `localhost`, so a phone on
 your network cannot use them yet; inventory-tng-8i4.13.2 is for that.
 
+The pages call the API through types generated from its schema. After you
+change an endpoint, regenerate both, and commit `frontend/src/api/`:
+
+```sh
+cd backend
+uv run python -m inventory_tng.openapi   # frontend/src/api/openapi.json
+cd ../frontend
+npm run api                              # frontend/src/api/schema.d.ts
+```
+
+A backend test fails while the schema is out of date, and CI fails while the
+types are. `npm run api` installs the generator from `frontend/tools/openapi/`
+first, which has its own TypeScript 5 (docs/decisions/0010).
+
 ### Registering a device
 
 Pages that record anything need a registered device (docs/decisions/0009).
@@ -109,9 +123,10 @@ Until administrator pages exist, make a code from the command line:
 uv run python -m inventory_tng.registration_codes create --uses 1 --days 1
 ```
 
-It prints a phrase, once, to send to `POST /api/devices` as `{"code": ...}`.
-With `--base-url http://<your-laptop>:8000` it also prints the link and a QR
-code for a phone. With `APP_ENV=development` the cookie works over plain http.
+It prints a phrase, once. Enter it at <http://127.0.0.1:8000/register>.
+With `--base-url http://<your-laptop>:8000` it also prints a link and a QR
+code that open that page with the phrase filled in. With
+`APP_ENV=development` the cookie works over plain http.
 `revoke`, `devices` and `revoke-device` do the rest; `--help` lists them.
 
 ### Running the app in a container

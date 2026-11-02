@@ -29,7 +29,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import DbSession, set_actor
-from inventory_tng.devices import Refused, RegisteredDevice
+from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
 from inventory_tng.models import (
     QUANTITY,
     Item,
@@ -241,6 +241,10 @@ class Saved(BaseModel):
     transaction_id: int
 
 
+class KeyReusedReply(BaseModel):
+    reason: Literal["key_reused"]
+
+
 PATH = "/transactions"
 
 
@@ -249,8 +253,14 @@ PATH = "/transactions"
     status_code=201,
     responses={
         200: {"model": Saved, "description": "Already written with this key"},
-        403: {"model": Refused, "description": "This device is not registered"},
-        409: {"model": Refused, "description": "The key was used for another batch"},
+        403: {
+            "model": DeviceRefusedReply,
+            "description": "This device is not registered",
+        },
+        409: {
+            "model": KeyReusedReply,
+            "description": "The key was used for another batch",
+        },
     },
 )
 def save_batch(
@@ -293,4 +303,5 @@ def install(app: FastAPI) -> None:
 
     @app.exception_handler(KeyReused)
     def key_reused(_request: Request, _error: KeyReused) -> JSONResponse:
-        return JSONResponse({"reason": "key_reused"}, status_code=409)
+        body = KeyReusedReply(reason="key_reused")
+        return JSONResponse(body.model_dump(), status_code=409)
