@@ -12,13 +12,77 @@ label {
 }
 
 input,
+select,
 button {
   font: inherit;
   padding: 0.5rem 0.75rem;
 }
 
-input {
+input,
+select {
   box-sizing: border-box;
   margin-bottom: 0.75rem;
   width: 100%;
+}
+
+fieldset {
+  border: 0;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+
+legend {
+  margin-bottom: 0.25rem;
+}
+
+/* A radio button and its words, easy to tap. */
+.choice {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.choice input {
+  margin: 0;
+  width: auto;
+}
+
+.lines,
+.matches,
+.outbox,
+.problems {
+  list-style: none;
+  padding: 0;
+}
+
+.lines > li,
+.outbox > li {
+  border-top: 1px solid #ccc;
+  padding: 0.75rem 0;
+}
+
+.matches > li {
+  padding: 0.25rem 0;
+}
+
+.total {
+  margin: 0 0 0.5rem;
+}
+
+.save {
+  font-size: 1.25rem;
+  width: 100%;
+}
+
+/* Asks, after a while unused, whether the name chosen is still yours. */
+.who {
+  border: 2px solid #b35c00;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+}
+
+.who p,
+.saving-as {
+  margin-top: 0;
 }

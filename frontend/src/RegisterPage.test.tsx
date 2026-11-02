@@ -144,6 +144,7 @@ test("registering sends the batches that waited for it", async () => {
     waitingFor: "registration",
     note: "Waiting for this browser to be registered.",
     transactionId: null,
+    failures: 0,
   };
   localStorage.setItem("inventory.outbox.v1", JSON.stringify([waiting]));
   const outbox = new Outbox(api);

@@ -1,11 +1,18 @@
 import { v4 as uuid } from "uuid";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { type Body, Outbox, RETRY_MS, STORAGE_KEY } from "./outbox";
-import { answering, json } from "./test-fetch";
+import {
+  type Draft,
+  type Entry,
+  newEntry,
+  Outbox,
+  REPORT_AFTER,
+  RETRY_MS,
+  STORAGE_KEY,
+} from "./outbox";
+import { answering, json, saved } from "./test-fetch";
 
-function batch(fields: Partial<Body> = {}): Body {
+function draft(fields: Partial<Draft> = {}): Draft {
   return {
-    key: uuid(),
     kind: "move",
     volunteer_id: 1,
     from_location_id: 1,
@@ -15,64 +22,61 @@ function batch(fields: Partial<Body> = {}): Body {
   };
 }
 
-const saved = (id = 9) => json({ transaction_id: id }, 201);
+/** An entry as storage might hold it. */
+function entry(fields: Partial<Entry> = {}): Entry {
+  return { ...newEntry({ ...draft(), key: uuid() }, "a", 1), ...fields };
+}
 
-/** Replies in turn, then this one for good. */
+function store(...entries: unknown[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+}
+
+/** Storage that reads but refuses every write. */
+const full = {
+  getItem: (key: string) => localStorage.getItem(key),
+  setItem: () => {
+    throw new DOMException("full", "QuotaExceededError");
+  },
+} as unknown as Storage;
+
+/** Replies in turn, then saves for good. */
 function replies(...queued: (() => Response | Promise<Response>)[]) {
   return () => (queued.shift() ?? saved)();
 }
 
-/** Let the outbox's sends run. */
-async function settled(outbox: Outbox) {
-  await vi.waitFor(() =>
-    expect(
-      outbox.entries.value.some((e) => e.state === "waiting" && !e.note),
-    ).toBe(false),
-  );
-}
-
+const states = (outbox: Outbox) => outbox.entries.value.map((e) => e.state);
 const stored = () => JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
+const bodies = (sent: Request[]) =>
+  Promise.all(sent.map((request) => request.clone().json()));
 
 describe("queueing", () => {
-  test("a batch is kept, sent at once, and settles as saved", async () => {
+  test("a batch gets a key, is kept, sent at once, and settles as saved", async () => {
     const { api, sent } = answering(() => saved(41));
     const outbox = new Outbox(api);
-    const body = batch();
-    expect(outbox.queue(body, "Move: 1 item")).toBe(true);
-    await settled(outbox);
-    expect(await sent[0]?.json()).toEqual(body);
+    expect(outbox.queue(draft(), "Move: 1 item")).toBe(true);
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
+    const [kept] = outbox.entries.value;
+    expect(kept).toMatchObject({ transactionId: 41, what: "Move: 1 item" });
+    expect(kept?.body.key).toMatch(/^[0-9a-f-]{36}$/);
+    expect(await bodies(sent)).toEqual([kept?.body]);
     expect(new URL(sent[0]?.url ?? "").pathname).toBe("/api/transactions");
-    const [entry] = outbox.entries.value;
-    expect(entry).toMatchObject({
-      state: "saved",
-      transactionId: 41,
-      what: "Move: 1 item",
-    });
     expect(stored()).toEqual(outbox.entries.value);
   });
 
-  test("the same key twice is one batch, sent once", async () => {
-    const { api, sent } = answering(() => saved());
+  test("each batch queued gets a key of its own", () => {
+    const { api } = answering(() => json({ reason: "unregistered" }, 403));
     const outbox = new Outbox(api);
-    const body = batch();
-    outbox.queue(body, "a");
-    outbox.queue(body, "a");
-    await settled(outbox);
-    expect(outbox.entries.value).toHaveLength(1);
-    expect(sent).toHaveLength(1);
+    outbox.queue(draft(), "a");
+    outbox.queue(draft(), "b");
+    const [first, second] = outbox.entries.value.map((e) => e.body.key);
+    expect(first).not.toBe(second);
   });
 
-  test("a browser that will not store it says so, and nothing is sent", () => {
+  test("a browser that will not store it says so, shows and sends nothing", () => {
     const { api, sent } = answering(() => saved());
-    const full = {
-      ...localStorage,
-      getItem: () => null,
-      setItem: () => {
-        throw new DOMException("full", "QuotaExceededError");
-      },
-    } as unknown as Storage;
     const outbox = new Outbox(api, full);
-    expect(outbox.queue(batch(), "a")).toBe(false);
+    expect(outbox.queue(draft(), "a")).toBe(false);
+    expect(outbox.entries.value).toEqual([]);
     expect(sent).toEqual([]);
   });
 });
@@ -91,18 +95,15 @@ describe("sending again", () => {
     async (_name, first) => {
       const { api, sent } = answering(replies(first));
       const outbox = new Outbox(api);
-      const body = batch();
-      outbox.queue(body, "a");
+      outbox.queue(draft(), "a");
       await vi.waitFor(() =>
         expect(outbox.entries.value[0]?.waitingFor).toBe("network"),
       );
-      expect(outbox.entries.value[0]?.state).toBe("waiting");
+      expect(states(outbox)).toEqual(["waiting"]);
       await vi.advanceTimersByTimeAsync(RETRY_MS);
-      await vi.waitFor(() =>
-        expect(outbox.entries.value[0]?.state).toBe("saved"),
-      );
-      const bodies = await Promise.all(sent.map((request) => request.json()));
-      expect(bodies).toEqual([body, body]);
+      await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
+      const body = outbox.entries.value[0]?.body;
+      expect(await bodies(sent)).toEqual([body, body]);
     },
   );
 
@@ -111,8 +112,7 @@ describe("sending again", () => {
       replies(() => json({ reason: "unregistered" }, 403)),
     );
     const outbox = new Outbox(api);
-    const body = batch();
-    outbox.queue(body, "a");
+    outbox.queue(draft(), "a");
     await vi.waitFor(() =>
       expect(outbox.entries.value[0]?.waitingFor).toBe("registration"),
     );
@@ -120,42 +120,120 @@ describe("sending again", () => {
     await vi.advanceTimersByTimeAsync(RETRY_MS * 3);
     expect(sent).toHaveLength(1);
     await outbox.send();
-    expect(outbox.entries.value[0]?.state).toBe("saved");
-    expect(await sent[1]?.json()).toEqual(body);
+    expect(states(outbox)).toEqual(["saved"]);
+    const [once, again] = await bodies(sent);
+    expect(again).toEqual(once);
+  });
+
+  test("an unregistered device notes every waiting batch", async () => {
+    const { api } = answering(() => json({ reason: "unregistered" }, 403));
+    store(entry(), entry());
+    const outbox = new Outbox(api);
+    await outbox.send();
+    expect(outbox.entries.value.map((e) => e.waitingFor)).toEqual([
+      "registration",
+      "registration",
+    ]);
+  });
+
+  test("a server that can't save just now says so, not that there was no answer", async () => {
+    const { api } = answering(() =>
+      json({ reason: "database_unavailable" }, 503),
+    );
+    const outbox = new Outbox(api);
+    outbox.queue(draft(), "a");
+    await vi.waitFor(() =>
+      expect(outbox.entries.value[0]?.note).toBe(
+        "The inventory can't save just now. Trying again shortly.",
+      ),
+    );
   });
 
   test("a revoked device is told to register again", async () => {
     const { api } = answering(() => json({ reason: "revoked" }, 403));
     const outbox = new Outbox(api);
-    outbox.queue(batch(), "a");
+    outbox.queue(draft(), "a");
     await vi.waitFor(() =>
       expect(outbox.entries.value[0]?.note).toContain("withdrawn"),
     );
   });
 
-  test("a batch that cannot go now holds back the ones after it", async () => {
+  test("no answer holds back the batches after it", async () => {
     const { api, sent } = answering(
       replies(() => json({ reason: "database_unavailable" }, 503)),
     );
     const outbox = new Outbox(api);
-    const first = batch();
-    const second = batch();
-    outbox.queue(first, "first");
+    outbox.queue(draft(), "first");
     await vi.waitFor(() =>
       expect(outbox.entries.value[0]?.waitingFor).toBe("network"),
     );
-    outbox.queue(second, "second");
-    await vi.waitFor(() =>
-      expect(outbox.entries.value.map((e) => e.state)).toEqual([
-        "saved",
-        "saved",
-      ]),
-    );
-    const keys = await Promise.all(
-      sent.map(async (request) => (await request.json()).key),
-    );
+    outbox.queue(draft(), "second");
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["saved", "saved"]));
+    const [first, second] = outbox.entries.value.map((e) => e.body.key);
     // The first goes again before the second goes at all.
-    expect(keys).toEqual([first.key, first.key, second.key]);
+    expect((await bodies(sent)).map((body) => body.key)).toEqual([
+      first,
+      first,
+      second,
+    ]);
+  });
+});
+
+describe("a batch the server keeps failing on", () => {
+  beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
+  afterEach(() => vi.useRealTimers());
+
+  test("does not hold back the batches after it", async () => {
+    const { api, sent } = answering(async (request) =>
+      (await request.clone().json()).volunteer_id === 9
+        ? new Response("oops", { status: 500 })
+        : saved(),
+    );
+    const outbox = new Outbox(api);
+    outbox.queue(draft({ volunteer_id: 9 }), "stuck");
+    outbox.queue(draft(), "next");
+    await vi.waitFor(() =>
+      expect(states(outbox)).toEqual(["waiting", "saved"]),
+    );
+    expect(outbox.entries.value[0]).toMatchObject({ failures: 1 });
+    // Kept, and tried again next round.
+    const before = sent.length;
+    await vi.advanceTimersByTimeAsync(RETRY_MS);
+    await vi.waitFor(() => expect(sent.length).toBe(before + 1));
+    expect(outbox.entries.value[0]).toMatchObject({
+      state: "waiting",
+      failures: 2,
+    });
+  });
+
+  test("asks for a report after failing again and again, and still keeps it", async () => {
+    const { api } = answering(() => new Response("oops", { status: 500 }));
+    const outbox = new Outbox(api);
+    outbox.queue(draft(), "stuck");
+    for (let round = 1; round < REPORT_AFTER; round += 1) {
+      await vi.waitFor(() =>
+        expect(outbox.entries.value[0]?.failures).toBe(round),
+      );
+      expect(outbox.entries.value[0]?.note).toContain("Trying again shortly");
+      await vi.advanceTimersByTimeAsync(RETRY_MS);
+    }
+    await vi.waitFor(() =>
+      expect(outbox.entries.value[0]?.failures).toBe(REPORT_AFTER),
+    );
+    expect(outbox.entries.value[0]?.note).toContain("please report this");
+    expect(states(outbox)).toEqual(["waiting"]);
+  });
+
+  test("a success clears its failures", async () => {
+    const { api } = answering(
+      replies(() => new Response("oops", { status: 500 })),
+    );
+    const outbox = new Outbox(api);
+    outbox.queue(draft(), "a");
+    await vi.waitFor(() => expect(outbox.entries.value[0]?.failures).toBe(1));
+    await vi.advanceTimersByTimeAsync(RETRY_MS);
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
+    expect(outbox.entries.value[0]?.failures).toBe(0);
   });
 });
 
@@ -165,13 +243,10 @@ describe("refusals", () => {
       replies(() => json({ reason: "key_reused" }, 409)),
     );
     const outbox = new Outbox(api);
-    outbox.queue(batch(), "first");
-    outbox.queue(batch(), "second");
+    outbox.queue(draft(), "first");
+    outbox.queue(draft(), "second");
     await vi.waitFor(() =>
-      expect(outbox.entries.value.map((e) => e.state)).toEqual([
-        "refused",
-        "saved",
-      ]),
+      expect(states(outbox)).toEqual(["refused", "saved"]),
     );
     expect(outbox.entries.value[0]?.note).toContain("Please report this");
   });
@@ -191,70 +266,40 @@ describe("refusals", () => {
     ];
     const { api } = answering(() => json({ detail }, 422));
     const outbox = new Outbox(api);
-    outbox.queue(batch(), "a");
-    await vi.waitFor(() =>
-      expect(outbox.entries.value[0]?.state).toBe("refused"),
-    );
+    outbox.queue(draft(), "a");
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
     expect(outbox.entries.value[0]?.note).toBe(
       "Not saved. Line 2: There is no such row Value error, a move has only a from and to location",
     );
   });
 
-  test("a settled batch can be dismissed; a waiting one cannot", async () => {
-    const { api } = answering(
-      replies(
-        () => json({ detail: [] }, 422),
-        () => json({ reason: "unregistered" }, 403),
-      ),
-    );
-    const outbox = new Outbox(api);
-    const refused = batch();
-    const waiting = batch();
-    outbox.queue(refused, "a");
-    await vi.waitFor(() =>
-      expect(outbox.entries.value[0]?.state).toBe("refused"),
-    );
-    outbox.queue(waiting, "b");
-    await vi.waitFor(() =>
-      expect(outbox.entries.value[1]?.waitingFor).toBe("registration"),
-    );
-    outbox.dismiss(refused.key);
-    outbox.dismiss(waiting.key);
-    expect(outbox.entries.value.map((e) => e.body.key)).toEqual([waiting.key]);
+  test("a settled batch can be dismissed; a waiting one cannot", () => {
+    const refused = entry({ state: "refused", note: "no" });
+    const waiting = entry();
+    store(refused, waiting);
+    const outbox = new Outbox(answering(() => saved()).api);
+    outbox.dismiss(refused.body.key);
+    outbox.dismiss(waiting.body.key);
+    expect(outbox.entries.value).toEqual([waiting]);
   });
 });
 
 describe("storage", () => {
   test("waiting batches outlive the page", async () => {
-    const { api } = answering(() => json({ reason: "unregistered" }, 403));
-    const body = batch();
-    const before = new Outbox(api);
-    before.queue(body, "a");
-    await vi.waitFor(() =>
-      expect(before.entries.value[0]?.waitingFor).toBe("registration"),
-    );
-    const after = new Outbox(answering(() => saved()).api);
-    expect(after.entries.value.map((e) => e.body)).toEqual([body]);
-    await after.send();
-    expect(after.entries.value[0]?.state).toBe("saved");
+    const waiting = entry({ waitingFor: "registration" });
+    store(waiting);
+    const outbox = new Outbox(answering(() => saved()).api);
+    expect(outbox.entries.value).toEqual([waiting]);
+    await outbox.send();
+    expect(states(outbox)).toEqual(["saved"]);
   });
 
   test("an unreadable entry is dropped, and only that one", () => {
-    const good = {
-      body: batch(),
-      what: "a",
-      queuedAt: 1,
-      state: "waiting",
-      waitingFor: null,
-      note: null,
-      transactionId: null,
-    };
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify([good, { ...good, body: "not a batch" }, 7, null]),
-    );
-    const outbox = new Outbox(answering(() => saved()).api);
-    expect(outbox.entries.value).toEqual([good]);
+    const good = entry();
+    store(good, { ...good, body: "not a batch" }, 7, null);
+    expect(new Outbox(answering(() => saved()).api).entries.value).toEqual([
+      good,
+    ]);
   });
 
   test.each(["not json", '{"an": "object"}'])(
@@ -272,8 +317,8 @@ describe("storage", () => {
     const { api } = answering(() => saved(++id));
     const outbox = new Outbox(api);
     for (let n = 0; n < 12; n += 1) {
-      outbox.queue(batch(), `batch ${n}`);
-      await settled(outbox);
+      outbox.queue(draft(), `batch ${n}`);
+      await vi.waitFor(() => expect(states(outbox).at(-1)).toBe("saved"));
     }
     expect(outbox.entries.value.map((e) => e.what)).toEqual(
       Array.from({ length: 10 }, (_, n) => `batch ${n + 2}`),
@@ -284,8 +329,8 @@ describe("storage", () => {
     const { api } = answering(() => json({ reason: "unregistered" }, 403));
     const here = new Outbox(api);
     const there = new Outbox(api);
-    there.queue(batch(), "there");
-    here.queue(batch(), "here");
+    there.queue(draft(), "there");
+    here.queue(draft(), "here");
     await vi.waitFor(() => expect(stored()).toHaveLength(2));
     expect(here.entries.value.map((e) => e.what)).toEqual(["there", "here"]);
   });
@@ -298,14 +343,12 @@ describe("listening", () => {
     );
     const outbox = new Outbox(api);
     const stop = outbox.listen();
-    outbox.queue(batch(), "a");
+    outbox.queue(draft(), "a");
     await vi.waitFor(() =>
       expect(outbox.entries.value[0]?.waitingFor).toBe("network"),
     );
     window.dispatchEvent(new Event("online"));
-    await vi.waitFor(() =>
-      expect(outbox.entries.value[0]?.state).toBe("saved"),
-    );
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
     expect(sent).toHaveLength(2);
     stop();
   });
@@ -313,16 +356,8 @@ describe("listening", () => {
   test("another tab's change shows here", () => {
     const outbox = new Outbox(answering(() => saved()).api);
     const stop = outbox.listen();
-    const other = {
-      body: batch(),
-      what: "from the other tab",
-      queuedAt: 1,
-      state: "saved",
-      waitingFor: null,
-      note: null,
-      transactionId: 3,
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([other]));
+    const other = entry({ state: "saved", transactionId: 3 });
+    store(other);
     window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
     expect(outbox.entries.value).toEqual([other]);
     stop();
@@ -330,21 +365,8 @@ describe("listening", () => {
 
   test("sending twice at once sends each batch once", async () => {
     const { api, sent } = answering(() => saved());
+    store(entry());
     const outbox = new Outbox(api);
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify([
-        {
-          body: batch(),
-          what: "a",
-          queuedAt: 1,
-          state: "waiting",
-          waitingFor: null,
-          note: null,
-          transactionId: null,
-        },
-      ]),
-    );
     await Promise.all([outbox.send(), outbox.send()]);
     expect(sent).toHaveLength(1);
   });

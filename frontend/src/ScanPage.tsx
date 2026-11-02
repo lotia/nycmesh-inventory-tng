@@ -1,8 +1,600 @@
-export function ScanPage() {
+import { type Signal, useSignal } from "@preact/signals";
+import type { TargetedSubmitEvent } from "preact";
+import { useEffect, useMemo, useRef } from "preact/hooks";
+import { type Api, check, makeApi } from "./api/client";
+import { Catalogue as CatalogueReply, DeviceRefusedReply } from "./api/replies";
+import {
+  addOne,
+  askWho,
+  type Cart,
+  CartStore,
+  type Catalogue,
+  findCode,
+  freshCart,
+  indexOf,
+  type Line,
+  quantityOf,
+  SIDES,
+  search,
+  toBatch,
+} from "./cart";
+import { type Outbox, sharedOutbox } from "./outbox";
+import { decimal, thousandths } from "./quantity";
+import { NOT_REGISTERED } from "./registration";
+
+const API = makeApi();
+/** How often an open page checks whether to ask whose name it is, and
+ * whether its catalogue is stale. */
+const CHECK_EVERY_MS = 60_000;
+/** A page left open fetches the catalogue again once it is this old, so a
+ * hub tablet sees new items, volunteers and settings. */
+const CATALOGUE_FRESH_MS = 10 * 60_000;
+
+type Loaded =
+  | { state: "loading" }
+  | { state: "ready"; catalogue: Catalogue }
+  | { state: "unregistered"; reason: "unregistered" | "revoked" }
+  | { state: "unavailable" };
+
+async function loadCatalogue(api: Api): Promise<Loaded> {
+  const reply = await check(api.GET("/api/catalogue"), {
+    200: CatalogueReply,
+    403: DeviceRefusedReply,
+  });
+  switch (reply.status) {
+    case 200:
+      return { state: "ready", catalogue: reply.body };
+    case 403:
+      return { state: "unregistered", reason: reply.body.reason };
+    default:
+      return { state: "unavailable" };
+  }
+}
+
+/** The volunteer's page: fill a cart, then Save it to the outbox. */
+export function ScanPage({
+  api = API,
+  outbox = sharedOutbox(),
+}: {
+  api?: Api;
+  outbox?: Outbox;
+}) {
+  const loaded = useSignal<Loaded>({ state: "loading" });
+  const loadedAt = useRef(0);
+
+  function load() {
+    void loadCatalogue(api).then((result) => {
+      loaded.value = result;
+      loadedAt.current = Date.now();
+    });
+  }
+
+  useEffect(load, [api]);
+
+  // A page left open refreshes a stale catalogue; a failed refresh keeps
+  // the one it has.
+  useEffect(() => {
+    const refresh = () => {
+      const stale = Date.now() - loadedAt.current > CATALOGUE_FRESH_MS;
+      if (
+        document.visibilityState !== "visible" ||
+        !stale ||
+        loaded.value.state !== "ready"
+      ) {
+        return;
+      }
+      void loadCatalogue(api).then((result) => {
+        if (result.state === "ready") {
+          loaded.value = result;
+          loadedAt.current = Date.now();
+        }
+      });
+    };
+    const timer = setInterval(refresh, CHECK_EVERY_MS);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [api]);
+
+  useEffect(() => {
+    const stop = outbox.listen();
+    void outbox.send();
+    return stop;
+  }, [outbox]);
+
+  const current = loaded.value;
   return (
     <main>
       <h1>Scan</h1>
-      <p>Nothing here yet: the cart and the camera come next.</p>
+      {current.state === "loading" && <p>Loading the catalogue…</p>}
+      {current.state === "unregistered" && (
+        <p role="alert">
+          {NOT_REGISTERED[current.reason]} <a href="/register">Register it</a>,
+          then come back.
+        </p>
+      )}
+      {current.state === "unavailable" && (
+        <p role="alert">
+          Couldn't load the catalogue.{" "}
+          <button type="button" onClick={load}>
+            Try again
+          </button>
+        </p>
+      )}
+      {current.state === "ready" && (
+        <CartForm catalogue={current.catalogue} outbox={outbox} />
+      )}
+      <OutboxList outbox={outbox} />
     </main>
+  );
+}
+
+function CartForm({
+  catalogue,
+  outbox,
+}: {
+  catalogue: Catalogue;
+  outbox: Outbox;
+}) {
+  const store = useMemo(() => new CartStore(catalogue), []);
+  const cart = store.cart;
+  const query = useSignal("");
+  const problems = useSignal<string[]>([]);
+  const saved = useSignal<string | null>(null);
+  // After a while unused, the phone may have changed hands: offer to
+  // change the name, without stopping anyone saving.
+  const checkName = useSignal(askWho(cart.value, catalogue));
+  const nameList = useRef<HTMLSelectElement>(null);
+
+  // Tabs share one cart; a refreshed catalogue clears what it no longer has.
+  useEffect(() => store.listen(), [store]);
+  useEffect(() => store.useCatalogue(catalogue), [catalogue]);
+
+  // Asked when the page is shown again, and checked each minute, so a hub
+  // tablet left on asks too. Never, when administrators set 0.
+  useEffect(() => {
+    if (catalogue.settings.name_check_minutes === 0) {
+      return;
+    }
+    const maybeAsk = () => {
+      if (
+        document.visibilityState === "visible" &&
+        askWho(cart.value, catalogue)
+      ) {
+        checkName.value = true;
+      }
+    };
+    const timer = setInterval(maybeAsk, CHECK_EVERY_MS);
+    document.addEventListener("visibilitychange", maybeAsk);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", maybeAsk);
+    };
+  }, [catalogue]);
+
+  /** Say so if the browser would not keep the cart. */
+  function kept(stored: boolean) {
+    problems.value = stored
+      ? []
+      : [
+          "This browser isn't keeping the cart, so a reload will empty it. Free some space or leave private browsing.",
+        ];
+  }
+
+  function change(next: Cart) {
+    saved.value = null;
+    kept(store.change(next));
+  }
+
+  function set(fields: Partial<Cart>) {
+    change({ ...cart.value, ...fields });
+  }
+
+  function add(itemId: number, packageId?: number) {
+    change(addOne(cart.value, itemId, packageId));
+    query.value = "";
+  }
+
+  function save(event: TargetedSubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    // Another tab may have changed or saved this cart: saving what this tab
+    // shows could record it twice, so it shows that cart instead.
+    const current = store.forSaving();
+    if (current === null) {
+      problems.value = [
+        "The cart was changed in another tab. Check it, then save again.",
+      ];
+      return;
+    }
+    const batch = toBatch(current, catalogue);
+    if ("problems" in batch) {
+      problems.value = batch.problems;
+      return;
+    }
+    if (!outbox.queue(batch.draft, batch.what)) {
+      // Nothing was sent, and the cart stays to try again.
+      problems.value = [
+        "This browser wouldn't keep the batch, so it isn't saved. Free some space or leave private browsing, then try again.",
+      ];
+      return;
+    }
+    change(freshCart(current));
+    saved.value = batch.what;
+  }
+
+  const sides = SIDES[cart.value.kind];
+  const { items, volunteers } = indexOf(catalogue);
+  const name =
+    cart.value.volunteerId === null
+      ? undefined
+      : volunteers.get(cart.value.volunteerId);
+
+  function changeName() {
+    checkName.value = false;
+    nameList.current?.focus();
+  }
+
+  return (
+    <form onSubmit={save}>
+      {checkName.value && name !== undefined && (
+        <div role="alert" class="who">
+          <p>
+            Are you <strong>{name}</strong>? This phone hasn't been used for a
+            while.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              checkName.value = false;
+              // Only the time changes, so "Saved" stays on show.
+              kept(store.touch());
+            }}
+          >
+            That's me
+          </button>{" "}
+          <button
+            type="button"
+            onClick={() => {
+              set({ volunteerId: null });
+              changeName();
+            }}
+          >
+            Not me
+          </button>
+        </div>
+      )}
+      <label for="volunteer">Your name</label>
+      <select
+        id="volunteer"
+        ref={nameList}
+        value={String(cart.value.volunteerId ?? "")}
+        onChange={(event) =>
+          set({ volunteerId: idOrNull(event.currentTarget.value) })
+        }
+      >
+        <option value="">Pick your name</option>
+        {catalogue.volunteers.map((volunteer) => (
+          <option key={volunteer.id} value={volunteer.id}>
+            {volunteer.name}
+          </option>
+        ))}
+      </select>
+
+      <fieldset>
+        <legend>What is happening</legend>
+        {(
+          [
+            ["move", "Moving stock"],
+            ["receipt", "Receiving stock"],
+            ["install", "Taking it to an install"],
+          ] as const
+        ).map(([kind, words]) => (
+          <label key={kind} class="choice">
+            <input
+              type="radio"
+              name="kind"
+              value={kind}
+              checked={cart.value.kind === kind}
+              onChange={() => set({ kind })}
+            />
+            {words}
+          </label>
+        ))}
+      </fieldset>
+
+      {sides.from && (
+        <Place
+          id="from"
+          label="From"
+          catalogue={catalogue}
+          value={cart.value.fromId}
+          onPick={(fromId) => set({ fromId })}
+        />
+      )}
+      {sides.to && (
+        <Place
+          id="to"
+          label="To"
+          catalogue={catalogue}
+          value={cart.value.toId}
+          onPick={(toId) => set({ toId })}
+        />
+      )}
+      {cart.value.kind === "install" && (
+        <>
+          <label for="install">MeshDB install number (if you know it)</label>
+          <input
+            id="install"
+            inputMode="numeric"
+            autoComplete="off"
+            value={cart.value.installNumber}
+            onInput={(event) =>
+              set({ installNumber: event.currentTarget.value })
+            }
+          />
+        </>
+      )}
+
+      <h2>Cart</h2>
+      {cart.value.lines.length === 0 && <p>Nothing in the cart yet.</p>}
+      <ul class="lines">
+        {cart.value.lines.map((line) => {
+          const item = items.get(line.itemId);
+          return (
+            <CartLine
+              key={line.itemId}
+              line={line}
+              item={item}
+              onChange={(next) =>
+                set({
+                  lines: cart.value.lines.map((each) =>
+                    each.itemId === line.itemId ? next : each,
+                  ),
+                })
+              }
+              onRemove={() =>
+                set({
+                  lines: cart.value.lines.filter(
+                    (each) => each.itemId !== line.itemId,
+                  ),
+                })
+              }
+            />
+          );
+        })}
+      </ul>
+
+      <Finder catalogue={catalogue} query={query} onAdd={add} />
+
+      {problems.value.length > 0 && (
+        <ul role="alert" class="problems">
+          {problems.value.map((problem) => (
+            <li key={problem}>{problem}</li>
+          ))}
+        </ul>
+      )}
+      {saved.value !== null && (
+        <p role="status">Saved: {saved.value}. A new cart is ready.</p>
+      )}
+      {name !== undefined && (
+        <p class="saving-as">
+          Saving as <strong>{name}</strong>.{" "}
+          <button type="button" onClick={changeName}>
+            Change
+          </button>
+        </p>
+      )}
+      <button type="submit" class="save">
+        Save
+      </button>
+    </form>
+  );
+}
+
+function idOrNull(value: string): number | null {
+  return value === "" ? null : Number(value);
+}
+
+function Place({
+  id,
+  label,
+  catalogue,
+  value,
+  onPick,
+}: {
+  id: string;
+  label: string;
+  catalogue: Catalogue;
+  value: number | null;
+  onPick: (locationId: number | null) => void;
+}) {
+  const places = indexOf(catalogue).placeList;
+  return (
+    <>
+      <label for={id}>{label}</label>
+      <select
+        id={id}
+        value={String(value ?? "")}
+        onChange={(event) => onPick(idOrNull(event.currentTarget.value))}
+      >
+        <option value="">Pick a place</option>
+        {places.map((place) => (
+          <option key={place.id} value={place.id}>
+            {place.name}
+          </option>
+        ))}
+      </select>
+    </>
+  );
+}
+
+function CartLine({
+  line,
+  item,
+  onChange,
+  onRemove,
+}: {
+  line: Line;
+  item: Catalogue["items"][number] | undefined;
+  onChange: (line: Line) => void;
+  onRemove: () => void;
+}) {
+  if (item === undefined) {
+    return (
+      <li>
+        No longer in the catalogue.{" "}
+        <button type="button" onClick={onRemove}>
+          Remove
+        </button>
+      </li>
+    );
+  }
+  const quantity = quantityOf(line, item);
+  return (
+    <li>
+      <strong>{item.name}</strong>
+      {item.packages.map((pack) => (
+        <label key={pack.id} class="amount">
+          {pack.name} ({decimal(thousandths(pack.size) ?? 0)} {item.unit})
+          <input
+            inputMode="numeric"
+            value={line.packages[pack.id] ?? ""}
+            onInput={(event) =>
+              onChange({
+                ...line,
+                packages: {
+                  ...line.packages,
+                  [pack.id]: event.currentTarget.value,
+                },
+              })
+            }
+          />
+        </label>
+      ))}
+      <label class="amount">
+        {item.packages.length > 0
+          ? `Loose ${item.unit === "each" ? "units" : item.unit}`
+          : item.unit === "each"
+            ? "How many"
+            : `How many ${item.unit}`}
+        <input
+          inputMode={item.unit === "each" ? "numeric" : "decimal"}
+          value={line.loose}
+          onInput={(event) =>
+            onChange({ ...line, loose: event.currentTarget.value })
+          }
+        />
+      </label>
+      <p class="total">
+        {"problem" in quantity
+          ? quantity.problem
+          : `${decimal(quantity.amount)} ${item.unit} in all`}
+      </p>
+      <button type="button" onClick={onRemove}>
+        Remove
+      </button>
+    </li>
+  );
+}
+
+function Finder({
+  catalogue,
+  query,
+  onAdd,
+}: {
+  catalogue: Catalogue;
+  query: Signal<string>;
+  onAdd: (itemId: number, packageId?: number) => void;
+}) {
+  const matches = search(catalogue, query.value);
+  return (
+    <>
+      <label for="find">Find an item, or type or scan its code</label>
+      <input
+        id="find"
+        type="search"
+        autoComplete="off"
+        autoCapitalize="none"
+        spellcheck={false}
+        value={query.value}
+        onInput={(event) => {
+          query.value = event.currentTarget.value;
+        }}
+        onKeyDown={(event) => {
+          // A scanner gun types the code, then Enter.
+          if (event.key !== "Enter") {
+            return;
+          }
+          event.preventDefault();
+          const found = findCode(catalogue, query.value);
+          if (found !== null) {
+            onAdd(found.itemId, found.packageId);
+          } else if (matches.length === 1 && matches[0] !== undefined) {
+            onAdd(matches[0].id);
+          }
+        }}
+      />
+      {query.value.trim() !== "" && matches.length === 0 && (
+        <p>Nothing matches “{query.value.trim()}”.</p>
+      )}
+      <ul class="matches">
+        {matches.map((item) => (
+          <li key={item.id}>
+            <button type="button" onClick={() => onAdd(item.id)}>
+              {item.name}
+            </button>{" "}
+            <small>
+              {[item.category, item.manufacturer, item.part_number]
+                .filter(Boolean)
+                .join(" · ")}
+            </small>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+function OutboxList({ outbox }: { outbox: Outbox }) {
+  const entries = [...outbox.entries.value].reverse();
+  if (entries.length === 0) {
+    return null;
+  }
+  const needsRegistering = entries.some((e) => e.waitingFor === "registration");
+  return (
+    <section>
+      <h2>Saved on this browser</h2>
+      {needsRegistering && (
+        <p>
+          <a href="/register">Register this browser</a> to send what is waiting.
+        </p>
+      )}
+      <ul class="outbox">
+        {entries.map((entry) => (
+          <li key={entry.body.key}>
+            {entry.what}
+            <br />
+            <small>
+              {entry.state === "saved"
+                ? `In the inventory (transaction ${entry.transactionId}).`
+                : (entry.note ?? "Sending…")}
+            </small>
+            {entry.state !== "waiting" && (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  onClick={() => outbox.dismiss(entry.body.key)}
+                >
+                  Dismiss
+                </button>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

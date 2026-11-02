@@ -16,6 +16,16 @@ export type Outcome =
   // No answer, or one this build does not understand.
   | { kind: "failed" };
 
+/** Why this browser cannot save, in words, for every page that is told.
+ * Typed by the schema, as REFUSALS is. */
+export const NOT_REGISTERED: Record<
+  Schemas["DeviceRefusedReply"]["reason"],
+  string
+> = {
+  unregistered: "This browser isn't registered yet.",
+  revoked: "This browser's registration was withdrawn.",
+};
+
 /** What to tell a volunteer. Typed by the schema, so a new reason on the
  * server fails the type check until it has a message here. */
 export const REFUSALS: Record<Rejection, string> = {

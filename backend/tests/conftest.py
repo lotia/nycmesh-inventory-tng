@@ -17,6 +17,7 @@ from sqlalchemy import Connection, Engine, exc, make_url, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from inventory_tng import devices
 from inventory_tng.app import create_app
 from inventory_tng.db import get_session, make_engine
 from inventory_tng.local_env import local_env_values
@@ -169,6 +170,16 @@ def make_app(
 def client(make_app: Callable[..., FastAPI]) -> Iterator[TestClient]:
     with TestClient(make_app()) as client:
         yield client
+
+
+@pytest.fixture
+def registered_client(client: TestClient, session: Session) -> TestClient:
+    """The app's client, as a registered device."""
+    from test_devices import new_device
+
+    _, token = new_device(session)
+    client.cookies.set(devices.COOKIE, token)
+    return client
 
 
 # In a constant, because tracebacks show the code line that raised, and code

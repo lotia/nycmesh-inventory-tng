@@ -20,10 +20,8 @@ import segno
 from sqlalchemy.orm import Session
 
 from inventory_tng import devices
-from inventory_tng.db import CLI_ACTOR, make_engine, set_actor
-from inventory_tng.local_env import load_local_env
-from inventory_tng.logs import configure_logging
-from inventory_tng.settings import Settings
+from inventory_tng.command import run_command
+from inventory_tng.db import CLI_ACTOR, set_actor
 
 # Where the QR code's link goes: the registration page (inventory-tng-8i4.13).
 REGISTER_PATH = "/register"
@@ -52,15 +50,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    load_local_env()
-    settings = Settings.from_environ()
-    configure_logging(settings)
-    engine = make_engine(settings.database_url)
-    try:
-        with Session(engine) as session, session.begin():
-            return run(session, args)
-    finally:
-        engine.dispose()
+    return run_command(run, args)
 
 
 def positive[T: (int, float)](kind: type[T]) -> Callable[[str], T]:

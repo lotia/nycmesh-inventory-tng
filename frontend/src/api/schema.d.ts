@@ -113,6 +113,7 @@ export interface components {
     };
     /** Catalogue */
     Catalogue: {
+      settings: components["schemas"]["Settings"];
       /** Volunteers */
       volunteers: components["schemas"]["VolunteerEntry"][];
       /** Locations */
@@ -238,6 +239,14 @@ export interface components {
     Saved: {
       /** Transaction Id */
       transaction_id: number;
+    };
+    /**
+     * Settings
+     * @description How the page behaves, as administrators set it (models.ScanSettings).
+     */
+    Settings: {
+      /** Name Check Minutes */
+      name_check_minutes: number;
     };
     /** UnavailableReply */
     UnavailableReply: {

@@ -9,7 +9,7 @@ from decimal import Decimal
 
 import structlog
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,7 @@ from inventory_tng.models import (
     ItemPackage,
     Label,
     Location,
+    ScanSettings,
     Volunteer,
 )
 
@@ -31,19 +32,25 @@ router = APIRouter()
 PATH = "/catalogue"
 
 
-class VolunteerEntry(BaseModel):
+class Entry(BaseModel):
+    """Read straight from a row's attributes."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class VolunteerEntry(Entry):
     id: int
     name: str
 
 
-class LocationEntry(BaseModel):
+class LocationEntry(Entry):
     id: int
     name: str
     kind: str
     parent_id: int | None
 
 
-class PackageEntry(BaseModel):
+class PackageEntry(Entry):
     id: int
     name: str
     # In the item's unit.
@@ -61,7 +68,7 @@ class ItemEntry(BaseModel):
     packages: list[PackageEntry]
 
 
-class LabelEntry(BaseModel):
+class LabelEntry(Entry):
     """A printed code, and the one thing it names."""
 
     code: str
@@ -70,7 +77,14 @@ class LabelEntry(BaseModel):
     location_id: int | None
 
 
+class Settings(Entry):
+    """How the page behaves, as administrators set it (models.ScanSettings)."""
+
+    name_check_minutes: int
+
+
 class Catalogue(BaseModel):
+    settings: Settings
     volunteers: list[VolunteerEntry]
     locations: list[LocationEntry]
     items: list[ItemEntry]
@@ -94,7 +108,7 @@ def catalogue(session: Session) -> Catalogue:
         .order_by(ItemPackage.size)
     ):
         packages.setdefault(package.item_id, []).append(
-            PackageEntry(id=package.id, name=package.name, size=package.size)
+            PackageEntry.model_validate(package)
         )
     items = session.execute(
         select(Item, Category.name)
@@ -103,33 +117,40 @@ def catalogue(session: Session) -> Catalogue:
         .order_by(Item.name)
     )
     labels = session.scalars(select(Label).where(Label.revoked_at.is_(None)))
+    places = [LocationEntry.model_validate(x) for x in locations]
+    entries = [
+        ItemEntry(
+            id=item.id,
+            name=item.name,
+            unit=item.unit,
+            category=category,
+            manufacturer=item.manufacturer,
+            part_number=item.part_number,
+            old_code=item.old_code,
+            packages=packages.get(item.id, []),
+        )
+        for item, category in items
+    ]
+    # A label is sent only if everything it names is: one on a retired item,
+    # package or place would name what the page cannot show.
+    item_ids = {entry.id for entry in entries}
+    package_ids = {pack.id for entry in entries for pack in entry.packages}
+    location_ids = {place.id for place in places}
+
+    def names_current(label: Label) -> bool:
+        return (
+            (label.item_id is None or label.item_id in item_ids)
+            and (label.package_id is None or label.package_id in package_ids)
+            and (label.location_id is None or label.location_id in location_ids)
+        )
+
     return Catalogue(
-        volunteers=[VolunteerEntry(id=v.id, name=v.name) for v in volunteers],
-        locations=[
-            LocationEntry(id=x.id, name=x.name, kind=x.kind, parent_id=x.parent_id)
-            for x in locations
-        ],
-        items=[
-            ItemEntry(
-                id=item.id,
-                name=item.name,
-                unit=item.unit,
-                category=category,
-                manufacturer=item.manufacturer,
-                part_number=item.part_number,
-                old_code=item.old_code,
-                packages=packages.get(item.id, []),
-            )
-            for item, category in items
-        ],
+        settings=Settings.model_validate(session.get_one(ScanSettings, 1)),
+        volunteers=[VolunteerEntry.model_validate(v) for v in volunteers],
+        locations=places,
+        items=entries,
         labels=[
-            LabelEntry(
-                code=label.code,
-                item_id=label.item_id,
-                package_id=label.package_id,
-                location_id=label.location_id,
-            )
-            for label in labels
+            LabelEntry.model_validate(label) for label in labels if names_current(label)
         ],
     )
 

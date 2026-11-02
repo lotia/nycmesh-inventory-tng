@@ -6,7 +6,8 @@
  */
 import * as v from "valibot";
 
-const id = v.pipe(v.number(), v.integer());
+/** A row's id. */
+export const id = v.pipe(v.number(), v.integer());
 
 export const Registered = v.object({ device_id: id });
 
@@ -70,6 +71,7 @@ export const LabelEntry = v.object({
 });
 
 export const Catalogue = v.object({
+  settings: v.object({ name_check_minutes: v.pipe(id, v.minValue(0)) }),
   volunteers: v.array(VolunteerEntry),
   locations: v.array(LocationEntry),
   items: v.array(ItemEntry),

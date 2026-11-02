@@ -5,6 +5,10 @@ import { makeApi } from "./api/client";
 export const json = (body: unknown, status: number): Response =>
   Response.json(body, { status });
 
+/** The batch endpoint saving a batch as this transaction. */
+export const saved = (transactionId = 77): Response =>
+  json({ transaction_id: transactionId }, 201);
+
 /** An api whose fetch answers with `reply`, and keeps what it was sent. */
 export function answering(
   reply: (request: Request) => Response | Promise<Response>,

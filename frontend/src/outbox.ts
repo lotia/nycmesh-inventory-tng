@@ -2,9 +2,9 @@
  * Batches saved on this browser, kept until the server has answered about
  * them (docs/decisions/0002, 0009).
  *
- * Exactly once rests on the server, not here: each batch carries the
- * idempotency key its cart was given, every attempt sends the same body, and
- * the ledger answers a repeat with the first transaction. So the outbox
+ * Exactly once rests on the server, not here: each batch is given its
+ * idempotency key when it is queued, every attempt sends the same body with
+ * it, and the ledger answers a repeat with the first transaction. So the outbox
  * promises at least once: a batch settles only when the server has answered
  * about it, and nothing here ever gives a batch a new key.
  *
@@ -13,23 +13,28 @@
  * first, so two tabs do not drop each other's batches.
  */
 import { signal } from "@preact/signals";
+import { v4 as uuid } from "uuid";
 import * as v from "valibot";
 import { type Api, check, makeApi, type Schemas } from "./api/client";
 import {
   DeviceRefusedReply,
+  id,
   KeyReusedReply,
   Saved,
   ValidationFailed,
 } from "./api/replies";
+import { NOT_REGISTERED } from "./registration";
+import { onStoredChange, readStored, writeStored } from "./stored";
 
 /** Versioned: a later build that changes the shape reads this one too. */
 export const STORAGE_KEY = "inventory.outbox.v1";
 /** How long to wait before trying again after no answer. */
 export const RETRY_MS = 30_000;
+/** Unexpected answers to one batch before its note asks for a report. */
+export const REPORT_AFTER = 5;
 /** Saved batches kept on show, newest first, so a volunteer can check. */
 const SAVED_KEPT = 10;
 
-const id = v.pipe(v.number(), v.integer());
 const nullableId = v.exactOptional(v.nullable(id));
 
 /** A batch as POST /api/transactions takes it. */
@@ -46,6 +51,8 @@ export const BatchBody = v.object({
 });
 
 export type Body = Schemas["Batch"];
+/** A batch before the outbox gives it its key. */
+export type Draft = Omit<Body, "key">;
 
 const Entry = v.object({
   body: BatchBody,
@@ -58,15 +65,11 @@ const Entry = v.object({
   /** Why it was refused, or why it waits, in words. */
   note: v.nullable(v.string()),
   transactionId: v.nullable(id),
+  /** Unexpected answers to this batch in a row. */
+  failures: v.pipe(v.number(), v.integer()),
 });
 
 export type Entry = v.InferOutput<typeof Entry>;
-
-const NOT_REGISTERED: Record<"unregistered" | "revoked", string> = {
-  unregistered: "Waiting for this browser to be registered.",
-  revoked:
-    "This browser's registration was withdrawn. Register it again to send this batch.",
-};
 
 /** A 422's problems, in words a volunteer can act on. */
 function problems(detail: v.InferOutput<typeof ValidationFailed>["detail"]) {
@@ -95,12 +98,7 @@ export class Outbox {
   /** What storage holds, minus any entry that cannot be read: one bad entry
    * loses one batch, not every batch on the device. */
   private read(): Entry[] {
-    let stored: unknown;
-    try {
-      stored = JSON.parse(this.storage.getItem(STORAGE_KEY) ?? "[]");
-    } catch {
-      return [];
-    }
+    const stored = readStored(this.storage, STORAGE_KEY);
     if (!Array.isArray(stored)) {
       return [];
     }
@@ -114,13 +112,10 @@ export class Outbox {
    * would not store it (full, or storage forbidden). */
   private update(change: (entries: Entry[]) => Entry[]): boolean {
     const next = change(this.read());
-    this.entries.value = next;
-    try {
-      this.storage.setItem(STORAGE_KEY, JSON.stringify(next));
-      return true;
-    } catch {
-      return false;
-    }
+    const kept = writeStored(this.storage, STORAGE_KEY, next);
+    // Shown as stored, so the page never shows what was not kept.
+    this.entries.value = kept ? next : this.read();
+    return kept;
   }
 
   private settle(key: string, changes: Partial<Entry>): void {
@@ -135,27 +130,14 @@ export class Outbox {
   }
 
   /**
-   * Keep this batch and start sending it. False means the browser would not
-   * store it: the caller still holds the batch and must keep holding it.
-   * The same key twice is one batch, so a double tap queues once.
+   * Give this batch its key, keep it, and start sending it. The key is made
+   * here, before anything is sent, and kept with the batch for every
+   * attempt. False means the browser would not store it: nothing was sent,
+   * and the caller still holds the batch.
    */
-  queue(body: Body, what: string, now = Date.now()): boolean {
-    const kept = this.update((entries) =>
-      entries.some((entry) => entry.body.key === body.key)
-        ? entries
-        : [
-            ...entries,
-            {
-              body,
-              what,
-              queuedAt: now,
-              state: "waiting",
-              waitingFor: null,
-              note: null,
-              transactionId: null,
-            },
-          ],
-    );
+  queue(draft: Draft, what: string, now = Date.now()): boolean {
+    const entry = newEntry({ ...draft, key: uuid() }, what, now);
+    const kept = this.update((entries) => [...entries, entry]);
     if (kept) {
       void this.send();
     }
@@ -172,8 +154,12 @@ export class Outbox {
   }
 
   /**
-   * Send what is waiting, oldest first, one at a time. Stops at the first
-   * batch that cannot go now, since the rest would meet the same.
+   * Send what is waiting, oldest first, one at a time. Order does not
+   * matter to the ledger: each batch is its own transaction, and balances
+   * may go below zero (docs/decisions/0003). So a batch the server keeps
+   * failing on is passed over until the next round, and the rest still go.
+   * What would fail for every batch (no answer, the database or a proxy
+   * down, an unregistered device) stops the round.
    */
   async send(): Promise<void> {
     if (this.sending) {
@@ -181,10 +167,17 @@ export class Outbox {
     }
     this.sending = true;
     clearTimeout(this.retry);
+    const tried = new Set<string>();
     try {
       for (;;) {
-        const entry = this.read().find((each) => each.state === "waiting");
-        if (entry === undefined || !(await this.sendOne(entry))) {
+        const entry = this.read().find(
+          (each) => each.state === "waiting" && !tried.has(each.body.key),
+        );
+        if (entry === undefined) {
+          return;
+        }
+        tried.add(entry.body.key);
+        if ((await this.sendOne(entry)) === "stop") {
           return;
         }
       }
@@ -193,8 +186,13 @@ export class Outbox {
     }
   }
 
-  /** True when the server has settled it, so the next can go. */
-  private async sendOne(entry: Entry): Promise<boolean> {
+  private later(): void {
+    clearTimeout(this.retry);
+    this.retry = setTimeout(() => void this.send(), RETRY_MS);
+  }
+
+  /** Whether the round goes on to the next batch. */
+  private async sendOne(entry: Entry): Promise<"next" | "stop"> {
     const key = entry.body.key;
     const reply = await check(
       this.api.POST("/api/transactions", { body: entry.body }),
@@ -214,40 +212,64 @@ export class Outbox {
           waitingFor: null,
           note: null,
           transactionId: reply.body.transaction_id,
+          failures: 0,
         });
-        return true;
+        return "next";
       case 403:
         // Sent again once the device registers (registration.ts), or when
         // the page next opens.
-        this.settle(key, {
-          waitingFor: "registration",
-          note: NOT_REGISTERED[reply.body.reason],
-        });
-        return false;
+        // Every waiting batch waits for the same thing.
+        this.update((entries) =>
+          entries.map((each) =>
+            each.state === "waiting"
+              ? {
+                  ...each,
+                  waitingFor: "registration",
+                  note: `${NOT_REGISTERED[reply.body.reason]} Register it to send this batch.`,
+                }
+              : each,
+          ),
+        );
+        return "stop";
       case 409:
         this.settle(key, {
           state: "refused",
           waitingFor: null,
           note: "Not saved: its key was already used for a different batch. Please report this.",
         });
-        return true;
+        return "next";
       case 422:
         this.settle(key, {
           state: "refused",
           waitingFor: null,
           note: `Not saved. ${problems(reply.body.detail)}`,
         });
-        return true;
+        return "next";
+      case "unexpected": {
+        // Something about this batch, perhaps: the others still go. Never
+        // dropped; tried again each round.
+        const failures = entry.failures + 1;
+        this.settle(key, {
+          waitingFor: "network",
+          failures,
+          note:
+            failures >= REPORT_AFTER
+              ? `The inventory keeps failing on this batch (${reply.code}, ${failures} tries). It is kept and tried again; please report this.`
+              : `The inventory answered unexpectedly (${reply.code}). Trying again shortly.`,
+        });
+        this.later();
+        return "next";
+      }
       default:
         this.settle(key, {
           waitingFor: "network",
           note:
-            reply.status === "unexpected"
-              ? `The inventory answered unexpectedly (${reply.code}). Trying again shortly.`
+            reply.status === "unavailable"
+              ? "The inventory can't save just now. Trying again shortly."
               : "No answer from the inventory. Trying again shortly.",
         });
-        this.retry = setTimeout(() => void this.send(), RETRY_MS);
-        return false;
+        this.later();
+        return "stop";
     }
   }
 
@@ -260,21 +282,32 @@ export class Outbox {
         send();
       }
     };
-    const changed = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY) {
-        this.entries.value = this.read();
-      }
-    };
+    const stopFollowing = onStoredChange(STORAGE_KEY, () => {
+      this.entries.value = this.read();
+    });
     target.addEventListener("online", send);
     target.document.addEventListener("visibilitychange", visible);
-    target.addEventListener("storage", changed);
     return () => {
       target.removeEventListener("online", send);
       target.document.removeEventListener("visibilitychange", visible);
-      target.removeEventListener("storage", changed);
+      stopFollowing();
       clearTimeout(this.retry);
     };
   }
+}
+
+/** A batch as first kept: waiting, and not yet tried. */
+export function newEntry(body: Body, what: string, now = Date.now()): Entry {
+  return {
+    body,
+    what,
+    queuedAt: now,
+    state: "waiting",
+    waitingFor: null,
+    note: null,
+    transactionId: null,
+    failures: 0,
+  };
 }
 
 let shared: Outbox | undefined;
