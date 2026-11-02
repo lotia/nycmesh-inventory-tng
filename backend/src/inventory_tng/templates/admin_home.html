@@ -1,5 +1,9 @@
 {% extends "admin_base.html" %}
 {% block main %}
-<p>The administrator pages are on their way. For now:
-<a href="{{ paths.account }}">your account</a>.</p>
+<ul>
+  {% for path, label in sections %}
+  <li><a href="{{ path }}">{{ label }}</a>{% if current.get(label) is not none %}: {{ current[label] }}{% endif %}</li>
+  {% endfor %}
+  <li><a href="{{ paths.account }}">Your account</a></li>
+</ul>
 {% endblock %}

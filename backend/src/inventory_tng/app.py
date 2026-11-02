@@ -11,6 +11,7 @@ from fastapi import FastAPI
 
 from inventory_tng import (
     account,
+    admin,
     bundle,
     catalogue,
     db,
@@ -72,6 +73,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(bundle.router)
     app.include_router(sign_in.router)
     app.include_router(account.router)
+    app.include_router(admin.router)
     app.include_router(resets.router)
     bundle.install(app, settings)
     db.install(app)

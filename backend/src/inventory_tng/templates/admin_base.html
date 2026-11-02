@@ -7,7 +7,11 @@
   <title>{{ title }} · NYC Mesh Inventory</title>
   <style>
     :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.4; }
-    body { max-width: 34rem; margin: 2rem auto; padding: 0 1rem; }
+    body { max-width: 48rem; margin: 2rem auto; padding: 0 1rem; }
+    nav { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin-top: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid #8886; }
+    .retired { opacity: 0.7; }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; }
+    .actions form, .actions button { margin: 0; }
     label { display: block; margin-top: 1rem; font-weight: 600; }
     .hint { font-weight: normal; font-size: 0.9em; opacity: 0.8; }
     input { display: block; width: 100%; box-sizing: border-box; padding: 0.5rem; font-size: 1rem; margin-top: 0.25rem; }
@@ -35,6 +39,10 @@
     <span>Signed in as <a href="{{ paths.account }}"><strong>{{ admin.username }}</strong></a></span>
     <form method="post" action="{{ paths.sign_out }}"><button>Sign out</button></form>
   </header>
+  <nav aria-label="Sections">
+    <a href="{{ paths.home }}">Home</a>
+    {% for path, label in sections %}<a href="{{ path }}">{{ label }}</a>{% endfor %}
+  </nav>
   {% endif %}
   <main>
     <h1>{{ title }}</h1>

@@ -1,0 +1,30 @@
+{% extends "admin_base.html" %}
+{% block main %}
+<form method="post" action="{{ request.url.path }}" class="actions">
+  <label>New category
+    <input name="name" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required>
+    {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  <button>Add</button>
+</form>
+
+<section>
+  <table>
+    <tr><th>Category</th><th>Items</th></tr>
+    {% for category in current %}
+    <tr><td><a href="{{ request.url.path }}/{{ category.id }}">{{ category.name }}</a></td><td>{{ items.get(category.id, 0) }}</td></tr>
+    {% else %}
+    <tr><td colspan="2">None yet.</td></tr>
+    {% endfor %}
+  </table>
+</section>
+
+{% if retired %}
+<section class="retired">
+  <h2>Retired</h2>
+  <ul>
+    {% for category in retired %}<li><a href="{{ request.url.path }}/{{ category.id }}">{{ category.name }}</a></li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

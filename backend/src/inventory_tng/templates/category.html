@@ -1,0 +1,32 @@
+{% extends "admin_base.html" %}
+{% block main %}
+{% set here = request.url.path %}
+{% if category.retired_at %}
+<p>Retired: nobody can pick it.</p>
+{% endif %}
+<form method="post" action="{{ here }}/name" class="actions">
+  <label>Name
+    <input name="name" value="{{ category.name }}" maxlength="{{ name_max }}" required>
+    {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  <button>Rename</button>
+</form>
+
+<section>
+  <h2>Items</h2>
+  {% if items %}
+  <ul>{% for item in items %}<li>{{ item.name }}</li>{% endfor %}</ul>
+  {% else %}
+  <p>None.</p>
+  {% endif %}
+</section>
+
+<section class="actions">
+  {% if category.retired_at %}
+  <form method="post" action="{{ here }}/restore"><button>Bring back</button></form>
+  {% else %}
+  <form method="post" action="{{ here }}/retire"><button>Retire</button></form>
+  {% endif %}
+  <a href="{{ here.rsplit('/', 1)[0] }}">All categories</a>
+</section>
+{% endblock %}

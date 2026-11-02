@@ -4,17 +4,16 @@ sensitive; every change is (sign_in.ConfirmedAdmin), and is recorded as
 theirs (db.act_as). The rules are in accounts.py.
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, mail
-from inventory_tng.db import DbSession
+from inventory_tng.db import DbSession, unique
 from inventory_tng.local_time import site_zone
 from inventory_tng.mail import Notify
 from inventory_tng.pages import NOTICES, not_found, page, redirect
@@ -103,17 +102,6 @@ def _refused(
     )
 
 
-def _unique(change: Callable[[], object], session: Session) -> bool:
-    """Run `change` in a savepoint; False if it clashed with a unique name or
-    address, as PostgreSQL compares them."""
-    try:
-        with session.begin_nested():
-            change()
-    except IntegrityError:
-        return False
-    return True
-
-
 def _done(signed: SignedIn, session: Session, notice: str) -> Response:
     changed(signed, session)
     return redirect(ACCOUNT, notice=notice)
@@ -137,8 +125,8 @@ def change_email(
     values = {"email": email}
     if problem := accounts.email_problem(email):
         return _refused(request, session, signed, "email", problem, values)
-    if not _unique(
-        lambda: accounts.change_email(session, admin, email, _now()), session
+    if not unique(
+        session, lambda: accounts.change_email(session, admin, email, _now())
     ):
         taken = "Another administrator uses that address."
         return _refused(request, session, signed, "email", taken, values)
@@ -187,7 +175,7 @@ def rename_authenticator(
             accounts.rename_authenticator(session, admin_id, authenticator_id, name)
         )
 
-    if not _unique(rename, session):
+    if not unique(session, rename):
         return _refused(request, session, signed, field, NAME_TAKEN)
     if not found[0]:
         return not_found()  # Someone else's, or gone: ids reveal nothing.
