@@ -112,8 +112,10 @@ deployment settings, where administrators could not change it.
   administrator turns TOTP on.
 - A week-long session is longer than NIST SP 800-63B-4 suggests for two
   factors (24 hours); the 24-hour window for sensitive actions is what keeps
-  to it. A session left open on a shared machine can still change the
-  catalogue for a week, unless ended from the account page.
+  to it. Those are the defaults: administrators can raise both from the
+  Settings page, to 400 days and a week. A session left open on a shared
+  machine can still change the catalogue for a week, unless ended from the
+  account page.
 - Any administrator can take over another's account with a reset link. The
   history shows who made it.
 - Anyone who reads the database can copy the TOTP keys, until they are

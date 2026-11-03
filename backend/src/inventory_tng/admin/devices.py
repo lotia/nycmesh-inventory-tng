@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import devices
 from inventory_tng.accounts import qr_svg
-from inventory_tng.admin.common import ADMIN, admin_page, now, site_link
+from inventory_tng.admin.common import ADMIN, admin_page, now, site_link, whole
 from inventory_tng.db import DbSession
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import Device, RegistrationCode
@@ -91,11 +91,6 @@ def _list_page(
     )
 
 
-def _whole(text: str, top: int) -> int | None:
-    text = text.strip()
-    return int(text) if text.isdigit() and 1 <= int(text) <= top else None
-
-
 @router.get(DEVICES)
 def codes(request: Request, signed: AdminSignedIn, session: DbSession) -> Response:
     return _list_page(request, session, signed)
@@ -112,7 +107,7 @@ def make_code(
 ) -> Response:
     form = {"uses": uses, "days": days, "label": label}
     problems = {}
-    max_uses, lifetime = _whole(uses, MAX_USES), _whole(days, MAX_DAYS)
+    max_uses, lifetime = whole(uses, 1, MAX_USES), whole(days, 1, MAX_DAYS)
     if max_uses is None:
         problems["uses"] = f"From 1 to {MAX_USES} devices."
     if lifetime is None:

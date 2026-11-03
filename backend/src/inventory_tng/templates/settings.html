@@ -1,6 +1,43 @@
 {% extends "admin_base.html" %}
 {% block main %}
 <section>
+  <h2>Signing in</h2>
+  <p class="hint">Changing these asks for a fresh code, and every
+  administrator with an email is told.</p>
+  <form method="post" action="{{ here }}/sign-in">
+    <fieldset>
+      <legend>Authenticator app (TOTP)</legend>
+      {% for policy in policies %}
+      <label><input type="radio" name="totp_policy" value="{{ policy }}" {% if values.totp_policy == policy %}checked{% endif %} required>
+        {{ "Required of every administrator" if policy == "required" else "Optional: each administrator chooses" }}</label>
+      {% endfor %}
+      {% with name = "totp_policy" %}{% include "_field_problem.html" %}{% endwith %}
+    </fieldset>
+    {% for n in numbers %}
+    <label>{{ n.label }} <span class="hint">{{ n.hint }}</span>
+      <input name="{{ n.field }}" type="number" min="{{ n.low }}" max="{{ n.high }}" value="{{ values[n.field] }}" required>
+      {% with name = n.field %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    {% endfor %}
+    <button>Save</button>
+  </form>
+</section>
+
+<section>
+  <h2>Time zone</h2>
+  <form method="post" action="{{ here }}/site" class="actions">
+    <label>Times are shown in
+      <select name="time_zone" required>
+        {% for zone in zones %}<option {% if values.time_zone == zone %}selected{% endif %}>{{ zone }}</option>{% endfor %}
+      </select>
+      {% with name = "time_zone" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <button>Save</button>
+  </form>
+  <p class="hint">Everything is kept in UTC; this only changes how times read.</p>
+</section>
+
+<section>
   <h2>Scan page</h2>
   <form method="post" action="{{ here }}/scan">
     <label>Ask whose name it is after <span class="hint">minutes a phone sits unused; 0 never asks</span>
