@@ -78,6 +78,13 @@ def cheap_password_hashing() -> Iterator[None]:
         yield
 
 
+# For a test of what is in a clone but not in the image: the tasks, the docs.
+clone_only = pytest.mark.skipif(
+    not (local_env.CLONE / "mise.toml").exists(),
+    reason="only in a clone, not in the image",
+)
+
+
 @pytest.fixture(autouse=True)
 def no_local_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A command a test runs loads no `.env` into the environment, where it
@@ -166,7 +173,7 @@ def database_url() -> Iterator[str]:
     except OperationalError as error:
         pytest.exit(
             f"Cannot reach PostgreSQL at {make_url(SERVER_URL)}. Start it with "
-            f"`docker compose up -d --wait db` (or `podman compose`).\n{error}",
+            f"`mise run compose -- up -d --wait db`.\n{error}",
             returncode=2,
         )
     try:
