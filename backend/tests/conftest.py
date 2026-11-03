@@ -24,7 +24,7 @@ from sqlalchemy import Connection, Engine, exc, make_url, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, devices
+from inventory_tng import accounts, devices, local_env
 from inventory_tng.app import create_app
 from inventory_tng.db import get_session, get_session_factory, make_engine
 from inventory_tng.local_env import local_env_values
@@ -75,6 +75,13 @@ def cheap_password_hashing() -> Iterator[None]:
         monkeypatch.setattr(accounts, "_hasher", cheap)
         monkeypatch.setattr(accounts, "_DUMMY_HASH", cheap.hash("not a password"))
         yield
+
+
+@pytest.fixture(autouse=True)
+def no_local_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A command a test runs loads no `.env` into the environment, where it
+    would outlast the test and change what later ones see."""
+    monkeypatch.setattr(local_env, "ENV_FILE", tmp_path / "no.env")
 
 
 @pytest.fixture(autouse=True)
