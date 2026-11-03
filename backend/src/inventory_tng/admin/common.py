@@ -88,6 +88,17 @@ def site_link(request: Request, path: str, **query: str) -> str:
     return f"{site}{path}" + (f"?{urlencode(query)}" if query else "")
 
 
+def whole(typed: str, low: int, high: int) -> int | None:
+    """A whole number typed, from low to high. Plain digits only: isdigit()
+    alone lets through "²", which int() refuses, and a number too long to
+    read."""
+    typed = typed.strip()
+    if not (typed.isascii() and typed.isdigit() and len(typed) <= len(str(high))):
+        return None
+    number = int(typed)
+    return number if low <= number <= high else None
+
+
 async def text_form(request: Request) -> dict[str, str]:
     """A form's fields, for a route that takes more than it names, as a
     dependency, so the route itself runs in the threadpool."""

@@ -23,6 +23,7 @@ import structlog
 from fastapi import BackgroundTasks, Depends, Request
 from opentelemetry import metrics
 
+from inventory_tng.models import SignInSettings
 from inventory_tng.settings import MailConfig
 
 log = structlog.get_logger(__name__)
@@ -36,6 +37,7 @@ Kind = Literal[
     "password_changed",
     "email_changed",
     "recovery_code_used",
+    "sign_in_settings_changed",
 ]
 # Per network step. Mail goes out from the same threads as requests, so a
 # provider that has gone quiet holds one only briefly.
@@ -254,6 +256,29 @@ def recovery_code_used(left: int) -> Callable[[str, int], Message]:
             f"account on NYC Mesh Inventory. {left} are left: make new ones from "
             f"your account page if you are running low.\n\n{IF_NOT_YOU}",
             "recovery_code_used",
+            admin_id,
+        )
+
+    return build
+
+
+def sign_in_settings_changed(settings: SignInSettings) -> Callable[[str, int], Message]:
+    """Told to every administrator: one who could weaken these could
+    otherwise do it unseen. The values are read now, not when it is sent."""
+    totp, session_days = settings.totp_policy, settings.session_days
+    confirm_hours = settings.confirm_hours
+    confirm_idle_minutes = settings.confirm_idle_minutes
+
+    def build(to: str, admin_id: int) -> Message:
+        return Message(
+            to,
+            "NYC Mesh Inventory's sign-in settings were changed",
+            "An administrator just changed how administrators sign in to NYC "
+            f"Mesh Inventory. TOTP is now {totp}; sessions last {session_days} "
+            f"days; a code typed for a sensitive change lasts {confirm_hours} "
+            f"hours, or {confirm_idle_minutes} minutes unused.\n\n"
+            "If this was not agreed, check with the other administrators.",
+            "sign_in_settings_changed",
             admin_id,
         )
 
