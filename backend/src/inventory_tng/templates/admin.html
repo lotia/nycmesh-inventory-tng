@@ -1,0 +1,34 @@
+{% extends "admin_base.html" %}
+{% block main %}
+{% with name = "admin" %}{% if problems.get(name) %}<p role="alert">{{ problems[name] }}</p>{% endif %}{% endwith %}
+<p>
+  {% if other.retired_at %}Retired: they can't sign in.
+  {% elif not has_password %}Invited: they haven't chosen a password yet.
+  {% else %}Signs in with a password{{ " and an authenticator" if uses_totp else "" }}.{% endif %}
+  {% if other.email %}They gave an email address.{% endif %}
+</p>
+
+{% if not other.retired_at and not themselves %}
+<section>
+  <h2>Locked out?</h2>
+  <p class="hint">Make a link to pass on to them. It works once, within a day,
+  and signs them out everywhere.</p>
+  <form method="post" action="{{ here }}/reset" class="actions">
+    <button name="resets" value="password">Reset their password</button>
+    {% if has_password %}
+    <button name="resets" value="authenticators">Reset their authenticators</button>
+    <button name="resets" value="both">Reset both</button>
+    {% endif %}
+  </form>
+</section>
+{% endif %}
+
+<section class="actions">
+  {% if other.retired_at %}
+  <form method="post" action="{{ here }}/restore"><button>Bring back</button></form>
+  {% elif not themselves %}
+  <form method="post" action="{{ here }}/retire"><button>Retire</button></form>
+  {% endif %}
+  <a href="{{ list }}">All administrators</a>
+</section>
+{% endblock %}

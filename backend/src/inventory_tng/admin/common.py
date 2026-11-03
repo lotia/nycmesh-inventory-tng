@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, cast
+from urllib.parse import urlencode
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse
@@ -17,6 +18,7 @@ from inventory_tng.pages import NOTICES, page, templates
 from inventory_tng.sign_in import SignedIn
 
 ADMIN = "/admin"
+ADMINS = f"{ADMIN}/admins"
 NAME_MAX = 200
 
 _globals = cast(dict[str, Any], templates.env.globals)
@@ -75,6 +77,15 @@ def admin_page(
     unset (None) values, so page()'s defaults for problems and values hold."""
     given = {key: value for key, value in context.items() if value is not None}
     return page(request, template, {"admin": signed.admin} | given, status_code)
+
+
+def site_link(request: Request, path: str, **query: str) -> str:
+    """A link to pass on, as a QR code or by hand: under SITE_URL when mail
+    is set up; otherwise the site as this administrator reached it, which
+    their own browser chose."""
+    mail = request.app.state.settings.mail
+    site = mail.site_url if mail else str(request.base_url).rstrip("/")
+    return f"{site}{path}" + (f"?{urlencode(query)}" if query else "")
 
 
 async def text_form(request: Request) -> dict[str, str]:

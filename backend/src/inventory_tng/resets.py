@@ -145,9 +145,9 @@ def reset(
     ):
         problems = {"password": problem}
         return _reset_page(request, token, link, problems=problems, status_code=400)
-    resets_password = link.resets_password
-    accounts.use_reset_link(session, link, password if resets_password else None, now)
+    password_given = password if link.resets_password else None
+    changed = accounts.use_reset_link(session, link, password_given, now)
     session.commit()
-    if resets_password:
+    if changed:
         notify.tell(admin.email, admin.id, mail.password_changed)
     return redirect(SIGN_IN, notice="reset")

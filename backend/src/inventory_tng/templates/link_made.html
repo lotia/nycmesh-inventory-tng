@@ -1,0 +1,8 @@
+{% extends "admin_base.html" %}
+{% block main %}
+<p><strong>Shown only now.</strong> Pass this link on to {{ other.username }}
+yourself, in person or in a message only they read. It works once,
+within a day{% if invited %}, and with it they choose their password{% endif %}.</p>
+<p class="key">{{ link }}</p>
+<p><a href="{{ list }}">All administrators</a></p>
+{% endblock %}

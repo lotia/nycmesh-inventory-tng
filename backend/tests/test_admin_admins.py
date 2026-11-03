@@ -1,0 +1,239 @@
+"""Administrators: inviting, reset links, retiring (admin/admins.py)."""
+
+import re
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
+
+from conftest import SentMail
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from test_sign_in import (
+    code,
+    new_admin,
+    sign_in_with,
+    text,
+)
+
+from inventory_tng import accounts, sign_in
+from inventory_tng.admin.admins import ADMINS
+from inventory_tng.models import Admin, AdminSession
+
+NEW_PASSWORD = "a long passphrase of their own"
+
+
+def link_on(page: str) -> str:
+    match = re.search(r'class="key">(\S+)<', page)
+    assert match is not None
+    return match.group(1)
+
+
+def token_of(link: str) -> str:
+    return link.split("token=")[1]
+
+
+def admin_named(session: Session, username: str) -> Admin:
+    return session.scalars(select(Admin).where(Admin.username == username)).one()
+
+
+def test_inviting_an_administrator(
+    make_client: Callable[..., TestClient], session: Session, sent_mail: SentMail
+) -> None:
+    admin_client = make_client(mailer=sent_mail)
+    _, key = new_admin(session)
+    sign_in_with(admin_client, code=code(key))
+    form = {"username": "grace", "email": "grace@example.org"}
+    made = admin_client.post(ADMINS, data=form)
+    assert made.status_code == 200
+    assert made.headers["cache-control"] == "no-store"
+    link = link_on(made.text)
+    assert f"{sign_in.RESET}?token=" in link
+    grace = admin_named(session, "grace")
+    assert not accounts.has_password(session, grace.id)
+    assert "Invited: they haven't chosen a password yet." in text(
+        admin_client.get(f"{ADMINS}/{grace.id}")
+    )
+    # Grace opens it, chooses a password, signs in, and is asked for an
+    # authenticator, as TOTP is required.
+    theirs = make_client(admin_client.app, address="192.0.2.70")
+    form = {
+        "token": token_of(link),
+        "password": NEW_PASSWORD,
+        "password_again": NEW_PASSWORD,
+    }
+    assert theirs.post(sign_in.RESET, data=form).status_code == 303
+    assert sign_in_with(theirs, "grace", NEW_PASSWORD).status_code == 303
+    assert theirs.get(sign_in.HOME).headers["location"] == sign_in.NEW_AUTHENTICATOR
+    # Told they were invited; not warned that their first password "changed".
+    assert [m.kind for m in sent_mail] == ["invited"]
+    assert (
+        "An administrator of NYC Mesh Inventory just invited you" in sent_mail[0].body
+    )
+
+
+def test_an_invite_is_never_left_without_a_password(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A link for authenticators only would void the invite's, and set none."""
+    me = admin_named(session, "ada")
+    grace, _ = accounts.invite(session, "grace", None, me.id, datetime.now(UTC))
+    page = text(admin_client.get(f"{ADMINS}/{grace.id}"))
+    assert "Reset their authenticators" not in page
+    refused = admin_client.post(
+        f"{ADMINS}/{grace.id}/reset", data={"resets": "authenticators"}
+    )
+    assert "They have no password yet" in text(refused)
+
+
+def test_an_invite_needs_a_free_username(
+    admin_client: TestClient, session: Session
+) -> None:
+    for form, problem in (
+        ({"username": "ADA"}, "already has that username"),
+        ({"username": "two words"}, "Use 1 to 64"),
+        ({"username": "grace", "email": "nope"}, "doesn't look like an email"),
+    ):
+        refused = admin_client.post(ADMINS, data=form)
+        assert refused.status_code == 400
+        assert problem in text(refused)
+
+
+def test_a_reset_link_for_another_admin(
+    make_client: Callable[..., TestClient], session: Session, sent_mail: SentMail
+) -> None:
+    client = make_client(mailer=sent_mail)
+    _, key = new_admin(session)
+    sign_in_with(client, code=code(key))
+    ben, _ = new_admin(session, "ben", email="ben@example.org")
+    theirs = accounts.start_session(session, ben.id, None, datetime.now(UTC))[0]
+    made = client.post(f"{ADMINS}/{ben.id}/reset", data={"resets": "both"})
+    link = link_on(made.text)
+    assert [m.kind for m in sent_mail] == ["reset_link_made"]
+    form = {
+        "token": token_of(link),
+        "password": NEW_PASSWORD,
+        "password_again": NEW_PASSWORD,
+    }
+    assert client.post(sign_in.RESET, data=form).status_code == 303
+    assert accounts.check_password(session, ben.id, NEW_PASSWORD)
+    assert not accounts.uses_totp(session, ben.id)
+    assert theirs.ended_at is not None
+
+
+def test_your_own_reset_is_on_your_account_page(
+    admin_client: TestClient, session: Session
+) -> None:
+    me = admin_named(session, "ada")
+    refused = admin_client.post(f"{ADMINS}/{me.id}/reset", data={"resets": "both"})
+    assert "Change your own on your account page." in text(refused)
+
+
+def test_retiring_another_ends_their_sessions(
+    make_client: Callable[..., TestClient], session: Session, sent_mail: SentMail
+) -> None:
+    admin_client = make_client(mailer=sent_mail)
+    _, key = new_admin(session)
+    sign_in_with(admin_client, code=code(key))
+    ben, _ = new_admin(session, "ben", email="ben@example.org")
+    theirs = accounts.start_session(session, ben.id, None, datetime.now(UTC))[0]
+    done = admin_client.post(f"{ADMINS}/{ben.id}/retire")
+    assert done.headers["location"] == f"{ADMINS}?notice=admin_retired"
+    assert ben.retired_at is not None
+    assert theirs.ended_at is not None
+    assert admin_client.post(f"{ADMINS}/{ben.id}/restore").status_code == 303
+    assert ben.retired_at is None
+    # Their old password works again, so they are told.
+    assert [m.kind for m in sent_mail] == ["restored"]
+
+
+def test_an_administrator_retired_meanwhile_retires_nobody(
+    admin_client: TestClient, session: Session
+) -> None:
+    me = admin_named(session, "ada")
+    ben, _ = new_admin(session, "ben")
+    carol, _ = new_admin(session, "carol")
+    me.retired_at = datetime.now(UTC)
+    session.flush()
+    assert accounts.retire_admin(session, ben.id, me.id, datetime.now(UTC)) == (
+        "not_found"
+    )
+    assert ben.retired_at is None
+    assert carol.retired_at is None
+
+
+def test_nobody_retires_themselves_or_the_last(
+    admin_client: TestClient, session: Session
+) -> None:
+    me = admin_named(session, "ada")
+    refused = admin_client.post(f"{ADMINS}/{me.id}/retire")
+    assert "Another administrator must retire you." in text(refused)
+    grace, _ = accounts.invite(session, "grace", None, me.id, datetime.now(UTC))
+    assert accounts.retire_admin(session, me.id, grace.id, datetime.now(UTC)) == "last"
+
+
+def test_the_last_who_can_sign_in_stays_though_an_invite_waits(
+    admin_client: TestClient, session: Session
+) -> None:
+    """An invite not taken up cannot let anyone back in: it does not count,
+    and it may always go."""
+    me = admin_named(session, "ada")
+    grace, _ = accounts.invite(session, "grace", None, me.id, datetime.now(UTC))
+    assert accounts.retire_admin(session, me.id, grace.id, datetime.now(UTC)) == "last"
+    done = admin_client.post(f"{ADMINS}/{grace.id}/retire")
+    assert done.status_code == 303
+
+
+def test_changes_here_ask_for_a_fresh_code(
+    admin_client: TestClient, session: Session
+) -> None:
+    for row in session.scalars(select(AdminSession)):
+        row.confirmed_at = datetime.now(UTC) - timedelta(hours=2)
+        row.last_sensitive_at = None
+    session.flush()
+    asked = admin_client.post(ADMINS, data={"username": "grace"})
+    assert asked.status_code == 403
+    assert (
+        session.scalars(select(Admin).where(Admin.username == "grace")).first() is None
+    )
+
+
+def test_using_one_link_voids_the_others(session: Session) -> None:
+    """An emailed reset leaves no link another administrator made live."""
+    ada, _ = new_admin(session)
+    ben, _ = new_admin(session, "ben", email="ben@example.org")
+    now = datetime.now(UTC)
+    made = accounts.make_reset_link(
+        session,
+        ben.id,
+        now,
+        made_by_id=ada.id,
+        resets_password=True,
+        resets_authenticators=False,
+        lifetime=accounts.MADE_LINK_LIFETIME,
+    )
+    emailed = accounts.emailed_reset(session, "ben", now)
+    assert emailed is not None
+    found = accounts.find_reset_link(session, emailed.token, now)
+    assert found is not None
+    accounts.use_reset_link(session, found[0], NEW_PASSWORD, now)
+    assert accounts.find_reset_link(session, made, now) is None
+
+
+def test_bringing_one_back_voids_their_links(
+    admin_client: TestClient, session: Session
+) -> None:
+    ben, _ = new_admin(session, "ben")
+    now = datetime.now(UTC)
+    token = accounts.make_reset_link(
+        session,
+        ben.id,
+        now,
+        made_by_id=None,
+        resets_password=True,
+        resets_authenticators=False,
+        lifetime=accounts.EMAILED_LINK_LIFETIME,
+    )
+    ben.retired_at = now
+    session.flush()
+    assert admin_client.post(f"{ADMINS}/{ben.id}/restore").status_code == 303
+    assert accounts.find_reset_link(session, token, now) is None

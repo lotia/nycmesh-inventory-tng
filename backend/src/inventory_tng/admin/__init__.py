@@ -14,6 +14,7 @@ from typing import Any, cast
 from fastapi import APIRouter
 
 from inventory_tng.admin import (
+    admins,
     categories,
     counts,
     devices,
@@ -35,6 +36,7 @@ SECTIONS = (
     (stock.STOCK, "Stock"),
     (counts.COUNTS, "Counts"),
     (devices.DEVICES, "Devices"),
+    (admins.ADMINS, "Administrators"),
     (settings.SETTINGS, "Settings"),
 )
 cast(dict[str, Any], templates.env.globals)["sections"] = SECTIONS
@@ -49,6 +51,7 @@ for module in (
     stock,
     counts,
     devices,
+    admins,
     settings,
 ):
     router.include_router(module.router)

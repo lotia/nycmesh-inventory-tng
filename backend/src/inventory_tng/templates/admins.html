@@ -1,0 +1,40 @@
+{% extends "admin_base.html" %}
+{% block main %}
+<section>
+  <table>
+    <tr><th>Administrator</th><th>Email</th><th>Authenticator</th></tr>
+    {% for other in current %}
+    <tr>
+      <td><a href="{{ here }}/{{ other.id }}">{{ other.username }}</a>{% if other.id == admin.id %} <span class="hint">you</span>{% endif %}</td>
+      <td>{{ "yes" if other.email else "" }}</td>
+      <td>{{ "yes" if other.id in with_totp else "" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section>
+  <h2>Invite an administrator</h2>
+  <p class="hint">You get a link to pass on. With it they choose a password,
+  then set up an authenticator when they first sign in. It works once, within
+  a day.</p>
+  <form method="post" action="{{ here }}">
+    <label>Username
+      <input name="username" value="{{ values.get('username', '') }}" maxlength="{{ limits.username_max }}" required>
+      {% with name = "username" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <label>Email <span class="hint">optional: lets them reset their own password</span>
+      <input name="email" type="email" value="{{ values.get('email', '') }}">
+      {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <button>Invite</button>
+  </form>
+</section>
+
+{% if retired %}
+<section class="retired">
+  <h2>Retired</h2>
+  <ul>{% for other in retired %}<li><a href="{{ here }}/{{ other.id }}">{{ other.username }}</a></li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% endblock %}

@@ -8,7 +8,6 @@ open the registration page with it filled in; only its hash is kept.
 
 from datetime import datetime, timedelta
 from typing import Annotated, Literal
-from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
@@ -17,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import devices
 from inventory_tng.accounts import qr_svg
-from inventory_tng.admin.common import ADMIN, admin_page, now
+from inventory_tng.admin.common import ADMIN, admin_page, now, site_link
 from inventory_tng.db import DbSession
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import Device, RegistrationCode
@@ -127,11 +126,7 @@ def make_code(
         label=label.strip() or None,
     )
     changed(signed, session)
-    # SITE_URL when mail is set up; otherwise the site as the admin reached
-    # it, which their own browser chose.
-    mail = request.app.state.settings.mail
-    site = mail.site_url if mail else str(request.base_url).rstrip("/")
-    link = f"{site}{devices.REGISTER_PATH}?{urlencode({'code': phrase})}"
+    link = site_link(request, devices.REGISTER_PATH, code=phrase)
     return admin_page(
         request,
         signed,

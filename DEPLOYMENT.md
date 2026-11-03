@@ -104,8 +104,10 @@ restart. Later administrators are invited from the administrator pages
 
 ## Mail
 
-The app mails administrators reset links they ask for, and tells them when
-their password changes or a recovery code is used. It sends through a
+The app mails administrators reset links they ask for. It tells them when
+they are invited, when another administrator makes them a reset link or
+brings their account back, and when their password changes or a recovery
+code is used. It sends through a
 provider's authenticated SMTP, such as Mailgun's or Gmail's:
 
 - `MAIL_HOST`, such as `smtp.mailgun.org`.
