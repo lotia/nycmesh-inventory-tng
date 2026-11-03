@@ -29,6 +29,8 @@ Set these in the environment. Only `DATABASE_URL` is required.
   `UNMASK_SECRETS` and `VITE_DEV_SERVER`.
 - `SETUP_TOKEN`: lets the first administrator set up (below); at least 32
   characters. Remove it once they have.
+- `RECOVERY_TOKEN`: lets a locked-out administrator back in (below); at
+  least 32 characters. Remove it once they are.
 - `MAIL_HOST`, and with it `MAIL_FROM` and `SITE_URL`: mail to
   administrators (below). Without `MAIL_HOST`, none is sent.
 - `FORWARDED_ALLOW_IPS`: behind a proxy, the proxy's address, so the client
@@ -102,12 +104,28 @@ administrator exists, `/setup` is gone for good; remove `SETUP_TOKEN` and
 restart. Later administrators are invited from the administrator pages
 (docs/decisions/0012).
 
+## A locked-out administrator
+
+Another administrator can make a locked-out one a reset link, and one with
+an email can reset their own password. When neither can, make a token as
+above, set it as `RECOVERY_TOKEN` and restart. On Kubernetes, put it in the
+deployment's Secret and roll out; nobody needs to exec into a pod.
+
+Give it to them. They open `/recover`, type it and their username, and
+choose a new password. Their authenticators are removed: while TOTP is
+required they set up a new one at sign-in; while it is optional, until they
+add one, the password is all that protects the account. Each token works
+once, so make a new one for another try. `/recover` exists only
+while `RECOVERY_TOKEN` is set: remove it and restart afterwards. Anyone who
+can read the token's Secret can already read `DATABASE_URL`, so it trusts
+nobody new.
+
 ## Mail
 
 The app mails administrators reset links they ask for. It tells them when
 they are invited, when another administrator makes them a reset link or
-brings their account back, and when their password changes or a recovery
-code is used. It sends through a
+brings their account back, when the recovery token is used for them, and
+when their password changes or a recovery code is used. It sends through a
 provider's authenticated SMTP, such as Mailgun's or Gmail's:
 
 - `MAIL_HOST`, such as `smtp.mailgun.org`.

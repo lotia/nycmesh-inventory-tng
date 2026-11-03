@@ -24,7 +24,7 @@ from opentelemetry import metrics
 from sqlalchemy import ColumnElement, func, select, text, update
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import exists_where, set_actor
+from inventory_tng.db import exists_where, set_actor, unique
 from inventory_tng.devices import digest
 from inventory_tng.models import (
     Admin,
@@ -219,6 +219,20 @@ def _usable_links() -> tuple[ColumnElement[bool], ...]:
     return (ResetLink.used_at.is_(None), ResetLink.voided_at.is_(None))
 
 
+def current_admin(
+    session: Session, username: str, *where: ColumnElement[bool]
+) -> Admin | None:
+    """A current administrator by username, which ignores case, as its
+    unique index does."""
+    return session.scalar(
+        select(Admin).where(
+            func.lower(Admin.username) == username.strip().lower(),
+            Admin.retired_at.is_(None),
+            *where,
+        )
+    )
+
+
 def step_time(step: int) -> datetime:
     """When a TOTP time step began: pyotp's steps are 30 seconds."""
     return datetime.fromtimestamp(step * TOTP_INTERVAL, UTC)
@@ -365,12 +379,7 @@ def sign_in(
     without the password cannot lock its administrator out."""
     if not limiter.hit(PER_ADDRESS, "sign_in", address):
         _refuse_sign_in("rate_limited", None)
-    admin = session.scalar(
-        select(Admin).where(
-            func.lower(Admin.username) == username.strip().lower(),
-            Admin.retired_at.is_(None),
-        )
-    )
+    admin = current_admin(session, username)
     if not check_password(session, admin.id if admin else None, password):
         _refuse_sign_in("unknown_user" if admin is None else "bad_password", admin)
     assert admin is not None  # check_password is False without one.
@@ -512,13 +521,13 @@ def _confirmation(row: AdminSession, outcome: Confirmation) -> Confirmation:
 # The first administrator
 
 
-SetupRefusal = Literal["closed", "rate_limited", "bad_token"]
+TokenRefusal = Literal["closed", "rate_limited", "bad_token", "used", "no_admin"]
 
 
-class SetupRefused(Exception):
-    def __init__(self, reason: SetupRefusal) -> None:
+class TokenRefused(Exception):
+    def __init__(self, reason: TokenRefusal) -> None:
         super().__init__(reason)
-        self.reason: SetupRefusal = reason
+        self.reason: TokenRefusal = reason
 
 
 def setup_open(session: Session) -> bool:
@@ -527,16 +536,25 @@ def setup_open(session: Session) -> bool:
 
 
 def check_setup_token(expected: str, typed: str, address: str) -> None:
+    _check_operator_token("setup", expected, typed, address)
+
+
+def _check_operator_token(
+    purpose: Literal["setup", "recovery"], expected: str, typed: str, address: str
+) -> None:
+    """A token the operator set in the deployment's settings."""
     # Counted before it is compared, so a burst cannot slip under the limit.
-    if not limiter.hit(PER_ADDRESS, "setup", address):
-        _refuse_setup("rate_limited")
+    if not limiter.hit(PER_ADDRESS, purpose, address):
+        _refuse(purpose, "rate_limited")
     if not secrets.compare_digest(typed.strip().encode(), expected.encode()):
-        _refuse_setup("bad_token")
+        _refuse(purpose, "bad_token")
 
 
-def _refuse_setup(reason: SetupRefusal) -> NoReturn:
-    log.warning("setup refused", reason=reason)
-    raise SetupRefused(reason)
+def _refuse(purpose: Literal["setup", "recovery"], reason: TokenRefusal) -> NoReturn:
+    log.warning(f"{purpose} refused", reason=reason)
+    if purpose == "recovery":
+        recoveries.add(1, {"outcome": reason})
+    raise TokenRefused(reason)
 
 
 @dataclass(frozen=True)
@@ -567,7 +585,7 @@ def create_first_admin(
     commits."""
     session.execute(text("LOCK TABLE admin IN SHARE ROW EXCLUSIVE MODE"))
     if not setup_open(session):
-        _refuse_setup("closed")
+        _refuse("setup", "closed")
     set_actor(session, "system:setup")
     admin = Admin(username=username, email=email or None)
     session.add(admin)
@@ -725,19 +743,22 @@ def make_reset_link(
     resets_password: bool,
     resets_authenticators: bool,
     lifetime: timedelta,
+    recovery_token_hash: bytes | None = None,
 ) -> str:
     """A one-use link's token, the only time it is known. It voids earlier
     links of the same kind still unused, so the newest works: an emailed one
     voids only emailed ones, so asking by mail, which anyone may do, never
-    undoes a link another administrator made. A link for authenticators
-    only needs a password to keep: an invite has none."""
+    undoes a link another administrator or the recovery token made. A link
+    for authenticators only needs a password to keep: an invite has none."""
     if not resets_password and not has_password(session, admin_id):
         raise ValueError("they have no password yet: the link must set one")
-    void_reset_links(session, admin_id, now, emailed_only=made_by_id is None)
+    emailed = made_by_id is None and recovery_token_hash is None
+    void_reset_links(session, admin_id, now, emailed_only=emailed)
     token, token_hash = _new_token()
     link = ResetLink(
         admin_id=admin_id,
         made_by_id=made_by_id,
+        recovery_token_hash=recovery_token_hash,
         token_hash=token_hash,
         resets_password=resets_password,
         resets_authenticators=resets_authenticators,
@@ -759,7 +780,7 @@ def void_reset_links(
 ) -> None:
     query = update(ResetLink).where(ResetLink.admin_id == admin_id, *_usable_links())
     if emailed_only:
-        query = query.where(ResetLink.made_by_id.is_(None))
+        query = query.where(ResetLink.emailed())
     session.execute(query.values(voided_at=now))
 
 
@@ -780,13 +801,7 @@ def emailed_reset(
 ) -> EmailedReset | None:
     """For a current administrator with an email: a new emailed link, which
     resets the password only. None for anyone else, who is told the same."""
-    admin = session.scalar(
-        select(Admin).where(
-            func.lower(Admin.username) == username.strip().lower(),
-            Admin.retired_at.is_(None),
-            Admin.email.is_not(None),
-        )
-    )
+    admin = current_admin(session, username, Admin.email.is_not(None))
     if admin is None or admin.email is None:
         log.info("emailed reset not made", reason="no_such_address")
         return None
@@ -860,6 +875,57 @@ def use_reset_link(
         sessions_ended=ended,
     )
     return changed
+
+
+# The recovery token (docs/decisions/0012)
+
+recoveries = meter.create_counter(
+    "inventory.admin.recoveries",
+    unit="{attempt}",
+    description="Uses of the operator's recovery token, by outcome",
+)
+
+
+def recover(
+    session: Session,
+    expected: str,
+    typed: str,
+    username: str,
+    address: str,
+    now: datetime,
+) -> tuple[Admin, str]:
+    """A one-use link, made with the operator's RECOVERY_TOKEN, that resets
+    a current administrator's password and authenticators. Each token works
+    once: its hash is kept on the link it made. Raises TokenRefused."""
+    _check_operator_token("recovery", expected, typed, address)
+    token_hash = digest(typed.strip())
+    if exists_where(session, ResetLink.recovery_token_hash == token_hash):
+        _refuse("recovery", "used")
+    admin = current_admin(session, username)
+    if admin is None:
+        _refuse("recovery", "no_admin")
+    set_actor(session, "system:recovery")
+    link = ""
+
+    def make() -> None:
+        nonlocal link
+        link = make_reset_link(
+            session,
+            admin.id,
+            now,
+            made_by_id=None,
+            resets_password=True,
+            resets_authenticators=True,
+            lifetime=EMAILED_LINK_LIFETIME,
+            recovery_token_hash=token_hash,
+        )
+
+    # Two at once both pass the check above: the unique index stops one.
+    if not unique(session, make):
+        _refuse("recovery", "used")
+    recoveries.add(1, {"outcome": "made"})
+    log.warning("recovery link made", admin_id=admin.id)
+    return admin, link
 
 
 # Other administrators (admin/admins.py)

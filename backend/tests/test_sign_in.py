@@ -205,7 +205,7 @@ def test_setup_refuses_once_any_admin_exists_even_retired(
     admin.retired_at = NOW
     session.flush()
     assert client.get(sign_in.SETUP).status_code == 404
-    with pytest.raises(accounts.SetupRefused):
+    with pytest.raises(accounts.TokenRefused):
         accounts.create_first_admin(
             session,
             username="eve",
@@ -650,7 +650,7 @@ def test_losing_the_race_to_set_up_shows_not_found(
     key = hidden_key(client.get(sign_in.SETUP))
 
     def lost(*_args: object, **_kwargs: object) -> NoReturn:
-        raise accounts.SetupRefused("closed")
+        raise accounts.TokenRefused("closed")
 
     monkeypatch.setattr(accounts, "create_first_admin", lost)
     assert client.post(sign_in.SETUP, data=setup_form(key)).status_code == 404

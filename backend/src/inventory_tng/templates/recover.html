@@ -1,0 +1,17 @@
+{% extends "admin_base.html" %}
+{% block main %}
+<p>Locked out, with no other administrator to let you back in? Whoever runs
+the server can set a recovery token and give it to you. With it, reset your
+password and authenticators here. Each token works once.</p>
+<form method="post" action="{{ here }}">
+  <label>Recovery token <span class="hint">from whoever runs the server</span>
+    <input name="token" autocomplete="off" required>
+    {% with name = "token" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  <label>Your username
+    <input name="username" value="{{ values.username }}" autocomplete="username" required>
+    {% with name = "username" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  <button>Reset my account</button>
+</form>
+{% endblock %}

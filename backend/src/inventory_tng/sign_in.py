@@ -394,7 +394,7 @@ def setup(
     optional = _totp_optional(session)
     try:
         accounts.check_setup_token(expected, token, rate_key(request))
-    except accounts.SetupRefused as refused:
+    except accounts.TokenRefused as refused:
         limited = refused.reason == "rate_limited"
         return _setup_page(
             request,
@@ -441,7 +441,7 @@ def setup(
             user_agent=request.headers.get("user-agent"),
             now=now,
         )
-    except accounts.SetupRefused:
+    except accounts.TokenRefused:
         # Someone else finished setting up first, while this waited.
         return not_found()
     session.commit()

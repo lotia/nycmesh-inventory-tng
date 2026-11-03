@@ -34,6 +34,7 @@ Kind = Literal[
     "reset_link_made",
     "invited",
     "restored",
+    "recovery_link_made",
     "password_changed",
     "email_changed",
     "recovery_code_used",
@@ -220,6 +221,18 @@ def restored(to: str, admin_id: int) -> Message:
         "another administrator just brought it back: your password and "
         f"authenticators work again.\n\n{IF_NOT_YOU}",
         "restored",
+        admin_id,
+    )
+
+
+def recovery_link_made(to: str, admin_id: int) -> Message:
+    return Message(
+        to,
+        "Your NYC Mesh Inventory account is being recovered",
+        "Someone with the recovery token that whoever runs NYC Mesh Inventory "
+        "set just made a link that resets your password and authenticators. "
+        f"It works once, within the hour.\n\n{IF_NOT_YOU}",
+        "recovery_link_made",
         admin_id,
     )
 

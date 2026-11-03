@@ -1,7 +1,8 @@
 """Resetting an account with a link (docs/decisions/0012): asked for by
 mail from the sign-in page, by an administrator who gave an address, or
 made by another administrator (inventory-tng-8i4.12.4), for the password,
-the authenticators or both.
+the authenticators or both; or, while the operator has set RECOVERY_TOKEN,
+made with it at /recover for the password and authenticators.
 
 Asking always gets the same answer, and everything that depends on whether
 the account exists or has an address happens after the reply, so neither
@@ -18,7 +19,7 @@ from inventory_tng import accounts, mail
 from inventory_tng.db import DbSession, SessionFactory, Sessions
 from inventory_tng.mail import Notify
 from inventory_tng.models import ResetLink
-from inventory_tng.pages import NOTICES, page, redirect
+from inventory_tng.pages import NOTICES, not_found, page, redirect
 from inventory_tng.sign_in import FORGOT, RESET, SIGN_IN, TOO_MANY
 from inventory_tng.web import rate_key
 
@@ -29,6 +30,13 @@ ASKED = (
     "its way. It works once, within the hour."
 )
 NOTICES["reset"] = "Your account is reset: sign in."
+
+RECOVER = "/recover"
+REFUSED = {
+    "bad_token": ("token", "That isn't the recovery token."),
+    "used": ("token", "That token was used already: ask for a new one."),
+    "no_admin": ("username", "No current administrator has that username."),
+}
 
 
 def _now() -> datetime:
@@ -151,3 +159,63 @@ def reset(
     if changed:
         notify.tell(admin.email, admin.id, mail.password_changed)
     return redirect(SIGN_IN, notice="reset")
+
+
+def _recover_page(
+    request: Request,
+    *,
+    username: str = "",
+    problems: dict[str, str] | None = None,
+    alert: str | None = None,
+    status_code: int = 200,
+) -> HTMLResponse:
+    return page(
+        request,
+        "recover.html",
+        {
+            "title": "Recover an account",
+            "here": RECOVER,
+            "values": {"username": username},
+            "problems": problems or {},
+            "alert": alert,
+        },
+        status_code,
+    )
+
+
+@router.get(RECOVER)
+def recover_form(request: Request) -> Response:
+    if request.app.state.settings.recovery_token is None:
+        return not_found()
+    return _recover_page(request)
+
+
+@router.post(RECOVER)
+def recover(
+    request: Request,
+    session: DbSession,
+    notify: Notify,
+    token: Annotated[str, Form()] = "",
+    username: Annotated[str, Form()] = "",
+) -> Response:
+    """Straight on to the link's page: whoever has the token is the one
+    getting back in, or is with them."""
+    expected = request.app.state.settings.recovery_token
+    if expected is None:
+        return not_found()
+    try:
+        admin, link = accounts.recover(
+            session, expected, token, username, rate_key(request), _now()
+        )
+    except accounts.TokenRefused as refused:
+        if refused.reason == "rate_limited":
+            return _recover_page(
+                request, username=username, alert=TOO_MANY, status_code=429
+            )
+        field, words = REFUSED[refused.reason]
+        return _recover_page(
+            request, username=username, problems={field: words}, status_code=400
+        )
+    session.commit()
+    notify.tell(admin.email, admin.id, mail.recovery_link_made)
+    return redirect(RESET, token=link)

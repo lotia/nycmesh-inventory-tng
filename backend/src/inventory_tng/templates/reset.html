@@ -3,7 +3,8 @@
 {% if not link %}
 <p>This link doesn't work any more: it has been used, a newer one replaced
 it, or its time ran out. <a href="{{ paths.forgot }}">Ask for a new one</a>,
-or ask another administrator.</p>
+or ask another administrator. If nobody else can help, ask whoever runs the
+server for a new recovery token.</p>
 {% else %}
 <form method="post" action="{{ paths.reset }}">
   <input type="hidden" name="token" value="{{ token }}">

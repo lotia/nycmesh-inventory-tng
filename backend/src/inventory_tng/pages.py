@@ -45,11 +45,13 @@ def not_found() -> HTMLResponse:
     return HTMLResponse("Not found", status_code=404)
 
 
-def redirect(path: str, *, notice: str | None = None) -> RedirectResponse:
+def redirect(path: str, *, notice: str | None = None, **query: str) -> RedirectResponse:
     """After a form, so reloading does not send it again; `notice`, one of
     NOTICES, is said on the page it goes to."""
     if notice is not None:
         if notice not in NOTICES:
             raise ValueError(f"no such notice: {notice}")
-        path += ("&" if "?" in path else "?") + urlencode({"notice": notice})
+        query["notice"] = notice
+    if query:
+        path += ("&" if "?" in path else "?") + urlencode(query)
     return RedirectResponse(path, status_code=303)

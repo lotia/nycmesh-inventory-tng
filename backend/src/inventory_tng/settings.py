@@ -17,7 +17,7 @@ ENVIRONMENTS = ("development", "production")
 DEFAULT_PORTS = {"http": 80, "https": 443}
 # A setup token shorter than this could be guessed; secrets.token_urlsafe()
 # gives 43 characters.
-SETUP_TOKEN_LENGTH = 32
+OPERATOR_TOKEN_LENGTH = 32
 
 
 class SettingsError(Exception):
@@ -132,16 +132,23 @@ class Settings:
     # What /setup asks for before making the first administrator
     # (docs/decisions/0012); without it, setup is off.
     setup_token: str | None = field(default=None, repr=False)
+    # What /recover asks for before making a reset link for a locked-out
+    # administrator (docs/decisions/0012); without it, /recover is gone.
+    recovery_token: str | None = field(default=None, repr=False)
     # Password resets and notices by mail; None sends none.
     mail: MailConfig | None = None
 
     def __post_init__(self) -> None:
         # Every Settings passes through here, however it was built.
         object.__setattr__(self, "database_url", _database_url(self.database_url))
-        if self.setup_token is not None and len(self.setup_token) < SETUP_TOKEN_LENGTH:
-            raise SettingsError(
-                f"SETUP_TOKEN must be at least {SETUP_TOKEN_LENGTH} characters"
-            )
+        for name, token in (
+            ("SETUP_TOKEN", self.setup_token),
+            ("RECOVERY_TOKEN", self.recovery_token),
+        ):
+            if token is not None and len(token) < OPERATOR_TOKEN_LENGTH:
+                raise SettingsError(
+                    f"{name} must be at least {OPERATOR_TOKEN_LENGTH} characters"
+                )
         if not self.development:
             _refuse_development_only(self)
 
@@ -153,6 +160,7 @@ class Settings:
             logging=LogConfig.from_environ(environ),
             frontend=FrontendConfig.from_environ(environ),
             setup_token=environ.get("SETUP_TOKEN", "").strip() or None,
+            recovery_token=environ.get("RECOVERY_TOKEN", "").strip() or None,
             mail=MailConfig.from_environ(environ),
         )
 

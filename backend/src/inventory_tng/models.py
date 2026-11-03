@@ -42,6 +42,7 @@ from sqlalchemy import (
     LargeBinary,
     Numeric,
     Text,
+    and_,
     func,
     text,
 )
@@ -501,7 +502,7 @@ SECRET_COLUMNS = {
     "admin_password": ("password_hash",),
     "authenticator": ("totp_key",),
     "recovery_code": ("code_hash",),
-    "reset_link": ("token_hash",),
+    "reset_link": ("token_hash", "recovery_token_hash"),
 }
 
 
@@ -618,15 +619,20 @@ class AdminSession(Base):
 
 class ResetLink(Base):
     """A one-use link that resets an administrator's password, authenticators
-    or both. Made by another administrator, or emailed to the administrator
-    themselves (made_by_id NULL), which resets the password only."""
+    or both. Made by another administrator, with the operator's recovery
+    token, or emailed to the administrator themselves (neither), which resets
+    the password only."""
 
     __tablename__ = "reset_link"
     __table_args__ = (
         CheckConstraint("resets_password OR resets_authenticators", name="resets"),
         CheckConstraint(
-            "made_by_id IS NOT NULL OR NOT resets_authenticators",
+            "made_by_id IS NOT NULL OR recovery_token_hash IS NOT NULL "
+            "OR NOT resets_authenticators",
             name="emailed_resets_password_only",
+        ),
+        CheckConstraint(
+            "made_by_id IS NULL OR recovery_token_hash IS NULL", name="one_maker"
         ),
         CheckConstraint("made_by_id <> admin_id", name="not_made_for_oneself"),
     )
@@ -635,6 +641,8 @@ class ResetLink(Base):
     created_at: Mapped[CreatedAt]
     admin_id: Mapped[int] = _reference("admin.id")
     made_by_id: Mapped[int | None] = _reference("admin.id")
+    # Made with the operator's recovery token: its hash, so it works once.
+    recovery_token_hash: Mapped[bytes | None] = mapped_column(LargeBinary, unique=True)
     token_hash: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
     resets_password: Mapped[bool]
     resets_authenticators: Mapped[bool]
@@ -642,6 +650,12 @@ class ResetLink(Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Set when a newer link for the same administrator replaces it.
     voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    @classmethod
+    def emailed(cls) -> ColumnElement[bool]:
+        """Asked for by mail: made by neither an administrator nor the
+        recovery token."""
+        return and_(cls.made_by_id.is_(None), cls.recovery_token_hash.is_(None))
 
 
 class SignInSettings(Base):
