@@ -1,5 +1,8 @@
 {% extends "admin_base.html" %}
 {% block main %}
+{% for warning in warnings %}
+<p class="warning">{{ warning.words }} <a href="{{ warning.path }}">{{ warning.action }}</a>.</p>
+{% endfor %}
 <ul>
   {% for path, label in sections %}
   <li><a href="{{ path }}">{{ label }}</a>{% if current.get(label) is not none %}: {{ current[label] }}{% endif %}</li>
