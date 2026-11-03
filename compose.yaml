@@ -99,5 +99,18 @@ services:
       - "127.0.0.1:8025:8025"
       - "127.0.0.1:1025:1025"
 
+  # Optional: `mise run phone` (CONTRIBUTING.md, On a phone). In the app's
+  # network, so it reaches the app from 127.0.0.1, which uvicorn trusts by
+  # default: links say https and the tunnel's host, and the client address
+  # is the one Cloudflare saw, not one a client wrote in X-Forwarded-For.
+  tunnel:
+    image: docker.io/cloudflare/cloudflared:2026.10.7
+    profiles: [phone]
+    command: [tunnel, --no-autoupdate, --url, "http://localhost:8000"]
+    network_mode: service:app
+    depends_on:
+      app:
+        condition: service_healthy
+
 volumes:
   db:

@@ -98,8 +98,21 @@ pages' scripts come from in its `frontend` log line at startup:
 `source=build` or `source=dev_server`.
 
 The scan page needs a registered device, and some catalogue rows to choose
-from. The camera will work only over HTTPS or on `localhost`, so a phone on
-your network cannot use it; inventory-tng-8i4.13.2 is for that.
+from. The camera works only over HTTPS or on `localhost`.
+
+#### On a phone
+
+```sh
+mise run phone   # COMPOSE="podman compose" mise run phone, with Podman
+```
+
+This runs the app in its container (below) behind a Cloudflare quick
+tunnel, which gives it a public `https://….trycloudflare.com` address with a
+real certificate, and prints a one-use registration code for it, with a QR
+code. Scan that with the phone to register it, then go on to the scan page.
+Pages come from the container's build, not Vite's dev server. The address
+changes each time the tunnel starts, and anyone who has it reaches your app
+while it runs, so stop it when you are done.
 
 The pages call the API through types generated from its schema. After you
 change an endpoint, regenerate both, and commit `frontend/src/api/`:
