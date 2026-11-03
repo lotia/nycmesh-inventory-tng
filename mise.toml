@@ -36,3 +36,19 @@ run = ["uv run ruff check --fix", "uv run ruff format"]
 description = "Fix what Biome can fix, and format the frontend"
 dir = "frontend"
 run = "npm run fix"
+
+[tasks.phone]
+description = "Serve the app over https through a tunnel, and show a QR code that registers a phone"
+run = '''
+set -eu
+compose=${COMPOSE:-docker compose}
+$compose up -d --build --wait app
+# A new container, so its log holds only this tunnel's address.
+$compose --profile phone up -d --force-recreate tunnel
+url=$(timeout 60 $compose logs -f tunnel 2>&1 | grep -v '//api\.' \
+  | grep -m 1 -o 'https://[a-z0-9-]*\.trycloudflare\.com' || true)
+[ -n "$url" ] || { echo "No tunnel address: $compose logs tunnel" >&2; exit 1; }
+$compose exec -T app python -m inventory_tng.registration_codes create \
+  --uses 1 --days 1 --label phone --base-url "$url"
+echo "Stop it with: $compose --profile phone stop tunnel"
+'''
