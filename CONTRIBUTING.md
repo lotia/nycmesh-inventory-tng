@@ -38,11 +38,14 @@ Then push a branch and open a pull request: `git push -u origin <branch>`, or
 
 - [uv](https://docs.astral.sh/uv/). It installs the Python version the backend
   asks for and every dependency; every command below runs through `uv run`.
-- [Node.js](https://nodejs.org/), at the version in `mise.toml`, for the scan
-  page in `frontend/`. With mise, `mise install` fetches it.
-- A container runtime with compose, such as Docker or Podman, for the database
-  (and, if you want it, the app).
-- Optional: [mise](https://mise.jdx.dev/), for Node and a few shortcuts.
+- [mise](https://mise.jdx.dev/). It runs the tasks below, and `mise install`
+  fetches Node.js at the version in `mise.toml`, for the scan page in
+  `frontend/`. The tasks are shell scripts, for macOS and Linux; on Windows,
+  work in WSL.
+- Podman or Docker, with compose, for the database (and, if you want it, the
+  app). `mise run compose -- <arguments>` runs compose with Podman if it is
+  installed, else Docker. To choose, set `INVENTORY_COMPOSE` in `.env`, such
+  as `INVENTORY_COMPOSE=docker compose`.
 
 ## Local settings
 
@@ -62,7 +65,7 @@ is taken, change `INVENTORY_DB_PORT` in `.env`; `DATABASE_URL` follows it.
 ## Running the app
 
 ```sh
-docker compose up -d --wait db           # or: podman compose up -d --wait db
+mise run compose -- up -d --wait db
 cd backend
 uv run alembic upgrade head              # create or update the schema
 uv run python -m inventory_tng --reload  # http://127.0.0.1:8000/api/docs
@@ -103,7 +106,7 @@ from. The camera works only over HTTPS or on `localhost`.
 #### On a phone
 
 ```sh
-mise run phone   # COMPOSE="podman compose" mise run phone, with Podman
+mise run phone
 ```
 
 This runs the app in its container (below) behind a Cloudflare quick
@@ -144,7 +147,7 @@ command line.
 ### Mail
 
 To see the mail the app sends, start Mailpit, which catches it all and sends
-nothing on: `docker compose --profile mail up -d mail`. Set these in `.env`
+nothing on: `mise run compose -- --profile mail up -d mail`. Set these in `.env`
 and restart, then read the mail at <http://localhost:8025>:
 
 ```sh
@@ -161,8 +164,8 @@ container, set `INVENTORY_APP_MAIL_HOST=mail` too.
 ### Running the app in a container
 
 ```sh
-docker compose up -d --build --wait app  # or: podman compose; http://127.0.0.1:8000/api/docs
-docker compose logs -f app
+mise run compose -- up -d --build --wait app  # http://127.0.0.1:8000/api/docs
+mise run compose -- logs -f app
 ```
 
 This runs the backend the way production does, in a container beside the
@@ -186,7 +189,7 @@ client address it logs is the container network's, not your browser's.
 ## Running the checks
 
 ```sh
-docker compose up -d --wait db   # or: podman compose up -d --wait db
+mise run compose -- up -d --wait db
 cd backend
 
 # Optional: let the tools fix what they can. Neither changes behaviour.
@@ -214,13 +217,20 @@ CI runs these checks, in this order, on pushes to `main` and on pull requests,
 and builds the frontend.
 
 Only the backend's tests need the database; the other checks take about a
-second each. With mise, `mise run fix` runs the fixes and `mise run check`
-runs every check; start the database first. Each test run creates a
-database of its own on that server and drops it at the end; a run that was
-killed before it could is dropped by a later one. During the tests,
-`DATABASE_URL` points nowhere, so nothing reaches your own data: a test that
-needs the database takes the `database_url` fixture. Write tests in pytest
-style.
+second each. Start the database first. Then `mise run fix` runs the fixes
+and `mise run check` runs every check, or one side of them:
+
+```sh
+mise run fix-backend    # or: mise run fix-frontend
+mise run check-backend  # or: mise run check-frontend
+mise run check-scripts  # shellcheck, on the scripts in mise-tasks/
+```
+
+Each test run creates a database of its own on that server and drops it at
+the end; a run that was killed before it could is dropped by a later one.
+During the tests, `DATABASE_URL` points nowhere, so nothing reaches your own
+data: a test that needs the database takes the `database_url` fixture. Write
+tests in pytest style.
 
 ## Documentation
 
@@ -286,5 +296,5 @@ To see telemetry locally, start the dashboard, run the server with
 <http://localhost:18888>:
 
 ```sh
-docker compose --profile telemetry up -d dashboard   # or: podman compose
+mise run compose -- --profile telemetry up -d dashboard
 ```

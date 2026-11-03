@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#MISE description="Serve the app over https through a tunnel, and show a QR code that registers a phone"
+# CONTRIBUTING.md, On a phone.
+set -euo pipefail
+
+# The compose task's script itself: no mise for each call, and timeout
+# can run it.
+compose=$(dirname "$0")/compose
+compose() { "$compose" "$@"; }
+
+compose up -d --build --wait app
+# A new container, so its log holds only this tunnel's address.
+compose --profile phone up -d --force-recreate tunnel
+url=$(timeout 60 "$compose" logs -f tunnel 2>&1 |
+  grep -v '//api\.' |
+  grep -m 1 -o 'https://[a-z0-9-]*\.trycloudflare\.com' || true)
+if [[ -z $url ]]; then
+  echo "No tunnel address: mise run compose -- logs tunnel" >&2
+  exit 1
+fi
+compose exec -T app python -m inventory_tng.registration_codes create \
+  --uses 1 --days 1 --label phone --base-url "$url"
+echo "Stop it with: mise run compose -- --profile phone stop tunnel"

@@ -46,6 +46,10 @@ is, read [README.md](README.md).
    `npx markdownlint-cli2@0.24.0 <files>` from the repository's root, where
    `.markdownlint-cli2.jsonc` is. Never disable, relax or work around a rule
    (config, inline comments, ignores) without asking the person first.
+10. **Development workflows are mise tasks**, in `mise.toml` or as scripts
+    in `mise-tasks/`, each named in CONTRIBUTING.md as `mise run <task>`.
+    Compose runs through `mise run compose --`, never a runtime's own compose
+    command. `backend/tests/test_contributing.py` enforces both.
 
 ## More guidance
 
