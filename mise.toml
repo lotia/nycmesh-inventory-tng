@@ -1,23 +1,26 @@
-# The development tasks (CONTRIBUTING.md); longer ones are scripts in
-# mise-tasks/. Python's version comes from backend/pyproject.toml; Node's is
-# here, for mise and for CI.
+# The development tools and tasks (CONTRIBUTING.md); longer tasks are scripts
+# in mise-tasks/. Python's version comes from backend/pyproject.toml, through
+# uv; Node's is here, for mise and for CI.
 
 [tools]
 node = "26.12.1"
+uv = "0.13.6"
 shellcheck = "0.11.0"
+taplo = "0.10.0"
+"npm:markdownlint-cli2" = "0.24.0"
 
 [tasks.check]
-description = "Check the backend, the frontend and the task scripts"
-depends = ["check-backend", "check-frontend", "check-scripts"]
+description = "Check the backend, the frontend, the task scripts and the TOML"
+depends = ["check-backend", "check-frontend", "check-scripts", "check-toml"]
 
 [tasks.check-backend]
 description = "Type check, lint, format check and test the backend"
 dir = "backend"
 run = [
-  "uv run ty check",
-  "uv run ruff check",
-  "uv run ruff format --check",
-  "uv run pytest",
+    "uv run ty check",
+    "uv run ruff check",
+    "uv run ruff format --check",
+    "uv run pytest",
 ]
 
 [tasks.check-frontend]
@@ -29,9 +32,14 @@ run = ["npm run typecheck", "npm run lint", "npm test"]
 description = "Lint the task scripts in mise-tasks/"
 run = "shellcheck mise-tasks/*"
 
+[tasks.check-toml]
+description = "Lint and check the formatting of every TOML file"
+env = { RUST_LOG = "warn" }
+run = ["taplo lint", "taplo fmt --check"]
+
 [tasks.fix]
-description = "Fix what ruff and Biome can fix, and format"
-depends = ["fix-backend", "fix-frontend"]
+description = "Fix what ruff and Biome can fix, and format, TOML too"
+depends = ["fix-backend", "fix-frontend", "fix-toml"]
 
 [tasks.fix-backend]
 description = "Fix what ruff can fix, and format the backend"
@@ -42,3 +50,8 @@ run = ["uv run ruff check --fix", "uv run ruff format"]
 description = "Fix what Biome can fix, and format the frontend"
 dir = "frontend"
 run = "npm run fix"
+
+[tasks.fix-toml]
+description = "Format every TOML file"
+env = { RUST_LOG = "warn" }
+run = "taplo fmt"
