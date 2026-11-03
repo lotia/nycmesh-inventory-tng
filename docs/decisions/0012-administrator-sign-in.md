@@ -86,10 +86,19 @@ without a deployment.
 - **Another administrator can make a reset link**, for the password, the
   authenticators or both. It works once, lasts 24 hours, and is passed on
   however they like. Using it ends the account's sessions.
+- **The operator can let a locked-out administrator back in** by setting
+  `RECOVERY_TOKEN` in the deployment settings, for when nobody else can: a
+  lone administrator with no email, say. While it is set, `/recover` takes
+  it and a username and makes a reset link for the password and
+  authenticators, which lasts an hour. Each token works once: its hash is
+  kept on the link. It is rate limited, recorded in the history and logs,
+  and mailed to the administrator if they have an address. We rejected a
+  server command: on Kubernetes that means exec into a pod, which GitOps
+  setups often forbid, or a Job whose logs would keep the link.
 - **An administrator with an email can reset their own password** from the
   sign-in page. The page answers the same whether or not a mail was sent.
   At most three are sent an hour per account, and asking never voids a link
-  another administrator made.
+  another administrator or the recovery token made.
   The link works once, lasts an hour and resets the password only: TOTP is
   still asked for. Mail is sent after the reply, so its timing reveals
   nothing.

@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pyotp
 import pytest
@@ -20,7 +20,7 @@ from test_devices import new_device
 from test_ledger import Place
 from test_sign_in import PASSWORD, new_admin
 
-from inventory_tng import devices, mail
+from inventory_tng import accounts, devices, mail
 from inventory_tng.app import create_app
 from inventory_tng.db import get_session
 from inventory_tng.devices import RegisteredDevice
@@ -302,6 +302,18 @@ def test_counts_sign_ins_and_confirmations(
     assert sign_ins[(("factor", "totp"), ("outcome", "signed_in"))] >= 1
     confirmations = counted(reader, "inventory.admin.confirmations")
     assert confirmations[(("outcome", "refused"),)] >= 1
+
+
+def test_counts_recoveries(rolled_back: Recorded, session: Session) -> None:
+    _, _, reader, _ = rolled_back
+    new_admin(session)
+    token, now = "a recovery token the operator set, long", datetime.now(UTC)
+    with pytest.raises(accounts.TokenRefused):
+        accounts.recover(session, token, "nope", "ada", "192.0.2.90", now)
+    accounts.recover(session, token, token, "ada", "192.0.2.90", now)
+    recoveries = counted(reader, "inventory.admin.recoveries")
+    assert recoveries[(("outcome", "bad_token"),)] >= 1
+    assert recoveries[(("outcome", "made"),)] >= 1
 
 
 def needs_a_device(device: RegisteredDevice) -> int:

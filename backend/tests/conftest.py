@@ -46,6 +46,7 @@ FROM_THE_SHELL = (
     "VITE_DEV_SERVER",
     "FRONTEND_DIST",
     "SETUP_TOKEN",
+    "RECOVERY_TOKEN",
     "SITE_URL",
 )
 
@@ -230,12 +231,14 @@ def make_app(
         *,
         development: bool = False,
         setup_token: str | None = None,
+        recovery_token: str | None = None,
         mailer: SentMail | None = None,
     ) -> FastAPI:
         settings = Settings(
             database_url=database_url,
             development=development,
             setup_token=setup_token,
+            recovery_token=recovery_token,
             logging=logging or LogConfig(),
             frontend=frontend or FrontendConfig(dist=tmp_path / "no-build"),
         )
