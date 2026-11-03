@@ -240,6 +240,39 @@ During the tests, `DATABASE_URL` points nowhere, so nothing reaches your own
 data: a test that needs the database takes the `database_url` fixture. Write
 tests in pytest style.
 
+## Dependency updates
+
+Each kind of dependency is updated with its own tool. Make each update an
+issue and a commit of its own, and run `mise run setup` and `mise run check`
+after it.
+
+- **Tools in `mise.toml`**: `mise outdated --bump` lists newer releases;
+  `mise upgrade --bump` moves every pin, `mise upgrade --bump <tool>` one. CI
+  installs the same pins.
+- **Python packages**: `uv lock --upgrade` in `backend/` moves everything in
+  `uv.lock`, or `uv lock --upgrade-package <name>` one. `pyproject.toml` gives
+  each dependency a floor at a minor version only, such as `fastapi>=0.162`:
+  `uv.lock` pins what is installed, and is always committed. `uv add` writes
+  a patch too (`>=0.162.0`); trim it, as a test checks. Two exceptions: a
+  `0.0.z` package keeps its patch, there being no minor to name, and a series
+  released only as betas, such as OpenTelemetry's instrumentation, floors at
+  the minor's first beta (`>=0.66b0`).
+- **npm packages**: `npm outdated`, then `npm update` (or `npm install
+  <name>@<version>`) in `frontend/`; commit `package-lock.json`.
+- **GitHub Actions** in `.github/workflows/ci.yml`: by hand, to a release at
+  least two weeks old.
+
+uv's exact version is the pin in `mise.toml`, which CI reads too.
+`backend/pyproject.toml` names it twice more, both by minor version:
+`required-version`, a floor, and `uv_build`, the build backend, capped below
+the next minor (`uv_build>=0.13,<0.14`). A patch release of uv needs only
+`mise upgrade --bump uv`. A new minor needs the `uv_build` cap moved with it,
+or the build uses an older backend than the uv running it. The floor stops a
+uv older than it, not a newer one installed some other way, so use the uv
+mise installs. If uv stops with `Required uv version … does not match the
+running version`, its advice to run `uv self update` is wrong here: change
+the pin in `mise.toml` or the floor instead.
+
 ## Documentation
 
 README.md, CONTRIBUTING.md and DEPLOYMENT.md are for people setting up,

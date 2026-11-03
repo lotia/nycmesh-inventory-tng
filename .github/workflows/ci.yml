@@ -24,9 +24,18 @@ jobs:
         with:
           persist-credentials: false
       # setup-uv publishes full version tags only, so this one is exact.
-      # Its uv is the one backend/pyproject.toml requires.
+      # The uv mise.toml pins, as everyone runs (CONTRIBUTING.md, Dependency
+      # updates).
+      - id: uv
+        run: |
+          version=$(sed -n 's/^uv = "\([0-9.]*\)".*/\1/p' mise.toml)
+          [ "$(printf '%s\n' "$version" | wc -l)" = 1 ] && [ -n "$version" ] ||
+            { echo "No single uv pin in mise.toml" >&2; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+        working-directory: .
       - uses: astral-sh/setup-uv@v10.3.3
         with:
+          version: ${{ steps.uv.outputs.version }}
           cache-python: true
       # Started now, so the database comes up while the checks before it run.
       - run: docker compose up -d db
