@@ -28,7 +28,15 @@ from inventory_tng.settings import MailConfig
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
 
-Kind = Literal["reset_link", "password_changed", "email_changed", "recovery_code_used"]
+Kind = Literal[
+    "reset_link",
+    "reset_link_made",
+    "invited",
+    "restored",
+    "password_changed",
+    "email_changed",
+    "recovery_code_used",
+]
 # Per network step. Mail goes out from the same threads as requests, so a
 # provider that has gone quiet holds one only briefly.
 TIMEOUT_SECONDS = 10
@@ -173,6 +181,43 @@ def reset_link(to: str, admin_id: int, link: str) -> Message:
         "asks for its code.\n\n"
         "If it wasn't you, ignore this mail: your password stays as it is.",
         "reset_link",
+        admin_id,
+    )
+
+
+def reset_link_made(to: str, admin_id: int) -> Message:
+    return Message(
+        to,
+        "A reset link was made for your NYC Mesh Inventory account",
+        "Another administrator just made a link that resets your administrator "
+        "account on NYC Mesh Inventory, and will pass it on to you. It works "
+        f"once, within a day.\n\n{IF_NOT_YOU}",
+        "reset_link_made",
+        admin_id,
+    )
+
+
+def invited(to: str, admin_id: int) -> Message:
+    return Message(
+        to,
+        "You were invited to administer NYC Mesh Inventory",
+        "An administrator of NYC Mesh Inventory just invited you to be one too, "
+        "and will pass you a link to choose your password with. It works once, "
+        "within a day.\n\n"
+        "If you weren't expecting this, ignore this mail.",
+        "invited",
+        admin_id,
+    )
+
+
+def restored(to: str, admin_id: int) -> Message:
+    return Message(
+        to,
+        "Your NYC Mesh Inventory account was brought back",
+        "Your administrator account on NYC Mesh Inventory was retired, and "
+        "another administrator just brought it back: your password and "
+        f"authenticators work again.\n\n{IF_NOT_YOU}",
+        "restored",
         admin_id,
     )
 
