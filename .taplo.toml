@@ -1,0 +1,5 @@
+# taplo: how TOML is linted and formatted (mise run check-toml, fix-toml).
+# Formatted as uv writes backend/pyproject.toml, so uv add never fights it.
+[formatting]
+indent_string = "    "
+array_auto_collapse = false

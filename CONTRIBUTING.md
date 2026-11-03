@@ -36,22 +36,29 @@ Then push a branch and open a pull request: `git push -u origin <branch>`, or
 
 ## Requirements
 
-- [uv](https://docs.astral.sh/uv/). It installs the Python version the backend
-  asks for and every dependency; every command below runs through `uv run`.
-- [mise](https://mise.jdx.dev/). It runs the tasks below, and `mise install`
-  fetches Node.js at the version in `mise.toml`, for the scan page in
-  `frontend/`. The tasks are shell scripts, for macOS and Linux; on Windows,
-  work in WSL.
+- [mise](https://mise.jdx.dev/). It installs every other tool, at the
+  versions in `mise.toml`, and runs the tasks below. The tasks are shell
+  scripts, for macOS and Linux; on Windows, work in WSL.
 - Podman or Docker, with compose, for the database (and, if you want it, the
   app). `mise run compose -- <arguments>` runs compose with Podman if it is
   installed, else Docker. To choose, set `INVENTORY_COMPOSE` in `.env`, such
   as `INVENTORY_COMPOSE=docker compose`.
 
-## Local settings
+Activate mise in your shell (`mise activate`, in its docs), so the tools it
+installs are on your `PATH` in the clone. Then, in the clone, and again after
+a pull that changes a dependency:
 
 ```sh
-cp .env.example .env
+mise trust               # once: lets mise use this clone's mise.toml
+mise run setup
 ```
+
+It installs the tools in `mise.toml` (uv then installs the Python version the
+backend asks for), the backend's and frontend's dependencies, and makes a
+`.env` from `.env.example` if there is none. Every command below runs Python
+through `uv run`.
+
+## Local settings
 
 `.env` holds your local settings: the database's port and URL, and any logging
 or telemetry settings you want. Git ignores it, so it never reaches a commit;
@@ -224,6 +231,7 @@ and `mise run check` runs every check, or one side of them:
 mise run fix-backend    # or: mise run fix-frontend
 mise run check-backend  # or: mise run check-frontend
 mise run check-scripts  # shellcheck, on the scripts in mise-tasks/
+mise run check-toml     # taplo: lint and formatting (mise run fix-toml formats)
 ```
 
 Each test run creates a database of its own on that server and drops it at

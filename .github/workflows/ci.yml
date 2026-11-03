@@ -24,6 +24,7 @@ jobs:
         with:
           persist-credentials: false
       # setup-uv publishes full version tags only, so this one is exact.
+      # Its uv is the one backend/pyproject.toml requires.
       - uses: astral-sh/setup-uv@v10.3.3
         with:
           cache-python: true
@@ -34,12 +35,29 @@ jobs:
       - run: uv run ty check
       - run: uv run ruff check
       - run: uv run ruff format --check
-      # The task scripts in mise-tasks/; the runner has shellcheck.
-      - run: shellcheck mise-tasks/*
-        working-directory: .
       - run: docker compose up -d --wait db
         working-directory: .
       - run: uv run pytest
+
+  # Each check its own step, run directly, with the versions mise.toml pins.
+  tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # Only to install them: CI runs no mise tasks.
+      - uses: jdx/mise-action@v5.2.0
+        with:
+          install_args: shellcheck taplo
+      - run: shellcheck mise-tasks/*
+      - run: taplo lint
+        env:
+          RUST_LOG: warn
+      - run: taplo fmt --check
+        env:
+          RUST_LOG: warn
 
   frontend:
     runs-on: ubuntu-latest

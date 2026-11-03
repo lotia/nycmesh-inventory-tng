@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+#MISE description="Set up a clone: every tool, the dependencies, and a .env to start from"
+# CONTRIBUTING.md, Requirements. Safe to run again, as after a pull.
+set -euo pipefail
+cd "${MISE_PROJECT_ROOT:-$(dirname "$0")/..}"
+
+# mise installs the tools in mise.toml before it runs this.
+(cd backend && uv sync)
+# npm ci starts node_modules again: only when the lockfile is newer.
+if [[ frontend/package-lock.json -nt frontend/node_modules/.package-lock.json ]]; then
+  (cd frontend && npm ci)
+fi
+if [[ ! -f .env ]]; then
+  cp .env.example .env
+  echo "Made .env from .env.example."
+fi
+# The one thing mise cannot install: this says if it is missing.
+"$(dirname "$0")/compose" version >/dev/null

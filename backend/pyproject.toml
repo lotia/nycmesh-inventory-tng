@@ -3,7 +3,7 @@ name = "inventory-tng"
 version = "0.1.0"
 description = "Inventory tracking for NYC Mesh"
 authors = [
-    { name = "Ali Asad Lotia", email = "ali.asad.lotia@gmail.com" }
+    { name = "Ali Asad Lotia", email = "ali.asad.lotia@gmail.com" },
 ]
 requires-python = ">=3.15"
 dependencies = [
@@ -40,6 +40,11 @@ dev = [
     "ruff>=0.17.3",
     "ty>=0.0.95",
 ]
+
+[tool.uv]
+# mise.toml installs this uv, and CI's setup-uv reads it from here; uv
+# refuses to run as any other.
+required-version = "==0.13.6"
 
 [tool.alembic]
 script_location = "%(here)s/migrations"
