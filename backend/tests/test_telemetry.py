@@ -320,9 +320,14 @@ def test_counts_sign_in_resets(rolled_back: Recorded, session: Session) -> None:
     _, _, reader, _ = rolled_back
     ada, _ = new_admin(session)
     ben, _ = new_admin(session, "ben")
-    accounts.make_link_for(session, ben.id, ada.id, datetime.now(UTC))
+    carol, _ = new_admin(session, "carol")
+    now = datetime.now(UTC)
+    accounts.make_link_for(session, ben.id, ada.id, now)
+    carol.retired_at = now
+    accounts.restore_admin(session, carol.id, ada.id, now)
     resets = counted(reader, "inventory.admin.sign_in_resets")
     assert resets[(("action", "reset"),)] >= 1
+    assert resets[(("action", "restore"),)] >= 1
 
 
 def needs_a_device(device: RegisteredDevice) -> int:

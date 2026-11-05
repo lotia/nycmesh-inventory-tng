@@ -95,6 +95,9 @@ without a deployment.
   link while the account has no password: otherwise a mailbox alone would
   undo the reset. One who never chose a password has nothing to reset and
   gets a new invite instead.
+- **Bringing a retired administrator back resets their sign-in** the same
+  way, whatever they were retired for, so a stolen password or phone never
+  works again because the account came back.
 - **Only an administrator who can still sign in changes another.** A
   request already waiting when its session was cut off, by a reset or by
   retiring, changes nothing. So two resetting each other at once leave one
