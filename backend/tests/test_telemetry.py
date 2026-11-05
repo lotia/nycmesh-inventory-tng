@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 import pyotp
 import pytest
 import structlog
-from conftest import FailingMail, SentMail
+from conftest import FailingMail, SentMail, sessions_of
 from fastapi.testclient import TestClient
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 from opentelemetry.sdk.metrics.export import (
@@ -274,7 +274,7 @@ def rolled_back(recorded: Recorded, session: Session) -> Iterator[Recorded]:
     for every later test."""
     client = recorded[0]
     overrides = client.app.dependency_overrides  # ty: ignore[unresolved-attribute]
-    overrides[get_session] = lambda: session
+    overrides[get_session] = sessions_of(session)
     try:
         yield recorded
     finally:

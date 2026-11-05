@@ -9,6 +9,7 @@ codes for the database. Comparing the setup token is secrets.compare_digest.
 
 import re
 import secrets
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Literal, NoReturn
@@ -24,7 +25,7 @@ from opentelemetry import metrics
 from sqlalchemy import ColumnElement, delete, exists, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import exists_where, set_actor, unique
+from inventory_tng.db import exists_where, locked, set_actor, unique
 from inventory_tng.devices import digest
 from inventory_tng.models import (
     MADE_BY_ADMIN,
@@ -104,17 +105,43 @@ def hash_password(password: str) -> str:
     return _hasher.hash(password)
 
 
-def check_password(session: Session, admin_id: int | None, password: str) -> bool:
-    row = session.get(AdminPassword, admin_id) if admin_id is not None else None
+def _matches(password_hash: str | None, password: str) -> bool:
+    """Whether the password matches; as slow without a hash as with one."""
     try:
-        _hasher.verify(row.password_hash if row else _DUMMY_HASH, password)
+        _hasher.verify(
+            _DUMMY_HASH if password_hash is None else password_hash, password
+        )
     except VerificationError, InvalidHashError:
         return False
-    if row is None:
-        return False
-    # argon2-cffi's parameters have moved on since this hash was made.
+    return password_hash is not None
+
+
+def _rehash(row: AdminPassword, password: str) -> None:
+    """argon2-cffi's parameters have moved on since this hash was made."""
     if _hasher.check_needs_rehash(row.password_hash):
         row.password_hash = _hasher.hash(password)
+
+
+def check_password(session: Session, admin_id: int | None, password: str) -> bool:
+    """argon2's work with nothing locked, so guessing holds up nobody; then
+    their row locked (lock_admin), as a reset of their sign-in locks it
+    too, and the password must still be there and still match: a reset
+    done meanwhile took it, a link or a rehash may have changed it. One that
+    comes after waits for this request (inventory-tng-8i4.50.4)."""
+    stored = session.get(AdminPassword, admin_id) if admin_id is not None else None
+    verified = stored.password_hash if stored else None
+    if not _matches(verified, password):
+        return False
+    assert admin_id is not None  # _matches is False without a password.
+    lock_admin(session, admin_id)
+    current = session.get(AdminPassword, admin_id, populate_existing=True)
+    if current is None:
+        return False
+    if current.password_hash != verified and not _matches(
+        current.password_hash, password
+    ):
+        return False
+    _rehash(current, password)
     return True
 
 
@@ -267,13 +294,16 @@ def authenticator_named(session: Session, admin_id: int, name: str) -> bool:
 
 def locked_authenticators(session: Session, admin_id: int) -> list[Authenticator]:
     """The administrator's current authenticators, locked, so two requests
-    cannot both accept one code. None: they do not use TOTP."""
+    cannot both accept one code. None: they do not use TOTP. Their own row
+    first (lock_admin), as every path locks it before anything of theirs."""
+    lock_admin(session, admin_id)
     return list(
         session.scalars(
-            select(Authenticator)
-            .where(*_current(admin_id))
-            .order_by(Authenticator.id)
-            .with_for_update()
+            locked(
+                select(Authenticator)
+                .where(*_current(admin_id))
+                .order_by(Authenticator.id)
+            )
         )
     )
 
@@ -385,6 +415,11 @@ def sign_in(
     if not check_password(session, admin.id if admin else None, password):
         _refuse_sign_in("unknown_user" if admin is None else "bad_password", admin)
     assert admin is not None  # check_password is False without one.
+    # Their row is locked now: read it again, as a retire may have come.
+    # Retired, they are no administrator, as they would be found a moment
+    # later.
+    if not lock_current(session, admin):
+        _refuse_sign_in("unknown_user", None)
     set_actor(session, f"admin:{admin.id}")
     factor: Factor | None = "password"
     if authenticators := locked_authenticators(session, admin.id):
@@ -459,6 +494,21 @@ def find_session(
     return None if found is None else (found[0], found[1])
 
 
+def hold_signed_in(
+    session: Session, row: AdminSession, now: Callable[[], datetime]
+) -> bool:
+    """The gate a sensitive form passes (docs/decisions/0012): the
+    administrators lock (lock_admins), so any reset, retire or restore of
+    theirs is done or waits until this request ends, then their session
+    read again. True if it is still live and they can still sign in."""
+    if not lock_admins(session, row.admin_id):
+        return False
+    session.refresh(row)
+    # As _live says in SQL, at the time after the wait: the session may have
+    # run out during it.
+    return row.ended_at is None and row.expires_at > now()
+
+
 def end_session(row: AdminSession, now: datetime) -> None:
     row.ended_at = now
     log.info("signed out", admin_id=row.admin_id, sign_in_id=row.id)
@@ -493,9 +543,15 @@ def confirm(
         return _confirmation(row, "rate_limited"), None
     set_actor(session, f"admin:{row.admin_id}")
     factor: Factor | None = None
-    if authenticators := locked_authenticators(session, row.admin_id):
-        factor = check_second_factor(session, row.admin_id, authenticators, typed, now)
-    elif check_password(session, row.admin_id, typed):
+    if uses_totp(session, row.admin_id):
+        if authenticators := locked_authenticators(session, row.admin_id):
+            factor = check_second_factor(
+                session, row.admin_id, authenticators, typed, now
+            )
+    # Checked again once locked: TOTP may have been set up meanwhile.
+    elif check_password(session, row.admin_id, typed) and not uses_totp(
+        session, row.admin_id
+    ):
         factor = "password"
     if factor is None:
         return _confirmation(row, "refused"), None
@@ -640,9 +696,11 @@ def rename_authenticator(
     """False if it is not one of theirs. A name they already use is an
     IntegrityError on flush."""
     found = session.scalar(
-        select(Authenticator)
-        .where(*_current(admin_id), Authenticator.id == authenticator_id)
-        .with_for_update()
+        locked(
+            select(Authenticator).where(
+                *_current(admin_id), Authenticator.id == authenticator_id
+            )
+        )
     )
     if found is None:
         return False
@@ -782,6 +840,9 @@ def make_reset_link(
 def void_reset_links(
     session: Session, admin_id: int, now: datetime, *, emailed_only: bool = False
 ) -> None:
+    """Their unused links void; their own row first (lock_admin), so making
+    or voiding links waits for a reset, a sign-in or a link being used."""
+    lock_admin(session, admin_id)
     query = update(ResetLink).where(ResetLink.admin_id == admin_id, *_usable_links())
     if emailed_only:
         query = query.where(ResetLink.emailed())
@@ -807,7 +868,9 @@ def emailed_reset(
     emailed link, which resets the password only. None for anyone else,
     who is told the same."""
     admin = current_admin(session, username, Admin.email.is_not(None))
-    if admin is None or admin.email is None:
+    # Locked and read again: a reset, a retire or a change of email may have
+    # come while this looked them up.
+    if admin is None or not lock_current(session, admin) or admin.email is None:
         log.info("emailed reset not made", reason="no_such_address")
         return None
     # No password: an invite, or a reset another administrator made, which
@@ -836,7 +899,8 @@ def find_reset_link(
     session: Session, token: str, now: datetime, *, lock: bool = False
 ) -> tuple[ResetLink, Admin] | None:
     """The link with this token, if it can still be used, and its current
-    administrator; locked when it is about to be used, so it is used once.
+    administrator; locked when it is about to be used, so it is used once,
+    and so a sign-in or a reset of theirs waits for it.
     An emailed link needs a password still there: one made just as another
     administrator reset the account must not undo the reset."""
     query = (
@@ -853,9 +917,12 @@ def find_reset_link(
             ),
         )
     )
-    found = session.execute(
-        query.with_for_update(of=ResetLink) if lock else query
-    ).one_or_none()
+    found = session.execute(query).one_or_none()
+    if found is not None and lock:
+        # Its administrator first, as resets and sign-in lock them, then
+        # the link, read again as it may have been used or voided meanwhile.
+        lock_admin(session, found[1].id)
+        found = session.execute(locked(query, of=ResetLink)).one_or_none()
     return None if found is None else (found[0], found[1])
 
 
@@ -907,7 +974,8 @@ def recover(
     if exists_where(session, ResetLink.recovery_token_hash == token_hash):
         _refuse("recovery", "used")
     admin = current_admin(session, username)
-    if admin is None:
+    # Locked and read again, as a retire may have come meanwhile.
+    if admin is None or not lock_current(session, admin):
         _refuse("recovery", "no_admin")
     set_actor(session, "system:recovery")
     link = ""
@@ -966,9 +1034,10 @@ def reset_sign_in(
     links voided and their sessions ended, so nothing a thief may hold
     works, even if the link is never used. Returns a one-use link that sets
     a new password, for the one acting to pass on, and its kind: one who
-    never chose a password has nothing to reset, so gets a new invite. TOTP is set up again at sign-in while required. Counted
-    by the action that did it, unless it invited again. The caller holds
-    the administrators lock."""
+    never chose a password has nothing to reset, so gets a new invite.
+    TOTP is set up again at sign-in while required. Counted by the action
+    that did it, unless it invited again. The caller holds the
+    administrators lock."""
     kind: Literal["invite", "reset"] = (
         "reset" if has_password(session, admin_id) else "invite"
     )
@@ -1061,19 +1130,32 @@ def admins_who_can_sign_in(session: Session) -> int:
 Retirement = Literal["retired", "not_found", "themselves"]
 
 
+def lock_admin(session: Session, admin_id: int) -> None:
+    """Lock one administrator's row, before anything else of theirs is
+    locked, as lock_admins does for them all. FOR NO KEY UPDATE
+    (key_share): it waits for every other such lock, but not for a row that
+    refers to theirs being inserted (a password, a link, a ledger row),
+    which FOR UPDATE would also hold up. It does not read the row again."""
+    session.execute(
+        select(Admin.id).where(Admin.id == admin_id).with_for_update(key_share=True)
+    )
+
+
+def lock_current(session: Session, admin: Admin) -> bool:
+    """Lock their row and read it again, for a path that found them
+    unlocked: True if they are still current."""
+    session.refresh(admin, with_for_update={"key_share": True})
+    return admin.retired_at is None
+
+
 def lock_admins(session: Session, by_admin_id: int) -> bool:
-    """Lock every administrator row, in one order, and reload them, so
+    """Lock every administrator row, in one order, and read them again, so
     changes to who may sign in happen one at a time and never deadlock.
     False if the one acting can no longer sign in: retired, or their own
     sign-in reset meanwhile, so a request already waiting from a session
     just cut off changes nothing. As the one acting can always sign in and
     is never the one acted on, someone who can sign in always remains."""
-    session.execute(
-        select(Admin)
-        .order_by(Admin.id)
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    )
+    session.scalars(locked(select(Admin).order_by(Admin.id), key_share=True)).all()
     return admin_can_sign_in(session, session.get_one(Admin, by_admin_id))
 
 
@@ -1120,8 +1202,8 @@ def restore_admin(
     """Bring a retired administrator back with their sign-in reset
     (reset_sign_in), whatever they were retired for: a stolen password or
     phone never works again because the account came back. Returns them,
-    the link to pass on and its kind; None if there is
-    none to bring back, or the one acting can no longer sign in."""
+    the link to pass on and its kind; None if there is none to bring back,
+    or the one acting can no longer sign in."""
     admin = _locked_other(session, admin_id, by_admin_id, retired=True)
     if admin is None:
         return None
