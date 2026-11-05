@@ -31,8 +31,10 @@ bd close <id>
 bd sync
 ```
 
-Then push a branch and open a pull request: `git push -u origin <branch>`, or
-`jj git push --change @` with jj.
+Then run `mise run check` on what you are about to push, every time, and
+push only if it passes: there is no pull request to catch what it would
+have. Push straight to `main`, where CI checks it again: `git push origin
+main`, or with jj, `jj bookmark set main -r <change>` and `jj git push`.
 
 ## Requirements
 

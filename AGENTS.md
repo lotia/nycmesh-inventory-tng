@@ -26,6 +26,8 @@ is, read [README.md](README.md).
    then fix what it finds. Then a simplification pass, then fix again. Push
    only after both. In Claude Code, run `/code-review` and then `/simplify`
    yourself. In another harness, use its equivalents, or ask the person.
+   Then check and push as [Working on an issue](CONTRIBUTING.md#working-on-an-issue)
+   says, every time.
 6. **Code you write logs what it does**, at the right level. Log ids, not
    names, emails, free text, request bodies or database error messages; never
    secrets. The table in [Logging](CONTRIBUTING.md#logging) is the rule.
