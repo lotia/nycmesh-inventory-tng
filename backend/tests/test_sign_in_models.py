@@ -109,7 +109,7 @@ def test_an_authenticator_keeps_its_key_only_until_removed(
     add(session, Authenticator(admin_id=other.id, name="Pixel", totp_key="M"))
 
 
-def test_reset_links_reset_something_and_emailed_ones_only_the_password(
+def test_a_reset_links_kind_says_who_made_it(
     session: Session, admin: Admin, other: Admin
 ) -> None:
     def link(**fields: object) -> ResetLink:
@@ -117,19 +117,24 @@ def test_reset_links_reset_something_and_emailed_ones_only_the_password(
             "admin_id": admin.id,
             "made_by_id": other.id,
             "token_hash": b"h",
-            "resets_password": True,
-            "resets_authenticators": False,
+            "kind": "reset",
             "expires_at": LATER,
         } | fields
         return ResetLink(**values)
 
-    with violates(session, "ck_reset_link_resets"):
-        session.add(link(resets_password=False))
-    with violates(session, "ck_reset_link_emailed_resets_password_only"):
-        session.add(link(made_by_id=None, resets_authenticators=True))
+    with violates(session, "ck_reset_link_kind"):
+        session.add(link(kind="other"))
+    with violates(session, "ck_reset_link_made_by"):
+        session.add(link(kind="emailed"))
+    with violates(session, "ck_reset_link_made_by"):
+        session.add(link(made_by_id=None))
+    with violates(session, "ck_reset_link_recovery"):
+        session.add(link(made_by_id=None, kind="recovery"))
+    with violates(session, "ck_reset_link_recovery"):
+        session.add(link(kind="invite", recovery_token_hash=b"r"))
     with violates(session, "ck_reset_link_not_made_for_oneself"):
         session.add(link(made_by_id=admin.id))
-    add(session, link(made_by_id=None))
+    add(session, link(made_by_id=None, kind="emailed"))
 
 
 def test_history_holds_no_secret(session: Session, admin: Admin, other: Admin) -> None:
@@ -145,8 +150,7 @@ def test_history_holds_no_secret(session: Session, admin: Admin, other: Admin) -
             admin_id=admin.id,
             made_by_id=other.id,
             token_hash=b"token",
-            resets_password=True,
-            resets_authenticators=True,
+            kind="reset",
             expires_at=LATER,
         ),
     )

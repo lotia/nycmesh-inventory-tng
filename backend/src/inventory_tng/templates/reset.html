@@ -9,8 +9,10 @@ server for a new recovery token.</p>
 <form method="post" action="{{ paths.reset }}">
   <input type="hidden" name="token" value="{{ token }}">
   {% if link.resets_authenticators %}
-  <p>This removes your authenticators and recovery codes. Set up a new
-  authenticator when you next sign in.</p>
+  <p>{% if link.kind == "reset" %}Your password, authenticators and recovery
+  codes stopped working when this link was made.{% else %}This removes your
+  authenticators and recovery codes.{% endif %}{% if totp_required %}
+  Set up a new authenticator when you next sign in.{% endif %}</p>
   {% endif %}
   <label>New password <span class="hint">at least {{ limits.password_min }} characters</span>
     <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required autofocus>
@@ -21,7 +23,7 @@ server for a new recovery token.</p>
   </label>
   <button>Reset</button>
 </form>
-<p class="hint">This signs you out everywhere.{% if not link.resets_authenticators %}
+<p class="hint">This signs you out everywhere.{% if link.kind == "emailed" %}
 If you use an authenticator, signing in still asks for its code.{% endif %}</p>
 {% endif %}
 {% endblock %}

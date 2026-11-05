@@ -314,8 +314,7 @@ def upgrade() -> None:
         sa.Column("admin_id", sa.Integer(), nullable=False),
         sa.Column("made_by_id", sa.Integer(), nullable=True),
         sa.Column("token_hash", sa.LargeBinary(), nullable=False),
-        sa.Column("resets_password", sa.Boolean(), nullable=False),
-        sa.Column("resets_authenticators", sa.Boolean(), nullable=False),
+        sa.Column("kind", sa.Text(), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("used_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("voided_at", sa.DateTime(timezone=True), nullable=True),
@@ -323,12 +322,11 @@ def upgrade() -> None:
             "made_by_id <> admin_id", name=op.f("ck_reset_link_not_made_for_oneself")
         ),
         sa.CheckConstraint(
-            "made_by_id IS NOT NULL OR NOT resets_authenticators",
-            name=op.f("ck_reset_link_emailed_resets_password_only"),
+            "kind IN ('invite', 'emailed', 'reset')", name=op.f("ck_reset_link_kind")
         ),
         sa.CheckConstraint(
-            "resets_password OR resets_authenticators",
-            name=op.f("ck_reset_link_resets"),
+            "(made_by_id IS NOT NULL) = (kind IN ('invite', 'reset'))",
+            name=op.f("ck_reset_link_made_by"),
         ),
         sa.ForeignKeyConstraint(
             ["admin_id"],

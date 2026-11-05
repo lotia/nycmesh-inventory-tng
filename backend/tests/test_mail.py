@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
-from test_sign_in import code, new_admin, reset_link, sign_in_with, text
+from test_sign_in import code, new_admin, policy, reset_link, sign_in_with, text
 
 from inventory_tng import accounts, mail, sign_in
 from inventory_tng.models import Admin, AdminSession, ResetLink
@@ -400,14 +400,35 @@ def test_a_made_link_sets_a_password_and_tells_the_owner(
     """Its password went when it was made, so none is "changed": told anyway."""
     admin, _ = with_email(session)
     token = made_link(session, admin)
-    assert "removes your authenticators" in text(
-        client.get(f"{sign_in.RESET}?token={token}")
-    )
     form = {"token": token, "password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
     assert client.post(sign_in.RESET, data=form).status_code == 303
     assert accounts.check_password(session, admin.id, NEW_PASSWORD)
     assert not accounts.uses_totp(session, admin.id)
     assert [m.kind for m in sent_mail] == ["password_changed"]
+
+
+def test_a_made_link_asks_for_an_authenticator_only_while_required(
+    client: TestClient, session: Session
+) -> None:
+    admin, _ = with_email(session)
+    token = made_link(session, admin)
+    asked = "Set up a new authenticator"
+    assert asked in text(client.get(f"{sign_in.RESET}?token={token}"))
+    policy(session, "optional")
+    assert asked not in text(client.get(f"{sign_in.RESET}?token={token}"))
+
+
+def test_an_authenticator_added_after_a_reset_goes_when_its_link_is_used(
+    client: TestClient, session: Session
+) -> None:
+    """From a session cut off by the reset whose request was already under
+    way: the owner must not meet a thief's authenticator at sign-in."""
+    admin, _ = with_email(session)
+    token = made_link(session, admin)
+    accounts.add_authenticator(session, admin.id, "thief", "KEY", 0)
+    form = {"token": token, "password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
+    assert client.post(sign_in.RESET, data=form).status_code == 303
+    assert not accounts.uses_totp(session, admin.id)
 
 
 def test_asking_by_mail_never_undoes_a_reset_another_made(

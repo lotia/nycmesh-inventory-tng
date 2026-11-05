@@ -30,6 +30,7 @@ from inventory_tng.models import (
     AdminSession,
     Authenticator,
     RecoveryCode,
+    ResetKind,
     SignInSettings,
 )
 
@@ -431,18 +432,18 @@ def test_a_page_sends_someone_signed_out_to_sign_in_and_back(
 def reset_link(
     session: Session,
     admin: Admin,
-    *,
+    kind: ResetKind = "emailed",
     made_by: Admin | None = None,
-    authenticators: bool = False,
 ) -> str:
-    """A reset link's token: emailed, unless another administrator made it."""
+    """A reset link's token, emailed unless another kind is asked for, with
+    the maker its kind needs."""
     return accounts.make_reset_link(
         session,
         admin.id,
         datetime.now(UTC),
+        kind=kind,
         made_by_id=made_by.id if made_by else None,
-        resets_authenticators=authenticators,
-        lifetime=timedelta(hours=1 if made_by is None else 24),
+        recovery_token_hash=b"token" if kind == "recovery" else None,
     )
 
 
