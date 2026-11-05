@@ -8,15 +8,23 @@ An administrator page takes one of:
 - `AdminSignedIn`: signed in, with TOTP set up if it is required.
 - `ConfirmedAdmin`: that, for a sensitive action, with a code typed recently
   (accounts.confirmation_open); otherwise the page asks for one first. Once
-  the action is done, the route calls accounts.note_sensitive.
+  the action is done, the route calls changed(), which commits.
+
+A form through ConfirmedAdmin (or ConfirmedAny) also holds every
+administrator's lock (accounts.lock_admins) until it commits, so it runs
+one at a time with the others and with resets, retires and restores
+(inventory-tng-8i4.50.4). It commits once, at most: a commit after that
+fails (db.hold_until_commit). Work after the reply opens its own session.
 """
 
+import dataclasses
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Any, cast
 from urllib.parse import quote
 
+import structlog
 from fastapi import APIRouter, Depends, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.exc import IntegrityError
@@ -24,12 +32,19 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from inventory_tng import accounts, mail, request_logging
-from inventory_tng.db import DbSession, act_as, record_last_seen
+from inventory_tng.db import (
+    DbSession,
+    act_as,
+    hold_until_commit,
+    record_last_seen,
+)
 from inventory_tng.mail import Notify
 from inventory_tng.masking import is_secret_name
 from inventory_tng.models import Admin, AdminSession, SignInSettings
 from inventory_tng.pages import not_found, page, redirect, templates
 from inventory_tng.web import rate_key, set_private_cookie
+
+log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
@@ -185,30 +200,63 @@ class ConfirmHere(Exception):
 
 
 async def confirmed(
-    request: Request, signed: AnySignedIn, session: DbSession, notify: Notify
+    request: Request,
+    signed: AnySignedIn,
+    session: DbSession,
+    notify: Notify,
 ) -> SignedIn:
     """Within the window, goes on; viewing a page keeps nothing open. A page
     asked for once it has closed sends the browser to confirm first. A form
     sent once it has closed is asked for a code there and then (ConfirmHere),
-    and goes on when one comes with it."""
-    if accounts.confirmation_open(signed.row, signed.settings, _now()):
-        return signed
+    and goes on when one comes with it.
+
+    A form then passes the gate (_hold), after the commit a code makes, as
+    the module's docstring says."""
     if request.method == "GET":
-        raise Redirect(_then(CONFIRM, request))
+        if not accounts.confirmation_open(signed.row, signed.settings, _now()):
+            raise Redirect(_then(CONFIRM, request))
+        return signed
+    # The whole body first, as Starlette keeps it: a slow sender holds no
+    # lock while it trickles in.
     form = await request.form()
     carried = [
         (name, value)
         for name, value in form.multi_items()
         if isinstance(value, str) and name != CONFIRM_FIELD
     ]
-    typed = form.get(CONFIRM_FIELD)
-    if not isinstance(typed, str):
+    was_open = accounts.confirmation_open(signed.row, signed.settings, _now())
+    if not was_open:
+        typed = form.get(CONFIRM_FIELD)
+        if not isinstance(typed, str):
+            raise ConfirmHere(signed, carried)
+        # Its queries, and argon2's work, off the event loop.
+        outcome = await run_in_threadpool(_confirm, session, signed, typed, notify)
+        if outcome != "confirmed":
+            raise ConfirmHere(
+                signed, carried, _refused(outcome, signed), _status(outcome)
+            )
+    signed = await run_in_threadpool(_hold, session, signed)
+    # The window, again, with what the lock read: shorter settings may have
+    # come first.
+    if was_open and not accounts.confirmation_open(signed.row, signed.settings, _now()):
+        log.info("form asked for a code", admin_id=signed.admin.id, reason="waited")
         raise ConfirmHere(signed, carried)
-    # Its queries, and argon2's work, off the event loop.
-    outcome = await run_in_threadpool(_confirm, session, signed, typed, notify)
-    if outcome != "confirmed":
-        raise ConfirmHere(signed, carried, _refused(outcome, signed), _status(outcome))
+    hold_until_commit(session)
     return signed
+
+
+def _hold(session: Session, signed: SignedIn) -> SignedIn:
+    """The gate (accounts.hold_signed_in), then what the request knew of
+    them read again, as a reset, a retire or a settings change may have
+    come first."""
+    if not accounts.hold_signed_in(session, signed.row, _now):
+        log.warning("form refused", admin_id=signed.admin.id, reason="signed_out")
+        raise Redirect(SIGN_IN)
+    # Their admin row and session were read again with the lock.
+    session.refresh(signed.settings)
+    return dataclasses.replace(
+        signed, uses_totp=accounts.uses_totp(session, signed.admin.id)
+    )
 
 
 def _confirm(
@@ -217,18 +265,25 @@ def _confirm(
     """Confirm, keep it, and tell the owner if a recovery code did it."""
     outcome, factor = accounts.confirm(session, signed.row, typed, _now())
     if outcome == "confirmed":
+        left = _codes_left(session, signed.admin, factor)
         session.commit()
-        _after_second_factor(session, signed.admin, factor, notify)
+        # Now, with nothing locked or open, not after the reply: the form may
+        # yet end in an error page, though the code is used up.
+        if left is not None:
+            notify.tell_now(
+                signed.admin.email, signed.admin.id, mail.recovery_code_used(left)
+            )
     return outcome
 
 
-def _after_second_factor(
-    session: Session, admin: Admin, factor: accounts.Factor | None, notify: Notify
-) -> None:
-    """A recovery code used is told to its owner, in case it was not them."""
-    if factor == "recovery":
-        left = accounts.recovery_codes_left(session, admin.id)
-        notify.tell(admin.email, admin.id, mail.recovery_code_used(left))
+def _codes_left(
+    session: Session, admin: Admin, factor: accounts.Factor | None
+) -> int | None:
+    """How many recovery codes are left if one was just used, to tell its
+    owner, in case it was not them; None if it was another factor."""
+    if factor != "recovery":
+        return None
+    return accounts.recovery_codes_left(session, admin.id)
 
 
 def _refused(outcome: accounts.Confirmation, signed: SignedIn) -> str:
@@ -544,7 +599,8 @@ def sign_in(
     session.commit()
     request_logging.bind(admin_id=row.admin_id, sign_in_id=row.id)
     admin = session.get_one(Admin, row.admin_id)  # Loaded: no query.
-    _after_second_factor(session, admin, factor, notify)
+    if (left := _codes_left(session, admin, factor)) is not None:
+        notify.tell(admin.email, admin.id, mail.recovery_code_used(left))
     response = redirect(_local(next))
     _set_cookie(request, response, token, row)
     return response
@@ -637,8 +693,8 @@ def new_authenticator(
     key = key if accounts.is_totp_key(key) else accounts.new_totp_key()
     now = _now()
     # One at a time per administrator, so a second click cannot add the
-    # same name twice, or make a second set of recovery codes.
-    session.get_one(Admin, admin_id, with_for_update=True)
+    # same name twice, or make a second set of recovery codes: the gate
+    # (confirmed) holds their row.
     step = accounts.accepted_step(key, code, None, now)
     problems = _authenticator_problems(name, step)
     # Checked here too, though the insert below would catch it, so a taken

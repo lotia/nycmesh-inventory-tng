@@ -250,6 +250,10 @@ the end; a run that was killed before it could is dropped by a later one.
 During the tests, `DATABASE_URL` points nowhere, so nothing reaches your own
 data: a test that needs the database takes the `database_url` fixture. Write
 tests in pytest style.
+`tests/test_requests_at_once.py` holds tests of requests at the same time,
+on connections that really commit, marked by kind (its docstring):
+`uv run pytest -m concurrency` runs only those, and `-m "not end_to_end"`
+skips the ones through the whole app.
 
 ## Dependency updates
 

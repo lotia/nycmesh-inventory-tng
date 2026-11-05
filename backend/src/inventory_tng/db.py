@@ -15,6 +15,7 @@ from sqlalchemy import (
     Connection,
     Engine,
     MetaData,
+    Select,
     create_engine,
     event,
     exc,
@@ -63,23 +64,26 @@ def make_engine(url: str) -> Engine:
 def _in_utc(connection: DBAPIConnection, _record: object) -> None:
     """Times come back in UTC whatever the server's own zone
     (docs/decisions/0013). Set as each connection opens, rather than as a
-    startup option, which would replace any options DATABASE_URL gives. In
-    autocommit, so it is one round trip and outlasts every transaction."""
-    connection.autocommit = True
-    cursor = connection.cursor()
-    cursor.execute("SET TIME ZONE 'UTC'")
-    cursor.close()
-    connection.autocommit = False
+    startup option, which would replace any options DATABASE_URL gives."""
+    run_outside_transaction(connection, "SET TIME ZONE 'UTC'")
 
 
 def get_session(request: Request) -> Iterator[Session]:
-    # Rows stay loaded after a commit: a page that commits then shows them
-    # does not read them all again.
+    """The request's own session. Rows stay loaded after a commit: a page
+    that commits then shows them does not read them all again. It closes as
+    the route returns (DbSession's scope), before the reply is sent, any
+    page an exception handler shows, or any work after the reply: so what
+    the route did not commit is gone, and any lock it took, such as a
+    sensitive form's that was refused without a commit, is let go first."""
     with Session(request.app.state.engine, expire_on_commit=False) as session:
-        yield session
+        try:
+            yield session
+        finally:
+            # Closing keeps session.info: the hold ends with the route too.
+            release_hold(session)
 
 
-DbSession = Annotated[Session, Depends(get_session)]
+DbSession = Annotated[Session, Depends(get_session, scope="function")]
 
 # Opens a session of its own: for work after the reply, when the request's
 # has closed.
@@ -138,6 +142,51 @@ def set_actor(session: Session, actor: str) -> None:
 def exists_where(session: Session, *criteria: ColumnElement[bool]) -> bool:
     """Whether any row matches, as one EXISTS query."""
     return bool(session.scalar(select(exists().where(*criteria))))
+
+
+# Where a gated request (sign_in.confirmed) keeps the transaction its lock
+# lives in, until release_hold.
+GATE_INFO = "gate"
+
+
+def locked[*Ts](
+    query: Select[*Ts], *, key_share: bool = False, of: type[Base] | None = None
+) -> Select[*Ts]:
+    """`query` FOR UPDATE (FOR NO KEY UPDATE with key_share), of `of`'s rows
+    only if given, its rows read again: a lock is taken to see them as they
+    are, and rows loaded before it would otherwise keep what they were."""
+    return query.with_for_update(key_share=key_share, of=of).execution_options(
+        populate_existing=True
+    )
+
+
+def hold_until_commit(session: Session) -> None:
+    """This transaction holds a lock the request relies on: until
+    release_hold, a commit in any other one, after this one's commit
+    released it, fails."""
+    session.info[GATE_INFO] = session.get_transaction()
+
+
+def release_hold(session: Session) -> None:
+    session.info.pop(GATE_INFO, None)
+
+
+@event.listens_for(Session, "before_commit")
+def _commit_only_while_held(session: Session) -> None:
+    held = session.info.get(GATE_INFO)
+    if held is not None and held is not session.get_transaction():
+        raise RuntimeError("a gated request committed after its lock was gone")
+
+
+def run_outside_transaction(connection: DBAPIConnection, *statements: str) -> None:
+    """Run SET statements as a connection opens, in autocommit, so they are
+    one round trip each and no rollback undoes them."""
+    connection.autocommit = True
+    cursor = connection.cursor()
+    for statement in statements:
+        cursor.execute(statement)
+    cursor.close()
+    connection.autocommit = False
 
 
 def record_last_seen(

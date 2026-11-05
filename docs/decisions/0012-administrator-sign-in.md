@@ -103,6 +103,16 @@ without a deployment.
   retiring, changes nothing. So two resetting each other at once leave one
   who can sign in, and as nobody acts on themselves, someone who can sign
   in always remains: there is no separate check for the last one.
+- **Nothing already under way undoes a reset, retire or restore.** Every
+  sensitive form takes the same lock they do, every administrator's row in
+  one order, so it waits for one in progress; then it reads its session,
+  the account and the settings again, and goes to sign-in, or asks for a
+  code, if they changed. Checking a password is done with nothing locked,
+  then the account is locked and the same password must still be there.
+  Every path locks the account's own row before anything else of it, so
+  no two of them deadlock. Sensitive forms therefore run one at a time;
+  with a handful of administrators, nobody waits long. A page view or an
+  ordinary change already under way still finishes.
 - **The operator can let a locked-out administrator back in** by setting
   `RECOVERY_TOKEN` in the deployment settings, for when nobody else can: a
   lone administrator with no email, say. While it is set, `/recover` takes

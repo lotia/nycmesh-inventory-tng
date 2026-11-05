@@ -5,7 +5,10 @@ their account.
 Only the standard library's smtplib and ssl here: TLS checks the provider's
 certificate with the system's trust store (ssl.create_default_context).
 Mail is sent after the reply (Starlette's background tasks), so how long a
-reply takes never shows whether mail went out. A failure is logged and
+reply takes never shows whether mail went out; the one exception is the
+notice of a recovery code used to confirm a form, sent as soon as that use
+is kept, as the form may yet end in an error whose page sends nothing
+after it (sign_in._confirm). A failure is logged and
 counted, never shown on a page. Logs carry ids and the kind of mail, never
 addresses or links.
 """
@@ -129,6 +132,16 @@ class Notifier:
         address."""
         if self.mailer is not None and to:
             self.tasks.add_task(deliver, self.mailer, build(to, admin_id))
+
+    def tell_now(
+        self, to: str | None, admin_id: int, build: Callable[[str, int], Message]
+    ) -> None:
+        """As tell, but before the reply: for the one notice whose cause is
+        already kept while the reply may yet be an error page, which sends
+        nothing after it (sign_in._confirm). The reply then waits for the
+        provider."""
+        if self.mailer is not None and to:
+            deliver(self.mailer, build(to, admin_id))
 
     def later(self, job: Callable[[Mailer], None]) -> None:
         """Run `job` after the reply, if mail is set up."""

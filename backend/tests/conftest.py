@@ -1,10 +1,12 @@
 """Each test run gets a database of its own, created on the compose PostgreSQL
 server and dropped when the run ends. Each test's writes are rolled back."""
 
+import contextlib
 import dataclasses
 import logging
 import os
 import re
+import threading
 import time
 import uuid
 from collections.abc import Callable, Iterator
@@ -20,13 +22,20 @@ from alembic.config import Config
 from argon2 import PasswordHasher
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import Connection, Engine, exc, make_url, text
+from sqlalchemy import Connection, Engine, event, exc, make_url, text
+from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, devices, local_env
 from inventory_tng.app import create_app
-from inventory_tng.db import get_session, get_session_factory, make_engine
+from inventory_tng.db import (
+    get_session,
+    get_session_factory,
+    make_engine,
+    release_hold,
+    run_outside_transaction,
+)
 from inventory_tng.local_env import local_env_values
 from inventory_tng.logs import configure_structlog
 from inventory_tng.mail import Message, get_mailer
@@ -224,6 +233,157 @@ def session(engine: Engine) -> Iterator[Session]:
         transaction.rollback()
 
 
+# The tables sign-in writes, in the order committed() empties them after
+# its test.
+SIGN_IN_TABLES = (
+    "reset_link",
+    "recovery_code",
+    "authenticator",
+    "admin_session",
+    "admin_password",
+    "admin",
+)
+
+
+class Worker(threading.Thread):
+    """`work` on a thread of its own, keeping what it returned or raised."""
+
+    def __init__(self, work: Callable[[], object]) -> None:
+        super().__init__(daemon=True)
+        self.work = work
+        self.result: object = None
+        self.error: Exception | None = None
+        self.start()
+
+    def run(self) -> None:
+        try:
+            self.result = self.work()
+        except Exception as error:  # noqa: BLE001  Kept for the test to see.
+            self.error = error
+
+    def finished(self) -> Worker:
+        self.join(timeout=10)
+        assert not self.is_alive(), "it never finished"
+        return self
+
+
+class Committed:
+    """Sessions whose commits are real, for tests of two requests at once,
+    and the threads that run them."""
+
+    def __init__(self, engine: Engine) -> None:
+        self.engine = engine
+        self.sessions: list[Session] = []
+        self.workers: list[Worker] = []
+
+    def session(self) -> Session:
+        session = Session(self.engine, expire_on_commit=False)
+        self.sessions.append(session)
+        return session
+
+    def blocked(self, session: Session | None, work: Callable[[], object]) -> Worker:
+        """`work`, on `session`, started on a thread, once it is waiting
+        for a lock: the moment each test is about. With no session (an
+        app's request, on its own connection), once any connection to this
+        database is. Polls, as pg_stat_activity is read afresh per
+        transaction."""
+        pid = session.scalar(text("SELECT pg_backend_pid()")) if session else None
+        worker = Worker(work)
+        self.workers.append(worker)
+        probe = self.session()
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            waiting = probe.scalar(
+                text(
+                    "SELECT count(*) > 0 FROM pg_stat_activity"
+                    " WHERE wait_event_type = 'Lock'"
+                    " AND datname = current_database()"
+                    " AND (CAST(:p AS integer) IS NULL OR pid = :p)"
+                ),
+                {"p": pid},
+            )
+            probe.rollback()
+            if waiting:
+                return worker
+            time.sleep(0.01)
+        pytest.fail("it never waited for the lock")
+
+
+# Names these sessions' connections, so cleanup can end any left waiting.
+COMMITTED_APP = "inventory-tng-committed-test"
+
+
+def _wait_briefly(connection: DBAPIConnection, _record: object) -> None:
+    """At most five seconds for a lock, so a deadlock or a missing wait
+    fails rather than hangs; and named, for cleanup."""
+    run_outside_transaction(
+        connection,
+        "SET lock_timeout = '5s'",
+        f"SET application_name = '{COMMITTED_APP}'",
+    )
+
+
+@pytest.fixture
+def committed(database_url: str, engine: Engine) -> Iterator[Committed]:
+    """Two requests at once need commits other connections see, which the
+    `session` fixture's one transaction is not. Their own engine waits as
+    _wait_briefly says. `engine` has migrated the database. After the test,
+    any connection still waiting is ended, so its thread finishes before its
+    session is closed, and what they made of sign-in, with its history, is
+    deleted."""
+    del engine
+    own = make_engine(database_url)
+
+    event.listen(own, "connect", _wait_briefly)
+    with own.connect() as connection:
+        history_before = connection.scalar(
+            text("SELECT coalesce(max(id), 0) FROM catalogue_history")
+        )
+    committed = Committed(own)
+    yield committed
+    with own.connect() as connection:
+        connection.execute(
+            text(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity"
+                " WHERE application_name = :app AND datname = current_database()"
+                " AND pid <> pg_backend_pid()"
+            ),
+            {"app": COMMITTED_APP},
+        )
+    for worker in committed.workers:
+        worker.join(timeout=10)
+    # A session is not to be used from two threads: leave them all.
+    if any(worker.is_alive() for worker in committed.workers):
+        raise RuntimeError("a worker never finished; its rows are left behind")
+    for session in committed.sessions:
+        with contextlib.suppress(exc.DBAPIError):
+            session.close()
+    with own.begin() as connection:
+        # In order, each before what it refers to; then all history written
+        # since the test began, the deletes' own included.
+        for table in SIGN_IN_TABLES:
+            connection.execute(text(f"DELETE FROM {table}"))
+        connection.execute(
+            text("DELETE FROM catalogue_history WHERE id > :before"),
+            {"before": history_before},
+        )
+    own.dispose()
+
+
+def sessions_of(session: Session) -> Callable[[], Iterator[Session]]:
+    """An app's get_session for the test's own session, which outlives each
+    request, so it is not closed as the route returns (db.get_session); a
+    gated request's hold ends with the route, as its session would."""
+
+    def request_session() -> Iterator[Session]:
+        try:
+            yield session
+        finally:
+            release_hold(session)
+
+    return request_session
+
+
 @pytest.fixture
 def make_app(
     database_url: str, session: Session, tmp_path: Path
@@ -240,6 +400,7 @@ def make_app(
         setup_token: str | None = None,
         recovery_token: str | None = None,
         mailer: SentMail | None = None,
+        own_sessions: bool = False,
     ) -> FastAPI:
         settings = Settings(
             database_url=database_url,
@@ -252,13 +413,18 @@ def make_app(
         if mailer is not None:
             settings = dataclasses.replace(settings, mail=SITE_MAIL)
         app = create_app(settings)
-        app.dependency_overrides[get_session] = lambda: session
+        app.dependency_overrides[get_mailer] = lambda: mailer
+        # Each request with a session of its own, as in production, on the
+        # database as committed (the `committed` fixture cleans up).
+        if own_sessions:
+            event.listen(app.state.engine, "connect", _wait_briefly)
+            return app
+        app.dependency_overrides[get_session] = sessions_of(session)
         # Work after the reply uses the test's session too, so it is rolled
         # back with the rest.
         app.dependency_overrides[get_session_factory] = lambda: (
             lambda: nullcontext(session)
         )
-        app.dependency_overrides[get_mailer] = lambda: mailer
         return app
 
     return make
