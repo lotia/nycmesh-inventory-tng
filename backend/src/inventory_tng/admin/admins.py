@@ -1,6 +1,7 @@
 """Administrators (docs/decisions/0012): the list, inviting one, resetting
-one's sign-in with a link, retiring and bringing back. Every change here is
-sensitive, so it asks for a fresh code (sign_in.ConfirmedAdmin).
+one's sign-in with a link, retiring, and bringing back, which resets it
+too. Every change here is sensitive, so it asks for a fresh code
+(sign_in.ConfirmedAdmin).
 
 A link is shown once, to pass on however the administrator likes; only its
 hash is kept. Whoever it is for is told by mail, if they gave an address.
@@ -101,6 +102,8 @@ def _link_page(
     other: Admin,
     token: str,
     kind: Literal["invited", "reset"],
+    *,
+    brought_back: bool = False,
 ) -> HTMLResponse:
     return admin_page(
         request,
@@ -112,8 +115,30 @@ def _link_page(
             "other": other,
             "link": site_link(request, RESET, token=token),
             "kind": kind,
+            "brought_back": brought_back,
         },
     )
+
+
+def _reset_made(
+    request: Request,
+    signed: SignedIn,
+    notify: Notify,
+    other: Admin,
+    token: str,
+    invited: bool,
+    *,
+    brought_back: bool = False,
+) -> HTMLResponse:
+    """The link a reset or Bring back made, shown once, and the mail: one
+    who never chose a password is invited again instead."""
+    if invited:
+        notify.tell(other.email, other.id, mail.invited)
+    else:
+        told = mail.restored if brought_back else mail.reset_link_made
+        notify.tell(other.email, other.id, told)
+    kind = "invited" if invited else "reset"
+    return _link_page(request, signed, other, token, kind, brought_back=brought_back)
 
 
 @router.get(ADMINS)
@@ -187,10 +212,7 @@ def reset_sign_in(
             return not_found()
         return _admin_page(request, session, signed, other, OWN_RESET)
     changed(signed, session)
-    notify.tell(
-        other.email, other.id, mail.invited if invited else mail.reset_link_made
-    )
-    return _link_page(request, signed, other, token, "invited" if invited else "reset")
+    return _reset_made(request, signed, notify, other, token, invited)
 
 
 @router.post(f"{ADMINS}/{{admin_id}}/retire")
@@ -209,13 +231,14 @@ def retire(
 
 @router.post(f"{ADMINS}/{{admin_id}}/restore")
 def restore(
-    signed: ConfirmedAdmin, session: DbSession, notify: Notify, admin_id: int
+    request: Request,
+    signed: ConfirmedAdmin,
+    session: DbSession,
+    notify: Notify,
+    admin_id: int,
 ) -> Response:
-    """Their old password and authenticators work again, so they are told:
-    whoever retired them for a leak makes them a reset link too."""
-    if not accounts.restore_admin(session, admin_id, signed.admin.id, now()):
+    restored = accounts.restore_admin(session, admin_id, signed.admin.id, now())
+    if restored is None:
         return not_found()
     changed(signed, session)
-    other = session.get_one(Admin, admin_id)
-    notify.tell(other.email, other.id, mail.restored)
-    return redirect(f"{ADMINS}/{admin_id}", notice="restored")
+    return _reset_made(request, signed, notify, *restored, brought_back=True)

@@ -219,8 +219,10 @@ def restored(to: str, admin_id: int) -> Message:
         to,
         "Your NYC Mesh Inventory account was brought back",
         "Your administrator account on NYC Mesh Inventory was retired, and "
-        "another administrator just brought it back: your password and "
-        f"authenticators work again.\n\n{IF_NOT_YOU}",
+        "another administrator just brought it back with its sign-in reset: "
+        "any password, authenticators or recovery codes you had no longer "
+        "work. They will pass on a link for you to choose a new password, "
+        f"which works once, within a day.\n\n{IF_NOT_YOU}",
         "restored",
         admin_id,
     )

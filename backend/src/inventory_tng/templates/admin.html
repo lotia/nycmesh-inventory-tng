@@ -21,6 +21,10 @@
 </section>
 {% endif %}
 
+{% if other.retired_at %}
+<p class="hint">Bringing them back resets their sign-in, as Reset does: you
+get a link to pass on.</p>
+{% endif %}
 <section class="actions">
   {% if other.retired_at %}
   <form method="post" action="{{ here }}/restore"><button>Bring back</button></form>

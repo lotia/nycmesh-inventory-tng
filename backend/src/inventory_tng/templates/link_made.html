@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% block main %}
+{% if brought_back %}<p>Brought back.</p>{% endif %}
 {% if kind == "reset" %}
 <p>Their sign-in is reset: they are signed out everywhere, and their
 password, authenticators and recovery codes no longer work.</p>

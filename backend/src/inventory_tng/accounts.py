@@ -967,7 +967,7 @@ def reset_sign_in(
     by_admin_id: int,
     now: datetime,
     *,
-    action: Literal["reset"],
+    action: Literal["reset", "restore"],
 ) -> tuple[str, bool]:
     """Another administrator resets their sign-in, at once: their password
     goes, their authenticators are retired, their recovery codes and other
@@ -1013,10 +1013,8 @@ def make_link_for(
     whether it is an invite's. Raises LinkRefused."""
     if admin_id == by_admin_id:
         raise LinkRefused("themselves")
-    if not lock_admins(session, by_admin_id):
-        raise LinkRefused("not_found")
-    admin = session.get(Admin, admin_id)
-    if admin is None or admin.retired_at is not None:
+    admin = _locked_other(session, admin_id, by_admin_id, retired=False)
+    if admin is None:
         raise LinkRefused("not_found")
     token, invited = reset_sign_in(session, admin.id, by_admin_id, now, action="reset")
     return admin, token, invited
@@ -1089,6 +1087,20 @@ def lock_admins(session: Session, by_admin_id: int) -> bool:
     return admin_can_sign_in(session, session.get_one(Admin, by_admin_id))
 
 
+def _locked_other(
+    session: Session, admin_id: int, by_admin_id: int, *, retired: bool
+) -> Admin | None:
+    """Under the administrators lock (lock_admins), the administrator to
+    act on, retired or current as asked; None if there is none, or the one
+    acting can no longer sign in."""
+    if not lock_admins(session, by_admin_id):
+        return None
+    admin = session.get(Admin, admin_id)
+    if admin is None or (admin.retired_at is not None) != retired:
+        return None
+    return admin
+
+
 def retire_admin(
     session: Session, admin_id: int, by_admin_id: int, now: datetime
 ) -> Retirement:
@@ -1097,10 +1109,8 @@ def retire_admin(
     (lock_admins)."""
     if admin_id == by_admin_id:
         return "themselves"
-    if not lock_admins(session, by_admin_id):
-        return "not_found"
-    admin = session.get(Admin, admin_id)
-    if admin is None or admin.retired_at is not None:
+    admin = _locked_other(session, admin_id, by_admin_id, retired=False)
+    if admin is None:
         return "not_found"
     admin.retired_at = now
     ended = end_sessions(session, admin.id, now)
@@ -1116,19 +1126,20 @@ def retire_admin(
 
 def restore_admin(
     session: Session, admin_id: int, by_admin_id: int, now: datetime
-) -> bool:
-    """Bring a retired administrator back; False if there is none to, or
-    the one acting was retired meanwhile. Their old password and
-    authenticators work again, so the caller tells them; no reset link made
-    before, even one that slipped past the retiring, does."""
-    if not lock_admins(session, by_admin_id):
-        return False
-    admin = session.get(Admin, admin_id)
-    if admin is None or admin.retired_at is None:
-        return False
+) -> tuple[Admin, str, bool] | None:
+    """Bring a retired administrator back with their sign-in reset
+    (reset_sign_in), whatever they were retired for: a stolen password or
+    phone never works again because the account came back. Returns them,
+    the link to pass on and whether it is an invite's; None if there is
+    none to bring back, or the one acting can no longer sign in."""
+    admin = _locked_other(session, admin_id, by_admin_id, retired=True)
+    if admin is None:
+        return None
     admin.retired_at = None
-    void_reset_links(session, admin.id, now)
+    token, invited = reset_sign_in(
+        session, admin.id, by_admin_id, now, action="restore"
+    )
     log.info(
         "administrator restored", target_admin_id=admin_id, by_admin_id=by_admin_id
     )
-    return True
+    return admin, token, invited
