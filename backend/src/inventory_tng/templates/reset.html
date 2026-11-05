@@ -12,7 +12,6 @@ server for a new recovery token.</p>
   <p>This removes your authenticators and recovery codes. Set up a new
   authenticator when you next sign in.</p>
   {% endif %}
-  {% if link.resets_password %}
   <label>New password <span class="hint">at least {{ limits.password_min }} characters</span>
     <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required autofocus>
     {% with name = "password" %}{% include "_field_problem.html" %}{% endwith %}
@@ -20,7 +19,6 @@ server for a new recovery token.</p>
   <label>New password again
     <input name="password_again" type="password" autocomplete="new-password" required>
   </label>
-  {% endif %}
   <button>Reset</button>
 </form>
 <p class="hint">This signs you out everywhere.{% if not link.resets_authenticators %}

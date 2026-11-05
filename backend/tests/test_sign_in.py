@@ -433,7 +433,6 @@ def reset_link(
     admin: Admin,
     *,
     made_by: Admin | None = None,
-    password: bool = True,
     authenticators: bool = False,
 ) -> str:
     """A reset link's token: emailed, unless another administrator made it."""
@@ -442,7 +441,6 @@ def reset_link(
         admin.id,
         datetime.now(UTC),
         made_by_id=made_by.id if made_by else None,
-        resets_password=password,
         resets_authenticators=authenticators,
         lifetime=timedelta(hours=1 if made_by is None else 24),
     )

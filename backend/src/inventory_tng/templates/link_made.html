@@ -1,8 +1,12 @@
 {% extends "admin_base.html" %}
 {% block main %}
+{% if kind == "reset" %}
+<p>Their sign-in is reset: they are signed out everywhere, and their
+password, authenticators and recovery codes no longer work.</p>
+{% endif %}
 <p><strong>Shown only now.</strong> Pass this link on to {{ other.username }}
 yourself, in person or in a message only they read. It works once,
-within a day{% if invited %}, and with it they choose their password{% endif %}.</p>
+within a day, and with it they choose {% if kind == "invited" %}their{% else %}a new{% endif %} password.</p>
 <p class="key">{{ link }}</p>
 <p><a href="{{ list }}">All administrators</a></p>
 {% endblock %}

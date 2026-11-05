@@ -4,8 +4,10 @@ import re
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from conftest import SentMail
 from fastapi.testclient import TestClient
+from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from test_sign_in import (
@@ -36,6 +38,27 @@ def admin_named(session: Session, username: str) -> Admin:
     return session.scalars(select(Admin).where(Admin.username == username)).one()
 
 
+def assert_sign_in_was_reset(
+    session: Session, theirs: TestClient, made: Response, admin: Admin, key: str | None
+) -> None:
+    """Their old password, authenticator and recovery codes no longer work,
+    and the link shown sets a new password; TOTP is set up again at sign-in."""
+    assert made.status_code == 200
+    assert made.headers["cache-control"] == "no-store"
+    assert not accounts.has_password(session, admin.id)
+    assert not accounts.uses_totp(session, admin.id)
+    assert accounts.recovery_codes_left(session, admin.id) == 0
+    assert sign_in_with(theirs, admin.username, code=code(key)).status_code == 400
+    form = {
+        "token": token_of(link_on(made.text)),
+        "password": NEW_PASSWORD,
+        "password_again": NEW_PASSWORD,
+    }
+    assert theirs.post(sign_in.RESET, data=form).status_code == 303
+    assert sign_in_with(theirs, admin.username, NEW_PASSWORD).status_code == 303
+    assert theirs.get(sign_in.HOME).headers["location"] == sign_in.NEW_AUTHENTICATOR
+
+
 def test_inviting_an_administrator(
     make_client: Callable[..., TestClient], session: Session, sent_mail: SentMail
 ) -> None:
@@ -50,7 +73,7 @@ def test_inviting_an_administrator(
     assert f"{sign_in.RESET}?token=" in link
     grace = admin_named(session, "grace")
     assert not accounts.has_password(session, grace.id)
-    assert "Invited: they haven't chosen a password yet." in text(
+    assert "No password yet: they choose one with the link" in text(
         admin_client.get(f"{ADMINS}/{grace.id}")
     )
     # Grace opens it, chooses a password, signs in, and is asked for an
@@ -71,18 +94,18 @@ def test_inviting_an_administrator(
     )
 
 
-def test_an_invite_is_never_left_without_a_password(
+def test_resetting_an_invite_replaces_its_link(
     admin_client: TestClient, session: Session
 ) -> None:
-    """A link for authenticators only would void the invite's, and set none."""
     me = admin_named(session, "ada")
-    grace, _ = accounts.invite(session, "grace", None, me.id, datetime.now(UTC))
-    page = text(admin_client.get(f"{ADMINS}/{grace.id}"))
-    assert "Reset their authenticators" not in page
-    refused = admin_client.post(
-        f"{ADMINS}/{grace.id}/reset", data={"resets": "authenticators"}
-    )
-    assert "They have no password yet" in text(refused)
+    now = datetime.now(UTC)
+    grace, first = accounts.invite(session, "grace", None, me.id, now)
+    made = admin_client.post(f"{ADMINS}/{grace.id}/reset")
+    assert made.status_code == 200
+    # Nothing to reset: a new invite, which tells them nothing changed.
+    assert "they choose their password" in text(made)
+    assert accounts.find_reset_link(session, first, now) is None
+    assert accounts.find_reset_link(session, token_of(link_on(made.text)), now)
 
 
 def test_an_invite_needs_a_free_username(
@@ -98,33 +121,35 @@ def test_an_invite_needs_a_free_username(
         assert problem in text(refused)
 
 
-def test_a_reset_link_for_another_admin(
+def test_resetting_another_admins_sign_in(
     make_client: Callable[..., TestClient], session: Session, sent_mail: SentMail
 ) -> None:
+    """Everything a thief may hold stops working when the link is made, not
+    when it is used, so it stays that way if the link is never used."""
     client = make_client(mailer=sent_mail)
     _, key = new_admin(session)
     sign_in_with(client, code=code(key))
-    ben, _ = new_admin(session, "ben", email="ben@example.org")
-    theirs = accounts.start_session(session, ben.id, None, datetime.now(UTC))[0]
-    made = client.post(f"{ADMINS}/{ben.id}/reset", data={"resets": "both"})
-    link = link_on(made.text)
+    ben, ben_key = new_admin(session, "ben", email="ben@example.org")
+    accounts.make_recovery_codes(session, ben.id, datetime.now(UTC))
+    theirs = make_client(client.app, address="192.0.2.71")
+    assert sign_in_with(theirs, "ben", code=code(ben_key)).status_code == 303
+    assert theirs.get(sign_in.HOME).status_code == 200
+    emailed = accounts.emailed_reset(session, "ben", datetime.now(UTC))
+    assert emailed is not None
+    made = client.post(f"{ADMINS}/{ben.id}/reset")
     assert [m.kind for m in sent_mail] == ["reset_link_made"]
-    form = {
-        "token": token_of(link),
-        "password": NEW_PASSWORD,
-        "password_again": NEW_PASSWORD,
-    }
-    assert client.post(sign_in.RESET, data=form).status_code == 303
-    assert accounts.check_password(session, ben.id, NEW_PASSWORD)
-    assert not accounts.uses_totp(session, ben.id)
-    assert theirs.ended_at is not None
+    assert theirs.get(sign_in.HOME).headers["location"].startswith(sign_in.SIGN_IN)
+    now = datetime.now(UTC)
+    assert accounts.current_sessions(session, ben.id, now) == []
+    assert accounts.find_reset_link(session, emailed.token, now) is None
+    assert_sign_in_was_reset(session, theirs, made, ben, ben_key)
 
 
 def test_your_own_reset_is_on_your_account_page(
     admin_client: TestClient, session: Session
 ) -> None:
     me = admin_named(session, "ada")
-    refused = admin_client.post(f"{ADMINS}/{me.id}/reset", data={"resets": "both"})
+    refused = admin_client.post(f"{ADMINS}/{me.id}/reset")
     assert "Change your own on your account page." in text(refused)
 
 
@@ -161,26 +186,38 @@ def test_an_administrator_retired_meanwhile_retires_nobody(
     assert carol.retired_at is None
 
 
-def test_nobody_retires_themselves_or_the_last(
-    admin_client: TestClient, session: Session
-) -> None:
+def test_nobody_retires_themselves(admin_client: TestClient, session: Session) -> None:
     me = admin_named(session, "ada")
     refused = admin_client.post(f"{ADMINS}/{me.id}/retire")
     assert "Another administrator must retire you." in text(refused)
-    grace, _ = accounts.invite(session, "grace", None, me.id, datetime.now(UTC))
-    assert accounts.retire_admin(session, me.id, grace.id, datetime.now(UTC)) == "last"
 
 
-def test_the_last_who_can_sign_in_stays_though_an_invite_waits(
+def test_one_who_cannot_sign_in_changes_nobody(session: Session) -> None:
+    """A request already waiting from a session just cut off, as when its
+    sign-in was reset, or an invite not taken up: so someone who can sign
+    in always remains."""
+    ada, _ = new_admin(session)
+    ben, _ = new_admin(session, "ben")
+    now = datetime.now(UTC)
+    grace, _ = accounts.invite(session, "grace", None, ada.id, now)
+    assert accounts.retire_admin(session, ada.id, grace.id, now) == "not_found"
+    accounts.make_link_for(session, ada.id, ben.id, now)
+    assert accounts.retire_admin(session, ben.id, ada.id, now) == "not_found"
+    with pytest.raises(accounts.LinkRefused):
+        accounts.invite(session, "mallory", None, ada.id, now)
+    # Two resetting each other at once: the second finds itself reset.
+    with pytest.raises(accounts.LinkRefused):
+        accounts.make_link_for(session, ben.id, ada.id, now)
+    assert ben.retired_at is None
+    assert accounts.has_password(session, ben.id)
+
+
+def test_an_invite_not_taken_up_may_always_go(
     admin_client: TestClient, session: Session
 ) -> None:
-    """An invite not taken up cannot let anyone back in: it does not count,
-    and it may always go."""
     me = admin_named(session, "ada")
     grace, _ = accounts.invite(session, "grace", None, me.id, datetime.now(UTC))
-    assert accounts.retire_admin(session, me.id, grace.id, datetime.now(UTC)) == "last"
-    done = admin_client.post(f"{ADMINS}/{grace.id}/retire")
-    assert done.status_code == 303
+    assert admin_client.post(f"{ADMINS}/{grace.id}/retire").status_code == 303
 
 
 def test_changes_here_ask_for_a_fresh_code(
@@ -207,7 +244,6 @@ def test_using_one_link_voids_the_others(session: Session) -> None:
         ben.id,
         now,
         made_by_id=ada.id,
-        resets_password=True,
         resets_authenticators=False,
         lifetime=accounts.MADE_LINK_LIFETIME,
     )
@@ -229,7 +265,6 @@ def test_bringing_one_back_voids_their_links(
         ben.id,
         now,
         made_by_id=None,
-        resets_password=True,
         resets_authenticators=False,
         lifetime=accounts.EMAILED_LINK_LIFETIME,
     )

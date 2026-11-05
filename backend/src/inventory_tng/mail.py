@@ -191,10 +191,11 @@ def reset_link(to: str, admin_id: int, link: str) -> Message:
 def reset_link_made(to: str, admin_id: int) -> Message:
     return Message(
         to,
-        "A reset link was made for your NYC Mesh Inventory account",
-        "Another administrator just made a link that resets your administrator "
-        "account on NYC Mesh Inventory, and will pass it on to you. It works "
-        f"once, within a day.\n\n{IF_NOT_YOU}",
+        "Your NYC Mesh Inventory sign-in was reset",
+        "Another administrator just reset your sign-in on NYC Mesh Inventory: "
+        "you were signed out everywhere, and your password, authenticators "
+        "and recovery codes no longer work. They will pass on a link for you "
+        f"to choose a new password, which works once, within a day.\n\n{IF_NOT_YOU}",
         "reset_link_made",
         admin_id,
     )

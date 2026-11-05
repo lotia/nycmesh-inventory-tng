@@ -2,11 +2,11 @@
 {% block main %}
 {% if not mail_on %}
 <p>Resetting a password by email isn't set up here. Ask another
-administrator to make you a reset link.</p>
+administrator to reset your sign-in.</p>
 {% elif not notice %}
 <p>If your account has an email address, we'll send a link to choose a new
-password. If it doesn't, ask another administrator to make you a reset
-link.</p>
+password. If it doesn't, ask another administrator to reset your
+sign-in.</p>
 <form method="post" action="{{ paths.forgot }}">
   <label>Username
     <input name="username" autocomplete="username" maxlength="{{ limits.username_max }}" required autofocus>
