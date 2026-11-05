@@ -47,36 +47,31 @@ def upgrade() -> None:
     op.create_unique_constraint(
         op.f("uq_reset_link_recovery_token_hash"), "reset_link", ["recovery_token_hash"]
     )
-    op.drop_constraint(
-        op.f("ck_reset_link_emailed_resets_password_only"), "reset_link", type_="check"
+    op.drop_constraint(op.f("ck_reset_link_kind"), "reset_link", type_="check")
+    op.create_check_constraint(
+        op.f("ck_reset_link_kind"),
+        "reset_link",
+        "kind IN ('invite', 'emailed', 'reset', 'recovery')",
     )
     op.create_check_constraint(
-        op.f("ck_reset_link_emailed_resets_password_only"),
+        op.f("ck_reset_link_recovery"),
         "reset_link",
-        "made_by_id IS NOT NULL OR recovery_token_hash IS NOT NULL "
-        "OR NOT resets_authenticators",
-    )
-    op.create_check_constraint(
-        op.f("ck_reset_link_one_maker"),
-        "reset_link",
-        "made_by_id IS NULL OR recovery_token_hash IS NULL",
+        "(recovery_token_hash IS NOT NULL) = (kind = 'recovery')",
     )
     _history("token_hash", "recovery_token_hash")
 
 
 def downgrade() -> None:
-    # A recovery link resets authenticators, which 0006's rule refuses. Gone
-    # before the triggers change, so its token's hash stays out of history.
-    op.execute("DELETE FROM reset_link WHERE recovery_token_hash IS NOT NULL")
+    # 0006 has no recovery kind. Gone before the triggers change, so its
+    # token's hash stays out of history.
+    op.execute("DELETE FROM reset_link WHERE kind = 'recovery'")
     _history("token_hash")
-    op.drop_constraint(op.f("ck_reset_link_one_maker"), "reset_link", type_="check")
-    op.drop_constraint(
-        op.f("ck_reset_link_emailed_resets_password_only"), "reset_link", type_="check"
-    )
+    op.drop_constraint(op.f("ck_reset_link_recovery"), "reset_link", type_="check")
+    op.drop_constraint(op.f("ck_reset_link_kind"), "reset_link", type_="check")
     op.create_check_constraint(
-        op.f("ck_reset_link_emailed_resets_password_only"),
+        op.f("ck_reset_link_kind"),
         "reset_link",
-        "made_by_id IS NOT NULL OR NOT resets_authenticators",
+        "kind IN ('invite', 'emailed', 'reset')",
     )
     op.drop_constraint(
         op.f("uq_reset_link_recovery_token_hash"), "reset_link", type_="unique"

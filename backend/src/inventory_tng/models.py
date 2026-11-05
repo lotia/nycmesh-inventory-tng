@@ -28,7 +28,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from ipaddress import IPv4Address, IPv6Address
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal, get_args
 
 from sqlalchemy import (
     BigInteger,
@@ -42,7 +42,6 @@ from sqlalchemy import (
     LargeBinary,
     Numeric,
     Text,
-    and_,
     func,
     text,
 )
@@ -56,6 +55,16 @@ MONEY = Numeric(10, 2)
 
 UNITS = ("each", "m", "ft")
 TOTP_POLICIES = ("required", "optional")
+# What made a reset link (docs/decisions/0012): an invite; asking by mail;
+# another administrator resetting the account's sign-in; the operator's
+# recovery token. Every one sets a password. Using a reset or recovery one
+# removes the authenticators too: a reset removed them when it was made
+# already, and again catches any added from a session cut off meanwhile
+# (inventory-tng-8i4.50.4 closes that properly; then reset can go).
+ResetKind = Literal["invite", "emailed", "reset", "recovery"]
+RESET_KINDS: tuple[ResetKind, ...] = get_args(ResetKind)
+MADE_BY_ADMIN: tuple[ResetKind, ...] = ("invite", "reset")
+RESETS_AUTHENTICATORS: tuple[ResetKind, ...] = ("reset", "recovery")
 LOCATION_KINDS = ("store", "area", "vehicle", "custody")
 # What a transaction is. A count or an adjustment fixes the records, with
 # stock found (NULL to a location) or lost (a location to NULL).
@@ -618,22 +627,19 @@ class AdminSession(Base):
 
 
 class ResetLink(Base):
-    """A one-use link that sets an administrator's password, and resets their
-    authenticators too when resets_authenticators. Made by another
-    administrator, with the operator's recovery token, or emailed to the
-    administrator themselves (neither), which sets the password only.
-    resets_password is always true now (inventory-tng-8i4.50.1)."""
+    """A one-use link that sets an administrator's password, and for some
+    kinds resets their authenticators too (RESETS_AUTHENTICATORS)."""
 
     __tablename__ = "reset_link"
     __table_args__ = (
-        CheckConstraint("resets_password OR resets_authenticators", name="resets"),
+        CheckConstraint(_one_of("kind", RESET_KINDS), name="kind"),
         CheckConstraint(
-            "made_by_id IS NOT NULL OR recovery_token_hash IS NOT NULL "
-            "OR NOT resets_authenticators",
-            name="emailed_resets_password_only",
+            f"(made_by_id IS NOT NULL) = ({_one_of('kind', MADE_BY_ADMIN)})",
+            name="made_by",
         ),
         CheckConstraint(
-            "made_by_id IS NULL OR recovery_token_hash IS NULL", name="one_maker"
+            "(recovery_token_hash IS NOT NULL) = (kind = 'recovery')",
+            name="recovery",
         ),
         CheckConstraint("made_by_id <> admin_id", name="not_made_for_oneself"),
     )
@@ -645,18 +651,19 @@ class ResetLink(Base):
     # Made with the operator's recovery token: its hash, so it works once.
     recovery_token_hash: Mapped[bytes | None] = mapped_column(LargeBinary, unique=True)
     token_hash: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
-    resets_password: Mapped[bool]
-    resets_authenticators: Mapped[bool]
+    kind: Mapped[ResetKind] = mapped_column(Text)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Set when a newer link for the same administrator replaces it.
     voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    @property
+    def resets_authenticators(self) -> bool:
+        return self.kind in RESETS_AUTHENTICATORS
+
     @classmethod
     def emailed(cls) -> ColumnElement[bool]:
-        """Asked for by mail: made by neither an administrator nor the
-        recovery token."""
-        return and_(cls.made_by_id.is_(None), cls.recovery_token_hash.is_(None))
+        return cls.kind == "emailed"
 
 
 class SignInSettings(Base):
@@ -684,6 +691,10 @@ class SignInSettings(Base):
     # long, so long as each comes within confirm_idle_minutes of the last.
     confirm_hours: Mapped[int] = mapped_column(server_default=text("24"))
     confirm_idle_minutes: Mapped[int] = mapped_column(server_default=text("60"))
+
+    @property
+    def totp_required(self) -> bool:
+        return self.totp_policy == "required"
 
 
 class SiteSettings(Base):

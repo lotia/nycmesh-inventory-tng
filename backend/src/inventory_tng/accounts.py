@@ -27,11 +27,13 @@ from sqlalchemy.orm import Session
 from inventory_tng.db import exists_where, set_actor, unique
 from inventory_tng.devices import digest
 from inventory_tng.models import (
+    MADE_BY_ADMIN,
     Admin,
     AdminPassword,
     AdminSession,
     Authenticator,
     RecoveryCode,
+    ResetKind,
     ResetLink,
     SignInSettings,
     mint_code,
@@ -411,14 +413,12 @@ def _new_token() -> tuple[str, bytes]:
 
 def _set_password(
     session: Session, admin_id: int, password: str, now: datetime
-) -> bool:
-    """True if it replaced one they had."""
+) -> None:
     stored = session.get(AdminPassword, admin_id)
     if stored is None:
         session.add(AdminPassword(id=admin_id, password_hash=hash_password(password)))
-        return False
-    stored.password_hash, stored.changed_at = hash_password(password), now
-    return True
+    else:
+        stored.password_hash, stored.changed_at = hash_password(password), now
 
 
 def start_session(
@@ -747,26 +747,24 @@ def make_reset_link(
     admin_id: int,
     now: datetime,
     *,
-    made_by_id: int | None,
-    resets_authenticators: bool,
-    lifetime: timedelta,
+    kind: ResetKind,
+    made_by_id: int | None = None,
     recovery_token_hash: bytes | None = None,
 ) -> str:
-    """A one-use link's token, the only time it is known. Every link sets a
-    new password. It voids earlier links of the same kind still unused, so
-    the newest works: an emailed one voids only emailed ones, so asking by
-    mail, which anyone may do, never undoes a link another administrator or
-    the recovery token made."""
-    emailed = made_by_id is None and recovery_token_hash is None
-    void_reset_links(session, admin_id, now, emailed_only=emailed)
+    """A one-use link's token, the only time it is known. It voids earlier
+    links still unused, so the newest works: an emailed one voids only
+    emailed ones, so asking by mail, which anyone may do, never undoes a
+    link another administrator or the recovery token made. One another
+    administrator passes on lasts a day; any other, an hour."""
+    lifetime = MADE_LINK_LIFETIME if kind in MADE_BY_ADMIN else EMAILED_LINK_LIFETIME
+    void_reset_links(session, admin_id, now, emailed_only=kind == "emailed")
     token, token_hash = _new_token()
     link = ResetLink(
         admin_id=admin_id,
         made_by_id=made_by_id,
         recovery_token_hash=recovery_token_hash,
         token_hash=token_hash,
-        resets_password=True,
-        resets_authenticators=resets_authenticators,
+        kind=kind,
         expires_at=now + lifetime,
     )
     session.add(link)
@@ -775,6 +773,7 @@ def make_reset_link(
         "reset link made",
         admin_id=admin_id,
         reset_link_id=link.id,
+        kind=kind,
         made_by_id=made_by_id,
     )
     return token
@@ -824,9 +823,7 @@ def emailed_reset(
         session,
         admin.id,
         now,
-        made_by_id=None,
-        resets_authenticators=False,
-        lifetime=EMAILED_LINK_LIFETIME,
+        kind="emailed",
     )
     return EmailedReset(admin.id, admin.email, token)
 
@@ -864,14 +861,13 @@ def find_reset_link(
 
 def use_reset_link(
     session: Session, link: ResetLink, password: str, now: datetime
-) -> bool:
+) -> None:
     """Does what the link was made for: a new password (checked by the caller
     with password_problem), and, if it says so, its authenticators and
     recovery codes gone, so a new one is set up at sign-in while TOTP is
-    required. Every session of theirs ends. The caller commits. True if they
-    should be told: always, but for an invite's link choosing the first."""
+    required. Every session of theirs ends. The caller commits."""
     set_actor(session, f"admin:{link.admin_id}")
-    changed = _set_password(session, link.admin_id, password, now)
+    _set_password(session, link.admin_id, password, now)
     if link.resets_authenticators:
         _reset_authenticators(session, link.admin_id, now)
     link.used_at = now
@@ -884,8 +880,6 @@ def use_reset_link(
         reset_link_id=link.id,
         sessions_ended=ended,
     )
-    # A reset another administrator made removed the password already.
-    return changed or link.resets_authenticators
 
 
 # The recovery token (docs/decisions/0012)
@@ -924,9 +918,7 @@ def recover(
             session,
             admin.id,
             now,
-            made_by_id=None,
-            resets_authenticators=True,
-            lifetime=EMAILED_LINK_LIFETIME,
+            kind="recovery",
             recovery_token_hash=token_hash,
         )
 
@@ -968,28 +960,27 @@ def reset_sign_in(
     now: datetime,
     *,
     action: Literal["reset", "restore"],
-) -> tuple[str, bool]:
+) -> tuple[str, Literal["invite", "reset"]]:
     """Another administrator resets their sign-in, at once: their password
     goes, their authenticators are retired, their recovery codes and other
     links voided and their sessions ended, so nothing a thief may hold
     works, even if the link is never used. Returns a one-use link that sets
-    a new password, for the one acting to pass on, and whether it is an
-    invite's: one who never chose a password has nothing to reset, so gets
-    a new invite. TOTP is set up again at sign-in while required. Counted
+    a new password, for the one acting to pass on, and its kind: one who
+    never chose a password has nothing to reset, so gets a new invite. TOTP is set up again at sign-in while required. Counted
     by the action that did it, unless it invited again. The caller holds
     the administrators lock."""
-    invited = not has_password(session, admin_id)
+    kind: Literal["invite", "reset"] = (
+        "reset" if has_password(session, admin_id) else "invite"
+    )
     # The link first, which voids every other, as use_reset_link locks its
     # link before the password: a link being used meanwhile finishes, then
-    # this undoes it. It says the authenticators go, to whoever uses it, and
-    # using it tells the account's owner.
+    # this undoes it.
     token = make_reset_link(
         session,
         admin_id,
         now,
+        kind=kind,
         made_by_id=by_admin_id,
-        resets_authenticators=not invited,
-        lifetime=MADE_LINK_LIFETIME,
     )
     end_sessions(session, admin_id, now)
     session.execute(delete(AdminPassword).where(AdminPassword.id == admin_id))
@@ -998,26 +989,26 @@ def reset_sign_in(
         "sign-in reset",
         target_admin_id=admin_id,
         by_admin_id=by_admin_id,
-        invited_again=invited,
+        kind=kind,
     )
-    if not invited:
+    if kind == "reset":
         sign_in_resets.add(1, {"action": action})
-    return token, invited
+    return token, kind
 
 
 def make_link_for(
     session: Session, admin_id: int, by_admin_id: int, now: datetime
-) -> tuple[Admin, str, bool]:
+) -> tuple[Admin, str, Literal["invite", "reset"]]:
     """Reset another administrator's sign-in (reset_sign_in): never one's
-    own, which the account page changes. Returns them, the link and
-    whether it is an invite's. Raises LinkRefused."""
+    own, which the account page changes. Returns them, the link and its
+    kind. Raises LinkRefused."""
     if admin_id == by_admin_id:
         raise LinkRefused("themselves")
     admin = _locked_other(session, admin_id, by_admin_id, retired=False)
     if admin is None:
         raise LinkRefused("not_found")
-    token, invited = reset_sign_in(session, admin.id, by_admin_id, now, action="reset")
-    return admin, token, invited
+    token, kind = reset_sign_in(session, admin.id, by_admin_id, now, action="reset")
+    return admin, token, kind
 
 
 def invite(
@@ -1037,9 +1028,8 @@ def invite(
         session,
         admin.id,
         now,
+        kind="invite",
         made_by_id=made_by_id,
-        resets_authenticators=False,
-        lifetime=MADE_LINK_LIFETIME,
     )
     log.info("administrator invited", admin_id=admin.id, made_by_id=made_by_id)
     return admin, token
@@ -1126,20 +1116,18 @@ def retire_admin(
 
 def restore_admin(
     session: Session, admin_id: int, by_admin_id: int, now: datetime
-) -> tuple[Admin, str, bool] | None:
+) -> tuple[Admin, str, Literal["invite", "reset"]] | None:
     """Bring a retired administrator back with their sign-in reset
     (reset_sign_in), whatever they were retired for: a stolen password or
     phone never works again because the account came back. Returns them,
-    the link to pass on and whether it is an invite's; None if there is
+    the link to pass on and its kind; None if there is
     none to bring back, or the one acting can no longer sign in."""
     admin = _locked_other(session, admin_id, by_admin_id, retired=True)
     if admin is None:
         return None
     admin.retired_at = None
-    token, invited = reset_sign_in(
-        session, admin.id, by_admin_id, now, action="restore"
-    )
+    token, kind = reset_sign_in(session, admin.id, by_admin_id, now, action="restore")
     log.info(
         "administrator restored", target_admin_id=admin_id, by_admin_id=by_admin_id
     )
-    return admin, token, invited
+    return admin, token, kind

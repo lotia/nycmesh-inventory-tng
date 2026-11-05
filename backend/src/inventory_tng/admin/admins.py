@@ -101,7 +101,7 @@ def _link_page(
     signed: SignedIn,
     other: Admin,
     token: str,
-    kind: Literal["invited", "reset"],
+    kind: Literal["invite", "reset"],
     *,
     brought_back: bool = False,
 ) -> HTMLResponse:
@@ -126,18 +126,17 @@ def _reset_made(
     notify: Notify,
     other: Admin,
     token: str,
-    invited: bool,
+    kind: Literal["invite", "reset"],
     *,
     brought_back: bool = False,
 ) -> HTMLResponse:
     """The link a reset or Bring back made, shown once, and the mail: one
     who never chose a password is invited again instead."""
-    if invited:
-        notify.tell(other.email, other.id, mail.invited)
+    if kind == "invite":
+        told = mail.invited
     else:
         told = mail.restored if brought_back else mail.reset_link_made
-        notify.tell(other.email, other.id, told)
-    kind = "invited" if invited else "reset"
+    notify.tell(other.email, other.id, told)
     return _link_page(request, signed, other, token, kind, brought_back=brought_back)
 
 
@@ -179,7 +178,7 @@ def invite(
     other, token = invited[0]
     changed(signed, session)
     notify.tell(other.email, other.id, mail.invited)
-    return _link_page(request, signed, other, token, kind="invited")
+    return _link_page(request, signed, other, token, "invite")
 
 
 @router.get(f"{ADMINS}/{{admin_id}}")
@@ -204,7 +203,7 @@ def reset_sign_in(
     if other is None:
         return not_found()
     try:
-        other, token, invited = accounts.make_link_for(
+        other, token, kind = accounts.make_link_for(
             session, admin_id, signed.admin.id, now()
         )
     except accounts.LinkRefused as refused:
@@ -212,7 +211,7 @@ def reset_sign_in(
             return not_found()
         return _admin_page(request, session, signed, other, OWN_RESET)
     changed(signed, session)
-    return _reset_made(request, signed, notify, other, token, invited)
+    return _reset_made(request, signed, notify, other, token, kind)
 
 
 @router.post(f"{ADMINS}/{{admin_id}}/retire")

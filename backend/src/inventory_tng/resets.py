@@ -14,6 +14,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
+from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, mail
 from inventory_tng.db import DbSession, SessionFactory, Sessions
@@ -101,6 +102,7 @@ def _email_reset(
 
 def _reset_page(
     request: Request,
+    session: Session,
     token: str,
     link: ResetLink | None,
     *,
@@ -115,6 +117,8 @@ def _reset_page(
             "title": "Reset your account",
             "token": token,
             "link": link,
+            "totp_required": link is not None
+            and accounts.sign_in_settings(session).totp_required,
             "problems": problems or {},
         },
         status_code if link else 404,
@@ -124,7 +128,7 @@ def _reset_page(
 @router.get(RESET)
 def reset_form(request: Request, session: DbSession, token: str = "") -> Response:
     found = accounts.find_reset_link(session, token, _now())
-    return _reset_page(request, token, found[0] if found else None)
+    return _reset_page(request, session, token, found[0] if found else None)
 
 
 @router.post(RESET)
@@ -141,18 +145,23 @@ def reset(
         found = accounts.find_reset_link(session, token, now)
         problems = {"password": TOO_MANY}
         link = found[0] if found else None
-        return _reset_page(request, token, link, problems=problems, status_code=429)
+        return _reset_page(
+            request, session, token, link, problems=problems, status_code=429
+        )
     # Locked until the request's session ends, used or not.
     found = accounts.find_reset_link(session, token, now, lock=True)
     if found is None:
-        return _reset_page(request, token, None)
+        return _reset_page(request, session, token, None)
     link, admin = found
     if problem := accounts.password_problem(password, password_again):
         problems = {"password": problem}
-        return _reset_page(request, token, link, problems=problems, status_code=400)
-    tell = accounts.use_reset_link(session, link, password, now)
+        return _reset_page(
+            request, session, token, link, problems=problems, status_code=400
+        )
+    accounts.use_reset_link(session, link, password, now)
     session.commit()
-    if tell:
+    # An invite's link chooses the first password: nothing to warn about.
+    if link.kind != "invite":
         notify.tell(admin.email, admin.id, mail.password_changed)
     return redirect(SIGN_IN, notice="reset")
 

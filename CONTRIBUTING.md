@@ -83,6 +83,15 @@ uv run python -m inventory_tng --reload  # http://127.0.0.1:8000/api/docs
 itself; uvicorn's own logging flags are not used, the `LOG_*` settings are
 (Logging, below).
 
+### Migrations
+
+Until the first production deploy, a change may edit an existing migration
+instead of adding one, so the schema's history stays short. After a pull
+that does, your local database no longer matches its migrations: rebuild
+it, losing its data, with `mise run compose -- down --volumes`, then the
+commands above. Once production runs, a migration is never edited: add a
+new one.
+
 ### The scan page
 
 The scan page and the registration page are TypeScript, in `frontend/`

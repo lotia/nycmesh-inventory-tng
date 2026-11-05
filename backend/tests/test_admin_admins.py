@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from test_sign_in import (
     code,
     new_admin,
+    reset_link,
     sign_in_with,
     text,
 )
@@ -255,24 +256,18 @@ def test_changes_here_ask_for_a_fresh_code(
 
 
 def test_using_one_link_voids_the_others(session: Session) -> None:
-    """An emailed reset leaves no link another administrator made live."""
-    ada, _ = new_admin(session)
+    """An emailed reset leaves no recovery link live; asking by mail did not
+    void it, as anyone may ask."""
     ben, _ = new_admin(session, "ben", email="ben@example.org")
     now = datetime.now(UTC)
-    made = accounts.make_reset_link(
-        session,
-        ben.id,
-        now,
-        made_by_id=ada.id,
-        resets_authenticators=False,
-        lifetime=accounts.MADE_LINK_LIFETIME,
-    )
+    recovery = reset_link(session, ben, "recovery")
     emailed = accounts.emailed_reset(session, "ben", now)
     assert emailed is not None
+    assert accounts.find_reset_link(session, recovery, now) is not None
     found = accounts.find_reset_link(session, emailed.token, now)
     assert found is not None
     accounts.use_reset_link(session, found[0], NEW_PASSWORD, now)
-    assert accounts.find_reset_link(session, made, now) is None
+    assert accounts.find_reset_link(session, recovery, now) is None
 
 
 def test_bringing_one_back_voids_their_links(
@@ -280,14 +275,7 @@ def test_bringing_one_back_voids_their_links(
 ) -> None:
     ben, _ = new_admin(session, "ben")
     now = datetime.now(UTC)
-    token = accounts.make_reset_link(
-        session,
-        ben.id,
-        now,
-        made_by_id=None,
-        resets_authenticators=False,
-        lifetime=accounts.EMAILED_LINK_LIFETIME,
-    )
+    token = reset_link(session, ben)
     ben.retired_at = now
     session.flush()
     assert admin_client.post(f"{ADMINS}/{ben.id}/restore").status_code == 200
