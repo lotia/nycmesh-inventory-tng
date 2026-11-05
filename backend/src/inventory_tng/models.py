@@ -618,10 +618,11 @@ class AdminSession(Base):
 
 
 class ResetLink(Base):
-    """A one-use link that resets an administrator's password, authenticators
-    or both. Made by another administrator, with the operator's recovery
-    token, or emailed to the administrator themselves (neither), which resets
-    the password only."""
+    """A one-use link that sets an administrator's password, and resets their
+    authenticators too when resets_authenticators. Made by another
+    administrator, with the operator's recovery token, or emailed to the
+    administrator themselves (neither), which sets the password only.
+    resets_password is always true now (inventory-tng-8i4.50.1)."""
 
     __tablename__ = "reset_link"
     __table_args__ = (

@@ -1,5 +1,5 @@
-"""Administrators (docs/decisions/0012): the list, inviting one, a reset link
-for one who is locked out, retiring and bringing back. Every change here is
+"""Administrators (docs/decisions/0012): the list, inviting one, resetting
+one's sign-in with a link, retiring and bringing back. Every change here is
 sensitive, so it asks for a fresh code (sign_in.ConfirmedAdmin).
 
 A link is shown once, to pass on however the administrator likes; only its
@@ -7,7 +7,7 @@ hash is kept. Whoever it is for is told by mail, if they gave an address.
 """
 
 from collections.abc import Mapping
-from typing import Annotated
+from typing import Annotated, Literal
 
 import structlog
 from fastapi import APIRouter, Form, Request
@@ -34,21 +34,8 @@ log = structlog.get_logger(__name__)
 router = APIRouter(include_in_schema=False)
 
 TAKEN = "Another administrator already has that username or email."
-# What a reset link may reset, by the button pressed.
-RESETS = {
-    "password": (True, False),
-    "authenticators": (False, True),
-    "both": (True, True),
-}
-
-LINK_PROBLEMS = {
-    "themselves": "Change your own on your account page.",
-    "needs_password": "They have no password yet: make a link that sets one.",
-}
-PROBLEMS = {
-    "themselves": "Another administrator must retire you.",
-    "last": "They are the last administrator: invite another first.",
-}
+OWN_RESET = "Change your own on your account page."
+OWN_RETIRE = "Another administrator must retire you."
 
 NOTICES.update(
     {
@@ -109,7 +96,11 @@ def _admin_page(
 
 
 def _link_page(
-    request: Request, signed: SignedIn, other: Admin, token: str, invited: bool
+    request: Request,
+    signed: SignedIn,
+    other: Admin,
+    token: str,
+    kind: Literal["invited", "reset"],
 ) -> HTMLResponse:
     return admin_page(
         request,
@@ -120,7 +111,7 @@ def _link_page(
             "list": ADMINS,
             "other": other,
             "link": site_link(request, RESET, token=token),
-            "invited": invited,
+            "kind": kind,
         },
     )
 
@@ -163,7 +154,7 @@ def invite(
     other, token = invited[0]
     changed(signed, session)
     notify.tell(other.email, other.id, mail.invited)
-    return _link_page(request, signed, other, token, invited=True)
+    return _link_page(request, signed, other, token, kind="invited")
 
 
 @router.get(f"{ADMINS}/{{admin_id}}")
@@ -177,37 +168,29 @@ def admin(
 
 
 @router.post(f"{ADMINS}/{{admin_id}}/reset")
-def make_reset_link(
+def reset_sign_in(
     request: Request,
     signed: ConfirmedAdmin,
     session: DbSession,
     notify: Notify,
     admin_id: int,
-    resets: Annotated[str, Form()] = "",
 ) -> Response:
     other = session.get(Admin, admin_id)
     if other is None:
         return not_found()
-    if resets not in RESETS:
-        return _admin_page(request, session, signed, other, "Pick what it resets.")
-    password, authenticators = RESETS[resets]
     try:
-        other, token = accounts.make_link_for(
-            session,
-            admin_id,
-            signed.admin.id,
-            now(),
-            resets_password=password,
-            resets_authenticators=authenticators,
+        other, token, invited = accounts.make_link_for(
+            session, admin_id, signed.admin.id, now()
         )
     except accounts.LinkRefused as refused:
         if refused.reason == "not_found":
             return not_found()
-        problem = LINK_PROBLEMS[refused.reason]
-        return _admin_page(request, session, signed, other, problem)
+        return _admin_page(request, session, signed, other, OWN_RESET)
     changed(signed, session)
-    notify.tell(other.email, other.id, mail.reset_link_made)
-    return _link_page(request, signed, other, token, invited=False)
+    notify.tell(
+        other.email, other.id, mail.invited if invited else mail.reset_link_made
+    )
+    return _link_page(request, signed, other, token, "invited" if invited else "reset")
 
 
 @router.post(f"{ADMINS}/{{admin_id}}/retire")
@@ -217,9 +200,9 @@ def retire(
     outcome = accounts.retire_admin(session, admin_id, signed.admin.id, now())
     if outcome == "not_found":
         return not_found()
-    if outcome != "retired":
+    if outcome == "themselves":
         other = session.get_one(Admin, admin_id)
-        return _admin_page(request, session, signed, other, PROBLEMS[outcome])
+        return _admin_page(request, session, signed, other, OWN_RETIRE)
     changed(signed, session)
     return redirect(ADMINS, notice="admin_retired")
 

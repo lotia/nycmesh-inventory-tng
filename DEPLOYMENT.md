@@ -106,10 +106,11 @@ restart. Later administrators are invited from the administrator pages
 
 ## A locked-out administrator
 
-Another administrator can make a locked-out one a reset link, and one with
-an email can reset their own password. When neither can, make a token as
-above, set it as `RECOVERY_TOKEN` and restart. On Kubernetes, put it in the
-deployment's Secret and roll out; nobody needs to exec into a pod.
+Another administrator can reset a locked-out one's sign-in, which shows a
+link to pass on, and one with an email can reset their own password. When
+neither can, make a token as above, set it as `RECOVERY_TOKEN` and restart.
+On Kubernetes, put it in the deployment's Secret and roll out; nobody needs
+to exec into a pod.
 
 Give it to them. They open `/recover`, type it and their username, and
 choose a new password. Their authenticators are removed: while TOTP is
@@ -123,7 +124,7 @@ nobody new.
 ## Mail
 
 The app mails administrators reset links they ask for. It tells them when
-they are invited, when another administrator makes them a reset link or
+they are invited, when another administrator resets their sign-in or
 brings their account back, when the recovery token is used for them, and
 when their password changes or a recovery code is used. It sends through a
 provider's authenticated SMTP, such as Mailgun's or Gmail's:

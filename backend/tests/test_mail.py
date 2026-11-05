@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
-from test_sign_in import PASSWORD, code, new_admin, reset_link, sign_in_with, text
+from test_sign_in import code, new_admin, reset_link, sign_in_with, text
 
 from inventory_tng import accounts, mail, sign_in
 from inventory_tng.models import Admin, AdminSession, ResetLink
@@ -385,55 +385,43 @@ def test_no_address_no_notice(
 # a page; the reset page already does what each says)
 
 
-def made_link(
-    session: Session, admin: Admin, *, password: bool, authenticators: bool
-) -> str:
+def made_link(session: Session, admin: Admin) -> str:
+    """A reset another administrator made, which removed the password and
+    authenticators already."""
     colleague, _ = new_admin(session, "colleague")
-    return reset_link(
-        session,
-        admin,
-        made_by=colleague,
-        password=password,
-        authenticators=authenticators,
-    )
+    return accounts.reset_sign_in(
+        session, admin.id, colleague.id, datetime.now(UTC), action="reset"
+    )[0]
 
 
-def test_a_link_for_authenticators_only_keeps_the_password(
-    client: TestClient, session: Session
+def test_a_made_link_sets_a_password_and_tells_the_owner(
+    client: TestClient, session: Session, sent_mail: SentMail
 ) -> None:
+    """Its password went when it was made, so none is "changed": told anyway."""
     admin, _ = with_email(session)
-    accounts.make_recovery_codes(session, admin.id, datetime.now(UTC))
-    token = made_link(session, admin, password=False, authenticators=True)
-    page = text(client.get(f"{sign_in.RESET}?token={token}"))
-    assert 'name="password"' not in page
-    assert "removes your authenticators" in page
-    assert client.post(sign_in.RESET, data={"token": token}).status_code == 303
-    assert not accounts.uses_totp(session, admin.id)
-    assert accounts.recovery_codes_left(session, admin.id) == 0
-    assert accounts.check_password(session, admin.id, PASSWORD)
-    # Signing in, then, asks for a new authenticator, as TOTP is required.
-    client.cookies.clear()
-    assert sign_in_with(client).status_code == 303
-    home = client.get(sign_in.HOME)
-    assert home.headers["location"] == sign_in.NEW_AUTHENTICATOR
-
-
-def test_a_link_for_both_resets_both(client: TestClient, session: Session) -> None:
-    admin, _ = with_email(session)
-    token = made_link(session, admin, password=True, authenticators=True)
+    token = made_link(session, admin)
+    assert "removes your authenticators" in text(
+        client.get(f"{sign_in.RESET}?token={token}")
+    )
     form = {"token": token, "password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
     assert client.post(sign_in.RESET, data=form).status_code == 303
     assert accounts.check_password(session, admin.id, NEW_PASSWORD)
     assert not accounts.uses_totp(session, admin.id)
+    assert [m.kind for m in sent_mail] == ["password_changed"]
 
 
-def test_asking_by_mail_never_voids_a_link_a_colleague_made(
+def test_asking_by_mail_never_undoes_a_reset_another_made(
     client: TestClient, session: Session, sent_mail: SentMail
 ) -> None:
+    """With the authenticators gone too, a mailbox alone would be enough."""
     admin, _ = with_email(session)
-    token = made_link(session, admin, password=True, authenticators=True)
+    token = made_link(session, admin)
     ask(client)
+    assert sent_mail == []
     assert client.get(f"{sign_in.RESET}?token={token}").status_code == 200
+    # One asked for just as the reset was made, so not voided by it, fails.
+    emailed = reset_link(session, admin)
+    assert accounts.find_reset_link(session, emailed, datetime.now(UTC)) is None
 
 
 def test_mail_to_one_account_is_limited_whoever_asks(

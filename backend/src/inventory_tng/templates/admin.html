@@ -3,22 +3,20 @@
 {% with name = "admin" %}{% if problems.get(name) %}<p role="alert">{{ problems[name] }}</p>{% endif %}{% endwith %}
 <p>
   {% if other.retired_at %}Retired: they can't sign in.
-  {% elif not has_password %}Invited: they haven't chosen a password yet.
+  {% elif not has_password %}No password yet: they choose one with the link they were given.
   {% else %}Signs in with a password{{ " and an authenticator" if uses_totp else "" }}.{% endif %}
   {% if other.email %}They gave an email address.{% endif %}
 </p>
 
 {% if not other.retired_at and not themselves %}
 <section>
-  <h2>Locked out?</h2>
-  <p class="hint">Make a link to pass on to them. It works once, within a day,
-  and signs them out everywhere.</p>
+  <h2>Locked out, or a password or phone stolen?</h2>
+  <p class="hint">Resetting their sign-in signs them out everywhere at once:
+  their password, authenticators and recovery codes stop working. You get a
+  link to pass on, which works once, within a day, for them to choose a new
+  password.</p>
   <form method="post" action="{{ here }}/reset" class="actions">
-    <button name="resets" value="password">Reset their password</button>
-    {% if has_password %}
-    <button name="resets" value="authenticators">Reset their authenticators</button>
-    <button name="resets" value="both">Reset both</button>
-    {% endif %}
+    <button>Reset their sign-in</button>
   </form>
 </section>
 {% endif %}

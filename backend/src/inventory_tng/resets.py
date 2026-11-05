@@ -1,7 +1,7 @@
 """Resetting an account with a link (docs/decisions/0012): asked for by
 mail from the sign-in page, by an administrator who gave an address, or
-made by another administrator (inventory-tng-8i4.12.4), for the password,
-the authenticators or both; or, while the operator has set RECOVERY_TOKEN,
+made by another administrator who reset the account's sign-in
+(accounts.reset_sign_in); or, while the operator has set RECOVERY_TOKEN,
 made with it at /recover for the password and authenticators.
 
 Asking always gets the same answer, and everything that depends on whether
@@ -27,7 +27,8 @@ router = APIRouter(include_in_schema=False)
 
 ASKED = (
     "If that account has an email address, a link to reset its password is on "
-    "its way. It works once, within the hour."
+    "its way. It works once, within the hour. If none comes, ask another "
+    "administrator to reset your sign-in."
 )
 NOTICES["reset"] = "Your account is reset: sign in."
 
@@ -146,17 +147,12 @@ def reset(
     if found is None:
         return _reset_page(request, token, None)
     link, admin = found
-    # Only what the link was made for: one for authenticators only asks for
-    # no password.
-    if link.resets_password and (
-        problem := accounts.password_problem(password, password_again)
-    ):
+    if problem := accounts.password_problem(password, password_again):
         problems = {"password": problem}
         return _reset_page(request, token, link, problems=problems, status_code=400)
-    password_given = password if link.resets_password else None
-    changed = accounts.use_reset_link(session, link, password_given, now)
+    tell = accounts.use_reset_link(session, link, password, now)
     session.commit()
-    if changed:
+    if tell:
         notify.tell(admin.email, admin.id, mail.password_changed)
     return redirect(SIGN_IN, notice="reset")
 

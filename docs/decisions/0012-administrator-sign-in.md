@@ -83,9 +83,23 @@ without a deployment.
   that administrators change from a page. Changing them is a sensitive
   action, is recorded in the history, and is emailed to every administrator
   with an address.
-- **Another administrator can make a reset link**, for the password, the
-  authenticators or both. It works once, lasts 24 hours, and is passed on
-  however they like. Using it ends the account's sessions.
+- **Another administrator can reset an account's sign-in.** At once, its
+  password goes, its authenticators are retired, its recovery codes and
+  other links are voided and its sessions end, so nothing a thief may hold
+  works, even if the link is never used. They are shown a link that sets a
+  new password, which works once, lasts 24 hours, and is passed on however
+  they like; TOTP is set up again at sign-in. It always resets both: the one
+  acting rarely knows which factor leaked, and someone who only forgot their
+  password can reset it by mail. Asking by mail is a separate flow that
+  changes nothing until its link is used, as anyone may ask, and makes no
+  link while the account has no password: otherwise a mailbox alone would
+  undo the reset. One who never chose a password has nothing to reset and
+  gets a new invite instead.
+- **Only an administrator who can still sign in changes another.** A
+  request already waiting when its session was cut off, by a reset or by
+  retiring, changes nothing. So two resetting each other at once leave one
+  who can sign in, and as nobody acts on themselves, someone who can sign
+  in always remains: there is no separate check for the last one.
 - **The operator can let a locked-out administrator back in** by setting
   `RECOVERY_TOKEN` in the deployment settings, for when nobody else can: a
   lone administrator with no email, say. While it is set, `/recover` takes
