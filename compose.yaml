@@ -39,23 +39,46 @@ services:
     init: true
     # A terminal, so the logs keep their colour.
     tty: true
-    # Your settings, if you have a .env (CONTRIBUTING.md, Local settings)...
-    env_file:
-      - path: .env
-        required: false
-    # ...except where they name localhost, which inside the container is the
-    # container.
+    # Every setting it takes, and only those (CONTRIBUTING.md, Running the app
+    # in a container): each from your shell or .env, unset if neither sets
+    # it.
     environment:
-      DATABASE_URL: postgresql://inventory:inventory@db:5432/inventory
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${INVENTORY_APP_OTLP_ENDPOINT:-}
-      # The container serves the bundle it built, as production will, even
-      # when .env points your own server at Vite's or at another folder.
-      VITE_DEV_SERVER: ""
-      FRONTEND_DIST: /app/static
-      # Mailpit, when .env sends mail to it on localhost.
-      MAIL_HOST: ${INVENTORY_APP_MAIL_HOST:-}
+      APP_ENV:
+      UNMASK_SECRETS:
+      LOG_LEVEL:
+      LOG_LEVELS:
+      LOG_FORMAT:
+      LOG_CLIENT_ADDRESS:
       # The health check runs every 5 s: at debug, unless .env says otherwise.
       LOG_HEALTH_CHECKS: ${LOG_HEALTH_CHECKS:-false}
+      SETUP_TOKEN:
+      RECOVERY_TOKEN:
+      MAIL_PORT:
+      MAIL_SECURITY:
+      MAIL_FROM:
+      MAIL_USERNAME:
+      MAIL_PASSWORD:
+      SITE_URL:
+      OTEL_SDK_DISABLED:
+      OTEL_SERVICE_NAME:
+      OTEL_RESOURCE_ATTRIBUTES:
+      OTEL_TRACES_SAMPLER:
+      OTEL_TRACES_SAMPLER_ARG:
+      OTEL_TRACES_EXPORTER:
+      OTEL_METRICS_EXPORTER:
+      OTEL_LOGS_EXPORTER:
+      OTEL_METRIC_EXPORT_INTERVAL:
+      OTEL_BSP_SCHEDULE_DELAY:
+      OTEL_BLRP_SCHEDULE_DELAY:
+      # Its own, where .env's would name localhost, which inside the
+      # container is the container.
+      DATABASE_URL: postgresql://inventory:inventory@db:5432/inventory
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${INVENTORY_APP_OTLP_ENDPOINT:-}
+      # Mailpit, when .env sends mail to it on localhost.
+      MAIL_HOST: ${INVENTORY_APP_MAIL_HOST:-}
+      # The bundle it built, as production serves it.
+      VITE_DEV_SERVER: ""
+      FRONTEND_DIST: /app/static
     # Read-only bind mounts, so --reload sees your edits and nothing in the
     # container can change them. :z relabels them for SELinux.
     volumes:
