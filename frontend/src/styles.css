@@ -236,6 +236,15 @@
     @apply w-full text-xl;
   }
 
+  /* The camera's picture, while scanning labels. */
+  .volunteer .scanner {
+    @apply mb-3;
+  }
+
+  .volunteer .scanner video {
+    @apply block max-h-[60vh] w-full rounded bg-black object-cover;
+  }
+
   /* Asks, after a while unused, whether the name chosen is still yours. */
   .volunteer .who {
     @apply mb-4 border-2 border-caution p-3;

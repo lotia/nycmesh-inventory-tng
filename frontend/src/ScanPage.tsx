@@ -9,19 +9,21 @@ import {
   type Cart,
   CartStore,
   type Catalogue,
-  findCode,
   freshCart,
   indexOf,
   type Line,
   quantityOf,
   RETIRED,
   SIDES,
+  type Side,
   search,
   toBatch,
 } from "./cart";
+import { placeSides, readLabel, type Scanned } from "./labels";
 import { type Outbox, sharedOutbox } from "./outbox";
 import { decimal, thousandths } from "./quantity";
 import { NOT_REGISTERED } from "./registration";
+import { Scanner } from "./Scanner";
 
 const API = makeApi();
 /** How often an open page checks whether to ask whose name it is, and
@@ -198,6 +200,41 @@ function CartForm({
     query.value = "";
   }
 
+  // The camera, while open, and a place it read, asking From or To.
+  const scanning = useSignal(false);
+  const placeRead = useSignal<number | null>(null);
+
+  /** Acts on a label, read by the camera or typed by a scanner gun. */
+  function actOn(read: Scanned): string {
+    placeRead.value = null;
+    if (read.kind === "unknown") {
+      return `That label isn't in the inventory (${read.code}).`;
+    }
+    const { items: byId, places } = indexOf(catalogue);
+    if (read.kind === "place") {
+      const place = places.get(read.locationId);
+      const [only, other] = placeSides(cart.value);
+      query.value = "";
+      if (only !== undefined && other === undefined) {
+        placeOn(only, read.locationId);
+        return `${place}: ${only === "from" ? "from here" : "to here"}.`;
+      }
+      placeRead.value = read.locationId;
+      return `${place}: from here, or to here?`;
+    }
+    add(read.itemId, read.packageId);
+    // A buzz where the phone has one (not iOS Safari).
+    navigator.vibrate?.(60);
+    const item = byId.get(read.itemId);
+    const pack = item?.packages.find((each) => each.id === read.packageId);
+    return `Added ${pack === undefined ? "one" : `a ${pack.name}`}: ${item?.name}.`;
+  }
+
+  function placeOn(side: Side, locationId: number) {
+    set(side === "from" ? { fromId: locationId } : { toId: locationId });
+    placeRead.value = null;
+  }
+
   function save(event: TargetedSubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     // Another tab may have changed or saved this cart: saving what this tab
@@ -367,7 +404,28 @@ function CartForm({
         })}
       </ul>
 
-      <Finder catalogue={catalogue} query={query} onAdd={add} />
+      {scanning.value ? (
+        <Scanner
+          onCode={(code) => actOn(readLabel(catalogue, code))}
+          onDone={() => {
+            scanning.value = false;
+          }}
+        />
+      ) : (
+        <button type="button" onClick={() => (scanning.value = true)}>
+          Scan with the camera
+        </button>
+      )}
+      {placeRead.value !== null && (
+        <PlaceSides
+          place={placeRead.value}
+          name={indexOf(catalogue).places.get(placeRead.value) ?? ""}
+          sides={placeSides(cart.value)}
+          onPick={placeOn}
+        />
+      )}
+
+      <Finder catalogue={catalogue} query={query} onAdd={add} onLabel={actOn} />
 
       {problems.value.length > 0 && (
         <ul role="alert" class="problems">
@@ -391,6 +449,32 @@ function CartForm({
         Save
       </button>
     </form>
+  );
+}
+
+/** From or To, for a place a label named: the side still empty first. */
+function PlaceSides({
+  place,
+  name,
+  sides,
+  onPick,
+}: {
+  place: number;
+  name: string;
+  sides: Side[];
+  onPick: (side: Side, place: number) => void;
+}) {
+  return (
+    <fieldset>
+      <legend>{name}</legend>
+      <div class="actions">
+        {sides.map((side) => (
+          <button key={side} type="button" onClick={() => onPick(side, place)}>
+            {side === "from" ? "From" : "To"}
+          </button>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 
@@ -505,10 +589,13 @@ function Finder({
   catalogue,
   query,
   onAdd,
+  onLabel,
 }: {
   catalogue: Catalogue;
   query: Signal<string>;
   onAdd: (itemId: number, packageId?: number) => void;
+  /** A label's code typed, as a scanner gun types one. */
+  onLabel: (read: Scanned) => void;
 }) {
   const matches = search(catalogue, query.value);
   return (
@@ -530,9 +617,9 @@ function Finder({
             return;
           }
           event.preventDefault();
-          const found = findCode(catalogue, query.value);
-          if (found !== null) {
-            onAdd(found.itemId, found.packageId);
+          const read = readLabel(catalogue, query.value);
+          if (read.kind !== "unknown") {
+            onLabel(read);
           } else if (matches.length === 1 && matches[0] !== undefined) {
             onAdd(matches[0].id);
           }

@@ -149,7 +149,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      - run: npx playwright install --with-deps chromium webkit
+      # Full Chromium (playwright.config.ts), not its headless shell.
+      - run: npx playwright install --with-deps --no-shell chromium webkit
       - run: npm run build
       - run: docker compose up -d --wait db
         working-directory: .

@@ -6,6 +6,7 @@
  * inherit; playwright.config.ts reads BROWSER_BASE_URL from it too.
  */
 import { execFileSync, spawn } from "node:child_process";
+import { rmSync } from "node:fs";
 import { createServer } from "node:net";
 
 const BACKEND = new URL("../../backend/", import.meta.url).pathname;
@@ -27,8 +28,12 @@ function database(...args: string[]): string {
 }
 
 export default async function globalSetup() {
-  const prepared: Prepared = JSON.parse(database("create"));
-  const dropDatabase = () => database("drop", prepared.database_url);
+  const video = process.env.CAMERA_VIDEO ?? "";
+  const prepared: Prepared = JSON.parse(database("create", video));
+  const dropDatabase = () => {
+    database("drop", prepared.database_url);
+    rmSync(video, { force: true });
+  };
   const port = await freePort();
   const base = `http://${HOST}:${port}`;
   process.env.BROWSER_BASE_URL = base;
