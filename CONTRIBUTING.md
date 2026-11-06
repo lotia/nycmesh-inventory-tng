@@ -195,6 +195,10 @@ which spaces their forms; the scan and registration pages in
 - Use the tokens in `@theme` (`bg-band`, `text-heading`, …), not colours of
   your own: the dark scheme gives each token its own value.
 - Make markup that repeats a Jinja macro or a Preact component.
+- A page that prints a sheet of QR codes puts a `.printable` in its `main`:
+  radio buttons named `layout` and `paper`, then a `.print-sheet` of four
+  copies of one card (`frontend/src/styles.css`, Printing; as
+  `code_made.html` does).
 - Put each table in `<div class="table-scroll">`: one that cannot fit a
   phone scrolls there, not the page. Text that is often long and unbroken,
   such as a browser's name, can wrap instead, in a `wrap-anywhere` span.

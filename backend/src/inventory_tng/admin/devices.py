@@ -132,6 +132,7 @@ def make_code(
             "code": code,
             "phrase": phrase,
             "link": link,
+            "register": site_link(request, devices.REGISTER_PATH),
             "qr": qr_svg(link),
             "zone": site_zone(session),
         },

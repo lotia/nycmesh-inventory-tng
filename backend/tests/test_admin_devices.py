@@ -34,6 +34,9 @@ def test_making_a_code_shows_it_once(
     assert "Shown only now." in page
     assert "<svg" in page
     assert f"/register?code={phrase}" in page
+    # Ready to print: four cards, each with where to type the phrase.
+    assert page.count('class="print-card"') == 4
+    assert page.count("://testserver/register</strong>") == 4
     code = session.scalars(select(RegistrationCode)).one()
     assert (code.label, code.max_uses) == ("Open day", 2)
     assert (history(session, "registration_code", code.id)[0].actor or "").startswith(
