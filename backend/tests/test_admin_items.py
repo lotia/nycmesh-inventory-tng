@@ -235,6 +235,30 @@ def test_an_item_comes_back_only_into_a_current_category(
     assert item.retired_at is not None
 
 
+def test_bringing_an_item_back(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios)
+    admin_client.post(f"{ITEMS}/{item.id}/retire")
+    done = admin_client.post(f"{ITEMS}/{item.id}/restore")
+    assert done.status_code == 303
+    session.refresh(item)
+    assert item.retired_at is None
+
+
+def test_an_edit_with_a_problem_changes_nothing(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios)
+    refused = admin_client.post(
+        f"{ITEMS}/{item.id}",
+        data={"name": "", "category_id": str(radios.id), "unit": "each"},
+    )
+    assert refused.status_code == 400
+    session.refresh(item)
+    assert item.name == "LiteBeam"
+
+
 def test_changes_are_logged_by_id(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:

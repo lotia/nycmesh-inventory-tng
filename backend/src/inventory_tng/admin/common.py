@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import Base, exists_where
+from inventory_tng.db import Base, exists_where, get_locked
 from inventory_tng.ledger import balance, whole_enough
 from inventory_tng.pages import NOTICES, page, templates
 from inventory_tng.sign_in import SignedIn
@@ -45,7 +45,19 @@ RULES = {
     "location_custody_volunteer": "Stop them holding stock first.",
     "volunteer_merge_target": "Others are merged into them: merge those "
     "elsewhere first, or pick a current volunteer to merge into.",
+    "item_category_current": "Its category is retired: bring that back, or "
+    "pick another, first.",
+    "category_has_items": "Move or retire its items first.",
 }
+
+
+def locked_row[M: Base](session: Session, model: type[M], ident: object) -> M | None:
+    """A catalogue row, locked for the change a page makes to it: FOR NO KEY
+    UPDATE, which, unlike FOR UPDATE, does not hold up a foreign-key check on
+    it. A write's rules trigger takes lock_catalogue_rules() before its
+    foreign-key checks run, so a FOR UPDATE here could deadlock with a write
+    that points at this row (inventory-tng-8i4.58); this way they queue."""
+    return get_locked(session, model, ident, key_share=True)
 
 
 def rule_words(broken: str, unique: str) -> str:

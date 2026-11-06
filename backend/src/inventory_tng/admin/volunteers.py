@@ -19,11 +19,12 @@ from inventory_tng.admin.common import (
     admin_page,
     chosen,
     holds_stock,
+    locked_row,
     name_problem,
     now,
     rule_words,
 )
-from inventory_tng.db import DbSession, attempt, get_locked
+from inventory_tng.db import DbSession, attempt
 from inventory_tng.models import Location, Volunteer
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
@@ -193,7 +194,7 @@ def save_volunteer(
     name: Annotated[str, Form()] = "",
     email: Annotated[str, Form()] = "",
 ) -> Response:
-    found = get_locked(session, Volunteer, volunteer_id)
+    found = locked_row(session, Volunteer, volunteer_id)
     if found is None:
         return not_found()
     name, email = name.strip(), email.strip()
@@ -220,7 +221,7 @@ def save_volunteer(
 
 def _current(session: Session, volunteer_id: int) -> Volunteer | None:
     """A current volunteer, locked."""
-    found = get_locked(session, Volunteer, volunteer_id)
+    found = locked_row(session, Volunteer, volunteer_id)
     return None if found is None or found.retired_at is not None else found
 
 
@@ -244,7 +245,7 @@ def hold_stock(
 def stop_holding_stock(
     request: Request, signed: AdminSignedIn, session: DbSession, volunteer_id: int
 ) -> Response:
-    found = get_locked(session, Volunteer, volunteer_id)
+    found = locked_row(session, Volunteer, volunteer_id)
     custody = _custody(session, volunteer_id) if found else None
     if found is None or custody is None:
         return not_found()
@@ -305,7 +306,7 @@ def merge_volunteer(
 def restore_volunteer(
     request: Request, signed: AdminSignedIn, session: DbSession, volunteer_id: int
 ) -> Response:
-    found = get_locked(session, Volunteer, volunteer_id)
+    found = locked_row(session, Volunteer, volunteer_id)
     if found is None or found.retired_at is None:
         return not_found()
 
