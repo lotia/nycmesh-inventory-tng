@@ -10,6 +10,7 @@
     "lint": "biome check .",
     "fix": "biome check --write .",
     "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "api": "npm ci --prefix tools/openapi --no-audit --no-fund && npm run --prefix tools/openapi generate && biome format --write src/api"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "@biomejs/biome": "2.6.4",
     "@preact/preset-vite": "2.10.6",
     "@testing-library/preact": "3.2.6",
+    "@vitest/coverage-v8": "5.0.5",
     "happy-dom": "21.0.4",
     "typescript": "7.0.2",
     "vite": "8.3.5",

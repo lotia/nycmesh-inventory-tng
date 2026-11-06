@@ -11,7 +11,13 @@ taplo = "0.10.0"
 
 [tasks.check]
 description = "Check the backend, the frontend, the task scripts and the TOML"
-depends = ["check-backend", "check-frontend", "check-scripts", "check-toml"]
+depends = [
+    "check-backend",
+    "check-frontend",
+    "check-changed-lines",
+    "check-scripts",
+    "check-toml",
+]
 
 [tasks.check-backend]
 description = "Type check, lint, format check and test the backend"
@@ -20,13 +26,22 @@ run = [
     "uv run ty check",
     "uv run ruff check",
     "uv run ruff format --check",
-    "uv run pytest",
+    "uv run pytest --cov --cov-report=term --cov-report=xml",
 ]
 
 [tasks.check-frontend]
 description = "Type check, lint, format check and test the frontend"
 dir = "frontend"
-run = ["npm run typecheck", "npm run lint", "npm test"]
+run = ["npm run typecheck", "npm run lint", "npm run coverage"]
+
+[tasks.check-changed-lines]
+description = "Every line changed since origin/main is run by a test"
+depends = ["check-backend", "check-frontend"]
+run = """
+uv run --project backend diff-cover -c backend/pyproject.toml \
+  backend/coverage.xml frontend/coverage/cobertura-coverage.xml \
+  --include-untracked
+"""
 
 [tasks.check-scripts]
 description = "Lint the task scripts in mise-tasks/"

@@ -225,7 +225,7 @@ uv run ruff format
 uv run ty check                  # types
 uv run ruff check                # lint
 uv run ruff format --check       # formatting
-uv run pytest                    # tests, against the database started above
+uv run pytest --cov              # tests, against the database started above
 ```
 
 For the frontend:
@@ -235,7 +235,7 @@ cd frontend
 npm run fix                      # optional: Biome's fixes and formatting
 npm run typecheck                # types
 npm run lint                     # Biome: lint and formatting
-npm test                         # Vitest
+npm run coverage                 # Vitest, with coverage (npm test: without)
 ```
 
 CI runs these checks, in this order, on pushes to `main` and on pull requests,
@@ -248,6 +248,7 @@ and `mise run check` runs every check, or one side of them:
 ```sh
 mise run fix-backend    # or: mise run fix-frontend
 mise run check-backend  # or: mise run check-frontend
+mise run check-changed-lines  # both sides, then coverage of what you changed
 mise run check-scripts  # shellcheck, on the scripts in mise-tasks/
 mise run check-toml     # taplo: lint and formatting (mise run fix-toml formats)
 ```
@@ -261,6 +262,27 @@ tests in pytest style.
 requests at the same time, on connections that really commit, marked by
 kind (the first one's docstring): `uv run pytest -m concurrency` runs only
 those, and `-m "not end_to_end"` skips the ones through the whole app.
+
+### Coverage
+
+`mise run check` and CI measure which code the tests run, and fail when:
+
+- **the whole falls below its floor**: 94% of the backend's lines and
+  branches (`fail_under` in `backend/pyproject.toml`), and the frontend's
+  floors in `frontend/vite.config.ts`. Vitest raises those as coverage
+  rises: commit that change with yours.
+- **any line you added or changed is not run by a test**, or a branch on it
+  is taken only one way (`[tool.diff_cover]` in `backend/pyproject.toml`).
+  `mise run check-changed-lines` compares with `origin/main`, so run it
+  before you push; CI compares with what `main` was before the push. For a
+  line not worth a test, write `# pragma: no cover` (backend) or
+  `/* v8 ignore next */` (frontend) with a comment saying why.
+
+Only `uv run pytest --cov` and `npm run coverage` measure, so a test file
+run alone is never held to the floors. Their reports
+(`backend/coverage.xml`, `frontend/coverage/`) are not committed. Code that
+only the type checker sees (`if TYPE_CHECKING:`), the API types generated
+in `frontend/src/api/`, and the frontend's page entry files are left out.
 
 ## Dependency updates
 

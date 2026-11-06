@@ -13,6 +13,9 @@ import { defineConfig } from "vitest/config";
 
 const DEFAULT_ORIGIN = "http://localhost:5173";
 
+// Each page's entry: what the build bundles.
+const pages = ["src/scan.tsx", "src/register.tsx"];
+
 /**
  * VITE_DEV_SERVER as the backend reads it: from the shell, else from the
  * repository's .env and no other file, wherever Vite is started from.
@@ -47,7 +50,7 @@ export default defineConfig({
   build: {
     manifest: true,
     rolldownOptions: {
-      input: ["src/scan.tsx", "src/register.tsx"],
+      input: pages,
     },
   },
   server: {
@@ -62,5 +65,28 @@ export default defineConfig({
   test: {
     environment: "happy-dom",
     setupFiles: ["src/test-setup.ts"],
+    // The floors and how they are measured: CONTRIBUTING.md, Coverage.
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        // Test helpers, not the app.
+        "src/test-*.ts",
+        // Generated from the backend's schema (npm run api).
+        "src/api/**",
+        // Pages' entries: wiring that runs only in a browser.
+        ...pages,
+      ],
+      reporter: ["text-summary", "cobertura"],
+      // A point below what is reached, never lowered (autoUpdate).
+      thresholds: {
+        autoUpdate: (reached: number, previous: number) =>
+          Math.max(previous, Math.floor(reached) - 1),
+        statements: 96,
+        branches: 91,
+        functions: 95,
+        lines: 96,
+      },
+    },
   },
 });
