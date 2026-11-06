@@ -320,6 +320,7 @@ mise run check-backend  # or: mise run check-frontend
 mise run check-browser  # the browser tests
 mise run check-changed-lines  # both sides, then coverage of what you changed
 mise run check-scripts  # shellcheck, on the scripts in mise-tasks/
+mise run check-markdown # markdownlint (mise run fix-markdown fixes)
 mise run check-toml     # taplo: lint and formatting (mise run fix-toml formats)
 ```
 
@@ -403,6 +404,8 @@ running and working on the app. Keep them:
 
 Change an existing doc rather than adding one, and add a new file only when
 an issue asks for it.
+
+Lint what you write or change with `mise run check-markdown`.
 
 ## Logging
 

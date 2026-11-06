@@ -10,13 +10,14 @@ taplo = "0.10.0"
 "npm:markdownlint-cli2" = "0.24.0"
 
 [tasks.check]
-description = "Check the backend, the frontend, the browser tests, the task scripts and the TOML"
+description = "Check the backend, the frontend, the browser tests, the task scripts, the Markdown and the TOML"
 depends = [
     "check-backend",
     "check-frontend",
     "check-browser",
     "check-changed-lines",
     "check-scripts",
+    "check-markdown",
     "check-toml",
 ]
 
@@ -54,6 +55,10 @@ uv run --project backend diff-cover -c backend/pyproject.toml \
   --include-untracked
 """
 
+[tasks.check-markdown]
+description = "Lint every Markdown file the project writes (AGENTS.md rule 9)"
+run = "markdownlint-cli2"
+
 [tasks.check-scripts]
 description = "Lint the task scripts in mise-tasks/"
 run = "shellcheck mise-tasks/*"
@@ -64,8 +69,8 @@ env = { RUST_LOG = "warn" }
 run = ["taplo lint", "taplo fmt --check"]
 
 [tasks.fix]
-description = "Fix what ruff and Biome can fix, and format, TOML too"
-depends = ["fix-backend", "fix-frontend", "fix-toml"]
+description = "Fix what ruff, Biome and markdownlint can fix, and format, TOML too"
+depends = ["fix-backend", "fix-frontend", "fix-markdown", "fix-toml"]
 
 [tasks.fix-backend]
 description = "Fix what ruff can fix, and format the backend"
@@ -76,6 +81,10 @@ run = ["uv run ruff check --fix", "uv run ruff format"]
 description = "Fix what Biome can fix, and format the frontend"
 dir = "frontend"
 run = "npm run fix"
+
+[tasks.fix-markdown]
+description = "Fix what markdownlint can fix in the project's Markdown"
+run = "markdownlint-cli2 --fix"
 
 [tasks.fix-toml]
 description = "Format every TOML file"

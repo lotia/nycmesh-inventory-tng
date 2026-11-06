@@ -1,6 +1,12 @@
 // markdownlint (AGENTS.md rule 9). Every rule is on; a change here is agreed
 // with the maintainers first.
 {
+  // Every Markdown file the project writes: not what .gitignore leaves out,
+  // nor the files beads writes from its templates and rewrites itself
+  // (inventory-tng-pkm.1).
+  "globs": ["**/*.md"],
+  "gitignore": true,
+  "ignores": [".agents/skills/beads/**", ".beads/README.md"],
   "config": {
     // Table rows cannot wrap, and a table reads best as a grid.
     "MD013": { "tables": false }
