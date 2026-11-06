@@ -9,8 +9,8 @@ import re
 import threading
 import time
 import uuid
-from collections.abc import Callable, Iterator
-from contextlib import nullcontext
+from collections.abc import Callable, Generator, Iterator
+from contextlib import contextmanager, nullcontext
 from datetime import timedelta
 from pathlib import Path
 
@@ -173,12 +173,24 @@ def drop_left_behind(server: Engine, now: float) -> list[str]:
 
 @pytest.fixture(scope="session")
 def database_url() -> Iterator[str]:
+    with new_database() as url:
+        # Once reachable: this run's own is too new to be dropped.
+        server = make_engine(SERVER_URL).execution_options(isolation_level="AUTOCOMMIT")
+        drop_left_behind(server, time.time())
+        server.dispose()
+        yield url
+
+
+@contextmanager
+def new_database(template: str | None = None) -> Generator[str]:
+    """A database of its own, dropped afterwards: empty, with no schema, or a
+    copy of the database `template`."""
     name = f"test_{int(time.time())}_{uuid.uuid4().hex[:8]}"
     server = make_engine(SERVER_URL).execution_options(isolation_level="AUTOCOMMIT")
     try:
-        drop_left_behind(server, time.time())
+        copy = f' TEMPLATE "{template}"' if template else ""
         with server.connect() as connection:
-            connection.execute(text(f'CREATE DATABASE "{name}"'))
+            connection.execute(text(f'CREATE DATABASE "{name}"{copy}'))
         log.info("created test database", database=name)
     except OperationalError as error:
         pytest.exit(
@@ -199,10 +211,15 @@ def database_url() -> Iterator[str]:
 @pytest.fixture(scope="session")
 def engine(database_url: str) -> Iterator[Engine]:
     engine = make_engine(database_url)
-    with engine.begin() as connection:
-        command.upgrade(_alembic_config(connection), "head")
+    migrate(engine)
     yield engine
     engine.dispose()
+
+
+def migrate(engine: Engine) -> None:
+    """Every migration, up to the newest."""
+    with engine.begin() as connection:
+        command.upgrade(_alembic_config(connection), "head")
 
 
 @pytest.fixture
