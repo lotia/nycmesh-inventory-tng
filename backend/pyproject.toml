@@ -34,9 +34,13 @@ requires = ["uv_build>=0.13,<0.14"]
 build-backend = "uv_build"
 
 [dependency-groups]
+# Only diff-cover, so CI's changed-lines job installs no more.
+coverage = ["diff-cover>=11.0"]
 dev = [
+    { include-group = "coverage" },
     "httpx2>=2.16",
     "pytest>=9.2",
+    "pytest-cov>=7.1",
     "ruff>=0.17",
     "ty>=0.0.95",
 ]
@@ -79,6 +83,24 @@ extend-select = [
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "unittest.TestCase".msg = "Write tests in pytest style: plain functions, fixtures and assert."
+
+# The floors and how they are measured: CONTRIBUTING.md, Coverage.
+[tool.coverage.run]
+branch = true
+source = ["inventory_tng"]
+
+[tool.coverage.report]
+fail_under = 94
+# Only seen by the type checker, never run.
+exclude_also = ["if TYPE_CHECKING:"]
+skip_covered = true
+show_missing = true
+
+# Every changed line, both ways at each branch (mise run check-changed-lines
+# and CI, with -c).
+[tool.diff_cover]
+fail_under = 100
+branch_coverage = true
 
 [tool.pytest]
 testpaths = ["tests"]

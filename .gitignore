@@ -18,5 +18,10 @@ __pycache__/
 .ruff_cache/
 *.pyc
 
+# Coverage, written by mise run check
+.coverage
+coverage.xml
+frontend/coverage/
+
 # Local settings
 .env
