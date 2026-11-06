@@ -70,3 +70,15 @@ run = "npm run fix"
 description = "Format every TOML file"
 env = { RUST_LOG = "warn" }
 run = "taplo fmt"
+
+[tasks.dev-backend]
+description = "The backend, restarting when its Python changes (mise run dev runs it)"
+dir = "backend"
+# VITE_DEV_SERVER works only in development.
+env = { APP_ENV = "development" }
+run = "uv run python -m inventory_tng --reload"
+
+[tasks.dev-vite]
+description = "Vite's dev server, for the frontend (mise run dev runs it)"
+dir = "frontend"
+run = "npm run dev"

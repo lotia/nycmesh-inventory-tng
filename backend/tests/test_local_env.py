@@ -1,4 +1,6 @@
 import os
+import runpy
+import sys
 from pathlib import Path
 
 import pytest
@@ -48,3 +50,33 @@ def test_references_take_the_shells_value(
     monkeypatch.setattr(local_env, "ENV_FILE", env)
     monkeypatch.setenv("INVENTORY_DB_PORT", "5434")
     assert local_env.local_env_values()["DATABASE_URL"].endswith(":5434/x")
+
+
+def test_a_setting_comes_from_the_shell_then_the_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    env = tmp_path / ".env"
+    env.write_text("INVENTORY_TEST_ONLY_SETTING=from the file\n")
+    monkeypatch.setenv("INVENTORY_TEST_ONLY_SETTING", "from the shell")
+    assert local_env.setting("INVENTORY_TEST_ONLY_SETTING", env) == "from the shell"
+    # Set but empty is still the shell's say, as the backend reads it.
+    monkeypatch.setenv("INVENTORY_TEST_ONLY_SETTING", "")
+    assert local_env.setting("INVENTORY_TEST_ONLY_SETTING", env) == ""
+    monkeypatch.delenv("INVENTORY_TEST_ONLY_SETTING")
+    assert local_env.setting("INVENTORY_TEST_ONLY_SETTING", env) == "from the file"
+    assert local_env.setting("INVENTORY_TEST_ONLY_ELSE", env) == ""
+
+
+def test_it_runs_as_a_module(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """As the task scripts run it: python -m inventory_tng.local_env."""
+    env = tmp_path / ".env"
+    env.write_text("INVENTORY_TEST_ONLY_SETTING=from the file\n")
+    monkeypatch.delenv("INVENTORY_TEST_ONLY_SETTING", raising=False)
+    monkeypatch.setattr(
+        sys, "argv", ["local_env", "INVENTORY_TEST_ONLY_SETTING", "--file", str(env)]
+    )
+    with pytest.warns(RuntimeWarning, match="found in sys.modules"):
+        runpy.run_module("inventory_tng.local_env", run_name="__main__")
+    assert capsys.readouterr().out == "from the file\n"
