@@ -43,11 +43,10 @@ is, read [README.md](README.md).
    same change, without being asked. Change an existing doc rather than
    adding one, and add a new file only when an issue asks for it.
 9. **Lint every Markdown file you write or change, and fix everything it
-   finds.** The linter is markdownlint; inventory-tng-pkm sets it up and
-   cleans up the existing files. Until it lands, run `markdownlint-cli2
-   <files>` (mise installs it) from the repository's root, where
-   `.markdownlint-cli2.jsonc` is. Never disable, relax or work around a rule
-   (config, inline comments, ignores) without asking the person first.
+   finds:** `mise run check-markdown`. Never disable, relax or work around
+   a rule (config, inline comments, ignores) without asking the person
+   first. The ignores in `.markdownlint-cli2.jsonc` leave out only files
+   tools write.
 10. **Development workflows are mise tasks**, in `mise.toml` or as scripts
     in `mise-tasks/`, each named in CONTRIBUTING.md as `mise run <task>`.
     Compose runs through `mise run compose --`, never a runtime's own compose

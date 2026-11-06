@@ -66,8 +66,9 @@ jobs:
       # Only to install them: CI runs no mise tasks.
       - uses: jdx/mise-action@v5.2.0
         with:
-          install_args: shellcheck taplo
+          install_args: shellcheck taplo node npm:markdownlint-cli2
       - run: shellcheck mise-tasks/*
+      - run: markdownlint-cli2
       - run: taplo lint
         env:
           RUST_LOG: warn

@@ -27,5 +27,8 @@ frontend/coverage/
 frontend/test-results/
 frontend/playwright-report/
 
+# Checkouts Claude Code makes for agents working apart
+.claude/worktrees/
+
 # Local settings
 .env
