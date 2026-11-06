@@ -187,10 +187,11 @@ builds (docs/decisions/0014). Under `mise run dev` it comes from Vite's dev
 server and reloads on save; otherwise from the build. Without a build, pages
 are plain HTML. The app container builds it into its image, so a class new
 to a template shows there only after `mise run compose -- up -d --build app`.
-Administrator pages put their content in `<main class="admin page-width">`,
-which spaces their forms by gap; the scan and registration pages in
-`<main class="volunteer page-width">`, and their components style what only
-they show with utilities. When you style a page:
+Administrator pages put their content in `<main class="admin page-width">`;
+the scan and registration pages in `<main class="volunteer page-width">`,
+with a label above its control as `Field` (`frontend/src/Field.tsx`). Both
+space their forms by gap, and a component styles what only it shows with
+utilities. When you style a page:
 
 - Write each class name whole. Tailwind finds them by reading the templates
   and the frontend as text, so one built from parts is never generated.

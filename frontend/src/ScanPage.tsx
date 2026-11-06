@@ -19,6 +19,7 @@ import {
   search,
   toBatch,
 } from "./cart";
+import { Field } from "./Field";
 import { placeSides, readLabel, type Scanned } from "./labels";
 import { type Outbox, sharedOutbox } from "./outbox";
 import { decimal, thousandths } from "./quantity";
@@ -281,48 +282,56 @@ function CartForm({
   return (
     <form onSubmit={save}>
       {checkName.value && name !== undefined && (
-        <div role="alert" class="mb-4 border-2 border-caution p-3">
-          <p class="mt-0">
+        <div
+          role="alert"
+          class="flex flex-col items-start gap-3 border-2 border-caution p-3"
+        >
+          <div>
             Are you <strong>{name}</strong>? This phone hasn't been used for a
             while.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              checkName.value = false;
-              // Only the time changes, so "Saved" stays on show.
-              kept(store.touch());
-            }}
-          >
-            That's me
-          </button>{" "}
-          <button
-            type="button"
-            onClick={() => {
-              set({ volunteerId: null });
-              changeName();
-            }}
-          >
-            Not me
-          </button>
+          </div>
+          <div class="actions">
+            <button
+              type="button"
+              onClick={() => {
+                checkName.value = false;
+                // Only the time changes, so "Saved" stays on show.
+                kept(store.touch());
+              }}
+            >
+              That's me
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                set({ volunteerId: null });
+                changeName();
+              }}
+            >
+              Not me
+            </button>
+          </div>
         </div>
       )}
-      <label for="volunteer">Your name</label>
-      <select
-        id="volunteer"
-        ref={nameList}
-        value={String(cart.value.volunteerId ?? "")}
-        onChange={(event) =>
-          set({ volunteerId: idOrNull(event.currentTarget.value) })
-        }
-      >
-        <option value="">Pick your name</option>
-        {catalogue.volunteers.map((volunteer) => (
-          <option key={volunteer.id} value={volunteer.id}>
-            {volunteer.name}
-          </option>
-        ))}
-      </select>
+      <Field label="Your name">
+        {(id) => (
+          <select
+            id={id}
+            ref={nameList}
+            value={String(cart.value.volunteerId ?? "")}
+            onChange={(event) =>
+              set({ volunteerId: idOrNull(event.currentTarget.value) })
+            }
+          >
+            <option value="">Pick your name</option>
+            {catalogue.volunteers.map((volunteer) => (
+              <option key={volunteer.id} value={volunteer.id}>
+                {volunteer.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </Field>
 
       <fieldset>
         <legend>What is happening</legend>
@@ -333,9 +342,8 @@ function CartForm({
             ["install", "Taking it to an install"],
           ] as const
         ).map(([kind, words]) => (
-          <label key={kind} class="flex items-center gap-2 py-1 font-normal">
+          <label key={kind} class="flex items-center gap-2 font-normal">
             <input
-              class="m-0"
               type="radio"
               name="kind"
               value={kind}
@@ -349,7 +357,6 @@ function CartForm({
 
       {sides.from && (
         <Place
-          id="from"
           label="From"
           catalogue={catalogue}
           value={cart.value.fromId}
@@ -358,7 +365,6 @@ function CartForm({
       )}
       {sides.to && (
         <Place
-          id="to"
           label="To"
           catalogue={catalogue}
           value={cart.value.toId}
@@ -366,48 +372,52 @@ function CartForm({
         />
       )}
       {cart.value.kind === "install" && (
-        <>
-          <label for="install">MeshDB install number (if you know it)</label>
-          <input
-            id="install"
-            inputMode="numeric"
-            autoComplete="off"
-            value={cart.value.installNumber}
-            onInput={(event) =>
-              set({ installNumber: event.currentTarget.value })
-            }
-          />
-        </>
-      )}
-
-      <h2>Cart</h2>
-      {cart.value.lines.length === 0 && <p>Nothing in the cart yet.</p>}
-      <ul class={RULED_LIST}>
-        {cart.value.lines.map((line) => {
-          const item = items.get(line.itemId);
-          return (
-            <CartLine
-              key={line.itemId}
-              line={line}
-              item={item}
-              onChange={(next) =>
-                set({
-                  lines: cart.value.lines.map((each) =>
-                    each.itemId === line.itemId ? next : each,
-                  ),
-                })
-              }
-              onRemove={() =>
-                set({
-                  lines: cart.value.lines.filter(
-                    (each) => each.itemId !== line.itemId,
-                  ),
-                })
+        <Field label="MeshDB install number (if you know it)">
+          {(id) => (
+            <input
+              id={id}
+              inputMode="numeric"
+              autoComplete="off"
+              value={cart.value.installNumber}
+              onInput={(event) =>
+                set({ installNumber: event.currentTarget.value })
               }
             />
-          );
-        })}
-      </ul>
+          )}
+        </Field>
+      )}
+
+      <h2 class="mt-3">Cart</h2>
+      {cart.value.lines.length === 0 ? (
+        <p>Nothing in the cart yet.</p>
+      ) : (
+        <ul class={RULED_LIST}>
+          {cart.value.lines.map((line) => {
+            const item = items.get(line.itemId);
+            return (
+              <CartLine
+                key={line.itemId}
+                line={line}
+                item={item}
+                onChange={(next) =>
+                  set({
+                    lines: cart.value.lines.map((each) =>
+                      each.itemId === line.itemId ? next : each,
+                    ),
+                  })
+                }
+                onRemove={() =>
+                  set({
+                    lines: cart.value.lines.filter(
+                      (each) => each.itemId !== line.itemId,
+                    ),
+                  })
+                }
+              />
+            );
+          })}
+        </ul>
+      )}
 
       {scanning.value ? (
         <Scanner
@@ -443,7 +453,7 @@ function CartForm({
         <p role="status">Saved: {saved.value}. A new cart is ready.</p>
       )}
       {name !== undefined && (
-        <p class="mt-0">
+        <p>
           Saving as <strong>{name}</strong>.{" "}
           <button type="button" onClick={changeName}>
             Change
@@ -488,13 +498,11 @@ function idOrNull(value: string): number | null {
 }
 
 function Place({
-  id,
   label,
   catalogue,
   value,
   onPick,
 }: {
-  id: string;
   label: string;
   catalogue: Catalogue;
   value: number | null;
@@ -502,21 +510,22 @@ function Place({
 }) {
   const places = indexOf(catalogue).placeList;
   return (
-    <>
-      <label for={id}>{label}</label>
-      <select
-        id={id}
-        value={String(value ?? "")}
-        onChange={(event) => onPick(idOrNull(event.currentTarget.value))}
-      >
-        <option value="">Pick a place</option>
-        {places.map((place) => (
-          <option key={place.id} value={place.id}>
-            {place.name}
-          </option>
-        ))}
-      </select>
-    </>
+    <Field label={label}>
+      {(id) => (
+        <select
+          id={id}
+          value={String(value ?? "")}
+          onChange={(event) => onPick(idOrNull(event.currentTarget.value))}
+        >
+          <option value="">Pick a place</option>
+          {places.map((place) => (
+            <option key={place.id} value={place.id}>
+              {place.name}
+            </option>
+          ))}
+        </select>
+      )}
+    </Field>
   );
 }
 
@@ -543,47 +552,62 @@ function CartLine({
   }
   const quantity = quantityOf(line, item);
   return (
-    <li>
-      <strong>{item.name}</strong>
-      {item.retired && <small> {RETIRED}</small>}
+    <li class="flex flex-col gap-2">
+      <div>
+        <strong>{item.name}</strong>
+        {item.retired && <small> {RETIRED}</small>}
+      </div>
       {item.packages.map((pack) => (
-        <label key={pack.id} class="font-normal">
-          {pack.name} ({decimal(thousandths(pack.size) ?? 0)} {item.unit})
+        <Field
+          key={pack.id}
+          quiet
+          label={`${pack.name} (${decimal(thousandths(pack.size) ?? 0)} ${item.unit})`}
+        >
+          {(id) => (
+            <input
+              id={id}
+              inputMode="numeric"
+              value={line.packages[pack.id] ?? ""}
+              onInput={(event) =>
+                onChange({
+                  ...line,
+                  packages: {
+                    ...line.packages,
+                    [pack.id]: event.currentTarget.value,
+                  },
+                })
+              }
+            />
+          )}
+        </Field>
+      ))}
+      <Field
+        quiet
+        label={
+          item.packages.length > 0
+            ? `Loose ${item.unit === "each" ? "units" : item.unit}`
+            : item.unit === "each"
+              ? "How many"
+              : `How many ${item.unit}`
+        }
+      >
+        {(id) => (
           <input
-            inputMode="numeric"
-            value={line.packages[pack.id] ?? ""}
+            id={id}
+            inputMode={item.unit === "each" ? "numeric" : "decimal"}
+            value={line.loose}
             onInput={(event) =>
-              onChange({
-                ...line,
-                packages: {
-                  ...line.packages,
-                  [pack.id]: event.currentTarget.value,
-                },
-              })
+              onChange({ ...line, loose: event.currentTarget.value })
             }
           />
-        </label>
-      ))}
-      <label class="font-normal">
-        {item.packages.length > 0
-          ? `Loose ${item.unit === "each" ? "units" : item.unit}`
-          : item.unit === "each"
-            ? "How many"
-            : `How many ${item.unit}`}
-        <input
-          inputMode={item.unit === "each" ? "numeric" : "decimal"}
-          value={line.loose}
-          onInput={(event) =>
-            onChange({ ...line, loose: event.currentTarget.value })
-          }
-        />
-      </label>
-      <p class="mt-0 mb-2">
+        )}
+      </Field>
+      <div>
         {"problem" in quantity
           ? quantity.problem
           : `${decimal(quantity.amount)} ${item.unit} in all`}
-      </p>
-      <button type="button" onClick={onRemove}>
+      </div>
+      <button type="button" class="self-start" onClick={onRemove}>
         Remove
       </button>
     </li>
@@ -605,53 +629,58 @@ function Finder({
   const matches = search(catalogue, query.value);
   return (
     <>
-      <label for="find">Find an item, or type or scan its code</label>
-      <input
-        id="find"
-        type="search"
-        autoComplete="off"
-        autoCapitalize="none"
-        spellcheck={false}
-        value={query.value}
-        onInput={(event) => {
-          query.value = event.currentTarget.value;
-        }}
-        onKeyDown={(event) => {
-          // A scanner gun types the code, then Enter.
-          if (event.key !== "Enter") {
-            return;
-          }
-          event.preventDefault();
-          const read = readLabel(catalogue, query.value);
-          if (read.kind !== "unknown") {
-            onLabel(read);
-          } else if (matches.length === 1 && matches[0] !== undefined) {
-            onAdd(matches[0].id);
-          }
-        }}
-      />
+      <Field label="Find an item, or type or scan its code">
+        {(id) => (
+          <input
+            id={id}
+            type="search"
+            autoComplete="off"
+            autoCapitalize="none"
+            spellcheck={false}
+            value={query.value}
+            onInput={(event) => {
+              query.value = event.currentTarget.value;
+            }}
+            onKeyDown={(event) => {
+              // A scanner gun types the code, then Enter.
+              if (event.key !== "Enter") {
+                return;
+              }
+              event.preventDefault();
+              const read = readLabel(catalogue, query.value);
+              if (read.kind !== "unknown") {
+                onLabel(read);
+              } else if (matches.length === 1 && matches[0] !== undefined) {
+                onAdd(matches[0].id);
+              }
+            }}
+          />
+        )}
+      </Field>
       {query.value.trim() !== "" && matches.length === 0 && (
         <p>Nothing matches “{query.value.trim()}”.</p>
       )}
-      <ul class="list-none p-0 *:py-1">
-        {matches.map((item) => (
-          <li key={item.id}>
-            <button type="button" onClick={() => onAdd(item.id)}>
-              {item.name}
-            </button>{" "}
-            <small>
-              {[
-                item.retired ? RETIRED : null,
-                item.category,
-                item.manufacturer,
-                item.part_number,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </small>
-          </li>
-        ))}
-      </ul>
+      {matches.length > 0 && (
+        <ul class="list-none p-0 *:py-1">
+          {matches.map((item) => (
+            <li key={item.id}>
+              <button type="button" onClick={() => onAdd(item.id)}>
+                {item.name}
+              </button>{" "}
+              <small>
+                {[
+                  item.retired ? RETIRED : null,
+                  item.category,
+                  item.manufacturer,
+                  item.part_number,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </small>
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   );
 }

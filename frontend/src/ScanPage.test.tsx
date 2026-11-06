@@ -179,6 +179,18 @@ describe("filling and saving a cart", () => {
     expect(screen.getByText("1 each in all")).toBeDefined();
   });
 
+  test("another key, or Enter with more than one match, adds nothing", async () => {
+    open();
+    await ready();
+    find("a");
+    expect(screen.getByRole("button", { name: "LiteBeam 5AC" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Cat6 cable" })).toBeDefined();
+    const finder = screen.getByLabelText(/Find an item/);
+    fireEvent.keyDown(finder, { key: "a" });
+    fireEvent.keyDown(finder, { key: "Enter" });
+    expect(screen.getByText("Nothing in the cart yet.")).toBeDefined();
+  });
+
   test("Save says what is missing, and sends nothing", async () => {
     const { api, sent } = server();
     open(api);
@@ -216,6 +228,29 @@ describe("filling and saving a cart", () => {
     expect(screen.getByLabelText(/install number/)).toBeDefined();
     expect(screen.queryByLabelText("To")).toBeNull();
     expect(screen.getByLabelText("From")).toBeDefined();
+  });
+
+  test("a line is changed or removed on its own, and an install number typed", async () => {
+    open();
+    await ready();
+    find("cable");
+    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    find("litebeam");
+    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    fireEvent.input(screen.getByLabelText("Loose m"), {
+      target: { value: "2" },
+    });
+    expect(screen.getByText("2 m in all")).toBeDefined();
+    expect(screen.getByText("1 each in all")).toBeDefined();
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Remove" })[1] as Element,
+    );
+    expect(screen.queryByText("1 each in all")).toBeNull();
+    expect(screen.getByText("2 m in all")).toBeDefined();
+    fireEvent.click(screen.getByLabelText("Taking it to an install"));
+    const number = screen.getByLabelText(/install number/) as HTMLInputElement;
+    fireEvent.input(number, { target: { value: "1234" } });
+    expect(number.value).toBe("1234");
   });
 
   test("the cart survives a reload", async () => {
