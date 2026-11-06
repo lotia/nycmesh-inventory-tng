@@ -94,6 +94,13 @@ it, losing its data, with `mise run compose -- down --volumes`, then the
 commands above. Once production runs, a migration is never edited: add a
 new one.
 
+### Locking a row
+
+Lock rows with `db.locked` (a select) or `db.get_locked` (`Session.get`),
+never `with_for_update` itself: they also read the rows again as locked,
+which a plain locking read does not do for a row already loaded. `db.py`
+says why; `tests/test_locking.py` fails on `with_for_update` anywhere else.
+
 ### The scan page
 
 The scan page and the registration page are TypeScript, in `frontend/`
@@ -250,10 +257,10 @@ the end; a run that was killed before it could is dropped by a later one.
 During the tests, `DATABASE_URL` points nowhere, so nothing reaches your own
 data: a test that needs the database takes the `database_url` fixture. Write
 tests in pytest style.
-`tests/test_requests_at_once.py` holds tests of requests at the same time,
-on connections that really commit, marked by kind (its docstring):
-`uv run pytest -m concurrency` runs only those, and `-m "not end_to_end"`
-skips the ones through the whole app.
+`tests/test_requests_at_once.py` and `tests/test_locking.py` hold tests of
+requests at the same time, on connections that really commit, marked by
+kind (the first one's docstring): `uv run pytest -m concurrency` runs only
+those, and `-m "not end_to_end"` skips the ones through the whole app.
 
 ## Dependency updates
 

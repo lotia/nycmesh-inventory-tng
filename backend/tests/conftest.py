@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import accounts, devices, local_env
 from inventory_tng.app import create_app
 from inventory_tng.db import (
+    Base,
     get_session,
     get_session_factory,
     make_engine,
@@ -233,16 +234,21 @@ def session(engine: Engine) -> Iterator[Session]:
         transaction.rollback()
 
 
-# The tables sign-in writes, in the order committed() empties them after
-# its test.
-SIGN_IN_TABLES = (
-    "reset_link",
-    "recovery_code",
-    "authenticator",
-    "admin_session",
-    "admin_password",
-    "admin",
-)
+# Tables whose triggers refuse any delete (migration 0004): what a committed
+# test writes there could never be cleaned up, so it must not.
+APPEND_ONLY = ("ledger_transaction", "movement")
+
+
+def _newest_ids(connection: Connection) -> dict[str, int]:
+    """Every table's highest id now: committed() deletes what is above it
+    after its test. Each before what it refers to, as deleting needs."""
+    return {
+        table.name: int(
+            connection.scalar(text(f"SELECT coalesce(max(id), 0) FROM {table.name}"))
+        )
+        for table in reversed(Base.metadata.sorted_tables)
+        if "id" in table.c
+    }
 
 
 class Worker(threading.Thread):
@@ -329,16 +335,16 @@ def committed(database_url: str, engine: Engine) -> Iterator[Committed]:
     `session` fixture's one transaction is not. Their own engine waits as
     _wait_briefly says. `engine` has migrated the database. After the test,
     any connection still waiting is ended, so its thread finishes before its
-    session is closed, and what they made of sign-in, with its history, is
-    deleted."""
+    session is closed, and every row they made (any table, any connection,
+    history included) is deleted. Rows they changed but did not make, such
+    as a settings row, are not put back: a test that changes one restores
+    it itself. A committed test must not write the ledger (APPEND_ONLY)."""
     del engine
     own = make_engine(database_url)
 
     event.listen(own, "connect", _wait_briefly)
     with own.connect() as connection:
-        history_before = connection.scalar(
-            text("SELECT coalesce(max(id), 0) FROM catalogue_history")
-        )
+        before = _newest_ids(connection)
     committed = Committed(own)
     yield committed
     with own.connect() as connection:
@@ -359,13 +365,23 @@ def committed(database_url: str, engine: Engine) -> Iterator[Committed]:
         with contextlib.suppress(exc.DBAPIError):
             session.close()
     with own.begin() as connection:
-        # In order, each before what it refers to; then all history written
-        # since the test began, the deletes' own included.
-        for table in SIGN_IN_TABLES:
-            connection.execute(text(f"DELETE FROM {table}"))
+        # Only what the test made, each table before what it refers to, and
+        # only where it made any. History last, as the deletes write some.
+        after = _newest_ids(connection)
+        if grew := sorted(t for t in APPEND_ONLY if after[t] > before[t]):
+            raise RuntimeError(
+                f"a committed test wrote {grew}, whose rows cannot be deleted"
+                " (the ledger is append-only): its rows are left behind"
+            )
+        for name, newest in before.items():
+            if name != "catalogue_history":
+                connection.execute(
+                    text(f"DELETE FROM {name} WHERE id > :newest"),
+                    {"newest": newest},
+                )
         connection.execute(
-            text("DELETE FROM catalogue_history WHERE id > :before"),
-            {"before": history_before},
+            text("DELETE FROM catalogue_history WHERE id > :newest"),
+            {"newest": before["catalogue_history"]},
         )
     own.dispose()
 
@@ -388,9 +404,9 @@ def sessions_of(session: Session) -> Callable[[], Iterator[Session]]:
 def make_app(
     database_url: str, session: Session, tmp_path: Path
 ) -> Callable[..., FastAPI]:
-    """Apps on the test database, whose requests use the test's session. Their
-    bundle is an empty directory unless a test gives one, so no test depends
-    on whether this clone has a build."""
+    """Apps on the test database, whose requests use the test's session, or
+    the one given `on`. Their bundle is an empty directory unless a test
+    gives one, so no test depends on whether this clone has a build."""
 
     def make(
         logging: LogConfig | None = None,
@@ -401,6 +417,7 @@ def make_app(
         recovery_token: str | None = None,
         mailer: SentMail | None = None,
         own_sessions: bool = False,
+        on: Session | None = None,
     ) -> FastAPI:
         settings = Settings(
             database_url=database_url,
@@ -419,11 +436,12 @@ def make_app(
         if own_sessions:
             event.listen(app.state.engine, "connect", _wait_briefly)
             return app
-        app.dependency_overrides[get_session] = sessions_of(session)
-        # Work after the reply uses the test's session too, so it is rolled
-        # back with the rest.
+        used = on or session
+        app.dependency_overrides[get_session] = sessions_of(used)
+        # Work after the reply uses the same session, so it is rolled back
+        # (or cleaned up) with the rest.
         app.dependency_overrides[get_session_factory] = lambda: (
-            lambda: nullcontext(session)
+            lambda: nullcontext(used)
         )
         return app
 

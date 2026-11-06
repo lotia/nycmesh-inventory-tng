@@ -84,7 +84,7 @@ extend-select = [
 testpaths = ["tests"]
 strict = true
 filterwarnings = ["error"]
-# What a test in tests/test_requests_at_once.py tests (its docstring).
+# What a test tests (tests/test_requests_at_once.py's docstring).
 markers = [
     "concurrency: two transactions at once, on two database connections",
     "end_to_end: requests through the whole app",
