@@ -172,6 +172,11 @@
     @apply inline;
   }
 
+  /* Every table: one that cannot fit scrolls in here, never the page. */
+  .table-scroll {
+    @apply overflow-x-auto;
+  }
+
   .actions {
     @apply flex flex-wrap items-end gap-3;
   }

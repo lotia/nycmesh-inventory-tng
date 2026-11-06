@@ -1,16 +1,18 @@
 {% extends "admin_base.html" %}
 {% block main %}
 <section>
-  <table>
-    <tr><th>Administrator</th><th>Email</th><th>Authenticator</th></tr>
-    {% for other in current %}
-    <tr>
-      <td><a href="{{ here }}/{{ other.id }}">{{ other.username }}</a>{% if other.id == admin.id %} <span class="hint">you</span>{% endif %}</td>
-      <td>{{ "yes" if other.email else "" }}</td>
-      <td>{{ "yes" if other.id in with_totp else "" }}</td>
-    </tr>
-    {% endfor %}
-  </table>
+  <div class="table-scroll">
+    <table>
+      <tr><th>Administrator</th><th>Email</th><th>Authenticator</th></tr>
+      {% for other in current %}
+      <tr>
+        <td><a href="{{ here }}/{{ other.id }}">{{ other.username }}</a>{% if other.id == admin.id %} <span class="hint">you</span>{% endif %}</td>
+        <td>{{ "yes" if other.email else "" }}</td>
+        <td>{{ "yes" if other.id in with_totp else "" }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
 </section>
 
 <section>

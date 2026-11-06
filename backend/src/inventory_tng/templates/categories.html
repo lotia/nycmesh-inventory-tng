@@ -9,14 +9,16 @@
 </form>
 
 <section>
-  <table>
-    <tr><th>Category</th><th>Items</th></tr>
-    {% for category in current %}
-    <tr><td><a href="{{ here }}/{{ category.id }}">{{ category.name }}</a></td><td>{{ items.get(category.id, 0) }}</td></tr>
-    {% else %}
-    <tr><td colspan="2">None yet.</td></tr>
-    {% endfor %}
-  </table>
+  <div class="table-scroll">
+    <table>
+      <tr><th>Category</th><th>Items</th></tr>
+      {% for category in current %}
+      <tr><td><a href="{{ here }}/{{ category.id }}">{{ category.name }}</a></td><td>{{ items.get(category.id, 0) }}</td></tr>
+      {% else %}
+      <tr><td colspan="2">None yet.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
 </section>
 
 {% if retired %}

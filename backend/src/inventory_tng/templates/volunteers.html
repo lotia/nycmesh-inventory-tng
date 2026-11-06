@@ -1,15 +1,17 @@
 {% extends "admin_base.html" %}
 {% block main %}
 <section>
-  <table>
-    <tr><th>Volunteer</th><th>Holds stock</th></tr>
-    {% for volunteer in current %}
-    <tr><td><a href="{{ here }}/{{ volunteer.id }}">{{ volunteer.name }}</a></td>
-      <td>{{ "yes" if volunteer.id in holders else "" }}</td></tr>
-    {% else %}
-    <tr><td colspan="2">None yet.</td></tr>
-    {% endfor %}
-  </table>
+  <div class="table-scroll">
+    <table>
+      <tr><th>Volunteer</th><th>Holds stock</th></tr>
+      {% for volunteer in current %}
+      <tr><td><a href="{{ here }}/{{ volunteer.id }}">{{ volunteer.name }}</a></td>
+        <td>{{ "yes" if volunteer.id in holders else "" }}</td></tr>
+      {% else %}
+      <tr><td colspan="2">None yet.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
 </section>
 
 <section>

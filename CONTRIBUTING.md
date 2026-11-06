@@ -194,6 +194,11 @@ which spaces their forms. When you style a page:
 - Use the tokens in `@theme` (`bg-band`, `text-heading`, …), not colours of
   your own: the dark scheme gives each token its own value.
 - Make markup that repeats a Jinja macro or a Preact component.
+- Put each table in `<div class="table-scroll">`: one that cannot fit a
+  phone scrolls there, not the page. Text that is often long and unbroken,
+  such as a browser's name, can wrap instead, in a `wrap-anywhere` span.
+  The browser tests check each page they reach with a long word in every
+  table cell.
 
 ### Registering a device
 

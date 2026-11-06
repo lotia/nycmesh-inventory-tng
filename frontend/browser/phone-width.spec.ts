@@ -1,7 +1,7 @@
 /**
  * No page scrolls sideways on a phone (inventory-tng-8i4.60.5): every page
- * an administrator can reach by following links, and the volunteers' pages,
- * at 360 pixels wide.
+ * an administrator can reach by following links, also with a long word in
+ * every table cell, and the volunteers' pages, at 360 pixels wide.
  */
 import { expect, type Page, test } from "@playwright/test";
 import { signIn } from "./sign-in";
@@ -62,19 +62,10 @@ async function linksOn(page: Page): Promise<string[]> {
     });
 }
 
-/**
- * Pages known to be wider than a phone, and the issue that fixes each: it
- * takes the page off this list.
- */
-const KNOWN: Record<string, string> = {
-  // Its sessions table: browsers' names are long.
-  "/admin/account": "inventory-tng-8i4.60.3",
-};
-
-/** Fails if a page is wider than the screen, but for those KNOWN to be. */
+/** Fails if a page is wider than the screen. */
 function fits(widths: Map<string, number>): void {
   const wide = [...widths]
-    .filter(([path, width]) => width > 0 && !(path in KNOWN))
+    .filter(([, width]) => width > 0)
     .map(([path, width]) => `${path}, by ${width} pixels`);
   expect(wide, "pages wider than the screen").toEqual([]);
 }
@@ -90,8 +81,15 @@ test("every administrator page fits a phone", async ({ page }) => {
     }
     const response = await page.goto(path);
     expect(response?.ok(), `${path} answers`).toBe(true);
+    const links = await linksOn(page);
+    // Whatever the data: a long word in every table cell.
+    await page.locator("td").evaluateAll((cells) => {
+      for (const cell of cells) {
+        cell.append(` ${"x".repeat(80)}`);
+      }
+    });
     widths.set(path, await overflow(page));
-    waiting.push(...(await linksOn(page)).filter((link) => !widths.has(link)));
+    waiting.push(...links.filter((link) => !widths.has(link)));
   }
   // The crawl reached the pages behind the lists, not only the lists.
   expect([...widths.keys()].filter((path) => /\/\d+$/.test(path))).not.toEqual(

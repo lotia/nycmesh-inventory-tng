@@ -24,18 +24,20 @@ someone remote. Making one asks for a fresh code.</p>
 
 <section>
   <h2>Codes</h2>
-  <table>
-    <tr><th>Code</th><th>State</th><th>Used</th><th>Until</th></tr>
-    {% for code, state, registered in codes %}
-    <tr>
-      <td><a href="{{ codes_path }}/{{ code.id }}">{{ code.label or "Code " ~ code.id }}</a></td>
-      <td>{{ state }}</td>
-      <td>{{ code.uses }} of {{ code.max_uses }}</td>
-      <td>{{ code.expires_at | when(zone) }}</td>
-    </tr>
-    {% else %}
-    <tr><td colspan="4">None yet.</td></tr>
-    {% endfor %}
-  </table>
+  <div class="table-scroll">
+    <table>
+      <tr><th>Code</th><th>State</th><th>Used</th><th>Until</th></tr>
+      {% for code, state, registered in codes %}
+      <tr>
+        <td><a href="{{ codes_path }}/{{ code.id }}">{{ code.label or "Code " ~ code.id }}</a></td>
+        <td>{{ state }}</td>
+        <td>{{ code.uses }} of {{ code.max_uses }}</td>
+        <td>{{ code.expires_at | when(zone) }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">None yet.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
 </section>
 {% endblock %}

@@ -10,14 +10,16 @@ less than nothing somewhere: the records are wrong there, so count it.</p>
 {% for group in groups %}
 <section>
   <h2>{{ group.heading.name }}{% if by == "item" %} <span class="hint">{{ group.total | amount }} {{ group.heading.unit }} in all</span>{% endif %}</h2>
-  <table>
-    {% for row in group.rows %}
-    <tr>
-      <td>{{ row.item.name if by == "place" else row.location.name }}</td>
-      <td>{{ row.quantity | amount }} {{ row.item.unit }}{% if row.quantity < 0 %} <strong>count it</strong>{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </table>
+  <div class="table-scroll">
+    <table>
+      {% for row in group.rows %}
+      <tr>
+        <td>{{ row.item.name if by == "place" else row.location.name }}</td>
+        <td>{{ row.quantity | amount }} {{ row.item.unit }}{% if row.quantity < 0 %} <strong>count it</strong>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
 </section>
 {% else %}
 <p>Nothing is recorded anywhere yet.</p>
