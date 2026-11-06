@@ -1,17 +1,25 @@
 {% extends "admin_base.html" %}
 {% block main %}
+{% if recount %}
+<p>Something came in or went out of each of these after you started, so it's
+not clear whether you counted it before or after. Count them again now.</p>
+{% else %}
 <p>Type what is really there. Leave a line as it is if it's right, or blank
 if you didn't count it. Anything else here, add below.</p>
+{% endif %}
 <form method="post" action="{{ here }}">
   <input type="hidden" name="key" value="{{ key }}">
   <input type="hidden" name="as_of" value="{{ as_of }}">
   <table>
-    <tr><th>Item</th><th>Records say</th><th>Counted</th></tr>
+    <tr><th>Item</th><th>Records say</th>{% if recount %}<th>While you counted</th>{% endif %}<th>Counted</th></tr>
     {% for item, amount in rows %}
     {% set field = "counted_" ~ item.id %}
     <tr>
       <td>{{ item.name }}</td>
       <td>{{ amount | amount }} {{ item.unit }}{% if amount < 0 %} <strong>less than nothing</strong>{% endif %}</td>
+      {% if recount %}{% set typed, came, went = recount[item.id] %}
+      <td>{{ came | amount }} in, {{ went | amount }} out; you typed {{ typed | amount }}</td>
+      {% endif %}
       <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, amount | amount if amount > 0 else '0') }}" aria-label="{{ item.name }} counted">
         {% with name = field %}{% include "_field_problem.html" %}{% endwith %}</td>
     </tr>

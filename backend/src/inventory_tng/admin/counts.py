@@ -5,7 +5,8 @@ wrong.
 
 Each form carries a key made when it was shown, so sending it twice writes
 it once. A count also carries the place's latest ledger entry as it was
-shown, so a save made at the place meanwhile is never quietly undone.
+shown: the count is true for that moment, so a save made at the place
+meanwhile still applies, and an item it moved comes back to count again.
 """
 
 import uuid
@@ -25,17 +26,20 @@ from inventory_tng.admin.common import (
     current_rows,
     quantity,
     text_form,
+    whole,
 )
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.db import DbSession
 from inventory_tng.ledger import (
     expected,
+    moment,
     record_adjustment,
     record_count,
     retired_in_stock,
 )
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import (
+    INTEGER_MAX,
     AdjustmentReason,
     Admin,
     Item,
@@ -69,21 +73,6 @@ def _key(typed: str) -> uuid.UUID | None:
         return uuid.UUID(typed)
     except ValueError:
         return None
-
-
-def _as_of(session: Session, location_id: int) -> int:
-    """The latest ledger entry at a place: any save there moves it on."""
-    return (
-        session.scalar(
-            select(func.max(LedgerTransaction.id)).where(
-                or_(
-                    LedgerTransaction.to_location_id == location_id,
-                    LedgerTransaction.from_location_id == location_id,
-                )
-            )
-        )
-        or 0
-    )
 
 
 def _items(session: Session) -> list[Item]:
@@ -182,13 +171,20 @@ def _count_page(
     session: Session,
     signed: SignedIn,
     place: Location,
-    was: Mapping[int, Decimal],
+    as_of: int,
     *,
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
+    recount: Mapping[int, tuple[Decimal, Decimal, Decimal]] | None = None,
     alert: str | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
+    """The count form, with the records as of `as_of`. With recount, only the
+    items that moved while they were counted: what was typed for each, and
+    what came in and went out."""
+    was = expected(session, place.id, as_of=as_of, items=recount)
+    if recount:
+        was = {item_id: was.get(item_id, Decimal(0)) for item_id in recount}
     items = {i.id: i for i in session.scalars(select(Item).where(Item.id.in_(was)))}
     rows = sorted(
         ((items[item_id], amount) for item_id, amount in was.items()),
@@ -204,9 +200,10 @@ def _count_page(
             "list": COUNTS,
             "place": place,
             "rows": rows,
+            "recount": recount,
             "others": [i for i in _items(session) if i.id not in was],
             "key": (values or {}).get("key") or uuid.uuid4(),
-            "as_of": _as_of(session, place.id),
+            "as_of": as_of,
             "alert": alert,
             "problems": problems,
             "values": values,
@@ -222,7 +219,7 @@ def count_form(
     place = chosen(session, Location, str(location_id))
     if place is None:
         return not_found()
-    return _count_page(request, session, signed, place, expected(session, place.id))
+    return _count_page(request, session, signed, place, moment(session, place.id))
 
 
 def _counted(
@@ -275,29 +272,34 @@ def count(
 ) -> Response:
     place = chosen(session, Location, str(location_id))
     key = _key(form.get("key", ""))
-    if place is None or key is None:
+    as_of = whole(form.get("as_of", ""), 0, INTEGER_MAX)
+    if place is None or key is None or as_of is None:
         return not_found()
-    was = expected(session, place.id)
-    if form.get("as_of") != str(_as_of(session, place.id)):
-        values = {k: v for k, v in form.items() if not k.startswith(COUNTED)}
-        return _count_page(
-            request,
-            session,
-            signed,
-            place,
-            was,
-            values=values,
-            alert="The records changed while you counted: check the lines again.",
-            status_code=409,
-        )
     counted, problems = _counted(session, form)
     if problems:
+        # What was typed is as of when the form was shown.
         return _count_page(
-            request, session, signed, place, was, problems=problems, values=form
+            request, session, signed, place, as_of, problems=problems, values=form
         )
-    differed = record_count(session, key, signed.admin.id, place.id, counted, was)
+    result = record_count(session, key, signed.admin.id, place.id, counted, as_of)
     session.commit()
-    return redirect(COUNTS, notice="counted" if differed else "counted_same")
+    if not result.moved:
+        return redirect(COUNTS, notice="counted" if result.differed else "counted_same")
+    saved = len(counted) - len(result.moved)
+    return _count_page(
+        request,
+        session,
+        signed,
+        place,
+        moment(session, place.id),
+        recount={
+            item_id: (counted[item_id], came, went)
+            for item_id, (came, went) in result.moved.items()
+        },
+        alert=(f"Saved {saved} line{'s' if saved != 1 else ''}. " if saved else "")
+        + "These moved while you counted, so count them again.",
+        status_code=409,
+    )
 
 
 @router.post(ADJUSTMENTS)

@@ -1,6 +1,7 @@
 # 0003 — A transfer ledger over nested locations
 
-**Status:** accepted · 2026-10-30 · amended 2026-11-03 (counts, retired items)
+**Status:** accepted · 2026-10-30 · amended 2026-11-03 (counts, retired
+items), 2026-11-06 (counting while stock moves)
 
 ## Context
 
@@ -33,7 +34,11 @@ while. So we need more than one location from the start.
 - **Counts and adjustments are an administrator's**, and record whose. A
   count of a place writes what differs, found or lost, and a count that
   matches is written with no lines, so when a place was last counted is
-  known. An adjustment gives a reason from a list administrators extend,
+  known. A count is true for the moment its form was shown, so moves saved
+  while it is under way still apply. An item that moved at the place
+  meanwhile might have been counted before or after the move, so its line is
+  not saved; the page asks for it again, and saves every other line (Ali,
+  2026-11-03). An adjustment gives a reason from a list administrators extend,
   seeded with Damaged, Lost or stolen, Found, Used for testing and Records
   were wrong (Ali, 2026-11-03).
 - **Nothing is deleted: retiring is the soft delete**, and bringing back

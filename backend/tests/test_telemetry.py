@@ -1,7 +1,9 @@
 import logging
+import uuid
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import pyotp
 import pytest
@@ -17,10 +19,10 @@ from opentelemetry.sdk.metrics.export import (
 from sqlalchemy import exc
 from sqlalchemy.orm import Session
 from test_devices import new_device
-from test_ledger import Place
+from test_ledger import Place, stocked, write
 from test_sign_in import PASSWORD, new_admin
 
-from inventory_tng import accounts, devices, mail
+from inventory_tng import accounts, devices, ledger, mail
 from inventory_tng.app import create_app
 from inventory_tng.db import get_session
 from inventory_tng.devices import RegisteredDevice
@@ -328,6 +330,28 @@ def test_counts_sign_in_resets(rolled_back: Recorded, session: Session) -> None:
     resets = counted(reader, "inventory.admin.sign_in_resets")
     assert resets[(("action", "reset"),)] >= 1
     assert resets[(("action", "restore"),)] >= 1
+
+
+def test_counts_count_lines_withheld(rolled_back: Recorded, session: Session) -> None:
+    """Radios counted while three of them moved are not written: they are
+    counted again."""
+    _, _, reader, _ = rolled_back
+    ada, _ = new_admin(session)
+    place = stocked(session)
+    as_of = write(
+        session,
+        place,
+        kind="receipt",
+        from_location_id=None,
+        to_location_id=place.store.id,
+    ).id
+    write(session, place)
+    radios = {place.item.id: Decimal(5)}
+    result = ledger.record_count(
+        session, uuid.uuid4(), ada.id, place.store.id, radios, as_of
+    )
+    assert result.moved == {place.item.id: (Decimal(0), Decimal(3))}
+    assert counted(reader, "inventory.count.lines.withheld")[()] >= 1
 
 
 def needs_a_device(device: RegisteredDevice) -> int:
