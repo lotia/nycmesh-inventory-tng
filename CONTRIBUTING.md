@@ -74,24 +74,33 @@ is taken, change `INVENTORY_DB_PORT` in `.env`; `DATABASE_URL` follows it.
 ## Running the app
 
 ```sh
-mise run compose -- up -d --wait db
-cd backend
-uv run alembic upgrade head              # create or update the schema
-uv run python -m inventory_tng --reload  # http://127.0.0.1:8000/api/docs
+mise run dev             # http://127.0.0.1:8000, Ctrl-C stops it
 ```
 
-`--reload` restarts the server when you save a file. `--host`, `--port` and
-`--workers` are there too (`--help` lists them). The run command starts uvicorn
-itself; uvicorn's own logging flags are not used, the `LOG_*` settings are
-(Logging, below).
+It runs, in order:
+
+1. `mise run setup`, which installs what a pull changed;
+2. the database, and its migrations;
+3. two servers side by side, each line of output marked with which:
+   `dev-backend`, which renders every page and restarts when you save its
+   Python, and `dev-vite`, Vite's dev server for the frontend (The scan
+   page, below). If either fails, the other stops too.
+
+`mise run dev-backend` or `mise run dev-vite` runs one on its own. The
+backend runs with `APP_ENV=development`, whatever `.env` says.
+
+The backend is `uv run python -m inventory_tng --reload`, in `backend/`.
+`--host`, `--port` and `--workers` are there too (`--help` lists them). The
+run command starts uvicorn itself; uvicorn's own logging flags are not used,
+the `LOG_*` settings are (Logging, below).
 
 ### Migrations
 
 Until the first production deploy, a change may edit an existing migration
 instead of adding one, so the schema's history stays short. After a pull
 that does, your local database no longer matches its migrations: rebuild
-it, losing its data, with `mise run compose -- down --volumes`, then the
-commands above. Once production runs, a migration is never edited: add a
+it, losing its data, with `mise run compose -- down --volumes`, then
+`mise run dev`. Once production runs, a migration is never edited: add a
 new one.
 
 ### Locking a row
@@ -105,25 +114,24 @@ says why; `tests/test_locking.py` fails on `with_for_update` anywhere else.
 
 The scan page and the registration page are TypeScript, in `frontend/`
 (docs/decisions/0010). The backend serves them at `/scan` and `/register`,
-and answers 503 until they are built. Build them once, or run Vite's dev
-server while you work on them:
+and answers 503 until they are built, unless Vite's dev server serves them.
+
+Under `mise run dev` their scripts come from Vite's dev server, at
+`VITE_DEV_SERVER` (from your shell or `.env`, else `http://localhost:5173`;
+the port is required), so edits show as you save. A backend you run on its
+own does the same only if `VITE_DEV_SERVER` is set. The page still comes from
+the backend, so the device cookie and the API work as in production.
+
+Without the dev server, the backend serves a build instead:
 
 ```sh
 cd frontend
-npm ci                   # once, and after package-lock.json changes
 npm run build            # into frontend/dist, which the backend serves
-npm run dev              # or: the dev server, http://localhost:5173
 ```
 
-With the build, open <http://127.0.0.1:8000/scan>. A new build is picked up
-without restarting the backend when `APP_ENV=development`.
-
-To have edits show as you save, set `VITE_DEV_SERVER=http://localhost:5173`
-in `.env`, restart the backend and run `npm run dev`. The page still comes
-from the backend, so the device cookie and the API work as in production;
-its scripts come from Vite. The port is required. Each server says where its
-pages' scripts come from in its `frontend` log line at startup:
-`source=build` or `source=dev_server`.
+A new build is picked up without restarting the backend when
+`APP_ENV=development`. Each backend says where its pages' scripts come from
+in its `frontend` log line at startup: `source=build` or `source=dev_server`.
 
 The scan page needs a registered device, and some catalogue rows to choose
 from. The camera works only over HTTPS or on `localhost`.

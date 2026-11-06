@@ -1,5 +1,13 @@
-"""The repository's `.env` file (CONTRIBUTING.md, Local settings)."""
+"""The repository's `.env` file (CONTRIBUTING.md, Local settings).
 
+The task scripts read a setting as the backend does, with:
+
+    uv run python -m inventory_tng.local_env KEY [--file PATH]
+"""
+
+import argparse
+import os
+from collections.abc import Sequence
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -25,3 +33,27 @@ def local_env_values(path: Path | None = None) -> dict[str, str]:
     does."""
     values = DotEnv(path or ENV_FILE, override=False).dict()
     return {key: value for key, value in values.items() if value}
+
+
+def setting(key: str, path: Path | None = None) -> str:
+    """A setting as the backend reads it: the environment's value if it is
+    set at all, even empty; else the file's (the repository's `.env` unless
+    told another); else empty."""
+    if key in os.environ:
+        return os.environ[key]
+    return local_env_values(path).get(key, "")
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        prog="python -m inventory_tng.local_env",
+        description="Print a setting as the backend reads it, for mise-tasks/.",
+    )
+    parser.add_argument("key")
+    parser.add_argument("--file", type=Path, help="a .env other than the clone's")
+    args = parser.parse_args(argv)
+    print(setting(args.key, args.file))
+
+
+if __name__ == "__main__":
+    main()
