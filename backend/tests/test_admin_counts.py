@@ -16,6 +16,7 @@ from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.ledger import expected, lock_place, moment
 from inventory_tng.models import (
+    INTEGER_MAX,
     AdjustmentReason,
     Admin,
     LedgerTransaction,
@@ -41,7 +42,9 @@ def count_form(client: TestClient, path: str) -> dict[str, str]:
 
 
 def count_form_of(page: Response) -> dict[str, str]:
-    found = re.findall(r'type="hidden" name="(key|as_of)" value="([^"]*)"', page.text)
+    found = re.findall(
+        r'type="hidden" name="(key|as_of|items)" value="([^"]*)"', page.text
+    )
     return dict(found)
 
 
@@ -313,7 +316,7 @@ def test_a_recount_sent_back_with_a_problem_asks_for_its_items_only(
         data=shown
         | {f"counted_{place.item.id}": "5", f"counted_{place.cable.id}": "18"},
     )
-    again = count_form_of(asked) | {"recounting": "1"}
+    again = count_form_of(asked)
     refused = admin_client.post(
         path, data=again | {f"counted_{place.item.id}": "x", "counted_bad": "1"}
     )
@@ -322,6 +325,22 @@ def test_a_recount_sent_back_with_a_problem_asks_for_its_items_only(
     assert f'name="counted_{place.item.id}"' in page
     assert f'name="counted_{place.cable.id}"' not in page
     assert "Count them again now." in text(refused)
+
+
+def test_a_recount_sent_back_leaves_out_an_item_there_is_not(
+    admin_client: TestClient, session: Session
+) -> None:
+    place = stocked(session)
+    path = f"{COUNTS}/{place.store.id}"
+    shown = count_form(admin_client, path)
+    write(session, place)  # Three radios to the van.
+    asked = admin_client.post(path, data=shown | {f"counted_{place.item.id}": "5"})
+    again = count_form_of(asked)
+    again["items"] += f" {INTEGER_MAX}"
+    refused = admin_client.post(path, data=again | {f"counted_{place.item.id}": "x"})
+    assert refused.status_code == 400
+    assert f'name="counted_{place.item.id}"' in refused.text
+    assert f'name="counted_{INTEGER_MAX}"' not in refused.text
 
 
 def test_a_count_whose_every_line_moved_writes_nothing(

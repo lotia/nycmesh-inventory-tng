@@ -1,6 +1,6 @@
 {% extends "admin_base.html" %}
 {% block main %}
-{% if recounting %}
+{% if items %}
 <p>Something came in or went out of each of these after you started, so it's
 not clear whether you counted it before or after. Count them again now.</p>
 {% else %}
@@ -10,7 +10,7 @@ if you didn't count it. Anything else here, add below.</p>
 <form method="post" action="{{ here }}">
   <input type="hidden" name="key" value="{{ key }}">
   <input type="hidden" name="as_of" value="{{ as_of }}">
-  {% if recounting %}<input type="hidden" name="recounting" value="1">{% endif %}
+  {% if items %}<input type="hidden" name="items" value="{{ items | join(' ') }}">{% endif %}
   <div class="table-scroll">
     <table>
       <tr><th>Item</th><th>Records say</th>{% if recount %}<th>While you counted</th>{% endif %}<th>Counted</th></tr>

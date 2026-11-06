@@ -35,7 +35,6 @@ from sqlalchemy import (
     Select,
     Table,
     any_,
-    case,
     func,
     insert,
     or_,
@@ -109,7 +108,9 @@ def expected(
     as the balance view says now; with as_of, what they said at that moment
     (see moment()), of `items` only if given."""
     if as_of is not None:
-        flows = _flows(session, location_id, LedgerTransaction.id <= as_of, items=items)
+        (flows,) = _flows(
+            session, location_id, LedgerTransaction.id <= as_of, items=items
+        )
         return {
             item: came - went for item, (came, went) in flows.items() if came != went
         }
@@ -123,7 +124,7 @@ def lock_place(session: Session, location_id: int) -> None:
     """Wait for every save under way at a place, and hold up new ones until
     this transaction ends, so its ledger reads as one moment: every save
     takes FOR KEY SHARE on its places before it draws an id
-    (insert_transaction), and this takes FOR UPDATE."""
+    (_hold_places), and this takes FOR UPDATE."""
     get_locked(session, Location, location_id)
 
 
@@ -152,26 +153,39 @@ def _at(location_id: int) -> ColumnElement[bool]:
 def _flows(
     session: Session,
     location_id: int,
-    *where: ColumnElement[bool],
+    window: ColumnElement[bool],
+    *more: ColumnElement[bool],
     items: Collection[int] | None = None,
-) -> dict[int, tuple[Decimal, Decimal]]:
-    """What came into a place and what went out of it, by item, in the
-    ledger transactions `where` picks: of `items` only, if given."""
+) -> list[dict[int, tuple[Decimal, Decimal]]]:
+    """For each window (which ledger transactions it takes), what came into
+    a place and what went out of it, by item: each item that moved there in
+    that window, of `items` only, if given. One query, however many."""
     into = LedgerTransaction.to_location_id == location_id
     out = LedgerTransaction.from_location_id == location_id
+    windows = (window, *more)
+    where = [_at(location_id), or_(*windows)]
     if items is not None:
-        where = (*where, Movement.item_id.in_(items))
+        where.append(Movement.item_id.in_(items))
     rows = session.execute(
         select(
             Movement.item_id,
-            func.sum(case((into, Movement.quantity), else_=0)),
-            func.sum(case((out, Movement.quantity), else_=0)),
+            *(
+                func.sum(Movement.quantity).filter(each, side)
+                for each in windows
+                for side in (into, out)
+            ),
         )
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
-        .where(_at(location_id), *where)
+        .where(*where)
         .group_by(Movement.item_id)
     )
-    return {item_id: (came, went) for item_id, came, went in rows}
+    flows: list[dict[int, tuple[Decimal, Decimal]]] = [{} for _ in windows]
+    for item_id, *sums in rows:
+        # A sum over no movements is NULL: the item did not move in that one.
+        for flow, came, went in zip(flows, sums[::2], sums[1::2], strict=True):
+            if came is not None or went is not None:
+                flow[item_id] = (came or Decimal(0), went or Decimal(0))
+    return flows
 
 
 # What a volunteer records. Counts and adjustments are an administrator's
@@ -274,7 +288,8 @@ def record(
     changed since, and the volunteer must not be asked to fix what is saved."""
     if (written := _replay(session, batch)) is not None:
         return written, False
-    problems = _problems(session, batch)
+    header = {"device_id": device_id, **_header(batch)}
+    problems = _problems(session, batch, _hold_places(session, header))
     if problems:
         refused.add(1, {"reason": "invalid"})
         log.info("batch refused", problems=sorted({kind for _, kind in problems}))
@@ -282,8 +297,9 @@ def record(
     transaction = insert_transaction(
         session,
         batch.key,
-        {"device_id": device_id, **_header(batch)},
+        header,
         {line.item_id: line.quantity for line in batch.lines},
+        held=True,
     )
     if transaction is None:
         written = _replay(session, batch)
@@ -292,26 +308,37 @@ def record(
     return transaction, True
 
 
+def _hold_places(session: Session, header: Mapping[str, object]) -> set[int]:
+    """A save's places, held FOR KEY SHARE until it ends, before it has an
+    id: a count (lock_place) then waits for it whole, so none can draw an
+    id, wait, and commit after a count's moment that it falls inside. The
+    ids of those that exist."""
+    places = {header.get("from_location_id"), header.get("to_location_id")} - {None}
+    return set(
+        session.scalars(
+            locked(
+                select(Location.id).where(Location.id.in_(places)),
+                key_share=True,
+                shared=True,
+            )
+        )
+    )
+
+
 def insert_transaction(
     session: Session,
     key: uuid.UUID,
     header: Mapping[str, object],
     lines: Mapping[int, Decimal],
+    *,
+    held: bool = False,
 ) -> LedgerTransaction | None:
     """A transaction and its movements, unless its key is written already:
     None then. A concurrent request with the same key waits here for that
-    one to commit, then writes nothing."""
-    # Its places first, before it has an id: a count (lock_place) then waits
-    # for it whole, so none can draw an id, wait, and commit after a count's
-    # moment that it falls inside.
-    places = {header.get("from_location_id"), header.get("to_location_id")} - {None}
-    session.execute(
-        locked(
-            select(Location.id).where(Location.id.in_(places)),
-            key_share=True,
-            shared=True,
-        )
-    )
+    one to commit, then writes nothing. Its places are held first
+    (_hold_places), unless the caller `held` them already."""
+    if not held:
+        _hold_places(session, header)
     transaction = session.scalar(
         pg_insert(LedgerTransaction)
         .values(idempotency_key=key, **header)
@@ -333,13 +360,15 @@ def insert_transaction(
     return transaction
 
 
-def _problems(session: Session, batch: Batch) -> list[Problem]:
+def _problems(session: Session, batch: Batch, places: set[int]) -> list[Problem]:
+    """What is wrong with a batch, whose `places` are those of its places
+    that exist."""
     problems: list[Problem] = []
     if session.get(Volunteer, batch.volunteer_id) is None:
         problems.append((("volunteer_id",), "not_found"))
     for field in ("from_location_id", "to_location_id"):
         location_id = getattr(batch, field)
-        if location_id is not None and session.get(Location, location_id) is None:
+        if location_id is not None and location_id not in places:
             problems.append(((field,), "not_found"))
     items = {
         item.id: item
@@ -381,8 +410,12 @@ def _correct(
     kind: Literal["count", "adjustment"],
     header: Mapping[str, object],
     lines: Mapping[int, Decimal],
+    *,
+    held: bool = False,
 ) -> None:
-    transaction = insert_transaction(session, key, {"kind": kind, **header}, lines)
+    transaction = insert_transaction(
+        session, key, {"kind": kind, **header}, lines, held=held
+    )
     if transaction is None:
         return
     counted.add(1, {"kind": kind})
@@ -430,11 +463,13 @@ def record_count(
             LedgerTransaction.idempotency_key.in_((key, lost_key))
         )
     )
-    after = [LedgerTransaction.id > as_of]
+    after = LedgerTransaction.id > as_of
     if sent is not None:
-        after.append(LedgerTransaction.id < sent)
-    moved = _flows(session, location_id, *after, items=counted_at)
-    then = expected(session, location_id, as_of=as_of, items=counted_at)
+        after &= LedgerTransaction.id < sent
+    moved, flows = _flows(
+        session, location_id, after, LedgerTransaction.id <= as_of, items=counted_at
+    )
+    then = {item_id: came - went for item_id, (came, went) in flows.items()}
     kept = counted_at.keys() - moved.keys()
     found: dict[int, Decimal] = {}
     lost: dict[int, Decimal] = {}
@@ -452,13 +487,14 @@ def record_count(
             admin_id=admin_id,
             lines=len(moved),
         )
+    # Written held: lock_place above holds the place already.
     # A count of nothing at all still says when the place was counted.
     if found or ((kept or not counted_at) and not lost):
         header = {"admin_id": admin_id, "to_location_id": location_id}
-        _correct(session, key, "count", header, found)
+        _correct(session, key, "count", header, found, held=True)
     if lost:
         header = {"admin_id": admin_id, "from_location_id": location_id}
-        _correct(session, lost_key, "count", header, lost)
+        _correct(session, lost_key, "count", header, lost, held=True)
     return Counted(bool(found or lost), moved)
 
 
