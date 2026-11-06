@@ -312,6 +312,107 @@
 
   /* Black on white whatever the scheme, for a camera to read. */
   .qr svg {
-    @apply my-2 bg-white;
+    @apply my-2 h-auto w-52 bg-white;
+  }
+}
+
+/*
+ * Printing a sheet of QR codes (inventory-tng-8i4.61). A page with a
+ * .printable, a child of its main, prints only that .printable's
+ * .print-sheet, black on white, set by the radio buttons in it: layout
+ * (poster: the first of its four identical .print-cards; cards: all four)
+ * and paper (letter, a4). Other pages print as they are.
+ */
+@page letter {
+  size: letter;
+  margin: 0.5in;
+}
+
+@page a4 {
+  size: A4;
+  margin: 12mm;
+}
+
+@layer components {
+  .print-sheet {
+    @apply hidden;
+  }
+
+  @media print {
+    body:has(.printable) {
+      @apply bg-white text-black;
+      print-color-adjust: exact;
+
+      &
+        :is(
+          body > :not(main),
+          main > :not(.printable),
+          .printable > :not(.print-sheet)
+        ) {
+        @apply hidden;
+      }
+
+      /* The page's margins are the paper's. */
+      & main {
+        @apply m-0 p-0;
+      }
+    }
+
+    .print-sheet {
+      @apply block bg-white text-center text-black;
+      page: letter;
+    }
+
+    .printable:has(input[name="paper"][value="a4"]:checked) .print-sheet {
+      page: a4;
+    }
+
+    .print-card {
+      @apply break-inside-avoid text-lg;
+    }
+
+    .print-card .qr svg {
+      @apply mx-auto w-[5in];
+    }
+
+    .print-title {
+      @apply text-3xl font-semibold;
+    }
+
+    .print-small {
+      @apply text-sm;
+    }
+
+    .print-card:not(:first-child) {
+      @apply hidden;
+    }
+
+    /* Four cards, two by two, each a quarter of the page. */
+    .printable:has(input[name="layout"][value="cards"]:checked) {
+      & .print-sheet {
+        @apply grid grid-cols-2 gap-[0.4in];
+      }
+
+      & .print-card {
+        @apply block text-sm;
+      }
+
+      & .print-card p {
+        @apply my-1.5;
+      }
+
+      & .print-card .qr svg {
+        @apply w-[2in];
+      }
+
+      & .print-title {
+        @apply text-base;
+      }
+
+      /* However long a label, four still fit a page. */
+      & .print-label {
+        @apply max-h-[2lh] overflow-hidden;
+      }
+    }
   }
 }

@@ -185,7 +185,9 @@ def totp_link(key: str, username: str) -> str:
 
 
 def qr_svg(link: str) -> Markup:
-    return Markup(segno.make(link, error="m").svg_inline(scale=5, border=2))
+    """A QR code's SVG, with a viewBox so the stylesheet can size it."""
+    code = segno.make(link, error="m")
+    return Markup(code.svg_inline(scale=5, border=2, unit="px"))
 
 
 def grouped(text: str, size: int, separator: str) -> str:
