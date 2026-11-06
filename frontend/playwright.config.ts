@@ -2,23 +2,20 @@
  * The browser tests, in browser/ (CONTRIBUTING.md, Running the checks).
  * WebKit runs in CI, and wherever PLAYWRIGHT_WEBKIT=1.
  */
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig } from "@playwright/test";
+import { adminState, inRun } from "./browser/prepared";
 
-// What Chromium's camera shows: a label's QR code, which global-setup.ts
-// writes. Named once, here in the main process, for the workers to inherit.
-process.env.CAMERA_VIDEO ??= join(
-  tmpdir(),
-  `inventory-camera-${process.pid}.y4m`,
-);
-
-// The administrator's session, signed in once (sign-in.setup.ts) for every
-// test: signing in again for each would meet the sign-in rate limit.
-process.env.ADMIN_STATE ??= join(
-  tmpdir(),
-  `inventory-admin-${process.pid}.json`,
-);
+// This run's folder (backend/tests/browser_database.py) and port, chosen
+// once, here in the main process, for the backend and the workers to inherit.
+process.env.BROWSER_RUN ??= join(tmpdir(), `inventory-browser-${process.pid}`);
+process.env.BROWSER_PORT ??= freePort();
+const base = `http://127.0.0.1:${process.env.BROWSER_PORT}`;
+// The administrator's session, signed in once for every test: signing in
+// again for each would meet the sign-in rate limit.
+const signedIn = adminState();
 
 // A phone's width, the narrowest the pages are made for.
 const phone = {
@@ -30,12 +27,21 @@ const webkit = Boolean(process.env.CI) || process.env.PLAYWRIGHT_WEBKIT === "1";
 
 export default defineConfig({
   testDir: "browser",
-  globalSetup: "./browser/global-setup.ts",
+  // A database of its own, seeded, and the backend serving the build from it
+  // (backend/tests/browser_database.py).
+  webServer: {
+    command: "uv run python tests/browser_database.py serve",
+    cwd: "../backend",
+    // Its log lines, a traceback among them, with the tests'.
+    stdout: "pipe",
+    url: `${base}/api/healthz`,
+    timeout: 60_000,
+    gracefulShutdown: { signal: "SIGTERM", timeout: 10_000 },
+  },
   forbidOnly: Boolean(process.env.CI),
   reporter: process.env.CI ? "github" : "list",
   use: {
-    // Where global-setup.ts started the backend: the workers read it.
-    baseURL: process.env.BROWSER_BASE_URL,
+    baseURL: base,
     ...phone,
   },
   projects: [
@@ -49,7 +55,7 @@ export default defineConfig({
       dependencies: ["sign-in"],
       use: {
         browserName: "chromium",
-        storageState: process.env.ADMIN_STATE,
+        storageState: signedIn,
         // Full Chromium, headless: Playwright's lighter headless shell has
         // no camera, fake or not.
         channel: "chromium",
@@ -57,7 +63,8 @@ export default defineConfig({
         launchOptions: {
           args: [
             "--use-fake-device-for-media-stream",
-            `--use-file-for-fake-video-capture=${process.env.CAMERA_VIDEO}`,
+            // A label's QR code (browser_database.py).
+            `--use-file-for-fake-video-capture=${inRun("camera.y4m")}`,
           ],
         },
       },
@@ -69,10 +76,29 @@ export default defineConfig({
             dependencies: ["sign-in"],
             use: {
               browserName: "webkit" as const,
-              storageState: process.env.ADMIN_STATE,
+              storageState: signedIn,
             },
           },
         ]
       : []),
   ],
 });
+
+/**
+ * A port nothing listens on now, from the system. The config is read
+ * synchronously, so another Node process asks for it.
+ */
+function freePort(): string {
+  return execFileSync(
+    process.execPath,
+    [
+      "-e",
+      `const s = require("node:net").createServer();
+       s.listen(0, "127.0.0.1", () => {
+         process.stdout.write(String(s.address().port));
+         s.close();
+       });`,
+    ],
+    { encoding: "utf8" },
+  );
+}

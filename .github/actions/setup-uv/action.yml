@@ -1,0 +1,17 @@
+name: Set up uv
+description: The uv mise.toml pins, as everyone runs (CONTRIBUTING.md, Dependency updates).
+runs:
+  using: composite
+  steps:
+    # setup-uv publishes full version tags only, so this one is exact.
+    - id: uv
+      shell: bash
+      run: |
+        version=$(sed -n 's/^uv = "\([0-9.]*\)".*/\1/p' mise.toml)
+        [ "$(printf '%s\n' "$version" | wc -l)" = 1 ] && [ -n "$version" ] ||
+          { echo "No single uv pin in mise.toml" >&2; exit 1; }
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+    - uses: astral-sh/setup-uv@v10.3.3
+      with:
+        version: ${{ steps.uv.outputs.version }}
+        cache-python: true

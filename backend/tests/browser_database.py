@@ -1,68 +1,82 @@
-"""The database the browser tests (frontend/browser/) run against, from their
-global setup:
+"""What the browser tests (frontend/browser/) run against. Playwright's
+webServer (playwright.config.ts) starts
 
-    uv run python tests/browser_database.py create VIDEO    # prints JSON
-    uv run python tests/browser_database.py drop URL
+    uv run python tests/browser_database.py serve
 
-`create` makes one of its own (databases.py), migrated and seeded, with a
-registration code for the tests' devices, and prints what they need. It
-also writes VIDEO, for Chromium to show as its camera: the QR code of the
-seed's labelled item. One a run leaves behind is dropped by a later run, as
-test databases are.
+with BROWSER_RUN, a folder, and BROWSER_PORT set. It makes a database of
+its own (databases.py), migrated and seeded, with a registration code for
+the tests' device, and in BROWSER_RUN: prepared.json, what the tests need,
+and camera.y4m, the QR code of the seed's labelled item for Chromium to
+show as its camera. It then serves the built frontend from that database
+on BROWSER_PORT until Playwright stops it, and drops both. One a run
+leaves behind is dropped by a later run, as test databases are.
 """
 
 import argparse
-import contextlib
 import json
+import os
 import secrets
+import shutil
+import signal
 import sys
 from datetime import timedelta
 from pathlib import Path
 
 import segno
-import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from inventory_tng import __main__ as server
 from inventory_tng import devices, seed
 from inventory_tng.db import make_engine
 from inventory_tng.models import Item, Label
 
-from databases import create_database, drop_database, migrate
+from databases import migrate, new_database
 
 
 def main(argv: list[str]) -> int:
-    # Logs are for people: stdout is for the tests.
-    structlog.configure(logger_factory=structlog.PrintLoggerFactory(sys.stderr))
-    if argv[:1] == ["drop"] and len(argv) == 2:
-        drop_database(argv[1])
-        return 0
-    if argv[:1] != ["create"] or len(argv) != 2:
+    if argv != ["serve"]:
         print(__doc__, file=sys.stderr)
         return 2
-    url = create_database()
+    run, port = Path(os.environ["BROWSER_RUN"]), os.environ["BROWSER_PORT"]
+    signal.signal(signal.SIGTERM, stop)
+    # One a killed run left behind is used again: everything in it is remade.
+    run.mkdir(exist_ok=True)
     try:
-        prepared = prepare(url, Path(argv[1]))
-    except BaseException:
-        # Nothing printed for the tests to drop it by.
-        drop_database(url)
-        raise
-    print(json.dumps(prepared))
+        with new_database() as url:
+            prepared = prepare(url, run / "camera.y4m")
+            (run / "prepared.json").write_text(json.dumps(prepared))
+            os.environ |= {
+                "DATABASE_URL": url,
+                "APP_ENV": "development",
+                # The build, as production serves it.
+                "VITE_DEV_SERVER": "",
+                "LOG_LEVEL": "WARNING",
+            }
+            server.main(["--port", port])
+    finally:
+        shutil.rmtree(run, ignore_errors=True)
     return 0
+
+
+def stop(_signal: int, _frame: object) -> None:
+    """Playwright stops the server with SIGTERM, to the whole group, which uv
+    passes on too: uvicorn shuts down and passes it on to this, which ends
+    the process by way of the cleanup in main(), and ignores another."""
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    sys.exit(0)
 
 
 def prepare(url: str, video: Path) -> dict[str, str]:
     """The database migrated and seeded, a code for the tests' device, and
-    the camera's video: what the tests need, as printed."""
+    the camera's video: what the tests need."""
     engine = make_engine(url)
     try:
         migrate(engine)
         password = secrets.token_urlsafe(16)
         with Session(engine) as session, session.begin():
-            # Its words are for people: stdout is the JSON alone.
-            with contextlib.redirect_stdout(sys.stderr):
-                if seed.run(session, argparse.Namespace(password=password)) != 0:
-                    raise RuntimeError("the seed refused the new database")
+            if seed.run(session, argparse.Namespace(password=password)) != 0:
+                raise RuntimeError("the seed refused the new database")
             label = session.scalars(
                 select(Label.code).join(Item).where(Item.name == seed.LABELLED)
             ).one()
@@ -74,7 +88,6 @@ def prepare(url: str, video: Path) -> dict[str, str]:
     finally:
         engine.dispose()
     return {
-        "database_url": url,
         "username": seed.USERNAME,
         "password": password,
         "phrase": phrase,
