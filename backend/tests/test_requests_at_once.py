@@ -87,7 +87,7 @@ def signing_in(
 def resetting(committed: Committed, ada: int, ben: int) -> tuple[Session, str]:
     """Ada resetting Ben's sign-in, not yet committed, and its link."""
     session = committed.session()
-    _, token, _ = accounts.make_link_for(session, ben, ada, datetime.now(UTC))
+    _, token, _ = accounts.reset_admin_sign_in(session, ben, ada, datetime.now(UTC))
     return session, token
 
 
@@ -101,7 +101,7 @@ def reset_blocked(committed: Committed, ada: int, ben: int) -> tuple[Session, Wo
     """Ada resetting Ben's sign-in, once it waits for a lock."""
     reset = committed.session()
     worker = committed.blocked(
-        reset, lambda: accounts.make_link_for(reset, ben, ada, datetime.now(UTC))
+        reset, lambda: accounts.reset_admin_sign_in(reset, ben, ada, datetime.now(UTC))
     )
     return reset, worker
 

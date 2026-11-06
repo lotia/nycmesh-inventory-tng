@@ -4,6 +4,7 @@
 import re
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from typing import NoReturn
 
 import pytest
 from fastapi.testclient import TestClient
@@ -103,6 +104,20 @@ def test_resetting_an_invite_replaces_its_link(
     assert "they choose their password" in text(made)
     assert accounts.find_reset_link(session, first, now) is None
     assert accounts.find_reset_link(session, token_of(link_on(made.text)), now)
+
+
+def test_an_invite_by_one_who_can_no_longer_sign_in_is_not_found(
+    admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Their sign-in reset after the page let them in, and before invite
+    took the lock: a race, which the page's own check stops otherwise, so
+    invite stands in."""
+
+    def refuse(*_args: object, **_kwargs: object) -> NoReturn:
+        raise accounts.AdminRefused("not_found")
+
+    monkeypatch.setattr(accounts, "invite", refuse)
+    assert admin_client.post(ADMINS, data={"username": "grace"}).status_code == 404
 
 
 def test_an_invite_needs_a_free_username(
@@ -216,14 +231,14 @@ def test_one_who_cannot_sign_in_changes_nobody(session: Session) -> None:
     grace, _ = accounts.invite(session, "grace", None, ada.id, now)
     assert accounts.retire_admin(session, ada.id, grace.id, now) == "not_found"
     carol.retired_at = now
-    accounts.make_link_for(session, ada.id, ben.id, now)
+    accounts.reset_admin_sign_in(session, ada.id, ben.id, now)
     assert accounts.retire_admin(session, ben.id, ada.id, now) == "not_found"
     assert accounts.restore_admin(session, carol.id, ada.id, now) is None
-    with pytest.raises(accounts.LinkRefused):
+    with pytest.raises(accounts.AdminRefused):
         accounts.invite(session, "mallory", None, ada.id, now)
     # Two resetting each other at once: the second finds itself reset.
-    with pytest.raises(accounts.LinkRefused):
-        accounts.make_link_for(session, ben.id, ada.id, now)
+    with pytest.raises(accounts.AdminRefused):
+        accounts.reset_admin_sign_in(session, ben.id, ada.id, now)
     assert ben.retired_at is None
     assert accounts.has_password(session, ben.id)
 

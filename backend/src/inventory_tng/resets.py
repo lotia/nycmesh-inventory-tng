@@ -1,8 +1,9 @@
 """Resetting an account with a link (docs/decisions/0012): asked for by
 mail from the sign-in page, by an administrator who gave an address, or
-made by another administrator who reset the account's sign-in
-(accounts.reset_sign_in); or, while the operator has set RECOVERY_TOKEN,
-made with it at /recover for the password and authenticators.
+made by another administrator who reset the account's sign-in or brought
+it back (accounts.reset_admin_sign_in, accounts.restore_admin); or, while
+the operator has set RECOVERY_TOKEN, made with it at /recover for the
+password and authenticators.
 
 Asking always gets the same answer, and everything that depends on whether
 the account exists or has an address happens after the reply, so neither
