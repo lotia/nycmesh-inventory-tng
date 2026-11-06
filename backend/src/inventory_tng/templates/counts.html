@@ -55,22 +55,24 @@
 
 <section>
   <h2>Recently</h2>
-  <table>
-    <tr><th>When</th><th>What</th><th>Where</th><th>By</th></tr>
-    {% for entry in recent %}
-    {% set t = entry.transaction %}
-    <tr>
-      <td>{{ t.created_at | when(zone) }}</td>
-      <td>
-        {% if t.kind == "count" %}Count{% else %}{{ entry.reason }}{% endif %}:
-        {% for item, amount in entry.lines %}{{ "+" if entry.found else "-" }}{{ amount | amount }} {{ item.unit }} {{ item.name }}{{ ", " if not loop.last }}{% else %}as the records said{% endfor %}
-      </td>
-      <td>{{ entry.place }}</td>
-      <td>{{ entry.admin }}</td>
-    </tr>
-    {% else %}
-    <tr><td colspan="4">None yet.</td></tr>
-    {% endfor %}
-  </table>
+  <div class="table-scroll">
+    <table>
+      <tr><th>When</th><th>What</th><th>Where</th><th>By</th></tr>
+      {% for entry in recent %}
+      {% set t = entry.transaction %}
+      <tr>
+        <td>{{ t.created_at | when(zone) }}</td>
+        <td>
+          {% if t.kind == "count" %}Count{% else %}{{ entry.reason }}{% endif %}:
+          {% for item, amount in entry.lines %}{{ "+" if entry.found else "-" }}{{ amount | amount }} {{ item.unit }} {{ item.name }}{{ ", " if not loop.last }}{% else %}as the records said{% endfor %}
+        </td>
+        <td>{{ entry.place }}</td>
+        <td>{{ entry.admin }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">None yet.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
 </section>
 {% endblock %}

@@ -7,19 +7,21 @@
 </form>
 
 <section>
-  <table>
-    <tr><th>Item</th><th>Category</th><th>Unit</th><th>Part</th></tr>
-    {% for item in current %}
-    <tr>
-      <td><a href="{{ here }}/{{ item.id }}">{{ item.name }}</a></td>
-      <td>{{ category_names.get(item.category_id, "") }}</td>
-      <td>{{ item.unit }}</td>
-      <td>{{ item.manufacturer or "" }} {{ item.part_number or "" }}</td>
-    </tr>
-    {% else %}
-    <tr><td colspan="4">{{ "Nothing matches." if search else "None yet." }}</td></tr>
-    {% endfor %}
-  </table>
+  <div class="table-scroll">
+    <table>
+      <tr><th>Item</th><th>Category</th><th>Unit</th><th>Part</th></tr>
+      {% for item in current %}
+      <tr>
+        <td><a href="{{ here }}/{{ item.id }}">{{ item.name }}</a></td>
+        <td>{{ category_names.get(item.category_id, "") }}</td>
+        <td>{{ item.unit }}</td>
+        <td>{{ item.manufacturer or "" }} {{ item.part_number or "" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">{{ "Nothing matches." if search else "None yet." }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
 </section>
 
 <section>

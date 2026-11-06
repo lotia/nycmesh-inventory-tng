@@ -30,27 +30,29 @@
   <h2>Authenticators</h2>
   {% with name = "authenticators" %}{% include "_field_problem.html" %}{% endwith %}
   {% if authenticators %}
-  <table>
-    <tr><th>Name</th><th>Added</th><th>Last used</th><th></th></tr>
-    {% for authenticator, last_used in authenticators %}
-    <tr>
-      <td>
-        <form method="post" action="{{ paths.account }}/authenticators/{{ authenticator.id }}/name" class="actions">
-          <input name="authenticator_name" value="{{ authenticator.name }}" maxlength="{{ limits.authenticator_name_max }}" aria-label="Name" required>
-          <button>Rename</button>
-        </form>
-        {% with name = "authenticator_" ~ authenticator.id %}{% include "_field_problem.html" %}{% endwith %}
-      </td>
-      <td>{{ authenticator.created_at | when(zone) }}</td>
-      <td>{{ last_used | when(zone) if last_used else "never" }}</td>
-      <td>
-        <form method="post" action="{{ paths.account }}/authenticators/{{ authenticator.id }}/remove">
-          <button>Remove</button>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
+  <div class="table-scroll">
+    <table>
+      <tr><th>Name</th><th>Added</th><th>Last used</th><th></th></tr>
+      {% for authenticator, last_used in authenticators %}
+      <tr>
+        <td>
+          <form method="post" action="{{ paths.account }}/authenticators/{{ authenticator.id }}/name" class="actions">
+            <input name="authenticator_name" value="{{ authenticator.name }}" maxlength="{{ limits.authenticator_name_max }}" aria-label="Name" required>
+            <button>Rename</button>
+          </form>
+          {% with name = "authenticator_" ~ authenticator.id %}{% include "_field_problem.html" %}{% endwith %}
+        </td>
+        <td>{{ authenticator.created_at | when(zone) }}</td>
+        <td>{{ last_used | when(zone) if last_used else "never" }}</td>
+        <td>
+          <form method="post" action="{{ paths.account }}/authenticators/{{ authenticator.id }}/remove">
+            <button>Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
   {% if totp_optional and authenticators | length == 1 %}
   <p class="hint">Removing your only one turns TOTP off: your password alone
   will sign you in.</p>
@@ -78,21 +80,23 @@
 
 <section>
   <h2>Where you're signed in</h2>
-  <table>
-    <tr><th>Browser</th><th>Signed in</th><th>Last used</th><th></th></tr>
-    {% for row in sessions %}
-    <tr>
-      <td>{{ (row.user_agent or "Unknown") | truncate(60) }}{% if row.id == this_session %} <strong>(this one)</strong>{% endif %}</td>
-      <td>{{ row.created_at | when(zone) }}</td>
-      <td>{{ row.last_seen_at | when(zone) }}</td>
-      <td>
-        <form method="post" action="{{ paths.account }}/sessions/{{ row.id }}/end">
-          <button>{{ "Sign out" if row.id == this_session else "End" }}</button>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
+  <div class="table-scroll">
+    <table>
+      <tr><th>Browser</th><th>Signed in</th><th>Last used</th><th></th></tr>
+      {% for row in sessions %}
+      <tr>
+        <td><span class="wrap-anywhere">{{ (row.user_agent or "Unknown") | truncate(60) }}</span>{% if row.id == this_session %} <strong>(this one)</strong>{% endif %}</td>
+        <td>{{ row.created_at | when(zone) }}</td>
+        <td>{{ row.last_seen_at | when(zone) }}</td>
+        <td>
+          <form method="post" action="{{ paths.account }}/sessions/{{ row.id }}/end">
+            <button>{{ "Sign out" if row.id == this_session else "End" }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
   {% if sessions | length > 1 %}
   <form method="post" action="{{ paths.account }}/sessions/end-others">
     <button>Sign out everywhere else</button>

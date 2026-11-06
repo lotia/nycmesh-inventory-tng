@@ -52,25 +52,27 @@
 <section>
   <h2>Reasons for an adjustment</h2>
   <p class="hint">Offered when stock is found or written off on the Counts page.</p>
-  <table>
-    {% for reason in reasons %}
-    {% set field = "reason_" ~ reason.id %}
-    <tr {% if reason.retired_at %}class="retired"{% endif %}>
-      <td>
-        <form method="post" action="{{ here }}/reasons/{{ reason.id }}" class="actions">
-          <input name="name" value="{{ reason.name }}" maxlength="{{ name_max }}" aria-label="Reason" required>
-          <button name="action" value="rename">Rename</button>
-          {% if reason.retired_at %}
-          <button name="action" value="restore">Bring back</button>
-          {% else %}
-          <button name="action" value="retire">Retire</button>
-          {% endif %}
-        </form>
-        {% with name = field %}{% include "_field_problem.html" %}{% endwith %}
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
+  <div class="table-scroll">
+    <table>
+      {% for reason in reasons %}
+      {% set field = "reason_" ~ reason.id %}
+      <tr {% if reason.retired_at %}class="retired"{% endif %}>
+        <td>
+          <form method="post" action="{{ here }}/reasons/{{ reason.id }}" class="actions">
+            <input name="name" value="{{ reason.name }}" maxlength="{{ name_max }}" aria-label="Reason" required>
+            <button name="action" value="rename">Rename</button>
+            {% if reason.retired_at %}
+            <button name="action" value="restore">Bring back</button>
+            {% else %}
+            <button name="action" value="retire">Retire</button>
+            {% endif %}
+          </form>
+          {% with name = field %}{% include "_field_problem.html" %}{% endwith %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
   <form method="post" action="{{ here }}/reasons" class="actions">
     <label>New reason <input name="name" maxlength="{{ name_max }}" required>
       {% with name = "reason" %}{% include "_field_problem.html" %}{% endwith %}
