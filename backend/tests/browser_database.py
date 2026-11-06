@@ -8,15 +8,16 @@ its own (databases.py), migrated and seeded, with a registration code for
 the tests' device, and in BROWSER_RUN: prepared.json, what the tests need,
 and camera.y4m, the QR code of the seed's labelled item for Chromium to
 show as its camera. It then serves the built frontend from that database
-on BROWSER_PORT until Playwright stops it, and drops both. One a run
-leaves behind is dropped by a later run, as test databases are.
+on BROWSER_PORT until Playwright stops it, and drops the database and its
+files. A database a run leaves behind is dropped by a later run, as test
+databases are.
 """
 
 import argparse
+import contextlib
 import json
 import os
 import secrets
-import shutil
 import signal
 import sys
 from datetime import timedelta
@@ -33,6 +34,10 @@ from inventory_tng.models import Item, Label
 
 from databases import migrate, new_database
 
+# What a run writes in its folder: these, and the signed-in session
+# sign-in.setup.ts keeps (frontend/browser/prepared.ts, adminState).
+RUN_FILES = ("prepared.json", "camera.y4m", "admin.json")
+
 
 def main(argv: list[str]) -> int:
     if argv != ["serve"]:
@@ -40,7 +45,8 @@ def main(argv: list[str]) -> int:
         return 2
     run, port = Path(os.environ["BROWSER_RUN"]), os.environ["BROWSER_PORT"]
     signal.signal(signal.SIGTERM, stop)
-    # One a killed run left behind is used again: everything in it is remade.
+    # A folder that is there already, set beforehand or left by a killed run,
+    # is used as it is: only the run's own files go afterwards.
     run.mkdir(exist_ok=True)
     try:
         with new_database() as url:
@@ -55,7 +61,10 @@ def main(argv: list[str]) -> int:
             }
             server.main(["--port", port])
     finally:
-        shutil.rmtree(run, ignore_errors=True)
+        for name in RUN_FILES:
+            (run / name).unlink(missing_ok=True)
+        with contextlib.suppress(OSError):
+            run.rmdir()
     return 0
 
 

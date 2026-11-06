@@ -8,6 +8,8 @@ import pytest
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
+from inventory_tng.db import Base
+
 
 class Worker(threading.Thread):
     """`work` on a thread of its own, keeping what it returned or raised."""
@@ -71,3 +73,10 @@ class Committed:
                 return worker
             time.sleep(0.01)
         pytest.fail("it never waited for the lock")
+
+
+def made(committed: Committed, *rows: Base) -> None:
+    """The rows added from another connection, committed."""
+    setup = committed.session()
+    setup.add_all(rows)
+    setup.commit()

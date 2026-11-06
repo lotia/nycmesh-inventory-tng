@@ -15,7 +15,6 @@ none of these is a unit test; each is marked with what it tests:
 CONTRIBUTING.md says how to run or skip a kind.
 """
 
-import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import cast
@@ -36,6 +35,7 @@ from inventory_tng.db import (
     DbSession,
     describe_error,
     hold_until_commit,
+    locked,
     release_hold,
 )
 from inventory_tng.mail import Message, Notify
@@ -45,12 +45,14 @@ from inventory_tng.models import (
     AdminSession,
     Category,
     Item,
+    Location,
     SignInSettings,
     Volunteer,
 )
 
-from helpers.concurrency import Committed, Worker
+from helpers.concurrency import Committed, Worker, made
 from helpers.mail import SentMail
+from helpers.rows import tag
 from helpers.sign_in import PASSWORD, code, new_admin, reset_link, sign_in_with
 
 NEW_PASSWORD = "a long passphrase of their own"
@@ -751,16 +753,15 @@ Write = tuple[Callable[[Session], Base], Callable[[Session, Base], None]]
 
 
 def at_once(committed: Committed, first: Write, second: Write) -> str | None:
-    """Both rows locked, then the first written and committed while the
-    second waits: the rule the second was refused by, if any."""
+    """The first written, and committed while the second, locking its row
+    then writing, waits: the rule the second was refused by, if any."""
     one, two = committed.session(), committed.session()
     (lock_one, change_one), (lock_two, change_two) = first, second
-    mine, theirs = lock_one(one), lock_two(two)
-    change_one(one, mine)
+    change_one(one, lock_one(one))
     one.flush()
 
     def write_second() -> None:
-        change_two(two, theirs)
+        change_two(two, lock_two(two))
         two.flush()
 
     worker = committed.blocked(two, write_second)
@@ -771,11 +772,6 @@ def at_once(committed: Committed, first: Write, second: Write) -> str | None:
         return None
     assert isinstance(error, IntegrityError), error
     return describe_error(error).get("constraint")
-
-
-def tag() -> str:
-    """Unique names: rows committed by one test never clash with another's."""
-    return uuid.uuid4().hex[:8]
 
 
 def locking[M: Base](model: type[M], ident: int) -> Callable[[Session], Base]:
@@ -797,15 +793,11 @@ def setting(**values: object) -> Callable[[Session, Base], None]:
 
 def catalogue(committed: Committed) -> tuple[int, int]:
     """A category, and a retired item in it, committed."""
-    setup = committed.session()
     name = tag()
     category = Category(name=f"Radios {name}")
-    setup.add(category)
-    setup.flush()
-    item = Item(name=f"LiteBeam {name}", category_id=category.id)
-    item.retired_at = NOW
-    setup.add(item)
-    setup.commit()
+    made(committed, category)
+    item = Item(name=f"LiteBeam {name}", category_id=category.id, retired_at=NOW)
+    made(committed, item)
     return category.id, item.id
 
 
@@ -827,11 +819,9 @@ def test_an_item_comes_back_or_its_category_goes_not_both(
 
 
 def volunteers(committed: Committed) -> tuple[int, int]:
-    setup = committed.session()
     name = tag()
     a, b = Volunteer(name=f"A {name}"), Volunteer(name=f"B {name}")
-    setup.add_all([a, b])
-    setup.commit()
+    made(committed, a, b)
     return a.id, b.id
 
 
@@ -867,8 +857,7 @@ def test_crossing_merges_queue_and_the_second_is_refused(
 
 @pytest.mark.concurrency
 def test_an_item_added_while_its_category_is_retired(committed: Committed) -> None:
-    """The add's foreign-key check is not held up by the retire's row lock,
-    and the retire, writing second, is refused."""
+    """The retire waits for the add, then is refused."""
     category_id, _ = catalogue(committed)
     adding: Write = (
         lambda _session: Item(name=f"New {tag()}", category_id=category_id),
@@ -876,3 +865,52 @@ def test_an_item_added_while_its_category_is_retired(committed: Committed) -> No
     )
     retiring = (locking(Category, category_id), setting(retired_at=NOW))
     assert at_once(committed, adding, retiring) == "category_has_items"
+
+
+@pytest.mark.concurrency
+def test_an_item_added_once_its_category_is_locked_does_not_deadlock(
+    committed: Committed,
+) -> None:
+    """The retire's page has locked the category when the add writes: the
+    add's trigger waits for the rules' lock the page took first, rather than
+    holding it and waiting on the category, then is refused."""
+    category_id, _ = catalogue(committed)
+    retiring, adding = committed.session(), committed.session()
+    category = locked_row(retiring, Category, category_id)
+    assert category is not None
+
+    def add() -> None:
+        adding.add(Item(name=f"New {tag()}", category_id=category_id))
+        adding.flush()
+
+    worker = committed.blocked(adding, add)
+    category.retired_at = NOW
+    retiring.commit()
+    error = worker.finished().error
+    adding.rollback()
+    assert isinstance(error, IntegrityError), error
+    assert describe_error(error).get("constraint") == "item_category_current"
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize("model", [Location, Item])
+def test_a_page_waits_for_a_write_that_refers_to_its_row(
+    committed: Committed, model: type[Location | Item]
+) -> None:
+    """A save holds its places FOR KEY SHARE (ledger._hold_places), as a
+    movement's foreign key does its item, until it commits: a page's lock
+    waits for it, so retiring a place or fixing an item's unit reads what it
+    wrote (inventory-tng-8i4.69)."""
+    if model is Location:
+        row: Base = Location(name=f"Store {tag()}", kind="store")
+    else:
+        row = Item(name=f"LiteBeam {tag()}", category_id=catalogue(committed)[0])
+    made(committed, row)
+    saving = committed.session()
+    saving.execute(
+        locked(select(model.id).where(model.id == row.id), key_share=True, shared=True)
+    )
+    page = committed.session()
+    worker = committed.blocked(page, lambda: locked_row(page, model, row.id))
+    saving.commit()
+    assert worker.finished().error is None

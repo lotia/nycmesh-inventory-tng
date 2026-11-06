@@ -183,6 +183,8 @@ def test_unknown_items_and_others_packages_are_not_found(
     other = new_item(session, radios, "Other")
     theirs = add(session, ItemPackage(item_id=other.id, name="Box", size=4))
     assert admin_client.get(f"{ITEMS}/999999").status_code == 404
+    assert admin_client.post(f"{ITEMS}/999999", data={}).status_code == 404
+    assert admin_client.post(f"{ITEMS}/999999/packages").status_code == 404
     path = f"{ITEMS}/{item.id}/packages/{theirs.id}/retire"
     assert admin_client.post(path).status_code == 404
 

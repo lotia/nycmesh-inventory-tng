@@ -113,10 +113,11 @@ def test_a_refusal_names_each_bad_line(
         {"item_id": place.item.id, "quantity": "1.5"},
         {"item_id": place.cable.id, "quantity": "1.5"},
     ]
-    batch = place.batch(lines=lines, to_location_id=999999)
+    batch = place.batch(lines=lines, to_location_id=999999, volunteer_id=999999)
     response = client.post(URL, json=batch)
     assert response.status_code == 422
     assert [(p["loc"], p["type"]) for p in response.json()["detail"]] == [
+        (["body", "volunteer_id"], "not_found"),
         (["body", "to_location_id"], "not_found"),
         (["body", "lines", 1, "item_id"], "not_found"),
         (["body", "lines", 2, "quantity"], "not_whole"),

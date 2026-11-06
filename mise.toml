@@ -39,6 +39,7 @@ run = ["npm run typecheck", "npm run lint", "npm run coverage"]
 [tasks.check-browser]
 description = "Browser tests: the built app, in a real browser at a phone's width"
 dir = "frontend"
+depends = ["setup-browsers"]
 run = [
     "mise run compose -- up -d --wait db",
     "npm run build",

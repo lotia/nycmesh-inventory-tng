@@ -14,19 +14,22 @@ poster or four for cards. #}
 <div class="printable">
   <section>
     <h2>Print it</h2>
-    <fieldset>
-      <legend>Layout</legend>
-      <label><input type="radio" name="layout" value="poster" checked> A poster, one to a page</label>
-      <label><input type="radio" name="layout" value="cards"> Cards, four to a page</label>
-    </fieldset>
-    <fieldset>
-      <legend>Paper</legend>
-      <label><input type="radio" name="paper" value="letter" checked> US Letter</label>
-      <label><input type="radio" name="paper" value="a4"> A4</label>
-    </fieldset>
-    <button type="button" onclick="print()">Print</button>
-    <p class="hint">Print it now: the phrase is never shown again. If the print
-    dialog offers paper sizes, pick the same one there.</p>
+    {#- A form only for its spacing: nothing is sent. #}
+    <form>
+      <fieldset>
+        <legend>Layout</legend>
+        <label><input type="radio" name="layout" value="poster" checked> A poster, one to a page</label>
+        <label><input type="radio" name="layout" value="cards"> Cards, four to a page</label>
+      </fieldset>
+      <fieldset>
+        <legend>Paper</legend>
+        <label><input type="radio" name="paper" value="letter" checked> US Letter</label>
+        <label><input type="radio" name="paper" value="a4"> A4</label>
+      </fieldset>
+      <button type="button" onclick="print()">Print</button>
+      <p class="hint">Print it now: the phrase is never shown again. If the print
+      dialog offers paper sizes, pick the same one there.</p>
+    </form>
   </section>
   <div class="print-sheet">
     {% for _ in range(4) %}

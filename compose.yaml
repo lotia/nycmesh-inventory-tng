@@ -39,9 +39,10 @@ services:
     init: true
     # A terminal, so the logs keep their colour.
     tty: true
-    # Every setting it takes, and only those (CONTRIBUTING.md, Running the app
-    # in a container): each from your shell or .env, unset if neither sets
-    # it.
+    # The settings .env.example names, and only those (CONTRIBUTING.md,
+    # Running the app in a container): each from your shell or .env, unset if
+    # neither sets it. Not a signal's own OTLP endpoint, which would name
+    # localhost, as OTEL_EXPORTER_OTLP_ENDPOINT would.
     environment:
       APP_ENV:
       UNMASK_SECRETS:
@@ -59,6 +60,7 @@ services:
       MAIL_USERNAME:
       MAIL_PASSWORD:
       SITE_URL:
+      FORWARDED_ALLOW_IPS:
       OTEL_SDK_DISABLED:
       OTEL_SERVICE_NAME:
       OTEL_RESOURCE_ATTRIBUTES:

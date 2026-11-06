@@ -58,7 +58,6 @@ async function loadCatalogue(api: Api): Promise<Loaded> {
 const RULED_LIST = "list-none p-0 *:border-t *:border-line *:py-3";
 
 /** The volunteer's page: fill a cart, then Save it to the outbox. */
-
 export function ScanPage({
   api = API,
   outbox = sharedOutbox(),

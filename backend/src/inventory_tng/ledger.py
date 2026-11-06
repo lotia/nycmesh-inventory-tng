@@ -299,7 +299,6 @@ def record(
         batch.key,
         header,
         {line.item_id: line.quantity for line in batch.lines},
-        held=True,
     )
     if transaction is None:
         written = _replay(session, batch)
@@ -313,11 +312,15 @@ def _hold_places(session: Session, header: Mapping[str, object]) -> set[int]:
     id: a count (lock_place) then waits for it whole, so none can draw an
     id, wait, and commit after a count's moment that it falls inside. The
     ids of those that exist."""
-    places = {header.get("from_location_id"), header.get("to_location_id")} - {None}
     return set(
         session.scalars(
             locked(
-                select(Location.id).where(Location.id.in_(places)),
+                select(Location.id).where(
+                    Location.id.in_(
+                        {header.get("from_location_id"), header.get("to_location_id")}
+                        - {None}
+                    )
+                ),
                 key_share=True,
                 shared=True,
             )
@@ -330,15 +333,12 @@ def insert_transaction(
     key: uuid.UUID,
     header: Mapping[str, object],
     lines: Mapping[int, Decimal],
-    *,
-    held: bool = False,
 ) -> LedgerTransaction | None:
     """A transaction and its movements, unless its key is written already:
     None then. A concurrent request with the same key waits here for that
     one to commit, then writes nothing. Its places are held first
-    (_hold_places), unless the caller `held` them already."""
-    if not held:
-        _hold_places(session, header)
+    (_hold_places): again, if the caller holds them already, at no cost."""
+    _hold_places(session, header)
     transaction = session.scalar(
         pg_insert(LedgerTransaction)
         .values(idempotency_key=key, **header)
@@ -410,12 +410,8 @@ def _correct(
     kind: Literal["count", "adjustment"],
     header: Mapping[str, object],
     lines: Mapping[int, Decimal],
-    *,
-    held: bool = False,
 ) -> None:
-    transaction = insert_transaction(
-        session, key, {"kind": kind, **header}, lines, held=held
-    )
+    transaction = insert_transaction(session, key, {"kind": kind, **header}, lines)
     if transaction is None:
         return
     counted.add(1, {"kind": kind})
@@ -487,14 +483,13 @@ def record_count(
             admin_id=admin_id,
             lines=len(moved),
         )
-    # Written held: lock_place above holds the place already.
     # A count of nothing at all still says when the place was counted.
     if found or ((kept or not counted_at) and not lost):
         header = {"admin_id": admin_id, "to_location_id": location_id}
-        _correct(session, key, "count", header, found, held=True)
+        _correct(session, key, "count", header, found)
     if lost:
         header = {"admin_id": admin_id, "from_location_id": location_id}
-        _correct(session, lost_key, "count", header, lost, held=True)
+        _correct(session, lost_key, "count", header, lost)
     return Counted(bool(found or lost), moved)
 
 

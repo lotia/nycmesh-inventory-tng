@@ -142,11 +142,7 @@
     @apply mx-auto max-w-3xl px-4;
   }
 
-  /*
-   * An administrator page's main part. A form, and a fieldset in one, spaces
-   * what it holds by gap, not margins, its buttons at their own width; so
-   * what sits side by side, in a table's cell or .actions, has none to undo.
-   */
+  /* An administrator page's main part: its forms spaced by gap (0014). */
   .admin {
     @apply pt-6 pb-12;
   }

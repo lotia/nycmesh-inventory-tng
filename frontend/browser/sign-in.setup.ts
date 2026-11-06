@@ -1,7 +1,7 @@
 /**
  * Once for every test: signs in as the administrator the backend seeded,
- * and registers the browser as a device, then keeps both cookies
- * (playwright.config.ts, ADMIN_STATE).
+ * and registers the browser as a device, then keeps both cookies for every
+ * test (prepared.ts, adminState).
  */
 import { expect, test } from "@playwright/test";
 import { adminState, prepared } from "./prepared";
