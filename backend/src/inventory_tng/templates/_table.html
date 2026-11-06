@@ -1,0 +1,9 @@
+{#- Every table: one that cannot fit scrolls in its own box, never the
+page. Its rows are the call's body. -#}
+{% macro table() -%}
+<div class="overflow-x-auto">
+  <table>
+    {{- caller() -}}
+  </table>
+</div>
+{%- endmacro %}

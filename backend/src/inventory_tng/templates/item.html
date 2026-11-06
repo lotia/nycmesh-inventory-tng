@@ -1,4 +1,5 @@
 {% extends "admin_base.html" %}
+{% from "_table.html" import table %}
 {% block main %}
 {% if item.retired_at %}
 <p>Retired: it can't be received.{% if in_stock > 0 %} Volunteers can still
@@ -48,20 +49,18 @@ None is left, so nobody can pick it.{% endif %}</p>
 <section>
   <h2>Packages</h2>
   <p class="hint">Sizes it comes in, so one scan or pick counts the whole package.</p>
-  <div class="table-scroll">
-    <table>
-      {% for package in packages %}
-      <tr {% if package.retired_at %}class="retired"{% endif %}>
-        <td>{{ package.name }}</td><td>{{ package.size | amount }} {{ item.unit }}</td>
-        <td>{% if not package.retired_at %}
-          <form method="post" action="{{ here }}/packages/{{ package.id }}/retire"><button>Retire</button></form>
-        {% else %}retired{% endif %}</td>
-      </tr>
-      {% else %}
-      <tr><td>None.</td></tr>
-      {% endfor %}
-    </table>
-  </div>
+  {% call table() %}
+    {% for package in packages %}
+    <tr {% if package.retired_at %}class="retired"{% endif %}>
+      <td>{{ package.name }}</td><td>{{ package.size | amount }} {{ item.unit }}</td>
+      <td>{% if not package.retired_at %}
+        <form method="post" action="{{ here }}/packages/{{ package.id }}/retire"><button>Retire</button></form>
+      {% else %}retired{% endif %}</td>
+    </tr>
+    {% else %}
+    <tr><td>None.</td></tr>
+    {% endfor %}
+  {% endcall %}
   <form method="post" action="{{ here }}/packages" class="actions">
     <label>Package <input name="package_name" value="{{ values.get('package_name', '') }}" placeholder="Box" required>
       {% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}

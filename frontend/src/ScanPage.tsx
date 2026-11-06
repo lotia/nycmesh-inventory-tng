@@ -54,7 +54,11 @@ async function loadCatalogue(api: Api): Promise<Loaded> {
   }
 }
 
+/** A list whose entries are ruled apart: the cart's lines, the outbox. */
+const RULED_LIST = "list-none p-0 *:border-t *:border-line *:py-3";
+
 /** The volunteer's page: fill a cart, then Save it to the outbox. */
+
 export function ScanPage({
   api = API,
   outbox = sharedOutbox(),
@@ -278,8 +282,8 @@ function CartForm({
   return (
     <form onSubmit={save}>
       {checkName.value && name !== undefined && (
-        <div role="alert" class="who">
-          <p>
+        <div role="alert" class="mb-4 border-2 border-caution p-3">
+          <p class="mt-0">
             Are you <strong>{name}</strong>? This phone hasn't been used for a
             while.
           </p>
@@ -330,8 +334,9 @@ function CartForm({
             ["install", "Taking it to an install"],
           ] as const
         ).map(([kind, words]) => (
-          <label key={kind} class="choice">
+          <label key={kind} class="flex items-center gap-2 py-1 font-normal">
             <input
+              class="m-0"
               type="radio"
               name="kind"
               value={kind}
@@ -378,7 +383,7 @@ function CartForm({
 
       <h2>Cart</h2>
       {cart.value.lines.length === 0 && <p>Nothing in the cart yet.</p>}
-      <ul class="lines">
+      <ul class={RULED_LIST}>
         {cart.value.lines.map((line) => {
           const item = items.get(line.itemId);
           return (
@@ -429,7 +434,7 @@ function CartForm({
       <Finder catalogue={catalogue} query={query} onAdd={add} onLabel={actOn} />
 
       {problems.value.length > 0 && (
-        <ul role="alert" class="problems">
+        <ul role="alert" class="list-none p-0">
           {problems.value.map((problem) => (
             <li key={problem}>{problem}</li>
           ))}
@@ -439,14 +444,14 @@ function CartForm({
         <p role="status">Saved: {saved.value}. A new cart is ready.</p>
       )}
       {name !== undefined && (
-        <p class="saving-as">
+        <p class="mt-0">
           Saving as <strong>{name}</strong>.{" "}
           <button type="button" onClick={changeName}>
             Change
           </button>
         </p>
       )}
-      <button type="submit" class="save">
+      <button type="submit" class="w-full text-xl">
         Save
       </button>
     </form>
@@ -543,7 +548,7 @@ function CartLine({
       <strong>{item.name}</strong>
       {item.retired && <small> {RETIRED}</small>}
       {item.packages.map((pack) => (
-        <label key={pack.id} class="amount">
+        <label key={pack.id} class="font-normal">
           {pack.name} ({decimal(thousandths(pack.size) ?? 0)} {item.unit})
           <input
             inputMode="numeric"
@@ -560,7 +565,7 @@ function CartLine({
           />
         </label>
       ))}
-      <label class="amount">
+      <label class="font-normal">
         {item.packages.length > 0
           ? `Loose ${item.unit === "each" ? "units" : item.unit}`
           : item.unit === "each"
@@ -574,7 +579,7 @@ function CartLine({
           }
         />
       </label>
-      <p class="total">
+      <p class="mt-0 mb-2">
         {"problem" in quantity
           ? quantity.problem
           : `${decimal(quantity.amount)} ${item.unit} in all`}
@@ -629,7 +634,7 @@ function Finder({
       {query.value.trim() !== "" && matches.length === 0 && (
         <p>Nothing matches “{query.value.trim()}”.</p>
       )}
-      <ul class="matches">
+      <ul class="list-none p-0 *:py-1">
         {matches.map((item) => (
           <li key={item.id}>
             <button type="button" onClick={() => onAdd(item.id)}>
@@ -666,7 +671,7 @@ function OutboxList({ outbox }: { outbox: Outbox }) {
           <a href="/register">Register this browser</a> to send what is waiting.
         </p>
       )}
-      <ul class="outbox">
+      <ul class={RULED_LIST}>
         {entries.map((entry) => (
           <li key={entry.body.key}>
             {entry.what}

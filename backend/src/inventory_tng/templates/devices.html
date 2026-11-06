@@ -1,4 +1,5 @@
 {% extends "admin_base.html" %}
+{% from "_table.html" import table %}
 {% block main %}
 <p>A phone or computer must be registered before it can record anything.
 Make a code, then show its QR code in the room, or send its phrase to
@@ -24,20 +25,18 @@ someone remote. Making one asks for a fresh code.</p>
 
 <section>
   <h2>Codes</h2>
-  <div class="table-scroll">
-    <table>
-      <tr><th>Code</th><th>State</th><th>Used</th><th>Until</th></tr>
-      {% for code, state, registered in codes %}
-      <tr>
-        <td><a href="{{ codes_path }}/{{ code.id }}">{{ code.label or "Code " ~ code.id }}</a></td>
-        <td>{{ state }}</td>
-        <td>{{ code.uses }} of {{ code.max_uses }}</td>
-        <td>{{ code.expires_at | when(zone) }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="4">None yet.</td></tr>
-      {% endfor %}
-    </table>
-  </div>
+  {% call table() %}
+    <tr><th>Code</th><th>State</th><th>Used</th><th>Until</th></tr>
+    {% for code, state, registered in codes %}
+    <tr>
+      <td><a href="{{ codes_path }}/{{ code.id }}">{{ code.label or "Code " ~ code.id }}</a></td>
+      <td>{{ state }}</td>
+      <td>{{ code.uses }} of {{ code.max_uses }}</td>
+      <td>{{ code.expires_at | when(zone) }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4">None yet.</td></tr>
+    {% endfor %}
+  {% endcall %}
 </section>
 {% endblock %}
