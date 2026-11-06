@@ -255,13 +255,18 @@ Your `backend/src` and `backend/migrations` are mounted into it, so it picks
 up your edits. Pass `--build` again after changing dependencies or
 `frontend/`.
 
-It reads your `.env`, except `DATABASE_URL` and `OTEL_EXPORTER_OTLP_ENDPOINT`,
-because inside the container `localhost` is the container, and
-`VITE_DEV_SERVER` and `FRONTEND_DIST`, so it serves the bundle it built.
-To send its telemetry to the dashboard, start the dashboard (Logging, below)
-and set `INVENTORY_APP_OTLP_ENDPOINT=http://dashboard:18890`. It takes
-port 8000, as the run command does; `INVENTORY_APP_PORT` moves it. The
-client address it logs is the container network's, not your browser's.
+It takes only the settings `compose.yaml` lists under the app's
+`environment:`, each from your shell or `.env`. A setting the app gains goes
+in `.env.example` and in that list; a test checks that every one
+`.env.example` names is there. The container sets its own
+`DATABASE_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT` and `MAIL_HOST`, because
+inside it `localhost` is the container, and its own `VITE_DEV_SERVER` and
+`FRONTEND_DIST`, so it serves the bundle it built. To send its telemetry
+to the dashboard, start the dashboard (Logging, below) and set
+`INVENTORY_APP_OTLP_ENDPOINT=http://dashboard:18890`; to send mail to
+Mailpit, `INVENTORY_APP_MAIL_HOST=mail`. It takes port 8000, as the run
+command does; `INVENTORY_APP_PORT` moves it. The client address it logs is
+the container network's, not your browser's.
 
 ## Running the checks
 
