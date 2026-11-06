@@ -175,22 +175,31 @@ def _count_page(
     *,
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
+    items: Collection[int] = (),
     recount: Mapping[int, tuple[Decimal, Decimal, Decimal]] | None = None,
-    only: Collection[int] | None = None,
     alert: str | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
-    """The count form, with the records as of `as_of`. With recount, only the
-    items that moved while they were counted: what was typed for each, and
-    what came in and went out; with only, those items, as a recount sent
-    back with a problem."""
-    asked = recount or only
-    was = expected(session, place.id, as_of=as_of, items=asked)
-    if asked:
-        was = {item_id: was.get(item_id, Decimal(0)) for item_id in asked}
-    items = {i.id: i for i in session.scalars(select(Item).where(Item.id.in_(was)))}
+    """The count form, with the records as of `as_of`: of everything there,
+    or a recount of `items` only, which the form carries. With `recount`,
+    what was typed for each and what came in and went out while it was
+    counted."""
+    was = expected(session, place.id, as_of=as_of, items=items or None)
+    if items:
+        was = {item_id: was.get(item_id, Decimal(0)) for item_id in items}
+    countable = _items(session)
+    named = {item.id: item for item in countable}
+    if missing := was.keys() - named.keys():
+        # What the records had then but cannot be counted now, or what the
+        # form's items, sent back, name that is no item at all.
+        missed = session.scalars(select(Item).where(Item.id.in_(missing)))
+        named |= {item.id: item for item in missed}
     rows = sorted(
-        ((items[item_id], amount) for item_id, amount in was.items()),
+        (
+            (named[item_id], amount)
+            for item_id, amount in was.items()
+            if item_id in named
+        ),
         key=lambda row: row[0].name.lower(),
     )
     return admin_page(
@@ -204,8 +213,8 @@ def _count_page(
             "place": place,
             "rows": rows,
             "recount": recount,
-            "recounting": bool(asked),
-            "others": [i for i in _items(session) if i.id not in was],
+            "items": sorted(items),
+            "others": [item for item in countable if item.id not in was],
             "key": (values or {}).get("key") or uuid.uuid4(),
             "as_of": as_of,
             "alert": alert,
@@ -283,12 +292,6 @@ def count(
     if problems:
         # What was typed is as of when the form was shown; a recount asks
         # again for its own items only.
-        ids = [
-            whole(f.removeprefix(COUNTED), 1, INTEGER_MAX)
-            for f in form
-            if f.startswith(COUNTED)
-        ]
-        only = [i for i in ids if i is not None] if form.get("recounting") else None
         return _count_page(
             request,
             session,
@@ -297,7 +300,11 @@ def count(
             as_of,
             problems=problems,
             values=form,
-            only=only,
+            items={
+                item_id
+                for typed in form.get("items", "").split()
+                if (item_id := whole(typed, 1, INTEGER_MAX)) is not None
+            },
         )
     result = record_count(session, key, signed.admin.id, place.id, counted, as_of)
     session.commit()
@@ -310,6 +317,7 @@ def count(
         signed,
         place,
         moment(session, place.id),
+        items=result.moved.keys(),
         recount={
             item_id: (counted[item_id], came, went)
             for item_id, (came, went) in result.moved.items()
