@@ -277,16 +277,35 @@ npm run lint                     # Biome: lint and formatting
 npm run coverage                 # Vitest, with coverage (npm test: without)
 ```
 
+Those are unit tests: Vitest runs the frontend's in a page it simulates
+(happy-dom), with no layout. The browser tests, in `frontend/browser/`, are
+another kind: Playwright drives a real browser engine against the whole app,
+built frontend and all, from a database of their own
+(`backend/tests/browser_database.py`), at a phone's width. They check what
+only a real browser can, such as that no page scrolls sideways:
+
+```sh
+mise run check-browser           # builds, starts the app, runs them
+```
+
+They run in Chromium; also in WebKit, Safari's engine, in CI and with
+`PLAYWRIGHT_WEBKIT=1`, which has `mise run check-browser` install it too.
+Playwright's WebKit is built for Ubuntu and may not start on other systems
+(installing it says what it lacks). Each run has a database and a port of
+its own, so runs from two clones do not meet.
+
 CI runs these checks, in this order, on pushes to `main` and on pull requests,
 and builds the frontend.
 
-Only the backend's tests need the database; the other checks take about a
-second each. Start the database first. Then `mise run fix` runs the fixes
-and `mise run check` runs every check, or one side of them:
+Only the backend's tests and the browser tests need the database; the other
+checks take about a second each. Start the database first. Then
+`mise run fix` runs the fixes and `mise run check` runs every check, or one
+side of them:
 
 ```sh
 mise run fix-backend    # or: mise run fix-frontend
 mise run check-backend  # or: mise run check-frontend
+mise run check-browser  # the browser tests
 mise run check-changed-lines  # both sides, then coverage of what you changed
 mise run check-scripts  # shellcheck, on the scripts in mise-tasks/
 mise run check-toml     # taplo: lint and formatting (mise run fix-toml formats)

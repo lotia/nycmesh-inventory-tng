@@ -65,6 +65,8 @@ export default defineConfig({
     strictPort: true,
   },
   test: {
+    // Unit tests only: browser/ is Playwright's (playwright.config.ts).
+    include: ["src/**/*.test.{ts,tsx}"],
     environment: "happy-dom",
     setupFiles: ["src/test-setup.ts"],
     // The floors and how they are measured: CONTRIBUTING.md, Coverage.

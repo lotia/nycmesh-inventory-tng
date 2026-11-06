@@ -5,7 +5,8 @@ is dropped when the run ends or, if it never could, by a later run
 import os
 import time
 
-from conftest import NO_DATABASE, SERVER_URL, drop_left_behind
+from conftest import NO_DATABASE
+from databases import SERVER_URL, drop_left_behind
 from sqlalchemy import make_url, text
 
 from inventory_tng.db import make_engine
@@ -32,7 +33,7 @@ def test_databases_left_behind_are_dropped_and_no_others(database_url: str) -> N
             for name in (old, recent):
                 connection.execute(text(f'CREATE DATABASE "{name}"'))
         # This run's own is new, so it stays too.
-        dropped = drop_left_behind(server, now)
+        dropped = drop_left_behind(now)
         assert dropped == [old]
         with server.connect() as connection:
             left = set(

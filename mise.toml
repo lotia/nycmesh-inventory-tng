@@ -10,10 +10,11 @@ taplo = "0.10.0"
 "npm:markdownlint-cli2" = "0.24.0"
 
 [tasks.check]
-description = "Check the backend, the frontend, the task scripts and the TOML"
+description = "Check the backend, the frontend, the browser tests, the task scripts and the TOML"
 depends = [
     "check-backend",
     "check-frontend",
+    "check-browser",
     "check-changed-lines",
     "check-scripts",
     "check-toml",
@@ -33,6 +34,16 @@ run = [
 description = "Type check, lint, format check and test the frontend"
 dir = "frontend"
 run = ["npm run typecheck", "npm run lint", "npm run coverage"]
+
+[tasks.check-browser]
+description = "Browser tests: the built app, in a real browser at a phone's width"
+dir = "frontend"
+run = [
+    "mise run compose -- up -d --wait db",
+    "npx playwright install chromium $([ \"${PLAYWRIGHT_WEBKIT:-}\" = 1 ] && echo webkit)",
+    "npm run build",
+    "npx playwright test",
+]
 
 [tasks.check-changed-lines]
 description = "Every line changed since origin/main is run by a test"

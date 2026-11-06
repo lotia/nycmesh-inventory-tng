@@ -5,26 +5,29 @@ import contextlib
 import dataclasses
 import logging
 import os
-import re
 import threading
 import time
-import uuid
-from collections.abc import Callable, Generator, Iterator
-from contextlib import contextmanager, nullcontext
-from datetime import timedelta
+from collections.abc import Callable, Iterator
+from contextlib import nullcontext
 from pathlib import Path
 
 import argon2.profiles
 import pytest
 import structlog
-from alembic import command
 from alembic.config import Config
 from argon2 import PasswordHasher
+from databases import (
+    Unreachable,
+    alembic_config_for,
+    create_database,
+    drop_database,
+    drop_left_behind,
+    migrate,
+)
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import Connection, Engine, event, exc, make_url, text
+from sqlalchemy import Connection, Engine, event, exc, text
 from sqlalchemy.engine.interfaces import DBAPIConnection
-from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, devices, local_env
@@ -37,7 +40,6 @@ from inventory_tng.db import (
     release_hold,
     run_outside_transaction,
 )
-from inventory_tng.local_env import local_env_values
 from inventory_tng.logs import configure_structlog
 from inventory_tng.mail import Message, get_mailer
 from inventory_tng.rate_limits import limiter
@@ -127,85 +129,22 @@ def restore_logging() -> Iterator[None]:
     configure_structlog()
 
 
-PYPROJECT = Path(__file__).parents[1] / "pyproject.toml"
-
-# The database compose starts: from the shell, else the repository's .env
-# (CONTRIBUTING.md, Local settings), else compose's default port.
-LOCAL = local_env_values()
-PORT = os.environ.get("INVENTORY_DB_PORT") or LOCAL.get("INVENTORY_DB_PORT") or "5433"
-SERVER_URL = Settings(
-    database_url=os.environ.get("DATABASE_URL")
-    or LOCAL.get("DATABASE_URL")
-    or f"postgresql://inventory:inventory@localhost:{PORT}/inventory"
-).database_url
-
-
 # What DATABASE_URL is during the tests: nothing listens on port 1.
 NO_DATABASE = "postgresql://nobody@127.0.0.1:1/use_the_database_url_fixture"
-
-# Each run's database is named for when it began, so a run that never got to
-# drop its own (killed, or crashed) is dropped by a later one.
-TEST_DATABASE = re.compile(r"test_(\d+)_[0-9a-f]{8}")
-LEFT_BEHIND = timedelta(hours=1)
-
-
-def drop_left_behind(server: Engine, now: float) -> list[str]:
-    """Test databases from runs that began over an hour ago and that nothing
-    is connected to: never a run still going."""
-    with server.connect() as connection:
-        idle = connection.scalars(
-            text(
-                "SELECT datname FROM pg_database WHERE datname LIKE 'test\\_%' "
-                "AND datname NOT IN (SELECT datname FROM pg_stat_activity "
-                "WHERE datname IS NOT NULL)"
-            )
-        ).all()
-        dropped = []
-        for name in idle:
-            match = TEST_DATABASE.fullmatch(name)
-            if match and now - int(match.group(1)) > LEFT_BEHIND.total_seconds():
-                connection.execute(text(f'DROP DATABASE IF EXISTS "{name}"'))
-                dropped.append(name)
-    if dropped:
-        log.info("dropped test databases left behind", databases=dropped)
-    return dropped
 
 
 @pytest.fixture(scope="session")
 def database_url() -> Iterator[str]:
-    with new_database() as url:
+    try:
+        url = create_database()
+    except Unreachable as error:
+        pytest.exit(str(error), returncode=2)
+    try:
         # Once reachable: this run's own is too new to be dropped.
-        server = make_engine(SERVER_URL).execution_options(isolation_level="AUTOCOMMIT")
-        drop_left_behind(server, time.time())
-        server.dispose()
+        drop_left_behind()
         yield url
-
-
-@contextmanager
-def new_database(template: str | None = None) -> Generator[str]:
-    """A database of its own, dropped afterwards: empty, with no schema, or a
-    copy of the database `template`."""
-    name = f"test_{int(time.time())}_{uuid.uuid4().hex[:8]}"
-    server = make_engine(SERVER_URL).execution_options(isolation_level="AUTOCOMMIT")
-    try:
-        copy = f' TEMPLATE "{template}"' if template else ""
-        with server.connect() as connection:
-            connection.execute(text(f'CREATE DATABASE "{name}"{copy}'))
-        log.info("created test database", database=name)
-    except OperationalError as error:
-        pytest.exit(
-            f"Cannot reach PostgreSQL at {make_url(SERVER_URL)}. Start it with "
-            f"`mise run compose -- up -d --wait db`.\n{error}",
-            returncode=2,
-        )
-    try:
-        url = make_url(SERVER_URL).set(database=name)
-        yield url.render_as_string(hide_password=False)
     finally:
-        with server.connect() as connection:
-            connection.execute(text(f'DROP DATABASE "{name}" WITH (FORCE)'))
-        log.info("dropped test database", database=name)
-        server.dispose()
+        drop_database(url)
 
 
 @pytest.fixture(scope="session")
@@ -216,26 +155,14 @@ def engine(database_url: str) -> Iterator[Engine]:
     engine.dispose()
 
 
-def migrate(engine: Engine) -> None:
-    """Every migration, up to the newest."""
-    with engine.begin() as connection:
-        command.upgrade(_alembic_config(connection), "head")
-
-
 @pytest.fixture
 def alembic_config(engine: Engine) -> Iterator[Config]:
     """Migrations run inside a transaction that is rolled back after the test,
     so a failed downgrade cannot leave later tests without a schema."""
     with engine.connect() as connection:
         transaction = connection.begin()
-        yield _alembic_config(connection)
+        yield alembic_config_for(connection)
         transaction.rollback()
-
-
-def _alembic_config(connection: Connection) -> Config:
-    config = Config(toml_file=PYPROJECT)
-    config.attributes["connection"] = connection
-    return config
 
 
 @pytest.fixture

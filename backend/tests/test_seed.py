@@ -7,7 +7,8 @@ import sys
 from collections.abc import Iterator
 
 import pytest
-from conftest import NO_DATABASE, migrate, new_database
+from conftest import NO_DATABASE
+from databases import migrate, new_database
 from sqlalchemy import delete, func, make_url, select
 from sqlalchemy.orm import Session
 
