@@ -663,12 +663,26 @@ def create_first_admin(
 def change_password(
     session: Session, row: AdminSession, password: str, now: datetime
 ) -> None:
-    """A new password; every other session of theirs ends, and any unused
+    """A new password, from the session `row`: every other session of
+    theirs ends, and any unused reset link. The caller has checked it
+    (password_problem) and commits."""
+    set_password(session, row.admin_id, password, now, keep=row.id)
+
+
+def set_password(
+    session: Session,
+    admin_id: int,
+    password: str,
+    now: datetime,
+    *,
+    keep: int | None = None,
+) -> None:
+    """A new password: their sessions end, all but `keep`, and any unused
     reset link. The caller has checked it (password_problem) and commits."""
-    _set_password(session, row.admin_id, password, now)
-    ended = end_sessions(session, row.admin_id, now, keep=row.id)
-    void_reset_links(session, row.admin_id, now)
-    log.info("password changed", admin_id=row.admin_id, sessions_ended=ended)
+    _set_password(session, admin_id, password, now)
+    ended = end_sessions(session, admin_id, now, keep=keep)
+    void_reset_links(session, admin_id, now)
+    log.info("password changed", admin_id=admin_id, sessions_ended=ended)
 
 
 def change_email(session: Session, admin: Admin, email: str, now: datetime) -> None:

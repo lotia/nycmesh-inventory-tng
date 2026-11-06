@@ -94,6 +94,21 @@ The backend is `uv run python -m inventory_tng --reload`, in `backend/`.
 run command starts uvicorn itself; uvicorn's own logging flags are not used,
 the `LOG_*` settings are (Logging, below).
 
+### Some data to work with
+
+```sh
+cd backend
+uv run python -m inventory_tng.seed     # or: --password <yours>
+```
+
+On an empty database it makes an administrator, `dev`, with a password it
+prints once, and a few categories, items, places, volunteers and stock.
+Sign-in codes become optional, so `dev` signs in with the password alone.
+Run again, it only sets `dev`'s password, and only if you give one. It
+refuses a database it did not seed, and needs `APP_ENV=development`, as
+`.env.example` sets, also in the app container:
+`mise run compose -- exec app python -m inventory_tng.seed`.
+
 ### Migrations
 
 Until the first production deploy, a change may edit an existing migration
