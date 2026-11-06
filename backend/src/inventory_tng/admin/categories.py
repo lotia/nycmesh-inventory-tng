@@ -10,8 +10,15 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.admin.common import ADMIN, admin_page, name_problem, now
-from inventory_tng.db import DbSession, get_locked, unique
+from inventory_tng.admin.common import (
+    ADMIN,
+    RULES,
+    admin_page,
+    locked_row,
+    name_problem,
+    now,
+)
+from inventory_tng.db import DbSession, refusal, unique
 from inventory_tng.models import Category, Item
 from inventory_tng.pages import not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
@@ -129,7 +136,7 @@ def rename_category(
     category_id: int,
     name: Annotated[str, Form()] = "",
 ) -> Response:
-    found = get_locked(session, Category, category_id)
+    found = locked_row(session, Category, category_id)
     if found is None:
         return not_found()
     name = name.strip()
@@ -151,13 +158,18 @@ def rename_category(
 def retire_category(
     request: Request, signed: AdminSignedIn, session: DbSession, category_id: int
 ) -> Response:
-    found = get_locked(session, Category, category_id)
+    found = locked_row(session, Category, category_id)
     if found is None or found.retired_at is not None:
         return not_found()
-    if _items(session).get(found.id):
-        problem = "Move or retire its items first."
-        return _category_page(request, session, signed, found, problem)
-    found.retired_at = now()
+
+    def retire() -> None:
+        found.retired_at = now()
+
+    # The database decides, items added or brought back meanwhile too.
+    if refusal(session, retire, "category_has_items"):
+        return _category_page(
+            request, session, signed, found, RULES["category_has_items"]
+        )
     session.commit()
     log.info("category retired", category_id=category_id)
     return redirect(CATEGORIES, notice="retired")
@@ -167,7 +179,7 @@ def retire_category(
 def restore_category(
     request: Request, signed: AdminSignedIn, session: DbSession, category_id: int
 ) -> Response:
-    found = get_locked(session, Category, category_id)
+    found = locked_row(session, Category, category_id)
     if found is None or found.retired_at is None:
         return not_found()
 

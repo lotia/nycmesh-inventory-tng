@@ -2,7 +2,7 @@
 has moved in it: the ledger's quantities are in that unit. A retired item
 with stock left may still be taken, never received (docs/decisions/0003)."""
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from decimal import Decimal
 from typing import Annotated
 
@@ -17,12 +17,14 @@ from inventory_tng.admin.common import (
     ADMIN,
     admin_page,
     chosen,
+    locked_row,
     name_problem,
     now,
     quantity,
+    rule_words,
     text_form,
 )
-from inventory_tng.db import DbSession, exists_where, get_locked, unique
+from inventory_tng.db import DbSession, exists_where, refusal, unique
 from inventory_tng.ledger import balance
 from inventory_tng.models import UNITS, Category, Item, ItemPackage, Movement
 from inventory_tng.pages import NOTICES, not_found, redirect
@@ -38,6 +40,20 @@ TAKEN = (
     "Another item already has that name, that manufacturer and part number, "
     "or that old code."
 )
+RESTORE_TAKEN = "A current item already has its name or part number: change one first."
+
+
+def _refused(
+    session: Session, change: Callable[[], object], problems: dict[str, str]
+) -> bool:
+    """Makes the change, unless its name is taken or its category retired:
+    then says so, beside that field. True if it was refused."""
+    broken = refusal(session, change, "unique", "item_category_current")
+    if broken is not None:
+        field = "name" if broken == "unique" else "category_id"
+        problems[field] = rule_words(broken, TAKEN)
+    return broken is not None
+
 
 NOTICES.update(
     {
@@ -177,8 +193,8 @@ def add_item(
 ) -> Response:
     values, problems = _fields(session, form)
     item = Item(**values)
-    if not problems and not unique(session, lambda: session.add(item)):
-        problems["name"] = TAKEN
+    if not problems:
+        _refused(session, lambda: session.add(item), problems)
     if problems:
         return _list_page(request, session, signed, problems=problems, values=form)
     session.commit()
@@ -204,7 +220,7 @@ def save_item(
     item_id: int,
     form: TextForm,
 ) -> Response:
-    found = get_locked(session, Item, item_id)
+    found = locked_row(session, Item, item_id)
     if found is None:
         return not_found()
     values, problems = _fields(session, form, unit_fixed=_moved(session, item_id))
@@ -213,8 +229,8 @@ def save_item(
         for field, value in values.items():
             setattr(found, field, value)
 
-    if not problems and not unique(session, save):
-        problems["name"] = TAKEN
+    if not problems:
+        _refused(session, save, problems)
     if problems:
         return _item_page(
             request, session, signed, found, problems=problems, values=form
@@ -226,7 +242,7 @@ def save_item(
 
 @router.post(f"{ITEMS}/{{item_id}}/retire")
 def retire_item(signed: AdminSignedIn, session: DbSession, item_id: int) -> Response:
-    found = get_locked(session, Item, item_id)
+    found = locked_row(session, Item, item_id)
     if found is None or found.retired_at is not None:
         return not_found()
     found.retired_at = now()
@@ -239,20 +255,16 @@ def retire_item(signed: AdminSignedIn, session: DbSession, item_id: int) -> Resp
 def restore_item(
     request: Request, signed: AdminSignedIn, session: DbSession, item_id: int
 ) -> Response:
-    found = get_locked(session, Item, item_id)
+    found = locked_row(session, Item, item_id)
     if found is None or found.retired_at is None:
         return not_found()
-    if chosen(session, Category, str(found.category_id)) is None:
-        problem = "Its category is retired: bring that back, or pick another, first."
-        return _item_page(request, session, signed, found, problems={"name": problem})
 
     def restore() -> None:
         found.retired_at = None
 
-    if not unique(session, restore):
-        problem = (
-            "A current item already has its name or part number: change one first."
-        )
+    # Beside the name: the category list shows only current categories.
+    if broken := refusal(session, restore, "unique", "item_category_current"):
+        problem = rule_words(broken, RESTORE_TAKEN)
         return _item_page(request, session, signed, found, problems={"name": problem})
     session.commit()
     log.info("item restored", item_id=item_id)
@@ -268,7 +280,7 @@ def add_package(
     package_name: Annotated[str, Form()] = "",
     size: Annotated[str, Form()] = "",
 ) -> Response:
-    found = get_locked(session, Item, item_id)
+    found = locked_row(session, Item, item_id)
     if found is None:
         return not_found()
     name = package_name.strip()
@@ -296,7 +308,7 @@ def add_package(
 def retire_package(
     signed: AdminSignedIn, session: DbSession, item_id: int, package_id: int
 ) -> Response:
-    package = get_locked(session, ItemPackage, package_id)
+    package = locked_row(session, ItemPackage, package_id)
     if package is None or package.item_id != item_id or package.retired_at:
         return not_found()
     package.retired_at = now()

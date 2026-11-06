@@ -20,12 +20,13 @@ from inventory_tng import accounts, mail
 from inventory_tng.admin.common import (
     ADMIN,
     admin_page,
+    locked_row,
     name_problem,
     now,
     text_form,
     whole,
 )
-from inventory_tng.db import DbSession, attempt, get_locked, unique
+from inventory_tng.db import DbSession, attempt, unique
 from inventory_tng.local_time import is_time_zone
 from inventory_tng.mail import Notify
 from inventory_tng.models import (
@@ -209,7 +210,7 @@ def change_reason(
     action: Annotated[str, Form()] = "rename",
 ) -> Response:
     """Rename, retire or bring back, as the button pressed says."""
-    reason = get_locked(session, AdjustmentReason, reason_id)
+    reason = locked_row(session, AdjustmentReason, reason_id)
     if reason is None:
         return not_found()
     action = action if action in {"retire", "restore"} else "rename"

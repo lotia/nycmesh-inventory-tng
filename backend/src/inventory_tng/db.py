@@ -258,13 +258,21 @@ def attempt(session: Session, change: Callable[[], object]) -> str | None:
     return None
 
 
+def refusal(
+    session: Session, change: Callable[[], object], *expected: str
+) -> str | None:
+    """attempt(), for a change only the `expected` rules may refuse: which
+    did, if one did. Any other rule broken is a bug, and raised."""
+    broken = attempt(session, change)
+    if broken is not None and broken not in expected:
+        raise ValueError(f"refused by {broken}, not {', '.join(expected)}")
+    return broken
+
+
 def unique(session: Session, change: Callable[[], object]) -> bool:
     """attempt(), for a change only a unique index can refuse: False if it
     did."""
-    broken = attempt(session, change)
-    if broken not in {None, "unique"}:
-        raise ValueError(f"refused by {broken}, not a unique index")
-    return broken is None
+    return refusal(session, change, "unique") is None
 
 
 UNIQUE_VIOLATION = "23505"

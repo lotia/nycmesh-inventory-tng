@@ -123,6 +123,8 @@ Lock rows with `db.locked` (a select) or `db.get_locked` (`Session.get`),
 never `with_for_update` itself: they also read the rows again as locked,
 which a plain locking read does not do for a row already loaded. `db.py`
 says why; `tests/test_locking.py` fails on `with_for_update` anywhere else.
+Admin pages lock catalogue rows with `admin.common.locked_row`; its
+docstring says why.
 
 ### The scan page
 

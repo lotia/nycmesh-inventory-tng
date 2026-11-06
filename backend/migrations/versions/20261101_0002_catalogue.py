@@ -159,6 +159,38 @@ BEGIN
 END
 $$;
 
+-- A current item is in a current category (inventory-tng-8i4.58)...
+CREATE FUNCTION check_item() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM lock_catalogue_rules();
+    -- Only for a current item (the trigger's WHEN).
+    IF EXISTS (
+        SELECT FROM category WHERE id = NEW.category_id AND retired_at IS NOT NULL
+    ) THEN
+        RAISE EXCEPTION 'a current item''s category must be current'
+            USING ERRCODE = 'check_violation', CONSTRAINT = 'item_category_current';
+    END IF;
+    RETURN NEW;
+END
+$$;
+
+-- ...so a category with current items stays current.
+CREATE FUNCTION check_category() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM lock_catalogue_rules();
+    -- Only as it is retired (the trigger's WHEN).
+    IF EXISTS (
+        SELECT FROM item WHERE category_id = NEW.id AND retired_at IS NULL
+    ) THEN
+        RAISE EXCEPTION 'retire or move a category''s items first'
+            USING ERRCODE = 'check_violation', CONSTRAINT = 'category_has_items';
+    END IF;
+    RETURN NEW;
+END
+$$;
+
 CREATE FUNCTION check_label() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -201,6 +233,13 @@ CREATE TRIGGER check_location
 CREATE TRIGGER check_volunteer
     BEFORE INSERT OR UPDATE OF merged_into_id, retired_at ON volunteer
     FOR EACH ROW EXECUTE FUNCTION check_volunteer();
+CREATE TRIGGER check_item
+    BEFORE INSERT OR UPDATE OF category_id, retired_at ON item
+    FOR EACH ROW WHEN (NEW.retired_at IS NULL)
+    EXECUTE FUNCTION check_item();
+CREATE TRIGGER check_category BEFORE UPDATE OF retired_at ON category
+    FOR EACH ROW WHEN (OLD.retired_at IS NULL AND NEW.retired_at IS NOT NULL)
+    EXECUTE FUNCTION check_category();
 CREATE TRIGGER check_label
     BEFORE INSERT OR UPDATE OF code, item_id, package_id ON label
     FOR EACH ROW EXECUTE FUNCTION check_label();
@@ -637,5 +676,6 @@ def downgrade() -> None:
         op.drop_table(table)
     op.execute(
         "DROP FUNCTION lock_catalogue_rules(), record_catalogue_history(), "
-        "check_location(), check_volunteer(), check_label(), check_item_package()"
+        "check_location(), check_volunteer(), check_item(), check_category(), "
+        "check_label(), check_item_package()"
     )

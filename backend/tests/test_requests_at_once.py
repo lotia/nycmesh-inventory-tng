@@ -1,6 +1,7 @@
 """Requests at once (inventory-tng-8i4.50.4): whatever was under way when
 another administrator reset or retired an account waits for it, then finds
-it done, and no two paths deadlock. On connections that really commit, so
+it done, and no two paths deadlock. The catalogue's rules hold the same way
+(inventory-tng-8i4.58). On connections that really commit, so
 none of these is a unit test; each is marked with what it tests:
 
 - `concurrency`: two transactions at once, on two connections. One is held
@@ -14,6 +15,7 @@ none of these is a unit test; each is marked with what it tests:
 CONTRIBUTING.md says how to run or skip a kind.
 """
 
+import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import cast
@@ -25,14 +27,29 @@ from fastapi.responses import Response
 from fastapi.testclient import TestClient
 from httpx2 import Response as Answer
 from sqlalchemy import delete, select, text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 from test_sign_in import PASSWORD, code, new_admin, reset_link, sign_in_with
 
 from inventory_tng import accounts, mail, sign_in
-from inventory_tng.db import DbSession, hold_until_commit, release_hold
+from inventory_tng.admin.common import locked_row
+from inventory_tng.db import (
+    Base,
+    DbSession,
+    describe_error,
+    hold_until_commit,
+    release_hold,
+)
 from inventory_tng.mail import Message, Notify
-from inventory_tng.models import Admin, AdminPassword, AdminSession, SignInSettings
+from inventory_tng.models import (
+    Admin,
+    AdminPassword,
+    AdminSession,
+    Category,
+    Item,
+    SignInSettings,
+    Volunteer,
+)
 
 NEW_PASSWORD = "a long passphrase of their own"
 
@@ -720,3 +737,140 @@ def test_a_form_that_waited_is_asked_for_a_code_if_the_window_shrank(
         restoring = committed.session()
         restoring.get_one(SignInSettings, 1).confirm_idle_minutes = was
         restoring.commit()
+
+
+# The catalogue's rules under concurrent writes (inventory-tng-8i4.58): the
+# second write waits, then is refused, rather than the two deadlocking.
+
+NOW = datetime.now(UTC)
+
+# A request's write: its row locked, then changed and flushed.
+Write = tuple[Callable[[Session], Base], Callable[[Session, Base], None]]
+
+
+def at_once(committed: Committed, first: Write, second: Write) -> str | None:
+    """Both rows locked, then the first written and committed while the
+    second waits: the rule the second was refused by, if any."""
+    one, two = committed.session(), committed.session()
+    (lock_one, change_one), (lock_two, change_two) = first, second
+    mine, theirs = lock_one(one), lock_two(two)
+    change_one(one, mine)
+    one.flush()
+
+    def write_second() -> None:
+        change_two(two, theirs)
+        two.flush()
+
+    worker = committed.blocked(two, write_second)
+    one.commit()
+    error = worker.finished().error
+    two.rollback()
+    if error is None:
+        return None
+    assert isinstance(error, IntegrityError), error
+    return describe_error(error).get("constraint")
+
+
+def tag() -> str:
+    """Unique names: rows committed by one test never clash with another's."""
+    return uuid.uuid4().hex[:8]
+
+
+def locking[M: Base](model: type[M], ident: int) -> Callable[[Session], Base]:
+    def lock(session: Session) -> Base:
+        found = locked_row(session, model, ident)
+        assert found is not None
+        return found
+
+    return lock
+
+
+def setting(**values: object) -> Callable[[Session, Base], None]:
+    def change(_session: Session, row: Base) -> None:
+        for name, value in values.items():
+            setattr(row, name, value)
+
+    return change
+
+
+def catalogue(committed: Committed) -> tuple[int, int]:
+    """A category, and a retired item in it, committed."""
+    setup = committed.session()
+    name = tag()
+    category = Category(name=f"Radios {name}")
+    setup.add(category)
+    setup.flush()
+    item = Item(name=f"LiteBeam {name}", category_id=category.id)
+    item.retired_at = NOW
+    setup.add(item)
+    setup.commit()
+    return category.id, item.id
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize(
+    ("first", "refused"),
+    [("restore", "category_has_items"), ("retire", "item_category_current")],
+)
+def test_an_item_comes_back_or_its_category_goes_not_both(
+    committed: Committed, first: str, refused: str
+) -> None:
+    category_id, item_id = catalogue(committed)
+    writes: dict[str, Write] = {
+        "restore": (locking(Item, item_id), setting(retired_at=None)),
+        "retire": (locking(Category, category_id), setting(retired_at=NOW)),
+    }
+    second = "retire" if first == "restore" else "restore"
+    assert at_once(committed, writes[first], writes[second]) == refused
+
+
+def volunteers(committed: Committed) -> tuple[int, int]:
+    setup = committed.session()
+    name = tag()
+    a, b = Volunteer(name=f"A {name}"), Volunteer(name=f"B {name}")
+    setup.add_all([a, b])
+    setup.commit()
+    return a.id, b.id
+
+
+def merging(volunteer_id: int, into_id: int) -> Write:
+    """As merge_volunteer does: the duplicate locked, then merged."""
+    return (
+        locking(Volunteer, volunteer_id),
+        setting(merged_into_id=into_id, retired_at=NOW),
+    )
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize("first", ["merge", "retire"])
+def test_a_merge_and_a_retire_of_its_target_not_both(
+    committed: Committed, first: str
+) -> None:
+    duplicate, kept = volunteers(committed)
+    writes: dict[str, Write] = {
+        "merge": merging(duplicate, kept),
+        "retire": (locking(Volunteer, kept), setting(retired_at=NOW)),
+    }
+    second = "retire" if first == "merge" else "merge"
+    assert at_once(committed, writes[first], writes[second]) == "volunteer_merge_target"
+
+
+@pytest.mark.concurrency
+def test_crossing_merges_queue_and_the_second_is_refused(
+    committed: Committed,
+) -> None:
+    a, b = volunteers(committed)
+    assert at_once(committed, merging(a, b), merging(b, a)) == "volunteer_merge_target"
+
+
+@pytest.mark.concurrency
+def test_an_item_added_while_its_category_is_retired(committed: Committed) -> None:
+    """The add's foreign-key check is not held up by the retire's row lock,
+    and the retire, writing second, is refused."""
+    category_id, _ = catalogue(committed)
+    adding: Write = (
+        lambda _session: Item(name=f"New {tag()}", category_id=category_id),
+        lambda session, item: session.add(item),
+    )
+    retiring = (locking(Category, category_id), setting(retired_at=NOW))
+    assert at_once(committed, adding, retiring) == "category_has_items"

@@ -11,7 +11,7 @@ import pytest
 from sqlalchemy import Engine, delete, exc, select, text, update
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import Base, describe_error, set_actor
+from inventory_tng.db import Base, describe_error, refusal, set_actor
 from inventory_tng.models import (
     LABEL_ALPHABET,
     LABEL_LENGTH,
@@ -315,6 +315,36 @@ def test_merges_point_at_a_current_volunteer(session: Session) -> None:
     # Point the others onward first, and then it can go.
     merge(session, a, c)
     merge(session, b, c)
+
+
+def test_current_items_sit_in_current_categories(session: Session) -> None:
+    """inventory-tng-8i4.58: whatever writes them."""
+    radios = add(session, Category(name="Radios rule"))
+    old = add(session, Category(name="Old rule", retired_at=NOW))
+    item = add(session, Item(name="LiteBeam rule", category_id=radios.id))
+    with violates(session, "item_category_current"):
+        session.add(Item(name="Into the old", category_id=old.id))
+    with violates(session, "item_category_current"):
+        change(session, item, category_id=old.id)
+    # A category with a current item stays current...
+    with violates(session, "category_has_items"):
+        change(session, radios, retired_at=NOW)
+    # ...until the item goes, and a retired item cannot come back into it.
+    change(session, item, retired_at=NOW)
+    change(session, radios, retired_at=NOW)
+    with violates(session, "item_category_current"):
+        change(session, item, retired_at=None)
+    # A retired item may sit in a retired category.
+    add(session, Item(name="Retired too", category_id=old.id, retired_at=NOW))
+
+
+def test_a_rule_a_change_does_not_expect_is_raised(session: Session) -> None:
+    """db.refusal: a check the page should have caught first, refused by
+    the database, is a bug, raised rather than shown as a vague problem."""
+    radios = add(session, Category(name="Radios refused"))
+    bad = Item(name="Below nothing", category_id=radios.id, minimum=-1)
+    with pytest.raises(ValueError, match="ck_item_minimum"):
+        refusal(session, lambda: session.add(bad), "unique")
 
 
 def test_volunteer_emails_are_unique_ignoring_case(session: Session) -> None:
