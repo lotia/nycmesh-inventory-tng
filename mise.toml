@@ -41,7 +41,6 @@ description = "Browser tests: the built app, in a real browser at a phone's widt
 dir = "frontend"
 run = [
     "mise run compose -- up -d --wait db",
-    "npx playwright install --no-shell chromium $([ \"${PLAYWRIGHT_WEBKIT:-}\" = 1 ] && echo webkit)",
     "npm run build",
     "npx playwright test",
 ]

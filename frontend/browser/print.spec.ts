@@ -3,6 +3,7 @@
  * as a poster or four cards, on US Letter or A4.
  */
 import { expect, type Page, test } from "@playwright/test";
+import { prepared } from "./prepared";
 
 /** Makes a code, confirming with the password if asked. */
 async function makeCode(page: Page, label = "Hub open day"): Promise<void> {
@@ -13,7 +14,7 @@ async function makeCode(page: Page, label = "Hub open day"): Promise<void> {
   const password = page.getByLabel("Your password");
   await expect(made.or(password)).toBeVisible();
   if (await password.isVisible()) {
-    await password.fill(process.env.ADMIN_PASSWORD ?? "");
+    await password.fill(prepared().password);
     await page.getByRole("button", { name: "Confirm" }).click();
   }
   await expect(made).toBeVisible();
