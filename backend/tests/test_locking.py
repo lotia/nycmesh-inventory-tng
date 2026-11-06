@@ -17,11 +17,9 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from conftest import Committed
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from test_sign_in import code, new_admin, sign_in_with
 
 import inventory_tng
 from inventory_tng import devices
@@ -44,6 +42,9 @@ from inventory_tng.models import (
     RegistrationCode,
     Volunteer,
 )
+
+from helpers.concurrency import Committed
+from helpers.sign_in import code, new_admin, sign_in_with
 
 SOURCE = Path(inventory_tng.__file__).parent
 # The only code that may lock with with_for_update: the wrappers' bodies.

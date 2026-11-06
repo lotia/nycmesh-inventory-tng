@@ -1,15 +1,15 @@
 """Each run has a database of its own, which nothing else reaches, and which
 is dropped when the run ends or, if it never could, by a later run
-(conftest.py)."""
+(databases.py, and conftest.py's fixtures)."""
 
 import os
 import time
 
-from conftest import NO_DATABASE
-from databases import SERVER_URL, drop_left_behind
 from sqlalchemy import make_url, text
 
 from inventory_tng.db import make_engine
+
+from databases import NO_DATABASE, SERVER_URL, drop_left_behind
 
 
 def test_the_shells_database_url_is_out_of_reach() -> None:

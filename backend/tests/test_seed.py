@@ -7,8 +7,6 @@ import sys
 from collections.abc import Iterator
 
 import pytest
-from conftest import NO_DATABASE
-from databases import migrate, new_database
 from sqlalchemy import delete, func, make_url, select
 from sqlalchemy.orm import Session
 
@@ -16,6 +14,8 @@ from inventory_tng import accounts, seed
 from inventory_tng.db import make_engine
 from inventory_tng.ledger import expected
 from inventory_tng.models import Admin, AdminPassword, Item, Location, Volunteer
+
+from databases import NO_DATABASE, migrate, new_database
 
 SIGN_IN = "Sign in at /admin as dev, password "
 PASSWORD = "a password for the tests"

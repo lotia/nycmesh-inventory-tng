@@ -5,8 +5,6 @@ import contextlib
 import dataclasses
 import logging
 import os
-import threading
-import time
 from collections.abc import Callable, Iterator
 from contextlib import nullcontext
 from pathlib import Path
@@ -16,13 +14,6 @@ import pytest
 import structlog
 from alembic.config import Config
 from argon2 import PasswordHasher
-from databases import (
-    Unreachable,
-    alembic_config_for,
-    create_database,
-    drop_database,
-    migrate,
-)
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Connection, Engine, event, exc, text
@@ -36,13 +27,26 @@ from inventory_tng.db import (
     get_session,
     get_session_factory,
     make_engine,
-    release_hold,
     run_outside_transaction,
 )
 from inventory_tng.logs import configure_structlog
-from inventory_tng.mail import Message, get_mailer
+from inventory_tng.mail import get_mailer
 from inventory_tng.rate_limits import limiter
-from inventory_tng.settings import FrontendConfig, LogConfig, MailConfig, Settings
+from inventory_tng.settings import FrontendConfig, LogConfig, Settings
+
+from databases import (
+    NO_DATABASE,
+    Unreachable,
+    alembic_config_for,
+    create_database,
+    drop_database,
+    migrate,
+)
+from helpers.apps import sessions_of
+from helpers.concurrency import Committed
+from helpers.devices import new_device
+from helpers.mail import SITE_MAIL, SentMail
+from helpers.sign_in import code, new_admin, sign_in_with
 
 # structlog's lines go through the standard library, where caplog sees them.
 configure_structlog()
@@ -89,13 +93,6 @@ def cheap_password_hashing() -> Iterator[None]:
         yield
 
 
-# For a test of what is in a clone but not in the image: the tasks, the docs.
-clone_only = pytest.mark.skipif(
-    not (local_env.CLONE / "mise.toml").exists(),
-    reason="only in a clone, not in the image",
-)
-
-
 @pytest.fixture(autouse=True)
 def no_local_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A command a test runs loads no `.env` into the environment, where it
@@ -126,10 +123,6 @@ def restore_logging() -> Iterator[None]:
         lg.handlers[:] = handlers
         lg.level, lg.propagate, lg.disabled = level, propagate, disabled
     configure_structlog()
-
-
-# What DATABASE_URL is during the tests: nothing listens on port 1.
-NO_DATABASE = "postgresql://nobody@127.0.0.1:1/use_the_database_url_fixture"
 
 
 @pytest.fixture(scope="session")
@@ -190,70 +183,6 @@ def _newest_ids(connection: Connection) -> dict[str, int]:
         for table in reversed(Base.metadata.sorted_tables)
         if "id" in table.c
     }
-
-
-class Worker(threading.Thread):
-    """`work` on a thread of its own, keeping what it returned or raised."""
-
-    def __init__(self, work: Callable[[], object]) -> None:
-        super().__init__(daemon=True)
-        self.work = work
-        self.result: object = None
-        self.error: Exception | None = None
-        self.start()
-
-    def run(self) -> None:
-        try:
-            self.result = self.work()
-        except Exception as error:  # noqa: BLE001  Kept for the test to see.
-            self.error = error
-
-    def finished(self) -> Worker:
-        self.join(timeout=10)
-        assert not self.is_alive(), "it never finished"
-        return self
-
-
-class Committed:
-    """Sessions whose commits are real, for tests of two requests at once,
-    and the threads that run them."""
-
-    def __init__(self, engine: Engine) -> None:
-        self.engine = engine
-        self.sessions: list[Session] = []
-        self.workers: list[Worker] = []
-
-    def session(self) -> Session:
-        session = Session(self.engine, expire_on_commit=False)
-        self.sessions.append(session)
-        return session
-
-    def blocked(self, session: Session | None, work: Callable[[], object]) -> Worker:
-        """`work`, on `session`, started on a thread, once it is waiting
-        for a lock: the moment each test is about. With no session (an
-        app's request, on its own connection), once any connection to this
-        database is. Polls, as pg_stat_activity is read afresh per
-        transaction."""
-        pid = session.scalar(text("SELECT pg_backend_pid()")) if session else None
-        worker = Worker(work)
-        self.workers.append(worker)
-        probe = self.session()
-        deadline = time.monotonic() + 5
-        while time.monotonic() < deadline:
-            waiting = probe.scalar(
-                text(
-                    "SELECT count(*) > 0 FROM pg_stat_activity"
-                    " WHERE wait_event_type = 'Lock'"
-                    " AND datname = current_database()"
-                    " AND (CAST(:p AS integer) IS NULL OR pid = :p)"
-                ),
-                {"p": pid},
-            )
-            probe.rollback()
-            if waiting:
-                return worker
-            time.sleep(0.01)
-        pytest.fail("it never waited for the lock")
 
 
 # Names these sessions' connections, so cleanup can end any left waiting.
@@ -327,20 +256,6 @@ def committed(database_url: str, engine: Engine) -> Iterator[Committed]:
     own.dispose()
 
 
-def sessions_of(session: Session) -> Callable[[], Iterator[Session]]:
-    """An app's get_session for the test's own session, which outlives each
-    request, so it is not closed as the route returns (db.get_session); a
-    gated request's hold ends with the route, as its session would."""
-
-    def request_session() -> Iterator[Session]:
-        try:
-            yield session
-        finally:
-            release_hold(session)
-
-    return request_session
-
-
 @pytest.fixture
 def make_app(
     database_url: str, session: Session, tmp_path: Path
@@ -389,39 +304,12 @@ def make_app(
     return make
 
 
-# Mail as a site sets it up, for apps given a mailer. Links start here.
-SITE_MAIL = MailConfig(
-    host="smtp.example.org",
-    site_url="https://inventory.example.org",
-    sender="inventory@example.org",
-)
-
-
-class SentMail(list[Message]):
-    """A stand-in mailer: what would have gone out."""
-
-    def send(self, message: Message) -> None:
-        self.append(message)
-
-
-class FailingMail:
-    """A stand-in mailer whose every send fails with `error`."""
-
-    def __init__(self, error: Exception) -> None:
-        self.error = error
-
-    def send(self, message: Message) -> None:
-        raise self.error
-
-
 @pytest.fixture
 def admin_client(
     make_client: Callable[..., TestClient], session: Session
 ) -> TestClient:
     """A client signed in as an administrator, Ada, with the confirmation
     window open."""
-    from test_sign_in import code, new_admin, sign_in_with
-
     client = make_client()
     _, key = new_admin(session)
     assert sign_in_with(client, code=code(key)).status_code == 303
@@ -470,8 +358,6 @@ def client(make_app: Callable[..., FastAPI]) -> Iterator[TestClient]:
 @pytest.fixture
 def registered_client(client: TestClient, session: Session) -> TestClient:
     """The app's client, as a registered device."""
-    from test_devices import new_device
-
     _, token = new_device(session)
     client.cookies.set(devices.COOKIE, token)
     return client

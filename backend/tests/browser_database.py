@@ -21,13 +21,14 @@ from pathlib import Path
 
 import segno
 import structlog
-from databases import create_database, drop_database, migrate
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import devices, seed
 from inventory_tng.db import make_engine
 from inventory_tng.models import Item, Label
+
+from databases import create_database, drop_database, migrate
 
 
 def main(argv: list[str]) -> int:

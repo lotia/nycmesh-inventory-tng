@@ -3,12 +3,13 @@
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
-from conftest import SentMail
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from test_sign_in import code, new_admin, sign_in_with, text
 
 from inventory_tng.admin.home import ALONE, NO_EMAIL
+
+from helpers.mail import SentMail
+from helpers.sign_in import code, new_admin, sign_in_with, text
 
 
 def test_a_lone_administrator_is_told(admin_client: TestClient) -> None:

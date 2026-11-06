@@ -7,9 +7,9 @@ import re
 import tomllib
 from pathlib import Path
 
-from conftest import clone_only
-
 from inventory_tng.local_env import CLONE
+
+from helpers.clone import clone_only
 
 pytestmark = clone_only
 

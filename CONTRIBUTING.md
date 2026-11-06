@@ -328,7 +328,9 @@ Each test run creates a database of its own on that server and drops it at
 the end; a run that was killed before it could is dropped by a later one.
 During the tests, `DATABASE_URL` points nowhere, so nothing reaches your own
 data: a test that needs the database takes the `database_url` fixture. Write
-tests in pytest style.
+tests in pytest style. `tests/conftest.py` holds fixtures, hooks and what
+only they use; what tests share besides is in `tests/helpers/`, which
+they import from, never from conftest.py or from one another.
 `tests/test_requests_at_once.py` and `tests/test_locking.py` hold tests of
 requests at the same time, on connections that really commit, marked by
 kind (the first one's docstring): `uv run pytest -m concurrency` runs only

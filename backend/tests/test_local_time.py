@@ -8,7 +8,6 @@ import pytest
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
-from test_models import history, violates
 
 from inventory_tng import local_time, registration_codes
 from inventory_tng.local_time import (
@@ -19,6 +18,8 @@ from inventory_tng.local_time import (
     site_zone,
 )
 from inventory_tng.models import SiteSettings
+
+from helpers.rows import history, violates
 
 
 def test_times_come_back_in_utc_whatever_the_servers_zone(engine: Engine) -> None:

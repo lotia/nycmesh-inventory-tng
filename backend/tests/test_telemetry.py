@@ -8,7 +8,6 @@ from decimal import Decimal
 import pyotp
 import pytest
 import structlog
-from conftest import FailingMail, SentMail, sessions_of
 from fastapi.testclient import TestClient
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 from opentelemetry.sdk.metrics.export import (
@@ -18,9 +17,6 @@ from opentelemetry.sdk.metrics.export import (
 )
 from sqlalchemy import exc
 from sqlalchemy.orm import Session
-from test_devices import new_device
-from test_ledger import Place, received, stocked, write
-from test_sign_in import PASSWORD, new_admin
 
 from inventory_tng import accounts, devices, ledger, mail
 from inventory_tng.app import create_app
@@ -29,6 +25,12 @@ from inventory_tng.devices import RegisteredDevice
 from inventory_tng.masking import MASK, Masker
 from inventory_tng.settings import Settings
 from inventory_tng.telemetry import Telemetry, enabled
+
+from helpers.apps import sessions_of
+from helpers.devices import new_device
+from helpers.mail import FailingMail, SentMail
+from helpers.sign_in import PASSWORD, new_admin
+from helpers.stock import Place, received, stocked, write
 
 ENDPOINT = {"OTEL_EXPORTER_OTLP_ENDPOINT": "http://collector:4318"}
 

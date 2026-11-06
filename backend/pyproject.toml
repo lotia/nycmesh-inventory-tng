@@ -81,6 +81,10 @@ extend-select = [
     "UP",   # modern syntax for the Python version in requires-python
 ]
 
+[tool.ruff.lint.isort]
+# What tests import from tests/ (pythonpath, below), not from a package.
+known-local-folder = ["databases", "helpers"]
+
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "unittest.TestCase".msg = "Write tests in pytest style: plain functions, fixtures and assert."
 
@@ -104,6 +108,8 @@ branch_coverage = true
 
 [tool.pytest]
 testpaths = ["tests"]
+# Where tests import helpers and databases from.
+pythonpath = ["tests"]
 strict = true
 filterwarnings = ["error"]
 # What a test tests (tests/test_requests_at_once.py's docstring).

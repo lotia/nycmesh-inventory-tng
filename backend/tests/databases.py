@@ -121,3 +121,7 @@ def alembic_config_for(connection: Connection) -> Config:
     config = Config(toml_file=PYPROJECT)
     config.attributes["connection"] = connection
     return config
+
+
+# What DATABASE_URL is during the tests: nothing listens on port 1.
+NO_DATABASE = "postgresql://nobody@127.0.0.1:1/use_the_database_url_fixture"

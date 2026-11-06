@@ -10,7 +10,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
-from test_models import add
 
 from inventory_tng.models import (
     Category,
@@ -20,6 +19,9 @@ from inventory_tng.models import (
     Location,
     Volunteer,
 )
+
+from helpers.rows import add
+from helpers.stock import Place, write
 
 URL = "/api/catalogue"
 NOW = datetime.now(UTC)
@@ -179,8 +181,6 @@ def test_names_stay_out_of_the_logs(registered_client: TestClient, rows: Rows) -
 def test_a_retired_item_stays_while_it_has_stock(
     registered_client: TestClient, session: Session
 ) -> None:
-    from test_ledger import Place, write
-
     place = Place(session)
     write(
         session,
@@ -213,8 +213,6 @@ def test_a_retired_item_counts_stock_where_there_is_some(
 ) -> None:
     """Four at the store and four short at the van make nothing in all, but
     four are on a shelf to take."""
-    from test_ledger import Place, write
-
     place = Place(session)
     write(
         session,

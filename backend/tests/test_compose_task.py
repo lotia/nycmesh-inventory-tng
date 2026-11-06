@@ -9,9 +9,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from conftest import clone_only
 
 from inventory_tng.local_env import CLONE
+
+from helpers.clone import clone_only
 
 SCRIPT = CLONE / "mise-tasks" / "compose"
 

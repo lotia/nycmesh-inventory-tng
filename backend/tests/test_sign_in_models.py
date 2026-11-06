@@ -6,7 +6,6 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
-from test_models import add, history, violates
 
 from inventory_tng.models import (
     SECRET_COLUMNS,
@@ -17,6 +16,8 @@ from inventory_tng.models import (
     ResetLink,
     SignInSettings,
 )
+
+from helpers.rows import add, history, violates
 
 LATER = datetime.now(UTC) + timedelta(days=1)
 

@@ -5,12 +5,9 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from conftest import SentMail
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from test_models import history
-from test_sign_in import code, new_admin, sign_in_with
 
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.models import (
@@ -19,6 +16,10 @@ from inventory_tng.models import (
     SignInSettings,
     SiteSettings,
 )
+
+from helpers.mail import SentMail
+from helpers.rows import history
+from helpers.sign_in import code, new_admin, sign_in_with
 
 
 def test_shows_and_changes_the_name_check(
