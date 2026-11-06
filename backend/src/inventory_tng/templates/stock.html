@@ -1,4 +1,5 @@
 {% extends "admin_base.html" %}
+{% from "_table.html" import table %}
 {% block main %}
 <p>
   {% if by == "place" %}By place · <a href="?by=item">by item</a>{% else %}<a href="?by=place">By place</a> · by item{% endif %}
@@ -10,16 +11,14 @@ less than nothing somewhere: the records are wrong there, so count it.</p>
 {% for group in groups %}
 <section>
   <h2>{{ group.heading.name }}{% if by == "item" %} <span class="hint">{{ group.total | amount }} {{ group.heading.unit }} in all</span>{% endif %}</h2>
-  <div class="table-scroll">
-    <table>
-      {% for row in group.rows %}
-      <tr>
-        <td>{{ row.item.name if by == "place" else row.location.name }}</td>
-        <td>{{ row.quantity | amount }} {{ row.item.unit }}{% if row.quantity < 0 %} <strong>count it</strong>{% endif %}</td>
-      </tr>
-      {% endfor %}
-    </table>
-  </div>
+  {% call table() %}
+    {% for row in group.rows %}
+    <tr>
+      <td>{{ row.item.name if by == "place" else row.location.name }}</td>
+      <td>{{ row.quantity | amount }} {{ row.item.unit }}{% if row.quantity < 0 %} <strong>count it</strong>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  {% endcall %}
 </section>
 {% else %}
 <p>Nothing is recorded anywhere yet.</p>

@@ -1,4 +1,5 @@
 {% extends "admin_base.html" %}
+{% from "_table.html" import table %}
 {% block main %}
 {% if items %}
 <p>Something came in or went out of each of these after you started, so it's
@@ -11,25 +12,23 @@ if you didn't count it. Anything else here, add below.</p>
   <input type="hidden" name="key" value="{{ key }}">
   <input type="hidden" name="as_of" value="{{ as_of }}">
   {% if items %}<input type="hidden" name="items" value="{{ items | join(' ') }}">{% endif %}
-  <div class="table-scroll">
-    <table>
-      <tr><th>Item</th><th>Records say</th>{% if recount %}<th>While you counted</th>{% endif %}<th>Counted</th></tr>
-      {% for item, amount in rows %}
-      {% set field = "counted_" ~ item.id %}
-      <tr>
-        <td>{{ item.name }}</td>
-        <td>{{ amount | amount }} {{ item.unit }}{% if amount < 0 %} <strong>less than nothing</strong>{% endif %}</td>
-        {% if recount %}{% set typed, came, went = recount[item.id] %}
-        <td>{{ came | amount }} in, {{ went | amount }} out; you typed {{ typed | amount }}</td>
-        {% endif %}
-        <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, amount | amount if amount > 0 else '0') }}" aria-label="{{ item.name }} counted">
-          {% with name = field %}{% include "_field_problem.html" %}{% endwith %}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="3">The records say nothing is here.</td></tr>
-      {% endfor %}
-    </table>
-  </div>
+  {% call table() %}
+    <tr><th>Item</th><th>Records say</th>{% if recount %}<th>While you counted</th>{% endif %}<th>Counted</th></tr>
+    {% for item, amount in rows %}
+    {% set field = "counted_" ~ item.id %}
+    <tr>
+      <td>{{ item.name }}</td>
+      <td>{{ amount | amount }} {{ item.unit }}{% if amount < 0 %} <strong>less than nothing</strong>{% endif %}</td>
+      {% if recount %}{% set typed, came, went = recount[item.id] %}
+      <td>{{ came | amount }} in, {{ went | amount }} out; you typed {{ typed | amount }}</td>
+      {% endif %}
+      <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, amount | amount if amount > 0 else '0') }}" aria-label="{{ item.name }} counted">
+        {% with name = field %}{% include "_field_problem.html" %}{% endwith %}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="3">The records say nothing is here.</td></tr>
+    {% endfor %}
+  {% endcall %}
   <fieldset>
     <legend>Something else here</legend>
     <label>Item

@@ -77,9 +77,17 @@ export function Scanner({
   }, []);
 
   return (
-    <section class="scanner" aria-label="Camera">
-      <video ref={video} muted playsInline />
-      <p role="status">{said.value}</p>
+    <section class="mb-3" aria-label="Camera">
+      <video
+        class="block max-h-[60vh] w-full rounded bg-black object-cover"
+        ref={video}
+        muted
+        playsInline
+      />
+      {/* A long code read, such as an old sticker's link, wraps. */}
+      <p class="wrap-anywhere" role="status">
+        {said.value}
+      </p>
       <div class="actions">
         {torch.value !== null && (
           <Torch

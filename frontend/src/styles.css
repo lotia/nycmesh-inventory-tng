@@ -142,47 +142,55 @@
     @apply mx-auto max-w-3xl px-4;
   }
 
-  /* An administrator page's main part: its forms' spacing. */
+  /*
+   * An administrator page's main part. A form, and a fieldset in one, spaces
+   * what it holds by gap, not margins, its buttons at their own width; so
+   * what sits side by side, in a table's cell or .actions, has none to undo.
+   */
   .admin {
     @apply pt-6 pb-12;
   }
 
-  .admin label {
+  .admin :is(form, fieldset):not(.actions) {
+    @apply flex flex-col gap-4;
+
+    & > * {
+      @apply my-0;
+    }
+
+    & > button {
+      @apply self-start;
+    }
+  }
+
+  /* Above, not below; not in a table's cell or a row, which space their own. */
+  .admin form:not(td > form, .actions > form) {
     @apply mt-4;
   }
 
-  .admin :is(input, select, textarea) {
-    @apply mt-1;
+  .admin fieldset {
+    @apply pt-2;
   }
 
-  .admin :is(button, fieldset) {
-    @apply mt-5;
+  .admin label > :is(input, select, textarea) {
+    @apply mt-1;
   }
 
   .admin section {
     @apply mt-8;
   }
 
-  /* Side by side, as in a table's cell or a row of buttons: no spacing. */
-  .admin :is(td, .actions) :is(form, button, input) {
-    @apply m-0;
-  }
-
-  .admin td form:not(.actions) {
+  /* A table's cell may hold a button's form or two, side by side. */
+  .admin td > form:not(.actions) {
     @apply inline;
-  }
-
-  /* Every table: one that cannot fit scrolls in here, never the page. */
-  .table-scroll {
-    @apply overflow-x-auto;
   }
 
   .actions {
     @apply flex flex-wrap items-end gap-3;
   }
 
-  /* The scan and registration pages' main part (frontend/src), and the
-     shapes only they use. */
+  /* The scan and registration pages' main part (frontend/src): its forms'
+     spacing. What a component alone shows, it styles itself. */
   .volunteer {
     @apply pt-4 pb-12;
   }
@@ -201,62 +209,6 @@
 
   .volunteer legend {
     @apply mb-1;
-  }
-
-  /* A radio button and its words, easy to tap. */
-  .volunteer .choice {
-    @apply flex items-center gap-2 py-1 font-normal;
-  }
-
-  .volunteer .choice input {
-    @apply m-0;
-  }
-
-  .volunteer .amount {
-    @apply font-normal;
-  }
-
-  .volunteer :is(.lines, .matches, .outbox, .problems) {
-    @apply list-none p-0;
-  }
-
-  .volunteer :is(.lines, .outbox) > li {
-    @apply border-t border-line py-3;
-  }
-
-  .volunteer .matches > li {
-    @apply py-1;
-  }
-
-  .volunteer .total {
-    @apply mt-0 mb-2;
-  }
-
-  .volunteer .save {
-    @apply w-full text-xl;
-  }
-
-  /* The camera's picture, while scanning labels. */
-  .volunteer .scanner {
-    @apply mb-3;
-  }
-
-  /* A long code read, such as an old sticker's link, wraps. */
-  .volunteer .scanner [role="status"] {
-    @apply wrap-anywhere;
-  }
-
-  .volunteer .scanner video {
-    @apply block max-h-[60vh] w-full rounded bg-black object-cover;
-  }
-
-  /* Asks, after a while unused, whether the name chosen is still yours. */
-  .volunteer .who {
-    @apply mb-4 border-2 border-caution p-3;
-  }
-
-  .volunteer :is(.who p, .saving-as) {
-    @apply mt-0;
   }
 
   /* The band at the top of every page, as MeshDB's. */

@@ -188,8 +188,9 @@ server and reloads on save; otherwise from the build. Without a build, pages
 are plain HTML. The app container builds it into its image, so a class new
 to a template shows there only after `mise run compose -- up -d --build app`.
 Administrator pages put their content in `<main class="admin page-width">`,
-which spaces their forms; the scan and registration pages in
-`<main class="volunteer page-width">`. When you style a page:
+which spaces their forms by gap; the scan and registration pages in
+`<main class="volunteer page-width">`, and their components style what only
+they show with utilities. When you style a page:
 
 - Write each class name whole. Tailwind finds them by reading the templates
   and the frontend as text, so one built from parts is never generated.
@@ -200,8 +201,9 @@ which spaces their forms; the scan and registration pages in
   radio buttons named `layout` and `paper`, then a `.print-sheet` of four
   copies of one card (`frontend/src/styles.css`, Printing; as
   `code_made.html` does).
-- Put each table in `<div class="table-scroll">`: one that cannot fit a
-  phone scrolls there, not the page. Text that is often long and unbroken,
+- Write each table with the `table` macro in `_table.html` (`{% call
+  table() %}` its rows `{% endcall %}`): one that cannot fit a phone
+  scrolls in its own box, not the page. Text that is often long and unbroken,
   such as a browser's name, can wrap instead, in a `wrap-anywhere` span.
   The browser tests check each page they reach with a long word in every
   table cell.

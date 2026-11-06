@@ -1,4 +1,5 @@
 {% extends "admin_base.html" %}
+{% from "_table.html" import table %}
 {% block main %}
 <p>{{ state | capitalize }}: {{ code.uses }} of {{ code.max_uses }} used,
 until {{ code.expires_at | when(zone) }}.</p>
@@ -10,24 +11,22 @@ registered; revoke any that look wrong below.</p>
 
 <section>
   <h2>Devices it registered</h2>
-  <div class="table-scroll">
-    <table>
-      <tr><th>Device</th><th>Registered</th><th>Last used</th><th>From</th><th></th></tr>
-      {% for device, before in devices %}
-      <tr {% if device.revoked_at %}class="retired"{% endif %}>
-        <td>{{ device.label or "Device " ~ device.id }}</td>
-        <td>{{ device.created_at | when(zone) }}{% if before is not none %} <span class="hint">{{ before }} before revoking</span>{% endif %}</td>
-        <td>{{ device.last_seen_at | when(zone) }}</td>
-        <td><span class="wrap-anywhere">{{ device.first_seen_from or "" }}</span></td>
-        <td>{% if device.revoked_at %}revoked{% else %}
-          <form method="post" action="{{ list }}/{{ device.id }}/revoke"><button>Revoke</button></form>
-        {% endif %}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="5">None yet.</td></tr>
-      {% endfor %}
-    </table>
-  </div>
+  {% call table() %}
+    <tr><th>Device</th><th>Registered</th><th>Last used</th><th>From</th><th></th></tr>
+    {% for device, before in devices %}
+    <tr {% if device.revoked_at %}class="retired"{% endif %}>
+      <td>{{ device.label or "Device " ~ device.id }}</td>
+      <td>{{ device.created_at | when(zone) }}{% if before is not none %} <span class="hint">{{ before }} before revoking</span>{% endif %}</td>
+      <td>{{ device.last_seen_at | when(zone) }}</td>
+      <td><span class="wrap-anywhere">{{ device.first_seen_from or "" }}</span></td>
+      <td>{% if device.revoked_at %}revoked{% else %}
+        <form method="post" action="{{ list }}/{{ device.id }}/revoke"><button>Revoke</button></form>
+      {% endif %}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5">None yet.</td></tr>
+    {% endfor %}
+  {% endcall %}
 </section>
 <p><a href="{{ list }}">All codes</a></p>
 {% endblock %}
