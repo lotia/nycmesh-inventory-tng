@@ -4,10 +4,11 @@ import pytest
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
-from test_models import violates
 
 from inventory_tng import scan_settings
 from inventory_tng.models import CatalogueHistory, ScanSettings
+
+from helpers.rows import violates
 
 
 def run(session: Session, *argv: str) -> int:

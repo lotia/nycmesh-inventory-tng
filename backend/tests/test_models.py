@@ -1,17 +1,15 @@
 """The database's own rules (models.py, migration 0002). Each failing write is
 checked by the constraint it names, which is what describe_error() logs."""
 
-from collections.abc import Callable, Generator
-from contextlib import contextmanager
+from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
 
 import pytest
-from sqlalchemy import Engine, delete, exc, select, text, update
+from sqlalchemy import Engine, delete, select, text, update
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import Base, describe_error, refusal, set_actor
+from inventory_tng.db import Base, refusal, set_actor
 from inventory_tng.models import (
     LABEL_ALPHABET,
     LABEL_LENGTH,
@@ -26,46 +24,15 @@ from inventory_tng.models import (
     mint_label_code,
 )
 
+from helpers.rows import add, violates
+
 NOW = datetime(2026, 11, 1, tzinfo=UTC)
-
-
-@contextmanager
-def violates(session: Session, constraint: str) -> Generator[None]:
-    """The block's writes fail on `constraint`, and are rolled back to a
-    savepoint, so the test can go on."""
-    # The block is the caller's, so it cannot be one statement.
-    with pytest.raises(exc.IntegrityError) as raised, session.begin_nested():  # noqa: PT012
-        yield
-        session.flush()
-    assert describe_error(raised.value).get("constraint") == constraint
-
-
-def add[T: Base](session: Session, row: T) -> T:
-    session.add(row)
-    session.flush()
-    return row
-
-
-def named[T: Base](session: Session, model: type[T], name: str) -> T:
-    """The one row of `model` with this name."""
-    table: Any = model
-    return session.scalars(select(model).where(table.name == name)).one()
 
 
 def change(session: Session, row: Base, **values: object) -> None:
     """An UPDATE straight to the database, as a trigger sees it."""
     model = type(row)
     session.execute(update(model).where(model.id == row.id).values(**values))  # ty: ignore[unresolved-attribute]
-
-
-def history(
-    session: Session, table: str, row_id: int | None = None
-) -> list[CatalogueHistory]:
-    """A table's history, or one row's, oldest first."""
-    query = select(CatalogueHistory).where(CatalogueHistory.table_name == table)
-    if row_id is not None:
-        query = query.where(CatalogueHistory.row_id == row_id)
-    return list(session.scalars(query.order_by(CatalogueHistory.id)))
 
 
 def merge(session: Session, duplicate: Volunteer, into: Volunteer) -> None:

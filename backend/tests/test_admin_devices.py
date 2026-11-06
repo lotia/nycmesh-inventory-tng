@@ -8,12 +8,13 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from test_models import history
-from test_sign_in import text
 
 from inventory_tng import devices
 from inventory_tng.admin.devices import CODES, DEVICES
 from inventory_tng.models import AdminSession, RegistrationCode
+
+from helpers.rows import history
+from helpers.sign_in import text
 
 
 def make_code(client: TestClient, **form: str) -> tuple[Response, str]:

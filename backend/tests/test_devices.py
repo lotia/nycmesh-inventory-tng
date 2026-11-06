@@ -19,7 +19,7 @@ from inventory_tng.logs import configure_logging
 from inventory_tng.models import CatalogueHistory, Device, RegistrationCode
 from inventory_tng.settings import LogConfig, Settings
 
-ADDRESS = "192.0.2.10"
+from helpers.devices import ADDRESS, new_device
 
 
 def whoami(device: RegisteredDevice) -> dict[str, int]:
@@ -76,12 +76,6 @@ def device_history(session: Session, device_id: int) -> list[str]:
             .order_by(CatalogueHistory.id)
         )
     )
-
-
-def new_device(session: Session) -> tuple[Device, str]:
-    """A registered device and its cookie, for tests of what needs one."""
-    _, phrase = devices.create_code(session, max_uses=1, lifetime=timedelta(days=1))
-    return devices.register(session, phrase, ADDRESS)
 
 
 @pytest.fixture

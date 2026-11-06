@@ -2,11 +2,13 @@
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from test_models import add, history, named
-from test_sign_in import text
 
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.models import Location, Volunteer
+
+from helpers.rows import add, history, named
+from helpers.sign_in import text
+from helpers.stock import Place, write
 
 
 def place(
@@ -127,8 +129,6 @@ def test_a_place_holding_stock_is_not_retired(
     admin_client: TestClient, session: Session
 ) -> None:
     """Once retired it could be neither counted nor adjusted."""
-    from test_ledger import Place, write
-
     stock = Place(session)
     write(session, stock)  # Three into the van.
     refused = admin_client.post(f"{LOCATIONS}/{stock.van.id}/retire")
