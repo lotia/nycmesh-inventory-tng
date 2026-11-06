@@ -34,13 +34,13 @@ tree-shaken and minified.
   (headings, paragraphs, lists) in the stylesheet's base layer, never form
   spacing. The administrator pages' form spacing
   belongs to their layout (`.admin`), and the scan pages' to theirs
-  (`.volunteer`), so neither has rules to undo the other's. `.admin`
-  spaces a form's fields by gap on the form, not margins on each field,
-  so a form side by side with others, in a table's cell or `.actions`,
-  has none to undo (inventory-tng-8i4.60.7). Repeated pieces of markup
-  become Jinja macros or Preact components, not copied runs of utility
-  classes; what one component alone shows, such as the scan page's cart
-  or camera, it styles with utilities in its own markup.
+  (`.volunteer`), so neither has rules to undo the other's. Both space a
+  form's fields by gap on the form, not margins on each field, so a form
+  side by side with others, in a table's cell or `.actions`, has none to
+  undo, nor has a component (inventory-tng-8i4.60.7, 8i4.60.8). Repeated
+  pieces of markup become Jinja macros or Preact components, not copied
+  runs of utility classes; what one component alone shows, such as the
+  scan page's cart or camera, it styles with utilities in its own markup.
 - **A class name is always written whole** in a template or a component.
   Tailwind finds classes by reading the sources as text, so one built from
   parts, such as `"text-" ~ colour`, is never generated.

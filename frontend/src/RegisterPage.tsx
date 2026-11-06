@@ -1,6 +1,7 @@
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren, TargetedSubmitEvent } from "preact";
 import { type Api, makeApi } from "./api/client";
+import { Field } from "./Field";
 import { type Outbox, sharedOutbox } from "./outbox";
 import { type Outcome, REFUSALS, register } from "./registration";
 
@@ -92,19 +93,22 @@ export function RegisterPage({
         browser you don't usually use, open the link in yours.
       </p>
       <form onSubmit={submit}>
-        <label for="code">Registration phrase</label>
-        <input
-          id="code"
-          name="code"
-          required
-          autoComplete="off"
-          autoCapitalize="none"
-          spellcheck={false}
-          value={code.value}
-          onInput={(event) => {
-            code.value = event.currentTarget.value;
-          }}
-        />
+        <Field label="Registration phrase">
+          {(id) => (
+            <input
+              id={id}
+              name="code"
+              required
+              autoComplete="off"
+              autoCapitalize="none"
+              spellcheck={false}
+              value={code.value}
+              onInput={(event) => {
+                code.value = event.currentTarget.value;
+              }}
+            />
+          )}
+        </Field>
         <button type="submit" disabled={sending.value}>
           {sending.value ? "Registering…" : "Register"}
         </button>

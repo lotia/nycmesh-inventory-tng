@@ -142,13 +142,16 @@
     @apply mx-auto max-w-3xl px-4;
   }
 
-  /* An administrator page's main part: its forms spaced by gap (0014). */
+  /* An administrator page's main part. */
   .admin {
     @apply pt-6 pb-12;
+    --form-gap: --spacing(4);
   }
 
-  .admin :is(form, fieldset):not(.actions) {
-    @apply flex flex-col gap-4;
+  /* Either kind of page: forms and their fieldsets spaced by gap, each
+     kind's own, not by their children's margins (0014). */
+  :is(.admin, .volunteer) :is(form, fieldset):not(.actions) {
+    @apply flex flex-col gap-(--form-gap);
 
     & > * {
       @apply my-0;
@@ -185,22 +188,15 @@
     @apply flex flex-wrap items-end gap-3;
   }
 
-  /* The scan and registration pages' main part (frontend/src): its forms'
-     spacing. What a component alone shows, it styles itself. */
+  /* The scan and registration pages' main part (frontend/src). What a
+     component alone shows, it styles itself. */
   .volunteer {
     @apply pt-4 pb-12;
-  }
-
-  .volunteer label {
-    @apply mb-1;
-  }
-
-  .volunteer :is(input, select) {
-    @apply mb-3;
+    --form-gap: --spacing(3);
   }
 
   .volunteer fieldset {
-    @apply mb-3 border-0 p-0;
+    @apply border-0 p-0;
   }
 
   .volunteer legend {

@@ -77,7 +77,7 @@ export function Scanner({
   }, []);
 
   return (
-    <section class="mb-3" aria-label="Camera">
+    <section aria-label="Camera">
       <video
         class="block max-h-[60vh] w-full rounded bg-black object-cover"
         ref={video}
