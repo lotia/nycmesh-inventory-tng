@@ -18,9 +18,9 @@ Two choices that keep a volunteer's work from being lost:
 """
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Literal, NamedTuple
 
 import structlog
 from fastapi import APIRouter, FastAPI, Request, Response
@@ -29,21 +29,25 @@ from opentelemetry import metrics
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import (
     Column,
+    ColumnElement,
     Integer,
     MetaData,
     Select,
     Table,
     any_,
+    case,
     func,
     insert,
+    or_,
     select,
 )
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import DbSession, set_actor
+from inventory_tng.db import DbSession, get_locked, set_actor
 from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
 from inventory_tng.models import (
+    INTEGER_MAX,
     QUANTITY,
     Item,
     LedgerTransaction,
@@ -94,16 +98,74 @@ def whole_enough(unit: str, amount: Decimal) -> bool:
     return unit != "each" or amount == amount.to_integral_value()
 
 
-def expected(session: Session, location_id: int) -> dict[int, Decimal]:
-    """What the records say is at a place, by item: only what is not zero."""
-    return {
-        item_id: amount
-        for item_id, amount in session.execute(
-            select(balance.c.item_id, balance.c.quantity).where(
-                balance.c.location_id == location_id, balance.c.quantity != 0
-            )
+def expected(
+    session: Session,
+    location_id: int,
+    *,
+    as_of: int | None = None,
+    items: Collection[int] | None = None,
+) -> dict[int, Decimal]:
+    """What the records say is at a place, by item: only what is not zero.
+    With as_of, what they said at that moment (see moment()); with items,
+    of those only."""
+    bounds = [] if as_of is None else [LedgerTransaction.id <= as_of]
+    flows = _flows(session, location_id, *bounds, items=items)
+    return {item: came - went for item, (came, went) in flows.items() if came != went}
+
+
+def lock_place(session: Session, location_id: int) -> None:
+    """Wait for every save under way at a place, and hold up new ones until
+    this transaction ends, so its ledger reads as one moment: inserting a
+    ledger transaction takes FOR KEY SHARE on its places, through their
+    foreign keys, and this takes FOR UPDATE."""
+    get_locked(session, Location, location_id)
+
+
+def moment(session: Session, location_id: int) -> int:
+    """Now, at a place, as a count form shows it: its latest ledger
+    transaction, with no save there under way, so none can commit later
+    with a lower id. The lock is held only for the read."""
+    with session.begin_nested() as reading:
+        lock_place(session, location_id)
+        latest = session.scalar(
+            select(func.max(LedgerTransaction.id)).where(_at(location_id))
         )
-    }
+        # Rolling back to the savepoint releases the lock.
+        reading.rollback()
+    return latest or 0
+
+
+def _at(location_id: int) -> ColumnElement[bool]:
+    """A ledger transaction into or out of a place."""
+    return or_(
+        LedgerTransaction.to_location_id == location_id,
+        LedgerTransaction.from_location_id == location_id,
+    )
+
+
+def _flows(
+    session: Session,
+    location_id: int,
+    *where: ColumnElement[bool],
+    items: Collection[int] | None = None,
+) -> dict[int, tuple[Decimal, Decimal]]:
+    """What came into a place and what went out of it, by item, in the
+    ledger transactions `where` picks: of `items` only, if given."""
+    into = LedgerTransaction.to_location_id == location_id
+    out = LedgerTransaction.from_location_id == location_id
+    if items is not None:
+        where = (*where, Movement.item_id.in_(items))
+    rows = session.execute(
+        select(
+            Movement.item_id,
+            func.sum(case((into, Movement.quantity), else_=0)),
+            func.sum(case((out, Movement.quantity), else_=0)),
+        )
+        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .where(_at(location_id), *where)
+        .group_by(Movement.item_id)
+    )
+    return {item_id: (came, went) for item_id, came, went in rows}
 
 
 # What a volunteer records. Counts and adjustments are an administrator's
@@ -142,7 +204,7 @@ refused = meter.create_counter(
 )
 
 # An id or install number: positive, and fits PostgreSQL's integer.
-Number = Annotated[int, Field(gt=0, le=2**31 - 1)]
+Number = Annotated[int, Field(gt=0, le=INTEGER_MAX)]
 
 
 class Line(BaseModel):
@@ -288,6 +350,12 @@ counted = meter.create_counter(
     unit="{transaction}",
     description="Counts and adjustments written, by kind",
 )
+withheld = meter.create_counter(
+    "inventory.count.lines.withheld",
+    unit="{line}",
+    description="Count lines not written because the item moved at the place "
+    "while it was counted, so it is counted again",
+)
 
 
 def _correct(
@@ -309,34 +377,72 @@ def _correct(
     )
 
 
+class Counted(NamedTuple):
+    differed: bool
+    # Items counted that moved at the place since the form was shown, with
+    # what came in and what went out since. Not written: count them again.
+    moved: dict[int, tuple[Decimal, Decimal]]
+
+
 def record_count(
     session: Session,
     key: uuid.UUID,
     admin_id: int,
     location_id: int,
     counted_at: Mapping[int, Decimal],
-    was: Mapping[int, Decimal],
-) -> bool:
-    """Put the records right for what was counted at a place, given what
-    they said (`was`, from expected()): True if anything differed. Items not
-    counted are left as they are. Found more, or nothing differed, is a count
-    into the place under the key; found less, a count out of it under a key
-    made from it, so sending it twice writes it once."""
+    as_of: int,
+) -> Counted:
+    """Put the records right for what was counted at a place, as they stood
+    when the form was shown: as of `as_of`, the place's latest ledger
+    transaction then, from moment() (docs/decisions/0003). Items not
+    counted are left as they are.
+
+    An item that moved there since may have been counted before the move or
+    after it, so its line is not written: it comes back to count again. The
+    rest are written against the records as of `as_of`, so a move saved
+    meanwhile still applies on top.
+
+    Found more, or nothing differed, is a count into the place under the key;
+    found less, a count out of it under a key made from it, so sending it
+    twice writes it once, and finds what moved as the first send did. A
+    count whose every line moved writes nothing."""
+    lock_place(session, location_id)
+    lost_key = uuid.uuid5(key, "lost")
+    sent = session.scalar(
+        select(func.min(LedgerTransaction.id)).where(
+            LedgerTransaction.idempotency_key.in_((key, lost_key))
+        )
+    )
+    after = [LedgerTransaction.id > as_of]
+    if sent is not None:
+        after.append(LedgerTransaction.id < sent)
+    moved = _flows(session, location_id, *after, items=counted_at)
+    then = expected(session, location_id, as_of=as_of, items=counted_at)
+    kept = counted_at.keys() - moved.keys()
     found: dict[int, Decimal] = {}
     lost: dict[int, Decimal] = {}
-    for item_id, amount in counted_at.items():
-        difference = amount - was.get(item_id, Decimal(0))
+    for item_id in kept:
+        difference = counted_at[item_id] - then.get(item_id, Decimal(0))
         if difference > 0:
             found[item_id] = difference
         elif difference < 0:
             lost[item_id] = -difference
-    if found or not lost:
+    if moved and sent is None:
+        withheld.add(len(moved))
+        log.info(
+            "count lines withheld",
+            location_id=location_id,
+            admin_id=admin_id,
+            lines=len(moved),
+        )
+    # A count of nothing at all still says when the place was counted.
+    if found or ((kept or not counted_at) and not lost):
         header = {"admin_id": admin_id, "to_location_id": location_id}
         _correct(session, key, "count", header, found)
     if lost:
         header = {"admin_id": admin_id, "from_location_id": location_id}
-        _correct(session, uuid.uuid5(key, "lost"), "count", header, lost)
-    return bool(found or lost)
+        _correct(session, lost_key, "count", header, lost)
+    return Counted(bool(found or lost), moved)
 
 
 def record_adjustment(

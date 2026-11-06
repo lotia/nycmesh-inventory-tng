@@ -6,6 +6,7 @@ import uuid
 from decimal import Decimal
 
 import pytest
+from conftest import Committed
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy import select
@@ -14,8 +15,9 @@ from test_ledger import Place, stocked, write
 from test_models import violates
 from test_sign_in import text
 
-from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS, expected
+from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS
 from inventory_tng.admin.settings import SETTINGS
+from inventory_tng.ledger import expected, lock_place, moment
 from inventory_tng.models import (
     AdjustmentReason,
     Admin,
@@ -33,8 +35,12 @@ def key_on(response: Response) -> str:
 def count_form(client: TestClient, path: str) -> dict[str, str]:
     """The count page's hidden fields, as it was shown: its key, and the
     place's latest ledger entry then."""
-    shown = client.get(path).text
-    return dict(re.findall(r'type="hidden" name="(key|as_of)" value="([^"]*)"', shown))
+    return count_form_of(client.get(path))
+
+
+def count_form_of(page: Response) -> dict[str, str]:
+    found = re.findall(r'type="hidden" name="(key|as_of)" value="([^"]*)"', page.text)
+    return dict(found)
 
 
 def counts_written(session: Session) -> list[LedgerTransaction]:
@@ -231,20 +237,196 @@ def test_reasons_can_be_added_renamed_retired_and_brought_back(
     assert "already a reason by that name" in text(taken)
 
 
-def test_a_count_shown_before_a_save_is_asked_again(
+def with_cable(session: Session, place: Place) -> None:
+    """Twenty metres of cable received into the store, beside the radios."""
+    write(
+        session,
+        place,
+        kind="receipt",
+        from_location_id=None,
+        to_location_id=place.store.id,
+        lines=[{"item_id": place.cable.id, "quantity": "20"}],
+    )
+
+
+def test_a_save_during_a_count_still_applies(
     admin_client: TestClient, session: Session
 ) -> None:
-    """A volunteer moved three out after the page was shown: leaving the
-    line as it was must not put them back."""
+    """The count is true for when its form was shown: three radios moved to
+    the van meanwhile, and only the cable was counted, so it saves in one go
+    and the move stands."""
+    place = stocked(session)
+    with_cable(session, place)
+    path = f"{COUNTS}/{place.store.id}"
+    shown = count_form(admin_client, path)
+    write(session, place)  # Three radios to the van.
+    done = admin_client.post(
+        path,
+        data=shown
+        | {f"counted_{place.item.id}": "", f"counted_{place.cable.id}": "18"},
+    )
+    assert done.headers["location"] == f"{COUNTS}?notice=counted"
+    assert expected(session, place.store.id) == {
+        place.item.id: Decimal(2),
+        place.cable.id: Decimal(18),
+    }
+
+
+def test_an_item_that_moved_while_counted_is_counted_again(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Three radios went to the van after the page was shown: the count of
+    radios may be from before or after, so only the cable is saved, and the
+    page asks for the radios again, as they are now."""
+    place = stocked(session)
+    with_cable(session, place)
+    path = f"{COUNTS}/{place.store.id}"
+    shown = count_form(admin_client, path)
+    write(session, place)  # Three radios to the van.
+    asked = admin_client.post(
+        path,
+        data=shown
+        | {f"counted_{place.item.id}": "5", f"counted_{place.cable.id}": "18"},
+    )
+    assert asked.status_code == 409
+    page = text(asked)
+    assert "Saved 1 line. These moved while you counted" in page
+    assert "0 in, 3 out; you typed 5" in page
+    assert place.cable.name not in page.split("Something else here")[0]
+    assert expected(session, place.store.id) == {
+        place.item.id: Decimal(2),
+        place.cable.id: Decimal(18),
+    }
+    again = count_form_of(asked)
+    assert again["key"] != shown["key"]
+    assert again["as_of"] != shown["as_of"]
+    done = admin_client.post(path, data=again | {f"counted_{place.item.id}": "1"})
+    assert done.headers["location"] == f"{COUNTS}?notice=counted"
+    assert expected(session, place.store.id)[place.item.id] == Decimal(1)
+
+
+def test_a_count_whose_every_line_moved_writes_nothing(
+    admin_client: TestClient, session: Session
+) -> None:
     place = stocked(session)
     path = f"{COUNTS}/{place.store.id}"
     shown = count_form(admin_client, path)
-    write(session, place)  # Three to the van.
-    refused = admin_client.post(path, data=shown | {f"counted_{place.item.id}": "5"})
-    assert refused.status_code == 409
-    assert "records changed while you counted" in text(refused)
+    write(session, place)  # Three radios to the van.
+    asked = admin_client.post(path, data=shown | {f"counted_{place.item.id}": "5"})
+    assert asked.status_code == 409
+    assert "Saved" not in text(asked)
     assert counts_written(session) == []
-    assert expected(session, place.store.id) == {place.item.id: Decimal(2)}
+
+
+def test_a_count_needs_the_moment_it_was_shown(
+    admin_client: TestClient, session: Session
+) -> None:
+    place = stocked(session)
+    path = f"{COUNTS}/{place.store.id}"
+    shown = count_form(admin_client, path)
+    for as_of in ("", "²", "-1", str(2**31)):
+        refused = admin_client.post(
+            path, data=shown | {"as_of": as_of, f"counted_{place.item.id}": "5"}
+        )
+        assert refused.status_code == 404
+    assert counts_written(session) == []
+
+
+def test_a_count_shown_again_for_a_problem_keeps_its_moment(
+    admin_client: TestClient, session: Session
+) -> None:
+    """What was typed is as of when the form was first shown, so the form
+    shown again to fix a line keeps that moment, not a later one."""
+    place = stocked(session)
+    with_cable(session, place)
+    path = f"{COUNTS}/{place.store.id}"
+    shown = count_form(admin_client, path)
+    write(session, place, lines=[{"item_id": place.item.id, "quantity": "5"}])
+    refused = admin_client.post(
+        path,
+        data=shown
+        | {f"counted_{place.item.id}": "5", f"counted_{place.cable.id}": "x"},
+    )
+    assert refused.status_code == 400
+    assert count_form_of(refused)["as_of"] == shown["as_of"]
+    # Every radio has gone since, but the radios' line is still there.
+    assert f'name="counted_{place.item.id}" inputmode="decimal" value="5"' in (
+        refused.text
+    )
+
+
+def test_a_count_sent_again_after_a_later_move_is_not_asked_again(
+    admin_client: TestClient, session: Session
+) -> None:
+    """The first send saved every line: a move after it does not make the
+    second send ask for the radios again."""
+    place = stocked(session)
+    path = f"{COUNTS}/{place.store.id}"
+    form = count_form(admin_client, path) | {f"counted_{place.item.id}": "4"}
+    assert admin_client.post(path, data=form).status_code == 303
+    write(session, place)  # Three radios to the van.
+    again = admin_client.post(path, data=form)
+    assert again.headers["location"] == f"{COUNTS}?notice=counted"
+    assert expected(session, place.store.id) == {place.item.id: Decimal(1)}
+
+
+def a_store(committed: Committed) -> Place:
+    setup = committed.session()
+    place = Place(setup)
+    setup.commit()
+    return place
+
+
+def receive(session: Session, place: Place) -> None:
+    """Three radios received into the store. Committed tests may not write
+    the ledger (APPEND_ONLY), so the caller rolls it back."""
+    write(
+        session,
+        place,
+        kind="receipt",
+        from_location_id=None,
+        to_location_id=place.store.id,
+    )
+
+
+@pytest.mark.concurrency
+def test_a_count_form_waits_for_a_save_under_way_at_the_place(
+    committed: Committed,
+) -> None:
+    """Its moment must not leave out a save that commits later with a lower
+    ledger id."""
+    place = a_store(committed)
+    saving = committed.session()
+    receive(saving, place)
+    counting = committed.session()
+    worker = committed.blocked(counting, lambda: moment(counting, place.store.id))
+    saving.rollback()
+    assert worker.finished().error is None
+
+
+@pytest.mark.concurrency
+def test_a_count_form_does_not_hold_up_saves(committed: Committed) -> None:
+    """The form keeps its moment, not the lock: a save at the place goes
+    ahead while the form is still being made."""
+    place = a_store(committed)
+    counting = committed.session()
+    moment(counting, place.store.id)
+    saving = committed.session()
+    receive(saving, place)
+    saving.rollback()
+    counting.rollback()
+
+
+@pytest.mark.concurrency
+def test_a_save_at_the_place_waits_for_a_count(committed: Committed) -> None:
+    place = a_store(committed)
+    counting = committed.session()
+    lock_place(counting, place.store.id)
+    saving = committed.session()
+    worker = committed.blocked(saving, lambda: receive(saving, place))
+    counting.rollback()
+    assert worker.finished().error is None
+    saving.rollback()
 
 
 def test_leftovers_of_a_retired_item_can_be_written_off(

@@ -16,13 +16,13 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.command import run_command
 from inventory_tng.db import CLI_ACTOR, set_actor
-from inventory_tng.models import ScanSettings
+from inventory_tng.models import INTEGER_MAX, ScanSettings
 
 log = structlog.get_logger(__name__)
 
 
 # The column is a PostgreSQL integer.
-MAX_MINUTES = 2**31 - 1
+MAX_MINUTES = INTEGER_MAX
 
 
 def whole(text: str) -> int:

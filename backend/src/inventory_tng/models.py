@@ -51,6 +51,8 @@ from sqlalchemy.orm import Mapped, MappedColumn, mapped_column
 from inventory_tng.db import ACTOR_PATTERN, Base
 
 QUANTITY = Numeric(12, 3)
+# The largest PostgreSQL integer: what an id or other integer column holds.
+INTEGER_MAX = 2**31 - 1
 MONEY = Numeric(10, 2)
 
 UNITS = ("each", "m", "ft")
