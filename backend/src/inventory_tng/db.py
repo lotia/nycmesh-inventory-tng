@@ -149,14 +149,45 @@ def exists_where(session: Session, *criteria: ColumnElement[bool]) -> bool:
 GATE_INFO = "gate"
 
 
+# Locking a row (inventory-tng-8i4.57): lock with locked or get_locked,
+# never with_for_update itself (tests/test_locking.py fails on it elsewhere).
+#
+# SQLAlchemy keeps one object per row in a session (its identity map). A
+# query, even SELECT ... FOR UPDATE, that returns a row the session has
+# already loaded gives back that object as it was: it does not overwrite its
+# attributes with what the locked row now holds, unless asked to with
+# populate_existing. So code that read a row, then locks it, would decide on
+# values from before the lock, which another request may have changed: a
+# lost update, or a check passed on old data (tests/test_locking.py shows
+# it with two sessions). SQLAlchemy's maintainer keeps populate_existing
+# something to ask for, as it overwrites changes not yet written
+# (https://groups.google.com/g/sqlalchemy/c/I2ftUVJcAuo); both wrappers run
+# a query, which first writes those (autoflush, on in every session here),
+# so none is lost. They only pass SQLAlchemy's public parameters on and add
+# the option:
+# https://docs.sqlalchemy.org/en/21/core/selectable.html#sqlalchemy.sql.expression.GenerativeSelect.with_for_update
+# https://docs.sqlalchemy.org/en/21/orm/session_api.html#sqlalchemy.orm.Session.get
+# https://docs.sqlalchemy.org/en/21/orm/queryguide/api.html#populate-existing
+
+
 def locked[*Ts](
     query: Select[*Ts], *, key_share: bool = False, of: type[Base] | None = None
 ) -> Select[*Ts]:
-    """`query` FOR UPDATE (FOR NO KEY UPDATE with key_share), of `of`'s rows
-    only if given, its rows read again: a lock is taken to see them as they
-    are, and rows loaded before it would otherwise keep what they were."""
+    """`query` with its rows locked and read again as locked: SELECT ... FOR
+    UPDATE, or FOR NO KEY UPDATE with `key_share` (which does not hold up
+    inserting a row that refers to these); only `of`'s rows if given."""
     return query.with_for_update(key_share=key_share, of=of).execution_options(
         populate_existing=True
+    )
+
+
+def get_locked[M: Base](
+    session: Session, model: type[M], ident: object, *, key_share: bool = False
+) -> M | None:
+    """Session.get, as locked does: the row locked, and read again into the
+    object the session may already hold. None if there is no such row."""
+    return session.get(
+        model, ident, with_for_update={"key_share": key_share}, populate_existing=True
     )
 
 

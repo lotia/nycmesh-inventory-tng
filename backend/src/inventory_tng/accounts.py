@@ -25,7 +25,7 @@ from opentelemetry import metrics
 from sqlalchemy import ColumnElement, delete, exists, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import exists_where, locked, set_actor, unique
+from inventory_tng.db import exists_where, get_locked, locked, set_actor, unique
 from inventory_tng.devices import digest
 from inventory_tng.models import (
     MADE_BY_ADMIN,
@@ -365,11 +365,12 @@ def check_second_factor(
     if _totp_code(typed) is not None or len(typed) > CODE_FIELD_MAX:
         return None
     recovery = session.scalar(
-        select(RecoveryCode)
-        .where(
-            *_unused_codes(admin_id), RecoveryCode.code_hash == _recovery_digest(typed)
+        locked(
+            select(RecoveryCode).where(
+                *_unused_codes(admin_id),
+                RecoveryCode.code_hash == _recovery_digest(typed),
+            )
         )
-        .with_for_update()
     )
     if recovery is None:
         return None
@@ -1137,14 +1138,14 @@ def lock_admin(session: Session, admin_id: int) -> None:
     refers to theirs being inserted (a password, a link, a ledger row),
     which FOR UPDATE would also hold up. It does not read the row again."""
     session.execute(
-        select(Admin.id).where(Admin.id == admin_id).with_for_update(key_share=True)
+        locked(select(Admin.id).where(Admin.id == admin_id), key_share=True)
     )
 
 
 def lock_current(session: Session, admin: Admin) -> bool:
     """Lock their row and read it again, for a path that found them
     unlocked: True if they are still current."""
-    session.refresh(admin, with_for_update={"key_share": True})
+    get_locked(session, Admin, admin.id, key_share=True)
     return admin.retired_at is None
 
 

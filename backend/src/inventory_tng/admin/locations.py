@@ -23,7 +23,7 @@ from inventory_tng.admin.common import (
     now,
     rule_words,
 )
-from inventory_tng.db import DbSession, attempt
+from inventory_tng.db import DbSession, attempt, get_locked
 from inventory_tng.models import Location, Volunteer
 from inventory_tng.pages import not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
@@ -183,7 +183,7 @@ def location(
 
 def _changeable(session: Session, location_id: int) -> Location | None:
     """A location this page changes, locked: not a volunteer's custody."""
-    found = session.get(Location, location_id, with_for_update=True)
+    found = get_locked(session, Location, location_id)
     return None if found is None or found.kind == "custody" else found
 
 

@@ -34,7 +34,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from inventory_tng import request_logging
-from inventory_tng.db import DbSession, record_last_seen
+from inventory_tng.db import DbSession, locked, record_last_seen
 from inventory_tng.models import Device, RegistrationCode
 from inventory_tng.rate_limits import limiter
 from inventory_tng.web import client_address, set_private_cookie
@@ -156,9 +156,11 @@ def register(session: Session, phrase: str, address: str | None) -> tuple[Device
 def _usable_code(session: Session, phrase: str) -> RegistrationCode:
     # Locked, so two phones cannot both take a code's last use.
     code = session.scalar(
-        select(RegistrationCode)
-        .where(RegistrationCode.phrase_hash == digest(normalise_phrase(phrase)))
-        .with_for_update()
+        locked(
+            select(RegistrationCode).where(
+                RegistrationCode.phrase_hash == digest(normalise_phrase(phrase))
+            )
+        )
     )
     if code is None:
         _reject("unknown", None)

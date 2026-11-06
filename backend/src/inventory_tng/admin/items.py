@@ -22,7 +22,7 @@ from inventory_tng.admin.common import (
     quantity,
     text_form,
 )
-from inventory_tng.db import DbSession, exists_where, unique
+from inventory_tng.db import DbSession, exists_where, get_locked, unique
 from inventory_tng.ledger import balance
 from inventory_tng.models import UNITS, Category, Item, ItemPackage, Movement
 from inventory_tng.pages import NOTICES, not_found, redirect
@@ -204,7 +204,7 @@ def save_item(
     item_id: int,
     form: TextForm,
 ) -> Response:
-    found = session.get(Item, item_id, with_for_update=True)
+    found = get_locked(session, Item, item_id)
     if found is None:
         return not_found()
     values, problems = _fields(session, form, unit_fixed=_moved(session, item_id))
@@ -226,7 +226,7 @@ def save_item(
 
 @router.post(f"{ITEMS}/{{item_id}}/retire")
 def retire_item(signed: AdminSignedIn, session: DbSession, item_id: int) -> Response:
-    found = session.get(Item, item_id, with_for_update=True)
+    found = get_locked(session, Item, item_id)
     if found is None or found.retired_at is not None:
         return not_found()
     found.retired_at = now()
@@ -239,7 +239,7 @@ def retire_item(signed: AdminSignedIn, session: DbSession, item_id: int) -> Resp
 def restore_item(
     request: Request, signed: AdminSignedIn, session: DbSession, item_id: int
 ) -> Response:
-    found = session.get(Item, item_id, with_for_update=True)
+    found = get_locked(session, Item, item_id)
     if found is None or found.retired_at is None:
         return not_found()
     if chosen(session, Category, str(found.category_id)) is None:
@@ -268,7 +268,7 @@ def add_package(
     package_name: Annotated[str, Form()] = "",
     size: Annotated[str, Form()] = "",
 ) -> Response:
-    found = session.get(Item, item_id, with_for_update=True)
+    found = get_locked(session, Item, item_id)
     if found is None:
         return not_found()
     name = package_name.strip()
@@ -296,7 +296,7 @@ def add_package(
 def retire_package(
     signed: AdminSignedIn, session: DbSession, item_id: int, package_id: int
 ) -> Response:
-    package = session.get(ItemPackage, package_id, with_for_update=True)
+    package = get_locked(session, ItemPackage, package_id)
     if package is None or package.item_id != item_id or package.retired_at:
         return not_found()
     package.retired_at = now()
