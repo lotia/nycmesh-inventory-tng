@@ -8,11 +8,12 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from servestatic.compress import Compressor
 
-from inventory_tng.bundle import MANIFEST, Bundle, Tags
+from inventory_tng.bundle import MANIFEST, STYLES, Bundle, Tags
 from inventory_tng.settings import FrontendConfig
 
 # The shape `vite build` writes: two entries sharing a chunk that carries the
-# stylesheet, and a chunk only the scan page imports.
+# stylesheets, a chunk only the scan page imports, and the shared stylesheet,
+# an entry of its own that the shared chunk also names.
 BUILD = {
     "src/scan.tsx": {
         "file": "assets/scan-Bk6ZGfA8.js",
@@ -31,7 +32,12 @@ BUILD = {
     },
     "_shared-DeiyL5Lk.js": {
         "file": "assets/shared-DeiyL5Lk.js",
-        "css": ["assets/shared-qHQdyY8N.css"],
+        "css": ["assets/shared-qHQdyY8N.css", "assets/styles-BXvLJlQA.css"],
+    },
+    "src/styles.css": {
+        "file": "assets/styles-BXvLJlQA.css",
+        "src": "src/styles.css",
+        "isEntry": True,
     },
 }
 SCRIPT = b"export const answer = 42;\n" * 40
@@ -66,6 +72,7 @@ def test_an_entry_loads_its_imports_styles_and_preloads_them(dist: Path) -> None
     assert bundle.tags("src/scan.tsx") == Tags(
         styles=(
             "/static/assets/shared-qHQdyY8N.css",
+            "/static/assets/styles-BXvLJlQA.css",
             "/static/assets/cart-T5y6u7I8.css",
         ),
         preloads=(
@@ -74,6 +81,21 @@ def test_an_entry_loads_its_imports_styles_and_preloads_them(dist: Path) -> None
         ),
         scripts=("/static/assets/scan-Bk6ZGfA8.js",),
     )
+
+
+def test_the_shared_stylesheet_is_its_own_entry(dist: Path) -> None:
+    bundle = Bundle(FrontendConfig(dist=dist), development=False)
+    assert bundle.tags(STYLES) == Tags(styles=("/static/assets/styles-BXvLJlQA.css",))
+
+
+def test_server_rendered_pages_load_the_shared_stylesheet(
+    pages: TestClient, make_app: Callable[..., FastAPI]
+) -> None:
+    link = '<link rel="stylesheet" href="/static/assets/styles-BXvLJlQA.css">'
+    assert link in pages.get("/admin/sign-in").text
+    # Without a build, a plain page.
+    with TestClient(make_app()) as unbuilt:
+        assert "stylesheet" not in unbuilt.get("/admin/sign-in").text
 
 
 def test_the_dev_server_serves_the_sources_instead(dist: Path) -> None:
@@ -207,6 +229,23 @@ def test_an_unusable_manifest_is_no_build(
     ]
     with TestClient(app) as client:
         assert client.get("/scan").status_code == 503
+
+
+def test_development_reads_the_manifest_again_only_when_it_changes(
+    make_app: Callable[..., FastAPI], tmp_path: Path
+) -> None:
+    """Every page loads the shared stylesheet: an unusable manifest says so
+    once, not on every page."""
+    (tmp_path / MANIFEST).parent.mkdir(parents=True)
+    (tmp_path / MANIFEST).write_text("{}")
+    with structlog.testing.capture_logs() as logs:
+        app = make_app(frontend=FrontendConfig(dist=tmp_path), development=True)
+        with TestClient(app) as client:
+            for _ in range(3):
+                client.get("/admin/sign-in")
+    assert [line["event"] for line in logs if line["log_level"] == "warning"] == [
+        "frontend manifest unusable"
+    ]
 
 
 def test_outside_development_the_build_is_the_one_at_startup(

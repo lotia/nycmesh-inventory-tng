@@ -5,47 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>{{ title }} · NYC Mesh Inventory</title>
-  <style>
-    :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.4; }
-    body { max-width: 48rem; margin: 2rem auto; padding: 0 1rem; }
-    nav { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin-top: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid #8886; }
-    .retired { opacity: 0.7; }
-    .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; }
-    .actions form, .actions button { margin: 0; }
-    label { display: block; margin-top: 1rem; font-weight: 600; }
-    .hint { font-weight: normal; font-size: 0.9em; opacity: 0.8; }
-    input { display: block; width: 100%; box-sizing: border-box; padding: 0.5rem; font-size: 1rem; margin-top: 0.25rem; }
-    button { margin-top: 1.25rem; padding: 0.5rem 1.25rem; font-size: 1rem; }
-    .problem { color: #b00020; font-weight: normal; }
-    [role=alert] { border-left: 4px solid #b00020; padding: 0.5rem 0.75rem; }
-    .key, .codes { font-family: ui-monospace, monospace; font-size: 1.1em; letter-spacing: 0.05em; }
-    .codes { padding-left: 1.5rem; }
-    .qr svg { background: #fff; display: block; margin: 0.5rem 0; }
-    fieldset { margin-top: 1.5rem; border: 1px solid #8888; padding: 0 1rem 1rem; }
-    header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
-    header form button { margin: 0; }
-    section { margin-top: 2rem; }
-    table { border-collapse: collapse; width: 100%; }
-    td, th { text-align: left; padding: 0.35rem 0.5rem 0.35rem 0; vertical-align: top; }
-    td form, td button { margin: 0; display: inline; }
-    .inline { display: flex; gap: 0.5rem; align-items: end; }
-    .inline input { margin: 0; }
-    .warning { border-left: 4px solid #b8860b; padding: 0.5rem 0.75rem; }
-    [role=status] { border-left: 4px solid #2e7d32; padding: 0.5rem 0.75rem; }
-  </style>
+  {#- The shared stylesheet (docs/decisions/0014); without a build, none. #}
+  {% with tags = shared_styles(request) %}{% include "_tags.html" %}{% endwith %}
 </head>
 <body>
-  {% if admin %}
-  <header>
-    <span>Signed in as <a href="{{ paths.account }}"><strong>{{ admin.username }}</strong></a></span>
-    <form method="post" action="{{ paths.sign_out }}"><button>Sign out</button></form>
+  <header class="masthead">
+    <div class="masthead-inner page-width">
+      <a class="brand" href="{{ paths.home }}">
+        {% include "_nycmesh_logo.svg" %}
+        <span>NYC Mesh</span><span class="brand-rule"></span><span>Inventory</span>
+      </a>
+      {% if admin %}
+      <div class="signed-in">
+        <span>Signed in as <a href="{{ paths.account }}"><strong>{{ admin.username }}</strong></a></span>
+        <form method="post" action="{{ paths.sign_out }}"><button>Sign out</button></form>
+      </div>
+      {% endif %}
+    </div>
+    {% if admin %}
+    <nav class="sections page-width" aria-label="Sections">
+      <a href="{{ paths.home }}">Home</a>
+      {% for path, label in sections %}<a href="{{ path }}">{{ label }}</a>{% endfor %}
+    </nav>
+    {% endif %}
   </header>
-  <nav aria-label="Sections">
-    <a href="{{ paths.home }}">Home</a>
-    {% for path, label in sections %}<a href="{{ path }}">{{ label }}</a>{% endfor %}
-  </nav>
-  {% endif %}
-  <main>
+  <main class="admin page-width">
     <h1>{{ title }}</h1>
     {% if alert %}<p role="alert">{{ alert }}</p>{% endif %}
     {% if notice %}<p role="status">{{ notice }}</p>{% endif %}

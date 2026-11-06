@@ -1,5 +1,6 @@
-"""The scan page's bundle: the pages that load it, and /static that serves it
-(docs/decisions/0010).
+"""The frontend's bundle: the scan and registration pages that load it, the
+stylesheet every page shares, and /static that serves them (docs/decisions/0010
+and 0014).
 
 A page's tags come from Vite's manifest, following the entry's imports for
 styles and preloads, as Vite's backend integration guide says; with
@@ -10,7 +11,7 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import structlog
 from fastapi import APIRouter, FastAPI, Request
@@ -34,6 +35,8 @@ PAGES = {
     "/scan": ("Scan", "src/scan.tsx"),
     "/register": ("Register this device", "src/register.tsx"),
 }
+# The stylesheet the server-rendered pages load: an entry of its own.
+STYLES = "src/styles.css"
 
 
 @dataclass(frozen=True)
@@ -48,12 +51,17 @@ class Tags:
 class Bundle:
     """The tags each page needs. Outside development, read once at startup,
     as /static's files are, so a build is never replaced under a running
-    server. In development, read on every page, so a new build shows."""
+    server. In development, read again whenever the manifest changes, so a
+    new build shows."""
 
     def __init__(self, config: FrontendConfig, *, development: bool) -> None:
         self.config = config
         self.development = development
-        self.built = None if config.dev_server is not None else self.read()
+        self.built: dict[str, Tags] | None = None
+        # The manifest's modification time and size when self.built was read.
+        self.read_at: tuple[int, int] | None = None
+        if config.dev_server is None:
+            self.reread()
 
     def tags(self, entry: str) -> Tags | None:
         """None if there is no usable build."""
@@ -61,17 +69,28 @@ class Bundle:
             # The dev server serves the sources under the build's base.
             base = self.config.dev_server + STATIC
             return Tags(scripts=(base + "@vite/client", base + entry))
-        built = self.read() if self.development else self.built
-        return None if built is None else built[entry]
+        if self.development:
+            self.reread()
+        return None if self.built is None else self.built[entry]
+
+    def reread(self) -> None:
+        """Read the manifest again if it changed since it was last read."""
+        try:
+            found = (self.config.dist / MANIFEST).stat()
+            changed_at = (found.st_mtime_ns, found.st_size)
+        except OSError:
+            changed_at = None
+        if changed_at != self.read_at:
+            self.read_at = changed_at
+            self.built = None if changed_at is None else self.read()
 
     def read(self) -> dict[str, Tags] | None:
         """Each entry's tags, from the manifest; None if there is no usable
         build."""
         try:
             manifest = json.loads((self.config.dist / MANIFEST).read_text())
-            return {
-                entry: _from_manifest(manifest, entry) for _, entry in PAGES.values()
-            }
+            entries = [entry for _, entry in PAGES.values()] + [STYLES]
+            return {entry: _from_manifest(manifest, entry) for entry in entries}
         except FileNotFoundError:
             return None
         except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
@@ -82,6 +101,9 @@ class Bundle:
 
 
 def _from_manifest(manifest: dict[str, dict], entry: str) -> Tags:
+    # An entry that is only a stylesheet, as Vite wrote it.
+    if manifest[entry]["file"].endswith(".css"):
+        return Tags(styles=(STATIC + manifest[entry]["file"],))
     styles: list[str] = []
     preloads: list[str] = []
     seen: set[str] = set()
@@ -121,6 +143,16 @@ def _page(title: str, entry: str) -> Callable[[Request], Response]:
 
     return page
 
+
+def shared_styles(request: Request) -> Tags:
+    """What a server-rendered page loads for the shared stylesheet: the
+    built file, or in development the dev server's, which reloads it.
+    Nothing without a build: the page is plain HTML then."""
+    return request.app.state.bundle.tags(STYLES) or Tags()
+
+
+# Jinja types its globals by its own defaults' types; any value will do.
+cast(dict[str, Any], templates.env.globals)["shared_styles"] = shared_styles
 
 for path, (title, entry) in PAGES.items():
     router.add_api_route(

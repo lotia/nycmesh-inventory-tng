@@ -35,7 +35,7 @@
     {% for authenticator, last_used in authenticators %}
     <tr>
       <td>
-        <form method="post" action="{{ paths.account }}/authenticators/{{ authenticator.id }}/name" class="inline">
+        <form method="post" action="{{ paths.account }}/authenticators/{{ authenticator.id }}/name" class="actions">
           <input name="authenticator_name" value="{{ authenticator.name }}" maxlength="{{ limits.authenticator_name_max }}" aria-label="Name" required>
           <button>Rename</button>
         </form>

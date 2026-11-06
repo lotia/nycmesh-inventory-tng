@@ -1,0 +1,10 @@
+{#- What a page's <head> loads from the frontend's bundle (bundle.Tags). -#}
+{% for href in tags.styles %}
+<link rel="stylesheet" href="{{ href }}">
+{% endfor %}
+{% for href in tags.preloads %}
+<link rel="modulepreload" href="{{ href }}">
+{% endfor %}
+{% for src in tags.scripts %}
+<script type="module" src="{{ src }}"></script>
+{% endfor %}

@@ -1,5 +1,7 @@
 /**
- * Builds the scan page and the registration page (docs/decisions/0010).
+ * Builds the scan page, the registration page and the stylesheet every page
+ * shares (docs/decisions/0010 and 0014). Tailwind's plugin also reloads the
+ * pages open on the dev server when a template it reads is saved.
  *
  * The backend serves the output under /static and reads the manifest to
  * write each page's tags, so the entries' names below are the ones the
@@ -9,13 +11,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 import preact from "@preact/preset-vite";
+import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vitest/config";
 
 const DEFAULT_ORIGIN = "http://localhost:5173";
 
 // Each page's entry: what the build bundles.
 const pages = ["src/scan.tsx", "src/register.tsx"];
-
 /**
  * VITE_DEV_SERVER as the backend reads it: from the shell, else from the
  * repository's .env and no other file, wherever Vite is started from.
@@ -41,7 +43,7 @@ if (!port || port === "0") {
 }
 
 export default defineConfig({
-  plugins: [preact()],
+  plugins: [preact(), tailwindcss()],
   base: "/static/",
   // No public/ directory: the backend serves only the hashed files Vite
   // writes to assets/, so a file copied as it is would be found by the dev
@@ -50,7 +52,7 @@ export default defineConfig({
   build: {
     manifest: true,
     rolldownOptions: {
-      input: pages,
+      input: [...pages, "src/styles.css"],
     },
   },
   server: {
