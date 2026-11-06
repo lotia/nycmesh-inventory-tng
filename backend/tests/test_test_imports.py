@@ -14,12 +14,20 @@ def shared_from(source: str) -> set[str]:
     found = set()
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.ImportFrom):
-            names = [node.module or ""]
+            # `from . import test_x` and `from tests import conftest` too.
+            names = [node.module or "", *(alias.name for alias in node.names)]
         elif isinstance(node, ast.Import):
             names = [alias.name for alias in node.names]
         else:
             continue
-        found |= {n for n in names if n == "conftest" or n.startswith("test_")}
+        found |= {
+            name
+            for name in names
+            if any(
+                part == "conftest" or part.startswith("test_")
+                for part in name.split(".")
+            )
+        }
     return found
 
 
@@ -27,6 +35,8 @@ def shared_from(source: str) -> set[str]:
     ("source", "found"),
     [
         ("from conftest import SentMail", {"conftest"}),
+        ("from . import test_models", {"test_models"}),
+        ("import tests.conftest", {"tests.conftest"}),
         ("from helpers.rows import add\nimport databases", set()),
     ],
 )

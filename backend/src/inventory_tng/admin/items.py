@@ -24,7 +24,7 @@ from inventory_tng.admin.common import (
     rule_words,
     text_form,
 )
-from inventory_tng.db import DbSession, exists_where, refusal, unique
+from inventory_tng.db import DbSession, exists_where, get_locked, refusal, unique
 from inventory_tng.ledger import balance
 from inventory_tng.models import UNITS, Category, Item, ItemPackage, Movement
 from inventory_tng.pages import NOTICES, not_found, redirect
@@ -45,14 +45,13 @@ RESTORE_TAKEN = "A current item already has its name or part number: change one 
 
 def _refused(
     session: Session, change: Callable[[], object], problems: dict[str, str]
-) -> bool:
+) -> None:
     """Makes the change, unless its name is taken or its category retired:
-    then says so, beside that field. True if it was refused."""
+    then says so in `problems`, beside that field."""
     broken = refusal(session, change, "unique", "item_category_current")
     if broken is not None:
         field = "name" if broken == "unique" else "category_id"
         problems[field] = rule_words(broken, TAKEN)
-    return broken is not None
 
 
 NOTICES.update(
@@ -308,7 +307,7 @@ def add_package(
 def retire_package(
     signed: AdminSignedIn, session: DbSession, item_id: int, package_id: int
 ) -> Response:
-    package = locked_row(session, ItemPackage, package_id)
+    package = get_locked(session, ItemPackage, package_id)
     if package is None or package.item_id != item_id or package.retired_at:
         return not_found()
     package.retired_at = now()

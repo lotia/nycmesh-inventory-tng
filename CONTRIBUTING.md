@@ -307,9 +307,10 @@ only a real browser can, such as that no page scrolls sideways:
 mise run check-browser           # builds, starts the app, runs them
 ```
 
-They run in Chromium, which `mise run setup` installs; also in WebKit,
-Safari's engine, in CI and with `PLAYWRIGHT_WEBKIT=1`: run `mise run setup`
-with it set to install WebKit too. Playwright's WebKit is built for Ubuntu
+They run in Chromium; also in WebKit, Safari's engine, in CI and with
+`PLAYWRIGHT_WEBKIT=1`. `mise run setup-browsers` installs them when
+Playwright changes, and `mise run setup` and `mise run check-browser` run
+it. Playwright's WebKit is built for Ubuntu
 and may not start on other systems (installing it says what it lacks).
 Playwright starts the backend itself, with a database of its own, on a port
 chosen for the run, so runs from two clones do not meet.

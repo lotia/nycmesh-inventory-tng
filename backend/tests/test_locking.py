@@ -43,7 +43,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 
-from helpers.concurrency import Committed
+from helpers.concurrency import Committed, made
 from helpers.sign_in import code, new_admin, sign_in_with
 
 SOURCE = Path(inventory_tng.__file__).parent
@@ -152,12 +152,6 @@ def test_the_check_sees_each_way_of_locking(tmp_path: Path) -> None:
     assert outside_the_wrappers(db, wrappers_in=db) == [4]
     # Another file of that name is no exception.
     assert outside_the_wrappers(db) == [2, 4]
-
-
-def made(committed: Committed, *rows: Base) -> None:
-    setup = committed.session()
-    setup.add_all(rows)
-    setup.commit()
 
 
 def changed(

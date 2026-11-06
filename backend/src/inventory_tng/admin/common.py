@@ -52,12 +52,17 @@ RULES = {
 
 
 def locked_row[M: Base](session: Session, model: type[M], ident: object) -> M | None:
-    """A catalogue row, locked for the change a page makes to it: FOR NO KEY
-    UPDATE, which, unlike FOR UPDATE, does not hold up a foreign-key check on
-    it. A write's rules trigger takes lock_catalogue_rules() before its
-    foreign-key checks run, so a FOR UPDATE here could deadlock with a write
-    that points at this row (inventory-tng-8i4.58); this way they queue."""
-    return get_locked(session, model, ident, key_share=True)
+    """A row whose table's triggers check the catalogue's rules, locked for
+    the change a page makes to it (others take db.get_locked): first the
+    rules' lock every catalogue rules trigger takes (lock_catalogue_rules),
+    then the row FOR UPDATE. FOR UPDATE waits for any write under way that
+    refers to the row, such as a save holding its places or a movement of an
+    item, so what the page then reads of them is settled. The rules' lock
+    first keeps one order: a trigger holds it while it checks a reference to
+    this row, so taken after the row it could deadlock (inventory-tng-8i4.58,
+    8i4.69). Saves and counts never take it, so they wait on no page."""
+    session.execute(select(func.lock_catalogue_rules()))
+    return get_locked(session, model, ident)
 
 
 def rule_words(broken: str, unique: str) -> str:

@@ -240,6 +240,7 @@ def test_reasons_can_be_added_renamed_retired_and_brought_back(
     assert given.retired_at is None
     taken = admin_client.post(f"{SETTINGS}/reasons", data={"name": "damaged"})
     assert "already a reason by that name" in text(taken)
+    assert admin_client.post(f"{SETTINGS}/reasons/999999").status_code == 404
 
 
 def with_cable(session: Session, place: Place) -> None:

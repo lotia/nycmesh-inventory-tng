@@ -181,9 +181,10 @@ def _count_page(
     status_code: int = 200,
 ) -> HTMLResponse:
     """The count form, with the records as of `as_of`: of everything there,
-    or a recount of `items` only, which the form carries. With `recount`,
-    what was typed for each and what came in and went out while it was
-    counted."""
+    or a recount of `items` only, which the form carries. With `recount`, a
+    recount of its items: what was typed for each and what came in and went
+    out while it was counted."""
+    items = items or (recount or {}).keys()
     was = expected(session, place.id, as_of=as_of, items=items or None)
     if items:
         was = {item_id: was.get(item_id, Decimal(0)) for item_id in items}
@@ -317,7 +318,6 @@ def count(
         signed,
         place,
         moment(session, place.id),
-        items=result.moved.keys(),
         recount={
             item_id: (counted[item_id], came, went)
             for item_id, (came, went) in result.moved.items()

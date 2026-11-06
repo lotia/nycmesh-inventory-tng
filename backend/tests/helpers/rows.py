@@ -1,5 +1,6 @@
 """Catalogue rows: adding, finding, their history and the rules they break."""
 
+import uuid
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
@@ -43,3 +44,9 @@ def history(
     if row_id is not None:
         query = query.where(CatalogueHistory.row_id == row_id)
     return list(session.scalars(query.order_by(CatalogueHistory.id)))
+
+
+def tag() -> str:
+    """For unique names: rows committed by one test never clash with
+    another's."""
+    return uuid.uuid4().hex[:8]

@@ -10,16 +10,7 @@ cd "${MISE_PROJECT_ROOT:-$(dirname "$0")/..}"
 if [[ frontend/package-lock.json -nt frontend/node_modules/.package-lock.json ]]; then
   (cd frontend && npm ci)
 fi
-# The browsers the browser tests use, for the Playwright it pins: Chromium,
-# and WebKit with PLAYWRIGHT_WEBKIT=1. Again only when the lockfile is newer
-# than the last install that worked (npm ci clears the mark).
-browsers=(chromium)
-[[ "${PLAYWRIGHT_WEBKIT:-}" = 1 ]] && browsers+=(webkit)
-installed="frontend/node_modules/.browsers-$(IFS=-; echo "${browsers[*]}")"
-if [[ frontend/package-lock.json -nt "$installed" ]]; then
-  (cd frontend && node_modules/.bin/playwright install --no-shell "${browsers[@]}")
-  touch "$installed"
-fi
+"$(dirname "$0")/setup-browsers"
 if [[ ! -f .env ]]; then
   cp .env.example .env
   echo "Made .env from .env.example."
