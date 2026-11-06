@@ -82,6 +82,11 @@ description = "Format every TOML file"
 env = { RUST_LOG = "warn" }
 run = "taplo fmt"
 
+[tasks.seed]
+description = "Seed an empty development database (CONTRIBUTING.md); -- --password sets the administrator's"
+dir = "backend"
+run = "uv run python -m inventory_tng.seed"
+
 [tasks.dev-backend]
 description = "The backend, restarting when its Python changes (mise run dev runs it)"
 dir = "backend"

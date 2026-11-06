@@ -21,14 +21,10 @@ from inventory_tng.models import INTEGER_MAX, ScanSettings
 log = structlog.get_logger(__name__)
 
 
-# The column is a PostgreSQL integer.
-MAX_MINUTES = INTEGER_MAX
-
-
 def whole(text: str) -> int:
-    if not text.isdigit() or int(text) > MAX_MINUTES:
+    if not text.isdigit() or int(text) > INTEGER_MAX:
         raise argparse.ArgumentTypeError(
-            f"must be a whole number from 0 to {MAX_MINUTES}, not {text}"
+            f"must be a whole number from 0 to {INTEGER_MAX}, not {text}"
         )
     return int(text)
 

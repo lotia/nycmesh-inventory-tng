@@ -2,7 +2,6 @@
 migrated and dropped. Each is named for when it was made, so one left
 behind is dropped by a later run."""
 
-import os
 import re
 import time
 import uuid
@@ -18,7 +17,7 @@ from sqlalchemy import Connection, Engine, make_url, text
 from sqlalchemy.exc import OperationalError
 
 from inventory_tng.db import make_engine
-from inventory_tng.local_env import local_env_values
+from inventory_tng.local_env import setting
 from inventory_tng.settings import Settings
 
 log = structlog.get_logger(__name__)
@@ -27,11 +26,9 @@ PYPROJECT = Path(__file__).parents[1] / "pyproject.toml"
 
 # The database compose starts: from the shell, else the repository's .env
 # (CONTRIBUTING.md, Local settings), else compose's default port.
-LOCAL = local_env_values()
-PORT = os.environ.get("INVENTORY_DB_PORT") or LOCAL.get("INVENTORY_DB_PORT") or "5433"
+PORT = setting("INVENTORY_DB_PORT") or "5433"
 SERVER_URL = Settings(
-    database_url=os.environ.get("DATABASE_URL")
-    or LOCAL.get("DATABASE_URL")
+    database_url=setting("DATABASE_URL")
     or f"postgresql://inventory:inventory@localhost:{PORT}/inventory"
 ).database_url
 
@@ -89,6 +86,8 @@ def create_database(template: str | None = None) -> str:
     finally:
         server.dispose()
     log.info("created test database", database=name)
+    # Reachable now: sweep up after earlier runs. This one is too new to go.
+    drop_left_behind()
     url = make_url(SERVER_URL).set(database=name)
     return url.render_as_string(hide_password=False)
 

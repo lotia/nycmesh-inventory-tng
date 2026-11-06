@@ -13,6 +13,13 @@ process.env.CAMERA_VIDEO ??= join(
   `inventory-camera-${process.pid}.y4m`,
 );
 
+// The administrator's session, signed in once (sign-in.setup.ts) for every
+// test: signing in again for each would meet the sign-in rate limit.
+process.env.ADMIN_STATE ??= join(
+  tmpdir(),
+  `inventory-admin-${process.pid}.json`,
+);
+
 // A phone's width, the narrowest the pages are made for.
 const phone = {
   viewport: { width: 360, height: 740 },
@@ -33,9 +40,16 @@ export default defineConfig({
   },
   projects: [
     {
+      name: "sign-in",
+      testMatch: /sign-in\.setup\.ts/,
+      use: { browserName: "chromium", channel: "chromium" },
+    },
+    {
       name: "chromium",
+      dependencies: ["sign-in"],
       use: {
         browserName: "chromium",
+        storageState: process.env.ADMIN_STATE,
         // Full Chromium, headless: Playwright's lighter headless shell has
         // no camera, fake or not.
         channel: "chromium",
@@ -49,7 +63,16 @@ export default defineConfig({
       },
     },
     ...(webkit
-      ? [{ name: "webkit", use: { browserName: "webkit" as const } }]
+      ? [
+          {
+            name: "webkit",
+            dependencies: ["sign-in"],
+            use: {
+              browserName: "webkit" as const,
+              storageState: process.env.ADMIN_STATE,
+            },
+          },
+        ]
       : []),
   ],
 });

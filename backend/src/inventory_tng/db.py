@@ -171,14 +171,19 @@ GATE_INFO = "gate"
 
 
 def locked[*Ts](
-    query: Select[*Ts], *, key_share: bool = False, of: type[Base] | None = None
+    query: Select[*Ts],
+    *,
+    key_share: bool = False,
+    shared: bool = False,
+    of: type[Base] | None = None,
 ) -> Select[*Ts]:
     """`query` with its rows locked and read again as locked: SELECT ... FOR
     UPDATE, or FOR NO KEY UPDATE with `key_share` (which does not hold up
-    inserting a row that refers to these); only `of`'s rows if given."""
-    return query.with_for_update(key_share=key_share, of=of).execution_options(
-        populate_existing=True
-    )
+    inserting a row that refers to these); with `shared` too, FOR KEY SHARE,
+    which only FOR UPDATE waits for. Only `of`'s rows if given."""
+    return query.with_for_update(
+        read=shared, key_share=key_share, of=of
+    ).execution_options(populate_existing=True)
 
 
 def get_locked[M: Base](

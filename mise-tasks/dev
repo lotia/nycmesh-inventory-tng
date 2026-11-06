@@ -6,9 +6,9 @@ set -euo pipefail
 
 clone=$(dirname "$0")/..
 
-# Vite's address, read as the backend reads it (the shell, then .env); empty
-# means Vite's own default, DEFAULT_ORIGIN in frontend/vite.config.ts. Both
-# servers get it from here, so they agree.
+# Vite's address, read as the backend reads it (the shell, then .env), else
+# the same default as DEFAULT_ORIGIN in frontend/vite.config.ts. Both servers
+# get it from here, so they agree.
 VITE_DEV_SERVER=$(uv run --quiet --frozen --project "$clone/backend" \
   python -m inventory_tng.local_env VITE_DEV_SERVER)
 export VITE_DEV_SERVER=${VITE_DEV_SERVER:-http://localhost:5173}

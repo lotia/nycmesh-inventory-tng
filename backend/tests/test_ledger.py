@@ -60,15 +60,19 @@ class Place:
 def stocked(session: Session, quantity: str = "5") -> Place:
     """A Place with `quantity` radios received into its store."""
     place = Place(session)
-    write(
-        session,
-        place,
-        kind="receipt",
-        from_location_id=None,
-        to_location_id=place.store.id,
-        lines=[{"item_id": place.item.id, "quantity": quantity}],
-    )
+    received(session, place, [{"item_id": place.item.id, "quantity": quantity}])
     return place
+
+
+def received(
+    session: Session, place: Place, lines: list[dict[str, object]] | None = None
+) -> LedgerTransaction:
+    """A receipt into the place's store: of `lines`, else three radios."""
+    fields: dict[str, object] = {"kind": "receipt", "from_location_id": None}
+    fields["to_location_id"] = place.store.id
+    if lines is not None:
+        fields["lines"] = lines
+    return write(session, place, **fields)
 
 
 @pytest.fixture
@@ -412,13 +416,7 @@ def test_a_retired_item_is_taken_never_received(
     client: TestClient, session: Session, place: Place
 ) -> None:
     """What is left of it may go out; nothing more comes in."""
-    write(
-        session,
-        place,
-        kind="receipt",
-        from_location_id=None,
-        to_location_id=place.store.id,
-    )
+    received(session, place)
     place.item.retired_at = datetime.now(UTC)
     session.flush()
     receipt = place.batch(

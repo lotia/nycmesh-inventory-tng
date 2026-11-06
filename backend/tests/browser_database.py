@@ -7,7 +7,7 @@ global setup:
 `create` makes one of its own (databases.py), migrated and seeded, with a
 registration code for the tests' devices, and prints what they need. It
 also writes VIDEO, for Chromium to show as its camera: the QR code of the
-seeded radio's label. One a run leaves behind is dropped by a later run, as
+seed's labelled item. One a run leaves behind is dropped by a later run, as
 test databases are.
 """
 
@@ -21,7 +21,7 @@ from pathlib import Path
 
 import segno
 import structlog
-from databases import create_database, drop_database, drop_left_behind, migrate
+from databases import create_database, drop_database, migrate
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -39,37 +39,46 @@ def main(argv: list[str]) -> int:
     if argv[:1] != ["create"] or len(argv) != 2:
         print(__doc__, file=sys.stderr)
         return 2
-    drop_left_behind()
     url = create_database()
-    engine = make_engine(url)
-    migrate(engine)
-    password = secrets.token_urlsafe(16)
-    with Session(engine) as session, session.begin():
-        # Its words are for people: stdout is the JSON alone.
-        with contextlib.redirect_stdout(sys.stderr):
-            seeded = seed.run(session, argparse.Namespace(password=password))
-        if seeded != 0:
-            return 1
-        radio = session.scalars(
-            select(Label.code).join(Item).where(Item.name == "LiteBeam 5AC Gen2")
-        ).one()
-        write_camera_video(Path(argv[1]), radio)
-        # One device for each browser the tests run in.
-        _, phrase = devices.create_code(
-            session, max_uses=10, lifetime=timedelta(hours=1), label="browser tests"
-        )
-    engine.dispose()
-    print(
-        json.dumps(
-            {
-                "database_url": url,
-                "username": seed.USERNAME,
-                "password": password,
-                "phrase": phrase,
-            }
-        )
-    )
+    try:
+        prepared = prepare(url, Path(argv[1]))
+    except BaseException:
+        # Nothing printed for the tests to drop it by.
+        drop_database(url)
+        raise
+    print(json.dumps(prepared))
     return 0
+
+
+def prepare(url: str, video: Path) -> dict[str, str]:
+    """The database migrated and seeded, a code for the tests' device, and
+    the camera's video: what the tests need, as printed."""
+    engine = make_engine(url)
+    try:
+        migrate(engine)
+        password = secrets.token_urlsafe(16)
+        with Session(engine) as session, session.begin():
+            # Its words are for people: stdout is the JSON alone.
+            with contextlib.redirect_stdout(sys.stderr):
+                if seed.run(session, argparse.Namespace(password=password)) != 0:
+                    raise RuntimeError("the seed refused the new database")
+            label = session.scalars(
+                select(Label.code).join(Item).where(Item.name == seed.LABELLED)
+            ).one()
+            write_camera_video(video, label)
+            # The one device the tests share, registered by sign-in.setup.ts.
+            _, phrase = devices.create_code(
+                session, max_uses=1, lifetime=timedelta(hours=1), label="browser tests"
+            )
+    finally:
+        engine.dispose()
+    return {
+        "database_url": url,
+        "username": seed.USERNAME,
+        "password": password,
+        "phrase": phrase,
+        "labelled": seed.LABELLED,
+    }
 
 
 def write_camera_video(path: Path, text: str) -> None:

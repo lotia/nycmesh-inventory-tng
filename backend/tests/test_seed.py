@@ -102,14 +102,14 @@ def test_an_administrator_without_a_password_gets_one(
     assert SIGN_IN in capsys.readouterr().out
 
 
-def test_it_refuses_a_database_in_use(
+def test_it_refuses_a_database_someone_works_in(
     seeding: Session, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    seeding.add(Volunteer(name="Someone real"))
+    seeding.add(Admin(username="ada"))
     seeding.commit()
     assert seed.main([]) == 1
-    assert "holds volunteer rows and was never seeded" in capsys.readouterr().err
-    assert the_admin(seeding) is None
+    assert "has administrators already" in capsys.readouterr().err
+    assert seeding.scalars(select(Admin.username)).all() == ["ada"]
 
 
 def test_it_runs_as_a_module(

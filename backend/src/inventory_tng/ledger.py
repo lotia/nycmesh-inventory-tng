@@ -44,7 +44,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import DbSession, get_locked, set_actor
+from inventory_tng.db import DbSession, get_locked, locked, set_actor
 from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
 from inventory_tng.models import (
     INTEGER_MAX,
@@ -105,19 +105,25 @@ def expected(
     as_of: int | None = None,
     items: Collection[int] | None = None,
 ) -> dict[int, Decimal]:
-    """What the records say is at a place, by item: only what is not zero.
-    With as_of, what they said at that moment (see moment()); with items,
-    of those only."""
-    bounds = [] if as_of is None else [LedgerTransaction.id <= as_of]
-    flows = _flows(session, location_id, *bounds, items=items)
-    return {item: came - went for item, (came, went) in flows.items() if came != went}
+    """What the records say is at a place, by item: only what is not zero,
+    as the balance view says now; with as_of, what they said at that moment
+    (see moment()), of `items` only if given."""
+    if as_of is not None:
+        flows = _flows(session, location_id, LedgerTransaction.id <= as_of, items=items)
+        return {
+            item: came - went for item, (came, went) in flows.items() if came != went
+        }
+    query = select(balance.c.item_id, balance.c.quantity).where(
+        balance.c.location_id == location_id, balance.c.quantity != 0
+    )
+    return {item_id: amount for item_id, amount in session.execute(query)}
 
 
 def lock_place(session: Session, location_id: int) -> None:
     """Wait for every save under way at a place, and hold up new ones until
-    this transaction ends, so its ledger reads as one moment: inserting a
-    ledger transaction takes FOR KEY SHARE on its places, through their
-    foreign keys, and this takes FOR UPDATE."""
+    this transaction ends, so its ledger reads as one moment: every save
+    takes FOR KEY SHARE on its places before it draws an id
+    (insert_transaction), and this takes FOR UPDATE."""
     get_locked(session, Location, location_id)
 
 
@@ -295,6 +301,17 @@ def insert_transaction(
     """A transaction and its movements, unless its key is written already:
     None then. A concurrent request with the same key waits here for that
     one to commit, then writes nothing."""
+    # Its places first, before it has an id: a count (lock_place) then waits
+    # for it whole, so none can draw an id, wait, and commit after a count's
+    # moment that it falls inside.
+    places = {header.get("from_location_id"), header.get("to_location_id")} - {None}
+    session.execute(
+        locked(
+            select(Location.id).where(Location.id.in_(places)),
+            key_share=True,
+            shared=True,
+        )
+    )
     transaction = session.scalar(
         pg_insert(LedgerTransaction)
         .values(idempotency_key=key, **header)

@@ -82,8 +82,10 @@ class Bundle:
         except OSError:
             changed_at = None
         if changed_at != self.read_at:
-            self.read_at = changed_at
+            # The build first: another request that sees read_at changed
+            # must find the build that goes with it.
             self.built = None if changed_at is None else self.read()
+            self.read_at = changed_at
 
     def read(self) -> dict[str, Tags] | None:
         """Each entry's tags, from the manifest; None if there is no usable

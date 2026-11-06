@@ -19,7 +19,7 @@ from opentelemetry.sdk.metrics.export import (
 from sqlalchemy import exc
 from sqlalchemy.orm import Session
 from test_devices import new_device
-from test_ledger import Place, stocked, write
+from test_ledger import Place, received, stocked, write
 from test_sign_in import PASSWORD, new_admin
 
 from inventory_tng import accounts, devices, ledger, mail
@@ -338,13 +338,7 @@ def test_counts_count_lines_withheld(rolled_back: Recorded, session: Session) ->
     _, _, reader, _ = rolled_back
     ada, _ = new_admin(session)
     place = stocked(session)
-    as_of = write(
-        session,
-        place,
-        kind="receipt",
-        from_location_id=None,
-        to_location_id=place.store.id,
-    ).id
+    as_of = received(session, place).id
     write(session, place)
     radios = {place.item.id: Decimal(5)}
     result = ledger.record_count(

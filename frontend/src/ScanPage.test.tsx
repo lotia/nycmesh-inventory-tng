@@ -4,17 +4,14 @@ import { openCamera } from "./camera";
 import { STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
 import { Outbox } from "./outbox";
 import { ScanPage } from "./ScanPage";
+import { fakeCamera } from "./test-camera";
 import { CATALOGUE } from "./test-catalogue";
 import { answering, json, saved } from "./test-fetch";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));
-const camera = { inView: [] as string[] };
-vi.mocked(openCamera).mockImplementation(async () => ({
-  read: async () => camera.inView,
-  torch: null,
-  stop: () => {},
-}));
+const camera = fakeCamera();
+vi.mocked(openCamera).mockImplementation(camera.open);
 
 /** An API with the test catalogue, saving batches as transaction 77. */
 function server(save: () => Response | Promise<Response> = () => saved()) {
@@ -389,13 +386,13 @@ describe("whose name it is", () => {
 describe("scanning labels with the camera", () => {
   /** Shows the camera these labels: it reads them within a moment. */
   function scan(...codes: string[]) {
-    camera.inView = codes;
+    camera.state.inView = codes;
   }
 
   async function opened() {
     open();
     await ready();
-    camera.inView = [];
+    camera.state.inView = [];
     fireEvent.click(
       screen.getByRole("button", { name: "Scan with the camera" }),
     );
@@ -452,6 +449,15 @@ describe("scanning labels with the camera", () => {
     scan("B3ZT9W");
     await screen.findByText("Added one: LiteBeam 5AC.");
     expect(screen.queryByRole("button", { name: "From" })).toBeNull();
+  });
+
+  test("a stray code leaves a place's question to answer", async () => {
+    await opened();
+    scan("S4HELF");
+    await screen.findByRole("button", { name: "From" });
+    scan("NOT-OURS");
+    await screen.findByText("That label isn't in the inventory (NOT-OURS).");
+    screen.getByRole("button", { name: "From" });
   });
 
   test("a scanner gun's place label asks too", async () => {
