@@ -23,5 +23,9 @@ __pycache__/
 coverage.xml
 frontend/coverage/
 
+# The browser tests' output, written by mise run check-browser
+frontend/test-results/
+frontend/playwright-report/
+
 # Local settings
 .env
