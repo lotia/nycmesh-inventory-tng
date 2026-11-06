@@ -32,9 +32,10 @@ tree-shaken and minified.
   device's setting (Ali, 2026-11-06).
 - **Plain elements get type, colour and borders** in the stylesheet's base
   layer, never spacing between them. The administrator pages' form spacing
-  belongs to their layout (`.admin`), and the scan pages keep their own, so
-  neither has rules to undo the other's. Repeated pieces of markup become
-  Jinja macros or Preact components, not copied runs of utility classes.
+  belongs to their layout (`.admin`), and the scan pages' to theirs
+  (`.volunteer`), so neither has rules to undo the other's. Repeated
+  pieces of markup become Jinja macros or Preact components, not copied
+  runs of utility classes.
 - **A class name is always written whole** in a template or a component.
   Tailwind finds classes by reading the sources as text, so one built from
   parts, such as `"text-" ~ colour`, is never generated.

@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from servestatic.compress import Compressor
 
-from inventory_tng.bundle import MANIFEST, STYLES, Bundle, Tags
+from inventory_tng.bundle import MANIFEST, PAGES, SCAN, STYLES, Bundle, Tags
 from inventory_tng.settings import FrontendConfig
 
 # The shape `vite build` writes: two entries sharing a chunk that carries the
@@ -125,6 +125,16 @@ def test_each_page_loads_its_entry(pages: TestClient, path: str, script: str) ->
         response.text
     )
     assert '<div id="app"></div>' in response.text
+
+
+@pytest.mark.parametrize("path", PAGES)
+def test_volunteers_pages_have_the_band_and_nothing_of_an_administrators(
+    pages: TestClient, path: str
+) -> None:
+    page = pages.get(path).text
+    assert f'<a class="brand" href="{SCAN}">' in page
+    assert "Sign out" not in page
+    assert 'aria-label="Sections"' not in page
 
 
 @pytest.mark.parametrize(

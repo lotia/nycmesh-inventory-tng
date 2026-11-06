@@ -137,7 +137,7 @@
 }
 
 @layer components {
-  /* The width every administrator page's content keeps. */
+  /* The width every page's content keeps. */
   .page-width {
     @apply mx-auto max-w-3xl px-4;
   }
@@ -181,7 +181,71 @@
     @apply flex flex-wrap items-end gap-3;
   }
 
-  /* The band at the top of every administrator page, as MeshDB's. */
+  /* The scan and registration pages' main part (frontend/src), and the
+     shapes only they use. */
+  .volunteer {
+    @apply pt-4 pb-12;
+  }
+
+  .volunteer label {
+    @apply mb-1;
+  }
+
+  .volunteer :is(input, select) {
+    @apply mb-3;
+  }
+
+  .volunteer fieldset {
+    @apply mb-3 border-0 p-0;
+  }
+
+  .volunteer legend {
+    @apply mb-1;
+  }
+
+  /* A radio button and its words, easy to tap. */
+  .volunteer .choice {
+    @apply flex items-center gap-2 py-1 font-normal;
+  }
+
+  .volunteer .choice input {
+    @apply m-0;
+  }
+
+  .volunteer .amount {
+    @apply font-normal;
+  }
+
+  .volunteer :is(.lines, .matches, .outbox, .problems) {
+    @apply list-none p-0;
+  }
+
+  .volunteer :is(.lines, .outbox) > li {
+    @apply border-t border-line py-3;
+  }
+
+  .volunteer .matches > li {
+    @apply py-1;
+  }
+
+  .volunteer .total {
+    @apply mt-0 mb-2;
+  }
+
+  .volunteer .save {
+    @apply w-full text-xl;
+  }
+
+  /* Asks, after a while unused, whether the name chosen is still yours. */
+  .volunteer .who {
+    @apply mb-4 border-2 border-caution p-3;
+  }
+
+  .volunteer :is(.who p, .saving-as) {
+    @apply mt-0;
+  }
+
+  /* The band at the top of every page, as MeshDB's. */
   .masthead {
     @apply border-b border-line bg-band;
     anchor-name: --masthead;

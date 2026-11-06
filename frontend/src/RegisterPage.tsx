@@ -116,7 +116,7 @@ export function RegisterPage({
 
 function Page({ children }: { children: ComponentChildren }) {
   return (
-    <main>
+    <main class="volunteer page-width">
       <h1>Register this device</h1>
       {children}
     </main>

@@ -107,7 +107,7 @@ export function ScanPage({
 
   const current = loaded.value;
   return (
-    <main>
+    <main class="volunteer page-width">
       <h1>Scan</h1>
       {current.state === "loading" && <p>Loading the catalogue…</p>}
       {current.state === "unregistered" && (

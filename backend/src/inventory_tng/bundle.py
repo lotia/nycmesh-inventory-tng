@@ -31,8 +31,9 @@ ASSETS = STATIC + "assets/"
 # Where Vite's manifest is, inside dist.
 MANIFEST = Path(".vite") / "manifest.json"
 # Each page and the entry in frontend/vite.config.ts that it loads.
+SCAN = "/scan"
 PAGES = {
-    "/scan": ("Scan", "src/scan.tsx"),
+    SCAN: ("Scan", "src/scan.tsx"),
     "/register": ("Register this device", "src/register.tsx"),
 }
 # The stylesheet the server-rendered pages load: an entry of its own.
@@ -136,7 +137,7 @@ def _page(title: str, entry: str) -> Callable[[Request], Response]:
         return templates.TemplateResponse(
             request,
             "page.html",
-            {"title": title, "tags": page_tags},
+            {"title": title, "tags": page_tags, "brand_home": SCAN},
             # The page names this build's files, so it must not outlive it.
             headers={"Cache-Control": "no-cache"},
         )
