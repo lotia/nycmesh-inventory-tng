@@ -2,27 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/preact";
 import { expect, test, vi } from "vitest";
 import { DecoderUnavailable, type Session } from "./camera";
 import { Scanner } from "./Scanner";
-
-/**
- * A camera that sees `inView`, whatever is put there, unless `read` or
- * `torch` say otherwise.
- */
-function camera(overrides: Partial<Session> = {}) {
-  const state = {
-    inView: [] as string[],
-    stopped: false,
-    lit: [] as boolean[],
-  };
-  const session: Session = {
-    read: async () => state.inView,
-    torch: null,
-    stop: () => {
-      state.stopped = true;
-    },
-    ...overrides,
-  };
-  return { state, open: async () => session };
-}
+import { fakeCamera as camera } from "./test-camera";
 
 /** A read that answers only when `finish` is called. */
 function slowRead() {

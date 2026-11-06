@@ -10,8 +10,9 @@ from conftest import Committed
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy import select
+from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
-from test_ledger import Place, stocked, write
+from test_ledger import Place, received, stocked, write
 from test_models import violates
 from test_sign_in import text
 
@@ -239,14 +240,7 @@ def test_reasons_can_be_added_renamed_retired_and_brought_back(
 
 def with_cable(session: Session, place: Place) -> None:
     """Twenty metres of cable received into the store, beside the radios."""
-    write(
-        session,
-        place,
-        kind="receipt",
-        from_location_id=None,
-        to_location_id=place.store.id,
-        lines=[{"item_id": place.cable.id, "quantity": "20"}],
-    )
+    received(session, place, [{"item_id": place.cable.id, "quantity": "20"}])
 
 
 def test_a_save_during_a_count_still_applies(
@@ -303,6 +297,30 @@ def test_an_item_that_moved_while_counted_is_counted_again(
     done = admin_client.post(path, data=again | {f"counted_{place.item.id}": "1"})
     assert done.headers["location"] == f"{COUNTS}?notice=counted"
     assert expected(session, place.store.id)[place.item.id] == Decimal(1)
+
+
+def test_a_recount_sent_back_with_a_problem_asks_for_its_items_only(
+    admin_client: TestClient, session: Session
+) -> None:
+    place = stocked(session)
+    with_cable(session, place)
+    path = f"{COUNTS}/{place.store.id}"
+    shown = count_form(admin_client, path)
+    write(session, place)  # Three radios to the van.
+    asked = admin_client.post(
+        path,
+        data=shown
+        | {f"counted_{place.item.id}": "5", f"counted_{place.cable.id}": "18"},
+    )
+    again = count_form_of(asked) | {"recounting": "1"}
+    refused = admin_client.post(
+        path, data=again | {f"counted_{place.item.id}": "x", "counted_bad": "1"}
+    )
+    assert refused.status_code == 400
+    page = refused.text
+    assert f'name="counted_{place.item.id}"' in page
+    assert f'name="counted_{place.cable.id}"' not in page
+    assert "Count them again now." in text(refused)
 
 
 def test_a_count_whose_every_line_moved_writes_nothing(
@@ -380,13 +398,7 @@ def a_store(committed: Committed) -> Place:
 def receive(session: Session, place: Place) -> None:
     """Three radios received into the store. Committed tests may not write
     the ledger (APPEND_ONLY), so the caller rolls it back."""
-    write(
-        session,
-        place,
-        kind="receipt",
-        from_location_id=None,
-        to_location_id=place.store.id,
-    )
+    received(session, place)
 
 
 @pytest.mark.concurrency
@@ -419,14 +431,26 @@ def test_a_count_form_does_not_hold_up_saves(committed: Committed) -> None:
 
 @pytest.mark.concurrency
 def test_a_save_at_the_place_waits_for_a_count(committed: Committed) -> None:
+    """Before it has an id: one drawn first could be committed after the
+    count's moment, though lower (inventory-tng-099)."""
     place = a_store(committed)
     counting = committed.session()
     lock_place(counting, place.store.id)
+    before = ids_drawn(counting)
     saving = committed.session()
     worker = committed.blocked(saving, lambda: receive(saving, place))
+    assert ids_drawn(committed.session()) == before
     counting.rollback()
     assert worker.finished().error is None
     saving.rollback()
+
+
+def ids_drawn(session: Session) -> tuple[int, bool]:
+    """How far the ledger's ids have been handed out."""
+    last, called = session.execute(
+        sql_text("SELECT last_value, is_called FROM ledger_transaction_id_seq")
+    ).one()
+    return last, called
 
 
 def test_leftovers_of_a_retired_item_can_be_written_off(

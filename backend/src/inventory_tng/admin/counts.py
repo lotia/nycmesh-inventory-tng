@@ -10,7 +10,7 @@ meanwhile still applies, and an item it moved comes back to count again.
 """
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from decimal import Decimal
 from typing import Annotated, Any
 
@@ -176,15 +176,18 @@ def _count_page(
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
     recount: Mapping[int, tuple[Decimal, Decimal, Decimal]] | None = None,
+    only: Collection[int] | None = None,
     alert: str | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
     """The count form, with the records as of `as_of`. With recount, only the
     items that moved while they were counted: what was typed for each, and
-    what came in and went out."""
-    was = expected(session, place.id, as_of=as_of, items=recount)
-    if recount:
-        was = {item_id: was.get(item_id, Decimal(0)) for item_id in recount}
+    what came in and went out; with only, those items, as a recount sent
+    back with a problem."""
+    asked = recount or only
+    was = expected(session, place.id, as_of=as_of, items=asked)
+    if asked:
+        was = {item_id: was.get(item_id, Decimal(0)) for item_id in asked}
     items = {i.id: i for i in session.scalars(select(Item).where(Item.id.in_(was)))}
     rows = sorted(
         ((items[item_id], amount) for item_id, amount in was.items()),
@@ -201,6 +204,7 @@ def _count_page(
             "place": place,
             "rows": rows,
             "recount": recount,
+            "recounting": bool(asked),
             "others": [i for i in _items(session) if i.id not in was],
             "key": (values or {}).get("key") or uuid.uuid4(),
             "as_of": as_of,
@@ -277,9 +281,23 @@ def count(
         return not_found()
     counted, problems = _counted(session, form)
     if problems:
-        # What was typed is as of when the form was shown.
+        # What was typed is as of when the form was shown; a recount asks
+        # again for its own items only.
+        ids = [
+            whole(f.removeprefix(COUNTED), 1, INTEGER_MAX)
+            for f in form
+            if f.startswith(COUNTED)
+        ]
+        only = [i for i in ids if i is not None] if form.get("recounting") else None
         return _count_page(
-            request, session, signed, place, as_of, problems=problems, values=form
+            request,
+            session,
+            signed,
+            place,
+            as_of,
+            problems=problems,
+            values=form,
+            only=only,
         )
     result = record_count(session, key, signed.admin.id, place.id, counted, as_of)
     session.commit()

@@ -21,7 +21,6 @@ from databases import (
     alembic_config_for,
     create_database,
     drop_database,
-    drop_left_behind,
     migrate,
 )
 from fastapi import FastAPI
@@ -140,8 +139,6 @@ def database_url() -> Iterator[str]:
     except Unreachable as error:
         pytest.exit(str(error), returncode=2)
     try:
-        # Once reachable: this run's own is too new to be dropped.
-        drop_left_behind()
         yield url
     finally:
         drop_database(url)

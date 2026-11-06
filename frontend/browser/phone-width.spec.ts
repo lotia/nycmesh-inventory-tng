@@ -4,7 +4,6 @@
  * every table cell, and the volunteers' pages, at 360 pixels wide.
  */
 import { expect, type Page, test } from "@playwright/test";
-import { signIn } from "./sign-in";
 
 /** How far past the screen's edge the page reaches, in pixels. */
 async function overflow(page: Page): Promise<number> {
@@ -71,8 +70,6 @@ function fits(widths: Map<string, number>): void {
 }
 
 test("every administrator page fits a phone", async ({ page }) => {
-  await signIn(page);
-
   const widths = new Map<string, number>();
   const waiting = ["/admin"];
   for (let path = waiting.shift(); path !== undefined; path = waiting.shift()) {
@@ -98,19 +95,21 @@ test("every administrator page fits a phone", async ({ page }) => {
   fits(widths);
 });
 
-test("signing in fits a phone", async ({ page }) => {
-  await page.goto("/admin/sign-in");
-  fits(new Map([["/admin/sign-in", await overflow(page)]]));
+test.describe("signed out", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("signing in fits a phone", async ({ page }) => {
+    await page.goto("/admin/sign-in");
+    fits(new Map([["/admin/sign-in", await overflow(page)]]));
+  });
 });
 
 test("registering and the scan page fit a phone", async ({ page }) => {
   const widths = new Map<string, number>();
-  await page.goto(`/register?code=${process.env.REGISTRATION_PHRASE ?? ""}`);
-  widths.set("/register", await overflow(page));
-  await page.getByRole("button", { name: "Register" }).click();
-  await expect(page.getByText("This browser is registered.")).toBeVisible();
-  await page.goto("/scan");
-  await expect(page.getByRole("heading", { name: "Scan" })).toBeVisible();
-  widths.set("/scan", await overflow(page));
+  for (const path of ["/register", "/scan"]) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    widths.set(path, await overflow(page));
+  }
   fits(widths);
 });

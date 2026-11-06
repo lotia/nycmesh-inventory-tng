@@ -4,7 +4,6 @@
  * only one shows.
  */
 import { expect, type Page, test } from "@playwright/test";
-import { signIn } from "./sign-in";
 
 /** In the band at the top of the page, or the menu it opens, as shown now. */
 function shown(page: Page, role: "link" | "button", name: string) {
@@ -17,7 +16,7 @@ function shown(page: Page, role: "link" | "button", name: string) {
 test("the menu opens on a phone and leads to each section", async ({
   page,
 }) => {
-  await signIn(page);
+  await page.goto("/admin");
   await expect(shown(page, "link", "Settings")).toHaveCount(0);
   await shown(page, "button", "Menu").click();
   await expect(shown(page, "button", "Sign out")).toHaveCount(1);
@@ -27,7 +26,7 @@ test("the menu opens on a phone and leads to each section", async ({
 });
 
 test("the open menu fits a phone, however long a name", async ({ page }) => {
-  await signIn(page);
+  await page.goto("/admin");
   // As long a username as an administrator may have, with nowhere to break.
   await page.locator("#menu strong").evaluate((name) => {
     name.textContent = "a".repeat(64);
@@ -46,7 +45,7 @@ test.describe("on a wide screen", () => {
   test.use({ viewport: { width: 1024, height: 768 } });
 
   test("the sections show, with no menu", async ({ page }) => {
-    await signIn(page);
+    await page.goto("/admin");
     await expect(shown(page, "button", "Menu")).toHaveCount(0);
     await expect(shown(page, "link", "Settings")).toHaveCount(1);
     await expect(shown(page, "button", "Sign out")).toHaveCount(1);

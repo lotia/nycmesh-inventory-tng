@@ -13,12 +13,12 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import structlog
-from sqlalchemy import exists, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts
 from inventory_tng.command import run_command
-from inventory_tng.db import CLI_ACTOR, Base, set_actor
+from inventory_tng.db import CLI_ACTOR, Base, exists_where, set_actor
 from inventory_tng.ledger import Batch, record
 from inventory_tng.models import (
     Admin,
@@ -35,8 +35,10 @@ log = structlog.get_logger(__name__)
 USERNAME = "dev"
 CATEGORIES = ("Radios", "Cables", "Mounts")
 # Name, category, unit, manufacturer, part number.
+# The item the seed labels, which the browser tests' camera reads.
+LABELLED = "LiteBeam 5AC Gen2"
 ITEMS = (
-    ("LiteBeam 5AC Gen2", "Radios", "each", "Ubiquiti", "LBE-5AC-Gen2"),
+    (LABELLED, "Radios", "each", "Ubiquiti", "LBE-5AC-Gen2"),
     ("NanoStation 5AC Loco", "Radios", "each", "Ubiquiti", "Loco5AC"),
     ("Outdoor Cat6 cable", "Cables", "m", None, None),
     ("Pole mount", "Mounts", "each", None, None),
@@ -75,10 +77,11 @@ def run(session: Session, args: argparse.Namespace) -> int:
     admin = session.scalar(select(Admin).where(Admin.username == USERNAME))
     seeding = admin is None
     if seeding:
-        if (found := _in_use(session)) is not None:
-            log.warning("seed refused", table=found)
+        # Someone works in it already: not the seed's to fill.
+        if exists_where(session, Admin.id.is_not(None)):
+            log.warning("seed refused")
             print(
-                f"This database holds {found} rows and was never seeded.",
+                "This database has administrators already, and was never seeded.",
                 file=sys.stderr,
             )
             return 1
@@ -98,26 +101,6 @@ def run(session: Session, args: argparse.Namespace) -> int:
     if seeding:
         print("Sign-in codes are optional here: turn them on under Settings.")
     return 0
-
-
-# Tables the migrations fill: what an empty database already holds.
-MIGRATED = {
-    "adjustment_reason",
-    "catalogue_history",
-    "scan_settings",
-    "sign_in_settings",
-    "site_settings",
-}
-
-
-def _in_use(session: Session) -> str | None:
-    """A table that shows this database is in use, if any."""
-    for table in Base.metadata.sorted_tables:
-        if table.name not in MIGRATED and session.scalar(
-            select(exists().select_from(table))
-        ):
-            return table.name
-    return None
 
 
 def _catalogue(session: Session) -> None:
@@ -144,7 +127,7 @@ def _catalogue(session: Session) -> None:
             session, Location(name=name, kind=kind, parent_id=parent_id)
         )
     volunteers = [_add(session, Volunteer(name=name)) for name in VOLUNTEERS]
-    _add(session, Label(item_id=items["LiteBeam 5AC Gen2"].id))
+    _add(session, Label(item_id=items[LABELLED].id))
     _add(session, Label(location_id=places["Shelf A"].id))
     received = Batch(
         key=uuid.uuid4(),

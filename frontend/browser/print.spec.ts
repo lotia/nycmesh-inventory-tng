@@ -3,11 +3,9 @@
  * as a poster or four cards, on US Letter or A4.
  */
 import { expect, type Page, test } from "@playwright/test";
-import { signIn } from "./sign-in";
 
 /** Makes a code, confirming with the password if asked. */
 async function makeCode(page: Page, label = "Hub open day"): Promise<void> {
-  await signIn(page);
   await page.goto("/admin/devices");
   await page.getByLabel("What it's for").fill(label);
   await page.getByRole("button", { name: "Make a code" }).click();
@@ -79,7 +77,6 @@ test("each layout fits one page of each paper", async ({
 });
 
 test("a page with nothing to print prints as it is", async ({ page }) => {
-  await signIn(page);
   await page.goto("/admin/items");
   await page.emulateMedia({ media: "print" });
   await expect(page.getByRole("banner")).toBeVisible();

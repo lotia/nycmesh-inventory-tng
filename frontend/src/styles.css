@@ -35,7 +35,7 @@
   }
 }
 
-/* Every page: type, colour and borders, no spacing between elements. */
+/* Every page: type, colour, borders and the spacing of text; never form spacing. */
 @layer base {
   :root {
     @apply scheme-light-dark;
@@ -168,7 +168,7 @@
     @apply m-0;
   }
 
-  .admin td form {
+  .admin td form:not(.actions) {
     @apply inline;
   }
 
@@ -241,6 +241,11 @@
     @apply mb-3;
   }
 
+  /* A long code read, such as an old sticker's link, wraps. */
+  .volunteer .scanner [role="status"] {
+    @apply wrap-anywhere;
+  }
+
   .volunteer .scanner video {
     @apply block max-h-[60vh] w-full rounded bg-black object-cover;
   }
@@ -287,6 +292,19 @@
   @supports (top: anchor(--masthead bottom)) {
     .menu-panel {
       top: anchor(--masthead bottom);
+    }
+  }
+
+  /* A browser without popovers (Safari before 17): the sections as on a
+     wide screen, wrapped. */
+  @supports not selector(:popover-open) {
+    .menu-panel,
+    [popovertarget] {
+      @apply hidden;
+    }
+
+    .sections {
+      @apply flex;
     }
   }
 

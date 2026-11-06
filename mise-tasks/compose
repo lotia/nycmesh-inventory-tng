@@ -10,9 +10,12 @@ set -euo pipefail
 # project mise is running for, which is the same one unless a test says not.
 clone=$(dirname "$0")/..
 root=${MISE_PROJECT_ROOT:-$clone}
-# Read as the backend reads its settings, .env's quotes, comments and all.
-compose=$(uv run --quiet --frozen --project "$clone/backend" \
-  python -m inventory_tng.local_env INVENTORY_COMPOSE --file "$root/.env")
+compose=${INVENTORY_COMPOSE:-}
+if [[ -z $compose && -f $root/.env ]]; then
+  # Read as the backend reads its settings, quotes, comments and all.
+  compose=$(uv run --quiet --frozen --project "$clone/backend" \
+    python -m inventory_tng.local_env INVENTORY_COMPOSE --file "$root/.env")
+fi
 if [[ -z $compose ]]; then
   if command -v podman >/dev/null; then
     compose="podman compose"

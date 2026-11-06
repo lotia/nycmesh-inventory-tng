@@ -206,10 +206,11 @@ function CartForm({
 
   /** Acts on a label, read by the camera or typed by a scanner gun. */
   function actOn(read: Scanned): string {
-    placeRead.value = null;
     if (read.kind === "unknown") {
+      // A stray code leaves a place's question to answer.
       return `That label isn't in the inventory (${read.code}).`;
     }
+    placeRead.value = null;
     const { items: byId, places } = indexOf(catalogue);
     if (read.kind === "place") {
       const place = places.get(read.locationId);

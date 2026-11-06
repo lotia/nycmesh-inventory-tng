@@ -8,8 +8,9 @@
 import { execFileSync, spawn } from "node:child_process";
 import { rmSync } from "node:fs";
 import { createServer } from "node:net";
+import { fileURLToPath } from "node:url";
 
-const BACKEND = new URL("../../backend/", import.meta.url).pathname;
+const BACKEND = fileURLToPath(new URL("../../backend/", import.meta.url));
 const HOST = "127.0.0.1";
 
 type Prepared = {
@@ -17,6 +18,7 @@ type Prepared = {
   username: string;
   password: string;
   phrase: string;
+  labelled: string;
 };
 
 function database(...args: string[]): string {
@@ -28,18 +30,20 @@ function database(...args: string[]): string {
 }
 
 export default async function globalSetup() {
+  const port = await freePort();
   const video = process.env.CAMERA_VIDEO ?? "";
   const prepared: Prepared = JSON.parse(database("create", video));
-  const dropDatabase = () => {
+  const cleanUp = () => {
     database("drop", prepared.database_url);
     rmSync(video, { force: true });
+    rmSync(process.env.ADMIN_STATE ?? "", { force: true });
   };
-  const port = await freePort();
   const base = `http://${HOST}:${port}`;
   process.env.BROWSER_BASE_URL = base;
   process.env.ADMIN_USERNAME = prepared.username;
   process.env.ADMIN_PASSWORD = prepared.password;
   process.env.REGISTRATION_PHRASE = prepared.phrase;
+  process.env.LABELLED_ITEM = prepared.labelled;
 
   // In the run's own process group, so Ctrl-C stops it with the run; uv
   // passes a signal on to the server.
@@ -66,7 +70,7 @@ export default async function globalSetup() {
   const teardown = async () => {
     server.kill();
     await stopped;
-    dropDatabase();
+    cleanUp();
   };
   try {
     await healthy(new URL("/api/healthz", base), stopped);
