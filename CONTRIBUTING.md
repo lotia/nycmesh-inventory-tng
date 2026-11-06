@@ -291,7 +291,8 @@ Those are unit tests: Vitest runs the frontend's in a page it simulates
 (happy-dom), with no layout. The browser tests, in `frontend/browser/`, are
 another kind: Playwright drives a real browser engine against the whole app,
 built frontend and all, from a database of their own
-(`backend/tests/browser_database.py`), at a phone's width. They check what
+(`backend/tests/browser_database.py`), at a phone's width, with a fake
+camera in Chromium that shows a seeded label. They check what
 only a real browser can, such as that no page scrolls sideways:
 
 ```sh

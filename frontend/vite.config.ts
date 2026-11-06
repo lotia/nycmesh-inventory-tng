@@ -80,13 +80,15 @@ export default defineConfig({
         "src/api/**",
         // Pages' entries: wiring that runs only in a browser.
         ...pages,
+        // The camera itself: browser/camera.spec.ts runs it, in Chromium.
+        "src/camera.ts",
       ],
       reporter: ["text-summary", "cobertura"],
       // A point below what is reached, never lowered (autoUpdate).
       thresholds: {
         autoUpdate: (reached: number, previous: number) =>
           Math.max(previous, Math.floor(reached) - 1),
-        statements: 96,
+        statements: 97,
         branches: 91,
         functions: 95,
         lines: 96,

@@ -54,7 +54,7 @@ export type Kind = Cart["kind"];
 
 /** Which sides a kind has: a receipt comes from outside, an install goes to
  * one (the ledger's rule, in ledger.py). */
-export const SIDES: Record<Kind, { from: boolean; to: boolean }> = {
+export const SIDES: Record<Kind, Record<Side, boolean>> = {
   move: { from: true, to: true },
   receipt: { from: false, to: true },
   install: { from: true, to: false },
@@ -185,9 +185,17 @@ type Index = {
   placeList: { id: number; name: string }[];
   /** What search looks through, per item, in lower case. */
   haystacks: Map<number, string>;
-  /** Label codes and old codes, upper case, to what they name. */
-  codes: Map<string, { itemId: number; packageId?: number }>;
+  /** Label codes and items' old codes, upper case, to what they name. */
+  codes: Map<string, Named>;
 };
+
+/** What a label or an old code names: an item, a package of one, a place. */
+export type Named =
+  | { kind: "item"; itemId: number; packageId?: number }
+  | { kind: "place"; locationId: number };
+
+/** A batch's two sides, of which a kind has one or both (SIDES). */
+export type Side = "from" | "to";
 
 const indexes = new WeakMap<Catalogue, Index>();
 
@@ -213,16 +221,23 @@ export function indexOf(catalogue: Catalogue): Index {
   const codes: Index["codes"] = new Map();
   for (const item of catalogue.items) {
     if (item.old_code !== null) {
-      codes.set(item.old_code.toUpperCase(), { itemId: item.id });
+      codes.set(item.old_code.toUpperCase(), { kind: "item", itemId: item.id });
     }
   }
   for (const label of catalogue.labels) {
-    if (label.item_id !== null) {
+    const code = label.code.toUpperCase();
+    if (label.location_id !== null) {
+      codes.set(code, { kind: "place", locationId: label.location_id });
+    } else if (label.item_id !== null) {
       codes.set(
-        label.code.toUpperCase(),
+        code,
         label.package_id === null
-          ? { itemId: label.item_id }
-          : { itemId: label.item_id, packageId: label.package_id },
+          ? { kind: "item", itemId: label.item_id }
+          : {
+              kind: "item",
+              itemId: label.item_id,
+              packageId: label.package_id,
+            },
       );
     }
   }
@@ -431,14 +446,6 @@ export function toBatch(
     words.push(`for install ${installNumber}`);
   }
   return { draft, what: words.join(" ") };
-}
-
-/** The item a typed or scanned code names, and the package, if any. */
-export function findCode(
-  catalogue: Catalogue,
-  text: string,
-): { itemId: number; packageId?: number } | null {
-  return indexOf(catalogue).codes.get(text.trim().toUpperCase()) ?? null;
 }
 
 /** Items whose name, maker, part number, code or category holds every word. */

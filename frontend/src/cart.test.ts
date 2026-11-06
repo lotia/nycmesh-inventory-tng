@@ -4,7 +4,6 @@ import {
   askWho,
   type Cart,
   CartStore,
-  findCode,
   freshCart,
   indexOf,
   loadCart,
@@ -198,21 +197,6 @@ describe("turning a cart into a batch", () => {
 });
 
 describe("finding", () => {
-  test("a label finds its item and package; an old code its item", () => {
-    expect(findCode(CATALOGUE, " k7qx2m ")).toEqual({
-      itemId: 101,
-      packageId: 1001,
-    });
-    expect(findCode(CATALOGUE, "B3ZT9W")).toEqual({ itemId: 100 });
-    expect(findCode(CATALOGUE, "lb5")).toEqual({ itemId: 100 });
-  });
-
-  test("a location's label, or an unknown code, finds no item", () => {
-    expect(findCode(CATALOGUE, "S4HELF")).toBeNull();
-    expect(findCode(CATALOGUE, "NOPE")).toBeNull();
-    expect(findCode(CATALOGUE, "  ")).toBeNull();
-  });
-
   test("search matches every word, anywhere in an item's details", () => {
     expect(search(CATALOGUE, "ubiquiti beam").map((i) => i.id)).toEqual([100]);
     expect(search(CATALOGUE, "CABLES").map((i) => i.id)).toEqual([101]);

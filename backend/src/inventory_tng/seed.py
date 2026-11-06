@@ -145,6 +145,7 @@ def _catalogue(session: Session) -> None:
         )
     volunteers = [_add(session, Volunteer(name=name)) for name in VOLUNTEERS]
     _add(session, Label(item_id=items["LiteBeam 5AC Gen2"].id))
+    _add(session, Label(location_id=places["Shelf A"].id))
     received = Batch(
         key=uuid.uuid4(),
         kind="receipt",

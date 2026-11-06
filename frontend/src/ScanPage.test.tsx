@@ -1,10 +1,20 @@
 import { fireEvent, render, screen, within } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
+import { openCamera } from "./camera";
 import { STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
 import { Outbox } from "./outbox";
 import { ScanPage } from "./ScanPage";
 import { CATALOGUE } from "./test-catalogue";
 import { answering, json, saved } from "./test-fetch";
+
+// The camera, faked: it sees whatever a test puts in `inView`.
+vi.mock("./camera", () => ({ openCamera: vi.fn() }));
+const camera = { inView: [] as string[] };
+vi.mocked(openCamera).mockImplementation(async () => ({
+  read: async () => camera.inView,
+  torch: null,
+  stop: () => {},
+}));
 
 /** An API with the test catalogue, saving batches as transaction 77. */
 function server(save: () => Response | Promise<Response> = () => saved()) {
@@ -373,5 +383,91 @@ describe("whose name it is", () => {
     expect(screen.queryByText(/Are you/)).toBeNull();
     await vi.advanceTimersByTimeAsync(IDLE + 60_000);
     expect(screen.getByText(/Are you/)).toBeDefined();
+  });
+});
+
+describe("scanning labels with the camera", () => {
+  /** Shows the camera these labels: it reads them within a moment. */
+  function scan(...codes: string[]) {
+    camera.inView = codes;
+  }
+
+  async function opened() {
+    open();
+    await ready();
+    camera.inView = [];
+    fireEvent.click(
+      screen.getByRole("button", { name: "Scan with the camera" }),
+    );
+    await screen.findByText("Point the camera at a label.");
+  }
+
+  test("an item's label adds one, and a package's label a package", async () => {
+    const vibrate = vi.fn();
+    Object.assign(navigator, { vibrate });
+    await opened();
+    scan("B3ZT9W");
+    await screen.findByText("Added one: LiteBeam 5AC.");
+    expect(vibrate).toHaveBeenCalled();
+    scan("K7QX2M");
+    await screen.findByText("Added a Spool: Cat6 cable.");
+    expect(screen.queryByText("Nothing in the cart yet.")).toBeNull();
+  });
+
+  test("a place's label asks from or to, the empty side first", async () => {
+    await opened();
+    scan("S4HELF");
+    await screen.findByText("Hub › Shelf A: from here, or to here?");
+    screen.getByRole("group", { name: "Hub › Shelf A" });
+    const sides = screen
+      .getAllByRole("button", { name: /^(From|To)$/ })
+      .map((button) => button.textContent);
+    expect(sides).toEqual(["From", "To"]);
+    fireEvent.click(screen.getByRole("button", { name: "To" }));
+    expect(selected("To")).toBe("11");
+    expect(screen.queryByRole("button", { name: "From" })).toBeNull();
+  });
+
+  test("a place's label sets the only side a kind has, at once", async () => {
+    storeCart({ ...freshCart(), kind: "receipt" });
+    await opened();
+    scan("S4HELF");
+    await screen.findByText("Hub › Shelf A: to here.");
+    expect(selected("To")).toBe("11");
+    expect(screen.queryByRole("button", { name: "From" })).toBeNull();
+  });
+
+  test("for an install, a place's label is where it comes from", async () => {
+    storeCart({ ...freshCart(), kind: "install" });
+    await opened();
+    scan("S4HELF");
+    await screen.findByText("Hub › Shelf A: from here.");
+    expect(selected("From")).toBe("11");
+  });
+
+  test("an item read next puts a place's question away", async () => {
+    await opened();
+    scan("S4HELF");
+    await screen.findByRole("button", { name: "From" });
+    scan("B3ZT9W");
+    await screen.findByText("Added one: LiteBeam 5AC.");
+    expect(screen.queryByRole("button", { name: "From" })).toBeNull();
+  });
+
+  test("a scanner gun's place label asks too", async () => {
+    open();
+    await ready();
+    find("s4helf");
+    fireEvent.keyDown(screen.getByLabelText(/Find an item/), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("button", { name: "To" }));
+    expect(selected("To")).toBe("11");
+  });
+
+  test("an unknown label says so, and Done closes the camera", async () => {
+    await opened();
+    scan("OLD-FORM");
+    await screen.findByText("That label isn't in the inventory (OLD-FORM).");
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    screen.getByRole("button", { name: "Scan with the camera" });
   });
 });
