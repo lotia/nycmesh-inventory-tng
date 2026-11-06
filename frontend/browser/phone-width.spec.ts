@@ -4,6 +4,7 @@
  * at 360 pixels wide.
  */
 import { expect, type Page, test } from "@playwright/test";
+import { signIn } from "./sign-in";
 
 /** How far past the screen's edge the page reaches, in pixels. */
 async function overflow(page: Page): Promise<number> {
@@ -79,11 +80,7 @@ function fits(widths: Map<string, number>): void {
 }
 
 test("every administrator page fits a phone", async ({ page }) => {
-  await page.goto("/admin/sign-in");
-  await page.getByLabel("Username").fill(process.env.ADMIN_USERNAME ?? "");
-  await page.getByLabel("Password").fill(process.env.ADMIN_PASSWORD ?? "");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText("Signed in as")).toBeVisible();
+  await signIn(page);
 
   const widths = new Map<string, number>();
   const waiting = ["/admin"];

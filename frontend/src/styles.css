@@ -179,6 +179,7 @@
   /* The band at the top of every administrator page, as MeshDB's. */
   .masthead {
     @apply border-b border-line bg-band;
+    anchor-name: --masthead;
   }
 
   .masthead-inner {
@@ -194,11 +195,29 @@
   }
 
   .sections {
-    @apply flex flex-wrap gap-x-4 gap-y-1 pb-2;
+    @apply hidden flex-wrap gap-x-4 gap-y-1 pb-2 md:flex;
+  }
+
+  /*
+   * On a phone: the menu, opened below the band and scrolling with it. Where
+   * anchor positioning is missing, about where the band ends.
+   */
+  .menu-panel {
+    @apply absolute inset-x-0 top-[4.1rem] bottom-auto m-0 w-auto border-b border-line bg-band px-4 pt-1 pb-4 text-ink shadow-md;
+  }
+
+  @supports (top: anchor(--masthead bottom)) {
+    .menu-panel {
+      top: anchor(--masthead bottom);
+    }
+  }
+
+  .menu-panel nav a {
+    @apply block border-b border-line py-3 no-underline;
   }
 
   .signed-in {
-    @apply flex items-center gap-3;
+    @apply flex flex-wrap items-center gap-3;
   }
 
   .retired {
