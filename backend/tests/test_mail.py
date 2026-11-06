@@ -390,9 +390,10 @@ def made_link(session: Session, admin: Admin) -> str:
     """A reset another administrator made, which removed the password and
     authenticators already."""
     colleague, _ = new_admin(session, "colleague")
-    return accounts.reset_sign_in(
-        session, admin.id, colleague.id, datetime.now(UTC), action="reset"
-    )[0]
+    _, token, _ = accounts.reset_admin_sign_in(
+        session, admin.id, colleague.id, datetime.now(UTC)
+    )
+    return token
 
 
 def test_a_made_link_sets_a_password_and_tells_the_owner(

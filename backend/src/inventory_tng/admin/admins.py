@@ -170,7 +170,7 @@ def invite(
     try:
         if not problems and (broken := attempt(session, make)):
             problems["username"] = rule_words(broken, TAKEN)
-    except accounts.LinkRefused:
+    except accounts.AdminRefused:
         return not_found()
     if problems:
         values = {"username": username, "email": email}
@@ -192,7 +192,7 @@ def admin(
 
 
 @router.post(f"{ADMINS}/{{admin_id}}/reset")
-def reset_sign_in(
+def reset(
     request: Request,
     signed: ConfirmedAdmin,
     session: DbSession,
@@ -203,10 +203,10 @@ def reset_sign_in(
     if other is None:
         return not_found()
     try:
-        other, token, kind = accounts.make_link_for(
+        other, token, kind = accounts.reset_admin_sign_in(
             session, admin_id, signed.admin.id, now()
         )
-    except accounts.LinkRefused as refused:
+    except accounts.AdminRefused as refused:
         if refused.reason == "not_found":
             return not_found()
         return _admin_page(request, session, signed, other, OWN_RESET)

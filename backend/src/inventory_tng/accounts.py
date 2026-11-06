@@ -1022,13 +1022,15 @@ def recover(
 MADE_LINK_LIFETIME = timedelta(hours=24)
 
 
-LinkRefusal = Literal["not_found", "themselves"]
+# Why reset_admin_sign_in or invite refused. retire_admin and restore_admin
+# report theirs as what they return.
+AdminRefusal = Literal["not_found", "themselves"]
 
 
-class LinkRefused(Exception):
-    def __init__(self, reason: LinkRefusal) -> None:
+class AdminRefused(Exception):
+    def __init__(self, reason: AdminRefusal) -> None:
         super().__init__(reason)
-        self.reason: LinkRefusal = reason
+        self.reason: AdminRefusal = reason
 
 
 sign_in_resets = meter.create_counter(
@@ -1038,7 +1040,7 @@ sign_in_resets = meter.create_counter(
 )
 
 
-def reset_sign_in(
+def _reset_sign_in(
     session: Session,
     admin_id: int,
     by_admin_id: int,
@@ -1082,18 +1084,18 @@ def reset_sign_in(
     return token, kind
 
 
-def make_link_for(
+def reset_admin_sign_in(
     session: Session, admin_id: int, by_admin_id: int, now: datetime
 ) -> tuple[Admin, str, Literal["invite", "reset"]]:
-    """Reset another administrator's sign-in (reset_sign_in): never one's
+    """Reset another administrator's sign-in (_reset_sign_in): never one's
     own, which the account page changes. Returns them, the link and its
-    kind. Raises LinkRefused."""
+    kind. Raises AdminRefused."""
     if admin_id == by_admin_id:
-        raise LinkRefused("themselves")
+        raise AdminRefused("themselves")
     admin = _locked_other(session, admin_id, by_admin_id, retired=False)
     if admin is None:
-        raise LinkRefused("not_found")
-    token, kind = reset_sign_in(session, admin.id, by_admin_id, now, action="reset")
+        raise AdminRefused("not_found")
+    token, kind = _reset_sign_in(session, admin.id, by_admin_id, now, action="reset")
     return admin, token, kind
 
 
@@ -1103,10 +1105,10 @@ def invite(
     """A new administrator, with no password yet, so nobody can sign in as
     them, and the one-use link that lets them choose one. They set up TOTP
     at their first sign-in while it is required. A username or email already
-    taken is an IntegrityError on flush; LinkRefused if the one inviting was
+    taken is an IntegrityError on flush; AdminRefused if the one inviting was
     retired meanwhile."""
     if not lock_admins(session, made_by_id):
-        raise LinkRefused("not_found")
+        raise AdminRefused("not_found")
     admin = Admin(username=username, email=email or None)
     session.add(admin)
     session.flush()
@@ -1217,7 +1219,7 @@ def restore_admin(
     session: Session, admin_id: int, by_admin_id: int, now: datetime
 ) -> tuple[Admin, str, Literal["invite", "reset"]] | None:
     """Bring a retired administrator back with their sign-in reset
-    (reset_sign_in), whatever they were retired for: a stolen password or
+    (_reset_sign_in), whatever they were retired for: a stolen password or
     phone never works again because the account came back. Returns them,
     the link to pass on and its kind; None if there is none to bring back,
     or the one acting can no longer sign in."""
@@ -1225,7 +1227,7 @@ def restore_admin(
     if admin is None:
         return None
     admin.retired_at = None
-    token, kind = reset_sign_in(session, admin.id, by_admin_id, now, action="restore")
+    token, kind = _reset_sign_in(session, admin.id, by_admin_id, now, action="restore")
     log.info(
         "administrator restored", target_admin_id=admin_id, by_admin_id=by_admin_id
     )

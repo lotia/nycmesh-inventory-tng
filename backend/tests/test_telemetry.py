@@ -326,7 +326,7 @@ def test_counts_sign_in_resets(rolled_back: Recorded, session: Session) -> None:
     ben, _ = new_admin(session, "ben")
     carol, _ = new_admin(session, "carol")
     now = datetime.now(UTC)
-    accounts.make_link_for(session, ben.id, ada.id, now)
+    accounts.reset_admin_sign_in(session, ben.id, ada.id, now)
     carol.retired_at = now
     accounts.restore_admin(session, carol.id, ada.id, now)
     resets = counted(reader, "inventory.admin.sign_in_resets")
