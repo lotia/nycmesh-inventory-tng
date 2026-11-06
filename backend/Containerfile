@@ -2,14 +2,18 @@
 # Running the app in a container). Production's image: inventory-tng-8i4.18.
 # Built from the repository's root, so it can build frontend/ too.
 
-# The scan page's bundle (docs/decisions/0010). Node is needed to build it,
-# never to run it, so it stays in this stage.
+# The frontend's bundle: the scan page and the shared stylesheet
+# (docs/decisions/0010 and 0014). Node is needed to build it, never to run it,
+# so it stays in this stage.
 # On the build machine's own platform: its output runs anywhere.
 FROM --platform=$BUILDPLATFORM docker.io/library/node:26.12.1-trixie-slim AS frontend
 WORKDIR /frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
 COPY frontend ./
+# Where styles.css looks for the templates' class names: without them, a
+# class only a template uses would be missing from the stylesheet.
+COPY backend/src/inventory_tng/templates /backend/src/inventory_tng/templates
 RUN npm run build
 
 # uv is pinned, so every build reads uv.lock the same way.

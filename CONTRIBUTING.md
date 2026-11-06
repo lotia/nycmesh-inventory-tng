@@ -164,6 +164,22 @@ A backend test fails while the schema is out of date, and CI fails while the
 types are. `npm run api` installs the generator from `frontend/tools/openapi/`
 first, which has its own TypeScript 5 (docs/decisions/0010).
 
+### Styles
+
+Every page shares one stylesheet, `frontend/src/styles.css`, which Tailwind
+builds (docs/decisions/0014). Under `mise run dev` it comes from Vite's dev
+server and reloads on save; otherwise from the build. Without a build, pages
+are plain HTML. The app container builds it into its image, so a class new
+to a template shows there only after `mise run compose -- up -d --build app`.
+Administrator pages put their content in `<main class="admin page-width">`,
+which spaces their forms. When you style a page:
+
+- Write each class name whole. Tailwind finds them by reading the templates
+  and the frontend as text, so one built from parts is never generated.
+- Use the tokens in `@theme` (`bg-band`, `text-heading`, …), not colours of
+  your own: the dark scheme gives each token its own value.
+- Make markup that repeats a Jinja macro or a Preact component.
+
 ### Registering a device
 
 Administrator pages need someone signed in. To make the first administrator,

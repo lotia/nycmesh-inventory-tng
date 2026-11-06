@@ -1,0 +1,229 @@
+/* The stylesheet every page shares, in NYC Mesh's look (docs/decisions/0014). */
+@import "tailwindcss";
+
+/* The server-rendered pages. This file's own folder is scanned already. */
+@source "../../backend/src/inventory_tng/templates";
+
+/* MeshDB's identity, as tokens the dark scheme below gives other values. */
+@theme {
+  --color-page: #ffffff;
+  --color-ink: #212529;
+  --color-muted: #6c757d;
+  --color-band: #f4f4f4;
+  --color-heading: #55585b;
+  --color-line: #dee2e6;
+  --color-highlight: #f9e79f;
+  --color-brand: #f1b013;
+  --color-problem: #b00020;
+  --color-done: #2e7d32;
+  --color-caution: #b8860b;
+}
+
+/* Ours, not MeshDB's, which is light only: the same roles, for the dark. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-page: #16181b;
+    --color-ink: #e6e6e6;
+    --color-muted: #a0a4a8;
+    --color-band: #23262a;
+    --color-heading: #b9bdc1;
+    --color-line: #3a3e43;
+    --color-highlight: #5c4e14;
+    --color-problem: #ff8a80;
+    --color-done: #81c784;
+    --color-caution: #e0b84a;
+  }
+}
+
+/* Every page: type, colour and borders, no spacing between elements. */
+@layer base {
+  :root {
+    @apply scheme-light-dark;
+  }
+
+  body {
+    @apply bg-page text-ink;
+  }
+
+  h1 {
+    @apply mb-2 text-2xl font-semibold;
+  }
+
+  h2 {
+    @apply mt-6 mb-2 border-b border-heading pb-1 text-lg font-semibold text-heading;
+  }
+
+  p,
+  ul,
+  ol,
+  table {
+    @apply my-3;
+  }
+
+  ol,
+  ul {
+    @apply pl-6;
+  }
+
+  ol {
+    @apply list-decimal;
+  }
+
+  ul {
+    @apply list-disc;
+  }
+
+  a {
+    @apply underline decoration-muted underline-offset-2 hover:decoration-brand;
+  }
+
+  label {
+    @apply block font-semibold;
+  }
+
+  input,
+  select,
+  textarea {
+    @apply block w-full rounded border border-line bg-page px-2 py-2 text-base;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    @apply inline-block w-auto;
+  }
+
+  button {
+    @apply cursor-pointer rounded border border-heading bg-band px-5 py-2 text-base hover:bg-highlight;
+  }
+
+  fieldset {
+    @apply rounded border border-line px-4 pb-4;
+  }
+
+  legend {
+    @apply px-1 font-semibold;
+  }
+
+  table {
+    @apply w-full;
+  }
+
+  th {
+    @apply border-b border-heading text-heading;
+  }
+
+  td,
+  th {
+    @apply py-1.5 pr-2 text-left align-top;
+  }
+
+  tr:hover > td {
+    @apply bg-highlight/40;
+  }
+
+  [role="alert"],
+  [role="status"],
+  .warning {
+    @apply border-l-4 px-3 py-2;
+  }
+
+  [role="alert"] {
+    @apply border-problem;
+  }
+
+  [role="status"] {
+    @apply border-done;
+  }
+}
+
+@layer components {
+  /* The width every administrator page's content keeps. */
+  .page-width {
+    @apply mx-auto max-w-3xl px-4;
+  }
+
+  /* An administrator page's main part: its forms' spacing. */
+  .admin {
+    @apply pt-6 pb-12;
+  }
+
+  .admin label {
+    @apply mt-4;
+  }
+
+  .admin :is(input, select, textarea) {
+    @apply mt-1;
+  }
+
+  .admin :is(button, fieldset) {
+    @apply mt-5;
+  }
+
+  .admin section {
+    @apply mt-8;
+  }
+
+  /* Side by side, as in a table's cell or a row of buttons: no spacing. */
+  .admin :is(td, .actions) :is(form, button, input) {
+    @apply m-0;
+  }
+
+  .admin td form {
+    @apply inline;
+  }
+
+  .actions {
+    @apply flex flex-wrap items-end gap-3;
+  }
+
+  /* The band at the top of every administrator page, as MeshDB's. */
+  .masthead {
+    @apply border-b border-line bg-band;
+  }
+
+  .masthead-inner {
+    @apply flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3;
+  }
+
+  .brand {
+    @apply flex items-center gap-2 font-semibold no-underline;
+  }
+
+  .brand-rule {
+    @apply h-5 border-l border-heading;
+  }
+
+  .sections {
+    @apply flex flex-wrap gap-x-4 gap-y-1 pb-2;
+  }
+
+  .signed-in {
+    @apply flex items-center gap-3;
+  }
+
+  .retired {
+    @apply opacity-70;
+  }
+
+  .hint {
+    @apply text-sm font-normal text-muted;
+  }
+
+  .problem {
+    @apply font-normal text-problem;
+  }
+
+  .warning {
+    @apply border-caution;
+  }
+
+  .key,
+  .codes {
+    @apply font-mono text-lg tracking-wide;
+  }
+
+  /* Black on white whatever the scheme, for a camera to read. */
+  .qr svg {
+    @apply my-2 bg-white;
+  }
+}
