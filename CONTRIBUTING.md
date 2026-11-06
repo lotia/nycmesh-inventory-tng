@@ -187,7 +187,8 @@ server and reloads on save; otherwise from the build. Without a build, pages
 are plain HTML. The app container builds it into its image, so a class new
 to a template shows there only after `mise run compose -- up -d --build app`.
 Administrator pages put their content in `<main class="admin page-width">`,
-which spaces their forms. When you style a page:
+which spaces their forms; the scan and registration pages in
+`<main class="volunteer page-width">`. When you style a page:
 
 - Write each class name whole. Tailwind finds them by reading the templates
   and the frontend as text, so one built from parts is never generated.

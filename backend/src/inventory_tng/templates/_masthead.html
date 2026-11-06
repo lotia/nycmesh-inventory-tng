@@ -1,6 +1,6 @@
-{#- The band at the top of every administrator page, as MeshDB's: on a
-phone, the sections fold into a menu (inventory-tng-8i4.60.2). The menu is
-a popover: the browser closes it on Escape or a tap outside, and keeps it
+{#- The band at the top of every page, as MeshDB's. Signed in, the
+sections fold into a menu on a phone (inventory-tng-8i4.60.2): a
+popover, which the browser closes on Escape or a tap outside, and keeps
 hidden without a stylesheet. -#}
 {% macro sections_links() %}
 <a href="{{ paths.home }}">Home</a>
@@ -14,7 +14,7 @@ hidden without a stylesheet. -#}
 
 <header class="masthead">
   <div class="masthead-inner page-width">
-    <a class="brand" href="{{ paths.home }}">
+    <a class="brand" href="{{ brand_home | default(paths.home) }}">
       {% include "_nycmesh_logo.svg" %}
       <span>NYC Mesh</span><span class="brand-rule"></span><span>Inventory</span>
     </a>
