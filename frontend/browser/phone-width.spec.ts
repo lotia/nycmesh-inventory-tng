@@ -1,7 +1,7 @@
 /**
  * No page scrolls sideways on a phone (inventory-tng-8i4.60.5): every page
- * an administrator can reach by following links, also with a long word in
- * every table cell, and the volunteers' pages, at 360 pixels wide.
+ * an administrator can reach by following links, and the volunteers' pages,
+ * at 360 pixels wide, also with a long word in everything that shows text.
  */
 import { expect, type Page, test } from "@playwright/test";
 
@@ -61,6 +61,33 @@ async function linksOn(page: Page): Promise<string[]> {
     });
 }
 
+/**
+ * Whatever the data: a long word, such as a pasted link or a name typed
+ * without spaces, in every element that shows text.
+ */
+async function longWords(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const showing = new Set<Element>();
+    const texts = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+    );
+    for (let text = texts.nextNode(); text; text = texts.nextNode()) {
+      const parent = text.parentElement;
+      if (
+        text.textContent?.trim() &&
+        parent &&
+        !parent.closest("script, style")
+      ) {
+        showing.add(parent);
+      }
+    }
+    for (const element of showing) {
+      element.append(` ${"x".repeat(80)}`);
+    }
+  });
+}
+
 /** Fails if a page is wider than the screen. */
 function fits(widths: Map<string, number>): void {
   const wide = [...widths]
@@ -79,12 +106,7 @@ test("every administrator page fits a phone", async ({ page }) => {
     const response = await page.goto(path);
     expect(response?.ok(), `${path} answers`).toBe(true);
     const links = await linksOn(page);
-    // Whatever the data: a long word in every table cell.
-    await page.locator("td").evaluateAll((cells) => {
-      for (const cell of cells) {
-        cell.append(` ${"x".repeat(80)}`);
-      }
-    });
+    await longWords(page);
     widths.set(path, await overflow(page));
     waiting.push(...links.filter((link) => !widths.has(link)));
   }
@@ -109,6 +131,7 @@ test("registering and the scan page fit a phone", async ({ page }) => {
   for (const path of ["/register", "/scan"]) {
     await page.goto(path);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await longWords(page);
     widths.set(path, await overflow(page));
   }
   fits(widths);

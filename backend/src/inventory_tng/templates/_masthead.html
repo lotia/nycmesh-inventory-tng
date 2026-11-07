@@ -8,7 +8,7 @@ hidden without a stylesheet. -#}
 {% endmacro %}
 
 {% macro signed_in_as() %}
-<span class="wrap-anywhere">Signed in as <a href="{{ paths.account }}"><strong>{{ admin.username }}</strong></a></span>
+<span>Signed in as <a href="{{ paths.account }}"><strong>{{ admin.username }}</strong></a></span>
 <form method="post" action="{{ paths.sign_out }}"><button>Sign out</button></form>
 {% endmacro %}
 

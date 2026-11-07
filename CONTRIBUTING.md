@@ -235,9 +235,9 @@ utilities. When you style a page:
 - Write each table with the `table` macro in `_table.html` (`{% call
   table() %}` its rows `{% endcall %}`): one that cannot fit a phone
   scrolls in its own box, not the page. Text that is often long and unbroken,
-  such as a browser's name, can wrap instead, in a `wrap-anywhere` span.
-  The browser tests check each page they reach with a long word in every
-  table cell.
+  such as a browser's name, can wrap inside its cell, in a `wrap-anywhere`
+  span; elsewhere long words wrap by themselves. The browser tests check
+  each page they reach with a long word in everything that shows text.
 
 ### Registering a device
 
