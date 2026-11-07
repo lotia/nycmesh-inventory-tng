@@ -3,22 +3,7 @@
  * the code, one to a page, on US Letter or A4.
  */
 import { expect, type Page, test } from "@playwright/test";
-import { prepared } from "./prepared";
-
-/** Makes a code, confirming with the password if asked. */
-async function makeCode(page: Page, label = "Hub open day"): Promise<void> {
-  await page.goto("/admin/devices");
-  await page.getByLabel("What it's for").fill(label);
-  await page.getByRole("button", { name: "Make a code" }).click();
-  const made = page.getByRole("heading", { name: "A new registration code" });
-  const password = page.getByLabel("Your password");
-  await expect(made.or(password)).toBeVisible();
-  if (await password.isVisible()) {
-    await password.fill(prepared().password);
-    await page.getByRole("button", { name: "Confirm" }).click();
-  }
-  await expect(made).toBeVisible();
-}
+import { makeCode } from "./codes";
 
 const sheet = (page: Page) =>
   page.locator(".print-sheet").filter({ visible: true });
