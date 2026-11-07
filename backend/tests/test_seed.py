@@ -1,48 +1,37 @@
-"""The seed command (seed.py). Each test that seeds has a database of its own,
-copied from one migrated once: the run's shared database may already hold
-rows other tests committed, which the seed would refuse."""
+"""The seed command (seed.py). Each test that seeds has a database of its own
+(own_database), as the seed refuses a database that holds rows already."""
 
 import runpy
 import sys
 from collections.abc import Iterator
 
 import pytest
-from sqlalchemy import delete, func, make_url, select
+from sqlalchemy import Engine, delete, func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, seed
-from inventory_tng.db import make_engine
 from inventory_tng.ledger import expected
 from inventory_tng.models import Admin, AdminPassword, Item, Location, Volunteer
 
-from databases import NO_DATABASE, migrated_engine, new_database
+from databases import NO_DATABASE
 
 SIGN_IN = "Sign in at /admin as dev, password "
 PASSWORD = "a password for the tests"
 
 
-@pytest.fixture(scope="module")
-def migrated() -> Iterator[str]:
-    """A database with the schema and nothing else, to copy."""
-    with new_database() as url:
-        with migrated_engine(url):
-            pass
-        yield url
-
-
 @pytest.fixture
 def seeding(
-    migrated: str, monkeypatch: pytest.MonkeyPatch, restore_logging: None
+    own_database: str,
+    own_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+    restore_logging: None,
 ) -> Iterator[Session]:
-    """The seed command's settings, on a copy of `migrated`, and a session
+    """The seed command's settings, on a database of its own, and a session
     to see what it made."""
-    with new_database(template=make_url(migrated).database) as url:
-        monkeypatch.setenv("DATABASE_URL", url)
-        monkeypatch.setenv("APP_ENV", "development")
-        engine = make_engine(url)
-        with Session(engine) as session:
-            yield session
-        engine.dispose()
+    monkeypatch.setenv("DATABASE_URL", own_database)
+    monkeypatch.setenv("APP_ENV", "development")
+    with Session(own_engine) as session:
+        yield session
 
 
 def the_admin(session: Session) -> Admin | None:
