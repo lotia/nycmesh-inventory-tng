@@ -22,7 +22,7 @@ often as needed; pick some here to print them again.</p>
       <td class="key">{{ label.code }}</td>
       <td><a href="{{ items_path ~ '/' ~ label.item_id if label.item_id else locations_path ~ '/' ~ label.location_id }}">{{ named.words }}</a></td>
       <td>{{ label.created_at | when(zone) }}</td>
-      <td><form method="post" action="{{ here }}/{{ label.id }}/revoke"><button>Revoke</button></form></td>
+      <td><a href="{{ here }}/{{ label.id }}/revoke">Revoke</a></td>
     </tr>
     {% else %}
     <tr><td colspan="5">{{ "Nothing matches." if search else "None yet." }}</td></tr>

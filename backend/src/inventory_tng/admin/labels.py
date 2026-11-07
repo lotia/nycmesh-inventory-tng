@@ -146,6 +146,28 @@ def print_labels(
     )
 
 
+@router.get(f"{LABELS}/{{label_id}}/revoke")
+def confirm_revoke(
+    request: Request, signed: AdminSignedIn, session: DbSession, label_id: int
+) -> Response:
+    """Revoking can't be undone and voids every printed copy: say so first."""
+    found = session.get(Label, label_id)
+    if found is None or found.revoked_at is not None:
+        return not_found()
+    (named,) = labels.named(session, [found])
+    return admin_page(
+        request,
+        signed,
+        "label_revoke.html",
+        {
+            "title": f"Revoke {found.code}?",
+            "here": f"{LABELS}/{label_id}/revoke",
+            "list": LABELS,
+            "named": named,
+        },
+    )
+
+
 @router.post(f"{LABELS}/{{label_id}}/revoke")
 def revoke_label(signed: AdminSignedIn, session: DbSession, label_id: int) -> Response:
     if not labels.revoke(session, label_id, now()):
