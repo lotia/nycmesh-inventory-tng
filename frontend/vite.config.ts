@@ -69,6 +69,9 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}"],
     environment: "happy-dom",
     setupFiles: ["src/test-setup.ts"],
+    // Files and tests in a random order, its seed printed, so none can
+    // depend on another (CONTRIBUTING.md, Running the checks).
+    sequence: { shuffle: true },
     // The floors and how they are measured: CONTRIBUTING.md, Coverage.
     coverage: {
       provider: "v8",

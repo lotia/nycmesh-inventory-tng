@@ -373,13 +373,18 @@ data: a test that needs the database takes the `database_url` fixture. Write
 tests in pytest style. `tests/conftest.py` holds fixtures, hooks and what
 only they use; what tests share besides is in `tests/helpers/`, which
 they import from, never from conftest.py or from one another.
-Every test leaves the database as it found it, so none depends on
-another or on their order: the `session` fixture rolls back; a test whose
-code commits takes the `committed` fixture, which deletes the rows it made;
-one that must commit to the ledger, which nothing can delete from, uses a
-database of its own (`new_database` in `tests/databases.py`). A test that
-leaves any row added, changed or deleted fails, named by
-`leaves_the_database_as_it_was` in conftest.py.
+Tests run in a random order, the backend's with pytest-randomly and the
+frontend's with Vitest's shuffle, so none can depend on another. Each run
+prints its seed; to run that order again, pass it: `uv run pytest
+--randomly-seed=<seed>`, or `npm test -- --sequence.seed=<seed>`.
+
+Every test leaves the database as it found it: the `session` fixture rolls
+back; a test whose code commits takes the `committed` fixture, which deletes
+the rows it made; one that must commit what nothing can delete, such as the
+ledger, takes `own_database`, a migrated database for it alone. A test, or
+a module through its module-scoped fixtures, that leaves any row added,
+changed or deleted fails, named by `leaves_the_database_as_it_was` in
+conftest.py.
 `tests/test_requests_at_once.py` and `tests/test_locking.py` hold tests of
 requests at the same time, on connections that really commit, marked by
 kind (the first one's docstring): `uv run pytest -m concurrency` runs only

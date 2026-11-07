@@ -6,7 +6,7 @@ import dataclasses
 import functools
 import logging
 import os
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator, Iterator
 from pathlib import Path
 
 import argon2.profiles
@@ -16,7 +16,7 @@ from alembic.config import Config
 from argon2 import PasswordHasher
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import Connection, Engine, TextClause, event, exc, text
+from sqlalchemy import Connection, Engine, TextClause, event, exc, make_url, text
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session
 
@@ -39,6 +39,8 @@ from databases import (
     create_database,
     drop_database,
     migrate,
+    migrated_engine,
+    new_database,
 )
 from helpers.apps import on_session
 from helpers.concurrency import Committed
@@ -146,6 +148,33 @@ def engine(database_url: str) -> Iterator[Engine]:
     engine.dispose()
 
 
+@pytest.fixture(scope="session")
+def migrated_template() -> Iterator[str]:
+    """The name of a database with the schema and nothing else, which
+    nothing stays connected to, so own_database can copy it."""
+    with new_database() as url:
+        with migrated_engine(url):
+            pass
+        yield make_url(url).database or ""
+
+
+@pytest.fixture
+def own_database(migrated_template: str) -> Iterator[str]:
+    """The URL of a migrated database for this test alone, dropped after:
+    for a test that commits what nothing can clean up, such as the ledger,
+    or that needs no rows but its own."""
+    with new_database(template=migrated_template) as url:
+        yield url
+
+
+@pytest.fixture
+def own_engine(own_database: str) -> Iterator[Engine]:
+    """An engine on own_database, disposed after."""
+    engine = make_engine(own_database)
+    yield engine
+    engine.dispose()
+
+
 @pytest.fixture
 def alembic_config(engine: Engine) -> Iterator[Config]:
     """Migrations run inside a transaction that is rolled back after the test,
@@ -215,6 +244,38 @@ def _fingerprints(engine: Engine) -> dict[str, str]:
         return dict(connection.execute(_fingerprint_query(engine)).all())
 
 
+# On each module: the tables a test's own check already failed it for, so
+# the module's check doesn't blame the same rows on another test. A second
+# leak into one of these tables in that module shows once the first is fixed.
+_REPORTED = pytest.StashKey[set[str]]()
+
+
+@contextlib.contextmanager
+def _unchanged(engine: Engine, what: str, module: pytest.Module) -> Generator[None]:
+    """Fails `what` if the run's database differs after the block, in any
+    table not already reported in `module`."""
+    before = _fingerprints(engine)
+    yield
+    after = _fingerprints(engine)
+    reported = module.stash.setdefault(_REPORTED, set())
+    changed = sorted(
+        name for name in before if before[name] != after[name] and name not in reported
+    )
+    reported.update(changed)
+    if changed:
+        pytest.fail(f"{what} left rows behind in {changed}", pytrace=False)
+
+
+@functools.cache
+def _modules_using_the_database(session: pytest.Session) -> frozenset[str]:
+    """The modules with a test that takes database_url, found once a run."""
+    return frozenset(
+        item.module.__name__
+        for item in session.items
+        if isinstance(item, pytest.Function) and "database_url" in item.fixturenames
+    )
+
+
 @pytest.fixture(autouse=True)
 def leaves_the_database_as_it_was(request: pytest.FixtureRequest) -> Iterator[None]:
     """Each test that uses the database leaves it as it found it, so no test
@@ -223,16 +284,29 @@ def leaves_the_database_as_it_was(request: pytest.FixtureRequest) -> Iterator[No
     count them. Autouse, so set up before the test's other fixtures and torn
     down after them (the session's rollback, committed's cleanup). A test
     that takes database_url gets the run's database migrated (engine), as
-    the check needs. Module-scoped fixtures are outside what it sees."""
+    the check needs."""
     if "database_url" not in request.fixturenames:
         yield
         return
-    engine: Engine = request.getfixturevalue("engine")
-    before = _fingerprints(engine)
-    yield
-    after = _fingerprints(engine)
-    if changed := sorted(name for name in before if before[name] != after[name]):
-        pytest.fail(f"the test left rows behind in {changed}", pytrace=False)
+    module = request.node.getparent(pytest.Module)
+    assert module is not None  # Every test here is in a module.
+    with _unchanged(request.getfixturevalue("engine"), "the test", module):
+        yield
+
+
+@pytest.fixture(scope="module", autouse=True)
+def module_leaves_the_database_as_it_was(
+    request: pytest.FixtureRequest,
+) -> Iterator[None]:
+    """As leaves_the_database_as_it_was, around a whole module: what its
+    module-scoped fixtures commit, as they are set up or torn down, which no
+    one test's check sees."""
+    if request.module.__name__ not in _modules_using_the_database(request.session):
+        yield
+        return
+    engine = request.getfixturevalue("engine")
+    with _unchanged(engine, "the module", request.node):
+        yield
 
 
 # Names these sessions' connections, so cleanup can end any left waiting.

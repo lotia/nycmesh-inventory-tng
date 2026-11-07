@@ -41,6 +41,7 @@ dev = [
     "httpx2>=2.16",
     "pytest>=9.2",
     "pytest-cov>=7.1",
+    "pytest-randomly>=5.0",
     "ruff>=0.17",
     "ty>=0.0.95",
 ]
