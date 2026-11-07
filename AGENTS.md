@@ -13,7 +13,9 @@ is, read [README.md](README.md).
    [CONTRIBUTING.md](CONTRIBUTING.md#version-control-and-issues). It is written
    for people and agents alike, so follow it as written.
 2. **Track work in beads (`bd`)**, not in TODO lists or a harness's own task
-   tool. Run `bd prime` if beads context is missing.
+   tool. Run `bd prime` if beads context is missing. Label every bead you
+   file from the list in [Labels](CONTRIBUTING.md#labels), and
+   `needs-decision` whenever it waits on the person.
 3. **Never implement cryptography.** No hashing, encryption, signing, key
    derivation, MAC or random-number algorithm written by hand, however
    small, and none copied in. Always call an established library or a
