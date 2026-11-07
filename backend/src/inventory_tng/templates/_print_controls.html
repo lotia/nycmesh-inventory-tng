@@ -1,0 +1,18 @@
+{#- What a .printable shows on screen (styles.css, Printing): the paper,
+which the print styles read, and a Print button. The call's body is a
+hint below the button. -#}
+{% macro print_controls(heading) -%}
+<section>
+  <h2>{{ heading }}</h2>
+  {#- Not a form: nothing is sent, and Enter must not leave the page. #}
+  <div class="flex flex-col items-start gap-4 *:my-0">
+    <fieldset>
+      <legend>Paper</legend>
+      <label><input type="radio" name="paper" value="letter" checked> US Letter</label>
+      <label><input type="radio" name="paper" value="a4"> A4</label>
+    </fieldset>
+    <button type="button" onclick="print()">Print</button>
+    <p class="hint">{{ caller() }}</p>
+  </div>
+</section>
+{%- endmacro %}

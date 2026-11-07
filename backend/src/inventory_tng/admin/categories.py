@@ -14,11 +14,10 @@ from inventory_tng.admin.common import (
     ADMIN,
     RULES,
     admin_page,
-    locked_row,
     name_problem,
     now,
 )
-from inventory_tng.db import DbSession, refusal, unique
+from inventory_tng.db import DbSession, locked_row, refusal, unique
 from inventory_tng.models import Category, Item
 from inventory_tng.pages import not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn

@@ -12,21 +12,28 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from inventory_tng import labels
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.common import (
     ADMIN,
     admin_page,
     chosen,
-    locked_row,
     name_problem,
     now,
     quantity,
     rule_words,
     text_form,
 )
-from inventory_tng.db import DbSession, exists_where, get_locked, refusal, unique
+from inventory_tng.db import (
+    DbSession,
+    exists_where,
+    get_locked,
+    locked_row,
+    refusal,
+    unique,
+)
 from inventory_tng.ledger import balance
-from inventory_tng.models import UNITS, Category, Item, ItemPackage, Movement
+from inventory_tng.models import UNITS, Category, Item, ItemPackage, Label, Movement
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
@@ -144,6 +151,7 @@ def _item_page(
             "units": UNITS,
             "unit_fixed": _moved(session, item.id),
             "in_stock": _in_stock(session, item.id),
+            "labels": labels.current_of(session, Label.item_id == item.id),
             "problems": problems,
             "values": values,
         },

@@ -12,13 +12,14 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import Base, exists_where, get_locked
+from inventory_tng.db import Base, exists_where
 from inventory_tng.ledger import balance, whole_enough
 from inventory_tng.pages import NOTICES, page, templates
 from inventory_tng.sign_in import SignedIn
 
 ADMIN = "/admin"
 ADMINS = f"{ADMIN}/admins"
+LABELS = f"{ADMIN}/labels"
 NAME_MAX = 200
 
 _globals = cast(dict[str, Any], templates.env.globals)
@@ -51,35 +52,10 @@ RULES = {
 }
 
 
-def locked_row[M: Base](session: Session, model: type[M], ident: object) -> M | None:
-    """A row whose table's triggers check the catalogue's rules, locked for
-    the change a page makes to it (others take db.get_locked): first the
-    rules' lock every catalogue rules trigger takes (lock_catalogue_rules),
-    then the row FOR UPDATE. FOR UPDATE waits for any write under way that
-    refers to the row, such as a save holding its places or a movement of an
-    item, so what the page then reads of them is settled. The rules' lock
-    first keeps one order: a trigger holds it while it checks a reference to
-    this row, so taken after the row it could deadlock (inventory-tng-8i4.58,
-    8i4.69). Saves and counts never take it, but they do wait for a page's
-    row lock (their foreign keys share-lock what they refer to): a page that
-    locks two rows a save also refers to takes them in the save's order, its
-    places then its volunteer, or the two could deadlock (8i4.78)."""
-    session.execute(select(func.lock_catalogue_rules()))
-    return get_locked(session, model, ident)
-
-
 def rule_words(broken: str, unique: str) -> str:
     if broken == "unique":
         return unique
     return RULES.get(broken, "That breaks one of the inventory's rules.")
-
-
-def amount(value: Decimal | None) -> str:
-    """12.500 as "12.5", 3.000 as "3": as people write quantities."""
-    return "" if value is None else format(value.normalize(), "f")
-
-
-templates.env.filters["amount"] = amount
 
 
 def now() -> datetime:

@@ -1,4 +1,5 @@
 {% extends "admin_base.html" %}
+{% from "_print_controls.html" import print_controls %}
 {% block main %}
 <p><strong>Shown only now.</strong> It registers up to {{ code.max_uses }}
 device{{ "s" if code.max_uses != 1 else "" }}, until {{ code.expires_at | when(zone) }}.</p>
@@ -11,20 +12,8 @@ volunteer will use for the scan page.</p>
 
 {#- Printing (styles.css): the paper, then what prints, one code to a page. #}
 <div class="printable">
-  <section>
-    <h2>Print it</h2>
-    {#- Not a form: nothing is sent, and Enter must not leave the page. #}
-    <div class="flex flex-col items-start gap-4 *:my-0">
-      <fieldset>
-        <legend>Paper</legend>
-        <label><input type="radio" name="paper" value="letter" checked> US Letter</label>
-        <label><input type="radio" name="paper" value="a4"> A4</label>
-      </fieldset>
-      <button type="button" onclick="print()">Print</button>
-      <p class="hint">Print it now: the phrase is never shown again. If the print
-      dialog offers paper sizes, pick the same one there.</p>
-    </div>
-  </section>
+  {% call print_controls("Print it") %}Print it now: the phrase is never shown
+  again. If the print dialog offers paper sizes, pick the same one there.{% endcall %}
   <div class="print-sheet">
     <p class="print-title">Register your phone for NYC Mesh Inventory</p>
     <div class="qr">{{ qr }}</div>

@@ -34,3 +34,24 @@ def test_short_recovery_codes_are_voided(alembic_config: Config) -> None:
         text("SELECT code_hash, voided_at IS NOT NULL FROM recovery_code")
     ).all()
     assert sorted(rows) == [(b"unused", True), (b"used", False)]
+
+
+def test_extra_current_labels_are_revoked(alembic_config: Config) -> None:
+    """Migration 0012: one current label for each thing, the oldest."""
+    command.downgrade(alembic_config, "0011")
+    connection = alembic_config.attributes["connection"]
+    store_id = connection.scalar(
+        text("INSERT INTO location (name, kind) VALUES ('Hub', 'store') RETURNING id")
+    )
+    connection.execute(
+        text(
+            "INSERT INTO label (code, location_id) VALUES "
+            "('2222222222', :s), ('3333333333', :s)"
+        ),
+        {"s": store_id},
+    )
+    command.upgrade(alembic_config, "head")
+    rows = connection.execute(
+        text("SELECT code, revoked_at IS NOT NULL FROM label ORDER BY id")
+    ).all()
+    assert rows == [("2222222222", False), ("3333333333", True)]

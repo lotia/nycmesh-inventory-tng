@@ -22,6 +22,13 @@ prefilled Google Form links, which the new app cannot read.
   unless told otherwise (`segno.make_qr`), and not every reader reads one.
 - **QR codes only.** Manufacturers' barcodes would need a field of their own
   on items, so they wait for an issue of their own.
+- **One current code for each item, package or place** (Ali, 2026-11-07),
+  printed in as many copies as wanted; a unique index keeps it one.
+  Separate codes per sticker would add nothing a scan can use. Revoking a
+  code voids every copy, and labels made after get a new code.
+- **Twelve labels to a page** (Ali, 2026-11-07), three by four, on plain US
+  Letter or A4, cut apart or on full-sheet sticker paper: any printer, no
+  particular label product.
 - **Old stickers are replaced before launch** (Ali, 2026-11-06); one scanned
   reads as a label the inventory does not have.
 - **Scanning stays open until Done.** Each item label adds one, or one
@@ -34,7 +41,9 @@ prefilled Google Form links, which the new app cannot read.
 
 ## Consequences
 
-- Printing labels (inventory-tng-8i4.16) writes the bare code, as a full QR
-  code, and the code in words beside it for typing.
+- Labels are made from an item's or a place's page and found, printed
+  again and revoked on the labels page (inventory-tng-8i4.16). Each shows
+  the bare code as a full QR code, the code in words beneath it for typing,
+  and what it names.
 - Chromium's fake camera, showing a seeded label, tests scanning end to end
   (`frontend/browser/camera.spec.ts`); iOS Safari is checked by hand.
