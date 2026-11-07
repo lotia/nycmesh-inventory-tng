@@ -4,7 +4,10 @@ codes, a sign-in link (inventory-tng-8i4.74).
 Such a page is the form's own answer, never kept (pages.page), so Back then
 Forward offers to send the form again. Each form carries a key made when it
 was shown ({{ once_field() }}), and its route asks sent_before() first: sent
-again, the key is found spent and nothing is made, rather than a second secret that voids the first.
+again, the key is found spent and nothing is made, rather than a second
+secret that voids the first. A double-click is stopped before that, in the
+browser (admin_base.html): it would show only the second answer, and the
+first's secret never.
 """
 
 import uuid
@@ -46,7 +49,9 @@ def once_field() -> Markup:
     ).format(FIELD, uuid.uuid4())
 
 
-cast(dict[str, Any], templates.env.globals)["once_field"] = once_field
+cast(dict[str, Any], templates.env.globals).update(
+    once_field=once_field, once_name=FIELD
+)
 
 
 def form_key(typed: str) -> uuid.UUID | None:
