@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from structlog.testing import capture_logs
 
 from inventory_tng import accounts, sign_in
 from inventory_tng.admin.admins import ADMINS
@@ -218,6 +219,9 @@ def test_retiring_or_bringing_back_one_there_is_not_is_not_found(
 ) -> None:
     current, _ = new_admin(session, "ben")
     assert admin_client.post(f"{ADMINS}/999999/retire").status_code == 404
+    assert admin_client.post(f"{ADMINS}/999999/reset").status_code == 404
+    me = admin_named(session, "ada")
+    assert admin_client.post(f"{ADMINS}/{me.id}/restore").status_code == 404
     # Bringing back one who is not retired finds nobody to bring back.
     assert admin_client.post(f"{ADMINS}/{current.id}/restore").status_code == 404
     assert current.retired_at is None
@@ -247,11 +251,18 @@ def test_one_who_cannot_sign_in_changes_nobody(session: Session) -> None:
         accounts.retire_admin(session, ben.id, ada.id, now)
     with pytest.raises(accounts.AdminRefused, match="not_found"):
         accounts.restore_admin(session, carol.id, ada.id, now)
-    with pytest.raises(accounts.AdminRefused):
+    with pytest.raises(accounts.AdminRefused, match="not_found"):
         accounts.invite(session, "mallory", None, ada.id, now)
     # Two resetting each other at once: the second finds itself reset.
-    with pytest.raises(accounts.AdminRefused):
+    with (
+        capture_logs() as logs,
+        pytest.raises(accounts.AdminRefused, match="not_found"),
+    ):
         accounts.reset_admin_sign_in(session, ben.id, ada.id, now)
+    # Told apart from a stale id: a session cut off, still at work.
+    assert [(e["log_level"], e["action"], e["why"]) for e in logs] == [
+        ("warning", "reset", "signed_out")
+    ]
     assert ben.retired_at is None
     assert accounts.has_password(session, ben.id)
 

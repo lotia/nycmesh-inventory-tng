@@ -189,7 +189,8 @@ are plain HTML. The app container builds it into its image, so a class new
 to a template shows there only after `mise run compose -- up -d --build app`.
 Administrator pages put their content in `<main class="admin page-width">`;
 the scan and registration pages in `<main class="volunteer page-width">`,
-with a label above its control as `Field` (`frontend/src/Field.tsx`). Both
+with a label above its text box or list as `Field`
+(`frontend/src/Field.tsx`). Both
 space their forms by gap, and a component styles what only it shows with
 utilities. When you style a page:
 

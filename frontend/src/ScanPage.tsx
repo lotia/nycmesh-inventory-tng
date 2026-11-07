@@ -333,7 +333,8 @@ function CartForm({
         )}
       </Field>
 
-      <fieldset>
+      {/* Choices close together, each tall enough to tap. */}
+      <fieldset class="gap-1">
         <legend>What is happening</legend>
         {(
           [
@@ -342,7 +343,7 @@ function CartForm({
             ["install", "Taking it to an install"],
           ] as const
         ).map(([kind, words]) => (
-          <label key={kind} class="flex items-center gap-2 font-normal">
+          <label key={kind} class="flex items-center gap-2 py-1 font-normal">
             <input
               type="radio"
               name="kind"
@@ -387,7 +388,7 @@ function CartForm({
         </Field>
       )}
 
-      <h2 class="mt-3">Cart</h2>
+      <h2>Cart</h2>
       {cart.value.lines.length === 0 ? (
         <p>Nothing in the cart yet.</p>
       ) : (
