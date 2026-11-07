@@ -170,6 +170,27 @@ def test_copies_and_picks_must_make_sense(
     )
 
 
+def test_revoking_asks_to_confirm_first(
+    admin_client: TestClient, session: Session, cable: Item
+) -> None:
+    label = add(session, Label(item_id=cable.id))
+    confirm = f"{LABELS}/{label.id}/revoke"
+    assert f'<a href="{confirm}">Revoke</a>' in admin_client.get(LABELS).text
+    page = admin_client.get(confirm)
+    assert page.status_code == 200
+    words = " ".join(text(page).split())
+    assert f'<span class="key">{label.code}</span>, names Cat6 cable.' in words
+    assert "can't be undone" in words
+    assert (
+        f'<form method="post" action="{confirm}"><button>Revoke</button>' in page.text
+    )
+    session.refresh(label)
+    assert label.revoked_at is None  # Only its button revokes.
+    admin_client.post(confirm)
+    assert admin_client.get(confirm).status_code == 404
+    assert admin_client.get(f"{LABELS}/0/revoke").status_code == 404
+
+
 def test_revoking_voids_the_code_and_the_next_labels_get_a_new_one(
     admin_client: TestClient, session: Session, cable: Item
 ) -> None:
