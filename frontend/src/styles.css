@@ -41,8 +41,11 @@
     @apply scheme-light-dark;
   }
 
+  /* A long word, such as a pasted link or a name typed without spaces,
+     wraps wherever it must rather than widening the page, in a flex row too
+     (anywhere, unlike break-word, lets a box shrink below the word). */
   body {
-    @apply bg-page text-ink;
+    @apply bg-page text-ink wrap-anywhere;
   }
 
   h1 {
@@ -112,9 +115,11 @@
     @apply border-b border-heading text-heading;
   }
 
+  /* A cell keeps its longest word whole: a table that cannot fit then
+     scrolls in its own box (the table macro), rather than splitting it. */
   td,
   th {
-    @apply py-1.5 pr-2 text-left align-top;
+    @apply py-1.5 pr-2 text-left align-top wrap-break-word;
   }
 
   tr:hover > td {
@@ -335,9 +340,8 @@
       }
     }
 
-    /* Long words wrap: a label may be a pasted link. */
     .print-sheet {
-      @apply block text-center text-lg wrap-anywhere;
+      @apply block text-center text-lg;
       page: letter;
     }
 

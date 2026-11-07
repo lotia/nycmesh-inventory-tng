@@ -84,10 +84,7 @@ export function Scanner({
         muted
         playsInline
       />
-      {/* A long code read, such as an old sticker's link, wraps. */}
-      <p class="wrap-anywhere" role="status">
-        {said.value}
-      </p>
+      <p role="status">{said.value}</p>
       <div class="actions">
         {torch.value !== null && (
           <Torch
