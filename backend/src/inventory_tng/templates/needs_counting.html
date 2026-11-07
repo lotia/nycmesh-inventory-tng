@@ -1,0 +1,24 @@
+{% extends "admin_base.html" %}
+{% from "_table.html" import table %}
+{% block main %}
+{% include "_stock_views.html" %}
+<p class="hint">Places that show less than nothing of an item: the records are
+wrong there until someone counts it.</p>
+{% for group in places %}
+<section>
+  <h2>{{ group.heading.name }}</h2>
+  {% call table() %}
+    {% for row in group.rows %}
+    <tr><td>{{ row.item.name }}</td><td>{{ row.quantity | amount }} {{ row.item.unit }}</td></tr>
+    {% endfor %}
+  {% endcall %}
+  {% if group.heading.retired_at %}
+  <p class="hint">Retired: it can't be counted.</p>
+  {% else %}
+  <p><a href="{{ counts }}/{{ group.heading.id }}">Count {{ group.heading.name }}</a></p>
+  {% endif %}
+</section>
+{% else %}
+<p>Nothing shows less than nothing.</p>
+{% endfor %}
+{% endblock %}

@@ -68,6 +68,9 @@ RESET_KINDS: tuple[ResetKind, ...] = get_args(ResetKind)
 MADE_BY_ADMIN: tuple[ResetKind, ...] = ("invite", "reset")
 RESETS_AUTHENTICATORS: tuple[ResetKind, ...] = ("reset", "recovery")
 LOCATION_KINDS = ("store", "area", "vehicle", "custody")
+# The stores and the areas in them (an area sits only in a store or another
+# area): where stock counts towards reordering (docs/decisions/0003).
+STORE_KINDS = ("store", "area")
 # What a transaction is. A count or an adjustment fixes the records, with
 # stock found (NULL to a location) or lost (a location to NULL).
 TRANSACTION_KINDS = ("move", "receipt", "install", "count", "adjustment")

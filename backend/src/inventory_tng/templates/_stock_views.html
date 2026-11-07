@@ -1,0 +1,6 @@
+{#- The stock pages' views (admin/stock.py, stock_views), the one shown not a link. -#}
+<nav aria-label="Stock views" class="actions">
+  {% for href, label, name in stock_views %}
+  {% if name == view %}<strong>{{ label }}</strong>{% else %}<a href="{{ href }}">{{ label }}</a>{% endif %}
+  {% endfor %}
+</nav>
