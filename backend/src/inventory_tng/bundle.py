@@ -15,7 +15,7 @@ from typing import Any, cast
 
 import structlog
 from fastapi import APIRouter, FastAPI, Request
-from fastapi.responses import PlainTextResponse, Response
+from fastapi.responses import PlainTextResponse, RedirectResponse, Response
 from servestatic import ServeStaticASGI
 from starlette.types import ASGIApp
 
@@ -156,6 +156,13 @@ def shared_styles(request: Request) -> Tags:
 
 # Jinja types its globals by its own defaults' types; any value will do.
 cast(dict[str, Any], templates.env.globals)["shared_styles"] = shared_styles
+
+
+@router.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
+def root() -> RedirectResponse:
+    """Volunteers' phones are who come here; administrators keep /admin."""
+    return RedirectResponse(SCAN, status_code=302)
+
 
 for path, (title, entry) in PAGES.items():
     router.add_api_route(
