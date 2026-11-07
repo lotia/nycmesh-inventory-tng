@@ -16,6 +16,7 @@ from inventory_tng.admin.common import LABELS
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.labels import PRINT
 from inventory_tng.admin.locations import LOCATIONS
+from inventory_tng.catalogue import catalogue
 from inventory_tng.models import (
     Category,
     Item,
@@ -27,6 +28,7 @@ from inventory_tng.models import (
 
 from helpers.rows import add, history
 from helpers.sign_in import text
+from helpers.stock import stocked
 
 
 @pytest.fixture
@@ -207,7 +209,7 @@ def test_revoking_voids_the_code_and_the_next_labels_get_a_new_one(
     assert new.revoked_at is None
     page = text(admin_client.get(LABELS))
     assert (
-        page.index(new.code) < page.index("No longer scanned") < page.index(label.code)
+        page.index(new.code) < page.index("<h2>Inactive</h2>") < page.index(label.code)
     )
 
 
@@ -240,3 +242,54 @@ def test_a_sheet_has_a_limit(
     assert four.status_code == 200
     five = admin_client.get(PRINT, params={"label": label.id, "copies": 5})
     assert five.headers["location"] == f"{LABELS}?notice=too_many"
+
+
+def test_inactive_labels_say_why_and_agree_with_the_scan_page(
+    admin_client: TestClient, session: Session, cable: Item
+) -> None:
+    place = stocked(session)  # Radios in its store.
+    hub = add(session, Location(name="Hub", kind="store"))
+    when = cable.created_at
+    still_stocked = add(session, Label(item_id=place.item.id))
+    rows = {
+        "Revoked": add(session, Label(location_id=hub.id, revoked_at=when)),
+        "Item retired": add(session, Label(item_id=cable.id)),
+        "Place retired": add(session, Label(location_id=place.van.id)),
+    }
+    radio_box = add(
+        session, ItemPackage(item_id=place.item.id, name="Box", size=Decimal(4))
+    )
+    rows["Package retired"] = add(
+        session, Label(item_id=place.item.id, package_id=radio_box.id)
+    )
+    # Retired with stock left, the radios still scan: volunteers may take them.
+    place.item.retired_at = cable.retired_at = place.van.retired_at = when
+    radio_box.retired_at = when
+    session.flush()
+    scanned = {entry.code for entry in catalogue(session).labels}
+    assert still_stocked.code in scanned
+    assert scanned.isdisjoint(label.code for label in rows.values())
+    page = " ".join(text(admin_client.get(LABELS)).split())
+    inactive = page.index("<h2>Inactive</h2>")
+    assert page.index(still_stocked.code) < inactive
+    for why, label in rows.items():
+        assert page.index(label.code) > inactive
+        assert why in page[page.index(label.code) :].split("</tr>")[0], why
+
+
+def test_finding_labels_by_package_or_the_place_around(
+    admin_client: TestClient,
+    session: Session,
+    cable: Item,
+    reel: ItemPackage,
+    shelf: Location,
+) -> None:
+    on_reel = add(session, Label(item_id=cable.id, package_id=reel.id))
+    on_shelf = add(session, Label(location_id=shelf.id))
+
+    def found(search: str) -> set[str]:
+        page = text(admin_client.get(LABELS, params={"q": search}))
+        return {x.code for x in (on_reel, on_shelf) if x.code in page}
+
+    assert found("reel") == {on_reel.code}
+    assert found("hub") == {on_shelf.code}

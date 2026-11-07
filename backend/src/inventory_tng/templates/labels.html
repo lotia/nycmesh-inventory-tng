@@ -39,17 +39,17 @@ often as needed; pick some here to print them again.</p>
   {% endif %}
 </section>
 
-{% if spent %}
+{% if inactive %}
 <section>
-  <h2>No longer scanned</h2>
-  <p class="hint">Revoked, or naming something retired.</p>
+  <h2>Inactive</h2>
+  <p class="hint">The scan page doesn't read these.</p>
   {% call table() %}
     <tr><th>Code</th><th>Names</th><th>Why</th></tr>
-    {% for named in spent %}
+    {% for named in inactive %}
     <tr class="retired">
       <td class="key">{{ named.label.code }}</td>
       <td>{{ named.words }}</td>
-      <td>{{ "revoked " ~ (named.label.revoked_at | when(zone)) if named.label.revoked_at else "retired" }}</td>
+      <td>{{ named.why | capitalize }}{% if named.label.revoked_at %} {{ named.label.revoked_at | when(zone) }}{% endif %}</td>
     </tr>
     {% endfor %}
   {% endcall %}

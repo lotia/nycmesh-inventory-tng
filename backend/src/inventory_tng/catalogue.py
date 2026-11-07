@@ -10,12 +10,13 @@ from decimal import Decimal
 import structlog
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from inventory_tng import labels
 from inventory_tng.db import DbSession
 from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
-from inventory_tng.ledger import retired_in_stock
+from inventory_tng.ledger import takeable
 from inventory_tng.models import (
     Category,
     Item,
@@ -117,10 +118,10 @@ def catalogue(session: Session) -> Catalogue:
     items = session.execute(
         select(Item, Category.name)
         .join(Category, Category.id == Item.category_id)
-        .where(or_(Item.retired_at.is_(None), Item.id.in_(retired_in_stock())))
+        .where(takeable())
         .order_by(Item.name)
     )
-    labels = session.scalars(select(Label).where(Label.revoked_at.is_(None)))
+    found = session.scalars(select(Label).where(Label.revoked_at.is_(None)))
     places = [LocationEntry.model_validate(x) for x in locations]
     entries = [
         ItemEntry(
@@ -136,18 +137,13 @@ def catalogue(session: Session) -> Catalogue:
         )
         for item, category in items
     ]
-    # A label is sent only if everything it names is: one on a retired item,
-    # package or place would name what the page cannot show.
-    item_ids = {entry.id for entry in entries}
-    package_ids = {pack.id for entry in entries for pack in entry.packages}
-    location_ids = {place.id for place in places}
-
-    def names_current(label: Label) -> bool:
-        return (
-            (label.item_id is None or label.item_id in item_ids)
-            and (label.package_id is None or label.package_id in package_ids)
-            and (label.location_id is None or label.location_id in location_ids)
-        )
+    # A label is sent only if everything it names is (labels.inactive): one
+    # on a retired item, package or place would name what the page cannot show.
+    sent = labels.Sent(
+        {entry.id for entry in entries},
+        {pack.id for entry in entries for pack in entry.packages},
+        {place.id for place in places},
+    )
 
     return Catalogue(
         settings=Settings.model_validate(session.get_one(ScanSettings, 1)),
@@ -155,7 +151,9 @@ def catalogue(session: Session) -> Catalogue:
         locations=places,
         items=entries,
         labels=[
-            LabelEntry.model_validate(label) for label in labels if names_current(label)
+            LabelEntry.model_validate(label)
+            for label in found
+            if labels.inactive(label, sent) is None
         ],
     )
 

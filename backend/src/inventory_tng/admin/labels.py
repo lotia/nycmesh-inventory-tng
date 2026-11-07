@@ -9,7 +9,7 @@ import structlog
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import Response
 from sqlalchemy import or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from inventory_tng import labels
 from inventory_tng.accounts import qr_svg
@@ -18,7 +18,7 @@ from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.db import DbSession
 from inventory_tng.local_time import site_zone
-from inventory_tng.models import Item, Label, Location
+from inventory_tng.models import Item, ItemPackage, Label, Location
 from inventory_tng.pages import NOTICES, not_found, redirect, templates
 from inventory_tng.sign_in import AdminSignedIn
 
@@ -46,17 +46,25 @@ NOTICES.update(
 
 
 def _found(session: Session, search: str) -> list[labels.Named]:
+    """Labels whose code is the search, or whose words name it: the item,
+    its package, the place or the place it is in."""
+    parent = aliased(Location)
     query = (
         select(Label)
         .outerjoin(Item, Item.id == Label.item_id)
+        .outerjoin(ItemPackage, ItemPackage.id == Label.package_id)
         .outerjoin(Location, Location.id == Label.location_id)
+        .outerjoin(parent, parent.id == Location.parent_id)
     )
     if search:
         query = query.where(
             or_(
                 Label.code == search.upper(),
                 Item.matches(search),
-                Location.name.icontains(search, autoescape=True),
+                *(
+                    name.icontains(search, autoescape=True)
+                    for name in (ItemPackage.name, Location.name, parent.name)
+                ),
             )
         )
     found = labels.named(session, session.scalars(query).all())
@@ -81,7 +89,7 @@ def list_labels(
             "locations_path": LOCATIONS,
             "search": search,
             "current": [each for each in found if each.current],
-            "spent": [each for each in found if not each.current],
+            "inactive": [each for each in found if not each.current],
             "zone": site_zone(session),
         },
     )

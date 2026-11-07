@@ -16,7 +16,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.admin.common import (
@@ -35,7 +35,7 @@ from inventory_tng.ledger import (
     moment,
     record_adjustment,
     record_count,
-    retired_in_stock,
+    takeable,
 )
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import (
@@ -73,11 +73,7 @@ def _items(session: Session) -> list[Item]:
     """What can be counted or adjusted: current items, and retired ones with
     stock left, which may still be written off."""
     return list(
-        session.scalars(
-            select(Item)
-            .where(or_(Item.retired_at.is_(None), Item.id.in_(retired_in_stock())))
-            .order_by(func.lower(Item.name))
-        )
+        session.scalars(select(Item).where(takeable()).order_by(func.lower(Item.name)))
     )
 
 
