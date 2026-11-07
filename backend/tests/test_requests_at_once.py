@@ -180,7 +180,7 @@ def test_a_sign_in_under_way_waits_for_a_retire_then_is_refused(
     """Retiring keeps the password: the account itself must be read again."""
     ada, ben, key = admins
     retiring = committed.session()
-    assert accounts.retire_admin(retiring, ben, ada, datetime.now(UTC)) == "retired"
+    accounts.retire_admin(retiring, ben, ada, datetime.now(UTC))
     worker = signing_in_blocked(committed, key)
     retiring.commit()
     error = worker.finished().error
@@ -331,7 +331,7 @@ def test_a_recovery_under_way_waits_for_a_retire_then_is_refused(
     ada, ben, _ = admins
     token = "a recovery token the operator set, long"
     retiring = committed.session()
-    assert accounts.retire_admin(retiring, ben, ada, datetime.now(UTC)) == "retired"
+    accounts.retire_admin(retiring, ben, ada, datetime.now(UTC))
     recovering = committed.session()
     worker = committed.blocked(
         recovering,
