@@ -334,3 +334,20 @@ def install(app: FastAPI) -> None:
         log.warning("database unavailable", **describe_error(error))
         body = UnavailableReply(reason="database_unavailable")
         return JSONResponse(body.model_dump(), status_code=503)
+
+
+def locked_row[M: Base](session: Session, model: type[M], ident: object) -> M | None:
+    """A row whose table's triggers check the catalogue's rules, locked for
+    the change a page makes to it (others take db.get_locked): first the
+    rules' lock every catalogue rules trigger takes (lock_catalogue_rules),
+    then the row FOR UPDATE. FOR UPDATE waits for any write under way that
+    refers to the row, such as a save holding its places or a movement of an
+    item, so what the page then reads of them is settled. The rules' lock
+    first keeps one order: a trigger holds it while it checks a reference to
+    this row, so taken after the row it could deadlock (inventory-tng-8i4.58,
+    8i4.69). Saves and counts never take it, but they do wait for a page's
+    row lock (their foreign keys share-lock what they refer to): a page that
+    locks two rows a save also refers to takes them in the save's order, its
+    places then its volunteer, or the two could deadlock (8i4.78)."""
+    session.execute(select(func.lock_catalogue_rules()))
+    return get_locked(session, model, ident)

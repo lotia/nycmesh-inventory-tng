@@ -31,7 +31,6 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, mail, sign_in
 from inventory_tng.admin.admins import ADMINS
-from inventory_tng.admin.common import locked_row
 from inventory_tng.admin.volunteers import VOLUNTEERS
 from inventory_tng.db import (
     Base,
@@ -39,6 +38,7 @@ from inventory_tng.db import (
     describe_error,
     hold_until_commit,
     locked,
+    locked_row,
     release_hold,
 )
 from inventory_tng.mail import Message, Notify

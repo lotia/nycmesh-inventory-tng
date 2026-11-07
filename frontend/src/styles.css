@@ -360,5 +360,41 @@
     .print-small {
       @apply text-sm;
     }
+
+    /*
+     * Labels (inventory-tng-8i4.16): a .print-sheet each page, of twelve
+     * .print-labels, three across and four down, with lines to cut along.
+     * Rows a little short of a quarter of the paper, so four always fit.
+     */
+    .label-sheet.print-sheet {
+      @apply grid grid-cols-3 text-base;
+      grid-auto-rows: 2.45in;
+      break-after: page;
+
+      &:last-child {
+        break-after: auto;
+      }
+    }
+
+    .printable:has(input[name="paper"][value="a4"]:checked) .label-sheet {
+      grid-auto-rows: 66mm;
+    }
+
+    .print-label {
+      @apply flex flex-col items-center justify-center overflow-hidden border border-dashed border-gray-400 p-2 *:my-0;
+      break-inside: avoid;
+
+      & .qr svg {
+        @apply my-0 w-[1.5in];
+      }
+
+      & .key {
+        @apply text-base;
+      }
+
+      & .print-small {
+        @apply line-clamp-2 wrap-anywhere;
+      }
+    }
   }
 }

@@ -19,12 +19,11 @@ from inventory_tng.admin.common import (
     admin_page,
     chosen,
     holds_stock,
-    locked_row,
     name_problem,
     now,
     rule_words,
 )
-from inventory_tng.db import DbSession, attempt, get_locked
+from inventory_tng.db import DbSession, attempt, get_locked, locked_row
 from inventory_tng.models import Location, Volunteer
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn

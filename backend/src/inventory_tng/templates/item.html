@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_labels.html" import labels_section with context %}
 {% block main %}
 {% if item.retired_at %}
 <p>Retired: it can't be received.{% if in_stock > 0 %} Volunteers can still
@@ -71,6 +72,20 @@ None is left, so nobody can pick it.{% endif %}</p>
     <button>Add package</button>
   </form>
 </section>
+
+{% if not item.retired_at %}
+{% call labels_section(labels) %}
+  <input type="hidden" name="item_id" value="{{ item.id }}">
+  <label>Of
+    <select name="package_id">
+      <option value="">One {{ "unit" if item.unit == "each" else item.unit }}</option>
+      {% for package in packages if not package.retired_at %}
+      <option value="{{ package.id }}">{{ package.name }} of {{ package.size | amount }}</option>
+      {% endfor %}
+    </select>
+  </label>
+{% endcall %}
+{% endif %}
 
 <section class="actions">
   {% if item.retired_at %}

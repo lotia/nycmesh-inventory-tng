@@ -13,19 +13,19 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from inventory_tng import labels
 from inventory_tng.admin.common import (
     ADMIN,
     admin_page,
     chosen,
     current_rows,
     holds_stock,
-    locked_row,
     name_problem,
     now,
     rule_words,
 )
-from inventory_tng.db import DbSession, attempt
-from inventory_tng.models import STORE_KINDS, Location, Volunteer
+from inventory_tng.db import DbSession, attempt, locked_row
+from inventory_tng.models import STORE_KINDS, Label, Location, Volunteer
 from inventory_tng.pages import not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
@@ -129,6 +129,7 @@ def _location_page(
             "location": location,
             "kind": KINDS.get(location.kind, "Volunteer's custody"),
             "areas": areas,
+            "labels": labels.current_of(session, Label.location_id == location.id),
             "parents": _parents(current_rows(session, Location), location),
             "problems": {"name": problem} if problem else None,
             "values": values,

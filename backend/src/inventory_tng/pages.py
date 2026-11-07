@@ -2,6 +2,7 @@
 page or a redirect is sent."""
 
 from collections.abc import Mapping
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, NoReturn
 from urllib.parse import urlencode
@@ -19,6 +20,14 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 # {{ moment | when(zone) }}: a stored UTC time as people read it
 # (docs/decisions/0013).
 templates.env.filters["when"] = show
+
+
+def amount(value: Decimal | None) -> str:
+    """12.500 as "12.5", 3.000 as "3": as people write quantities."""
+    return "" if value is None else format(value.normalize(), "f")
+
+
+templates.env.filters["amount"] = amount
 
 
 # What a page says after a change, by the ?notice= it was sent back with

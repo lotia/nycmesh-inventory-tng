@@ -327,11 +327,21 @@ class Location(Base):
 
 class Label(Base):
     """A printed code, mapped to an item or a location. On an item, a package
-    makes one scan count as the package's size; without one, as 1 unit."""
+    makes one scan count as the package's size; without one, as 1 unit. Each
+    item, package or place has one current code, printed as often as wanted
+    (docs/decisions/0015)."""
 
     __tablename__ = "label"
     __table_args__ = (
         Index("uq_label_code", "code", unique=True),
+        Index(
+            "uq_label_current",
+            text("coalesce(item_id, 0)"),
+            text("coalesce(package_id, 0)"),
+            text("coalesce(location_id, 0)"),
+            unique=True,
+            postgresql_where=text("revoked_at IS NULL"),
+        ),
         CheckConstraint(
             f"code ~ '^[{LABEL_ALPHABET}]{{{LABEL_LENGTH}}}$'", name="code"
         ),

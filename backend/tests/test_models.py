@@ -156,6 +156,19 @@ def test_a_label_code_never_changes(session: Session, store: Location) -> None:
         )
 
 
+def test_one_current_label_for_each_thing(
+    session: Session, new_item: Callable[..., Item], store: Location
+) -> None:
+    item = new_item()
+    add(session, Label(item_id=item.id))
+    add(session, Label(location_id=store.id))
+    with violates(session, "uq_label_current"):
+        session.add(Label(item_id=item.id))
+    with violates(session, "uq_label_current"):
+        session.add(Label(location_id=store.id))
+    add(session, Label(item_id=item.id, revoked_at=datetime.now(UTC)))
+
+
 def test_a_labels_package_belongs_to_its_item(
     session: Session, new_item: Callable[..., Item], store: Location
 ) -> None:

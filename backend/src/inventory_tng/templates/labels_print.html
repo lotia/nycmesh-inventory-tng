@@ -1,0 +1,33 @@
+{% extends "admin_base.html" %}
+{% from "_table.html" import table %}
+{% from "_print_controls.html" import print_controls %}
+{% block main %}
+{% call table() %}
+  <tr><th>Code</th><th>Names</th></tr>
+  {% for named in picked %}
+  <tr><td class="key">{{ named.label.code }}</td><td>{{ named.words }}</td></tr>
+  {% endfor %}
+{% endcall %}
+<p>{{ copies }} cop{{ "y" if copies == 1 else "ies" }} of each: {{ total }}
+label{{ "s" if total != 1 else "" }}, on {{ sheets | length }}
+page{{ "s" if sheets | length != 1 else "" }}.</p>
+
+{#- Printing (styles.css): the paper, then what prints, twelve to a page. #}
+<div class="printable">
+  {% call print_controls("Print them") %}Cut along the dashed lines, or print
+  on full-sheet sticker paper. If the print dialog offers paper sizes, pick
+  the same one there, at 100% scale.{% endcall %}
+  {% for sheet in sheets %}
+  <div class="print-sheet label-sheet">
+    {% for named in sheet %}
+    <div class="print-label">
+      <div class="qr">{{ qrs[named.label.id] }}</div>
+      <p class="key">{{ named.label.code }}</p>
+      <p class="print-small">{{ named.words }}</p>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+<p><a href="{{ list }}">All labels</a></p>
+{% endblock %}

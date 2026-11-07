@@ -184,9 +184,11 @@ def totp_link(key: str, username: str) -> str:
     return pyotp.TOTP(key).provisioning_uri(name=username, issuer_name=ISSUER)
 
 
-def qr_svg(link: str) -> Markup:
-    """A QR code's SVG, with a viewBox so the stylesheet can size it."""
-    code = segno.make(link, error="m")
+def qr_svg(text: str, error: str = "m") -> Markup:
+    """A QR code's SVG, with a viewBox so the stylesheet can size it. Always
+    a full QR code: segno.make picks a Micro QR for a short text, which not
+    every reader reads (docs/decisions/0015)."""
+    code = segno.make_qr(text, error=error)
     return Markup(code.svg_inline(scale=5, border=2, unit="px"))
 
 

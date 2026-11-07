@@ -1,0 +1,58 @@
+{% extends "admin_base.html" %}
+{% from "_table.html" import table %}
+{% block main %}
+<form method="get" action="{{ here }}" class="actions">
+  <label>Find <input name="q" value="{{ search }}" type="search"></label>
+  <button>Find</button>
+  {% if search %}<a href="{{ here }}">All labels</a>{% endif %}
+</form>
+<p class="hint">Make labels from an <a href="{{ items_path }}">item's</a> or a
+<a href="{{ locations_path }}">location's</a> page. Each has one code, printed as
+often as needed; pick some here to print them again.</p>
+
+{#- The picks and copies belong to this form, from wherever they are. #}
+<form method="get" action="{{ print_path }}" id="print-labels"></form>
+<section>
+  {% call table() %}
+    <tr><th>Print</th><th>Code</th><th>Names</th><th>Made</th><th></th></tr>
+    {% for named in current %}
+    {% set label = named.label %}
+    <tr>
+      <td><input type="checkbox" name="label" value="{{ label.id }}" form="print-labels" aria-label="Print {{ label.code }}"></td>
+      <td class="key">{{ label.code }}</td>
+      <td><a href="{{ items_path ~ '/' ~ label.item_id if label.item_id else locations_path ~ '/' ~ label.location_id }}">{{ named.words }}</a></td>
+      <td>{{ label.created_at | when(zone) }}</td>
+      <td><form method="post" action="{{ here }}/{{ label.id }}/revoke"><button>Revoke</button></form></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5">{{ "Nothing matches." if search else "None yet." }}</td></tr>
+    {% endfor %}
+  {% endcall %}
+  {% if current %}
+  <div class="actions">
+    <label>Copies of each
+      <input name="copies" form="print-labels" type="number" inputmode="numeric" min="1" max="{{ max_copies }}" value="1" required>
+    </label>
+    <button form="print-labels">Print the ones picked</button>
+  </div>
+  <p class="hint">Revoking a code stops every copy of it scanning.</p>
+  {% endif %}
+</section>
+
+{% if spent %}
+<section>
+  <h2>No longer scanned</h2>
+  <p class="hint">Revoked, or naming something retired.</p>
+  {% call table() %}
+    <tr><th>Code</th><th>Names</th><th>Why</th></tr>
+    {% for named in spent %}
+    <tr class="retired">
+      <td class="key">{{ named.label.code }}</td>
+      <td>{{ named.words }}</td>
+      <td>{{ "revoked " ~ (named.label.revoked_at | when(zone)) if named.label.revoked_at else "retired" }}</td>
+    </tr>
+    {% endfor %}
+  {% endcall %}
+</section>
+{% endif %}
+{% endblock %}

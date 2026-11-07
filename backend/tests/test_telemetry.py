@@ -18,7 +18,7 @@ from opentelemetry.sdk.metrics.export import (
 from sqlalchemy import exc
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, devices, ledger, mail
+from inventory_tng import accounts, devices, labels, ledger, mail
 from inventory_tng.app import create_app
 from inventory_tng.db import get_session
 from inventory_tng.devices import RegisteredDevice
@@ -386,3 +386,21 @@ def test_counts_mail_sent_and_failed(recorded: Recorded) -> None:
     sent = counted(reader, "inventory.mail.sent")
     assert sent[(("kind", "password_changed"), ("outcome", "sent"))] >= 1
     assert sent[(("kind", "password_changed"), ("outcome", "failed"))] >= 1
+
+
+def test_counts_labels_made_printed_and_revoked(
+    rolled_back: Recorded, session: Session
+) -> None:
+    _, _, reader, _ = rolled_back
+    place = stocked(session)
+    made = labels.make_for_item(session, place.item.id)
+    assert made is not None
+    assert labels.make_for_item(session, place.item.id) == made  # Not again.
+    assert labels.make_for_place(session, place.store.id) is not None
+    assert labels.record_printing(labels.printable(session, [made.id]), 5) == 5
+    assert labels.revoke(session, made.id, datetime.now(UTC))
+    by_names = counted(reader, "inventory.labels.made")
+    assert by_names[(("names", "item"),)] >= 1
+    assert by_names[(("names", "location"),)] >= 1
+    assert sum(counted(reader, "inventory.labels.printed").values()) >= 5
+    assert sum(counted(reader, "inventory.labels.revoked").values()) >= 1

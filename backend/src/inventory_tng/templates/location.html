@@ -1,4 +1,5 @@
 {% extends "admin_base.html" %}
+{% from "_labels.html" import labels_section with context %}
 {% block main %}
 <p>{{ kind }}{% if location.retired_at %}, retired: nobody can pick it{% endif %}.</p>
 {% if location.kind == "custody" %}
@@ -26,6 +27,12 @@
   <h2>Areas inside</h2>
   <ul>{% for area in areas %}<li><a href="{{ list }}/{{ area.id }}">{{ area.name }}</a></li>{% endfor %}</ul>
 </section>
+{% endif %}
+
+{% if location.kind != "custody" and not location.retired_at %}
+{% call labels_section(labels) %}
+  <input type="hidden" name="location_id" value="{{ location.id }}">
+{% endcall %}
 {% endif %}
 
 <section class="actions">
