@@ -153,13 +153,20 @@
   :is(.admin, .volunteer) :is(form, fieldset):not(.actions) {
     @apply flex flex-col gap-(--form-gap);
 
-    & > * {
-      @apply my-0;
-    }
-
     & > button {
       @apply self-start;
     }
+
+    /* A heading starts a part of the form: more room above it. */
+    & > :is(h2, h3) {
+      @apply mt-3;
+    }
+  }
+
+  /* No margins of their own to add to the gap, but with no specificity:
+     a component's rule, such as .volunteer legend, still gives one. */
+  :where(.admin, .volunteer) :where(form, fieldset):where(:not(.actions)) > * {
+    @apply my-0;
   }
 
   /* Above, not below; not in a table's cell or a row, which space their own. */

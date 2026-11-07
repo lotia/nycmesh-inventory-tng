@@ -8,7 +8,7 @@ hash is kept. Whoever it is for is told by mail, if they gave an address.
 """
 
 from collections.abc import Mapping
-from typing import Annotated, Literal
+from typing import Annotated
 
 import structlog
 from fastapi import APIRouter, Form, Request
@@ -101,7 +101,7 @@ def _link_page(
     signed: SignedIn,
     other: Admin,
     token: str,
-    kind: Literal["invite", "reset"],
+    kind: accounts.LinkKind,
     *,
     brought_back: bool = False,
 ) -> HTMLResponse:
@@ -126,7 +126,7 @@ def _reset_made(
     notify: Notify,
     other: Admin,
     token: str,
-    kind: Literal["invite", "reset"],
+    kind: accounts.LinkKind,
     *,
     brought_back: bool = False,
 ) -> HTMLResponse:
@@ -246,6 +246,7 @@ def restore(
     try:
         restored = accounts.restore_admin(session, admin_id, signed.admin.id, now())
     except accounts.AdminRefused:
+        # Whatever the reason: oneself is never retired, so never found here.
         return not_found()
     changed(signed, session)
     return _reset_made(request, signed, notify, *restored, brought_back=True)

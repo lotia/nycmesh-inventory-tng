@@ -1022,6 +1022,10 @@ def recover(
 MADE_LINK_LIFETIME = timedelta(hours=24)
 
 
+# What a link made for another administrator does: lets them choose a first
+# password, or a new one.
+LinkKind = Literal["invite", "reset"]
+
 # Why an invite, or an action on another administrator, was refused.
 AdminRefusal = Literal["not_found", "themselves"]
 
@@ -1032,16 +1036,27 @@ class AdminRefused(Exception):
         self.reason: AdminRefusal = reason
 
 
+AdminAction = Literal["invite", "reset", "retire", "restore"]
+# Why, for the log: the page says only not found, but an operator should
+# tell a session cut off meanwhile (signed_out, a warning) from a stale id.
+Why = Literal["themselves", "no_such_admin", "signed_out"]
+
+
 def _refuse_action(
-    reason: AdminRefusal, by_admin_id: int, target_admin_id: int | None = None
+    action: AdminAction,
+    why: Why,
+    by_admin_id: int,
+    target_admin_id: int | None = None,
 ) -> NoReturn:
-    log.info(
+    emit = log.warning if why == "signed_out" else log.info
+    emit(
         "administrator action refused",
-        reason=reason,
+        action=action,
+        why=why,
         by_admin_id=by_admin_id,
         target_admin_id=target_admin_id,
     )
-    raise AdminRefused(reason)
+    raise AdminRefused("themselves" if why == "themselves" else "not_found")
 
 
 sign_in_resets = meter.create_counter(
@@ -1058,7 +1073,7 @@ def _reset_sign_in(
     now: datetime,
     *,
     action: Literal["reset", "restore"],
-) -> tuple[str, Literal["invite", "reset"]]:
+) -> tuple[str, LinkKind]:
     """Another administrator resets their sign-in, at once: their password
     goes, their authenticators are retired, their recovery codes and other
     links voided and their sessions ended, so nothing a thief may hold
@@ -1068,9 +1083,7 @@ def _reset_sign_in(
     TOTP is set up again at sign-in while required. Counted by the action
     that did it, unless it invited again. The caller holds the
     administrators lock."""
-    kind: Literal["invite", "reset"] = (
-        "reset" if has_password(session, admin_id) else "invite"
-    )
+    kind: LinkKind = "reset" if has_password(session, admin_id) else "invite"
     # The link first, which voids every other, as use_reset_link locks its
     # link before the password: a link being used meanwhile finishes, then
     # this undoes it.
@@ -1097,11 +1110,11 @@ def _reset_sign_in(
 
 def reset_admin_sign_in(
     session: Session, admin_id: int, by_admin_id: int, now: datetime
-) -> tuple[Admin, str, Literal["invite", "reset"]]:
+) -> tuple[Admin, str, LinkKind]:
     """Reset another administrator's sign-in (_reset_sign_in): never one's
     own, which the account page changes. Returns them, the link and its
     kind. Raises AdminRefused."""
-    admin = _locked_other(session, admin_id, by_admin_id, retired=False)
+    admin = _locked_other(session, "reset", admin_id, by_admin_id, retired=False)
     token, kind = _reset_sign_in(session, admin.id, by_admin_id, now, action="reset")
     return admin, token, kind
 
@@ -1112,10 +1125,10 @@ def invite(
     """A new administrator, with no password yet, so nobody can sign in as
     them, and the one-use link that lets them choose one. They set up TOTP
     at their first sign-in while it is required. A username or email already
-    taken is an IntegrityError on flush; AdminRefused if the one inviting was
-    retired meanwhile."""
+    taken is an IntegrityError on flush; AdminRefused if the one inviting can
+    no longer sign in (retired, or their sign-in reset, meanwhile)."""
     if not lock_admins(session, made_by_id):
-        _refuse_action("not_found", made_by_id)
+        _refuse_action("invite", "signed_out", made_by_id)
     admin = Admin(username=username, email=email or None)
     session.add(admin)
     session.flush()
@@ -1182,19 +1195,27 @@ def lock_admins(session: Session, by_admin_id: int) -> bool:
 
 
 def _locked_other(
-    session: Session, admin_id: int, by_admin_id: int, *, retired: bool
+    session: Session,
+    action: AdminAction,
+    admin_id: int,
+    by_admin_id: int,
+    *,
+    retired: bool,
 ) -> Admin:
     """Under the administrators lock (lock_admins), the other administrator
     to act on, retired or current as asked. AdminRefused: 'themselves' for
     oneself, which only a current administrator can be; 'not_found' if
-    there is none, or the one acting can no longer sign in."""
+    there is none, or the one acting can no longer sign in. An id with no
+    administrator at all is refused before any lock."""
     if admin_id == by_admin_id:
-        _refuse_action("themselves", by_admin_id, admin_id)
+        _refuse_action(action, "themselves", by_admin_id, admin_id)
+    if session.get(Admin, admin_id) is None:
+        _refuse_action(action, "no_such_admin", by_admin_id, admin_id)
     if not lock_admins(session, by_admin_id):
-        _refuse_action("not_found", by_admin_id, admin_id)
-    admin = session.get(Admin, admin_id)
-    if admin is None or (admin.retired_at is not None) != retired:
-        _refuse_action("not_found", by_admin_id, admin_id)
+        _refuse_action(action, "signed_out", by_admin_id, admin_id)
+    admin = session.get_one(Admin, admin_id)
+    if (admin.retired_at is not None) != retired:
+        _refuse_action(action, "no_such_admin", by_admin_id, admin_id)
     return admin
 
 
@@ -1204,7 +1225,7 @@ def retire_admin(
     """Retire another administrator, ending their sessions and any reset
     link. Never oneself; someone who can sign in always remains
     (lock_admins). Raises AdminRefused."""
-    admin = _locked_other(session, admin_id, by_admin_id, retired=False)
+    admin = _locked_other(session, "retire", admin_id, by_admin_id, retired=False)
     admin.retired_at = now
     ended = end_sessions(session, admin.id, now)
     void_reset_links(session, admin.id, now)
@@ -1218,12 +1239,12 @@ def retire_admin(
 
 def restore_admin(
     session: Session, admin_id: int, by_admin_id: int, now: datetime
-) -> tuple[Admin, str, Literal["invite", "reset"]]:
+) -> tuple[Admin, str, LinkKind]:
     """Bring a retired administrator back with their sign-in reset
     (_reset_sign_in), whatever they were retired for: a stolen password or
     phone never works again because the account came back. Returns them,
     the link to pass on and its kind. Raises AdminRefused."""
-    admin = _locked_other(session, admin_id, by_admin_id, retired=True)
+    admin = _locked_other(session, "restore", admin_id, by_admin_id, retired=True)
     admin.retired_at = None
     token, kind = _reset_sign_in(session, admin.id, by_admin_id, now, action="restore")
     log.info(
