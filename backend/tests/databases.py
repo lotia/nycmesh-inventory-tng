@@ -69,10 +69,16 @@ def drop_left_behind(now: float | None = None) -> list[str]:
     return dropped
 
 
+def database_name(at: int) -> str:
+    """A test database's name: when it was made (`at`, in seconds), and
+    random, so two made in the same second differ."""
+    return f"test_{at}_{uuid.uuid4().hex[:8]}"
+
+
 def create_database(template: str | None = None) -> str:
     """A database of its own, and its URL: empty, with no schema, or a copy
     of the database `template`."""
-    name = f"test_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+    name = database_name(int(time.time()))
     server = _server()
     try:
         copy = f' TEMPLATE "{template}"' if template else ""
