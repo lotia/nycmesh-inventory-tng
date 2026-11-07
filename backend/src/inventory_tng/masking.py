@@ -15,6 +15,7 @@ import traceback
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from typing import Self, TextIO
+from urllib.parse import parse_qsl, urlencode
 
 import psycopg
 from pydantic import BaseModel, ValidationError
@@ -199,6 +200,26 @@ def is_secret_name(name: str) -> bool:
     return _classify(name)[0]
 
 
+# Query parameters that carry a secret without saying so by name: the
+# registration phrase and a sign-in code are both sent as `code`. Not a
+# secret word in general, which would mask `status_code`.
+SECRET_QUERY_NAMES = frozenset({"code"})
+
+
+def mask_query(query: str) -> str:
+    """A query string with the values of secret parameters masked."""
+    return urlencode(
+        [
+            (
+                name,
+                MASK if is_secret_name(name) or name in SECRET_QUERY_NAMES else value,
+            )
+            for name, value in parse_qsl(query, keep_blank_values=True)
+        ]
+    )
+
+
+@functools.lru_cache(maxsize=1024)
 def _classify(key: str) -> tuple[bool, bool]:
     """Whether a field name means a secret, and whether it means personal
     data. Cached: the same few names recur on every line."""

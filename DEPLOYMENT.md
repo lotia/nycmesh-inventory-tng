@@ -24,9 +24,9 @@ Set these in the environment. Only `DATABASE_URL` is required.
 
 - `DATABASE_URL`: `postgresql://user:password@host:port/database`.
 - `APP_ENV`: leave unset in production. `development` is for local work
-  only: it stops masking personal data in logs, lets the cookie travel over
-  http, re-reads the scan page's build on every page, and allows
-  `UNMASK_SECRETS` and `VITE_DEV_SERVER`.
+  only: it stops masking personal data in logs and redacting traces, lets the
+  cookie travel over http, re-reads the scan page's build on every page, and
+  allows `UNMASK_SECRETS`, `TRACE_REDACTION=off` and `VITE_DEV_SERVER`.
 - `SETUP_TOKEN`: lets the first administrator set up (below); at least 32
   characters. Remove it once they have.
 - `RECOVERY_TOKEN`: lets a locked-out administrator back in (below); at
@@ -40,13 +40,34 @@ Set these in the environment. Only `DATABASE_URL` is required.
 - `LOG_CLIENT_ADDRESS`: `false` when the proxy logs client addresses itself.
 - `LOG_HEALTH_CHECKS`: `false` logs successful health checks at debug.
 - `OTEL_EXPORTER_OTLP_ENDPOINT`: sends logs and metrics over OTLP/HTTP; off
-  when unset.
+  when unset. `OTEL_TRACES_EXPORTER=otlp` sends traces too, redacted
+  (below).
+- `TRACE_REDACTION_OFF_UNTIL`, `REDACTION_OFF_MAX_HOURS`: traces unredacted
+  for a while (Debugging with unredacted traces, below).
 - `FRONTEND_DIST`: the folder holding the compressed scan page (below). It
   defaults to the checkout's `frontend/dist`.
 - `VITE_DEV_SERVER`: never in production; the app refuses to start with it.
 
 What each logging setting does is in
 [CONTRIBUTING.md](CONTRIBUTING.md#logging).
+
+### Debugging with unredacted traces
+
+Traces leave redacted: only the span attributes on an allow-list, no query
+text, query string or client address, and errors without their messages
+(docs/decisions/0008). To see more for a while:
+
+1. Set `TRACE_REDACTION_OFF_UNTIL` to a time at most
+   `REDACTION_OFF_MAX_HOURS` (default 6) hours away, such as
+   `2026-11-07T18:00Z`, and restart. The app refuses a time further off.
+2. While it is off, each process's starting line is a warning saying until
+   when, each warns at most hourly while unredacted spans leave, and every
+   span carries `inventory.redaction=off`. Secrets stay masked.
+3. Past the time, redaction comes back on by itself. Remove the setting at
+   the next deploy.
+
+A collector in between may keep its own redaction; relax or route it on
+purpose if the unredacted spans are to reach you.
 
 ## Installing, migrating and starting
 

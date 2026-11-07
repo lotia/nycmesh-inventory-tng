@@ -58,6 +58,9 @@ log = structlog.get_logger(__name__)
 FROM_THE_SHELL = (
     "APP_ENV",
     "UNMASK_SECRETS",
+    "TRACE_REDACTION",
+    "TRACE_REDACTION_OFF_UNTIL",
+    "REDACTION_OFF_MAX_HOURS",
     "VITE_DEV_SERVER",
     "FRONTEND_DIST",
     "SETUP_TOKEN",

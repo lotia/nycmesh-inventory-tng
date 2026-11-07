@@ -56,3 +56,7 @@ could not check it.
   `describe_error()` alongside, which keeps the constraint.
 - Built in stages: secrets, personal data and `APP_ENV` (inventory-tng-8i4.37);
   the log switches (8i4.38); traces (8i4.40).
+- Unredacted spans still have the values of secret query parameters masked
+  (`token`, and `code`, which carries the registration phrase and sign-in
+  codes), unless `UNMASK_SECRETS=true`. A span that leaves unredacted outside
+  development carries `inventory.redaction=off`.
