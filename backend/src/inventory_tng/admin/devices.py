@@ -16,7 +16,14 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import devices
 from inventory_tng.accounts import qr_svg
-from inventory_tng.admin.common import ADMIN, admin_page, now, site_link, whole
+from inventory_tng.admin.common import (
+    ADMIN,
+    NAME_MAX,
+    admin_page,
+    now,
+    site_link,
+    whole,
+)
 from inventory_tng.db import DbSession
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import Device, RegistrationCode
@@ -106,19 +113,23 @@ def make_code(
     label: Annotated[str, Form()] = "",
 ) -> Response:
     form = {"uses": uses, "days": days, "label": label}
+    label = label.strip()
     problems = {}
     max_uses, lifetime = whole(uses, 1, MAX_USES), whole(days, 1, MAX_DAYS)
     if max_uses is None:
         problems["uses"] = f"From 1 to {MAX_USES} devices."
     if lifetime is None:
         problems["days"] = f"From 1 to {MAX_DAYS} days."
-    if max_uses is None or lifetime is None:
+    # Any longer would not fit the printed page.
+    if len(label) > NAME_MAX:
+        problems["label"] = f"Up to {NAME_MAX} characters."
+    if problems or max_uses is None or lifetime is None:
         return _list_page(request, session, signed, problems=problems, values=form)
     code, phrase = devices.create_code(
         session,
         max_uses=max_uses,
         lifetime=timedelta(days=lifetime),
-        label=label.strip() or None,
+        label=label or None,
     )
     changed(signed, session)
     link = site_link(request, devices.REGISTER_PATH, code=phrase)

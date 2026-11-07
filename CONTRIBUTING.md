@@ -199,10 +199,9 @@ utilities. When you style a page:
 - Use the tokens in `@theme` (`bg-band`, `text-heading`, …), not colours of
   your own: the dark scheme gives each token its own value.
 - Make markup that repeats a Jinja macro or a Preact component.
-- A page that prints a sheet of QR codes puts a `.printable` in its `main`:
-  radio buttons named `layout` and `paper`, then a `.print-sheet` of four
-  copies of one card (`frontend/src/styles.css`, Printing; as
-  `code_made.html` does).
+- A page that prints a QR code puts a `.printable` in its `main`: radio
+  buttons named `paper`, then a `.print-sheet`, what prints
+  (`frontend/src/styles.css`, Printing; as `code_made.html` does).
 - Write each table with the `table` macro in `_table.html` (`{% call
   table() %}` its rows `{% endcall %}`): one that cannot fit a phone
   scrolls in its own box, not the page. Text that is often long and unbroken,

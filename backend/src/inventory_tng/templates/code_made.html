@@ -9,18 +9,12 @@ device{{ "s" if code.max_uses != 1 else "" }}, until {{ code.expires_at | when(z
 <p class="hint">at <a href="{{ link }}">the registration page</a>, in the browser the
 volunteer will use for the scan page.</p>
 
-{#- Printing (styles.css): the choices, then what prints, one card for a
-poster or four for cards. #}
+{#- Printing (styles.css): the paper, then what prints, one code to a page. #}
 <div class="printable">
   <section>
     <h2>Print it</h2>
     {#- A form only for its spacing: nothing is sent. #}
     <form>
-      <fieldset>
-        <legend>Layout</legend>
-        <label><input type="radio" name="layout" value="poster" checked> A poster, one to a page</label>
-        <label><input type="radio" name="layout" value="cards"> Cards, four to a page</label>
-      </fieldset>
       <fieldset>
         <legend>Paper</legend>
         <label><input type="radio" name="paper" value="letter" checked> US Letter</label>
@@ -32,17 +26,13 @@ poster or four for cards. #}
     </form>
   </section>
   <div class="print-sheet">
-    {% for _ in range(4) %}
-    <div class="print-card">
-      <p class="print-title">Register your phone for NYC Mesh Inventory</p>
-      <div class="qr">{{ qr }}</div>
-      <p>Scan this with your phone's camera.</p>
-      <p>Or open <strong>{{ register }}</strong> and type
-        <span class="key">{{ phrase }}</span></p>
-      {% if code.label %}<p class="print-small print-label">{{ code.label }}</p>{% endif %}
-      <p class="print-small">Until {{ code.expires_at | when(zone) }}</p>
-    </div>
-    {% endfor %}
+    <p class="print-title">Register your phone for NYC Mesh Inventory</p>
+    <div class="qr">{{ qr }}</div>
+    <p>Scan this with your phone's camera.</p>
+    <p>Or open <strong>{{ register }}</strong> and type
+      <span class="key">{{ phrase }}</span></p>
+    {% if code.label %}<p class="print-small">{{ code.label }}</p>{% endif %}
+    <p class="print-small">Until {{ code.expires_at | when(zone) }}</p>
   </div>
 </div>
 
