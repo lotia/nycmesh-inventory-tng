@@ -6,6 +6,7 @@ telemetry. Under `--workers` or `--reload` each process runs it for itself.
 
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
 import anyio
 import structlog
@@ -28,23 +29,37 @@ def create_server() -> FastAPI:
     database = make_url(settings.database_url)
     telemetry_on = enabled()
     app = create_app(settings)
+    # Spans leaving unredacted outside development: said in the starting line.
+    traces_off = False
     if telemetry_on:
         # Here and not in create_app(): providers belong to the process
         # (docs/decisions/0007).
-        telemetry = Telemetry.create()
+        telemetry = Telemetry.create(
+            traces=settings.traces,
+            development=settings.development,
+            secrets=masker.secrets,
+        )
         telemetry.make_global()
         telemetry.attach_logs(masker)
         telemetry.instrument(app, app.state.engine)
         flush_when_stopped(app, telemetry.shutdown)
+        traces_off = (
+            telemetry.tracer_provider is not None
+            and settings.traces.off_outside_development(
+                development=settings.development, now=datetime.now(UTC)
+            )
+        )
     # After telemetry, so the line reaches OTLP too. A warning while secrets
-    # are shown, which is how a dashboard tells.
-    (log.info if masker.secrets else log.warning)(
+    # are shown, or traces leave unredacted outside development, which is
+    # how a dashboard tells.
+    (log.info if masker.secrets and not traces_off else log.warning)(
         "starting",
         log_level=settings.logging.level,
         log_format=settings.logging.format,
         log_health_checks=settings.logging.health_checks,
         log_redaction=masker.redact,
         log_unmasked=not masker.secrets,
+        trace_redaction_off_until=settings.traces.off_until if traces_off else None,
         database_host=database.host,
         database_port=database.port,
         database_name=database.database,

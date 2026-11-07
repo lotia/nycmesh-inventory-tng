@@ -9,10 +9,11 @@ import copy
 import logging
 import os
 import sys
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from types import TracebackType
-from typing import Self
+from typing import Self, cast
 
 import structlog
 from fastapi import FastAPI
@@ -31,17 +32,25 @@ from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, LogRecordExp
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import MetricReader, PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.trace import Event, ReadableSpan, TracerProvider
+from opentelemetry.sdk.trace.export import (
+    BatchSpanProcessor,
+    SpanExporter,
+    SpanExportResult,
+)
 from opentelemetry.sdk.trace.sampling import DEFAULT_OFF
+from opentelemetry.trace import Link, Status
 from opentelemetry.util.types import AnyValue
 from sqlalchemy import Engine
 
 from inventory_tng import request_logging
 from inventory_tng.logs import ADDED_FIELDS
-from inventory_tng.masking import Masker
+from inventory_tng.masking import Masker, mask_query
+from inventory_tng.settings import TraceRedaction
 
 SERVICE_NAME = "inventory-tng"
+
+log = structlog.get_logger(__name__)
 
 
 # Fields OpenTelemetry records in fields of its own: the body, the exception,
@@ -56,6 +65,38 @@ ExcInfo = tuple[type[BaseException], BaseException, TracebackType | None]
 
 
 SIGNALS = {"METRICS": "otlp", "LOGS": "otlp", "TRACES": "none"}
+
+# The span attributes a redacted span keeps (docs/decisions/0008; the
+# evidence is on inventory-tng-8i4.39): an allow-list, so whatever a new
+# instrumentation records is dropped until it is added here, on purpose,
+# with the reason. Not kept, notably: client.address and client.port,
+# url.path (http.route carries the template) and url.query,
+# user_agent.original, and the query text.
+KEPT_ATTRIBUTES = frozenset(
+    {
+        "http.request.method",
+        "http.request.method_original",
+        "http.response.status_code",
+        "http.route",
+        "url.scheme",
+        "network.protocol.version",
+        "server.address",
+        "server.port",
+        "error.type",
+        "db.system.name",
+        "db.namespace",
+        "db.operation.name",
+        "db.collection.name",
+        "db.query.summary",
+        "db.response.status_code",
+    }
+)
+# Of an exception event, its type: the message and trace may quote values.
+KEPT_EVENT_ATTRIBUTES = frozenset({"exception.type", "exception.escaped"})
+# On a span that left unredacted outside development.
+REDACTION_MARK = "inventory.redaction"
+# How often a worker says redaction is off, while it is.
+WARN_EVERY = timedelta(hours=1)
 
 
 def enabled(environ: Mapping[str, str] = os.environ) -> bool:
@@ -77,6 +118,106 @@ def _wanted(environ: Mapping[str, str], signal: str, *, default: str) -> bool:
     return "otlp" in {name.strip().lower() for name in names} and bool(endpoint)
 
 
+class RedactingSpanExporter(SpanExporter):
+    """Spans as they may leave the process (docs/decisions/0008): redacted
+    to the allow-list, or, while `traces` says not, whole but for secrets,
+    and marked and warned about outside development. Decided at each
+    export, so redaction comes back on by itself when the time runs out."""
+
+    def __init__(
+        self,
+        exporter: SpanExporter,
+        *,
+        traces: TraceRedaction | None = None,
+        development: bool = False,
+        secrets: bool = True,
+        now: Callable[[], datetime] = lambda: datetime.now(UTC),
+    ) -> None:
+        self.exporter = exporter
+        self.traces = traces or TraceRedaction()
+        self.development = development
+        # Secret names by the log masker's rule; never personal data, which
+        # is what being unredacted is for.
+        self.secrets = Masker(redact=False, secrets=secrets)
+        self.now = now
+        # The server's starting line has said so already.
+        self._warned: datetime | None = now()
+
+    def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        now = self.now()
+        if self.traces.redacting(development=self.development, now=now):
+            return self.exporter.export([_redacted(span) for span in spans])
+        mark = self.traces.off_outside_development(
+            development=self.development, now=now
+        )
+        if mark and (self._warned is None or now - self._warned >= WARN_EVERY):
+            self._warned = now
+            log.warning("trace redaction is off", until=self.traces.off_until)
+        return self.exporter.export([self._unredacted(span, mark) for span in spans])
+
+    def shutdown(self) -> None:
+        self.exporter.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30_000) -> bool:
+        return self.exporter.force_flush(timeout_millis)
+
+    def _unredacted(self, span: ReadableSpan, mark: bool) -> ReadableSpan:
+        attributes = self.secrets.fields(span.attributes or {})
+        query = attributes.get("url.query")
+        if self.secrets.secrets and isinstance(query, str):
+            attributes["url.query"] = mask_query(query)
+        if mark:
+            attributes[REDACTION_MARK] = "off"
+        return _rebuilt(span, cast(dict[str, AnyValue], attributes))
+
+
+def _redacted(span: ReadableSpan) -> ReadableSpan:
+    events = [
+        Event(
+            event.name, _only(event.attributes, KEPT_EVENT_ATTRIBUTES), event.timestamp
+        )
+        for event in span.events
+    ]
+    return _rebuilt(
+        span,
+        _only(span.attributes, KEPT_ATTRIBUTES),
+        events,
+        [Link(link.context) for link in span.links],
+        Status(span.status.status_code),
+    )
+
+
+def _only(
+    attributes: Mapping[str, AnyValue] | None, kept: frozenset[str]
+) -> dict[str, AnyValue]:
+    return {key: value for key, value in (attributes or {}).items() if key in kept}
+
+
+def _rebuilt(
+    span: ReadableSpan,
+    attributes: Mapping[str, AnyValue],
+    events: Sequence[Event] | None = None,
+    links: Sequence[Link] | None = None,
+    status: Status | None = None,
+) -> ReadableSpan:
+    """The span again, with these attributes, events and status: its own
+    are fixed once it ends, so a changed one is a new one."""
+    return ReadableSpan(
+        name=span.name,
+        context=span.context,
+        parent=span.parent,
+        resource=span.resource,
+        attributes=attributes,
+        events=span.events if events is None else events,
+        links=span.links if links is None else links,
+        kind=span.kind,
+        status=span.status if status is None else status,
+        start_time=span.start_time,
+        end_time=span.end_time,
+        instrumentation_scope=span.instrumentation_scope,
+    )
+
+
 @dataclass
 class Telemetry:
     meter_provider: MeterProvider
@@ -91,11 +232,16 @@ class Telemetry:
         *,
         metric_reader: MetricReader | None = None,
         log_exporter: LogRecordExporter | None = None,
+        span_exporter: SpanExporter | None = None,
+        traces: TraceRedaction | None = None,
+        development: bool = False,
+        secrets: bool = True,
     ) -> Self:
         """Providers exporting over OTLP, or to the reader and exporter given
         (the tests pass in-memory ones). A signal starts only if it has an
-        endpoint, its own or the shared one. The server flushes them when the
-        app stops (server.flush_when_stopped)."""
+        endpoint, its own or the shared one. Spans always leave through a
+        RedactingSpanExporter, redacting unless `traces` says not. The server
+        flushes them when the app stops (server.flush_when_stopped)."""
         resource = Resource.create()
         name = resource.attributes.get("service.name")
         if not isinstance(name, str) or name.startswith("unknown_service"):
@@ -117,12 +263,18 @@ class Telemetry:
             )
 
         tracer_provider = None
-        if _wanted(environ, "TRACES", default=SIGNALS["TRACES"]):
+        if span_exporter or _wanted(environ, "TRACES", default=SIGNALS["TRACES"]):
             # Trace only what the ingress chose to trace, unless a sampler is
             # set in OTEL_TRACES_SAMPLER.
             sampler = None if environ.get("OTEL_TRACES_SAMPLER") else DEFAULT_OFF
             tracer_provider = TracerProvider(resource=resource, sampler=sampler)
-            tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+            redactor = RedactingSpanExporter(
+                span_exporter or OTLPSpanExporter(),
+                traces=traces,
+                development=development,
+                secrets=secrets,
+            )
+            tracer_provider.add_span_processor(BatchSpanProcessor(redactor))
 
         return cls(
             meter_provider=MeterProvider(resource=resource, metric_readers=readers),

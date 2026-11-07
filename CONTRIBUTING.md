@@ -491,6 +491,12 @@ Exporting logs and metrics over OpenTelemetry stays off unless
 not gRPC. Of the other standard variables, `OTEL_SERVICE_NAME`,
 `OTEL_RESOURCE_ATTRIBUTES` and the SDK's timing settings apply, and
 `OTEL_LOGS_EXPORTER=none` or `OTEL_METRICS_EXPORTER=none` stops one signal.
+`OTEL_TRACES_EXPORTER=otlp` sends traces, which are off by default. Spans
+leave through `telemetry.RedactingSpanExporter`: outside development, with
+only the attributes in `KEPT_ATTRIBUTES` (add one there, with the reason,
+to keep it); in development, whole, unless `TRACE_REDACTION=on`. Secrets in
+query strings are masked either way, unless `UNMASK_SECRETS=true`. How to
+see unredacted traces in production for a while is in DEPLOYMENT.md.
 To see telemetry locally, start the dashboard, run the server with
 `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`, and open
 <http://localhost:18888>:
