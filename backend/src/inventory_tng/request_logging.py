@@ -4,12 +4,12 @@ request (docs/decisions/0006)."""
 import re
 import secrets
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from contextvars import ContextVar
 
 import structlog
 from starlette.datastructures import Headers, MutableHeaders
-from starlette.responses import PlainTextResponse
+from starlette.responses import PlainTextResponse, Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from structlog.typing import EventDict
 
@@ -66,8 +66,10 @@ class RequestLogging:
 
     Starlette's own error handler sits outside every middleware, so a failure
     is caught here instead: logged at error, with the request id, and answered
-    with a 500 that carries the id too. An app-wide exception handler would
-    therefore never see it; this app registers none.
+    with a 500 that carries the id too: `failed`'s answer (pages.ErrorPages),
+    or plain text if that fails as well. An app-wide handler for Exception
+    would therefore never see it; the app's handlers are for the errors it
+    raises on purpose, such as HTTPException.
     """
 
     def __init__(
@@ -76,8 +78,10 @@ class RequestLogging:
         *,
         client_address: bool,
         quiet_paths: frozenset[str],
+        failed: Callable[[Scope], Response],
     ) -> None:
         self.app = app
+        self.failed = failed
         self.client_address = client_address
         self.quiet_paths = quiet_paths
 
@@ -113,8 +117,7 @@ class RequestLogging:
                     )
                     if status is not None:
                         raise  # The response has begun; there is no 500 to send.
-                    error = PlainTextResponse("Internal Server Error", status_code=500)
-                    await error(scope, receive, send_with_id)
+                    await self._failure(scope)(scope, receive, send_with_id)
                     return
                 # Successful requests to quiet paths go to debug, where
                 # LOG_LEVEL=DEBUG still shows them. Failures always show.
@@ -124,6 +127,13 @@ class RequestLogging:
 
         finally:
             _fields.reset(fields)
+
+    def _failure(self, scope: Scope) -> Response:
+        try:
+            return self.failed(scope)
+        except Exception:
+            log.exception("the failure page failed")
+            return PlainTextResponse("Internal Server Error", status_code=500)
 
 
 def _ms(started: float) -> float:

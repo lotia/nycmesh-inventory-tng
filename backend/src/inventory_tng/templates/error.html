@@ -1,0 +1,8 @@
+{#- A page answering an error (pages.ErrorPages): whoever asked, signed in
+or not, with a way on. #}
+{% extends "admin_base.html" %}
+{% block main %}
+<p>{{ words }}</p>
+<p>Go to <a href="{{ scan }}">the scan page</a>, or, if you look after the
+inventory, <a href="{{ paths.home }}">its administrator pages</a>.</p>
+{% endblock %}

@@ -3,12 +3,15 @@ page or a redirect is sent."""
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 from urllib.parse import urlencode
 
-from fastapi import Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Request
+from fastapi.exception_handlers import http_exception_handler
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from starlette.exceptions import HTTPException
+from starlette.types import Scope
 
 from inventory_tng.local_time import show
 
@@ -41,8 +44,10 @@ def page(
     )
 
 
-def not_found() -> HTMLResponse:
-    return HTMLResponse("Not found", status_code=404)
+def not_found() -> NoReturn:
+    """There is no such page, or nothing here by that id: answered as
+    install() says."""
+    raise HTTPException(status_code=404)
 
 
 def redirect(path: str, *, notice: str | None = None, **query: str) -> RedirectResponse:
@@ -55,3 +60,67 @@ def redirect(path: str, *, notice: str | None = None, **query: str) -> RedirectR
     if query:
         path += ("&" if "?" in path else "?") + urlencode(query)
     return RedirectResponse(path, status_code=303)
+
+
+# What a page answering an error says, by status code: 400 for any other
+# client error, 500 for any server error.
+ERRORS = {
+    400: (
+        "That didn't work",
+        "The inventory could not take that as it was sent. Go back and try again.",
+    ),
+    404: ("Not found", "There is nothing here. The link may be old, or mistyped."),
+    405: ("Not here", "That can't be done at this address."),
+    500: (
+        "Something went wrong",
+        (
+            "The inventory could not do that. Try again; if it happens again, "
+            "tell whoever looks after it."
+        ),
+    ),
+}
+
+
+class ErrorPages:
+    """How an error is answered: on a page, with a page of the app's own
+    (error.html) and a way on; under `api`, with FastAPI's JSON."""
+
+    def __init__(self, *, api: str, scan: str, admin: str) -> None:
+        self.api, self.scan, self.admin = api, scan, admin
+
+    def _under(self, request: Request, prefix: str) -> bool:
+        """Whether the path, behind any proxy's prefix, is `prefix` or in it."""
+        path = request.url.path.removeprefix(request.scope.get("root_path", ""))
+        return path == prefix or path.startswith(prefix + "/")
+
+    def in_api(self, request: Request) -> bool:
+        return self._under(request, self.api)
+
+    def page(self, request: Request, status: int) -> Response:
+        title, words = ERRORS.get(status) or ERRORS[400 if status < 500 else 500]
+        # The logo goes where this person most likely came from.
+        home = self.admin if self._under(request, self.admin) else self.scan
+        context = {
+            "title": title,
+            "words": words,
+            "scan": self.scan,
+            "brand_home": home,
+        }
+        return page(request, "error.html", context, status)
+
+    def failed(self, scope: Scope) -> Response:
+        """A request that raised (request_logging.RequestLogging)."""
+        request = Request(scope)
+        if self.in_api(request):
+            return JSONResponse({"detail": "Internal Server Error"}, 500)
+        return self.page(request, 500)
+
+    def install(self, app: FastAPI) -> None:
+        @app.exception_handler(HTTPException)
+        async def http_error(request: Request, error: HTTPException) -> Response:
+            # Below 400 (a 304, say) is no error page's to answer.
+            if self.in_api(request) or error.status_code < 400:
+                return await http_exception_handler(request, error)
+            answer = self.page(request, error.status_code)
+            answer.headers.update(error.headers or {})
+            return answer

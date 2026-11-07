@@ -18,6 +18,7 @@ from inventory_tng import (
     devices,
     health,
     ledger,
+    pages,
     resets,
     sign_in,
 )
@@ -57,9 +58,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     # mail.get_mailer hands it to routes.
     app.state.mailer = SmtpMailer(settings.mail) if settings.mail else None
+    errors = pages.ErrorPages(api=API, scan=bundle.SCAN, admin=sign_in.HOME)
+    errors.install(app)
     app.add_middleware(CrossSiteRefusal)
     app.add_middleware(
         RequestLogging,
+        failed=errors.failed,
         client_address=settings.logging.client_address,
         # LOG_HEALTH_CHECKS=false quietens successful health checks.
         quiet_paths=frozenset()
