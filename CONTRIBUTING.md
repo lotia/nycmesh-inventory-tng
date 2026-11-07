@@ -36,6 +36,36 @@ push only if it passes: there is no pull request to catch what it would
 have. Push straight to `main`, where CI checks it again: `git push origin
 main`, or with jj, `jj bookmark set main -r <change>` and `jj git push`.
 
+### Labels
+
+Label every issue you file (`bd create --labels a,b`, or `bd label add`
+after): one or more areas, and each kind that applies. Use these, and add to
+this list rather than inventing one on the spot.
+
+| Label | For |
+| --- | --- |
+| `area:accounts` | Administrators, signing in, their mail |
+| `area:catalogue` | Items, categories, places, volunteers, labels |
+| `area:stock` | The ledger, counts, adjustments, stock views |
+| `area:devices` | Registering devices, registration codes |
+| `area:scan-page` | The volunteers' scan and register pages |
+| `area:admin-ui` | The administrator pages' layout and look |
+| `area:printing` | Printed QR codes and labels |
+| `area:telemetry` | Logs, metrics, traces |
+| `area:security` | Anything that changes what an attacker could do |
+| `area:tooling` | Tests, mise tasks, CI, the dev setup |
+| `area:deploy` | Images, Kubernetes, operating the app |
+| `area:docs` | The project's own documents |
+| `research` | Research or investigation comes first |
+| `design-research` | Research into how the pages look and behave |
+| `needs-decision` | Waits on a maintainer's choice or input; remove it once given |
+| `manual-test` | Steps someone does by hand |
+| `revisit` | An idea set aside, to look at again |
+
+To find them: `bd list --label needs-decision`, `bd list --label area:stock`,
+`bd ready --label-any research,manual-test`, and `bd label list-all` for
+every label in use.
+
 ## Requirements
 
 - [mise](https://mise.jdx.dev/). It installs every other tool, at the
