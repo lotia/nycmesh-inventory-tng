@@ -14,6 +14,7 @@ from sqlalchemy import ColumnElement, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import get_locked, locked_row
+from inventory_tng.ledger import takeable
 from inventory_tng.models import Item, ItemPackage, Label, Location
 from inventory_tng.pages import amount
 
@@ -41,14 +42,45 @@ revoked = meter.create_counter(
 )
 
 
+# Why the scan page doesn't read a label.
+Inactive = Literal["revoked", "item retired", "package retired", "place retired"]
+
+
+@dataclass(frozen=True)
+class Sent:
+    """The ids the scan page's catalogue holds (catalogue.catalogue)."""
+
+    items: AbstractSet[int]
+    packages: AbstractSet[int]
+    places: AbstractSet[int]
+
+
+def inactive(label: Label, sent: Sent) -> Inactive | None:
+    """Why the scan page doesn't read this label, or None if it does: it
+    reads one only if it isn't revoked and the catalogue holds everything it
+    names, as a retired item does while it has stock."""
+    if label.revoked_at is not None:
+        return "revoked"
+    if label.location_id is not None and label.location_id not in sent.places:
+        return "place retired"
+    if label.item_id is not None and label.item_id not in sent.items:
+        return "item retired"
+    if label.package_id is not None and label.package_id not in sent.packages:
+        return "package retired"
+    return None
+
+
 @dataclass(frozen=True)
 class Named:
-    """A label and what it names, in words. `current` if a scan of it is
-    read: it is not revoked, and what it names is not retired."""
+    """A label, what it names in words, and why it is inactive, if it is."""
 
     label: Label
     words: str
-    current: bool
+    why: Inactive | None
+
+    @property
+    def current(self) -> bool:
+        return self.why is None
 
 
 def _package_words(item: Item, package: ItemPackage) -> str:
@@ -79,22 +111,29 @@ def named(session: Session, labels: Sequence[Label]) -> list[Named]:
     places = _by_id(session, Location, place_ids)
     # And the place each area is in.
     places |= _by_id(session, Location, {p.parent_id for p in places.values()})
+    sent_items = set(
+        session.scalars(select(Item.id).where(Item.id.in_(items), takeable()))
+    )
+    sent = Sent(
+        sent_items,
+        {
+            i
+            for i, package in packages.items()
+            if package.retired_at is None and package.item_id in sent_items
+        },
+        {i for i, place in places.items() if place.retired_at is None},
+    )
     found = []
     for label in labels:
         if label.location_id is not None:
             place = places[label.location_id]
             parent = places.get(place.parent_id or 0)
             words = place.name + (f", in {parent.name}" if parent else "")
-            retired = place.retired_at is not None
         else:
             item = items[label.item_id or 0]
             package = packages.get(label.package_id or 0)
             words = item.name if package is None else _package_words(item, package)
-            retired = item.retired_at is not None or (
-                package is not None and package.retired_at is not None
-            )
-        current = label.revoked_at is None and not retired
-        found.append(Named(label, words, current))
+        found.append(Named(label, words, inactive(label, sent)))
     return found
 
 

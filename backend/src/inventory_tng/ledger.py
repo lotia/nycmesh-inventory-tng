@@ -120,6 +120,12 @@ def retired_in_stock() -> Select[tuple[int]]:
     )
 
 
+def takeable() -> ColumnElement[bool]:
+    """Items volunteers may still pick: current ones, and retired ones with
+    some left (retired_in_stock). What the scan page's catalogue holds."""
+    return or_(Item.retired_at.is_(None), Item.id.in_(retired_in_stock()))
+
+
 def whole_enough(unit: str, amount: Decimal) -> bool:
     """An item counted in each moves in whole units (migration 0004's
     movement_whole_units, said where a person can fix it)."""
