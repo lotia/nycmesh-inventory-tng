@@ -24,7 +24,7 @@ from inventory_tng.admin.common import (
     now,
     rule_words,
 )
-from inventory_tng.db import DbSession, attempt
+from inventory_tng.db import DbSession, attempt, get_locked
 from inventory_tng.models import Location, Volunteer
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
@@ -245,10 +245,13 @@ def hold_stock(
 def stop_holding_stock(
     request: Request, signed: AdminSignedIn, session: DbSession, volunteer_id: int
 ) -> Response:
-    found = locked_row(session, Volunteer, volunteer_id)
+    found = session.get(Volunteer, volunteer_id)
     custody = _custody(session, volunteer_id) if found else None
     if found is None or custody is None:
         return not_found()
+    # Their custody, then them: a save's order (locked_row says why).
+    locked_row(session, Location, custody.id)
+    get_locked(session, Volunteer, volunteer_id)  # The rules' lock is held.
     if holds_stock(session, custody.id):
         problem = "They still hold stock: move it back to a store first."
         return _refused(request, session, signed, found, problem)

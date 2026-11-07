@@ -16,7 +16,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 
-from helpers.rows import add, history, named
+from helpers.rows import add, history, named, tag
 from helpers.sign_in import text
 
 
@@ -30,10 +30,8 @@ def custody_of(session: Session, volunteer: Volunteer) -> Location | None:
 
 def give(session: Session, location: Location) -> None:
     """One of something, received straight into `location`."""
-    category = add(session, Category(name=f"Things {uuid.uuid4().hex[:6]}"))
-    item = add(
-        session, Item(name=f"Thing {uuid.uuid4().hex[:6]}", category_id=category.id)
-    )
+    category = add(session, Category(name=f"Things {tag()}"))
+    item = add(session, Item(name=f"Thing {tag()}", category_id=category.id))
     batch = add(
         session,
         LedgerTransaction(

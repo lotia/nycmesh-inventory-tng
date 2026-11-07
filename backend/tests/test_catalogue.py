@@ -1,6 +1,5 @@
 """What the scan page fills a cart from."""
 
-import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -20,7 +19,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 
-from helpers.rows import add
+from helpers.rows import add, tag
 from helpers.stock import Place, write
 
 URL = "/api/catalogue"
@@ -31,22 +30,22 @@ class Rows:
     """Current rows beside retired, merged and revoked ones."""
 
     def __init__(self, session: Session) -> None:
-        tag = uuid.uuid4().hex[:8]
-        category = add(session, Category(name=f"Cables {tag}"))
+        mark = tag()
+        category = add(session, Category(name=f"Cables {mark}"))
         self.cable = add(
             session,
             Item(
-                name=f"Cable {tag}",
+                name=f"Cable {mark}",
                 category_id=category.id,
                 unit="m",
                 manufacturer="Ubiquiti",
-                part_number=f"TC-{tag}",
-                old_code=f"OLD-{tag}",
+                part_number=f"TC-{mark}",
+                old_code=f"OLD-{mark}",
             ),
         )
         self.retired_item = add(
             session,
-            Item(name=f"Old cable {tag}", category_id=category.id, retired_at=NOW),
+            Item(name=f"Old cable {mark}", category_id=category.id, retired_at=NOW),
         )
         self.spool = add(
             session, ItemPackage(item_id=self.cable.id, name="Spool", size=Decimal(300))
@@ -58,19 +57,20 @@ class Rows:
             session,
             ItemPackage(item_id=self.cable.id, name="Reel", size=1, retired_at=NOW),
         )
-        self.store = add(session, Location(name=f"Store {tag}", kind="store"))
+        self.store = add(session, Location(name=f"Store {mark}", kind="store"))
         self.shelf = add(
-            session, Location(name=f"Shelf {tag}", kind="area", parent_id=self.store.id)
+            session,
+            Location(name=f"Shelf {mark}", kind="area", parent_id=self.store.id),
         )
         self.closed = add(
-            session, Location(name=f"Closed {tag}", kind="store", retired_at=NOW)
+            session, Location(name=f"Closed {mark}", kind="store", retired_at=NOW)
         )
-        self.volunteer = add(session, Volunteer(name=f"Volunteer {tag}"))
-        self.left = add(session, Volunteer(name=f"Left {tag}", retired_at=NOW))
+        self.volunteer = add(session, Volunteer(name=f"Volunteer {mark}"))
+        self.left = add(session, Volunteer(name=f"Left {mark}", retired_at=NOW))
         self.merged = add(
             session,
             Volunteer(
-                name=f"Twin {tag}", merged_into_id=self.volunteer.id, retired_at=NOW
+                name=f"Twin {mark}", merged_into_id=self.volunteer.id, retired_at=NOW
             ),
         )
         self.label = add(

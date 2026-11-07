@@ -1209,11 +1209,12 @@ def _locked_other(
     administrator at all is refused before any lock."""
     if admin_id == by_admin_id:
         _refuse_action(action, "themselves", by_admin_id, admin_id)
-    if session.get(Admin, admin_id) is None:
+    admin = session.get(Admin, admin_id)
+    if admin is None:
         _refuse_action(action, "no_such_admin", by_admin_id, admin_id)
+    # lock_admins reads every administrator again, this one too.
     if not lock_admins(session, by_admin_id):
         _refuse_action(action, "signed_out", by_admin_id, admin_id)
-    admin = session.get_one(Admin, admin_id)
     if (admin.retired_at is not None) != retired:
         _refuse_action(action, "no_such_admin", by_admin_id, admin_id)
     return admin

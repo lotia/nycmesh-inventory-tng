@@ -13,8 +13,8 @@ volunteer will use for the scan page.</p>
 <div class="printable">
   <section>
     <h2>Print it</h2>
-    {#- A form only for its spacing: nothing is sent. #}
-    <form>
+    {#- Not a form: nothing is sent, and Enter must not leave the page. #}
+    <div class="flex flex-col items-start gap-4 *:my-0">
       <fieldset>
         <legend>Paper</legend>
         <label><input type="radio" name="paper" value="letter" checked> US Letter</label>
@@ -23,7 +23,7 @@ volunteer will use for the scan page.</p>
       <button type="button" onclick="print()">Print</button>
       <p class="hint">Print it now: the phrase is never shown again. If the print
       dialog offers paper sizes, pick the same one there.</p>
-    </form>
+    </div>
   </section>
   <div class="print-sheet">
     <p class="print-title">Register your phone for NYC Mesh Inventory</p>

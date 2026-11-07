@@ -60,7 +60,10 @@ def locked_row[M: Base](session: Session, model: type[M], ident: object) -> M | 
     item, so what the page then reads of them is settled. The rules' lock
     first keeps one order: a trigger holds it while it checks a reference to
     this row, so taken after the row it could deadlock (inventory-tng-8i4.58,
-    8i4.69). Saves and counts never take it, so they wait on no page."""
+    8i4.69). Saves and counts never take it, but they do wait for a page's
+    row lock (their foreign keys share-lock what they refer to): a page that
+    locks two rows a save also refers to takes them in the save's order, its
+    places then its volunteer, or the two could deadlock (8i4.78)."""
     session.execute(select(func.lock_catalogue_rules()))
     return get_locked(session, model, ident)
 

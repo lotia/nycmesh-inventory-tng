@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
-#MISE description="Install the browsers the browser tests use, when Playwright changes"
+#MISE description="Install the browsers the browser tests use, when any is missing"
 # For the Playwright package-lock.json pins: Chromium, and WebKit with
-# PLAYWRIGHT_WEBKIT=1. Only when the lockfile is newer than the last install
-# that worked (npm ci clears the mark). mise run setup and check-browser run
-# it; on its own, after clearing Playwright's browser cache, remove the mark.
+# PLAYWRIGHT_WEBKIT=1. Each Playwright version wants its own build, so a
+# browser is missing after Playwright changes, as after its cache is
+# cleared. mise run check-browser runs this.
 set -euo pipefail
 cd "${MISE_PROJECT_ROOT:-$(dirname "$0")/..}/frontend"
 
 browsers=(chromium)
 [[ "${PLAYWRIGHT_WEBKIT:-}" = 1 ]] && browsers+=(webkit)
-installed="node_modules/.browsers-$(IFS=-; echo "${browsers[*]}")"
-if [[ package-lock.json -nt "$installed" ]]; then
+missing=$(node -e '
+  const pw = require("playwright-core");
+  const fs = require("node:fs");
+  for (const name of process.argv.slice(1)) {
+    if (!fs.existsSync(pw[name].executablePath())) console.log(name);
+  }' "${browsers[@]}")
+if [[ -n "$missing" ]]; then
   node_modules/.bin/playwright install --no-shell "${browsers[@]}"
-  touch "$installed"
 fi
