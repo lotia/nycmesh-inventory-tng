@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, delete, exc, insert, select, text, update
+from sqlalchemy import delete, exc, insert, select, text, update
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
@@ -22,6 +22,7 @@ from inventory_tng.models import (
     Movement,
 )
 
+from databases import migrated_engine, new_database
 from helpers.rows import add, violates
 from helpers.stock import Place, received, write
 
@@ -247,25 +248,23 @@ def test_the_ledger_cannot_be_truncated(session: Session, table: str) -> None:
         session.execute(text(f"TRUNCATE {table} CASCADE"))
 
 
-@pytest.fixture
-def committed(engine: Engine) -> int:
-    """A transaction already committed, as yesterday's would be. It stays in
-    this run's database: nothing can delete it."""
-    with Session(engine) as session, session.begin():
-        return write(session, Place(session)).id
-
-
-def test_movements_are_never_added_to_a_recorded_transaction(
-    committed: int, session: Session, place: Place
-) -> None:
-    # committed first: place's writes take lock_catalogue_rules() until the
-    # test ends, which committed's own session would wait on.
-    with violates(session, "movement_with_transaction"):
-        session.execute(
-            insert(Movement).values(
-                transaction_id=committed, item_id=place.item.id, quantity=1
+def test_movements_are_never_added_to_a_recorded_transaction() -> None:
+    """On a database of its own: the transaction is committed, as yesterday's
+    would be, and nothing can delete it from the ledger (conftest's
+    APPEND_ONLY), so it must not stay where later tests count stock."""
+    with new_database() as url, migrated_engine(url) as engine:
+        with Session(engine, expire_on_commit=False) as first, first.begin():
+            place = Place(first)
+            committed = write(first, place).id
+        with (
+            Session(engine) as session,
+            violates(session, "movement_with_transaction"),
+        ):
+            session.execute(
+                insert(Movement).values(
+                    transaction_id=committed, item_id=place.item.id, quantity=1
+                )
             )
-        )
 
 
 def test_a_transaction_has_movements(session: Session, place: Place) -> None:

@@ -20,13 +20,12 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, devices, labels, ledger, mail
 from inventory_tng.app import create_app
-from inventory_tng.db import get_session
 from inventory_tng.devices import RegisteredDevice
 from inventory_tng.masking import MASK, Masker
 from inventory_tng.settings import Settings
 from inventory_tng.telemetry import Telemetry, enabled
 
-from helpers.apps import sessions_of
+from helpers.apps import on_session
 from helpers.devices import new_device
 from helpers.mail import FailingMail, SentMail
 from helpers.sign_in import PASSWORD, new_admin
@@ -249,12 +248,11 @@ def counted(reader: InMemoryMetricReader, name: str) -> dict[tuple[object, ...],
     }
 
 
-def test_counts_registrations_and_refusals(recorded: Recorded) -> None:
-    client, _, reader, _ = recorded
-    with Session(client.app.state.engine) as session, session.begin():  # ty: ignore[unresolved-attribute]
-        _, phrase = devices.create_code(
-            session, max_uses=1, lifetime=timedelta(hours=1)
-        )
+def test_counts_registrations_and_refusals(
+    rolled_back: Recorded, session: Session
+) -> None:
+    client, _, reader, _ = rolled_back
+    _, phrase = devices.create_code(session, max_uses=1, lifetime=timedelta(hours=1))
     assert client.post("/api/devices", json={"code": phrase}).status_code == 201
     assert client.post("/api/devices", json={"code": phrase}).status_code == 400
     client.app.add_api_route("/api/needs-a-device", needs_a_device)  # ty: ignore[unresolved-attribute]
@@ -278,11 +276,13 @@ def rolled_back(recorded: Recorded, session: Session) -> Iterator[Recorded]:
     for every later test."""
     client = recorded[0]
     overrides = client.app.dependency_overrides  # ty: ignore[unresolved-attribute]
-    overrides[get_session] = sessions_of(session)
+    added = on_session(session)
+    overrides |= added
     try:
         yield recorded
     finally:
-        overrides.pop(get_session)
+        for dependency in added:
+            overrides.pop(dependency)
         client.cookies.clear()
 
 
@@ -354,12 +354,12 @@ def needs_a_device(device: RegisteredDevice) -> int:
     return device.id
 
 
-def test_counts_batches_written_replayed_and_refused(recorded: Recorded) -> None:
-    client, _, reader, _ = recorded
-    engine = client.app.state.engine  # ty: ignore[unresolved-attribute]
-    with Session(engine, expire_on_commit=False) as session, session.begin():
-        place = Place(session)
-        _, token = new_device(session)
+def test_counts_batches_written_replayed_and_refused(
+    rolled_back: Recorded, session: Session
+) -> None:
+    client, _, reader, _ = rolled_back
+    place = Place(session)
+    _, token = new_device(session)
     client.cookies.set(devices.COOKIE, token)
     batch = place.batch()
     assert client.post("/api/transactions", json=batch).status_code == 201
