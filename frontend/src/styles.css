@@ -295,11 +295,10 @@
 }
 
 /*
- * Printing a sheet of QR codes (inventory-tng-8i4.61). A page with a
+ * Printing a QR code (inventory-tng-8i4.61, 8i4.60.9). A page with a
  * .printable, a child of its main, prints only that .printable's
- * .print-sheet, black on white, set by the radio buttons in it: layout
- * (poster: the first of its four identical .print-cards; cards: all four)
- * and paper (letter, a4). Other pages print as they are.
+ * .print-sheet, black on white, on the paper its radio buttons name
+ * (letter, a4). Other pages print as they are.
  */
 @page letter {
   size: letter;
@@ -336,8 +335,9 @@
       }
     }
 
+    /* Long words wrap: a label may be a pasted link. */
     .print-sheet {
-      @apply block bg-white text-center text-black;
+      @apply block text-center text-lg wrap-anywhere;
       page: letter;
     }
 
@@ -345,11 +345,7 @@
       page: a4;
     }
 
-    .print-card {
-      @apply break-inside-avoid text-lg;
-    }
-
-    .print-card .qr svg {
+    .print-sheet .qr svg {
       @apply mx-auto w-[5in];
     }
 
@@ -359,38 +355,6 @@
 
     .print-small {
       @apply text-sm;
-    }
-
-    .print-card:not(:first-child) {
-      @apply hidden;
-    }
-
-    /* Four cards, two by two, each a quarter of the page. */
-    .printable:has(input[name="layout"][value="cards"]:checked) {
-      & .print-sheet {
-        @apply grid grid-cols-2 gap-[0.4in];
-      }
-
-      & .print-card {
-        @apply block text-sm;
-      }
-
-      & .print-card p {
-        @apply my-1.5;
-      }
-
-      & .print-card .qr svg {
-        @apply w-[2in];
-      }
-
-      & .print-title {
-        @apply text-base;
-      }
-
-      /* However long a label, four still fit a page. */
-      & .print-label {
-        @apply max-h-[2lh] overflow-hidden;
-      }
     }
   }
 }

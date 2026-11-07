@@ -35,9 +35,9 @@ def test_making_a_code_shows_it_once(
     assert "Shown only now." in page
     assert "<svg" in page
     assert f"/register?code={phrase}" in page
-    # Ready to print: four cards, each with where to type the phrase.
-    assert page.count('class="print-card"') == 4
-    assert page.count("://testserver/register</strong>") == 4
+    # Ready to print: one sheet, with where to type the phrase.
+    assert page.count('class="print-sheet"') == 1
+    assert page.count("://testserver/register</strong>") == 1
     code = session.scalars(select(RegistrationCode)).one()
     assert (code.label, code.max_uses) == ("Open day", 2)
     assert (history(session, "registration_code", code.id)[0].actor or "").startswith(
@@ -69,6 +69,7 @@ def test_limits_on_a_code(admin_client: TestClient) -> None:
         ({"uses": "0"}, "From 1 to 500 devices."),
         ({"uses": "many"}, "From 1 to 500 devices."),
         ({"days": "91"}, "From 1 to 90 days."),
+        ({"label": "x" * 201}, "Up to 200 characters."),
     ):
         refused, _ = make_code(admin_client, **form)
         assert refused.status_code == 400

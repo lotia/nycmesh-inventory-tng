@@ -10,6 +10,7 @@ someone remote. Making one asks for a fresh code.</p>
   <form method="post" action="{{ codes_path }}">
     <label>What it's for <span class="hint">optional, such as "Hub open day"</span>
       <input name="label" value="{{ values.get('label', '') }}" maxlength="{{ name_max }}">
+      {% with name = "label" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <label>Devices it may register <span class="hint">keep it small</span>
       <input name="uses" type="number" min="1" max="{{ max_uses }}" value="{{ values.get('uses', '1') }}" required>

@@ -1,6 +1,6 @@
 /**
- * A registration code prints cleanly (inventory-tng-8i4.61): only the sheet,
- * as a poster or four cards, on US Letter or A4.
+ * A registration code prints cleanly (inventory-tng-8i4.61, 8i4.60.9): only
+ * the code, one to a page, on US Letter or A4.
  */
 import { expect, type Page, test } from "@playwright/test";
 import { prepared } from "./prepared";
@@ -20,30 +20,23 @@ async function makeCode(page: Page, label = "Hub open day"): Promise<void> {
   await expect(made).toBeVisible();
 }
 
-const cards = (page: Page) =>
-  page.locator(".print-card").filter({ visible: true });
+const sheet = (page: Page) =>
+  page.locator(".print-sheet").filter({ visible: true });
 
 async function qrWidth(page: Page): Promise<number | undefined> {
-  return (await cards(page).first().locator("svg").boundingBox())?.width;
+  return (await sheet(page).locator("svg").boundingBox())?.width;
 }
 
-test("printing shows only the sheet: a poster, or four cards", async ({
-  page,
-}) => {
+test("printing shows only the sheet: the code, large", async ({ page }) => {
   await makeCode(page);
-  await expect(cards(page)).toHaveCount(0);
+  await expect(sheet(page)).toHaveCount(0);
   await page.emulateMedia({ media: "print" });
   await expect(page.getByRole("banner")).toBeHidden();
   await expect(page.getByRole("button", { name: "Print" })).toBeHidden();
-  await expect(cards(page)).toHaveCount(1);
-  await expect(cards(page)).toContainText("Hub open day");
-  // A poster's code is large, a card's smaller: 96 pixels to the inch.
+  await expect(sheet(page)).toHaveCount(1);
+  await expect(sheet(page)).toContainText("Hub open day");
+  // Five inches across: 96 pixels to the inch.
   expect(await qrWidth(page)).toBe(5 * 96);
-  await page.emulateMedia({ media: "screen" });
-  await page.getByLabel("Cards, four to a page").check();
-  await page.emulateMedia({ media: "print" });
-  await expect(cards(page)).toHaveCount(4);
-  expect(await qrWidth(page)).toBe(2 * 96);
 });
 
 /** The size of each page of a PDF, in points: one entry for each page. */
@@ -59,22 +52,26 @@ function pages(pdf: Buffer): string[] {
   );
 }
 
-test("each layout fits one page of each paper", async ({
-  page,
-  browserName,
-}) => {
+test("the code fits one page of each paper", async ({ page, browserName }) => {
   test.skip(browserName !== "chromium", "only Chromium prints to PDF");
   // As long a label as an administrator might type.
   await makeCode(page, "A label ".repeat(40));
   const sizes = { "US Letter": "612x792", A4: "595x842" };
   for (const [paper, size] of Object.entries(sizes)) {
-    for (const layout of ["A poster, one to a page", "Cards, four to a page"]) {
-      await page.getByLabel(paper).check();
-      await page.getByLabel(layout).check();
-      const pdf = await page.pdf({ preferCSSPageSize: true });
-      expect(pages(pdf), `${layout}, on ${paper}`).toEqual([size]);
-    }
+    await page.getByLabel(paper).check();
+    const pdf = await page.pdf({ preferCSSPageSize: true });
+    expect(pages(pdf), paper).toEqual([size]);
   }
+});
+
+test("a long label with no spaces wraps on the page", async ({ page }) => {
+  await makeCode(page, "x".repeat(200));
+  await page.emulateMedia({ media: "print" });
+  const label = sheet(page).getByText("x".repeat(200));
+  const wide = await label.evaluate(
+    (element) => element.scrollWidth > element.clientWidth,
+  );
+  expect(wide).toBe(false);
 });
 
 test("a page with nothing to print prints as it is", async ({ page }) => {
