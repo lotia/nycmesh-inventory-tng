@@ -25,7 +25,7 @@ from inventory_tng.admin.common import (
     rule_words,
 )
 from inventory_tng.db import DbSession, attempt
-from inventory_tng.models import Location, Volunteer
+from inventory_tng.models import STORE_KINDS, Location, Volunteer
 from inventory_tng.pages import not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
@@ -61,8 +61,7 @@ def _parents(current: list[Location], moving: Location | None = None) -> list[Lo
     return [
         location
         for location in current
-        if location.kind in {"store", "area"}
-        and (moving is None or location.id != moving.id)
+        if location.kind in STORE_KINDS and (moving is None or location.id != moving.id)
     ]
 
 

@@ -48,6 +48,7 @@ from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
 from inventory_tng.models import (
     INTEGER_MAX,
     QUANTITY,
+    STORE_KINDS,
     Item,
     LedgerTransaction,
     Location,
@@ -69,6 +70,34 @@ balance = Table(
     Column("location_id", Integer),
     Column("quantity", QUANTITY),
 )
+
+
+# Less than nothing at a place: the records are wrong there until it is
+# counted (docs/decisions/0003).
+SHORT = balance.c.quantity < 0
+
+
+def in_stores(items: Select[int]) -> Select[int, Decimal, bool]:
+    """Each of `items`' stock across the current stores and their areas,
+    and whether any of it is SHORT there. The ids go to the view as arrays,
+    as in retired_in_stock, so only those balances are summed."""
+    places = func.array(
+        select(Location.id)
+        .where(Location.kind.in_(STORE_KINDS), Location.retired_at.is_(None))
+        .scalar_subquery()
+    )
+    return (
+        select(
+            balance.c.item_id,
+            func.sum(balance.c.quantity).label("total"),
+            func.bool_or(SHORT).label("short"),
+        )
+        .where(
+            balance.c.item_id == any_(func.array(items.scalar_subquery())),
+            balance.c.location_id == any_(places),
+        )
+        .group_by(balance.c.item_id)
+    )
 
 
 def retired_in_stock() -> Select[tuple[int]]:

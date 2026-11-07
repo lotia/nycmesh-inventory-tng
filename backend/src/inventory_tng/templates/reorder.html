@@ -1,0 +1,25 @@
+{% extends "admin_base.html" %}
+{% from "_table.html" import table %}
+{% block main %}
+{% include "_stock_views.html" %}
+<p class="hint">Items whose stock in the stores, across their areas, is at or
+below the level to reorder at. An item without one, set on its page, is never
+listed.</p>
+{% call table() %}
+  <tr><th>Item</th><th>In the stores</th><th>Reorder at</th></tr>
+  {% for row in rows %}
+  <tr>
+    <td><a href="{{ items_path }}/{{ row.item.id }}">{{ row.item.name }}</a></td>
+    <td>{{ row.in_stores | amount }} {{ row.item.unit }}{% if row.count_first %} <strong>count first</strong>{% endif %}</td>
+    <td>{{ row.item.minimum | amount }} {{ row.item.unit }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="3">Nothing is at or below its level.</td></tr>
+  {% endfor %}
+{% endcall %}
+{% if any_short %}
+<p class="hint">Count first: somewhere in the stores shows less than nothing
+of it, so the total is not to be trusted until it is counted
+(<a href="{{ needs_counting_path }}">Needs counting</a>).</p>
+{% endif %}
+{% endblock %}
