@@ -1022,8 +1022,7 @@ def recover(
 MADE_LINK_LIFETIME = timedelta(hours=24)
 
 
-# Why reset_admin_sign_in or invite refused. retire_admin and restore_admin
-# report theirs as what they return.
+# Why an invite, or an action on another administrator, was refused.
 AdminRefusal = Literal["not_found", "themselves"]
 
 
@@ -1031,6 +1030,18 @@ class AdminRefused(Exception):
     def __init__(self, reason: AdminRefusal) -> None:
         super().__init__(reason)
         self.reason: AdminRefusal = reason
+
+
+def _refuse_action(
+    reason: AdminRefusal, by_admin_id: int, target_admin_id: int | None = None
+) -> NoReturn:
+    log.info(
+        "administrator action refused",
+        reason=reason,
+        by_admin_id=by_admin_id,
+        target_admin_id=target_admin_id,
+    )
+    raise AdminRefused(reason)
 
 
 sign_in_resets = meter.create_counter(
@@ -1090,11 +1101,7 @@ def reset_admin_sign_in(
     """Reset another administrator's sign-in (_reset_sign_in): never one's
     own, which the account page changes. Returns them, the link and its
     kind. Raises AdminRefused."""
-    if admin_id == by_admin_id:
-        raise AdminRefused("themselves")
     admin = _locked_other(session, admin_id, by_admin_id, retired=False)
-    if admin is None:
-        raise AdminRefused("not_found")
     token, kind = _reset_sign_in(session, admin.id, by_admin_id, now, action="reset")
     return admin, token, kind
 
@@ -1108,7 +1115,7 @@ def invite(
     taken is an IntegrityError on flush; AdminRefused if the one inviting was
     retired meanwhile."""
     if not lock_admins(session, made_by_id):
-        raise AdminRefused("not_found")
+        _refuse_action("not_found", made_by_id)
     admin = Admin(username=username, email=email or None)
     session.add(admin)
     session.flush()
@@ -1145,10 +1152,6 @@ def admins_who_can_sign_in(session: Session) -> int:
     )
 
 
-# not_found covers the one acting no longer able to sign in, too.
-Retirement = Literal["retired", "not_found", "themselves"]
-
-
 def lock_admin(session: Session, admin_id: int) -> None:
     """Lock one administrator's row, before anything else of theirs is
     locked, as lock_admins does for them all. FOR NO KEY UPDATE
@@ -1180,29 +1183,28 @@ def lock_admins(session: Session, by_admin_id: int) -> bool:
 
 def _locked_other(
     session: Session, admin_id: int, by_admin_id: int, *, retired: bool
-) -> Admin | None:
-    """Under the administrators lock (lock_admins), the administrator to
-    act on, retired or current as asked; None if there is none, or the one
-    acting can no longer sign in."""
+) -> Admin:
+    """Under the administrators lock (lock_admins), the other administrator
+    to act on, retired or current as asked. AdminRefused: 'themselves' for
+    oneself, which only a current administrator can be; 'not_found' if
+    there is none, or the one acting can no longer sign in."""
+    if admin_id == by_admin_id:
+        _refuse_action("themselves", by_admin_id, admin_id)
     if not lock_admins(session, by_admin_id):
-        return None
+        _refuse_action("not_found", by_admin_id, admin_id)
     admin = session.get(Admin, admin_id)
     if admin is None or (admin.retired_at is not None) != retired:
-        return None
+        _refuse_action("not_found", by_admin_id, admin_id)
     return admin
 
 
 def retire_admin(
     session: Session, admin_id: int, by_admin_id: int, now: datetime
-) -> Retirement:
+) -> None:
     """Retire another administrator, ending their sessions and any reset
     link. Never oneself; someone who can sign in always remains
-    (lock_admins)."""
-    if admin_id == by_admin_id:
-        return "themselves"
+    (lock_admins). Raises AdminRefused."""
     admin = _locked_other(session, admin_id, by_admin_id, retired=False)
-    if admin is None:
-        return "not_found"
     admin.retired_at = now
     ended = end_sessions(session, admin.id, now)
     void_reset_links(session, admin.id, now)
@@ -1212,20 +1214,16 @@ def retire_admin(
         by_admin_id=by_admin_id,
         sessions_ended=ended,
     )
-    return "retired"
 
 
 def restore_admin(
     session: Session, admin_id: int, by_admin_id: int, now: datetime
-) -> tuple[Admin, str, Literal["invite", "reset"]] | None:
+) -> tuple[Admin, str, Literal["invite", "reset"]]:
     """Bring a retired administrator back with their sign-in reset
     (_reset_sign_in), whatever they were retired for: a stolen password or
     phone never works again because the account came back. Returns them,
-    the link to pass on and its kind; None if there is none to bring back,
-    or the one acting can no longer sign in."""
+    the link to pass on and its kind. Raises AdminRefused."""
     admin = _locked_other(session, admin_id, by_admin_id, retired=True)
-    if admin is None:
-        return None
     admin.retired_at = None
     token, kind = _reset_sign_in(session, admin.id, by_admin_id, now, action="restore")
     log.info(

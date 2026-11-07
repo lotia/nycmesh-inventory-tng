@@ -140,6 +140,20 @@ def _reset_made(
     return _link_page(request, signed, other, token, kind, brought_back=brought_back)
 
 
+def _refused(
+    request: Request,
+    session: Session,
+    signed: SignedIn,
+    refused: accounts.AdminRefused,
+    own: str,
+) -> Response:
+    """Not found, or their own page saying `own` (as they acted on
+    themselves)."""
+    if refused.reason == "not_found":
+        return not_found()
+    return _admin_page(request, session, signed, signed.admin, own)
+
+
 @router.get(ADMINS)
 def admins(request: Request, signed: AdminSignedIn, session: DbSession) -> Response:
     return _list_page(request, session, signed)
@@ -199,17 +213,12 @@ def reset(
     notify: Notify,
     admin_id: int,
 ) -> Response:
-    other = session.get(Admin, admin_id)
-    if other is None:
-        return not_found()
     try:
         other, token, kind = accounts.reset_admin_sign_in(
             session, admin_id, signed.admin.id, now()
         )
     except accounts.AdminRefused as refused:
-        if refused.reason == "not_found":
-            return not_found()
-        return _admin_page(request, session, signed, other, OWN_RESET)
+        return _refused(request, session, signed, refused, OWN_RESET)
     changed(signed, session)
     return _reset_made(request, signed, notify, other, token, kind)
 
@@ -218,12 +227,10 @@ def reset(
 def retire(
     request: Request, signed: ConfirmedAdmin, session: DbSession, admin_id: int
 ) -> Response:
-    outcome = accounts.retire_admin(session, admin_id, signed.admin.id, now())
-    if outcome == "not_found":
-        return not_found()
-    if outcome == "themselves":
-        other = session.get_one(Admin, admin_id)
-        return _admin_page(request, session, signed, other, OWN_RETIRE)
+    try:
+        accounts.retire_admin(session, admin_id, signed.admin.id, now())
+    except accounts.AdminRefused as refused:
+        return _refused(request, session, signed, refused, OWN_RETIRE)
     changed(signed, session)
     return redirect(ADMINS, notice="admin_retired")
 
@@ -236,8 +243,9 @@ def restore(
     notify: Notify,
     admin_id: int,
 ) -> Response:
-    restored = accounts.restore_admin(session, admin_id, signed.admin.id, now())
-    if restored is None:
+    try:
+        restored = accounts.restore_admin(session, admin_id, signed.admin.id, now())
+    except accounts.AdminRefused:
         return not_found()
     changed(signed, session)
     return _reset_made(request, signed, notify, *restored, brought_back=True)

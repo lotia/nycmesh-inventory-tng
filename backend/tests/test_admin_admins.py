@@ -207,11 +207,21 @@ def test_an_administrator_retired_meanwhile_retires_nobody(
     carol, _ = new_admin(session, "carol")
     me.retired_at = datetime.now(UTC)
     session.flush()
-    assert accounts.retire_admin(session, ben.id, me.id, datetime.now(UTC)) == (
-        "not_found"
-    )
+    with pytest.raises(accounts.AdminRefused, match="not_found"):
+        accounts.retire_admin(session, ben.id, me.id, datetime.now(UTC))
     assert ben.retired_at is None
     assert carol.retired_at is None
+
+
+def test_retiring_or_bringing_back_one_there_is_not_is_not_found(
+    admin_client: TestClient, session: Session
+) -> None:
+    current, _ = new_admin(session, "ben")
+    assert admin_client.post(f"{ADMINS}/999999/retire").status_code == 404
+    # Bringing back one who is not retired finds nobody to bring back.
+    assert admin_client.post(f"{ADMINS}/{current.id}/restore").status_code == 404
+    assert current.retired_at is None
+    assert accounts.has_password(session, current.id)
 
 
 def test_nobody_retires_themselves(admin_client: TestClient, session: Session) -> None:
@@ -229,11 +239,14 @@ def test_one_who_cannot_sign_in_changes_nobody(session: Session) -> None:
     carol, _ = new_admin(session, "carol")
     now = datetime.now(UTC)
     grace, _ = accounts.invite(session, "grace", None, ada.id, now)
-    assert accounts.retire_admin(session, ada.id, grace.id, now) == "not_found"
+    with pytest.raises(accounts.AdminRefused, match="not_found"):
+        accounts.retire_admin(session, ada.id, grace.id, now)
     carol.retired_at = now
     accounts.reset_admin_sign_in(session, ada.id, ben.id, now)
-    assert accounts.retire_admin(session, ben.id, ada.id, now) == "not_found"
-    assert accounts.restore_admin(session, carol.id, ada.id, now) is None
+    with pytest.raises(accounts.AdminRefused, match="not_found"):
+        accounts.retire_admin(session, ben.id, ada.id, now)
+    with pytest.raises(accounts.AdminRefused, match="not_found"):
+        accounts.restore_admin(session, carol.id, ada.id, now)
     with pytest.raises(accounts.AdminRefused):
         accounts.invite(session, "mallory", None, ada.id, now)
     # Two resetting each other at once: the second finds itself reset.
@@ -295,7 +308,8 @@ def test_bringing_one_back_voids_their_links(
 def test_only_a_retired_administrator_is_brought_back(session: Session) -> None:
     ada, _ = new_admin(session)
     ben, _ = new_admin(session, "ben")
-    assert accounts.restore_admin(session, ben.id, ada.id, datetime.now(UTC)) is None
+    with pytest.raises(accounts.AdminRefused, match="not_found"):
+        accounts.restore_admin(session, ben.id, ada.id, datetime.now(UTC))
     assert accounts.has_password(session, ben.id)
 
 
