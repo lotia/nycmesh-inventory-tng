@@ -18,7 +18,7 @@ from inventory_tng.admin.admins import ADMINS
 from inventory_tng.models import Admin, AdminSession
 
 from helpers.mail import SentMail
-from helpers.sign_in import code, new_admin, reset_link, sign_in_with, text
+from helpers.sign_in import code, new_admin, once, reset_link, sign_in_with, text
 
 NEW_PASSWORD = "a long passphrase of their own"
 
@@ -65,7 +65,7 @@ def test_inviting_an_administrator(
     _, key = new_admin(session)
     sign_in_with(admin_client, code=code(key))
     form = {"username": "grace", "email": "grace@example.org"}
-    made = admin_client.post(ADMINS, data=form)
+    made = admin_client.post(ADMINS, data=once(**form))
     assert made.status_code == 200
     assert made.headers["cache-control"] == "no-store"
     link = link_on(made.text)
@@ -99,7 +99,7 @@ def test_resetting_an_invite_replaces_its_link(
     me = admin_named(session, "ada")
     now = datetime.now(UTC)
     grace, first = accounts.invite(session, "grace", None, me.id, now)
-    made = admin_client.post(f"{ADMINS}/{grace.id}/reset")
+    made = admin_client.post(f"{ADMINS}/{grace.id}/reset", data=once())
     assert made.status_code == 200
     # Nothing to reset: a new invite, which tells them nothing changed.
     assert "they choose their password" in text(made)
@@ -118,7 +118,7 @@ def test_an_invite_by_one_who_can_no_longer_sign_in_is_not_found(
         raise accounts.AdminRefused("not_found")
 
     monkeypatch.setattr(accounts, "invite", refuse)
-    assert admin_client.post(ADMINS, data={"username": "grace"}).status_code == 404
+    assert admin_client.post(ADMINS, data=once(username="grace")).status_code == 404
 
 
 def test_an_invite_needs_a_free_username(
@@ -129,7 +129,7 @@ def test_an_invite_needs_a_free_username(
         ({"username": "two words"}, "Use 1 to 64"),
         ({"username": "grace", "email": "nope"}, "doesn't look like an email"),
     ):
-        refused = admin_client.post(ADMINS, data=form)
+        refused = admin_client.post(ADMINS, data=once(**form))
         assert refused.status_code == 400
         assert problem in text(refused)
 
@@ -149,7 +149,7 @@ def test_resetting_another_admins_sign_in(
     assert theirs.get(sign_in.HOME).status_code == 200
     emailed = accounts.emailed_reset(session, "ben", datetime.now(UTC))
     assert emailed is not None
-    made = client.post(f"{ADMINS}/{ben.id}/reset")
+    made = client.post(f"{ADMINS}/{ben.id}/reset", data=once())
     assert [m.kind for m in sent_mail] == ["reset_link_made"]
     assert theirs.get(sign_in.HOME).headers["location"].startswith(sign_in.SIGN_IN)
     now = datetime.now(UTC)
@@ -162,7 +162,7 @@ def test_your_own_reset_is_on_your_account_page(
     admin_client: TestClient, session: Session
 ) -> None:
     me = admin_named(session, "ada")
-    refused = admin_client.post(f"{ADMINS}/{me.id}/reset")
+    refused = admin_client.post(f"{ADMINS}/{me.id}/reset", data=once())
     assert "Change your own on your account page." in text(refused)
 
 
@@ -191,7 +191,7 @@ def test_bringing_one_back_resets_their_sign_in(
     ben, ben_key = new_admin(session, "ben", email="ben@example.org")
     accounts.make_recovery_codes(session, ben.id, datetime.now(UTC))
     assert admin_client.post(f"{ADMINS}/{ben.id}/retire").status_code == 303
-    made = admin_client.post(f"{ADMINS}/{ben.id}/restore")
+    made = admin_client.post(f"{ADMINS}/{ben.id}/restore", data=once())
     assert "Brought back." in text(made)
     assert "Their sign-in is reset" in text(made)
     assert ben.retired_at is None
@@ -219,11 +219,16 @@ def test_retiring_or_bringing_back_one_there_is_not_is_not_found(
 ) -> None:
     current, _ = new_admin(session, "ben")
     assert admin_client.post(f"{ADMINS}/999999/retire").status_code == 404
-    assert admin_client.post(f"{ADMINS}/999999/reset").status_code == 404
+    assert admin_client.post(f"{ADMINS}/999999/reset", data=once()).status_code == 404
     me = admin_named(session, "ada")
-    assert admin_client.post(f"{ADMINS}/{me.id}/restore").status_code == 404
+    assert (
+        admin_client.post(f"{ADMINS}/{me.id}/restore", data=once()).status_code == 404
+    )
     # Bringing back one who is not retired finds nobody to bring back.
-    assert admin_client.post(f"{ADMINS}/{current.id}/restore").status_code == 404
+    assert (
+        admin_client.post(f"{ADMINS}/{current.id}/restore", data=once()).status_code
+        == 404
+    )
     assert current.retired_at is None
     assert accounts.has_password(session, current.id)
 
@@ -282,7 +287,7 @@ def test_changes_here_ask_for_a_fresh_code(
         row.confirmed_at = datetime.now(UTC) - timedelta(hours=2)
         row.last_sensitive_at = None
     session.flush()
-    asked = admin_client.post(ADMINS, data={"username": "grace"})
+    asked = admin_client.post(ADMINS, data=once(username="grace"))
     assert asked.status_code == 403
     assert (
         session.scalars(select(Admin).where(Admin.username == "grace")).first() is None
@@ -312,7 +317,9 @@ def test_bringing_one_back_voids_their_links(
     token = reset_link(session, ben)
     ben.retired_at = now
     session.flush()
-    assert admin_client.post(f"{ADMINS}/{ben.id}/restore").status_code == 200
+    assert (
+        admin_client.post(f"{ADMINS}/{ben.id}/restore", data=once()).status_code == 200
+    )
     assert accounts.find_reset_link(session, token, now) is None
 
 
@@ -332,7 +339,7 @@ def test_bringing_back_an_invite_invites_them_again(
     grace, _ = accounts.invite(session, "grace", None, me.id, now)
     grace.retired_at = now
     session.flush()
-    made = admin_client.post(f"{ADMINS}/{grace.id}/restore")
+    made = admin_client.post(f"{ADMINS}/{grace.id}/restore", data=once())
     assert "Brought back." in text(made)
     assert "they choose their password" in text(made)
     assert "Their sign-in is reset" not in text(made)

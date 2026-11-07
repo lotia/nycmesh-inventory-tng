@@ -72,6 +72,7 @@
   <p>{{ recovery_codes_left }} left{% if recovery_codes_left < 4 %}: make new ones
   soon{% endif %}. Making new ones voids the old.</p>
   <form method="post" action="{{ paths.account }}/recovery-codes">
+    {{ once_field() }}
     <button>Make new recovery codes</button>
   </form>
 </section>

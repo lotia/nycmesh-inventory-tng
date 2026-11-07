@@ -1,0 +1,8 @@
+{#- A form that makes something shown only once, sent again (once.py). #}
+{% extends "admin_base.html" %}
+{% block main %}
+<p>That form was already sent, and made {{ made }}, shown then. Nothing new
+was made. It can't be shown again: Back and Forward don't keep it.</p>
+<p><a href="{{ back }}">Go back</a>, and make another there if you need
+one.</p>
+{% endblock %}

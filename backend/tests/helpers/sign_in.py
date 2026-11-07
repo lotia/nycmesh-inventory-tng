@@ -1,6 +1,7 @@
 """Administrators, and signing them in."""
 
 import html
+import uuid
 from datetime import UTC, datetime
 
 import pyotp
@@ -23,6 +24,12 @@ _GROUP = f"[A-Z0-9]{{{accounts.RECOVERY_CODE_GROUP}}}"
 _MORE = accounts.RECOVERY_CODE_LENGTH // accounts.RECOVERY_CODE_GROUP - 1
 RECOVERY_CODE = rf"<li>({_GROUP}(?:-{_GROUP}){{{_MORE}}})</li>"
 PASSWORD = "correct horse battery staple"
+
+
+def once(**form: str) -> dict[str, str]:
+    """A form that makes something shown once, with the new key its page
+    gives it (once.py)."""
+    return {"once": str(uuid.uuid4())} | form
 
 
 def new_admin(

@@ -6,8 +6,9 @@ Every mapped class registers here; migrations/env.py imports this module, so
 autogenerate sees every table.
 
 Conventions, on every table but the ledger's, which is append-only and is its
-own history (LedgerTransaction), and administrators' sessions, which change
-on every request and are only ever ended (AdminSession):
+own history (LedgerTransaction), forms already sent, which are only added to
+(SentForm), and administrators' sessions, which change on every request and
+are only ever ended (AdminSession):
 
 - An integer id and `created_at`, set by the database.
 - Nothing is deleted. A row is retired (`retired_at`; NULL means current) and
@@ -730,3 +731,15 @@ class AdjustmentReason(Base):
     created_at: Mapped[CreatedAt]
     name: Mapped[str] = mapped_column(Text)
     retired_at: Mapped[RetiredAt]
+
+
+class SentForm(Base):
+    """A form that makes something shown only once, by the key it was shown
+    with (once.py), so sending it again makes nothing. Only ever added to,
+    so it is its own history, as the ledger is."""
+
+    __tablename__ = "sent_form"
+
+    id: Mapped[IntId]
+    created_at: Mapped[CreatedAt]
+    key: Mapped[uuid.UUID] = mapped_column(unique=True)

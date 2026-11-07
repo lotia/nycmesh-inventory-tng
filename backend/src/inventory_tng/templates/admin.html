@@ -16,6 +16,7 @@
   link to pass on, which works once, within a day, for them to choose a new
   password.</p>
   <form method="post" action="{{ here }}/reset" class="actions">
+    {{ once_field() }}
     <button>Reset their sign-in</button>
   </form>
 </section>
@@ -27,7 +28,7 @@ get a link to pass on.</p>
 {% endif %}
 <section class="actions">
   {% if other.retired_at %}
-  <form method="post" action="{{ here }}/restore"><button>Bring back</button></form>
+  <form method="post" action="{{ here }}/restore">{{ once_field() }}<button>Bring back</button></form>
   {% elif not themselves %}
   <form method="post" action="{{ here }}/retire"><button>Retire</button></form>
   {% endif %}

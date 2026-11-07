@@ -24,6 +24,7 @@ from helpers.sign_in import (
     RECOVERY_CODE,
     code,
     new_admin,
+    once,
     other_session,
     policy,
     reset_link,
@@ -209,7 +210,7 @@ def test_new_recovery_codes(
     session: Session,
     ada: tuple[Admin, str],
 ) -> None:
-    made = client.post(f"{ACCOUNT}/recovery-codes")
+    made = client.post(f"{ACCOUNT}/recovery-codes", data=once())
     codes = re.findall(RECOVERY_CODE, made.text)
     assert len(codes) == accounts.RECOVERY_CODES
     assert made.headers["cache-control"] == "no-store"
