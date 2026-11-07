@@ -21,6 +21,7 @@ from inventory_tng.admin.common import ADMINS, admin_page, now, rule_words, site
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.mail import Notify
 from inventory_tng.models import Admin
+from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import (
     RESET,
@@ -167,6 +168,7 @@ def invite(
     notify: Notify,
     username: Annotated[str, Form()] = "",
     email: Annotated[str, Form()] = "",
+    once: OnceKey = "",
 ) -> Response:
     username, email = username.strip(), email.strip()
     problems = {}
@@ -181,6 +183,10 @@ def invite(
             accounts.invite(session, username, email, signed.admin.id, now())
         )
 
+    if not problems and (
+        again := sent_before(request, session, signed, once, "link", ADMINS)
+    ):
+        return again
     try:
         if not problems and (broken := attempt(session, make)):
             problems["username"] = rule_words(broken, TAKEN)
@@ -212,7 +218,12 @@ def reset(
     session: DbSession,
     notify: Notify,
     admin_id: int,
+    once: OnceKey = "",
 ) -> Response:
+    if again := sent_before(
+        request, session, signed, once, "link", f"{ADMINS}/{admin_id}"
+    ):
+        return again
     try:
         other, token, kind = accounts.reset_admin_sign_in(
             session, admin_id, signed.admin.id, now()
@@ -242,7 +253,12 @@ def restore(
     session: DbSession,
     notify: Notify,
     admin_id: int,
+    once: OnceKey = "",
 ) -> Response:
+    if again := sent_before(
+        request, session, signed, once, "link", f"{ADMINS}/{admin_id}"
+    ):
+        return again
     try:
         restored = accounts.restore_admin(session, admin_id, signed.admin.id, now())
     except accounts.AdminRefused:

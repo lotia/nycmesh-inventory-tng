@@ -15,6 +15,7 @@ none of these is a unit test; each is marked with what it tests:
 CONTRIBUTING.md says how to run or skip a kind.
 """
 
+import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import cast
@@ -29,6 +30,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, mail, sign_in
+from inventory_tng.admin.admins import ADMINS
 from inventory_tng.admin.common import locked_row
 from inventory_tng.admin.volunteers import VOLUNTEERS
 from inventory_tng.db import (
@@ -47,6 +49,7 @@ from inventory_tng.models import (
     Category,
     Item,
     Location,
+    SentForm,
     SignInSettings,
     Volunteer,
 )
@@ -947,3 +950,41 @@ def test_ending_custody_waits_for_a_save_into_it(
     saving.commit()
     answer = cast(Answer, worker.finished().result)
     assert answer.status_code == 303
+
+
+def inviting(client: TestClient, key: str, username: str) -> Answer:
+    return client.post(ADMINS, data={"once": key, "username": username})
+
+
+@pytest.mark.end_to_end
+def test_a_form_refused_after_its_key_is_spent_can_be_sent_again(
+    committed: Committed, admins: Admins, real_client: tuple[TestClient, SentMail]
+) -> None:
+    """A taken username is found after the key is spent: refused without a
+    commit, nothing is kept, so the same form, put right, goes through
+    (once.py, inventory-tng-8i4.74)."""
+    client, _ = real_client
+    signed_in_as_ben(committed, client, admins[2])
+    key = str(uuid.uuid4())
+    assert inviting(client, key, "ADA").status_code == 400
+    assert inviting(client, key, "grace").status_code == 200
+    assert inviting(client, key, "grace").status_code == 409
+
+
+@pytest.mark.concurrency
+def test_a_form_sent_twice_at_once_waits_then_makes_nothing(
+    committed: Committed, admins: Admins, real_client: tuple[TestClient, SentMail]
+) -> None:
+    client, _ = real_client
+    signed_in_as_ben(committed, client, admins[2])
+    key = uuid.uuid4()
+    first = committed.session()
+    first.add(SentForm(key=key))
+    first.flush()
+    worker = committed.blocked(None, lambda: inviting(client, str(key), "grace"))
+    first.commit()
+    assert cast(Answer, worker.finished().result).status_code == 409
+    assert (
+        committed.session().scalar(select(Admin.id).where(Admin.username == "grace"))
+        is None
+    )

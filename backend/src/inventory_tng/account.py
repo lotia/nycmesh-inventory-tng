@@ -16,6 +16,7 @@ from inventory_tng import accounts, mail
 from inventory_tng.db import DbSession, unique
 from inventory_tng.local_time import site_zone
 from inventory_tng.mail import Notify
+from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, page, redirect
 from inventory_tng.sign_in import (
     ACCOUNT,
@@ -202,11 +203,16 @@ def remove_authenticator(
 
 @router.post(f"{ACCOUNT}/recovery-codes")
 def new_recovery_codes(
-    request: Request, signed: ConfirmedAdmin, session: DbSession
+    request: Request,
+    signed: ConfirmedAdmin,
+    session: DbSession,
+    once: OnceKey = "",
 ) -> Response:
     if not signed.uses_totp:
         problem = "Recovery codes come with an authenticator."
         return _refused(request, session, signed, "recovery_codes", problem)
+    if again := sent_before(request, session, signed, once, "recovery_codes", ACCOUNT):
+        return again
     codes = accounts.make_recovery_codes(session, signed.admin.id, _now())
     changed(signed, session)
     return page(

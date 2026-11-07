@@ -47,6 +47,7 @@ from inventory_tng.models import (
     Location,
     Movement,
 )
+from inventory_tng.once import form_key
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
@@ -66,13 +67,6 @@ NOTICES.update(
 )
 
 TextForm = Annotated[dict[str, str], Depends(text_form)]
-
-
-def _key(typed: str) -> uuid.UUID | None:
-    try:
-        return uuid.UUID(typed)
-    except ValueError:
-        return None
 
 
 def _items(session: Session) -> list[Item]:
@@ -285,7 +279,7 @@ def count(
     form: TextForm,
 ) -> Response:
     place = chosen(session, Location, str(location_id))
-    key = _key(form.get("key", ""))
+    key = form_key(form.get("key", ""))
     as_of = whole(form.get("as_of", ""), 0, INTEGER_MAX)
     if place is None or key is None or as_of is None:
         return not_found()
@@ -353,7 +347,7 @@ def adjust(
     reason = chosen(session, AdjustmentReason, form.get("reason_id", ""))
     if reason is None:
         problems["reason_id"] = "Pick a reason."
-    key = _key(form.get("key", ""))
+    key = form_key(form.get("key", ""))
     if key is None:
         problems["amount"] = "This form is out of date: try again."
     if (

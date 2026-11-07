@@ -15,13 +15,11 @@ from inventory_tng.admin.devices import CODES, DEVICES
 from inventory_tng.models import AdminSession, RegistrationCode
 
 from helpers.rows import history
-from helpers.sign_in import text
+from helpers.sign_in import once, text
 
 
 def make_code(client: TestClient, **form: str) -> tuple[Response, str]:
-    made = client.post(
-        CODES, data={"uses": "2", "days": "1", "label": "Open day"} | form
-    )
+    made = client.post(CODES, data=once(uses="2", days="1", label="Open day") | form)
     match = re.search(r'class="key">([a-z-]+)<', made.text)
     return made, match.group(1) if match else ""
 

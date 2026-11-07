@@ -20,6 +20,7 @@
   then set up an authenticator when they first sign in. It works once, within
   a day.</p>
   <form method="post" action="{{ here }}">
+    {{ once_field() }}
     <label>Username
       <input name="username" value="{{ values.get('username', '') }}" maxlength="{{ limits.username_max }}" required>
       {% with name = "username" %}{% include "_field_problem.html" %}{% endwith %}

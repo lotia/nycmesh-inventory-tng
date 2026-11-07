@@ -6,5 +6,6 @@ are not shown again.</strong></p>
 <ol class="codes">
   {% for code in codes %}<li>{{ code }}</li>{% endfor %}
 </ol>
+{% include "_shown_once.html" %}
 <p><a href="{{ paths.home }}">I've kept them: carry on</a></p>
 {% endblock %}

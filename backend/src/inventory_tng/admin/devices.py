@@ -27,6 +27,7 @@ from inventory_tng.admin.common import (
 from inventory_tng.db import DbSession
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import Device, RegistrationCode
+from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 
@@ -111,6 +112,7 @@ def make_code(
     uses: Annotated[str, Form()] = "1",
     days: Annotated[str, Form()] = "1",
     label: Annotated[str, Form()] = "",
+    once: OnceKey = "",
 ) -> Response:
     form = {"uses": uses, "days": days, "label": label}
     label = label.strip()
@@ -125,6 +127,10 @@ def make_code(
         problems["label"] = f"Up to {NAME_MAX} characters."
     if problems or max_uses is None or lifetime is None:
         return _list_page(request, session, signed, problems=problems, values=form)
+    if again := sent_before(
+        request, session, signed, once, "registration_code", DEVICES
+    ):
+        return again
     code, phrase = devices.create_code(
         session,
         max_uses=max_uses,

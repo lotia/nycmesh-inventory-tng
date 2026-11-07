@@ -9,5 +9,6 @@ password, authenticators and recovery codes no longer work.</p>
 yourself, in person or in a message only they read. It works once,
 within a day, and with it they choose {% if kind == "invite" %}their{% else %}a new{% endif %} password.</p>
 <p class="key">{{ link }}</p>
+{% include "_shown_once.html" %}
 <p><a href="{{ list }}">All administrators</a></p>
 {% endblock %}

@@ -8,6 +8,7 @@ someone remote. Making one asks for a fresh code.</p>
 <section>
   <h2>Make a registration code</h2>
   <form method="post" action="{{ codes_path }}">
+    {{ once_field() }}
     <label>What it's for <span class="hint">optional, such as "Hub open day"</span>
       <input name="label" value="{{ values.get('label', '') }}" maxlength="{{ name_max }}">
       {% with name = "label" %}{% include "_field_problem.html" %}{% endwith %}
