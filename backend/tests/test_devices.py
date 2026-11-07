@@ -19,6 +19,7 @@ from inventory_tng.logs import configure_logging
 from inventory_tng.models import CatalogueHistory, Device, RegistrationCode
 from inventory_tng.settings import LogConfig, Settings
 
+from helpers.concurrency import Committed
 from helpers.devices import ADDRESS, new_device
 
 
@@ -79,10 +80,11 @@ def device_history(session: Session, device_id: int) -> list[str]:
 
 
 @pytest.fixture
-def committed_cookie(engine: Engine) -> tuple[int, str]:
+def committed_cookie(committed: Committed) -> tuple[int, str]:
     """A device committed to the database, for what runs in a transaction of
-    its own, such as recording when it was last seen."""
-    with Session(engine) as session, session.begin():
+    its own, such as recording when it was last seen; deleted after the test
+    (conftest's committed), so later tests don't find it."""
+    with committed.session() as session, session.begin():
         device, token = new_device(session)
         device_id = device.id
     return device_id, token
@@ -318,12 +320,15 @@ def test_the_command_line_says_when_a_code_does_not_exist(
     assert registration_codes.main(["devices", "999999"]) == 1
 
 
+@pytest.mark.usefixtures("committed")
 def test_the_command_line_makes_a_code_that_registers(
     database_url: str,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     session: Session,
 ) -> None:
+    """The command commits its code; `committed` deletes it after, once
+    `session`, set up after it, has rolled back and let go of the code."""
     monkeypatch.setenv("DATABASE_URL", database_url)
     assert (
         registration_codes.main(

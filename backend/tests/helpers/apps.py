@@ -1,10 +1,12 @@
 """What an app under test is given."""
 
 from collections.abc import Callable, Iterator
+from contextlib import nullcontext
+from typing import Any
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import release_hold
+from inventory_tng.db import get_session, get_session_factory, release_hold
 
 
 def sessions_of(session: Session) -> Callable[[], Iterator[Session]]:
@@ -19,3 +21,12 @@ def sessions_of(session: Session) -> Callable[[], Iterator[Session]]:
             release_hold(session)
 
     return request_session
+
+
+def on_session(session: Session) -> dict[Callable[..., Any], Callable[..., Any]]:
+    """An app's dependency overrides that put its requests, and the work
+    after each reply, on the test's session, so they roll back with it."""
+    return {
+        get_session: sessions_of(session),
+        get_session_factory: lambda: lambda: nullcontext(session),
+    }

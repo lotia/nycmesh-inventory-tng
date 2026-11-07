@@ -111,6 +111,17 @@ def new_database(template: str | None = None) -> Generator[str]:
         drop_database(url)
 
 
+@contextmanager
+def migrated_engine(url: str) -> Generator[Engine]:
+    """An engine on the database at `url`, migrated, disposed afterwards."""
+    engine = make_engine(url)
+    try:
+        migrate(engine)
+        yield engine
+    finally:
+        engine.dispose()
+
+
 def migrate(engine: Engine) -> None:
     """Every migration, up to the newest."""
     with engine.begin() as connection:

@@ -3,10 +3,10 @@ server and dropped when the run ends. Each test's writes are rolled back."""
 
 import contextlib
 import dataclasses
+import functools
 import logging
 import os
 from collections.abc import Callable, Iterator
-from contextlib import nullcontext
 from pathlib import Path
 
 import argon2.profiles
@@ -16,7 +16,7 @@ from alembic.config import Config
 from argon2 import PasswordHasher
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import Connection, Engine, event, exc, text
+from sqlalchemy import Connection, Engine, TextClause, event, exc, text
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session
 
@@ -24,8 +24,6 @@ from inventory_tng import accounts, devices, local_env
 from inventory_tng.app import create_app
 from inventory_tng.db import (
     Base,
-    get_session,
-    get_session_factory,
     make_engine,
     run_outside_transaction,
 )
@@ -42,7 +40,7 @@ from databases import (
     drop_database,
     migrate,
 )
-from helpers.apps import sessions_of
+from helpers.apps import on_session
 from helpers.concurrency import Committed
 from helpers.devices import new_device
 from helpers.mail import SITE_MAIL, SentMail
@@ -188,6 +186,55 @@ def _newest_ids(connection: Connection) -> dict[str, int]:
     }
 
 
+@functools.cache
+def _fingerprint_query(engine: Engine) -> TextClause:
+    """One query for every table's fingerprint (PostgreSQL's md5 of all its
+    rows, in order), built once per run, as the schema doesn't change
+    between tests. Every table in it, alembic_version too, not only the
+    models'."""
+    with engine.connect() as connection:
+        tables = connection.scalars(
+            text(
+                "SELECT table_name FROM information_schema.tables"
+                " WHERE table_schema = current_schema() AND table_type = 'BASE TABLE'"
+            )
+        ).all()
+    return text(
+        " UNION ALL ".join(
+            f"SELECT '{name}', md5(coalesce("
+            f"string_agg(t::text, ',' ORDER BY t::text), '')) FROM \"{name}\" t"
+            for name in tables
+        )
+    )
+
+
+def _fingerprints(engine: Engine) -> dict[str, str]:
+    """Every table's fingerprint: any row added, changed or deleted changes
+    its table's."""
+    with engine.connect() as connection:
+        return dict(connection.execute(_fingerprint_query(engine)).all())
+
+
+@pytest.fixture(autouse=True)
+def leaves_the_database_as_it_was(request: pytest.FixtureRequest) -> Iterator[None]:
+    """Each test that uses the database leaves it as it found it, so no test
+    depends on another, or on their order. One that commits rows nothing
+    cleans up fails here, itself, rather than a later test that happens to
+    count them. Autouse, so set up before the test's other fixtures and torn
+    down after them (the session's rollback, committed's cleanup). A test
+    that takes database_url gets the run's database migrated (engine), as
+    the check needs. Module-scoped fixtures are outside what it sees."""
+    if "database_url" not in request.fixturenames:
+        yield
+        return
+    engine: Engine = request.getfixturevalue("engine")
+    before = _fingerprints(engine)
+    yield
+    after = _fingerprints(engine)
+    if changed := sorted(name for name in before if before[name] != after[name]):
+        pytest.fail(f"the test left rows behind in {changed}", pytrace=False)
+
+
 # Names these sessions' connections, so cleanup can end any left waiting.
 COMMITTED_APP = "inventory-tng-committed-test"
 
@@ -295,13 +342,7 @@ def make_app(
         if own_sessions:
             event.listen(app.state.engine, "connect", _wait_briefly)
             return app
-        used = on or session
-        app.dependency_overrides[get_session] = sessions_of(used)
-        # Work after the reply uses the same session, so it is rolled back
-        # (or cleaned up) with the rest.
-        app.dependency_overrides[get_session_factory] = lambda: (
-            lambda: nullcontext(used)
-        )
+        app.dependency_overrides |= on_session(on or session)
         return app
 
     return make

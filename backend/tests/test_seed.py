@@ -15,7 +15,7 @@ from inventory_tng.db import make_engine
 from inventory_tng.ledger import expected
 from inventory_tng.models import Admin, AdminPassword, Item, Location, Volunteer
 
-from databases import NO_DATABASE, migrate, new_database
+from databases import NO_DATABASE, migrated_engine, new_database
 
 SIGN_IN = "Sign in at /admin as dev, password "
 PASSWORD = "a password for the tests"
@@ -25,9 +25,8 @@ PASSWORD = "a password for the tests"
 def migrated() -> Iterator[str]:
     """A database with the schema and nothing else, to copy."""
     with new_database() as url:
-        engine = make_engine(url)
-        migrate(engine)
-        engine.dispose()
+        with migrated_engine(url):
+            pass
         yield url
 
 

@@ -29,10 +29,9 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import __main__ as server
 from inventory_tng import devices, seed
-from inventory_tng.db import make_engine
 from inventory_tng.models import Item, Label
 
-from databases import migrate, new_database
+from databases import migrated_engine, new_database
 
 # What a run writes in its folder: these, and the signed-in session
 # sign-in.setup.ts keeps (frontend/browser/prepared.ts, adminState).
@@ -79,23 +78,18 @@ def stop(_signal: int, _frame: object) -> None:
 def prepare(url: str, video: Path) -> dict[str, str]:
     """The database migrated and seeded, a code for the tests' device, and
     the camera's video: what the tests need."""
-    engine = make_engine(url)
-    try:
-        migrate(engine)
-        password = secrets.token_urlsafe(16)
-        with Session(engine) as session, session.begin():
-            if seed.run(session, argparse.Namespace(password=password)) != 0:
-                raise RuntimeError("the seed refused the new database")
-            label = session.scalars(
-                select(Label.code).join(Item).where(Item.name == seed.LABELLED)
-            ).one()
-            write_camera_video(video, label)
-            # The one device the tests share, registered by sign-in.setup.ts.
-            _, phrase = devices.create_code(
-                session, max_uses=1, lifetime=timedelta(hours=1), label="browser tests"
-            )
-    finally:
-        engine.dispose()
+    password = secrets.token_urlsafe(16)
+    with migrated_engine(url) as engine, Session(engine) as session, session.begin():
+        if seed.run(session, argparse.Namespace(password=password)) != 0:
+            raise RuntimeError("the seed refused the new database")
+        label = session.scalars(
+            select(Label.code).join(Item).where(Item.name == seed.LABELLED)
+        ).one()
+        write_camera_video(video, label)
+        # The one device the tests share, registered by sign-in.setup.ts.
+        _, phrase = devices.create_code(
+            session, max_uses=1, lifetime=timedelta(hours=1), label="browser tests"
+        )
     return {
         "username": seed.USERNAME,
         "password": password,
