@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import devices
+from inventory_tng.admin.common import NAME_MAX
 from inventory_tng.admin.devices import CODES, DEVICES
 from inventory_tng.models import AdminSession, RegistrationCode
 
@@ -69,7 +70,7 @@ def test_limits_on_a_code(admin_client: TestClient) -> None:
         ({"uses": "0"}, "From 1 to 500 devices."),
         ({"uses": "many"}, "From 1 to 500 devices."),
         ({"days": "91"}, "From 1 to 90 days."),
-        ({"label": "x" * 201}, "Up to 200 characters."),
+        ({"label": "x" * (NAME_MAX + 1)}, f"Up to {NAME_MAX} characters."),
     ):
         refused, _ = make_code(admin_client, **form)
         assert refused.status_code == 400

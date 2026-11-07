@@ -43,7 +43,7 @@ TAKEN = (
 RESTORE_TAKEN = "A current item already has its name or part number: change one first."
 
 
-def _refused(
+def _change_or_note(
     session: Session, change: Callable[[], object], problems: dict[str, str]
 ) -> None:
     """Makes the change, unless its name is taken or its category retired:
@@ -193,7 +193,7 @@ def add_item(
     values, problems = _fields(session, form)
     item = Item(**values)
     if not problems:
-        _refused(session, lambda: session.add(item), problems)
+        _change_or_note(session, lambda: session.add(item), problems)
     if problems:
         return _list_page(request, session, signed, problems=problems, values=form)
     session.commit()
@@ -229,7 +229,7 @@ def save_item(
             setattr(found, field, value)
 
     if not problems:
-        _refused(session, save, problems)
+        _change_or_note(session, save, problems)
     if problems:
         return _item_page(
             request, session, signed, found, problems=problems, values=form

@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, mail, sign_in
 from inventory_tng.admin.common import locked_row
+from inventory_tng.admin.volunteers import VOLUNTEERS
 from inventory_tng.db import (
     Base,
     DbSession,
@@ -914,3 +915,35 @@ def test_a_page_waits_for_a_write_that_refers_to_its_row(
     worker = committed.blocked(page, lambda: locked_row(page, model, row.id))
     saving.commit()
     assert worker.finished().error is None
+
+
+@pytest.mark.end_to_end
+def test_ending_custody_waits_for_a_save_into_it(
+    committed: Committed, admins: Admins, real_client: tuple[TestClient, SentMail]
+) -> None:
+    """A save holds its places until it commits (ledger._hold_places):
+    ending a volunteer's custody waits for one into it, so it reads what the
+    save brought (inventory-tng-8i4.78)."""
+    client, _ = real_client
+    _, _, key = admins
+    signed_in_as_ben(committed, client, key)
+    volunteer = Volunteer(name=f"V {tag()}")
+    made(committed, volunteer)
+    custody = Location(
+        name=f"Custody {tag()}", kind="custody", volunteer_id=volunteer.id
+    )
+    made(committed, custody)
+    saving = committed.session()
+    saving.execute(
+        locked(
+            select(Location.id).where(Location.id == custody.id),
+            key_share=True,
+            shared=True,
+        )
+    )
+    worker = committed.blocked(
+        None, lambda: client.post(f"{VOLUNTEERS}/{volunteer.id}/custody/end")
+    )
+    saving.commit()
+    answer = cast(Answer, worker.finished().result)
+    assert answer.status_code == 303

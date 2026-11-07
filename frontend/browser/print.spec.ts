@@ -54,8 +54,8 @@ function pages(pdf: Buffer): string[] {
 
 test("the code fits one page of each paper", async ({ page, browserName }) => {
   test.skip(browserName !== "chromium", "only Chromium prints to PDF");
-  // As long a label as an administrator might type.
-  await makeCode(page, "A label ".repeat(40));
+  // As long a label as the server takes (admin.common.NAME_MAX).
+  await makeCode(page, "A label ".repeat(25));
   const sizes = { "US Letter": "612x792", A4: "595x842" };
   for (const [paper, size] of Object.entries(sizes)) {
     await page.getByLabel(paper).check();

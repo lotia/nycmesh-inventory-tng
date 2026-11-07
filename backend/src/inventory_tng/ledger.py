@@ -337,7 +337,8 @@ def insert_transaction(
     """A transaction and its movements, unless its key is written already:
     None then. A concurrent request with the same key waits here for that
     one to commit, then writes nothing. Its places are held first
-    (_hold_places): again, if the caller holds them already, at no cost."""
+    (_hold_places), even when the caller holds them already: one more
+    indexed query, which keeps every caller safe."""
     _hold_places(session, header)
     transaction = session.scalar(
         pg_insert(LedgerTransaction)

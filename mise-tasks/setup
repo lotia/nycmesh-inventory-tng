@@ -10,7 +10,6 @@ cd "${MISE_PROJECT_ROOT:-$(dirname "$0")/..}"
 if [[ frontend/package-lock.json -nt frontend/node_modules/.package-lock.json ]]; then
   (cd frontend && npm ci)
 fi
-"$(dirname "$0")/setup-browsers"
 if [[ ! -f .env ]]; then
   cp .env.example .env
   echo "Made .env from .env.example."

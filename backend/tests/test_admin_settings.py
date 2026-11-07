@@ -1,6 +1,5 @@
 """The settings page: how the scan page behaves (admin/settings.py)."""
 
-import html
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
@@ -19,7 +18,7 @@ from inventory_tng.models import (
 
 from helpers.mail import SentMail
 from helpers.rows import history
-from helpers.sign_in import code, new_admin, sign_in_with
+from helpers.sign_in import code, new_admin, sign_in_with, text
 
 
 def test_shows_and_changes_the_name_check(
@@ -32,9 +31,7 @@ def test_shows_and_changes_the_name_check(
     change = history(session, "scan_settings")[-1]
     assert (change.actor or "").startswith("admin:")
     # The scan page reads it with the catalogue.
-    assert "within ten minutes" in html.unescape(
-        admin_client.get(done.headers["location"]).text
-    )
+    assert "within ten minutes" in text(admin_client.get(done.headers["location"]))
 
 
 @pytest.mark.parametrize("typed", ["", "-1", "soon", "1441"])
