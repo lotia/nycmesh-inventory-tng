@@ -2,7 +2,7 @@
 
 The tables are generated from models.py. The rules that need more than one
 row are triggers, below; each raises a check violation (23514) named for its
-rule. The ledger has no history triggers: it is append-only, so it is its own
+rule. The ledger has no history: it is append-only, so it is its own
 history. The app's login may only read and add to it: of what 0001 gives it,
 UPDATE and DELETE are taken back here, and it never had TRUNCATE.
 
@@ -88,20 +88,6 @@ BEGIN
     RETURN NEW;
 END
 $$;
-
--- A delivery checked in is no longer on order: on_order goes down by what
--- arrived, never below zero. Through item's history triggers, like any change.
-CREATE FUNCTION receive_movement() RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-    IF (SELECT kind FROM ledger_transaction WHERE id = NEW.transaction_id) = 'receipt'
-    THEN
-        UPDATE item SET on_order = greatest(on_order - NEW.quantity, 0)
-        WHERE id = NEW.item_id AND on_order > 0;
-    END IF;
-    RETURN NULL;
-END
-$$;
 """
 
 TRIGGERS = r"""
@@ -123,8 +109,6 @@ CREATE TRIGGER check_movement BEFORE INSERT ON movement
 CREATE TRIGGER check_item_unit BEFORE UPDATE OF unit ON item
     FOR EACH ROW WHEN (OLD.unit IS DISTINCT FROM NEW.unit)
     EXECUTE FUNCTION check_item_unit();
-CREATE TRIGGER receive AFTER INSERT ON movement
-    FOR EACH ROW EXECUTE FUNCTION receive_movement();
 """
 
 # In minus out, for every item and location stock has been at. A location
@@ -279,6 +263,5 @@ def downgrade() -> None:
     op.drop_table("ledger_transaction")
     op.execute(
         "DROP FUNCTION ledger_append_only(), stamp_ledger_transaction(), "
-        "check_ledger_transaction_lines(), check_movement(), check_item_unit(), "
-        "receive_movement()"
+        "check_ledger_transaction_lines(), check_movement(), check_item_unit()"
     )

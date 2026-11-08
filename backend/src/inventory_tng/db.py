@@ -12,7 +12,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import (
     ColumnElement,
-    Connection,
     Engine,
     MetaData,
     Select,
@@ -97,46 +96,31 @@ def get_session_factory(request: Request) -> SessionFactory:
 
 Sessions = Annotated[SessionFactory, Depends(get_session_factory)]
 
-# Read by the history trigger (migration 0002, which writes the name out):
-# who made this transaction's changes.
-ACTOR_SETTING = "inventory.actor"
-# Also catalogue_history's check constraint (models.py, migration 0003).
+# Who makes a session's changes, for history (history.py): ids, never
+# names, so history holds no personal data through it. Also
+# catalogue_history's check constraint (models.py, migration 0003).
 # system:<name> is anything that is not a person, such as the command line.
 CLI_ACTOR = "system:cli"
 ACTOR_PATTERN = "(admin|volunteer):[0-9]+|system:[a-z_]+"
 ACTOR = re.compile(ACTOR_PATTERN)
-# Where act_as() keeps a session's actor.
+# Where set_actor keeps it.
 ACTOR_INFO = "inventory.actor"
 
 
-def act_as(session: Session, actor: str) -> None:
-    """Name who makes every change this session writes, in this transaction
-    and every later one, as set_actor does for one: a signed-in request's
-    session, so no route need remember to."""
+def set_actor(session: Session, actor: str) -> None:
+    """Name who makes every change this session writes from now on:
+    "admin:3", "volunteer:7", or "system:cli" for something that is not a
+    person. A signed-in request's session is named as it starts, so no
+    route need remember to."""
     if not ACTOR.fullmatch(actor):
         raise ValueError("an actor is admin:<id>, volunteer:<id> or system:<name>")
     session.info[ACTOR_INFO] = actor
-    if session.in_transaction():
-        set_actor(session, actor)
-
-
-@event.listens_for(Session, "after_begin")
-def _actor_for_each_transaction(
-    session: Session, _transaction: object, connection: Connection
-) -> None:
-    if actor := session.info.get(ACTOR_INFO):
-        connection.execute(select(func.set_config(ACTOR_SETTING, actor, True)))
-
-
-def set_actor(session: Session, actor: str) -> None:
-    """Name who is making this transaction's changes: "admin:3",
-    "volunteer:7", or "system:cli" for something that is not a person; ids
-    and never names, so history holds no personal data through it. Lasts
-    until the transaction ends."""
-    if not ACTOR.fullmatch(actor):
-        raise ValueError("an actor is admin:<id>, volunteer:<id> or system:<name>")
-    session.execute(select(func.set_config(ACTOR_SETTING, actor, True)))
     log.debug("actor set", actor=actor)
+
+
+def current_actor(session: Session) -> str | None:
+    """Who set_actor named, or None."""
+    return session.info.get(ACTOR_INFO)
 
 
 def exists_where(session: Session, *criteria: ColumnElement[bool]) -> bool:

@@ -34,9 +34,9 @@ from starlette.concurrency import run_in_threadpool
 from inventory_tng import accounts, mail, request_logging
 from inventory_tng.db import (
     DbSession,
-    act_as,
     hold_until_commit,
     record_last_seen,
+    set_actor,
 )
 from inventory_tng.mail import Notify
 from inventory_tng.masking import is_secret_name
@@ -158,7 +158,7 @@ def signed_in(request: Request, session: DbSession) -> SignedIn:
     # session, as a session id usually is the secret cookie.
     request_logging.bind(admin_id=admin.id, sign_in_id=row.id)
     # Every change this request makes is theirs, in the history.
-    act_as(session, f"admin:{admin.id}")
+    set_actor(session, f"admin:{admin.id}")
     return SignedIn(
         admin=admin,
         row=row,

@@ -15,7 +15,7 @@ from structlog.testing import capture_logs
 
 from inventory_tng.database_role import LEDGER
 from inventory_tng.db import describe_error, set_actor
-from inventory_tng.ledger import balance
+from inventory_tng.ledger import balance, on_order_after
 from inventory_tng.models import (
     CatalogueHistory,
     Item,
@@ -175,6 +175,20 @@ def test_an_install_records_its_install_number(
     transaction = session.get_one(LedgerTransaction, response.json()["transaction_id"])
     assert transaction.install_number == 1234
     assert balances(session, place.item) == {(place.item.id, place.store.id): -3}
+
+
+@pytest.mark.parametrize(
+    ("on_order", "received", "after"),
+    [
+        (Decimal(5), Decimal(3), Decimal(2)),
+        (Decimal(5), Decimal(8), Decimal(0)),
+        (Decimal("2.5"), Decimal("2.5"), Decimal(0)),
+    ],
+)
+def test_on_order_goes_down_by_what_arrives(
+    on_order: Decimal, received: Decimal, after: Decimal
+) -> None:
+    assert on_order_after(on_order, received) == after
 
 
 def test_a_receipt_lowers_on_order_but_not_below_zero(

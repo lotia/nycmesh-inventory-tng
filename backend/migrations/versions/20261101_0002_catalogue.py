@@ -20,18 +20,8 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-# Written into this file, not imported, so the migration stays as it was run.
-HISTORY_TABLES = (
-    "category",
-    "item",
-    "item_package",
-    "vendor",
-    "vendor_offer",
-    "vendor_price",
-    "volunteer",
-    "location",
-    "label",
-)
+# 0001's: migrations do not import one another.
+APP_ROLE = "inventory_app"
 
 FUNCTIONS = r"""
 -- Every trigger that reads other rows calls this first, so rule-checking
@@ -41,22 +31,6 @@ FUNCTIONS = r"""
 CREATE FUNCTION lock_catalogue_rules() RETURNS void
 LANGUAGE sql AS $$
     SELECT pg_advisory_xact_lock(hashtext('inventory.catalogue_rules'));
-$$;
-
-CREATE FUNCTION record_catalogue_history() RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-    INSERT INTO catalogue_history (table_name, row_id, action, actor, old_row, new_row)
-    VALUES (
-        TG_TABLE_NAME,
-        CASE WHEN TG_OP = 'DELETE' THEN OLD.id ELSE NEW.id END,
-        lower(TG_OP),
-        nullif(current_setting('inventory.actor', true), ''),
-        CASE WHEN TG_OP <> 'INSERT' THEN to_jsonb(OLD) END,
-        CASE WHEN TG_OP <> 'DELETE' THEN to_jsonb(NEW) END
-    );
-    RETURN NULL;
-END
 $$;
 
 -- Each check runs only for the change it is about, and each trigger fires
@@ -246,17 +220,6 @@ CREATE TRIGGER check_label
 CREATE TRIGGER check_item_package BEFORE UPDATE OF item_id ON item_package
     FOR EACH ROW WHEN (OLD.item_id IS DISTINCT FROM NEW.item_id)
     EXECUTE FUNCTION check_item_package();
-"""
-
-
-def history_triggers(table: str) -> str:
-    """Every insert and delete, and every update that changes something."""
-    return f"""
-CREATE TRIGGER record_history AFTER INSERT OR DELETE ON {table}
-    FOR EACH ROW EXECUTE FUNCTION record_catalogue_history();
-CREATE TRIGGER record_history_update AFTER UPDATE ON {table}
-    FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*)
-    EXECUTE FUNCTION record_catalogue_history();
 """
 
 
@@ -652,10 +615,10 @@ def upgrade() -> None:
         ("volunteer", "merged_into_id"),
     ):
         op.create_index(op.f(f"ix_{table}_{column}"), table, [column])
+    # History is only added to by the app (history.py), never rewritten.
+    op.execute(f"REVOKE UPDATE, DELETE ON catalogue_history FROM {APP_ROLE}")
     op.execute(FUNCTIONS)
     op.execute(TRIGGERS)
-    for table in HISTORY_TABLES:
-        op.execute(history_triggers(table))
 
 
 def downgrade() -> None:
@@ -675,7 +638,7 @@ def downgrade() -> None:
     ):
         op.drop_table(table)
     op.execute(
-        "DROP FUNCTION lock_catalogue_rules(), record_catalogue_history(), "
+        "DROP FUNCTION lock_catalogue_rules(), "
         "check_location(), check_volunteer(), check_item(), check_category(), "
         "check_label(), check_item_package()"
     )

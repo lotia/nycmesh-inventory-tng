@@ -1,7 +1,7 @@
 """An administrator's own account page (docs/decisions/0012): email,
 password, authenticators, recovery codes and sessions. Viewing it is not
 sensitive; every change is (sign_in.ConfirmedAdmin), and is recorded as
-theirs (db.act_as). The rules are in accounts.py.
+theirs (db.set_actor). The rules are in accounts.py.
 """
 
 from collections.abc import Mapping

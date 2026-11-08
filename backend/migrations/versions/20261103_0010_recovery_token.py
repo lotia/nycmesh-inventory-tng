@@ -2,8 +2,7 @@
 
 With RECOVERY_TOKEN set, /recover makes a reset link for the password and
 authenticators, made by no administrator. The token's hash is kept on the
-link, unique, so each token works once, and is left out of history like the
-link's own token.
+link, unique, so each token works once.
 
 Revision ID: 0010
 Revises: 0009
@@ -19,25 +18,6 @@ revision: str = "0010"
 down_revision: str | Sequence[str] | None = "0009"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
-
-CHANGED = "OLD IS DISTINCT FROM NEW"
-
-
-def _history(*secret: str) -> None:
-    """0006's triggers on reset_link, leaving out these columns."""
-    function = "record_catalogue_history({})".format(
-        ", ".join(f"'{column}'" for column in secret)
-    )
-    op.execute("DROP TRIGGER record_history ON reset_link")
-    op.execute("DROP TRIGGER record_history_update ON reset_link")
-    op.execute(
-        "CREATE TRIGGER record_history AFTER INSERT OR DELETE ON reset_link "
-        f"FOR EACH ROW EXECUTE FUNCTION {function}"
-    )
-    op.execute(
-        "CREATE TRIGGER record_history_update AFTER UPDATE ON reset_link "
-        f"FOR EACH ROW WHEN ({CHANGED}) EXECUTE FUNCTION {function}"
-    )
 
 
 def upgrade() -> None:
@@ -58,14 +38,11 @@ def upgrade() -> None:
         "reset_link",
         "(recovery_token_hash IS NOT NULL) = (kind = 'recovery')",
     )
-    _history("token_hash", "recovery_token_hash")
 
 
 def downgrade() -> None:
-    # 0006 has no recovery kind. Gone before the triggers change, so its
-    # token's hash stays out of history.
+    # 0006 has no recovery kind.
     op.execute("DELETE FROM reset_link WHERE kind = 'recovery'")
-    _history("token_hash")
     op.drop_constraint(op.f("ck_reset_link_recovery"), "reset_link", type_="check")
     op.drop_constraint(op.f("ck_reset_link_kind"), "reset_link", type_="check")
     op.create_check_constraint(

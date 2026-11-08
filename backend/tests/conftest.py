@@ -383,7 +383,7 @@ def committed(database_url: str, owner_engine: Engine) -> Iterator[Committed]:
     own.dispose()
     with owner_engine.begin() as connection:
         # Only what the test made, each table before what it refers to, and
-        # only where it made any. History last, as the deletes write some.
+        # only where it made any.
         after = _newest_ids(connection)
         if grew := sorted(t for t in LEDGER if after[t] > before[t]):
             raise RuntimeError(
@@ -391,15 +391,10 @@ def committed(database_url: str, owner_engine: Engine) -> Iterator[Committed]:
                 " (the ledger is append-only): its rows are left behind"
             )
         for name, newest in before.items():
-            if name != "catalogue_history":
-                connection.execute(
-                    text(f"DELETE FROM {name} WHERE id > :newest"),
-                    {"newest": newest},
-                )
-        connection.execute(
-            text("DELETE FROM catalogue_history WHERE id > :newest"),
-            {"newest": before["catalogue_history"]},
-        )
+            connection.execute(
+                text(f"DELETE FROM {name} WHERE id > :newest"),
+                {"newest": newest},
+            )
 
 
 @pytest.fixture

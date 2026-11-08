@@ -2,9 +2,6 @@
 
 Administrators, their passwords, authenticators, recovery codes, sessions and
 reset links, and the one-row sign_in_settings, made here with its defaults.
-Changes go to catalogue_history, except sessions', which change on every
-request. The history function now leaves out the columns its trigger names,
-models.SECRET_COLUMNS, so no secret is ever copied into history.
 
 Revision ID: 0006
 Revises: 0005
@@ -21,46 +18,6 @@ down_revision: str | Sequence[str] | None = "0005"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-# 0002's record_catalogue_history(), now leaving out the columns its trigger
-# names. Its triggers name none, and TG_ARGV is then NULL: hence coalesce,
-# so they record whole rows as before. One function writes all history.
-HISTORY_FUNCTION = r"""
-CREATE OR REPLACE FUNCTION record_catalogue_history() RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-    INSERT INTO catalogue_history (table_name, row_id, action, actor, old_row, new_row)
-    VALUES (
-        TG_TABLE_NAME,
-        CASE WHEN TG_OP = 'DELETE' THEN OLD.id ELSE NEW.id END,
-        lower(TG_OP),
-        nullif(current_setting('inventory.actor', true), ''),
-        CASE WHEN TG_OP <> 'INSERT' THEN to_jsonb(OLD) - coalesce(TG_ARGV, '{}') END,
-        CASE WHEN TG_OP <> 'DELETE' THEN to_jsonb(NEW) - coalesce(TG_ARGV, '{}') END
-    );
-    RETURN NULL;
-END
-$$;
-"""
-
-# 0002's, as it was, for the downgrade.
-HISTORY_FUNCTION_0002 = r"""
-CREATE OR REPLACE FUNCTION record_catalogue_history() RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-    INSERT INTO catalogue_history (table_name, row_id, action, actor, old_row, new_row)
-    VALUES (
-        TG_TABLE_NAME,
-        CASE WHEN TG_OP = 'DELETE' THEN OLD.id ELSE NEW.id END,
-        lower(TG_OP),
-        nullif(current_setting('inventory.actor', true), ''),
-        CASE WHEN TG_OP <> 'INSERT' THEN to_jsonb(OLD) END,
-        CASE WHEN TG_OP <> 'DELETE' THEN to_jsonb(NEW) END
-    );
-    RETURN NULL;
-END
-$$;
-"""
-
 # For every one-row settings table from here on: refuses deleting the row,
 # naming the table in its error and constraint.
 KEPT = r"""
@@ -75,34 +32,6 @@ CREATE TRIGGER sign_in_settings_kept BEFORE DELETE ON sign_in_settings
 CREATE TRIGGER sign_in_settings_kept_truncate BEFORE TRUNCATE ON sign_in_settings
     FOR EACH STATEMENT EXECUTE FUNCTION settings_row_kept();
 """
-
-# Each table with history, the columns left out of it, and when an update is
-# worth recording: an authenticator's last step moves at every sign-in.
-HISTORY = (
-    ("admin", (), "OLD IS DISTINCT FROM NEW"),
-    ("sign_in_settings", (), "OLD IS DISTINCT FROM NEW"),
-    ("admin_password", ("password_hash",), "OLD IS DISTINCT FROM NEW"),
-    (
-        "authenticator",
-        ("totp_key",),
-        "(to_jsonb(OLD) - 'last_step') IS DISTINCT FROM (to_jsonb(NEW) - 'last_step')",
-    ),
-    ("recovery_code", ("code_hash",), "OLD IS DISTINCT FROM NEW"),
-    ("reset_link", ("token_hash",), "OLD IS DISTINCT FROM NEW"),
-)
-
-
-def history_triggers(table: str, secret: tuple[str, ...], changed: str) -> None:
-    arguments = ", ".join(f"'{column}'" for column in secret)
-    function = f"record_catalogue_history({arguments})"
-    op.execute(
-        f"CREATE TRIGGER record_history AFTER INSERT OR DELETE ON {table} "
-        f"FOR EACH ROW EXECUTE FUNCTION {function}"
-    )
-    op.execute(
-        f"CREATE TRIGGER record_history_update AFTER UPDATE ON {table} "
-        f"FOR EACH ROW WHEN ({changed}) EXECUTE FUNCTION {function}"
-    )
 
 
 def upgrade() -> None:
@@ -349,11 +278,7 @@ def upgrade() -> None:
     op.create_index(
         op.f("ix_reset_link_made_by_id"), "reset_link", ["made_by_id"], unique=False
     )
-    op.execute(HISTORY_FUNCTION)
-    for table, secret, changed in HISTORY:
-        history_triggers(table, secret, changed)
     op.execute(KEPT)
-    op.execute("SELECT set_config('inventory.actor', 'system:migration', true)")
     op.execute("INSERT INTO sign_in_settings DEFAULT VALUES")
 
 
@@ -383,4 +308,3 @@ def downgrade() -> None:
     )
     op.drop_table("admin")
     op.execute("DROP FUNCTION settings_row_kept()")
-    op.execute(HISTORY_FUNCTION_0002)

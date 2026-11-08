@@ -2,7 +2,7 @@
 
 One row, made here with the defaults, changed but never deleted. A trigger
 refuses a time zone PostgreSQL does not know, and 0006's settings_row_kept()
-refuses deleting the row. Its changes go to catalogue_history.
+refuses deleting the row.
 
 Revision ID: 0007
 Revises: 0006
@@ -36,12 +36,6 @@ CREATE TRIGGER site_settings_kept BEFORE DELETE ON site_settings
     FOR EACH ROW EXECUTE FUNCTION settings_row_kept();
 CREATE TRIGGER site_settings_kept_truncate BEFORE TRUNCATE ON site_settings
     FOR EACH STATEMENT EXECUTE FUNCTION settings_row_kept();
-
-CREATE TRIGGER record_history AFTER INSERT OR DELETE ON site_settings
-    FOR EACH ROW EXECUTE FUNCTION record_catalogue_history();
-CREATE TRIGGER record_history_update AFTER UPDATE ON site_settings
-    FOR EACH ROW WHEN (OLD IS DISTINCT FROM NEW)
-    EXECUTE FUNCTION record_catalogue_history();
 """
 
 
@@ -62,7 +56,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_site_settings")),
     )
     op.execute(RULES)
-    op.execute("SELECT set_config('inventory.actor', 'system:migration', true)")
     op.execute("INSERT INTO site_settings DEFAULT VALUES")
 
 
