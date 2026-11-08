@@ -132,6 +132,12 @@ def whole_enough(unit: str, amount: Decimal) -> bool:
     return unit != "each" or amount == amount.to_integral_value()
 
 
+def on_order_after(on_order: Decimal, received: Decimal) -> Decimal:
+    """An item's on_order once `received` of it arrives: down by that much,
+    never below zero."""
+    return max(on_order - received, Decimal(0))
+
+
 def expected(
     session: Session,
     location_id: int,
@@ -373,7 +379,8 @@ def insert_transaction(
     None then. A concurrent request with the same key waits here for that
     one to commit, then writes nothing. Its places are held first
     (_hold_places), even when the caller holds them already: one more
-    indexed query, which keeps every caller safe."""
+    indexed query, which keeps every caller safe. A receipt lowers what is
+    on order of each item it brings (on_order_after)."""
     _hold_places(session, header)
     transaction = session.scalar(
         pg_insert(LedgerTransaction)
@@ -393,7 +400,23 @@ def insert_transaction(
                 for item_id, amount in lines.items()
             ],
         )
+        if transaction.kind == "receipt":
+            _receive(session, lines)
     return transaction
+
+
+def _receive(session: Session, lines: Mapping[int, Decimal]) -> None:
+    """Through the ORM, so it is history. The items locked by id, so two
+    receipts of the same items take them in one order."""
+    items = session.scalars(
+        locked(
+            select(Item).where(Item.id.in_(lines), Item.on_order > 0).order_by(Item.id),
+            key_share=True,
+        )
+    )
+    for item in items:
+        assert item.on_order is not None  # The query asked for more than 0.
+        item.on_order = on_order_after(item.on_order, lines[item.id])
 
 
 def _problems(session: Session, batch: Batch, places: set[int]) -> list[Problem]:

@@ -22,7 +22,7 @@ from argon2.exceptions import InvalidHashError, VerificationError
 from limits import RateLimitItemPerHour, RateLimitItemPerMinute
 from markupsafe import Markup
 from opentelemetry import metrics
-from sqlalchemy import ColumnElement, delete, exists, func, or_, select, text, update
+from sqlalchemy import ColumnElement, exists, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import exists_where, get_locked, locked, set_actor, unique
@@ -762,9 +762,14 @@ def recovery_codes_left(session: Session, admin_id: int) -> int:
 
 
 def _void_recovery_codes(session: Session, admin_id: int, now: datetime) -> None:
-    session.execute(
-        update(RecoveryCode).where(*_unused_codes(admin_id)).values(voided_at=now)
-    )
+    for code in session.scalars(
+        locked(
+            select(RecoveryCode)
+            .where(*_unused_codes(admin_id))
+            .order_by(RecoveryCode.id)
+        )
+    ):
+        code.voided_at = now
 
 
 def _reset_authenticators(session: Session, admin_id: int, now: datetime) -> None:
@@ -862,10 +867,11 @@ def void_reset_links(
     """Their unused links void; their own row first (lock_admin), so making
     or voiding links waits for a reset, a sign-in or a link being used."""
     lock_admin(session, admin_id)
-    query = update(ResetLink).where(ResetLink.admin_id == admin_id, *_usable_links())
+    query = select(ResetLink).where(ResetLink.admin_id == admin_id, *_usable_links())
     if emailed_only:
         query = query.where(ResetLink.emailed())
-    session.execute(query.values(voided_at=now))
+    for link in session.scalars(locked(query.order_by(ResetLink.id))):
+        link.voided_at = now
 
 
 @dataclass(frozen=True)
@@ -1097,7 +1103,8 @@ def _reset_sign_in(
         made_by_id=by_admin_id,
     )
     end_sessions(session, admin_id, now)
-    session.execute(delete(AdminPassword).where(AdminPassword.id == admin_id))
+    if (password := get_locked(session, AdminPassword, admin_id)) is not None:
+        session.delete(password)
     _reset_authenticators(session, admin_id, now)
     log.info(
         "sign-in reset",

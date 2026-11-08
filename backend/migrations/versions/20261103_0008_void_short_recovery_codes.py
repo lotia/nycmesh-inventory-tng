@@ -3,7 +3,7 @@
 Every recovery code still unused was made ten characters long, short enough
 to guess back from a stolen database. They are void from here: their
 administrators make new, longer ones from the account page, which shows
-none left. Voids are history, as the migration (system:migration).
+none left.
 
 Revision ID: 0008
 Revises: 0007
@@ -21,7 +21,6 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.execute("SELECT set_config('inventory.actor', 'system:migration', true)")
     op.execute(
         "UPDATE recovery_code SET voided_at = now() "
         "WHERE used_at IS NULL AND voided_at IS NULL"

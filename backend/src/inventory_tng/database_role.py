@@ -5,11 +5,14 @@ import structlog
 from sqlalchemy import Connection, Engine, column, exc, func, select, table
 
 from inventory_tng.db import describe_error
+from inventory_tng.history import HISTORY_TABLE
 
 log = structlog.get_logger(__name__)
 
 LEDGER = ("ledger_transaction", "movement")
-# What would let the login change the ledger or empty it.
+# Tables the app only adds to: the ledger, and history (history.py).
+APPEND_ONLY = (*LEDGER, HISTORY_TABLE)
+# What would let the login change one or empty it.
 FORBIDDEN = ("UPDATE", "DELETE", "TRUNCATE")
 # What it needs to record anything: a login without these is not the app's.
 NEEDED = ("SELECT", "INSERT")
@@ -24,15 +27,17 @@ _PG_TABLES = table(
 
 
 class RefusedLogin(Exception):
-    """The app's database login could change the ledger, cannot record, or
-    owns a table."""
+    """The app's database login could change the ledger or history, cannot
+    record, or owns a table."""
 
 
 def refusals(connection: Connection) -> dict[str, list[str]]:
     """What is wrong with the login `connection` uses, by kind: "may"
-    (privileges on the ledger it must not have, as "UPDATE movement"),
+    (privileges on APPEND_ONLY it must not have, as "UPDATE movement"),
     "lacks" (ones it needs), "owns" (tables). Empty if nothing is."""
-    pairs = [(name, privilege) for name in LEDGER for privilege in FORBIDDEN + NEEDED]
+    pairs = [
+        (name, privilege) for name in APPEND_ONLY for privilege in FORBIDDEN + NEEDED
+    ]
     held = connection.execute(
         select(*(func.has_table_privilege(name, p) for name, p in pairs))
     ).one()

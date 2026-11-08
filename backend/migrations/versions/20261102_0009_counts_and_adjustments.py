@@ -213,16 +213,6 @@ def upgrade() -> None:
     op.execute(LINES)
     op.execute(MOVEMENT)
     op.execute(BALANCE)
-    op.execute(
-        "CREATE TRIGGER record_history AFTER INSERT OR DELETE ON adjustment_reason "
-        "FOR EACH ROW EXECUTE FUNCTION record_catalogue_history()"
-    )
-    op.execute(
-        "CREATE TRIGGER record_history_update AFTER UPDATE ON adjustment_reason "
-        "FOR EACH ROW WHEN (OLD IS DISTINCT FROM NEW) "
-        "EXECUTE FUNCTION record_catalogue_history()"
-    )
-    op.execute("SELECT set_config('inventory.actor', 'system:migration', true)")
     reasons = sa.table("adjustment_reason", sa.column("name", sa.Text()))
     op.bulk_insert(reasons, [{"name": name} for name in REASONS])
 

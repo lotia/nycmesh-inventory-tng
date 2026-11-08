@@ -158,7 +158,18 @@ new one.
 Migrations run as the owner, and every table they create gives the app
 `SELECT`, `INSERT`, `UPDATE` and `DELETE` (migration 0001). A migration
 that creates a table the app must not change revokes what it must not do
-there, as 0004 does for the ledger.
+there, as 0002 does for history and 0004 for the ledger. What a migration
+writes is not in the history.
+
+### History
+
+Every row added, changed or deleted through the ORM, in any table but the
+ledger, sent forms and sessions, is written to `catalogue_history` as the
+session flushes, with who did it (`db.set_actor`); `history.py` says what
+it leaves out. So write those tables through the ORM: `session.add`, an
+object's attributes, `session.delete`. A statement such as `update(Item)`
+is never recorded, and `tests/test_history.py` fails on one. The app may
+only add to the history.
 
 ### Locking a row
 

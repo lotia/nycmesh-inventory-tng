@@ -30,11 +30,11 @@ from fastapi.responses import JSONResponse
 from limits import RateLimitItemPerMinute
 from opentelemetry import metrics
 from pydantic import BaseModel
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import request_logging
-from inventory_tng.db import DbSession, locked, record_last_seen
+from inventory_tng.db import DbSession, get_locked, locked, record_last_seen
 from inventory_tng.models import Device, RegistrationCode
 from inventory_tng.rate_limits import limiter
 from inventory_tng.web import client_address, set_private_cookie
@@ -207,15 +207,13 @@ def revoke_device(session: Session, device_id: int) -> bool:
 def _revoke(
     session: Session, model: type[RegistrationCode | Device], row_id: int, field: str
 ) -> bool:
-    done = session.scalar(
-        update(model)
-        .where(model.id == row_id, model.revoked_at.is_(None))
-        .values(revoked_at=datetime.now(UTC))
-        .returning(model.id)
-    )
-    if done is not None:
-        log.info(f"{model.__tablename__.replace('_', ' ')} revoked", **{field: row_id})
-    return done is not None
+    # Locked first, so of two revokes at once the second sees the first's.
+    found = get_locked(session, model, row_id)
+    if found is None or found.revoked_at is not None:
+        return False
+    found.revoked_at = datetime.now(UTC)
+    log.info(f"{model.__tablename__.replace('_', ' ')} revoked", **{field: row_id})
+    return True
 
 
 def devices_registered_with(

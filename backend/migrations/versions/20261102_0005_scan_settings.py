@@ -1,8 +1,7 @@
 """scan settings: how the scan page behaves, set by administrators
 
 One row, made here with the defaults, which may be changed but never
-deleted: every scan page reads it. Its changes go to catalogue_history, with
-0002's function, so who changed a setting is recorded.
+deleted: every scan page reads it.
 
 Revision ID: 0005
 Revises: 0004
@@ -56,17 +55,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_scan_settings")),
     )
-    op.execute(
-        "CREATE TRIGGER record_history AFTER INSERT OR DELETE ON scan_settings "
-        "FOR EACH ROW EXECUTE FUNCTION record_catalogue_history()"
-    )
-    op.execute(
-        "CREATE TRIGGER record_history_update AFTER UPDATE ON scan_settings "
-        "FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*) "
-        "EXECUTE FUNCTION record_catalogue_history()"
-    )
     op.execute(KEPT)
-    op.execute("SELECT set_config('inventory.actor', 'system:migration', true)")
     op.execute("INSERT INTO scan_settings DEFAULT VALUES")
 
 

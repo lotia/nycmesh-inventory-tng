@@ -4,11 +4,11 @@ docs/decisions/0012)."""
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import Engine, select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from inventory_tng.history import SECRET_COLUMNS
 from inventory_tng.models import (
-    SECRET_COLUMNS,
     Admin,
     AdminPassword,
     Authenticator,
@@ -186,23 +186,3 @@ def test_a_code_accepted_is_not_history(session: Session, admin: Admin) -> None:
     authenticator.last_step = 12345
     session.flush()
     assert [row.action for row in history(session, "authenticator")] == ["insert"]
-
-
-def test_each_secret_column_is_left_out_by_its_trigger(engine: Engine) -> None:
-    """SECRET_COLUMNS and migration 0006's triggers name the same columns."""
-    with engine.connect() as connection:
-        rows = connection.execute(
-            text(
-                "SELECT c.relname, pg_get_triggerdef(t.oid) FROM pg_trigger t "
-                "JOIN pg_class c ON c.oid = t.tgrelid "
-                "WHERE t.tgname LIKE 'record_history%'"
-            )
-        )
-        definitions: dict[str, list[str]] = {}
-        for table, definition in rows:
-            definitions.setdefault(table, []).append(definition)
-    for table, columns in SECRET_COLUMNS.items():
-        assert len(definitions[table]) == 2
-        for definition in definitions[table]:
-            arguments = ", ".join(f"'{column}'" for column in columns)
-            assert definition.endswith(f"record_catalogue_history({arguments})")

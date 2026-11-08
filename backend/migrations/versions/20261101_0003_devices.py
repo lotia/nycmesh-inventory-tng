@@ -1,8 +1,7 @@
 """devices and registration codes (docs/decisions/0009)
 
-Their changes go to catalogue_history like everything else, with 0002's
-function, so who revoked a device or a code is recorded. Things that are not
-people, such as the command line, may now be actors (system:<name>).
+Things that are not people, such as the command line, may now be actors
+(system:<name>).
 
 Revision ID: 0003
 Revises: 0002
@@ -81,28 +80,6 @@ def upgrade() -> None:
         ["registration_code_id"],
         unique=False,
     )
-    # As 0002's history_triggers(), written out so this migration stays as run.
-    # An update that changes only last_seen_at, which moves every hour a
-    # device is used, is not history.
-    for table, changed in (
-        ("registration_code", "OLD IS DISTINCT FROM NEW"),
-        (
-            "device",
-            (
-                "(to_jsonb(OLD) - 'last_seen_at') IS DISTINCT FROM "
-                "(to_jsonb(NEW) - 'last_seen_at')"
-            ),
-        ),
-    ):
-        op.execute(
-            f"CREATE TRIGGER record_history AFTER INSERT OR DELETE ON {table} "
-            "FOR EACH ROW EXECUTE FUNCTION record_catalogue_history()"
-        )
-        op.execute(
-            f"CREATE TRIGGER record_history_update AFTER UPDATE ON {table} "
-            f"FOR EACH ROW WHEN ({changed}) "
-            "EXECUTE FUNCTION record_catalogue_history()"
-        )
     op.execute(
         "ALTER TABLE catalogue_history DROP CONSTRAINT ck_catalogue_history_actor, "
         "ADD CONSTRAINT ck_catalogue_history_actor "
@@ -117,6 +94,6 @@ def downgrade() -> None:
         "ADD CONSTRAINT ck_catalogue_history_actor "
         "CHECK (actor ~ '^(admin|volunteer):[0-9]+$') NOT VALID"
     )
-    # Their indexes and triggers go with them.
+    # Their indexes go with them.
     op.drop_table("device")
     op.drop_table("registration_code")

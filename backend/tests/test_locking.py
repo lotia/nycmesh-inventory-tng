@@ -21,7 +21,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-import inventory_tng
 from inventory_tng import devices
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.items import ITEMS
@@ -45,8 +44,8 @@ from inventory_tng.models import (
 
 from helpers.concurrency import Committed, made
 from helpers.sign_in import code, new_admin, sign_in_with
+from helpers.source import SOURCE, offending, outside
 
-SOURCE = Path(inventory_tng.__file__).parent
 # The only code that may lock with with_for_update: the wrappers' bodies.
 WRAPPERS = ("locked", "get_locked")
 DB = SOURCE / "db.py"
@@ -99,28 +98,15 @@ def lockings(tree: ast.AST) -> list[int]:
 def outside_the_wrappers(path: Path, wrappers_in: Path = DB) -> list[int]:
     """lockings in `path`, but in the wrappers' own module (db.py, the one
     file, not any of that name) not those inside the wrappers."""
-    tree = ast.parse(path.read_text(), str(path))
-    if path.resolve() != wrappers_in.resolve():
-        return lockings(tree)
-    allowed = {
-        line
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name in WRAPPERS
-        for line in range(node.lineno, (node.end_lineno or node.lineno) + 1)
-    }
-    return [line for line in lockings(tree) if line not in allowed]
+    return outside(path, lockings, {wrappers_in: WRAPPERS})
 
 
 @pytest.mark.helper
 def test_every_locking_read_goes_through_db() -> None:
-    offending = {
-        str(path.relative_to(SOURCE)): lines
-        for path in sorted(SOURCE.rglob("*.py"))
-        if (lines := outside_the_wrappers(path))
-    }
-    assert offending == {}, (
+    found = offending(lockings, {DB: WRAPPERS})
+    assert found == {}, (
         "Lock rows with db.locked (a select) or db.get_locked (Session.get), "
-        f"not with_for_update or FOR UPDATE in SQL (db.py says why): {offending}"
+        f"not with_for_update or FOR UPDATE in SQL (db.py says why): {found}"
     )
 
 

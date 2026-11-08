@@ -6,11 +6,11 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import Engine, delete, select, text, update
+from sqlalchemy import delete, select, text, update
 from sqlalchemy.orm import Session
 
 from inventory_tng.database_role import LEDGER
-from inventory_tng.db import Base, refusal, set_actor
+from inventory_tng.db import ACTOR_INFO, Base, refusal, set_actor
 from inventory_tng.models import (
     LABEL_ALPHABET,
     LABEL_LENGTH,
@@ -361,32 +361,6 @@ def test_every_change_is_recorded_with_its_actor(
     )
 
 
-def test_every_table_records_history(engine: Engine) -> None:
-    with engine.connect() as connection:
-        rows = connection.execute(
-            text(
-                "SELECT event_object_table, trigger_name "
-                "FROM information_schema.triggers "
-                "WHERE trigger_name LIKE 'record_history%'"
-            )
-        )
-        watched = {(table, trigger) for table, trigger in rows}
-    assert watched == {
-        (table, trigger)
-        # The ledger and sent forms are only added to, so each is its own
-        # history; sessions change on every request.
-        for table in set(Base.metadata.tables)
-        - {
-            "catalogue_history",
-            "ledger_transaction",
-            "movement",
-            "admin_session",
-            "sent_form",
-        }
-        for trigger in ("record_history", "record_history_update")
-    }
-
-
 def test_search_is_fuzzy_and_indexed(
     session: Session, new_item: Callable[..., Item]
 ) -> None:
@@ -413,7 +387,12 @@ def test_search_is_fuzzy_and_indexed(
 def test_an_update_that_changes_nothing_is_not_recorded(
     session: Session, category: Category
 ) -> None:
-    change(session, category, name=category.name)
+    # Set without its value loaded, the ORM cannot tell it is the same, so
+    # it writes the UPDATE: history is what sees that nothing changed.
+    name = category.name
+    session.expire(category, ["name"])
+    category.name = name
+    session.flush()
     actions = session.scalars(
         select(CatalogueHistory.action).where(
             CatalogueHistory.table_name == "category",
@@ -425,7 +404,7 @@ def test_an_update_that_changes_nothing_is_not_recorded(
 
 def test_history_refuses_a_name_as_actor(session: Session) -> None:
     """Even set without set_actor(), as a shell or script might."""
-    session.execute(text("SELECT set_config('inventory.actor', 'Jane Doe', true)"))
+    session.info[ACTOR_INFO] = "Jane Doe"
     with violates(session, "ck_catalogue_history_actor"):
         session.add(Category(name="Tools"))
 

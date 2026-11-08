@@ -207,9 +207,10 @@ def test_last_seen_is_not_history(
     client: TestClient, session: Session, phrase: str
 ) -> None:
     device_id = client.post("/api/devices", json={"code": phrase}).json()["device_id"]
-    change = update(Device).where(Device.id == device_id)
-    session.execute(change.values(last_seen_at=datetime.now(UTC) - timedelta(days=2)))
-    session.execute(change.values(label="Store tablet"))
+    device = session.get_one(Device, device_id)
+    device.last_seen_at = datetime.now(UTC) - timedelta(days=2)
+    session.flush()
+    device.label = "Store tablet"
     assert device_history(session, device_id) == ["insert", "update"]
 
 
@@ -259,17 +260,12 @@ def test_a_codes_devices_show_how_long_before_revocation_they_came(
     early, _ = devices.register(session, phrase, ADDRESS)
     late, _ = devices.register(session, phrase, ADDRESS)
     now = datetime.now(UTC)
-    for device, minutes in ((early, 60), (late, 3)):
-        session.execute(
-            update(Device)
-            .where(Device.id == device.id)
-            .values(created_at=now - timedelta(minutes=minutes))
-        )
+    early.created_at = now - timedelta(minutes=60)
+    late.created_at = now - timedelta(minutes=3)
     standing = devices.devices_registered_with(session, code.id)
     assert standing is not None
     assert [b for _, b in standing] == [None, None]
     assert devices.revoke_code(session, code.id)
-    session.expire_all()
     listed = devices.devices_registered_with(session, code.id)
     assert listed is not None
     assert [device.id for device, _ in listed] == [late.id, early.id]

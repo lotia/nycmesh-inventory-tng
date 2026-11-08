@@ -15,9 +15,9 @@ are only ever ended (AdminSession):
   every foreign key is ON DELETE RESTRICT, in PostgreSQL itself.
 - Quantities are numeric(12,3); money is numeric(10,2).
 - Names are unique, ignoring case, among current rows.
-- Every insert, update and delete is written to `catalogue_history` by a
-  trigger, with the actor the request set (db.set_actor). Secret columns,
-  such as a password's hash, are left out of it (SECRET_COLUMNS).
+- Every insert, update and delete through the ORM is written to
+  `catalogue_history`, with the actor the session names (db.set_actor),
+  leaving out secret columns such as a password's hash (history.py).
 
 The rules a single row can show are check constraints; the rest are triggers,
 in the migration that creates these tables. Both raise check violations
@@ -49,6 +49,9 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import INET, JSONB
 from sqlalchemy.orm import Mapped, MappedColumn, mapped_column
 
+# Imported for its flush listeners: whatever can write these tables records
+# their history.
+from inventory_tng import history  # noqa: F401
 from inventory_tng.db import ACTOR_PATTERN, Base
 
 QUANTITY = Numeric(12, 3)
@@ -363,8 +366,8 @@ class Label(Base):
 
 
 class CatalogueHistory(Base):
-    """Every change to the tables above, written by a trigger. Nothing reads
-    it until there is a screen for it."""
+    """Every change to the tables above (history.py). Nothing reads it until
+    there is a screen for it. The app may only add to it (migration 0002)."""
 
     __tablename__ = "catalogue_history"
     __table_args__ = (
@@ -378,13 +381,14 @@ class CatalogueHistory(Base):
     table_name: Mapped[str] = mapped_column(Text)
     row_id: Mapped[int]
     action: Mapped[str] = mapped_column(Text)
-    # From db.set_actor(), e.g. "admin:3"; NULL for a migration or the shell.
+    # From db.set_actor(), e.g. "admin:3"; NULL if the session named nobody.
     actor: Mapped[str | None] = mapped_column(Text)
     at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    old_row: Mapped[dict[str, object] | None] = mapped_column(JSONB)
-    new_row: Mapped[dict[str, object] | None] = mapped_column(JSONB)
+    # NULL, not JSON null, where there is no row (an insert's old_row).
+    old_row: Mapped[dict[str, object] | None] = mapped_column(JSONB(none_as_null=True))
+    new_row: Mapped[dict[str, object] | None] = mapped_column(JSONB(none_as_null=True))
 
 
 class RegistrationCode(Base):
@@ -518,17 +522,6 @@ class ScanSettings(Base):
     # Unused this many minutes, the page asks whether the name chosen is still
     # the person holding the phone. 0 never asks.
     name_check_minutes: Mapped[int] = mapped_column(server_default=text("15"))
-
-
-# Columns history leaves out, by table: what would let someone sign in, or
-# copy a second factor (docs/decisions/0012). Migration 0006 writes the same
-# lists into each table's history trigger.
-SECRET_COLUMNS = {
-    "admin_password": ("password_hash",),
-    "authenticator": ("totp_key",),
-    "recovery_code": ("code_hash",),
-    "reset_link": ("token_hash", "recovery_token_hash"),
-}
 
 
 class Admin(Base):
