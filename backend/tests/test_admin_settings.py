@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from inventory_tng.admin import settings as settings_page
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.models import (
     AdminSession,
@@ -142,3 +143,13 @@ def test_a_zone_set_elsewhere_still_shows(
     session.get_one(SiteSettings, 1).time_zone = "UTC"
     session.flush()
     assert "<option selected>UTC</option>" in admin_client.get(SETTINGS).text
+
+
+def test_a_zone_the_database_does_not_know_is_refused(
+    admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Python's list of zones and PostgreSQL's may differ."""
+    monkeypatch.setattr(settings_page, "is_time_zone", lambda _zone: True)
+    refused = admin_client.post(f"{SETTINGS}/site", data={"time_zone": "Mars/Olympus"})
+    assert refused.status_code == 400
+    assert "The database doesn't know that zone" in text(refused)

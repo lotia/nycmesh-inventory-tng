@@ -293,7 +293,7 @@ def save_site_settings(
     def save() -> None:
         site.time_zone = time_zone
 
-    if problem is None and attempt(session, save):
+    if problem is None and attempt(session, save)[1]:
         problem = "The database doesn't know that zone: pick another nearby."
     if problem is not None:
         return _page(

@@ -66,7 +66,7 @@ BEGIN
             USING ERRCODE = 'check_violation', CONSTRAINT = 'movement_with_transaction';
     END IF;
     -- FOR SHARE: an item's unit cannot change under a movement being
-    -- written, and check_item_unit() sees the movement once it commits.
+    -- written, and items.save sees the movement once it commits.
     IF NEW.quantity <> trunc(NEW.quantity)
         AND (SELECT unit FROM item WHERE id = NEW.item_id FOR SHARE) = 'each'
     THEN

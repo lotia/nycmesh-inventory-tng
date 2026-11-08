@@ -19,9 +19,13 @@ are only ever ended (AdminSession):
   `catalogue_history`, with the actor the session names (db.set_actor),
   leaving out secret columns such as a password's hash (history.py).
 
-The rules a single row can show are check constraints; the rest are triggers,
-in the migration that creates these tables. Both raise check violations
-(SQLSTATE 23514) named for the rule, which describe_error() logs.
+The rules a single row can show are check constraints, which raise check
+violations (SQLSTATE 23514) named for the rule, as describe_error() logs.
+The catalogue's rules that need other rows are the app's: each table is
+written only by its own module (locations, volunteers, categories, items,
+labels), under the catalogue lock (db.locked_row), which raises
+db.RuleBroken named for the rule. The ledger's and the settings' are still
+triggers, in the migrations that create those tables.
 """
 
 import secrets
@@ -104,7 +108,7 @@ RetiredAt = Annotated[datetime | None, mapped_column(DateTime(timezone=True))]
 
 
 def _reference(target: str) -> MappedColumn[Any]:
-    """A foreign key, indexed: RESTRICT and the triggers look rows up by it.
+    """A foreign key, indexed: RESTRICT and the rules look rows up by it.
     Nullable or not as the column's Mapped type says."""
     return mapped_column(ForeignKey(target, ondelete="RESTRICT"), index=True)
 

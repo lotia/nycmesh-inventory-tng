@@ -43,7 +43,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import DbSession, get_locked, locked, set_actor
+from inventory_tng.db import DbSession, exists_where, get_locked, locked, set_actor
 from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
 from inventory_tng.models import (
     INTEGER_MAX,
@@ -117,6 +117,14 @@ def retired_in_stock() -> Select[tuple[int]]:
             balance.c.item_id == any_(retired),
         )
         .distinct()
+    )
+
+
+def holds_stock(session: Session, location_id: int) -> bool:
+    """Whether the records say anything is at a place, of any item, more or
+    less than nothing."""
+    return exists_where(
+        session, balance.c.location_id == location_id, balance.c.quantity != 0
     )
 
 

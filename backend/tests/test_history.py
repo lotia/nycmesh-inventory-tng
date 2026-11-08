@@ -42,7 +42,7 @@ from inventory_tng.models import (
 )
 
 from helpers.rows import add, history, refused
-from helpers.source import SOURCE, offending, outside
+from helpers.source import MODELS, SOURCE, offending, outside
 
 # The pure functions.
 
@@ -182,7 +182,6 @@ SQL_WRITE = re.compile(
     r"\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM|MERGE\s+INTO|TRUNCATE|COPY)\s+\"?(\w+)",
     re.IGNORECASE,
 )
-MODELS = {m.class_.__name__: m.class_.__tablename__ for m in Base.registry.mappers}
 
 
 def _has_history(target: ast.expr | None) -> bool:
@@ -280,7 +279,7 @@ def _sql_write(node: ast.AST) -> bool:
     )
 
 
-def statement_writes(tree: ast.AST) -> list[int]:
+def statement_writes(tree: ast.AST, _path: Path | None = None) -> list[int]:
     """Lines that write to a table with history other than through the
     flush."""
     functions, modules = _imported(tree)

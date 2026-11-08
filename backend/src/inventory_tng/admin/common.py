@@ -1,5 +1,5 @@
 """What the administrator pages share: how a page is sent, how a form is
-read and checked, and how the database's rules are put into words."""
+read and checked, and how the catalogue's rules are put into words."""
 
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -12,8 +12,8 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import Base, exists_where
-from inventory_tng.ledger import balance, whole_enough
+from inventory_tng.db import Base
+from inventory_tng.ledger import whole_enough
 from inventory_tng.pages import NOTICES, page, templates
 from inventory_tng.sign_in import SignedIn
 
@@ -35,15 +35,16 @@ NOTICES.update(
     }
 )
 
-# The database's rules, by the name it gives one that a change broke
-# (db.attempt), in words. A page passes its own words for "unique", which
-# depend on what it is naming.
+# The catalogue's rules, by the name db.attempt gives one that a change
+# broke (db.RuleBroken's), in words. A page passes its own words for
+# "unique", which depend on what it is naming.
 RULES = {
     "location_area_parent": "An area goes inside a store or another area.",
     "location_no_cycle": "That would put it inside itself.",
     "location_parent_current": "Its place is retired, or places are still "
     "inside it: bring that back, or move those, first.",
     "location_custody_volunteer": "Stop them holding stock first.",
+    "location_holds_stock": "Move what is here elsewhere, or count it, first.",
     "volunteer_merge_target": "Others are merged into them: merge those "
     "elsewhere first, or pick a current volunteer to merge into.",
     "item_category_current": "Its category is retired: bring that back, or "
@@ -161,11 +162,3 @@ def quantity(
     if unit is not None and not whole_enough(unit, value):
         return "This item is counted in whole units."
     return value
-
-
-def holds_stock(session: Session, location_id: int) -> bool:
-    """Whether the records say anything is at a place, of any item, more or
-    less than nothing."""
-    return exists_where(
-        session, balance.c.location_id == location_id, balance.c.quantity != 0
-    )

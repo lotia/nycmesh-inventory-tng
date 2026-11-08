@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from inventory_tng import categories
 from inventory_tng.admin.common import (
     ADMIN,
     RULES,
@@ -17,7 +18,7 @@ from inventory_tng.admin.common import (
     name_problem,
     now,
 )
-from inventory_tng.db import DbSession, locked_row, refusal, unique
+from inventory_tng.db import DbSession, refusal, unique
 from inventory_tng.models import Category, Item
 from inventory_tng.pages import not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
@@ -94,7 +95,9 @@ def _category_page(
 
 
 @router.get(CATEGORIES)
-def categories(request: Request, signed: AdminSignedIn, session: DbSession) -> Response:
+def list_categories(
+    request: Request, signed: AdminSignedIn, session: DbSession
+) -> Response:
     return _list_page(request, session, signed)
 
 
@@ -106,11 +109,12 @@ def add_category(
     name: Annotated[str, Form()] = "",
 ) -> Response:
     name = name.strip()
-    added = Category(name=name)
     problem = name_problem(name)
-    if problem is None and not unique(session, lambda: session.add(added)):
-        problem = TAKEN
-    if problem is not None:
+    added = None
+    if problem is None:
+        added, _ = refusal(session, lambda: categories.add(session, name), "unique")
+        problem = None if added else TAKEN
+    if added is None:
         return _list_page(request, session, signed, problem, name)
     session.commit()
     log.info("category added", category_id=added.id)
@@ -135,16 +139,14 @@ def rename_category(
     category_id: int,
     name: Annotated[str, Form()] = "",
 ) -> Response:
-    found = locked_row(session, Category, category_id)
+    found = session.get(Category, category_id)
     if found is None:
         return not_found()
     name = name.strip()
-
-    def rename() -> None:
-        found.name = name
-
     problem = name_problem(name)
-    if problem is None and not unique(session, rename):
+    if problem is None and not unique(
+        session, lambda: categories.rename(session, found, name)
+    ):
         problem = TAKEN
     if problem is not None:
         return _category_page(request, session, signed, found, problem)
@@ -157,15 +159,14 @@ def rename_category(
 def retire_category(
     request: Request, signed: AdminSignedIn, session: DbSession, category_id: int
 ) -> Response:
-    found = locked_row(session, Category, category_id)
+    found = session.get(Category, category_id)
     if found is None or found.retired_at is not None:
         return not_found()
-
-    def retire() -> None:
-        found.retired_at = now()
-
-    # The database decides, items added or brought back meanwhile too.
-    if refusal(session, retire, "category_has_items"):
+    # Under the catalogue lock: items added or brought back meanwhile too.
+    _, broken = refusal(
+        session, lambda: categories.retire(session, found, now()), "category_has_items"
+    )
+    if broken:
         return _category_page(
             request, session, signed, found, RULES["category_has_items"]
         )
@@ -178,14 +179,10 @@ def retire_category(
 def restore_category(
     request: Request, signed: AdminSignedIn, session: DbSession, category_id: int
 ) -> Response:
-    found = locked_row(session, Category, category_id)
+    found = session.get(Category, category_id)
     if found is None or found.retired_at is None:
         return not_found()
-
-    def restore() -> None:
-        found.retired_at = None
-
-    if not unique(session, restore):
+    if not unique(session, lambda: categories.restore(session, found)):
         problem = (
             f"A current category is already called {found.name}: rename one first."
         )

@@ -26,21 +26,30 @@ from fastapi.responses import Response
 from fastapi.testclient import TestClient
 from httpx2 import Response as Answer
 from sqlalchemy import delete, select, text
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, mail, sign_in
+from inventory_tng import (
+    accounts,
+    categories,
+    items,
+    locations,
+    mail,
+    sign_in,
+    volunteers,
+)
 from inventory_tng.admin.admins import ADMINS
 from inventory_tng.admin.volunteers import VOLUNTEERS
 from inventory_tng.db import (
     Base,
     DbSession,
-    describe_error,
+    RuleBroken,
     hold_until_commit,
     locked,
     locked_row,
     release_hold,
 )
+from inventory_tng.ledger import Batch, record
 from inventory_tng.mail import Message, Notify
 from inventory_tng.models import (
     Admin,
@@ -748,24 +757,24 @@ def test_a_form_that_waited_is_asked_for_a_code_if_the_window_shrank(
 
 
 # The catalogue's rules under concurrent writes (inventory-tng-8i4.58): the
-# second write waits, then is refused, rather than the two deadlocking.
+# second write waits for the catalogue lock, or the row, then is refused,
+# rather than the two deadlocking or both passing.
 
 NOW = datetime.now(UTC)
 
-# A request's write: its row locked, then changed and flushed.
-Write = tuple[Callable[[Session], Base], Callable[[Session, Base], None]]
+# A request's write: a domain function, on the request's session.
+Write = Callable[[Session], object]
 
 
 def at_once(committed: Committed, first: Write, second: Write) -> str | None:
-    """The first written, and committed while the second, locking its row
-    then writing, waits: the rule the second was refused by, if any."""
+    """The first written, and committed while the second waits: the rule
+    the second was refused by, if any."""
     one, two = committed.session(), committed.session()
-    (lock_one, change_one), (lock_two, change_two) = first, second
-    change_one(one, lock_one(one))
+    first(one)
     one.flush()
 
     def write_second() -> None:
-        change_two(two, lock_two(two))
+        second(two)
         two.flush()
 
     worker = committed.blocked(two, write_second)
@@ -774,25 +783,23 @@ def at_once(committed: Committed, first: Write, second: Write) -> str | None:
     two.rollback()
     if error is None:
         return None
-    assert isinstance(error, IntegrityError), error
-    return describe_error(error).get("constraint")
+    assert isinstance(error, RuleBroken), error
+    return error.rule
 
 
-def locking[M: Base](model: type[M], ident: int) -> Callable[[Session], Base]:
-    def lock(session: Session) -> Base:
-        found = locked_row(session, model, ident)
-        assert found is not None
-        return found
-
-    return lock
+def either_first(
+    committed: Committed, one: Write, other: Write, *, swapped: bool
+) -> str | None:
+    """at_once, with `one` first, or `other` if `swapped`."""
+    return at_once(committed, *((other, one) if swapped else (one, other)))
 
 
-def setting(**values: object) -> Callable[[Session, Base], None]:
-    def change(_session: Session, row: Base) -> None:
-        for name, value in values.items():
-            setattr(row, name, value)
-
-    return change
+def doing[M: Base](
+    model: type[M], ident: int, change: Callable[[Session, M], object]
+) -> Write:
+    """As a page does: the row loaded, then changed by its domain function,
+    which locks it."""
+    return lambda session: change(session, session.get_one(model, ident))
 
 
 def catalogue(committed: Committed) -> tuple[int, int]:
@@ -805,24 +812,25 @@ def catalogue(committed: Committed) -> tuple[int, int]:
     return category.id, item.id
 
 
+def retiring_category(category_id: int) -> Write:
+    return doing(Category, category_id, lambda s, c: categories.retire(s, c, NOW))
+
+
 @pytest.mark.concurrency
 @pytest.mark.parametrize(
-    ("first", "refused"),
-    [("restore", "category_has_items"), ("retire", "item_category_current")],
+    ("swapped", "refused"),
+    [(False, "category_has_items"), (True, "item_category_current")],
 )
 def test_an_item_comes_back_or_its_category_goes_not_both(
-    committed: Committed, first: str, refused: str
+    committed: Committed, swapped: bool, refused: str
 ) -> None:
     category_id, item_id = catalogue(committed)
-    writes: dict[str, Write] = {
-        "restore": (locking(Item, item_id), setting(retired_at=None)),
-        "retire": (locking(Category, category_id), setting(retired_at=NOW)),
-    }
-    second = "retire" if first == "restore" else "restore"
-    assert at_once(committed, writes[first], writes[second]) == refused
+    restoring = doing(Item, item_id, items.restore)
+    retiring = retiring_category(category_id)
+    assert either_first(committed, restoring, retiring, swapped=swapped) == refused
 
 
-def volunteers(committed: Committed) -> tuple[int, int]:
+def two_volunteers(committed: Committed) -> tuple[int, int]:
     name = tag()
     a, b = Volunteer(name=f"A {name}"), Volunteer(name=f"B {name}")
     made(committed, a, b)
@@ -830,53 +838,104 @@ def volunteers(committed: Committed) -> tuple[int, int]:
 
 
 def merging(volunteer_id: int, into_id: int) -> Write:
-    """As merge_volunteer does: the duplicate locked, then merged."""
-    return (
-        locking(Volunteer, volunteer_id),
-        setting(merged_into_id=into_id, retired_at=NOW),
+    return doing(
+        Volunteer, volunteer_id, lambda s, v: volunteers.merge(s, v, into_id, NOW)
     )
 
 
+def retiring_volunteer(volunteer_id: int) -> Write:
+    return doing(Volunteer, volunteer_id, lambda s, v: volunteers.retire(s, v, NOW))
+
+
 @pytest.mark.concurrency
-@pytest.mark.parametrize("first", ["merge", "retire"])
+@pytest.mark.parametrize("swapped", [False, True])
 def test_a_merge_and_a_retire_of_its_target_not_both(
-    committed: Committed, first: str
+    committed: Committed, swapped: bool
 ) -> None:
-    duplicate, kept = volunteers(committed)
-    writes: dict[str, Write] = {
-        "merge": merging(duplicate, kept),
-        "retire": (locking(Volunteer, kept), setting(retired_at=NOW)),
-    }
-    second = "retire" if first == "merge" else "merge"
-    assert at_once(committed, writes[first], writes[second]) == "volunteer_merge_target"
+    duplicate, kept = two_volunteers(committed)
+    one, other = merging(duplicate, kept), retiring_volunteer(kept)
+    refused = either_first(committed, one, other, swapped=swapped)
+    assert refused == "volunteer_merge_target"
 
 
 @pytest.mark.concurrency
 def test_crossing_merges_queue_and_the_second_is_refused(
     committed: Committed,
 ) -> None:
-    a, b = volunteers(committed)
+    a, b = two_volunteers(committed)
     assert at_once(committed, merging(a, b), merging(b, a)) == "volunteer_merge_target"
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize("swapped", [False, True])
+def test_a_volunteer_starts_holding_stock_or_is_retired_not_both(
+    committed: Committed, swapped: bool
+) -> None:
+    volunteer_id, _ = two_volunteers(committed)
+    holding = doing(Volunteer, volunteer_id, volunteers.hold_stock)
+    retiring = retiring_volunteer(volunteer_id)
+    refused = either_first(committed, holding, retiring, swapped=swapped)
+    assert refused == "location_custody_volunteer"
+
+
+def stores(committed: Committed) -> tuple[int, int, int]:
+    """Two stores, and an area in the first, committed."""
+    name = tag()
+    one, two = (Location(name=f"Store {n} {name}", kind="store") for n in "12")
+    made(committed, one, two)
+    shelf = Location(name=f"Shelf {name}", kind="area", parent_id=one.id)
+    made(committed, shelf)
+    return one.id, two.id, shelf.id
+
+
+def moving(location_id: int, parent_id: int) -> Write:
+    return doing(
+        Location,
+        location_id,
+        lambda s, place: locations.save(s, place, place.name, parent_id),
+    )
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize("swapped", [False, True])
+def test_an_area_moves_in_or_its_new_place_is_retired_not_both(
+    committed: Committed, swapped: bool
+) -> None:
+    _, other, shelf = stores(committed)
+    retiring = doing(Location, other, lambda s, p: locations.retire(s, p, NOW))
+    refused = either_first(committed, moving(shelf, other), retiring, swapped=swapped)
+    assert refused == "location_parent_current"
+
+
+@pytest.mark.concurrency
+def test_crossing_moves_queue_and_the_second_is_refused(committed: Committed) -> None:
+    """Each alone is fine; together they would make a cycle."""
+    store, _, shelf = stores(committed)
+    bin_ = Location(name=f"Bin {tag()}", kind="area", parent_id=store)
+    made(committed, bin_)
+    refused = at_once(committed, moving(shelf, bin_.id), moving(bin_.id, shelf))
+    assert refused == "location_no_cycle"
 
 
 @pytest.mark.concurrency
 def test_an_item_added_while_its_category_is_retired(committed: Committed) -> None:
     """The retire waits for the add, then is refused."""
     category_id, _ = catalogue(committed)
-    adding: Write = (
-        lambda _session: Item(name=f"New {tag()}", category_id=category_id),
-        lambda session, item: session.add(item),
-    )
-    retiring = (locking(Category, category_id), setting(retired_at=NOW))
-    assert at_once(committed, adding, retiring) == "category_has_items"
+
+    def adding(session: Session) -> Item:
+        values = {"name": f"New {tag()}", "category_id": category_id}
+        return items.add(session, values)
+
+    refused = at_once(committed, adding, retiring_category(category_id))
+    assert refused == "category_has_items"
 
 
 @pytest.mark.concurrency
 def test_an_item_added_once_its_category_is_locked_does_not_deadlock(
     committed: Committed,
 ) -> None:
-    """The retire's page has locked the category when the add writes: the
-    add's trigger waits for the rules' lock the page took first, rather than
+    """The retire's page has locked the category when the add starts: the
+    add waits for the catalogue lock the page took first, rather than
     holding it and waiting on the category, then is refused."""
     category_id, _ = catalogue(committed)
     retiring, adding = committed.session(), committed.session()
@@ -884,16 +943,43 @@ def test_an_item_added_once_its_category_is_locked_does_not_deadlock(
     assert category is not None
 
     def add() -> None:
-        adding.add(Item(name=f"New {tag()}", category_id=category_id))
-        adding.flush()
+        items.add(adding, {"name": f"New {tag()}", "category_id": category_id})
 
     worker = committed.blocked(adding, add)
-    category.retired_at = NOW
+    categories.retire(retiring, category, NOW)
     retiring.commit()
     error = worker.finished().error
     adding.rollback()
-    assert isinstance(error, IntegrityError), error
-    assert describe_error(error).get("constraint") == "item_category_current"
+    assert isinstance(error, RuleBroken), error
+    assert error.rule == "item_category_current"
+
+
+@pytest.mark.concurrency
+def test_a_unit_changed_while_a_fraction_is_moved_waits_then_is_refused(
+    own_committed: Committed,
+) -> None:
+    """A save holds its items (its movements' foreign keys share-lock them)
+    until it commits: changing an item's unit waits for it, then sees the
+    fraction it moved. On a database of its own, as it writes the ledger."""
+    category = Category(name="Cables")
+    made(own_committed, category)
+    cable = Item(name="Cat6", category_id=category.id, unit="m")
+    store = Location(name="Store", kind="store")
+    volunteer = Volunteer(name="V")
+    made(own_committed, cable, store, volunteer)
+    receipt = Batch(
+        key=uuid.uuid4(),
+        kind="receipt",
+        volunteer_id=volunteer.id,
+        to_location_id=store.id,
+        lines=[{"item_id": cable.id, "quantity": "1.5"}],
+    )
+    refused = at_once(
+        own_committed,
+        lambda session: record(session, receipt, device_id=None),
+        doing(Item, cable.id, lambda s, item: items.save(s, item, {"unit": "each"})),
+    )
+    assert refused == "movement_whole_units"
 
 
 @pytest.mark.concurrency
@@ -950,6 +1036,35 @@ def test_ending_custody_waits_for_a_save_into_it(
     saving.commit()
     answer = cast(Answer, worker.finished().result)
     assert answer.status_code == 303
+
+
+@pytest.mark.end_to_end
+def test_custody_ended_twice_at_once_is_ended_once(
+    committed: Committed, admins: Admins, real_client: tuple[TestClient, SentMail]
+) -> None:
+    """The second request read the custody as current, then waits for the
+    first: it finds it ended, rather than ending it again later."""
+    client, _ = real_client
+    _, _, key = admins
+    signed_in_as_ben(committed, client, key)
+    volunteer = Volunteer(name=f"V {tag()}")
+    made(committed, volunteer)
+    custody = Location(
+        name=f"Custody {tag()}", kind="custody", volunteer_id=volunteer.id
+    )
+    made(committed, custody)
+    ending = committed.session()
+    held = ending.get_one(Location, custody.id)
+    locations.retire(ending, held, NOW)
+    ending.flush()
+    worker = committed.blocked(
+        None, lambda: client.post(f"{VOLUNTEERS}/{volunteer.id}/custody/end")
+    )
+    ending.commit()
+    answer = cast(Answer, worker.finished().result)
+    assert answer.status_code == 404
+    checking = committed.session()
+    assert checking.get_one(Location, custody.id).retired_at == NOW
 
 
 def inviting(client: TestClient, key: str, username: str) -> Answer:

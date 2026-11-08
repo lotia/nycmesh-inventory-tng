@@ -19,10 +19,11 @@ from inventory_tng.database_role import (
     check,
     refusals,
 )
-from inventory_tng.db import make_engine
+from inventory_tng.db import Base, make_engine
 from inventory_tng.settings import Settings
 
 from databases import OWNER, as_role, superuser_url
+from helpers.rows import refused
 
 
 def on_append_only(privileges: tuple[str, ...]) -> list[str]:
@@ -107,3 +108,51 @@ def test_the_app_may_truncate_no_table(
     """Migration 0001 never grants it; the owner, who may, finds the tables."""
     assert session.scalars(TRUNCATABLE).all() == []
     assert {*APPEND_ONLY, "item"} <= set(owner_session.scalars(TRUNCATABLE))
+
+
+# Columns the app may not change once a row is made (migration 0002), so the
+# rules that rely on them need no check: a label's code and what it names, a
+# package's item, a place's kind and volunteer. Every other column of every
+# other table is the app's to change, but in the tables it only adds to.
+FIXED = {
+    "label": {"id", "created_at", "code", "item_id", "package_id", "location_id"},
+    "item_package": {"id", "created_at", "item_id"},
+    "location": {"id", "created_at", "kind", "volunteer_id"},
+}
+
+
+def test_the_app_may_change_every_column_but_the_fixed(session: Session) -> None:
+    """So a new column on a table with fixed ones fails here until the
+    migration grants it, or it is listed above."""
+    granted: dict[str, set[str]] = {}
+    for table, column in session.execute(
+        text(
+            "SELECT table_name, column_name FROM information_schema.column_privileges"
+            " WHERE grantee = current_user AND privilege_type = 'UPDATE'"
+            " AND table_schema = 'public'"
+        )
+    ):
+        granted.setdefault(table, set()).add(column)
+    expected = {
+        name: set(table.c.keys()) - FIXED.get(name, set())
+        for name, table in Base.metadata.tables.items()
+        if name not in APPEND_ONLY
+    }
+    assert {name: granted.get(name, set()) for name in expected} == expected
+    assert not set(granted) & set(APPEND_ONLY)
+
+
+@pytest.mark.parametrize(
+    ("table", "column"),
+    # Not id: PostgreSQL refuses that first, as an identity.
+    [
+        (t, column)
+        for t, columns in FIXED.items()
+        for column in sorted(columns - {"id"})
+    ],
+)
+def test_a_fixed_column_cannot_be_changed(
+    session: Session, table: str, column: str
+) -> None:
+    with refused(session):
+        session.execute(text(f"UPDATE {table} SET {column} = {column}"))

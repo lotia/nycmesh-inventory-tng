@@ -102,6 +102,16 @@ def test_a_package_and_a_place_have_codes_of_their_own(
     assert f'<form method="post" action="{LABELS}"' in page
 
 
+def test_no_label_for_another_items_package(
+    admin_client: TestClient, session: Session, cable: Item, reel: ItemPackage
+) -> None:
+    """A current package of another item: none of this one's."""
+    other = add(session, Item(name="Radio", category_id=cable.category_id))
+    sent = {"item_id": str(other.id), "package_id": str(reel.id), "copies": "1"}
+    assert admin_client.post(LABELS, data=sent).status_code == 404
+    assert labels_of(session) == []
+
+
 def test_no_labels_for_what_is_retired_or_a_volunteers_custody(
     admin_client: TestClient,
     session: Session,

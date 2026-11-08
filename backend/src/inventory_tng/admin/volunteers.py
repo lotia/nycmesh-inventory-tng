@@ -1,8 +1,8 @@
 """Volunteers: the names the scan page offers (docs/decisions/0004). One who
 can hold stock has a custody location of their own, named for them. A
 duplicate is merged into the volunteer it duplicates: it is retired, and the
-ledger keeps its rows, which readers follow forward. The rules are the
-database's (migration 0002); this page says them in words."""
+ledger keeps its rows, which readers follow forward. The rules are
+volunteers.py's; this page says them in words."""
 
 from collections.abc import Mapping
 from typing import Annotated
@@ -13,17 +13,17 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from inventory_tng import volunteers
 from inventory_tng.accounts import email_problem
 from inventory_tng.admin.common import (
     ADMIN,
     admin_page,
     chosen,
-    holds_stock,
     name_problem,
     now,
     rule_words,
 )
-from inventory_tng.db import DbSession, attempt, get_locked, locked_row
+from inventory_tng.db import DbSession, attempt
 from inventory_tng.models import Location, Volunteer
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
@@ -42,16 +42,6 @@ NOTICES.update(
         "custody_off": "They no longer hold stock.",
     }
 )
-
-
-def _custody(session: Session, volunteer_id: int) -> Location | None:
-    return session.scalar(
-        select(Location).where(
-            Location.kind == "custody",
-            Location.volunteer_id == volunteer_id,
-            Location.retired_at.is_(None),
-        )
-    )
 
 
 def _list_page(
@@ -116,7 +106,7 @@ def _volunteer_page(
             "here": f"{VOLUNTEERS}/{volunteer.id}",
             "list": VOLUNTEERS,
             "volunteer": volunteer,
-            "custody": _custody(session, volunteer.id),
+            "custody": volunteers.custody(session, volunteer.id),
             "merged_into": merged_into,
             "others": others,
             "problems": problems,
@@ -149,7 +139,9 @@ def _checked(name: str, email: str) -> dict[str, str]:
 
 
 @router.get(VOLUNTEERS)
-def volunteers(request: Request, signed: AdminSignedIn, session: DbSession) -> Response:
+def list_volunteers(
+    request: Request, signed: AdminSignedIn, session: DbSession
+) -> Response:
     return _list_page(request, session, signed)
 
 
@@ -163,10 +155,14 @@ def add_volunteer(
 ) -> Response:
     name, email = name.strip(), email.strip()
     problems = _checked(name, email)
-    volunteer = Volunteer(name=name, email=email or None)
-    if not problems and (broken := attempt(session, lambda: session.add(volunteer))):
+    volunteer, broken = None, None
+    if not problems:
+        volunteer, broken = attempt(
+            session, lambda: volunteers.add(session, name, email or None)
+        )
+    if broken:
         problems["name"] = rule_words(broken, TAKEN)
-    if problems:
+    if volunteer is None:
         values = {"name": name, "email": email}
         return _list_page(request, session, signed, problems=problems, values=values)
     session.commit()
@@ -193,21 +189,17 @@ def save_volunteer(
     name: Annotated[str, Form()] = "",
     email: Annotated[str, Form()] = "",
 ) -> Response:
-    found = locked_row(session, Volunteer, volunteer_id)
+    found = session.get(Volunteer, volunteer_id)
     if found is None:
         return not_found()
     name, email = name.strip(), email.strip()
     problems = _checked(name, email)
-    custody = _custody(session, found.id)
-
-    def save() -> None:
-        found.name, found.email = name, email or None
-        # Their custody is named for them.
-        if custody is not None:
-            custody.name = name
-
-    if not problems and (broken := attempt(session, save)):
-        problems["name"] = rule_words(broken, TAKEN)
+    if not problems:
+        _, broken = attempt(
+            session, lambda: volunteers.save(session, found, name, email or None)
+        )
+        if broken:
+            problems["name"] = rule_words(broken, TAKEN)
     if problems:
         values = {"name": name, "email": email}
         return _volunteer_page(
@@ -219,8 +211,9 @@ def save_volunteer(
 
 
 def _current(session: Session, volunteer_id: int) -> Volunteer | None:
-    """A current volunteer, locked."""
-    found = locked_row(session, Volunteer, volunteer_id)
+    """A current volunteer, as the page found them: the domain function
+    reads them again as it locks them (db.relock)."""
+    found = session.get(Volunteer, volunteer_id)
     return None if found is None or found.retired_at is not None else found
 
 
@@ -231,10 +224,9 @@ def hold_stock(
     found = _current(session, volunteer_id)
     if found is None:
         return not_found()
-    if _custody(session, found.id) is None:
-        custody = Location(name=found.name, kind="custody", volunteer_id=found.id)
-        if broken := attempt(session, lambda: session.add(custody)):
-            return _refused(request, session, signed, found, rule_words(broken, TAKEN))
+    _, broken = attempt(session, lambda: volunteers.hold_stock(session, found))
+    if broken:
+        return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
     log.info("custody started", volunteer_id=volunteer_id)
     return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="custody_on")
@@ -245,16 +237,15 @@ def stop_holding_stock(
     request: Request, signed: AdminSignedIn, session: DbSession, volunteer_id: int
 ) -> Response:
     found = session.get(Volunteer, volunteer_id)
-    custody = _custody(session, volunteer_id) if found else None
-    if found is None or custody is None:
+    if found is None or volunteers.custody(session, volunteer_id) is None:
         return not_found()
-    # Their custody, then them: a save's order (locked_row says why).
-    locked_row(session, Location, custody.id)
-    get_locked(session, Volunteer, volunteer_id)  # The rules' lock is held.
-    if holds_stock(session, custody.id):
+    _, broken = attempt(
+        session, lambda: volunteers.stop_holding_stock(session, found, now())
+    )
+    if broken:
+        # location_holds_stock: the one rule ending custody can break.
         problem = "They still hold stock: move it back to a store first."
         return _refused(request, session, signed, found, problem)
-    custody.retired_at = now()
     session.commit()
     log.info("custody ended", volunteer_id=volunteer_id)
     return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="custody_off")
@@ -267,11 +258,8 @@ def retire_volunteer(
     found = _current(session, volunteer_id)
     if found is None:
         return not_found()
-
-    def retire() -> None:
-        found.retired_at = now()
-
-    if broken := attempt(session, retire):
+    _, broken = attempt(session, lambda: volunteers.retire(session, found, now()))
+    if broken:
         return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
     log.info("volunteer retired", volunteer_id=volunteer_id)
@@ -293,11 +281,10 @@ def merge_volunteer(
     into = chosen(session, Volunteer, into_id)
     if into is None or into.id == found.id:
         return _refused(request, session, signed, found, "Pick who they duplicate.")
-
-    def merge() -> None:
-        found.merged_into_id, found.retired_at = into.id, now()
-
-    if broken := attempt(session, merge):
+    _, broken = attempt(
+        session, lambda: volunteers.merge(session, found, into.id, now())
+    )
+    if broken:
         return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
     log.info("volunteer merged", volunteer_id=volunteer_id, merged_into_id=into.id)
@@ -308,15 +295,11 @@ def merge_volunteer(
 def restore_volunteer(
     request: Request, signed: AdminSignedIn, session: DbSession, volunteer_id: int
 ) -> Response:
-    found = locked_row(session, Volunteer, volunteer_id)
+    found = session.get(Volunteer, volunteer_id)
     if found is None or found.retired_at is None:
         return not_found()
-
-    def restore() -> None:
-        # A merged duplicate comes back as itself.
-        found.retired_at, found.merged_into_id = None, None
-
-    if broken := attempt(session, restore):
+    _, broken = attempt(session, lambda: volunteers.restore(session, found))
+    if broken:
         return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
     log.info("volunteer restored", volunteer_id=volunteer_id)

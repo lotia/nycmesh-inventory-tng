@@ -20,6 +20,7 @@ from sqlalchemy import (
     exc,
     exists,
     func,
+    inspect,
     select,
     update,
 )
@@ -221,42 +222,82 @@ def record_last_seen(
         )
 
 
-def attempt(session: Session, change: Callable[[], object]) -> str | None:
+class RuleBroken(Exception):
+    """A change the catalogue's rules refuse, by the rule's name (as
+    admin.common.RULES puts it into words). Raised before anything is
+    written."""
+
+    def __init__(self, rule: str) -> None:
+        super().__init__(rule)
+        self.rule = rule
+
+
+class Gone(Exception):
+    """The row a change is for is no longer as the page found it, such as
+    retired meanwhile by another request: there is nothing here to change,
+    and a page answers not found (pages.ErrorPages)."""
+
+
+def enforce(broken: str | None, *, when: bool = True) -> None:
+    """Raise RuleBroken for `broken`, a rule's name, if `when`: as a rule
+    function returns it, or named for a rule of one condition, as in
+    enforce("category_has_items", when=has_items)."""
+    if broken is not None and when:
+        log.debug("rule broken", rule=broken)
+        raise RuleBroken(broken)
+
+
+def attempt[T](
+    session: Session, change: Callable[[], T]
+) -> tuple[T | None, str | None]:
     """Run `change` in a savepoint, with nothing of it kept if it breaks a
-    rule. Returns None if it held, "unique" if it broke a unique index (as
-    PostgreSQL compares names, ignoring case among current rows), or the
-    name of the check constraint or trigger rule it broke, so a page can say
-    why in its own words. Any other failure is raised."""
+    rule: what it returned, and None; or None, and "unique" if it broke a
+    unique index (as PostgreSQL compares names, ignoring case among current
+    rows), the name of the check constraint it broke, or the rule a domain
+    function refused it by (RuleBroken), so a page can say why in its own
+    words. Any other failure is raised."""
+    held = session.info.get(LOCK_INFO)
     try:
         with session.begin_nested():
-            change()
+            done = change()
             session.flush()
+    except RuleBroken as broken:
+        _unheld(session, held)
+        return None, broken.rule
     except exc.IntegrityError as error:
+        _unheld(session, held)
         sqlstate = getattr(error.orig, "sqlstate", None)
         if sqlstate == UNIQUE_VIOLATION:
-            return "unique"
+            return None, "unique"
         constraint = describe_error(error).get("constraint")
         if sqlstate == CHECK_VIOLATION and constraint:
-            return constraint
+            return None, constraint
         raise
-    return None
+    return done, None
 
 
-def refusal(
-    session: Session, change: Callable[[], object], *expected: str
-) -> str | None:
-    """attempt(), for a change only the `expected` rules may refuse: which
-    did, if one did. Any other rule broken is a bug, and raised."""
-    broken = attempt(session, change)
+def _unheld(session: Session, held: object) -> None:
+    """After a savepoint rolled back: a catalogue lock taken in it went
+    with it."""
+    if held is None:
+        session.info.pop(LOCK_INFO, None)
+
+
+def refusal[T](
+    session: Session, change: Callable[[], T], *expected: str
+) -> tuple[T | None, str | None]:
+    """attempt(), for a change only the `expected` rules may refuse. Any
+    other rule broken is a bug, and raised."""
+    done, broken = attempt(session, change)
     if broken is not None and broken not in expected:
         raise ValueError(f"refused by {broken}, not {', '.join(expected)}")
-    return broken
+    return done, broken
 
 
 def unique(session: Session, change: Callable[[], object]) -> bool:
     """attempt(), for a change only a unique index can refuse: False if it
     did."""
-    return refusal(session, change, "unique") is None
+    return refusal(session, change, "unique")[1] is None
 
 
 UNIQUE_VIOLATION = "23505"
@@ -320,18 +361,101 @@ def install(app: FastAPI) -> None:
         return JSONResponse(body.model_dump(), status_code=503)
 
 
+# The catalogue lock (pg_advisory_xact_lock's key): every write to the
+# catalogue (categories, items and their packages, volunteers, locations,
+# labels) takes it first, in the domain function that makes it, so writes
+# whose rules read other rows go one at a time: two at once could each pass
+# their checks and together break them, such as two moves that make a
+# cycle. Writes are few (administrators), so one lock is enough. Held until
+# the transaction ends, or a savepoint it was taken in is rolled back.
+CATALOGUE_LOCK = 0x696E76656E746F72  # Any fixed key; "inventor" in ASCII.
+CATALOGUE_TABLES = frozenset(
+    ("category", "item", "item_package", "label", "location", "volunteer")
+)
+# What may change without the lock: a receipt lowers what is on order of
+# the items it brings (ledger._receive), which no rule reads.
+UNLOCKED_COLUMNS = {"item": {"on_order"}}
+# Where lock_catalogue notes the transaction that holds the lock.
+LOCK_INFO = "inventory.catalogue_lock"
+
+
+def lock_catalogue(session: Session) -> None:
+    """Take the catalogue lock: wait for any catalogue write under way to
+    end. Taking it again in the same transaction is free."""
+    session.execute(select(func.pg_advisory_xact_lock(CATALOGUE_LOCK)))
+    session.info.setdefault(LOCK_INFO, session.get_transaction())
+
+
+@event.listens_for(Session, "after_transaction_end")
+def _lock_released(session: Session, transaction: object) -> None:
+    if session.info.get(LOCK_INFO) is transaction:
+        del session.info[LOCK_INFO]
+
+
+@event.listens_for(Session, "before_flush")
+def _catalogue_written_under_lock(
+    session: Session, _context: object, _instances: object
+) -> None:
+    """A catalogue row is written only by a domain function, which holds
+    the catalogue lock: anything else is a bug, refused before it is
+    written."""
+    if session.info.get(LOCK_INFO) is not None:
+        return
+    rows = [*session.new, *session.deleted]
+    for row in session.dirty:
+        state = inspect(row)
+        table = getattr(row, "__tablename__", None)
+        changed = {a.key for a in state.attrs if a.history.has_changes()}
+        if changed - UNLOCKED_COLUMNS.get(table or "", set()):
+            rows.append(row)
+    if written := sorted(
+        {table for row in rows if (table := getattr(row, "__tablename__", None))}
+        & CATALOGUE_TABLES
+    ):
+        log.error("catalogue written without its lock", tables=written)
+        raise RuntimeError(f"{written} written without the catalogue lock")
+
+
+def is_current(session: Session, model: type[Base], row_id: int) -> bool:
+    """Whether the row is there and not retired, read afresh: an object the
+    session holds may be from before a lock."""
+    table: Any = model
+    return exists_where(session, table.id == row_id, table.retired_at.is_(None))
+
+
 def locked_row[M: Base](session: Session, model: type[M], ident: object) -> M | None:
-    """A row whose table's triggers check the catalogue's rules, locked for
-    the change a page makes to it (others take db.get_locked): first the
-    rules' lock every catalogue rules trigger takes (lock_catalogue_rules),
-    then the row FOR UPDATE. FOR UPDATE waits for any write under way that
-    refers to the row, such as a save holding its places or a movement of an
-    item, so what the page then reads of them is settled. The rules' lock
-    first keeps one order: a trigger holds it while it checks a reference to
-    this row, so taken after the row it could deadlock (inventory-tng-8i4.58,
-    8i4.69). Saves and counts never take it, but they do wait for a page's
-    row lock (their foreign keys share-lock what they refer to): a page that
-    locks two rows a save also refers to takes them in the save's order, its
-    places then its volunteer, or the two could deadlock (8i4.78)."""
-    session.execute(select(func.lock_catalogue_rules()))
+    """A catalogue row, locked for a change to it (other rows take
+    db.get_locked). Only domain functions lock catalogue rows: a page reads
+    them with session.get, and the function it calls locks them (relock)
+    and reads them again as locked.
+
+    Locks are taken in one order, so no two writes deadlock:
+
+    1. The catalogue lock (lock_catalogue), which every catalogue write
+       takes before it reads what its rules need.
+    2. Then rows, FOR UPDATE: several of a table by id, and places before
+       a volunteer, as a save takes them (volunteers._lock: their custody
+       location, then them).
+
+    FOR UPDATE waits for any write under way that refers to the row, such
+    as a save holding its places or a movement of an item, so what the
+    change then reads of them is settled. Saves, counts and receipts never
+    take the catalogue lock; the one rule input they write, an item's
+    movements, is guarded by the item's row lock instead (items.save). They
+    do hold the rows they refer to (their foreign keys share-lock them): a
+    change that locks two rows a save also refers to takes them in the
+    save's order, its places then its volunteer, or the two could deadlock
+    (inventory-tng-8i4.58, 8i4.69, 8i4.78)."""
+    lock_catalogue(session)
     return get_locked(session, model, ident)
+
+
+def relock(session: Session, row: Base, *, current: bool | None = None) -> None:
+    """locked_row, for a row the session holds: the catalogue lock, then
+    the row, read again as locked into the same object. With `current`,
+    Gone unless the row, as locked, is current (True) or retired (False)."""
+    found = locked_row(session, type(row), inspect(row).identity)
+    assert found is row  # The session's own object, refreshed.
+    retirable: Any = row
+    if current is not None and (retirable.retired_at is None) != current:
+        raise Gone
