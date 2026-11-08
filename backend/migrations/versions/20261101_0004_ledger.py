@@ -3,7 +3,8 @@
 The tables are generated from models.py. The rules that need more than one
 row are triggers, below; each raises a check violation (23514) named for its
 rule. The ledger has no history triggers: it is append-only, so it is its own
-history.
+history. The app's login may only read and add to it: of what 0001 gives it,
+UPDATE and DELETE are taken back here, and it never had TRUNCATE.
 
 Revision ID: 0004
 Revises: 0003
@@ -140,6 +141,9 @@ WHERE side.location_id IS NOT NULL
 GROUP BY m.item_id, side.location_id;
 """
 
+# 0001's: migrations do not import one another.
+APP_ROLE = "inventory_app"
+
 revision: str = "0004"
 down_revision: str | Sequence[str] | None = "0003"
 branch_labels: str | Sequence[str] | None = None
@@ -260,6 +264,7 @@ def upgrade() -> None:
     op.create_index(
         op.f("ix_movement_transaction_id"), "movement", ["transaction_id"], unique=False
     )
+    op.execute(f"REVOKE UPDATE, DELETE ON ledger_transaction, movement FROM {APP_ROLE}")
     op.execute(FUNCTIONS)
     op.execute(TRIGGERS)
     op.execute(BALANCE)

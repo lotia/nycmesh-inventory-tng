@@ -20,9 +20,13 @@ There is no production container image or Helm chart yet
 
 ## Settings
 
-Set these in the environment. Only `DATABASE_URL` is required.
+Set these in the environment. Only `DATABASE_URL` is required, and for
+migrations only `MIGRATION_DATABASE_URL`.
 
-- `DATABASE_URL`: `postgresql://user:password@host:port/database`.
+- `DATABASE_URL`: `postgresql://user:password@host:port/database`, logging
+  in as the app's role (Database roles, below).
+- `MIGRATION_DATABASE_URL`: the same, logging in as the owner. Only
+  migrations read it; the app never needs it.
 - `APP_ENV`: leave unset in production. `development` is for local work
   only: it stops masking personal data in logs and redacting traces, lets the
   cookie travel over http, re-reads the scan page's build on every page, and
@@ -50,6 +54,32 @@ Set these in the environment. Only `DATABASE_URL` is required.
 
 What each logging setting does is in
 [CONTRIBUTING.md](CONTRIBUTING.md#logging).
+
+### Database roles
+
+The app and its migrations log in as two roles, so that the app can read
+and add to the stock ledger but never change or empty it:
+
+- `inventory_owner` owns the database and everything in it, and runs the
+  migrations. On CloudNativePG it is the Cluster's `bootstrap.initdb.owner`,
+  with the database as `bootstrap.initdb.database`; its Secret goes only to
+  whatever migrates.
+- `inventory_app` is the app's login: a managed role (`managed.roles`, with
+  `login: true` and a `passwordSecret`), with no other attributes. The name
+  is fixed: migrations grant to it. Its Secret goes to the app.
+
+Making the two roles is the only step that needs a superuser. The migrations
+grant `inventory_app` what it may do, so nobody grants anything by hand.
+Roles belong to the whole PostgreSQL server: two environments sharing one
+server would share `inventory_app` too, so give each its own server, as each
+CloudNativePG Cluster is.
+
+The app checks its login as it starts and refuses to start, logging
+`database login refused`, if it could `UPDATE`, `DELETE` or `TRUNCATE` the
+ledger, cannot read and add to it, or owns any table: as the owner or a
+superuser, it would. It also refuses to start if it cannot check, logging
+`database login not checked`: the database is out of reach, or not yet
+migrated, so the ledger is not there to check.
 
 ### Debugging with unredacted traces
 
@@ -93,7 +123,7 @@ test -n "$(find /srv/inventory/static-<commit>/assets -name '*.br' -print -quit)
 Then point `FRONTEND_DIST` at the new folder, migrate and restart:
 
 ```sh
-uv run alembic upgrade head    # before starting a new version
+uv run alembic upgrade head    # before starting a new version, as the owner
 uv run python -m inventory_tng --host 0.0.0.0 --port 8000 --workers 2
 ```
 
@@ -105,7 +135,8 @@ says which folder it serves.
 
 `GET /api/healthz` answers 200 when the app can reach the database, and 503
 when it cannot. Use it as a readiness check, not a liveness check: a
-database outage should take the app out of rotation, not restart it.
+database outage once it runs should take the app out of rotation, not
+restart it.
 
 The limits on guessing registration phrases, passwords and codes are kept
 per process, so each worker allows its own attempts.

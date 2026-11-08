@@ -1,7 +1,7 @@
 """How the scan page behaves, as administrators set it."""
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
@@ -71,5 +71,3 @@ def test_the_database_keeps_one_row_and_no_negatives(session: Session) -> None:
 def test_the_row_is_never_deleted(session: Session) -> None:
     with violates(session, "scan_settings_kept"):
         session.delete(session.get_one(ScanSettings, 1))
-    with violates(session, "scan_settings_kept"):
-        session.execute(text("TRUNCATE scan_settings"))

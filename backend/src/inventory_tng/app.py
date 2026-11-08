@@ -14,6 +14,7 @@ from inventory_tng import (
     admin,
     bundle,
     catalogue,
+    database_role,
     db,
     devices,
     health,
@@ -33,12 +34,24 @@ log = structlog.get_logger(__name__)
 API = "/api"
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, *, check_login: bool = True
+) -> FastAPI:
+    """`check_login=False` skips the check of the database login at startup
+    (database_role.py): for tests, which check the login they use once."""
     settings = settings or Settings.from_environ()
     engine = make_engine(settings.database_url)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
+        # Before serving anything: never as a login that could change the
+        # ledger.
+        if check_login:
+            try:
+                database_role.check(engine)
+            except database_role.RefusedLogin:
+                engine.dispose()
+                raise
         log.info("started")
         try:
             yield

@@ -24,6 +24,19 @@ def violates(session: Session, constraint: str) -> Generator[None]:
     assert describe_error(raised.value).get("constraint") == constraint
 
 
+# PostgreSQL's insufficient_privilege.
+PERMISSION_DENIED = "42501"
+
+
+@contextmanager
+def refused(session: Session) -> Generator[None]:
+    """The block's statement is refused for want of a privilege, and rolled
+    back to a savepoint, so the test can go on."""
+    with pytest.raises(exc.ProgrammingError) as raised, session.begin_nested():
+        yield
+    assert describe_error(raised.value).get("sqlstate") == PERMISSION_DENIED
+
+
 def add[T: Base](session: Session, row: T) -> T:
     session.add(row)
     session.flush()

@@ -1,5 +1,7 @@
 """Runs migrations on the connection a caller passes in config.attributes (the
-tests do), or else on DATABASE_URL."""
+tests do), or else on MIGRATION_DATABASE_URL, which logs in as the schema's
+owner (DEPLOYMENT.md, Database roles). It is required, with no fallback to
+DATABASE_URL, the app's login, which cannot create tables."""
 
 from alembic import context
 from sqlalchemy import Connection
@@ -9,7 +11,7 @@ from inventory_tng import models  # noqa: F401
 from inventory_tng.db import Base, make_engine
 from inventory_tng.local_env import load_local_env
 from inventory_tng.logs import configure_logging
-from inventory_tng.settings import Settings
+from inventory_tng.settings import migration_settings
 
 if context.is_offline_mode():
     raise SystemExit("Offline (--sql) migrations are not supported.")
@@ -27,7 +29,7 @@ else:
     # Run from the command line, so this is where the process starts
     # (docs/decisions/0007). The tests pass a connection and keep their own.
     load_local_env()
-    settings = Settings.from_environ()
+    settings = migration_settings()
     configure_logging(settings)
     engine = make_engine(settings.database_url)
     try:

@@ -210,6 +210,18 @@ class Settings:
         )
 
 
+def migration_settings(environ: Mapping[str, str] = os.environ) -> Settings:
+    """What migrations need, and only that: MIGRATION_DATABASE_URL, the
+    owner's login (DEPLOYMENT.md, Database roles), and how to log. A
+    migration Job is given none of the app's other settings."""
+    name = "MIGRATION_DATABASE_URL"
+    return Settings(
+        database_url=_database_url(environ.get(name, ""), name),
+        development=_environment(environ.get("APP_ENV") or "") == "development",
+        logging=LogConfig.from_environ(environ),
+    )
+
+
 def _refuse_development_only(settings: Settings) -> None:
     """The settings that work only with APP_ENV=development, all checked here."""
     if settings.logging.unmask_secrets:
@@ -294,20 +306,20 @@ def _site_url(value: str) -> str:
     return value.rstrip("/")
 
 
-def _database_url(value: str) -> str:
+def _database_url(value: str, name: str = "DATABASE_URL") -> str:
     # An empty variable counts as unset, so a blank line in a .env file cannot
     # stand in for a real value.
     value = value.strip()
     if not value:
-        raise SettingsError("DATABASE_URL is not set")
+        raise SettingsError(f"{name} is not set")
     try:
         url = make_url(value)
     except ArgumentError as error:
-        raise SettingsError(f"DATABASE_URL is not a database URL: {error}") from None
+        raise SettingsError(f"{name} is not a database URL: {error}") from None
     # postgres://, postgresql:// and either with +psycopg all mean psycopg 3.
     backend, _, driver = url.drivername.partition("+")
     if backend not in {"postgres", "postgresql"} or driver not in {"", "psycopg"}:
-        raise SettingsError(f"DATABASE_URL must be PostgreSQL, not {url.drivername}")
+        raise SettingsError(f"{name} must be PostgreSQL, not {url.drivername}")
     return url.set(drivername="postgresql+psycopg").render_as_string(
         hide_password=False
     )

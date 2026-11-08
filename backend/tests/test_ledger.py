@@ -13,6 +13,7 @@ from sqlalchemy import Engine, delete, exc, insert, select, text, update
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
+from inventory_tng.database_role import LEDGER
 from inventory_tng.db import describe_error, set_actor
 from inventory_tng.ledger import balance
 from inventory_tng.models import (
@@ -22,7 +23,7 @@ from inventory_tng.models import (
     Movement,
 )
 
-from helpers.rows import add, violates
+from helpers.rows import add, refused, violates
 from helpers.stock import Place, received, write
 
 URL = "/api/transactions"
@@ -211,7 +212,7 @@ def written(session: Session, place: Place) -> LedgerTransaction:
     return write(session, place)
 
 
-@pytest.mark.parametrize(
+CHANGES = pytest.mark.parametrize(
     "change",
     [
         lambda t: (
@@ -232,19 +233,33 @@ def written(session: Session, place: Place) -> LedgerTransaction:
         "delete movement",
     ],
 )
-def test_the_ledger_is_append_only(
+LEDGER_TABLES = pytest.mark.parametrize("table", LEDGER)
+
+
+@CHANGES
+def test_the_app_may_not_change_the_ledger(
     session: Session, written: LedgerTransaction, change: Callable[..., Any]
 ) -> None:
-    with violates(session, "ledger_append_only"):
+    """Its login lacks the privileges (migrations 0001 and 0004)."""
+    with refused(session):
         session.execute(change(written))
 
 
-@pytest.mark.parametrize("table", ["ledger_transaction", "movement"])
-def test_the_ledger_cannot_be_truncated(session: Session, table: str) -> None:
-    # Nothing written first: PostgreSQL refuses a TRUNCATE in a transaction
-    # with a deferred check still to run.
-    with violates(session, "ledger_append_only"):
+@LEDGER_TABLES
+def test_the_app_may_not_truncate_the_ledger(session: Session, table: str) -> None:
+    with refused(session):
         session.execute(text(f"TRUNCATE {table} CASCADE"))
+
+
+@CHANGES
+def test_the_ledger_is_append_only_even_for_its_owner(
+    owner_session: Session, change: Callable[..., Any]
+) -> None:
+    """The trigger, under the privileges: the owner has every privilege."""
+    set_actor(owner_session, "system:test")
+    written = write(owner_session, Place(owner_session))
+    with violates(owner_session, "ledger_append_only"):
+        owner_session.execute(change(written))
 
 
 def test_movements_are_never_added_to_a_recorded_transaction(

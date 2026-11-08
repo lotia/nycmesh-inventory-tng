@@ -9,6 +9,8 @@ from inventory_tng.app import create_app
 from inventory_tng.request_logging import request_id
 from inventory_tng.settings import LogConfig, Settings
 
+from helpers.apps import out_of_reach
+
 TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736"
 TRACEPARENT = f"00-{TRACE_ID}-00f067aa0ba902b7-01"
 
@@ -102,9 +104,7 @@ def test_successful_health_checks_can_be_quietened(
 
 
 def test_a_failing_health_check_always_shows() -> None:
-    url = "postgresql+psycopg://u:p@127.0.0.1:1/x"
-    settings = Settings(database_url=url, logging=LogConfig(health_checks=False))
-    with TestClient(create_app(settings)) as client, capture_logs() as logs:
-        client.get("/api/healthz")
+    with capture_logs() as logs:
+        out_of_reach(LogConfig(health_checks=False)).get("/api/healthz")
     (line,) = [entry for entry in logs if entry["event"] == "request"]
     assert (line["status"], line["log_level"]) == (503, "info")

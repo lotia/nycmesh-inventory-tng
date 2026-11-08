@@ -77,8 +77,6 @@ def test_the_settings_row_is_one_never_deleted_and_history(session: Session) -> 
         session.add(SiteSettings(id=2))
     with violates(session, "site_settings_kept"):
         session.delete(session.get_one(SiteSettings, 1))
-    with violates(session, "site_settings_kept"):
-        session.execute(text("TRUNCATE site_settings"))
     session.get_one(SiteSettings, 1).time_zone = "America/Chicago"
     session.flush()
     change = history(session, "site_settings")[-1]
