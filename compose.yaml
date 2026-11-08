@@ -6,6 +6,8 @@ services:
   db:
     image: docker.io/library/postgres:18
     environment:
+      # The superuser, which only makes the roles below and the tests'
+      # databases: the app and migrations never log in as it.
       POSTGRES_DB: inventory
       POSTGRES_USER: inventory
       POSTGRES_PASSWORD: inventory
@@ -14,6 +16,9 @@ services:
       - "127.0.0.1:${INVENTORY_DB_PORT:-5433}:5432"
     volumes:
       - db:/var/lib/postgresql
+      # On a new volume only: the owner and app roles, and the database made
+      # the owner's (DEPLOYMENT.md, Database roles).
+      - ./backend/migrations/initdb:/docker-entrypoint-initdb.d:ro,z
     healthcheck:
       # -h, so it asks over TCP: on first start the image runs a setup server
       # on the socket only, and that one must not count. -U and -d only stop
@@ -76,8 +81,10 @@ services:
       OTEL_BSP_SCHEDULE_DELAY:
       OTEL_BLRP_SCHEDULE_DELAY:
       # Its own, where .env's would name localhost, which inside the
-      # container is the container.
-      DATABASE_URL: postgresql://inventory:inventory@db:5432/inventory
+      # container is the container. It migrates as the owner, and serves as
+      # the app.
+      DATABASE_URL: postgresql://inventory_app:inventory_app@db:5432/inventory
+      MIGRATION_DATABASE_URL: postgresql://inventory_owner:inventory_owner@db:5432/inventory
       OTEL_EXPORTER_OTLP_ENDPOINT: ${INVENTORY_APP_OTLP_ENDPOINT:-}
       # Mailpit, when .env sends mail to it on localhost.
       MAIL_HOST: ${INVENTORY_APP_MAIL_HOST:-}

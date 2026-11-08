@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, devices, local_env
 from inventory_tng.app import create_app
+from inventory_tng.database_role import LEDGER, refusals
 from inventory_tng.db import (
     Base,
     make_engine,
@@ -38,7 +39,7 @@ from databases import (
     alembic_config_for,
     create_database,
     drop_database,
-    migrate,
+    migrated_as_owner,
     migrated_engine,
     new_database,
 )
@@ -54,7 +55,7 @@ log = structlog.get_logger(__name__)
 
 
 # The app's settings a developer may export, which would change what tests
-# see. DATABASE_URL is replaced, below.
+# see. DATABASE_URL and MIGRATION_DATABASE_URL are replaced, below.
 FROM_THE_SHELL = (
     "APP_ENV",
     "UNMASK_SECRETS",
@@ -77,10 +78,12 @@ def no_settings_from_the_shell() -> Iterator[None]:
         for name in list(os.environ):
             if name.startswith(("OTEL_", "LOG_", "MAIL_")) or name in FROM_THE_SHELL:
                 monkeypatch.delenv(name)
-        # Code that reads DATABASE_URL itself, such as a command's main(),
-        # finds no database at all rather than the developer's: a test that
+        # Code that reads DATABASE_URL or MIGRATION_DATABASE_URL itself, such
+        # as a command's main(), finds no database at all rather than the
+        # developer's, even after load_local_env() reads .env: a test that
         # needs one takes database_url, the run's own.
-        monkeypatch.setenv("DATABASE_URL", NO_DATABASE)
+        for name in ("DATABASE_URL", "MIGRATION_DATABASE_URL"):
+            monkeypatch.setenv(name, NO_DATABASE)
         yield
 
 
@@ -130,6 +133,8 @@ def restore_logging() -> Iterator[None]:
 
 @pytest.fixture(scope="session")
 def database_url() -> Iterator[str]:
+    """The run's database, as the app logs in to it: inventory_app, which
+    cannot change the ledger (DEPLOYMENT.md, Database roles)."""
     try:
         url = create_database()
     except Unreachable as error:
@@ -141,9 +146,21 @@ def database_url() -> Iterator[str]:
 
 
 @pytest.fixture(scope="session")
-def engine(database_url: str) -> Iterator[Engine]:
+def owner_engine(database_url: str) -> Iterator[Engine]:
+    """The run's database as its owner, who migrated it."""
+    with migrated_as_owner(database_url) as engine:
+        yield engine
+
+
+@pytest.fixture(scope="session")
+def engine(database_url: str, owner_engine: Engine) -> Iterator[Engine]:
+    """The run's database as the app, once migrated. Its login is checked
+    here, once, as the app checks it at startup: apps the tests make skip
+    that (make_app), and test_database_role.py tests the check itself."""
+    del owner_engine
     engine = make_engine(database_url)
-    migrate(engine)
+    with engine.connect() as connection:
+        assert refusals(connection) == {}
     yield engine
     engine.dispose()
 
@@ -176,19 +193,16 @@ def own_engine(own_database: str) -> Iterator[Engine]:
 
 
 @pytest.fixture
-def alembic_config(engine: Engine) -> Iterator[Config]:
+def alembic_config(owner_engine: Engine) -> Iterator[Config]:
     """Migrations run inside a transaction that is rolled back after the test,
     so a failed downgrade cannot leave later tests without a schema."""
-    with engine.connect() as connection:
+    with owner_engine.connect() as connection:
         transaction = connection.begin()
         yield alembic_config_for(connection)
         transaction.rollback()
 
 
-@pytest.fixture
-def session(engine: Engine) -> Iterator[Session]:
-    """A session whose work is rolled back after the test, even if the code
-    under test commits."""
+def _rolled_back(engine: Engine) -> Iterator[Session]:
     with engine.connect() as connection:
         transaction = connection.begin()
         with Session(
@@ -198,9 +212,18 @@ def session(engine: Engine) -> Iterator[Session]:
         transaction.rollback()
 
 
-# Tables whose triggers refuse any delete (migration 0004): what a committed
-# test writes there could never be cleaned up, so it must not.
-APPEND_ONLY = ("ledger_transaction", "movement")
+@pytest.fixture
+def session(engine: Engine) -> Iterator[Session]:
+    """A session whose work is rolled back after the test, even if the code
+    under test commits."""
+    yield from _rolled_back(engine)
+
+
+@pytest.fixture
+def owner_session(owner_engine: Engine) -> Iterator[Session]:
+    """As `session`, logged in as the owner: for what only the owner may do,
+    such as TRUNCATE, or changing the ledger to see its triggers refuse."""
+    yield from _rolled_back(owner_engine)
 
 
 def _newest_ids(connection: Connection) -> dict[str, int]:
@@ -283,14 +306,14 @@ def leaves_the_database_as_it_was(request: pytest.FixtureRequest) -> Iterator[No
     cleans up fails here, itself, rather than a later test that happens to
     count them. Autouse, so set up before the test's other fixtures and torn
     down after them (the session's rollback, committed's cleanup). A test
-    that takes database_url gets the run's database migrated (engine), as
-    the check needs."""
+    that takes database_url gets the run's database migrated (owner_engine),
+    as the check needs."""
     if "database_url" not in request.fixturenames:
         yield
         return
     module = request.node.getparent(pytest.Module)
     assert module is not None  # Every test here is in a module.
-    with _unchanged(request.getfixturevalue("engine"), "the test", module):
+    with _unchanged(request.getfixturevalue("owner_engine"), "the test", module):
         yield
 
 
@@ -304,7 +327,7 @@ def module_leaves_the_database_as_it_was(
     if request.module.__name__ not in _modules_using_the_database(request.session):
         yield
         return
-    engine = request.getfixturevalue("engine")
+    engine = request.getfixturevalue("owner_engine")
     with _unchanged(engine, "the module", request.node):
         yield
 
@@ -324,20 +347,19 @@ def _wait_briefly(connection: DBAPIConnection, _record: object) -> None:
 
 
 @pytest.fixture
-def committed(database_url: str, engine: Engine) -> Iterator[Committed]:
+def committed(database_url: str, owner_engine: Engine) -> Iterator[Committed]:
     """Two requests at once need commits other connections see, which the
     `session` fixture's one transaction is not. Their own engine waits as
-    _wait_briefly says. `engine` has migrated the database. After the test,
-    any connection still waiting is ended, so its thread finishes before its
-    session is closed, and every row they made (any table, any connection,
-    history included) is deleted. Rows they changed but did not make, such
-    as a settings row, are not put back: a test that changes one restores
-    it itself. A committed test must not write the ledger (APPEND_ONLY)."""
-    del engine
+    _wait_briefly says. After the test, any connection still waiting is
+    ended, so its thread finishes before its session is closed, and every
+    row they made (any table, any connection, history included) is deleted,
+    as the owner. Rows they changed but did not make, such as a settings
+    row, are not put back: a test that changes one restores it itself. A
+    committed test must not write the ledger, which nothing can delete."""
     own = make_engine(database_url)
 
     event.listen(own, "connect", _wait_briefly)
-    with own.connect() as connection:
+    with owner_engine.connect() as connection:
         before = _newest_ids(connection)
     committed = Committed(own)
     yield committed
@@ -358,11 +380,12 @@ def committed(database_url: str, engine: Engine) -> Iterator[Committed]:
     for session in committed.sessions:
         with contextlib.suppress(exc.DBAPIError):
             session.close()
-    with own.begin() as connection:
+    own.dispose()
+    with owner_engine.begin() as connection:
         # Only what the test made, each table before what it refers to, and
         # only where it made any. History last, as the deletes write some.
         after = _newest_ids(connection)
-        if grew := sorted(t for t in APPEND_ONLY if after[t] > before[t]):
+        if grew := sorted(t for t in LEDGER if after[t] > before[t]):
             raise RuntimeError(
                 f"a committed test wrote {grew}, whose rows cannot be deleted"
                 " (the ledger is append-only): its rows are left behind"
@@ -377,7 +400,6 @@ def committed(database_url: str, engine: Engine) -> Iterator[Committed]:
             text("DELETE FROM catalogue_history WHERE id > :newest"),
             {"newest": before["catalogue_history"]},
         )
-    own.dispose()
 
 
 @pytest.fixture
@@ -409,7 +431,8 @@ def make_app(
         )
         if mailer is not None:
             settings = dataclasses.replace(settings, mail=SITE_MAIL)
-        app = create_app(settings)
+        # Its login is checked once, by `engine`.
+        app = create_app(settings, check_login=False)
         app.dependency_overrides[get_mailer] = lambda: mailer
         # Each request with a session of its own, as in production, on the
         # database as committed (the `committed` fixture cleans up).

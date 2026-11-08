@@ -1,6 +1,8 @@
 """Databases of their own for tests, on the server compose starts: made,
 migrated and dropped. Each is named for when it was made, so one left
-behind is dropped by a later run."""
+behind is dropped by a later run. Each belongs to the owner role, which
+migrates it; the tests log in as the app's role (DEPLOYMENT.md, Database
+roles), made on the server, if missing, by the file compose runs."""
 
 import re
 import time
@@ -18,19 +20,28 @@ from sqlalchemy.exc import OperationalError
 
 from inventory_tng.db import make_engine
 from inventory_tng.local_env import setting
-from inventory_tng.settings import Settings
 
 log = structlog.get_logger(__name__)
 
 PYPROJECT = Path(__file__).parents[1] / "pyproject.toml"
+ROLES_SQL = Path(__file__).parents[1] / "migrations" / "initdb" / "1-roles.sql"
 
-# The database compose starts: from the shell, else the repository's .env
-# (CONTRIBUTING.md, Local settings), else compose's default port.
+# Compose's superuser, which makes the roles and the databases, on the port
+# from the shell, else the repository's .env (CONTRIBUTING.md, Local
+# settings), else compose's default.
 PORT = setting("INVENTORY_DB_PORT") or "5433"
-SERVER_URL = Settings(
-    database_url=setting("DATABASE_URL")
-    or f"postgresql://inventory:inventory@localhost:{PORT}/inventory"
-).database_url
+SERVER = make_url(f"postgresql+psycopg://inventory:inventory@localhost:{PORT}")
+
+
+def superuser_url(database: str) -> str:
+    """Compose's superuser's URL for `database`."""
+    return SERVER.set(database=database).render_as_string(hide_password=False)
+
+
+SERVER_URL = superuser_url("inventory")
+# The roles ROLES_SQL makes, each with its own name as its password.
+OWNER = "inventory_owner"
+APP = "inventory_app"
 
 TEST_DATABASE = re.compile(r"test_(\d+)_[0-9a-f]{8}")
 LEFT_BEHIND = timedelta(hours=1)
@@ -75,18 +86,29 @@ def database_name(at: int) -> str:
     return f"test_{at}_{uuid.uuid4().hex[:8]}"
 
 
+def as_role(url: str, role: str) -> str:
+    """`url`, logging in as `role`, one of the roles ROLES_SQL makes."""
+    return (
+        make_url(url)
+        .set(username=role, password=role)
+        .render_as_string(hide_password=False)
+    )
+
+
 def create_database(template: str | None = None) -> str:
-    """A database of its own, and its URL: empty, with no schema, or a copy
-    of the database `template`."""
+    """A database of its own, and the URL the app logs in to it with: empty,
+    with no schema, or a copy of the database `template`. The roles are made
+    first, if missing: compose's volume may predate them."""
     name = database_name(int(time.time()))
     server = _server()
     try:
         copy = f' TEMPLATE "{template}"' if template else ""
         with server.connect() as connection:
-            connection.execute(text(f'CREATE DATABASE "{name}"{copy}'))
+            connection.exec_driver_sql(ROLES_SQL.read_text())
+            connection.execute(text(f'CREATE DATABASE "{name}" OWNER {OWNER}{copy}'))
     except OperationalError as error:
         raise Unreachable(
-            f"Cannot reach PostgreSQL at {make_url(SERVER_URL)}. Start it with "
+            f"Cannot reach PostgreSQL at {SERVER}. Start it with "
             f"`mise run compose -- up -d --wait db`.\n{error}"
         ) from error
     finally:
@@ -94,8 +116,7 @@ def create_database(template: str | None = None) -> str:
     log.info("created test database", database=name)
     # Reachable now: sweep up after earlier runs. This one is too new to go.
     drop_left_behind()
-    url = make_url(SERVER_URL).set(database=name)
-    return url.render_as_string(hide_password=False)
+    return as_role(superuser_url(name), APP)
 
 
 def drop_database(url: str) -> None:
@@ -118,20 +139,29 @@ def new_database(template: str | None = None) -> Generator[str]:
 
 
 @contextmanager
-def migrated_engine(url: str) -> Generator[Engine]:
-    """An engine on the database at `url`, migrated, disposed afterwards."""
-    engine = make_engine(url)
+def migrated_as_owner(url: str) -> Generator[Engine]:
+    """An engine on the database at `url` as its owner, which has migrated
+    it to the newest; disposed afterwards."""
+    engine = make_engine(as_role(url, OWNER))
     try:
-        migrate(engine)
+        with engine.begin() as connection:
+            command.upgrade(alembic_config_for(connection), "head")
         yield engine
     finally:
         engine.dispose()
 
 
-def migrate(engine: Engine) -> None:
-    """Every migration, up to the newest."""
-    with engine.begin() as connection:
-        command.upgrade(alembic_config_for(connection), "head")
+@contextmanager
+def migrated_engine(url: str) -> Generator[Engine]:
+    """An engine on the database at `url`, as the app, once migrated;
+    disposed afterwards."""
+    with migrated_as_owner(url):
+        pass
+    engine = make_engine(url)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
 
 
 def alembic_config_for(connection: Connection) -> Config:
@@ -140,5 +170,6 @@ def alembic_config_for(connection: Connection) -> Config:
     return config
 
 
-# What DATABASE_URL is during the tests: nothing listens on port 1.
+# What DATABASE_URL and MIGRATION_DATABASE_URL are during the tests: nothing
+# listens on port 1.
 NO_DATABASE = "postgresql://nobody@127.0.0.1:1/use_the_database_url_fixture"

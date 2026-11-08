@@ -92,14 +92,22 @@ through `uv run`.
 
 ## Local settings
 
-`.env` holds your local settings: the database's port and URL, and any logging
-or telemetry settings you want. Git ignores it, so it never reaches a commit;
-change `.env.example` only to change what everyone starts from. Compose, the
-run command and migrations read `.env`, and the tests read its database
-settings. A value set in your shell wins over the file.
+`.env` holds your local settings: the database's port and URLs, and any
+logging or telemetry settings you want. Git ignores it, so it never reaches a
+commit; change `.env.example` only to change what everyone starts from.
+Compose, the run command and migrations read `.env`, and the tests read its
+database port. A value set in your shell wins over the file.
 
 The database listens on port 5433, so it can run beside MeshDB's. If that port
-is taken, change `INVENTORY_DB_PORT` in `.env`; `DATABASE_URL` follows it.
+is taken, change `INVENTORY_DB_PORT` in `.env`; both URLs follow it.
+
+The app logs in with `DATABASE_URL`, as `inventory_app`, which may read and
+add to the ledger but never change it. Migrations log in with
+`MIGRATION_DATABASE_URL`, as `inventory_owner`, which owns the schema
+(DEPLOYMENT.md, Database roles). Compose makes both roles, with their names
+as passwords, when it creates the database's volume. A volume made before
+them, or a `.env` that still logs in as `inventory`, needs the database
+rebuilt (Migrations, below) and `.env` brought in line with `.env.example`.
 
 ## Running the app
 
@@ -146,6 +154,11 @@ that does, your local database no longer matches its migrations: rebuild
 it, losing its data, with `mise run compose -- down --volumes`, then
 `mise run dev`. Once production runs, a migration is never edited: add a
 new one.
+
+Migrations run as the owner, and every table they create gives the app
+`SELECT`, `INSERT`, `UPDATE` and `DELETE` (migration 0001). A migration
+that creates a table the app must not change revokes what it must not do
+there, as 0004 does for the ledger.
 
 ### Locking a row
 
@@ -291,13 +304,13 @@ up your edits. Pass `--build` again after changing dependencies or
 It takes only the settings `compose.yaml` lists under the app's
 `environment:`, each from your shell or `.env`. A setting the app gains goes
 in `.env.example` and in that list; a test checks that every one
-`.env.example` names is there. The container sets its own
-`DATABASE_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT` and `MAIL_HOST`, because
-inside it `localhost` is the container, and its own `VITE_DEV_SERVER` and
-`FRONTEND_DIST`, so it serves the bundle it built. To send its telemetry
-to the dashboard, start the dashboard (Logging, below) and set
-`INVENTORY_APP_OTLP_ENDPOINT=http://dashboard:18890`; to send mail to
-Mailpit, `INVENTORY_APP_MAIL_HOST=mail`. It takes port 8000, as the run
+`.env.example` names is there. The container sets its own `DATABASE_URL`,
+`MIGRATION_DATABASE_URL`, `OTEL_EXPORTER_OTLP_ENDPOINT` and `MAIL_HOST`,
+because inside it `localhost` is the container, and its own
+`VITE_DEV_SERVER` and `FRONTEND_DIST`, so it serves the bundle it built. To
+send its telemetry to the dashboard, start the dashboard (Logging, below)
+and set `INVENTORY_APP_OTLP_ENDPOINT=http://dashboard:18890`; to send mail
+to Mailpit, `INVENTORY_APP_MAIL_HOST=mail`. It takes port 8000, as the run
 command does; `INVENTORY_APP_PORT` moves it. The client address it logs is
 the container network's, not your browser's.
 
@@ -368,11 +381,15 @@ mise run check-toml     # taplo: lint and formatting (mise run fix-toml formats)
 
 Each test run creates a database of its own on that server and drops it at
 the end; a run that was killed before it could is dropped by a later one.
-During the tests, `DATABASE_URL` points nowhere, so nothing reaches your own
-data: a test that needs the database takes the `database_url` fixture. Write
-tests in pytest style. `tests/conftest.py` holds fixtures, hooks and what
-only they use; what tests share besides is in `tests/helpers/`, which
-they import from, never from conftest.py or from one another.
+It makes the two roles first if the server lacks them. During the tests,
+`DATABASE_URL` and `MIGRATION_DATABASE_URL` point nowhere, so nothing
+reaches your own data: a test that needs the database takes the
+`database_url` fixture. Tests log in as the app; one that needs what only
+the owner may do, such as `TRUNCATE`, takes `owner_session` or
+`owner_engine`. Write tests in pytest style. `tests/conftest.py` holds
+fixtures, hooks and what only they use; what tests share besides is in
+`tests/helpers/`, which they import from, never from conftest.py or from
+one another.
 Tests run in a random order, the backend's with pytest-randomly and the
 frontend's with Vitest's shuffle, so none can depend on another. Each run
 prints its seed; to run that order again, pass it: `uv run pytest

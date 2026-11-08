@@ -2,7 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from inventory_tng.settings import FrontendConfig, Settings, SettingsError
+from inventory_tng.settings import (
+    FrontendConfig,
+    Settings,
+    SettingsError,
+    migration_settings,
+)
 
 URL = "postgresql://u:p@db/x"
 
@@ -24,6 +29,35 @@ def test_checks_a_url_given_directly_too() -> None:
 def test_refuses_a_missing_or_empty_database_url(environ: dict[str, str]) -> None:
     with pytest.raises(SettingsError, match="DATABASE_URL"):
         Settings.from_environ(environ)
+
+
+def test_migrations_read_their_own_url_and_no_app_settings() -> None:
+    """MIGRATION_DATABASE_URL, the owner's login (migrations/env.py): a
+    migration needs no DATABASE_URL, and the app's other settings, even
+    unusable ones, do not stop it."""
+    environ = {
+        "MIGRATION_DATABASE_URL": "postgresql://owner:p@db/x",
+        "MAIL_HOST": "smtp.example.org",
+        "LOG_FORMAT": "json",
+    }
+    settings = migration_settings(environ)
+    assert settings.database_url == "postgresql+psycopg://owner:p@db/x"
+    assert settings.logging.format == "json"
+    assert settings.mail is None
+
+
+@pytest.mark.parametrize(
+    ("environ", "error"),
+    [
+        ({"DATABASE_URL": URL}, "MIGRATION_DATABASE_URL is not set"),
+        ({"MIGRATION_DATABASE_URL": "sqlite:///x.db"}, "MIGRATION_DATABASE_URL must"),
+    ],
+)
+def test_migrations_refuse_a_missing_or_wrong_url(
+    environ: dict[str, str], error: str
+) -> None:
+    with pytest.raises(SettingsError, match=error):
+        migration_settings(environ)
 
 
 @pytest.mark.parametrize(

@@ -12,8 +12,9 @@ from inventory_tng.db import make_engine
 from databases import NO_DATABASE, SERVER_URL, database_name, drop_left_behind
 
 
-def test_the_shells_database_url_is_out_of_reach() -> None:
+def test_the_shells_database_urls_are_out_of_reach() -> None:
     assert os.environ["DATABASE_URL"] == NO_DATABASE
+    assert os.environ["MIGRATION_DATABASE_URL"] == NO_DATABASE
 
 
 def test_the_run_uses_a_database_of_its_own(database_url: str) -> None:

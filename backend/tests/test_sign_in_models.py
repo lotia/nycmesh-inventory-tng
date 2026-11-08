@@ -66,8 +66,6 @@ def test_the_settings_row_is_one_and_never_deleted(session: Session) -> None:
         session.add(SignInSettings(id=2))
     with violates(session, "sign_in_settings_kept"):
         session.delete(session.get_one(SignInSettings, 1))
-    with violates(session, "sign_in_settings_kept"):
-        session.execute(text("TRUNCATE sign_in_settings"))
 
 
 def test_usernames_are_unique_ignoring_case_even_once_retired(

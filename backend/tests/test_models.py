@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import Engine, delete, select, text, update
 from sqlalchemy.orm import Session
 
+from inventory_tng.database_role import LEDGER
 from inventory_tng.db import Base, refusal, set_actor
 from inventory_tng.models import (
     LABEL_ALPHABET,
@@ -427,3 +428,23 @@ def test_history_refuses_a_name_as_actor(session: Session) -> None:
     session.execute(text("SELECT set_config('inventory.actor', 'Jane Doe', true)"))
     with violates(session, "ck_catalogue_history_actor"):
         session.add(Category(name="Tools"))
+
+
+@pytest.mark.parametrize(
+    ("table", "rule"),
+    [
+        ("site_settings", "site_settings_kept"),
+        ("scan_settings", "scan_settings_kept"),
+        ("sign_in_settings", "sign_in_settings_kept"),
+        *((table, "ledger_append_only") for table in LEDGER),
+    ],
+)
+def test_tables_kept_whole_cannot_be_truncated(
+    owner_session: Session, table: str, rule: str
+) -> None:
+    """Even by the owner, who alone may TRUNCATE (test_database_role.py).
+    CASCADE, as the ledger's movements refer to its transactions; on the
+    ledger with nothing written first, as PostgreSQL refuses a TRUNCATE in a
+    transaction with a deferred check still to run."""
+    with violates(owner_session, rule):
+        owner_session.execute(text(f"TRUNCATE {table} CASCADE"))

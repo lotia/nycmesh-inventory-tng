@@ -8,7 +8,7 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
-from sqlalchemy import select
+from sqlalchemy import Engine, select
 from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 
@@ -451,26 +451,30 @@ def test_a_count_form_does_not_hold_up_saves(committed: Committed) -> None:
 
 
 @pytest.mark.concurrency
-def test_a_save_at_the_place_waits_for_a_count(committed: Committed) -> None:
+def test_a_save_at_the_place_waits_for_a_count(
+    committed: Committed, owner_engine: Engine
+) -> None:
     """Before it has an id: one drawn first could be committed after the
     count's moment, though lower (inventory-tng-099)."""
     place = a_store(committed)
     counting = committed.session()
     lock_place(counting, place.store.id)
-    before = ids_drawn(counting)
+    before = ids_drawn(owner_engine)
     saving = committed.session()
     worker = committed.blocked(saving, lambda: receive(saving, place))
-    assert ids_drawn(committed.session()) == before
+    assert ids_drawn(owner_engine) == before
     counting.rollback()
     assert worker.finished().error is None
     saving.rollback()
 
 
-def ids_drawn(session: Session) -> tuple[int, bool]:
-    """How far the ledger's ids have been handed out."""
-    last, called = session.execute(
-        sql_text("SELECT last_value, is_called FROM ledger_transaction_id_seq")
-    ).one()
+def ids_drawn(owner_engine: Engine) -> tuple[int, bool]:
+    """How far the ledger's ids have been handed out: read as the owner, as
+    the app has no privileges on the sequence, nor needs any."""
+    with owner_engine.connect() as connection:
+        last, called = connection.execute(
+            sql_text("SELECT last_value, is_called FROM ledger_transaction_id_seq")
+        ).one()
     return last, called
 
 
