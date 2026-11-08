@@ -24,7 +24,8 @@ violations (SQLSTATE 23514) named for the rule, as describe_error() logs.
 The catalogue's rules that need other rows are the app's: each table is
 written only by its own module (locations, volunteers, categories, items,
 labels), under the catalogue lock (db.locked_row), which raises
-db.RuleBroken named for the rule. The ledger's and the settings' are still
+db.RuleBroken named for the rule. So are the ledger's, which
+ledger.insert_transaction, its one writer, checks. The settings' are still
 triggers, in the migrations that create those tables.
 """
 
@@ -445,7 +446,9 @@ class LedgerTransaction(Base):
     once (docs/decisions/0003). A NULL side is outside the system: a delivery
     coming in, an install going out. Its movements are written with it, all or
     none, and neither is ever changed or deleted: a mistake is fixed by a
-    count or an adjustment. The rules are in migration 0004."""
+    count or an adjustment. The app's login may only read and add to it
+    (migration 0004), and ledger.insert_transaction, which writes it, checks
+    its rules."""
 
     __tablename__ = "ledger_transaction"
     __table_args__ = (
@@ -479,7 +482,7 @@ class LedgerTransaction(Base):
     )
 
     id: Mapped[IntId]
-    # The server's clock, always: a trigger sets it, whatever was sent.
+    # The server's clock, always: insert_transaction sets it to now().
     created_at: Mapped[CreatedAt]
     # The client's, so a batch sent twice is written once.
     idempotency_key: Mapped[uuid.UUID] = mapped_column(unique=True)

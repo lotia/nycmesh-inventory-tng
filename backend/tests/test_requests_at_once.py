@@ -18,6 +18,7 @@ CONTRIBUTING.md says how to run or skip a kind.
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import cast
 
 import pytest
@@ -49,7 +50,7 @@ from inventory_tng.db import (
     locked_row,
     release_hold,
 )
-from inventory_tng.ledger import Batch, record
+from inventory_tng.ledger import insert_transaction
 from inventory_tng.mail import Message, Notify
 from inventory_tng.models import (
     Admin,
@@ -67,6 +68,7 @@ from helpers.concurrency import Committed, Worker, made
 from helpers.mail import SentMail
 from helpers.rows import tag
 from helpers.sign_in import PASSWORD, code, new_admin, reset_link, sign_in_with
+from helpers.stock import Place
 
 NEW_PASSWORD = "a long passphrase of their own"
 
@@ -954,32 +956,51 @@ def test_an_item_added_once_its_category_is_locked_does_not_deadlock(
     assert error.rule == "item_category_current"
 
 
+def stocking(committed: Committed) -> Place:
+    """A Place, committed."""
+    setup = committed.session()
+    place = Place(setup)
+    setup.commit()
+    return place
+
+
+def receiving(item: Item, store: Location, amount: str) -> Write:
+    """A receipt of `amount` of the item into the store, as the ledger
+    writes every save, count and adjustment."""
+    header = {"kind": "receipt", "to_location_id": store.id}
+    return lambda session: insert_transaction(
+        session, uuid.uuid4(), header, {item.id: Decimal(amount)}
+    )
+
+
 @pytest.mark.concurrency
+@pytest.mark.parametrize("swapped", [False, True])
 def test_a_unit_changed_while_a_fraction_is_moved_waits_then_is_refused(
+    own_committed: Committed, swapped: bool
+) -> None:
+    """A save holds its items FOR KEY SHARE (ledger.hold) until it
+    commits, and changing an item's unit holds it FOR UPDATE: whichever
+    comes second waits, then is refused by its own module's rule, of the
+    same name. On a database of its own, as it writes the ledger."""
+    place = stocking(own_committed)
+    to_each = doing(
+        Item, place.cable.id, lambda s, item: items.save(s, item, {"unit": "each"})
+    )
+    receipt = receiving(place.cable, place.store, "1.5")
+    refused = either_first(own_committed, receipt, to_each, swapped=swapped)
+    assert refused == "movement_whole_units"
+
+
+@pytest.mark.concurrency
+def test_a_receipt_while_its_item_is_retired_waits_then_is_refused(
     own_committed: Committed,
 ) -> None:
-    """A save holds its items (its movements' foreign keys share-lock them)
-    until it commits: changing an item's unit waits for it, then sees the
-    fraction it moved. On a database of its own, as it writes the ledger."""
-    category = Category(name="Cables")
-    made(own_committed, category)
-    cable = Item(name="Cat6", category_id=category.id, unit="m")
-    store = Location(name="Store", kind="store")
-    volunteer = Volunteer(name="V")
-    made(own_committed, cable, store, volunteer)
-    receipt = Batch(
-        key=uuid.uuid4(),
-        kind="receipt",
-        volunteer_id=volunteer.id,
-        to_location_id=store.id,
-        lines=[{"item_id": cable.id, "quantity": "1.5"}],
-    )
-    refused = at_once(
-        own_committed,
-        lambda session: record(session, receipt, device_id=None),
-        doing(Item, cable.id, lambda s, item: items.save(s, item, {"unit": "each"})),
-    )
-    assert refused == "movement_whole_units"
+    """Retiring holds the item FOR UPDATE: a receipt of it waits, then sees
+    it retired. On a database of its own, in case the receipt is written."""
+    place = stocking(own_committed)
+    retiring = doing(Item, place.item.id, lambda s, i: items.retire(s, i, NOW))
+    refused = at_once(own_committed, retiring, receiving(place.item, place.store, "1"))
+    assert refused == "receipt_retired_item"
 
 
 @pytest.mark.concurrency

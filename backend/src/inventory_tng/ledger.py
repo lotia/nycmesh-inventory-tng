@@ -2,9 +2,13 @@
 
 The scan page sends a batch with a key it made; a batch sent again with the
 same key, after a dropped connection or from the outbox, is written once.
-The tables' rules are in PostgreSQL (migration 0004), for every writer; the
-checks here are the ones that can name what is wrong, line by line, so a
-volunteer can fix it.
+insert_transaction is the one function that writes the ledger: saves,
+counts and adjustments all reach it, and it refuses what breaks the
+ledger's rules (db.RuleBroken), as hold() finds them. A batch's are said
+line by line, so a volunteer is told which line to fix.
+The app's login may only read and add to the ledger (DEPLOYMENT.md,
+Database roles), and nothing here adds movements to a transaction already
+written, so a transaction never changes once written.
 
 Two choices that keep a volunteer's work from being lost:
 
@@ -14,11 +18,12 @@ Two choices that keep a volunteer's work from being lost:
   item is never received (docs/decisions/0003), so a receipt of one is
   refused, and the outbox says so.
 - The server's clock decides when a batch happened, not the phone's: a batch
-  resent from the outbox is recorded when it arrives.
+  resent from the outbox is recorded when it arrives. created_at is the
+  database's now(), and nothing sent sets it.
 """
 
 import uuid
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from decimal import Decimal
 from typing import Annotated, Literal, NamedTuple
 
@@ -28,26 +33,30 @@ from fastapi.responses import JSONResponse
 from opentelemetry import metrics
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import (
-    Column,
     ColumnElement,
-    Integer,
-    MetaData,
     Select,
-    Table,
+    Subquery,
     any_,
     func,
     insert,
     or_,
     select,
+    union_all,
 )
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import DbSession, exists_where, get_locked, locked, set_actor
+from inventory_tng.db import (
+    DbSession,
+    enforce,
+    exists_where,
+    get_locked,
+    locked,
+    set_actor,
+)
 from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
 from inventory_tng.models import (
     INTEGER_MAX,
-    QUANTITY,
     STORE_KINDS,
     Item,
     LedgerTransaction,
@@ -61,15 +70,37 @@ meter = metrics.get_meter(__name__)
 
 router = APIRouter()
 
-# The view migration 0004 creates, in a MetaData of its own so autogenerate
-# does not try to make it a table.
-balance = Table(
-    "balance",
-    MetaData(),
-    Column("item_id", Integer),
-    Column("location_id", Integer),
-    Column("quantity", QUANTITY),
-)
+
+def _balance() -> Subquery:
+    """In minus out, for every item and place stock has been at: a place
+    whose stock all left keeps its row, at zero. Each side of a transaction
+    is a select of its own, joined by UNION ALL, so a filter on a place or
+    an item reaches the indexes on each side, instead of summing the whole
+    ledger first."""
+    moved = select(Movement.item_id).join(
+        LedgerTransaction, LedgerTransaction.id == Movement.transaction_id
+    )
+    into = moved.add_columns(
+        LedgerTransaction.to_location_id.label("location_id"),
+        Movement.quantity.label("quantity"),
+    ).where(LedgerTransaction.to_location_id.is_not(None))
+    out = moved.add_columns(
+        LedgerTransaction.from_location_id, -Movement.quantity
+    ).where(LedgerTransaction.from_location_id.is_not(None))
+    side = union_all(into, out).subquery("side")
+    return (
+        select(
+            side.c.item_id,
+            side.c.location_id,
+            func.sum(side.c.quantity).label("quantity"),
+        )
+        .group_by(side.c.item_id, side.c.location_id)
+        .subquery("balance")
+    )
+
+
+# Read as a table: select(balance.c.quantity).where(balance.c.item_id == ...).
+balance = _balance()
 
 
 # Less than nothing at a place: the records are wrong there until it is
@@ -79,7 +110,7 @@ SHORT = balance.c.quantity < 0
 
 def in_stores(items: Select[int]) -> Select[int, Decimal, bool]:
     """Each of `items`' stock across the current stores and their areas,
-    and whether any of it is SHORT there. The ids go to the view as arrays,
+    and whether any of it is SHORT there. The ids go to balance as arrays,
     as in retired_in_stock, so only those balances are summed."""
     places = func.array(
         select(Location.id)
@@ -103,7 +134,7 @@ def in_stores(items: Select[int]) -> Select[int, Decimal, bool]:
 def retired_in_stock() -> Select[tuple[int]]:
     """The ids of retired items with some left at a current place: what
     volunteers may still take, and administrators write off. The retired ids
-    go to the view as an array, which PostgreSQL pushes down to the movement
+    go to balance as an array, which PostgreSQL pushes down to the movement
     index, so only their balances are summed, however long the ledger."""
     retired = func.array(
         select(Item.id).where(Item.retired_at.is_not(None)).scalar_subquery()
@@ -135,9 +166,34 @@ def takeable() -> ColumnElement[bool]:
 
 
 def whole_enough(unit: str, amount: Decimal) -> bool:
-    """An item counted in each moves in whole units (migration 0004's
-    movement_whole_units, said where a person can fix it)."""
+    """An item counted in each moves in whole units."""
     return unit != "each" or amount == amount.to_integral_value()
+
+
+def line_breaks(kind: str, item: Item, amount: Decimal) -> list[str]:
+    """The ledger's rules a line of a transaction of this kind breaks,
+    moving `amount` of `item`: whole units for an item counted in each, and
+    a retired item never received (docs/decisions/0003). Empty if it
+    breaks none."""
+    broken = []
+    if not whole_enough(item.unit, amount):
+        broken.append("movement_whole_units")
+    if item.retired_at is not None and kind == "receipt":
+        broken.append("receipt_retired_item")
+    return broken
+
+
+def lines_break(
+    kind: str, items: Mapping[int, Item], lines: Iterable[tuple[int, Decimal]]
+) -> list[list[str] | None]:
+    """For each line, of an item id and an amount, the rules it breaks
+    (line_breaks), or None if its item is not in `items`."""
+    return [
+        None
+        if (item := items.get(item_id)) is None
+        else line_breaks(kind, item, amount)
+        for item_id, amount in lines
+    ]
 
 
 def on_order_after(on_order: Decimal, received: Decimal) -> Decimal:
@@ -154,7 +210,7 @@ def expected(
     items: Collection[int] | None = None,
 ) -> dict[int, Decimal]:
     """What the records say is at a place, by item: only what is not zero,
-    as the balance view says now; with as_of, what they said at that moment
+    as balance says now; with as_of, what they said at that moment
     (see moment()), of `items` only if given."""
     if as_of is not None:
         (flows,) = _flows(
@@ -338,17 +394,14 @@ def record(
     if (written := _replay(session, batch)) is not None:
         return written, False
     header = {"device_id": device_id, **_header(batch)}
-    problems = _problems(session, batch, _hold_places(session, header))
+    lines = {line.item_id: line.quantity for line in batch.lines}
+    held = hold(session, header, lines)
+    problems = _problems(session, batch, held)
     if problems:
         refused.add(1, {"reason": "invalid"})
         log.info("batch refused", problems=sorted({kind for _, kind in problems}))
         raise BatchRefused(problems)
-    transaction = insert_transaction(
-        session,
-        batch.key,
-        header,
-        {line.item_id: line.quantity for line in batch.lines},
-    )
+    transaction = insert_transaction(session, batch.key, header, lines, held=held)
     if transaction is None:
         written = _replay(session, batch)
         assert written is not None  # The conflict was on this key.
@@ -356,11 +409,24 @@ def record(
     return transaction, True
 
 
+# A save, count or adjustment holds the rows it refers to until it ends, so
+# what it read of them holds when it is written, in this order, as every
+# change that locks rows a save refers to must (db.locked_row):
+#
+# 1. Its places, FOR KEY SHARE (_hold_places), before it has an id.
+# 2. Its items, FOR KEY SHARE, by id (hold): what the ledger's rules read
+#    of them, a unit and whether retired. Changing either takes FOR UPDATE
+#    (items.save, items.retire), which waits for it, and it for that.
+# 3. Its volunteer, device and administrator, FOR KEY SHARE, as the
+#    transaction's foreign keys take them.
+# 4. A receipt's items, FOR NO KEY UPDATE, by id (_receive), to lower what
+#    is on order, which KEY SHARE does not wait for.
+
+
 def _hold_places(session: Session, header: Mapping[str, object]) -> set[int]:
-    """A save's places, held FOR KEY SHARE until it ends, before it has an
-    id: a count (lock_place) then waits for it whole, so none can draw an
-    id, wait, and commit after a count's moment that it falls inside. The
-    ids of those that exist."""
+    """A save's places, held before it has an id: a count (lock_place) then
+    waits for it whole, so none can draw an id, wait, and commit after a
+    count's moment that it falls inside. The ids of those that exist."""
     return set(
         session.scalars(
             locked(
@@ -377,22 +443,51 @@ def _hold_places(session: Session, header: Mapping[str, object]) -> set[int]:
     )
 
 
+class Held(NamedTuple):
+    """The rows hold() holds that exist: places by id, and items."""
+
+    places: set[int]
+    items: dict[int, Item]
+
+
+def hold(
+    session: Session, header: Mapping[str, object], item_ids: Collection[int]
+) -> Held:
+    """Hold a transaction's places, then its items."""
+    places = _hold_places(session, header)
+    if not item_ids:
+        return Held(places, {})
+    query = select(Item).where(Item.id.in_(list(item_ids))).order_by(Item.id)
+    held = session.scalars(locked(query, key_share=True, shared=True))
+    return Held(places, {item.id: item for item in held})
+
+
 def insert_transaction(
     session: Session,
     key: uuid.UUID,
     header: Mapping[str, object],
     lines: Mapping[int, Decimal],
+    *,
+    held: Held | None = None,
 ) -> LedgerTransaction | None:
     """A transaction and its movements, unless its key is written already:
-    None then. A concurrent request with the same key waits here for that
-    one to commit, then writes nothing. Its places are held first
-    (_hold_places), even when the caller holds them already: one more
-    indexed query, which keeps every caller safe. A receipt lowers what is
-    on order of each item it brings (on_order_after)."""
-    _hold_places(session, header)
+    None then, once a request writing it under way has committed. The one
+    writer of the ledger. RuleBroken, before anything is written, for a
+    transaction with no lines but a count, or a line that breaks a rule.
+    `held` is hold()'s for these, if the caller took it in this
+    transaction; else it is taken here. created_at is the database's
+    now(), whatever the header says. A receipt lowers what is on order of
+    each item it brings."""
+    kind = str(header["kind"])
+    enforce("ledger_transaction_lines", when=not lines and kind != "count")
+    items = (held or hold(session, header, lines)).items
+    for broken in lines_break(kind, items, lines.items()):
+        # An item that does not exist is the foreign key's to refuse.
+        for rule in broken or ():
+            enforce(rule)
     transaction = session.scalar(
         pg_insert(LedgerTransaction)
-        .values(idempotency_key=key, **header)
+        .values({**header, "idempotency_key": key, "created_at": func.now()})
         .on_conflict_do_nothing(index_elements=["idempotency_key"])
         .returning(LedgerTransaction)
     )
@@ -427,32 +522,31 @@ def _receive(session: Session, lines: Mapping[int, Decimal]) -> None:
         item.on_order = on_order_after(item.on_order, lines[item.id])
 
 
-def _problems(session: Session, batch: Batch, places: set[int]) -> list[Problem]:
-    """What is wrong with a batch, whose `places` are those of its places
-    that exist."""
+# Each of line_breaks' rules, as a batch's problem: which field, and what.
+LINE_PROBLEMS: dict[str, tuple[str, Literal["not_whole", "retired"]]] = {
+    "movement_whole_units": ("quantity", "not_whole"),
+    "receipt_retired_item": ("item_id", "retired"),
+}
+
+
+def _problems(session: Session, batch: Batch, held: Held) -> list[Problem]:
+    """What is wrong with a batch, line by line, with its rows held
+    (hold)."""
     problems: list[Problem] = []
     if session.get(Volunteer, batch.volunteer_id) is None:
         problems.append((("volunteer_id",), "not_found"))
     for field in ("from_location_id", "to_location_id"):
         location_id = getattr(batch, field)
-        if location_id is not None and location_id not in places:
+        if location_id is not None and location_id not in held.places:
             problems.append(((field,), "not_found"))
-    items = {
-        item.id: item
-        for item in session.scalars(
-            select(Item).where(Item.id.in_({line.item_id for line in batch.lines}))
-        )
-    }
-    for number, line in enumerate(batch.lines):
-        item = items.get(line.item_id)
-        if item is None:
+    lines = [(line.item_id, line.quantity) for line in batch.lines]
+    for number, broken in enumerate(lines_break(batch.kind, held.items, lines)):
+        if broken is None:
             problems.append((("lines", number, "item_id"), "not_found"))
             continue
-        if not whole_enough(item.unit, line.quantity):
-            problems.append((("lines", number, "quantity"), "not_whole"))
-        # Retired: what is left goes, nothing more comes in.
-        if item.retired_at is not None and batch.kind == "receipt":
-            problems.append((("lines", number, "item_id"), "retired"))
+        for rule in broken:
+            field, kind = LINE_PROBLEMS[rule]
+            problems.append((("lines", number, field), kind))
     return problems
 
 
