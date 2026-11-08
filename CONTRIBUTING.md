@@ -182,10 +182,12 @@ per kind of change, which take the catalogue lock, lock and read what the
 rules need, and refuse a change that breaks one by raising `db.RuleBroken`
 with the rule's name. `db.attempt` returns that name, and
 `admin/common.py`'s `RULES` says it in words. A page reads rows with
-`session.get` and leaves locking to those functions. A flush that writes a
-catalogue row without the catalogue lock is refused, and
-`tests/test_write_owners.py` fails when another module makes or deletes
-one.
+`session.get` and leaves locking to those functions. The ledger is
+written only by `ledger.insert_transaction`, which saves, counts and
+adjustments all call, and which checks its rules the same way. A flush that
+writes a catalogue row without the catalogue lock is refused, and
+`tests/test_write_owners.py` fails when another module or function writes
+one of these tables, or deletes any row.
 
 ### Locking a row
 
@@ -435,7 +437,7 @@ prints its seed; to run that order again, pass it: `uv run pytest
 
 Every test leaves the database as it found it: the `session` fixture rolls
 back; a test whose code commits takes the `committed` fixture, which deletes
-the rows it made; one that must commit what nothing can delete, such as the
+the rows it made; one that must commit what is never deleted, such as the
 ledger, takes `own_database`, a migrated database for it alone. A test, or
 a module through its module-scoped fixtures, that leaves any row added,
 changed or deleted fails, named by `leaves_the_database_as_it_was` in

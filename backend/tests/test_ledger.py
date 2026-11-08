@@ -1,5 +1,6 @@
-"""The ledger (docs/decisions/0003): its rules in the database, and the batch
-endpoint the scan page saves to."""
+"""The ledger (docs/decisions/0003): its rules, which insert_transaction
+enforces, the privileges that keep it append-only, and the batch endpoint
+the scan page saves to."""
 
 import uuid
 from collections.abc import Callable
@@ -9,22 +10,32 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, delete, exc, insert, select, text, update
+from sqlalchemy import delete, select, text, update
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import items
 from inventory_tng.database_role import LEDGER
-from inventory_tng.db import describe_error, set_actor
-from inventory_tng.ledger import balance, on_order_after
+from inventory_tng.db import set_actor
+from inventory_tng.ledger import (
+    balance,
+    insert_transaction,
+    line_breaks,
+    lines_break,
+    on_order_after,
+    record_adjustment,
+    whole_enough,
+)
 from inventory_tng.models import (
+    AdjustmentReason,
+    Admin,
     CatalogueHistory,
     Item,
     LedgerTransaction,
     Movement,
 )
 
-from helpers.rows import add, breaks, refused, setting_up, violates
+from helpers.rows import add, breaks, named, refused, violates
 from helpers.stock import Place, received, write
 
 URL = "/api/transactions"
@@ -218,7 +229,141 @@ def test_a_receipt_lowers_on_order_but_not_below_zero(
     assert actor == f"volunteer:{place.volunteer.id}"
 
 
-# The rules in the database, which every writer meets.
+# The ledger's rules, without the database.
+
+
+@pytest.mark.parametrize(
+    ("unit", "amount", "whole"),
+    [
+        ("each", Decimal(3), True),
+        ("each", Decimal("3.000"), True),
+        ("each", Decimal("0.5"), False),
+        ("m", Decimal("0.5"), True),
+    ],
+)
+def test_an_item_counted_in_each_moves_in_whole_units(
+    unit: str, amount: Decimal, whole: bool
+) -> None:
+    assert whole_enough(unit, amount) is whole
+
+
+@pytest.mark.parametrize(
+    ("kind", "unit", "amount", "retired", "broken"),
+    [
+        ("move", "each", Decimal(1), False, []),
+        ("move", "each", Decimal("1.5"), False, ["movement_whole_units"]),
+        ("move", "m", Decimal("1.5"), False, []),
+        ("receipt", "each", Decimal(1), True, ["receipt_retired_item"]),
+        # What is left of a retired item may still go, or be counted.
+        ("move", "each", Decimal(1), True, []),
+        ("install", "each", Decimal(1), True, []),
+        ("count", "each", Decimal(1), True, []),
+        ("adjustment", "each", Decimal(1), True, []),
+        # Every rule broken is named, in this order.
+        (
+            "receipt",
+            "each",
+            Decimal("1.5"),
+            True,
+            ["movement_whole_units", "receipt_retired_item"],
+        ),
+    ],
+)
+def test_the_rules_a_line_breaks(
+    kind: str, unit: str, amount: Decimal, retired: bool, broken: list[str]
+) -> None:
+    item = Item(unit=unit, retired_at=datetime.now(UTC) if retired else None)
+    assert line_breaks(kind, item, amount) == broken
+
+
+def test_each_line_is_checked_on_its_own() -> None:
+    """A line of an item not held is the foreign key's to refuse."""
+    radio = Item(id=1, unit="each")
+    lines = [(1, Decimal(1)), (2, Decimal(1)), (1, Decimal("1.5"))]
+    assert lines_break("move", {1: radio}, lines) == [
+        [],
+        None,
+        ["movement_whole_units"],
+    ]
+
+
+# The ledger's rules, on PostgreSQL: each refused by the function that
+# writes it.
+
+
+def test_a_transaction_has_movements(session: Session, place: Place) -> None:
+    """All but a count, which may find what the records say (migration
+    0009)."""
+    header = {"kind": "receipt", "to_location_id": place.store.id}
+    with breaks(session, "ledger_transaction_lines"):
+        insert_transaction(session, uuid.uuid4(), header, {})
+
+
+def test_items_counted_in_each_move_in_whole_units(
+    session: Session, place: Place
+) -> None:
+    """In an adjustment too, which never passes through a batch's checks."""
+    admin = add(session, Admin(username="ada"))
+    reason = named(session, AdjustmentReason, "Found")
+    with breaks(session, "movement_whole_units"):
+        record_adjustment(
+            session,
+            uuid.uuid4(),
+            admin.id,
+            place.store.id,
+            place.item.id,
+            Decimal("0.5"),
+            found=True,
+            reason_id=reason.id,
+        )
+
+
+def test_a_retired_item_is_never_received(session: Session, place: Place) -> None:
+    """Whoever writes it: not only the batch endpoint."""
+    place.item.retired_at = datetime.now(UTC)
+    session.flush()
+    header = {"kind": "receipt", "to_location_id": place.store.id}
+    with breaks(session, "receipt_retired_item"):
+        insert_transaction(session, uuid.uuid4(), header, {place.item.id: Decimal(1)})
+
+
+def test_a_line_of_no_item_is_the_foreign_keys_to_refuse(
+    session: Session, place: Place
+) -> None:
+    header = {"kind": "receipt", "to_location_id": place.store.id}
+    with violates(session, "fk_movement_item_id_item"):
+        insert_transaction(session, uuid.uuid4(), header, {999999: Decimal(1)})
+
+
+def test_the_server_clock_decides_when(
+    client: TestClient, session: Session, place: Place
+) -> None:
+    """A created_at sent with a batch is ignored: the database's now() is
+    when it happened."""
+    long_ago = datetime(2020, 1, 1, tzinfo=UTC)
+    response = client.post(URL, json=place.batch(created_at=long_ago.isoformat()))
+    assert response.status_code == 201
+    transaction = session.get_one(LedgerTransaction, response.json()["transaction_id"])
+    assert transaction.created_at > long_ago + timedelta(days=365)
+
+
+def test_the_server_clock_decides_when_whoever_writes(
+    session: Session, place: Place
+) -> None:
+    """insert_transaction ignores a created_at in its header too."""
+    long_ago = datetime(2020, 1, 1, tzinfo=UTC)
+    header = {
+        "kind": "receipt",
+        "to_location_id": place.store.id,
+        "created_at": long_ago,
+    }
+    lines = {place.item.id: Decimal(1)}
+    transaction = insert_transaction(session, uuid.uuid4(), header, lines)
+    assert transaction is not None
+    assert transaction.created_at > long_ago + timedelta(days=365)
+
+
+# The privileges that keep the ledger append-only.
 
 
 @pytest.fixture
@@ -248,7 +393,6 @@ CHANGES = pytest.mark.parametrize(
         "delete movement",
     ],
 )
-LEDGER_TABLES = pytest.mark.parametrize("table", LEDGER)
 
 
 @CHANGES
@@ -260,57 +404,26 @@ def test_the_app_may_not_change_the_ledger(
         session.execute(change(written))
 
 
-@LEDGER_TABLES
+@pytest.mark.parametrize("table", LEDGER)
 def test_the_app_may_not_truncate_the_ledger(session: Session, table: str) -> None:
     with refused(session):
         session.execute(text(f"TRUNCATE {table} CASCADE"))
 
 
-@CHANGES
-def test_the_ledger_is_append_only_even_for_its_owner(
-    owner_session: Session, change: Callable[..., Any]
-) -> None:
-    """The trigger, under the privileges: the owner has every privilege."""
-    set_actor(owner_session, "system:test")
-    written = write(owner_session, Place(owner_session))
-    with violates(owner_session, "ledger_append_only"):
-        owner_session.execute(change(written))
-
-
-def test_movements_are_never_added_to_a_recorded_transaction(
-    own_engine: Engine,
-) -> None:
-    """On a database of its own: the transaction is committed, as yesterday's
-    would be, and nothing can delete it from the ledger (conftest's
-    APPEND_ONLY), so it must not stay where later tests count stock."""
-    with Session(own_engine, expire_on_commit=False) as first, first.begin():
-        place = Place(setting_up(first))
-        committed = write(first, place).id
-    with (
-        Session(own_engine) as session,
-        violates(session, "movement_with_transaction"),
-    ):
-        session.execute(
-            insert(Movement).values(
-                transaction_id=committed, item_id=place.item.id, quantity=1
-            )
+def test_the_ledger_has_no_logic_in_the_database(session: Session) -> None:
+    """Its rules are insert_transaction's and its balance a select: no
+    trigger or view (PostgreSQL's own triggers for foreign keys aside)."""
+    triggers = session.scalars(
+        text(
+            "SELECT tgname FROM pg_trigger"
+            " WHERE tgrelid IN ('ledger_transaction'::regclass, 'movement'::regclass)"
+            " AND NOT tgisinternal"
         )
-
-
-def test_a_transaction_has_movements(session: Session, place: Place) -> None:
-    """All but a count, which may find what the records say (migration 0009)."""
-    session.add(
-        LedgerTransaction(
-            idempotency_key=uuid.uuid4(),
-            kind="receipt",
-            to_location_id=place.store.id,
-        )
-    )
-    session.flush()
-    # The check waits for the commit; this brings it forward.
-    with pytest.raises(exc.IntegrityError) as raised:
-        session.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
-    assert describe_error(raised.value)["constraint"] == "ledger_transaction_lines"
+    ).all()
+    views = session.scalars(
+        text("SELECT viewname FROM pg_views WHERE schemaname = 'public'")
+    ).all()
+    assert (triggers, views) == ([], [])
 
 
 @pytest.mark.parametrize(
@@ -352,17 +465,6 @@ def test_a_transaction_goes_between_two_places(session: Session, place: Place) -
         )
 
 
-def test_items_counted_in_each_move_in_whole_units(
-    session: Session, place: Place, written: LedgerTransaction
-) -> None:
-    with violates(session, "movement_whole_units"):
-        session.execute(
-            insert(Movement).values(
-                transaction_id=written.id, item_id=place.item.id, quantity="0.5"
-            )
-        )
-
-
 def test_an_item_with_fractional_movements_is_never_counted_in_each(
     session: Session, place: Place
 ) -> None:
@@ -370,21 +472,6 @@ def test_an_item_with_fractional_movements_is_never_counted_in_each(
     with breaks(session, "movement_whole_units"):
         items.save(session, place.cable, {"unit": "each"})
     items.save(session, place.cable, {"unit": "ft"})
-
-
-def test_the_server_clock_decides_when(session: Session, place: Place) -> None:
-    long_ago = datetime(2020, 1, 1, tzinfo=UTC)
-    transaction = add(
-        session,
-        LedgerTransaction(
-            idempotency_key=uuid.uuid4(),
-            kind="receipt",
-            to_location_id=place.store.id,
-            created_at=long_ago,
-        ),
-    )
-    session.refresh(transaction)
-    assert transaction.created_at > long_ago + timedelta(days=365)
 
 
 def test_a_retired_item_is_taken_never_received(
@@ -403,21 +490,3 @@ def test_a_retired_item_is_taken_never_received(
         (["body", "lines", 0, "item_id"], "retired")
     ]
     assert client.post(URL, json=place.batch()).status_code == 201
-
-
-def test_the_database_never_receives_a_retired_item(
-    session: Session, place: Place
-) -> None:
-    """Whoever writes it: not only the batch endpoint."""
-    place.item.retired_at = datetime.now(UTC)
-    session.flush()
-    receipt = add(
-        session,
-        LedgerTransaction(
-            idempotency_key=uuid.uuid4(), kind="receipt", to_location_id=place.store.id
-        ),
-    )
-    with violates(session, "receipt_retired_item"):
-        session.add(
-            Movement(transaction_id=receipt.id, item_id=place.item.id, quantity=1)
-        )

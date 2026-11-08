@@ -223,9 +223,9 @@ def record_last_seen(
 
 
 class RuleBroken(Exception):
-    """A change the catalogue's rules refuse, by the rule's name (as
-    admin.common.RULES puts it into words). Raised before anything is
-    written."""
+    """A change the catalogue's or the ledger's rules refuse, by the rule's
+    name (as admin.common.RULES puts the catalogue's into words). Raised
+    before anything is written."""
 
     def __init__(self, rule: str) -> None:
         super().__init__(rule)
@@ -438,13 +438,11 @@ def locked_row[M: Base](session: Session, model: type[M], ident: object) -> M | 
        location, then them).
 
     FOR UPDATE waits for any write under way that refers to the row, such
-    as a save holding its places or a movement of an item, so what the
-    change then reads of them is settled. Saves, counts and receipts never
-    take the catalogue lock; the one rule input they write, an item's
-    movements, is guarded by the item's row lock instead (items.save). They
-    do hold the rows they refer to (their foreign keys share-lock them): a
-    change that locks two rows a save also refers to takes them in the
-    save's order, its places then its volunteer, or the two could deadlock
+    as a save holding its places or its items, so what the change then
+    reads of them is settled. Saves, counts and adjustments never take the
+    catalogue lock; the order they hold rows in is ledger.py's, above
+    _hold_places. A change that locks two rows a save also refers to takes
+    them in the save's order, or the two could deadlock
     (inventory-tng-8i4.58, 8i4.69, 8i4.78)."""
     lock_catalogue(session)
     return get_locked(session, model, ident)

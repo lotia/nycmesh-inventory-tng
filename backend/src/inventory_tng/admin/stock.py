@@ -1,4 +1,4 @@
-"""What is where, from the ledger's balance view (docs/decisions/0003):
+"""What is where, from the ledger's balance (docs/decisions/0003):
 read-only, by place or by item; what to reorder; and what needs counting. A
 negative balance means the records are wrong somewhere, so it is shown as
 needing a count (inventory-tng-8i4.15)."""

@@ -12,7 +12,6 @@ leaves tests free to write with statements on purpose.
 """
 
 import ast
-import re
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from ipaddress import IPv4Address, IPv4Interface, IPv6Address
@@ -42,7 +41,7 @@ from inventory_tng.models import (
 )
 
 from helpers.rows import add, history, refused
-from helpers.source import MODELS, SOURCE, offending, outside
+from helpers.source import SOURCE, How, Write, offending, outside, writes
 
 # The pure functions.
 
@@ -174,128 +173,18 @@ ALLOWED = {
     # Writes catalogue_history itself.
     SOURCE / "history.py": ("_after_flush",),
 }
-DML = {"insert", "update", "delete"}
-BULK = {"bulk_save_objects", "bulk_insert_mappings", "bulk_update_mappings"}
-# Either case: SQL is as often written lower. Prose such as "update the
-# item" passes, as "the" is no table.
-SQL_WRITE = re.compile(
-    r"\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM|MERGE\s+INTO|TRUNCATE|COPY)\s+\"?(\w+)",
-    re.IGNORECASE,
-)
-
-
-def _has_history(target: ast.expr | None) -> bool:
-    """Whether a statement on `target` writes to a table with history: a
-    model named outright is looked up; anything else, such as a variable,
-    cannot be told, so it counts."""
-    if isinstance(target, ast.Name) and target.id in MODELS:
-        return has_history(MODELS[target.id])
-    return True
-
-
-def _first(node: ast.Call) -> ast.expr | None:
-    return node.args[0] if node.args else None
-
-
-def _imported(tree: ast.AST) -> tuple[set[str], set[str]]:
-    """The names insert, update and delete from SQLAlchemy go by here, and
-    the names SQLAlchemy's modules go by."""
-    functions: set[str] = set()
-    modules: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and (node.module or "").startswith(
-            "sqlalchemy"
-        ):
-            functions |= {a.asname or a.name for a in node.names if a.name in DML}
-        elif isinstance(node, ast.Import):
-            modules |= {
-                a.asname or a.name.split(".")[0]
-                for a in node.names
-                if a.name.startswith("sqlalchemy")
-            }
-    return functions, modules
-
-
-def _dml_called(node: ast.AST, functions: set[str], modules: set[str]) -> bool:
-    """update(Item), or sa.update(Item), however imported."""
-    if not isinstance(node, ast.Call):
-        return False
-    called = node.func
-    named = isinstance(called, ast.Name) and called.id in functions
-    of_module = (
-        isinstance(called, ast.Attribute)
-        and called.attr in DML
-        and isinstance(called.value, ast.Name)
-        and called.value.id in modules
-    )
-    return (named or of_module) and _has_history(_first(node))
-
-
-def _table_dml(node: ast.AST) -> bool:
-    """Item.__table__.update()."""
-    return (
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr in DML
-        and isinstance(node.func.value, ast.Attribute)
-        and node.func.value.attr == "__table__"
-        and _has_history(node.func.value.value)
-    )
-
-
-def _query_dml(node: ast.AST) -> bool:
-    """session.query(Item)...update(): the legacy Query's statements."""
-    if not (
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr in DML
-    ):
-        return False
-    owner: ast.expr = node.func.value
-    while isinstance(owner, ast.Call | ast.Attribute):
-        if isinstance(owner, ast.Call):
-            if isinstance(owner.func, ast.Attribute) and owner.func.attr == "query":
-                return True
-            owner = owner.func
-        else:
-            owner = owner.value
-    return False
-
-
-def _bulk(node: ast.AST) -> bool:
-    """session.bulk_save_objects() and the like."""
-    return isinstance(node, ast.Attribute) and node.attr in BULK
-
-
-def _sql_write(node: ast.AST) -> bool:
-    """SQL in a string that writes to a table with history."""
-    return (
-        isinstance(node, ast.Constant)
-        and isinstance(node.value, str)
-        and any(
-            table in Base.metadata.tables and has_history(table)
-            for table in SQL_WRITE.findall(node.value)
-        )
-    )
 
 
 def statement_writes(tree: ast.AST, _path: Path | None = None) -> list[int]:
     """Lines that write to a table with history other than through the
-    flush."""
-    functions, modules = _imported(tree)
+    flush: a statement on such a table, or on one the source cannot
+    tell."""
     return sorted(
         {
-            getattr(node, "lineno", 0)
-            for node in ast.walk(tree)
-            if any(
-                (
-                    _dml_called(node, functions, modules),
-                    _table_dml(node),
-                    _query_dml(node),
-                    _bulk(node),
-                    _sql_write(node),
-                )
-            )
+            write.line
+            for write in writes(tree)
+            if write.how == "statement"
+            and (write.table is None or has_history(write.table))
         }
     )
 
@@ -321,28 +210,59 @@ IMPORTS = (
 @pytest.mark.parametrize(
     ("line", "found"),
     [
-        ("update(Item).values(name='x')", True),
-        ("remove(Device)", True),
-        ("pg_insert(Admin)", True),
+        # Statements, however written.
+        ("update(Item).values(name='x')", ("item", "statement")),
+        ("remove(Device)", ("device", "statement")),
+        ("pg_insert(Admin)", ("admin", "statement")),
+        ("sa.update(model)", (None, "statement")),
+        ("sa.insert(models.Movement)", ("movement", "statement")),
+        ("Item.__table__.delete()", ("item", "statement")),
+        ("remove(LedgerTransaction.__table__)", ("ledger_transaction", "statement")),
+        (
+            "session.query(Item).filter_by(id=1).update({'name': 'x'})",
+            ("item", "statement"),
+        ),
+        ("session.bulk_save_objects(rows)", (None, "statement")),
+        ("text('UPDATE item SET name = 1')", ("item", "statement")),
+        ("'DELETE FROM reset_link'", ("reset_link", "statement")),
+        ("'update item set name = 1'", ("item", "statement")),
+        ("text('INSERT INTO movement VALUES (1)')", ("movement", "statement")),
+        # Rows made and deleted through the ORM.
+        ("Movement(item_id=1)", ("movement", "row")),
+        ("models.LedgerTransaction(kind='move')", ("ledger_transaction", "row")),
+        ("session.delete(row)", (None, "delete")),
+        # Prose, reads, and what only shares a name.
+        ("'update the item'", None),
+        ("def f():\n    'Refuses UPDATE item.'", None),
+        ("settings.update(fields)", None),
+        ("select(Movement)", None),
+        ("Item.id.in_(ids)", None),
+    ],
+)
+def test_the_detector_sees_each_way_of_writing(
+    line: str, found: tuple[str | None, How] | None
+) -> None:
+    """helpers.source.writes, which this file's check and
+    test_write_owners.py's share, so neither can pass by missing one."""
+    expected = [] if found is None else [Write(4, *found)]
+    assert writes(ast.parse(IMPORTS + line)) == expected
+
+
+@pytest.mark.helper
+@pytest.mark.parametrize(
+    ("line", "found"),
+    [
+        ("update(Item)", True),
         ("sa.update(model)", True),
-        ("Item.__table__.delete()", True),
-        ("session.query(Item).filter_by(id=1).update({'name': 'x'})", True),
-        ("session.bulk_save_objects(rows)", True),
-        ("text('UPDATE item SET name = 1')", True),
-        ("'DELETE FROM reset_link'", True),
-        ("'update item set name = 1'", True),
-        # Tables without history, prose, and what only shares a name.
         ("update(LedgerTransaction)", False),
         ("pg_insert(SentForm)", False),
-        ("Movement.__table__.insert()", False),
-        ("text('INSERT INTO movement VALUES (1)')", False),
-        ("'update the item'", False),
-        ("settings.update(fields)", False),
+        ("Item(name='x')", False),
         ("session.delete(row)", False),
     ],
 )
-def test_the_check_sees_each_way_of_writing(line: str, found: bool) -> None:
-    """So the test above cannot pass by missing one."""
+def test_only_statements_on_tables_with_history_count(line: str, found: bool) -> None:
+    """A statement on a table without history, or a write through the
+    flush, is not this check's."""
     assert statement_writes(ast.parse(IMPORTS + line)) == ([4] if found else [])
 
 

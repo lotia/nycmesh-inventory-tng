@@ -1,13 +1,16 @@
 """Each catalogue table is written by one module, its owner, whose domain
-functions take the catalogue lock and check the rules (db.locked_row).
+functions take the catalogue lock and check the rules (db.locked_row); the
+ledger, by ledger.insert_transaction alone, which checks its rules and
+writes a transaction's movements with it.
 
 Two checks hold that: the app refuses a flush that writes a catalogue row
 without the catalogue lock (db.LOCK_INFO), tested here on PostgreSQL; and
 the first test below reads the app's source with Python's ast module
-(nothing of it runs in the app) and fails on a catalogue row made outside
-its owner, or a row deleted outside the few functions allowed to. Nothing
-in the catalogue is deleted. Statements such as update(Item) are refused
-everywhere by test_history.py.
+(nothing of it runs in the app; helpers.source.writes) and fails on a row
+made or written outside its owner, or a row deleted outside the few
+functions allowed to. Nothing in the catalogue is deleted. Statements on a
+table with history, such as update(Item), are refused everywhere by
+test_history.py.
 """
 
 import ast
@@ -22,9 +25,10 @@ from sqlalchemy.orm import Session
 from inventory_tng.db import LOCK_INFO, attempt, enforce, lock_catalogue
 from inventory_tng.models import Category, Item
 
-from helpers.source import MODELS, SOURCE, offending
+from helpers.source import SOURCE, offending, writes
 
-# Each catalogue table, and the module that alone makes its rows.
+# Each table written by one module only, and that module. None: no module,
+# only ALLOWED's functions.
 OWNERS: dict[str, str | None] = {
     "category": "categories.py",
     "item": "items.py",
@@ -36,35 +40,37 @@ OWNERS: dict[str, str | None] = {
     "vendor": None,
     "vendor_offer": None,
     "vendor_price": None,
+    "ledger_transaction": None,
+    "movement": None,
 }
-# The functions that delete a row: an administrator's password, as it is
-# reset.
-ALLOWED = {SOURCE / "accounts.py": ("_reset_sign_in",)}
+# The functions that may write any table: one deletes an administrator's
+# password, as it is reset; the other is the ledger's one writer.
+ALLOWED = {
+    SOURCE / "accounts.py": ("_reset_sign_in",),
+    SOURCE / "ledger.py": ("insert_transaction",),
+}
 
 
 def not_owned_writes(tree: ast.Module, path: Path) -> list[int]:
-    """The lines that make a catalogue row in a module not its owner, or
-    delete any row (session.delete)."""
+    """The lines that make or write a row of a table in OWNERS in a module
+    not its owner, or delete any row (session.delete)."""
     module = str(path.relative_to(SOURCE)) if path.is_relative_to(SOURCE) else ""
-    found = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        match node.func:
-            case ast.Name(id=name) if name in MODELS and MODELS[name] in OWNERS:
-                if OWNERS[MODELS[name]] != module:
-                    found.append(node.lineno)
-            case ast.Attribute(attr="delete") if len(node.args) == 1:
-                found.append(node.lineno)
-    return sorted(found)
+    return sorted(
+        {
+            write.line
+            for write in writes(tree)
+            if write.how == "delete"
+            or (write.table in OWNERS and OWNERS[write.table] != module)
+        }
+    )
 
 
 @pytest.mark.helper
-def test_catalogue_rows_are_made_by_their_owners_only() -> None:
+def test_rows_are_written_by_their_owners_only() -> None:
     found = offending(not_owned_writes, ALLOWED)
     assert found == {}, (
-        "Make catalogue rows through their owner's domain functions "
-        f"(test_write_owners.OWNERS), which check the rules: {found}"
+        "Write these tables through their owner's domain functions "
+        f"(test_write_owners.OWNERS, ALLOWED), which check the rules: {found}"
     )
 
 
@@ -83,6 +89,14 @@ def test_each_owner_is_a_module() -> None:
         ("items.py", "Item(name='x')", False),
         ("items.py", "ItemPackage(item_id=1)", False),
         ("items.py", "Label(item_id=1)", True),
+        # The ledger: only ALLOWED's insert_transaction, in no module.
+        ("ledger.py", "Movement(item_id=1)", True),
+        (
+            "ledger.py",
+            "from sqlalchemy import insert\ninsert(LedgerTransaction)",
+            True,
+        ),
+        ("admin/counts.py", "text('INSERT INTO movement VALUES (1)')", True),
         # Not the catalogue's, and not a write.
         ("admin/items.py", "AdjustmentReason(name='x')", False),
         ("admin/items.py", "select(Item).where(Item.name == 'x')", False),

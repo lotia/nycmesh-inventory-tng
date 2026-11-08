@@ -179,8 +179,8 @@ def migrated_template() -> Iterator[str]:
 @pytest.fixture
 def own_database(migrated_template: str) -> Iterator[str]:
     """The URL of a migrated database for this test alone, dropped after:
-    for a test that commits what nothing can clean up, such as the ledger,
-    or that needs no rows but its own."""
+    for a test that commits what is never deleted, such as the ledger, or
+    that needs no rows but its own."""
     with new_database(template=migrated_template) as url:
         yield url
 
@@ -223,7 +223,7 @@ def session(engine: Engine) -> Iterator[Session]:
 @pytest.fixture
 def owner_session(owner_engine: Engine) -> Iterator[Session]:
     """As `session`, logged in as the owner: for what only the owner may do,
-    such as TRUNCATE, or changing the ledger to see its triggers refuse."""
+    such as TRUNCATE."""
     yield from _rolled_back(owner_engine)
 
 
@@ -379,7 +379,7 @@ def _committed_engine(url: str) -> Generator[Committed]:
 @pytest.fixture
 def own_committed(own_database: str) -> Iterator[Committed]:
     """committed's sessions, on own_database: for two requests at once
-    where one writes the ledger, which nothing can delete. The database goes
+    where one writes the ledger, which is never deleted. The database goes
     with the test, so nothing is cleaned up but the connections."""
     with _committed_engine(own_database) as committed:
         yield committed
@@ -393,7 +393,7 @@ def committed(database_url: str, owner_engine: Engine) -> Iterator[Committed]:
     included) is deleted, as the owner. Rows they changed but did not make,
     such as a settings row, are not put back: a test that changes one
     restores it itself. A committed test must not write the ledger, which
-    nothing can delete."""
+    is append-only: not even a test deletes from it."""
     with owner_engine.connect() as connection:
         before = _newest_ids(connection)
     with _committed_engine(database_url) as committed:
@@ -404,7 +404,7 @@ def committed(database_url: str, owner_engine: Engine) -> Iterator[Committed]:
         after = _newest_ids(connection)
         if grew := sorted(t for t in LEDGER if after[t] > before[t]):
             raise RuntimeError(
-                f"a committed test wrote {grew}, whose rows cannot be deleted"
+                f"a committed test wrote {grew}, whose rows are never deleted"
                 " (the ledger is append-only): its rows are left behind"
             )
         for name, newest in before.items():
