@@ -1,5 +1,8 @@
-"""The database's own rules (models.py, migration 0002). Each failing write is
-checked by the constraint it names, which is what describe_error() logs."""
+"""The catalogue's rules: the database's own (models.py, migration 0002),
+each failing write checked by the constraint it names, which is what
+describe_error() logs; and the app's, each refused through its domain
+function by the rule's name (db.RuleBroken), whose every case
+test_catalogue_rules.py tests without a database."""
 
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -9,6 +12,7 @@ import pytest
 from sqlalchemy import delete, select, text, update
 from sqlalchemy.orm import Session
 
+from inventory_tng import categories, items, labels, locations, volunteers
 from inventory_tng.database_role import LEDGER
 from inventory_tng.db import ACTOR_INFO, Base, refusal, set_actor
 from inventory_tng.models import (
@@ -25,13 +29,13 @@ from inventory_tng.models import (
     mint_label_code,
 )
 
-from helpers.rows import add, violates
+from helpers.rows import add, breaks, violates
 
 NOW = datetime(2026, 11, 1, tzinfo=UTC)
 
 
 def change(session: Session, row: Base, **values: object) -> None:
-    """An UPDATE straight to the database, as a trigger sees it."""
+    """An UPDATE straight to the database, as its constraints see it."""
     model = type(row)
     session.execute(update(model).where(model.id == row.id).values(**values))  # ty: ignore[unresolved-attribute]
 
@@ -149,14 +153,6 @@ def test_a_label_names_an_item_or_a_location(
         session.add(Label(item_id=item.id, location_id=store.id))
 
 
-def test_a_label_code_never_changes(session: Session, store: Location) -> None:
-    label = add(session, Label(location_id=store.id))
-    with violates(session, "label_code_immutable"):
-        session.execute(
-            update(Label).where(Label.id == label.id).values(code=mint_label_code())
-        )
-
-
 def test_one_current_label_for_each_thing(
     session: Session, new_item: Callable[..., Item], store: Location
 ) -> None:
@@ -177,11 +173,9 @@ def test_a_labels_package_belongs_to_its_item(
     reel = add(session, ItemPackage(item_id=cable.id, name="reel", size=Decimal(305)))
     with violates(session, "ck_label_package_needs_item"):
         session.add(Label(location_id=store.id, package_id=reel.id))
-    with violates(session, "label_package_item"):
-        session.add(Label(item_id=radio.id, package_id=reel.id))
-    add(session, Label(item_id=cable.id, package_id=reel.id))
-    with violates(session, "label_package_item"):
-        change(session, reel, item_id=radio.id)
+    # Another item's package names nothing of this one's.
+    assert labels.make_for_item(session, radio.id, reel.id) is None
+    assert labels.make_for_item(session, cable.id, reel.id) is not None
 
 
 def test_package_sizes_are_positive(
@@ -210,23 +204,25 @@ def test_location_checks(
 def test_an_areas_parent_is_a_store_or_an_area(
     session: Session, store: Location
 ) -> None:
-    van = add(session, Location(name="Van", kind="vehicle"))
-    with violates(session, "location_area_parent"):
-        session.add(Location(name="Glovebox", kind="area", parent_id=van.id))
-    shelf = add(session, Location(name="Shelf", kind="area", parent_id=store.id))
-    add(session, Location(name="Bin", kind="area", parent_id=shelf.id))
-    # A store with areas under it stays something that can have them.
-    with violates(session, "location_area_parent"):
-        change(session, store, kind="vehicle")
+    van = locations.add(session, "Van", "vehicle")
+    with breaks(session, "location_area_parent"):
+        locations.add(session, "Glovebox", "area", van.id)
+    shelf = locations.add(session, "Shelf", "area", store.id)
+    bin_ = locations.add(session, "Bin", "area", store.id)
+    with breaks(session, "location_area_parent"):
+        locations.save(session, bin_, "Bin", van.id)
+    locations.save(session, bin_, "Bin", shelf.id)
+    # Renamed where it is, nothing is checked.
+    locations.save(session, van, "Big van")
 
 
 def test_the_location_tree_has_no_cycles(session: Session, store: Location) -> None:
-    shelf = add(session, Location(name="Shelf", kind="area", parent_id=store.id))
-    bin_ = add(session, Location(name="Bin", kind="area", parent_id=shelf.id))
-    with violates(session, "location_no_cycle"):
-        change(session, shelf, parent_id=bin_.id)
-    with violates(session, "location_no_cycle"):
-        change(session, shelf, parent_id=shelf.id)
+    shelf = locations.add(session, "Shelf", "area", store.id)
+    bin_ = locations.add(session, "Bin", "area", shelf.id)
+    with breaks(session, "location_no_cycle"):
+        locations.save(session, shelf, "Shelf", bin_.id)
+    with breaks(session, "location_no_cycle"):
+        locations.save(session, shelf, "Shelf", shelf.id)
 
 
 def test_custody_belongs_to_one_current_volunteer(session: Session) -> None:
@@ -235,35 +231,44 @@ def test_custody_belongs_to_one_current_volunteer(session: Session) -> None:
     with violates(session, "uq_location_custody_volunteer_id"):
         session.add(Location(name="Also with A", kind="custody", volunteer_id=alice.id))
     gone = add(session, Volunteer(name="Volunteer B", retired_at=NOW))
-    with violates(session, "location_custody_volunteer"):
-        session.add(Location(name="With B", kind="custody", volunteer_id=gone.id))
+    with breaks(session, "location_custody_volunteer"):
+        locations.add_custody(session, gone.id, "With B")
 
 
 def test_a_volunteer_holding_stock_stays_current(session: Session) -> None:
-    holder = add(session, Volunteer(name="Volunteer A"))
-    other = add(session, Volunteer(name="Volunteer B"))
-    custody = add(
-        session, Location(name="With A", kind="custody", volunteer_id=holder.id)
-    )
-    with violates(session, "location_custody_volunteer"):
-        change(session, holder, retired_at=NOW)
-    with violates(session, "location_custody_volunteer"):
-        merge(session, holder, other)
-    custody.retired_at = NOW
-    session.flush()
-    merge(session, holder, other)
+    holder = volunteers.add(session, "Volunteer A", None)
+    other = volunteers.add(session, "Volunteer B", None)
+    custody = volunteers.hold_stock(session, holder)
+    with breaks(session, "location_custody_volunteer"):
+        volunteers.retire(session, holder, NOW)
+    with breaks(session, "location_custody_volunteer"):
+        volunteers.merge(session, holder, other.id, NOW)
+    locations.retire(session, custody, NOW)
+    volunteers.merge(session, holder, other.id, NOW)
+    # Nor does custody come back for a volunteer who is gone.
+    with breaks(session, "location_custody_volunteer"):
+        locations.restore(session, custody)
+
+
+def test_a_volunteers_custody_is_renamed_with_them(session: Session) -> None:
+    holder = volunteers.add(session, "Volunteer A", None)
+    other = volunteers.add(session, "Volunteer B", None)
+    custody = volunteers.hold_stock(session, holder)
+    volunteers.save(session, holder, "Volunteer Ada", "ada@example.org")
+    volunteers.save(session, other, "Volunteer Ben", None)
+    assert (custody.name, holder.email) == ("Volunteer Ada", "ada@example.org")
 
 
 def test_current_areas_have_current_parents(session: Session, store: Location) -> None:
-    shelf = add(session, Location(name="Shelf", kind="area", parent_id=store.id))
-    with violates(session, "location_parent_current"):
-        change(session, store, retired_at=NOW)
-    shelf.retired_at = NOW
-    session.flush()
-    store.retired_at = NOW
-    session.flush()
-    with violates(session, "location_parent_current"):
-        session.add(Location(name="New shelf", kind="area", parent_id=store.id))
+    shelf = locations.add(session, "Shelf", "area", store.id)
+    with breaks(session, "location_parent_current"):
+        locations.retire(session, store, NOW)
+    locations.retire(session, shelf, NOW)
+    locations.retire(session, store, NOW)
+    with breaks(session, "location_parent_current"):
+        locations.add(session, "New shelf", "area", store.id)
+    with breaks(session, "location_parent_current"):
+        locations.restore(session, shelf)
 
 
 def test_root_locations_of_different_kinds_may_share_a_name(session: Session) -> None:
@@ -281,42 +286,60 @@ def test_actors_are_ids(session: Session, actor: str) -> None:
 
 
 def test_merges_point_at_a_current_volunteer(session: Session) -> None:
-    a, b, c = (add(session, Volunteer(name=f"Volunteer {n}")) for n in "ABC")
+    a, b, c = (volunteers.add(session, f"Volunteer {n}", None) for n in "ABC")
     with violates(session, "ck_volunteer_not_merged_into_self"):
         merge(session, a, a)
     with violates(session, "ck_volunteer_merged_is_retired"):
         change(session, a, merged_into_id=b.id)
-    merge(session, a, b)
+    volunteers.merge(session, a, b.id, NOW)
     # Not into one that is merged itself...
-    with violates(session, "volunteer_merge_target"):
-        merge(session, c, a)
+    with breaks(session, "volunteer_merge_target"):
+        volunteers.merge(session, c, a.id, NOW)
     # ...and the target stays current while others point at it.
-    with violates(session, "volunteer_merge_target"):
-        change(session, b, retired_at=NOW)
+    with breaks(session, "volunteer_merge_target"):
+        volunteers.retire(session, b, NOW)
     # Point the others onward first, and then it can go.
-    merge(session, a, c)
-    merge(session, b, c)
+    volunteers.restore(session, a)
+    volunteers.merge(session, a, c.id, NOW)
+    volunteers.merge(session, b, c.id, NOW)
 
 
 def test_current_items_sit_in_current_categories(session: Session) -> None:
-    """inventory-tng-8i4.58: whatever writes them."""
-    radios = add(session, Category(name="Radios rule"))
-    old = add(session, Category(name="Old rule", retired_at=NOW))
-    item = add(session, Item(name="LiteBeam rule", category_id=radios.id))
-    with violates(session, "item_category_current"):
-        session.add(Item(name="Into the old", category_id=old.id))
-    with violates(session, "item_category_current"):
-        change(session, item, category_id=old.id)
+    """inventory-tng-8i4.58."""
+    radios = categories.add(session, "Radios rule")
+    old = categories.add(session, "Old rule")
+    categories.retire(session, old, NOW)
+    item = items.add(session, {"name": "LiteBeam rule", "category_id": radios.id})
+    with breaks(session, "item_category_current"):
+        items.add(session, {"name": "Into the old", "category_id": old.id})
+    with breaks(session, "item_category_current"):
+        items.save(session, item, {"category_id": old.id})
     # A category with a current item stays current...
-    with violates(session, "category_has_items"):
-        change(session, radios, retired_at=NOW)
+    with breaks(session, "category_has_items"):
+        categories.retire(session, radios, NOW)
     # ...until the item goes, and a retired item cannot come back into it.
-    change(session, item, retired_at=NOW)
-    change(session, radios, retired_at=NOW)
-    with violates(session, "item_category_current"):
-        change(session, item, retired_at=None)
+    items.retire(session, item, NOW)
+    categories.retire(session, radios, NOW)
+    with breaks(session, "item_category_current"):
+        items.restore(session, item)
+    # A retired item can still be changed there.
+    items.save(session, item, {"notes": "kept for parts"})
     # A retired item may sit in a retired category.
-    add(session, Item(name="Retired too", category_id=old.id, retired_at=NOW))
+    items.add(
+        session, {"name": "Retired too", "category_id": old.id, "retired_at": NOW}
+    )
+
+
+def test_the_catalogue_rules_are_in_python_not_the_database(session: Session) -> None:
+    """No trigger on a catalogue table, so no function behind one."""
+    triggers = session.scalars(
+        text(
+            "SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgrelid IN"
+            " ('category'::regclass, 'item'::regclass, 'item_package'::regclass,"
+            " 'label'::regclass, 'location'::regclass, 'volunteer'::regclass)"
+        )
+    ).all()
+    assert triggers == []
 
 
 def test_a_rule_a_change_does_not_expect_is_raised(session: Session) -> None:

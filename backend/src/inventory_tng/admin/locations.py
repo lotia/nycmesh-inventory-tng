@@ -1,7 +1,7 @@
 """Locations: stores, the areas inside them, and vehicles
 (docs/decisions/0003). A volunteer's custody is a location too, made and
 retired with the volunteer, so it is shown here but changed there. The tree's
-rules are the database's (migration 0002); this page says them in words."""
+rules are locations.py's; this page says them in words."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -13,18 +13,17 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import labels
+from inventory_tng import labels, locations
 from inventory_tng.admin.common import (
     ADMIN,
     admin_page,
     chosen,
     current_rows,
-    holds_stock,
     name_problem,
     now,
     rule_words,
 )
-from inventory_tng.db import DbSession, attempt, locked_row
+from inventory_tng.db import DbSession, attempt
 from inventory_tng.models import STORE_KINDS, Label, Location, Volunteer
 from inventory_tng.pages import not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
@@ -139,7 +138,9 @@ def _location_page(
 
 
 @router.get(LOCATIONS)
-def locations(request: Request, signed: AdminSignedIn, session: DbSession) -> Response:
+def list_locations(
+    request: Request, signed: AdminSignedIn, session: DbSession
+) -> Response:
     return _list_page(request, session, signed)
 
 
@@ -162,10 +163,15 @@ def add_location(
     parent = chosen(session, Location, parent_id) if kind == "area" else None
     if kind == "area" and parent is None:
         problems["parent_id"] = "Pick where it is."
-    location = Location(name=name, kind=kind, parent_id=parent.id if parent else None)
-    if not problems and (broken := attempt(session, lambda: session.add(location))):
+    location, broken = None, None
+    if not problems:
+        under = parent.id if parent else None
+        location, broken = attempt(
+            session, lambda: locations.add(session, name, kind, under)
+        )
+    if broken:
         problems["name"] = rule_words(broken, TAKEN)
-    if problems:
+    if location is None:
         return _list_page(request, session, signed, problems=problems, values=form)
     session.commit()
     log.info("location added", location_id=location.id)
@@ -183,8 +189,9 @@ def location(
 
 
 def _changeable(session: Session, location_id: int) -> Location | None:
-    """A location this page changes, locked: not a volunteer's custody."""
-    found = locked_row(session, Location, location_id)
+    """A location this page changes: not a volunteer's custody, whose kind
+    never changes."""
+    found = session.get(Location, location_id)
     return None if found is None or found.kind == "custody" else found
 
 
@@ -206,13 +213,12 @@ def save_location(
     if found.kind == "area" and parent is None:
         problem = "Pick where it is."
 
-    def save() -> None:
-        found.name = name
-        if parent is not None:
-            found.parent_id = parent.id
-
-    if problem is None and (broken := attempt(session, save)):
-        problem = rule_words(broken, TAKEN)
+    if problem is None:
+        under = parent.id if parent else None
+        _, broken = attempt(
+            session, lambda: locations.save(session, found, name, under)
+        )
+        problem = broken and rule_words(broken, TAKEN)
     if problem is not None:
         values = {"name": name, "parent_id": parent_id}
         return _location_page(request, session, signed, found, problem, values)
@@ -228,16 +234,8 @@ def retire_location(
     found = _changeable(session, location_id)
     if found is None or found.retired_at is not None:
         return not_found()
-    # Once retired, a place cannot be counted or adjusted, so nothing at it
-    # could be put right.
-    if holds_stock(session, found.id):
-        problem = "Move what is here elsewhere, or count it, first."
-        return _location_page(request, session, signed, found, problem)
-
-    def retire() -> None:
-        found.retired_at = now()
-
-    if broken := attempt(session, retire):
+    _, broken = attempt(session, lambda: locations.retire(session, found, now()))
+    if broken:
         problem = rule_words(broken, TAKEN)
         return _location_page(request, session, signed, found, problem)
     session.commit()
@@ -253,10 +251,8 @@ def restore_location(
     if found is None or found.retired_at is None:
         return not_found()
 
-    def restore() -> None:
-        found.retired_at = None
-
-    if broken := attempt(session, restore):
+    _, broken = attempt(session, lambda: locations.restore(session, found))
+    if broken:
         taken = "A current place beside it already has its name: rename one first."
         return _location_page(
             request, session, signed, found, rule_words(broken, taken)

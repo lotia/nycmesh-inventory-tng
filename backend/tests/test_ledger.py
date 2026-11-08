@@ -13,6 +13,7 @@ from sqlalchemy import Engine, delete, exc, insert, select, text, update
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
+from inventory_tng import items
 from inventory_tng.database_role import LEDGER
 from inventory_tng.db import describe_error, set_actor
 from inventory_tng.ledger import balance, on_order_after
@@ -23,7 +24,7 @@ from inventory_tng.models import (
     Movement,
 )
 
-from helpers.rows import add, refused, violates
+from helpers.rows import add, breaks, refused, setting_up, violates
 from helpers.stock import Place, received, write
 
 URL = "/api/transactions"
@@ -283,7 +284,7 @@ def test_movements_are_never_added_to_a_recorded_transaction(
     would be, and nothing can delete it from the ledger (conftest's
     APPEND_ONLY), so it must not stay where later tests count stock."""
     with Session(own_engine, expire_on_commit=False) as first, first.begin():
-        place = Place(first)
+        place = Place(setting_up(first))
         committed = write(first, place).id
     with (
         Session(own_engine) as session,
@@ -366,10 +367,9 @@ def test_an_item_with_fractional_movements_is_never_counted_in_each(
     session: Session, place: Place
 ) -> None:
     write(session, place, lines=[{"item_id": place.cable.id, "quantity": "1.5"}])
-    with violates(session, "movement_whole_units"):
-        session.execute(
-            update(Item).where(Item.id == place.cable.id).values(unit="each")
-        )
+    with breaks(session, "movement_whole_units"):
+        items.save(session, place.cable, {"unit": "each"})
+    items.save(session, place.cable, {"unit": "ft"})
 
 
 def test_the_server_clock_decides_when(session: Session, place: Place) -> None:

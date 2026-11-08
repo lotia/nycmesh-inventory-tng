@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.db import Base
 
+from helpers.rows import setting_up
+
 
 class Worker(threading.Thread):
     """`work` on a thread of its own, keeping what it returned or raised."""
@@ -43,7 +45,7 @@ class Committed:
         self.workers: list[Worker] = []
 
     def session(self) -> Session:
-        session = Session(self.engine, expire_on_commit=False)
+        session = setting_up(Session(self.engine, expire_on_commit=False))
         self.sessions.append(session)
         return session
 

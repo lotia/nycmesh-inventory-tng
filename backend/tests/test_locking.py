@@ -56,7 +56,7 @@ SQL_LOCK = re.compile(
 )
 
 
-def lockings(tree: ast.AST) -> list[int]:
+def lockings(tree: ast.AST, _path: Path | None = None) -> list[int]:
     """The lines in `tree` that lock a row without the wrappers:
     - a method named with_for_update called (query.with_for_update());
     - a keyword argument by that name (Session.get's, Session.refresh's);
@@ -194,14 +194,15 @@ def test_what_a_locking_read_returns_for_a_row_loaded_before_it(
 # Each site: what a future change would do (load the row in the request's
 # session before the route locks it) is done by the test, then another
 # connection changes the row and commits, then the route runs. Through
-# db.get_locked it sees the change; with a plain locking read it would act
-# on the row as first loaded, which these tests fail on. Sites whose outcome
-# does not depend on the row's earlier values have none: saving an item, a
+# db.get_locked (or db.relock, which a catalogue page's domain function
+# takes) it sees the change; with a plain locking read it would act on the
+# row as first loaded, which these tests fail on. Sites whose outcome does
+# not depend on the row's earlier values have none: saving an item, a
 # volunteer, a location or a category's name (each writes what the form
 # says), adding a package and ending custody (they only need the row to be
 # there), and the recovery code a sign-in uses (PostgreSQL re-checks its
-# WHERE on the locked row). Merging takes the same helper
-# (volunteers._current) as retiring and holding stock, tested here.
+# WHERE on the locked row). Merging locks as retiring does
+# (volunteers._lock), tested here.
 
 
 @pytest.fixture

@@ -1,6 +1,10 @@
 """Labels (docs/decisions/0015): each item, package of one, or place has one
 current code, printed in as many copies as wanted. Revoking a code voids
-every copy; making labels for that thing again then makes a new code."""
+every copy; making labels for that thing again then makes a new code.
+
+Every write to the label table is here. A label is only made or revoked:
+the app may not change its code or what it names (migration 0002). Each
+write takes the catalogue lock first (db.locked_row)."""
 
 from collections.abc import Sequence
 from collections.abc import Set as AbstractSet
@@ -202,7 +206,8 @@ def make_for_item(
     session: Session, item_id: int, package_id: int | None = None
 ) -> Label | None:
     """The current label of an item, or of one of its packages, made if it
-    has none: None if that is retired or not there."""
+    has none: None if that is retired or not there. A package never moves
+    to another item (migration 0002), so the label always names its own."""
     item = locked_row(session, Item, item_id)
     if item is None or item.retired_at is not None:
         return None
@@ -225,7 +230,7 @@ def make_for_place(session: Session, location_id: int) -> Label | None:
 
 def revoke(session: Session, label_id: int, at: datetime) -> bool:
     """Revokes a current label: False if there is none by that id."""
-    label = get_locked(session, Label, label_id)
+    label = locked_row(session, Label, label_id)
     if label is None or label.revoked_at is not None:
         return False
     label.revoked_at = at

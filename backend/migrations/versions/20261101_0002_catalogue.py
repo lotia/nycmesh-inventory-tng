@@ -1,7 +1,8 @@
 """catalogue, locations, volunteers and labels
 
 The tables are generated from models.py. The rules a single row cannot show
-are triggers, below; each raises a check violation (23514) named for its rule.
+are the app's (inventory_tng.locations, volunteers, categories, items and
+labels).
 
 Revision ID: 0002
 Revises: 0001
@@ -22,205 +23,15 @@ depends_on: str | Sequence[str] | None = None
 
 # 0001's: migrations do not import one another.
 APP_ROLE = "inventory_app"
-
-FUNCTIONS = r"""
--- Every trigger that reads other rows calls this first, so rule-checking
--- writes go one at a time: two concurrent ones could each pass their checks
--- and together break them, such as two moves that make a cycle. Writes are
--- few (administrators, and volunteers taking stock), so one lock is enough.
-CREATE FUNCTION lock_catalogue_rules() RETURNS void
-LANGUAGE sql AS $$
-    SELECT pg_advisory_xact_lock(hashtext('inventory.catalogue_rules'));
-$$;
-
--- Each check runs only for the change it is about, and each trigger fires
--- only when one of its columns is written.
-CREATE FUNCTION check_location() RETURNS trigger
-LANGUAGE plpgsql AS $$
-DECLARE
-    moved boolean := TG_OP = 'INSERT' OR NEW.parent_id IS DISTINCT FROM OLD.parent_id;
-    retiring boolean := TG_OP = 'UPDATE'
-        AND OLD.retired_at IS NULL AND NEW.retired_at IS NOT NULL;
-    reviving boolean := TG_OP = 'INSERT' OR NEW.retired_at IS DISTINCT FROM OLD.retired_at;
-BEGIN
-    PERFORM lock_catalogue_rules();
-    -- An area's parent is a store or another area...
-    IF moved AND NEW.parent_id IS NOT NULL AND NOT EXISTS (
-        SELECT FROM location WHERE id = NEW.parent_id AND kind IN ('store', 'area')
-    ) THEN
-        RAISE EXCEPTION 'an area''s parent must be a store or an area'
-            USING ERRCODE = 'check_violation', CONSTRAINT = 'location_area_parent';
-    END IF;
-    -- ...and stays one: a location with areas under it keeps a kind that can
-    -- have them.
-    IF TG_OP = 'UPDATE' AND NEW.kind IS DISTINCT FROM OLD.kind
-        AND NEW.kind NOT IN ('store', 'area')
-        AND EXISTS (SELECT FROM location WHERE parent_id = NEW.id)
-    THEN
-        RAISE EXCEPTION 'a location with areas under it must be a store or an area'
-            USING ERRCODE = 'check_violation', CONSTRAINT = 'location_area_parent';
-    END IF;
-    -- A current area's parent is current, and stays so while it has some.
-    IF (moved OR reviving) AND NEW.retired_at IS NULL AND NEW.parent_id IS NOT NULL
-        AND EXISTS (
-            SELECT FROM location WHERE id = NEW.parent_id AND retired_at IS NOT NULL
-        )
-    THEN
-        RAISE EXCEPTION 'a current area''s parent must be current'
-            USING ERRCODE = 'check_violation', CONSTRAINT = 'location_parent_current';
-    END IF;
-    IF retiring AND EXISTS (
-        SELECT FROM location WHERE parent_id = NEW.id AND retired_at IS NULL
-    ) THEN
-        RAISE EXCEPTION 'retire the areas under a location first'
-            USING ERRCODE = 'check_violation', CONSTRAINT = 'location_parent_current';
-    END IF;
-    -- The tree has no cycles: walking up from the new parent never reaches
-    -- this location. A new row cannot be anyone's parent yet.
-    IF TG_OP = 'UPDATE' AND moved AND NEW.parent_id IS NOT NULL AND EXISTS (
-        WITH RECURSIVE up (id, parent_id) AS (
-            SELECT id, parent_id FROM location WHERE id = NEW.parent_id
-            UNION
-            SELECT l.id, l.parent_id FROM location l JOIN up ON l.id = up.parent_id
-        )
-        SELECT FROM up WHERE id = NEW.id
-    ) THEN
-        RAISE EXCEPTION 'a location cannot be inside itself'
-            USING ERRCODE = 'check_violation', CONSTRAINT = 'location_no_cycle';
-    END IF;
-    -- A current custody location belongs to a current volunteer
-    -- (check_volunteer keeps it so). A merged volunteer is retired.
-    IF NEW.volunteer_id IS NOT NULL AND NEW.retired_at IS NULL AND NOT EXISTS (
-        SELECT FROM volunteer WHERE id = NEW.volunteer_id AND retired_at IS NULL
-    ) THEN
-        RAISE EXCEPTION 'a custody location''s volunteer must be current'
-            USING ERRCODE = 'check_violation', CONSTRAINT = 'location_custody_volunteer';
-    END IF;
-    RETURN NEW;
-END
-$$;
-
-CREATE FUNCTION check_volunteer() RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-    PERFORM lock_catalogue_rules();
-    -- A merge points at a current volunteer (a merged one is retired, by
-    -- ck_volunteer_merged_is_retired)...
-    IF NEW.merged_into_id IS NOT NULL AND NOT EXISTS (
-        SELECT FROM volunteer WHERE id = NEW.merged_into_id AND retired_at IS NULL
-    ) THEN
-        RAISE EXCEPTION 'a volunteer can be merged only into a current one'
-            USING ERRCODE = 'check_violation', CONSTRAINT = 'volunteer_merge_target';
-    END IF;
-    IF TG_OP = 'UPDATE' AND OLD.retired_at IS NULL AND NEW.retired_at IS NOT NULL THEN
-        -- ...and one that others are merged into stays current: point those
-        -- at the new volunteer first.
-        IF EXISTS (SELECT FROM volunteer WHERE merged_into_id = NEW.id) THEN
-            RAISE EXCEPTION 'others are merged into this volunteer; move them first'
-                USING ERRCODE = 'check_violation', CONSTRAINT = 'volunteer_merge_target';
-        END IF;
-        -- A volunteer holding stock stays current until their custody
-        -- location is retired.
-        IF EXISTS (
-            SELECT FROM location
-            WHERE volunteer_id = NEW.id AND kind = 'custody' AND retired_at IS NULL
-        ) THEN
-            RAISE EXCEPTION 'retire this volunteer''s custody location first'
-                USING ERRCODE = 'check_violation', CONSTRAINT = 'location_custody_volunteer';
-        END IF;
-    END IF;
-    RETURN NEW;
-END
-$$;
-
--- A current item is in a current category (inventory-tng-8i4.58)...
-CREATE FUNCTION check_item() RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-    PERFORM lock_catalogue_rules();
-    -- Only for a current item (the trigger's WHEN).
-    IF EXISTS (
-        SELECT FROM category WHERE id = NEW.category_id AND retired_at IS NOT NULL
-    ) THEN
-        RAISE EXCEPTION 'a current item''s category must be current'
-            USING ERRCODE = 'check_violation', CONSTRAINT = 'item_category_current';
-    END IF;
-    RETURN NEW;
-END
-$$;
-
--- ...so a category with current items stays current.
-CREATE FUNCTION check_category() RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-    PERFORM lock_catalogue_rules();
-    -- Only as it is retired (the trigger's WHEN).
-    IF EXISTS (
-        SELECT FROM item WHERE category_id = NEW.id AND retired_at IS NULL
-    ) THEN
-        RAISE EXCEPTION 'retire or move a category''s items first'
-            USING ERRCODE = 'check_violation', CONSTRAINT = 'category_has_items';
-    END IF;
-    RETURN NEW;
-END
-$$;
-
-CREATE FUNCTION check_label() RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-    PERFORM lock_catalogue_rules();
-    IF TG_OP = 'UPDATE' AND NEW.code IS DISTINCT FROM OLD.code THEN
-        RAISE EXCEPTION 'a label''s code cannot change'
-            USING ERRCODE = 'check_violation', CONSTRAINT = 'label_code_immutable';
-    END IF;
-    -- With no item, ck_label_package_needs_item says what is wrong.
-    IF NEW.package_id IS NOT NULL AND NEW.item_id IS NOT NULL AND NOT EXISTS (
-        SELECT FROM item_package WHERE id = NEW.package_id AND item_id = NEW.item_id
-    ) THEN
-        RAISE EXCEPTION 'a label''s package must belong to its item'
-            USING ERRCODE = 'check_violation', CONSTRAINT = 'label_package_item';
-    END IF;
-    RETURN NEW;
-END
-$$;
-
--- The other side of check_label(): a package keeps the item its labels name.
-CREATE FUNCTION check_item_package() RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-    PERFORM lock_catalogue_rules();
-    IF EXISTS (
-        SELECT FROM label WHERE package_id = NEW.id AND item_id <> NEW.item_id
-    ) THEN
-        RAISE EXCEPTION 'a label''s package must belong to its item'
-            USING ERRCODE = 'check_violation', CONSTRAINT = 'label_package_item';
-    END IF;
-    RETURN NEW;
-END
-$$;
-"""
-
-TRIGGERS = r"""
-CREATE TRIGGER check_location
-    BEFORE INSERT OR UPDATE OF parent_id, kind, retired_at, volunteer_id ON location
-    FOR EACH ROW EXECUTE FUNCTION check_location();
-CREATE TRIGGER check_volunteer
-    BEFORE INSERT OR UPDATE OF merged_into_id, retired_at ON volunteer
-    FOR EACH ROW EXECUTE FUNCTION check_volunteer();
-CREATE TRIGGER check_item
-    BEFORE INSERT OR UPDATE OF category_id, retired_at ON item
-    FOR EACH ROW WHEN (NEW.retired_at IS NULL)
-    EXECUTE FUNCTION check_item();
-CREATE TRIGGER check_category BEFORE UPDATE OF retired_at ON category
-    FOR EACH ROW WHEN (OLD.retired_at IS NULL AND NEW.retired_at IS NOT NULL)
-    EXECUTE FUNCTION check_category();
-CREATE TRIGGER check_label
-    BEFORE INSERT OR UPDATE OF code, item_id, package_id ON label
-    FOR EACH ROW EXECUTE FUNCTION check_label();
-CREATE TRIGGER check_item_package BEFORE UPDATE OF item_id ON item_package
-    FOR EACH ROW WHEN (OLD.item_id IS DISTINCT FROM NEW.item_id)
-    EXECUTE FUNCTION check_item_package();
-"""
+# The columns the app may change once a row is made; the rest are set as it
+# is made, never after. So a label's code and what it names never change,
+# a package never moves to another item, and a place keeps its kind and its
+# volunteer: rules that then need no check.
+UPDATABLE = {
+    "label": ("revoked_at",),
+    "item_package": ("name", "size", "retired_at"),
+    "location": ("name", "parent_id", "retired_at"),
+}
 
 
 def upgrade() -> None:
@@ -600,7 +411,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_vendor_price")),
     )
-    # Foreign keys, for RESTRICT and the triggers' lookups.
+    # Foreign keys, for RESTRICT and the rules' lookups.
     for table, column in (
         ("item", "category_id"),
         ("item_package", "item_id"),
@@ -617,12 +428,13 @@ def upgrade() -> None:
         op.create_index(op.f(f"ix_{table}_{column}"), table, [column])
     # History is only added to by the app (history.py), never rewritten.
     op.execute(f"REVOKE UPDATE, DELETE ON catalogue_history FROM {APP_ROLE}")
-    op.execute(FUNCTIONS)
-    op.execute(TRIGGERS)
+    for table, columns in UPDATABLE.items():
+        op.execute(f"REVOKE UPDATE ON {table} FROM {APP_ROLE}")
+        op.execute(f"GRANT UPDATE ({', '.join(columns)}) ON {table} TO {APP_ROLE}")
 
 
 def downgrade() -> None:
-    # Indexes and triggers go with their tables. pg_trgm stays: something
+    # Indexes go with their tables. pg_trgm stays: something
     # else may use it, and it may have been there before this migration.
     for table in (
         "vendor_price",
@@ -637,8 +449,3 @@ def downgrade() -> None:
         "catalogue_history",
     ):
         op.drop_table(table)
-    op.execute(
-        "DROP FUNCTION lock_catalogue_rules(), "
-        "check_location(), check_volunteer(), check_item(), check_category(), "
-        "check_label(), check_item_package()"
-    )

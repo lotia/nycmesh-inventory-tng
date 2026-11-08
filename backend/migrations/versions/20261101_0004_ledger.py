@@ -62,26 +62,10 @@ BEGIN
             USING ERRCODE = 'check_violation', CONSTRAINT = 'movement_with_transaction';
     END IF;
     -- FOR SHARE: an item's unit cannot change under a movement being
-    -- written, and check_item_unit() sees the movement once it commits.
+    -- written, and items.save sees the movement once it commits.
     IF NEW.quantity <> trunc(NEW.quantity)
         AND (SELECT unit FROM item WHERE id = NEW.item_id FOR SHARE) = 'each'
     THEN
-        RAISE EXCEPTION 'an item counted in each moves in whole units'
-            USING ERRCODE = 'check_violation', CONSTRAINT = 'movement_whole_units';
-    END IF;
-    RETURN NEW;
-END
-$$;
-
--- The other side of check_movement(): an item with fractional movements is
--- never counted in each. The update holds the item's row, which is all the
--- locking this rule needs.
-CREATE FUNCTION check_item_unit() RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-    IF NEW.unit = 'each' AND EXISTS (
-        SELECT FROM movement WHERE item_id = NEW.id AND quantity <> trunc(quantity)
-    ) THEN
         RAISE EXCEPTION 'an item counted in each moves in whole units'
             USING ERRCODE = 'check_violation', CONSTRAINT = 'movement_whole_units';
     END IF;
@@ -106,9 +90,6 @@ CREATE CONSTRAINT TRIGGER check_lines AFTER INSERT ON ledger_transaction
     FOR EACH ROW EXECUTE FUNCTION check_ledger_transaction_lines();
 CREATE TRIGGER check_movement BEFORE INSERT ON movement
     FOR EACH ROW EXECUTE FUNCTION check_movement();
-CREATE TRIGGER check_item_unit BEFORE UPDATE OF unit ON item
-    FOR EACH ROW WHEN (OLD.unit IS DISTINCT FROM NEW.unit)
-    EXECUTE FUNCTION check_item_unit();
 """
 
 # In minus out, for every item and location stock has been at. A location
@@ -258,10 +239,9 @@ def downgrade() -> None:
     # Indexes and triggers go with their tables. DROP TABLE is not TRUNCATE,
     # so the append-only triggers do not stop it.
     op.execute("DROP VIEW balance")
-    op.execute("DROP TRIGGER check_item_unit ON item")
     op.drop_table("movement")
     op.drop_table("ledger_transaction")
     op.execute(
         "DROP FUNCTION ledger_append_only(), stamp_ledger_transaction(), "
-        "check_ledger_transaction_lines(), check_movement(), check_item_unit()"
+        "check_ledger_transaction_lines(), check_movement()"
     )

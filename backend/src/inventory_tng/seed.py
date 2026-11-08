@@ -16,19 +16,18 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts
-from inventory_tng.command import run_command
-from inventory_tng.db import CLI_ACTOR, Base, exists_where, set_actor
-from inventory_tng.ledger import Batch, record
-from inventory_tng.models import (
-    Admin,
-    Category,
-    Item,
-    ItemPackage,
-    Label,
-    Location,
-    Volunteer,
+from inventory_tng import (
+    accounts,
+    categories,
+    items,
+    labels,
+    locations,
+    volunteers,
 )
+from inventory_tng.command import run_command
+from inventory_tng.db import CLI_ACTOR, exists_where, set_actor
+from inventory_tng.ledger import Batch, record
+from inventory_tng.models import Admin, Location
 
 log = structlog.get_logger(__name__)
 
@@ -104,48 +103,41 @@ def run(session: Session, args: argparse.Namespace) -> int:
 
 
 def _catalogue(session: Session) -> None:
-    categories = {name: _add(session, Category(name=name)) for name in CATEGORIES}
-    items = {
-        name: _add(
+    """Through the domain functions, as an administrator's pages would."""
+    kinds = {name: categories.add(session, name) for name in CATEGORIES}
+    things = {
+        name: items.add(
             session,
-            Item(
-                name=name,
-                category_id=categories[category].id,
-                unit=unit,
-                manufacturer=maker,
-                part_number=part,
-            ),
+            {
+                "name": name,
+                "category_id": kinds[category].id,
+                "unit": unit,
+                "manufacturer": maker,
+                "part_number": part,
+            },
         )
         for name, category, unit, maker, part in ITEMS
     }
     item, package, size = PACKAGE
-    _add(session, ItemPackage(item_id=items[item].id, name=package, size=size))
+    items.add_package(session, things[item], package, size)
     places: dict[str, Location] = {}
     for name, kind, parent in LOCATIONS:
         parent_id = places[parent].id if parent else None
-        places[name] = _add(
-            session, Location(name=name, kind=kind, parent_id=parent_id)
-        )
-    volunteers = [_add(session, Volunteer(name=name)) for name in VOLUNTEERS]
-    _add(session, Label(item_id=items[LABELLED].id))
-    _add(session, Label(location_id=places["Shelf A"].id))
+        places[name] = locations.add(session, name, kind, parent_id)
+    people = [volunteers.add(session, name, None) for name in VOLUNTEERS]
+    labels.make_for_item(session, things[LABELLED].id)
+    labels.make_for_place(session, places["Shelf A"].id)
     received = Batch(
         key=uuid.uuid4(),
         kind="receipt",
-        volunteer_id=volunteers[0].id,
+        volunteer_id=people[0].id,
         to_location_id=places["Shelf A"].id,
         lines=[
-            {"item_id": items[name].id, "quantity": quantity}
+            {"item_id": things[name].id, "quantity": quantity}
             for name, quantity in STOCK.items()
         ],
     )
     record(session, received, device_id=None)
-
-
-def _add[M: Base](session: Session, row: M) -> M:
-    session.add(row)
-    session.flush()
-    return row
 
 
 if __name__ == "__main__":

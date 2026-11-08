@@ -188,7 +188,7 @@ def invite(
     ):
         return again
     try:
-        if not problems and (broken := attempt(session, make)):
+        if not problems and (broken := attempt(session, make)[1]):
             problems["username"] = rule_words(broken, TAKEN)
     except accounts.AdminRefused:
         return not_found()

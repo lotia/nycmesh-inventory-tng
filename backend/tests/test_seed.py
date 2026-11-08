@@ -14,6 +14,7 @@ from inventory_tng.ledger import expected
 from inventory_tng.models import Admin, AdminPassword, Item, Location, Volunteer
 
 from databases import NO_DATABASE
+from helpers.rows import setting_up
 
 SIGN_IN = "Sign in at /admin as dev, password "
 PASSWORD = "a password for the tests"
@@ -31,7 +32,7 @@ def seeding(
     monkeypatch.setenv("DATABASE_URL", own_database)
     monkeypatch.setenv("APP_ENV", "development")
     with Session(own_engine) as session:
-        yield session
+        yield setting_up(session)
 
 
 def the_admin(session: Session) -> Admin | None:

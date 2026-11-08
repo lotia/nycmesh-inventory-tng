@@ -47,6 +47,7 @@ from helpers.apps import on_session
 from helpers.concurrency import Committed
 from helpers.devices import new_device
 from helpers.mail import SITE_MAIL, SentMail
+from helpers.rows import setting_up
 from helpers.sign_in import code, new_admin, sign_in_with
 
 # structlog's lines go through the standard library, where caplog sees them.
@@ -208,7 +209,7 @@ def _rolled_back(engine: Engine) -> Iterator[Session]:
         with Session(
             bind=connection, join_transaction_mode="create_savepoint"
         ) as session:
-            yield session
+            yield setting_up(session)
         transaction.rollback()
 
 
@@ -346,21 +347,13 @@ def _wait_briefly(connection: DBAPIConnection, _record: object) -> None:
     )
 
 
-@pytest.fixture
-def committed(database_url: str, owner_engine: Engine) -> Iterator[Committed]:
-    """Two requests at once need commits other connections see, which the
-    `session` fixture's one transaction is not. Their own engine waits as
-    _wait_briefly says. After the test, any connection still waiting is
-    ended, so its thread finishes before its session is closed, and every
-    row they made (any table, any connection, history included) is deleted,
-    as the owner. Rows they changed but did not make, such as a settings
-    row, are not put back: a test that changes one restores it itself. A
-    committed test must not write the ledger, which nothing can delete."""
-    own = make_engine(database_url)
-
+@contextlib.contextmanager
+def _committed_engine(url: str) -> Generator[Committed]:
+    """Committed sessions on `url`, whose connections wait as _wait_briefly
+    says. After, any still waiting is ended, so its thread finishes before
+    its session is closed; then they all are."""
+    own = make_engine(url)
     event.listen(own, "connect", _wait_briefly)
-    with owner_engine.connect() as connection:
-        before = _newest_ids(connection)
     committed = Committed(own)
     yield committed
     with own.connect() as connection:
@@ -381,6 +374,30 @@ def committed(database_url: str, owner_engine: Engine) -> Iterator[Committed]:
         with contextlib.suppress(exc.DBAPIError):
             session.close()
     own.dispose()
+
+
+@pytest.fixture
+def own_committed(own_database: str) -> Iterator[Committed]:
+    """committed's sessions, on own_database: for two requests at once
+    where one writes the ledger, which nothing can delete. The database goes
+    with the test, so nothing is cleaned up but the connections."""
+    with _committed_engine(own_database) as committed:
+        yield committed
+
+
+@pytest.fixture
+def committed(database_url: str, owner_engine: Engine) -> Iterator[Committed]:
+    """Two requests at once need commits other connections see, which the
+    `session` fixture's one transaction is not (_committed_engine). After
+    the test, every row they made (any table, any connection, history
+    included) is deleted, as the owner. Rows they changed but did not make,
+    such as a settings row, are not put back: a test that changes one
+    restores it itself. A committed test must not write the ledger, which
+    nothing can delete."""
+    with owner_engine.connect() as connection:
+        before = _newest_ids(connection)
+    with _committed_engine(database_url) as committed:
+        yield committed
     with owner_engine.begin() as connection:
         # Only what the test made, each table before what it refers to, and
         # only where it made any.

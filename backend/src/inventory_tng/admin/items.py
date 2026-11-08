@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import labels
+from inventory_tng import items, labels
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.common import (
     ADMIN,
@@ -24,14 +24,7 @@ from inventory_tng.admin.common import (
     rule_words,
     text_form,
 )
-from inventory_tng.db import (
-    DbSession,
-    exists_where,
-    get_locked,
-    locked_row,
-    refusal,
-    unique,
-)
+from inventory_tng.db import DbSession, exists_where, refusal
 from inventory_tng.ledger import balance
 from inventory_tng.models import UNITS, Category, Item, ItemPackage, Label, Movement
 from inventory_tng.pages import NOTICES, not_found, redirect
@@ -50,15 +43,17 @@ TAKEN = (
 RESTORE_TAKEN = "A current item already has its name or part number: change one first."
 
 
-def _change_or_note(
-    session: Session, change: Callable[[], object], problems: dict[str, str]
-) -> None:
-    """Makes the change, unless its name is taken or its category retired:
-    then says so in `problems`, beside that field."""
-    broken = refusal(session, change, "unique", "item_category_current")
+def _change_or_note[T](
+    session: Session, change: Callable[[], T], problems: dict[str, str]
+) -> T | None:
+    """Makes the change, and returns what it did, unless its name is taken
+    or its category retired: then says so in `problems`, beside that
+    field."""
+    done, broken = refusal(session, change, "unique", "item_category_current")
     if broken is not None:
         field = "name" if broken == "unique" else "category_id"
         problems[field] = rule_words(broken, TAKEN)
+    return done
 
 
 NOTICES.update(
@@ -188,7 +183,7 @@ def _fields(
 
 
 @router.get(ITEMS)
-def items(
+def list_items(
     request: Request, signed: AdminSignedIn, session: DbSession, q: str = ""
 ) -> Response:
     return _list_page(request, session, signed, search=q.strip())
@@ -199,10 +194,10 @@ def add_item(
     request: Request, signed: AdminSignedIn, session: DbSession, form: TextForm
 ) -> Response:
     values, problems = _fields(session, form)
-    item = Item(**values)
+    item = None
     if not problems:
-        _change_or_note(session, lambda: session.add(item), problems)
-    if problems:
+        item = _change_or_note(session, lambda: items.add(session, values), problems)
+    if item is None:
         return _list_page(request, session, signed, problems=problems, values=form)
     session.commit()
     log.info("item added", item_id=item.id)
@@ -227,17 +222,12 @@ def save_item(
     item_id: int,
     form: TextForm,
 ) -> Response:
-    found = locked_row(session, Item, item_id)
+    found = session.get(Item, item_id)
     if found is None:
         return not_found()
     values, problems = _fields(session, form, unit_fixed=_moved(session, item_id))
-
-    def save() -> None:
-        for field, value in values.items():
-            setattr(found, field, value)
-
     if not problems:
-        _change_or_note(session, save, problems)
+        _change_or_note(session, lambda: items.save(session, found, values), problems)
     if problems:
         return _item_page(
             request, session, signed, found, problems=problems, values=form
@@ -249,10 +239,10 @@ def save_item(
 
 @router.post(f"{ITEMS}/{{item_id}}/retire")
 def retire_item(signed: AdminSignedIn, session: DbSession, item_id: int) -> Response:
-    found = locked_row(session, Item, item_id)
+    found = session.get(Item, item_id)
     if found is None or found.retired_at is not None:
         return not_found()
-    found.retired_at = now()
+    items.retire(session, found, now())
     session.commit()
     log.info("item retired", item_id=item_id)
     return redirect(ITEMS, notice="retired")
@@ -262,15 +252,17 @@ def retire_item(signed: AdminSignedIn, session: DbSession, item_id: int) -> Resp
 def restore_item(
     request: Request, signed: AdminSignedIn, session: DbSession, item_id: int
 ) -> Response:
-    found = locked_row(session, Item, item_id)
+    found = session.get(Item, item_id)
     if found is None or found.retired_at is None:
         return not_found()
-
-    def restore() -> None:
-        found.retired_at = None
-
+    _, broken = refusal(
+        session,
+        lambda: items.restore(session, found),
+        "unique",
+        "item_category_current",
+    )
     # Beside the name: the category list shows only current categories.
-    if broken := refusal(session, restore, "unique", "item_category_current"):
+    if broken:
         problem = rule_words(broken, RESTORE_TAKEN)
         return _item_page(request, session, signed, found, problems={"name": problem})
     session.commit()
@@ -287,7 +279,7 @@ def add_package(
     package_name: Annotated[str, Form()] = "",
     size: Annotated[str, Form()] = "",
 ) -> Response:
-    found = locked_row(session, Item, item_id)
+    found = session.get(Item, item_id)
     if found is None:
         return not_found()
     name = package_name.strip()
@@ -301,8 +293,10 @@ def add_package(
         problems["size"] = parsed
     if not problems:
         assert isinstance(parsed, Decimal)  # Checked above; narrows the type.
-        package = ItemPackage(item_id=item_id, name=name, size=parsed)
-        if unique(session, lambda: session.add(package)):
+        package, _ = refusal(
+            session, lambda: items.add_package(session, found, name, parsed), "unique"
+        )
+        if package is not None:
             session.commit()
             log.info("package added", item_package_id=package.id)
             return redirect(f"{ITEMS}/{item_id}", notice="package_added")
@@ -315,10 +309,10 @@ def add_package(
 def retire_package(
     signed: AdminSignedIn, session: DbSession, item_id: int, package_id: int
 ) -> Response:
-    package = get_locked(session, ItemPackage, package_id)
+    package = session.get(ItemPackage, package_id)
     if package is None or package.item_id != item_id or package.retired_at:
         return not_found()
-    package.retired_at = now()
+    items.retire_package(session, package, now())
     session.commit()
     log.info("package retired", item_package_id=package_id)
     return redirect(f"{ITEMS}/{item_id}", notice="package_retired")

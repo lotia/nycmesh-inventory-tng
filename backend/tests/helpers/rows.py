@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import Base, describe_error
+from inventory_tng.db import LOCK_INFO, Base, RuleBroken, describe_error
 from inventory_tng.models import CatalogueHistory
 
 
@@ -22,6 +22,16 @@ def violates(session: Session, constraint: str) -> Generator[None]:
         yield
         session.flush()
     assert describe_error(raised.value).get("constraint") == constraint
+
+
+@contextmanager
+def breaks(session: Session, rule: str) -> Generator[None]:
+    """The block's domain function refuses the change by `rule`
+    (db.RuleBroken), and what the block did is rolled back to a savepoint,
+    so the test can go on."""
+    with pytest.raises(RuleBroken) as raised, session.begin_nested():
+        yield
+    assert raised.value.rule == rule
 
 
 # PostgreSQL's insufficient_privilege.
@@ -63,3 +73,11 @@ def tag() -> str:
     """For unique names: rows committed by one test never clash with
     another's."""
     return uuid.uuid4().hex[:8]
+
+
+def setting_up(session: Session) -> Session:
+    """A test's own session, which writes rows directly to set up what it
+    tests: the app refuses a catalogue row written without the catalogue
+    lock (db.LOCK_INFO), but not on this session."""
+    session.info[LOCK_INFO] = "a test's own rows"
+    return session

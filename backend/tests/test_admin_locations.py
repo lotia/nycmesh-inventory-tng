@@ -135,3 +135,10 @@ def test_a_place_holding_stock_is_not_retired(
     assert refused.status_code == 400
     assert "Move what is here elsewhere, or count it, first." in text(refused)
     assert stock.van.retired_at is None
+
+
+def test_a_place_needs_a_name(admin_client: TestClient, session: Session) -> None:
+    hub = place(session, "Hub", "store")
+    refused = admin_client.post(f"{LOCATIONS}/{hub.id}", data={"name": " "})
+    assert refused.status_code == 400
+    assert hub.name == "Hub"

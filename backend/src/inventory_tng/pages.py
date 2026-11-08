@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException
 from starlette.types import Scope
 
+from inventory_tng.db import Gone
 from inventory_tng.local_time import show
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -125,6 +126,13 @@ class ErrorPages:
         return self.page(request, 500)
 
     def install(self, app: FastAPI) -> None:
+        @app.exception_handler(Gone)
+        async def gone(request: Request, _error: Gone) -> Response:
+            """What a change was for is not as the page found it any more:
+            there is nothing here by that id, as there would be on a fresh
+            look."""
+            return await http_error(request, HTTPException(status_code=404))
+
         @app.exception_handler(HTTPException)
         async def http_error(request: Request, error: HTTPException) -> Response:
             # Below 400 (a 304, say) is no error page's to answer.

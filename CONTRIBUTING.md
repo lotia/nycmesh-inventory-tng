@@ -158,8 +158,10 @@ new one.
 Migrations run as the owner, and every table they create gives the app
 `SELECT`, `INSERT`, `UPDATE` and `DELETE` (migration 0001). A migration
 that creates a table the app must not change revokes what it must not do
-there, as 0002 does for history and 0004 for the ledger. What a migration
-writes is not in the history.
+there, as 0002 does for history and for columns set only as a row is
+made, and 0004 for the ledger. `tests/test_database_role.py` lists those
+columns, so a new column the app cannot change fails there until listed.
+What a migration writes is not in the history.
 
 ### History
 
@@ -171,14 +173,29 @@ object's attributes, `session.delete`. A statement such as `update(Item)`
 is never recorded, and `tests/test_history.py` fails on one. The app may
 only add to the history.
 
+### The catalogue's rules
+
+Each catalogue table is written only by its own module: `categories.py`,
+`items.py` (items and their packages), `locations.py`, `volunteers.py` and
+`labels.py`. Admin pages and the seed call those modules' functions, one
+per kind of change, which take the catalogue lock, lock and read what the
+rules need, and refuse a change that breaks one by raising `db.RuleBroken`
+with the rule's name. `db.attempt` returns that name, and
+`admin/common.py`'s `RULES` says it in words. A page reads rows with
+`session.get` and leaves locking to those functions. A flush that writes a
+catalogue row without the catalogue lock is refused, and
+`tests/test_write_owners.py` fails when another module makes or deletes
+one.
+
 ### Locking a row
 
 Lock rows with `db.locked` (a select) or `db.get_locked` (`Session.get`),
 never `with_for_update` itself: they also read the rows again as locked,
 which a plain locking read does not do for a row already loaded. `db.py`
 says why; `tests/test_locking.py` fails on `with_for_update` anywhere else.
-Admin pages lock catalogue rows with `admin.common.locked_row`; its
-docstring says why.
+Catalogue rows are locked with `db.locked_row` or `db.relock`, which take
+the catalogue lock first; `locked_row`'s docstring gives the order every
+change takes its locks in.
 
 ### The scan page
 
@@ -401,6 +418,16 @@ the owner may do, such as `TRUNCATE`, takes `owner_session` or
 fixtures, hooks and what only they use; what tests share besides is in
 `tests/helpers/`, which they import from, never from conftest.py or from
 one another.
+
+Write a rule of more than one condition as a function of plain values,
+such as a map of each place's parent, that returns the rule broken or
+nothing, and test every way it can be broken without the database
+(`tests/test_catalogue_rules.py`). Test on PostgreSQL what only it can
+show: that the function making a change refuses it by the rule's name,
+once per rule; constraints, indexes and privileges; and, for each rule
+that reads other rows, two changes at once, the second waiting, then
+refused. Use the real database there, never a mocked session.
+
 Tests run in a random order, the backend's with pytest-randomly and the
 frontend's with Vitest's shuffle, so none can depend on another. Each run
 prints its seed; to run that order again, pass it: `uv run pytest
