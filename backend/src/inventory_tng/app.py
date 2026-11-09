@@ -6,6 +6,7 @@ Nothing process-wide is set up here, logging included (docs/decisions/0007).
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+import anyio
 import structlog
 from fastapi import FastAPI
 
@@ -68,6 +69,9 @@ def create_app(
         responses=db.UNAVAILABLE,
     )
     app.state.engine = engine
+    # As many requests hold a session at once as the pool has connections
+    # (db.session_slot).
+    app.state.sessions = anyio.CapacityLimiter(db.POOL + db.OVERFLOW)
     app.state.settings = settings
     # mail.get_mailer hands it to routes.
     app.state.mailer = SmtpMailer(settings.mail) if settings.mail else None

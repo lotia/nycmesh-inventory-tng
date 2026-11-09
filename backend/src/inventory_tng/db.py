@@ -2,17 +2,21 @@
 
 import functools
 import re
-from collections.abc import Callable, Collection, Iterator
+import threading
+import weakref
+from collections.abc import AsyncIterator, Callable, Collection, Iterator
 from contextlib import AbstractContextManager
 from datetime import datetime
 from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple
 
+import anyio
 import structlog
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from opentelemetry import metrics
 from pydantic import BaseModel
 from sqlalchemy import (
+    URL,
     Column,
     ColumnElement,
     Engine,
@@ -61,29 +65,106 @@ class Base(DeclarativeBase):
     )
 
 
+# Connections per process (DEPLOYMENT.md, Database connections). The
+# request pool: one connection per request, and at most POOL + OVERFLOW
+# requests hold a session at once (session_slot), fewer than the threads
+# that run sync routes and dependencies (AnyIO's 40). The side pool
+# (side_engine): writes in a transaction of their own beside a request's.
+# Waiting longer than POOL_TIMEOUT seconds for either answers 503 (install).
+POOL, OVERFLOW = 10, 5
+SIDE_POOL, SIDE_OVERFLOW = 2, 3
+POOL_TIMEOUT = 10
+# Longer than any lock the rules wait for in the normal run of things (the
+# catalogue lock, a row a save holds): a wait this long is something stuck,
+# and the request answers 503 rather than holding its connection forever.
+LOCK_TIMEOUT = "10s"
+
+
 def make_engine(url: str) -> Engine:
+    """The app's engine, with its side pool (side_engine)."""
+    engine = _engine(url, POOL, OVERFLOW)
+    side_engine(engine)
+    return engine
+
+
+def _engine(url: str | URL, pool: int, overflow: int) -> Engine:
     # A database that drops packets fails a request in seconds instead of
     # holding a worker until the operating system gives up. Parameters are
     # hidden from SQLAlchemy's log lines and messages, because they can hold
     # personal data.
     engine = create_engine(
         url,
+        pool_size=pool,
+        max_overflow=overflow,
+        pool_timeout=POOL_TIMEOUT,
         pool_pre_ping=True,
         connect_args={"connect_timeout": 5},
         hide_parameters=True,
     )
-    event.listen(engine, "connect", _in_utc)
+    event.listen(engine, "connect", _prepare)
     return engine
 
 
-def _in_utc(connection: DBAPIConnection, _record: object) -> None:
+def _prepare(connection: DBAPIConnection, _record: object) -> None:
     """Times come back in UTC whatever the server's own zone
-    (docs/decisions/0013). Set as each connection opens, rather than as a
-    startup option, which would replace any options DATABASE_URL gives."""
-    run_outside_transaction(connection, "SET TIME ZONE 'UTC'")
+    (docs/decisions/0013), and a lock is waited for at most LOCK_TIMEOUT.
+    Set as each connection opens, rather than as startup options, which
+    would replace any options DATABASE_URL gives."""
+    run_outside_transaction(
+        connection, "SET TIME ZONE 'UTC'", f"SET lock_timeout = '{LOCK_TIMEOUT}'"
+    )
 
 
-def get_session(request: Request) -> Iterator[Session]:
+_SIDE: weakref.WeakKeyDictionary[Engine, Engine] = weakref.WeakKeyDictionary()
+# Request threads can ask for an engine's first side pool at once.
+_SIDE_MADE = threading.Lock()
+
+
+def side_engine(engine: Engine) -> Engine:
+    """The pool for writes in a transaction of their own beside a request's
+    (record_last_seen, rate_limits): a small one of its own, so a request
+    holding one of `engine`'s connections never waits on that pool for a
+    second. Enough such requests at once would otherwise each hold one and
+    wait for another, until the pool timed out (inventory-tng-8i4.125). Its
+    connections never wait on `engine`'s, so no cycle can form. Made with
+    `engine` by make_engine, or here for one made otherwise; its
+    connections close as `engine`'s do, by dispose() or once it is gone."""
+    with _SIDE_MADE:
+        if (side := _SIDE.get(engine)) is None:
+            side = _SIDE[engine] = _engine(engine.url, SIDE_POOL, SIDE_OVERFLOW)
+            event.listen(engine, "engine_disposed", lambda _engine: side.dispose())
+            weakref.finalize(engine, side.dispose)
+    return side
+
+
+class NoSession(exc.TimeoutError):
+    """No place for the request's session within POOL_TIMEOUT."""
+
+
+async def session_slot(request: Request) -> AsyncIterator[None]:
+    """A place among the requests that hold a session at once, no more than
+    the request pool has connections (app.state.sessions), waited for on
+    the event loop before the session is made. A request holds its
+    connection across several threads in turn: its dependencies', its
+    route's, and FastAPI's check of a returned model. With more requests
+    holding connections than there are threads, each thread could wait for
+    a connection held by a request waiting for a thread, until the pool
+    timed out (inventory-tng-8i4.125). A request waiting here holds neither."""
+    sessions: anyio.CapacityLimiter = request.app.state.sessions
+    try:
+        with anyio.fail_after(POOL_TIMEOUT):
+            await sessions.acquire()
+    except TimeoutError:
+        raise NoSession("no place for a session") from None
+    try:
+        yield
+    finally:
+        sessions.release()
+
+
+def get_session(
+    request: Request, _slot: Annotated[None, Depends(session_slot, scope="function")]
+) -> Iterator[Session]:
     """The request's own session. Rows stay loaded after a commit: a page
     that commits then shows them does not read them all again. It closes as
     the route returns (DbSession's scope), before the reply is sent, any
@@ -106,7 +187,10 @@ SessionFactory = Callable[[], AbstractContextManager[Session]]
 
 
 def get_session_factory(request: Request) -> SessionFactory:
-    engine = request.app.state.engine
+    """On the side pool: work after the reply holds no place among the
+    requests (session_slot), so it must not take the request pool's
+    connections from those that do."""
+    engine = side_engine(request.app.state.engine)
     return lambda: Session(engine, expire_on_commit=False)
 
 
@@ -284,10 +368,26 @@ def record_last_seen(
 ) -> None:
     """Set a row's last_seen_at in a transaction of its own, so a request
     that saves nothing still counts, and the route's own transaction is left
-    alone. A row the route has not committed is not seen, which is fine."""
-    with Session(engine) as session, session.begin():
-        session.execute(
-            update(model).where(model.id == row_id).values(last_seen_at=now)
+    alone. A row the route has not committed is not seen, which is fine.
+    Bookkeeping only: with the side pool busy, as under a flood of guesses
+    counted against the rate limits, or the row locked longer than
+    LOCK_TIMEOUT, it is skipped, not the request failed."""
+    try:
+        with Session(side_engine(engine)) as session, session.begin():
+            session.execute(
+                update(model).where(model.id == row_id).values(last_seen_at=now)
+            )
+    except exc.TimeoutError:
+        pool_timeouts.add(1, {"db.client.connection.pool.name": "side"})
+        log.warning("last seen not recorded", table=model.__tablename__, row_id=row_id)
+    except exc.OperationalError as error:
+        if getattr(error.orig, "sqlstate", None) != LOCK_NOT_AVAILABLE:
+            raise
+        log.warning(
+            "last seen not recorded",
+            table=model.__tablename__,
+            row_id=row_id,
+            **describe_error(error),
         )
 
 
@@ -379,12 +479,15 @@ def describe_error(error: exc.SQLAlchemyError) -> dict[str, str]:
     return fields
 
 
+LOCK_NOT_AVAILABLE = "55P03"  # A lock waited for longer than LOCK_TIMEOUT.
+
 # OperationalErrors that trying again can cure. Any other is a bug, and
 # stays a 500: retrying it forever would hide it.
 RETRYABLE_SQLSTATES = (
     "08",  # The connection failed or was lost.
     "40001",  # Serialization failure.
     "40P01",  # Deadlock.
+    LOCK_NOT_AVAILABLE,
     "53300",  # Too many connections.
     "57014",  # A statement timed out.
     "57P01",  # The server is shutting down...
@@ -406,6 +509,13 @@ UNAVAILABLE: dict[int | str, dict[str, Any]] = {
 }
 
 
+pool_timeouts = metrics.get_meter(__name__).create_counter(
+    "db.client.connection.timeouts",
+    unit="{timeout}",
+    description="Requests that found no free connection in time, by pool",
+)
+
+
 def install(app: FastAPI) -> None:
     """A database the app cannot reach, or that cannot answer just now, is a
     503 on any route, so a client such as the scan page's outbox knows to try
@@ -418,6 +528,12 @@ def install(app: FastAPI) -> None:
         # No sqlstate: the server never answered, as when it is down.
         if sqlstate and not sqlstate.startswith(RETRYABLE_SQLSTATES):
             raise error
+        if isinstance(error, exc.TimeoutError):
+            # Too many requests at once for the request pool (NoSession), or
+            # the side pool busy: the request pool's own connections are
+            # never waited for, as no more requests hold one than it has.
+            pool = "requests" if isinstance(error, NoSession) else "side"
+            pool_timeouts.add(1, {"db.client.connection.pool.name": pool})
         log.warning("database unavailable", **describe_error(error))
         body = UnavailableReply(reason="database_unavailable")
         return JSONResponse(body.model_dump(), status_code=503)

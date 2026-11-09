@@ -38,7 +38,7 @@ class Refusal(Exception):
 
 @pytest.mark.parametrize(
     ("sqlstate", "status"),
-    [("40P01", 503), ("57014", 503), ("08006", 503), ("54000", 500)],
+    [("40P01", 503), ("57014", 503), ("08006", 503), ("55P03", 503), ("54000", 500)],
 )
 def test_only_errors_a_retry_can_cure_are_503s(
     database_url: str, sqlstate: str, status: int

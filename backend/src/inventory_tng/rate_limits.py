@@ -21,6 +21,7 @@ from limits.strategies import MovingWindowRateLimiter
 from sqlalchemy import Engine, delete, exc, func, select, text
 from sqlalchemy.orm import Session
 
+from inventory_tng.db import side_engine
 from inventory_tng.models import RateLimit
 
 log = structlog.get_logger(__name__)
@@ -109,5 +110,8 @@ class PostgresStorage(Storage, MovingWindowSupport):
 
 def limiter(session: Session) -> MovingWindowRateLimiter:
     """The rate limits, on the database `session` uses, in transactions of
-    their own."""
-    return MovingWindowRateLimiter(PostgresStorage(session.get_bind().engine))
+    their own, on its side pool (db.side_engine): counting never waits on
+    the pool the request's own connection came from."""
+    return MovingWindowRateLimiter(
+        PostgresStorage(side_engine(session.get_bind().engine))
+    )
