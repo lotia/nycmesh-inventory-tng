@@ -141,9 +141,18 @@ def test_the_unit_is_fixed_once_stock_has_moved(
     add(session, Movement(transaction_id=batch.id, item_id=item.id, quantity=1))
     page = text(admin_client.get(f"{ITEMS}/{item.id}"))
     assert "fixed, as stock has moved in it" in page
+    assert '<input type="hidden" name="unit" value="each">' in page
     form = {"name": item.name, "category_id": str(radios.id), "unit": "m"}
-    admin_client.post(f"{ITEMS}/{item.id}", data=form)
+    refused = admin_client.post(f"{ITEMS}/{item.id}", data=form)
+    assert refused.status_code == 400
+    assert "Its unit is fixed, as stock has moved in it." in text(refused)
     assert item.unit == "each"
+    # The form sends the fixed unit back as it is, so the rest still saves.
+    kept = admin_client.post(f"{ITEMS}/{item.id}", data=form | {"unit": "each"})
+    assert kept.status_code == 303
+    # A form without a unit is refused, rather than keeping the one stored.
+    unitless = admin_client.post(f"{ITEMS}/{item.id}", data=form | {"unit": ""})
+    assert "Pick a unit." in text(unitless)
 
 
 def test_packages(admin_client: TestClient, session: Session, radios: Category) -> None:
@@ -185,6 +194,8 @@ def test_unknown_items_and_others_packages_are_not_found(
     assert admin_client.get(f"{ITEMS}/999999").status_code == 404
     assert admin_client.post(f"{ITEMS}/999999", data={}).status_code == 404
     assert admin_client.post(f"{ITEMS}/999999/packages").status_code == 404
+    # A current item is not brought back.
+    assert admin_client.post(f"{ITEMS}/{item.id}/restore").status_code == 404
     path = f"{ITEMS}/{item.id}/packages/{theirs.id}/retire"
     assert admin_client.post(path).status_code == 404
 

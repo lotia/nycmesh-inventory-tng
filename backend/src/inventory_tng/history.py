@@ -25,7 +25,7 @@ import structlog
 from sqlalchemy import Table, event, insert, inspect, select
 from sqlalchemy.orm import Session, UOWTransaction
 
-from inventory_tng.db import Base, current_actor
+from inventory_tng.db import Base, changed_attributes, current_actor
 
 log = structlog.get_logger(__name__)
 
@@ -151,12 +151,7 @@ def _id(row: Base) -> int | None:
 def _changes_history(row: Base, table: Table) -> bool:
     """Whether the row has a change besides those in NOT_A_CHANGE, so a
     sign-in moving an authenticator's last step reads nothing."""
-    skipped = NOT_A_CHANGE.get(table.name, ())
-    return any(
-        attribute.history.has_changes()
-        for attribute in inspect(row).attrs
-        if attribute.key not in skipped
-    )
+    return bool(changed_attributes(row) - set(NOT_A_CHANGE.get(table.name, ())))
 
 
 def _read(session: Session, keys: Iterable[Key]) -> dict[Key, Row]:

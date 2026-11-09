@@ -1,5 +1,6 @@
 """Items and the packages they come in. An item's unit is fixed once stock
-has moved in it: the ledger's quantities are in that unit. A retired item
+has moved in it (items.save): the form shows it, and does not offer to
+change it. A retired item
 with stock left may still be taken, never received (docs/decisions/0003)."""
 
 from collections.abc import Callable, Mapping
@@ -43,16 +44,22 @@ TAKEN = (
 RESTORE_TAKEN = "A current item already has its name or part number: change one first."
 
 
+# The rules a change to an item may break, and the field each is shown by.
+REFUSED_FIELDS = {
+    "unique": "name",
+    "item_category_current": "category_id",
+    "item_unit_fixed": "unit",
+}
+
+
 def _change_or_note[T](
     session: Session, change: Callable[[], T], problems: dict[str, str]
 ) -> T | None:
-    """Makes the change, and returns what it did, unless its name is taken
-    or its category retired: then says so in `problems`, beside that
-    field."""
-    done, broken = refusal(session, change, "unique", "item_category_current")
+    """Makes the change, and returns what it did, unless it breaks one of
+    REFUSED_FIELDS' rules: then says so in `problems`, beside that field."""
+    done, broken = refusal(session, change, *REFUSED_FIELDS)
     if broken is not None:
-        field = "name" if broken == "unique" else "category_id"
-        problems[field] = rule_words(broken, TAKEN)
+        problems[REFUSED_FIELDS[broken]] = rule_words(broken, TAKEN)
     return done
 
 
@@ -155,7 +162,7 @@ def _item_page(
 
 
 def _fields(
-    session: Session, form: Mapping[str, str], *, unit_fixed: bool = False
+    session: Session, form: Mapping[str, str]
 ) -> tuple[dict[str, object], dict[str, str]]:
     """What to set, and what is wrong."""
     values: dict[str, object] = {"name": form.get("name", "").strip()}
@@ -169,11 +176,10 @@ def _fields(
         problems["category_id"] = "Pick a category."
     else:
         values["category_id"] = category.id
-    if not unit_fixed:
-        if form.get("unit") not in UNITS:
-            problems["unit"] = "Pick a unit."
-        else:
-            values["unit"] = form["unit"]
+    if form.get("unit") not in UNITS:
+        problems["unit"] = "Pick a unit."
+    else:
+        values["unit"] = form["unit"]
     minimum = quantity(form.get("minimum", ""), positive=False)
     if isinstance(minimum, str):
         problems["minimum"] = minimum
@@ -225,7 +231,7 @@ def save_item(
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
-    values, problems = _fields(session, form, unit_fixed=_moved(session, item_id))
+    values, problems = _fields(session, form)
     if not problems:
         _change_or_note(session, lambda: items.save(session, found, values), problems)
     if problems:

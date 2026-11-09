@@ -1,8 +1,17 @@
 """The time zones the app knows: zoneinfo's, from the tzdata package, so
-they do not depend on the operating system's (docs/decisions/0013)."""
+they do not depend on the operating system's (docs/decisions/0013).
+
+zoneinfo looks in the operating system's zone folders before tzdata, so
+importing this module empties that search path, for the whole process.
+Every use of a zone comes through here first (models imports it, and
+local_time models), so the server, the command line, migrations and
+tests all read tzdata alone. In code, not PYTHONTZPATH, so no way of
+starting the app can leave it out."""
 
 import functools
 import zoneinfo
+
+zoneinfo.reset_tzpath(to=())
 
 
 @functools.cache

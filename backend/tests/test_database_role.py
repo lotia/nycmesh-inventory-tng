@@ -65,6 +65,20 @@ def test_a_login_that_cannot_record_is_refused(superuser: Connection) -> None:
     assert refusals(superuser) == {"lacks": named(NEEDED)}
 
 
+def test_a_login_that_may_update_one_column_of_the_ledger_is_refused(
+    superuser: Connection,
+) -> None:
+    """A grant on a column, which has_table_privilege alone does not see."""
+    clerk = f"clerk_{uuid.uuid4().hex[:8]}"
+    superuser.execute(text(f"CREATE ROLE {clerk}"))
+    superuser.execute(
+        text(f"GRANT SELECT, INSERT ON {', '.join(APPEND_ONLY)} TO {clerk}")
+    )
+    superuser.execute(text(f"GRANT UPDATE (quantity) ON movement TO {clerk}"))
+    superuser.execute(text(f"SET LOCAL ROLE {clerk}"))
+    assert refusals(superuser) == {"may": ["UPDATE movement"]}
+
+
 def test_the_app_starts_as_its_own_login(engine: Engine) -> None:
     with capture_logs() as logs:
         check(engine)
