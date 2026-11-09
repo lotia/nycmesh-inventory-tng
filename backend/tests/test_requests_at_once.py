@@ -26,7 +26,7 @@ from fastapi import BackgroundTasks, FastAPI
 from fastapi.responses import Response
 from fastapi.testclient import TestClient
 from httpx2 import Response as Answer
-from sqlalchemy import delete, select, text
+from sqlalchemy import Engine, delete, select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
@@ -65,7 +65,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 
-from helpers.concurrency import Committed, Worker, made
+from helpers.concurrency import Committed, Worker, delete_made, made, newest_ids
 from helpers.mail import SentMail
 from helpers.rows import tag
 from helpers.sign_in import PASSWORD, code, new_admin, reset_link, sign_in_with
@@ -513,6 +513,27 @@ def test_a_rename_after_another_is_not_lost(
     first.commit()
     (renamed,) = accounts.authenticators(committed.session(), ben)
     assert renamed.name == "Phone"
+
+
+@pytest.mark.helper
+def test_cleanup_fails_at_once_on_a_lock_left_held(
+    committed: Committed, owner_engine: Engine
+) -> None:
+    """committed's cleanup waits only briefly for a lock, so one a worker
+    left held fails the test, saying so, rather than hanging the run
+    (inventory-tng-8i4.105). Here a shorter wait than the fixture's."""
+    with owner_engine.connect() as connection:
+        before = newest_ids(connection)
+    category = Category(name=f"Radios {tag()}")
+    made(committed, category)
+    holding = committed.session()
+    holding.execute(locked(select(Category.id).where(Category.id == category.id)))
+    # On a thread, so this test fails rather than hangs if cleanup waits.
+    cleanup = Worker(lambda: delete_made(owner_engine, before, wait="50ms"))
+    error = cleanup.finished().error
+    holding.rollback()
+    assert isinstance(error, RuntimeError), error
+    assert "a lock another connection still holds" in str(error)
 
 
 @pytest.mark.helper
