@@ -9,11 +9,11 @@ import re
 import tomllib
 from pathlib import Path
 
+import pytest
+
 from inventory_tng.local_env import CLONE
 
-from helpers.clone import clone_only
-
-pytestmark = clone_only
+pytestmark = pytest.mark.clone
 
 TASK_SCRIPTS = CLONE / "mise-tasks"
 WORKFLOW = CLONE / ".github" / "workflows" / "ci.yml"

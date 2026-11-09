@@ -47,6 +47,7 @@ from databases import (
     new_database,
 )
 from helpers.apps import on_session
+from helpers.categories import marked_against_its_needs, needs_database
 from helpers.concurrency import LOCK_TIMEOUT, Committed, delete_made, newest_ids
 from helpers.devices import new_device
 from helpers.mail import SITE_MAIL, SentMail
@@ -137,10 +138,10 @@ def restore_logging() -> Iterator[None]:
     configure_structlog()
 
 
-@pytest.fixture(scope="session")
-def database_url() -> Iterator[str]:
-    """The run's database, as the app logs in to it: inventory_app, which
-    cannot change the ledger (DEPLOYMENT.md, Database roles)."""
+@contextlib.contextmanager
+def _database_or_exit() -> Generator[str]:
+    """A database of its own, dropped after; if the server cannot be reached, the run ends there,
+    saying how to start it, rather than every test failing on it."""
     try:
         url = create_database()
     except Unreachable as error:
@@ -152,10 +153,41 @@ def database_url() -> Iterator[str]:
 
 
 @pytest.fixture(scope="session")
+def database_url() -> Iterator[str]:
+    """The run's database, as the app logs in to it: inventory_app, which
+    cannot change the ledger (DEPLOYMENT.md, Database roles)."""
+    with _database_or_exit() as url:
+        yield url
+
+
+@pytest.fixture(scope="session")
 def owner_engine(database_url: str) -> Iterator[Engine]:
     """The run's database as its owner, who migrated it."""
     with migrated_as_owner(database_url) as engine:
         yield engine
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """What each test needs, from its fixtures, so a category runs alone
+    (CONTRIBUTING.md, Running the checks): `database` for PostgreSQL. A
+    `clone` test is skipped where there is no clone, as in the image."""
+    in_a_clone = (local_env.CLONE / "mise.toml").exists()
+    wrong = []
+    for item in items:
+        fixtures = getattr(item, "fixturenames", ())
+        if needs_database(fixtures):
+            item.add_marker(pytest.mark.database)
+        if marked_against_its_needs((m.name for m in item.iter_markers()), fixtures):
+            wrong.append(item.nodeid)
+        if item.get_closest_marker("clone") and not in_a_clone:
+            item.add_marker(
+                pytest.mark.skip(reason="only in a clone, not in the image")
+            )
+    # Before any filter (-m, -k), so every run checks every collected test.
+    if wrong:
+        raise pytest.UsageError(
+            f"marked concurrency or end_to_end but needing no database: {wrong}"
+        )
 
 
 @pytest.fixture(autouse=True)
@@ -198,7 +230,7 @@ def engine(database: Database) -> Engine:
 def migrated_template() -> Iterator[str]:
     """The name of a database with the schema and nothing else, which
     nothing stays connected to, so own_database can copy it."""
-    with new_database() as url:
+    with _database_or_exit() as url:
         with migrated_engine(url):
             pass
         yield make_url(url).database or ""
@@ -314,7 +346,9 @@ def _unchanged(engine: Engine, what: str, module: pytest.Module) -> Generator[No
 
 @functools.cache
 def _modules_using_the_database(session: pytest.Session) -> frozenset[str]:
-    """The modules with a test that takes database_url, found once a run."""
+    """The modules with a test that takes database_url, found once a run:
+    the run's database, which the module check reads, not any database
+    (helpers.categories.needs_database), as own_database's are not it."""
     return frozenset(
         item.module.__name__
         for item in session.items

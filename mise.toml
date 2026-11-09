@@ -31,6 +31,11 @@ run = [
     "uv run pytest --cov --cov-report=term --cov-report=xml",
 ]
 
+[tasks.test-without-database]
+description = "Run every backend test that needs no PostgreSQL, with no database"
+dir = "backend"
+run = 'uv run pytest -m "not database"'
+
 [tasks.check-frontend]
 description = "Type check, lint, format check and test the frontend"
 dir = "frontend"

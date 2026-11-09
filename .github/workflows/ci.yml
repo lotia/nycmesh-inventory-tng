@@ -42,6 +42,22 @@ jobs:
           name: backend-coverage
           path: backend/coverage.xml
 
+  # The backend's tests that need no PostgreSQL, with none: a test reaching
+  # the database without being marked so (tests/conftest.py) fails here.
+  test-without-database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-uv
+      - run: uv sync --locked
+      - run: uv run pytest -m "not database"
+
   # One job per check, as the mise tasks are, so one failing never hides
   # another. mise only installs each job's tool, at the version mise.toml
   # pins: CI runs no mise tasks.

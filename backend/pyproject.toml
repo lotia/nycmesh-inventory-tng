@@ -115,8 +115,13 @@ strict = true
 filterwarnings = ["error"]
 # What a test tests (tests/test_requests_at_once.py's docstring).
 markers = [
+    # What a test needs: database, worked out by tests/conftest.py, never
+    # by hand; clone, by its module, and skipped in the image.
+    "database: needs PostgreSQL (its fixtures reach database_url or migrated_template)",
+    "clone: needs a clone of the repository; skipped in the image",
+    # What a test is about, by hand.
     "concurrency: two transactions at once, on two database connections",
     "end_to_end: requests through the whole app",
-    "helper: one helper's contract, on a real database session",
+    "helper: one helper's contract",
     "breaks_pool_order: takes connections out of the pools' order on purpose (db.Database)",
 ]

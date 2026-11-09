@@ -12,11 +12,9 @@ import pytest
 
 from inventory_tng.local_env import CLONE
 
-from helpers.clone import clone_only
-
 SCRIPT = CLONE / "mise-tasks" / "compose"
 
-pytestmark = clone_only
+pytestmark = pytest.mark.clone
 
 Run = Callable[..., subprocess.CompletedProcess[str]]
 

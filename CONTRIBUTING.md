@@ -427,8 +427,21 @@ the same name; one that only makes sense on your machine, such as setting it
 up, is named otherwise. A test fails on a job not named for a task, or a
 `check-…` task without a job.
 
-Only the backend's tests and the browser tests need the database; the other
-checks take about a second each. Start the database first. Then
+Each test belongs to a category by what it needs to run. `tests/conftest.py`
+marks the backend's `database` from their fixtures, never by hand: a test
+whose fixtures reach `database_url` or `migrated_template` is one. A module
+of tests of what is in a clone marks itself `clone`.
+
+| Tests | Need | Run them |
+| --- | --- | --- |
+| Backend, `not database` | Python; CI runs them with no PostgreSQL | `mise run test-without-database` |
+| Backend, `database` | PostgreSQL | `mise run check-backend`, with the rest |
+| Backend, `clone` | a clone of the repository; skipped in the image | with the others |
+| Frontend | Node | `mise run check-frontend` |
+| Browser | PostgreSQL, Node, browsers (`mise run setup-browsers`) | `mise run check-browser` |
+
+The backend's run from `backend/`. Start the database first, or with none
+run only the first row; the other checks take about a second each. Then
 `mise run fix` runs the fixes and `mise run check` runs every check, or one
 side of them:
 
@@ -477,8 +490,10 @@ changed or deleted fails, named by `leaves_the_database_as_it_was` in
 conftest.py.
 `tests/test_requests_at_once.py` and `tests/test_locking.py` hold tests of
 requests at the same time, on connections that really commit, marked by
-kind (the first one's docstring): `uv run pytest -m concurrency` runs only
-those, and `-m "not end_to_end"` skips the ones through the whole app.
+hand with what they are about (the first one's docstring), apart from what
+they need: `uv run pytest -m concurrency` runs only those, and
+`-m "not end_to_end"` skips the ones through the whole app. Both are
+`database` tests too, which a test checks.
 
 A test's own sessions write rows freely to set up what it tests, but the
 app's requests on them meet the lock guard (`db.protection`) as in
