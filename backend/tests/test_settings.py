@@ -27,7 +27,11 @@ def test_checks_a_url_given_directly_too() -> None:
 
 @pytest.mark.parametrize("environ", [{}, {"DATABASE_URL": ""}, {"DATABASE_URL": " "}])
 def test_refuses_a_missing_or_empty_database_url(environ: dict[str, str]) -> None:
-    with pytest.raises(SettingsError, match="DATABASE_URL"):
+    """The message says where the value is described, for dev and production."""
+    with pytest.raises(
+        SettingsError,
+        match=r"^DATABASE_URL is not set: .*\.env\.example.*DEPLOYMENT\.md \(Settings\)",
+    ):
         Settings.from_environ(environ)
 
 
@@ -49,7 +53,10 @@ def test_migrations_read_their_own_url_and_no_app_settings() -> None:
 @pytest.mark.parametrize(
     ("environ", "error"),
     [
-        ({"DATABASE_URL": URL}, "MIGRATION_DATABASE_URL is not set"),
+        (
+            {"DATABASE_URL": URL},
+            r"MIGRATION_DATABASE_URL is not set: development's is in \.env\.example",
+        ),
         ({"MIGRATION_DATABASE_URL": "sqlite:///x.db"}, "MIGRATION_DATABASE_URL must"),
     ],
 )
