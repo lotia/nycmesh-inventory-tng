@@ -9,6 +9,7 @@ import {
   RETRY_MS,
   STORAGE_KEY,
 } from "./outbox";
+import { telemetry } from "./telemetry";
 import { answering, json, saved } from "./test-fetch";
 
 function draft(fields: Partial<Draft> = {}): Draft {
@@ -135,6 +136,23 @@ describe("sending again", () => {
       "registration",
     ]);
   });
+
+  test.each([
+    ["no_answer", () => Promise.reject(new TypeError("Failed to fetch"))],
+    ["unavailable", () => json({ reason: "database_unavailable" }, 503)],
+    ["unexpected", () => new Response("oops", { status: 500 })],
+  ] as const)(
+    "a batch to send again is reported as %s",
+    async (reason, first) => {
+      const record = vi.spyOn(telemetry, "record");
+      const { api } = answering(replies(first));
+      new Outbox(api).queue(draft(), "a");
+      await vi.waitFor(() =>
+        expect(record).toHaveBeenCalledWith({ kind: "outbox_retry", reason }),
+      );
+      record.mockRestore();
+    },
+  );
 
   test("a server that can't save just now says so, not that there was no answer", async () => {
     const { api } = answering(() =>

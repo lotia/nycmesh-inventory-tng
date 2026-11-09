@@ -20,6 +20,7 @@ from inventory_tng import (
     devices,
     health,
     ledger,
+    page_telemetry,
     pages,
     resets,
     sign_in,
@@ -92,6 +93,7 @@ def create_app(
     app.include_router(devices.router, prefix=API)
     app.include_router(ledger.router, prefix=API)
     app.include_router(catalogue.router, prefix=API)
+    app.include_router(page_telemetry.router, prefix=API)
     app.include_router(bundle.router)
     app.include_router(sign_in.router)
     app.include_router(account.router)

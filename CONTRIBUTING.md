@@ -255,6 +255,13 @@ in its `frontend` log line at startup: `source=build` or `source=dev_server`.
 The scan page needs a registered device, and some catalogue rows to choose
 from. The camera works only over HTTPS or on `localhost`.
 
+Both pages report their errors, three Web Vitals, the outbox's retries and
+how long a batch took from its first line to saving, through
+`frontend/src/telemetry.ts`, to `POST /api/telemetry`, which turns them into
+`inventory.*` metrics (docs/decisions/0006). Its schema, in
+`backend/src/inventory_tng/page_telemetry.py`, lists all a page may send:
+something new to report starts there.
+
 #### On a phone
 
 ```sh

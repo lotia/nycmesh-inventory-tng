@@ -293,6 +293,16 @@ describe("the cart store, shared by tabs", () => {
     expect(loadCart()).toEqual(store.cart.value);
   });
 
+  test("a cart is started with its first line, and starts again once empty", () => {
+    const store = new CartStore(CATALOGUE);
+    store.change(filled(), 10);
+    expect(store.cart.value.startedAt).toBe(10);
+    store.change(addOne(store.cart.value, 100), 20);
+    expect(store.cart.value.startedAt).toBe(10);
+    store.change(freshCart(store.cart.value), 30);
+    expect(store.cart.value.startedAt).toBe(0);
+  });
+
   test("a cart another tab changed is not saved here, and is shown instead", () => {
     const here = new CartStore(CATALOGUE);
     const there = new CartStore(CATALOGUE);

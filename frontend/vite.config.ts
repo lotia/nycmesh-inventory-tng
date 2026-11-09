@@ -91,8 +91,8 @@ export default defineConfig({
       thresholds: {
         autoUpdate: (reached: number, previous: number) =>
           Math.max(previous, Math.floor(reached) - 1),
-        statements: 97,
-        branches: 92,
+        statements: 98,
+        branches: 93,
         functions: 98,
         lines: 97,
       },
