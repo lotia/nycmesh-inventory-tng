@@ -155,16 +155,17 @@ against the same limit.
 ### Database connections
 
 Each process (one per pod, or each of `--workers`) holds at most 20 connections
-to PostgreSQL: 15 for requests (10, and 5 more under load) and 5 for the writes
-a request makes in a transaction of its own (when a device or administrator was
-last seen, and attempts counted against a rate limit) and for work after the
-reply (such as a reset email), in a pool of their own so a request never waits
-on its own pool for a second connection. At most 15 requests use the database at
-once; the rest wait their turn, holding nothing, and one that waits 10 seconds
-answers 503, as does one that waits that long to count an attempt against a rate
-limit; one that waits that long to record when it was last seen goes on without.
-Each is counted as `db.client.connection.timeouts`, by pool, and
-`db.client.connection.count` shows each pool's connections in use.
+to PostgreSQL, in three pools, none of whose connections ever waits for another
+from a pool that waits on it: 15 for requests (10, and 5 more under load); 3 for
+recording when a device or administrator was last seen and for work after the
+reply (such as a reset email); and 2 for attempts counted against a rate limit.
+At most 15 requests use the database at once; the rest wait their turn, holding
+nothing, and one that waits 10 seconds answers 503, as does one that waits that
+long to count an attempt against a rate limit; one that waits that long to
+record when it was last seen goes on without. Each is counted as
+`db.client.connection.timeouts`, by pool, and `db.client.connection.count` shows
+each pool's connections in use. An error logged as "connection taken out of pool
+order" is a bug that could let the pools wait on themselves: report it.
 
 Any connection, the migrations' and commands' too, waits at most 10 seconds
 for a lock: a request answers 503 (recording when it was last seen is

@@ -6,7 +6,6 @@ Nothing process-wide is set up here, logging included (docs/decisions/0007).
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-import anyio
 import structlog
 from fastapi import FastAPI
 
@@ -25,7 +24,7 @@ from inventory_tng import (
     sign_in,
 )
 from inventory_tng.cross_site import CrossSiteRefusal
-from inventory_tng.db import make_engine
+from inventory_tng.db import make_database
 from inventory_tng.mail import SmtpMailer
 from inventory_tng.request_logging import RequestLogging
 from inventory_tng.settings import Settings
@@ -41,7 +40,7 @@ def create_app(
     """`check_login=False` skips the check of the database login at startup
     (database_role.py): for tests, which check the login they use once."""
     settings = settings or Settings.from_environ()
-    engine = make_engine(settings.database_url)
+    database = make_database(settings.database_url)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
@@ -49,15 +48,15 @@ def create_app(
         # ledger.
         if check_login:
             try:
-                database_role.check(engine)
+                database_role.check(database.engine)
             except database_role.RefusedLogin:
-                engine.dispose()
+                database.dispose()
                 raise
         log.info("started")
         try:
             yield
         finally:
-            engine.dispose()
+            database.dispose()
             log.info("stopped")
 
     app = FastAPI(
@@ -68,10 +67,7 @@ def create_app(
         redoc_url=None,
         responses=db.UNAVAILABLE,
     )
-    app.state.engine = engine
-    # As many requests hold a session at once as the pool has connections
-    # (db.session_slot).
-    app.state.sessions = anyio.CapacityLimiter(db.POOL + db.OVERFLOW)
+    app.state.db = database
     app.state.settings = settings
     # mail.get_mailer hands it to routes.
     app.state.mailer = SmtpMailer(settings.mail) if settings.mail else None

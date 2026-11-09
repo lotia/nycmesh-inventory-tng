@@ -18,14 +18,17 @@ refund() is ours, not the library's: it takes back the newest attempt
 counted against a key, for one that turned out not to be a guess.
 """
 
+from collections.abc import Generator
+from contextlib import contextmanager
+
 import structlog
 from limits import RateLimitItem
 from limits.storage import MovingWindowSupport, Storage
 from limits.strategies import MovingWindowRateLimiter
-from sqlalchemy import Engine, delete, exc, func, select, text
+from sqlalchemy import Connection, Engine, delete, exc, func, select, text
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import side_engine
+from inventory_tng.db import PoolTimeout, database_of
 from inventory_tng.models import RateLimit
 
 log = structlog.get_logger(__name__)
@@ -68,11 +71,22 @@ class PostgresStorage(Storage, MovingWindowSupport):
     def base_exceptions(self) -> type[Exception]:
         return exc.SQLAlchemyError
 
+    @contextmanager
+    def _connection(self) -> Generator[Connection]:
+        """A connection from the limits pool; PoolTimeout if none comes in
+        time, so the 503 says which pool ran out (db.install)."""
+        try:
+            connection = self.engine.connect()
+        except exc.TimeoutError:
+            raise PoolTimeout("limits") from None
+        with connection:
+            yield connection
+
     def acquire_entry(self, key: str, limit: int, expiry: int, amount: int = 1) -> bool:
         if amount > limit:
             return False
         params = {"key": key, "limit": limit, "expiry": expiry, "amount": amount}
-        with self.engine.connect() as connection:
+        with self._connection() as connection:
             with connection.begin():
                 acquired = connection.scalar(_ACQUIRE, params) is not None
             with connection.begin():
@@ -83,23 +97,23 @@ class PostgresStorage(Storage, MovingWindowSupport):
         return acquired
 
     def get_moving_window(self, key: str, limit: int, expiry: int) -> tuple[float, int]:
-        with self.engine.connect() as connection:
+        with self._connection() as connection:
             start, count = connection.execute(
                 _WINDOW, {"key": key, "expiry": expiry}
             ).one()
         return float(start), count
 
     def clear(self, key: str) -> None:
-        with self.engine.begin() as connection:
+        with self._connection() as connection, connection.begin():
             connection.execute(delete(RateLimit).where(RateLimit.key == key))
 
     def reset(self) -> int:
-        with self.engine.begin() as connection:
+        with self._connection() as connection, connection.begin():
             return connection.execute(delete(RateLimit)).rowcount
 
     def check(self) -> bool:
         try:
-            with self.engine.connect() as connection:
+            with self._connection() as connection:
                 connection.scalar(select(1))
         except exc.SQLAlchemyError:
             return False
@@ -108,7 +122,7 @@ class PostgresStorage(Storage, MovingWindowSupport):
     def refund(self, key: str) -> None:
         """Take back the newest attempt counted against `key`. Not part of
         the library's contract."""
-        with self.engine.begin() as connection:
+        with self._connection() as connection, connection.begin():
             refunded = connection.execute(_REFUND, {"key": key}).rowcount
         log.debug("attempt refunded", refunded=refunded)
 
@@ -133,10 +147,10 @@ def refund(session: Session, item: RateLimitItem, *identifiers: str) -> None:
 
 def limiter(session: Session) -> MovingWindowRateLimiter:
     """The rate limits, on the database `session` uses, in transactions of
-    their own, on its side pool (db.side_engine): counting never waits on
-    the pool the request's own connection came from."""
+    their own, on its limits pool (db.Database.limits): counting never waits
+    on a pool the caller's own connection came from."""
     return MovingWindowRateLimiter(_storage(session))
 
 
 def _storage(session: Session) -> PostgresStorage:
-    return PostgresStorage(side_engine(session.get_bind().engine))
+    return PostgresStorage(database_of(session).limits)

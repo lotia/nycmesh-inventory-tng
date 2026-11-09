@@ -10,7 +10,7 @@ from collections.abc import Callable
 import structlog
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import make_engine
+from inventory_tng.db import make_database
 from inventory_tng.local_env import load_local_env
 from inventory_tng.logs import configure_logging
 from inventory_tng.settings import Settings
@@ -31,9 +31,9 @@ def run_command(
         log.warning("command refused outside development")
         print("Only with APP_ENV=development.", file=sys.stderr)
         return 1
-    engine = make_engine(settings.database_url)
+    database = make_database(settings.database_url)
     try:
-        with Session(engine) as session, session.begin():
+        with database.session() as session, session.begin():
             return run(session, args)
     finally:
-        engine.dispose()
+        database.dispose()

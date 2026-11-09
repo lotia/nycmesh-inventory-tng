@@ -24,10 +24,21 @@ from structlog.testing import capture_logs
 
 from inventory_tng import db
 from inventory_tng.app import create_app
-from inventory_tng.db import LOCK_TIMEOUT, DbSession, _engine, side_engine
+from inventory_tng.db import (
+    LOCK_TIMEOUT,
+    Database,
+    DbSession,
+    PoolTimeout,
+    make_database,
+)
+
+# Imported before conftest replaces it in every test.
+from inventory_tng.db import pool_order_broken as logs_pool_order_broken
 from inventory_tng.models import Device
 from inventory_tng.rate_limits import limiter
 from inventory_tng.settings import Settings
+
+from helpers.pools import small_database
 
 
 def test_more_requests_than_threads_and_connections_do_not_stall(
@@ -39,9 +50,8 @@ def test_more_requests_than_threads_and_connections_do_not_stall(
     db.session_slot, threads waited for connections held by requests
     waiting for threads, until the pool timed out: 503s after 10 seconds."""
     app = create_app(Settings(database_url=database_url))
-    app.state.engine.dispose()
-    app.state.engine = _engine(database_url, 2, 0)
-    app.state.sessions = anyio.CapacityLimiter(2)
+    app.state.db.dispose()
+    app.state.db = make_database(database_url, pool=(2, 0))
 
     def reads_first(session: DbSession) -> Session:
         session.execute(text("SELECT 1"))
@@ -70,7 +80,7 @@ def test_more_requests_than_threads_and_connections_do_not_stall(
         for path in ("/api/healthz", "/api/reads-first"):
             assert asyncio.run(at_once(path)) == [200] * 40, path
     finally:
-        app.state.engine.dispose()
+        app.state.db.dispose()
     assert time.monotonic() - started < db.POOL_TIMEOUT / 2
 
 
@@ -78,22 +88,22 @@ def test_no_place_for_a_session_in_time_is_a_503(database_url: str) -> None:
     """As many requests hold a session as may: the next waits, then is
     told to try again."""
     app = create_app(Settings(database_url=database_url))
-    app.state.sessions = anyio.CapacityLimiter(1)
+    app.state.db.dispose()
+    app.state.db = make_database(database_url, pool=(1, 0), timeout=0.1)
 
     async def full() -> int:
         # Held by another, as by a request under way.
-        await app.state.sessions.acquire_on_behalf_of(object())
+        await app.state.db.sessions.acquire_on_behalf_of(object())
         transport = httpx2.ASGITransport(app=app)
         async with httpx2.AsyncClient(
             transport=transport, base_url="http://t"
         ) as client:
-            with patch.object(db, "POOL_TIMEOUT", 0.1):
-                return (await client.get("/api/healthz")).status_code
+            return (await client.get("/api/healthz")).status_code
 
     try:
         assert asyncio.run(full()) == 503
     finally:
-        app.state.engine.dispose()
+        app.state.db.dispose()
 
 
 def test_a_request_holding_its_connection_still_counts_and_is_seen(
@@ -102,26 +112,20 @@ def test_a_request_holding_its_connection_still_counts_and_is_seen(
     """With the request pool's one connection held, rate limits and last
     seen use the side pool rather than wait for it: before, they waited
     until the pool timed out."""
-    engine = _engine(database_url, 1, 0)
-    try:
-        with Session(engine) as request:
-            request.execute(text("SELECT 1"))  # Holds the one connection.
-            started = time.monotonic()
-            assert limiter(request).hit(RateLimitItemPerMinute(1), "test", "held")
-            db.record_last_seen(engine, Device, -1, datetime.now(UTC))
-            assert time.monotonic() - started < db.POOL_TIMEOUT / 2
-    finally:
-        engine.dispose()
+    with small_database(database_url) as database, database.session() as request:
+        request.execute(text("SELECT 1"))  # Holds the one connection.
+        assert limiter(request).hit(RateLimitItemPerMinute(1), "test", "held")
+        db.record_last_seen(database, Device, -1, datetime.now(UTC))
 
 
-def test_connections_wait_for_a_lock_for_a_while_only(engine: Engine) -> None:
-    for pool in (engine, side_engine(engine)):
+def test_connections_wait_for_a_lock_for_a_while_only(database: Database) -> None:
+    for pool in database.pools.values():
         with pool.connect() as connection:
             assert connection.scalar(text("SHOW lock_timeout")) == LOCK_TIMEOUT
 
 
 def test_last_seen_is_skipped_while_its_row_is_locked_too_long(
-    engine: Engine, monkeypatch: pytest.MonkeyPatch
+    database: Database, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Only a lock waited for too long: any other failure is raised."""
 
@@ -133,16 +137,71 @@ def test_last_seen_is_skipped_while_its_row_is_locked_too_long(
 
     monkeypatch.setattr(Session, "execute", refused(LockNotAvailable()))
     with capture_logs() as logs:
-        db.record_last_seen(engine, Device, -1, datetime.now(UTC))
+        db.record_last_seen(database, Device, -1, datetime.now(UTC))
     assert [line["event"] for line in logs] == ["last seen not recorded"]
     monkeypatch.setattr(Session, "execute", refused(ConnectionFailure()))
     with pytest.raises(exc.OperationalError):
-        db.record_last_seen(engine, Device, -1, datetime.now(UTC))
+        db.record_last_seen(database, Device, -1, datetime.now(UTC))
 
 
-def test_work_after_the_reply_uses_the_side_pool(engine: Engine) -> None:
+def test_work_after_the_reply_uses_the_side_pool(database: Database) -> None:
     """It holds no place among the requests (db.session_slot), so it must
     not take the request pool's connections from those that do."""
-    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(engine=engine)))
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(db=database)))
     with db.get_session_factory(cast(Request, request))() as session:
-        assert session.get_bind() is side_engine(engine)
+        assert session.get_bind() is database.side
+
+
+def test_a_session_without_its_database_says_so(engine: Engine) -> None:
+    with Session(engine) as session, pytest.raises(RuntimeError, match="Database"):
+        db.database_of(session)
+
+
+def test_work_after_the_reply_counts_on_a_pool_it_does_not_hold(
+    database_url: str,
+) -> None:
+    """A reset email's lookup holds a side-pool connection while it counts
+    the attempt: on the limits pool, which waits on nothing, so the side
+    pool never waits on itself."""
+    with (
+        small_database(database_url) as database,
+        database.session(side=True) as after_the_reply,
+    ):
+        after_the_reply.execute(text("SELECT 1"))  # Holds the side pool.
+        assert limiter(after_the_reply).hit(RateLimitItemPerMinute(1), "test", "after")
+
+
+@pytest.mark.breaks_pool_order
+def test_a_busy_limits_pool_says_so(database_url: str) -> None:
+    with (
+        small_database(database_url) as database,
+        database.limits.connect(),
+        database.session() as request,
+        pytest.raises(PoolTimeout) as busy,
+    ):
+        limiter(request).hit(RateLimitItemPerMinute(1), "test", "busy")
+    assert busy.value.pool == "limits"
+
+
+def test_the_pool_order_is_watched(database_url: str) -> None:
+    """A take from a pool while the thread holds one from the same pool, or
+    a later one, is reported (db.pool_order_broken; conftest fails a test
+    on it): here, the side pool while holding the limits pool."""
+    broken: list[tuple[str, list[str]]] = []
+    with (
+        patch.object(db, "pool_order_broken", lambda p, h: broken.append((p, h))),
+        small_database(database_url, side=(1, 0)) as database,
+        database.limits.connect(),
+        database.side.connect(),
+    ):
+        pass
+    assert broken == [("side", ["limits"])]
+
+
+def test_a_break_in_the_pool_order_is_logged_as_an_error() -> None:
+    """In production, where no test is watching (conftest replaces it)."""
+    with capture_logs() as logs:
+        logs_pool_order_broken("side", ["limits"])
+    assert [(line["log_level"], line["pool"], line["held"]) for line in logs] == [
+        ("error", "side", ["limits"])
+    ]

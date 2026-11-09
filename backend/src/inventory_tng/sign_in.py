@@ -160,7 +160,7 @@ def signed_in(request: Request, session: DbSession) -> SignedIn:
         raise Redirect(_then(SIGN_IN, request) if request.method == "GET" else SIGN_IN)
     row, admin = found
     if row.last_seen_at <= now - accounts.SEEN_EVERY:
-        record_last_seen(request.app.state.engine, AdminSession, row.id, now)
+        record_last_seen(request.app.state.db, AdminSession, row.id, now)
     # sign_in_id, not admin_session_id: the masker hides any field naming a
     # session, as a session id usually is the secret cookie.
     request_logging.bind(admin_id=admin.id, sign_in_id=row.id)

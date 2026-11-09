@@ -41,10 +41,9 @@ from opentelemetry.sdk.trace.export import (
 from opentelemetry.sdk.trace.sampling import DEFAULT_OFF
 from opentelemetry.trace import Link, Status
 from opentelemetry.util.types import AnyValue
-from sqlalchemy import Engine
 
 from inventory_tng import request_logging
-from inventory_tng.db import side_engine
+from inventory_tng.db import Database
 from inventory_tng.logs import ADDED_FIELDS
 from inventory_tng.masking import Masker, mask_query
 from inventory_tng.settings import TraceRedaction
@@ -283,7 +282,7 @@ class Telemetry:
             tracer_provider=tracer_provider,
         )
 
-    def instrument(self, app: FastAPI, engine: Engine) -> None:
+    def instrument(self, app: FastAPI, database: Database) -> None:
         """Requests, queries and the connection pool. Call make_global()
         first: psycopg's instrumentation records to the global provider."""
         _opt_in_to_stable_names()
@@ -301,7 +300,7 @@ class Telemetry:
             tracer_provider=self.tracer_provider,
             raise_exception_on_conflict=True,
         )
-        observe_pool(self.meter_provider, engine)
+        observe_pool(self.meter_provider, database)
 
     def attach_logs(self, masker: Masker) -> None:
         """Send every log line, ours and the libraries', over OTLP as well,
@@ -346,11 +345,11 @@ def _opt_in_to_stable_names() -> None:
     )
 
 
-def observe_pool(provider: MeterProvider, engine: Engine) -> None:
+def observe_pool(provider: MeterProvider, database: Database) -> None:
     # TODO(inventory-tng-8i4.34): remove once opentelemetry-instrumentation-sqlalchemy
     # supports SQLAlchemy 2.1.
-    # Both of the app's pools (db.side_engine), by name.
-    pools = {"requests": engine, "side": side_engine(engine)}
+    # The app's pools (db.Database), by name.
+    pools = database.pools
 
     def connections(_options: CallbackOptions) -> Iterable[Observation]:
         for name, each in pools.items():

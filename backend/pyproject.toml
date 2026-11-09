@@ -118,4 +118,5 @@ markers = [
     "concurrency: two transactions at once, on two database connections",
     "end_to_end: requests through the whole app",
     "helper: one helper's contract, on a real database session",
+    "breaks_pool_order: takes connections out of the pools' order on purpose (db.Database)",
 ]
