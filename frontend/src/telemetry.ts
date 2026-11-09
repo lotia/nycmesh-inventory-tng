@@ -16,6 +16,9 @@ import { type Metric, onCLS, onINP, onLCP } from "web-vitals";
 export const PATH = "/api/telemetry";
 export const FLUSH_AT = 10;
 export const MOST_PER_PAGE = 50;
+/** The longest scan_to_save the backend takes (page_telemetry.ScanToSave):
+ * an event outside its bounds would have the whole report refused. */
+export const MOST_SECONDS_TO_SAVE = 86_400;
 
 export type Page = "scan" | "register";
 export type Retry = "no_answer" | "unavailable" | "unexpected";

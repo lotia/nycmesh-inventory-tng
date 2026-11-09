@@ -18,27 +18,28 @@ lost.
 
 import argparse
 import base64
-import binascii
 import os
+import re
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import structlog
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from sqlalchemy.orm import Session
 
 from inventory_tng.local_env import CLONE
 
-log = structlog.get_logger(__name__)
-
 DEVELOPMENT_DIR = CLONE / ".local" / "totp-keys"
 KEY_BITS = 256
 # AES-GCM's standard nonce, random for each seal: at a few hundred seals
 # per key, far below where random nonces could repeat.
 NONCE_BYTES = 12
+# A version's file name: no sign or leading zero, so each has one name.
+VERSION = re.compile(r"[1-9][0-9]*")
+# The newest version authenticator.key_version (a smallint) holds.
+MOST_VERSION = 32767
 
 
 class TotpKeysError(Exception):
@@ -93,7 +94,9 @@ class TotpKeys:
     @classmethod
     def load(cls, directory: Path) -> TotpKeys:
         """Every version in `directory`. Names that are not a version, such as
-        the hidden entries a mounted Secret has, are passed over."""
+        the hidden entries a mounted Secret has, are passed over. Not logged:
+        settings load it before logging is set up (the server's starting
+        line says which versions it has)."""
         try:
             entries = list(directory.iterdir())
         except OSError as error:
@@ -102,11 +105,15 @@ class TotpKeys:
             ) from None
         keys = {}
         for entry in entries:
-            if not entry.name.isdigit() or int(entry.name) < 1:
+            if not VERSION.fullmatch(entry.name):
                 continue
+            if int(entry.name) > MOST_VERSION:
+                raise TotpKeysError(
+                    f"TOTP_KEYS_DIR's version {entry.name} is past {MOST_VERSION}"
+                )
             try:
                 key = base64.b64decode(entry.read_text().strip(), validate=True)
-            except OSError, ValueError, binascii.Error:
+            except OSError, ValueError:  # binascii.Error is a ValueError.
                 key = b""
             if len(key) * 8 != KEY_BITS:
                 raise TotpKeysError(
@@ -119,7 +126,6 @@ class TotpKeys:
                 f"TOTP_KEYS_DIR {directory} holds no key: add one as a file "
                 "named 1, from `python -m inventory_tng.totp_keys new`"
             )
-        log.info("totp keys loaded", versions=sorted(keys))
         return cls(keys)
 
 

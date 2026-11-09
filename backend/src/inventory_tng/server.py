@@ -65,6 +65,11 @@ def create_server() -> FastAPI:
         ),
         log_unmasked=not masker.secrets,
         trace_redaction_off_until=settings.traces.off_until if traces_off else None,
+        # from_environ always loads them; TotpKeys.load cannot log, as it
+        # runs before logging is set up.
+        sealing_key_versions=(
+            sorted(settings.totp_keys.keys) if settings.totp_keys else []
+        ),
         database_host=database.host,
         database_port=database.port,
         database_name=database.database,

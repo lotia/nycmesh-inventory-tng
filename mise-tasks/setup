@@ -15,8 +15,9 @@ if [[ ! -f .env ]]; then
   echo "Made .env from .env.example."
 fi
 # The key development seals authenticators' TOTP keys with (DEPLOYMENT.md,
-# TOTP keys), readable by you alone.
-if [[ ! -e .local/totp-keys/1 ]]; then
+# TOTP keys), readable by you alone. Made again if empty, as a run that
+# failed while making it leaves it.
+if [[ ! -s .local/totp-keys/1 ]]; then
   mkdir -p .local/totp-keys
   (umask 077 && cd backend &&
     uv run python -m inventory_tng.totp_keys new > ../.local/totp-keys/1)

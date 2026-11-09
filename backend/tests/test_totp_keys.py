@@ -55,9 +55,11 @@ def test_the_newest_version_seals_and_every_version_opens(tmp_path: Path) -> Non
     first = TotpKeys.load(keys_in(tmp_path, **{"1": totp_keys.new_key()}))
     version, one = first.seal(KEY, 1)
     # A mounted Secret's hidden entries, and anything not a version, are
-    # passed over.
+    # passed over: a second name for a version too, so which key it is never
+    # depends on the order the directory lists them in.
+    not_versions = {"..data": "", "notes": "x", "02": "x", "\u00b2": "x", "0": "x"}
     both = TotpKeys.load(
-        keys_in(tmp_path, **{"2": totp_keys.new_key(), "..data": "", "notes": "x"})
+        keys_in(tmp_path, **{"2": totp_keys.new_key()}, **not_versions)
     )
     assert both.newest == 2
     assert both.seal(KEY, 1)[0] == 2
@@ -74,6 +76,13 @@ def test_a_file_that_is_not_a_key_is_refused_without_showing_it(
         TotpKeys.load(keys_in(tmp_path, **{"1": content}))
     if content:
         assert content not in str(refused.value)
+
+
+def test_a_version_the_database_cannot_hold_is_refused(tmp_path: Path) -> None:
+    """authenticator.key_version is a smallint."""
+    newest = str(totp_keys.MOST_VERSION + 1)
+    with pytest.raises(TotpKeysError, match=f"version {newest} is past"):
+        TotpKeys.load(keys_in(tmp_path, **{newest: totp_keys.new_key()}))
 
 
 def test_a_missing_or_empty_directory_is_refused(tmp_path: Path) -> None:
@@ -195,6 +204,7 @@ def test_startup_says_how_many_authenticators_are_unreadable(
     ]
 
 
+@pytest.mark.usefixtures("restore_logging")
 def test_reseal_runs_as_an_operator_command(
     own_database: str,
     monkeypatch: pytest.MonkeyPatch,

@@ -21,7 +21,7 @@ from sqlalchemy import Engine, TextClause, delete, event, exc, make_url, text
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, db, devices, local_env
+from inventory_tng import accounts, db, devices, local_env, page_telemetry
 from inventory_tng.app import create_app
 from inventory_tng.database_role import refusals
 from inventory_tng.db import (
@@ -117,6 +117,14 @@ def cheap_password_hashing() -> Iterator[None]:
         monkeypatch.setattr(accounts, "_hasher", cheap)
         monkeypatch.setattr(accounts, "_DUMMY_HASH", cheap.hash("not a password"))
         yield
+
+
+@pytest.fixture(autouse=True)
+def no_page_reports_counted() -> None:
+    """Page reports count against their address in memory
+    (page_telemetry.report_counts), shared by every test in the process: each
+    starts with none."""
+    page_telemetry.report_counts.reset()
 
 
 @pytest.fixture(autouse=True)

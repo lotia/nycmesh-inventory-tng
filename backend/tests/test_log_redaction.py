@@ -2,16 +2,20 @@
 (docs/decisions/0008; masking.Masker, settings.Redaction)."""
 
 import json
+import logging
 from datetime import UTC, datetime, timedelta
 
 import pytest
 import structlog
+from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from structlog.testing import capture_logs
 
 from inventory_tng.logs import configure_logging
 from inventory_tng.masking import MASK, REDACTION_FIELD, Masker
 from inventory_tng.server import create_server
 from inventory_tng.settings import Redaction, Settings, SettingsError
+from inventory_tng.telemetry import StructlogBridge, Telemetry
 
 from helpers.settings import from_environ
 
@@ -121,3 +125,27 @@ def test_the_settings_reach_the_masker(capsys: pytest.CaptureFixture[str]) -> No
     (line,) = [json.loads(out) for out in capsys.readouterr().out.splitlines()]
     assert line["email"] == "jane@example.org"
     assert line[REDACTION_FIELD] == "off"
+
+
+def test_library_lines_over_otlp_say_so_too() -> None:
+    """The standard library's lines reach OTLP without structlog's
+    processors: the bridge marks them, as stdout's formatter does."""
+    exporter = InMemoryLogRecordExporter()
+    telemetry = Telemetry.create(
+        {}, metric_reader=InMemoryMetricReader(), log_exporter=exporter
+    )
+    assert telemetry.logger_provider is not None
+    masker = masker_at(Redaction(off_until=NOW + timedelta(hours=2)), [NOW])
+    bridge = StructlogBridge(logger_provider=telemetry.logger_provider, masker=masker)
+    try:
+        bridge.emit(
+            logging.LogRecord(
+                "some.library", logging.WARNING, __file__, 1, "theirs", (), None
+            )
+        )
+        telemetry.logger_provider.force_flush()
+    finally:
+        telemetry.logger_provider.shutdown()
+    (entry,) = exporter.get_finished_logs()
+    assert entry.log_record.attributes is not None
+    assert entry.log_record.attributes[REDACTION_FIELD] == "off"

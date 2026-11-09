@@ -4,7 +4,7 @@ import { openCamera } from "./camera";
 import { STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
 import { Outbox } from "./outbox";
 import { ScanPage } from "./ScanPage";
-import { telemetry } from "./telemetry";
+import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
 import { fakeCamera } from "./test-camera";
 import { CATALOGUE } from "./test-catalogue";
 import { answering, json, saved } from "./test-fetch";
@@ -311,6 +311,27 @@ test("a cart kept by an older page, which did not note its start, reports no tim
   expect(record).not.toHaveBeenCalledWith(
     expect.objectContaining({ kind: "scan_to_save" }),
   );
+});
+
+test("a cart kept for days reports a day, the most the backend takes", async () => {
+  const record = vi.spyOn(telemetry, "record");
+  storeCart({
+    ...freshCart(),
+    volunteerId: 1,
+    fromId: 10,
+    toId: 12,
+    lines: [{ itemId: 101, packages: {}, loose: "4" }],
+    startedAt: Date.now() - 3 * MOST_SECONDS_TO_SAVE * 1000,
+  });
+  const { api, sent } = server();
+  open(api);
+  await ready();
+  save();
+  await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
+  expect(record).toHaveBeenCalledWith({
+    kind: "scan_to_save",
+    seconds: MOST_SECONDS_TO_SAVE,
+  });
 });
 
 describe("other tabs and a changing catalogue", () => {

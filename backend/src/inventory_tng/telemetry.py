@@ -412,12 +412,15 @@ class StructlogBridge(LoggingHandler):
             fields = message  # Masked already, by structlog's processors.
         else:
             # The standard library's: only the context is added, so only it
-            # needs masking.
-            fields = self._masker.fields(
+            # needs masking, and marking while unredacted, as stdout's
+            # formatter does (logs.configure_logging, foreign_pre_chain).
+            fields = self._masker(
+                None,
+                record.levelname.lower(),
                 {
                     **structlog.contextvars.get_contextvars(),
                     **request_logging.request_fields(),
-                }
+                },
             )
         record.__dict__["_fields"] = {
             key: value for key, value in fields.items() if key not in NOT_ATTRIBUTES
