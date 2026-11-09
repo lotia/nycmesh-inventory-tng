@@ -20,13 +20,15 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from sqlalchemy import Engine
+from sqlalchemy import Engine, exc, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import LOCK_INFO, Gone, attempt, enforce, lock_catalogue
 from inventory_tng.models import Category, Item
 
 from helpers.source import SOURCE, offending, writes
+
+FOREIGN_KEY_VIOLATION = "23503"  # PostgreSQL's code for a missing parent.
 
 # Each table written by one module only, and that module. None: no module,
 # only ALLOWED's functions.
@@ -169,6 +171,26 @@ def test_a_lock_taken_in_a_change_that_fails_goes_with_it(fresh: Session) -> Non
     with pytest.raises(Gone):
         attempt(fresh, gone)
     assert LOCK_INFO not in fresh.info
+
+
+def test_a_change_breaking_another_constraint_is_raised(fresh: Session) -> None:
+    """A foreign key, say: no rule a page words, so a bug. The savepoint
+    rolls back, and what came before it is kept."""
+    lock_catalogue(fresh)
+    category = Category(name="Radios")
+    fresh.add(category)
+    fresh.flush()
+
+    def orphan() -> None:
+        lock_catalogue(fresh)
+        fresh.add(Item(name="LiteBeam", category_id=category.id + 1))
+
+    with pytest.raises(exc.IntegrityError) as raised:
+        attempt(fresh, orphan)
+    assert getattr(raised.value.orig, "sqlstate", None) == FOREIGN_KEY_VIOLATION
+    assert fresh.scalars(select(Category.id)).all() == [category.id]
+    assert fresh.scalars(select(Item.id)).all() == []
+    assert LOCK_INFO in fresh.info  # Taken before the savepoint: still held.
 
 
 def test_a_receipt_lowers_what_is_on_order_without_the_lock(fresh: Session) -> None:

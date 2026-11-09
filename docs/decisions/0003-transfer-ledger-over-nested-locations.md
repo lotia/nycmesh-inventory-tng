@@ -40,7 +40,9 @@ while. So we need more than one location from the start.
   while it is under way still apply. An item that moved at the place
   meanwhile might have been counted before or after the move, so its line is
   not saved; the page asks for it again, and saves every other line (Ali,
-  2026-11-03). An adjustment gives a reason from a list administrators extend,
+  2026-11-03). A count names each item once: a form naming one twice is
+  refused, saying why, as it isn't clear which number is right (Ali,
+  2026-11-08). An adjustment gives a reason from a list administrators extend,
   seeded with Damaged, Lost or stolen, Found, Used for testing and Records
   were wrong (Ali, 2026-11-03).
 - **Nothing is deleted: retiring is the soft delete**, and bringing back

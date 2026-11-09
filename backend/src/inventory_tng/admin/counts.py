@@ -7,13 +7,21 @@ Each form carries a key made when it was shown, so sending it twice writes
 it once. A count also carries the place's latest ledger entry as it was
 shown: the count is true for that moment, so a save made at the place
 meanwhile still applies, and an item it moved comes back to count again.
+
+A count names each item once: a form naming one on two fields (counted_5
+and counted_05, or the select at the foot choosing an item listed above) is
+refused and shown again saying why, as it isn't clear which number is
+right. The page itself never sends one. record_count takes a mapping by item,
+so it cannot be sent a repeat: the check is here, where fields become items.
 """
 
 import uuid
+from collections import Counter
 from collections.abc import Collection, Mapping
 from decimal import Decimal
 from typing import Annotated, Any
 
+import structlog
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
@@ -51,12 +59,19 @@ from inventory_tng.once import form_key
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
+log = structlog.get_logger(__name__)
+
 router = APIRouter(include_in_schema=False)
 
 COUNTS = f"{ADMIN}/counts"
 ADJUSTMENTS = f"{COUNTS}/adjustments"
 RECENT = 30
 COUNTED = "counted_"
+EXTRA = "extra_quantity"
+TWICE = (
+    "An item is on this form more than once. Each item is counted once, so "
+    "it isn't clear which number is right: nothing was saved."
+)
 
 NOTICES.update(
     {
@@ -226,43 +241,62 @@ def count_form(
     return _count_page(request, session, signed, place, moment(session, place.id))
 
 
-def _counted(
-    session: Session, form: Mapping[str, str]
-) -> tuple[dict[int, Decimal], dict[str, str]]:
-    """What was typed, by item, and what is wrong with it. An item added at
-    the foot counts as one more line."""
-    lines = {
-        field.removeprefix(COUNTED): typed
+# A field of the count form: its name, the item it names (None for no
+# item), and what was typed for it.
+Line = tuple[str, int | None, str]
+
+
+def _item_id(typed: str) -> int | None:
+    """The item named by digits, however many zeros lead them."""
+    return whole(typed.lstrip("0"), 1, INTEGER_MAX)
+
+
+def lines(form: Mapping[str, str]) -> list[Line]:
+    """The count form's lines. An item chosen at the foot with an amount is
+    one more, shown at its amount; one with none is not counted."""
+    found = [
+        (field, _item_id(field.removeprefix(COUNTED)), typed)
         for field, typed in form.items()
         if field.startswith(COUNTED)
+    ]
+    extra, typed = form.get("extra_item_id", ""), form.get(EXTRA, "")
+    if extra and typed.strip():
+        found.append((EXTRA, _item_id(extra), typed))
+    return found
+
+
+def repeated(found: Collection[Line]) -> dict[str, int]:
+    """The fields naming an item another field names too, and that item."""
+    times = Counter(item_id for _, item_id, _ in found)
+    return {
+        field: item_id
+        for field, item_id, _ in found
+        if item_id is not None and times[item_id] > 1
     }
-    extra = form.get("extra_item_id", "")
-    if extra.isdigit() and form.get("extra_quantity", "").strip():
-        lines[extra] = form["extra_quantity"]
+
+
+def _counted(
+    session: Session, found: Collection[Line]
+) -> tuple[dict[int, Decimal], dict[str, str]]:
+    """What was typed, by item, and what is wrong with it."""
     units = dict(
         session.execute(
             select(Item.id, Item.unit).where(
-                Item.id.in_([int(i) for i in lines if i.isdigit()])
+                Item.id.in_([item_id for _, item_id, _ in found if item_id])
             )
         ).all()
     )
     counted: dict[int, Decimal] = {}
     problems: dict[str, str] = {}
-    for item_id, typed in lines.items():
-        field = (
-            "extra_quantity"
-            if item_id == extra and f"{COUNTED}{extra}" not in form
-            else f"{COUNTED}{item_id}"
-        )
-        unit = units.get(int(item_id)) if item_id.isdigit() else None
-        if unit is None:
+    for field, item_id, typed in found:
+        if item_id is None or (unit := units.get(item_id)) is None:
             problems[field] = "No such item."
             continue
         amount = quantity(typed, positive=False, unit=unit)
         if isinstance(amount, str):
             problems[field] = amount
         elif amount is not None:
-            counted[int(item_id)] = amount
+            counted[item_id] = amount
     return counted, problems
 
 
@@ -279,7 +313,15 @@ def count(
     as_of = whole(form.get("as_of", ""), 0, INTEGER_MAX)
     if place is None or key is None or as_of is None:
         return not_found()
-    counted, problems = _counted(session, form)
+    found = lines(form)
+    counted, problems = _counted(session, found)
+    if twice := repeated(found):
+        problems |= dict.fromkeys(twice, "This item is on the form more than once.")
+        log.info(
+            "count refused: an item named twice",
+            location_id=place.id,
+            item_ids=sorted(set(twice.values())),
+        )
     if problems:
         # What was typed is as of when the form was shown; a recount asks
         # again for its own items only.
@@ -291,6 +333,7 @@ def count(
             as_of,
             problems=problems,
             values=form,
+            alert=TWICE if twice else None,
             items={
                 item_id
                 for typed in form.get("items", "").split()
