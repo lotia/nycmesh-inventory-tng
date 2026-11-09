@@ -1,6 +1,8 @@
 """AGENTS.md rule 10: every development workflow is a mise task named in
 CONTRIBUTING.md as `mise run <task>`, and contributors run compose through
-`mise run compose`, which picks the container runtime."""
+`mise run compose`, which picks the container runtime. CI runs each check
+directly, not through mise, as a job named for the task that runs it
+locally."""
 
 import os
 import re
@@ -14,12 +16,15 @@ from helpers.clone import clone_only
 pytestmark = clone_only
 
 TASK_SCRIPTS = CLONE / "mise-tasks"
+WORKFLOW = CLONE / ".github" / "workflows" / "ci.yml"
+# A job: a key two spaces in, under `jobs:`, whatever characters it uses.
+JOB = re.compile(r"^  ([^\s:#]+):", re.MULTILINE)
 # A runtime's own compose command (a space, a hyphen or a line break between),
 # but not a value, such as INVENTORY_COMPOSE=docker compose.
 DIRECT = re.compile(r"(?<![=\"'])\b(?:docker|podman)(?:\s+|-)compose\b")
 # Where running compose directly is right: the task that picks the runtime,
 # and CI, which runs its own.
-ALLOWED = {TASK_SCRIPTS / "compose", CLONE / ".github" / "workflows" / "ci.yml"}
+ALLOWED = {TASK_SCRIPTS / "compose", WORKFLOW}
 NOT_OURS = {".git", ".jj", ".beads", ".venv", "node_modules", "dist", "__pycache__"}
 
 
@@ -62,3 +67,12 @@ def test_compose_runs_through_mise() -> None:
         if path not in ALLOWED and (hits := DIRECT.findall(path.read_text()))
     }
     assert direct == {}
+
+
+def test_ci_runs_every_check_as_a_job_named_for_its_task() -> None:
+    """So a failed job names the command that runs it locally, and no check
+    runs only on a developer's machine. `check` runs them all, locally."""
+    jobs = set(JOB.findall(WORKFLOW.read_text().split("\njobs:\n", 1)[1]))
+    assert jobs
+    assert jobs - tasks() == set()
+    assert {task for task in tasks() if task.startswith("check-")} - jobs == set()

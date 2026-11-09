@@ -11,11 +11,11 @@ permissions:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   # A pull request's newer run replaces its older one; on main every push
-  # runs to the end, as changed-lines checks only the lines it brought.
+  # runs to the end, as check-changed-lines checks only the lines it brought.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  check:
+  check-backend:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -35,35 +35,56 @@ jobs:
       - run: uv run ruff format --check
       - run: docker compose up -d --wait db
         working-directory: .
-      # Held to the floor in pyproject.toml; coverage.xml for changed-lines.
+      # Held to the floor in pyproject.toml; coverage.xml for check-changed-lines.
       - run: uv run pytest --cov --cov-report=term --cov-report=xml
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: backend-coverage
           path: backend/coverage.xml
 
-  # Each check its own step, run directly, with the versions mise.toml pins.
-  tools:
+  # One job per check, as the mise tasks are, so one failing never hides
+  # another. mise only installs each job's tool, at the version mise.toml
+  # pins: CI runs no mise tasks.
+  check-scripts:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      # Only to install them: CI runs no mise tasks.
       - uses: jdx/mise-action@v5.2.0
         with:
-          install_args: shellcheck taplo node npm:markdownlint-cli2
+          install_args: shellcheck
       - run: shellcheck mise-tasks/*
-      - run: markdownlint-cli2
-      - run: taplo lint
-        env:
-          RUST_LOG: warn
-      - run: taplo fmt --check
-        env:
-          RUST_LOG: warn
 
-  frontend:
+  check-markdown:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v5.2.0
+        with:
+          install_args: node npm:markdownlint-cli2
+      - run: markdownlint-cli2
+
+  check-toml:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RUST_LOG: warn
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v5.2.0
+        with:
+          install_args: taplo
+      - run: taplo lint
+      - run: taplo fmt --check
+
+  check-frontend:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -87,7 +108,7 @@ jobs:
       - run: git add --intent-to-add src/api && git diff --exit-code -- src/api
       - run: npm run typecheck
       - run: npm run lint
-      # Held to the floors in vite.config.ts; the report for changed-lines.
+      # Held to the floors in vite.config.ts; the report for check-changed-lines.
       - run: npm run coverage
       - uses: actions/upload-artifact@v7.0.2
         with:
@@ -97,7 +118,7 @@ jobs:
 
   # The built app in real browsers, Chromium and WebKit, at a phone's width
   # (frontend/browser/, CONTRIBUTING.md: Running the checks).
-  browser:
+  check-browser:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -138,8 +159,8 @@ jobs:
   # (CONTRIBUTING.md: Coverage). Changes go straight to main, so a push is
   # compared with what main was before it, not with origin/main, which
   # already holds it.
-  changed-lines:
-    needs: [check, frontend]
+  check-changed-lines:
+    needs: [check-backend, check-frontend]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

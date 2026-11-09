@@ -34,7 +34,7 @@ requires = ["uv_build>=0.13,<0.14"]
 build-backend = "uv_build"
 
 [dependency-groups]
-# Only diff-cover, so CI's changed-lines job installs no more.
+# Only diff-cover, so CI's check-changed-lines job installs no more.
 coverage = ["diff-cover>=11.0"]
 dev = [
     { include-group = "coverage" },
