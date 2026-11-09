@@ -5,6 +5,9 @@ name: inventory-tng
 services:
   db:
     image: docker.io/library/postgres:18
+    # Room for the tests across processes (CONTRIBUTING.md, Running the
+    # checks) beside a running app; 100 is the default.
+    command: ["postgres", "-c", "max_connections=200"]
     environment:
       # The superuser, which only makes the roles below and the tests'
       # databases: the app and migrations never log in as it.

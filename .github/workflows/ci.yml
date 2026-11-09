@@ -36,7 +36,8 @@ jobs:
       - run: docker compose up -d --wait db
         working-directory: .
       # Held to the floor in pyproject.toml; coverage.xml for check-changed-lines.
-      - run: uv run pytest --cov --cov-report=term --cov-report=xml
+      # Across processes, one per core (CONTRIBUTING.md, Running the checks).
+      - run: uv run pytest -n auto --maxprocesses=8 --cov --cov-report=term --cov-report=xml
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: backend-coverage
