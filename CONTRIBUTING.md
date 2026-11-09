@@ -460,8 +460,12 @@ the end; a run that was killed before it could is dropped by a later one.
 It makes the two roles first if the server lacks them. During the tests,
 `DATABASE_URL` and `MIGRATION_DATABASE_URL` point nowhere, so nothing
 reaches your own data: a test that needs the database takes the
-`database_url` fixture. Tests log in as the app; one that needs what only
-the owner may do, such as `TRUNCATE`, takes `owner_session` or
+`database_url` fixture. A request test whose route reads no row, such as
+an error page or a page that sends someone signed out to sign in, takes
+`make_client_without_database` or
+`make_app_without_database` instead, and runs without PostgreSQL: one whose
+request reaches for it fails. Tests log in as the app; one that needs what
+only the owner may do, such as `TRUNCATE`, takes `owner_session` or
 `owner_engine`. Write tests in pytest style. `tests/conftest.py` holds
 fixtures, hooks and what only they use; what tests share besides is in
 `tests/helpers/`, which they import from, never from conftest.py or from

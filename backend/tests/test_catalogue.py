@@ -1,5 +1,6 @@
 """What the scan page fills a cart from."""
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -100,8 +101,10 @@ def by_id(entries: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
     return {entry["id"]: entry for entry in entries}
 
 
-def test_an_unregistered_device_is_refused(client: TestClient) -> None:
-    response = client.get(URL)
+def test_an_unregistered_device_is_refused(
+    make_client_without_database: Callable[..., TestClient],
+) -> None:
+    response = make_client_without_database().get(URL)
     assert (response.status_code, response.json()) == (403, {"reason": "unregistered"})
 
 

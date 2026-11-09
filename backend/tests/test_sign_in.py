@@ -380,9 +380,9 @@ def test_sign_in_only_goes_on_to_this_site(
 
 
 def test_a_page_sends_someone_signed_out_to_sign_in_and_back(
-    client: TestClient,
+    make_client_without_database: Callable[..., TestClient],
 ) -> None:
-    response = client.get("/admin?page=2")
+    response = make_client_without_database().get("/admin?page=2")
     assert response.headers["location"] == "/admin/sign-in?next=/admin%3Fpage%3D2"
 
 

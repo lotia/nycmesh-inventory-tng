@@ -91,14 +91,17 @@ def test_tries_are_limited(client: TestClient, session: Session) -> None:
 
 
 def test_without_the_setting_there_is_no_page(
-    make_client: Callable[..., TestClient],
+    make_client_without_database: Callable[..., TestClient],
 ) -> None:
-    client = make_client()
+    client = make_client_without_database()
     assert client.get(RECOVER).status_code == 404
     assert client.post(RECOVER, data={"token": TOKEN}).status_code == 404
 
 
-def test_the_page_is_there_with_the_setting(client: TestClient) -> None:
+def test_the_page_is_there_with_the_setting(
+    make_client_without_database: Callable[..., TestClient], sent_mail: SentMail
+) -> None:
+    client = make_client_without_database(recovery_token=TOKEN, mailer=sent_mail)
     assert client.get(RECOVER).status_code == 200
 
 
