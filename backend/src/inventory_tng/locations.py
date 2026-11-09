@@ -3,10 +3,8 @@ the tree's rules. Stores and vehicles stand alone; areas nest under a store
 or another area; a volunteer holding stock has a custody location.
 
 A rule of more than one condition is a function of plain values,
-returning the name of the rule a change would break, or None. Each write
-takes the catalogue lock, reads what its rules need, and writes only if
-they hold (db.locked_row says in what order it locks). The app may not
-change a location's kind or volunteer (migration 0002), so no rule need
+returning the name of the rule a change would break, or None. The app may
+not change a location's kind or volunteer (migration 0002), so no rule need
 keep a place with areas one that can have them."""
 
 from collections.abc import Mapping
@@ -16,7 +14,13 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import enforce, exists_where, is_current, lock_catalogue, relock
+from inventory_tng.db import (
+    enforce,
+    exists_where,
+    lock_catalogue,
+    relock,
+    require_current,
+)
 from inventory_tng.ledger import holds_stock
 from inventory_tng.models import STORE_KINDS, Location, Volunteer
 
@@ -103,8 +107,7 @@ def add(
 def add_custody(session: Session, volunteer_id: int, name: str) -> Location:
     """Where a volunteer's stock is, named for them. The caller holds the
     catalogue lock and the volunteer's row (volunteers.hold_stock)."""
-    current = is_current(session, Volunteer, volunteer_id)
-    enforce("location_custody_volunteer", when=not current)
+    require_current(session, Volunteer, volunteer_id, "location_custody_volunteer")
     location = Location(name=name, kind="custody", volunteer_id=volunteer_id)
     session.add(location)
     session.flush()
@@ -152,6 +155,7 @@ def restore(session: Session, location: Location) -> None:
     relock(session, location, current=False)
     enforce(placing(_parent(session, location.parent_id), current=True))
     if location.volunteer_id is not None:
-        current = is_current(session, Volunteer, location.volunteer_id)
-        enforce("location_custody_volunteer", when=not current)
+        require_current(
+            session, Volunteer, location.volunteer_id, "location_custody_volunteer"
+        )
     location.retired_at = None

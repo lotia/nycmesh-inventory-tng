@@ -21,12 +21,8 @@ are only ever ended (AdminSession):
 
 The rules a single row can show are check constraints, which raise check
 violations (SQLSTATE 23514) named for the rule, as describe_error() logs.
-The catalogue's rules that need other rows are the app's: each table is
-written only by its own module (locations, volunteers, categories, items,
-labels), under the catalogue lock (db.locked_row), which raises
-db.RuleBroken named for the rule. So are the ledger's, which
-ledger.insert_transaction, its one writer, checks. The database holds no
-trigger, function or view (docs/decisions/0016).
+Rules that need other rows are the app's, checked by each table's one
+writer: CONTRIBUTING.md, The catalogue's rules (docs/decisions/0016).
 """
 
 import secrets
@@ -76,6 +72,19 @@ NAME_CHECK_MINUTES = (0, 24 * 60)
 SESSION_DAYS = (1, 400)
 CONFIRM_HOURS = (1, 7 * 24)
 CONFIRM_IDLE_MINUTES = (1, 7 * 24 * 60)
+
+
+def whole(typed: str, low: int, high: int) -> int | None:
+    """A whole number typed, from low to high. Plain digits only: isdigit()
+    alone lets through "²", which int() refuses, and a number too long to
+    read."""
+    typed = typed.strip()
+    if not (typed.isascii() and typed.isdigit() and len(typed) <= len(str(high))):
+        return None
+    number = int(typed)
+    return number if low <= number <= high else None
+
+
 # What made a reset link (docs/decisions/0012): an invite; asking by mail;
 # another administrator resetting the account's sign-in; the operator's
 # recovery token. Every one sets a password. Using a reset or recovery one

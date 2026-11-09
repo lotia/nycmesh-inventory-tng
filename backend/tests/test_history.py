@@ -122,9 +122,9 @@ def test_a_secret_changing_is_history_without_the_secret() -> None:
 
 # Which tables have history, and the columns named for them.
 
-# The tables that had history triggers before, written out: no table loses
-# its history by a slip in WITHOUT_HISTORY, and a new table has history
-# unless it is named there.
+# The tables with history, written out: no table loses its history by a
+# slip in WITHOUT_HISTORY, and a new table has history unless it is named
+# there.
 HISTORY_TABLES = {
     "category",
     "item",

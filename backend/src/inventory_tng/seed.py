@@ -25,9 +25,9 @@ from inventory_tng import (
     volunteers,
 )
 from inventory_tng.command import run_command
-from inventory_tng.db import CLI_ACTOR, exists_where, set_actor
+from inventory_tng.db import CLI_ACTOR, exists_where, set_actor, settings_row
 from inventory_tng.ledger import Batch, record
-from inventory_tng.models import Admin, Location
+from inventory_tng.models import Admin, Location, SignInSettings
 
 log = structlog.get_logger(__name__)
 
@@ -87,7 +87,7 @@ def run(session: Session, args: argparse.Namespace) -> int:
         admin = Admin(username=USERNAME)
         session.add(admin)
         session.flush()
-        accounts.sign_in_settings(session).totp_policy = "optional"
+        settings_row(session, SignInSettings).totp_policy = "optional"
         _catalogue(session)
         log.info("seeded", admin_id=admin.id)
     elif given is None and accounts.has_password(session, admin.id):

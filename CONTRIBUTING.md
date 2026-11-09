@@ -106,9 +106,8 @@ The app logs in with `DATABASE_URL`, as `inventory_app`, which may read and
 add to the ledger but never change it. Migrations log in with
 `MIGRATION_DATABASE_URL`, as `inventory_owner`, which owns the schema
 (DEPLOYMENT.md, Database roles). Compose makes both roles, with their names
-as passwords, when it creates the database's volume. A volume made before
-them, or a `.env` that still logs in as `inventory`, needs the database
-rebuilt (Migrations, below) and `.env` brought in line with `.env.example`.
+as passwords, when it creates the database's volume. If the roles are
+missing, rebuild the database (Migrations, below).
 
 ## Running the app
 

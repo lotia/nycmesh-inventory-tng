@@ -11,8 +11,7 @@ from inventory_tng.app import create_app
 from inventory_tng.db import get_session, get_session_factory, release_hold
 from inventory_tng.settings import LogConfig, Settings
 
-# Nothing listens on port 1, so connecting fails at once.
-OUT_OF_REACH = "postgresql+psycopg://u:p@127.0.0.1:1/x"
+from databases import NO_DATABASE
 
 
 def sessions_of(session: Session) -> Callable[[], Iterator[Session]]:
@@ -42,5 +41,5 @@ def out_of_reach(logging: LogConfig | None = None) -> TestClient:
     """A client of an app on its own engine and sessions, whose database is
     out of reach, as one that went away once the app was running. Never
     started: started, the app would refuse it (database_role.check)."""
-    settings = Settings(database_url=OUT_OF_REACH, logging=logging or LogConfig())
+    settings = Settings(database_url=NO_DATABASE, logging=logging or LogConfig())
     return TestClient(create_app(settings))

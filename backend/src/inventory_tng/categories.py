@@ -1,9 +1,6 @@
 """Categories: every write to the category table, and its rule. A category
 with current items stays current: they would be left in one nobody can
-pick (items.add, save and restore are the other side).
-
-Each write takes the catalogue lock, reads what its rule needs, and writes
-only if it holds (db.locked_row)."""
+pick (items.add, save and restore are the other side)."""
 
 from datetime import datetime
 

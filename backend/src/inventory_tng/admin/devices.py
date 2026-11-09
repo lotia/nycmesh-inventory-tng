@@ -22,11 +22,10 @@ from inventory_tng.admin.common import (
     admin_page,
     now,
     site_link,
-    whole,
 )
 from inventory_tng.db import DbSession
 from inventory_tng.local_time import site_zone
-from inventory_tng.models import Device, RegistrationCode
+from inventory_tng.models import Device, RegistrationCode, whole
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, ConfirmedAdmin, SignedIn, changed

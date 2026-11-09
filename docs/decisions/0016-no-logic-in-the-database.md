@@ -54,7 +54,8 @@ privilege, so neither binds it.
   history, and the app refuses a catalogue write made without the catalogue
   lock.
 - Concurrency is the app's to get right: the lock order is written down once
-  for the catalogue (`db.locked_row`) and once for the ledger (`ledger.py`).
+  for the catalogue (`db.locked_row`), once for the ledger (`ledger.py`) and
+  once for administrators (`accounts.lock_admins`).
 - PostgreSQL features still in use, and what another database would need:
   - fuzzy search: `pg_trgm` and a GIN index on `item.search_text`, a computed
     column (the largest cost);

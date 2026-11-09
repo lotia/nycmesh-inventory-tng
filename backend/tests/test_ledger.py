@@ -15,8 +15,8 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import items
-from inventory_tng.database_role import LEDGER
 from inventory_tng.db import set_actor
+from inventory_tng.history import LEDGER
 from inventory_tng.ledger import (
     balance,
     insert_transaction,
@@ -323,10 +323,12 @@ def test_each_line_is_checked_on_its_own() -> None:
         ([1, 2, 3], set()),
         ([1, 2, 1], {0, 2}),
         ([4, 4, 5, 5, 4], {0, 1, 2, 3, 4}),
+        # None names no item, so repeats none.
+        ([None, 1, None], set()),
     ],
 )
 def test_a_repeated_item_names_each_of_its_lines(
-    item_ids: list[int], twice: set[int]
+    item_ids: list[int | None], twice: set[int]
 ) -> None:
     assert repeated(item_ids) == twice
 

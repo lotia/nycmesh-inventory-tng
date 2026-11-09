@@ -14,7 +14,7 @@ from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS, lines, repeated
+from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS, lines, named_twice
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.ledger import expected, lock_place, moment
 from inventory_tng.models import (
@@ -28,7 +28,7 @@ from inventory_tng.models import (
 from helpers.concurrency import Committed
 from helpers.rows import violates
 from helpers.sign_in import text
-from helpers.stock import Place, received, stocked, write
+from helpers.stock import Place, committed_place, received, stocked, write
 
 
 def key_on(response: Response) -> str:
@@ -171,7 +171,7 @@ def test_a_count_refuses_what_is_not_a_quantity(
 def test_a_count_form_naming_an_item_twice_names_each_field(
     form: dict[str, str], twice: set[str]
 ) -> None:
-    assert repeated(lines(form)).keys() == twice
+    assert named_twice(lines(form)).keys() == twice
 
 
 def test_a_count_form_reads_the_item_each_field_names() -> None:
@@ -189,7 +189,7 @@ def test_a_count_form_reads_the_item_each_field_names() -> None:
         (f"counted_{INTEGER_MAX + 1}", None, "3"),
         ("extra_quantity", 8, "4"),
     ]
-    assert repeated([("counted_5", 5, "1"), ("counted_05", 5, "2")]) == {
+    assert named_twice([("counted_5", 5, "1"), ("counted_05", 5, "2")]) == {
         "counted_5": 5,
         "counted_05": 5,
     }
@@ -499,13 +499,6 @@ def test_a_count_sent_again_after_a_later_move_is_not_asked_again(
     assert expected(session, place.store.id) == {place.item.id: Decimal(1)}
 
 
-def a_store(committed: Committed) -> Place:
-    setup = committed.session()
-    place = Place(setup)
-    setup.commit()
-    return place
-
-
 def receive(session: Session, place: Place) -> None:
     """Three radios received into the store. Committed tests may not write
     the ledger (APPEND_ONLY), so the caller rolls it back."""
@@ -518,7 +511,7 @@ def test_a_count_form_waits_for_a_save_under_way_at_the_place(
 ) -> None:
     """Its moment must not leave out a save that commits later with a lower
     ledger id."""
-    place = a_store(committed)
+    place = committed_place(committed)
     saving = committed.session()
     receive(saving, place)
     counting = committed.session()
@@ -531,7 +524,7 @@ def test_a_count_form_waits_for_a_save_under_way_at_the_place(
 def test_a_count_form_does_not_hold_up_saves(committed: Committed) -> None:
     """The form keeps its moment, not the lock: a save at the place goes
     ahead while the form is still being made."""
-    place = a_store(committed)
+    place = committed_place(committed)
     counting = committed.session()
     moment(counting, place.store.id)
     saving = committed.session()
@@ -546,7 +539,7 @@ def test_a_save_at_the_place_waits_for_a_count(
 ) -> None:
     """Before it has an id: one drawn first could be committed after the
     count's moment, though lower (inventory-tng-099)."""
-    place = a_store(committed)
+    place = committed_place(committed)
     counting = committed.session()
     lock_place(counting, place.store.id)
     before = ids_drawn(owner_engine)

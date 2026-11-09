@@ -13,12 +13,12 @@ from sqlalchemy.orm import Session, aliased
 
 from inventory_tng import labels
 from inventory_tng.accounts import qr_svg
-from inventory_tng.admin.common import LABELS, admin_page, now, whole
+from inventory_tng.admin.common import LABELS, admin_page, now
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.db import DbSession
 from inventory_tng.local_time import site_zone
-from inventory_tng.models import Item, ItemPackage, Label, Location
+from inventory_tng.models import Item, ItemPackage, Label, Location, whole
 from inventory_tng.pages import NOTICES, not_found, redirect, templates
 from inventory_tng.sign_in import AdminSignedIn
 

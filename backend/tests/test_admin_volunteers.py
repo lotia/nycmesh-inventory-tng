@@ -3,6 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -184,6 +185,23 @@ def test_ending_custody_they_do_not_have_is_not_found(
     ada = add(session, Volunteer(name="Ada"))
     assert admin_client.post(f"{VOLUNTEERS}/{ada.id}/custody/end").status_code == 404
     assert admin_client.post(f"{VOLUNTEERS}/0/custody/end").status_code == 404
+
+
+@pytest.mark.parametrize("action", ["custody", "retire", "merge", "restore"])
+def test_an_unknown_volunteer_is_not_found(
+    admin_client: TestClient, action: str
+) -> None:
+    assert admin_client.post(f"{VOLUNTEERS}/0/{action}").status_code == 404
+
+
+@pytest.mark.parametrize("action", ["custody", "merge"])
+def test_a_retired_volunteer_is_not_found(
+    admin_client: TestClient, session: Session, action: str
+) -> None:
+    """Neither given custody nor merged, whoever the merge names."""
+    ada = add(session, Volunteer(name="Ada", retired_at=datetime.now(UTC)))
+    path = f"{VOLUNTEERS}/{ada.id}/{action}"
+    assert admin_client.post(path, data={"into_id": "0"}).status_code == 404
 
 
 def test_one_holding_stock_is_not_merged(

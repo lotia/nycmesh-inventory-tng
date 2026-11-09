@@ -3,10 +3,7 @@ item_package tables, and their rules. A current item is in a current
 category (categories.retire is the other side), and an item's unit is
 fixed once stock has moved in it, as the ledger's quantities are in that
 unit. The app may not move a package to another item (migration 0002),
-so its labels always name its item.
-
-Each write takes the catalogue lock, reads what its rules need, and
-writes only if they hold (db.locked_row)."""
+so its labels always name its item."""
 
 from collections.abc import Mapping
 from datetime import datetime
@@ -14,15 +11,20 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import enforce, exists_where, is_current, lock_catalogue, relock
+from inventory_tng.db import (
+    enforce,
+    exists_where,
+    lock_catalogue,
+    relock,
+    require_current,
+)
 from inventory_tng.models import Category, Item, ItemPackage, Movement
 
 
 def _in_current_category(session: Session, category_id: int) -> None:
     """A current item, added, moved or brought back: its category is
     current."""
-    current = is_current(session, Category, category_id)
-    enforce("item_category_current", when=not current)
+    require_current(session, Category, category_id, "item_category_current")
 
 
 def add(session: Session, values: Mapping[str, object]) -> Item:

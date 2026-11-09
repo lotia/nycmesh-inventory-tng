@@ -102,6 +102,7 @@ def test_retiring_and_bringing_back(admin_client: TestClient, session: Session) 
 def test_an_unknown_category_is_not_found(admin_client: TestClient) -> None:
     assert admin_client.get(f"{CATEGORIES}/999999").status_code == 404
     assert admin_client.post(f"{CATEGORIES}/999999/retire").status_code == 404
+    assert admin_client.post(f"{CATEGORIES}/999999/restore").status_code == 404
 
 
 def test_a_page_shown_again_after_a_refusal_still_links_right(

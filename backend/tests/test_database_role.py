@@ -25,7 +25,7 @@ from inventory_tng.database_role import (
 from inventory_tng.db import Base, make_engine
 from inventory_tng.settings import Settings
 
-from databases import OWNER, as_role, superuser_url
+from databases import NO_DATABASE, OWNER, as_role, superuser_url
 from helpers.rows import refused
 
 
@@ -97,7 +97,7 @@ def test_the_app_refuses_to_start_as_the_owner(database_url: str) -> None:
 
 def test_the_app_refuses_to_start_unchecked() -> None:
     """A database it cannot reach: it cannot tell, so it does not start."""
-    engine = make_engine("postgresql+psycopg://u:p@127.0.0.1:1/x")
+    engine = make_engine(NO_DATABASE)
     with capture_logs() as logs, pytest.raises(RefusedLogin):
         check(engine)
     engine.dispose()

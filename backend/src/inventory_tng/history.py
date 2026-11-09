@@ -30,12 +30,12 @@ from inventory_tng.db import Base, changed_attributes, current_actor
 log = structlog.get_logger(__name__)
 
 HISTORY_TABLE = "catalogue_history"
+# The ledger's tables, which the app only adds to (database_role.py).
+LEDGER = ("ledger_transaction", "movement")
 # Every table but these has history. The ledger and sent forms are only
 # added to, so each is its own history; administrators' sessions change on
 # every request.
-WITHOUT_HISTORY = frozenset(
-    {HISTORY_TABLE, "ledger_transaction", "movement", "admin_session", "sent_form"}
-)
+WITHOUT_HISTORY = frozenset({HISTORY_TABLE, *LEDGER, "admin_session", "sent_form"})
 # Columns left out of history, by table: what would let someone sign in, or
 # copy a second factor (docs/decisions/0012). Changing one is still history.
 SECRET_COLUMNS: Mapping[str, tuple[str, ...]] = {

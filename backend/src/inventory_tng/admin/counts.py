@@ -16,8 +16,7 @@ so it cannot be sent a repeat: the check is here, where fields become items.
 """
 
 import uuid
-from collections import Counter
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
 from typing import Annotated, Any
 
@@ -34,7 +33,6 @@ from inventory_tng.admin.common import (
     current_rows,
     quantity,
     text_form,
-    whole,
 )
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.db import DbSession
@@ -43,6 +41,7 @@ from inventory_tng.ledger import (
     moment,
     record_adjustment,
     record_count,
+    repeated,
     takeable,
 )
 from inventory_tng.local_time import site_zone
@@ -54,6 +53,7 @@ from inventory_tng.models import (
     LedgerTransaction,
     Location,
     Movement,
+    whole,
 )
 from inventory_tng.once import form_key
 from inventory_tng.pages import NOTICES, not_found, redirect
@@ -265,13 +265,12 @@ def lines(form: Mapping[str, str]) -> list[Line]:
     return found
 
 
-def repeated(found: Collection[Line]) -> dict[str, int]:
-    """The fields naming an item another field names too, and that item."""
-    times = Counter(item_id for _, item_id, _ in found)
+def named_twice(found: Sequence[Line]) -> dict[str, int | None]:
+    """The fields naming an item another field names too (ledger.repeated),
+    and that item."""
     return {
-        field: item_id
-        for field, item_id, _ in found
-        if item_id is not None and times[item_id] > 1
+        found[number][0]: found[number][1]
+        for number in repeated([item_id for _, item_id, _ in found])
     }
 
 
@@ -315,12 +314,12 @@ def count(
         return not_found()
     found = lines(form)
     counted, problems = _counted(session, found)
-    if twice := repeated(found):
-        problems |= dict.fromkeys(twice, "This item is on the form more than once.")
+    if repeats := named_twice(found):
+        problems |= dict.fromkeys(repeats, "This item is on the form more than once.")
         log.info(
             "count refused: an item named twice",
             location_id=place.id,
-            item_ids=sorted(set(twice.values())),
+            item_ids=sorted({item_id for item_id in repeats.values() if item_id}),
         )
     if problems:
         # What was typed is as of when the form was shown; a recount asks
@@ -333,7 +332,7 @@ def count(
             as_of,
             problems=problems,
             values=form,
-            alert=TWICE if twice else None,
+            alert=TWICE if repeats else None,
             items={
                 item_id
                 for typed in form.get("items", "").split()

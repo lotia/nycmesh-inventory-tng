@@ -15,20 +15,20 @@ import structlog
 from sqlalchemy.orm import Session
 
 from inventory_tng.command import run_command
-from inventory_tng.db import CLI_ACTOR, get_locked, set_actor
-from inventory_tng.models import NAME_CHECK_MINUTES, ScanSettings
+from inventory_tng.db import CLI_ACTOR, set_actor, settings_row
+from inventory_tng.models import NAME_CHECK_MINUTES, ScanSettings, whole
 
 log = structlog.get_logger(__name__)
 
 
-def whole(text: str) -> int:
+def minutes(text: str) -> int:
     """A number of minutes in the range ScanSettings holds."""
-    low, high = NAME_CHECK_MINUTES
-    if not (text.isascii() and text.isdigit() and low <= int(text) <= high):
+    if (number := whole(text, *NAME_CHECK_MINUTES)) is None:
+        low, high = NAME_CHECK_MINUTES
         raise argparse.ArgumentTypeError(
             f"must be a whole number from {low} to {high}, not {text}"
         )
-    return int(text)
+    return number
 
 
 def parse(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -38,7 +38,7 @@ def parse(argv: Sequence[str] | None = None) -> argparse.Namespace:
     change = commands.add_parser("set", help="change one or more settings")
     change.add_argument(
         "--name-check-minutes",
-        type=whole,
+        type=minutes,
         help="unused this long, the page asks whose name it is; 0 never asks",
     )
     args = parser.parse_args(argv)
@@ -53,15 +53,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def run(session: Session, args: argparse.Namespace) -> int:
-    current = session.get_one(ScanSettings, 1)
     if args.command == "set":
         set_actor(session, CLI_ACTOR)
-        # Locked and read again into `current`, so history records the row
-        # this changes, should a page save at the same time (history.py).
-        get_locked(session, ScanSettings, 1)
+        current = settings_row(session, ScanSettings)
         current.name_check_minutes = args.name_check_minutes
         session.flush()
         log.info("scan settings changed", name_check_minutes=args.name_check_minutes)
+    else:
+        current = session.get_one(ScanSettings, 1)
     print(f"name check: {describe(current.name_check_minutes)}")
     return 0
 

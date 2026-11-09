@@ -4,9 +4,7 @@ pointing at them. One who can hold stock has a custody location
 (locations.add_custody), named for them.
 
 A rule of more than one condition is a function of plain values, returning
-the name of the rule a change would break, or None. Each write takes the
-catalogue lock and its rows (_lock), reads what its rules need, and writes
-only if they hold (db.locked_row)."""
+the name of the rule a change would break, or None."""
 
 from datetime import datetime
 
@@ -18,10 +16,10 @@ from inventory_tng.db import (
     Gone,
     enforce,
     exists_where,
-    is_current,
     lock_catalogue,
     locked,
     relock,
+    require_current,
 )
 from inventory_tng.models import Location, Volunteer
 
@@ -106,8 +104,7 @@ def retire(session: Session, volunteer: Volunteer, at: datetime) -> None:
 def merge(session: Session, volunteer: Volunteer, into_id: int, at: datetime) -> None:
     """A duplicate of `into_id`: retired, pointing at them."""
     held = _lock(session, volunteer, current=True)
-    into_current = is_current(session, Volunteer, into_id)
-    enforce("volunteer_merge_target", when=not into_current)
+    require_current(session, Volunteer, into_id, "volunteer_merge_target")
     _leaving(session, volunteer, held)
     volunteer.merged_into_id, volunteer.retired_at = into_id, at
 

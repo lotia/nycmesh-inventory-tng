@@ -1,7 +1,7 @@
 """Items and the packages they come in. An item's unit is fixed once stock
 has moved in it (items.save): the form shows it, and does not offer to
-change it. A retired item
-with stock left may still be taken, never received (docs/decisions/0003)."""
+change it. A retired item with stock left may still be taken, never
+received (docs/decisions/0003)."""
 
 from collections.abc import Callable, Mapping
 from decimal import Decimal
@@ -246,7 +246,7 @@ def save_item(
 @router.post(f"{ITEMS}/{{item_id}}/retire")
 def retire_item(signed: AdminSignedIn, session: DbSession, item_id: int) -> Response:
     found = session.get(Item, item_id)
-    if found is None or found.retired_at is not None:
+    if found is None:
         return not_found()
     items.retire(session, found, now())
     session.commit()
@@ -259,7 +259,7 @@ def restore_item(
     request: Request, signed: AdminSignedIn, session: DbSession, item_id: int
 ) -> Response:
     found = session.get(Item, item_id)
-    if found is None or found.retired_at is None:
+    if found is None:
         return not_found()
     _, broken = refusal(
         session,
@@ -316,7 +316,7 @@ def retire_package(
     signed: AdminSignedIn, session: DbSession, item_id: int, package_id: int
 ) -> Response:
     package = session.get(ItemPackage, package_id)
-    if package is None or package.item_id != item_id or package.retired_at:
+    if package is None or package.item_id != item_id:
         return not_found()
     items.retire_package(session, package, now())
     session.commit()
