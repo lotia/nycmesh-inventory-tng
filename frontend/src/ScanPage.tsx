@@ -25,7 +25,7 @@ import { type Outbox, sharedOutbox } from "./outbox";
 import { decimal, thousandths } from "./quantity";
 import { NOT_REGISTERED } from "./registration";
 import { Scanner } from "./Scanner";
-import { telemetry } from "./telemetry";
+import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
 
 const API = makeApi();
 /** How often an open page checks whether to ask whose name it is, and
@@ -265,7 +265,11 @@ function CartForm({
       return;
     }
     if (current.startedAt > 0) {
-      const seconds = (Date.now() - current.startedAt) / 1000;
+      // A cart kept overnight counts as a day, and a clock put back as none.
+      const seconds = Math.min(
+        Math.max((Date.now() - current.startedAt) / 1000, 0),
+        MOST_SECONDS_TO_SAVE,
+      );
       telemetry.record({ kind: "scan_to_save", seconds });
     }
     change(freshCart(current));

@@ -25,6 +25,7 @@ def test_sets_up_logging_then_builds_the_app(
     # Whatever else is said, such as that the scan page is not built.
     (line,) = [line for line in lines if line["event"] == "starting"]
     assert line["database_host"] == "db.example"
+    assert line["sealing_key_versions"] == [1]  # The tests' TOTP keys.
     assert "secret" not in json.dumps(line)
 
 

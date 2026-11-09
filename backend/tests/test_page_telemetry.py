@@ -62,18 +62,13 @@ def test_only_what_the_schema_names_is_taken(
     assert client.post(PATH, json={"events": events}).status_code == 422
 
 
-def test_an_error_is_logged_without_anything_the_page_said(
+def test_a_reports_errors_are_logged_once_without_anything_the_page_said(
     client: TestClient,
 ) -> None:
     event = {"kind": "error", "page": "scan", "source": "error"}
     with capture_logs() as logs:
-        assert client.post(PATH, json={"events": [event]}).status_code == 204
-    assert {
-        "event": "page error",
-        "page": "scan",
-        "source": "error",
-        "log_level": "warning",
-    } in logs
+        assert client.post(PATH, json={"events": [event, event]}).status_code == 204
+    assert {"event": "page errors", "count": 2, "log_level": "warning"} in logs
 
 
 def test_reports_count_against_their_address(client: TestClient) -> None:

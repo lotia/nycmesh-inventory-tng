@@ -23,7 +23,7 @@ from sqlalchemy import exc
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts, db, devices, labels, ledger, mail
+from inventory_tng import accounts, db, devices, labels, ledger, mail, page_telemetry
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS
 from inventory_tng.app import create_app
@@ -635,3 +635,17 @@ def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
     assert errors[(("page", "register"), ("source", "unhandledrejection"))] >= 1
     assert counted(reader, "inventory.outbox.retries")[(("reason", "no_answer"),)] >= 1
     assert histogram_counts(reader, "inventory.scan.to_save.duration")[()] >= 1
+    # Buckets that fit the values, not the SDK's own from 5 up.
+    bounds = {
+        name: {
+            tuple(point.explicit_bounds)
+            for point in metric.data.data_points
+            if isinstance(point, HistogramDataPoint)
+        }
+        for metric in metrics_in(reader)
+        if (name := metric.name).startswith("inventory.page.web_vital.")
+    }
+    assert bounds == {
+        "inventory.page.web_vital.duration": {page_telemetry.VITAL_SECONDS},
+        "inventory.page.web_vital.layout_shift": {page_telemetry.LAYOUT_SHIFTS},
+    }

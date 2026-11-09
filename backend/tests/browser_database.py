@@ -6,8 +6,9 @@ webServer (playwright.config.ts) starts
 with BROWSER_RUN, a folder, and BROWSER_PORT set. It makes a database of
 its own (databases.py), migrated and seeded, with a registration code for
 the tests' device, and in BROWSER_RUN: prepared.json, what the tests need,
-and camera.y4m, the QR code of the seed's labelled item for Chromium to
-show as its camera. It then serves the built frontend from that database
+camera.y4m, the QR code of the seed's labelled item for Chromium to
+show as its camera, and totp-keys, a key of the run's own to seal
+authenticators with. It then serves the built frontend from that database
 on BROWSER_PORT until Playwright stops it, and drops the database and its
 files. A database a run leaves behind is dropped by a later run, as test
 databases are.
@@ -28,14 +29,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import __main__ as server
-from inventory_tng import devices, seed
+from inventory_tng import devices, seed, totp_keys
 from inventory_tng.models import Item, Label
 
 from databases import migrated_engine, new_database
 
 # What a run writes in its folder: these, and the signed-in session
 # sign-in.setup.ts keeps (frontend/browser/prepared.ts, adminState).
-RUN_FILES = ("prepared.json", "camera.y4m", "admin.json")
+RUN_FILES = ("prepared.json", "camera.y4m", "admin.json", "totp-keys/1")
+# The run's own TOTP key (totp_keys.py), as a clone may have none in
+# .local/totp-keys: CI runs no `mise run setup`.
+TOTP_KEYS = "totp-keys"
 
 
 def main(argv: list[str]) -> int:
@@ -51,9 +55,12 @@ def main(argv: list[str]) -> int:
         with new_database() as url:
             prepared = prepare(url, run / "camera.y4m")
             (run / "prepared.json").write_text(json.dumps(prepared))
+            (run / TOTP_KEYS).mkdir(exist_ok=True)
+            (run / TOTP_KEYS / "1").write_text(totp_keys.new_key())
             os.environ |= {
                 "DATABASE_URL": url,
                 "APP_ENV": "development",
+                "TOTP_KEYS_DIR": str(run / TOTP_KEYS),
                 # The build, as production serves it.
                 "VITE_DEV_SERVER": "",
                 "LOG_LEVEL": "WARNING",
@@ -62,8 +69,9 @@ def main(argv: list[str]) -> int:
     finally:
         for name in RUN_FILES:
             (run / name).unlink(missing_ok=True)
-        with contextlib.suppress(OSError):
-            run.rmdir()
+        for folder in (run / TOTP_KEYS, run):
+            with contextlib.suppress(OSError):
+                folder.rmdir()
     return 0
 
 

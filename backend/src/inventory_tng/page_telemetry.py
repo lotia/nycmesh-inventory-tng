@@ -5,7 +5,10 @@ The schema is the list of what may be sent: closed sets of names and
 clamped numbers, nothing free. Each event becomes a metric; an error says
 only that one happened, and on which page. Open to any browser, since the
 register page reports before its device is registered, so every report
-counts against its address first.
+counts against its address first: in this process's memory, not the
+database's shared limits (rate_limits.py), which guard signing in and
+registering. A page's numbers are not worth a connection, and a flood of
+them must not hold one up from those.
 """
 
 from typing import Annotated, Literal
@@ -14,12 +17,12 @@ import structlog
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 from limits import RateLimitItemPerMinute
+from limits.storage import MemoryStorage
+from limits.strategies import MovingWindowRateLimiter
 from opentelemetry import metrics
 from pydantic import BaseModel, ConfigDict, Field
 
-from inventory_tng.db import DbSession
 from inventory_tng.devices import RateLimitedReply
-from inventory_tng.rate_limits import limiter
 from inventory_tng.web import rate_key
 
 log = structlog.get_logger(__name__)
@@ -31,6 +34,8 @@ PATH = "/telemetry"
 # A page flushes at ten events and sends fifty at most; a few pages open at
 # once on one network share an address.
 REPORTS = RateLimitItemPerMinute(30)
+report_counts = MemoryStorage()
+reports = MovingWindowRateLimiter(report_counts)
 MOST_EVENTS = 50
 
 Page = Literal["scan", "register"]
@@ -80,15 +85,22 @@ page_errors = meter.create_counter(
     unit="{error}",
     description="Errors the scan and register pages caught, by page and source",
 )
+# Buckets around each vital's thresholds (web.dev: good up to 0.2 s for
+# INP and 2.5 s for LCP, poor past 0.5 s and 4 s; good up to 0.1 for CLS,
+# poor past 0.25): the SDK's own, from 5 up, would put nearly all in one.
+VITAL_SECONDS = (0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 4, 6, 10, 20, 60)
+LAYOUT_SHIFTS = (0.01, 0.025, 0.05, 0.1, 0.15, 0.25, 0.5, 1, 2.5)
 vital_durations = meter.create_histogram(
     "inventory.page.web_vital.duration",
     unit="s",
     description="Largest Contentful Paint and Interaction to Next Paint",
+    explicit_bucket_boundaries_advisory=VITAL_SECONDS,
 )
 layout_shifts = meter.create_histogram(
     "inventory.page.web_vital.layout_shift",
     unit="1",
     description="Cumulative Layout Shift",
+    explicit_bucket_boundaries_advisory=LAYOUT_SHIFTS,
 )
 outbox_retries = meter.create_counter(
     "inventory.outbox.retries",
@@ -120,7 +132,6 @@ def record(event: WebVital | PageError | OutboxRetry | ScanToSave) -> None:
             )
         case PageError():
             page_errors.add(1, {"page": event.page, "source": event.source})
-            log.warning("page error", page=event.page, source=event.source)
         case OutboxRetry():
             outbox_retries.add(1, {"reason": event.reason})
         case _:  # ScanToSave, the last kind left.
@@ -134,12 +145,15 @@ def record(event: WebVital | PageError | OutboxRetry | ScanToSave) -> None:
         429: {"model": RateLimitedReply, "description": "Too many reports from here"}
     },
 )
-def report(report: Report, request: Request, session: DbSession) -> Response:
+def report(report: Report, request: Request) -> Response:
     """Record what a page reports about itself."""
-    if not limiter(session).hit(REPORTS, "telemetry", rate_key(request)):
+    if not reports.hit(REPORTS, "telemetry", rate_key(request)):
         log.info("page report refused", reason="rate_limited")
         body = RateLimitedReply(reason="rate_limited").model_dump()
         return JSONResponse(body, status_code=429)
     for event in report.events:
         record(event)
+    # One line for a report's errors, however many: the counter has each.
+    if errors := sum(isinstance(event, PageError) for event in report.events):
+        log.warning("page errors", count=errors)
     return Response(status_code=204)

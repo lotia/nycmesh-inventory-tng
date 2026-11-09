@@ -21,7 +21,9 @@ There is no production container image or Helm chart yet
 ## Settings
 
 Set these in the environment. Only `DATABASE_URL` and `TOTP_KEYS_DIR` are
-required, and for migrations only `MIGRATION_DATABASE_URL`.
+required, and for migrations only `MIGRATION_DATABASE_URL`, with
+`TOTP_KEYS_DIR` too for the migration that seals authenticators' keys (TOTP
+keys, below).
 
 - `DATABASE_URL`: `postgresql://user:password@host:port/database`, logging
   in as the app's role (Database roles, below).
@@ -271,7 +273,8 @@ per version, named `1`, `2` and so on, each holding a key. The highest
 version seals; every version present opens.
 
 Make a key and put it in a Secret, mounted as a folder into the app's pods
-only:
+only, and into the migration's while it first upgrades past migration 0016,
+which seals the keys a database already holds:
 
 ```sh
 uv run python -m inventory_tng.totp_keys new > 1
@@ -281,8 +284,9 @@ kubectl create secret generic inventory-totp-keys --from-file=1
 Back the Secret up apart from the database's backups, and keep it as
 carefully: the two together can make codes.
 
-**Rotating.** Add the next version to the Secret, roll out, then seal every
-authenticator with it:
+**Rotating.** Add the next version to the Secret, roll out (each process's
+starting line lists the versions it has, `sealing_key_versions`), then seal
+every authenticator with it:
 
 ```sh
 kubectl exec deploy/inventory -- python -m inventory_tng.totp_keys reseal

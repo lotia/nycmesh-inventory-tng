@@ -2,6 +2,7 @@
 # Podman both read this file. Local settings, version control and issues
 # never belong in an image.
 .env
+.local/
 .git/
 .jj/
 .beads/
