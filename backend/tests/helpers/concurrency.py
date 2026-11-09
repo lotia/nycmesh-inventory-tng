@@ -2,15 +2,21 @@
 
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
 import pytest
-from sqlalchemy import Engine, text
+from psycopg.errors import LockNotAvailable
+from sqlalchemy import Connection, Engine, exc, text
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import Base
 
 from helpers.rows import setting_up
+
+# The longest a test's connection waits for a lock, so a deadlock, a
+# missing wait or a lock a worker left held fails the test rather than
+# hanging the run.
+LOCK_TIMEOUT = "5s"
 
 
 class Worker(threading.Thread):
@@ -82,3 +88,39 @@ def made(committed: Committed, *rows: Base) -> None:
     setup = committed.session()
     setup.add_all(rows)
     setup.commit()
+
+
+def newest_ids(connection: Connection) -> dict[str, int]:
+    """Every table's highest id now: delete_made deletes what is above it.
+    Each before what it refers to, as deleting needs."""
+    return {
+        table.name: int(
+            connection.scalar(text(f"SELECT coalesce(max(id), 0) FROM {table.name}"))
+        )
+        for table in reversed(Base.metadata.sorted_tables)
+        if "id" in table.c
+    }
+
+
+def delete_made(
+    engine: Engine, before: Mapping[str, int], *, wait: str = LOCK_TIMEOUT
+) -> None:
+    """Delete the rows made since `before` (newest_ids), in one
+    transaction, each table before what it refers to. Waits at most `wait`
+    for a lock: one another connection left held fails it, saying so,
+    rather than hanging the run (inventory-tng-8i4.105)."""
+    try:
+        with engine.begin() as connection:
+            connection.execute(text(f"SET LOCAL lock_timeout = '{wait}'"))
+            for name, newest in before.items():
+                connection.execute(
+                    text(f"DELETE FROM {name} WHERE id > :newest"),
+                    {"newest": newest},
+                )
+    except exc.OperationalError as error:
+        if not isinstance(error.orig, LockNotAvailable):
+            raise
+        raise RuntimeError(
+            f"cleanup waited {wait} for a lock another connection still holds:"
+            " the test's rows are left behind"
+        ) from error

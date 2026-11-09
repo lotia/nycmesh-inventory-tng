@@ -16,18 +16,14 @@ from alembic.config import Config
 from argon2 import PasswordHasher
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import Connection, Engine, TextClause, event, exc, make_url, text
+from sqlalchemy import Engine, TextClause, event, exc, make_url, text
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, devices, local_env
 from inventory_tng.app import create_app
 from inventory_tng.database_role import refusals
-from inventory_tng.db import (
-    Base,
-    make_engine,
-    run_outside_transaction,
-)
+from inventory_tng.db import make_engine, run_outside_transaction
 from inventory_tng.history import LEDGER
 from inventory_tng.logs import configure_structlog
 from inventory_tng.mail import get_mailer
@@ -45,7 +41,7 @@ from databases import (
     new_database,
 )
 from helpers.apps import on_session
-from helpers.concurrency import Committed
+from helpers.concurrency import LOCK_TIMEOUT, Committed, delete_made, newest_ids
 from helpers.devices import new_device
 from helpers.mail import SITE_MAIL, SentMail
 from helpers.rows import setting_up
@@ -236,18 +232,6 @@ def owner_session(owner_engine: Engine) -> Iterator[Session]:
     yield from _rolled_back(owner_engine)
 
 
-def _newest_ids(connection: Connection) -> dict[str, int]:
-    """Every table's highest id now: committed() deletes what is above it
-    after its test. Each before what it refers to, as deleting needs."""
-    return {
-        table.name: int(
-            connection.scalar(text(f"SELECT coalesce(max(id), 0) FROM {table.name}"))
-        )
-        for table in reversed(Base.metadata.sorted_tables)
-        if "id" in table.c
-    }
-
-
 @functools.cache
 def _fingerprint_query(engine: Engine) -> TextClause:
     """One query for every table's fingerprint (PostgreSQL's md5 of all its
@@ -347,11 +331,11 @@ COMMITTED_APP = "inventory-tng-committed-test"
 
 
 def _wait_briefly(connection: DBAPIConnection, _record: object) -> None:
-    """At most five seconds for a lock, so a deadlock or a missing wait
+    """At most LOCK_TIMEOUT for a lock, so a deadlock or a missing wait
     fails rather than hangs; and named, for cleanup."""
     run_outside_transaction(
         connection,
-        "SET lock_timeout = '5s'",
+        f"SET lock_timeout = '{LOCK_TIMEOUT}'",
         f"SET application_name = '{COMMITTED_APP}'",
     )
 
@@ -399,28 +383,23 @@ def committed(database_url: str, owner_engine: Engine) -> Iterator[Committed]:
     """Two requests at once need commits other connections see, which the
     `session` fixture's one transaction is not (_committed_engine). After
     the test, every row they made (any table, any connection, history
-    included) is deleted, as the owner. Rows they changed but did not make,
+    included) is deleted, as the owner, waiting as briefly for a lock as
+    they do (delete_made). Rows they changed but did not make,
     such as a settings row, are not put back: a test that changes one
     restores it itself. A committed test must not write the ledger, which
     is append-only: not even a test deletes from it."""
     with owner_engine.connect() as connection:
-        before = _newest_ids(connection)
+        before = newest_ids(connection)
     with _committed_engine(database_url) as committed:
         yield committed
-    with owner_engine.begin() as connection:
-        # Only what the test made, each table before what it refers to, and
-        # only where it made any.
-        after = _newest_ids(connection)
-        if grew := sorted(t for t in LEDGER if after[t] > before[t]):
-            raise RuntimeError(
-                f"a committed test wrote {grew}, whose rows are never deleted"
-                " (the ledger is append-only): its rows are left behind"
-            )
-        for name, newest in before.items():
-            connection.execute(
-                text(f"DELETE FROM {name} WHERE id > :newest"),
-                {"newest": newest},
-            )
+    with owner_engine.connect() as connection:
+        after = newest_ids(connection)
+    if grew := sorted(t for t in LEDGER if after[t] > before[t]):
+        raise RuntimeError(
+            f"a committed test wrote {grew}, whose rows are never deleted"
+            " (the ledger is append-only): its rows are left behind"
+        )
+    delete_made(owner_engine, before)
 
 
 @pytest.fixture
