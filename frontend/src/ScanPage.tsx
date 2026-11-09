@@ -25,6 +25,7 @@ import { type Outbox, sharedOutbox } from "./outbox";
 import { decimal, thousandths } from "./quantity";
 import { NOT_REGISTERED } from "./registration";
 import { Scanner } from "./Scanner";
+import { telemetry } from "./telemetry";
 
 const API = makeApi();
 /** How often an open page checks whether to ask whose name it is, and
@@ -262,6 +263,10 @@ function CartForm({
         "This browser wouldn't keep the batch, so it isn't saved. Free some space or leave private browsing, then try again.",
       ];
       return;
+    }
+    if (current.startedAt > 0) {
+      const seconds = (Date.now() - current.startedAt) / 1000;
+      telemetry.record({ kind: "scan_to_save", seconds });
     }
     change(freshCart(current));
     saved.value = batch.what;

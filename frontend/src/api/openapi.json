@@ -230,6 +230,58 @@
           }
         ]
       }
+    },
+    "/api/telemetry": {
+      "post": {
+        "summary": "Report",
+        "description": "Record what a page reports about itself.",
+        "operationId": "report_api_telemetry_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Report"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "503": {
+            "description": "The database cannot answer; try again",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnavailableReply"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many reports from here",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitedReply"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -581,6 +633,24 @@
         "required": ["id", "name", "kind", "parent_id"],
         "title": "LocationEntry"
       },
+      "OutboxRetry": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "outbox_retry",
+            "title": "Kind"
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["no_answer", "unavailable", "unexpected"],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind", "reason"],
+        "title": "OutboxRetry"
+      },
       "PackageEntry": {
         "properties": {
           "id": {
@@ -599,6 +669,29 @@
         "type": "object",
         "required": ["id", "name", "size"],
         "title": "PackageEntry"
+      },
+      "PageError": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "error",
+            "title": "Kind"
+          },
+          "page": {
+            "type": "string",
+            "enum": ["scan", "register"],
+            "title": "Page"
+          },
+          "source": {
+            "type": "string",
+            "enum": ["error", "unhandledrejection"],
+            "title": "Source"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind", "page", "source"],
+        "title": "PageError"
       },
       "RateLimitedReply": {
         "properties": {
@@ -634,6 +727,45 @@
         "required": ["code"],
         "title": "Registration"
       },
+      "Report": {
+        "properties": {
+          "events": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/WebVital"
+                },
+                {
+                  "$ref": "#/components/schemas/PageError"
+                },
+                {
+                  "$ref": "#/components/schemas/OutboxRetry"
+                },
+                {
+                  "$ref": "#/components/schemas/ScanToSave"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "error": "#/components/schemas/PageError",
+                  "outbox_retry": "#/components/schemas/OutboxRetry",
+                  "scan_to_save": "#/components/schemas/ScanToSave",
+                  "web_vital": "#/components/schemas/WebVital"
+                }
+              }
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Events"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["events"],
+        "title": "Report"
+      },
       "Saved": {
         "properties": {
           "transaction_id": {
@@ -644,6 +776,25 @@
         "type": "object",
         "required": ["transaction_id"],
         "title": "Saved"
+      },
+      "ScanToSave": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "scan_to_save",
+            "title": "Kind"
+          },
+          "seconds": {
+            "type": "number",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Seconds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind", "seconds"],
+        "title": "ScanToSave"
       },
       "Settings": {
         "properties": {
@@ -719,6 +870,40 @@
         "type": "object",
         "required": ["id", "name"],
         "title": "VolunteerEntry"
+      },
+      "WebVital": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "web_vital",
+            "title": "Kind"
+          },
+          "page": {
+            "type": "string",
+            "enum": ["scan", "register"],
+            "title": "Page"
+          },
+          "name": {
+            "type": "string",
+            "enum": ["LCP", "INP", "CLS"],
+            "title": "Name"
+          },
+          "value": {
+            "type": "number",
+            "maximum": 600000.0,
+            "minimum": 0.0,
+            "title": "Value"
+          },
+          "rating": {
+            "type": "string",
+            "enum": ["good", "needs-improvement", "poor"],
+            "title": "Rating"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind", "page", "name", "value", "rating"],
+        "title": "WebVital"
       }
     },
     "securitySchemes": {

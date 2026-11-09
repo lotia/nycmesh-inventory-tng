@@ -87,6 +87,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/telemetry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Report
+     * @description Record what a page reports about itself.
+     */
+    post: operations["report_api_telemetry_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -216,6 +236,19 @@ export interface components {
       /** Parent Id */
       parent_id: number | null;
     };
+    /** OutboxRetry */
+    OutboxRetry: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "outbox_retry";
+      /**
+       * Reason
+       * @enum {string}
+       */
+      reason: "no_answer" | "unavailable" | "unexpected";
+    };
     /** PackageEntry */
     PackageEntry: {
       /** Id */
@@ -224,6 +257,24 @@ export interface components {
       name: string;
       /** Size */
       size: string;
+    };
+    /** PageError */
+    PageError: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "error";
+      /**
+       * Page
+       * @enum {string}
+       */
+      page: "scan" | "register";
+      /**
+       * Source
+       * @enum {string}
+       */
+      source: "error" | "unhandledrejection";
     };
     /** RateLimitedReply */
     RateLimitedReply: {
@@ -243,10 +294,30 @@ export interface components {
       /** Code */
       code: string;
     };
+    /** Report */
+    Report: {
+      /** Events */
+      events: (
+        | components["schemas"]["WebVital"]
+        | components["schemas"]["PageError"]
+        | components["schemas"]["OutboxRetry"]
+        | components["schemas"]["ScanToSave"]
+      )[];
+    };
     /** Saved */
     Saved: {
       /** Transaction Id */
       transaction_id: number;
+    };
+    /** ScanToSave */
+    ScanToSave: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "scan_to_save";
+      /** Seconds */
+      seconds: number;
     };
     /**
      * Settings
@@ -283,6 +354,31 @@ export interface components {
       id: number;
       /** Name */
       name: string;
+    };
+    /** WebVital */
+    WebVital: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "web_vital";
+      /**
+       * Page
+       * @enum {string}
+       */
+      page: "scan" | "register";
+      /**
+       * Name
+       * @enum {string}
+       */
+      name: "LCP" | "INP" | "CLS";
+      /** Value */
+      value: number;
+      /**
+       * Rating
+       * @enum {string}
+       */
+      rating: "good" | "needs-improvement" | "poor";
     };
   };
   responses: never;
@@ -476,6 +572,55 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["DeviceRefusedReply"];
+        };
+      };
+      /** @description The database cannot answer; try again */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["UnavailableReply"];
+        };
+      };
+    };
+  };
+  report_api_telemetry_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Report"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description Too many reports from here */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RateLimitedReply"];
         };
       };
       /** @description The database cannot answer; try again */

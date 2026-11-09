@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from httpx2 import Response as Answer
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 from opentelemetry.sdk.metrics.export import (
+    HistogramDataPoint,
     InMemoryMetricReader,
     Metric,
     NumberDataPoint,
@@ -580,3 +581,57 @@ def test_counts_last_seen_skipped_for_a_busy_side_pool(
         db.record_last_seen(database, Device, -1, datetime.now(UTC))
     assert counted(reader, "db.client.connection.timeouts")[key] == before + 1
     assert [line["event"] for line in logs] == ["last seen not recorded"]
+
+
+def histogram_counts(
+    reader: InMemoryMetricReader, name: str
+) -> dict[tuple[object, ...], int]:
+    """A histogram's numbers of values, by its attributes' values."""
+    return {
+        tuple(sorted((point.attributes or {}).items())): point.count
+        for metric in metrics_in(reader)
+        if metric.name == name
+        for point in metric.data.data_points
+        if isinstance(point, HistogramDataPoint)
+    }
+
+
+def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
+    client, _, reader, _ = rolled_back
+    events = [
+        {
+            "kind": "web_vital",
+            "page": "scan",
+            "name": "LCP",
+            "value": 1200,
+            "rating": "good",
+        },
+        {
+            "kind": "web_vital",
+            "page": "scan",
+            "name": "CLS",
+            "value": 0.3,
+            "rating": "poor",
+        },
+        {"kind": "error", "page": "register", "source": "unhandledrejection"},
+        {"kind": "outbox_retry", "reason": "no_answer"},
+        {"kind": "scan_to_save", "seconds": 42.5},
+    ]
+    assert client.post("/api/telemetry", json={"events": events}).status_code == 204
+    durations = histogram_counts(reader, "inventory.page.web_vital.duration")
+    assert (
+        durations[
+            (
+                ("browser.web_vital.name", "LCP"),
+                ("browser.web_vital.rating", "good"),
+                ("page", "scan"),
+            )
+        ]
+        >= 1
+    )
+    shifts = histogram_counts(reader, "inventory.page.web_vital.layout_shift")
+    assert shifts[(("browser.web_vital.rating", "poor"), ("page", "scan"))] >= 1
+    errors = counted(reader, "inventory.page.errors")
+    assert errors[(("page", "register"), ("source", "unhandledrejection"))] >= 1
+    assert counted(reader, "inventory.outbox.retries")[(("reason", "no_answer"),)] >= 1
+    assert histogram_counts(reader, "inventory.scan.to_save.duration")[()] >= 1

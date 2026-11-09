@@ -4,6 +4,7 @@ import { openCamera } from "./camera";
 import { STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
 import { Outbox } from "./outbox";
 import { ScanPage } from "./ScanPage";
+import { telemetry } from "./telemetry";
 import { fakeCamera } from "./test-camera";
 import { CATALOGUE } from "./test-catalogue";
 import { answering, json, saved } from "./test-fetch";
@@ -135,6 +136,7 @@ describe("loading", () => {
 
 describe("filling and saving a cart", () => {
   test("a move is saved, sent, and a new cart keeps the choices", async () => {
+    const record = vi.spyOn(telemetry, "record");
     const { api, sent } = server();
     const outbox = open(api);
     await ready();
@@ -162,6 +164,11 @@ describe("filling and saving a cart", () => {
       lines: [{ item_id: 100, quantity: "5" }],
     });
     expect(outbox.entries.value[0]?.body.key).toBe(body.key);
+    // How long it took from its first line, which the page reports.
+    expect(record).toHaveBeenCalledWith({
+      kind: "scan_to_save",
+      seconds: expect.any(Number),
+    });
     // The next cart: empty, with the same name and places.
     expect(screen.getByText("Nothing in the cart yet.")).toBeDefined();
     expect(selected("Your name")).toBe("1");
@@ -285,6 +292,25 @@ describe("filling and saving a cart", () => {
       what: "Receipt: 1 item to Hub › Shelf A",
     });
   });
+});
+
+test("a cart kept by an older page, which did not note its start, reports no time", async () => {
+  const record = vi.spyOn(telemetry, "record");
+  storeCart({
+    ...freshCart(),
+    volunteerId: 1,
+    fromId: 10,
+    toId: 12,
+    lines: [{ itemId: 101, packages: {}, loose: "4" }],
+  });
+  const { api, sent } = server();
+  open(api);
+  await ready();
+  save();
+  await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
+  expect(record).not.toHaveBeenCalledWith(
+    expect.objectContaining({ kind: "scan_to_save" }),
+  );
 });
 
 describe("other tabs and a changing catalogue", () => {

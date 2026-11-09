@@ -25,6 +25,7 @@ import {
 } from "./api/replies";
 import { NOT_REGISTERED } from "./registration";
 import { onStoredChange, readStored, writeStored } from "./stored";
+import { telemetry } from "./telemetry";
 
 /** Versioned: a later build that changes the shape reads this one too. */
 export const STORAGE_KEY = "inventory.outbox.v1";
@@ -249,6 +250,7 @@ export class Outbox {
         // Something about this batch, perhaps: the others still go. Never
         // dropped; tried again each round.
         const failures = entry.failures + 1;
+        telemetry.record({ kind: "outbox_retry", reason: "unexpected" });
         this.settle(key, {
           waitingFor: "network",
           failures,
@@ -261,6 +263,10 @@ export class Outbox {
         return "next";
       }
       default:
+        telemetry.record({
+          kind: "outbox_retry",
+          reason: reply.status === "unavailable" ? "unavailable" : "no_answer",
+        });
         this.settle(key, {
           waitingFor: "network",
           note:

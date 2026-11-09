@@ -43,6 +43,9 @@ const CartSchema = v.object({
   /** When the cart was last used, in milliseconds since 1970: what the name
    * check goes by (askWho). */
   usedAt: v.optional(v.number(), 0),
+  /** When its first line went in, in milliseconds since 1970; 0 while
+   * empty: how long a batch took from then to saving (telemetry.ts). */
+  startedAt: v.optional(v.number(), 0),
   /** New with every change to what the cart holds: how a tab tells whether
    * another tab has changed it since (CartStore). */
   revision: v.optional(v.string(), ""),
@@ -70,6 +73,7 @@ export function freshCart(last?: Cart): Cart {
     installNumber: "",
     lines: [],
     usedAt: 0,
+    startedAt: 0,
     revision: "",
   };
 }
@@ -141,7 +145,8 @@ export class CartStore {
 
   /** Change what the cart holds. False if the browser would not keep it. */
   change(next: Cart, now = Date.now()): boolean {
-    return this.write({ ...next, revision: uuid(), usedAt: now });
+    const startedAt = next.lines.length === 0 ? 0 : next.startedAt || now;
+    return this.write({ ...next, revision: uuid(), usedAt: now, startedAt });
   }
 
   /** Mark the cart used now, changing nothing in it. */
