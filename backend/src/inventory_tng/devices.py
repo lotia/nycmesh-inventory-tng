@@ -27,6 +27,7 @@ from typing import Annotated, Literal, NoReturn
 import structlog
 from fastapi import APIRouter, Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
+from fastapi.security import APIKeyCookie
 from limits import RateLimitItemPerMinute
 from opentelemetry import metrics
 from pydantic import BaseModel
@@ -245,11 +246,27 @@ class DeviceRefused(Exception):
         self.reason: Refusal = reason
 
 
-def current_device(request: Request, session: DbSession) -> Device:
+# The device cookie, as the API's schema declares it, so /api/docs and the
+# schema say which routes need it (openapi-typescript's types do not).
+# Missing, it is None: the refusal is current_device's own (DeviceRefused,
+# its metric and log).
+device_cookie = APIKeyCookie(
+    name=COOKIE,
+    scheme_name="device",
+    description="Set by POST /api/devices when a device registers with a code. "
+    "A browser sends its own: Authorize on /api/docs cannot set a cookie.",
+    auto_error=False,
+)
+
+
+def current_device(
+    request: Request,
+    session: DbSession,
+    token: Annotated[str | None, Depends(device_cookie)],
+) -> Device:
     """The registered device making this request, or DeviceRefused. Reads the
     row every time: the cookie alone is never enough, or revoking a device
     would not stop it. Puts device_id on the request's log lines."""
-    token = request.cookies.get(COOKIE)
     device = (
         session.scalar(select(Device).where(Device.token_hash == digest(token)))
         if token

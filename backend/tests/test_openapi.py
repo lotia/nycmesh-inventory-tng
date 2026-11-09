@@ -45,3 +45,24 @@ def test_refusals_name_their_reasons(schema: dict[str, Any]) -> None:
     assert reasons("CodeRefusedReply") == set(get_args(devices.BadCode))
     assert reasons("RateLimitedReply") == {"rate_limited"}
     assert reasons("DeviceRefusedReply") == set(get_args(devices.Refusal))
+
+
+def test_routes_that_need_a_registered_device_say_so(schema: dict[str, Any]) -> None:
+    """The device cookie is declared as an API key (devices.device_cookie),
+    on exactly the routes that refuse an unregistered device (403), so
+    /api/docs and other clients see which need it."""
+    scheme = schema["components"]["securitySchemes"]["device"]
+    assert (scheme["type"], scheme["in"], scheme["name"]) == (
+        "apiKey",
+        "cookie",
+        devices.COOKIE,
+    )
+    needing, refusing = set(), set()
+    for path, operations in schema["paths"].items():
+        for method, operation in operations.items():
+            if {"device": []} in operation.get("security", []):
+                needing.add((method, path))
+            if "403" in operation["responses"]:
+                refusing.add((method, path))
+    assert needing == refusing
+    assert ("post", "/api/transactions") in needing
