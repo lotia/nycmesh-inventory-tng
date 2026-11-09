@@ -316,15 +316,14 @@ def test_the_command_line_says_when_a_code_does_not_exist(
     assert registration_codes.main(["devices", "999999"]) == 1
 
 
-@pytest.mark.usefixtures("committed")
 def test_the_command_line_makes_a_code_that_registers(
     database_url: str,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    session: Session,
+    committed: Committed,
 ) -> None:
-    """The command commits its code; `committed` deletes it after, once
-    `session`, set up after it, has rolled back and let go of the code."""
+    """The command commits its code; `committed` deletes it after, once its
+    session has rolled back and let go of the code."""
     monkeypatch.setenv("DATABASE_URL", database_url)
     assert (
         registration_codes.main(
@@ -337,5 +336,5 @@ def test_the_command_line_makes_a_code_that_registers(
         line.removeprefix("Phrase: ") for line in out.splitlines() if "Phrase:" in line
     )
     assert f"https://inventory.example/register?code={phrase}" in out
-    device, _ = devices.register(session, phrase, ADDRESS)
+    device, _ = devices.register(committed.session(), phrase, ADDRESS)
     assert device.id

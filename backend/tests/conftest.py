@@ -370,16 +370,32 @@ def _committed_engine(url: str) -> Generator[Committed]:
 
 
 @pytest.fixture
-def own_committed(own_database: str) -> Iterator[Committed]:
+def _clients() -> Iterator[list[TestClient]]:
+    """Every client make_client makes, closed after the test."""
+    clients: list[TestClient] = []
+    yield clients
+    for client in clients:
+        client.__exit__(None, None, None)
+
+
+# Both take _clients, so they end any request a worker still has in flight
+# before its client closes, which would wait for it forever (8i4.118).
+
+
+@pytest.fixture
+def own_committed(own_database: str, _clients: list[TestClient]) -> Iterator[Committed]:
     """committed's sessions, on own_database: for two requests at once
     where one writes the ledger, which is never deleted. The database goes
     with the test, so nothing is cleaned up but the connections."""
+    del _clients
     with _committed_engine(own_database) as committed:
         yield committed
 
 
 @pytest.fixture
-def committed(database_url: str, owner_engine: Engine) -> Iterator[Committed]:
+def committed(
+    database_url: str, owner_engine: Engine, _clients: list[TestClient]
+) -> Iterator[Committed]:
     """Two requests at once need commits other connections see, which the
     `session` fixture's one transaction is not (_committed_engine). After
     the test, every row they made (any table, any connection, history
@@ -388,6 +404,7 @@ def committed(database_url: str, owner_engine: Engine) -> Iterator[Committed]:
     such as a settings row, are not put back: a test that changes one
     restores it itself. A committed test must not write the ledger, which
     is append-only: not even a test deletes from it."""
+    del _clients
     with owner_engine.connect() as connection:
         before = newest_ids(connection)
     with _committed_engine(database_url) as committed:
@@ -456,12 +473,11 @@ def admin_client(
 
 @pytest.fixture
 def make_client(
-    make_app: Callable[..., FastAPI],
-) -> Iterator[Callable[..., TestClient]]:
+    make_app: Callable[..., FastAPI], _clients: list[TestClient]
+) -> Callable[..., TestClient]:
     """Clients over https, as production is, for the Secure cookies, not
     following redirects, which are what is tested. `address` is where the
     request seems to come from, for rate limits by address."""
-    clients: list[TestClient] = []
 
     def make(
         app: FastAPI | None = None, *, address: str = "192.0.2.1", **app_kwargs: object
@@ -472,12 +488,10 @@ def make_client(
             follow_redirects=False,
             client=(address, 50000),
         )
-        clients.append(client.__enter__())
+        _clients.append(client.__enter__())
         return client
 
-    yield make
-    for client in clients:
-        client.__exit__(None, None, None)
+    return make
 
 
 @pytest.fixture
