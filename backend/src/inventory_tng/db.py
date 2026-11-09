@@ -430,8 +430,9 @@ def lock_catalogue(session: Session) -> None:
 # docs/decisions/0012); "not_a_change", which changing alone is no history
 # (it moves with use); and "row_lock_only" (above).
 #
-# A test's own session, which writes rows to set up what it tests, is left
-# alone (UNGUARDED_INFO; tests/helpers/rows.py, setting_up).
+# A test's own session is left alone as the test writes rows to set up what
+# it tests (UNGUARDED_INFO; tests/helpers/rows.py, setting_up), but not as
+# the app's requests use it (tests/helpers/apps.py, as_the_app).
 type Lock = Literal["catalogue", "row"]
 type Flag = Literal["secret", "not_a_change", "row_lock_only"]
 type Action = Literal["insert", "update", "delete"]

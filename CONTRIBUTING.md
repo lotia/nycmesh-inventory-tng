@@ -454,6 +454,11 @@ requests at the same time, on connections that really commit, marked by
 kind (the first one's docstring): `uv run pytest -m concurrency` runs only
 those, and `-m "not end_to_end"` skips the ones through the whole app.
 
+A test's own sessions write rows freely to set up what it tests, but the
+app's requests on them meet the lock guard (`db.protection`) as in
+production: a route that changes a row it did not lock fails its test
+(`tests/helpers/apps.py`).
+
 ### Coverage
 
 `mise run check` and CI measure which code the tests run, and fail when:

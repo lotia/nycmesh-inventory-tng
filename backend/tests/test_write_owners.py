@@ -16,8 +16,11 @@ from pathlib import Path
 
 import argon2
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from sqlalchemy import Engine, Text, exc, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
+from structlog.testing import capture_logs
 
 from inventory_tng import accounts
 from inventory_tng.db import (
@@ -25,8 +28,10 @@ from inventory_tng.db import (
     LOCKS_INFO,
     Action,
     Base,
+    DbSession,
     Gone,
     Lock,
+    Sessions,
     attempt,
     changed_columns,
     enforce,
@@ -513,3 +518,46 @@ def test_a_tests_own_session_is_left_alone(fresh: Session) -> None:
     fresh.get_one(SiteSettings, 1).time_zone = "Europe/London"
     fresh.add(Category(name="Radios"))
     fresh.flush()
+
+
+def test_the_apps_requests_in_a_test_are_guarded_and_its_setup_is_not(
+    make_app: Callable[..., FastAPI], session: Session
+) -> None:
+    """The app's requests meet the guard, and what they leave unflushed is
+    dropped; the test's setup around them does not (helpers.apps.as_the_app)."""
+    app = make_app()
+
+    @app.post("/unlocked")
+    def unlocked(request_session: DbSession, sessions: Sessions) -> None:
+        with sessions():
+            pass
+        request_session.get_one(SiteSettings, 1).time_zone = "Europe/London"
+        request_session.flush()
+
+    @app.post("/unflushed")
+    def unflushed(request_session: DbSession) -> None:
+        request_session.add(Category(name=f"Cables {tag()}"))
+        request_session.delete(radios)
+
+    # Unflushed, and with the row locked: the app finds neither.
+    settings_row(session, SiteSettings).time_zone = "Asia/Tokyo"
+    radios = Category(name=f"Radios {tag()}")
+    session.add(radios)
+    with (
+        TestClient(app, base_url="https://testserver") as client,
+        capture_logs() as logs,
+    ):
+        # The app answers its own errors: the guard's refusal is a 500.
+        assert client.post("/unlocked").status_code == 500
+        assert client.post("/unflushed").status_code == 200
+    assert not session.new
+    assert not session.deleted
+    assert radios in session
+    refused = [
+        log["table"] for log in logs if log["event"] == "written without its lock"
+    ]
+    assert refused == ["site_settings"]
+    settings = session.get_one(SiteSettings, 1)
+    assert settings.time_zone == "Asia/Tokyo"
+    settings.time_zone = "Europe/Paris"
+    session.flush()

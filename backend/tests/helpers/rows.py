@@ -85,7 +85,8 @@ def tag() -> str:
 def setting_up(session: Session) -> Session:
     """A test's own session, which writes rows directly to set up what it
     tests: the app refuses a write without the lock its table names
-    (db.protection), but not on this session (db.UNGUARDED_INFO)."""
+    (db.protection), but not on this session (db.UNGUARDED_INFO), except
+    as the app's requests use it (helpers.apps.as_the_app)."""
     session.info[UNGUARDED_INFO] = "a test's own rows"
     return session
 
