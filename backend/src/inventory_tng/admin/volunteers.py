@@ -210,19 +210,13 @@ def save_volunteer(
     return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="saved")
 
 
-def _current(session: Session, volunteer_id: int) -> Volunteer | None:
-    """A current volunteer, as the page found them: the domain function
-    reads them again as it locks them (db.relock)."""
-    found = session.get(Volunteer, volunteer_id)
-    return None if found is None or found.retired_at is not None else found
-
-
 @router.post(f"{VOLUNTEERS}/{{volunteer_id}}/custody")
 def hold_stock(
     request: Request, signed: AdminSignedIn, session: DbSession, volunteer_id: int
 ) -> Response:
-    found = _current(session, volunteer_id)
-    if found is None:
+    found = session.get(Volunteer, volunteer_id)
+    # A retired volunteer holds nothing.
+    if found is None or found.retired_at is not None:
         return not_found()
     _, broken = attempt(session, lambda: volunteers.hold_stock(session, found))
     if broken:
@@ -237,7 +231,7 @@ def stop_holding_stock(
     request: Request, signed: AdminSignedIn, session: DbSession, volunteer_id: int
 ) -> Response:
     found = session.get(Volunteer, volunteer_id)
-    if found is None or volunteers.custody(session, volunteer_id) is None:
+    if found is None:
         return not_found()
     _, broken = attempt(
         session, lambda: volunteers.stop_holding_stock(session, found, now())
@@ -255,7 +249,7 @@ def stop_holding_stock(
 def retire_volunteer(
     request: Request, signed: AdminSignedIn, session: DbSession, volunteer_id: int
 ) -> Response:
-    found = _current(session, volunteer_id)
+    found = session.get(Volunteer, volunteer_id)
     if found is None:
         return not_found()
     _, broken = attempt(session, lambda: volunteers.retire(session, found, now()))
@@ -275,8 +269,9 @@ def merge_volunteer(
     into_id: Annotated[str, Form()] = "",
 ) -> Response:
     """This one is a duplicate of `into_id`: retired, pointing at it."""
-    found = _current(session, volunteer_id)
-    if found is None:
+    found = session.get(Volunteer, volunteer_id)
+    # Before `into` is checked, so a retired one is not found whatever it is.
+    if found is None or found.retired_at is not None:
         return not_found()
     into = chosen(session, Volunteer, into_id)
     if into is None or into.id == found.id:
@@ -296,7 +291,7 @@ def restore_volunteer(
     request: Request, signed: AdminSignedIn, session: DbSession, volunteer_id: int
 ) -> Response:
     found = session.get(Volunteer, volunteer_id)
-    if found is None or found.retired_at is None:
+    if found is None:
         return not_found()
     _, broken = attempt(session, lambda: volunteers.restore(session, found))
     if broken:

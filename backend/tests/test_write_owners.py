@@ -23,7 +23,14 @@ import pytest
 from sqlalchemy import Engine, exc, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import LOCK_INFO, Gone, attempt, enforce, lock_catalogue
+from inventory_tng.db import (
+    CATALOGUE_TABLES,
+    LOCK_INFO,
+    Gone,
+    attempt,
+    enforce,
+    lock_catalogue,
+)
 from inventory_tng.models import Category, Item
 
 from helpers.source import SOURCE, offending, writes
@@ -46,8 +53,8 @@ OWNERS: dict[str, str | None] = {
     # Only ALLOWED's insert_transaction.
     "ledger_transaction": None,
     "movement": None,
-    # Never made or deleted. Their row is changed by setting attributes
-    # (admin/settings.py, scan_settings.py), which this check cannot see.
+    # Never made or deleted. Their row is changed by setting attributes on
+    # db.settings_row's, which this check cannot see.
     "scan_settings": None,
     "sign_in_settings": None,
     "site_settings": None,
@@ -87,6 +94,13 @@ def test_each_owner_is_a_module() -> None:
     assert all(
         (SOURCE / owner).is_file() for owner in OWNERS.values() if owner is not None
     )
+
+
+def test_the_lock_guards_every_table_a_module_owns() -> None:
+    """The tables the guard refuses without the catalogue lock are the ones
+    owned here, so a new catalogue table cannot be missed by it."""
+    owned = {table for table, owner in OWNERS.items() if owner is not None}
+    assert owned == CATALOGUE_TABLES
 
 
 @pytest.mark.parametrize(

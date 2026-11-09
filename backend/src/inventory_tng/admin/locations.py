@@ -232,7 +232,7 @@ def retire_location(
     request: Request, signed: AdminSignedIn, session: DbSession, location_id: int
 ) -> Response:
     found = _changeable(session, location_id)
-    if found is None or found.retired_at is not None:
+    if found is None:
         return not_found()
     _, broken = attempt(session, lambda: locations.retire(session, found, now()))
     if broken:
@@ -248,9 +248,8 @@ def restore_location(
     request: Request, signed: AdminSignedIn, session: DbSession, location_id: int
 ) -> Response:
     found = _changeable(session, location_id)
-    if found is None or found.retired_at is None:
+    if found is None:
         return not_found()
-
     _, broken = attempt(session, lambda: locations.restore(session, found))
     if broken:
         taken = "A current place beside it already has its name: rename one first."

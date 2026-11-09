@@ -30,6 +30,13 @@ def test_set_changes_it_and_says_so(
     assert line["name_check_minutes"] == 20
 
 
+def test_show_says_what_it_is(
+    session: Session, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert run(session, "show") == 0
+    assert capsys.readouterr().out == "name check: asks after 15 minutes unused\n"
+
+
 def test_zero_never_asks(session: Session, capsys: pytest.CaptureFixture[str]) -> None:
     run(session, "set", "--name-check-minutes", "0")
     assert capsys.readouterr().out == "name check: never asks\n"

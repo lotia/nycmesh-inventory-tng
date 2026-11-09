@@ -14,6 +14,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 
+from helpers.concurrency import Committed
 from helpers.rows import add, tag
 
 
@@ -41,6 +42,14 @@ class Place:
             "to_location_id": self.van.id,
             "lines": [{"item_id": self.item.id, "quantity": "3"}],
         } | fields
+
+
+def committed_place(committed: Committed) -> Place:
+    """A Place, committed, for tests on two connections."""
+    setup = committed.session()
+    place = Place(setup)
+    setup.commit()
+    return place
 
 
 def stocked(session: Session, quantity: str = "5") -> Place:

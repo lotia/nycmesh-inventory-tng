@@ -160,7 +160,7 @@ def retire_category(
     request: Request, signed: AdminSignedIn, session: DbSession, category_id: int
 ) -> Response:
     found = session.get(Category, category_id)
-    if found is None or found.retired_at is not None:
+    if found is None:
         return not_found()
     # Under the catalogue lock: items added or brought back meanwhile too.
     _, broken = refusal(
@@ -180,7 +180,7 @@ def restore_category(
     request: Request, signed: AdminSignedIn, session: DbSession, category_id: int
 ) -> Response:
     found = session.get(Category, category_id)
-    if found is None or found.retired_at is None:
+    if found is None:
         return not_found()
     if not unique(session, lambda: categories.restore(session, found)):
         problem = (

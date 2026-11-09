@@ -181,6 +181,15 @@ def get_locked[M: Base](
     )
 
 
+def settings_row[M: Base](session: Session, model: type[M]) -> M:
+    """A settings table's one row, id 1, locked for a change to it, so
+    history records the row as it was (history.py). Made by its migration
+    and never deleted."""
+    row = get_locked(session, model, 1)
+    assert row is not None
+    return row
+
+
 def hold_until_commit(session: Session) -> None:
     """This transaction holds a lock the request relies on: until
     release_hold, a commit in any other one, after this one's commit
@@ -261,30 +270,23 @@ def attempt[T](
         with session.begin_nested():
             done = change()
             session.flush()
-    except RuleBroken as broken:
-        _unheld(session, held)
-        return None, broken.rule
-    except exc.IntegrityError as error:
-        _unheld(session, held)
-        sqlstate = getattr(error.orig, "sqlstate", None)
-        if sqlstate == UNIQUE_VIOLATION:
-            return None, "unique"
-        constraint = describe_error(error).get("constraint")
-        if sqlstate == CHECK_VIOLATION and constraint:
-            return None, constraint
-        raise
-    except BaseException:
-        # Such as Gone: the savepoint rolled back all the same.
-        _unheld(session, held)
+    except BaseException as error:
+        # The savepoint rolled back, however it failed: a catalogue lock
+        # taken in it went with it.
+        if held is None:
+            session.info.pop(LOCK_INFO, None)
+        if isinstance(error, RuleBroken):
+            return None, error.rule
+        if isinstance(error, exc.IntegrityError):
+            sqlstate = getattr(error.orig, "sqlstate", None)
+            if sqlstate == UNIQUE_VIOLATION:
+                return None, "unique"
+            constraint = describe_error(error).get("constraint")
+            if sqlstate == CHECK_VIOLATION and constraint:
+                return None, constraint
+        # Such as Gone, or any other failure: raised.
         raise
     return done, None
-
-
-def _unheld(session: Session, held: object) -> None:
-    """After a savepoint rolled back, however: a catalogue lock taken in it
-    went with it."""
-    if held is None:
-        session.info.pop(LOCK_INFO, None)
 
 
 def refusal[T](
@@ -424,11 +426,14 @@ def _catalogue_written_under_lock(
         raise RuntimeError(f"{written} written without the catalogue lock")
 
 
-def is_current(session: Session, model: type[Base], row_id: int) -> bool:
-    """Whether the row is there and not retired, read afresh: an object the
-    session holds may be from before a lock."""
+def require_current(
+    session: Session, model: type[Base], row_id: int, rule: str
+) -> None:
+    """RuleBroken for `rule` unless the row is there and not retired, read
+    afresh: an object the session holds may be from before a lock."""
     table: Any = model
-    return exists_where(session, table.id == row_id, table.retired_at.is_(None))
+    current = exists_where(session, table.id == row_id, table.retired_at.is_(None))
+    enforce(rule, when=not current)
 
 
 def locked_row[M: Base](session: Session, model: type[M], ident: object) -> M | None:

@@ -122,6 +122,7 @@ def test_custody_is_shown_but_changed_with_the_volunteer(
     path = f"{LOCATIONS}/{custody.id}"
     assert admin_client.post(path, data={"name": "Mine"}).status_code == 404
     assert admin_client.post(f"{path}/retire").status_code == 404
+    assert admin_client.post(f"{path}/restore").status_code == 404
     assert "change it with the volunteer" in text(admin_client.get(path))
 
 

@@ -194,6 +194,8 @@ def test_unknown_items_and_others_packages_are_not_found(
     assert admin_client.get(f"{ITEMS}/999999").status_code == 404
     assert admin_client.post(f"{ITEMS}/999999", data={}).status_code == 404
     assert admin_client.post(f"{ITEMS}/999999/packages").status_code == 404
+    assert admin_client.post(f"{ITEMS}/999999/retire").status_code == 404
+    assert admin_client.post(f"{ITEMS}/999999/restore").status_code == 404
     # A current item is not brought back.
     assert admin_client.post(f"{ITEMS}/{item.id}/restore").status_code == 404
     path = f"{ITEMS}/{item.id}/packages/{theirs.id}/retire"

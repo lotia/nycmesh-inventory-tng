@@ -69,7 +69,7 @@ from helpers.concurrency import Committed, Worker, made
 from helpers.mail import SentMail
 from helpers.rows import tag
 from helpers.sign_in import PASSWORD, code, new_admin, reset_link, sign_in_with
-from helpers.stock import Place
+from helpers.stock import committed_place
 
 NEW_PASSWORD = "a long passphrase of their own"
 
@@ -957,14 +957,6 @@ def test_an_item_added_once_its_category_is_locked_does_not_deadlock(
     assert error.rule == "item_category_current"
 
 
-def stocking(committed: Committed) -> Place:
-    """A Place, committed."""
-    setup = committed.session()
-    place = Place(setup)
-    setup.commit()
-    return place
-
-
 def receiving(item: Item, store: Location, amount: str) -> Write:
     """A receipt of `amount` of the item into the store, as the ledger
     writes every save, count and adjustment."""
@@ -987,7 +979,7 @@ def test_a_unit_changed_while_stock_moves_waits_then_is_refused(
     comes second waits, then is refused, the unit change as stock has
     moved, the save as it moves a fraction of an item now counted in each.
     On a database of its own, as it writes the ledger."""
-    place = stocking(own_committed)
+    place = committed_place(own_committed)
     to_each = doing(
         Item, place.cable.id, lambda s, item: items.save(s, item, {"unit": "each"})
     )
@@ -1001,7 +993,7 @@ def test_a_receipt_while_its_item_is_retired_waits_then_is_refused(
 ) -> None:
     """Retiring holds the item FOR UPDATE: a receipt of it waits, then sees
     it retired. On a database of its own, in case the receipt is written."""
-    place = stocking(own_committed)
+    place = committed_place(own_committed)
     retiring = doing(Item, place.item.id, lambda s, i: items.retire(s, i, NOW))
     refused = at_once(own_committed, retiring, receiving(place.item, place.store, "1"))
     assert refused == "receipt_retired_item"
@@ -1015,7 +1007,7 @@ def test_a_batch_sent_twice_at_once_is_written_once(
     waits on the first's key, then writes nothing and finds the first's
     (ledger.record), which the route answers 200 with. On a database of its
     own, as it writes the ledger."""
-    place = stocking(own_committed)
+    place = committed_place(own_committed)
     batch = Batch.model_validate(place.batch())
     one, two = own_committed.session(), own_committed.session()
     first, wrote = record(one, batch, device_id=None)

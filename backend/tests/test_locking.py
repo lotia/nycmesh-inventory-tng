@@ -95,12 +95,6 @@ def lockings(tree: ast.AST, _path: Path | None = None) -> list[int]:
     return sorted(set(found))
 
 
-def outside_the_wrappers(path: Path, wrappers_in: Path = DB) -> list[int]:
-    """lockings in `path`, but in the wrappers' own module (db.py, the one
-    file, not any of that name) not those inside the wrappers."""
-    return outside(path, lockings, {wrappers_in: WRAPPERS})
-
-
 @pytest.mark.helper
 def test_every_locking_read_goes_through_db() -> None:
     found = offending(lockings, {DB: WRAPPERS})
@@ -112,8 +106,8 @@ def test_every_locking_read_goes_through_db() -> None:
 
 @pytest.mark.helper
 def test_the_check_sees_each_way_of_locking(tmp_path: Path) -> None:
-    """So the test above cannot pass by missing them; and the wrappers
-    themselves are allowed, the rest of db.py is not."""
+    """So the test above cannot pass by missing them. Which functions are
+    exceptions is outside's, tested in test_history.py."""
     code = tmp_path / "locks.py"
     code.write_text(
         "query.with_for_update()\n"
@@ -127,17 +121,7 @@ def test_the_check_sees_each_way_of_locking(tmp_path: Path) -> None:
         "session.refresh(row)\n"
         "text('SELECT 1')\n"
     )
-    assert outside_the_wrappers(code) == [1, 2, 3, 4, 5, 6]
-    db = tmp_path / "db.py"
-    db.write_text(
-        "def locked(query):\n"
-        "    return query.with_for_update()\n"
-        "def other(query):\n"
-        "    return query.with_for_update()\n"
-    )
-    assert outside_the_wrappers(db, wrappers_in=db) == [4]
-    # Another file of that name is no exception.
-    assert outside_the_wrappers(db) == [2, 4]
+    assert outside(code, lockings, {DB: WRAPPERS}) == [1, 2, 3, 4, 5, 6]
 
 
 def changed(

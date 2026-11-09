@@ -22,12 +22,13 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, devices, local_env
 from inventory_tng.app import create_app
-from inventory_tng.database_role import LEDGER, refusals
+from inventory_tng.database_role import refusals
 from inventory_tng.db import (
     Base,
     make_engine,
     run_outside_transaction,
 )
+from inventory_tng.history import LEDGER
 from inventory_tng.logs import configure_structlog
 from inventory_tng.mail import get_mailer
 from inventory_tng.rate_limits import limiter

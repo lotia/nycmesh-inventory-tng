@@ -3,8 +3,7 @@ current code, printed in as many copies as wanted. Revoking a code voids
 every copy; making labels for that thing again then makes a new code.
 
 Every write to the label table is here. A label is only made or revoked:
-the app may not change its code or what it names (migration 0002). Each
-write takes the catalogue lock first (db.locked_row)."""
+the app may not change its code or what it names (migration 0002)."""
 
 from collections.abc import Sequence
 from collections.abc import Set as AbstractSet

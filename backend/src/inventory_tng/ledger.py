@@ -197,12 +197,17 @@ def lines_break(
     ]
 
 
-def repeated(item_ids: Sequence[int]) -> set[int]:
-    """The positions of the lines whose item another line names too. A
-    batch names each item on one line: the ledger keeps a line per item, so
-    a second would be lost."""
+def repeated(item_ids: Sequence[int | None]) -> set[int]:
+    """The positions of the lines whose item another line names too (None
+    names no item, so repeats none). A batch or a count names each item on
+    one line: the ledger keeps a line per item, so a second would be
+    lost."""
     times = Counter(item_ids)
-    return {number for number, item_id in enumerate(item_ids) if times[item_id] > 1}
+    return {
+        number
+        for number, item_id in enumerate(item_ids)
+        if item_id is not None and times[item_id] > 1
+    }
 
 
 def on_order_after(on_order: Decimal, received: Decimal) -> Decimal:
@@ -415,13 +420,12 @@ def record(
         return written, False
     header = {"device_id": device_id, **_header(batch)}
     lines = {line.item_id: line.quantity for line in batch.lines}
-    held = hold(session, header, lines)
-    problems = _problems(session, batch, held)
+    problems = _problems(session, batch, hold(session, header, lines))
     if problems:
         refused.add(1, {"reason": "invalid"})
         log.info("batch refused", problems=sorted({kind for _, kind in problems}))
         raise BatchRefused(problems)
-    transaction = insert_transaction(session, batch.key, header, lines, held=held)
+    transaction = insert_transaction(session, batch.key, header, lines)
     if transaction is None:
         written = _replay(session, batch)
         assert written is not None  # The conflict was on this key.
@@ -487,23 +491,19 @@ def insert_transaction(
     key: uuid.UUID,
     header: Mapping[str, object],
     lines: Mapping[int, Decimal],
-    *,
-    held: Held | None = None,
 ) -> LedgerTransaction | None:
     """A transaction and its movements, unless its key is written already:
     None then, once a request writing it under way has committed. The one
     writer of the ledger. RuleBroken, before anything is written, for a
     transaction with no lines but a count, or a line that breaks a rule.
-    `held` is hold()'s for these, if the caller took it in this
-    transaction; else, or if it lacks one of these items, it is taken here,
-    so no line's rules go unchecked. created_at is the database's now(),
-    whatever the header says. A receipt lowers what is on order of each
-    item it brings."""
+    Its rows are held here (hold), so every caller's lines are checked as
+    locked; a caller that held them already only takes its own locks
+    again. created_at is the database's now(), whatever the header says. A
+    receipt lowers what is on order of each item it brings."""
     kind = str(header["kind"])
     enforce("ledger_transaction_lines", when=not lines and kind != "count")
-    if held is None or not lines.keys() <= held.items.keys():
-        held = hold(session, header, lines)
-    for broken in lines_break(kind, held.items, lines.items()):
+    items = hold(session, header, lines).items
+    for broken in lines_break(kind, items, lines.items()):
         # An item that does not exist is the foreign key's to refuse.
         for rule in broken or ():
             enforce(rule)

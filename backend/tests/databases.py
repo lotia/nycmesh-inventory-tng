@@ -170,6 +170,7 @@ def alembic_config_for(connection: Connection) -> Config:
     return config
 
 
-# What DATABASE_URL and MIGRATION_DATABASE_URL are during the tests: nothing
-# listens on port 1.
-NO_DATABASE = "postgresql://nobody@127.0.0.1:1/use_the_database_url_fixture"
+# What DATABASE_URL and MIGRATION_DATABASE_URL are during the tests, and a
+# database out of reach wherever a test wants one: nothing listens on port
+# 1, so connecting fails at once.
+NO_DATABASE = "postgresql+psycopg://nobody@127.0.0.1:1/use_the_database_url_fixture"

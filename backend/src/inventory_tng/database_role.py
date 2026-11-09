@@ -14,11 +14,10 @@ from sqlalchemy import (
 )
 
 from inventory_tng.db import describe_error
-from inventory_tng.history import HISTORY_TABLE
+from inventory_tng.history import HISTORY_TABLE, LEDGER
 
 log = structlog.get_logger(__name__)
 
-LEDGER = ("ledger_transaction", "movement")
 # Tables the app only adds to: the ledger, and history (history.py).
 APPEND_ONLY = (*LEDGER, HISTORY_TABLE)
 # The one-row settings tables, which every page reads: the app changes
