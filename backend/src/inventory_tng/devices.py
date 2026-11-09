@@ -207,8 +207,10 @@ def revoke_device(session: Session, device_id: int) -> bool:
 def _revoke(
     session: Session, model: type[RegistrationCode | Device], row_id: int, field: str
 ) -> bool:
-    # Locked first, so of two revokes at once the second sees the first's.
-    found = get_locked(session, model, row_id)
+    # Locked first, so of two revokes at once the second sees the first's;
+    # key_share, as an update does, so it does not wait for saves the
+    # device is making, which refer to its row.
+    found = get_locked(session, model, row_id, key_share=True)
     if found is None or found.revoked_at is not None:
         return False
     found.revoked_at = datetime.now(UTC)

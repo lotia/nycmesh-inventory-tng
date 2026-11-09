@@ -63,4 +63,5 @@ privilege, so neither binds it.
   - advisory locks (the catalogue lock), `FOR KEY SHARE` and
     `FOR NO KEY UPDATE`, `LOCK TABLE ... SHARE ROW EXCLUSIVE`;
   - `INSERT ... ON CONFLICT DO NOTHING`, arrays in queries, and
-    `has_table_privilege` in the startup check.
+    `has_table_privilege` and `has_any_column_privilege` in the startup
+    check.

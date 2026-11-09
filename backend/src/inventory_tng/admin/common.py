@@ -49,6 +49,7 @@ RULES = {
     "elsewhere first, or pick a current volunteer to merge into.",
     "item_category_current": "Its category is retired: bring that back, or "
     "pick another, first.",
+    "item_unit_fixed": "Its unit is fixed, as stock has moved in it.",
     "category_has_items": "Move or retire its items first.",
     "site_settings_time_zone": "Pick a zone from the list.",
 }

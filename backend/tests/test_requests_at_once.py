@@ -975,21 +975,24 @@ def receiving(item: Item, store: Location, amount: str) -> Write:
 
 
 @pytest.mark.concurrency
-@pytest.mark.parametrize("swapped", [False, True])
-def test_a_unit_changed_while_a_fraction_is_moved_waits_then_is_refused(
-    own_committed: Committed, swapped: bool
+@pytest.mark.parametrize(
+    ("swapped", "refused"),
+    [(False, "item_unit_fixed"), (True, "movement_whole_units")],
+)
+def test_a_unit_changed_while_stock_moves_waits_then_is_refused(
+    own_committed: Committed, swapped: bool, refused: str
 ) -> None:
     """A save holds its items FOR KEY SHARE (ledger.hold) until it
     commits, and changing an item's unit holds it FOR UPDATE: whichever
-    comes second waits, then is refused by its own module's rule, of the
-    same name. On a database of its own, as it writes the ledger."""
+    comes second waits, then is refused, the unit change as stock has
+    moved, the save as it moves a fraction of an item now counted in each.
+    On a database of its own, as it writes the ledger."""
     place = stocking(own_committed)
     to_each = doing(
         Item, place.cable.id, lambda s, item: items.save(s, item, {"unit": "each"})
     )
     receipt = receiving(place.cable, place.store, "1.5")
-    refused = either_first(own_committed, receipt, to_each, swapped=swapped)
-    assert refused == "movement_whole_units"
+    assert either_first(own_committed, receipt, to_each, swapped=swapped) == refused
 
 
 @pytest.mark.concurrency

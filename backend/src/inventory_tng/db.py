@@ -273,12 +273,16 @@ def attempt[T](
         if sqlstate == CHECK_VIOLATION and constraint:
             return None, constraint
         raise
+    except BaseException:
+        # Such as Gone: the savepoint rolled back all the same.
+        _unheld(session, held)
+        raise
     return done, None
 
 
 def _unheld(session: Session, held: object) -> None:
-    """After a savepoint rolled back: a catalogue lock taken in it went
-    with it."""
+    """After a savepoint rolled back, however: a catalogue lock taken in it
+    went with it."""
     if held is None:
         session.info.pop(LOCK_INFO, None)
 
@@ -386,6 +390,12 @@ def lock_catalogue(session: Session) -> None:
     session.info.setdefault(LOCK_INFO, session.get_transaction())
 
 
+def changed_attributes(row: Base) -> set[str]:
+    """The attributes of a row the session holds that were set to something
+    new, not yet flushed. Loads nothing."""
+    return {a.key for a in inspect(row).attrs if a.history.has_changes()}
+
+
 @event.listens_for(Session, "after_transaction_end")
 def _lock_released(session: Session, transaction: object) -> None:
     if session.info.get(LOCK_INFO) is transaction:
@@ -403,10 +413,8 @@ def _catalogue_written_under_lock(
         return
     rows = [*session.new, *session.deleted]
     for row in session.dirty:
-        state = inspect(row)
         table = getattr(row, "__tablename__", None)
-        changed = {a.key for a in state.attrs if a.history.has_changes()}
-        if changed - UNLOCKED_COLUMNS.get(table or "", set()):
+        if changed_attributes(row) - UNLOCKED_COLUMNS.get(table or "", set()):
             rows.append(row)
     if written := sorted(
         {table for row in rows if (table := getattr(row, "__tablename__", None))}

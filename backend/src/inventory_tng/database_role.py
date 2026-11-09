@@ -2,7 +2,16 @@
 (DEPLOYMENT.md, Database roles)."""
 
 import structlog
-from sqlalchemy import Connection, Engine, column, exc, func, select, table
+from sqlalchemy import (
+    ColumnElement,
+    Connection,
+    Engine,
+    column,
+    exc,
+    func,
+    select,
+    table,
+)
 
 from inventory_tng.db import describe_error
 from inventory_tng.history import HISTORY_TABLE
@@ -45,6 +54,15 @@ class RefusedLogin(Exception):
     settings table, cannot record, or owns a table."""
 
 
+def _holds(name: str, privilege: str) -> ColumnElement[bool]:
+    """Whether the login holds `privilege` on table `name`. UPDATE of any
+    one column counts: has_table_privilege does not see a grant on a
+    column, which would still let the login change it."""
+    if privilege == "UPDATE":
+        return func.has_any_column_privilege(name, privilege)
+    return func.has_table_privilege(name, privilege)
+
+
 def refusals(connection: Connection) -> dict[str, list[str]]:
     """What is wrong with the login `connection` uses, by kind: "may"
     (FORBIDDEN privileges it has, as "UPDATE movement"), "lacks" (NEEDED
@@ -55,9 +73,7 @@ def refusals(connection: Connection) -> dict[str, list[str]]:
         for name, held in privileges.items()
         for privilege in held
     ]
-    held = connection.execute(
-        select(*(func.has_table_privilege(name, p) for name, p in pairs))
-    ).one()
+    held = connection.execute(select(*(_holds(name, p) for name, p in pairs))).one()
     may, needed = named(FORBIDDEN), named(NEEDED)
     has_forbidden, has_needed = held[: len(may)], held[len(may) :]
     found = {

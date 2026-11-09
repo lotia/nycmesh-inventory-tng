@@ -493,13 +493,17 @@ def test_a_transaction_goes_between_two_places(session: Session, place: Place) -
         )
 
 
-def test_an_item_with_fractional_movements_is_never_counted_in_each(
+def test_an_items_unit_is_fixed_once_stock_has_moved(
     session: Session, place: Place
 ) -> None:
-    write(session, place, lines=[{"item_id": place.cable.id, "quantity": "1.5"}])
-    with breaks(session, "movement_whole_units"):
-        items.save(session, place.cable, {"unit": "each"})
+    """In whole units or not: the ledger's quantities are in that unit."""
     items.save(session, place.cable, {"unit": "ft"})
+    write(session, place, lines=[{"item_id": place.cable.id, "quantity": "1.5"}])
+    for unit in ("each", "m"):
+        with breaks(session, "item_unit_fixed"):
+            items.save(session, place.cable, {"unit": unit})
+    items.save(session, place.cable, {"unit": "ft", "notes": "By the reel"})
+    assert (place.cable.unit, place.cable.notes) == ("ft", "By the reel")
 
 
 def test_a_retired_item_is_taken_never_received(

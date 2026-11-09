@@ -15,7 +15,7 @@ import structlog
 from sqlalchemy.orm import Session
 
 from inventory_tng.command import run_command
-from inventory_tng.db import CLI_ACTOR, set_actor
+from inventory_tng.db import CLI_ACTOR, get_locked, set_actor
 from inventory_tng.models import NAME_CHECK_MINUTES, ScanSettings
 
 log = structlog.get_logger(__name__)
@@ -56,6 +56,9 @@ def run(session: Session, args: argparse.Namespace) -> int:
     current = session.get_one(ScanSettings, 1)
     if args.command == "set":
         set_actor(session, CLI_ACTOR)
+        # Locked and read again into `current`, so history records the row
+        # this changes, should a page save at the same time (history.py).
+        get_locked(session, ScanSettings, 1)
         current.name_check_minutes = args.name_check_minutes
         session.flush()
         log.info("scan settings changed", name_check_minutes=args.name_check_minutes)

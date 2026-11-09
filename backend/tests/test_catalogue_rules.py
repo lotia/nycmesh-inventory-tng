@@ -5,7 +5,7 @@ to show, on PostgreSQL."""
 
 import pytest
 
-from inventory_tng import items, locations, volunteers
+from inventory_tng import locations, volunteers
 from inventory_tng.locations import Parent
 
 STORE, AREA, VAN = Parent("store", True), Parent("area", True), Parent("vehicle", True)
@@ -73,17 +73,3 @@ def test_a_volunteer_leaves_once_nothing_points_at_them(
     assert (
         volunteers.leaving(others_merged_in=merged_in, holds_custody=custody) == broken
     )
-
-
-@pytest.mark.parametrize(
-    ("unit", "fractions", "broken"),
-    [
-        ("each", True, "movement_whole_units"),
-        ("each", False, None),
-        ("m", True, None),
-    ],
-)
-def test_an_item_moved_in_fractions_is_not_counted_in_each(
-    unit: str, fractions: bool, broken: str | None
-) -> None:
-    assert items.unit_fits(unit, moved_in_fractions=fractions) == broken

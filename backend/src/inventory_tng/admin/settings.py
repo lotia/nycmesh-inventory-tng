@@ -36,6 +36,7 @@ from inventory_tng.models import (
     AdjustmentReason,
     Admin,
     ScanSettings,
+    SignInSettings,
     SiteSettings,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
@@ -173,7 +174,10 @@ def save_scan_settings(
             problems={"name_check_minutes": problem},
             values={"name_check_minutes": name_check_minutes},
         )
-    session.get_one(ScanSettings, 1).name_check_minutes = minutes
+    # Locked, so history records the row this save changes (history.py).
+    scan = get_locked(session, ScanSettings, 1)
+    assert scan is not None  # Made by its migration, never deleted.
+    scan.name_check_minutes = minutes
     session.commit()
     log.info("scan settings changed", name_check_minutes=minutes)
     return redirect(SETTINGS, notice="settings_saved")
@@ -257,7 +261,9 @@ def save_sign_in_settings(
             problems[n.field] = f"Whole {n.unit}, from {n.low} to {n.high}."
     if problems:
         return _page(request, session, signed, problems=problems, values=form)
-    current = accounts.sign_in_settings(session)
+    # Locked, so history records the row this save changes (history.py).
+    current = get_locked(session, SignInSettings, 1)
+    assert current is not None  # Made by its migration, never deleted.
     if all(getattr(current, field) == value for field, value in chosen.items()):
         # Nothing to record, and nobody to tell.
         return redirect(SETTINGS, notice="saved")
@@ -283,7 +289,9 @@ def save_site_settings(
     time_zone: Annotated[str, Form()] = "",
 ) -> Response:
     """The zone times are shown in, which SiteSettings checks."""
-    site = session.get_one(SiteSettings, 1)
+    # Locked, so history records the row this save changes (history.py).
+    site = get_locked(session, SiteSettings, 1)
+    assert site is not None  # Made by its migration, never deleted.
     if time_zone == site.time_zone:
         return redirect(SETTINGS, notice="site_saved")
 

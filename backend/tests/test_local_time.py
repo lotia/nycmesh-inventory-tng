@@ -1,7 +1,9 @@
 """Times are UTC; one site time zone shows them (docs/decisions/0013)."""
 
+import zoneinfo
 from argparse import Namespace
 from datetime import UTC, datetime, timedelta
+from importlib.resources import files
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pytest
@@ -12,7 +14,7 @@ from structlog.testing import capture_logs
 from inventory_tng import local_time, registration_codes
 from inventory_tng.local_time import DEFAULT_ZONE, local, show, site_zone
 from inventory_tng.models import SiteSettings
-from inventory_tng.time_zones import is_time_zone
+from inventory_tng.time_zones import is_time_zone, known_zones
 
 from helpers.rows import breaks, history, violates
 
@@ -58,6 +60,15 @@ def test_another_zone_can_be_chosen(session: Session) -> None:
 def test_a_time_without_a_zone_is_refused(session: Session) -> None:
     with pytest.raises(ValueError, match="store UTC"):
         local(datetime(2026, 7, 1, 12), site_zone(session))
+
+
+def test_zones_come_from_tzdata_alone() -> None:
+    """Not the operating system's: zoneinfo searches none of its folders,
+    so a zone loads from tzdata, and the zones known are tzdata's list."""
+    assert zoneinfo.TZPATH == ()
+    assert ZoneInfo.no_cache("America/New_York").key == "America/New_York"
+    listed = files("tzdata").joinpath("zones").read_text().split()
+    assert known_zones() == frozenset(listed)
 
 
 @pytest.mark.parametrize("name", ["America/New_York", "UTC"])

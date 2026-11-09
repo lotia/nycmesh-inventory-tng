@@ -23,7 +23,7 @@ import pytest
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import LOCK_INFO, attempt, enforce, lock_catalogue
+from inventory_tng.db import LOCK_INFO, Gone, attempt, enforce, lock_catalogue
 from inventory_tng.models import Category, Item
 
 from helpers.source import SOURCE, offending, writes
@@ -41,8 +41,11 @@ OWNERS: dict[str, str | None] = {
     "vendor": None,
     "vendor_offer": None,
     "vendor_price": None,
+    # Only ALLOWED's insert_transaction.
     "ledger_transaction": None,
     "movement": None,
+    # Never made or deleted. Their row is changed by setting attributes
+    # (admin/settings.py, scan_settings.py), which this check cannot see.
     "scan_settings": None,
     "sign_in_settings": None,
     "site_settings": None,
@@ -153,6 +156,18 @@ def test_a_lock_taken_in_a_refused_change_goes_with_it(fresh: Session) -> None:
         enforce("category_has_items")
 
     assert attempt(fresh, refused) == (None, "category_has_items")
+    assert LOCK_INFO not in fresh.info
+
+
+def test_a_lock_taken_in_a_change_that_fails_goes_with_it(fresh: Session) -> None:
+    """Gone, or any other failure, rolls the savepoint back as a rule does."""
+
+    def gone() -> None:
+        lock_catalogue(fresh)
+        raise Gone
+
+    with pytest.raises(Gone):
+        attempt(fresh, gone)
     assert LOCK_INFO not in fresh.info
 
 

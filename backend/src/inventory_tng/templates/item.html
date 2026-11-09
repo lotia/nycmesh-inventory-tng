@@ -24,11 +24,13 @@ None is left, so nobody can pick it.{% endif %}</p>
   <label>Unit
     {% if unit_fixed %}
     <span class="hint">{{ item.unit }}: fixed, as stock has moved in it</span>
+    <input type="hidden" name="unit" value="{{ item.unit }}">
     {% else %}
     <select name="unit">
       {% for unit in units %}<option {% if values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
     </select>
     {% endif %}
+    {% with name = "unit" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   {% for name, label, hint in [
     ("manufacturer", "Manufacturer", ""),

@@ -495,13 +495,15 @@ def insert_transaction(
     writer of the ledger. RuleBroken, before anything is written, for a
     transaction with no lines but a count, or a line that breaks a rule.
     `held` is hold()'s for these, if the caller took it in this
-    transaction; else it is taken here. created_at is the database's
-    now(), whatever the header says. A receipt lowers what is on order of
-    each item it brings."""
+    transaction; else, or if it lacks one of these items, it is taken here,
+    so no line's rules go unchecked. created_at is the database's now(),
+    whatever the header says. A receipt lowers what is on order of each
+    item it brings."""
     kind = str(header["kind"])
     enforce("ledger_transaction_lines", when=not lines and kind != "count")
-    items = (held or hold(session, header, lines)).items
-    for broken in lines_break(kind, items, lines.items()):
+    if held is None or not lines.keys() <= held.items.keys():
+        held = hold(session, header, lines)
+    for broken in lines_break(kind, held.items, lines.items()):
         # An item that does not exist is the foreign key's to refuse.
         for rule in broken or ():
             enforce(rule)
