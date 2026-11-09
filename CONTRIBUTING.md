@@ -617,9 +617,10 @@ As a safety net, fields are masked by name (docs/decisions/0008). Secrets are
 masked always. Outside development (`APP_ENV`, which defaults to
 `production`), so are personal data, fields named `sensitive_*`, and the
 values database and validation errors quote in tracebacks. So name a field
-for what it holds. `UNMASK_SECRETS=true`
-shows secrets too, for debugging; it works only with `APP_ENV=development`,
-and the app refuses to start with it anywhere else.
+for what it holds. In development, `LOG_REDACTION=on` masks those too, to
+test it; how to see them in production for a while is in DEPLOYMENT.md.
+`UNMASK_SECRETS=true` shows secrets too, for debugging; it works only with
+`APP_ENV=development`, and the app refuses to start with it anywhere else.
 
 Logs are colourised on a terminal. `LOG_LEVEL=DEBUG` turns on debug logs,
 `LOG_LEVELS` sets single loggers' levels (`sqlalchemy.engine=INFO` shows SQL,

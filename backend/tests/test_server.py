@@ -9,7 +9,7 @@ from inventory_tng import server
 from inventory_tng.app import create_app
 from inventory_tng.db import make_engine
 from inventory_tng.server import create_server, flush_when_stopped
-from inventory_tng.settings import Settings, TraceRedaction
+from inventory_tng.settings import Redaction, Settings
 
 
 @pytest.mark.usefixtures("restore_logging")
@@ -76,7 +76,7 @@ def test_traces_leave_through_the_redactor_with_the_settings(
     given = telemetry_on.given
     assert (given["development"], given["secrets"]) == (False, True)
     traces = given["traces"]
-    assert isinstance(traces, TraceRedaction)
+    assert isinstance(traces, Redaction)
     assert traces.redacting(development=False, now=datetime.now(UTC))
 
 

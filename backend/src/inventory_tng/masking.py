@@ -13,18 +13,24 @@ import itertools
 import re
 import traceback
 from collections.abc import Callable, Iterator, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Self, TextIO
 from urllib.parse import parse_qsl, urlencode
 
 import psycopg
+import structlog
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import exc
 from structlog.typing import EventDict, ExcInfo
 
-from inventory_tng.settings import Settings
+from inventory_tng.settings import REDACTION_WARN_EVERY, Redaction, Settings
+
+log = structlog.get_logger(__name__)
 
 MASK = "[masked]"
+# On each log line that leaves unredacted outside development.
+REDACTION_FIELD = "redaction"
 
 # A field is a secret if its name, lowercased and without separators,
 # contains one of these, so PGPASSWORD, DBPassword and api_key all match.
@@ -98,44 +104,92 @@ SENSITIVE = "sensitive"
 EXC_INFO = "exc_info"
 
 
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
 @dataclass(frozen=True)
 class Masker:
-    """A structlog processor, also used by the OTLP bridge (telemetry.py)."""
+    """A structlog processor, also used by the OTLP bridge (telemetry.py).
+
+    Whether it redacts personal data is decided for each line, so redaction
+    comes back on by itself once LOG_REDACTION_OFF_UNTIL has passed. While it
+    is off outside development, each line says so (REDACTION_FIELD), and a
+    warning is logged hourly, the server's starting line being the first."""
 
     # Personal data, sensitive_* fields, and values quoted in exception text.
-    redact: bool = True
+    redaction: Redaction = field(default_factory=Redaction)
+    development: bool = False
     secrets: bool = True
+    now: Callable[[], datetime] = field(default=_now, compare=False, repr=False)
+    # When it last warned that redaction is off: one, changed in place.
+    _warned: list[datetime] = field(default_factory=list, compare=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self._warned.append(self.now())
 
     @classmethod
     def from_settings(cls, settings: Settings) -> Self:
         return cls(
-            redact=not settings.development,
+            redaction=settings.logging.redaction,
+            development=settings.development,
             secrets=not settings.logging.unmask_secrets,
         )
 
+    @classmethod
+    def unredacting(cls, *, secrets: bool) -> Self:
+        """Masks secrets alone: for spans let out whole on purpose."""
+        return cls(development=True, secrets=secrets)
+
+    @property
+    def redact(self) -> bool:
+        return self.redaction.redacting(development=self.development, now=self.now())
+
+    def off_outside_development(self) -> bool:
+        """Unredacted where it matters: what is marked and warned about."""
+        return not self.development and not self.redact
+
     def __call__(self, _logger: object, _method: str, event: EventDict) -> EventDict:
-        return self.fields(event)
+        redact = self.redact
+        masked = self.fields(event, redact=redact)
+        if not redact and not self.development:
+            masked[REDACTION_FIELD] = "off"
+            self._warn_hourly()
+        return masked
 
-    def fields(self, fields: Mapping[str, object]) -> dict[str, object]:
-        return {key: self._value(str(key), value) for key, value in fields.items()}
+    def _warn_hourly(self) -> None:
+        now = self.now()
+        if now - self._warned[0] < REDACTION_WARN_EVERY:
+            return
+        # Before logging, so the warning's own line does not warn again.
+        self._warned[0] = now
+        log.warning("log redaction is off", until=self.redaction.off_until)
 
-    def _value(self, key: str, value: object) -> object:
+    def fields(
+        self, fields: Mapping[str, object], *, redact: bool | None = None
+    ) -> dict[str, object]:
+        redact = self.redact if redact is None else redact
+        return {
+            key: self._value(str(key), value, redact) for key, value in fields.items()
+        }
+
+    def _value(self, key: str, value: object, redact: bool) -> object:
         if key == EXC_INFO:
             return value
         plain = value is None or isinstance(value, (str, int, float))
         secret, personal = _classify(key)
-        if (self.secrets and secret) or (self.redact and personal):
+        if (self.secrets and secret) or (redact and personal):
             return MASK
         if plain:
             return value
         if isinstance(value, Mapping):
-            return self.fields(value)
+            return self.fields(value, redact=redact)
         if isinstance(value, BaseModel):
-            return self.fields(value.model_dump())
+            return self.fields(value.model_dump(), redact=redact)
         if dataclasses.is_dataclass(value) and not isinstance(value, type):
-            return self.fields(dataclasses.asdict(value))
+            return self.fields(dataclasses.asdict(value), redact=redact)
         if isinstance(value, (list, tuple)):
-            return type(value)(self._value("", item) for item in value)
+            return type(value)(self._value("", item, redact) for item in value)
         return value
 
     def exception_message(self, message: str, error: BaseException) -> str:
