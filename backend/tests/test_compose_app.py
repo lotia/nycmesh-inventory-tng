@@ -3,11 +3,11 @@ only those, listed one by one (inventory-tng-zr5), never the whole .env."""
 
 import re
 
+import pytest
+
 from inventory_tng.local_env import CLONE
 
-from helpers.clone import clone_only
-
-pytestmark = clone_only
+pytestmark = pytest.mark.clone
 
 # A setting, set or commented out: `NAME=` or `# NAME=`.
 SETTING = re.compile(r"^#? ?([A-Z][A-Z0-9_]*)=", re.MULTILINE)

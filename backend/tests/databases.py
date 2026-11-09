@@ -109,7 +109,8 @@ def create_database(template: str | None = None) -> str:
     except OperationalError as error:
         raise Unreachable(
             f"Cannot reach PostgreSQL at {SERVER}. Start it with "
-            f"`mise run compose -- up -d --wait db`.\n{error}"
+            f"`mise run compose -- up -d --wait db`, or run only the tests "
+            f"that need none: `uv run pytest -m 'not database'`.\n{error}"
         ) from error
     finally:
         server.dispose()
