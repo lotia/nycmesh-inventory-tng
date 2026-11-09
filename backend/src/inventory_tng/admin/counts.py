@@ -18,8 +18,8 @@ before.
 A count names each item once: a form naming one on two fields (counted_5
 and counted_05, or the select at the foot choosing an item listed above) is
 refused and shown again saying why, as it isn't clear which number is
-right. The page itself never sends one. record_count takes a mapping by item,
-so it cannot be sent a repeat: the check is here, where fields become items.
+right. The page itself never sends one. The ledger refuses a repeat too
+(movement_item_once), but the page checks first, to say which fields.
 """
 
 import uuid
@@ -46,6 +46,7 @@ from inventory_tng.admin.common import (
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.db import DbSession, by_name, refusal
 from inventory_tng.ledger import (
+    Lines,
     corrected,
     countable,
     expected,
@@ -308,10 +309,9 @@ def named_twice(found: Sequence[Line]) -> dict[str, int | None]:
     }
 
 
-def _counted(
-    session: Session, found: Collection[Line]
-) -> tuple[dict[int, Decimal], dict[str, str]]:
-    """What was typed, by item, and what is wrong with it."""
+def _counted(session: Session, found: Collection[Line]) -> tuple[Lines, dict[str, str]]:
+    """What was typed, as lines of an item and an amount, and what is wrong
+    with it."""
     units = dict(
         session.execute(
             select(Item.id, Item.unit).where(
@@ -319,7 +319,7 @@ def _counted(
             )
         ).all()
     )
-    counted: dict[int, Decimal] = {}
+    counted: list[tuple[int, Decimal]] = []
     problems: dict[str, str] = {}
     for field, item_id, typed in found:
         if item_id is None or (unit := units.get(item_id)) is None:
@@ -329,7 +329,7 @@ def _counted(
         if isinstance(amount, str):
             problems[field] = amount
         elif amount is not None:
-            counted[item_id] = amount
+            counted.append((item_id, amount))
     return counted, problems
 
 
@@ -405,6 +405,7 @@ def count(
     if not result.moved:
         return redirect(COUNTS, notice="counted" if result.differed else "counted_same")
     saved = len(counted) - len(result.moved)
+    amounts = dict(counted)
     return _count_page(
         request,
         session,
@@ -412,7 +413,7 @@ def count(
         place,
         moment(session, place.id),
         recount={
-            item_id: (counted[item_id], came, went)
+            item_id: (amounts[item_id], came, went)
             for item_id, (came, went) in result.moved.items()
         },
         alert=(f"Saved {saved} line{'s' if saved != 1 else ''}. " if saved else "")

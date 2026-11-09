@@ -5,7 +5,7 @@ fixed once stock has moved in it, as the ledger's quantities are in that
 unit. The app may not move a package to another item (migration 0002),
 so its labels always name its item."""
 
-from collections.abc import Mapping
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
 
@@ -27,29 +27,70 @@ def _in_current_category(session: Session, category_id: int) -> None:
     require_current(session, Category, category_id, "item_category_current")
 
 
-def add(session: Session, values: Mapping[str, object]) -> Item:
-    """An item of these columns' values."""
+@dataclass(frozen=True, kw_only=True)
+class Fields:
+    """What an administrator sets of an item: every column but what is on
+    order (which a receipt lowers) and when it was retired (retire,
+    restore). Each is required, so a field left out is an error, never
+    blanked: save sets them all. A new item's may be left blank (new)."""
+
+    name: str
+    category_id: int
+    unit: str
+    minimum: Decimal | None
+    manufacturer: str | None
+    part_number: str | None
+    old_code: str | None
+    notes: str | None
+    ordering_notes: str | None
+
+    @classmethod
+    def new(
+        cls,
+        *,
+        name: str,
+        category_id: int,
+        unit: str = "each",
+        minimum: Decimal | None = None,
+        manufacturer: str | None = None,
+        part_number: str | None = None,
+        old_code: str | None = None,
+        notes: str | None = None,
+        ordering_notes: str | None = None,
+    ) -> Fields:
+        """A new item's: those not given are blank, and its unit each."""
+        return cls(
+            name=name,
+            category_id=category_id,
+            unit=unit,
+            minimum=minimum,
+            manufacturer=manufacturer,
+            part_number=part_number,
+            old_code=old_code,
+            notes=notes,
+            ordering_notes=ordering_notes,
+        )
+
+
+def add(session: Session, fields: Fields) -> Item:
     lock_catalogue(session)
-    item = Item(**values)
-    if item.retired_at is None:
-        _in_current_category(session, item.category_id)
+    _in_current_category(session, fields.category_id)
+    item = Item(**asdict(fields))
     session.add(item)
     session.flush()
     return item
 
 
-def save(session: Session, item: Item, values: Mapping[str, object]) -> None:
-    """These columns set to these values."""
+def save(session: Session, item: Item, fields: Fields) -> None:
+    """Every one of `fields` set."""
     # FOR UPDATE waits for any movement of it being written.
     relock(session, item)
-    if values.get("unit", item.unit) != item.unit:
+    if fields.unit != item.unit:
         moved = exists_where(session, Movement.item_id == item.id)
         enforce("item_unit_fixed", when=moved)
-    category_id = values.get("category_id", item.category_id)
-    if item.retired_at is None and category_id != item.category_id:
-        assert isinstance(category_id, int)
-        _in_current_category(session, category_id)
-    for column, value in values.items():
+    if item.retired_at is None and fields.category_id != item.category_id:
+        _in_current_category(session, fields.category_id)
+    for column, value in asdict(fields).items():
         setattr(item, column, value)
 
 

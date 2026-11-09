@@ -4,6 +4,7 @@ describe_error() logs; and the app's, each refused through its domain
 function by the rule's name (db.RuleBroken), whose every case
 test_catalogue_rules.py tests without a database."""
 
+import dataclasses
 from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -28,7 +29,7 @@ from inventory_tng.models import (
     mint_label_code,
 )
 
-from helpers.rows import add, breaks, violates
+from helpers.rows import add, breaks, item_fields, violates
 
 NOW = datetime(2026, 11, 1, tzinfo=UTC)
 
@@ -303,16 +304,32 @@ def test_merges_point_at_a_current_volunteer(session: Session) -> None:
     volunteers.merge(session, b, c.id, NOW)
 
 
+def test_saving_an_item_blanks_no_field_left_out() -> None:
+    """items.save sets every field, so none may have a default: one left
+    out is an error, not a blank (inventory-tng-8i4.122)."""
+    defaults = [
+        field.name
+        for field in dataclasses.fields(items.Fields)
+        if field.default is not dataclasses.MISSING
+        or field.default_factory is not dataclasses.MISSING
+    ]
+    assert defaults == []
+    with pytest.raises(TypeError):
+        items.Fields(name="LiteBeam", category_id=1)  # ty: ignore[missing-argument]
+
+
 def test_current_items_sit_in_current_categories(session: Session) -> None:
     """inventory-tng-8i4.58."""
     radios = categories.add(session, "Radios rule")
     old = categories.add(session, "Old rule")
     categories.retire(session, old, NOW)
-    item = items.add(session, {"name": "LiteBeam rule", "category_id": radios.id})
+    item = items.add(
+        session, items.Fields.new(name="LiteBeam rule", category_id=radios.id)
+    )
     with breaks(session, "item_category_current"):
-        items.add(session, {"name": "Into the old", "category_id": old.id})
+        items.add(session, items.Fields.new(name="Into the old", category_id=old.id))
     with breaks(session, "item_category_current"):
-        items.save(session, item, {"category_id": old.id})
+        items.save(session, item, item_fields(item, category_id=old.id))
     # A category with a current item stays current...
     with breaks(session, "category_has_items"):
         categories.retire(session, radios, NOW)
@@ -321,12 +338,11 @@ def test_current_items_sit_in_current_categories(session: Session) -> None:
     categories.retire(session, radios, NOW)
     with breaks(session, "item_category_current"):
         items.restore(session, item)
-    # A retired item can still be changed there.
-    items.save(session, item, {"notes": "kept for parts"})
-    # A retired item may sit in a retired category.
-    items.add(
-        session, {"name": "Retired too", "category_id": old.id, "retired_at": NOW}
-    )
+    # A retired item may sit in a retired category, and still be changed
+    # there, or moved to another.
+    items.save(session, item, item_fields(item, notes="kept for parts"))
+    items.save(session, item, item_fields(item, category_id=old.id))
+    assert item.category_id == old.id
 
 
 # What the migrations made that runs inside PostgreSQL, by kind: triggers

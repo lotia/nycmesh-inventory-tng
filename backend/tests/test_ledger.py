@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, select, text, update
+from sqlalchemy import delete, insert, select, text, update
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
@@ -25,6 +25,7 @@ from inventory_tng.ledger import (
     lines_break,
     on_order_after,
     record_adjustment,
+    record_count,
     repeated,
     retired_places_holding_stock,
     retired_sides,
@@ -40,7 +41,7 @@ from inventory_tng.models import (
     Movement,
 )
 
-from helpers.rows import add, breaks, named, refused, violates
+from helpers.rows import add, breaks, item_fields, named, refused, violates
 from helpers.stock import Place, received, retire, write
 
 URL = "/api/transactions"
@@ -346,7 +347,7 @@ def test_a_transaction_has_movements(session: Session, place: Place) -> None:
     0009)."""
     header = {"kind": "receipt", "to_location_id": place.store.id}
     with breaks(session, "ledger_transaction_lines"):
-        insert_transaction(session, uuid.uuid4(), header, {})
+        insert_transaction(session, uuid.uuid4(), header, [])
 
 
 def test_items_counted_in_each_move_in_whole_units(
@@ -373,7 +374,35 @@ def test_a_retired_item_is_never_received(session: Session, place: Place) -> Non
     retire(session, place.item)
     header = {"kind": "receipt", "to_location_id": place.store.id}
     with breaks(session, "receipt_retired_item"):
-        insert_transaction(session, uuid.uuid4(), header, {place.item.id: Decimal(1)})
+        insert_transaction(session, uuid.uuid4(), header, [(place.item.id, Decimal(1))])
+
+
+def test_an_item_is_on_one_line_whoever_writes(session: Session, place: Place) -> None:
+    """Not only the scan API and the count page, which say which lines: a
+    second line of an item is refused, never dropped (inventory-tng-8i4.122)."""
+    header = {"kind": "receipt", "to_location_id": place.store.id}
+    twice = [(place.item.id, Decimal(1)), (place.item.id, Decimal(2))]
+    with breaks(session, "movement_item_once"):
+        insert_transaction(session, uuid.uuid4(), header, twice)
+    admin = add(session, Admin(username="ada"))
+    with breaks(session, "movement_item_once"):
+        record_count(session, uuid.uuid4(), admin.id, place.store.id, twice, 0)
+    assert not session.scalars(select(LedgerTransaction)).all()
+
+
+def test_an_item_once_in_a_transaction_is_the_databases_too(
+    session: Session, place: Place
+) -> None:
+    header = {"kind": "receipt", "to_location_id": place.store.id}
+    lines = [(place.item.id, Decimal(1))]
+    transaction = insert_transaction(session, uuid.uuid4(), header, lines)
+    assert transaction is not None
+    with violates(session, "uq_movement_transaction_id_item_id"):
+        session.execute(
+            insert(Movement).values(
+                transaction_id=transaction.id, item_id=place.item.id, quantity=1
+            )
+        )
 
 
 def test_a_line_of_no_item_is_the_foreign_keys_to_refuse(
@@ -381,7 +410,7 @@ def test_a_line_of_no_item_is_the_foreign_keys_to_refuse(
 ) -> None:
     header = {"kind": "receipt", "to_location_id": place.store.id}
     with violates(session, "fk_movement_item_id_item"):
-        insert_transaction(session, uuid.uuid4(), header, {999999: Decimal(1)})
+        insert_transaction(session, uuid.uuid4(), header, [(999999, Decimal(1))])
 
 
 def test_the_server_clock_decides_when(
@@ -406,7 +435,7 @@ def test_the_server_clock_decides_when_whoever_writes(
         "to_location_id": place.store.id,
         "created_at": long_ago,
     }
-    lines = {place.item.id: Decimal(1)}
+    lines = [(place.item.id, Decimal(1))]
     transaction = insert_transaction(session, uuid.uuid4(), header, lines)
     assert transaction is not None
     assert transaction.created_at > long_ago + timedelta(days=365)
@@ -502,12 +531,14 @@ def test_an_items_unit_is_fixed_once_stock_has_moved(
     session: Session, place: Place
 ) -> None:
     """In whole units or not: the ledger's quantities are in that unit."""
-    items.save(session, place.cable, {"unit": "ft"})
+    items.save(session, place.cable, item_fields(place.cable, unit="ft"))
     write(session, place, lines=[{"item_id": place.cable.id, "quantity": "1.5"}])
     for unit in ("each", "m"):
         with breaks(session, "item_unit_fixed"):
-            items.save(session, place.cable, {"unit": unit})
-    items.save(session, place.cable, {"unit": "ft", "notes": "By the reel"})
+            items.save(session, place.cable, item_fields(place.cable, unit=unit))
+    items.save(
+        session, place.cable, item_fields(place.cable, unit="ft", notes="By the reel")
+    )
     assert (place.cable.unit, place.cable.notes) == ("ft", "By the reel")
 
 

@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, mail
+from inventory_tng import accounts, adjustment_reasons, mail, scan_settings
 from inventory_tng.admin.common import (
     ADMIN,
     RULES,
@@ -24,7 +24,7 @@ from inventory_tng.admin.common import (
     now,
     text_form,
 )
-from inventory_tng.db import DbSession, get_locked, refusal, settings_row, unique
+from inventory_tng.db import DbSession, refusal, settings_row, unique
 from inventory_tng.mail import Notify
 from inventory_tng.models import (
     CONFIRM_HOURS,
@@ -174,7 +174,7 @@ def save_scan_settings(
             problems={"name_check_minutes": problem},
             values={"name_check_minutes": name_check_minutes},
         )
-    settings_row(session, ScanSettings).name_check_minutes = minutes
+    scan_settings.change(session, minutes)
     session.commit()
     log.info("scan settings changed", name_check_minutes=minutes)
     return redirect(SETTINGS, notice="settings_saved")
@@ -189,11 +189,14 @@ def add_reason(
 ) -> Response:
     name = name.strip()
     problem = name_problem(name)
-    added = AdjustmentReason(name=name)
-    if problem is None and not unique(session, lambda: session.add(added)):
-        problem = REASON_TAKEN
-    if problem is not None:
-        return _page(request, session, signed, problems={"reason": problem})
+    added = None
+    if problem is None:
+        added, _ = refusal(
+            session, lambda: adjustment_reasons.add(session, name), "unique"
+        )
+    if added is None:
+        problems = {"reason": problem or REASON_TAKEN}
+        return _page(request, session, signed, problems=problems)
     session.commit()
     log.info("adjustment reason added", adjustment_reason_id=added.id)
     return redirect(SETTINGS, notice="added")
@@ -209,7 +212,7 @@ def change_reason(
     action: Annotated[str, Form()] = "rename",
 ) -> Response:
     """Rename, retire or bring back, as the button pressed says."""
-    reason = get_locked(session, AdjustmentReason, reason_id)
+    reason = adjustment_reasons.locked(session, reason_id)
     if reason is None:
         return not_found()
     action = action if action in {"retire", "restore"} else "rename"
@@ -217,11 +220,11 @@ def change_reason(
 
     def change() -> None:
         if action == "retire":
-            reason.retired_at = now()
+            adjustment_reasons.retire(reason, now())
         elif action == "restore":
-            reason.retired_at = None
+            adjustment_reasons.restore(reason)
         else:
-            reason.name = name
+            adjustment_reasons.rename(reason, name)
 
     problem = name_problem(name)
     if problem is None and not unique(session, change):
