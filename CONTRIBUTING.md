@@ -390,6 +390,12 @@ uv run ruff format --check       # formatting
 uv run pytest --cov              # tests, against the database started above
 ```
 
+`mise run check-backend` and CI run the tests across processes, one per
+core and at most 8: `uv run pytest -n auto --maxprocesses=8 --cov`. Each
+process makes databases of its own, which takes a moment, so past 8 a run
+is slower, and running a few tests is quicker without `-n`. Each process
+holds up to about 22 connections, so compose's PostgreSQL allows 200.
+
 For the frontend:
 
 ```sh
@@ -482,8 +488,9 @@ refused. Use the real database there, never a mocked session.
 
 Tests run in a random order, the backend's with pytest-randomly and the
 frontend's with Vitest's shuffle, so none can depend on another. Each run
-prints its seed; to run that order again, pass it: `uv run pytest
---randomly-seed=<seed>`, or `npm test -- --sequence.seed=<seed>`.
+prints its seed; to run that order again, pass it, in one process (no
+`-n`): `uv run pytest --randomly-seed=<seed>`, or
+`npm test -- --sequence.seed=<seed>`.
 
 Every test leaves the database as it found it: the `session` fixture rolls
 back; a test whose code commits takes the `committed` fixture, which deletes

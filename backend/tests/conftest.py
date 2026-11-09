@@ -139,13 +139,18 @@ def restore_logging() -> Iterator[None]:
 
 
 @contextlib.contextmanager
-def _database_or_exit() -> Generator[str]:
+def _database_or_exit(session: pytest.Session) -> Generator[str]:
     """A database of its own, dropped after; if the server cannot be reached, the run ends there,
     saying how to start it, rather than every test failing on it."""
     try:
         url = create_database()
     except Unreachable as error:
-        pytest.exit(str(error), returncode=2)
+        if "PYTEST_XDIST_WORKER" not in os.environ:
+            pytest.exit(str(error), returncode=2)
+        # pytest.exit in one of pytest-xdist's processes only ends that
+        # process, and the message with it: fail the test saying it, and stop.
+        session.shouldstop = str(error)
+        pytest.fail(str(error), pytrace=False)
     try:
         yield url
     finally:
@@ -153,10 +158,10 @@ def _database_or_exit() -> Generator[str]:
 
 
 @pytest.fixture(scope="session")
-def database_url() -> Iterator[str]:
+def database_url(request: pytest.FixtureRequest) -> Iterator[str]:
     """The run's database, as the app logs in to it: inventory_app, which
     cannot change the ledger (DEPLOYMENT.md, Database roles)."""
-    with _database_or_exit() as url:
+    with _database_or_exit(request.session) as url:
         yield url
 
 
@@ -227,10 +232,10 @@ def engine(database: Database) -> Engine:
 
 
 @pytest.fixture(scope="session")
-def migrated_template() -> Iterator[str]:
+def migrated_template(request: pytest.FixtureRequest) -> Iterator[str]:
     """The name of a database with the schema and nothing else, which
     nothing stays connected to, so own_database can copy it."""
-    with _database_or_exit() as url:
+    with _database_or_exit(request.session) as url:
         with migrated_engine(url):
             pass
         yield make_url(url).database or ""
