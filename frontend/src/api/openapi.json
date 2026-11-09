@@ -179,7 +179,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "device": []
+          }
+        ]
       }
     },
     "/api/catalogue": {
@@ -218,7 +223,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "device": []
+          }
+        ]
       }
     }
   },
@@ -709,6 +719,14 @@
         "type": "object",
         "required": ["id", "name"],
         "title": "VolunteerEntry"
+      }
+    },
+    "securitySchemes": {
+      "device": {
+        "type": "apiKey",
+        "description": "Set by POST /api/devices when a device registers with a code. A browser sends its own: Authorize on /api/docs cannot set a cookie.",
+        "in": "cookie",
+        "name": "inventory_device"
       }
     }
   }
