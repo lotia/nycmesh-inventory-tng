@@ -223,15 +223,15 @@ def traced(
         database_url=database_url, logging=LogConfig(client_address=True)
     )
     app = create_app(settings)
-    telemetry.instrument(app, app.state.engine)
+    telemetry.instrument(app, app.state.db)
 
     def named() -> dict[str, str]:
-        with app.state.engine.connect() as connection:
+        with app.state.db.engine.connect() as connection:
             connection.execute(text("SELECT 'Jane Doe' AS literal_name"))
         return {}
 
     def failing() -> None:
-        with app.state.engine.connect() as connection:
+        with app.state.db.engine.connect() as connection:
             connection.execute(text("SELECT 'jane@example.org'::int"))
 
     app.add_api_route("/named", named)

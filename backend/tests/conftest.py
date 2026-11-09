@@ -20,10 +20,16 @@ from sqlalchemy import Engine, TextClause, delete, event, exc, make_url, text
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, devices, local_env
+from inventory_tng import accounts, db, devices, local_env
 from inventory_tng.app import create_app
 from inventory_tng.database_role import refusals
-from inventory_tng.db import make_engine, run_outside_transaction
+from inventory_tng.db import (
+    DATABASE_INFO,
+    Database,
+    make_database,
+    make_engine,
+    run_outside_transaction,
+)
 from inventory_tng.history import LEDGER
 from inventory_tng.logs import configure_structlog
 from inventory_tng.mail import get_mailer
@@ -152,17 +158,40 @@ def owner_engine(database_url: str) -> Iterator[Engine]:
         yield engine
 
 
+@pytest.fixture(autouse=True)
+def keeps_to_the_pool_order(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[None]:
+    """No test takes a connection out of the pools' order (db.Database),
+    which with enough at once would wait on itself, unless it is marked as
+    doing so on purpose, as a test of a busy pool does."""
+    broken: list[tuple[str, list[str]]] = []
+    monkeypatch.setattr(
+        db, "pool_order_broken", lambda pool, held: broken.append((pool, held))
+    )
+    yield
+    if request.node.get_closest_marker("breaks_pool_order") is None:
+        assert broken == [], f"connections taken out of the pools' order: {broken}"
+
+
 @pytest.fixture(scope="session")
-def engine(database_url: str, owner_engine: Engine) -> Iterator[Engine]:
-    """The run's database as the app, once migrated. Its login is checked
-    here, once, as the app checks it at startup: apps the tests make skip
-    that (make_app), and test_database_role.py tests the check itself."""
+def database(database_url: str, owner_engine: Engine) -> Iterator[Database]:
+    """The run's database as the app, once migrated, with the app's pools.
+    Its login is checked here, once, as the app checks it at startup: apps
+    the tests make skip that (make_app), and test_database_role.py tests the
+    check itself."""
     del owner_engine
-    engine = make_engine(database_url)
-    with engine.connect() as connection:
+    database = make_database(database_url)
+    with database.engine.connect() as connection:
         assert refusals(connection) == {}
-    yield engine
-    engine.dispose()
+    yield database
+    database.dispose()
+
+
+@pytest.fixture(scope="session")
+def engine(database: Database) -> Engine:
+    """The run's database as the app: its request pool."""
+    return database.engine
 
 
 @pytest.fixture(scope="session")
@@ -202,21 +231,25 @@ def alembic_config(owner_engine: Engine) -> Iterator[Config]:
         transaction.rollback()
 
 
-def _rolled_back(engine: Engine) -> Iterator[Session]:
+def _rolled_back(engine: Engine, database: Database | None = None) -> Iterator[Session]:
+    """A session rolled back after the test; knowing `database`, for writes
+    in a transaction of their own on its side pool (db.database_of)."""
     with engine.connect() as connection:
         transaction = connection.begin()
         with Session(
-            bind=connection, join_transaction_mode="create_savepoint"
+            bind=connection,
+            join_transaction_mode="create_savepoint",
+            info={DATABASE_INFO: database} if database else {},
         ) as session:
             yield setting_up(session)
         transaction.rollback()
 
 
 @pytest.fixture
-def session(engine: Engine) -> Iterator[Session]:
+def session(database: Database) -> Iterator[Session]:
     """A session whose work is rolled back after the test, even if the code
     under test commits."""
-    yield from _rolled_back(engine)
+    yield from _rolled_back(database.engine, database)
 
 
 @pytest.fixture
@@ -350,11 +383,12 @@ def _committed_engine(url: str) -> Generator[Committed]:
     """Committed sessions on `url`, whose connections wait as _wait_briefly
     says. After, any still waiting is ended, so its thread finishes before
     its session is closed; then they all are."""
-    own = make_engine(url)
-    event.listen(own, "connect", _wait_briefly)
+    own = make_database(url)
+    for pool in own.pools.values():
+        event.listen(pool, "connect", _wait_briefly)
     committed = Committed(own)
     yield committed
-    with own.connect() as connection:
+    with own.engine.connect() as connection:
         connection.execute(
             text(
                 "SELECT pg_terminate_backend(pid) FROM pg_stat_activity"
@@ -456,7 +490,8 @@ def make_app(database_url: str, session: Session) -> Callable[..., FastAPI]:
         # Each request with a session of its own, as in production, on the
         # database as committed (the `committed` fixture cleans up).
         if own_sessions:
-            event.listen(app.state.engine, "connect", _wait_briefly)
+            for pool in app.state.db.pools.values():
+                event.listen(pool, "connect", _wait_briefly)
             return app
         app.dependency_overrides |= on_session(on or session)
         return app

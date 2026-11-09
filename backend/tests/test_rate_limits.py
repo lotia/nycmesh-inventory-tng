@@ -12,7 +12,7 @@ from limits import RateLimitItemPerMinute
 from sqlalchemy import Engine, exc, func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import make_engine
+from inventory_tng.db import Database, make_database, make_engine
 from inventory_tng.models import RateLimit
 from inventory_tng.rate_limits import PostgresStorage, limiter, refund
 
@@ -20,27 +20,26 @@ TEN = RateLimitItemPerMinute(10)
 
 
 @pytest.fixture
-def app_session(engine: Engine) -> Iterator[Session]:
+def app_session(database: Database) -> Iterator[Session]:
     """A session of the app's, as a request has, on the run's database."""
-    with Session(engine) as session:
+    with database.session() as session:
         yield session
 
 
 @pytest.fixture
-def other_instance(database_url: str) -> Iterator[Engine]:
-    """Another instance of the app on the same database: an engine, and so
-    a pool, of its own."""
-    engine = make_engine(database_url)
-    yield engine
-    engine.dispose()
+def other_instance(database_url: str) -> Iterator[Database]:
+    """Another instance of the app on the same database: pools of its own."""
+    other = make_database(database_url)
+    yield other
+    other.dispose()
 
 
 def test_every_instance_shares_the_counts(
-    app_session: Session, other_instance: Engine
+    app_session: Session, other_instance: Database
 ) -> None:
     for _ in range(10):
         assert limiter(app_session).hit(TEN, "sign_in", "192.0.2.1")
-    with Session(other_instance) as there:
+    with other_instance.session() as there:
         assert not limiter(there).test(TEN, "sign_in", "192.0.2.1")
         assert not limiter(there).hit(TEN, "sign_in", "192.0.2.1")
         # Another key, or another limit's name, has counts of its own.
@@ -49,10 +48,10 @@ def test_every_instance_shares_the_counts(
 
 
 def test_attempts_at_once_allow_exactly_the_limit(
-    engine: Engine, other_instance: Engine
+    database: Database, other_instance: Database
 ) -> None:
     def attempt(number: int) -> bool:
-        with Session(engine if number % 2 else other_instance) as session:
+        with (database if number % 2 else other_instance).session() as session:
             return limiter(session).hit(TEN, "code", "1")
 
     with ThreadPoolExecutor(max_workers=10) as pool:

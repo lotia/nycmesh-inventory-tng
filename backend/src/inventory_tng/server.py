@@ -41,7 +41,7 @@ def create_server() -> FastAPI:
         )
         telemetry.make_global()
         telemetry.attach_logs(masker)
-        telemetry.instrument(app, app.state.engine)
+        telemetry.instrument(app, app.state.db)
         flush_when_stopped(app, telemetry.shutdown)
         traces_off = (
             telemetry.tracer_provider is not None

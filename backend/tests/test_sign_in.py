@@ -628,3 +628,21 @@ def test_the_cookie_lasts_as_long_as_the_session(
     row = session.scalars(select(AdminSession)).one()
     expires = row.expires_at.astimezone(UTC).strftime("%a, %d %b %Y %H:%M:%S GMT")
     assert f"expires={expires}" in response.headers["set-cookie"]
+
+
+def test_a_session_unseen_a_while_is_marked_seen(
+    admin_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """On the side pool, in a transaction of its own (db.record_last_seen)."""
+    seen: list[tuple[object, int]] = []
+    monkeypatch.setattr(
+        sign_in,
+        "record_last_seen",
+        lambda database, _model, row_id, _now: seen.append((database, row_id)),
+    )
+    (row,) = session.scalars(select(AdminSession)).all()
+    row.last_seen_at = datetime.now(UTC) - accounts.SEEN_EVERY - timedelta(seconds=1)
+    session.flush()
+    admin_client.get(sign_in.HOME)
+    app = admin_client.app
+    assert seen == [(app.state.db, row.id)]  # ty: ignore[unresolved-attribute]

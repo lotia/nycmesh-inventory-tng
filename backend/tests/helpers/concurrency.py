@@ -9,7 +9,7 @@ from psycopg.errors import LockNotAvailable
 from sqlalchemy import Connection, Engine, exc, text
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import Base
+from inventory_tng.db import Base, Database
 
 from helpers.rows import setting_up
 
@@ -45,13 +45,13 @@ class Committed:
     """Sessions whose commits are real, for tests of two requests at once,
     and the threads that run them."""
 
-    def __init__(self, engine: Engine) -> None:
-        self.engine = engine
+    def __init__(self, database: Database) -> None:
+        self.database = database
         self.sessions: list[Session] = []
         self.workers: list[Worker] = []
 
     def session(self) -> Session:
-        session = setting_up(Session(self.engine, expire_on_commit=False))
+        session = setting_up(self.database.session(expire_on_commit=False))
         self.sessions.append(session)
         return session
 

@@ -292,7 +292,7 @@ def current_device(
     request_logging.bind(device_id=device.id)
     now = datetime.now(UTC)
     if device.last_seen_at <= now - LAST_SEEN_EVERY:
-        record_last_seen(request.app.state.engine, Device, device.id, now)
+        record_last_seen(request.app.state.db, Device, device.id, now)
     return device
 
 

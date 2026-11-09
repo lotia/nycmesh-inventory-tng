@@ -3,9 +3,9 @@
 import functools
 import re
 import threading
-import weakref
 from collections.abc import AsyncIterator, Callable, Collection, Iterator
 from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple
 
@@ -65,29 +65,110 @@ class Base(DeclarativeBase):
     )
 
 
-# Connections per process (DEPLOYMENT.md, Database connections). The
-# request pool: one connection per request, and at most POOL + OVERFLOW
-# requests hold a session at once (session_slot), fewer than the threads
-# that run sync routes and dependencies (AnyIO's 40). The side pool
-# (side_engine): writes in a transaction of their own beside a request's.
-# Waiting longer than POOL_TIMEOUT seconds for either answers 503 (install).
+# Connections per process, by pool (Database; DEPLOYMENT.md, Database
+# connections). The request pool's, fewer than the threads that run sync
+# routes and dependencies (AnyIO's 40). The small pools keep no overflow,
+# which would be opened and closed again for each burst.
 POOL, OVERFLOW = 10, 5
-SIDE_POOL, SIDE_OVERFLOW = 2, 3
+SIDE_POOL, SIDE_OVERFLOW = 3, 0
+LIMITS_POOL, LIMITS_OVERFLOW = 2, 0
 POOL_TIMEOUT = 10
 # Longer than any lock the rules wait for in the normal run of things (the
 # catalogue lock, a row a save holds): a wait this long is something stuck,
 # and the request answers 503 rather than holding its connection forever.
 LOCK_TIMEOUT = "10s"
+# The app's pools, in the order one may wait on the next (Database).
+type PoolName = Literal["requests", "side", "limits"]
+POOLS: tuple[PoolName, ...] = ("requests", "side", "limits")
+# Where a session keeps the Database it came from (database_of).
+DATABASE_INFO = "inventory.database"
+
+
+@dataclass(frozen=True)
+class Database:
+    """The app's database, made once by create_app (make_database) and kept
+    as app.state.db: three pools, and the places for requests' sessions, as
+    many as the request pool has connections (session_slot).
+
+    No connection is ever held while waiting for another from its own pool,
+    or a pool that waits on its: enough at once would each hold one and wait
+    for another (inventory-tng-8i4.125). So a request (request pool) writes
+    last seen on the side pool, work after the reply runs on the side pool,
+    and either counts attempts on the limits pool, whose connections wait on
+    nothing: each pool's connections wait only on those after it in POOLS
+    (tests/conftest.py checks every test keeps to it). Waiting longer than
+    `timeout` for any answers 503 (install)."""
+
+    engine: Engine
+    side: Engine
+    limits: Engine
+    sessions: anyio.CapacityLimiter
+    # How long to wait for a connection, or a place for a session.
+    timeout: float = POOL_TIMEOUT
+
+    def session(self, *, side: bool = False, expire_on_commit: bool = True) -> Session:
+        """A session on the request pool, or the side pool, that knows this
+        Database (database_of)."""
+        return Session(
+            self.side if side else self.engine,
+            info={DATABASE_INFO: self},
+            expire_on_commit=expire_on_commit,
+        )
+
+    @property
+    def pools(self) -> dict[PoolName, Engine]:
+        """Each pool by name, in POOLS' order."""
+        return {"requests": self.engine, "side": self.side, "limits": self.limits}
+
+    def dispose(self) -> None:
+        for pool in self.pools.values():
+            pool.dispose()
+
+
+def make_database(
+    url: str | URL,
+    *,
+    pool: tuple[int, int] = (POOL, OVERFLOW),
+    side: tuple[int, int] = (SIDE_POOL, SIDE_OVERFLOW),
+    limits: tuple[int, int] = (LIMITS_POOL, LIMITS_OVERFLOW),
+    timeout: float = POOL_TIMEOUT,
+) -> Database:
+    """The app's database; tests give smaller pools and shorter waits."""
+    return Database(
+        _engine(url, *pool, timeout, name="requests"),
+        _engine(url, *side, timeout, name="side"),
+        _engine(url, *limits, timeout, name="limits"),
+        anyio.CapacityLimiter(sum(pool)),
+        timeout,
+    )
+
+
+def database_of(session: Session) -> Database:
+    """The Database `session` came from, for attempts counted on its limits
+    pool (rate_limits): every session the app makes knows it
+    (Database.session), as tests' do."""
+    try:
+        return session.info[DATABASE_INFO]
+    except KeyError:
+        raise RuntimeError(
+            "a session made without its Database (db.Database.session)"
+        ) from None
 
 
 def make_engine(url: str) -> Engine:
-    """The app's engine, with its side pool (side_engine)."""
-    engine = _engine(url, POOL, OVERFLOW)
-    side_engine(engine)
-    return engine
+    """One pool, for what serves no requests: migrations and the tests'
+    own set-up."""
+    return _engine(url, POOL, OVERFLOW)
 
 
-def _engine(url: str | URL, pool: int, overflow: int) -> Engine:
+def _engine(
+    url: str | URL,
+    pool: int,
+    overflow: int,
+    timeout: float = POOL_TIMEOUT,
+    *,
+    name: PoolName | None = None,
+) -> Engine:
     # A database that drops packets fails a request in seconds instead of
     # holding a worker until the operating system gives up. Parameters are
     # hidden from SQLAlchemy's log lines and messages, because they can hold
@@ -96,13 +177,53 @@ def _engine(url: str | URL, pool: int, overflow: int) -> Engine:
         url,
         pool_size=pool,
         max_overflow=overflow,
-        pool_timeout=POOL_TIMEOUT,
+        pool_timeout=timeout,
         pool_pre_ping=True,
         connect_args={"connect_timeout": 5},
         hide_parameters=True,
+        pool_logging_name=name,
     )
     event.listen(engine, "connect", _prepare)
+    if name is not None:
+        _watch_order(engine, name)
     return engine
+
+
+# The side and limits pools' connections taken and not yet given back, by
+# their record: the thread that took each, and its pool's place in POOLS.
+_TAKEN: dict[int, tuple[int, int]] = {}
+_TAKING = threading.Lock()
+
+
+def pool_order_broken(pool: PoolName, held: list[PoolName]) -> None:
+    """A thread took a connection from `pool` while it held one from `held`,
+    the same pool or one after it in POOLS: enough such at once would wait
+    on each other (Database). A bug; tests fail on it (conftest)."""
+    log.error("connection taken out of pool order", pool=pool, held=held)
+
+
+def _watch_order(engine: Engine, name: PoolName) -> None:
+    """Check each take from the side and limits pools against the pools the
+    thread already holds. The request pool's are left out: its discipline
+    is the requests' places (session_slot), and a request's connection
+    passes between threads."""
+    if (place := POOLS.index(name)) == 0:
+        return
+
+    def taken(_dbapi: object, record: object, _proxy: object) -> None:
+        thread = threading.get_ident()
+        with _TAKING:
+            held = [POOLS[p] for t, p in _TAKEN.values() if t == thread and p >= place]
+            _TAKEN[id(record)] = (thread, place)
+        if held:
+            pool_order_broken(name, held)
+
+    def given_back(_dbapi: object, record: object) -> None:
+        with _TAKING:
+            _TAKEN.pop(id(record), None)
+
+    event.listen(engine, "checkout", taken)
+    event.listen(engine, "checkin", given_back)
 
 
 def _prepare(connection: DBAPIConnection, _record: object) -> None:
@@ -115,47 +236,38 @@ def _prepare(connection: DBAPIConnection, _record: object) -> None:
     )
 
 
-_SIDE: weakref.WeakKeyDictionary[Engine, Engine] = weakref.WeakKeyDictionary()
-# Request threads can ask for an engine's first side pool at once.
-_SIDE_MADE = threading.Lock()
+class PoolTimeout(exc.TimeoutError):
+    """No connection from one of the app's pools, or no place for a
+    request's session, within Database.timeout: which (pool_timeouts)."""
+
+    def __init__(self, pool: PoolName) -> None:
+        super().__init__(f"no connection from the {pool} pool in time")
+        self.pool = pool
 
 
-def side_engine(engine: Engine) -> Engine:
-    """The pool for writes in a transaction of their own beside a request's
-    (record_last_seen, rate_limits): a small one of its own, so a request
-    holding one of `engine`'s connections never waits on that pool for a
-    second. Enough such requests at once would otherwise each hold one and
-    wait for another, until the pool timed out (inventory-tng-8i4.125). Its
-    connections never wait on `engine`'s, so no cycle can form. Made with
-    `engine` by make_engine, or here for one made otherwise; its
-    connections close as `engine`'s do, by dispose() or once it is gone."""
-    with _SIDE_MADE:
-        if (side := _SIDE.get(engine)) is None:
-            side = _SIDE[engine] = _engine(engine.url, SIDE_POOL, SIDE_OVERFLOW)
-            event.listen(engine, "engine_disposed", lambda _engine: side.dispose())
-            weakref.finalize(engine, side.dispose)
-    return side
+class NoSession(PoolTimeout):
+    """No place for the request's session within Database.timeout."""
 
-
-class NoSession(exc.TimeoutError):
-    """No place for the request's session within POOL_TIMEOUT."""
+    def __init__(self) -> None:
+        super().__init__("requests")
 
 
 async def session_slot(request: Request) -> AsyncIterator[None]:
     """A place among the requests that hold a session at once, no more than
-    the request pool has connections (app.state.sessions), waited for on
+    the request pool has connections (Database.sessions), waited for on
     the event loop before the session is made. A request holds its
     connection across several threads in turn: its dependencies', its
     route's, and FastAPI's check of a returned model. With more requests
     holding connections than there are threads, each thread could wait for
     a connection held by a request waiting for a thread, until the pool
     timed out (inventory-tng-8i4.125). A request waiting here holds neither."""
-    sessions: anyio.CapacityLimiter = request.app.state.sessions
+    database: Database = request.app.state.db
+    sessions = database.sessions
     try:
-        with anyio.fail_after(POOL_TIMEOUT):
+        with anyio.fail_after(database.timeout):
             await sessions.acquire()
     except TimeoutError:
-        raise NoSession("no place for a session") from None
+        raise NoSession from None
     try:
         yield
     finally:
@@ -171,7 +283,8 @@ def get_session(
     page an exception handler shows, or any work after the reply: so what
     the route did not commit is gone, and any lock it took, such as a
     sensitive form's that was refused without a commit, is let go first."""
-    with Session(request.app.state.engine, expire_on_commit=False) as session:
+    database: Database = request.app.state.db
+    with database.session(expire_on_commit=False) as session:
         try:
             yield session
         finally:
@@ -190,8 +303,8 @@ def get_session_factory(request: Request) -> SessionFactory:
     """On the side pool: work after the reply holds no place among the
     requests (session_slot), so it must not take the request pool's
     connections from those that do."""
-    engine = side_engine(request.app.state.engine)
-    return lambda: Session(engine, expire_on_commit=False)
+    database: Database = request.app.state.db
+    return lambda: database.session(side=True, expire_on_commit=False)
 
 
 Sessions = Annotated[SessionFactory, Depends(get_session_factory)]
@@ -364,7 +477,7 @@ def run_outside_transaction(connection: DBAPIConnection, *statements: str) -> No
 
 
 def record_last_seen(
-    engine: Engine, model: type[Any], row_id: int, now: datetime
+    database: Database, model: type[Any], row_id: int, now: datetime
 ) -> None:
     """Set a row's last_seen_at in a transaction of its own, so a request
     that saves nothing still counts, and the route's own transaction is left
@@ -373,7 +486,7 @@ def record_last_seen(
     counted against the rate limits, or the row locked longer than
     LOCK_TIMEOUT, it is skipped, not the request failed."""
     try:
-        with Session(side_engine(engine)) as session, session.begin():
+        with database.session(side=True) as session, session.begin():
             session.execute(
                 update(model).where(model.id == row_id).values(last_seen_at=now)
             )
@@ -530,9 +643,10 @@ def install(app: FastAPI) -> None:
             raise error
         if isinstance(error, exc.TimeoutError):
             # Too many requests at once for the request pool (NoSession), or
-            # the side pool busy: the request pool's own connections are
-            # never waited for, as no more requests hold one than it has.
-            pool = "requests" if isinstance(error, NoSession) else "side"
+            # the limits pool busy. The request pool's own connections are
+            # never waited for, as no more requests hold one than it has;
+            # the side pool's last seen is skipped (record_last_seen).
+            pool = error.pool if isinstance(error, PoolTimeout) else "side"
             pool_timeouts.add(1, {"db.client.connection.pool.name": pool})
         log.warning("database unavailable", **describe_error(error))
         body = UnavailableReply(reason="database_unavailable")

@@ -18,7 +18,7 @@ from opentelemetry.sdk.metrics.export import (
     Metric,
     NumberDataPoint,
 )
-from sqlalchemy import create_engine, exc
+from sqlalchemy import exc
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
@@ -36,6 +36,7 @@ from inventory_tng.telemetry import Telemetry, enabled
 from helpers.apps import on_session
 from helpers.devices import new_device
 from helpers.mail import FailingMail, SentMail
+from helpers.pools import small_database
 from helpers.rows import add, shown, tag
 from helpers.sign_in import PASSWORD, code, new_admin, sign_in_with
 from helpers.stock import Place, adjustment_form, received, retire, stocked, write
@@ -110,7 +111,7 @@ def recorded(database_url: str) -> Iterator[Recorded]:
     telemetry = Telemetry.create({}, metric_reader=reader, log_exporter=exporter)
     telemetry.make_global()
     app = create_app(Settings(database_url=database_url))
-    telemetry.instrument(app, app.state.engine)
+    telemetry.instrument(app, app.state.db)
     telemetry.attach_logs(Masker())
     root = logging.getLogger()
     level = root.level
@@ -545,7 +546,7 @@ def test_counts_requests_that_found_no_free_connection(recorded: Recorded) -> No
     assert counted(reader, "db.client.connection.timeouts")[side] == before + 1
 
     def no_session() -> None:
-        raise NoSession("no place for a session")
+        raise NoSession
 
     app.add_api_route("/api/no-session", no_session)
     requests = (("db.client.connection.pool.name", "requests"),)
@@ -558,9 +559,10 @@ def test_counts_requests_that_found_no_free_connection(recorded: Recorded) -> No
         for pair in attributes
         if isinstance(pair, tuple) and pair[0] == "db.client.connection.pool.name"
     }
-    assert pools == {"requests", "side"}
+    assert pools == {"requests", "side", "limits"}
 
 
+@pytest.mark.breaks_pool_order
 def test_counts_last_seen_skipped_for_a_busy_side_pool(
     recorded: Recorded, database_url: str
 ) -> None:
@@ -568,17 +570,13 @@ def test_counts_last_seen_skipped_for_a_busy_side_pool(
     no request for it. Skipped, not a 503, but a side pool timeout all the
     same."""
     _, _, reader, _ = recorded
-    engine = db._engine(database_url, 1, 0)
-    side = db._SIDE[engine] = create_engine(
-        engine.url, pool_size=1, max_overflow=0, pool_timeout=0.1
-    )
     key = (("db.client.connection.pool.name", "side"),)
     before = counted(reader, "db.client.connection.timeouts").get(key, 0)
-    try:
-        with side.connect(), capture_logs() as logs:
-            db.record_last_seen(engine, Device, -1, datetime.now(UTC))
-    finally:
-        side.dispose()
-        engine.dispose()
+    with (
+        small_database(database_url) as database,
+        database.side.connect(),
+        capture_logs() as logs,
+    ):
+        db.record_last_seen(database, Device, -1, datetime.now(UTC))
     assert counted(reader, "db.client.connection.timeouts")[key] == before + 1
     assert [line["event"] for line in logs] == ["last seen not recorded"]

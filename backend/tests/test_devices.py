@@ -15,7 +15,7 @@ from sqlalchemy import Engine, select, update
 from sqlalchemy.orm import Session
 
 from inventory_tng import devices, registration_codes
-from inventory_tng.db import get_locked
+from inventory_tng.db import Database, get_locked
 from inventory_tng.devices import COOKIE, RegisteredDevice, RegistrationRejected
 from inventory_tng.logs import configure_logging
 from inventory_tng.models import CatalogueHistory, Device, RegistrationCode
@@ -342,12 +342,14 @@ def test_the_command_line_makes_a_code_that_registers(
     assert device.id
 
 
-def test_guesses_sent_at_once_get_no_more_than_the_limit(engine: Engine) -> None:
+def test_guesses_sent_at_once_get_no_more_than_the_limit(
+    database: Database,
+) -> None:
     """Each counts before its code is checked, so none slips under the limit
     while another is being checked (inventory-tng-8i4.126)."""
 
     def guess(_: int) -> str:
-        with Session(engine) as session:
+        with database.session() as session:
             try:
                 devices.register(session, "not-a-code-at-all", "192.0.2.80")
             except RegistrationRejected as rejected:

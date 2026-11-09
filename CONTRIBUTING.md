@@ -222,6 +222,12 @@ with `admin/common.form_version` and shows a refusal as `RULES[CHANGED]`'s
 alert, which `admin_page` answers 409. An administrator's own account is
 not versioned: only they edit it.
 
+A request's session comes from the app's request pool; a write in a
+transaction of its own, or work after the reply, takes the side pool, and
+an attempt counted against a rate limit the limits pool (`db.Database`). Take
+a connection only from a pool after the ones you hold: every test checks it,
+and one that breaks the order on purpose is marked `breaks_pool_order`.
+
 ### The scan page
 
 The scan page and the registration page are TypeScript, in `frontend/`
