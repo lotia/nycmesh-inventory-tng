@@ -106,7 +106,7 @@
     "/api/transactions": {
       "post": {
         "summary": "Save Batch",
-        "description": "Write a whole batch, or none of it. A 422 names each bad line.",
+        "description": "Write a whole batch, or none of it. A 422 names each bad line, as\nFastAPI's own do: an item, location or volunteer that does not exist, a\nfraction of an item counted in each, a retired item received, or an item\nanother line names too (repeated): send each item on one line.",
         "operationId": "save_batch_api_transactions_post",
         "requestBody": {
           "content": {
@@ -288,7 +288,8 @@
             "type": "array",
             "maxItems": 500,
             "minItems": 1,
-            "title": "Lines"
+            "title": "Lines",
+            "description": "One line per item: a batch naming an item on more than one line is refused, 422 with type repeated on each of those lines."
           }
         },
         "type": "object",

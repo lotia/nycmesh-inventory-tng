@@ -55,7 +55,10 @@ export interface paths {
     put?: never;
     /**
      * Save Batch
-     * @description Write a whole batch, or none of it. A 422 names each bad line.
+     * @description Write a whole batch, or none of it. A 422 names each bad line, as
+     *     FastAPI's own do: an item, location or volunteer that does not exist, a
+     *     fraction of an item counted in each, a retired item received, or an item
+     *     another line names too (repeated): send each item on one line.
      */
     post: operations["save_batch_api_transactions_post"];
     delete?: never;
@@ -108,7 +111,10 @@ export interface components {
       to_location_id?: number | null;
       /** Install Number */
       install_number?: number | null;
-      /** Lines */
+      /**
+       * Lines
+       * @description One line per item: a batch naming an item on more than one line is refused, 422 with type repeated on each of those lines.
+       */
       lines: components["schemas"]["Line"][];
     };
     /** Catalogue */

@@ -50,7 +50,7 @@ from inventory_tng.db import (
     locked_row,
     release_hold,
 )
-from inventory_tng.ledger import insert_transaction
+from inventory_tng.ledger import Batch, insert_transaction, record
 from inventory_tng.mail import Message, Notify
 from inventory_tng.models import (
     Admin,
@@ -58,6 +58,7 @@ from inventory_tng.models import (
     AdminSession,
     Category,
     Item,
+    LedgerTransaction,
     Location,
     SentForm,
     SignInSettings,
@@ -1001,6 +1002,32 @@ def test_a_receipt_while_its_item_is_retired_waits_then_is_refused(
     retiring = doing(Item, place.item.id, lambda s, i: items.retire(s, i, NOW))
     refused = at_once(own_committed, retiring, receiving(place.item, place.store, "1"))
     assert refused == "receipt_retired_item"
+
+
+@pytest.mark.concurrency
+def test_a_batch_sent_twice_at_once_is_written_once(
+    own_committed: Committed,
+) -> None:
+    """Neither finds its key written, so both reach the insert: the second
+    waits on the first's key, then writes nothing and finds the first's
+    (ledger.record), which the route answers 200 with. On a database of its
+    own, as it writes the ledger."""
+    place = stocking(own_committed)
+    batch = Batch.model_validate(place.batch())
+    one, two = own_committed.session(), own_committed.session()
+    first, wrote = record(one, batch, device_id=None)
+    worker = own_committed.blocked(two, lambda: record(two, batch, device_id=None))
+    one.commit()
+    finished = worker.finished()
+    two.rollback()
+    assert finished.error is None
+    second, wrote_again = cast(tuple[LedgerTransaction, bool], finished.result)
+    assert (wrote, wrote_again, second.id) == (True, False, first.id)
+    checking = own_committed.session()
+    keyed = LedgerTransaction.idempotency_key == batch.key
+    assert checking.scalars(select(LedgerTransaction.id).where(keyed)).all() == [
+        first.id
+    ]
 
 
 @pytest.mark.concurrency
