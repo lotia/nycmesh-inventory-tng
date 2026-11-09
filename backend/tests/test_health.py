@@ -16,8 +16,8 @@ def test_healthz_answers_once_the_database_does(client: TestClient) -> None:
 
 
 def test_healthz_is_503_and_warns_when_the_database_is_unreachable() -> None:
-    # Made first: making an app warns of its own when the scan page is not
-    # built, as in CI's backend job, and only the request's warnings count.
+    # Made first: making an app warns that the scan page is not built
+    # (conftest's no_settings_from_the_shell), and only the request's warnings count.
     client = out_of_reach()
     with capture_logs() as logs:
         response = client.get("/api/healthz")

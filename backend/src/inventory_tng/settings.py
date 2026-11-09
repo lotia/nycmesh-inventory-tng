@@ -102,7 +102,8 @@ class FrontendConfig:
     """Where the scan page's bundle is (docs/decisions/0010)."""
 
     # What `vite build` wrote, or the container's compressed copy of it.
-    dist: Path = CLONE_DIST
+    # Looked up as each config is made, so it can be patched.
+    dist: Path = field(default_factory=lambda: CLONE_DIST)
     # Vite's dev server, such as http://localhost:5173: pages load the bundle
     # from it instead of dist. Development only.
     dev_server: str | None = None
@@ -115,7 +116,7 @@ class FrontendConfig:
     def from_environ(cls, environ: Mapping[str, str] = os.environ) -> Self:
         dist = environ.get("FRONTEND_DIST", "").strip()
         return cls(
-            dist=Path(dist) if dist else cls.dist,
+            dist=Path(dist) if dist else CLONE_DIST,
             dev_server=environ.get("VITE_DEV_SERVER", "").strip() or None,
         )
 

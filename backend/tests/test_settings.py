@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from inventory_tng import settings
 from inventory_tng.settings import (
     FrontendConfig,
     Settings,
@@ -87,6 +88,17 @@ def test_refuses_an_unclear_client_address_setting() -> None:
     environ = {"DATABASE_URL": "postgresql://db/x", "LOG_CLIENT_ADDRESS": "maybe"}
     with pytest.raises(SettingsError, match="LOG_CLIENT_ADDRESS"):
         Settings.from_environ(environ)
+
+
+def test_the_suite_finds_no_build() -> None:
+    """Whether or not this clone has a frontend/dist (conftest's
+    no_settings_from_the_shell): CI's backend job has none, so a test that
+    read this one could pass here and fail there."""
+    missing = settings.CLONE_DIST
+    assert missing != settings.CLONE / "frontend" / "dist"
+    assert not missing.exists()
+    assert Settings(database_url=URL).frontend.dist == missing
+    assert Settings.from_environ({"DATABASE_URL": URL}).frontend.dist == missing
 
 
 def test_reads_where_the_bundle_is(tmp_path: Path) -> None:
