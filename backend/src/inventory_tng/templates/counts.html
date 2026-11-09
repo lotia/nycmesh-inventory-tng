@@ -2,8 +2,9 @@
 {% from "_table.html" import table %}
 {% from "_retired.html" import retired %}
 {% block main %}
-<section>
+<section id="count">
   <h2>Count a place</h2>
+  {% with section_id="count" %}{% include "_notice.html" %}{% endwith %}
   <p class="hint">See what the records say is there, and put right what isn't.</p>
   <form method="get" action="{{ here }}/place" class="actions">
     <label>Place
@@ -16,8 +17,9 @@
   </form>
 </section>
 
-<section>
+<section id="adjust">
   <h2>Found or written off</h2>
+  {% with section_id="adjust" %}{% include "_notice.html" %}{% endwith %}
   <form method="post" action="{{ here }}/adjustments">
     <input type="hidden" name="key" value="{{ values.get('key', key) }}">
     <label>Place

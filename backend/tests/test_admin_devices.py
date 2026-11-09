@@ -86,7 +86,10 @@ def test_revoking_a_code_and_a_device(
     assert code.revoked_at is not None
     assert device.revoked_at is None  # Its devices stay registered.
     done = admin_client.post(f"{DEVICES}/{device.id}/revoke")
-    assert done.headers["location"] == f"{CODES}/{code.id}?notice=device_revoked"
+    assert (
+        done.headers["location"]
+        == f"{CODES}/{code.id}?notice=device_revoked&section=devices#devices"
+    )
     session.refresh(device)
     assert device.revoked_at is not None
 

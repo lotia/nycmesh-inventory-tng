@@ -199,7 +199,7 @@ def save_scan_settings(
         return _changed(request, session, signed)
     session.commit()
     log.info("scan settings changed", name_check_minutes=minutes)
-    return redirect(SETTINGS, notice="settings_saved")
+    return redirect(SETTINGS, notice="settings_saved", section="scan-page")
 
 
 @router.post(f"{SETTINGS}/reasons")
@@ -221,7 +221,7 @@ def add_reason(
         return _page(request, session, signed, problems=problems)
     session.commit()
     log.info("adjustment reason added", adjustment_reason_id=added.id)
-    return redirect(SETTINGS, notice="added")
+    return redirect(SETTINGS, notice="added", section="reasons")
 
 
 @router.post(f"{SETTINGS}/reasons/{{reason_id}}")
@@ -265,7 +265,7 @@ def change_reason(
     session.commit()
     log.info("adjustment reason changed", adjustment_reason_id=reason_id, action=action)
     notice = {"retire": "reason_retired", "restore": "restored"}
-    return redirect(SETTINGS, notice=notice.get(action, "saved"))
+    return redirect(SETTINGS, notice=notice.get(action, "saved"), section="reasons")
 
 
 @router.post(f"{SETTINGS}/sign-in")
@@ -294,7 +294,7 @@ def save_sign_in_settings(
         return _changed(request, session, signed)
     if all(getattr(current, field) == value for field, value in chosen.items()):
         # Nothing to record, and nobody to tell.
-        return redirect(SETTINGS, notice="saved")
+        return redirect(SETTINGS, notice="saved", section="sign-in")
     for field, value in chosen.items():
         setattr(current, field, value)
     changed(signed, session)
@@ -306,7 +306,7 @@ def save_sign_in_settings(
         )
     ):
         notify.tell(email, admin_id, told)
-    return redirect(SETTINGS, notice="saved")
+    return redirect(SETTINGS, notice="saved", section="sign-in")
 
 
 @router.post(f"{SETTINGS}/site")
@@ -323,7 +323,7 @@ def save_site_settings(
     except RuleBroken:  # changed_since_shown, before anything is written.
         return _changed(request, session, signed)
     if time_zone == site.time_zone:
-        return redirect(SETTINGS, notice="site_saved")
+        return redirect(SETTINGS, notice="site_saved", section="time-zone")
 
     def save() -> None:
         site.time_zone = time_zone
@@ -339,4 +339,4 @@ def save_site_settings(
         )
     session.commit()
     log.info("site time zone changed")
-    return redirect(SETTINGS, notice="site_saved")
+    return redirect(SETTINGS, notice="site_saved", section="time-zone")

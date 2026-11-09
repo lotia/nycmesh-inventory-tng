@@ -21,8 +21,9 @@
 </form>
 
 {% if not volunteer.retired_at %}
-<section>
+<section id="holding">
   <h2>Holding stock</h2>
+  {% with section_id="holding" %}{% include "_notice.html" %}{% endwith %}
   {% if custody %}
   <p>They can hold stock: it shows as theirs, wherever they take it.</p>
   <form method="post" action="{{ here }}/custody/end"><button>Stop</button></form>

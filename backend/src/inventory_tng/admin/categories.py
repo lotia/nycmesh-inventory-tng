@@ -183,7 +183,7 @@ def retire_category(
         )
     session.commit()
     log.info("category retired", category_id=category_id)
-    return redirect(CATEGORIES, notice="retired")
+    return redirect(CATEGORIES, notice="retired", section="retired")
 
 
 @router.post(f"{CATEGORIES}/{{category_id}}/restore")

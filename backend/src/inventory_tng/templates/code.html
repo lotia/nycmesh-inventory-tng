@@ -9,8 +9,9 @@ until {{ code.expires_at | when(zone) }}.</p>
 registered; revoke any that look wrong below.</p>
 {% endif %}
 
-<section>
+<section id="devices">
   <h2>Devices it registered</h2>
+  {% with section_id="devices" %}{% include "_notice.html" %}{% endwith %}
   {% call table() %}
     <tr><th>Device</th><th>Registered</th><th>Last used</th><th>From</th><th></th></tr>
     {% for device, before in devices %}

@@ -108,7 +108,7 @@ def test_a_count_puts_the_records_right(
             "extra_quantity": "10.5",
         },
     )
-    assert done.headers["location"] == f"{COUNTS}?notice=counted"
+    assert done.headers["location"] == f"{COUNTS}?notice=counted&section=count#count"
     assert expected(session, place.store.id) == {
         place.item.id: Decimal(3),
         place.cable.id: Decimal("10.5"),
@@ -128,7 +128,9 @@ def test_a_count_that_matches_is_still_recorded(
     done = admin_client.post(
         path, data=count_form(admin_client, path) | {f"counted_{place.item.id}": "5"}
     )
-    assert done.headers["location"] == f"{COUNTS}?notice=counted_same"
+    assert (
+        done.headers["location"] == f"{COUNTS}?notice=counted_same&section=count#count"
+    )
     (clean,) = counts_written(session)
     assert clean.to_location_id == place.store.id
     assert (
@@ -251,7 +253,7 @@ def test_a_count_naming_an_item_twice_is_refused(
     assert counts_written(session) == []
     assert expected(session, place.store.id) == {place.item.id: Decimal(5)}
     done = admin_client.post(path, data=shown)
-    assert done.headers["location"] == f"{COUNTS}?notice=counted"
+    assert done.headers["location"] == f"{COUNTS}?notice=counted&section=count#count"
     assert expected(session, place.store.id) == {place.item.id: Decimal(3)}
 
 
@@ -265,7 +267,7 @@ def test_found_and_written_off(admin_client: TestClient, session: Session) -> No
         amount="2",
     )
     done = admin_client.post(ADJUSTMENTS, data=form)
-    assert done.headers["location"] == f"{COUNTS}?notice=adjusted"
+    assert done.headers["location"] == f"{COUNTS}?notice=adjusted&section=adjust#adjust"
     admin_client.post(ADJUSTMENTS, data=form)  # Twice: written once.
     (written,) = counts_written(session)
     assert (written.kind, written.reason_id) == ("adjustment", int(form["reason_id"]))
@@ -372,7 +374,7 @@ def test_a_save_during_a_count_still_applies(
         data=shown
         | {f"counted_{place.item.id}": "", f"counted_{place.cable.id}": "18"},
     )
-    assert done.headers["location"] == f"{COUNTS}?notice=counted"
+    assert done.headers["location"] == f"{COUNTS}?notice=counted&section=count#count"
     assert expected(session, place.store.id) == {
         place.item.id: Decimal(2),
         place.cable.id: Decimal(18),
@@ -408,7 +410,7 @@ def test_an_item_that_moved_while_counted_is_counted_again(
     assert again["key"] != shown["key"]
     assert again["as_of"] != shown["as_of"]
     done = admin_client.post(path, data=again | {f"counted_{place.item.id}": "1"})
-    assert done.headers["location"] == f"{COUNTS}?notice=counted"
+    assert done.headers["location"] == f"{COUNTS}?notice=counted&section=count#count"
     assert expected(session, place.store.id)[place.item.id] == Decimal(1)
 
 
@@ -513,7 +515,7 @@ def test_a_count_sent_again_after_a_later_move_is_not_asked_again(
     assert admin_client.post(path, data=form).status_code == 303
     write(session, place)  # Three radios to the van.
     again = admin_client.post(path, data=form)
-    assert again.headers["location"] == f"{COUNTS}?notice=counted"
+    assert again.headers["location"] == f"{COUNTS}?notice=counted&section=count#count"
     assert expected(session, place.store.id) == {place.item.id: Decimal(1)}
 
 
@@ -667,7 +669,7 @@ def test_a_retired_place_counted_to_nothing_clears_every_signal(
     assert "is retired, but the records say something" in text(shown)
     form = count_form_of(shown) | {f"counted_{place.item.id}": "0"}
     done = admin_client.post(path, data=form)
-    assert done.headers["location"] == f"{COUNTS}?notice=counted"
+    assert done.headers["location"] == f"{COUNTS}?notice=counted&section=count#count"
     assert expected(session, place.van.id) == {}
     assert signals(admin_client, place) == dict.fromkeys(every, False)
     # Sent again, it is answered as the first send was, writing nothing.

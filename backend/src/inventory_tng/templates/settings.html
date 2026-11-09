@@ -1,8 +1,9 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% block main %}
-<section>
+<section id="sign-in">
   <h2>Signing in</h2>
+  {% with section_id="sign-in" %}{% include "_notice.html" %}{% endwith %}
   <p class="hint">Changing these asks for a fresh code, and every
   administrator with an email is told.</p>
   <form method="post" action="{{ here }}/sign-in">
@@ -25,8 +26,9 @@
   </form>
 </section>
 
-<section>
+<section id="time-zone">
   <h2>Time zone</h2>
+  {% with section_id="time-zone" %}{% include "_notice.html" %}{% endwith %}
   <form method="post" action="{{ here }}/site" class="actions">
     <input type="hidden" name="site_version" value="{{ values.site_version }}">
     <label>Times are shown in
@@ -40,8 +42,9 @@
   <p class="hint">Everything is kept in UTC; this only changes how times read.</p>
 </section>
 
-<section>
+<section id="scan-page">
   <h2>Scan page</h2>
+  {% with section_id="scan-page" %}{% include "_notice.html" %}{% endwith %}
   <form method="post" action="{{ here }}/scan">
     <input type="hidden" name="scan_version" value="{{ values.scan_version }}">
     <label>Ask whose name it is after <span class="hint">minutes a phone sits unused; 0 never asks</span>
@@ -53,8 +56,9 @@
   <p class="hint">After that long, the page asks "Are you …?" before the next
   save, so a shared phone isn't used under someone else's name.</p>
 </section>
-<section>
+<section id="reasons">
   <h2>Reasons for an adjustment</h2>
+  {% with section_id="reasons" %}{% include "_notice.html" %}{% endwith %}
   <p class="hint">Offered when stock is found or written off on the Counts page.</p>
   {% call table() %}
     {% for reason in reasons %}

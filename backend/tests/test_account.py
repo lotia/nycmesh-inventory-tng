@@ -95,7 +95,7 @@ def test_changing_the_email(
 ) -> None:
     admin, _ = ada
     done = client.post(f"{ACCOUNT}/email", data={"email": "ada@example.org"})
-    assert done.headers["location"] == f"{ACCOUNT}?notice=email"
+    assert done.headers["location"] == f"{ACCOUNT}?notice=email&section=email#email"
     assert admin.email == "ada@example.org"
     assert client.post(f"{ACCOUNT}/email", data={"email": ""}).status_code == 303
     assert admin.email is None
@@ -123,7 +123,10 @@ def test_changing_the_password_ends_the_other_sessions(
     other = other_session(session, admin)
     form = {"password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
     done = client.post(f"{ACCOUNT}/password", data=form)
-    assert done.headers["location"] == f"{ACCOUNT}?notice=password"
+    assert (
+        done.headers["location"]
+        == f"{ACCOUNT}?notice=password&section=password#password"
+    )
     assert other.ended_at is not None
     assert mine.ended_at is None
     stored = session.get_one(AdminPassword, admin.id)
@@ -190,7 +193,10 @@ def test_removing_one_of_two_wipes_its_key(
         session, TOTP_KEYS, admin.id, "Spare", accounts.new_totp_key(), 0
     )
     done = client.post(f"{ACCOUNT}/authenticators/{spare.id}/remove")
-    assert done.headers["location"] == f"{ACCOUNT}?notice=removed"
+    assert (
+        done.headers["location"]
+        == f"{ACCOUNT}?notice=removed&section=authenticators#authenticators"
+    )
     assert spare.retired_at is not None
     assert spare.sealed_key is None
     assert spare.key_version is None
@@ -207,7 +213,10 @@ def test_removing_the_last_while_optional_turns_totp_off(
     accounts.make_recovery_codes(session, admin.id, datetime.now(UTC))
     (authenticator,) = accounts.authenticators(session, admin.id)
     done = client.post(f"{ACCOUNT}/authenticators/{authenticator.id}/remove")
-    assert done.headers["location"] == f"{ACCOUNT}?notice=totp_off"
+    assert (
+        done.headers["location"]
+        == f"{ACCOUNT}?notice=totp_off&section=authenticators#authenticators"
+    )
     assert not accounts.uses_totp(session, admin.id)
     assert accounts.recovery_codes_left(session, admin.id) == 0
     client.cookies.clear()
@@ -236,7 +245,10 @@ def test_ending_another_session_and_this_one(
     other = other_session(session, admin, "Firefox")
     assert "Firefox" in text(client.get(ACCOUNT))
     done = client.post(f"{ACCOUNT}/sessions/{other.id}/end")
-    assert done.headers["location"] == f"{ACCOUNT}?notice=session"
+    assert (
+        done.headers["location"]
+        == f"{ACCOUNT}?notice=session&section=sessions#sessions"
+    )
     assert other.ended_at is not None
     out = client.post(f"{ACCOUNT}/sessions/{mine.id}/end")
     assert out.headers["location"] == sign_in.SIGN_IN
@@ -294,7 +306,7 @@ def test_a_late_form_asks_for_a_code_and_keeps_what_was_typed(
         f"{ACCOUNT}/email",
         data={"email": "ada@example.org", sign_in.CONFIRM_FIELD: later},
     )
-    assert done.headers["location"] == f"{ACCOUNT}?notice=email"
+    assert done.headers["location"] == f"{ACCOUNT}?notice=email&section=email#email"
     assert admin.email == "ada@example.org"
 
 

@@ -196,4 +196,4 @@ def revoke_device(
         return not_found()
     changed(signed, session)
     code_id = device.registration_code_id
-    return redirect(f"{CODES}/{code_id}", notice="device_revoked")
+    return redirect(f"{CODES}/{code_id}", notice="device_revoked", section="devices")

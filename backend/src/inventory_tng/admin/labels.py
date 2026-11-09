@@ -107,7 +107,7 @@ def make_labels(
     """Makes the code if it has none, then opens its sheet to print."""
     count = whole(copies, 1, labels.MAX_COPIES)
     if count is None:
-        return redirect(LABELS, notice="copies")
+        return redirect(LABELS, notice="copies", section="current")
     if item_id is not None and location_id is None:
         label = labels.make_for_item(session, item_id, package_id)
     elif location_id is not None and item_id is None and package_id is None:
@@ -130,12 +130,12 @@ def print_labels(
 ) -> Response:
     count = whole(copies, 1, labels.MAX_COPIES)
     if count is None:
-        return redirect(LABELS, notice="copies")
+        return redirect(LABELS, notice="copies", section="current")
     picked = labels.printable(session, label or [])
     if not picked:
-        return redirect(LABELS, notice="pick_labels")
+        return redirect(LABELS, notice="pick_labels", section="current")
     if len(picked) * count > labels.MAX_LABELS:
-        return redirect(LABELS, notice="too_many")
+        return redirect(LABELS, notice="too_many", section="current")
     total = labels.record_printing(picked, count)
     return admin_page(
         request,
@@ -181,4 +181,4 @@ def revoke_label(signed: AdminSignedIn, session: DbSession, label_id: int) -> Re
     if not labels.revoke(session, label_id, now()):
         return not_found()
     session.commit()
-    return redirect(LABELS, notice="label_revoked")
+    return redirect(LABELS, notice="label_revoked", section="inactive")

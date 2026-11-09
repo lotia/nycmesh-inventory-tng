@@ -29,8 +29,9 @@
 </section>
 
 {% if retired %}
-<section class="retired">
+<section class="retired" id="retired">
   <h2>Retired</h2>
+  {% with section_id="retired" %}{% include "_notice.html" %}{% endwith %}
   <ul>{% for volunteer in retired %}<li><a href="{{ here }}/{{ volunteer.id }}">{{ volunteer.name }}</a>
     {% if volunteer.merged_into_id %}<span class="hint">merged into {{ names.get(volunteer.merged_into_id, "") }}</span>{% endif %}</li>{% endfor %}</ul>
 </section>

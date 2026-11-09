@@ -262,7 +262,7 @@ def retire_item(signed: AdminSignedIn, session: DbSession, item_id: int) -> Resp
     items.retire(session, found, now())
     session.commit()
     log.info("item retired", item_id=item_id)
-    return redirect(ITEMS, notice="retired")
+    return redirect(ITEMS, notice="retired", section="retired")
 
 
 @router.post(f"{ITEMS}/{{item_id}}/restore")
@@ -316,7 +316,9 @@ def add_package(
         if package is not None:
             session.commit()
             log.info("package added", item_package_id=package.id)
-            return redirect(f"{ITEMS}/{item_id}", notice="package_added")
+            return redirect(
+                f"{ITEMS}/{item_id}", notice="package_added", section="packages"
+            )
         problems["package_name"] = "It already has a package by that name."
     values = {"package_name": name, "size": size}
     return _item_page(request, session, signed, found, problems=problems, values=values)
@@ -332,4 +334,4 @@ def retire_package(
     items.retire_package(session, package, now())
     session.commit()
     log.info("package retired", item_package_id=package_id)
-    return redirect(f"{ITEMS}/{item_id}", notice="package_retired")
+    return redirect(f"{ITEMS}/{item_id}", notice="package_retired", section="packages")
