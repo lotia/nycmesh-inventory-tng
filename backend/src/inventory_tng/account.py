@@ -103,9 +103,21 @@ def _refused(
     )
 
 
+# Each notice by the section of the page it is about.
+SECTIONS = {
+    "email": "email",
+    "password": "password",
+    "renamed": "authenticators",
+    "removed": "authenticators",
+    "totp_off": "authenticators",
+    "session": "sessions",
+    "others": "sessions",
+}
+
+
 def _done(signed: SignedIn, session: Session, notice: str) -> Response:
     changed(signed, session)
-    return redirect(ACCOUNT, notice=notice)
+    return redirect(ACCOUNT, notice=notice, section=SECTIONS[notice])
 
 
 @router.get(ACCOUNT)

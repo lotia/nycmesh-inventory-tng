@@ -175,7 +175,10 @@ def test_retiring_another_ends_their_sessions(
     ben, _ = new_admin(session, "ben", email="ben@example.org")
     theirs = accounts.start_session(session, ben.id, None, datetime.now(UTC))[0]
     done = admin_client.post(f"{ADMINS}/{ben.id}/retire")
-    assert done.headers["location"] == f"{ADMINS}?notice=admin_retired"
+    assert (
+        done.headers["location"]
+        == f"{ADMINS}?notice=admin_retired&section=retired#retired"
+    )
     assert ben.retired_at is not None
     assert theirs.ended_at is not None
     assert [m.kind for m in sent_mail] == []

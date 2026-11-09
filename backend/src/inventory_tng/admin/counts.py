@@ -403,7 +403,11 @@ def count(
     session.commit()
     corrected(signed.admin.id, place.id, result.written, result.withheld)
     if not result.moved:
-        return redirect(COUNTS, notice="counted" if result.differed else "counted_same")
+        return redirect(
+            COUNTS,
+            notice="counted" if result.differed else "counted_same",
+            section="count",
+        )
     saved = len(counted) - len(result.moved)
     amounts = dict(counted)
     return _count_page(
@@ -481,4 +485,4 @@ def adjust(
     assert written is not None
     session.commit()
     corrected(signed.admin.id, place.id, written)
-    return redirect(COUNTS, notice="adjusted")
+    return redirect(COUNTS, notice="adjusted", section="adjust")

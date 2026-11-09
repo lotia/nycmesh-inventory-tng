@@ -50,8 +50,9 @@ None is left, so nobody can pick it.{% endif %}</p>
   <button>Save</button>
 </form>
 
-<section>
+<section id="packages">
   <h2>Packages</h2>
+  {% with section_id="packages" %}{% include "_notice.html" %}{% endwith %}
   <p class="hint">Sizes it comes in, so one scan or pick counts the whole package.</p>
   {% call table() %}
     {% for package in packages %}

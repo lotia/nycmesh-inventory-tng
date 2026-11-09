@@ -243,7 +243,7 @@ def retire(
     except accounts.AdminRefused as refused:
         return _refused(request, session, signed, refused, OWN_RETIRE)
     changed(signed, session)
-    return redirect(ADMINS, notice="admin_retired")
+    return redirect(ADMINS, notice="admin_retired", section="retired")
 
 
 @router.post(f"{ADMINS}/{{admin_id}}/restore")

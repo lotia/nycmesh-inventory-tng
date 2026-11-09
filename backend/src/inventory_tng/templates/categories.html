@@ -21,8 +21,9 @@
 </section>
 
 {% if retired %}
-<section class="retired">
+<section class="retired" id="retired">
   <h2>Retired</h2>
+  {% with section_id="retired" %}{% include "_notice.html" %}{% endwith %}
   <ul>
     {% for category in retired %}<li><a href="{{ here }}/{{ category.id }}">{{ category.name }}</a></li>{% endfor %}
   </ul>

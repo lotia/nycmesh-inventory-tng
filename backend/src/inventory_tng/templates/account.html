@@ -1,8 +1,9 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% block main %}
-<section>
+<section id="email">
   <h2>Email</h2>
+  {% with section_id="email" %}{% include "_notice.html" %}{% endwith %}
   <form method="post" action="{{ paths.account }}/email">
     <label>Email <span class="hint">optional: lets you reset your own password</span>
       <input name="email" type="email" value="{{ values.get('email', admin.email or '') }}" autocomplete="email">
@@ -12,8 +13,9 @@
   </form>
 </section>
 
-<section>
+<section id="password">
   <h2>Password</h2>
+  {% with section_id="password" %}{% include "_notice.html" %}{% endwith %}
   <form method="post" action="{{ paths.account }}/password">
     <label>New password <span class="hint">at least {{ limits.password_min }} characters</span>
       <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required>
@@ -27,8 +29,9 @@
   <p class="hint">Changing it signs you out everywhere else.</p>
 </section>
 
-<section>
+<section id="authenticators">
   <h2>Authenticators</h2>
+  {% with section_id="authenticators" %}{% include "_notice.html" %}{% endwith %}
   {% with name = "authenticators" %}{% include "_field_problem.html" %}{% endwith %}
   {% if authenticators %}
   {% call table() %}
@@ -78,8 +81,9 @@
 </section>
 {% endif %}
 
-<section>
+<section id="sessions">
   <h2>Where you're signed in</h2>
+  {% with section_id="sessions" %}{% include "_notice.html" %}{% endwith %}
   {% call table() %}
     <tr><th>Browser</th><th>Signed in</th><th>Last used</th><th></th></tr>
     {% for row in sessions %}

@@ -170,13 +170,22 @@ def test_copies_and_picks_must_make_sense(
     gone = add(session, Label(item_id=cable.id, revoked_at=label.created_at))
     for copies in ("0", "121", "lots"):
         sent = admin_client.get(PRINT, params={"label": label.id, "copies": copies})
-        assert sent.headers["location"] == f"{LABELS}?notice=copies"
+        assert (
+            sent.headers["location"]
+            == f"{LABELS}?notice=copies&section=current#current"
+        )
         made_form = {"item_id": str(cable.id), "copies": copies}
         refused = admin_client.post(LABELS, data=made_form)
-        assert refused.headers["location"] == f"{LABELS}?notice=copies"
+        assert (
+            refused.headers["location"]
+            == f"{LABELS}?notice=copies&section=current#current"
+        )
     for picks in ({}, {"label": gone.id}, {"label": 0}):
         sent = admin_client.get(PRINT, params=picks)
-        assert sent.headers["location"] == f"{LABELS}?notice=pick_labels"
+        assert (
+            sent.headers["location"]
+            == f"{LABELS}?notice=pick_labels&section=current#current"
+        )
     assert "Pick a current label" in text(
         admin_client.get(LABELS, params={"notice": "pick_labels"})
     )
@@ -208,7 +217,10 @@ def test_revoking_voids_the_code_and_the_next_labels_get_a_new_one(
 ) -> None:
     label = add(session, Label(item_id=cable.id))
     revoked = admin_client.post(f"{LABELS}/{label.id}/revoke")
-    assert revoked.headers["location"] == f"{LABELS}?notice=label_revoked"
+    assert (
+        revoked.headers["location"]
+        == f"{LABELS}?notice=label_revoked&section=inactive#inactive"
+    )
     session.refresh(label)
     assert label.revoked_at is not None
     assert admin_client.post(f"{LABELS}/{label.id}/revoke").status_code == 404
@@ -251,7 +263,9 @@ def test_a_sheet_has_a_limit(
     four = admin_client.get(PRINT, params={"label": label.id, "copies": 4})
     assert four.status_code == 200
     five = admin_client.get(PRINT, params={"label": label.id, "copies": 5})
-    assert five.headers["location"] == f"{LABELS}?notice=too_many"
+    assert (
+        five.headers["location"] == f"{LABELS}?notice=too_many&section=current#current"
+    )
 
 
 def test_inactive_labels_say_why_and_agree_with_the_scan_page(

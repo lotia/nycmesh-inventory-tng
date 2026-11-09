@@ -1,0 +1,4 @@
+{#- The notice, if it is about the section with id `section_id` (pages.SECTION).
+    Included just after that section's heading, which has that id:
+    {% with section_id="retired" %}{% include "_notice.html" %}{% endwith %} -#}
+{% if notice and notice_section == section_id %}<p role="status">{{ notice }}</p>{% endif %}

@@ -249,7 +249,7 @@ def retire_location(
         return _location_page(request, session, signed, found, problem)
     session.commit()
     log.info("location retired", location_id=location_id)
-    return redirect(LOCATIONS, notice="retired")
+    return redirect(LOCATIONS, notice="retired", section="retired")
 
 
 @router.post(f"{LOCATIONS}/{{location_id}}/restore")

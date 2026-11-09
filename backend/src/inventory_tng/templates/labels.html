@@ -12,7 +12,8 @@ often as needed; pick some here to print them again.</p>
 
 {#- The picks and copies belong to this form, from wherever they are. #}
 <form method="get" action="{{ print_path }}" id="print-labels"></form>
-<section>
+<section id="current">
+  {% with section_id="current" %}{% include "_notice.html" %}{% endwith %}
   {% call table() %}
     <tr><th>Print</th><th>Code</th><th>Names</th><th>Made</th><th></th></tr>
     {% for named in current %}
@@ -40,8 +41,9 @@ often as needed; pick some here to print them again.</p>
 </section>
 
 {% if inactive %}
-<section>
+<section id="inactive">
   <h2>Inactive</h2>
+  {% with section_id="inactive" %}{% include "_notice.html" %}{% endwith %}
   <p class="hint">The scan page doesn't read these.</p>
   {% call table() %}
     <tr><th>Code</th><th>Names</th><th>Why</th></tr>

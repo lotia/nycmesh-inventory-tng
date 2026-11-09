@@ -29,7 +29,10 @@ def test_shows_and_changes_the_name_check(
     scan = session.get_one(ScanSettings, 1)
     form = {"name_check_minutes": "30", "scan_version": shown(scan)}
     done = admin_client.post(f"{SETTINGS}/scan", data=form)
-    assert done.headers["location"] == f"{SETTINGS}?notice=settings_saved"
+    assert (
+        done.headers["location"]
+        == f"{SETTINGS}?notice=settings_saved&section=scan-page#scan-page"
+    )
     assert session.get_one(ScanSettings, 1).name_check_minutes == 30
     change = history(session, "scan_settings")[-1]
     assert (change.actor or "").startswith("admin:")
@@ -76,7 +79,9 @@ def test_sign_in_settings_change_and_everyone_is_told(
     done = client.post(
         f"{SETTINGS}/sign-in", data=SIGN_IN_FORM | {"sign_in_version": version}
     )
-    assert done.headers["location"] == f"{SETTINGS}?notice=saved"
+    assert (
+        done.headers["location"] == f"{SETTINGS}?notice=saved&section=sign-in#sign-in"
+    )
     settings = session.get_one(SignInSettings, 1)
     assert (
         settings.totp_policy,
@@ -129,13 +134,19 @@ def test_the_time_zone(admin_client: TestClient, session: Session) -> None:
     site = session.get_one(SiteSettings, 1)
     form = {"time_zone": "Europe/London", "site_version": shown(site)}
     done = admin_client.post(f"{SETTINGS}/site", data=form)
-    assert done.headers["location"] == f"{SETTINGS}?notice=site_saved"
+    assert (
+        done.headers["location"]
+        == f"{SETTINGS}?notice=site_saved&section=time-zone#time-zone"
+    )
     assert session.get_one(SiteSettings, 1).time_zone == "Europe/London"
     with capture_logs() as logs:
         again = admin_client.post(
             f"{SETTINGS}/site", data=form | {"site_version": shown(site)}
         )
-    assert again.headers["location"] == f"{SETTINGS}?notice=site_saved"
+    assert (
+        again.headers["location"]
+        == f"{SETTINGS}?notice=site_saved&section=time-zone#time-zone"
+    )
     assert not any(line["event"] == "site time zone changed" for line in logs)
     form = {"time_zone": "Mars/Olympus", "site_version": shown(site)}
     refused = admin_client.post(f"{SETTINGS}/site", data=form)

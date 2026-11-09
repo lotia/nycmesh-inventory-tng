@@ -233,7 +233,9 @@ def hold_stock(
         return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
     log.info("custody started", volunteer_id=volunteer_id)
-    return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="custody_on")
+    return redirect(
+        f"{VOLUNTEERS}/{volunteer_id}", notice="custody_on", section="holding"
+    )
 
 
 @router.post(f"{VOLUNTEERS}/{{volunteer_id}}/custody/end")
@@ -252,7 +254,9 @@ def stop_holding_stock(
         return _refused(request, session, signed, found, problem)
     session.commit()
     log.info("custody ended", volunteer_id=volunteer_id)
-    return redirect(f"{VOLUNTEERS}/{volunteer_id}", notice="custody_off")
+    return redirect(
+        f"{VOLUNTEERS}/{volunteer_id}", notice="custody_off", section="holding"
+    )
 
 
 @router.post(f"{VOLUNTEERS}/{{volunteer_id}}/retire")
@@ -267,7 +271,7 @@ def retire_volunteer(
         return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
     log.info("volunteer retired", volunteer_id=volunteer_id)
-    return redirect(VOLUNTEERS, notice="retired")
+    return redirect(VOLUNTEERS, notice="retired", section="retired")
 
 
 @router.post(f"{VOLUNTEERS}/{{volunteer_id}}/merge")
