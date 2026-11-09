@@ -415,7 +415,8 @@ def sign_in(
     a burst sent at once cannot all slip under the limit. Codes count
     against the account too, but only once its password was right: someone
     without the password cannot lock its administrator out."""
-    if not limiter.hit(PER_ADDRESS, "sign_in", address):
+    limits = limiter(session)
+    if not limits.hit(PER_ADDRESS, "sign_in", address):
         _refuse_sign_in("rate_limited", None)
     admin = current_admin(session, username)
     if not check_password(session, admin.id if admin else None, password):
@@ -429,7 +430,7 @@ def sign_in(
     set_actor(session, f"admin:{admin.id}")
     factor: Factor | None = "password"
     if authenticators := locked_authenticators(session, admin.id):
-        if not limiter.hit(PER_ACCOUNT, "code", str(admin.id)):
+        if not limits.hit(PER_ACCOUNT, "code", str(admin.id)):
             _refuse_sign_in("rate_limited", admin)
         factor = check_second_factor(session, admin.id, authenticators, code, now)
     if factor is None:
@@ -548,7 +549,7 @@ def confirm(
     attempt counts against the administrator's codes, shared with signing
     in, so a stolen session cannot guess them. Returns the outcome and the
     factor used."""
-    if not limiter.hit(PER_ACCOUNT, "code", str(row.admin_id)):
+    if not limiter(session).hit(PER_ACCOUNT, "code", str(row.admin_id)):
         return _confirmation(row, "rate_limited"), None
     set_actor(session, f"admin:{row.admin_id}")
     factor: Factor | None = None
@@ -600,16 +601,22 @@ def setup_open(session: Session) -> bool:
     return not exists_where(session, Admin.id.is_not(None))
 
 
-def check_setup_token(expected: str, typed: str, address: str) -> None:
-    _check_operator_token("setup", expected, typed, address)
+def check_setup_token(
+    session: Session, expected: str, typed: str, address: str
+) -> None:
+    _check_operator_token(session, "setup", expected, typed, address)
 
 
 def _check_operator_token(
-    purpose: Literal["setup", "recovery"], expected: str, typed: str, address: str
+    session: Session,
+    purpose: Literal["setup", "recovery"],
+    expected: str,
+    typed: str,
+    address: str,
 ) -> None:
     """A token the operator set in the deployment's settings."""
     # Counted before it is compared, so a burst cannot slip under the limit.
-    if not limiter.hit(PER_ADDRESS, purpose, address):
+    if not limiter(session).hit(PER_ADDRESS, purpose, address):
         _refuse(purpose, "rate_limited")
     if not secrets.compare_digest(typed.strip().encode(), expected.encode()):
         _refuse(purpose, "bad_token")
@@ -885,9 +892,9 @@ class EmailedReset:
     token: str
 
 
-def may_ask_for_reset(address: str) -> bool:
+def may_ask_for_reset(session: Session, address: str) -> bool:
     """Asking by mail, per address, counted before anything else."""
-    return limiter.hit(PER_ADDRESS, "forgot", address)
+    return limiter(session).hit(PER_ADDRESS, "forgot", address)
 
 
 def emailed_reset(
@@ -907,7 +914,7 @@ def emailed_reset(
     if not has_password(session, admin.id):
         log.info("emailed reset not made", reason="no_password", admin_id=admin.id)
         return None
-    if not limiter.hit(EMAILED_PER_ACCOUNT, "emailed_reset", str(admin.id)):
+    if not limiter(session).hit(EMAILED_PER_ACCOUNT, "emailed_reset", str(admin.id)):
         log.warning("emailed reset not made", reason="rate_limited", admin_id=admin.id)
         return None
     set_actor(session, f"admin:{admin.id}")
@@ -920,8 +927,8 @@ def emailed_reset(
     return EmailedReset(admin.id, admin.email, token)
 
 
-def may_use_reset_link(address: str) -> bool:
-    return limiter.hit(PER_ADDRESS, "reset", address)
+def may_use_reset_link(session: Session, address: str) -> bool:
+    return limiter(session).hit(PER_ADDRESS, "reset", address)
 
 
 def find_reset_link(
@@ -998,7 +1005,7 @@ def recover(
     """A one-use link, made with the operator's RECOVERY_TOKEN, that resets
     a current administrator's password and authenticators. Each token works
     once: its hash is kept on the link it made. Raises TokenRefused."""
-    _check_operator_token("recovery", expected, typed, address)
+    _check_operator_token(session, "recovery", expected, typed, address)
     token_hash = digest(typed.strip())
     if exists_where(session, ResetLink.recovery_token_hash == token_hash):
         _refuse("recovery", "used")

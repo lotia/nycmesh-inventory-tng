@@ -493,3 +493,17 @@ def test_site_url_is_https_outside_development() -> None:
     for bad in ("https://u@inventory.example.org", "https://x.org/#frag"):
         with pytest.raises(SettingsError, match="SITE_URL is needed"):
             Settings.from_environ(environ | {"SITE_URL": bad})
+
+
+def test_using_reset_links_is_rate_limited(
+    client: TestClient, session: Session, sent_mail: SentMail
+) -> None:
+    """Per address, counted before the link is looked up."""
+    with_email(session)
+    ask(client)
+    token = token_of(the_link(sent_mail))
+    short = {"token": token, "password": "short", "password_again": "short"}
+    for _ in range(10):
+        client.post(sign_in.RESET, data=short)
+    limited = client.post(sign_in.RESET, data=short)
+    assert limited.status_code == 429

@@ -149,7 +149,9 @@ database outage once it runs should take the app out of rotation, not
 restart it.
 
 The limits on guessing registration phrases, passwords and codes are kept
-per process, so each worker allows its own attempts.
+in the database (the `rate_limit` table), so every pod and worker counts
+against the same limit. Each attempt counted takes a second database
+connection from the app's pool for a moment, beside the request's.
 
 ## The first administrator
 

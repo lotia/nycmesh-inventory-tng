@@ -133,12 +133,13 @@ def register(session: Session, phrase: str, address: str | None) -> tuple[Device
     attempts count towards the limit, so a room of phones behind one address
     can all register with a good code."""
     bucket = address or "unknown"
-    if not limiter.test(ATTEMPTS, "register", bucket):
+    limits = limiter(session)
+    if not limits.test(ATTEMPTS, "register", bucket):
         _reject("rate_limited", None)
     try:
         code = _usable_code(session, phrase)
     except RegistrationRejected:
-        limiter.hit(ATTEMPTS, "register", bucket)
+        limits.hit(ATTEMPTS, "register", bucket)
         raise
     code.uses += 1
     token = secrets.token_urlsafe(16)

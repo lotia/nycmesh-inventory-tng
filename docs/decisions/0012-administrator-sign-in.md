@@ -32,7 +32,8 @@ without a deployment.
   wrong, and the code field is shown to everyone, so the page never reveals
   that a password was right or which accounts use TOTP. An unknown username
   is checked against a dummy hash, so it takes as long as a known one.
-- **Attempts are rate limited**, per process, as registration is (0009):
+- **Attempts are rate limited**, as registration is (0009), in the
+  database, shared by every instance (Amendment):
   every attempt per address, and codes per administrator, counted only once
   the password was right. Without the password, nobody can lock an
   administrator out by their username.
@@ -161,3 +162,19 @@ deployment settings, where administrators could not change it.
   tells an attacker is worth at most ten code guesses every 15 minutes.
 - An administrator who could change the TOTP policy could weaken it; the
   history and the email to every administrator are what make that visible.
+
+## Amendment: limits shared by every instance (2026-11-09)
+
+Kept per process, the limits allowed each pod and worker its own attempts:
+with P processes, P times as many guesses at a code an administrator's
+password already unlocks (inventory-tng-8i4.124). They are now kept in
+PostgreSQL, through the `limits` library's moving window over a storage of
+our own (rate_limits.py): one statement per attempt, atomic across
+instances, timed by the database's clock, committed apart from the request
+so a refused attempt still counts, and deleted once its window passes.
+
+We rejected Valkey (a new service to run, and sign-in down whenever it is),
+PyrateLimiter's PostgreSQL bucket (a table per key, made at runtime, and a
+table lock that refuses attempts under the limit when instances meet), and
+a counter of our own without `limits` (it would change every call site and
+lose the moving window for about 50 fewer lines).

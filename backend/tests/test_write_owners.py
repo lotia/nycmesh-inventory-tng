@@ -71,6 +71,8 @@ UNLOCKED = {
     "movement",
     "admin_session",
     "sent_form",
+    # Counted attempts, written by one statement that holds the key's row.
+    "rate_limit",
 }
 
 
