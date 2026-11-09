@@ -132,6 +132,30 @@ services:
       - "127.0.0.1:18888:18888"
       - "127.0.0.1:4318:18890"
 
+  # Optional: `mise run browser-webkit` (CONTRIBUTING.md, Running the checks).
+  # Playwright's own image and server, for WebKit where Playwright's WebKit
+  # does not run on the host. Its version is frontend/package-lock.json's
+  # @playwright/test, here twice, which a test keeps the same. The browser
+  # reaches the app on the host through the tests' connection
+  # (playwright.config.ts, exposeNetwork).
+  webkit:
+    image: mcr.microsoft.com/playwright:v1.64.1-noble
+    profiles: [webkit]
+    command: [npx, -y, playwright@1.64.1, run-server, --port, "3000", --host, "0.0.0.0"]
+    init: true
+    ipc: host
+    ports:
+      - "127.0.0.1:${INVENTORY_WEBKIT_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('net').connect(3000).on('connect', () => process.exit(0)).on('error', () => process.exit(1))"
+      interval: 2s
+      # The first start fetches Playwright's package.
+      start_period: 120s
+
   # Optional: `mise run compose -- --profile mail up -d mail`, then
   # http://localhost:8025. It catches mail sent to localhost:1025, and sends
   # nothing on (CONTRIBUTING.md, Mail).
