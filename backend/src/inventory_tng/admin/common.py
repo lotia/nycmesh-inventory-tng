@@ -54,7 +54,12 @@ RULES = {
     "site_settings_time_zone": "Pick a zone from the list.",
     "movement_whole_units": "This item is counted in whole units.",
     "location_countable": "That place is retired and holds nothing: pick another.",
+    "changed_since_shown": "Not saved: someone else saved this after you opened "
+    "it. Here it is as it is now: make your change again.",
 }
+# A save refused as its row changed since its form was shown (db.unchanged):
+# the page shows it again as it is now, with RULES' words as an alert.
+CHANGED = "changed_since_shown"
 
 
 def rule_words(broken: str, unique: str) -> str:
@@ -72,11 +77,18 @@ def admin_page(
     signed: SignedIn,
     template: str,
     context: Mapping[str, Any],
-    status_code: int = 200,
+    status_code: int | None = None,
 ) -> HTMLResponse:
     """An administrator page: page(), signed in, without the context's
-    unset (None) values, so page()'s defaults for problems and values hold."""
+    unset (None) values, so page()'s defaults for problems and values hold.
+    Unless given, its status says what the context does: 409 with an alert,
+    such as a row changed since its form was shown (CHANGED), 400 with
+    problems, else 200."""
     given = {key: value for key, value in context.items() if value is not None}
+    if status_code is None:
+        status_code = (
+            409 if given.get("alert") else 400 if given.get("problems") else 200
+        )
     return page(request, template, {"admin": signed.admin} | given, status_code)
 
 
@@ -93,6 +105,12 @@ async def text_form(request: Request) -> dict[str, str]:
     """A form's fields, for a route that takes more than it names, as a
     dependency, so the route itself runs in the threadpool."""
     return {k: v for k, v in (await request.form()).items() if isinstance(v, str)}
+
+
+def form_version(typed: str) -> int:
+    """The version of its row an edit form showed (models.Versioned), or 0,
+    which no row has, so a form sent without one is refused as changed."""
+    return whole(typed, 0, INTEGER_MAX) or 0
 
 
 def row_id(typed: str) -> int | None:

@@ -16,7 +16,7 @@ import structlog
 from sqlalchemy.orm import Session
 
 from inventory_tng.command import run_command
-from inventory_tng.db import CLI_ACTOR, set_actor, settings_row
+from inventory_tng.db import CLI_ACTOR, Seen, set_actor, settings_row
 from inventory_tng.models import NAME_CHECK_MINUTES, ScanSettings, whole
 
 log = structlog.get_logger(__name__)
@@ -56,7 +56,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 def run(session: Session, args: argparse.Namespace) -> int:
     if args.command == "set":
         set_actor(session, CLI_ACTOR)
-        current = change(session, args.name_check_minutes)
+        # No form: what the operator types is meant to replace what is there.
+        current = change(session, args.name_check_minutes, seen=None)
         session.flush()
         log.info("scan settings changed", name_check_minutes=args.name_check_minutes)
     else:
@@ -65,10 +66,10 @@ def run(session: Session, args: argparse.Namespace) -> int:
     return 0
 
 
-def change(session: Session, name_check_minutes: int) -> ScanSettings:
+def change(session: Session, name_check_minutes: int, *, seen: Seen) -> ScanSettings:
     """The settings, changed, in the range its check constraint holds
     (NAME_CHECK_MINUTES), which the page and the command check first."""
-    current = settings_row(session, ScanSettings)
+    current = settings_row(session, ScanSettings, seen=seen)
     current.name_check_minutes = name_check_minutes
     return current
 

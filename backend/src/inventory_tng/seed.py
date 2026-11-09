@@ -87,7 +87,7 @@ def run(session: Session, args: argparse.Namespace) -> int:
         admin = Admin(username=USERNAME)
         session.add(admin)
         session.flush()
-        settings_row(session, SignInSettings).totp_policy = "optional"
+        settings_row(session, SignInSettings, seen=None).totp_policy = "optional"
         _catalogue(session)
         log.info("seeded", admin_id=admin.id)
     elif given is None and accounts.has_password(session, admin.id):

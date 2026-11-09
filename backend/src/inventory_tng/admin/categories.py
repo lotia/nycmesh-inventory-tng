@@ -13,8 +13,10 @@ from sqlalchemy.orm import Session
 from inventory_tng import categories
 from inventory_tng.admin.common import (
     ADMIN,
+    CHANGED,
     RULES,
     admin_page,
+    form_version,
     name_problem,
     now,
 )
@@ -72,6 +74,7 @@ def _category_page(
     signed: SignedIn,
     category: Category,
     problem: str | None = None,
+    alert: str | None = None,
 ) -> HTMLResponse:
     items = session.scalars(
         select(Item)
@@ -89,8 +92,8 @@ def _category_page(
             "category": category,
             "items": items,
             "problems": {"name": problem} if problem else None,
+            "alert": alert,
         },
-        400 if problem else 200,
     )
 
 
@@ -138,16 +141,24 @@ def rename_category(
     session: DbSession,
     category_id: int,
     name: Annotated[str, Form()] = "",
+    version: Annotated[str, Form()] = "",
 ) -> Response:
     found = session.get(Category, category_id)
     if found is None:
         return not_found()
     name = name.strip()
     problem = name_problem(name)
-    if problem is None and not unique(
-        session, lambda: categories.rename(session, found, name)
-    ):
-        problem = TAKEN
+    if problem is None:
+        seen = form_version(version)
+        _, broken = refusal(
+            session,
+            lambda: categories.rename(session, found, name, seen=seen),
+            "unique",
+            CHANGED,
+        )
+        if broken == CHANGED:
+            return _category_page(request, session, signed, found, alert=RULES[CHANGED])
+        problem = broken and TAKEN
     if problem is not None:
         return _category_page(request, session, signed, found, problem)
     session.commit()

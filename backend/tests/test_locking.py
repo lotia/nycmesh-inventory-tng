@@ -43,6 +43,7 @@ from inventory_tng.models import (
 )
 
 from helpers.concurrency import Committed, made
+from helpers.rows import shown
 from helpers.sign_in import code, new_admin, sign_in_with
 from helpers.source import SOURCE, offending, outside
 
@@ -316,17 +317,20 @@ def test_custody_started_after_a_rename_takes_the_new_name(
 
 
 @pytest.mark.end_to_end
-def test_a_reason_renamed_meanwhile_keeps_it(
+def test_a_reason_renamed_meanwhile_is_not_renamed_back(
     committed: Committed, primed: tuple[TestClient, Session]
 ) -> None:
-    """With no name sent, the reason keeps the name it has, not the one the
-    request first loaded."""
+    """A form shown before another rename is refused, and shows the name the
+    reason has now, not the one the request first loaded
+    (inventory-tng-8i4.123)."""
     client, session = primed
     reason = AdjustmentReason(name="Dropped in the river")
     made(committed, reason)
     loaded = session.get_one(AdjustmentReason, reason.id)
+    form = {"name": "Lost in the river", "version": shown(loaded)}
     changed(committed, AdjustmentReason, reason.id, name="Soaked")
-    sent = client.post(f"{SETTINGS}/reasons/{reason.id}", data={"name": ""})
-    assert sent.status_code == 303
+    sent = client.post(f"{SETTINGS}/reasons/{reason.id}", data=form)
+    assert sent.status_code == 409
+    assert 'value="Soaked"' in sent.text
     assert committed.session().get_one(AdjustmentReason, reason.id).name == "Soaked"
     assert loaded.name == "Soaked"

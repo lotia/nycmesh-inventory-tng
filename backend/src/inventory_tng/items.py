@@ -12,6 +12,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import (
+    Seen,
     enforce,
     exists_where,
     lock_catalogue,
@@ -81,10 +82,10 @@ def add(session: Session, fields: Fields) -> Item:
     return item
 
 
-def save(session: Session, item: Item, fields: Fields) -> None:
+def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> None:
     """Every one of `fields` set."""
     # FOR UPDATE waits for any movement of it being written.
-    relock(session, item)
+    relock(session, item, seen=seen)
     if fields.unit != item.unit:
         moved = exists_where(session, Movement.item_id == item.id)
         enforce("item_unit_fixed", when=moved)

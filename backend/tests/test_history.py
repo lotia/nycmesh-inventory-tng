@@ -150,6 +150,18 @@ def test_every_table_has_history_but_those_named() -> None:
     assert {t.name for t in TABLES.values() if has_history(t)} == HISTORY_TABLES
 
 
+VERSIONED = (
+    "adjustment_reason",
+    "category",
+    "item",
+    "location",
+    "scan_settings",
+    "sign_in_settings",
+    "site_settings",
+    "volunteer",
+)
+
+
 @pytest.mark.parametrize(
     ("flag", "columns"),
     [
@@ -164,7 +176,10 @@ def test_every_table_has_history_but_those_named() -> None:
         ),
         (
             "not_a_change",
-            {"device": {"last_seen_at"}, "authenticator": {"last_step"}},
+            {"device": {"last_seen_at"}, "authenticator": {"last_step"}}
+            # Each edit form's row's (models.Versioned), which moves with
+            # every change.
+            | {table: {"edit_version"} for table in VERSIONED},
         ),
         ("row_lock_only", {"item": {"on_order"}}),
     ],

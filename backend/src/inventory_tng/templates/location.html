@@ -6,6 +6,7 @@
 <p>A volunteer's custody: change it with the volunteer.</p>
 {% else %}
 <form method="post" action="{{ here }}">
+  <input type="hidden" name="version" value="{{ values.get('version', location.edit_version) }}">
   <label>Name
     <input name="name" value="{{ values.get('name', location.name) }}" maxlength="{{ name_max }}" required>
     {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}

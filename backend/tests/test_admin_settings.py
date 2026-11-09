@@ -18,7 +18,7 @@ from inventory_tng.models import (
 )
 
 from helpers.mail import SentMail
-from helpers.rows import history
+from helpers.rows import history, shown
 from helpers.sign_in import code, new_admin, sign_in_with, text
 
 
@@ -26,7 +26,9 @@ def test_shows_and_changes_the_name_check(
     admin_client: TestClient, session: Session
 ) -> None:
     assert 'value="15"' in admin_client.get(SETTINGS).text
-    done = admin_client.post(f"{SETTINGS}/scan", data={"name_check_minutes": "30"})
+    scan = session.get_one(ScanSettings, 1)
+    form = {"name_check_minutes": "30", "scan_version": shown(scan)}
+    done = admin_client.post(f"{SETTINGS}/scan", data=form)
     assert done.headers["location"] == f"{SETTINGS}?notice=settings_saved"
     assert session.get_one(ScanSettings, 1).name_check_minutes == 30
     change = history(session, "scan_settings")[-1]
@@ -43,7 +45,11 @@ def test_refuses_what_is_not_minutes(admin_client: TestClient, typed: str) -> No
 
 
 def test_zero_never_asks(admin_client: TestClient, session: Session) -> None:
-    admin_client.post(f"{SETTINGS}/scan", data={"name_check_minutes": "0"})
+    form = {
+        "name_check_minutes": "0",
+        "scan_version": shown(session.get_one(ScanSettings, 1)),
+    }
+    admin_client.post(f"{SETTINGS}/scan", data=form)
     assert session.get_one(ScanSettings, 1).name_check_minutes == 0
 
 
@@ -66,7 +72,10 @@ def test_sign_in_settings_change_and_everyone_is_told(
     new_admin(session, "ben", email="ben@example.org")
     new_admin(session, "carol")  # No address: not told.
     sign_in_with(client, code=code(key))
-    done = client.post(f"{SETTINGS}/sign-in", data=SIGN_IN_FORM)
+    version = shown(session.get_one(SignInSettings, 1))
+    done = client.post(
+        f"{SETTINGS}/sign-in", data=SIGN_IN_FORM | {"sign_in_version": version}
+    )
     assert done.headers["location"] == f"{SETTINGS}?notice=saved"
     settings = session.get_one(SignInSettings, 1)
     assert (
@@ -117,16 +126,19 @@ def test_sign_in_settings_ask_for_a_fresh_code(
 def test_the_time_zone(admin_client: TestClient, session: Session) -> None:
     page = admin_client.get(SETTINGS).text
     assert "<option selected>America/New_York</option>" in page
-    done = admin_client.post(f"{SETTINGS}/site", data={"time_zone": "Europe/London"})
+    site = session.get_one(SiteSettings, 1)
+    form = {"time_zone": "Europe/London", "site_version": shown(site)}
+    done = admin_client.post(f"{SETTINGS}/site", data=form)
     assert done.headers["location"] == f"{SETTINGS}?notice=site_saved"
     assert session.get_one(SiteSettings, 1).time_zone == "Europe/London"
     with capture_logs() as logs:
         again = admin_client.post(
-            f"{SETTINGS}/site", data={"time_zone": "Europe/London"}
+            f"{SETTINGS}/site", data=form | {"site_version": shown(site)}
         )
     assert again.headers["location"] == f"{SETTINGS}?notice=site_saved"
     assert not any(line["event"] == "site time zone changed" for line in logs)
-    refused = admin_client.post(f"{SETTINGS}/site", data={"time_zone": "Mars/Olympus"})
+    form = {"time_zone": "Mars/Olympus", "site_version": shown(site)}
+    refused = admin_client.post(f"{SETTINGS}/site", data=form)
     assert refused.status_code == 400
     assert "Pick a zone from the list." in refused.text
 
@@ -139,6 +151,7 @@ def test_saving_the_same_sign_in_settings_tells_nobody(
     sign_in_with(client, code=code(key))
     same = SIGN_IN_FORM | {"totp_policy": "required", "session_days": "7"}
     same |= {"confirm_hours": "24", "confirm_idle_minutes": "60"}
+    same |= {"sign_in_version": shown(session.get_one(SignInSettings, 1))}
     assert client.post(f"{SETTINGS}/sign-in", data=same).status_code == 303
     assert list(sent_mail) == []
 

@@ -8,7 +8,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import get_locked
+from inventory_tng.db import Seen, get_locked, unchanged
 from inventory_tng.models import AdjustmentReason
 
 
@@ -25,7 +25,8 @@ def add(session: Session, name: str) -> AdjustmentReason:
     return reason
 
 
-def rename(reason: AdjustmentReason, name: str) -> None:
+def rename(reason: AdjustmentReason, name: str, *, seen: Seen) -> None:
+    unchanged(reason, seen)
     reason.name = name
 
 

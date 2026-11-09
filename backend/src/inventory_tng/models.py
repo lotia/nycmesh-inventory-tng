@@ -153,7 +153,22 @@ def _unique_current_name(table: str, *scope: str) -> Index:
     )
 
 
-class Category(Base):
+class Versioned:
+    """A row an edit form shows. Each update the app makes adds one to its
+    edit_version (db._next_version); the form sends back the one it showed,
+    and a save of a row changed since is refused (db.unchanged), rather than
+    undoing that change (inventory-tng-8i4.123). Not SQLAlchemy's
+    version_id_col: that refuses a locking read of a row changed since the
+    session loaded it, which every domain function makes (db.relock), and
+    checks the version loaded in this request, not the one a form showed in
+    an earlier one."""
+
+    edit_version: Mapped[int] = mapped_column(
+        server_default=text("1"), info={"not_a_change": True}
+    )
+
+
+class Category(Versioned, Base):
     __tablename__ = "category"
     __table_args__ = (
         _unique_current_name("category"),
@@ -166,7 +181,7 @@ class Category(Base):
     retired_at: Mapped[RetiredAt]
 
 
-class Item(Base):
+class Item(Versioned, Base):
     """A catalogue entry, never the stock: stock comes from the ledger, and is
     always counted in `unit`."""
 
@@ -311,7 +326,7 @@ class VendorPrice(Base):
     )
 
 
-class Volunteer(Base):
+class Volunteer(Versioned, Base):
     """A name to pick, not a login (docs/decisions/0004)."""
 
     __tablename__ = "volunteer"
@@ -341,7 +356,7 @@ class Volunteer(Base):
     retired_at: Mapped[RetiredAt]
 
 
-class Location(Base):
+class Location(Versioned, Base):
     """Where stock is (docs/decisions/0003). Areas nest under a store or
     another area; a volunteer holding stock is a custody location."""
 
@@ -573,7 +588,7 @@ class Movement(Base):
     quantity: Mapped[Decimal] = mapped_column(QUANTITY)
 
 
-class ScanSettings(Base):
+class ScanSettings(Versioned, Base):
     """How the scan page behaves, which administrators set on the Settings
     page (admin/settings.py, through scan_settings.py). One row, id 1, made
     by its migration. Changes are history like everything else."""
@@ -757,7 +772,7 @@ class ResetLink(Base):
         return cls.kind == "emailed"
 
 
-class SignInSettings(Base):
+class SignInSettings(Versioned, Base):
     """How signing in works, which administrators set (docs/decisions/0012).
     One row, id 1, made by its migration and never deleted. Changes are
     history like everything else."""
@@ -788,7 +803,7 @@ class SignInSettings(Base):
         return self.totp_policy == "required"
 
 
-class SiteSettings(Base):
+class SiteSettings(Versioned, Base):
     """Settings for the whole site, which administrators set. One row, id 1,
     made by its migration and never deleted. Changes are history like
     everything else."""
@@ -813,7 +828,7 @@ class SiteSettings(Base):
         return value
 
 
-class AdjustmentReason(Base):
+class AdjustmentReason(Versioned, Base):
     """Why stock was written off or found outside a count. Administrators
     extend the list (adjustment_reasons.py); its first entries come with its
     migration."""

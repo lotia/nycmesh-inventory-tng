@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import (
+    Seen,
     enforce,
     exists_where,
     lock_catalogue,
@@ -115,10 +116,15 @@ def add_custody(session: Session, volunteer_id: int, name: str) -> Location:
 
 
 def save(
-    session: Session, location: Location, name: str, parent_id: int | None = None
+    session: Session,
+    location: Location,
+    name: str,
+    parent_id: int | None = None,
+    *,
+    seen: Seen,
 ) -> None:
     """Renamed, and moved under `parent_id` if one is given."""
-    relock(session, location)
+    relock(session, location, seen=seen)
     if parent_id is not None and parent_id != location.parent_id:
         current = location.retired_at is None
         enforce(placing(_parent(session, parent_id), current=current))

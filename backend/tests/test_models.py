@@ -210,19 +210,19 @@ def test_an_areas_parent_is_a_store_or_an_area(
     shelf = locations.add(session, "Shelf", "area", store.id)
     bin_ = locations.add(session, "Bin", "area", store.id)
     with breaks(session, "location_area_parent"):
-        locations.save(session, bin_, "Bin", van.id)
-    locations.save(session, bin_, "Bin", shelf.id)
+        locations.save(session, bin_, "Bin", van.id, seen=None)
+    locations.save(session, bin_, "Bin", shelf.id, seen=None)
     # Renamed where it is, nothing is checked.
-    locations.save(session, van, "Big van")
+    locations.save(session, van, "Big van", seen=None)
 
 
 def test_the_location_tree_has_no_cycles(session: Session, store: Location) -> None:
     shelf = locations.add(session, "Shelf", "area", store.id)
     bin_ = locations.add(session, "Bin", "area", shelf.id)
     with breaks(session, "location_no_cycle"):
-        locations.save(session, shelf, "Shelf", bin_.id)
+        locations.save(session, shelf, "Shelf", bin_.id, seen=None)
     with breaks(session, "location_no_cycle"):
-        locations.save(session, shelf, "Shelf", shelf.id)
+        locations.save(session, shelf, "Shelf", shelf.id, seen=None)
 
 
 def test_custody_belongs_to_one_current_volunteer(session: Session) -> None:
@@ -254,8 +254,8 @@ def test_a_volunteers_custody_is_renamed_with_them(session: Session) -> None:
     holder = volunteers.add(session, "Volunteer A", None)
     other = volunteers.add(session, "Volunteer B", None)
     custody = volunteers.hold_stock(session, holder)
-    volunteers.save(session, holder, "Volunteer Ada", "ada@example.org")
-    volunteers.save(session, other, "Volunteer Ben", None)
+    volunteers.save(session, holder, "Volunteer Ada", "ada@example.org", seen=None)
+    volunteers.save(session, other, "Volunteer Ben", None, seen=None)
     assert (custody.name, holder.email) == ("Volunteer Ada", "ada@example.org")
 
 
@@ -329,7 +329,7 @@ def test_current_items_sit_in_current_categories(session: Session) -> None:
     with breaks(session, "item_category_current"):
         items.add(session, items.Fields.new(name="Into the old", category_id=old.id))
     with breaks(session, "item_category_current"):
-        items.save(session, item, item_fields(item, category_id=old.id))
+        items.save(session, item, item_fields(item, category_id=old.id), seen=None)
     # A category with a current item stays current...
     with breaks(session, "category_has_items"):
         categories.retire(session, radios, NOW)
@@ -340,8 +340,8 @@ def test_current_items_sit_in_current_categories(session: Session) -> None:
         items.restore(session, item)
     # A retired item may sit in a retired category, and still be changed
     # there, or moved to another.
-    items.save(session, item, item_fields(item, notes="kept for parts"))
-    items.save(session, item, item_fields(item, category_id=old.id))
+    items.save(session, item, item_fields(item, notes="kept for parts"), seen=None)
+    items.save(session, item, item_fields(item, category_id=old.id), seen=None)
     assert item.category_id == old.id
 
 

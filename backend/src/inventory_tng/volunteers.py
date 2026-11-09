@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import locations
 from inventory_tng.db import (
     Gone,
+    Seen,
     enforce,
     exists_where,
     lock_catalogue,
@@ -48,14 +49,18 @@ def custody(session: Session, volunteer_id: int) -> Location | None:
 
 
 def _lock(
-    session: Session, volunteer: Volunteer, *, current: bool | None = None
+    session: Session,
+    volunteer: Volunteer,
+    *,
+    current: bool | None = None,
+    seen: Seen = None,
 ) -> Location | None:
     """The catalogue lock, then their custody location, then them, each read
     again as locked (db.locked_row says why in that order): their custody
-    location, if they have one. With `current`, as db.relock."""
+    location, if they have one. With `current` and `seen`, as db.relock."""
     lock_catalogue(session)
     held = session.scalar(locked(_custody(volunteer.id)))
-    relock(session, volunteer, current=current)
+    relock(session, volunteer, current=current, seen=seen)
     return held
 
 
@@ -72,9 +77,16 @@ def add(session: Session, name: str, email: str | None) -> Volunteer:
     return volunteer
 
 
-def save(session: Session, volunteer: Volunteer, name: str, email: str | None) -> None:
+def save(
+    session: Session,
+    volunteer: Volunteer,
+    name: str,
+    email: str | None,
+    *,
+    seen: Seen,
+) -> None:
     """Renamed, with their custody location."""
-    held = _lock(session, volunteer)
+    held = _lock(session, volunteer, seen=seen)
     volunteer.name, volunteer.email = name, email
     if held is not None:
         locations.rename_custody(session, held, name)

@@ -916,7 +916,7 @@ def moving(location_id: int, parent_id: int) -> Write:
     return doing(
         Location,
         location_id,
-        lambda s, place: locations.save(s, place, place.name, parent_id),
+        lambda s, place: locations.save(s, place, place.name, parent_id, seen=None),
     )
 
 
@@ -1007,7 +1007,7 @@ def test_a_unit_changed_while_stock_moves_waits_then_is_refused(
     to_each = doing(
         Item,
         place.cable.id,
-        lambda s, item: items.save(s, item, item_fields(item, unit="each")),
+        lambda s, item: items.save(s, item, item_fields(item, unit="each"), seen=None),
     )
     receipt = receiving(place.cable, place.store, "1.5")
     assert either_first(own_committed, receipt, to_each, swapped=swapped) == refused

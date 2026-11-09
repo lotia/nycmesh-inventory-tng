@@ -108,3 +108,9 @@ def item_fields(item: Item, **changes: object) -> items.Fields:
     names = (field.name for field in dataclasses.fields(items.Fields))
     now = items.Fields(**{name: getattr(item, name) for name in names})
     return dataclasses.replace(now, **changes)
+
+
+def shown(row: Base) -> str:
+    """The version of a row its edit form shows and sends back
+    (models.Versioned): the row as it is now."""
+    return str(getattr(row, "edit_version"))  # noqa: B009

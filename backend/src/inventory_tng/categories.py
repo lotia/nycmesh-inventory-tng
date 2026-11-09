@@ -6,7 +6,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import enforce, exists_where, lock_catalogue, relock
+from inventory_tng.db import Seen, enforce, exists_where, lock_catalogue, relock
 from inventory_tng.models import Category, Item
 
 
@@ -18,8 +18,8 @@ def add(session: Session, name: str) -> Category:
     return category
 
 
-def rename(session: Session, category: Category, name: str) -> None:
-    relock(session, category)
+def rename(session: Session, category: Category, name: str, *, seen: Seen) -> None:
+    relock(session, category, seen=seen)
     category.name = name
 
 

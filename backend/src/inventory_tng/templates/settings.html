@@ -6,6 +6,7 @@
   <p class="hint">Changing these asks for a fresh code, and every
   administrator with an email is told.</p>
   <form method="post" action="{{ here }}/sign-in">
+    <input type="hidden" name="sign_in_version" value="{{ values.sign_in_version }}">
     <fieldset>
       <legend>Authenticator app (TOTP)</legend>
       {% for policy in policies %}
@@ -27,6 +28,7 @@
 <section>
   <h2>Time zone</h2>
   <form method="post" action="{{ here }}/site" class="actions">
+    <input type="hidden" name="site_version" value="{{ values.site_version }}">
     <label>Times are shown in
       <select name="time_zone" required>
         {% for zone in zones %}<option {% if values.time_zone == zone %}selected{% endif %}>{{ zone }}</option>{% endfor %}
@@ -41,6 +43,7 @@
 <section>
   <h2>Scan page</h2>
   <form method="post" action="{{ here }}/scan">
+    <input type="hidden" name="scan_version" value="{{ values.scan_version }}">
     <label>Ask whose name it is after <span class="hint">minutes a phone sits unused; 0 never asks</span>
       <input name="name_check_minutes" type="number" min="{{ name_check_min }}" max="{{ name_check_max }}" value="{{ values.name_check_minutes }}" required>
       {% with name = "name_check_minutes" %}{% include "_field_problem.html" %}{% endwith %}
@@ -59,6 +62,7 @@
     <tr {% if reason.retired_at %}class="retired"{% endif %}>
       <td>
         <form method="post" action="{{ here }}/reasons/{{ reason.id }}" class="actions">
+          <input type="hidden" name="version" value="{{ reason.edit_version }}">
           <input name="name" value="{{ reason.name }}" maxlength="{{ name_max }}" aria-label="Reason" required>
           <button name="action" value="rename">Rename</button>
           {% if reason.retired_at %}

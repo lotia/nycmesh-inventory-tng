@@ -212,6 +212,16 @@ the catalogue lock first; `locked_row`'s docstring gives the order every
 change takes its locks in. A row is changed or deleted only once this
 transaction has locked it.
 
+A row an edit form shows is `models.Versioned`: every update adds one to
+its `edit_version`. The form sends back the one it showed, and the domain
+function, holding the row's lock, refuses a row changed since
+(`changed_since_shown`, `db.unchanged`), so a save never quietly undoes
+another administrator's. Its `seen` argument is required; pass `None` only
+where nothing was shown, as a command. A page parses what its form sent
+with `admin/common.form_version` and shows a refusal as `RULES[CHANGED]`'s
+alert, which `admin_page` answers 409. An administrator's own account is
+not versioned: only they edit it.
+
 ### The scan page
 
 The scan page and the registration page are TypeScript, in `frontend/`

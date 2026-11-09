@@ -237,7 +237,8 @@ def _fingerprint_query(engine: Engine) -> TextClause:
     """One query for every table's fingerprint (PostgreSQL's md5 of all its
     rows, in order), built once per run, as the schema doesn't change
     between tests. Every table in it, alembic_version too, not only the
-    models'."""
+    models'. Without a row's edit_version (models.Versioned), which a row
+    changed and put back still moves on."""
     with engine.connect() as connection:
         tables = connection.scalars(
             text(
@@ -247,8 +248,9 @@ def _fingerprint_query(engine: Engine) -> TextClause:
         ).all()
     return text(
         " UNION ALL ".join(
-            f"SELECT '{name}', md5(coalesce("
-            f"string_agg(t::text, ',' ORDER BY t::text), '')) FROM \"{name}\" t"
+            f"SELECT '{name}', md5(coalesce(string_agg((to_jsonb(t) - 'edit_version')"
+            f"::text, ',' ORDER BY (to_jsonb(t) - 'edit_version')::text), ''))"
+            f' FROM "{name}" t'
             for name in tables
         )
     )
