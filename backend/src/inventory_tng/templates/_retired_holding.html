@@ -1,0 +1,16 @@
+{#- Retired places that hold stock (ledger.retired_places_holding_stock),
+each to count; gone once each is counted to nothing. -#}
+{% if retired_places %}
+<div class="warning">
+  {% if retired_places | length == 1 %}
+  <p>{{ 1 | retired_holding }}, which a save brought or took after it was
+  retired. Count it to put the records right.</p>
+  {% else %}
+  <p>{{ retired_places | length | retired_holding }}, which a save brought or
+  took after they were retired. Count each to put the records right.</p>
+  {% endif %}
+  <ul>
+    {% for place in retired_places %}<li><a href="{{ counts_path }}/{{ place.id }}">Count {{ place.name }}</a></li>{% endfor %}
+  </ul>
+</div>
+{% endif %}

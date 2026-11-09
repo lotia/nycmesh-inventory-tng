@@ -16,7 +16,9 @@ Two choices that keep a volunteer's work from being lost:
   wait in the outbox while an administrator retires or merges something, and
   readers follow a merged volunteer forward. The one exception: a retired
   item is never received (docs/decisions/0003), so a receipt of one is
-  refused, and the outbox says so.
+  refused, and the outbox says so. A save at a retired place is logged and
+  counted, and the place shows as holding stock (retired_holding_stock)
+  until an administrator counts it.
 - The server's clock decides when a batch happened, not the phone's: a batch
   resent from the outbox is recorded when it arrives. created_at is the
   database's now(), and nothing sent sets it.
@@ -132,24 +134,59 @@ def in_stores(items: Select[int]) -> Select[int, Decimal, bool]:
     )
 
 
+def _retired(model: type[Item | Location]) -> ColumnElement[list[int]]:
+    """The ids of a model's retired rows, as an array for balance to take:
+    PostgreSQL pushes it down to the ledger's indexes, so only their
+    balances are summed, however long the ledger."""
+    return func.array(
+        select(model.id).where(model.retired_at.is_not(None)).scalar_subquery()
+    )
+
+
 def retired_in_stock() -> Select[tuple[int]]:
     """The ids of retired items with some left at a current place: what
-    volunteers may still take, and administrators write off. The retired ids
-    go to balance as an array, which PostgreSQL pushes down to the movement
-    index, so only their balances are summed, however long the ledger."""
-    retired = func.array(
-        select(Item.id).where(Item.retired_at.is_not(None)).scalar_subquery()
-    )
+    volunteers may still take, and administrators write off."""
     return (
         select(balance.c.item_id)
         .join(Location, Location.id == balance.c.location_id)
         .where(
             Location.retired_at.is_(None),
             balance.c.quantity > 0,
-            balance.c.item_id == any_(retired),
+            balance.c.item_id == any_(_retired(Item)),
         )
         .distinct()
     )
+
+
+def retired_holding_stock() -> Select[int]:
+    """The ids of retired places the records say hold something, more or
+    less than nothing: what a save brought or took after the place was
+    retired, for an administrator to count."""
+    return (
+        select(balance.c.location_id)
+        .where(
+            balance.c.location_id == any_(_retired(Location)),
+            balance.c.quantity != 0,
+        )
+        .distinct()
+    )
+
+
+def retired_places_holding_stock(session: Session) -> list[Location]:
+    """retired_holding_stock's places, by name as people sort them."""
+    return list(
+        session.scalars(
+            select(Location)
+            .where(Location.id.in_(retired_holding_stock()))
+            .order_by(func.lower(Location.name))
+        )
+    )
+
+
+def countable() -> ColumnElement[bool]:
+    """Places an administrator may count or adjust: current ones, and
+    retired ones that hold stock (retired_holding_stock), to put right."""
+    return or_(Location.retired_at.is_(None), Location.id.in_(retired_holding_stock()))
 
 
 def holds_stock(session: Session, location_id: int) -> bool:
@@ -333,6 +370,11 @@ replayed = meter.create_counter(
     unit="{transaction}",
     description="Batches sent again with a key already written, by kind",
 )
+at_retired_place = meter.create_counter(
+    "inventory.transactions.at_retired_place",
+    unit="{transaction}",
+    description="Batches written to or from a retired place, by side",
+)
 refused = meter.create_counter(
     "inventory.transactions.refused",
     unit="{transaction}",
@@ -408,19 +450,40 @@ class KeyReused(Exception):
     """The key was already used, for a different batch."""
 
 
-def record(
-    session: Session, batch: Batch, *, device_id: int | None
-) -> tuple[LedgerTransaction, bool]:
-    """Write the batch, or find the one already written with its key. True if
-    this call wrote it. The caller commits.
+Side = Literal["from", "to"]
+
+
+def retired_sides(
+    from_id: int | None, to_id: int | None, places: Mapping[int, bool]
+) -> list[Side]:
+    """The sides of a batch whose place `places` (by id, whether retired)
+    says is retired."""
+    return [
+        side
+        for side, location_id in (("from", from_id), ("to", to_id))
+        if location_id is not None and places.get(location_id, False)
+    ]
+
+
+class Recorded(NamedTuple):
+    transaction: LedgerTransaction
+    # Whether this call wrote it, and if so, the sides at a retired place.
+    written: bool
+    retired: Sequence[Side] = ()
+
+
+def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded:
+    """Write the batch, or find the one already written with its key. The
+    caller commits.
 
     A batch already written is not checked again: the catalogue may have
     changed since, and the volunteer must not be asked to fix what is saved."""
     if (written := _replay(session, batch)) is not None:
-        return written, False
+        return Recorded(written, False)
     header = {"device_id": device_id, **_header(batch)}
     lines = {line.item_id: line.quantity for line in batch.lines}
-    problems = _problems(session, batch, hold(session, header, lines))
+    held = hold(session, header, lines)
+    problems = _problems(session, batch, held)
     if problems:
         refused.add(1, {"reason": "invalid"})
         log.info("batch refused", problems=sorted({kind for _, kind in problems}))
@@ -429,8 +492,9 @@ def record(
     if transaction is None:
         written = _replay(session, batch)
         assert written is not None  # The conflict was on this key.
-        return written, False
-    return transaction, True
+        return Recorded(written, False)
+    retired = retired_sides(batch.from_location_id, batch.to_location_id, held.places)
+    return Recorded(transaction, True, retired)
 
 
 # A save, count or adjustment holds the rows it refers to until it ends, so
@@ -447,30 +511,31 @@ def record(
 #    is on order, which KEY SHARE does not wait for.
 
 
-def _hold_places(session: Session, header: Mapping[str, object]) -> set[int]:
+def _hold_places(session: Session, header: Mapping[str, object]) -> dict[int, bool]:
     """A save's places, held before it has an id: a count (lock_place) then
     waits for it whole, so none can draw an id, wait, and commit after a
-    count's moment that it falls inside. The ids of those that exist."""
-    return set(
-        session.scalars(
-            locked(
-                select(Location.id).where(
-                    Location.id.in_(
-                        {header.get("from_location_id"), header.get("to_location_id")}
-                        - {None}
-                    )
-                ),
-                key_share=True,
-                shared=True,
-            )
+    count's moment that it falls inside. Those that exist, by id, and
+    whether each is retired."""
+    rows = session.execute(
+        locked(
+            select(Location.id, Location.retired_at.is_not(None)).where(
+                Location.id.in_(
+                    {header.get("from_location_id"), header.get("to_location_id")}
+                    - {None}
+                )
+            ),
+            key_share=True,
+            shared=True,
         )
     )
+    return {location_id: retired for location_id, retired in rows}
 
 
 class Held(NamedTuple):
-    """The rows hold() holds that exist: places by id, and items."""
+    """The rows hold() holds that exist: places by id, whether retired, and
+    items."""
 
-    places: set[int]
+    places: dict[int, bool]
     items: dict[int, Item]
 
 
@@ -645,6 +710,12 @@ def corrected(
         )
 
 
+def sent_keys(key: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
+    """The keys a count or an adjustment sent with `key` writes under: that
+    key, and the one a count's transaction out of the place takes."""
+    return key, uuid.uuid5(key, "lost")
+
+
 def record_count(
     session: Session,
     key: uuid.UUID,
@@ -668,10 +739,10 @@ def record_count(
     twice writes it once, and finds what moved as the first send did. A
     count whose every line moved writes nothing."""
     lock_place(session, location_id)
-    lost_key = uuid.uuid5(key, "lost")
+    _, lost_key = keys = sent_keys(key)
     sent = session.scalar(
         select(func.min(LedgerTransaction.id)).where(
-            LedgerTransaction.idempotency_key.in_((key, lost_key))
+            LedgerTransaction.idempotency_key.in_(keys)
         )
     )
     after = LedgerTransaction.id > as_of
@@ -793,7 +864,7 @@ def save_batch(
     another line names too (repeated): send each item on one line."""
     # So the history of anything the batch changes, such as on_order, says who.
     set_actor(session, f"volunteer:{batch.volunteer_id}")
-    transaction, written = record(session, batch, device_id=device.id)
+    transaction, written, retired = record(session, batch, device_id=device.id)
     # Read before the commit, which expires it.
     transaction_id = transaction.id
     session.commit()
@@ -810,6 +881,17 @@ def save_batch(
         lines=len(batch.lines),
         volunteer_id=batch.volunteer_id,
     )
+    if retired:
+        for side in retired:
+            at_retired_place.add(1, {"side": side})
+        # Accepted, as a volunteer's work is never lost; the place shows as
+        # holding stock until it is counted (docs/decisions/0003).
+        log.warning(
+            "transaction at a retired place",
+            transaction_id=transaction_id,
+            from_location_id=batch.from_location_id,
+            to_location_id=batch.to_location_id,
+        )
     return Saved(transaction_id=transaction_id)
 
 

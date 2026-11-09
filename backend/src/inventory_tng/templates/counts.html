@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_retired.html" import retired %}
 {% block main %}
 <section>
   <h2>Count a place</h2>
@@ -8,7 +9,7 @@
     <label>Place
       <select name="location_id" required>
         <option value="">Pick one</option>
-        {% for place in places %}<option value="{{ place.id }}">{{ place.name }}</option>{% endfor %}
+        {% for place in places %}<option value="{{ place.id }}">{{ place.name }}{{ retired(place) }}</option>{% endfor %}
       </select>
     </label>
     <button>Count it</button>
@@ -22,7 +23,7 @@
     <label>Place
       <select name="location_id" required>
         <option value="">Pick one</option>
-        {% for place in places %}<option value="{{ place.id }}" {% if values.get('location_id') == place.id | string %}selected{% endif %}>{{ place.name }}</option>{% endfor %}
+        {% for place in places %}<option value="{{ place.id }}" {% if values.get('location_id') == place.id | string %}selected{% endif %}>{{ place.name }}{{ retired(place) }}</option>{% endfor %}
       </select>
       {% with name = "location_id" %}{% include "_field_problem.html" %}{% endwith %}
     </label>

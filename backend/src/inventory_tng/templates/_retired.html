@@ -1,0 +1,3 @@
+{#- After a place's or an item's name: whether it is retired. Plain text,
+so it can go in an option. -#}
+{% macro retired(row) %}{% if row.retired_at %} (retired){% endif %}{% endmacro %}

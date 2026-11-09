@@ -288,6 +288,11 @@
     @apply border-caution;
   }
 
+  /* A number beside a section's name, of things to put right there. */
+  .badge {
+    @apply rounded-full border-2 border-caution px-1.5 text-sm font-semibold;
+  }
+
   .key,
   .codes {
     @apply font-mono text-lg tracking-wide;

@@ -1,4 +1,5 @@
-"""The administrators' home page, and its warnings (admin/home.py)."""
+"""The administrators' home page, and its warnings (admin/home.py), and
+the navigation's badge."""
 
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -6,10 +7,14 @@ from datetime import UTC, datetime, timedelta
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.home import ALONE, NO_EMAIL
+from inventory_tng.models import Location
 
 from helpers.mail import SentMail
+from helpers.rows import add, tag
 from helpers.sign_in import code, new_admin, sign_in_with, text
+from helpers.stock import retire, stocked, write
 
 
 def test_a_lone_administrator_is_told(admin_client: TestClient) -> None:
@@ -43,3 +48,24 @@ def test_no_email_is_told_only_where_mail_is_set_up(
     later = code(key, datetime.now(UTC) + timedelta(seconds=30))
     assert sign_in_with(without, code=later).status_code == 303
     assert NO_EMAIL not in text(without.get("/admin"))
+
+
+def test_retired_places_holding_stock_are_told_and_counted_in_the_navigation(
+    admin_client: TestClient, session: Session
+) -> None:
+    """More or less than nothing: three saved into the van and three taken
+    from a shelf, each after it was retired."""
+    place = stocked(session)
+    shelf = add(session, Location(name=f"Shelf {tag()}", kind="store"))
+    assert "retired place" not in text(admin_client.get("/admin"))
+    retire(session, place.van, shelf)
+    write(session, place)
+    write(session, place, from_location_id=shelf.id)
+    page = text(admin_client.get("/admin"))
+    assert "2 retired places hold stock" in page
+    for retired in (place.van, shelf):
+        assert f'<a href="{COUNTS}/{retired.id}">Count {retired.name}</a>' in page
+    assert (
+        'Counts <span class="badge"><span aria-hidden="true">2</span>'
+        '<span class="sr-only">: 2 retired places hold stock</span></span>' in page
+    )

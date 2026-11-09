@@ -1,16 +1,17 @@
 """Server-rendered pages (docs/decisions/0002): their templates, and how a
 page or a redirect is sent."""
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any, NamedTuple, NoReturn
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session, object_session
 from starlette.exceptions import HTTPException
 from starlette.types import Scope
 
@@ -31,6 +32,49 @@ def amount(value: Decimal | None) -> str:
 templates.env.filters["amount"] = amount
 
 
+def retired_holding(places: int) -> str:
+    """How many retired places hold stock, in words."""
+    if places == 1:
+        return "1 retired place holds stock"
+    return f"{places} retired places hold stock"
+
+
+templates.env.filters["retired_holding"] = retired_holding
+
+
+class Badge(NamedTuple):
+    """A number beside a section in the navigation: how many things to put
+    right there, and what they are, for a screen reader."""
+
+    count: int
+    words: str
+
+
+# The administrator pages' sections, in the navigation's order, by path and
+# name (admin/__init__.py), and the badge of any that has one, by path, from
+# the module that owns it.
+SECTIONS: list[tuple[str, str]] = []
+BADGES: dict[str, Callable[[Session], Badge | None]] = {}
+
+
+def sections(
+    admin: object, known: Mapping[str, Badge | None] | None = None
+) -> list[tuple[str, str, Badge | None]]:
+    """The navigation, for a page drawn for `admin`: each section with its
+    badge, as `known` gives it (by path) for a page that has read it
+    already, else read in the session that loaded `admin`. With none open,
+    no badges."""
+    known = known or {}
+    session = object_session(admin)
+
+    def badge(path: str) -> Badge | None:
+        if path in known:
+            return known[path]
+        return BADGES[path](session) if session and path in BADGES else None
+
+    return [(path, label, badge(path)) for path, label in SECTIONS]
+
+
 # What a page says after a change, by the ?notice= it was sent back with
 # (redirect(..., notice=)). A fixed list: a link can only show one of these.
 NOTICES: dict[str, str] = {}
@@ -43,12 +87,17 @@ def page(
     status_code: int = 200,
 ) -> HTMLResponse:
     """A page, never cached: some show secrets once, and all show what only
-    the person signed in may see. Forms read `problems` and `values`."""
+    the person signed in may see. Forms read `problems` and `values`. A page
+    for an administrator (`admin`) has the navigation, unless the context
+    gives its `sections`, read already."""
     notice = NOTICES.get(request.query_params.get("notice", ""))
+    full = {"problems": {}, "values": {}, "notice": notice} | dict(context)
+    if full.get("admin") is not None and full.get("sections") is None:
+        full["sections"] = sections(full["admin"])
     return templates.TemplateResponse(
         request,
         template,
-        {"problems": {}, "values": {}, "notice": notice} | dict(context),
+        full,
         status_code=status_code,
         headers={"Cache-Control": "no-store"},
     )

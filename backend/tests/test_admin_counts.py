@@ -18,6 +18,7 @@ from inventory_tng import items
 from inventory_tng.admin.common import RULES
 from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS, lines, named_twice
 from inventory_tng.admin.settings import SETTINGS
+from inventory_tng.admin.stock import STOCK
 from inventory_tng.ledger import expected, lock_place, moment
 from inventory_tng.models import (
     INTEGER_MAX,
@@ -31,7 +32,15 @@ from inventory_tng.models import (
 from helpers.concurrency import Committed
 from helpers.rows import violates
 from helpers.sign_in import code, new_admin, sign_in_with, text
-from helpers.stock import Place, committed_place, received, stocked, write
+from helpers.stock import (
+    Place,
+    at_retired_van,
+    committed_place,
+    received,
+    retire,
+    stocked,
+    write,
+)
 
 
 def key_on(response: Response) -> str:
@@ -633,3 +642,110 @@ def test_a_unit_changed_to_each_as_the_page_writes_is_said_and_nothing_is_writte
     assert answer.status_code == 400
     assert RULES["movement_whole_units"] in text(answer)
     assert counts_written(own_committed.session()) == []
+
+
+# Stock at a retired place (docs/decisions/0003)
+
+
+# The badge beside Counts, its words read in place of the number.
+BADGE = (
+    'Counts <span class="badge"><span aria-hidden="true">1</span>'
+    '<span class="sr-only">: 1 retired place holds stock</span></span>'
+)
+
+
+def signals(client: TestClient, place: Place) -> dict[str, bool]:
+    """Where the van shows as retired and holding stock."""
+    link = f'href="{COUNTS}/{place.van.id}"'
+    home = text(client.get("/admin"))
+    stock = text(client.get(STOCK))
+    return {
+        "home": "1 retired place holds stock" in home and link in home,
+        "badge": BADGE in stock,
+        "stock": "1 retired place holds stock" in stock,
+        "counts": f"{place.van.name} (retired)" in text(client.get(COUNTS)),
+        "form": client.get(f"{COUNTS}/{place.van.id}").status_code == 200,
+    }
+
+
+def test_a_retired_place_counted_to_nothing_clears_every_signal(
+    admin_client: TestClient, session: Session
+) -> None:
+    place = at_retired_van(session)
+    every = dict.fromkeys(("home", "badge", "stock", "counts", "form"), True)
+    assert signals(admin_client, place) == every
+    path = f"{COUNTS}/{place.van.id}"
+    shown = admin_client.get(path)
+    assert "is retired, but the records say something" in text(shown)
+    form = count_form_of(shown) | {f"counted_{place.item.id}": "0"}
+    done = admin_client.post(path, data=form)
+    assert done.headers["location"] == f"{COUNTS}?notice=counted"
+    assert expected(session, place.van.id) == {}
+    assert signals(admin_client, place) == dict.fromkeys(every, False)
+    # Sent again, it is answered as the first send was, writing nothing.
+    again = admin_client.post(path, data=form)
+    assert again.headers["location"] == done.headers["location"]
+    assert len(counts_written(session)) == 1
+
+
+def test_stock_at_a_retired_place_can_be_written_off(
+    admin_client: TestClient, session: Session
+) -> None:
+    place = at_retired_van(session)
+    lost = session.scalars(
+        select(AdjustmentReason).where(AdjustmentReason.name == "Lost or stolen")
+    ).one()
+    form = {
+        "key": key_on(admin_client.get(COUNTS)),
+        "location_id": str(place.van.id),
+        "item_id": str(place.item.id),
+        "amount": "3",
+        "direction": "off",
+        "reason_id": str(lost.id),
+    }
+    assert admin_client.post(ADJUSTMENTS, data=form).status_code == 303
+    assert expected(session, place.van.id) == {}
+    assert not any(signals(admin_client, place).values())
+    # Sent again, it is answered as the first send was, writing nothing.
+    assert admin_client.post(ADJUSTMENTS, data=form).status_code == 303
+    assert len(counts_written(session)) == 1
+
+
+def test_a_retired_place_holding_nothing_is_not_offered(
+    admin_client: TestClient, session: Session
+) -> None:
+    place = stocked(session)
+    retire(session, place.van)
+    assert place.van.name not in text(admin_client.get(COUNTS))
+    assert admin_client.get(f"{COUNTS}/{place.van.id}").status_code == 404
+
+
+def test_a_form_for_a_retired_place_holding_nothing_writes_nothing(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A stale or hand-made form, with a key not yet written, is refused as
+    for a place there is not."""
+    place = stocked(session)
+    retire(session, place.van)
+    counted = admin_client.post(
+        f"{COUNTS}/{place.van.id}",
+        data={
+            "key": str(uuid.uuid4()),
+            "as_of": "0",
+            f"counted_{place.item.id}": "2",
+        },
+    )
+    assert counted.status_code == 404
+    reason = session.scalars(select(AdjustmentReason.id)).first()
+    form = {
+        "key": str(uuid.uuid4()),
+        "location_id": str(place.van.id),
+        "item_id": str(place.item.id),
+        "amount": "2",
+        "direction": "found",
+        "reason_id": str(reason),
+    }
+    adjusted = admin_client.post(ADJUSTMENTS, data=form)
+    assert adjusted.status_code == 400
+    assert "Pick a place." in text(adjusted)
+    assert counts_written(session) == []

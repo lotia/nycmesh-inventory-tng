@@ -19,12 +19,15 @@ from inventory_tng.db import set_actor
 from inventory_tng.history import LEDGER
 from inventory_tng.ledger import (
     balance,
+    countable,
     insert_transaction,
     line_breaks,
     lines_break,
     on_order_after,
     record_adjustment,
     repeated,
+    retired_places_holding_stock,
+    retired_sides,
     whole_enough,
 )
 from inventory_tng.models import (
@@ -33,11 +36,12 @@ from inventory_tng.models import (
     CatalogueHistory,
     Item,
     LedgerTransaction,
+    Location,
     Movement,
 )
 
 from helpers.rows import add, breaks, named, refused, violates
-from helpers.stock import Place, received, write
+from helpers.stock import Place, received, retire, write
 
 URL = "/api/transactions"
 
@@ -524,3 +528,83 @@ def test_a_retired_item_is_taken_never_received(
         (["body", "lines", 0, "item_id"], "retired")
     ]
     assert client.post(URL, json=place.batch()).status_code == 201
+
+
+# Stock at a retired place (docs/decisions/0003)
+
+
+@pytest.mark.parametrize(
+    ("from_id", "to_id", "sides"),
+    [
+        (1, 2, []),
+        (1, 3, ["to"]),
+        (3, 1, ["from"]),
+        (3, 4, ["from", "to"]),
+        (None, 3, ["to"]),
+        (3, None, ["from"]),
+        (5, None, []),  # A place that does not exist is not retired.
+    ],
+)
+def test_the_sides_at_a_retired_place(
+    from_id: int | None, to_id: int | None, sides: list[str]
+) -> None:
+    places = {1: False, 2: False, 3: True, 4: True}
+    assert retired_sides(from_id, to_id, places) == sides
+
+
+def test_a_batch_at_a_retired_place_is_accepted_and_logged(
+    client: TestClient, session: Session, place: Place
+) -> None:
+    """It may have waited in the outbox while the van was retired."""
+    retire(session, place.van)
+    with capture_logs() as logs:
+        response = client.post(URL, json=place.batch())
+    assert response.status_code == 201
+    (line,) = [
+        line for line in logs if line["event"] == "transaction at a retired place"
+    ]
+    assert line == {
+        "event": "transaction at a retired place",
+        "log_level": "warning",
+        "transaction_id": response.json()["transaction_id"],
+        "from_location_id": place.store.id,
+        "to_location_id": place.van.id,
+    }
+
+
+def test_a_batch_between_current_places_logs_no_warning(
+    client: TestClient, place: Place
+) -> None:
+    with capture_logs() as logs:
+        assert client.post(URL, json=place.batch()).status_code == 201
+    assert not [line for line in logs if line["log_level"] == "warning"]
+
+
+def test_retired_places_holding_stock_more_or_less_than_nothing(
+    session: Session, place: Place
+) -> None:
+    """Not a current place, nor a retired one holding nothing."""
+
+    def holding() -> set[int]:
+        return {location.id for location in retired_places_holding_stock(session)}
+
+    write(session, place)  # The store short three, the van three.
+    assert {place.store.id, place.van.id}.isdisjoint(holding())
+    retire(session, place.store, place.van)
+    assert holding() >= {place.store.id, place.van.id}
+    write(session, place, from_location_id=place.van.id, to_location_id=place.store.id)
+    assert {place.store.id, place.van.id}.isdisjoint(holding())
+
+
+def test_only_current_places_and_retired_ones_holding_stock_are_countable(
+    session: Session, place: Place
+) -> None:
+    def countable_ids() -> set[int]:
+        return set(session.scalars(select(Location.id).where(countable())))
+
+    write(session, place)  # The store short three, the van three.
+    assert {place.store.id, place.van.id} <= countable_ids()
+    retire(session, place.store, place.van)
+    assert {place.store.id, place.van.id} <= countable_ids()
+    write(session, place, from_location_id=place.van.id, to_location_id=place.store.id)
+    assert {place.store.id, place.van.id}.isdisjoint(countable_ids())

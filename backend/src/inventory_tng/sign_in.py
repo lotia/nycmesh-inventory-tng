@@ -41,7 +41,14 @@ from inventory_tng.db import (
 from inventory_tng.mail import Notify
 from inventory_tng.masking import is_secret_name
 from inventory_tng.models import Admin, AdminSession, SignInSettings
-from inventory_tng.pages import not_found, page, redirect, templates
+from inventory_tng.pages import (
+    Badge,
+    not_found,
+    page,
+    redirect,
+    sections,
+    templates,
+)
 from inventory_tng.web import rate_key, set_private_cookie
 
 log = structlog.get_logger(__name__)
@@ -185,7 +192,9 @@ CONFIRM_FIELD = "confirm_code"
 
 class ConfirmHere(Exception):
     """A form sent once the window had closed: shown again as a code field,
-    carrying what was typed, so it goes on once the code is accepted."""
+    carrying what was typed, so it goes on once the code is accepted. Its
+    navigation is read as it is raised: the page is drawn once the request's
+    session has closed."""
 
     def __init__(
         self,
@@ -197,6 +206,7 @@ class ConfirmHere(Exception):
         super().__init__()
         self.signed, self.carried = signed, carried
         self.alert, self.status_code = alert, status_code
+        self.sections = sections(signed.admin)
 
 
 async def confirmed(
@@ -329,6 +339,7 @@ def _confirm_page(
     carried: list[tuple[str, str]],
     alert: str | None = None,
     status_code: int = 200,
+    navigation: list[tuple[str, str, Badge | None]] | None = None,
 ) -> HTMLResponse:
     """Asks for a code, then sends `carried` on to `action`. Fields whose
     names say they are secret, as the log masker reads them (masking.py), are
@@ -345,6 +356,7 @@ def _confirm_page(
             "carried": [(n, v) for n, v in carried if not is_secret_name(n)],
             "retype": list(dict.fromkeys(n for n, _ in carried if is_secret_name(n))),
             "field": CONFIRM_FIELD,
+            "sections": navigation,
         },
         status_code,
     )
@@ -364,6 +376,7 @@ def install(app: FastAPI) -> None:
             carried=error.carried,
             alert=error.alert,
             status_code=error.status_code,
+            navigation=error.sections,
         )
 
 

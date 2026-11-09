@@ -13,7 +13,7 @@ from inventory_tng.models import Item, Location
 
 from helpers.rows import add, tag
 from helpers.sign_in import text
-from helpers.stock import Place, received, stocked, write
+from helpers.stock import Place, at_retired_van, received, retire, stocked, write
 
 
 def test_nothing_yet(admin_client: TestClient) -> None:
@@ -134,24 +134,31 @@ def test_count_first_only_for_what_is_short_in_the_stores(
     assert "count first" not in page
 
 
-def test_a_retired_place_short_is_listed_but_not_offered_for_a_count(
+def test_a_retired_place_short_is_offered_for_a_count(
     admin_client: TestClient, session: Session
 ) -> None:
+    """A save took from it after it was retired."""
     place = Place(session)
-    write(session, place)  # The store is short three.
-    write(
-        session,
-        place,
-        from_location_id=place.van.id,
-        to_location_id=place.store.id,
-        lines=[{"item_id": place.item.id, "quantity": "6"}],
-    )
-    place.van.retired_at = datetime.now(UTC)
-    session.flush()
+    retire(session, place.van)
+    write(session, place, from_location_id=place.van.id, to_location_id=place.store.id)
     page = needs_counting_page(admin_client)
-    van = page[page.index(f"<h2>{place.van.name}</h2>") :]
-    assert "Retired: it can't be counted." in van.split("</section>")[0]
-    assert f'href="{COUNTS}/{place.van.id}"' not in page
+    van = page[page.index(f"<h2>{place.van.name}</h2>") :].split("</section>")[0]
+    assert f'href="{COUNTS}/{place.van.id}"' in van
+    assert f"Count {place.van.name}</a> (retired)" in van
+
+
+def test_the_stock_page_warns_of_stock_at_a_retired_place(
+    admin_client: TestClient, session: Session
+) -> None:
+    assert "retired place" not in text(admin_client.get(STOCK))
+    place = at_retired_van(session)
+    page = text(admin_client.get(STOCK))
+    assert "1 retired place holds" in page
+    assert f'<a href="{COUNTS}/{place.van.id}">Count {place.van.name}</a>' in page
+    assert f"<h2>{place.van.name} (retired)</h2>" in page
+    by_item = text(admin_client.get(STOCK, params={"by": "item"}))
+    assert "1 retired place holds" in by_item
+    assert f"{place.van.name} (retired)</td>" in by_item
 
 
 def test_the_stock_page_counts_the_places_short(

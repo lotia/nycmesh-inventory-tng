@@ -1,6 +1,7 @@
 """Stock to move: the rows a batch needs, and batches written."""
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -74,7 +75,21 @@ def received(
 
 
 def write(session: Session, place: Place, **fields: object) -> LedgerTransaction:
-    transaction, _ = record(
+    return record(
         session, Batch.model_validate(place.batch(**fields)), device_id=None
-    )
-    return transaction
+    ).transaction
+
+
+def retire(session: Session, *places: Location) -> None:
+    for retired in places:
+        retired.retired_at = datetime.now(UTC)
+    session.flush()
+
+
+def at_retired_van(session: Session) -> Place:
+    """Five radios in the store, and three of them saved into the van after
+    it was retired."""
+    place = stocked(session)
+    retire(session, place.van)
+    write(session, place)
+    return place

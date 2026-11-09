@@ -34,7 +34,7 @@ from helpers.apps import on_session
 from helpers.devices import new_device
 from helpers.mail import FailingMail, SentMail
 from helpers.sign_in import PASSWORD, code, new_admin, sign_in_with
-from helpers.stock import Place, received, stocked, write
+from helpers.stock import Place, received, retire, stocked, write
 
 ENDPOINT = {"OTEL_EXPORTER_OTLP_ENDPOINT": "http://collector:4318"}
 
@@ -434,6 +434,26 @@ def test_a_count_refused_after_its_first_transaction_records_nothing(
     assert recorded_by_kind(reader) == before
     assert not [line for line in logs if line["event"] == "count recorded"]
     assert ledger.expected(session, place.store.id) == {place.item.id: Decimal(5)}
+
+
+def test_counts_batches_at_a_retired_place_by_side(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """A move into the van after it was retired, then one out of it."""
+    client, _, reader, _ = rolled_back
+    place = Place(session)
+    retire(session, place.van)
+    _, token = new_device(session)
+    client.cookies.set(devices.COOKIE, token)
+    before = counted(reader, "inventory.transactions.at_retired_place")
+    out = {"from_location_id": place.van.id, "to_location_id": place.store.id}
+    for batch in (place.batch(), place.batch(**out)):
+        assert client.post("/api/transactions", json=batch).status_code == 201
+    client.cookies.clear()
+    after = counted(reader, "inventory.transactions.at_retired_place")
+    for side in ("to", "from"):
+        key = (("side", side),)
+        assert after[key] - before.get(key, 0) == 1
 
 
 def needs_a_device(device: RegisteredDevice) -> int:

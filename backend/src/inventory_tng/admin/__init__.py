@@ -9,10 +9,9 @@ page passes its own paths to its templates, so a page shown again after a
 refused form still links where it should.
 """
 
-from typing import Any, cast
-
 from fastapi import APIRouter
 
+from inventory_tng import pages
 from inventory_tng.admin import (
     admins,
     categories,
@@ -26,10 +25,9 @@ from inventory_tng.admin import (
     stock,
     volunteers,
 )
-from inventory_tng.pages import templates
 
 # The sections, in the order the navigation shows them.
-SECTIONS = (
+pages.SECTIONS[:] = (
     (items.ITEMS, "Items"),
     (categories.CATEGORIES, "Categories"),
     (locations.LOCATIONS, "Locations"),
@@ -41,7 +39,6 @@ SECTIONS = (
     (admins.ADMINS, "Administrators"),
     (settings.SETTINGS, "Settings"),
 )
-cast(dict[str, Any], templates.env.globals)["sections"] = SECTIONS
 
 router = APIRouter(include_in_schema=False)
 for module in (

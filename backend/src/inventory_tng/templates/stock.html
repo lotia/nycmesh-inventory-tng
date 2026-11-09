@@ -1,7 +1,9 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_retired.html" import retired %}
 {% block main %}
 {% include "_stock_views.html" %}
+{% include "_retired_holding.html" %}
 {% if needing_count %}
 <p role="alert">{{ needing_count }} {{ view ~ (" shows" if needing_count == 1 else "s show") }}
 less than nothing somewhere: the records are wrong there, so count it
@@ -9,11 +11,11 @@ less than nothing somewhere: the records are wrong there, so count it
 {% endif %}
 {% for group in groups %}
 <section>
-  <h2>{{ group.heading.name }}{% if view == "item" %} <span class="hint">{{ group.total | amount }} {{ group.heading.unit }} in all</span>{% endif %}</h2>
+  <h2>{{ group.heading.name }}{{ retired(group.heading) }}{% if view == "item" %} <span class="hint">{{ group.total | amount }} {{ group.heading.unit }} in all</span>{% endif %}</h2>
   {% call table() %}
     {% for row in group.rows %}
     <tr>
-      <td>{{ row.item.name if view == "place" else row.location.name }}</td>
+      <td>{% if view == "place" %}{{ row.item.name }}{% else %}{{ row.location.name }}{{ retired(row.location) }}{% endif %}</td>
       <td>{{ row.quantity | amount }} {{ row.item.unit }}{% if row.quantity < 0 %} <strong>count it</strong>{% endif %}</td>
     </tr>
     {% endfor %}
