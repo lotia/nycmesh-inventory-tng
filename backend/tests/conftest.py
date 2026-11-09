@@ -73,10 +73,18 @@ FROM_THE_SHELL = (
 
 
 @pytest.fixture(scope="session", autouse=True)
-def no_settings_from_the_shell() -> Iterator[None]:
-    """A developer's OTEL_*, LOG_* and app settings must not reach the tests.
+def no_settings_from_the_shell(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Iterator[None]:
+    """A developer's OTEL_*, LOG_* and app settings must not reach the tests,
+    nor this clone's frontend/dist: apps find no scan page build unless a
+    test gives one (test_bundle), as in CI's backend job, which has none.
     Session-scoped, so it runs before every module-scoped fixture too."""
     with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(
+            "inventory_tng.settings.CLONE_DIST",
+            tmp_path_factory.getbasetemp() / "no-build",
+        )
         for name in list(os.environ):
             if name.startswith(("OTEL_", "LOG_", "MAIL_")) or name in FROM_THE_SHELL:
                 monkeypatch.delenv(name)
@@ -416,12 +424,9 @@ def committed(database_url: str, owner_engine: Engine) -> Iterator[Committed]:
 
 
 @pytest.fixture
-def make_app(
-    database_url: str, session: Session, tmp_path: Path
-) -> Callable[..., FastAPI]:
+def make_app(database_url: str, session: Session) -> Callable[..., FastAPI]:
     """Apps on the test database, whose requests use the test's session, or
-    the one given `on`. Their bundle is an empty directory unless a test
-    gives one, so no test depends on whether this clone has a build."""
+    the one given `on`."""
 
     def make(
         logging: LogConfig | None = None,
@@ -440,7 +445,7 @@ def make_app(
             setup_token=setup_token,
             recovery_token=recovery_token,
             logging=logging or LogConfig(),
-            frontend=frontend or FrontendConfig(dist=tmp_path / "no-build"),
+            frontend=frontend or FrontendConfig(),
         )
         if mailer is not None:
             settings = dataclasses.replace(settings, mail=SITE_MAIL)

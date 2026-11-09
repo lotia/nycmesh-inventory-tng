@@ -22,7 +22,7 @@ def test_sets_up_logging_then_builds_the_app(
     assert isinstance(create_server(), FastAPI)
 
     lines = [json.loads(out) for out in capsys.readouterr().out.splitlines()]
-    # Whatever else is said, such as whether this clone has a frontend build.
+    # Whatever else is said, such as that the scan page is not built.
     (line,) = [line for line in lines if line["event"] == "starting"]
     assert line["database_host"] == "db.example"
     assert "secret" not in json.dumps(line)
