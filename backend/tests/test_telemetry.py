@@ -4,10 +4,12 @@ from collections.abc import Callable, Generator, Iterator, Mapping
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import cast
 
 import pyotp
 import pytest
 import structlog
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from httpx2 import Response as Answer
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
@@ -16,18 +18,18 @@ from opentelemetry.sdk.metrics.export import (
     Metric,
     NumberDataPoint,
 )
-from sqlalchemy import exc
+from sqlalchemy import create_engine, exc
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts, devices, labels, ledger, mail
+from inventory_tng import accounts, db, devices, labels, ledger, mail
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS
 from inventory_tng.app import create_app
-from inventory_tng.db import RuleBroken
+from inventory_tng.db import NoSession, RuleBroken
 from inventory_tng.devices import RegisteredDevice
 from inventory_tng.masking import MASK, Masker
-from inventory_tng.models import Category, LedgerTransaction
+from inventory_tng.models import Category, Device, LedgerTransaction
 from inventory_tng.settings import Settings
 from inventory_tng.telemetry import Telemetry, enabled
 
@@ -524,3 +526,59 @@ def test_counts_saves_refused_as_changed_since_shown(
     assert after == before + 1
     (line,) = [entry for entry in logs if entry["event"].startswith("edit refused")]
     assert (line["table"], line["row_id"]) == ("category", radios.id)
+
+
+def test_counts_requests_that_found_no_free_connection(recorded: Recorded) -> None:
+    """A pool too small, or requests stuck holding theirs (db.POOL_TIMEOUT),
+    shows as a 503 and in this count."""
+    client, _, reader, _ = recorded
+
+    def no_connection() -> None:
+        raise exc.TimeoutError("QueuePool limit reached")
+
+    app = cast(FastAPI, client.app)
+    app.add_api_route("/api/no-connection", no_connection)
+    # A pool's own timeout: the side pool's (the request pool's is NoSession).
+    side = (("db.client.connection.pool.name", "side"),)
+    before = counted(reader, "db.client.connection.timeouts").get(side, 0)
+    assert client.get("/api/no-connection").status_code == 503
+    assert counted(reader, "db.client.connection.timeouts")[side] == before + 1
+
+    def no_session() -> None:
+        raise NoSession("no place for a session")
+
+    app.add_api_route("/api/no-session", no_session)
+    requests = (("db.client.connection.pool.name", "requests"),)
+    before = counted(reader, "db.client.connection.timeouts").get(requests, 0)
+    assert client.get("/api/no-session").status_code == 503
+    assert counted(reader, "db.client.connection.timeouts")[requests] == before + 1
+    pools = {
+        pair[1]
+        for attributes in counted(reader, "db.client.connection.count")
+        for pair in attributes
+        if isinstance(pair, tuple) and pair[0] == "db.client.connection.pool.name"
+    }
+    assert pools == {"requests", "side"}
+
+
+def test_counts_last_seen_skipped_for_a_busy_side_pool(
+    recorded: Recorded, database_url: str
+) -> None:
+    """Bookkeeping: a flood of guesses counted against the rate limits fails
+    no request for it. Skipped, not a 503, but a side pool timeout all the
+    same."""
+    _, _, reader, _ = recorded
+    engine = db._engine(database_url, 1, 0)
+    side = db._SIDE[engine] = create_engine(
+        engine.url, pool_size=1, max_overflow=0, pool_timeout=0.1
+    )
+    key = (("db.client.connection.pool.name", "side"),)
+    before = counted(reader, "db.client.connection.timeouts").get(key, 0)
+    try:
+        with side.connect(), capture_logs() as logs:
+            db.record_last_seen(engine, Device, -1, datetime.now(UTC))
+    finally:
+        side.dispose()
+        engine.dispose()
+    assert counted(reader, "db.client.connection.timeouts")[key] == before + 1
+    assert [line["event"] for line in logs] == ["last seen not recorded"]

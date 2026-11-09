@@ -150,8 +150,30 @@ restart it.
 
 The limits on guessing registration phrases, passwords and codes are kept
 in the database (the `rate_limit` table), so every pod and worker counts
-against the same limit. Each attempt counted takes a second database
-connection from the app's pool for a moment, beside the request's.
+against the same limit.
+
+### Database connections
+
+Each process (one per pod, or each of `--workers`) holds at most 20 connections
+to PostgreSQL: 15 for requests (10, and 5 more under load) and 5 for the writes
+a request makes in a transaction of its own (when a device or administrator was
+last seen, and attempts counted against a rate limit) and for work after the
+reply (such as a reset email), in a pool of their own so a request never waits
+on its own pool for a second connection. At most 15 requests use the database at
+once; the rest wait their turn, holding nothing, and one that waits 10 seconds
+answers 503, as does one that waits that long to count an attempt against a rate
+limit; one that waits that long to record when it was last seen goes on without.
+Each is counted as `db.client.connection.timeouts`, by pool, and
+`db.client.connection.count` shows each pool's connections in use.
+
+Any connection, the migrations' and commands' too, waits at most 10 seconds
+for a lock: a request answers 503 (recording when it was last seen is
+skipped instead), and a migration stuck behind the running app's work fails
+rather than hold up every query after it, so run it again.
+
+Count the total before scaling: processes × 20, plus one for a migration,
+must stay under PostgreSQL's `max_connections` (100 by default, less 3 kept
+for superusers and CloudNativePG's own).
 
 ## The first administrator
 

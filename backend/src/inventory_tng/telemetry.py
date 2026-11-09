@@ -44,6 +44,7 @@ from opentelemetry.util.types import AnyValue
 from sqlalchemy import Engine
 
 from inventory_tng import request_logging
+from inventory_tng.db import side_engine
 from inventory_tng.logs import ADDED_FIELDS
 from inventory_tng.masking import Masker, mask_query
 from inventory_tng.settings import TraceRedaction
@@ -348,16 +349,23 @@ def _opt_in_to_stable_names() -> None:
 def observe_pool(provider: MeterProvider, engine: Engine) -> None:
     # TODO(inventory-tng-8i4.34): remove once opentelemetry-instrumentation-sqlalchemy
     # supports SQLAlchemy 2.1.
+    # Both of the app's pools (db.side_engine), by name.
+    pools = {"requests": engine, "side": side_engine(engine)}
+
     def connections(_options: CallbackOptions) -> Iterable[Observation]:
-        pool = engine.pool  # Read each time: dispose() replaces it.
-        yield Observation(
-            getattr(pool, "checkedout", lambda: 0)(),
-            {"db.client.connection.state": "used"},
-        )
-        yield Observation(
-            getattr(pool, "checkedin", lambda: 0)(),
-            {"db.client.connection.state": "idle"},
-        )
+        for name, each in pools.items():
+            pool = each.pool  # Read each time: dispose() replaces it.
+            for state, count in (
+                ("used", getattr(pool, "checkedout", lambda: 0)()),
+                ("idle", getattr(pool, "checkedin", lambda: 0)()),
+            ):
+                yield Observation(
+                    count,
+                    {
+                        "db.client.connection.state": state,
+                        "db.client.connection.pool.name": name,
+                    },
+                )
 
     provider.get_meter(__name__).create_observable_gauge(
         "db.client.connection.count",
