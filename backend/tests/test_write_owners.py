@@ -1,82 +1,80 @@
-"""Each catalogue table is written by one module, its owner, whose domain
-functions take the catalogue lock and check the rules (db.locked_row); the
-ledger, by ledger.insert_transaction alone, which checks its rules and
-writes a transaction's movements with it. Each settings table has one row,
-made by its migration, which nothing makes again or deletes.
-
-Two checks hold that: the app refuses a flush that writes a catalogue row
-without the catalogue lock (db.LOCK_INFO), tested here on PostgreSQL; and
-the first test below reads the app's source with Python's ast module
-(nothing of it runs in the app; helpers.source.writes) and fails on a row
-made or written outside its owner, or a row deleted outside the few
-functions allowed to. Nothing in the catalogue is deleted. Statements on a
-table with history, such as update(Item), are refused everywhere by
-test_history.py.
+"""Who writes which table, and holding what: each model declares it
+(db.protection), and db.py says what each declaration means. The app's
+flush guard is tested here on PostgreSQL. It sees every write, by setting an
+attribute too, but not where a row was made: so the first test below reads
+the app's source with Python's ast module (nothing of it runs in the app;
+helpers.source.writes) and fails on a row made outside its owner, or one
+deleted outside the few functions allowed to. Statements on a table with
+history, such as update(Item), are refused everywhere by test_history.py.
 """
 
 import ast
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from sqlalchemy import Engine, exc, select
-from sqlalchemy.orm import Session
+from sqlalchemy import Engine, Text, exc, select
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from inventory_tng.db import (
-    CATALOGUE_TABLES,
-    LOCK_INFO,
+    CATALOGUE,
+    LOCKS_INFO,
+    Action,
+    Base,
     Gone,
+    Lock,
     attempt,
+    changed_columns,
     enforce,
+    flagged,
+    get_locked,
     lock_catalogue,
+    locked,
+    missing_lock,
+    settings_row,
 )
-from inventory_tng.models import Category, Item
+from inventory_tng.models import Category, Item, SiteSettings
 
+from helpers.rows import setting_up
 from helpers.source import SOURCE, offending, writes
 
 FOREIGN_KEY_VIOLATION = "23503"  # PostgreSQL's code for a missing parent.
 
-# Each table written by one module only, and that module. None: no module,
-# only ALLOWED's functions.
-OWNERS: dict[str, str | None] = {
-    "category": "categories.py",
-    "item": "items.py",
-    "item_package": "items.py",
-    "label": "labels.py",
-    "location": "locations.py",
-    "volunteer": "volunteers.py",
-    # Nothing writes these yet.
-    "vendor": None,
-    "vendor_offer": None,
-    "vendor_price": None,
-    # Only ALLOWED's insert_transaction.
-    "ledger_transaction": None,
-    "movement": None,
-    # Never made or deleted. Their row is changed by setting attributes on
-    # db.settings_row's, which this check cannot see.
-    "scan_settings": None,
-    "sign_in_settings": None,
-    "site_settings": None,
-}
+TABLES = Base.metadata.tables
+# Each table's owner, as its model declares it. None: no module, only
+# ALLOWED's functions (or its migration).
+OWNERS: dict[str, str | None] = {t.name: t.info["owner"] for t in TABLES.values()}
 # The functions that may write any table: one deletes an administrator's
-# password, as it is reset; the other is the ledger's one writer.
+# password, as it is reset; one is the ledger's one writer; and the seed
+# makes its administrator, in a development database only.
 ALLOWED = {
     SOURCE / "accounts.py": ("_reset_sign_in",),
     SOURCE / "ledger.py": ("insert_transaction",),
+    SOURCE / "seed.py": ("run",),
+}
+# The tables a write needs no lock for, written out, so none loses its
+# lock by a slip in its declaration: only added to, or changed on every
+# request by its own browser.
+UNLOCKED = {
+    "catalogue_history",
+    "ledger_transaction",
+    "movement",
+    "admin_session",
+    "sent_form",
 }
 
 
 def not_owned_writes(tree: ast.Module, path: Path) -> list[int]:
-    """The lines that make or write a row of a table in OWNERS in a module
-    not its owner, or delete any row (session.delete)."""
+    """The lines that make or write a row of a table in a module not its
+    owner, or delete any row (session.delete)."""
     module = str(path.relative_to(SOURCE)) if path.is_relative_to(SOURCE) else ""
     return sorted(
         {
             write.line
             for write in writes(tree)
             if write.how == "delete"
-            or (write.table in OWNERS and OWNERS[write.table] != module)
+            or (write.table is not None and OWNERS[write.table] != module)
         }
     )
 
@@ -86,7 +84,8 @@ def test_rows_are_written_by_their_owners_only() -> None:
     found = offending(not_owned_writes, ALLOWED)
     assert found == {}, (
         "Write these tables through their owner's domain functions "
-        f"(test_write_owners.OWNERS, ALLOWED), which check the rules: {found}"
+        f"(db.protection's owner, test_write_owners.ALLOWED), which check the"
+        f" rules: {found}"
     )
 
 
@@ -96,11 +95,17 @@ def test_each_owner_is_a_module() -> None:
     )
 
 
-def test_the_lock_guards_every_table_a_module_owns() -> None:
-    """The tables the guard refuses without the catalogue lock are the ones
-    owned here, so a new catalogue table cannot be missed by it."""
-    owned = {table for table, owner in OWNERS.items() if owner is not None}
-    assert owned == CATALOGUE_TABLES
+def test_every_table_declares_its_protection() -> None:
+    """So a new table cannot be forgotten: each says who makes it, what a
+    write holds and whether it has history; the catalogue's are made by a
+    module of their own."""
+    for table in TABLES.values():
+        assert set(table.info) == {"owner", "lock", "history"}, table.name
+        assert table.info["lock"] in {"catalogue", "row", None}, table.name
+        assert isinstance(table.info["history"], bool), table.name
+        if table.info["lock"] == "catalogue":
+            assert table.info["owner"] is not None, table.name
+    assert {t.name for t in TABLES.values() if t.info["lock"] is None} == UNLOCKED
 
 
 @pytest.mark.parametrize(
@@ -126,8 +131,9 @@ def test_the_lock_guards_every_table_a_module_owns() -> None:
             "from sqlalchemy import delete\ndelete(ScanSettings)",
             True,
         ),
-        # Not the catalogue's, and not a write.
-        ("admin/items.py", "AdjustmentReason(name='x')", False),
+        ("admin/items.py", "AdjustmentReason(name='x')", True),
+        ("admin/settings.py", "AdjustmentReason(name='x')", False),
+        # Not a write.
         ("admin/items.py", "select(Item).where(Item.name == 'x')", False),
     ],
 )
@@ -136,6 +142,66 @@ def test_the_check_sees_each_way_of_writing(
 ) -> None:
     """So the test above cannot pass by missing one."""
     assert bool(not_owned_writes(ast.parse(code), SOURCE / module)) is found
+
+
+# The guard's rule, without a database.
+
+
+@pytest.mark.parametrize(
+    ("lock", "action", "changed", "catalogue", "row", "missing"),
+    [
+        (None, "update", {"name"}, False, False, None),
+        ("row", "insert", set(), False, False, None),
+        ("row", "update", {"name"}, False, False, "row"),
+        ("row", "delete", set(), False, False, "row"),
+        ("row", "update", {"name"}, False, True, None),
+        ("catalogue", "insert", set(), False, False, "catalogue"),
+        ("catalogue", "insert", set(), True, False, None),
+        ("catalogue", "update", {"name"}, True, False, "row"),
+        ("catalogue", "update", {"name"}, False, True, "catalogue"),
+        ("catalogue", "update", {"name"}, True, True, None),
+        # Only columns that need its row's lock alone, such as on_order.
+        ("catalogue", "update", set(), False, True, None),
+        ("catalogue", "update", set(), False, False, "row"),
+        ("catalogue", "delete", set(), True, False, "row"),
+        ("catalogue", "delete", set(), False, True, "catalogue"),
+    ],
+)
+def test_the_lock_a_write_lacks(
+    lock: Lock | None,
+    action: Action,
+    changed: set[str],
+    catalogue: bool,
+    row: bool,
+    missing: str | None,
+) -> None:
+    found = missing_lock(
+        lock,
+        action,
+        changed,
+        catalogue=catalogue,
+        row=row,
+    )
+    assert found == missing
+
+
+class _Elsewhere(DeclarativeBase):
+    pass
+
+
+class _Renamed(_Elsewhere):
+    """A column mapped under another attribute's name."""
+
+    __tablename__ = "renamed"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    shown: Mapped[str] = mapped_column("stored", Text, info={"row_lock_only": True})
+
+
+def test_changes_are_named_by_column() -> None:
+    """As protection flags them, whatever attribute maps the column."""
+    row = _Renamed(shown="x")
+    assert changed_columns(row) == {"stored"}
+    assert flagged(_Renamed.__table__, "row_lock_only") == {"stored"}
 
 
 # On PostgreSQL: the guard as the app's sessions meet it.
@@ -149,9 +215,15 @@ def fresh(engine: Engine) -> Iterator[Session]:
         session.rollback()
 
 
+def held(session: Session) -> dict[object, object]:
+    return session.info.get(LOCKS_INFO, {})
+
+
 def test_a_catalogue_row_written_without_the_lock_is_refused(fresh: Session) -> None:
     fresh.add(Category(name="Radios"))
-    with pytest.raises(RuntimeError, match="catalogue lock"):
+    with pytest.raises(
+        RuntimeError, match="category insert without the catalogue lock"
+    ):
         fresh.flush()
 
 
@@ -161,7 +233,7 @@ def test_one_written_under_the_lock_is_not(fresh: Session) -> None:
     fresh.flush()
     # Held until the transaction ends.
     fresh.rollback()
-    assert LOCK_INFO not in fresh.info
+    assert held(fresh) == {}
 
 
 def test_a_lock_taken_in_a_refused_change_goes_with_it(fresh: Session) -> None:
@@ -172,7 +244,7 @@ def test_a_lock_taken_in_a_refused_change_goes_with_it(fresh: Session) -> None:
         enforce("category_has_items")
 
     assert attempt(fresh, refused) == (None, "category_has_items")
-    assert LOCK_INFO not in fresh.info
+    assert CATALOGUE not in held(fresh)
 
 
 def test_a_lock_taken_in_a_change_that_fails_goes_with_it(fresh: Session) -> None:
@@ -184,7 +256,25 @@ def test_a_lock_taken_in_a_change_that_fails_goes_with_it(fresh: Session) -> Non
 
     with pytest.raises(Gone):
         attempt(fresh, gone)
-    assert LOCK_INFO not in fresh.info
+    assert CATALOGUE not in held(fresh)
+
+
+def test_a_lock_taken_in_a_change_whose_flush_fails_goes_with_it(
+    fresh: Session,
+) -> None:
+    """A name taken, found as the savepoint flushes: SQLAlchemy rolls the
+    savepoint back from inside the flush, and only closes it after."""
+    lock_catalogue(fresh)
+    fresh.add(Category(name="Radios"))
+    fresh.flush()
+    del held(fresh)[CATALOGUE]  # As in a transaction that had not taken it.
+
+    def taken() -> None:
+        lock_catalogue(fresh)
+        fresh.add(Category(name="Radios"))
+
+    assert attempt(fresh, taken) == (None, "unique")
+    assert CATALOGUE not in held(fresh)
 
 
 def test_a_change_breaking_another_constraint_is_raised(fresh: Session) -> None:
@@ -204,11 +294,14 @@ def test_a_change_breaking_another_constraint_is_raised(fresh: Session) -> None:
     assert getattr(raised.value.orig, "sqlstate", None) == FOREIGN_KEY_VIOLATION
     assert fresh.scalars(select(Category.id)).all() == [category.id]
     assert fresh.scalars(select(Item.id)).all() == []
-    assert LOCK_INFO in fresh.info  # Taken before the savepoint: still held.
+    assert CATALOGUE in held(fresh)  # Taken before the savepoint: still held.
 
 
-def test_a_receipt_lowers_what_is_on_order_without_the_lock(fresh: Session) -> None:
-    """ledger._receive, which takes no catalogue lock: on_order alone."""
+def test_a_receipt_lowers_what_is_on_order_with_the_items_lock_alone(
+    fresh: Session,
+) -> None:
+    """ledger._receive locks the items but takes no catalogue lock:
+    on_order alone (row_lock_only)."""
     lock_catalogue(fresh)
     category = Category(name="Radios")
     fresh.add(category)
@@ -216,9 +309,168 @@ def test_a_receipt_lowers_what_is_on_order_without_the_lock(fresh: Session) -> N
     item = Item(name="LiteBeam", category_id=category.id, on_order=Decimal(5))
     fresh.add(item)
     fresh.flush()
-    del fresh.info[LOCK_INFO]  # As in a transaction that never took it.
+    del held(fresh)[CATALOGUE]  # As in a transaction that never took it.
     item.on_order = Decimal(2)
     fresh.flush()
     item.name = "LiteBeam 5AC"
-    with pytest.raises(RuntimeError, match="catalogue lock"):
+    with pytest.raises(RuntimeError, match="item update without the catalogue lock"):
         fresh.flush()
+
+
+def test_a_row_changed_without_its_lock_is_refused(fresh: Session) -> None:
+    """Read with session.get, not locked: set by an attribute, which no
+    reading of the source can tie to its owner."""
+    site = fresh.get_one(SiteSettings, 1)
+    site.time_zone = "Europe/London"
+    with pytest.raises(
+        RuntimeError,
+        match=r"site_settings update without the row lock: lock it in this"
+        r" transaction before changing it \(db.get_locked",
+    ):
+        fresh.flush()
+
+
+def test_a_row_set_to_what_it_holds_is_no_write(fresh: Session) -> None:
+    """The session counts it changed, but writes nothing."""
+    site = fresh.get_one(SiteSettings, 1)
+    site.time_zone = site.time_zone
+    assert site in fresh.dirty
+    fresh.flush()
+
+
+def test_a_row_deleted_without_its_lock_is_refused(fresh: Session) -> None:
+    fresh.delete(fresh.get_one(SiteSettings, 1))
+    with pytest.raises(RuntimeError, match="site_settings delete without the row lock"):
+        fresh.flush()
+
+
+@pytest.mark.parametrize(
+    "lock",
+    [
+        lambda session: settings_row(session, SiteSettings),
+        lambda session: get_locked(session, SiteSettings, 1, key_share=True),
+        lambda session: session.scalars(
+            # locked(), as a page's query would.
+            locked(select(SiteSettings))
+        ).one(),
+    ],
+    ids=["settings_row", "get_locked", "locked"],
+)
+def test_one_locked_first_is_not(
+    fresh: Session, lock: Callable[[Session], SiteSettings | None]
+) -> None:
+    site = lock(fresh)
+    assert site is not None
+    site.time_zone = "Europe/London"
+    fresh.flush()
+
+
+@pytest.mark.parametrize(
+    ("of", "noted"),
+    [
+        (SiteSettings, True),
+        (SiteSettings.__table__, False),
+        (SiteSettings.id, False),
+        ([SiteSettings.id], False),
+    ],
+    ids=["model", "table", "column", "list"],
+)
+def test_locked_notes_what_it_can_tell_is_locked(
+    fresh: Session, of: object, noted: bool
+) -> None:
+    """A model's rows; for any other `of`, nothing, so a change is refused
+    rather than let through."""
+    site = fresh.scalars(locked(select(SiteSettings), of=of)).one()  # ty: ignore[invalid-argument-type]
+    site.time_zone = "Europe/London"
+    if noted:
+        fresh.flush()
+    else:
+        with pytest.raises(RuntimeError, match="site_settings update"):
+            fresh.flush()
+
+
+def test_a_shared_lock_is_not_enough(fresh: Session) -> None:
+    """FOR KEY SHARE keeps a row from being deleted, not from a change."""
+    site = fresh.scalars(
+        locked(select(SiteSettings), key_share=True, shared=True)
+    ).one()
+    site.time_zone = "Europe/London"
+    with pytest.raises(RuntimeError, match="site_settings update"):
+        fresh.flush()
+
+
+def test_a_row_added_in_the_transaction_is_its_own(fresh: Session) -> None:
+    """No other transaction can see it until it commits."""
+    lock_catalogue(fresh)
+    category = Category(name="Radios")
+    fresh.add(category)
+    fresh.flush()
+    category.name = "Antennas"
+    fresh.flush()
+
+
+@pytest.mark.parametrize(
+    ("savepoints", "kept"),
+    [
+        ("rolled back", False),
+        ("released", True),
+        ("released, then the one around it rolled back", False),
+    ],
+)
+def test_a_savepoint_rolled_back_forgets_its_locks(
+    fresh: Session, savepoints: str, kept: bool
+) -> None:
+    """As PostgreSQL lets go of them; one released passes them to the
+    transaction around it."""
+    with fresh.begin_nested() as outer:
+        with fresh.begin_nested() as inner:
+            site = settings_row(fresh, SiteSettings)
+            if savepoints == "rolled back":
+                inner.rollback()
+        if savepoints.endswith("rolled back"):
+            outer.rollback()
+    site.time_zone = "Europe/London"
+    if kept:
+        fresh.flush()
+    else:
+        with pytest.raises(RuntimeError, match="site_settings update"):
+            fresh.flush()
+
+
+@pytest.mark.parametrize(
+    ("savepoint", "kept"), [("rolled back", False), ("released", True)]
+)
+def test_a_row_written_in_a_savepoint_rolled_back_loses_its_lock(
+    fresh: Session, savepoint: str, kept: bool
+) -> None:
+    """Locked before the savepoint, changed in it: PostgreSQL lets go of
+    the lock if it rolls back."""
+    site = settings_row(fresh, SiteSettings)
+    with fresh.begin_nested() as inner:
+        site.time_zone = "Europe/London"
+        fresh.flush()
+        if savepoint == "rolled back":
+            inner.rollback()
+    site.time_zone = "Asia/Tokyo"
+    if kept:
+        fresh.flush()
+    else:
+        with pytest.raises(RuntimeError, match="site_settings update"):
+            fresh.flush()
+
+
+def test_the_transactions_end_forgets_every_lock(fresh: Session) -> None:
+    site = settings_row(fresh, SiteSettings)
+    fresh.rollback()
+    assert held(fresh) == {}
+    site.time_zone = "Europe/London"
+    with pytest.raises(RuntimeError, match="site_settings update"):
+        fresh.flush()
+
+
+def test_a_tests_own_session_is_left_alone(fresh: Session) -> None:
+    """helpers.rows.setting_up, which writes rows to set up a test."""
+    setting_up(fresh)
+    fresh.get_one(SiteSettings, 1).time_zone = "Europe/London"
+    fresh.add(Category(name="Radios"))
+    fresh.flush()

@@ -7,7 +7,6 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.history import SECRET_COLUMNS
 from inventory_tng.models import (
     Admin,
     AdminPassword,
@@ -17,7 +16,7 @@ from inventory_tng.models import (
     SignInSettings,
 )
 
-from helpers.rows import add, history, violates
+from helpers.rows import add, flagged_columns, history, violates
 
 LATER = datetime.now(UTC) + timedelta(days=1)
 
@@ -159,7 +158,14 @@ def test_history_holds_no_secret(session: Session, admin: Admin, other: Admin) -
     )
     authenticator.totp_key, authenticator.retired_at = None, datetime.now(UTC)
     session.flush()
-    for table, columns in SECRET_COLUMNS.items():
+    secret = flagged_columns("secret")
+    assert set(secret) == {
+        "admin_password",
+        "authenticator",
+        "recovery_code",
+        "reset_link",
+    }
+    for table, columns in secret.items():
         rows = history(session, table)
         assert rows, table
         for row in rows:

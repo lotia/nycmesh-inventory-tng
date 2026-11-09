@@ -454,7 +454,10 @@ def _new_token() -> tuple[str, bytes]:
 def _set_password(
     session: Session, admin_id: int, password: str, now: datetime
 ) -> None:
-    stored = session.get(AdminPassword, admin_id)
+    """Their row, then their password's, locked in the order every path
+    takes them (lock_admin, _reset_sign_in)."""
+    lock_admin(session, admin_id)
+    stored = get_locked(session, AdminPassword, admin_id)
     if stored is None:
         session.add(AdminPassword(id=admin_id, password_hash=hash_password(password)))
     else:

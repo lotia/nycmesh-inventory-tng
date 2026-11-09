@@ -51,8 +51,8 @@ privilege, so neither binds it.
 - A rule is read, tested and changed in one place, in Python.
 - Code that writes around a module's functions would skip its rules. Tests
   refuse rows made outside their module and statement writes to tables with
-  history, and the app refuses a catalogue write made without the catalogue
-  lock.
+  history, and the app refuses a write made without its table's lock
+  (Amendment).
 - Concurrency is the app's to get right: the lock order is written down once
   for the catalogue (`db.locked_row`), once for the ledger (`ledger.py`) and
   once for administrators (`accounts.lock_admins`).
@@ -66,3 +66,37 @@ privilege, so neither binds it.
   - `INSERT ... ON CONFLICT DO NOTHING`, arrays in queries, and
     `has_table_privilege` and `has_any_column_privilege` in the startup
     check.
+
+## Amendment: one guard, declared on the models (2026-11-08)
+
+Setting an attribute on a loaded row escaped every check but the catalogue
+lock's, and each table's protection was in four lists nothing tied together
+(inventory-tng-8i4.112).
+
+- **Each table declares its protection once**, on its model
+  (`db.protection` in `__table_args__`): its owner module, the lock a write
+  holds (`"catalogue"`, `"row"` or none) and whether it has history; and on
+  a column, `secret`, `not_a_change` or `row_lock_only`. The guard, history
+  and `tests/test_write_owners.py` read `Base.metadata`.
+- **One flush guard** replaces the catalogue lock's: a changed or deleted
+  row of a table with a lock was locked in this transaction (`db.locked`,
+  `get_locked` and the helpers on them note it), or added in it; a catalogue
+  write holds the catalogue lock too, but to `item.on_order`. A savepoint
+  rolled back forgets what was locked or written in it, as PostgreSQL
+  lets go of those locks. Tables
+  only added to (the ledger, history, sent forms) or changed on every
+  request (administrators' sessions) need none. The static test is kept
+  for what the guard cannot see: where a row was made, and deletes.
+- **Single-row rules**: a check constraint where PostgreSQL can check it;
+  else `@validates` on the model (the site's time zone). Rules that read
+  other rows stay in domain functions.
+- **History still reads each row before a flush.** Taking it from a locked,
+  loaded object was tried and dropped: it saved one primary-key read per
+  table per flush, on writes made at an administrator's pace, but made
+  history's correctness depend on the lock record, and recorded values
+  PostgreSQL never stored (5.0004 in a numeric(12,3), after an earlier
+  flush in the same transaction).
+
+We rejected a flag per owner module set while its functions run: it says
+who wrote, not that the row was locked, which is what history and the
+rules rely on.

@@ -24,9 +24,6 @@ from sqlalchemy.orm import Session
 from inventory_tng import devices
 from inventory_tng.db import Base, set_actor
 from inventory_tng.history import (
-    NOT_A_CHANGE,
-    SECRET_COLUMNS,
-    WITHOUT_HISTORY,
     Change,
     change,
     has_history,
@@ -40,7 +37,7 @@ from inventory_tng.models import (
     Item,
 )
 
-from helpers.rows import add, history, refused
+from helpers.rows import add, flagged_columns, history, refused
 from helpers.source import SOURCE, How, Write, offending, outside, writes
 
 # The pure functions.
@@ -82,26 +79,27 @@ def test_a_value_history_cannot_write_is_refused() -> None:
         json_value(1j)
 
 
+TABLES = Base.metadata.tables
 ROW: dict[str, object] = {"id": 1, "name": "Radios", "retired_at": None}
 
 
 def test_insert_update_and_delete_are_recorded() -> None:
     renamed = {**ROW, "name": "Antennas"}
-    assert change("category", None, ROW) == Change("insert", None, ROW)
-    assert change("category", ROW, renamed) == Change("update", ROW, renamed)
-    assert change("category", ROW, None) == Change("delete", ROW, None)
+    assert change(TABLES["category"], None, ROW) == Change("insert", None, ROW)
+    assert change(TABLES["category"], ROW, renamed) == Change("update", ROW, renamed)
+    assert change(TABLES["category"], ROW, None) == Change("delete", ROW, None)
 
 
 def test_an_update_that_changes_nothing_is_not_history() -> None:
-    assert change("category", ROW, dict(ROW)) is None
+    assert change(TABLES["category"], ROW, dict(ROW)) is None
 
 
 def test_a_change_to_a_column_that_moves_with_use_alone_is_not_history() -> None:
     seen = {"id": 1, "label": None, "last_seen_at": MOMENT}
     later = {**seen, "last_seen_at": MOMENT + timedelta(hours=1)}
-    assert change("device", seen, later) is None
+    assert change(TABLES["device"], seen, later) is None
     labelled = {**later, "label": "Store tablet"}
-    made = change("device", seen, labelled)
+    made = change(TABLES["device"], seen, labelled)
     assert made is not None
     # Recorded with the rest of the row, as it was and is.
     assert made.new_row == {
@@ -109,13 +107,13 @@ def test_a_change_to_a_column_that_moves_with_use_alone_is_not_history() -> None
         "last_seen_at": json_value(later["last_seen_at"]),
     }
     # The column is skipped for that table only.
-    assert change("admin_session", seen, later) is not None
+    assert change(TABLES["admin_session"], seen, later) is not None
 
 
 def test_a_secret_changing_is_history_without_the_secret() -> None:
     old = {"id": 1, "password_hash": "$argon2id$x", "changed_at": None}
     new = {**old, "password_hash": "$argon2id$y"}
-    assert change("admin_password", old, new) == Change(
+    assert change(TABLES["admin_password"], old, new) == Change(
         "update", {"id": 1, "changed_at": None}, {"id": 1, "changed_at": None}
     )
 
@@ -123,8 +121,7 @@ def test_a_secret_changing_is_history_without_the_secret() -> None:
 # Which tables have history, and the columns named for them.
 
 # The tables with history, written out: no table loses its history by a
-# slip in WITHOUT_HISTORY, and a new table has history unless it is named
-# there.
+# slip in its declaration (db.protection).
 HISTORY_TABLES = {
     "category",
     "item",
@@ -150,17 +147,32 @@ HISTORY_TABLES = {
 
 
 def test_every_table_has_history_but_those_named() -> None:
-    assert {t for t in Base.metadata.tables if has_history(t)} == HISTORY_TABLES
-    assert set(Base.metadata.tables) > WITHOUT_HISTORY
+    assert {t.name for t in TABLES.values() if has_history(t)} == HISTORY_TABLES
 
 
-@pytest.mark.parametrize("columns", [SECRET_COLUMNS, NOT_A_CHANGE])
-def test_the_columns_named_are_columns_of_tables_with_history(
-    columns: dict[str, tuple[str, ...]],
+@pytest.mark.parametrize(
+    ("flag", "columns"),
+    [
+        (
+            "secret",
+            {
+                "admin_password": {"password_hash"},
+                "authenticator": {"totp_key"},
+                "recovery_code": {"code_hash"},
+                "reset_link": {"token_hash", "recovery_token_hash"},
+            },
+        ),
+        (
+            "not_a_change",
+            {"device": {"last_seen_at"}, "authenticator": {"last_step"}},
+        ),
+    ],
+)
+def test_the_columns_history_treats_apart_are_on_tables_with_history(
+    flag: str, columns: dict[str, set[str]]
 ) -> None:
-    for table, names in columns.items():
-        assert table in HISTORY_TABLES
-        assert set(names) <= set(Base.metadata.tables[table].c.keys()), table
+    assert flagged_columns(flag) == columns
+    assert set(columns) <= HISTORY_TABLES
 
 
 # No write skips history.
@@ -168,7 +180,7 @@ def test_the_columns_named_are_columns_of_tables_with_history(
 # Statements that may write to a table with history, by module and
 # function, each because history would record nothing of it anyway.
 ALLOWED = {
-    # Sets last_seen_at alone, which is not history (NOT_A_CHANGE).
+    # Sets last_seen_at alone, which is not history ("not_a_change").
     SOURCE / "db.py": ("record_last_seen",),
     # Writes catalogue_history itself.
     SOURCE / "history.py": ("_after_flush",),
@@ -184,7 +196,7 @@ def statement_writes(tree: ast.AST, _path: Path | None = None) -> list[int]:
             write.line
             for write in writes(tree)
             if write.how == "statement"
-            and (write.table is None or has_history(write.table))
+            and (write.table is None or has_history(TABLES[write.table]))
         }
     )
 
