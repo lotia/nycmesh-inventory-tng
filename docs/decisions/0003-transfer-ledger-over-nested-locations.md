@@ -1,7 +1,9 @@
 # 0003 — A transfer ledger over nested locations
 
-**Status:** accepted · 2026-10-30 · amended 2026-11-03 (counts, retired
-items), 2026-11-06 (counting while stock moves)
+**Status:** accepted · 2026-10-30 · amended 2026-11-01 by 0009 (an
+unregistered device is blocked), 2026-11-03 (counts, retired items),
+2026-11-06 (counting while stock moves), 2026-11-08 by 0016 (where the
+rules live, balance)
 
 ## Context
 
@@ -24,13 +26,13 @@ while. So we need more than one location from the start.
   has left the inventory: it moves to the NULL side.
 - **The ledger is append-only.** Mistakes are fixed with a count or adjustment
   transaction, never by editing a row.
-- **Balance is in minus out**, computed by a database view.
+- **Balance is in minus out**, computed by a query (0016).
 - **Negative balances are allowed.** They mean the records are wrong
   somewhere, so the item needs counting. A volunteer is never blocked.
 - **Reorder is a separate signal**: total stock in stores at or below the
   minimum. An item with a negative balance shows on reorder as "count first".
-- **The rules live in PostgreSQL**, as constraints and triggers, so every
-  writer obeys them.
+- **The rules are the app's**, checked by the one function that writes each
+  table, with constraints and privileges in PostgreSQL (0016).
 - **Counts and adjustments are an administrator's**, and record whose. A
   count of a place writes what differs, found or lost, and a count that
   matches is written with no lines, so when a place was last counted is

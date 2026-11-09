@@ -1,6 +1,7 @@
 # 0013 — Times are UTC; one site time zone shows them
 
-**Status:** accepted · 2026-11-02
+**Status:** accepted · 2026-11-02 · amended 2026-11-08 by 0016 (who checks
+the zone)
 
 ## Context
 
@@ -18,7 +19,7 @@ site's.
   times come back in UTC whatever the server is set to.
 - **One site time zone shows them**: `site_settings.time_zone`, an IANA name,
   `America/New_York` by default. Administrators change it, and the change is
-  recorded in the history. PostgreSQL refuses a zone it does not know.
+  recorded in the history. The app refuses a zone zoneinfo does not know.
 - **Only what people read is converted**, with `local_time.show()`, which
   uses zoneinfo's rules for the zone, so it shows EST or EDT as the date
   requires. The tzdata package ships those rules, so they do not depend on
