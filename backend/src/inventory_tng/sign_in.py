@@ -466,7 +466,7 @@ def setup(
     }
     optional = _totp_optional(session)
     try:
-        accounts.check_setup_token(expected, token, rate_key(request))
+        accounts.check_setup_token(session, expected, token, rate_key(request))
     except accounts.TokenRefused as refused:
         limited = refused.reason == "rate_limited"
         return _setup_page(

@@ -16,7 +16,7 @@ from alembic.config import Config
 from argon2 import PasswordHasher
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, TextClause, event, exc, make_url, text
+from sqlalchemy import Engine, TextClause, delete, event, exc, make_url, text
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session
 
@@ -27,7 +27,7 @@ from inventory_tng.db import make_engine, run_outside_transaction
 from inventory_tng.history import LEDGER
 from inventory_tng.logs import configure_structlog
 from inventory_tng.mail import get_mailer
-from inventory_tng.rate_limits import limiter
+from inventory_tng.models import RateLimit
 from inventory_tng.settings import FrontendConfig, LogConfig, Settings
 
 from databases import (
@@ -110,12 +110,6 @@ def no_local_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A command a test runs loads no `.env` into the environment, where it
     would outlast the test and change what later ones see."""
     monkeypatch.setattr(local_env, "ENV_FILE", tmp_path / "no.env")
-
-
-@pytest.fixture(autouse=True)
-def fresh_rate_limits() -> None:
-    """Every test starts with no attempts counted against it."""
-    limiter.storage.reset()
 
 
 @pytest.fixture
@@ -309,8 +303,17 @@ def leaves_the_database_as_it_was(request: pytest.FixtureRequest) -> Iterator[No
         return
     module = request.node.getparent(pytest.Module)
     assert module is not None  # Every test here is in a module.
-    with _unchanged(request.getfixturevalue("owner_engine"), "the test", module):
+    owner = request.getfixturevalue("owner_engine")
+    # Attempts counted (rate_limits.py) commit whatever the test does, in
+    # transactions of their own: each test leaves none for the next.
+    with _unchanged(owner, "the test", module):
         yield
+        _no_rate_limits(owner)
+
+
+def _no_rate_limits(engine: Engine) -> None:
+    with engine.begin() as connection:
+        connection.execute(delete(RateLimit))
 
 
 @pytest.fixture(scope="module", autouse=True)

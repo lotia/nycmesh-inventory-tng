@@ -46,7 +46,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import INET, JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB
 from sqlalchemy.orm import Mapped, MappedColumn, mapped_column, validates
 
 # Imported for its flush listeners: whatever can write these tables records
@@ -856,3 +856,20 @@ class SentForm(Base):
     id: Mapped[IntId]
     created_at: Mapped[CreatedAt]
     key: Mapped[uuid.UUID] = mapped_column(unique=True)
+
+
+class RateLimit(Base):
+    """Attempts counted against one rate limit's key, such as sign-in from
+    one address (rate_limits.py): the times of those still inside its window,
+    at most its limit, and when the newest leaves it, after which the row is
+    deleted. Shared by every instance of the app."""
+
+    __tablename__ = "rate_limit"
+    __table_args__ = (
+        Index("ix_rate_limit_expires_at", "expires_at"),
+        protection(owner="rate_limits.py", lock=None, history=False),
+    )
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    hits: Mapped[list[datetime]] = mapped_column(ARRAY(DateTime(timezone=True)))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
