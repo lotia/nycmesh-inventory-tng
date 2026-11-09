@@ -10,16 +10,11 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import local_time, registration_codes
-from inventory_tng.local_time import (
-    DEFAULT_ZONE,
-    is_time_zone,
-    local,
-    show,
-    site_zone,
-)
+from inventory_tng.local_time import DEFAULT_ZONE, local, show, site_zone
 from inventory_tng.models import SiteSettings
+from inventory_tng.time_zones import is_time_zone
 
-from helpers.rows import history, violates
+from helpers.rows import breaks, history, violates
 
 
 def test_times_come_back_in_utc_whatever_the_servers_zone(engine: Engine) -> None:
@@ -65,18 +60,33 @@ def test_a_time_without_a_zone_is_refused(session: Session) -> None:
         local(datetime(2026, 7, 1, 12), site_zone(session))
 
 
-@pytest.mark.parametrize("name", ["Mars/Olympus", "../../etc/passwd", "", "+05:00"])
-def test_the_database_refuses_an_unknown_zone(session: Session, name: str) -> None:
+@pytest.mark.parametrize("name", ["America/New_York", "UTC"])
+def test_a_zone_tzdata_knows_is_one(name: str) -> None:
+    assert is_time_zone(name)
+
+
+@pytest.mark.parametrize(
+    "name",
+    # And an operating system's copies, which zoneinfo does not list.
+    ["Mars/Olympus", "right/UTC", "posix/Europe/London", "posixrules"],
+)
+def test_anything_else_is_not(name: str) -> None:
     assert not is_time_zone(name)
-    with violates(session, "site_settings_time_zone"):
-        session.get_one(SiteSettings, 1).time_zone = name
 
 
-def test_the_settings_row_is_one_never_deleted_and_history(session: Session) -> None:
+def test_an_unknown_zone_is_refused_as_it_is_set(session: Session) -> None:
+    """By SiteSettings itself, so every write is checked."""
+    site = session.get_one(SiteSettings, 1)
+    with breaks(session, "site_settings_time_zone"):
+        site.time_zone = "Mars/Olympus"
+    assert site.time_zone == DEFAULT_ZONE
+
+
+def test_the_settings_are_one_row_whose_changes_are_history(
+    session: Session,
+) -> None:
     with violates(session, "ck_site_settings_one_row"):
         session.add(SiteSettings(id=2))
-    with violates(session, "site_settings_kept"):
-        session.delete(session.get_one(SiteSettings, 1))
     session.get_one(SiteSettings, 1).time_zone = "America/Chicago"
     session.flush()
     change = history(session, "site_settings")[-1]
@@ -96,7 +106,8 @@ def test_the_command_line_shows_local_times(
 def test_a_zone_these_rules_do_not_know_falls_back(
     session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """PostgreSQL's list of zones and tzdata's can differ."""
+    """Such as one a newer tzdata dropped: the zone was checked as it was
+    set, against the rules of the time."""
     session.get_one(SiteSettings, 1).time_zone = "America/Chicago"
     session.flush()
     real = local_time.ZoneInfo

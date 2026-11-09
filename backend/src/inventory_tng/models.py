@@ -25,8 +25,8 @@ The catalogue's rules that need other rows are the app's: each table is
 written only by its own module (locations, volunteers, categories, items,
 labels), under the catalogue lock (db.locked_row), which raises
 db.RuleBroken named for the rule. So are the ledger's, which
-ledger.insert_transaction, its one writer, checks. The settings' are still
-triggers, in the migrations that create those tables.
+ledger.insert_transaction, its one writer, checks. The database holds no
+trigger, function or view (CONTRIBUTING.md, Migrations).
 """
 
 import secrets
@@ -52,12 +52,13 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import INET, JSONB
-from sqlalchemy.orm import Mapped, MappedColumn, mapped_column
+from sqlalchemy.orm import Mapped, MappedColumn, mapped_column, validates
 
 # Imported for its flush listeners: whatever can write these tables records
 # their history.
 from inventory_tng import history  # noqa: F401
-from inventory_tng.db import ACTOR_PATTERN, Base
+from inventory_tng.db import ACTOR_PATTERN, Base, enforce
+from inventory_tng.time_zones import is_time_zone
 
 QUANTITY = Numeric(12, 3)
 # The largest PostgreSQL integer: what an id or other integer column holds.
@@ -66,6 +67,15 @@ MONEY = Numeric(10, 2)
 
 UNITS = ("each", "m", "ft")
 TOTP_POLICIES = ("required", "optional")
+# The settings' ranges, lowest and highest, which their check constraints
+# hold and the pages and commands that set them offer. Unused a day, the
+# scan page would hardly ever ask whose name it is (0 never asks). A
+# session's cookie lasts as long, and browsers keep one 400 days. A code
+# for a sensitive change lasts a week at most.
+NAME_CHECK_MINUTES = (0, 24 * 60)
+SESSION_DAYS = (1, 400)
+CONFIRM_HOURS = (1, 7 * 24)
+CONFIRM_IDLE_MINUTES = (1, 7 * 24 * 60)
 # What made a reset link (docs/decisions/0012): an invite; asking by mail;
 # another administrator resetting the account's sign-in; the operator's
 # recovery token. Every one sets a password. Using a reset or recovery one
@@ -116,6 +126,11 @@ def _reference(target: str) -> MappedColumn[Any]:
 
 def _one_of(column: str, values: tuple[str, ...]) -> str:
     return f"{column} IN ({', '.join(repr(v) for v in values)})"
+
+
+def _between(column: str, bounds: tuple[int, int]) -> CheckConstraint:
+    low, high = bounds
+    return CheckConstraint(f"{column} BETWEEN {low} AND {high}", name=column)
 
 
 def _unique_current_name(table: str, *scope: str) -> Index:
@@ -521,7 +536,7 @@ class ScanSettings(Base):
     __tablename__ = "scan_settings"
     __table_args__ = (
         CheckConstraint("id = 1", name="one_row"),
-        CheckConstraint("name_check_minutes >= 0", name="name_check_minutes"),
+        _between("name_check_minutes", NAME_CHECK_MINUTES),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, server_default=text("1"))
@@ -691,10 +706,9 @@ class SignInSettings(Base):
     __table_args__ = (
         CheckConstraint("id = 1", name="one_row"),
         CheckConstraint(_one_of("totp_policy", TOTP_POLICIES), name="totp_policy"),
-        # A session's cookie lasts as long, and browsers keep one 400 days.
-        CheckConstraint("session_days BETWEEN 1 AND 400", name="session_days"),
-        CheckConstraint("confirm_hours > 0", name="confirm_hours"),
-        CheckConstraint("confirm_idle_minutes > 0", name="confirm_idle_minutes"),
+        _between("session_days", SESSION_DAYS),
+        _between("confirm_hours", CONFIRM_HOURS),
+        _between("confirm_idle_minutes", CONFIRM_IDLE_MINUTES),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, server_default=text("1"))
@@ -724,9 +738,15 @@ class SiteSettings(Base):
     id: Mapped[int] = mapped_column(primary_key=True, server_default=text("1"))
     created_at: Mapped[CreatedAt]
     # The IANA zone times are shown in (docs/decisions/0013). Every time is
-    # stored and compared in UTC; this is only for people reading them. A
-    # trigger refuses a zone PostgreSQL does not know.
+    # stored and compared in UTC; this is only for people reading them.
     time_zone: Mapped[str] = mapped_column(Text, server_default="America/New_York")
+
+    @validates("time_zone")
+    def _known_zone(self, _key: str, value: str) -> str:
+        """Refuses, as it is set, a zone tzdata does not know (RuleBroken
+        "site_settings_time_zone")."""
+        enforce("site_settings_time_zone", when=not is_time_zone(value))
+        return value
 
 
 class AdjustmentReason(Base):

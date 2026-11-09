@@ -51,7 +51,13 @@ def test_the_migration_makes_the_settings_row_with_its_defaults(
         ("session_days", 0, "ck_sign_in_settings_session_days"),
         ("session_days", 401, "ck_sign_in_settings_session_days"),
         ("confirm_hours", 0, "ck_sign_in_settings_confirm_hours"),
+        ("confirm_hours", 7 * 24 + 1, "ck_sign_in_settings_confirm_hours"),
         ("confirm_idle_minutes", 0, "ck_sign_in_settings_confirm_idle_minutes"),
+        (
+            "confirm_idle_minutes",
+            7 * 24 * 60 + 1,
+            "ck_sign_in_settings_confirm_idle_minutes",
+        ),
     ],
 )
 def test_the_settings_refuse_what_cannot_work(
@@ -61,11 +67,9 @@ def test_the_settings_refuse_what_cannot_work(
         setattr(session.get_one(SignInSettings, 1), field, value)
 
 
-def test_the_settings_row_is_one_and_never_deleted(session: Session) -> None:
+def test_the_settings_are_one_row(session: Session) -> None:
     with violates(session, "ck_sign_in_settings_one_row"):
         session.add(SignInSettings(id=2))
-    with violates(session, "sign_in_settings_kept"):
-        session.delete(session.get_one(SignInSettings, 1))
 
 
 def test_usernames_are_unique_ignoring_case_even_once_retired(

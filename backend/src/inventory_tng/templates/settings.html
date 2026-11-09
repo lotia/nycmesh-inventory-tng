@@ -42,7 +42,7 @@
   <h2>Scan page</h2>
   <form method="post" action="{{ here }}/scan">
     <label>Ask whose name it is after <span class="hint">minutes a phone sits unused; 0 never asks</span>
-      <input name="name_check_minutes" type="number" min="0" max="{{ name_check_max }}" value="{{ values.name_check_minutes }}" required>
+      <input name="name_check_minutes" type="number" min="{{ name_check_min }}" max="{{ name_check_max }}" value="{{ values.name_check_minutes }}" required>
       {% with name = "name_check_minutes" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <button>Save</button>

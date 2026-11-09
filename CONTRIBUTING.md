@@ -159,9 +159,11 @@ Migrations run as the owner, and every table they create gives the app
 `SELECT`, `INSERT`, `UPDATE` and `DELETE` (migration 0001). A migration
 that creates a table the app must not change revokes what it must not do
 there, as 0002 does for history and for columns set only as a row is
-made, and 0004 for the ledger. `tests/test_database_role.py` lists those
-columns, so a new column the app cannot change fails there until listed.
-What a migration writes is not in the history.
+made, 0004 for the ledger, and 0005 to 0007 for deleting a settings row.
+`tests/test_database_role.py` lists those columns, so a new column the app
+cannot change fails there until listed. What a migration writes is not in
+the history. Migrations create no trigger, function or view: the rules are
+the app's, and `tests/test_models.py` fails on one.
 
 ### History
 
@@ -184,10 +186,11 @@ with the rule's name. `db.attempt` returns that name, and
 `admin/common.py`'s `RULES` says it in words. A page reads rows with
 `session.get` and leaves locking to those functions. The ledger is
 written only by `ledger.insert_transaction`, which saves, counts and
-adjustments all call, and which checks its rules the same way. A flush that
-writes a catalogue row without the catalogue lock is refused, and
+adjustments all call, and which checks its rules the same way.
+`SiteSettings` checks the site's time zone itself, as it is set. A flush
+that writes a catalogue row without the catalogue lock is refused, and
 `tests/test_write_owners.py` fails when another module or function writes
-one of these tables, or deletes any row.
+one of these tables, makes a settings row, or deletes any row.
 
 ### Locking a row
 

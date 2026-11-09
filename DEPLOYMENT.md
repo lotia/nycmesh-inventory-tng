@@ -59,7 +59,7 @@ What each logging setting does is in
 
 The app and its migrations log in as two roles, so that the app can read
 and add to the stock ledger and the history but never change or empty
-them:
+them, and can change the settings but never delete them:
 
 - `inventory_owner` owns the database and everything in it, and runs the
   migrations. On CloudNativePG it is the Cluster's `bootstrap.initdb.owner`,
@@ -76,9 +76,14 @@ server would share `inventory_app` too, so give each its own server, as each
 CloudNativePG Cluster is.
 
 The app checks its login as it starts and refuses to start, logging
-`database login refused`, if it could `UPDATE`, `DELETE` or `TRUNCATE` the
-ledger or the history, cannot read and add to them, or owns any table: as
-the owner or a superuser, it would. It also refuses to start if it cannot
+`database login refused`, if it:
+
+- could `UPDATE`, `DELETE` or `TRUNCATE` the ledger or the history;
+- could `DELETE` or `TRUNCATE` a settings table;
+- cannot read and add to the ledger and the history;
+- owns any table.
+
+As the owner or a superuser, it would. It also refuses to start if it cannot
 check, logging `database login not checked`: the database is out of
 reach, or not yet migrated, so the ledger is not there to check.
 

@@ -287,16 +287,6 @@ def test_the_allowed_writes_are_only_in_their_own_functions(tmp_path: Path) -> N
 # On PostgreSQL.
 
 
-def test_history_is_in_python_not_the_database(session: Session) -> None:
-    triggers = session.scalars(
-        text("SELECT tgname FROM pg_trigger WHERE tgname LIKE 'record_history%'")
-    ).all()
-    functions = session.scalars(
-        text("SELECT proname FROM pg_proc WHERE proname = 'record_catalogue_history'")
-    ).all()
-    assert (triggers, functions) == ([], [])
-
-
 @pytest.fixture
 def item(session: Session) -> Item:
     radios = add(session, Category(name="Radios"))

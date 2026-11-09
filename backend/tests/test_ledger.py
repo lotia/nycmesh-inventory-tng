@@ -410,22 +410,6 @@ def test_the_app_may_not_truncate_the_ledger(session: Session, table: str) -> No
         session.execute(text(f"TRUNCATE {table} CASCADE"))
 
 
-def test_the_ledger_has_no_logic_in_the_database(session: Session) -> None:
-    """Its rules are insert_transaction's and its balance a select: no
-    trigger or view (PostgreSQL's own triggers for foreign keys aside)."""
-    triggers = session.scalars(
-        text(
-            "SELECT tgname FROM pg_trigger"
-            " WHERE tgrelid IN ('ledger_transaction'::regclass, 'movement'::regclass)"
-            " AND NOT tgisinternal"
-        )
-    ).all()
-    views = session.scalars(
-        text("SELECT viewname FROM pg_views WHERE schemaname = 'public'")
-    ).all()
-    assert (triggers, views) == ([], [])
-
-
 @pytest.mark.parametrize(
     ("fields", "constraint"),
     [
