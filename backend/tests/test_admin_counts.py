@@ -14,18 +14,26 @@ from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import items
+from inventory_tng import items, locations
 from inventory_tng.admin.common import RULES
 from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS, lines, named_twice
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.admin.stock import STOCK
-from inventory_tng.ledger import expected, lock_place, moment
+from inventory_tng.db import RuleBroken
+from inventory_tng.ledger import (
+    expected,
+    lock_place,
+    moment,
+    record_adjustment,
+    record_count,
+)
 from inventory_tng.models import (
     INTEGER_MAX,
     AdjustmentReason,
     Admin,
     Item,
     LedgerTransaction,
+    Location,
     Movement,
 )
 
@@ -34,7 +42,9 @@ from helpers.rows import violates
 from helpers.sign_in import code, new_admin, sign_in_with, text
 from helpers.stock import (
     Place,
+    adjustment_form,
     at_retired_van,
+    badge_html,
     committed_place,
     received,
     retire,
@@ -247,22 +257,18 @@ def test_a_count_naming_an_item_twice_is_refused(
 
 def test_found_and_written_off(admin_client: TestClient, session: Session) -> None:
     place = stocked(session)
-    damaged = session.scalars(
-        select(AdjustmentReason).where(AdjustmentReason.name == "Damaged")
-    ).one()
-    form = {
-        "key": key_on(admin_client.get(COUNTS)),
-        "location_id": str(place.store.id),
-        "item_id": str(place.item.id),
-        "amount": "2",
-        "direction": "off",
-        "reason_id": str(damaged.id),
-    }
+    form = adjustment_form(
+        session,
+        place.store,
+        place.item,
+        key=key_on(admin_client.get(COUNTS)),
+        amount="2",
+    )
     done = admin_client.post(ADJUSTMENTS, data=form)
     assert done.headers["location"] == f"{COUNTS}?notice=adjusted"
     admin_client.post(ADJUSTMENTS, data=form)  # Twice: written once.
     (written,) = counts_written(session)
-    assert (written.kind, written.reason_id) == ("adjustment", damaged.id)
+    assert (written.kind, written.reason_id) == ("adjustment", int(form["reason_id"]))
     assert expected(session, place.store.id) == {place.item.id: Decimal(3)}
     assert "Damaged: -2 each" in " ".join(text(admin_client.get(COUNTS)).split())
 
@@ -272,6 +278,8 @@ def test_found_and_written_off(admin_client: TestClient, session: Session) -> No
     [
         ({"location_id": ""}, "Pick a place."),
         ({"item_id": "999999"}, "Pick an item."),
+        # A digit int() cannot read.
+        ({"item_id": "²"}, "Pick an item."),
         ({"amount": "0"}, "Use a number above 0."),
         ({"amount": "1.5"}, "whole units"),
         ({"direction": "sideways"}, "Found or written off?"),
@@ -282,16 +290,7 @@ def test_an_adjustment_says_what_is_missing(
     admin_client: TestClient, session: Session, change: dict[str, str], problem: str
 ) -> None:
     place = stocked(session)
-    reason = session.scalars(select(AdjustmentReason)).first()
-    assert reason is not None
-    form = {
-        "key": str(uuid.uuid4()),
-        "location_id": str(place.store.id),
-        "item_id": str(place.item.id),
-        "amount": "1",
-        "direction": "found",
-        "reason_id": str(reason.id),
-    } | change
+    form = adjustment_form(session, place.store, place.item) | change
     refused = admin_client.post(ADJUSTMENTS, data=form)
     assert refused.status_code == 400
     assert problem in text(refused)
@@ -577,21 +576,12 @@ def test_leftovers_of_a_retired_item_can_be_written_off(
     admin_client: TestClient, session: Session
 ) -> None:
     place = stocked(session)
-    place.item.retired_at = place.item.created_at
-    session.flush()
+    retire(session, place.item)
     page = text(admin_client.get(COUNTS))
     assert place.item.name in page
-    lost = session.scalars(
-        select(AdjustmentReason).where(AdjustmentReason.name == "Lost or stolen")
-    ).one()
-    form = {
-        "key": key_on(admin_client.get(COUNTS)),
-        "location_id": str(place.store.id),
-        "item_id": str(place.item.id),
-        "amount": "5",
-        "direction": "off",
-        "reason_id": str(lost.id),
-    }
+    form = adjustment_form(
+        session, place.store, place.item, reason="Lost or stolen", amount="5"
+    )
     assert admin_client.post(ADJUSTMENTS, data=form).status_code == 303
     assert expected(session, place.store.id) == {}
 
@@ -610,7 +600,6 @@ def test_a_unit_changed_to_each_as_the_page_writes_is_said_and_nothing_is_writte
     place = committed_place(own_committed)
     setup = own_committed.session()
     _, totp = new_admin(setup)
-    reason_id = setup.scalars(select(AdjustmentReason.id)).first()
     setup.commit()
     page = own_committed.session()
     client = make_client(on=page)
@@ -623,14 +612,14 @@ def test_a_unit_changed_to_each_as_the_page_writes_is_said_and_nothing_is_writte
         }
     else:
         path = ADJUSTMENTS
-        form = {
-            "key": key_on(client.get(COUNTS)),
-            "location_id": str(place.store.id),
-            "item_id": str(place.cable.id),
-            "amount": "1.5",
-            "direction": "found",
-            "reason_id": str(reason_id),
-        }
+        form = adjustment_form(
+            setup,
+            place.store,
+            place.cable,
+            key=key_on(client.get(COUNTS)),
+            amount="1.5",
+            direction="found",
+        )
     changing = own_committed.session()
     cable = changing.get_one(Item, place.cable.id)
     items.save(changing, cable, {"unit": "each"})
@@ -647,21 +636,13 @@ def test_a_unit_changed_to_each_as_the_page_writes_is_said_and_nothing_is_writte
 # Stock at a retired place (docs/decisions/0003)
 
 
-# The badge beside Counts, its words read in place of the number.
-BADGE = (
-    'Counts <span class="badge"><span aria-hidden="true">1</span>'
-    '<span class="sr-only">: 1 retired place holds stock</span></span>'
-)
-
-
 def signals(client: TestClient, place: Place) -> dict[str, bool]:
-    """Where the van shows as retired and holding stock."""
-    link = f'href="{COUNTS}/{place.van.id}"'
-    home = text(client.get("/admin"))
+    """Where the van shows as retired and holding stock: each is shown by
+    its page's own tests, so these only check that each clears."""
     stock = text(client.get(STOCK))
     return {
-        "home": "1 retired place holds stock" in home and link in home,
-        "badge": BADGE in stock,
+        "home": f'href="{COUNTS}/{place.van.id}"' in text(client.get("/admin")),
+        "badge": badge_html(1) in stock,
         "stock": "1 retired place holds stock" in stock,
         "counts": f"{place.van.name} (retired)" in text(client.get(COUNTS)),
         "form": client.get(f"{COUNTS}/{place.van.id}").status_code == 200,
@@ -692,17 +673,9 @@ def test_stock_at_a_retired_place_can_be_written_off(
     admin_client: TestClient, session: Session
 ) -> None:
     place = at_retired_van(session)
-    lost = session.scalars(
-        select(AdjustmentReason).where(AdjustmentReason.name == "Lost or stolen")
-    ).one()
-    form = {
-        "key": key_on(admin_client.get(COUNTS)),
-        "location_id": str(place.van.id),
-        "item_id": str(place.item.id),
-        "amount": "3",
-        "direction": "off",
-        "reason_id": str(lost.id),
-    }
+    form = adjustment_form(
+        session, place.van, place.item, reason="Lost or stolen", amount="3"
+    )
     assert admin_client.post(ADJUSTMENTS, data=form).status_code == 303
     assert expected(session, place.van.id) == {}
     assert not any(signals(admin_client, place).values())
@@ -723,8 +696,8 @@ def test_a_retired_place_holding_nothing_is_not_offered(
 def test_a_form_for_a_retired_place_holding_nothing_writes_nothing(
     admin_client: TestClient, session: Session
 ) -> None:
-    """A stale or hand-made form, with a key not yet written, is refused as
-    for a place there is not."""
+    """A stale or hand-made form, with a key not yet written: the ledger
+    refuses it (location_countable), a count as for a place there is not."""
     place = stocked(session)
     retire(session, place.van)
     counted = admin_client.post(
@@ -736,16 +709,71 @@ def test_a_form_for_a_retired_place_holding_nothing_writes_nothing(
         },
     )
     assert counted.status_code == 404
-    reason = session.scalars(select(AdjustmentReason.id)).first()
-    form = {
-        "key": str(uuid.uuid4()),
-        "location_id": str(place.van.id),
-        "item_id": str(place.item.id),
-        "amount": "2",
-        "direction": "found",
-        "reason_id": str(reason),
-    }
+    form = adjustment_form(session, place.van, place.item, direction="found")
     adjusted = admin_client.post(ADJUSTMENTS, data=form)
     assert adjusted.status_code == 400
-    assert "Pick a place." in text(adjusted)
+    assert RULES["location_countable"] in text(adjusted)
     assert counts_written(session) == []
+
+
+def test_a_key_written_at_another_place_lets_no_other_place_through(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A form sent again gets its first answer, but only at the place it
+    was written for: its key opens no other place that cannot be counted."""
+    place = stocked(session)
+    retire(session, place.van)
+    path = f"{COUNTS}/{place.store.id}"
+    form = count_form(admin_client, path) | {f"counted_{place.item.id}": "5"}
+    assert admin_client.post(path, data=form).status_code == 303
+    elsewhere = admin_client.post(f"{COUNTS}/{place.van.id}", data=form)
+    assert elsewhere.status_code == 404
+    assert len(counts_written(session)) == 1
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize("kind", ["count", "adjustment"])
+def test_a_place_retired_as_it_is_counted_is_refused(
+    committed: Committed, kind: str
+) -> None:
+    """The page found the store current; a retire of it, holding nothing,
+    commits while the count or adjustment waits for the place (lock_place),
+    which then finds it may not be counted, and writes nothing."""
+    place = committed_place(committed)
+    setup = committed.session()
+    admin, _ = new_admin(setup)
+    reason_id = setup.scalars(select(AdjustmentReason.id)).first()
+    setup.commit()
+    retiring = committed.session()
+    store = retiring.get_one(Location, place.store.id)
+    locations.retire(retiring, store, store.created_at)
+    retiring.flush()
+    counting = committed.session()
+    key = uuid.uuid4()
+    if kind == "count":
+        worker = committed.blocked(
+            counting,
+            lambda: record_count(
+                counting, key, admin.id, place.store.id, {place.item.id: Decimal(1)}, 0
+            ),
+        )
+    else:
+        assert reason_id is not None
+        worker = committed.blocked(
+            counting,
+            lambda: record_adjustment(
+                counting,
+                key,
+                admin.id,
+                place.store.id,
+                place.item.id,
+                Decimal(1),
+                found=True,
+                reason_id=reason_id,
+            ),
+        )
+    retiring.commit()
+    error = worker.finished().error
+    assert isinstance(error, RuleBroken)
+    assert error.rule == "location_countable"
+    counting.rollback()

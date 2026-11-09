@@ -158,14 +158,8 @@ def test_history_holds_no_secret(session: Session, admin: Admin, other: Admin) -
     )
     authenticator.totp_key, authenticator.retired_at = None, datetime.now(UTC)
     session.flush()
-    secret = flagged_columns("secret")
-    assert set(secret) == {
-        "admin_password",
-        "authenticator",
-        "recovery_code",
-        "reset_link",
-    }
-    for table, columns in secret.items():
+    # Which those are is test_history.py's to pin; each has rows here.
+    for table, columns in flagged_columns("secret").items():
         rows = history(session, table)
         assert rows, table
         for row in rows:

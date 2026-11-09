@@ -1,7 +1,6 @@
 """What is where (admin/stock.py)."""
 
 import re
-from datetime import UTC, datetime
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
@@ -100,8 +99,7 @@ def test_reorder_leaves_out_retired_items_and_says_count_first(
     place = Place(session)
     place.item.minimum = Decimal(1)
     place.cable.minimum = Decimal(1)
-    place.cable.retired_at = datetime.now(UTC)
-    session.flush()
+    retire(session, place.cable)
     write(session, place)  # Three taken from a store that had none.
     page = reorder_page(admin_client)
     assert place.cable.name not in page

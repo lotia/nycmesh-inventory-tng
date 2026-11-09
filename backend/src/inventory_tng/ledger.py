@@ -51,6 +51,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.db import (
     DbSession,
+    by_name,
     enforce,
     exists_where,
     get_locked,
@@ -174,19 +175,28 @@ def retired_holding_stock() -> Select[int]:
 
 def retired_places_holding_stock(session: Session) -> list[Location]:
     """retired_holding_stock's places, by name as people sort them."""
-    return list(
-        session.scalars(
-            select(Location)
-            .where(Location.id.in_(retired_holding_stock()))
-            .order_by(func.lower(Location.name))
-        )
-    )
+    return by_name(session, Location, Location.id.in_(retired_holding_stock()))
+
+
+def retired_holding_stock_count(session: Session) -> int:
+    """How many retired places hold stock (retired_holding_stock), counted
+    without loading them, as the navigation's badge on every page needs."""
+    places = retired_holding_stock().subquery()
+    return session.scalar(select(func.count()).select_from(places)) or 0
 
 
 def countable() -> ColumnElement[bool]:
     """Places an administrator may count or adjust: current ones, and
     retired ones that hold stock (retired_holding_stock), to put right."""
     return or_(Location.retired_at.is_(None), Location.id.in_(retired_holding_stock()))
+
+
+def _require_countable(session: Session, location_id: int) -> None:
+    """RuleBroken unless the place may be counted or adjusted, read with
+    it locked (lock_place): a retire waits for that lock, and it for a
+    retire, so a place retired since the page checked is refused."""
+    allowed = exists_where(session, Location.id == location_id, countable())
+    enforce("location_countable", when=not allowed)
 
 
 def holds_stock(session: Session, location_id: int) -> bool:
@@ -280,7 +290,8 @@ def lock_place(session: Session, location_id: int) -> None:
     """Wait for every save under way at a place, and hold up new ones until
     this transaction ends, so its ledger reads as one moment: every save
     takes FOR KEY SHARE on its places before it draws an id
-    (_hold_places), and this takes FOR UPDATE."""
+    (_hold_places), and this takes FOR UPDATE, as a retire of the place
+    does (locations.retire), so the two go one at a time."""
     get_locked(session, Location, location_id)
 
 
@@ -291,14 +302,14 @@ def moment(session: Session, location_id: int) -> int:
     with session.begin_nested() as reading:
         lock_place(session, location_id)
         latest = session.scalar(
-            select(func.max(LedgerTransaction.id)).where(_at(location_id))
+            select(func.max(LedgerTransaction.id)).where(_at_place(location_id))
         )
         # Rolling back to the savepoint releases the lock.
         reading.rollback()
     return latest or 0
 
 
-def _at(location_id: int) -> ColumnElement[bool]:
+def _at_place(location_id: int) -> ColumnElement[bool]:
     """A ledger transaction into or out of a place."""
     return or_(
         LedgerTransaction.to_location_id == location_id,
@@ -319,7 +330,7 @@ def _flows(
     into = LedgerTransaction.to_location_id == location_id
     out = LedgerTransaction.from_location_id == location_id
     windows = (window, *more)
-    where = [_at(location_id), or_(*windows)]
+    where = [_at_place(location_id), or_(*windows)]
     if items is not None:
         where.append(Movement.item_id.in_(items))
     rows = session.execute(
@@ -669,11 +680,11 @@ def _correct(
     kind: Literal["count", "adjustment"],
     header: Mapping[str, object],
     lines: Mapping[int, Decimal],
-) -> Written | None:
-    """A count's or an adjustment's transaction, unless its key is written
-    already."""
+) -> list[Written]:
+    """A count's or an adjustment's transaction, as written: none if its
+    key is written already."""
     transaction = insert_transaction(session, key, {"kind": kind, **header}, lines)
-    return None if transaction is None else Written(transaction.id, kind, len(lines))
+    return [] if transaction is None else [Written(transaction.id, kind, len(lines))]
 
 
 class Counted(NamedTuple):
@@ -710,10 +721,14 @@ def corrected(
         )
 
 
-def sent_keys(key: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
-    """The keys a count or an adjustment sent with `key` writes under: that
-    key, and the one a count's transaction out of the place takes."""
-    return key, uuid.uuid5(key, "lost")
+def _first_sent(session: Session, location_id: int, *keys: uuid.UUID) -> int | None:
+    """The first transaction at the place written under any of `keys`: a
+    form sent before."""
+    return session.scalar(
+        select(func.min(LedgerTransaction.id)).where(
+            LedgerTransaction.idempotency_key.in_(keys), _at_place(location_id)
+        )
+    )
 
 
 def record_count(
@@ -737,16 +752,17 @@ def record_count(
     Found more, or nothing differed, is a count into the place under the key;
     found less, a count out of it under a key made from it, so sending it
     twice writes it once, and finds what moved as the first send did. A
-    count whose every line moved writes nothing."""
+    count whose every line moved writes nothing.
+
+    RuleBroken (location_countable) at a place that may not be counted,
+    unless the form was sent there before, so it gets its first answer."""
     lock_place(session, location_id)
-    _, lost_key = keys = sent_keys(key)
-    sent = session.scalar(
-        select(func.min(LedgerTransaction.id)).where(
-            LedgerTransaction.idempotency_key.in_(keys)
-        )
-    )
+    lost_key = uuid.uuid5(key, "lost")
+    sent = _first_sent(session, location_id, key, lost_key)
     after = LedgerTransaction.id > as_of
-    if sent is not None:
+    if sent is None:
+        _require_countable(session, location_id)
+    else:
         after &= LedgerTransaction.id < sent
     moved, flows = _flows(
         session, location_id, after, LedgerTransaction.id <= as_of, items=counted_at
@@ -761,19 +777,16 @@ def record_count(
             found[item_id] = difference
         elif difference < 0:
             lost[item_id] = -difference
-    written = []
+    written: list[Written] = []
     # A count of nothing at all still says when the place was counted.
     if found or ((kept or not counted_at) and not lost):
         header = {"admin_id": admin_id, "to_location_id": location_id}
-        written.append(_correct(session, key, "count", header, found))
+        written += _correct(session, key, "count", header, found)
     if lost:
         header = {"admin_id": admin_id, "from_location_id": location_id}
-        written.append(_correct(session, lost_key, "count", header, lost))
+        written += _correct(session, lost_key, "count", header, lost)
     return Counted(
-        bool(found or lost),
-        moved,
-        [transaction for transaction in written if transaction is not None],
-        len(moved) if sent is None else 0,
+        bool(found or lost), moved, written, len(moved) if sent is None else 0
     )
 
 
@@ -789,11 +802,15 @@ def record_adjustment(
     reason_id: int,
 ) -> list[Written]:
     """Stock found at a place, or written off from it, for a reason. What
-    it wrote: nothing if its key was written already."""
+    it wrote: nothing if its key was written already. RuleBroken
+    (location_countable), as record_count."""
+    lock_place(session, location_id)
+    if _first_sent(session, location_id, key) is not None:
+        return []
+    _require_countable(session, location_id)
     side = "to_location_id" if found else "from_location_id"
     header = {"admin_id": admin_id, "reason_id": reason_id, side: location_id}
-    written = _correct(session, key, "adjustment", header, {item_id: amount})
-    return [] if written is None else [written]
+    return _correct(session, key, "adjustment", header, {item_id: amount})
 
 
 def _header(batch: Batch) -> dict[str, object]:

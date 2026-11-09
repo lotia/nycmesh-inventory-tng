@@ -10,13 +10,16 @@ history, such as update(Item), are refused everywhere by test_history.py.
 
 import ast
 from collections.abc import Callable, Iterator
+from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
 
+import argon2
 import pytest
-from sqlalchemy import Engine, Text, exc, select
+from sqlalchemy import Engine, Text, exc, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
+from inventory_tng import accounts
 from inventory_tng.db import (
     CATALOGUE,
     LOCKS_INFO,
@@ -34,12 +37,13 @@ from inventory_tng.db import (
     missing_lock,
     settings_row,
 )
-from inventory_tng.models import Category, Item, SiteSettings
+from inventory_tng.models import Admin, AdminPassword, Category, Item, SiteSettings
 
-from helpers.rows import setting_up
+from helpers.rows import setting_up, tag
 from helpers.source import SOURCE, offending, writes
 
 FOREIGN_KEY_VIOLATION = "23503"  # PostgreSQL's code for a missing parent.
+LOCK_NOT_AVAILABLE = "55P03"  # PostgreSQL's, for NOWAIT on a locked row.
 
 TABLES = Base.metadata.tables
 # Each table's owner, as its model declares it. None: no module, only
@@ -96,16 +100,32 @@ def test_each_owner_is_a_module() -> None:
 
 
 def test_every_table_declares_its_protection() -> None:
-    """So a new table cannot be forgotten: each says who makes it, what a
-    write holds and whether it has history; the catalogue's are made by a
-    module of their own."""
+    """So a new table cannot be forgotten (db.protection's types say the
+    rest). The catalogue's are made by a module of their own. A table with
+    a lock has history, so test_history.py refuses a statement writing it,
+    which the guard would not see."""
     for table in TABLES.values():
         assert set(table.info) == {"owner", "lock", "history"}, table.name
-        assert table.info["lock"] in {"catalogue", "row", None}, table.name
-        assert isinstance(table.info["history"], bool), table.name
         if table.info["lock"] == "catalogue":
             assert table.info["owner"] is not None, table.name
+        if table.info["lock"] is not None:
+            assert table.info["history"], table.name
     assert {t.name for t in TABLES.values() if t.info["lock"] is None} == UNLOCKED
+
+
+def test_no_model_has_a_relationship() -> None:
+    """The guard and history see only the columns a session was given to
+    change (db.flush_writes), not rows a relationship() changes as it
+    flushes."""
+    related = {
+        mapper.class_.__name__
+        for mapper in Base.registry.mappers
+        if mapper.relationships
+    }
+    assert related == set(), (
+        "db.flush_writes and history.py see column changes only: write the"
+        f" foreign key instead of a relationship() on {related}"
+    )
 
 
 @pytest.mark.parametrize(
@@ -437,26 +457,27 @@ def test_a_savepoint_rolled_back_forgets_its_locks(
             fresh.flush()
 
 
-@pytest.mark.parametrize(
-    ("savepoint", "kept"), [("rolled back", False), ("released", True)]
-)
-def test_a_row_written_in_a_savepoint_rolled_back_loses_its_lock(
-    fresh: Session, savepoint: str, kept: bool
+@pytest.mark.parametrize("savepoint", ["rolled back", "released"])
+def test_a_row_written_in_a_savepoint_keeps_its_lock(
+    fresh: Session, engine: Engine, savepoint: str
 ) -> None:
-    """Locked before the savepoint, changed in it: PostgreSQL lets go of
-    the lock if it rolls back."""
+    """Locked before the savepoint, changed in it: PostgreSQL keeps the
+    lock however the savepoint ends (since 9.3, its SELECT page's
+    Locking Clause), so the guard does too, and another transaction still
+    cannot lock the row."""
     site = settings_row(fresh, SiteSettings)
     with fresh.begin_nested() as inner:
         site.time_zone = "Europe/London"
         fresh.flush()
         if savepoint == "rolled back":
             inner.rollback()
+    with engine.connect() as other, pytest.raises(exc.OperationalError) as raised:
+        other.execute(
+            text("SELECT 1 FROM site_settings WHERE id = 1 FOR UPDATE NOWAIT")
+        )
+    assert getattr(raised.value.orig, "sqlstate", None) == LOCK_NOT_AVAILABLE
     site.time_zone = "Asia/Tokyo"
-    if kept:
-        fresh.flush()
-    else:
-        with pytest.raises(RuntimeError, match="site_settings update"):
-            fresh.flush()
+    fresh.flush()
 
 
 def test_the_transactions_end_forgets_every_lock(fresh: Session) -> None:
@@ -466,6 +487,24 @@ def test_the_transactions_end_forgets_every_lock(fresh: Session) -> None:
     site.time_zone = "Europe/London"
     with pytest.raises(RuntimeError, match="site_settings update"):
         fresh.flush()
+
+
+def test_a_password_rehashed_as_it_is_checked_is_locked_first(fresh: Session) -> None:
+    """argon2's parameters moved on since the hash was made, so checking it
+    stores a new one, on the row it locked (accounts.check_password)."""
+    admin = Admin(username=f"rehash{tag()}")
+    fresh.add(admin)
+    fresh.flush()
+    older = argon2.PasswordHasher.from_parameters(
+        replace(argon2.profiles.CHEAPEST, time_cost=2)
+    )
+    made = older.hash("correct horse")
+    fresh.add(AdminPassword(id=admin.id, password_hash=made))
+    fresh.flush()
+    held(fresh).clear()  # As in a later transaction, which did not add them.
+    assert accounts.check_password(fresh, admin.id, "correct horse")
+    fresh.flush()
+    assert fresh.get_one(AdminPassword, admin.id).password_hash != made
 
 
 def test_a_tests_own_session_is_left_alone(fresh: Session) -> None:

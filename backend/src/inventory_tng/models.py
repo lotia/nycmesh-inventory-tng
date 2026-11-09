@@ -5,24 +5,16 @@ and administrators' sign-in (docs/decisions/0012).
 Every mapped class registers here; migrations/env.py imports this module, so
 autogenerate sees every table.
 
-Each table declares its protection once, in its __table_args__
-(db.protection: who makes its rows, the lock a write holds, whether it has
-history), and its columns what history leaves out (mapped_column info:
-"secret", "not_a_change"); db.py says what each means.
+Each table declares its protection, and each column any flag, as
+db.protection says.
 
-Conventions, on every table but the ledger's, which is append-only and is its
-own history (LedgerTransaction), forms already sent, which are only added to
-(SentForm), and administrators' sessions, which change on every request and
-are only ever ended (AdminSession):
+Conventions, on every table with history:
 
 - An integer id and `created_at`, set by the database.
 - Nothing is deleted. A row is retired (`retired_at`; NULL means current) and
   every foreign key is ON DELETE RESTRICT, in PostgreSQL itself.
 - Quantities are numeric(12,3); money is numeric(10,2).
 - Names are unique, ignoring case, among current rows.
-- Every insert, update and delete through the ORM is written to
-  `catalogue_history`, with the actor the session names (db.set_actor),
-  leaving out secret columns such as a password's hash (history.py).
 
 A rule about one row's own values is a check constraint, which raises a
 check violation (SQLSTATE 23514) named for the rule, as describe_error()

@@ -16,7 +16,7 @@ from opentelemetry.sdk.metrics.export import (
     Metric,
     NumberDataPoint,
 )
-from sqlalchemy import exc, select
+from sqlalchemy import exc
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
@@ -26,7 +26,7 @@ from inventory_tng.app import create_app
 from inventory_tng.db import RuleBroken
 from inventory_tng.devices import RegisteredDevice
 from inventory_tng.masking import MASK, Masker
-from inventory_tng.models import AdjustmentReason, LedgerTransaction
+from inventory_tng.models import LedgerTransaction
 from inventory_tng.settings import Settings
 from inventory_tng.telemetry import Telemetry, enabled
 
@@ -34,7 +34,7 @@ from helpers.apps import on_session
 from helpers.devices import new_device
 from helpers.mail import FailingMail, SentMail
 from helpers.sign_in import PASSWORD, code, new_admin, sign_in_with
-from helpers.stock import Place, received, retire, stocked, write
+from helpers.stock import Place, adjustment_form, received, retire, stocked, write
 
 ENDPOINT = {"OTEL_EXPORTER_OTLP_ENDPOINT": "http://collector:4318"}
 
@@ -389,15 +389,7 @@ def test_counts_counts_and_adjustments_written_once(
     before = recorded_by_kind(reader)
     assert count().status_code == 303
     assert count().status_code == 303
-    reason = session.scalars(select(AdjustmentReason.id)).first()
-    form = {
-        "key": str(uuid.uuid4()),
-        "location_id": str(place.store.id),
-        "item_id": str(place.item.id),
-        "amount": "1",
-        "direction": "off",
-        "reason_id": str(reason),
-    }
+    form = adjustment_form(session, place.store, place.item)
     for _ in range(2):
         adjusted = client.post(ADJUSTMENTS, data=form, follow_redirects=False)
         assert adjusted.status_code == 303

@@ -10,11 +10,10 @@ from sqlalchemy import func, select
 
 from inventory_tng import accounts
 from inventory_tng.admin.common import ADMINS, admin_page
-from inventory_tng.admin.counts import COUNTS, badge
+from inventory_tng.admin.counts import COUNTS
 from inventory_tng.db import DbSession
 from inventory_tng.ledger import retired_places_holding_stock
 from inventory_tng.models import Category, Item, Location, Volunteer
-from inventory_tng.pages import sections
 from inventory_tng.sign_in import ACCOUNT, HOME, AdminSignedIn
 
 router = APIRouter(include_in_schema=False)
@@ -57,7 +56,6 @@ def home(request: Request, signed: AdminSignedIn, session: DbSession) -> Respons
         warnings.append(Advice(ALONE, ADMINS, "Invite another"))
     if not signed.admin.email and request.app.state.settings.mail is not None:
         warnings.append(Advice(NO_EMAIL, ACCOUNT, "Add one"))
-    retired = retired_places_holding_stock(session)
     return admin_page(
         request,
         signed,
@@ -66,7 +64,7 @@ def home(request: Request, signed: AdminSignedIn, session: DbSession) -> Respons
             "title": "Inventory",
             "current": current,
             "warnings": warnings,
-            "retired_places": retired,
-            "sections": sections(signed.admin, {COUNTS: badge(retired)}),
+            "retired_places": retired_places_holding_stock(session),
+            "counts_path": COUNTS,
         },
     )

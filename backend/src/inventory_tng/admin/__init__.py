@@ -26,7 +26,7 @@ from inventory_tng.admin import (
     volunteers,
 )
 
-# The sections, in the order the navigation shows them.
+# The sections, in the order the navigation shows them, and their badges.
 pages.SECTIONS[:] = (
     (items.ITEMS, "Items"),
     (categories.CATEGORIES, "Categories"),
@@ -39,6 +39,7 @@ pages.SECTIONS[:] = (
     (admins.ADMINS, "Administrators"),
     (settings.SETTINGS, "Settings"),
 )
+pages.BADGES[counts.COUNTS] = counts.badge
 
 router = APIRouter(include_in_schema=False)
 for module in (

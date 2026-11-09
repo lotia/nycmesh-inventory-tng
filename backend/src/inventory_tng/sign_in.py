@@ -193,8 +193,9 @@ CONFIRM_FIELD = "confirm_code"
 class ConfirmHere(Exception):
     """A form sent once the window had closed: shown again as a code field,
     carrying what was typed, so it goes on once the code is accepted. Its
-    navigation is read as it is raised: the page is drawn once the request's
-    session has closed."""
+    navigation is read as it is made, a query, so off the event loop
+    (run_in_threadpool): the page is drawn once the request's session has
+    closed."""
 
     def __init__(
         self,
@@ -238,19 +239,23 @@ async def confirmed(
     if not was_open:
         typed = form.get(CONFIRM_FIELD)
         if not isinstance(typed, str):
-            raise ConfirmHere(signed, carried)
+            raise await run_in_threadpool(ConfirmHere, signed, carried)
         # Its queries, and argon2's work, off the event loop.
         outcome = await run_in_threadpool(_confirm, session, signed, typed, notify)
         if outcome != "confirmed":
-            raise ConfirmHere(
-                signed, carried, _refused(outcome, signed), _status(outcome)
+            raise await run_in_threadpool(
+                ConfirmHere,
+                signed,
+                carried,
+                _refused(outcome, signed),
+                _status(outcome),
             )
     signed = await run_in_threadpool(_hold, session, signed)
     # The window, again, with what the lock read: shorter settings may have
     # come first.
     if was_open and not accounts.confirmation_open(signed.row, signed.settings, _now()):
         log.info("form asked for a code", admin_id=signed.admin.id, reason="waited")
-        raise ConfirmHere(signed, carried)
+        raise await run_in_threadpool(ConfirmHere, signed, carried)
     hold_until_commit(session)
     return signed
 

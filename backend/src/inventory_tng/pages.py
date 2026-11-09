@@ -51,25 +51,18 @@ class Badge(NamedTuple):
 
 
 # The administrator pages' sections, in the navigation's order, by path and
-# name (admin/__init__.py), and the badge of any that has one, by path, from
-# the module that owns it.
+# name, and the badge of any that has one, by path (admin/__init__.py).
 SECTIONS: list[tuple[str, str]] = []
 BADGES: dict[str, Callable[[Session], Badge | None]] = {}
 
 
-def sections(
-    admin: object, known: Mapping[str, Badge | None] | None = None
-) -> list[tuple[str, str, Badge | None]]:
+def sections(admin: object) -> list[tuple[str, str, Badge | None]]:
     """The navigation, for a page drawn for `admin`: each section with its
-    badge, as `known` gives it (by path) for a page that has read it
-    already, else read in the session that loaded `admin`. With none open,
-    no badges."""
-    known = known or {}
+    badge, read in the session that loaded `admin`. With none open, no
+    badges."""
     session = object_session(admin)
 
     def badge(path: str) -> Badge | None:
-        if path in known:
-            return known[path]
         return BADGES[path](session) if session and path in BADGES else None
 
     return [(path, label, badge(path)) for path, label in SECTIONS]

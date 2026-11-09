@@ -20,7 +20,7 @@ from inventory_tng.models import (
 )
 
 from helpers.rows import add, tag
-from helpers.stock import Place, write
+from helpers.stock import Place, retire, write
 
 URL = "/api/catalogue"
 NOW = datetime.now(UTC)
@@ -189,9 +189,7 @@ def test_a_retired_item_stays_while_it_has_stock(
         from_location_id=None,
         to_location_id=place.store.id,
     )
-    for item in (place.item, place.cable):
-        item.retired_at = datetime.now(UTC)
-    session.flush()
+    retire(session, place.item, place.cable)
     items = by_id(registered_client.get(URL).json()["items"])
     # The radio has stock left; the cable never had any.
     assert items[place.item.id]["retired"] is True
@@ -230,6 +228,5 @@ def test_a_retired_item_counts_stock_where_there_is_some(
         to_location_id=None,
         lines=[{"item_id": place.item.id, "quantity": "4"}],
     )
-    place.item.retired_at = datetime.now(UTC)
-    session.flush()
+    retire(session, place.item)
     assert place.item.id in by_id(registered_client.get(URL).json()["items"])
