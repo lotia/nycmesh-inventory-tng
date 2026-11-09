@@ -126,10 +126,11 @@ CreatedAt = Annotated[
 RetiredAt = Annotated[datetime | None, mapped_column(DateTime(timezone=True))]
 
 
-def _reference(target: str) -> MappedColumn[Any]:
+def _reference(target: str, *, index: bool = True) -> MappedColumn[Any]:
     """A foreign key, indexed: RESTRICT and the rules look rows up by it.
-    Nullable or not as the column's Mapped type says."""
-    return mapped_column(ForeignKey(target, ondelete="RESTRICT"), index=True)
+    Not indexed alone (index=False) only where an index of the table's leads
+    with it. Nullable or not as the column's Mapped type says."""
+    return mapped_column(ForeignKey(target, ondelete="RESTRICT"), index=index)
 
 
 def _one_of(column: str, values: tuple[str, ...]) -> str:
@@ -555,19 +556,27 @@ class Movement(Base):
     __tablename__ = "movement"
     __table_args__ = (
         CheckConstraint("quantity > 0", name="quantity"),
+        # An item once in a transaction (ledger.insert_transaction refuses a
+        # repeat first); it also serves look-ups by transaction.
+        Index(
+            "uq_movement_transaction_id_item_id",
+            "transaction_id",
+            "item_id",
+            unique=True,
+        ),
         protection(owner=None, lock=None, history=False),
     )
 
     id: Mapped[IntId]
-    transaction_id: Mapped[int] = _reference("ledger_transaction.id")
+    transaction_id: Mapped[int] = _reference("ledger_transaction.id", index=False)
     item_id: Mapped[int] = _reference("item.id")
     quantity: Mapped[Decimal] = mapped_column(QUANTITY)
 
 
 class ScanSettings(Base):
     """How the scan page behaves, which administrators set on the Settings
-    page (admin/settings.py). One row, id 1, made by its migration. Changes
-    are history like everything else."""
+    page (admin/settings.py, through scan_settings.py). One row, id 1, made
+    by its migration. Changes are history like everything else."""
 
     __tablename__ = "scan_settings"
     __table_args__ = (
@@ -806,13 +815,13 @@ class SiteSettings(Base):
 
 class AdjustmentReason(Base):
     """Why stock was written off or found outside a count. Administrators
-    extend the list (admin/settings.py); its first entries come with its
+    extend the list (adjustment_reasons.py); its first entries come with its
     migration."""
 
     __tablename__ = "adjustment_reason"
     __table_args__ = (
         _unique_current_name("adjustment_reason"),
-        protection(owner="admin/settings.py", lock="row", history=True),
+        protection(owner="adjustment_reasons.py", lock="row", history=True),
     )
 
     id: Mapped[IntId]

@@ -98,10 +98,12 @@ def test_rows_are_written_by_their_owners_only() -> None:
     )
 
 
-def test_each_owner_is_a_module() -> None:
-    assert all(
-        (SOURCE / owner).is_file() for owner in OWNERS.values() if owner is not None
-    )
+def test_each_owner_is_a_domain_module() -> None:
+    """Not a page's: the pages call the owners' functions, which hold the
+    rules, so another front end can too (inventory-tng-8i4.122)."""
+    owners = {owner for owner in OWNERS.values() if owner is not None}
+    assert all((SOURCE / owner).is_file() for owner in owners)
+    assert [owner for owner in owners if owner.startswith("admin/")] == []
 
 
 def test_every_table_declares_its_protection() -> None:
@@ -156,8 +158,8 @@ def test_no_model_has_a_relationship() -> None:
             "from sqlalchemy import delete\ndelete(ScanSettings)",
             True,
         ),
-        ("admin/items.py", "AdjustmentReason(name='x')", True),
-        ("admin/settings.py", "AdjustmentReason(name='x')", False),
+        ("admin/settings.py", "AdjustmentReason(name='x')", True),
+        ("adjustment_reasons.py", "AdjustmentReason(name='x')", False),
         # Not a write.
         ("admin/items.py", "select(Item).where(Item.name == 'x')", False),
     ],

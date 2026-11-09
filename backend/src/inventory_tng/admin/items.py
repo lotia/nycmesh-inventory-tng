@@ -163,29 +163,29 @@ def _item_page(
 
 def _fields(
     session: Session, form: Mapping[str, str]
-) -> tuple[dict[str, object], dict[str, str]]:
-    """What to set, and what is wrong."""
-    values: dict[str, object] = {"name": form.get("name", "").strip()}
+) -> tuple[items.Fields | None, dict[str, str]]:
+    """What to set, unless something is wrong, and what is."""
+    name = form.get("name", "").strip()
     problems: dict[str, str] = {}
-    if problem := name_problem(str(values["name"])):
+    if problem := name_problem(name):
         problems["name"] = problem
-    for field in TEXT_FIELDS:
-        values[field] = form.get(field, "").strip() or None
     category = chosen(session, Category, form.get("category_id", ""))
     if category is None:
         problems["category_id"] = "Pick a category."
-    else:
-        values["category_id"] = category.id
-    if form.get("unit") not in UNITS:
+    unit = form.get("unit", "")
+    if unit not in UNITS:
         problems["unit"] = "Pick a unit."
-    else:
-        values["unit"] = form["unit"]
     minimum = quantity(form.get("minimum", ""), positive=False)
     if isinstance(minimum, str):
         problems["minimum"] = minimum
-    else:
-        values["minimum"] = minimum
-    return values, problems
+    # Each None or str here is a problem already; checked again for the types.
+    if problems or category is None or isinstance(minimum, str):
+        return None, problems
+    texts = {field: form.get(field, "").strip() or None for field in TEXT_FIELDS}
+    fields = items.Fields(
+        name=name, category_id=category.id, unit=unit, minimum=minimum, **texts
+    )
+    return fields, problems
 
 
 @router.get(ITEMS)
@@ -199,10 +199,10 @@ def list_items(
 def add_item(
     request: Request, signed: AdminSignedIn, session: DbSession, form: TextForm
 ) -> Response:
-    values, problems = _fields(session, form)
+    fields, problems = _fields(session, form)
     item = None
-    if not problems:
-        item = _change_or_note(session, lambda: items.add(session, values), problems)
+    if fields is not None:
+        item = _change_or_note(session, lambda: items.add(session, fields), problems)
     if item is None:
         return _list_page(request, session, signed, problems=problems, values=form)
     session.commit()
@@ -231,9 +231,9 @@ def save_item(
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
-    values, problems = _fields(session, form)
-    if not problems:
-        _change_or_note(session, lambda: items.save(session, found, values), problems)
+    fields, problems = _fields(session, form)
+    if fields is not None:
+        _change_or_note(session, lambda: items.save(session, found, fields), problems)
     if problems:
         return _item_page(
             request, session, signed, found, problems=problems, values=form

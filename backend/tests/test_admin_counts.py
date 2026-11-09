@@ -38,7 +38,7 @@ from inventory_tng.models import (
 )
 
 from helpers.concurrency import Committed
-from helpers.rows import violates
+from helpers.rows import item_fields, violates
 from helpers.sign_in import code, new_admin, sign_in_with, text
 from helpers.stock import (
     Place,
@@ -341,6 +341,9 @@ def test_reasons_can_be_added_renamed_retired_and_brought_back(
     assert given.retired_at is None
     taken = admin_client.post(f"{SETTINGS}/reasons", data={"name": "damaged"})
     assert "already a reason by that name" in text(taken)
+    unnamed = admin_client.post(f"{SETTINGS}/reasons", data={"name": "  "})
+    assert unnamed.status_code == 400
+    assert "Give it a name" in text(unnamed)
     assert admin_client.post(f"{SETTINGS}/reasons/999999").status_code == 404
 
 
@@ -622,7 +625,7 @@ def test_a_unit_changed_to_each_as_the_page_writes_is_said_and_nothing_is_writte
         )
     changing = own_committed.session()
     cable = changing.get_one(Item, place.cable.id)
-    items.save(changing, cable, {"unit": "each"})
+    items.save(changing, cable, item_fields(cable, unit="each"))
     changing.flush()
     worker = own_committed.blocked(page, lambda: client.post(path, data=form))
     changing.commit()
@@ -754,7 +757,12 @@ def test_a_place_retired_as_it_is_counted_is_refused(
         worker = committed.blocked(
             counting,
             lambda: record_count(
-                counting, key, admin.id, place.store.id, {place.item.id: Decimal(1)}, 0
+                counting,
+                key,
+                admin.id,
+                place.store.id,
+                [(place.item.id, Decimal(1))],
+                0,
             ),
         )
     else:

@@ -67,7 +67,7 @@ from inventory_tng.models import (
 
 from helpers.concurrency import Committed, Worker, delete_made, made, newest_ids
 from helpers.mail import SentMail
-from helpers.rows import tag
+from helpers.rows import item_fields, tag
 from helpers.sign_in import PASSWORD, code, new_admin, reset_link, sign_in_with
 from helpers.stock import committed_place
 
@@ -947,8 +947,9 @@ def test_an_item_added_while_its_category_is_retired(committed: Committed) -> No
     category_id, _ = catalogue(committed)
 
     def adding(session: Session) -> Item:
-        values = {"name": f"New {tag()}", "category_id": category_id}
-        return items.add(session, values)
+        return items.add(
+            session, items.Fields.new(name=f"New {tag()}", category_id=category_id)
+        )
 
     refused = at_once(committed, adding, retiring_category(category_id))
     assert refused == "category_has_items"
@@ -967,7 +968,9 @@ def test_an_item_added_once_its_category_is_locked_does_not_deadlock(
     assert category is not None
 
     def add() -> None:
-        items.add(adding, {"name": f"New {tag()}", "category_id": category_id})
+        items.add(
+            adding, items.Fields.new(name=f"New {tag()}", category_id=category_id)
+        )
 
     worker = committed.blocked(adding, add)
     categories.retire(retiring, category, NOW)
@@ -983,7 +986,7 @@ def receiving(item: Item, store: Location, amount: str) -> Write:
     writes every save, count and adjustment."""
     header = {"kind": "receipt", "to_location_id": store.id}
     return lambda session: insert_transaction(
-        session, uuid.uuid4(), header, {item.id: Decimal(amount)}
+        session, uuid.uuid4(), header, [(item.id, Decimal(amount))]
     )
 
 
@@ -1002,7 +1005,9 @@ def test_a_unit_changed_while_stock_moves_waits_then_is_refused(
     On a database of its own, as it writes the ledger."""
     place = committed_place(own_committed)
     to_each = doing(
-        Item, place.cable.id, lambda s, item: items.save(s, item, {"unit": "each"})
+        Item,
+        place.cable.id,
+        lambda s, item: items.save(s, item, item_fields(item, unit="each")),
     )
     receipt = receiving(place.cable, place.store, "1.5")
     assert either_first(own_committed, receipt, to_each, swapped=swapped) == refused

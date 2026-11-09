@@ -1,5 +1,6 @@
-"""How the scan page behaves, from the command line: the operator's fallback,
-as administrators use the Settings page (admin/settings.py):
+"""How the scan page behaves: every write to the scan_settings table, by
+the Settings page (admin/settings.py) and from the command line, the
+operator's fallback:
 
     uv run python -m inventory_tng.scan_settings show
     uv run python -m inventory_tng.scan_settings set --name-check-minutes 20
@@ -55,14 +56,21 @@ def main(argv: Sequence[str] | None = None) -> int:
 def run(session: Session, args: argparse.Namespace) -> int:
     if args.command == "set":
         set_actor(session, CLI_ACTOR)
-        current = settings_row(session, ScanSettings)
-        current.name_check_minutes = args.name_check_minutes
+        current = change(session, args.name_check_minutes)
         session.flush()
         log.info("scan settings changed", name_check_minutes=args.name_check_minutes)
     else:
         current = session.get_one(ScanSettings, 1)
     print(f"name check: {describe(current.name_check_minutes)}")
     return 0
+
+
+def change(session: Session, name_check_minutes: int) -> ScanSettings:
+    """The settings, changed, in the range its check constraint holds
+    (NAME_CHECK_MINUTES), which the page and the command check first."""
+    current = settings_row(session, ScanSettings)
+    current.name_check_minutes = name_check_minutes
+    return current
 
 
 def describe(minutes: int) -> str:

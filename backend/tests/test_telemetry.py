@@ -347,7 +347,7 @@ def test_counts_count_lines_withheld(rolled_back: Recorded, session: Session) ->
     place = stocked(session)
     as_of = received(session, place).id
     write(session, place)
-    radios = {place.item.id: Decimal(5)}
+    radios = [(place.item.id, Decimal(5))]
     result = ledger.record_count(
         session, uuid.uuid4(), ada.id, place.store.id, radios, as_of
     )
@@ -412,7 +412,7 @@ def test_a_count_refused_after_its_first_transaction_records_nothing(
         session: Session,
         key: uuid.UUID,
         header: Mapping[str, object],
-        lines: Mapping[int, Decimal],
+        lines: ledger.Lines,
     ) -> LedgerTransaction | None:
         if header.get("from_location_id") is not None:
             raise RuleBroken("movement_whole_units")

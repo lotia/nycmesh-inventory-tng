@@ -193,7 +193,13 @@ PostgreSQL cannot check it, the model's own `@validates`, as
 
 Each model declares who writes its table, holding what, and whether it has
 history, with `db.protection`; `db.py` gives the rules, which the flush and
-`tests/test_write_owners.py` enforce.
+`tests/test_write_owners.py` enforce. An owner is a domain module, never a
+page's, as `adjustment_reasons.py` is; a settings row, made by its
+migration, has none, and `scan_settings.change` is its one writer.
+`items.Fields` names every column an item's save sets, each required, so
+none is blanked by being left out. The ledger takes lines, not a mapping by
+item, so none is lost: a transaction naming an item twice is refused
+(`movement_item_once`), and its movements' unique index says so too.
 
 ### Locking a row
 

@@ -1,5 +1,6 @@
 """Catalogue rows: adding, finding, their history and the rules they break."""
 
+import dataclasses
 import uuid
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -9,6 +10,7 @@ import pytest
 from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 
+from inventory_tng import items
 from inventory_tng.db import (
     UNGUARDED_INFO,
     Base,
@@ -17,7 +19,7 @@ from inventory_tng.db import (
     describe_error,
     flagged,
 )
-from inventory_tng.models import CatalogueHistory
+from inventory_tng.models import CatalogueHistory, Item
 
 
 @contextmanager
@@ -99,3 +101,10 @@ def flagged_columns(flag: Flag) -> dict[str, set[str]]:
         for table in Base.metadata.tables.values()
         if (names := flagged(table, flag))
     }
+
+
+def item_fields(item: Item, **changes: object) -> items.Fields:
+    """An item's fields as they are, but for `changes`: for items.save."""
+    names = (field.name for field in dataclasses.fields(items.Fields))
+    now = items.Fields(**{name: getattr(item, name) for name in names})
+    return dataclasses.replace(now, **changes)

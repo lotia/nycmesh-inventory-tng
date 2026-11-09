@@ -108,13 +108,13 @@ def _catalogue(session: Session) -> None:
     things = {
         name: items.add(
             session,
-            {
-                "name": name,
-                "category_id": kinds[category].id,
-                "unit": unit,
-                "manufacturer": maker,
-                "part_number": part,
-            },
+            items.Fields.new(
+                name=name,
+                category_id=kinds[category].id,
+                unit=unit,
+                manufacturer=maker,
+                part_number=part,
+            ),
         )
         for name, category, unit, maker, part in ITEMS
     }

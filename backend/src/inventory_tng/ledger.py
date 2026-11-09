@@ -244,11 +244,16 @@ def lines_break(
     ]
 
 
+# A transaction's lines, each an item id and an amount, an item on one line
+# only (repeated), as its movements' unique index keeps them.
+Lines = Sequence[tuple[int, Decimal]]
+
+
 def repeated(item_ids: Sequence[int | None]) -> set[int]:
     """The positions of the lines whose item another line names too (None
     names no item, so repeats none). A batch or a count names each item on
-    one line: the ledger keeps a line per item, so a second would be
-    lost."""
+    one line: the ledger refuses a second (movement_item_once), so a page
+    or the scan API says which lines, before it would."""
     times = Counter(item_ids)
     return {
         number
@@ -492,9 +497,9 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
     if (written := _replay(session, batch)) is not None:
         return Recorded(written, False)
     header = {"device_id": device_id, **_header(batch)}
-    lines = {line.item_id: line.quantity for line in batch.lines}
-    held = hold(session, header, lines)
-    problems = _problems(session, batch, held)
+    lines = [(line.item_id, line.quantity) for line in batch.lines]
+    held = hold(session, header, [item_id for item_id, _ in lines])
+    problems = _problems(session, batch, held, lines)
     if problems:
         refused.add(1, {"reason": "invalid"})
         log.info("batch refused", problems=sorted({kind for _, kind in problems}))
@@ -566,7 +571,7 @@ def insert_transaction(
     session: Session,
     key: uuid.UUID,
     header: Mapping[str, object],
-    lines: Mapping[int, Decimal],
+    lines: Lines,
 ) -> LedgerTransaction | None:
     """A transaction and its movements, unless its key is written already:
     None then, once a request writing it under way has committed. The one
@@ -575,11 +580,12 @@ def insert_transaction(
     Its rows are held here (hold), so every caller's lines are checked as
     locked; a caller that held them already only takes its own locks
     again. created_at is the database's now(), whatever the header says. A
-    receipt lowers what is on order of each item it brings."""
+    receipt lowers what is on order of each item it brings. RuleBroken
+    (movement_item_once) for an item on more than one line."""
     kind = str(header["kind"])
     enforce("ledger_transaction_lines", when=not lines and kind != "count")
-    items = hold(session, header, lines).items
-    for broken in lines_break(kind, items, lines.items()):
+    items = hold(session, header, _each_once(lines)).items
+    for broken in lines_break(kind, items, lines):
         # An item that does not exist is the foreign key's to refuse.
         for rule in broken or ():
             enforce(rule)
@@ -598,7 +604,7 @@ def insert_transaction(
                     "item_id": item_id,
                     "quantity": amount,
                 }
-                for item_id, amount in lines.items()
+                for item_id, amount in lines
             ],
         )
         if transaction.kind == "receipt":
@@ -606,18 +612,29 @@ def insert_transaction(
     return transaction
 
 
-def _receive(session: Session, lines: Mapping[int, Decimal]) -> None:
+def _each_once(lines: Lines) -> list[int]:
+    """The lines' items, each on one line, or RuleBroken
+    (movement_item_once)."""
+    item_ids = [item_id for item_id, _ in lines]
+    enforce("movement_item_once", when=bool(repeated(item_ids)))
+    return item_ids
+
+
+def _receive(session: Session, lines: Lines) -> None:
     """Through the ORM, so it is history. The items locked by id, so two
     receipts of the same items take them in one order."""
+    received = dict(lines)
     items = session.scalars(
         locked(
-            select(Item).where(Item.id.in_(lines), Item.on_order > 0).order_by(Item.id),
+            select(Item)
+            .where(Item.id.in_(received), Item.on_order > 0)
+            .order_by(Item.id),
             key_share=True,
         )
     )
     for item in items:
         assert item.on_order is not None  # The query asked for more than 0.
-        item.on_order = on_order_after(item.on_order, lines[item.id])
+        item.on_order = on_order_after(item.on_order, received[item.id])
 
 
 # Each of line_breaks' rules, as a batch's problem: which field, and what.
@@ -627,9 +644,11 @@ LINE_PROBLEMS: dict[str, tuple[str, Literal["not_whole", "retired"]]] = {
 }
 
 
-def _problems(session: Session, batch: Batch, held: Held) -> list[Problem]:
-    """What is wrong with a batch, line by line, with its rows held
-    (hold)."""
+def _problems(
+    session: Session, batch: Batch, held: Held, lines: Lines
+) -> list[Problem]:
+    """What is wrong with a batch, line by line (`lines`, its own), with its
+    rows held (hold)."""
     problems: list[Problem] = []
     if session.get(Volunteer, batch.volunteer_id) is None:
         problems.append((("volunteer_id",), "not_found"))
@@ -637,7 +656,6 @@ def _problems(session: Session, batch: Batch, held: Held) -> list[Problem]:
         location_id = getattr(batch, field)
         if location_id is not None and location_id not in held.places:
             problems.append(((field,), "not_found"))
-    lines = [(line.item_id, line.quantity) for line in batch.lines]
     twice = repeated([item_id for item_id, _ in lines])
     for number, broken in enumerate(lines_break(batch.kind, held.items, lines)):
         if number in twice:
@@ -679,7 +697,7 @@ def _correct(
     key: uuid.UUID,
     kind: Literal["count", "adjustment"],
     header: Mapping[str, object],
-    lines: Mapping[int, Decimal],
+    lines: Lines,
 ) -> list[Written]:
     """A count's or an adjustment's transaction, as written: none if its
     key is written already."""
@@ -736,7 +754,7 @@ def record_count(
     key: uuid.UUID,
     admin_id: int,
     location_id: int,
-    counted_at: Mapping[int, Decimal],
+    counted: Lines,
     as_of: int,
 ) -> Counted:
     """Put the records right for what was counted at a place, as they stood
@@ -755,7 +773,10 @@ def record_count(
     count whose every line moved writes nothing.
 
     RuleBroken (location_countable) at a place that may not be counted,
-    unless the form was sent there before, so it gets its first answer."""
+    unless the form was sent there before, so it gets its first answer;
+    RuleBroken (movement_item_once) for an item counted on two lines."""
+    _each_once(counted)
+    counted_at = dict(counted)
     lock_place(session, location_id)
     lost_key = uuid.uuid5(key, "lost")
     sent = _first_sent(session, location_id, key, lost_key)
@@ -781,10 +802,10 @@ def record_count(
     # A count of nothing at all still says when the place was counted.
     if found or ((kept or not counted_at) and not lost):
         header = {"admin_id": admin_id, "to_location_id": location_id}
-        written += _correct(session, key, "count", header, found)
+        written += _correct(session, key, "count", header, list(found.items()))
     if lost:
         header = {"admin_id": admin_id, "from_location_id": location_id}
-        written += _correct(session, lost_key, "count", header, lost)
+        written += _correct(session, lost_key, "count", header, list(lost.items()))
     return Counted(
         bool(found or lost), moved, written, len(moved) if sent is None else 0
     )
@@ -810,7 +831,7 @@ def record_adjustment(
     _require_countable(session, location_id)
     side = "to_location_id" if found else "from_location_id"
     header = {"admin_id": admin_id, "reason_id": reason_id, side: location_id}
-    return _correct(session, key, "adjustment", header, {item_id: amount})
+    return _correct(session, key, "adjustment", header, [(item_id, amount)])
 
 
 def _header(batch: Batch) -> dict[str, object]:
