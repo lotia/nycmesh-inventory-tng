@@ -23,7 +23,8 @@ Two choices that keep a volunteer's work from being lost:
 """
 
 import uuid
-from collections.abc import Collection, Iterable, Mapping
+from collections import Counter
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from decimal import Decimal
 from typing import Annotated, Literal, NamedTuple
 
@@ -196,6 +197,14 @@ def lines_break(
     ]
 
 
+def repeated(item_ids: Sequence[int]) -> set[int]:
+    """The positions of the lines whose item another line names too. A
+    batch names each item on one line: the ledger keeps a line per item, so
+    a second would be lost."""
+    times = Counter(item_ids)
+    return {number for number, item_id in enumerate(item_ids) if times[item_id] > 1}
+
+
 def on_order_after(on_order: Decimal, received: Decimal) -> Decimal:
     """An item's on_order once `received` of it arrives: down by that much,
     never below zero."""
@@ -345,7 +354,15 @@ class Batch(BaseModel):
     from_location_id: Number | None = None
     to_location_id: Number | None = None
     install_number: Number | None = None
-    lines: Annotated[list[Line], Field(min_length=1, max_length=MAX_LINES)]
+    lines: Annotated[
+        list[Line],
+        Field(
+            min_length=1,
+            max_length=MAX_LINES,
+            description="One line per item: a batch naming an item on more than "
+            "one line is refused, 422 with type repeated on each of those lines.",
+        ),
+    ]
 
     @model_validator(mode="after")
     def _sides(self) -> Batch:
@@ -365,9 +382,12 @@ class Batch(BaseModel):
 
 
 # Where in the batch, as pydantic gives it ("lines", 2, "item_id"), and what.
-Problem = tuple[tuple[str | int, ...], Literal["not_found", "not_whole", "retired"]]
+Problem = tuple[
+    tuple[str | int, ...], Literal["not_found", "not_whole", "retired", "repeated"]
+]
 MESSAGES = {
     "not_found": "There is no such row",
+    "repeated": "This item is on another line too: put it on one line",
     "not_whole": "This item is counted in whole units",
     "retired": "This item is retired: what is left may be taken, never received",
 }
@@ -540,7 +560,10 @@ def _problems(session: Session, batch: Batch, held: Held) -> list[Problem]:
         if location_id is not None and location_id not in held.places:
             problems.append(((field,), "not_found"))
     lines = [(line.item_id, line.quantity) for line in batch.lines]
+    twice = repeated([item_id for item_id, _ in lines])
     for number, broken in enumerate(lines_break(batch.kind, held.items, lines)):
+        if number in twice:
+            problems.append((("lines", number, "item_id"), "repeated"))
         if broken is None:
             problems.append((("lines", number, "item_id"), "not_found"))
             continue
@@ -733,7 +756,10 @@ PATH = "/transactions"
 def save_batch(
     batch: Batch, device: RegisteredDevice, session: DbSession, response: Response
 ) -> Saved:
-    """Write a whole batch, or none of it. A 422 names each bad line."""
+    """Write a whole batch, or none of it. A 422 names each bad line, as
+    FastAPI's own do: an item, location or volunteer that does not exist, a
+    fraction of an item counted in each, a retired item received, or an item
+    another line names too (repeated): send each item on one line."""
     # So the history of anything the batch changes, such as on_order, says who.
     set_actor(session, f"volunteer:{batch.volunteer_id}")
     transaction, written = record(session, batch, device_id=device.id)

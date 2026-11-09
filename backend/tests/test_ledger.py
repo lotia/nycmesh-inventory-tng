@@ -24,6 +24,7 @@ from inventory_tng.ledger import (
     lines_break,
     on_order_after,
     record_adjustment,
+    repeated,
     whole_enough,
 )
 from inventory_tng.models import (
@@ -132,10 +133,38 @@ def test_a_refusal_names_each_bad_line(
     assert [(p["loc"], p["type"]) for p in response.json()["detail"]] == [
         (["body", "volunteer_id"], "not_found"),
         (["body", "to_location_id"], "not_found"),
+        (["body", "lines", 0, "item_id"], "repeated"),
         (["body", "lines", 1, "item_id"], "not_found"),
+        (["body", "lines", 2, "item_id"], "repeated"),
         (["body", "lines", 2, "quantity"], "not_whole"),
     ]
     assert saved(session, batch["key"]) == []
+
+
+def test_a_batch_naming_an_item_twice_is_refused(
+    client: TestClient, session: Session, place: Place
+) -> None:
+    """Each line of the item is named, nothing is written, and the key is
+    still free for the batch put right."""
+    lines = [
+        {"item_id": place.item.id, "quantity": "3"},
+        {"item_id": place.cable.id, "quantity": "1"},
+        {"item_id": place.item.id, "quantity": "2"},
+    ]
+    batch = place.batch(lines=lines)
+    response = client.post(URL, json=batch)
+    assert response.status_code == 422
+    assert [(p["loc"], p["type"]) for p in response.json()["detail"]] == [
+        (["body", "lines", 0, "item_id"], "repeated"),
+        (["body", "lines", 2, "item_id"], "repeated"),
+    ]
+    assert saved(session, batch["key"]) == []
+    assert balances(session, place.item, place.cable) == {}
+    merged = batch | {"lines": [{"item_id": place.item.id, "quantity": "5"}]}
+    first = client.post(URL, json=merged)
+    again = client.post(URL, json=merged)
+    assert (first.status_code, again.status_code) == (201, 200)
+    assert balances(session, place.item)[(place.item.id, place.van.id)] == 5
 
 
 @pytest.mark.parametrize(
@@ -285,6 +314,21 @@ def test_each_line_is_checked_on_its_own() -> None:
         None,
         ["movement_whole_units"],
     ]
+
+
+@pytest.mark.parametrize(
+    ("item_ids", "twice"),
+    [
+        ([1], set()),
+        ([1, 2, 3], set()),
+        ([1, 2, 1], {0, 2}),
+        ([4, 4, 5, 5, 4], {0, 1, 2, 3, 4}),
+    ],
+)
+def test_a_repeated_item_names_each_of_its_lines(
+    item_ids: list[int], twice: set[int]
+) -> None:
+    assert repeated(item_ids) == twice
 
 
 # The ledger's rules, on PostgreSQL: each refused by the function that
