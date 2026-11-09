@@ -17,8 +17,10 @@ from helpers.sign_in import text
 
 
 @pytest.mark.parametrize("method", ["GET", "HEAD"])
-def test_the_root_goes_to_the_scan_page(client: TestClient, method: str) -> None:
-    answer = client.request(method, "/", follow_redirects=False)
+def test_the_root_goes_to_the_scan_page(
+    make_client_without_database: Callable[..., TestClient], method: str
+) -> None:
+    answer = make_client_without_database().request(method, "/")
     assert (answer.status_code, answer.headers["location"]) == (302, SCAN)
 
 
@@ -30,9 +32,13 @@ def test_the_root_goes_to_the_scan_page(client: TestClient, method: str) -> None
     ],
 )
 def test_a_page_error_is_a_page(
-    client: TestClient, method: str, path: str, status: int, title: str
+    make_client_without_database: Callable[..., TestClient],
+    method: str,
+    path: str,
+    status: int,
+    title: str,
 ) -> None:
-    answer = client.request(method, path)
+    answer = make_client_without_database().request(method, path)
     assert answer.status_code == status
     assert answer.headers["content-type"].startswith("text/html")
     page = text(answer)
@@ -53,9 +59,11 @@ def test_nothing_by_that_id_is_the_same_page(admin_client: TestClient) -> None:
     ("path", "home"), [("/nowhere", SCAN), ("/admin/x/y", "/admin")]
 )
 def test_the_logo_goes_where_they_likely_came_from(
-    client: TestClient, path: str, home: str
+    make_client_without_database: Callable[..., TestClient], path: str, home: str
 ) -> None:
-    assert f'class="brand" href="{home}"' in client.get(path).text
+    assert (
+        f'class="brand" href="{home}"' in make_client_without_database().get(path).text
+    )
 
 
 @pytest.mark.parametrize(
@@ -66,17 +74,22 @@ def test_the_logo_goes_where_they_likely_came_from(
     ],
 )
 def test_the_api_answers_json(
-    client: TestClient, method: str, path: str, status: int, detail: str
+    make_client_without_database: Callable[..., TestClient],
+    method: str,
+    path: str,
+    status: int,
+    detail: str,
 ) -> None:
-    answer = client.request(method, path)
+    answer = make_client_without_database().request(method, path)
     assert (answer.status_code, answer.json()) == (status, {"detail": detail})
 
 
 @pytest.fixture
-def failing(make_app: Callable[..., FastAPI]) -> Iterator[TestClient]:
+def failing(make_app_without_database: Callable[..., FastAPI]) -> Iterator[TestClient]:
     """An app with a page and an API route that fail, its errors answered
-    as a browser would get them, not raised into the test."""
-    app = make_app()
+    as a browser would get them, not raised into the test. With no database:
+    the failures here are the app's own, never a database's 503."""
+    app = make_app_without_database()
 
     def fail() -> None:
         raise RuntimeError("a bug")

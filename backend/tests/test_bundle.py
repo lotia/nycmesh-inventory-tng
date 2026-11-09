@@ -6,6 +6,7 @@ import pytest
 import structlog
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from httpx2 import Response
 from servestatic.compress import Compressor
 
 from inventory_tng.bundle import MANIFEST, PAGES, SCAN, STYLES, Bundle, Tags
@@ -55,6 +56,14 @@ def build(dist: Path) -> None:
         Compressor(use_zstd=False, quiet=True).compress(dist / "assets" / name)
 
 
+def assert_not_built(response: Response) -> None:
+    """The scan page's own 503, saying there is no build."""
+    assert (response.status_code, response.text) == (
+        503,
+        "The scan page is not built yet.",
+    )
+
+
 @pytest.fixture
 def dist(tmp_path: Path) -> Path:
     build(tmp_path)
@@ -62,8 +71,12 @@ def dist(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def pages(make_app: Callable[..., FastAPI], dist: Path) -> Iterator[TestClient]:
-    with TestClient(make_app(frontend=FrontendConfig(dist=dist))) as client:
+def pages(
+    make_app_without_database: Callable[..., FastAPI], dist: Path
+) -> Iterator[TestClient]:
+    with TestClient(
+        make_app_without_database(frontend=FrontendConfig(dist=dist))
+    ) as client:
         yield client
 
 
@@ -89,12 +102,12 @@ def test_the_shared_stylesheet_is_its_own_entry(dist: Path) -> None:
 
 
 def test_server_rendered_pages_load_the_shared_stylesheet(
-    pages: TestClient, make_app: Callable[..., FastAPI]
+    pages: TestClient, make_app_without_database: Callable[..., FastAPI]
 ) -> None:
     link = '<link rel="stylesheet" href="/static/assets/styles-BXvLJlQA.css">'
     assert link in pages.get("/admin/sign-in").text
     # Without a build, a plain page.
-    with TestClient(make_app()) as unbuilt:
+    with TestClient(make_app_without_database()) as unbuilt:
         assert "stylesheet" not in unbuilt.get("/admin/sign-in").text
 
 
@@ -141,13 +154,13 @@ def test_volunteers_pages_have_the_band_and_nothing_of_an_administrators(
     ("dev_server", "source"), [(None, "build"), ("http://localhost:5173", "dev_server")]
 )
 def test_the_log_says_where_the_pages_scripts_come_from(
-    make_app: Callable[..., FastAPI],
+    make_app_without_database: Callable[..., FastAPI],
     tmp_path: Path,
     dev_server: str | None,
     source: str,
 ) -> None:
     with structlog.testing.capture_logs() as logs:
-        make_app(
+        make_app_without_database(
             frontend=FrontendConfig(dist=tmp_path, dev_server=dev_server),
             development=True,
         )
@@ -155,14 +168,16 @@ def test_the_log_says_where_the_pages_scripts_come_from(
     assert line["source"] == source
 
 
-def test_without_a_build_the_pages_say_so(make_app: Callable[..., FastAPI]) -> None:
+def test_without_a_build_the_pages_say_so(
+    make_app_without_database: Callable[..., FastAPI],
+) -> None:
     with structlog.testing.capture_logs() as logs:
-        app = make_app()
+        app = make_app_without_database()
     assert [line["event"] for line in logs if line["log_level"] == "warning"] == [
         "frontend not built"
     ]
     with TestClient(app) as client:
-        assert client.get("/scan").status_code == 503
+        assert_not_built(client.get("/scan"))
 
 
 def test_static_files_are_served_compressed_and_cached_for_good(
@@ -208,12 +223,14 @@ def test_the_manifest_and_missing_files_are_404s(pages: TestClient, path: str) -
 
 
 def test_a_dist_that_is_not_a_directory_is_no_build(
-    make_app: Callable[..., FastAPI], tmp_path: Path
+    make_app_without_database: Callable[..., FastAPI], tmp_path: Path
 ) -> None:
     dist = tmp_path / "dist"
     dist.write_text("not a directory")
-    with TestClient(make_app(frontend=FrontendConfig(dist=dist))) as client:
-        assert client.get("/scan").status_code == 503
+    with TestClient(
+        make_app_without_database(frontend=FrontendConfig(dist=dist))
+    ) as client:
+        assert_not_built(client.get("/scan"))
 
 
 @pytest.mark.parametrize(
@@ -227,29 +244,31 @@ def test_a_dist_that_is_not_a_directory_is_no_build(
     ids=["half-written", "older-build", "not-vite", "entries-not-objects"],
 )
 def test_an_unusable_manifest_is_no_build(
-    make_app: Callable[..., FastAPI], tmp_path: Path, manifest: str
+    make_app_without_database: Callable[..., FastAPI], tmp_path: Path, manifest: str
 ) -> None:
     (tmp_path / MANIFEST).parent.mkdir(parents=True)
     (tmp_path / MANIFEST).write_text(manifest)
     with structlog.testing.capture_logs() as logs:
-        app = make_app(frontend=FrontendConfig(dist=tmp_path))
+        app = make_app_without_database(frontend=FrontendConfig(dist=tmp_path))
     # It says what is wrong, not that there is no build.
     assert [line["event"] for line in logs if line["log_level"] == "warning"] == [
         "frontend manifest unusable"
     ]
     with TestClient(app) as client:
-        assert client.get("/scan").status_code == 503
+        assert_not_built(client.get("/scan"))
 
 
 def test_development_reads_the_manifest_again_only_when_it_changes(
-    make_app: Callable[..., FastAPI], tmp_path: Path
+    make_app_without_database: Callable[..., FastAPI], tmp_path: Path
 ) -> None:
     """Every page loads the shared stylesheet: an unusable manifest says so
     once, not on every page."""
     (tmp_path / MANIFEST).parent.mkdir(parents=True)
     (tmp_path / MANIFEST).write_text("{}")
     with structlog.testing.capture_logs() as logs:
-        app = make_app(frontend=FrontendConfig(dist=tmp_path), development=True)
+        app = make_app_without_database(
+            frontend=FrontendConfig(dist=tmp_path), development=True
+        )
         with TestClient(app) as client:
             for _ in range(3):
                 client.get("/admin/sign-in")
@@ -259,20 +278,24 @@ def test_development_reads_the_manifest_again_only_when_it_changes(
 
 
 def test_outside_development_the_build_is_the_one_at_startup(
-    make_app: Callable[..., FastAPI], tmp_path: Path
+    make_app_without_database: Callable[..., FastAPI], tmp_path: Path
 ) -> None:
-    with TestClient(make_app(frontend=FrontendConfig(dist=tmp_path))) as client:
+    with TestClient(
+        make_app_without_database(frontend=FrontendConfig(dist=tmp_path))
+    ) as client:
         build(tmp_path)
-        assert client.get("/scan").status_code == 503
+        assert_not_built(client.get("/scan"))
         assert client.get("/static/assets/scan-Bk6ZGfA8.js").status_code == 404
 
 
 def test_development_serves_each_new_build(
-    make_app: Callable[..., FastAPI], tmp_path: Path
+    make_app_without_database: Callable[..., FastAPI], tmp_path: Path
 ) -> None:
-    app = make_app(frontend=FrontendConfig(dist=tmp_path), development=True)
+    app = make_app_without_database(
+        frontend=FrontendConfig(dist=tmp_path), development=True
+    )
     with TestClient(app) as client:
-        assert client.get("/scan").status_code == 503
+        assert_not_built(client.get("/scan"))
         build(tmp_path)
         assert client.get("/scan").status_code == 200
         assert client.get("/static/assets/scan-Bk6ZGfA8.js").status_code == 200

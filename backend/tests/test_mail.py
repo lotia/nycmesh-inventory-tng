@@ -344,7 +344,10 @@ def test_without_mail_there_is_no_emailed_reset(
         assert refused.status_code == 404
 
 
-def test_the_sign_in_page_offers_it_with_mail(client: TestClient) -> None:
+def test_the_sign_in_page_offers_it_with_mail(
+    make_client_without_database: Callable[..., TestClient], sent_mail: SentMail
+) -> None:
+    client = make_client_without_database(mailer=sent_mail)
     assert "Forgot your password?" in text(client.get(sign_in.SIGN_IN))
 
 

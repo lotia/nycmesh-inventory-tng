@@ -76,8 +76,15 @@ def test_the_page_shows_the_account(
     assert re.search(r"\d{4}-\d\d-\d\d \d\d:\d\d E[SD]T", page)
 
 
-def test_viewing_it_needs_signing_in(client: TestClient) -> None:
-    assert client.get(ACCOUNT).headers["location"].startswith(sign_in.SIGN_IN)
+def test_viewing_it_needs_signing_in(
+    make_client_without_database: Callable[..., TestClient],
+) -> None:
+    assert (
+        make_client_without_database()
+        .get(ACCOUNT)
+        .headers["location"]
+        .startswith(sign_in.SIGN_IN)
+    )
 
 
 def test_changing_the_email(

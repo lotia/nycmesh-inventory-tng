@@ -492,6 +492,49 @@ def committed(
     delete_made(owner_engine, before)
 
 
+def _app(
+    database_url: str,
+    logging: LogConfig | None = None,
+    frontend: FrontendConfig | None = None,
+    *,
+    development: bool = False,
+    setup_token: str | None = None,
+    recovery_token: str | None = None,
+    mailer: SentMail | None = None,
+    reached: list[str] | None = None,
+) -> FastAPI:
+    """`reached` collects the pools of any connection the app tries to make,
+    for an app that is to have none (make_app_without_database)."""
+    settings = Settings(
+        database_url=database_url,
+        development=development,
+        setup_token=setup_token,
+        recovery_token=recovery_token,
+        logging=logging or LogConfig(),
+        frontend=frontend or FrontendConfig(),
+    )
+    if mailer is not None:
+        settings = dataclasses.replace(settings, mail=SITE_MAIL)
+    # Its login is checked once, by `engine`, if it has a database at all.
+    app = create_app(settings, check_login=False)
+    app.dependency_overrides[get_mailer] = lambda: mailer
+    if reached is not None:
+        for name, pool in app.state.db.pools.items():
+            event.listen(pool, "do_connect", lambda *_, name=name: reached.append(name))
+    return app
+
+
+@pytest.fixture
+def make_app_without_database() -> Iterator[Callable[..., FastAPI]]:
+    """Apps with no database behind them (NO_DATABASE), and no test session
+    lent: for a test whose requests read no row. One that reaches for the
+    database fails the test, whatever its request answered (a 503). make_app's
+    settings, without `own_sessions` and `on`."""
+    reached: list[str] = []
+    yield functools.partial(_app, NO_DATABASE, reached=reached)
+    assert reached == [], f"requests reached for the database, on {reached}"
+
+
 @pytest.fixture
 def make_app(database_url: str, session: Session) -> Callable[..., FastAPI]:
     """Apps on the test database, whose requests use the test's session, or
@@ -508,19 +551,15 @@ def make_app(database_url: str, session: Session) -> Callable[..., FastAPI]:
         own_sessions: bool = False,
         on: Session | None = None,
     ) -> FastAPI:
-        settings = Settings(
-            database_url=database_url,
+        app = _app(
+            database_url,
+            logging,
+            frontend,
             development=development,
             setup_token=setup_token,
             recovery_token=recovery_token,
-            logging=logging or LogConfig(),
-            frontend=frontend or FrontendConfig(),
+            mailer=mailer,
         )
-        if mailer is not None:
-            settings = dataclasses.replace(settings, mail=SITE_MAIL)
-        # Its login is checked once, by `engine`.
-        app = create_app(settings, check_login=False)
-        app.dependency_overrides[get_mailer] = lambda: mailer
         # Each request with a session of its own, as in production, on the
         # database as committed (the `committed` fixture cleans up).
         if own_sessions:
@@ -553,6 +592,20 @@ def make_client(
     following redirects, which are what is tested. `address` is where the
     request seems to come from, for rate limits by address."""
 
+    return _client_maker(make_app, _clients)
+
+
+@pytest.fixture
+def make_client_without_database(
+    make_app_without_database: Callable[..., FastAPI], _clients: list[TestClient]
+) -> Callable[..., TestClient]:
+    """make_client's, of apps with no database (make_app_without_database)."""
+    return _client_maker(make_app_without_database, _clients)
+
+
+def _client_maker(
+    make_app: Callable[..., FastAPI], clients: list[TestClient]
+) -> Callable[..., TestClient]:
     def make(
         app: FastAPI | None = None, *, address: str = "192.0.2.1", **app_kwargs: object
     ) -> TestClient:
@@ -562,7 +615,7 @@ def make_client(
             follow_redirects=False,
             client=(address, 50000),
         )
-        _clients.append(client.__enter__())
+        clients.append(client.__enter__())
         return client
 
     return make
