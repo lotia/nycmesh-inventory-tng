@@ -49,6 +49,7 @@ from inventory_tng.pages import (
     sections,
     templates,
 )
+from inventory_tng.totp_keys import TotpKeys
 from inventory_tng.web import rate_key, set_private_cookie
 
 log = structlog.get_logger(__name__)
@@ -241,7 +242,9 @@ async def confirmed(
         if not isinstance(typed, str):
             raise await run_in_threadpool(ConfirmHere, signed, carried)
         # Its queries, and argon2's work, off the event loop.
-        outcome = await run_in_threadpool(_confirm, session, signed, typed, notify)
+        outcome = await run_in_threadpool(
+            _confirm, request, session, signed, typed, notify
+        )
         if outcome != "confirmed":
             raise await run_in_threadpool(
                 ConfirmHere,
@@ -274,11 +277,22 @@ def _hold(session: Session, signed: SignedIn) -> SignedIn:
     )
 
 
+def totp_keys(request: Request) -> TotpKeys:
+    """What the app seals authenticators' keys with (totp_keys.py)."""
+    keys = request.app.state.settings.totp_keys
+    if keys is None:
+        # Only Settings built in code lack them; from_environ always loads.
+        raise RuntimeError("the app's Settings have no totp_keys")
+    return keys
+
+
 def _confirm(
-    session: Session, signed: SignedIn, typed: str, notify: Notify
+    request: Request, session: Session, signed: SignedIn, typed: str, notify: Notify
 ) -> accounts.Confirmation:
     """Confirm, keep it, and tell the owner if a recovery code did it."""
-    outcome, factor = accounts.confirm(session, signed.row, typed, _now())
+    outcome, factor = accounts.confirm(
+        session, totp_keys(request), signed.row, typed, _now()
+    )
     if outcome == "confirmed":
         left = _codes_left(session, signed.admin, factor)
         session.commit()
@@ -513,6 +527,7 @@ def setup(
             step=step,
             user_agent=request.headers.get("user-agent"),
             now=now,
+            keys=totp_keys(request),
         )
     except accounts.TokenRefused:
         # Someone else finished setting up first, while this waited.
@@ -602,6 +617,7 @@ def sign_in(
             address=rate_key(request),
             user_agent=request.headers.get("user-agent"),
             now=_now(),
+            keys=totp_keys(request),
         )
     except accounts.SignInRefused as refused:
         limited = refused.reason == "rate_limited"
@@ -649,7 +665,7 @@ def confirm(
     confirm_code: Annotated[str, Form()] = "",
     next: Annotated[str, Form()] = HOME,
 ) -> Response:
-    outcome = _confirm(session, signed, confirm_code, notify)
+    outcome = _confirm(request, session, signed, confirm_code, notify)
     if outcome == "confirmed":
         return redirect(_local(next))
     return _confirm_page(
@@ -727,7 +743,9 @@ def new_authenticator(
         try:
             # A savepoint: PostgreSQL may compare names its own way.
             with session.begin_nested():
-                accounts.add_authenticator(session, admin_id, name, key, step)
+                accounts.add_authenticator(
+                    session, totp_keys(request), admin_id, name, key, step
+                )
         except IntegrityError:
             problems["authenticator_name"] = NAME_TAKEN
     if problems:

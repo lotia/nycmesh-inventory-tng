@@ -94,11 +94,14 @@ services:
       # The bundle it built, as production serves it.
       VITE_DEV_SERVER: ""
       FRONTEND_DIST: /app/static
+      # .local/totp-keys, mounted below.
+      TOTP_KEYS_DIR: /run/secrets/totp-keys
     # Read-only bind mounts, so --reload sees your edits and nothing in the
     # container can change them. :z relabels them for SELinux.
     volumes:
       - ./backend/src:/app/src:ro,z
       - ./backend/migrations:/app/migrations:ro,z
+      - ./.local/totp-keys:/run/secrets/totp-keys:ro,z
     ports:
       - "127.0.0.1:${INVENTORY_APP_PORT:-8000}:8000"
     depends_on:

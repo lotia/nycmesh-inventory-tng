@@ -1,6 +1,7 @@
 """Each test run gets a database of its own, created on the compose PostgreSQL
 server and dropped when the run ends. Each test's writes are rolled back."""
 
+import base64
 import contextlib
 import dataclasses
 import functools
@@ -52,7 +53,7 @@ from helpers.concurrency import LOCK_TIMEOUT, Committed, delete_made, newest_ids
 from helpers.devices import new_device
 from helpers.mail import SITE_MAIL, SentMail
 from helpers.rows import setting_up
-from helpers.sign_in import code, new_admin, sign_in_with
+from helpers.sign_in import TOTP_KEYS, code, new_admin, sign_in_with
 
 # structlog's lines go through the standard library, where caplog sees them.
 configure_structlog()
@@ -97,6 +98,12 @@ def no_settings_from_the_shell(
         # needs one takes database_url, the run's own.
         for name in ("DATABASE_URL", "MIGRATION_DATABASE_URL"):
             monkeypatch.setenv(name, NO_DATABASE)
+        # The tests' TOTP keys, for what reads its settings from the
+        # environment, as the tests' apps are given them.
+        keys = tmp_path_factory.mktemp("totp-keys")
+        for version, key in TOTP_KEYS.keys.items():
+            (keys / str(version)).write_text(base64.b64encode(key).decode())
+        monkeypatch.setenv("TOTP_KEYS_DIR", str(keys))
         yield
 
 
@@ -517,11 +524,12 @@ def _app(
         recovery_token=recovery_token,
         logging=logging or LogConfig(),
         frontend=frontend or FrontendConfig(),
+        totp_keys=TOTP_KEYS,
     )
     if mailer is not None:
         settings = dataclasses.replace(settings, mail=SITE_MAIL)
     # Its login is checked once, by `engine`, if it has a database at all.
-    app = create_app(settings, check_login=False)
+    app = create_app(settings, startup_checks=False)
     app.dependency_overrides[get_mailer] = lambda: mailer
     if reached is not None:
         for name, pool in app.state.db.pools.items():

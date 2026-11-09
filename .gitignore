@@ -11,6 +11,9 @@
 # Personal VS Code workspaces; shared settings go in .vscode/settings.json
 *.code-workspace
 
+# Development's own secrets, such as the TOTP key mise run setup makes
+.local/
+
 # Python
 __pycache__/
 .venv/

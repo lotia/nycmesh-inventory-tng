@@ -14,5 +14,13 @@ if [[ ! -f .env ]]; then
   cp .env.example .env
   echo "Made .env from .env.example."
 fi
+# The key development seals authenticators' TOTP keys with (DEPLOYMENT.md,
+# TOTP keys), readable by you alone.
+if [[ ! -e .local/totp-keys/1 ]]; then
+  mkdir -p .local/totp-keys
+  (umask 077 && cd backend &&
+    uv run python -m inventory_tng.totp_keys new > ../.local/totp-keys/1)
+  echo "Made a TOTP key in .local/totp-keys."
+fi
 # The one thing mise cannot install: this says if it is missing.
 "$(dirname "$0")/compose" version >/dev/null

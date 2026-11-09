@@ -2,6 +2,8 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
 
+from helpers.sign_in import TOTP_KEYS
+
 
 def test_migrations_match_the_models(alembic_config: Config) -> None:
     command.check(alembic_config)
@@ -55,3 +57,31 @@ def test_extra_current_labels_are_revoked(alembic_config: Config) -> None:
         text("SELECT code, revoked_at IS NOT NULL FROM label ORDER BY id")
     ).all()
     assert rows == [("2222222222", False), ("3333333333", True)]
+
+
+def test_totp_keys_are_sealed_and_come_back(alembic_config: Config) -> None:
+    """Migration 0016: each current authenticator's key sealed with
+    TOTP_KEYS_DIR's newest version, for its administrator; and opened again
+    going down."""
+    command.downgrade(alembic_config, "0015")
+    connection = alembic_config.attributes["connection"]
+    admin_id = connection.scalar(
+        text("INSERT INTO admin (username) VALUES ('ada') RETURNING id")
+    )
+    connection.execute(
+        text(
+            "INSERT INTO authenticator (admin_id, name, totp_key) "
+            "VALUES (:a, 'Phone', 'JBSWY3DPEHPK3PXP')"
+        ),
+        {"a": admin_id},
+    )
+    command.upgrade(alembic_config, "head")
+    version, sealed = connection.execute(
+        text("SELECT key_version, sealed_key FROM authenticator")
+    ).one()
+    assert b"JBSWY3DPEHPK3PXP" not in sealed
+    assert TOTP_KEYS.open(version, sealed, admin_id) == "JBSWY3DPEHPK3PXP"
+    command.downgrade(alembic_config, "0015")
+    assert connection.scalar(text("SELECT totp_key FROM authenticator")) == (
+        "JBSWY3DPEHPK3PXP"
+    )

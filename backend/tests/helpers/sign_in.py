@@ -5,6 +5,7 @@ import uuid
 from datetime import UTC, datetime
 
 import pyotp
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy.orm import Session
@@ -18,12 +19,15 @@ from inventory_tng.models import (
     ResetKind,
     SignInSettings,
 )
+from inventory_tng.totp_keys import TotpKeys
 
 # A recovery code as the page shows it, in groups.
 _GROUP = f"[A-Z0-9]{{{accounts.RECOVERY_CODE_GROUP}}}"
 _MORE = accounts.RECOVERY_CODE_LENGTH // accounts.RECOVERY_CODE_GROUP - 1
 RECOVERY_CODE = rf"<li>({_GROUP}(?:-{_GROUP}){{{_MORE}}})</li>"
 PASSWORD = "correct horse battery staple"
+# What the tests' apps seal authenticators' keys with (conftest's make_app).
+TOTP_KEYS = TotpKeys({1: AESGCM.generate_key(256)})
 
 
 def once(**form: str) -> dict[str, str]:
@@ -49,9 +53,25 @@ def new_admin(
     key = None
     if totp:
         key = accounts.new_totp_key()
-        session.add(Authenticator(admin_id=admin.id, name="Phone", totp_key=key))
+        session.add(sealed(Authenticator(admin_id=admin.id, name="Phone"), key))
     session.flush()
     return admin, key
+
+
+def sealed(authenticator: Authenticator, key: str) -> Authenticator:
+    """`authenticator`, holding `key` as the app would seal it."""
+    version, sealed_key = TOTP_KEYS.seal(key, authenticator.admin_id)
+    authenticator.key_version, authenticator.sealed_key = version, sealed_key
+    return authenticator
+
+
+def opened(authenticator: Authenticator) -> str:
+    """The key `authenticator` holds, as the app reads it."""
+    assert authenticator.sealed_key is not None
+    assert authenticator.key_version is not None
+    return TOTP_KEYS.open(
+        authenticator.key_version, authenticator.sealed_key, authenticator.admin_id
+    )
 
 
 def code(key: str | None, at: datetime | None = None) -> str:

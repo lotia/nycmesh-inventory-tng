@@ -11,6 +11,7 @@ from fastapi import FastAPI
 
 from inventory_tng import (
     account,
+    accounts,
     admin,
     bundle,
     catalogue,
@@ -24,10 +25,11 @@ from inventory_tng import (
     sign_in,
 )
 from inventory_tng.cross_site import CrossSiteRefusal
-from inventory_tng.db import make_database
+from inventory_tng.db import Database, make_database
 from inventory_tng.mail import SmtpMailer
 from inventory_tng.request_logging import RequestLogging
 from inventory_tng.settings import Settings
+from inventory_tng.totp_keys import TotpKeys
 
 log = structlog.get_logger(__name__)
 
@@ -35,10 +37,11 @@ API = "/api"
 
 
 def create_app(
-    settings: Settings | None = None, *, check_login: bool = True
+    settings: Settings | None = None, *, startup_checks: bool = True
 ) -> FastAPI:
-    """`check_login=False` skips the check of the database login at startup
-    (database_role.py): for tests, which check the login they use once."""
+    """`startup_checks=False` skips what startup reads from the database: the
+    check of its login (database_role.py) and of the authenticators' keys.
+    For tests, which check the login they use once, and test those apart."""
     settings = settings or Settings.from_environ()
     database = make_database(settings.database_url)
 
@@ -46,12 +49,14 @@ def create_app(
     async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
         # Before serving anything: never as a login that could change the
         # ledger.
-        if check_login:
+        if startup_checks:
             try:
                 database_role.check(database.engine)
             except database_role.RefusedLogin:
                 database.dispose()
                 raise
+            if settings.totp_keys is not None:
+                check_totp_keys(database, settings.totp_keys)
         log.info("started")
         try:
             yield
@@ -98,3 +103,16 @@ def create_app(
     ledger.install(app)
     sign_in.install(app)
     return app
+
+
+def check_totp_keys(database: Database, keys: TotpKeys) -> None:
+    """Says at startup if any authenticator's key version is missing from
+    TOTP_KEYS_DIR: those take no code until their administrators enrol again
+    (DEPLOYMENT.md, TOTP keys)."""
+    with database.session() as session:
+        unreadable = accounts.unreadable_authenticators(session, keys)
+    if unreadable:
+        log.error(
+            "authenticators unreadable: their key versions are not in TOTP_KEYS_DIR",
+            count=unreadable,
+        )

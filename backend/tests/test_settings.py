@@ -10,6 +10,8 @@ from inventory_tng.settings import (
     migration_settings,
 )
 
+from helpers.settings import from_environ
+
 URL = "postgresql://u:p@db/x"
 
 
@@ -17,7 +19,7 @@ URL = "postgresql://u:p@db/x"
     "scheme", ["postgres", "postgresql", "postgres+psycopg", "postgresql+psycopg"]
 )
 def test_accepts_the_usual_postgresql_schemes(scheme: str) -> None:
-    settings = Settings.from_environ({"DATABASE_URL": f"{scheme}://u:p@db/x"})
+    settings = from_environ({"DATABASE_URL": f"{scheme}://u:p@db/x"})
     assert settings.database_url == "postgresql+psycopg://u:p@db/x"
 
 
@@ -33,7 +35,7 @@ def test_refuses_a_missing_or_empty_database_url(environ: dict[str, str]) -> Non
         SettingsError,
         match=r"^DATABASE_URL is not set: .*\.env\.example.*DEPLOYMENT\.md \(Settings\)",
     ):
-        Settings.from_environ(environ)
+        from_environ(environ)
 
 
 def test_migrations_read_their_own_url_and_no_app_settings() -> None:
@@ -73,7 +75,7 @@ def test_migrations_refuse_a_missing_or_wrong_url(
 )
 def test_refuses_anything_but_postgresql(value: str) -> None:
     with pytest.raises(SettingsError, match="DATABASE_URL"):
-        Settings.from_environ({"DATABASE_URL": value})
+        from_environ({"DATABASE_URL": value})
 
 
 @pytest.mark.parametrize(
@@ -81,13 +83,13 @@ def test_refuses_anything_but_postgresql(value: str) -> None:
 )
 def test_reads_whether_to_log_client_addresses(value: str, expected: bool) -> None:
     environ = {"DATABASE_URL": "postgresql://db/x", "LOG_CLIENT_ADDRESS": value}
-    assert Settings.from_environ(environ).logging.client_address is expected
+    assert from_environ(environ).logging.client_address is expected
 
 
 def test_refuses_an_unclear_client_address_setting() -> None:
     environ = {"DATABASE_URL": "postgresql://db/x", "LOG_CLIENT_ADDRESS": "maybe"}
     with pytest.raises(SettingsError, match="LOG_CLIENT_ADDRESS"):
-        Settings.from_environ(environ)
+        from_environ(environ)
 
 
 def test_the_suite_finds_no_build() -> None:
@@ -98,12 +100,12 @@ def test_the_suite_finds_no_build() -> None:
     assert missing != settings.CLONE / "frontend" / "dist"
     assert not missing.exists()
     assert Settings(database_url=URL).frontend.dist == missing
-    assert Settings.from_environ({"DATABASE_URL": URL}).frontend.dist == missing
+    assert from_environ({"DATABASE_URL": URL}).frontend.dist == missing
 
 
 def test_reads_where_the_bundle_is(tmp_path: Path) -> None:
     environ = {"DATABASE_URL": "postgresql://db/x", "FRONTEND_DIST": str(tmp_path)}
-    assert Settings.from_environ(environ).frontend.dist == tmp_path
+    assert from_environ(environ).frontend.dist == tmp_path
 
 
 def test_the_dev_server_is_for_development_only() -> None:
@@ -112,8 +114,8 @@ def test_the_dev_server_is_for_development_only() -> None:
         "VITE_DEV_SERVER": "http://localhost:5173",
     }
     with pytest.raises(SettingsError, match="VITE_DEV_SERVER"):
-        Settings.from_environ(environ)
-    settings = Settings.from_environ(environ | {"APP_ENV": "development"})
+        from_environ(environ)
+    settings = from_environ(environ | {"APP_ENV": "development"})
     assert settings.frontend.dev_server == "http://localhost:5173"
 
 
@@ -153,17 +155,23 @@ def test_a_dev_server_keeps_only_its_origin() -> None:
     [("", False), ("production", False), ("Development", True)],
 )
 def test_app_env_decides_development(value: str, development: bool) -> None:
-    settings = Settings.from_environ(
-        {"DATABASE_URL": "postgresql://db/x", "APP_ENV": value}
-    )
+    settings = from_environ({"DATABASE_URL": "postgresql://db/x", "APP_ENV": value})
     assert settings.development is development
 
 
 def test_a_setup_token_is_long_and_never_shown() -> None:
     token = "s" * 40
-    settings = Settings.from_environ({"DATABASE_URL": URL, "SETUP_TOKEN": f" {token} "})
+    settings = from_environ({"DATABASE_URL": URL, "SETUP_TOKEN": f" {token} "})
     assert settings.setup_token == token
     assert token not in repr(settings)
-    assert Settings.from_environ({"DATABASE_URL": URL}).setup_token is None
+    assert from_environ({"DATABASE_URL": URL}).setup_token is None
     with pytest.raises(SettingsError, match="SETUP_TOKEN must be at least 32"):
-        Settings.from_environ({"DATABASE_URL": URL, "SETUP_TOKEN": "short"})
+        from_environ({"DATABASE_URL": URL, "SETUP_TOKEN": "short"})
+
+
+def test_totp_keys_are_needed_outside_development(tmp_path: Path) -> None:
+    with pytest.raises(SettingsError, match="TOTP_KEYS_DIR is needed"):
+        Settings.from_environ({"DATABASE_URL": URL})
+    with pytest.raises(SettingsError, match="holds no key"):
+        Settings.from_environ({"DATABASE_URL": URL, "TOTP_KEYS_DIR": str(tmp_path)})
+    assert from_environ({"DATABASE_URL": URL}).totp_keys is not None

@@ -22,6 +22,7 @@ from helpers.mail import SentMail
 from helpers.sign_in import (
     PASSWORD,
     RECOVERY_CODE,
+    TOTP_KEYS,
     code,
     new_admin,
     once,
@@ -186,12 +187,13 @@ def test_removing_one_of_two_wipes_its_key(
 ) -> None:
     admin, _ = ada
     spare = accounts.add_authenticator(
-        session, admin.id, "Spare", accounts.new_totp_key(), 0
+        session, TOTP_KEYS, admin.id, "Spare", accounts.new_totp_key(), 0
     )
     done = client.post(f"{ACCOUNT}/authenticators/{spare.id}/remove")
     assert done.headers["location"] == f"{ACCOUNT}?notice=removed"
     assert spare.retired_at is not None
-    assert spare.totp_key is None
+    assert spare.sealed_key is None
+    assert spare.key_version is None
     assert accounts.uses_totp(session, admin.id)
 
 

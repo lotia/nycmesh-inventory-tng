@@ -169,14 +169,18 @@ VERSIONED = (
             "secret",
             {
                 "admin_password": {"password_hash"},
-                "authenticator": {"totp_key"},
+                "authenticator": {"sealed_key"},
                 "recovery_code": {"code_hash"},
                 "reset_link": {"token_hash", "recovery_token_hash"},
             },
         ),
         (
             "not_a_change",
-            {"device": {"last_seen_at"}, "authenticator": {"last_step"}}
+            {
+                "device": {"last_seen_at"},
+                # Resealing (totp_keys.py) changes nothing anyone did.
+                "authenticator": {"last_step", "sealed_key", "key_version"},
+            }
             # Each edit form's row's (models.Versioned), which moves with
             # every change.
             | {table: {"edit_version"} for table in VERSIONED},

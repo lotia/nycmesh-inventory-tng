@@ -42,6 +42,7 @@ from sqlalchemy import (
     Index,
     LargeBinary,
     Numeric,
+    SmallInteger,
     Text,
     func,
     text,
@@ -656,14 +657,17 @@ class AdminPassword(Base):
 
 
 class Authenticator(Base):
-    """One TOTP app an administrator signs in with. Its key is wiped when it
-    is removed. An administrator uses TOTP if they have a current one."""
+    """One TOTP app an administrator signs in with. Its key is sealed
+    (totp_keys.py) and wiped when it is removed. An administrator uses TOTP
+    if they have a current one."""
 
     __tablename__ = "authenticator"
     __table_args__ = (
         _unique_current_name("authenticator", "admin_id"),
         CheckConstraint(
-            "(totp_key IS NULL) = (retired_at IS NOT NULL)", name="key_until_retired"
+            "(sealed_key IS NULL) = (retired_at IS NOT NULL)"
+            " AND (key_version IS NULL) = (sealed_key IS NULL)",
+            name="key_until_retired",
         ),
         CheckConstraint("length(name) BETWEEN 1 AND 64", name="name"),
         protection(owner="accounts.py", lock="row", history=True),
@@ -674,8 +678,15 @@ class Authenticator(Base):
     admin_id: Mapped[int] = _reference("admin.id")
     # What the administrator calls it, such as "Pixel".
     name: Mapped[str] = mapped_column(Text)
-    # pyotp's base32 key.
-    totp_key: Mapped[str | None] = mapped_column(Text, info={"secret": True})
+    # pyotp's base32 key, sealed for this administrator (totp_keys.TotpKeys),
+    # and the version of TOTP_KEYS_DIR's key it was sealed with. Resealing
+    # with a newer version changes nothing anyone did.
+    sealed_key: Mapped[bytes | None] = mapped_column(
+        LargeBinary, info={"secret": True, "not_a_change": True}
+    )
+    key_version: Mapped[int | None] = mapped_column(
+        SmallInteger, info={"not_a_change": True}
+    )
     # The last time step a code was accepted for: that one and earlier ones
     # are refused, so a code cannot be used twice.
     last_step: Mapped[int | None] = mapped_column(
