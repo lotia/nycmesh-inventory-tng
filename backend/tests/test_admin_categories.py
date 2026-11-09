@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.models import Admin, Category, Item
 
-from helpers.rows import add, history, named
+from helpers.rows import add, history, named, shown
 from helpers.sign_in import text
 
 pytestmark = pytest.mark.usefixtures("admin_client")
@@ -62,11 +62,21 @@ def test_renaming(admin_client: TestClient, session: Session) -> None:
     add(session, Category(name="Cables"))
     path = f"{CATEGORIES}/{radios.id}"
     assert (
-        admin_client.post(f"{path}/name", data={"name": "Antennas"}).status_code == 303
+        admin_client.post(
+            f"{path}/name", data={"name": "Antennas", "version": shown(radios)}
+        ).status_code
+        == 303
     )
     assert radios.name == "Antennas"
-    taken = admin_client.post(f"{path}/name", data={"name": "CABLES"})
+    taken = admin_client.post(
+        f"{path}/name", data={"name": "CABLES", "version": shown(radios)}
+    )
     assert taken.status_code == 400
+    assert radios.name == "Antennas"
+    blank = admin_client.post(
+        f"{path}/name", data={"name": " ", "version": shown(radios)}
+    )
+    assert blank.status_code == 400
     assert radios.name == "Antennas"
 
 
@@ -94,7 +104,9 @@ def test_retiring_and_bringing_back(admin_client: TestClient, session: Session) 
     clash = admin_client.post(f"{path}/restore")
     assert clash.status_code == 400
     assert "rename one first" in text(clash)
-    admin_client.post(f"{path}/name", data={"name": "Old radios"})
+    admin_client.post(
+        f"{path}/name", data={"name": "Old radios", "version": shown(radios)}
+    )
     assert admin_client.post(f"{path}/restore").status_code == 303
     assert radios.retired_at is None
 

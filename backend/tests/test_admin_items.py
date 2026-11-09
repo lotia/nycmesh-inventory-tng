@@ -19,7 +19,7 @@ from inventory_tng.models import (
     Movement,
 )
 
-from helpers.rows import add, history, named
+from helpers.rows import add, history, named, shown
 from helpers.sign_in import text
 
 
@@ -115,6 +115,7 @@ def test_editing_every_field(
         "minimum": "305",
         "notes": "Outdoor",
         "ordering_notes": "Buy by the reel",
+        "version": shown(item),
     }
     done = admin_client.post(f"{ITEMS}/{item.id}", data=form)
     assert done.headers["location"] == f"{ITEMS}/{item.id}?notice=saved"
@@ -143,6 +144,7 @@ def test_the_unit_is_fixed_once_stock_has_moved(
     assert "fixed, as stock has moved in it" in page
     assert '<input type="hidden" name="unit" value="each">' in page
     form = {"name": item.name, "category_id": str(radios.id), "unit": "m"}
+    form |= {"version": shown(item)}
     refused = admin_client.post(f"{ITEMS}/{item.id}", data=form)
     assert refused.status_code == 400
     assert "Its unit is fixed, as stock has moved in it." in text(refused)
@@ -153,6 +155,8 @@ def test_the_unit_is_fixed_once_stock_has_moved(
     # A form without a unit is refused, rather than keeping the one stored.
     unitless = admin_client.post(f"{ITEMS}/{item.id}", data=form | {"unit": ""})
     assert "Pick a unit." in text(unitless)
+    negative = admin_client.post(f"{ITEMS}/{item.id}", data=form | {"minimum": "-1"})
+    assert negative.status_code == 400
 
 
 def test_packages(admin_client: TestClient, session: Session, radios: Category) -> None:

@@ -531,13 +531,18 @@ def test_an_items_unit_is_fixed_once_stock_has_moved(
     session: Session, place: Place
 ) -> None:
     """In whole units or not: the ledger's quantities are in that unit."""
-    items.save(session, place.cable, item_fields(place.cable, unit="ft"))
+    items.save(session, place.cable, item_fields(place.cable, unit="ft"), seen=None)
     write(session, place, lines=[{"item_id": place.cable.id, "quantity": "1.5"}])
     for unit in ("each", "m"):
         with breaks(session, "item_unit_fixed"):
-            items.save(session, place.cable, item_fields(place.cable, unit=unit))
+            items.save(
+                session, place.cable, item_fields(place.cable, unit=unit), seen=None
+            )
     items.save(
-        session, place.cable, item_fields(place.cable, unit="ft", notes="By the reel")
+        session,
+        place.cable,
+        item_fields(place.cable, unit="ft", notes="By the reel"),
+        seen=None,
     )
     assert (place.cable.unit, place.cable.notes) == ("ft", "By the reel")
 

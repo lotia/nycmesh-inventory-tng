@@ -18,7 +18,7 @@ from inventory_tng.models import (
     Volunteer,
 )
 
-from helpers.rows import add, history, named, tag
+from helpers.rows import add, history, named, shown, tag
 from helpers.sign_in import text
 
 
@@ -71,7 +71,7 @@ def test_renaming_renames_their_custody(
     ada = add(session, Volunteer(name="Ada"))
     path = f"{VOLUNTEERS}/{ada.id}"
     admin_client.post(f"{path}/custody")
-    admin_client.post(path, data={"name": "Ada L", "email": ""})
+    admin_client.post(path, data={"name": "Ada L", "email": "", "version": shown(ada)})
     custody = custody_of(session, ada)
     assert custody is not None
     assert (ada.name, custody.name) == ("Ada L", "Ada L")
@@ -173,7 +173,7 @@ def test_saving_needs_a_free_name(admin_client: TestClient, session: Session) ->
     add(session, Volunteer(name="Ben"))
     path = f"{VOLUNTEERS}/{ada.id}"
     for name, problem in (("", "Give it a name"), ("ben", "already has that name")):
-        refused = admin_client.post(path, data={"name": name})
+        refused = admin_client.post(path, data={"name": name, "version": shown(ada)})
         assert refused.status_code == 400
         assert problem in text(refused)
     assert ada.name == "Ada"

@@ -21,18 +21,20 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import accounts, devices, labels, ledger, mail
+from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS
 from inventory_tng.app import create_app
 from inventory_tng.db import RuleBroken
 from inventory_tng.devices import RegisteredDevice
 from inventory_tng.masking import MASK, Masker
-from inventory_tng.models import LedgerTransaction
+from inventory_tng.models import Category, LedgerTransaction
 from inventory_tng.settings import Settings
 from inventory_tng.telemetry import Telemetry, enabled
 
 from helpers.apps import on_session
 from helpers.devices import new_device
 from helpers.mail import FailingMail, SentMail
+from helpers.rows import add, shown, tag
 from helpers.sign_in import PASSWORD, code, new_admin, sign_in_with
 from helpers.stock import Place, adjustment_form, received, retire, stocked, write
 
@@ -502,3 +504,23 @@ def test_counts_labels_made_printed_and_revoked(
     assert by_names[(("names", "location"),)] >= 1
     assert sum(counted(reader, "inventory.labels.printed").values()) >= 5
     assert sum(counted(reader, "inventory.labels.revoked").values()) >= 1
+
+
+def test_counts_saves_refused_as_changed_since_shown(
+    rolled_back: Recorded, session: Session
+) -> None:
+    client, _, reader, _ = rolled_back
+    _, key = new_admin(session)
+    sign_in_with(client, code=code(key))
+    radios = add(session, Category(name=f"Radios {tag()}"))
+    form = {"name": f"Antennas {tag()}", "version": shown(radios)}
+    radios.name = f"Wireless {tag()}"
+    session.flush()
+    before = counted(reader, "inventory.edits.stale").get((("table", "category"),), 0)
+    with capture_logs() as logs:
+        refused = client.post(f"{CATEGORIES}/{radios.id}/name", data=form)
+    assert refused.status_code == 409
+    after = counted(reader, "inventory.edits.stale")[(("table", "category"),)]
+    assert after == before + 1
+    (line,) = [entry for entry in logs if entry["event"].startswith("edit refused")]
+    assert (line["table"], line["row_id"]) == ("category", radios.id)

@@ -18,13 +18,15 @@ from sqlalchemy.orm import Session
 from inventory_tng import accounts, adjustment_reasons, mail, scan_settings
 from inventory_tng.admin.common import (
     ADMIN,
+    CHANGED,
     RULES,
     admin_page,
+    form_version,
     name_problem,
     now,
     text_form,
 )
-from inventory_tng.db import DbSession, refusal, settings_row, unique
+from inventory_tng.db import DbSession, RuleBroken, refusal, settings_row
 from inventory_tng.mail import Notify
 from inventory_tng.models import (
     CONFIRM_HOURS,
@@ -114,6 +116,7 @@ def _page(
     *,
     problems: dict[str, str] | None = None,
     values: dict[str, str] | None = None,
+    alert: str | None = None,
 ) -> HTMLResponse:
     scan = session.get_one(ScanSettings, 1)
     sign_in = accounts.sign_in_settings(session)
@@ -135,6 +138,11 @@ def _page(
                 "name_check_minutes": str(scan.name_check_minutes),
                 "totp_policy": sign_in.totp_policy,
                 "time_zone": site.time_zone,
+                # What each form was shown at (models.Versioned), named as
+                # its form sends it, so one shown again keeps the one sent.
+                "scan_version": str(scan.edit_version),
+                "sign_in_version": str(sign_in.edit_version),
+                "site_version": str(site.edit_version),
             }
             | {n.field: str(getattr(sign_in, n.field)) for n in NUMBERS}
             | (values or {}),
@@ -146,9 +154,14 @@ def _page(
             "name_check_max": NAME_CHECK_MINUTES[1],
             "reasons": reasons,
             "problems": problems,
+            "alert": alert,
         },
-        400 if problems else 200,
     )
+
+
+def _changed(request: Request, session: Session, signed: SignedIn) -> HTMLResponse:
+    """The page as it is now, as a form's row changed since it was shown."""
+    return _page(request, session, signed, alert=RULES[CHANGED])
 
 
 @router.get(SETTINGS)
@@ -162,6 +175,7 @@ def save_scan_settings(
     signed: AdminSignedIn,
     session: DbSession,
     name_check_minutes: Annotated[str, Form()] = "",
+    scan_version: Annotated[str, Form()] = "",
 ) -> Response:
     minutes = whole(name_check_minutes, *NAME_CHECK_MINUTES)
     if minutes is None:
@@ -172,9 +186,17 @@ def save_scan_settings(
             session,
             signed,
             problems={"name_check_minutes": problem},
-            values={"name_check_minutes": name_check_minutes},
+            values={
+                "name_check_minutes": name_check_minutes,
+                "scan_version": scan_version,
+            },
         )
-    scan_settings.change(session, minutes)
+    seen = form_version(scan_version)
+    _, broken = refusal(
+        session, lambda: scan_settings.change(session, minutes, seen=seen), CHANGED
+    )
+    if broken is not None:
+        return _changed(request, session, signed)
     session.commit()
     log.info("scan settings changed", name_check_minutes=minutes)
     return redirect(SETTINGS, notice="settings_saved")
@@ -210,6 +232,7 @@ def change_reason(
     reason_id: int,
     name: Annotated[str, Form()] = "",
     action: Annotated[str, Form()] = "rename",
+    version: Annotated[str, Form()] = "",
 ) -> Response:
     """Rename, retire or bring back, as the button pressed says."""
     reason = adjustment_reasons.locked(session, reason_id)
@@ -224,11 +247,14 @@ def change_reason(
         elif action == "restore":
             adjustment_reasons.restore(reason)
         else:
-            adjustment_reasons.rename(reason, name)
+            adjustment_reasons.rename(reason, name, seen=form_version(version))
 
     problem = name_problem(name)
-    if problem is None and not unique(session, change):
-        problem = REASON_TAKEN
+    if problem is None:
+        _, broken = refusal(session, change, "unique", CHANGED)
+        if broken == CHANGED:
+            return _changed(request, session, signed)
+        problem = broken and REASON_TAKEN
     if problem is not None:
         return _page(
             request,
@@ -261,7 +287,11 @@ def save_sign_in_settings(
             problems[n.field] = f"Whole {n.unit}, from {n.low} to {n.high}."
     if problems:
         return _page(request, session, signed, problems=problems, values=form)
-    current = settings_row(session, SignInSettings)
+    try:
+        seen = form_version(form.get("sign_in_version", ""))
+        current = settings_row(session, SignInSettings, seen=seen)
+    except RuleBroken:  # changed_since_shown, before anything is written.
+        return _changed(request, session, signed)
     if all(getattr(current, field) == value for field, value in chosen.items()):
         # Nothing to record, and nobody to tell.
         return redirect(SETTINGS, notice="saved")
@@ -285,9 +315,13 @@ def save_site_settings(
     signed: AdminSignedIn,
     session: DbSession,
     time_zone: Annotated[str, Form()] = "",
+    site_version: Annotated[str, Form()] = "",
 ) -> Response:
     """The zone times are shown in, which SiteSettings checks."""
-    site = settings_row(session, SiteSettings)
+    try:
+        site = settings_row(session, SiteSettings, seen=form_version(site_version))
+    except RuleBroken:  # changed_since_shown, before anything is written.
+        return _changed(request, session, signed)
     if time_zone == site.time_zone:
         return redirect(SETTINGS, notice="site_saved")
 
@@ -301,7 +335,7 @@ def save_site_settings(
             session,
             signed,
             problems={"time_zone": RULES[broken]},
-            values={"time_zone": time_zone},
+            values={"time_zone": time_zone, "site_version": site_version},
         )
     session.commit()
     log.info("site time zone changed")

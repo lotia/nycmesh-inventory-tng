@@ -374,7 +374,7 @@ def test_a_row_deleted_without_its_lock_is_refused(fresh: Session) -> None:
 @pytest.mark.parametrize(
     "lock",
     [
-        lambda session: settings_row(session, SiteSettings),
+        lambda session: settings_row(session, SiteSettings, seen=None),
         lambda session: get_locked(session, SiteSettings, 1, key_share=True),
         lambda session: session.scalars(
             # locked(), as a page's query would.
@@ -451,7 +451,7 @@ def test_a_savepoint_rolled_back_forgets_its_locks(
     transaction around it."""
     with fresh.begin_nested() as outer:
         with fresh.begin_nested() as inner:
-            site = settings_row(fresh, SiteSettings)
+            site = settings_row(fresh, SiteSettings, seen=None)
             if savepoints == "rolled back":
                 inner.rollback()
         if savepoints.endswith("rolled back"):
@@ -472,7 +472,7 @@ def test_a_row_written_in_a_savepoint_keeps_its_lock(
     lock however the savepoint ends (since 9.3, its SELECT page's
     Locking Clause), so the guard does too, and another transaction still
     cannot lock the row."""
-    site = settings_row(fresh, SiteSettings)
+    site = settings_row(fresh, SiteSettings, seen=None)
     with fresh.begin_nested() as inner:
         site.time_zone = "Europe/London"
         fresh.flush()
@@ -488,7 +488,7 @@ def test_a_row_written_in_a_savepoint_keeps_its_lock(
 
 
 def test_the_transactions_end_forgets_every_lock(fresh: Session) -> None:
-    site = settings_row(fresh, SiteSettings)
+    site = settings_row(fresh, SiteSettings, seen=None)
     fresh.rollback()
     assert held(fresh) == {}
     site.time_zone = "Europe/London"
@@ -542,7 +542,7 @@ def test_the_apps_requests_in_a_test_are_guarded_and_its_setup_is_not(
         request_session.delete(radios)
 
     # Unflushed, and with the row locked: the app finds neither.
-    settings_row(session, SiteSettings).time_zone = "Asia/Tokyo"
+    settings_row(session, SiteSettings, seen=None).time_zone = "Asia/Tokyo"
     radios = Category(name=f"Radios {tag()}")
     session.add(radios)
     with (

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.models import Location, Volunteer
 
-from helpers.rows import add, history, named
+from helpers.rows import add, history, named, shown
 from helpers.sign_in import text
 from helpers.stock import Place, write
 
@@ -79,13 +79,15 @@ def test_moving_an_area_but_never_inside_itself(
     path = f"{LOCATIONS}/{shelf.id}"
     assert (
         admin_client.post(
-            path, data={"name": "Shelf", "parent_id": str(depot.id)}
+            path,
+            data={"name": "Shelf", "parent_id": str(depot.id), "version": shown(shelf)},
         ).status_code
         == 303
     )
     assert shelf.parent_id == depot.id
     # A move under its own area is refused.
-    loop = admin_client.post(path, data={"name": "Shelf", "parent_id": str(bin_.id)})
+    form = {"name": "Shelf", "parent_id": str(bin_.id), "version": shown(shelf)}
+    loop = admin_client.post(path, data=form)
     assert loop.status_code == 400
     assert "inside itself" in text(loop)
     assert shelf.parent_id == depot.id

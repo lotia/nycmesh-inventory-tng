@@ -38,7 +38,7 @@ from inventory_tng.models import (
 )
 
 from helpers.concurrency import Committed
-from helpers.rows import item_fields, violates
+from helpers.rows import item_fields, shown, violates
 from helpers.sign_in import code, new_admin, sign_in_with, text
 from helpers.stock import (
     Place,
@@ -329,18 +329,22 @@ def test_reasons_can_be_added_renamed_retired_and_brought_back(
         select(AdjustmentReason).where(AdjustmentReason.name == "Given away")
     ).one()
     path = f"{SETTINGS}/reasons/{given.id}"
-    admin_client.post(path, data={"name": "Donated", "action": "rename"})
+    form = {"name": "Donated", "version": shown(given)}
+    admin_client.post(path, data=form | {"action": "rename"})
     assert given.name == "Donated"
-    admin_client.post(path, data={"name": "Donated", "action": "retire"})
+    admin_client.post(path, data=form | {"action": "retire"})
     assert given.retired_at is not None
     assert (
         "Donated"
         not in text(admin_client.get(COUNTS)).split("Why")[1].split("</select>")[0]
     )
-    admin_client.post(path, data={"name": "Donated", "action": "restore"})
+    admin_client.post(path, data=form | {"action": "restore"})
     assert given.retired_at is None
     taken = admin_client.post(f"{SETTINGS}/reasons", data={"name": "damaged"})
     assert "already a reason by that name" in text(taken)
+    too_long = form | {"name": "x" * 1000, "version": shown(given), "action": "rename"}
+    assert admin_client.post(path, data=too_long).status_code == 400
+    assert given.name == "Donated"
     unnamed = admin_client.post(f"{SETTINGS}/reasons", data={"name": "  "})
     assert unnamed.status_code == 400
     assert "Give it a name" in text(unnamed)
@@ -625,7 +629,7 @@ def test_a_unit_changed_to_each_as_the_page_writes_is_said_and_nothing_is_writte
         )
     changing = own_committed.session()
     cable = changing.get_one(Item, place.cable.id)
-    items.save(changing, cable, item_fields(cable, unit="each"))
+    items.save(changing, cable, item_fields(cable, unit="each"), seen=None)
     changing.flush()
     worker = own_committed.blocked(page, lambda: client.post(path, data=form))
     changing.commit()

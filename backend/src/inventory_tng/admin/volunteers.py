@@ -17,8 +17,11 @@ from inventory_tng import volunteers
 from inventory_tng.accounts import email_problem
 from inventory_tng.admin.common import (
     ADMIN,
+    CHANGED,
+    RULES,
     admin_page,
     chosen,
+    form_version,
     name_problem,
     now,
     rule_words,
@@ -86,6 +89,7 @@ def _volunteer_page(
     *,
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
+    alert: str | None = None,
 ) -> HTMLResponse:
     others = session.scalars(
         select(Volunteer)
@@ -111,8 +115,8 @@ def _volunteer_page(
             "others": others,
             "problems": problems,
             "values": values,
+            "alert": alert,
         },
-        400 if problems else 200,
     )
 
 
@@ -188,6 +192,7 @@ def save_volunteer(
     volunteer_id: int,
     name: Annotated[str, Form()] = "",
     email: Annotated[str, Form()] = "",
+    version: Annotated[str, Form()] = "",
 ) -> Response:
     found = session.get(Volunteer, volunteer_id)
     if found is None:
@@ -195,13 +200,18 @@ def save_volunteer(
     name, email = name.strip(), email.strip()
     problems = _checked(name, email)
     if not problems:
+        seen = form_version(version)
         _, broken = attempt(
-            session, lambda: volunteers.save(session, found, name, email or None)
+            session,
+            lambda: volunteers.save(session, found, name, email or None, seen=seen),
         )
+        if broken == CHANGED:
+            alert = RULES[CHANGED]
+            return _volunteer_page(request, session, signed, found, alert=alert)
         if broken:
             problems["name"] = rule_words(broken, TAKEN)
     if problems:
-        values = {"name": name, "email": email}
+        values = {"name": name, "email": email, "version": version}
         return _volunteer_page(
             request, session, signed, found, problems=problems, values=values
         )

@@ -17,8 +17,11 @@ from inventory_tng import items, labels
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.common import (
     ADMIN,
+    CHANGED,
+    RULES,
     admin_page,
     chosen,
+    form_version,
     name_problem,
     now,
     quantity,
@@ -54,13 +57,14 @@ REFUSED_FIELDS = {
 
 def _change_or_note[T](
     session: Session, change: Callable[[], T], problems: dict[str, str]
-) -> T | None:
-    """Makes the change, and returns what it did, unless it breaks one of
-    REFUSED_FIELDS' rules: then says so in `problems`, beside that field."""
-    done, broken = refusal(session, change, *REFUSED_FIELDS)
-    if broken is not None:
+) -> tuple[T | None, str | None]:
+    """Makes the change: what it did, and None; or, if it breaks one of
+    REFUSED_FIELDS' rules, None, and the rule, which `problems` then says
+    beside its field, or CHANGED (db.unchanged)."""
+    done, broken = refusal(session, change, *REFUSED_FIELDS, CHANGED)
+    if broken in REFUSED_FIELDS:
         problems[REFUSED_FIELDS[broken]] = rule_words(broken, TAKEN)
-    return done
+    return done, broken
 
 
 NOTICES.update(
@@ -133,6 +137,7 @@ def _item_page(
     *,
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
+    alert: str | None = None,
 ) -> HTMLResponse:
     packages = session.scalars(
         select(ItemPackage)
@@ -156,8 +161,8 @@ def _item_page(
             "labels": labels.current_of(session, Label.item_id == item.id),
             "problems": problems,
             "values": values,
+            "alert": alert,
         },
-        400 if problems else 200,
     )
 
 
@@ -202,7 +207,7 @@ def add_item(
     fields, problems = _fields(session, form)
     item = None
     if fields is not None:
-        item = _change_or_note(session, lambda: items.add(session, fields), problems)
+        item, _ = _change_or_note(session, lambda: items.add(session, fields), problems)
     if item is None:
         return _list_page(request, session, signed, problems=problems, values=form)
     session.commit()
@@ -233,7 +238,13 @@ def save_item(
         return not_found()
     fields, problems = _fields(session, form)
     if fields is not None:
-        _change_or_note(session, lambda: items.save(session, found, fields), problems)
+        seen = form_version(form.get("version", ""))
+        _, broken = _change_or_note(
+            session, lambda: items.save(session, found, fields, seen=seen), problems
+        )
+        if broken == CHANGED:
+            alert = RULES[CHANGED]
+            return _item_page(request, session, signed, found, alert=alert)
     if problems:
         return _item_page(
             request, session, signed, found, problems=problems, values=form

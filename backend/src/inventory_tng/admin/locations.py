@@ -16,9 +16,12 @@ from sqlalchemy.orm import Session
 from inventory_tng import labels, locations
 from inventory_tng.admin.common import (
     ADMIN,
+    CHANGED,
+    RULES,
     admin_page,
     chosen,
     current_rows,
+    form_version,
     name_problem,
     now,
     rule_words,
@@ -111,6 +114,7 @@ def _location_page(
     location: Location,
     problem: str | None = None,
     values: Mapping[str, str] | None = None,
+    alert: str | None = None,
 ) -> HTMLResponse:
     areas = session.scalars(
         select(Location)
@@ -132,8 +136,8 @@ def _location_page(
             "parents": _parents(current_rows(session, Location), location),
             "problems": {"name": problem} if problem else None,
             "values": values,
+            "alert": alert,
         },
-        400 if problem else 200,
     )
 
 
@@ -203,6 +207,7 @@ def save_location(
     location_id: int,
     name: Annotated[str, Form()] = "",
     parent_id: Annotated[str, Form()] = "",
+    version: Annotated[str, Form()] = "",
 ) -> Response:
     found = _changeable(session, location_id)
     if found is None:
@@ -215,12 +220,16 @@ def save_location(
 
     if problem is None:
         under = parent.id if parent else None
+        seen = form_version(version)
         _, broken = attempt(
-            session, lambda: locations.save(session, found, name, under)
+            session, lambda: locations.save(session, found, name, under, seen=seen)
         )
+        if broken == CHANGED:
+            alert = RULES[CHANGED]
+            return _location_page(request, session, signed, found, alert=alert)
         problem = broken and rule_words(broken, TAKEN)
     if problem is not None:
-        values = {"name": name, "parent_id": parent_id}
+        values = {"name": name, "parent_id": parent_id, "version": version}
         return _location_page(request, session, signed, found, problem, values)
     session.commit()
     log.info("location saved", location_id=location_id)

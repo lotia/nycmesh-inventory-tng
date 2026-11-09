@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple
 import structlog
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
+from opentelemetry import metrics
 from pydantic import BaseModel
 from sqlalchemy import (
     Column,
@@ -213,12 +214,40 @@ def get_locked[M: Base](
     return row
 
 
-def settings_row[M: Base](session: Session, model: type[M]) -> M:
-    """A settings table's one row, id 1, locked for a change to it. Made by
-    its migration and never deleted."""
+def settings_row[M: Base](session: Session, model: type[M], *, seen: Seen) -> M:
+    """A settings table's one row, id 1, locked for a change to it, and
+    unchanged since `seen`. Made by its migration and never deleted."""
     row = get_locked(session, model, 1)
     assert row is not None
+    unchanged(row, seen)
     return row
+
+
+# The version of a row (models.Versioned) an edit form showed; None for a
+# change with no form, such as a command's, which means to replace what is
+# there. Required, so no caller leaves it out by mistake.
+type Seen = int | None
+
+stale = metrics.get_meter(__name__).create_counter(
+    "inventory.edits.stale",
+    unit="{edit}",
+    description="Saves refused as the row changed since its form was shown, by table",
+)
+
+
+def unchanged(row: Base, seen: Seen) -> None:
+    """RuleBroken (changed_since_shown) unless the row, as locked, is at
+    the version a form showed (models.Versioned): another save since would
+    otherwise be undone, unseen (inventory-tng-8i4.123)."""
+    if seen is not None and getattr(row, "edit_version") != seen:  # noqa: B009
+        table = type(row).__tablename__
+        stale.add(1, {"table": table})
+        log.info(
+            "edit refused: changed since shown",
+            table=table,
+            row_id=getattr(row, "id"),  # noqa: B009
+        )
+        raise RuleBroken("changed_since_shown")
 
 
 def hold_until_commit(session: Session) -> None:
@@ -428,7 +457,8 @@ def lock_catalogue(session: Session) -> None:
 # And on a column, mapped_column(info=...), a Flag: "secret", left out of
 # history (what would let someone sign in, or copy a second factor,
 # docs/decisions/0012); "not_a_change", which changing alone is no history
-# (it moves with use); and "row_lock_only" (above).
+# (it moves with use); and "row_lock_only" (above), which changing alone
+# moves no edit_version (_next_version).
 #
 # A test's own session is left alone as the test writes rows to set up what
 # it tests (UNGUARDED_INFO; tests/helpers/rows.py, setting_up), but not as
@@ -497,7 +527,7 @@ _WRITES = "inventory.writes"
 def flush_writes(session: Session, context: UOWTransaction) -> list[Write]:
     """What this flush writes: rows added, rows changed to something new,
     and rows deleted. Loads nothing. Found once per flush, for the guard
-    and history.py: no before_flush listener here changes a row."""
+    and history.py, before _next_version changes any row's version."""
     if (found := context.attributes.get(_WRITES)) is not None:
         return found
     found = []
@@ -648,6 +678,26 @@ def _written_under_lock(
             )
 
 
+@event.listens_for(Session, "before_flush")
+def _next_version(
+    session: Session, context: UOWTransaction, _instances: object
+) -> None:
+    """One more on the version of each row changed that has one
+    (models.Versioned), in the UPDATE itself. After flush_writes has found
+    what changed, so the guard and history see the version as no change of
+    their own. Not for a change only to row_lock_only columns, which no
+    edit form sets (a receipt lowering item.on_order): it undoes nothing a
+    form shows, so it refuses no form's save."""
+    for write in flush_writes(session, context):
+        if (
+            write.action == "update"
+            and "edit_version" in write.table.c
+            and write.changed - flagged(write.table, "row_lock_only")
+        ):
+            row: Any = write.row
+            row.edit_version = write.table.c.edit_version + 1
+
+
 def require_current(
     session: Session, model: type[Base], row_id: int, rule: str
 ) -> None:
@@ -683,12 +733,20 @@ def locked_row[M: Base](session: Session, model: type[M], ident: object) -> M | 
     return get_locked(session, model, ident)
 
 
-def relock(session: Session, row: Base, *, current: bool | None = None) -> None:
+def relock(
+    session: Session,
+    row: Base,
+    *,
+    current: bool | None = None,
+    seen: Seen = None,
+) -> None:
     """locked_row, for a row the session holds: the catalogue lock, then
     the row, read again as locked into the same object. With `current`,
-    Gone unless the row, as locked, is current (True) or retired (False)."""
+    Gone unless the row, as locked, is current (True) or retired (False);
+    with `seen`, unchanged since then."""
     found = locked_row(session, type(row), inspect(row).identity)
     assert found is row  # The session's own object, refreshed.
     retirable: Any = row
     if current is not None and (retirable.retired_at is None) != current:
         raise Gone
+    unchanged(row, seen)
