@@ -32,7 +32,8 @@ required, and for migrations only `MIGRATION_DATABASE_URL`.
 - `APP_ENV`: leave unset in production. `development` is for local work
   only: it stops masking personal data in logs and redacting traces, lets the
   cookie travel over http, re-reads the scan page's build on every page, and
-  allows `UNMASK_SECRETS`, `TRACE_REDACTION=off` and `VITE_DEV_SERVER`.
+  allows `UNMASK_SECRETS`, `LOG_REDACTION=off`, `TRACE_REDACTION=off` and
+  `VITE_DEV_SERVER`.
 - `SETUP_TOKEN`: lets the first administrator set up (below); at least 32
   characters. Remove it once they have.
 - `RECOVERY_TOKEN`: lets a locked-out administrator back in (below); at
@@ -48,8 +49,9 @@ required, and for migrations only `MIGRATION_DATABASE_URL`.
 - `OTEL_EXPORTER_OTLP_ENDPOINT`: sends logs and metrics over OTLP/HTTP; off
   when unset. `OTEL_TRACES_EXPORTER=otlp` sends traces too, redacted
   (below).
-- `TRACE_REDACTION_OFF_UNTIL`, `REDACTION_OFF_MAX_HOURS`: traces unredacted
-  for a while (Debugging with unredacted traces, below).
+- `LOG_REDACTION_OFF_UNTIL`, `TRACE_REDACTION_OFF_UNTIL`,
+  `REDACTION_OFF_MAX_HOURS`: logs or traces unredacted for a while
+  (Debugging with unredacted logs or traces, below).
 - `FRONTEND_DIST`: the folder holding the compressed scan page (below). It
   defaults to the checkout's `frontend/dist`.
 - `VITE_DEV_SERVER`: never in production; the app refuses to start with it.
@@ -93,18 +95,21 @@ The app writes the history (`catalogue_history`: who changed what, and
 when) itself. Changes made by migrations, or by SQL run by hand as either
 role, are not in it.
 
-### Debugging with unredacted traces
+### Debugging with unredacted logs or traces
 
-Traces leave redacted: only the span attributes on an allow-list, no query
-text, query string or client address, and errors without their messages
-(docs/decisions/0008). To see more for a while:
+Logs leave redacted: personal data, `sensitive_*` fields (such as a request
+body) and the values database errors quote are masked. Traces leave with
+only the span attributes on an allow-list, no query text, query string or
+client address, and errors without their messages (docs/decisions/0008). To
+see more of one for a while:
 
-1. Set `TRACE_REDACTION_OFF_UNTIL` to a time at most
-   `REDACTION_OFF_MAX_HOURS` (default 6) hours away, such as
+1. Set `LOG_REDACTION_OFF_UNTIL` or `TRACE_REDACTION_OFF_UNTIL` to a time at
+   most `REDACTION_OFF_MAX_HOURS` (default 6) hours away, such as
    `2026-11-07T18:00Z`, and restart. The app refuses a time further off.
 2. While it is off, each process's starting line is a warning saying until
-   when, each warns at most hourly while unredacted spans leave, and every
-   span carries `inventory.redaction=off`. Secrets stay masked.
+   when, and each warns again hourly. Every log line carries
+   `redaction=off`, or every span `inventory.redaction=off`. Secrets stay
+   masked.
 3. Past the time, redaction comes back on by itself. Remove the setting at
    the next deploy.
 

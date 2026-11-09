@@ -11,7 +11,7 @@ import os
 import sys
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from types import TracebackType
 from typing import Self, cast
 
@@ -46,7 +46,7 @@ from inventory_tng import request_logging
 from inventory_tng.db import Database
 from inventory_tng.logs import ADDED_FIELDS
 from inventory_tng.masking import Masker, mask_query
-from inventory_tng.settings import TraceRedaction
+from inventory_tng.settings import REDACTION_WARN_EVERY, Redaction
 
 SERVICE_NAME = "inventory-tng"
 
@@ -95,8 +95,6 @@ KEPT_ATTRIBUTES = frozenset(
 KEPT_EVENT_ATTRIBUTES = frozenset({"exception.type", "exception.escaped"})
 # On a span that left unredacted outside development.
 REDACTION_MARK = "inventory.redaction"
-# How often a worker says redaction is off, while it is.
-WARN_EVERY = timedelta(hours=1)
 
 
 def enabled(environ: Mapping[str, str] = os.environ) -> bool:
@@ -128,17 +126,17 @@ class RedactingSpanExporter(SpanExporter):
         self,
         exporter: SpanExporter,
         *,
-        traces: TraceRedaction | None = None,
+        traces: Redaction | None = None,
         development: bool = False,
         secrets: bool = True,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self.exporter = exporter
-        self.traces = traces or TraceRedaction()
+        self.traces = traces or Redaction()
         self.development = development
         # Secret names by the log masker's rule; never personal data, which
         # is what being unredacted is for.
-        self.secrets = Masker(redact=False, secrets=secrets)
+        self.secrets = Masker.unredacting(secrets=secrets)
         self.now = now
         # The server's starting line has said so already.
         self._warned: datetime | None = now()
@@ -150,7 +148,9 @@ class RedactingSpanExporter(SpanExporter):
         mark = self.traces.off_outside_development(
             development=self.development, now=now
         )
-        if mark and (self._warned is None or now - self._warned >= WARN_EVERY):
+        if mark and (
+            self._warned is None or now - self._warned >= REDACTION_WARN_EVERY
+        ):
             self._warned = now
             log.warning("trace redaction is off", until=self.traces.off_until)
         return self.exporter.export([self._unredacted(span, mark) for span in spans])
@@ -233,7 +233,7 @@ class Telemetry:
         metric_reader: MetricReader | None = None,
         log_exporter: LogRecordExporter | None = None,
         span_exporter: SpanExporter | None = None,
-        traces: TraceRedaction | None = None,
+        traces: Redaction | None = None,
         development: bool = False,
         secrets: bool = True,
     ) -> Self:

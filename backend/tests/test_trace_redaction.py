@@ -19,7 +19,7 @@ from structlog.testing import capture_logs
 
 from inventory_tng.app import create_app
 from inventory_tng.masking import MASK
-from inventory_tng.settings import LogConfig, Settings, SettingsError, TraceRedaction
+from inventory_tng.settings import LogConfig, Redaction, Settings, SettingsError
 from inventory_tng.telemetry import (
     KEPT_ATTRIBUTES,
     KEPT_EVENT_ATTRIBUTES,
@@ -68,11 +68,9 @@ def redactor(
     """Redacting or not as asked: in development by TRACE_REDACTION, else by
     a TRACE_REDACTION_OFF_UNTIL still to come."""
     if development:
-        traces = TraceRedaction(switch=redacting)
+        traces = Redaction(switch=redacting)
     else:
-        traces = TraceRedaction(
-            off_until=None if redacting else NOW + timedelta(hours=1)
-        )
+        traces = Redaction(off_until=None if redacting else NOW + timedelta(hours=1))
     return lambda memory: RedactingSpanExporter(
         memory,
         traces=traces,
@@ -115,7 +113,7 @@ def test_off_outside_development_is_warned_hourly() -> None:
     clock = [NOW]
     exporter = RedactingSpanExporter(
         InMemorySpanExporter(),
-        traces=TraceRedaction(off_until=NOW + timedelta(hours=2)),
+        traces=Redaction(off_until=NOW + timedelta(hours=2)),
         development=False,
         now=lambda: clock[0],
     )
@@ -138,7 +136,7 @@ def test_off_outside_development_is_marked() -> None:
 
 
 def test_redaction_comes_back_on_by_itself_when_the_time_runs_out() -> None:
-    off = TraceRedaction(off_until=NOW + timedelta(hours=1))
+    off = Redaction(off_until=NOW + timedelta(hours=1))
     clock = [NOW]
     memory = InMemorySpanExporter()
     exporter = RedactingSpanExporter(
@@ -163,7 +161,7 @@ def test_redaction_comes_back_on_by_itself_when_the_time_runs_out() -> None:
 )
 def test_who_redacts(development: bool, switch: bool | None, redacting: bool) -> None:
     assert (
-        TraceRedaction(switch=switch).redacting(development=development, now=NOW)
+        Redaction(switch=switch).redacting(development=development, now=NOW)
         is redacting
     )
 
@@ -187,21 +185,21 @@ def test_who_redacts(development: bool, switch: bool | None, redacting: bool) ->
 )
 def test_switches_that_are_refused(environ: dict[str, str], problem: str) -> None:
     with pytest.raises(SettingsError, match=problem):
-        TraceRedaction.from_environ(environ, now=NOW)
+        Redaction.from_environ("TRACE", environ, now=NOW)
 
 
 def test_off_until_within_the_cap_or_already_past() -> None:
-    soon = TraceRedaction.from_environ(
-        {"TRACE_REDACTION_OFF_UNTIL": "2026-11-07T18:00Z"}, now=NOW
+    soon = Redaction.from_environ(
+        "TRACE", {"TRACE_REDACTION_OFF_UNTIL": "2026-11-07T18:00Z"}, now=NOW
     )
     assert soon.off_until == NOW + timedelta(hours=6)
-    assert TraceRedaction.from_environ(
-        {"TRACE_REDACTION_OFF_UNTIL": "2026-11-07T11:00Z"}, now=NOW
+    assert Redaction.from_environ(
+        "TRACE", {"TRACE_REDACTION_OFF_UNTIL": "2026-11-07T11:00Z"}, now=NOW
     ).redacting(development=False, now=NOW)
 
 
 def test_off_for_good_only_in_development(database_url: str) -> None:
-    off = TraceRedaction(switch=False)
+    off = Redaction(switch=False)
     Settings(database_url=database_url, development=True, traces=off)
     with pytest.raises(SettingsError, match="TRACE_REDACTION=off works only"):
         Settings(database_url=database_url, traces=off)

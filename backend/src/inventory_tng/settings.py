@@ -26,36 +26,49 @@ class SettingsError(Exception):
     """A setting is missing or unusable."""
 
 
-# How far away TRACE_REDACTION_OFF_UNTIL may be, unless
+# How far away LOG_ or TRACE_REDACTION_OFF_UNTIL may be, unless
 # REDACTION_OFF_MAX_HOURS says otherwise (docs/decisions/0008).
 REDACTION_OFF_MAX_HOURS = 6
+# How often a process says redaction is off, while it is.
+REDACTION_WARN_EVERY = timedelta(hours=1)
+
+# Each has its own switches: LOG_REDACTION and LOG_REDACTION_OFF_UNTIL, and
+# TRACE_REDACTION and TRACE_REDACTION_OFF_UNTIL.
+Signal = Literal["LOG", "TRACE"]
 
 
 @dataclass(frozen=True)
-class TraceRedaction:
-    """Whether spans leave with only the attributes on the allow-list
-    (telemetry.RedactingSpanExporter, docs/decisions/0008). In development
-    they don't, unless TRACE_REDACTION=on. Anywhere else they do, unless
-    TRACE_REDACTION_OFF_UNTIL is still to come."""
+class Redaction:
+    """Whether one signal's personal data is redacted (docs/decisions/0008):
+    log lines' fields (masking.Masker) or spans' attributes
+    (telemetry.RedactingSpanExporter). In development it isn't, unless its
+    <SIGNAL>_REDACTION=on. Anywhere else it is, unless its
+    <SIGNAL>_REDACTION_OFF_UNTIL is still to come."""
 
-    # TRACE_REDACTION: True for on, False for off, None if unset.
+    # <SIGNAL>_REDACTION: True for on, False for off, None if unset.
     switch: bool | None = None
     off_until: datetime | None = None
 
     @classmethod
     def from_environ(
-        cls, environ: Mapping[str, str] = os.environ, now: datetime | None = None
+        cls,
+        signal: Signal,
+        environ: Mapping[str, str] = os.environ,
+        now: datetime | None = None,
     ) -> Self:
-        switch = environ.get("TRACE_REDACTION", "").strip().lower()
+        name = f"{signal}_REDACTION"
+        switch = environ.get(name, "").strip().lower()
         if switch not in {"", "on", "off"}:
-            raise SettingsError(
-                f"TRACE_REDACTION must be on or off, not {environ['TRACE_REDACTION']!r}"
-            )
+            raise SettingsError(f"{name} must be on or off, not {environ[name]!r}")
         hours = _whole_hours(environ.get("REDACTION_OFF_MAX_HOURS", ""))
-        until = environ.get("TRACE_REDACTION_OFF_UNTIL", "").strip()
+        until = environ.get(f"{name}_OFF_UNTIL", "").strip()
         return cls(
             switch=None if not switch else switch == "on",
-            off_until=_until(until, now or datetime.now(UTC), hours) if until else None,
+            off_until=(
+                _until(until, now or datetime.now(UTC), hours, f"{name}_OFF_UNTIL")
+                if until
+                else None
+            ),
         )
 
     def redacting(self, *, development: bool, now: datetime) -> bool:
@@ -80,6 +93,8 @@ class LogConfig:
     health_checks: bool = True
     # Secrets in logs and telemetry, for debugging. Development only.
     unmask_secrets: bool = False
+    # Personal data in log lines (masking.Masker).
+    redaction: Redaction = field(default_factory=Redaction)
 
     @classmethod
     def from_environ(cls, environ: Mapping[str, str] = os.environ) -> Self:
@@ -91,6 +106,7 @@ class LogConfig:
             client_address=_flag(environ, "LOG_CLIENT_ADDRESS", default.client_address),
             health_checks=_flag(environ, "LOG_HEALTH_CHECKS", default.health_checks),
             unmask_secrets=_flag(environ, "UNMASK_SECRETS", default.unmask_secrets),
+            redaction=Redaction.from_environ("LOG", environ),
         )
 
 
@@ -189,7 +205,7 @@ class Settings:
     recovery_token: str | None = field(default=None, repr=False)
     # Password resets and notices by mail; None sends none.
     mail: MailConfig | None = None
-    traces: TraceRedaction = field(default_factory=TraceRedaction)
+    traces: Redaction = field(default_factory=Redaction)
     # What authenticators' keys are sealed with (totp_keys.py). None only
     # for Settings built in code, as tests do: from_environ always loads them.
     totp_keys: TotpKeys | None = field(default=None, repr=False)
@@ -223,7 +239,7 @@ class Settings:
             setup_token=environ.get("SETUP_TOKEN", "").strip() or None,
             recovery_token=environ.get("RECOVERY_TOKEN", "").strip() or None,
             mail=MailConfig.from_environ(environ),
-            traces=TraceRedaction.from_environ(environ),
+            traces=Redaction.from_environ("TRACE", environ),
             totp_keys=totp_keys,
         )
 
@@ -245,11 +261,15 @@ def _refuse_development_only(settings: Settings) -> None:
     if settings.logging.unmask_secrets:
         raise SettingsError("UNMASK_SECRETS works only with APP_ENV=development")
     # Off for good is for a laptop; anywhere else, only for a while.
-    if settings.traces.switch is False:
-        raise SettingsError(
-            "TRACE_REDACTION=off works only with APP_ENV=development; "
-            "elsewhere use TRACE_REDACTION_OFF_UNTIL"
-        )
+    for signal, redaction in (
+        ("LOG", settings.logging.redaction),
+        ("TRACE", settings.traces),
+    ):
+        if redaction.switch is False:
+            raise SettingsError(
+                f"{signal}_REDACTION=off works only with APP_ENV=development; "
+                f"elsewhere use {signal}_REDACTION_OFF_UNTIL"
+            )
     # A page loading scripts from a developer's laptop is no production page.
     if settings.frontend.dev_server:
         raise SettingsError("VITE_DEV_SERVER works only with APP_ENV=development")
@@ -407,22 +427,17 @@ def _whole_hours(value: str) -> int:
     )
 
 
-def _until(value: str, now: datetime, hours: int) -> datetime:
+def _until(value: str, now: datetime, hours: int, name: str) -> datetime:
     """An ISO 8601 time with its offset, no more than `hours` from now. One
     already past is allowed: redaction is simply on again."""
     try:
         until = datetime.fromisoformat(value)
     except ValueError:
-        raise SettingsError(
-            f"TRACE_REDACTION_OFF_UNTIL must be an ISO 8601 time, not {value!r}"
-        ) from None
+        raise SettingsError(f"{name} must be an ISO 8601 time, not {value!r}") from None
     if until.tzinfo is None:
-        raise SettingsError(
-            "TRACE_REDACTION_OFF_UNTIL must say its offset, such as Z or -05:00"
-        )
+        raise SettingsError(f"{name} must say its offset, such as Z or -05:00")
     if until > now + timedelta(hours=hours):
         raise SettingsError(
-            f"TRACE_REDACTION_OFF_UNTIL may be at most {hours} hours away "
-            "(REDACTION_OFF_MAX_HOURS)"
+            f"{name} may be at most {hours} hours away (REDACTION_OFF_MAX_HOURS)"
         )
     return until

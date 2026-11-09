@@ -50,14 +50,19 @@ def create_server() -> FastAPI:
             )
         )
     # After telemetry, so the line reaches OTLP too. A warning while secrets
-    # are shown, or traces leave unredacted outside development, which is
-    # how a dashboard tells.
-    (log.info if masker.secrets and not traces_off else log.warning)(
+    # are shown, or logs or traces leave unredacted outside development,
+    # which is how a dashboard tells; the masker warns hourly after.
+    logs_off = masker.off_outside_development()
+    quiet = masker.secrets and not traces_off and not logs_off
+    (log.info if quiet else log.warning)(
         "starting",
         log_level=settings.logging.level,
         log_format=settings.logging.format,
         log_health_checks=settings.logging.health_checks,
         log_redaction=masker.redact,
+        log_redaction_off_until=(
+            settings.logging.redaction.off_until if logs_off else None
+        ),
         log_unmasked=not masker.secrets,
         trace_redaction_off_until=settings.traces.off_until if traces_off else None,
         database_host=database.host,
