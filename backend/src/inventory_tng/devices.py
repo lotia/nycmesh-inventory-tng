@@ -35,9 +35,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import request_logging
-from inventory_tng.db import DbSession, get_locked, locked, record_last_seen
+from inventory_tng.db import (
+    DbSession,
+    exists_where,
+    get_locked,
+    locked,
+    record_last_seen,
+)
 from inventory_tng.models import Device, RegistrationCode
-from inventory_tng.rate_limits import limiter
+from inventory_tng.rate_limits import limiter, refund
 from inventory_tng.web import client_address, set_private_cookie
 
 log = structlog.get_logger(__name__)
@@ -50,8 +56,8 @@ COOKIE = "inventory_device"
 COOKIE_MAX_AGE = int(timedelta(days=400).total_seconds())
 PHRASE_WORDS = 5  # About 64 bits from this list.
 LAST_SEEN_EVERY = timedelta(hours=1)
-# Guessing a phrase has to go through here, one address at a time. Per
-# process: with 64-bit phrases that is still far more than enough.
+# Guessing a phrase has to go through here, one address at a time, shared
+# by every instance: with 64-bit phrases that is far more than enough.
 ATTEMPTS = RateLimitItemPerMinute(10)
 
 # Why a code does not register: the phrase, or the address trying too often.
@@ -129,18 +135,19 @@ class RegistrationRejected(Exception):
 
 def register(session: Session, phrase: str, address: str | None) -> tuple[Device, str]:
     """Check the code, then register a device with an id of its own. Returns
-    the device and its cookie value, which is never stored. Only failed
-    attempts count towards the limit, so a room of phones behind one address
-    can all register with a good code."""
+    the device and its cookie value, which is never stored. Every attempt
+    counts before the code is checked, so a burst sent at once cannot all
+    slip under the limit (inventory-tng-8i4.126). One whose phrase is a
+    code's is no guess: refunded at once, before the code's row is waited
+    for, so a room of phones behind one address scanning one code can all
+    register."""
     bucket = address or "unknown"
-    limits = limiter(session)
-    if not limits.test(ATTEMPTS, "register", bucket):
+    if not limiter(session).hit(ATTEMPTS, "register", bucket):
         _reject("rate_limited", None)
-    try:
-        code = _usable_code(session, phrase)
-    except RegistrationRejected:
-        limits.hit(ATTEMPTS, "register", bucket)
-        raise
+    if not exists_where(session, RegistrationCode.phrase_hash == _phrase_hash(phrase)):
+        _reject("unknown", None)
+    refund(session, ATTEMPTS, "register", bucket)
+    code = _usable_code(session, phrase)
     code.uses += 1
     token = secrets.token_urlsafe(16)
     device = Device(
@@ -160,7 +167,7 @@ def _usable_code(session: Session, phrase: str) -> RegistrationCode:
     code = session.scalar(
         locked(
             select(RegistrationCode).where(
-                RegistrationCode.phrase_hash == digest(normalise_phrase(phrase))
+                RegistrationCode.phrase_hash == _phrase_hash(phrase)
             )
         )
     )
@@ -173,6 +180,10 @@ def _usable_code(session: Session, phrase: str) -> RegistrationCode:
     if code.uses >= code.max_uses:
         _reject("used_up", code)
     return code
+
+
+def _phrase_hash(phrase: str) -> bytes:
+    return digest(normalise_phrase(phrase))
 
 
 def _ip(address: str | None) -> IPv4Address | IPv6Address | None:
