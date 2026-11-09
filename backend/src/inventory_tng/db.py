@@ -1,20 +1,23 @@
 """The database: one engine per app, one session per request."""
 
+import functools
 import re
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Collection, Iterator
 from contextlib import AbstractContextManager
 from datetime import datetime
-from typing import Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple
 
 import structlog
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import (
+    Column,
     ColumnElement,
     Engine,
     MetaData,
     Select,
+    Table,
     create_engine,
     event,
     exc,
@@ -25,7 +28,17 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.engine.interfaces import DBAPIConnection
-from sqlalchemy.orm import DeclarativeBase, Session
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    InstanceState,
+    QueryContext,
+    Session,
+    SessionTransaction,
+)
+
+if TYPE_CHECKING:
+    # The type with_for_update takes for `of`, which locked passes on.
+    from sqlalchemy.sql.selectable import _ForUpdateOfArgument
 
 log = structlog.get_logger(__name__)
 
@@ -160,15 +173,20 @@ def locked[*Ts](
     *,
     key_share: bool = False,
     shared: bool = False,
-    of: type[Base] | None = None,
+    of: _ForUpdateOfArgument | None = None,
 ) -> Select[*Ts]:
     """`query` with its rows locked and read again as locked: SELECT ... FOR
     UPDATE, or FOR NO KEY UPDATE with `key_share` (which does not hold up
     inserting a row that refers to these); with `shared` too, FOR KEY SHARE,
-    which only FOR UPDATE waits for. Only `of`'s rows if given."""
+    which only FOR UPDATE waits for. Only `of`'s rows if given. Rows locked
+    to change, not `shared`, are noted as held (the guard below): all the
+    query loads, or `of`'s if it is a model; none for other `of`s."""
+    options: dict[str, Any] = {"populate_existing": True}
+    if not shared and (of is None or (isinstance(of, type) and issubclass(of, Base))):
+        options[LOCKING] = of or Base
     return query.with_for_update(
         read=shared, key_share=key_share, of=of
-    ).execution_options(populate_existing=True)
+    ).execution_options(**options)
 
 
 def get_locked[M: Base](
@@ -176,15 +194,17 @@ def get_locked[M: Base](
 ) -> M | None:
     """Session.get, as locked does: the row locked, and read again into the
     object the session may already hold. None if there is no such row."""
-    return session.get(
+    row = session.get(
         model, ident, with_for_update={"key_share": key_share}, populate_existing=True
     )
+    if row is not None:
+        _hold(session, inspect(row).key)
+    return row
 
 
 def settings_row[M: Base](session: Session, model: type[M]) -> M:
-    """A settings table's one row, id 1, locked for a change to it, so
-    history records the row as it was (history.py). Made by its migration
-    and never deleted."""
+    """A settings table's one row, id 1, locked for a change to it. Made by
+    its migration and never deleted."""
     row = get_locked(session, model, 1)
     assert row is not None
     return row
@@ -264,17 +284,13 @@ def attempt[T](
     unique index (as PostgreSQL compares names, ignoring case among current
     rows), the name of the check constraint it broke, or the rule a domain
     function refused it by (RuleBroken), so a page can say why in its own
-    words. Any other failure is raised."""
-    held = session.info.get(LOCK_INFO)
+    words. Any other failure is raised. Locks taken in `change` go with
+    the savepoint, however it failed (_savepoint_locks_released)."""
     try:
         with session.begin_nested():
             done = change()
             session.flush()
     except BaseException as error:
-        # The savepoint rolled back, however it failed: a catalogue lock
-        # taken in it went with it.
-        if held is None:
-            session.info.pop(LOCK_INFO, None)
         if isinstance(error, RuleBroken):
             return None, error.rule
         if isinstance(error, exc.IntegrityError):
@@ -368,62 +384,259 @@ def install(app: FastAPI) -> None:
 
 
 # The catalogue lock (pg_advisory_xact_lock's key): every write to the
-# catalogue (categories, items and their packages, volunteers, locations,
-# labels) takes it first, in the domain function that makes it, so writes
-# whose rules read other rows go one at a time: two at once could each pass
-# their checks and together break them, such as two moves that make a
-# cycle. Writes are few (administrators), so one lock is enough. Held until
-# the transaction ends, or a savepoint it was taken in is rolled back.
+# catalogue (the tables whose protection says lock="catalogue") takes it
+# first, in the domain function that makes it, so writes whose rules read
+# other rows go one at a time: two at once could each pass their checks and
+# together break them, such as two moves that make a cycle. Writes are few
+# (administrators), so one lock is enough. Held until the transaction ends,
+# or a savepoint it was taken in is rolled back.
 CATALOGUE_LOCK = 0x696E76656E746F72  # Any fixed key; "inventor" in ASCII.
-CATALOGUE_TABLES = frozenset(
-    ("category", "item", "item_package", "label", "location", "volunteer")
-)
-# What may change without the lock: a receipt lowers what is on order of
-# the items it brings (ledger._receive), which no rule reads.
-UNLOCKED_COLUMNS = {"item": {"on_order"}}
-# Where lock_catalogue notes the transaction that holds the lock.
-LOCK_INFO = "inventory.catalogue_lock"
 
 
 def lock_catalogue(session: Session) -> None:
     """Take the catalogue lock: wait for any catalogue write under way to
     end. Taking it again in the same transaction is free."""
     session.execute(select(func.pg_advisory_xact_lock(CATALOGUE_LOCK)))
-    session.info.setdefault(LOCK_INFO, session.get_transaction())
+    _hold(session, CATALOGUE)
 
 
-def changed_attributes(row: Base) -> set[str]:
-    """The attributes of a row the session holds that were set to something
-    new, not yet flushed. Loads nothing."""
-    return {a.key for a in inspect(row).attrs if a.history.has_changes()}
+# Each table's protection, declared once on its model (protection()) and
+# read from Base.metadata by the guard below, by history.py and by
+# tests/test_write_owners.py (docs/decisions/0016). This is the one place
+# its rules are written down.
+# - owner: the one module that makes its rows, or None: made only by its
+#   migration, or by a function tests/test_write_owners.py allows. That test
+#   reads the source for rows made, or any deleted, elsewhere.
+# - lock: what a write to it holds, which the guard checks as the session
+#   flushes. "row": a row changed or deleted was locked in this
+#   transaction (locked, get_locked, settings_row, relock), or added in it.
+#   "catalogue": that, and the catalogue lock for any write, but one to
+#   columns marked row_lock_only alone. None: no lock, for what is only
+#   added to or changes on every request.
+# - history: whether history.py records its rows' changes.
+# And on a column, mapped_column(info=...): "secret" (left out of history),
+# "not_a_change" (a change to it alone is no history) and "row_lock_only".
+#
+# A test's own session, which writes rows to set up what it tests, is left
+# alone (UNGUARDED_INFO; tests/helpers/rows.py, setting_up).
+type Lock = Literal["catalogue", "row"]
+type Action = Literal["insert", "update", "delete"]
+
+
+def protection(
+    *, owner: str | None, lock: Lock | None, history: bool
+) -> dict[str, dict[str, object]]:
+    """A model's __table_args__ entry declaring its table's protection."""
+    return {"info": {"owner": owner, "lock": lock, "history": history}}
+
+
+@functools.cache
+def flagged(table: Table, flag: str) -> frozenset[str]:
+    """The names of the table's columns whose info sets `flag`: read once
+    per table, as every flush asks for each row it writes."""
+    return frozenset(c.name for c in table.columns if c.info.get(flag))
+
+
+class Write(NamedTuple):
+    """A row a flush is about to write: its table, its id if it has one
+    yet, what is done to it, and for an update the columns set to
+    something new, by name."""
+
+    row: Base
+    table: Table
+    row_id: int | None
+    action: Action
+    changed: frozenset[str]
+
+
+def changed_columns(row: DeclarativeBase) -> frozenset[str]:
+    """The columns of a row the session holds that were set to something
+    new, not yet flushed, by their names in the table. Loads nothing."""
+    state = inspect(row)
+    return frozenset(
+        column.name
+        for prop in state.mapper.column_attrs
+        if state.attrs[prop.key].history.has_changes()
+        for column in prop.columns
+        if isinstance(column, Column)
+    )
+
+
+def flushed_id(row: Base) -> int | None:
+    """Its id, without loading anything: its identity, or the id it was
+    given, or the flush set; None before then."""
+    state = inspect(row)
+    return state.identity[0] if state.identity else state.dict.get("id")
+
+
+def flush_writes(session: Session) -> list[Write]:
+    """What the next flush writes: rows added, rows changed to something
+    new, and rows deleted. Loads nothing."""
+    found: list[Write] = []
+    for rows, action in (
+        (session.new, "insert"),
+        (session.dirty, "update"),
+        (session.deleted, "delete"),
+    ):
+        for row in rows:
+            state = inspect(row)
+            changed = changed_columns(row) if action == "update" else frozenset()
+            if action == "update" and not changed:
+                continue
+            table = state.mapper.local_table
+            assert isinstance(table, Table)
+            found.append(Write(row, table, flushed_id(row), action, changed))
+    return found
+
+
+# Where the locks this transaction holds are noted: the catalogue lock as
+# CATALOGUE, a row by its identity key, each with the transaction or
+# savepoint it was taken in; and, for a row held, each savepoint or
+# transaction a change or delete of it was flushed in. A savepoint rolled
+# back lets go of the locks taken in it, as PostgreSQL does, and of a row's
+# lock taken before it but written in it, as PostgreSQL also does ("Avoid
+# locking a row and then modifying it within a later savepoint", its SELECT
+# page). The transaction's end lets go of all.
+LOCKS_INFO = "inventory.locks"
+WRITTEN_INFO = "inventory.written"
+CATALOGUE = "catalogue"
+# The execution option locked marks a locking read with: the class whose
+# rows it locks.
+LOCKING = "inventory_locking"
+UNGUARDED_INFO = "inventory.unguarded"
+
+
+def _innermost(session: Session) -> SessionTransaction | None:
+    return session.get_nested_transaction() or session.get_transaction()
+
+
+def _hold(session: Session, key: object) -> None:
+    session.info.setdefault(LOCKS_INFO, {}).setdefault(key, _innermost(session))
+
+
+def _locked_as_read(
+    state: InstanceState[Any], context: QueryContext | None, *_: object
+) -> None:
+    # No context: set by an UPDATE statement, not read.
+    if context is None:
+        return
+    locking = context.query.get_execution_options().get(LOCKING)
+    if locking and issubclass(state.class_, locking):
+        _hold(context.session, state.key)
+
+
+# A row read by locked(): as it is first loaded, or read again into the
+# object the session holds (populate_existing).
+event.listen(Base, "load", _locked_as_read, propagate=True, raw=True)
+event.listen(Base, "refresh", _locked_as_read, propagate=True, raw=True)
+
+
+@event.listens_for(Session, "pending_to_persistent")
+def _added(session: Session, row: Base) -> None:
+    """A row this transaction added is its own until it commits: no other
+    can see it. Only where a write to its table needs a lock."""
+    state = inspect(row)
+    table = state.mapper.local_table
+    assert isinstance(table, Table)
+    if table.info["lock"] is not None:
+        _hold(session, state.key)
 
 
 @event.listens_for(Session, "after_transaction_end")
-def _lock_released(session: Session, transaction: object) -> None:
-    if session.info.get(LOCK_INFO) is transaction:
-        del session.info[LOCK_INFO]
+def _locks_released(session: Session, transaction: SessionTransaction) -> None:
+    if transaction.parent is None:
+        session.info.pop(LOCKS_INFO, None)
+        session.info.pop(WRITTEN_INFO, None)
+
+
+def _within(taken: SessionTransaction | None, savepoint: SessionTransaction) -> bool:
+    while taken is not None and taken is not savepoint:
+        taken = taken.parent
+    return taken is savepoint
+
+
+@event.listens_for(Session, "after_soft_rollback")
+def _savepoint_locks_released(
+    session: Session, transaction: SessionTransaction
+) -> None:
+    """Forget the locks taken in a savepoint rolled back, or in one
+    released into it, and those of rows written in it. A flush that fails
+    rolls back its own transaction within the savepoint, which rolls back
+    the savepoint: so the savepoint is the nearest one around the
+    transaction rolled back."""
+    while not transaction.nested and transaction.parent is not None:
+        transaction = transaction.parent
+    if not transaction.nested:
+        return
+    held = session.info.get(LOCKS_INFO, {})
+    written = session.info.get(WRITTEN_INFO, {})
+    for key, taken in list(held.items()):
+        if _within(taken, transaction) or any(
+            _within(at, transaction) for at in written.get(key, ())
+        ):
+            del held[key]
+            written.pop(key, None)
+
+
+def missing_lock(
+    lock: Lock | None,
+    action: Action,
+    changed: Collection[str],
+    *,
+    catalogue: bool,
+    row: bool,
+) -> Lock | None:
+    """The lock a write needs and lacks, given the table's (protection),
+    what the write is, the columns it changes that need more than their
+    row's lock, and whether the catalogue lock and the row's are held."""
+    if lock == "catalogue" and not catalogue and (action != "update" or changed):
+        return "catalogue"
+    if lock is not None and action != "insert" and not row:
+        return "row"
+    return None
+
+
+GUARD_FIXES: dict[Lock, str] = {
+    "catalogue": "write it through its owner's functions, which take the"
+    " catalogue lock (db.lock_catalogue, db.locked_row, db.relock)",
+    "row": "lock it in this transaction before changing it (db.get_locked,"
+    " db.locked, db.settings_row, db.relock)",
+}
 
 
 @event.listens_for(Session, "before_flush")
-def _catalogue_written_under_lock(
-    session: Session, _context: object, _instances: object
-) -> None:
-    """A catalogue row is written only by a domain function, which holds
-    the catalogue lock: anything else is a bug, refused before it is
-    written."""
-    if session.info.get(LOCK_INFO) is not None:
-        return
-    rows = [*session.new, *session.deleted]
-    for row in session.dirty:
-        table = getattr(row, "__tablename__", None)
-        if changed_attributes(row) - UNLOCKED_COLUMNS.get(table or "", set()):
-            rows.append(row)
-    if written := sorted(
-        {table for row in rows if (table := getattr(row, "__tablename__", None))}
-        & CATALOGUE_TABLES
-    ):
-        log.error("catalogue written without its lock", tables=written)
-        raise RuntimeError(f"{written} written without the catalogue lock")
+def _written_under_lock(session: Session, _context: object, _instances: object) -> None:
+    """A write to a table whose protection names a lock holds it (above):
+    anything else is a bug, refused before it is written. Notes where each
+    held row is written, for _savepoint_locks_released."""
+    held = session.info.get(LOCKS_INFO, {})
+    unguarded = session.info.get(UNGUARDED_INFO)
+    for write in flush_writes(session):
+        key = inspect(write.row).key
+        if write.action != "insert" and key in held:
+            written = session.info.setdefault(WRITTEN_INFO, {})
+            written.setdefault(key, []).append(_innermost(session))
+        if unguarded:
+            continue
+        missing = missing_lock(
+            write.table.info["lock"],
+            write.action,
+            write.changed - flagged(write.table, "row_lock_only"),
+            catalogue=CATALOGUE in held,
+            row=key in held,
+        )
+        if missing is not None:
+            log.error(
+                "written without its lock",
+                table=write.table.name,
+                row_id=write.row_id,
+                action=write.action,
+                lock=missing,
+            )
+            raise RuntimeError(
+                f"{write.table.name} {write.action} without the {missing} lock:"
+                f" {GUARD_FIXES[missing]}"
+            )
 
 
 def require_current(

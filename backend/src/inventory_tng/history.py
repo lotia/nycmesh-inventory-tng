@@ -1,5 +1,5 @@
 """History: every row the app adds, changes or deletes through the ORM, in a
-table that has history, is written to catalogue_history in the same
+table that has history (db.protection), is written to catalogue_history in the same
 transaction, with who did it (db.set_actor) and the row before and after.
 
 What to record is decided by pure functions (change, json_value); the flush
@@ -19,46 +19,37 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from ipaddress import IPv4Address, IPv4Interface, IPv6Address, IPv6Interface
-from typing import Literal
 
 import structlog
-from sqlalchemy import Table, event, insert, inspect, select
+from sqlalchemy import Table, event, insert, select
 from sqlalchemy.orm import Session, UOWTransaction
 
-from inventory_tng.db import Base, changed_attributes, current_actor
+from inventory_tng.db import (
+    Action,
+    Base,
+    current_actor,
+    flagged,
+    flush_writes,
+    flushed_id,
+)
 
 log = structlog.get_logger(__name__)
 
 HISTORY_TABLE = "catalogue_history"
 # The ledger's tables, which the app only adds to (database_role.py).
 LEDGER = ("ledger_transaction", "movement")
-# Every table but these has history. The ledger and sent forms are only
-# added to, so each is its own history; administrators' sessions change on
-# every request.
-WITHOUT_HISTORY = frozenset({HISTORY_TABLE, *LEDGER, "admin_session", "sent_form"})
-# Columns left out of history, by table: what would let someone sign in, or
-# copy a second factor (docs/decisions/0012). Changing one is still history.
-SECRET_COLUMNS: Mapping[str, tuple[str, ...]] = {
-    "admin_password": ("password_hash",),
-    "authenticator": ("totp_key",),
-    "recovery_code": ("code_hash",),
-    "reset_link": ("token_hash", "recovery_token_hash"),
-}
-# Columns whose change alone is not history, by table: each moves with use,
-# a device's at most hourly, an authenticator's at every sign-in. They stay
-# in the rows recorded.
-NOT_A_CHANGE: Mapping[str, tuple[str, ...]] = {
-    "device": ("last_seen_at",),
-    "authenticator": ("last_step",),
-}
+# Which tables have history, and the columns it leaves out ("secret": what
+# would let someone sign in, or copy a second factor, docs/decisions/0012)
+# or does not count as a change alone ("not_a_change": each moves with use),
+# are declared on the models (db.protection). A secret changing is still
+# history; a column not a change stays in the rows recorded.
 
-Action = Literal["insert", "update", "delete"]
 type Row = Mapping[str, object]
 type Image = dict[str, object]
 
 
-def has_history(table: str) -> bool:
-    return table not in WITHOUT_HISTORY
+def has_history(table: Table) -> bool:
+    return bool(table.info["history"])
 
 
 def json_value(value: object) -> object:
@@ -84,11 +75,11 @@ def json_value(value: object) -> object:
             raise TypeError(f"history has no JSON for {type(value).__name__}")
 
 
-def image(table: str, row: Row | None) -> Image | None:
+def image(table: Table, row: Row | None) -> Image | None:
     """The row as history keeps it: as JSON, without its secret columns."""
     if row is None:
         return None
-    secret = SECRET_COLUMNS.get(table, ())
+    secret = flagged(table, "secret")
     return {name: json_value(v) for name, v in row.items() if name not in secret}
 
 
@@ -99,13 +90,13 @@ class Change:
     new_row: Image | None
 
 
-def change(table: str, old: Row | None, new: Row | None) -> Change | None:
+def change(table: Table, old: Row | None, new: Row | None) -> Change | None:
     """What history records of one row, given it before (None: added) and
     after (None: deleted), not both None. None for an update that changes
-    nothing, or only columns in NOT_A_CHANGE. A secret column changing is a
+    nothing, or only columns not a change. A secret column changing is a
     change, recorded without it."""
     if old is not None and new is not None:
-        skipped = NOT_A_CHANGE.get(table, ())
+        skipped = flagged(table, "not_a_change")
         if {k: v for k, v in old.items() if k not in skipped} == {
             k: v for k, v in new.items() if k not in skipped
         }:
@@ -117,9 +108,11 @@ def change(table: str, old: Row | None, new: Row | None) -> Change | None:
 # The flush (imperative shell). Each row it touches is read from the
 # database before the flush and after it, rather than taken from the
 # objects, which may not hold every column (one expired, or set by the
-# database such as created_at and item.search_text). What is read before is
-# not locked: where two requests may change a row at once, the app locks it
-# first (db.locked).
+# database such as created_at and item.search_text), and may hold a value
+# other than the one stored (5.0004 in a numeric(12,3)). What is read before
+# is not locked: where two requests may change a row at once, the app locks
+# it first, and the flush refuses a change to a row of a table that names a
+# lock unless it is (db.protection).
 
 _PENDING = "inventory.history"
 
@@ -133,25 +126,6 @@ class _Pending:
     keys: dict[Key, None]
     added: list[tuple[Table, Base]]
     before: dict[Key, Row]
-
-
-def _table(row: Base) -> Table | None:
-    table = inspect(row).mapper.local_table
-    assert isinstance(table, Table)
-    return table if has_history(table.name) else None
-
-
-def _id(row: Base) -> int | None:
-    """Its id, without loading anything: its identity, or the id it was
-    given, or the flush set; None before then."""
-    state = inspect(row)
-    return state.identity[0] if state.identity else state.dict.get("id")
-
-
-def _changes_history(row: Base, table: Table) -> bool:
-    """Whether the row has a change besides those in NOT_A_CHANGE, so a
-    sign-in moving an authenticator's last step reads nothing."""
-    return bool(changed_attributes(row) - set(NOT_A_CHANGE.get(table.name, ())))
 
 
 def _read(session: Session, keys: Iterable[Key]) -> dict[Key, Row]:
@@ -173,19 +147,20 @@ def _before_flush(
 ) -> None:
     keys: dict[Key, None] = {}
     added: list[tuple[Table, Base]] = []
-    touched = [
-        *((row, False) for row in session.new),
-        *((row, True) for row in session.dirty),
-        *((row, False) for row in session.deleted),
-    ]
-    for row, updated in touched:
-        table = _table(row)
-        if table is None or (updated and not _changes_history(row, table)):
+    for write in flush_writes(session):
+        table = write.table
+        # Not history: a table without it, or a change only to columns not
+        # a change, so a sign-in moving an authenticator's last step reads
+        # nothing.
+        if not has_history(table) or (
+            write.action == "update"
+            and not write.changed - flagged(table, "not_a_change")
+        ):
             continue
-        if (row_id := _id(row)) is None:
-            added.append((table, row))
+        if write.row_id is None:
+            added.append((table, write.row))
         else:
-            keys[table, row_id] = None
+            keys[table, write.row_id] = None
     if keys or added:
         context.attributes[_PENDING] = _Pending(keys, added, _read(session, keys))
 
@@ -197,7 +172,7 @@ def _after_flush(session: Session, context: UOWTransaction) -> None:
         return
     keys = dict(pending.keys)
     for table, row in pending.added:
-        row_id = _id(row)
+        row_id = flushed_id(row)
         assert row_id is not None  # The flush has given it one.
         keys[table, row_id] = None
     before, after = pending.before, _read(session, keys)
@@ -208,7 +183,7 @@ def _after_flush(session: Session, context: UOWTransaction) -> None:
         # Neither: a row deleted that was already gone.
         if old is None and new is None:
             continue
-        if (made := change(table.name, old, new)) is not None:
+        if (made := change(table, old, new)) is not None:
             rows.append(
                 {
                     "table_name": table.name,

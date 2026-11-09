@@ -5,6 +5,11 @@ and administrators' sign-in (docs/decisions/0012).
 Every mapped class registers here; migrations/env.py imports this module, so
 autogenerate sees every table.
 
+Each table declares its protection once, in its __table_args__
+(db.protection: who makes its rows, the lock a write holds, whether it has
+history), and its columns what history leaves out (mapped_column info:
+"secret", "not_a_change"); db.py says what each means.
+
 Conventions, on every table but the ledger's, which is append-only and is its
 own history (LedgerTransaction), forms already sent, which are only added to
 (SentForm), and administrators' sessions, which change on every request and
@@ -19,10 +24,12 @@ are only ever ended (AdminSession):
   `catalogue_history`, with the actor the session names (db.set_actor),
   leaving out secret columns such as a password's hash (history.py).
 
-The rules a single row can show are check constraints, which raise check
-violations (SQLSTATE 23514) named for the rule, as describe_error() logs.
-Rules that need other rows are the app's, checked by each table's one
-writer: CONTRIBUTING.md, The catalogue's rules (docs/decisions/0016).
+A rule about one row's own values is a check constraint, which raises a
+check violation (SQLSTATE 23514) named for the rule, as describe_error()
+logs; one PostgreSQL cannot check, such as a known time zone, is the
+model's own (@validates, as SiteSettings'). Rules that need other rows are
+the app's, checked by each table's one writer: CONTRIBUTING.md, The
+catalogue's rules (docs/decisions/0016).
 """
 
 import secrets
@@ -53,7 +60,7 @@ from sqlalchemy.orm import Mapped, MappedColumn, mapped_column, validates
 # Imported for its flush listeners: whatever can write these tables records
 # their history.
 from inventory_tng import history  # noqa: F401
-from inventory_tng.db import ACTOR_PATTERN, Base, enforce
+from inventory_tng.db import ACTOR_PATTERN, Base, enforce, protection
 from inventory_tng.time_zones import is_time_zone
 
 QUANTITY = Numeric(12, 3)
@@ -155,7 +162,10 @@ def _unique_current_name(table: str, *scope: str) -> Index:
 
 class Category(Base):
     __tablename__ = "category"
-    __table_args__ = (_unique_current_name("category"),)
+    __table_args__ = (
+        _unique_current_name("category"),
+        protection(owner="categories.py", lock="catalogue", history=True),
+    )
 
     id: Mapped[IntId]
     created_at: Mapped[CreatedAt]
@@ -194,6 +204,7 @@ class Item(Base):
         CheckConstraint(_one_of("unit", UNITS), name="unit"),
         CheckConstraint("minimum >= 0", name="minimum"),
         CheckConstraint("on_order >= 0", name="on_order"),
+        protection(owner="items.py", lock="catalogue", history=True),
     )
 
     id: Mapped[IntId]
@@ -210,7 +221,10 @@ class Item(Base):
     # never reorder.
     minimum: Mapped[Decimal | None] = mapped_column(QUANTITY)
     # Set by whoever orders; checking in a delivery lowers it.
-    on_order: Mapped[Decimal | None] = mapped_column(QUANTITY)
+    # A receipt lowers it holding the item's row alone (ledger._receive).
+    on_order: Mapped[Decimal | None] = mapped_column(
+        QUANTITY, info={"row_lock_only": True}
+    )
     notes: Mapped[str | None] = mapped_column(Text)
     ordering_notes: Mapped[str | None] = mapped_column(Text)
     retired_at: Mapped[RetiredAt]
@@ -240,6 +254,7 @@ class ItemPackage(Base):
     __table_args__ = (
         _unique_current_name("item_package", "item_id"),
         CheckConstraint("size > 0", name="size"),
+        protection(owner="items.py", lock="catalogue", history=True),
     )
 
     id: Mapped[IntId]
@@ -253,7 +268,10 @@ class ItemPackage(Base):
 
 class Vendor(Base):
     __tablename__ = "vendor"
-    __table_args__ = (_unique_current_name("vendor"),)
+    __table_args__ = (
+        _unique_current_name("vendor"),
+        protection(owner=None, lock="row", history=True),
+    )
 
     id: Mapped[IntId]
     created_at: Mapped[CreatedAt]
@@ -266,7 +284,10 @@ class VendorOffer(Base):
     """Where to buy an item."""
 
     __tablename__ = "vendor_offer"
-    __table_args__ = (CheckConstraint("units_per_order > 0", name="units_per_order"),)
+    __table_args__ = (
+        CheckConstraint("units_per_order > 0", name="units_per_order"),
+        protection(owner=None, lock="row", history=True),
+    )
 
     id: Mapped[IntId]
     created_at: Mapped[CreatedAt]
@@ -283,7 +304,10 @@ class VendorPrice(Base):
     latest row."""
 
     __tablename__ = "vendor_price"
-    __table_args__ = (CheckConstraint("price >= 0", name="price"),)
+    __table_args__ = (
+        CheckConstraint("price >= 0", name="price"),
+        protection(owner=None, lock="row", history=True),
+    )
 
     id: Mapped[IntId]
     created_at: Mapped[CreatedAt]
@@ -311,6 +335,7 @@ class Volunteer(Base):
         CheckConstraint(
             "merged_into_id IS NULL OR retired_at IS NOT NULL", name="merged_is_retired"
         ),
+        protection(owner="volunteers.py", lock="catalogue", history=True),
     )
 
     id: Mapped[IntId]
@@ -346,6 +371,7 @@ class Location(Base):
             "(kind = 'custody') = (volunteer_id IS NOT NULL)",
             name="custody_has_volunteer",
         ),
+        protection(owner="locations.py", lock="catalogue", history=True),
     )
 
     id: Mapped[IntId]
@@ -383,6 +409,7 @@ class Label(Base):
         CheckConstraint(
             "package_id IS NULL OR item_id IS NOT NULL", name="package_needs_item"
         ),
+        protection(owner="labels.py", lock="catalogue", history=True),
     )
 
     id: Mapped[IntId]
@@ -403,6 +430,7 @@ class CatalogueHistory(Base):
         CheckConstraint("action IN ('insert', 'update', 'delete')", name="action"),
         # Ids, never names, whoever sets it (db.set_actor checks it first).
         CheckConstraint(f"actor ~ '^({ACTOR_PATTERN})$'", name="actor"),
+        protection(owner="history.py", lock=None, history=False),
     )
 
     # bigint: one row per change to any table above.
@@ -429,6 +457,7 @@ class RegistrationCode(Base):
     __table_args__ = (
         CheckConstraint("max_uses > 0", name="max_uses"),
         CheckConstraint("uses BETWEEN 0 AND max_uses", name="uses"),
+        protection(owner="devices.py", lock="row", history=True),
     )
 
     id: Mapped[IntId]
@@ -450,6 +479,7 @@ class Device(Base):
     beside the volunteer picked. Only the cookie's hash is kept."""
 
     __tablename__ = "device"
+    __table_args__ = (protection(owner="devices.py", lock="row", history=True),)
 
     id: Mapped[IntId]
     created_at: Mapped[CreatedAt]
@@ -457,8 +487,9 @@ class Device(Base):
     registration_code_id: Mapped[int] = _reference("registration_code.id")
     # The client address uvicorn resolved (FORWARDED_ALLOW_IPS), if it was one.
     first_seen_from: Mapped[IPv4Address | IPv6Address | None] = mapped_column(INET)
+    # Moves with use, at most hourly.
     last_seen_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True), server_default=func.now(), info={"not_a_change": True}
     )
     # A name an administrator gives it, such as "Store tablet".
     label: Mapped[str | None] = mapped_column(Text)
@@ -503,6 +534,7 @@ class LedgerTransaction(Base):
             "install_number IS NULL OR kind = 'install'",
             name="install_number_on_install",
         ),
+        protection(owner=None, lock=None, history=False),
     )
 
     id: Mapped[IntId]
@@ -529,7 +561,10 @@ class Movement(Base):
     unit."""
 
     __tablename__ = "movement"
-    __table_args__ = (CheckConstraint("quantity > 0", name="quantity"),)
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="quantity"),
+        protection(owner=None, lock=None, history=False),
+    )
 
     id: Mapped[IntId]
     transaction_id: Mapped[int] = _reference("ledger_transaction.id")
@@ -546,6 +581,7 @@ class ScanSettings(Base):
     __table_args__ = (
         CheckConstraint("id = 1", name="one_row"),
         _between("name_check_minutes", NAME_CHECK_MINUTES),
+        protection(owner=None, lock="row", history=True),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, server_default=text("1"))
@@ -575,6 +611,7 @@ class Admin(Base):
             "email ~ '^[^@[:space:]]+@[^@[:space:]]+$' AND length(email) <= 254",
             name="email",
         ),
+        protection(owner="accounts.py", lock="row", history=True),
     )
 
     id: Mapped[IntId]
@@ -590,12 +627,13 @@ class AdminPassword(Base):
     id. No row means they were invited and have not chosen one yet."""
 
     __tablename__ = "admin_password"
+    __table_args__ = (protection(owner="accounts.py", lock="row", history=True),)
 
     id: Mapped[int] = mapped_column(
         ForeignKey("admin.id", ondelete="RESTRICT"), primary_key=True
     )
     created_at: Mapped[CreatedAt]
-    password_hash: Mapped[str] = mapped_column(Text)
+    password_hash: Mapped[str] = mapped_column(Text, info={"secret": True})
     changed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -612,6 +650,7 @@ class Authenticator(Base):
             "(totp_key IS NULL) = (retired_at IS NOT NULL)", name="key_until_retired"
         ),
         CheckConstraint("length(name) BETWEEN 1 AND 64", name="name"),
+        protection(owner="accounts.py", lock="row", history=True),
     )
 
     id: Mapped[IntId]
@@ -620,10 +659,12 @@ class Authenticator(Base):
     # What the administrator calls it, such as "Pixel".
     name: Mapped[str] = mapped_column(Text)
     # pyotp's base32 key.
-    totp_key: Mapped[str | None] = mapped_column(Text)
+    totp_key: Mapped[str | None] = mapped_column(Text, info={"secret": True})
     # The last time step a code was accepted for: that one and earlier ones
     # are refused, so a code cannot be used twice.
-    last_step: Mapped[int | None] = mapped_column(BigInteger)
+    last_step: Mapped[int | None] = mapped_column(
+        BigInteger, info={"not_a_change": True}
+    )
     retired_at: Mapped[RetiredAt]
 
 
@@ -632,11 +673,14 @@ class RecoveryCode(Base):
     is lost. Only its hash is kept."""
 
     __tablename__ = "recovery_code"
+    __table_args__ = (protection(owner="accounts.py", lock="row", history=True),)
 
     id: Mapped[IntId]
     created_at: Mapped[CreatedAt]
     admin_id: Mapped[int] = _reference("admin.id")
-    code_hash: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
+    code_hash: Mapped[bytes] = mapped_column(
+        LargeBinary, unique=True, info={"secret": True}
+    )
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Set on the codes still unused when new ones are made.
     voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -647,6 +691,7 @@ class AdminSession(Base):
     device's is (docs/decisions/0009)."""
 
     __tablename__ = "admin_session"
+    __table_args__ = (protection(owner="accounts.py", lock=None, history=False),)
 
     id: Mapped[IntId]
     created_at: Mapped[CreatedAt]
@@ -682,6 +727,7 @@ class ResetLink(Base):
             name="recovery",
         ),
         CheckConstraint("made_by_id <> admin_id", name="not_made_for_oneself"),
+        protection(owner="accounts.py", lock="row", history=True),
     )
 
     id: Mapped[IntId]
@@ -689,8 +735,12 @@ class ResetLink(Base):
     admin_id: Mapped[int] = _reference("admin.id")
     made_by_id: Mapped[int | None] = _reference("admin.id")
     # Made with the operator's recovery token: its hash, so it works once.
-    recovery_token_hash: Mapped[bytes | None] = mapped_column(LargeBinary, unique=True)
-    token_hash: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
+    recovery_token_hash: Mapped[bytes | None] = mapped_column(
+        LargeBinary, unique=True, info={"secret": True}
+    )
+    token_hash: Mapped[bytes] = mapped_column(
+        LargeBinary, unique=True, info={"secret": True}
+    )
     kind: Mapped[ResetKind] = mapped_column(Text)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -718,6 +768,7 @@ class SignInSettings(Base):
         _between("session_days", SESSION_DAYS),
         _between("confirm_hours", CONFIRM_HOURS),
         _between("confirm_idle_minutes", CONFIRM_IDLE_MINUTES),
+        protection(owner=None, lock="row", history=True),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, server_default=text("1"))
@@ -742,7 +793,10 @@ class SiteSettings(Base):
     everything else."""
 
     __tablename__ = "site_settings"
-    __table_args__ = (CheckConstraint("id = 1", name="one_row"),)
+    __table_args__ = (
+        CheckConstraint("id = 1", name="one_row"),
+        protection(owner=None, lock="row", history=True),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, server_default=text("1"))
     created_at: Mapped[CreatedAt]
@@ -764,7 +818,10 @@ class AdjustmentReason(Base):
     migration."""
 
     __tablename__ = "adjustment_reason"
-    __table_args__ = (_unique_current_name("adjustment_reason"),)
+    __table_args__ = (
+        _unique_current_name("adjustment_reason"),
+        protection(owner="admin/settings.py", lock="row", history=True),
+    )
 
     id: Mapped[IntId]
     created_at: Mapped[CreatedAt]
@@ -778,6 +835,7 @@ class SentForm(Base):
     so it is its own history, as the ledger is."""
 
     __tablename__ = "sent_form"
+    __table_args__ = (protection(owner="once.py", lock=None, history=False),)
 
     id: Mapped[IntId]
     created_at: Mapped[CreatedAt]

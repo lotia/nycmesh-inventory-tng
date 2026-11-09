@@ -9,7 +9,13 @@ import pytest
 from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import LOCK_INFO, Base, RuleBroken, describe_error
+from inventory_tng.db import (
+    UNGUARDED_INFO,
+    Base,
+    RuleBroken,
+    describe_error,
+    flagged,
+)
 from inventory_tng.models import CatalogueHistory
 
 
@@ -77,7 +83,17 @@ def tag() -> str:
 
 def setting_up(session: Session) -> Session:
     """A test's own session, which writes rows directly to set up what it
-    tests: the app refuses a catalogue row written without the catalogue
-    lock (db.LOCK_INFO), but not on this session."""
-    session.info[LOCK_INFO] = "a test's own rows"
+    tests: the app refuses a write without the lock its table names
+    (db.protection), but not on this session (db.UNGUARDED_INFO)."""
+    session.info[UNGUARDED_INFO] = "a test's own rows"
     return session
+
+
+def flagged_columns(flag: str) -> dict[str, set[str]]:
+    """The columns whose info sets `flag`, by table, as the models declare
+    them: those with any."""
+    return {
+        table.name: set(names)
+        for table in Base.metadata.tables.values()
+        if (names := flagged(table, flag))
+    }
