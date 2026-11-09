@@ -16,15 +16,17 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.command import run_command
 from inventory_tng.db import CLI_ACTOR, set_actor
-from inventory_tng.models import INTEGER_MAX, ScanSettings
+from inventory_tng.models import NAME_CHECK_MINUTES, ScanSettings
 
 log = structlog.get_logger(__name__)
 
 
 def whole(text: str) -> int:
-    if not text.isdigit() or int(text) > INTEGER_MAX:
+    """A number of minutes in the range ScanSettings holds."""
+    low, high = NAME_CHECK_MINUTES
+    if not (text.isascii() and text.isdigit() and low <= int(text) <= high):
         raise argparse.ArgumentTypeError(
-            f"must be a whole number from 0 to {INTEGER_MAX}, not {text}"
+            f"must be a whole number from {low} to {high}, not {text}"
         )
     return int(text)
 

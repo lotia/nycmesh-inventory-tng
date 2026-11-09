@@ -1,7 +1,7 @@
 """scan settings: how the scan page behaves, set by administrators
 
-One row, made here with the defaults, which may be changed but never
-deleted: every scan page reads it.
+One row, made here with the defaults. The app's login may change its row
+but not delete it.
 
 Revision ID: 0005
 Revises: 0004
@@ -18,18 +18,8 @@ down_revision: str | Sequence[str] | None = "0004"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-KEPT = r"""
-CREATE FUNCTION scan_settings_kept() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-    RAISE EXCEPTION 'the scan settings are changed, never deleted'
-        USING ERRCODE = 'check_violation', CONSTRAINT = 'scan_settings_kept';
-END
-$$;
-CREATE TRIGGER scan_settings_kept BEFORE DELETE ON scan_settings
-    FOR EACH ROW EXECUTE FUNCTION scan_settings_kept();
-CREATE TRIGGER scan_settings_kept_truncate BEFORE TRUNCATE ON scan_settings
-    FOR EACH STATEMENT EXECUTE FUNCTION scan_settings_kept();
-"""
+# 0001's: migrations do not import one another.
+APP_ROLE = "inventory_app"
 
 
 def upgrade() -> None:
@@ -50,16 +40,15 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint("id = 1", name=op.f("ck_scan_settings_one_row")),
         sa.CheckConstraint(
-            "name_check_minutes >= 0",
+            "name_check_minutes BETWEEN 0 AND 1440",
             name=op.f("ck_scan_settings_name_check_minutes"),
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_scan_settings")),
     )
-    op.execute(KEPT)
     op.execute("INSERT INTO scan_settings DEFAULT VALUES")
+    op.execute(f"REVOKE DELETE ON scan_settings FROM {APP_ROLE}")
 
 
 def downgrade() -> None:
-    # Its triggers go with it; its history stays.
+    # Its history stays.
     op.drop_table("scan_settings")
-    op.execute("DROP FUNCTION scan_settings_kept()")

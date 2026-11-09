@@ -329,16 +329,34 @@ def test_current_items_sit_in_current_categories(session: Session) -> None:
     )
 
 
-def test_the_catalogue_rules_are_in_python_not_the_database(session: Session) -> None:
-    """No trigger on a catalogue table, so no function behind one."""
-    triggers = session.scalars(
-        text(
-            "SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgrelid IN"
-            " ('category'::regclass, 'item'::regclass, 'item_package'::regclass,"
-            " 'label'::regclass, 'location'::regclass, 'volunteer'::regclass)"
-        )
-    ).all()
-    assert triggers == []
+# What the migrations made that runs inside PostgreSQL, by kind: triggers
+# (PostgreSQL's own, for foreign keys, aside), functions (an extension's,
+# such as pg_trgm's, aside), views, rules (pg_rules leaves out a view's own
+# _RETURN rule), and row-level security, its policies or a table with it on.
+PUBLIC = "relnamespace = 'public'::regnamespace"
+LOGIC = {
+    "trigger": "SELECT tgrelid::regclass || ' ' || tgname FROM pg_trigger"
+    f" WHERE NOT tgisinternal AND tgrelid IN (SELECT oid FROM pg_class WHERE {PUBLIC})",
+    "function": "SELECT proname FROM pg_proc p"
+    " WHERE pronamespace = 'public'::regnamespace AND NOT EXISTS"
+    " (SELECT FROM pg_depend WHERE classid = 'pg_proc'::regclass"
+    " AND objid = p.oid AND deptype = 'e')",
+    "view": f"SELECT relname FROM pg_class WHERE {PUBLIC} AND relkind IN ('v', 'm')",
+    "rule": "SELECT tablename || ' ' || rulename FROM pg_rules"
+    " WHERE schemaname = 'public'",
+    "policy": "SELECT polrelid::regclass || ' ' || polname FROM pg_policy"
+    f" WHERE polrelid IN (SELECT oid FROM pg_class WHERE {PUBLIC})",
+    "row security": f"SELECT relname FROM pg_class WHERE {PUBLIC}"
+    " AND (relrowsecurity OR relforcerowsecurity)",
+}
+
+
+def test_no_logic_is_in_the_database(session: Session) -> None:
+    """Every rule is the app's (domain modules, ledger.insert_transaction,
+    SiteSettings), history is history.py's, stock is a select, and what may
+    never change or go is kept by the app login's privileges."""
+    found = {kind: session.scalars(text(sql)).all() for kind, sql in LOGIC.items()}
+    assert found == {kind: [] for kind in LOGIC}
 
 
 def test_a_rule_a_change_does_not_expect_is_raised(session: Session) -> None:
@@ -429,19 +447,3 @@ def test_history_refuses_a_name_as_actor(session: Session) -> None:
     session.info[ACTOR_INFO] = "Jane Doe"
     with violates(session, "ck_catalogue_history_actor"):
         session.add(Category(name="Tools"))
-
-
-@pytest.mark.parametrize(
-    ("table", "rule"),
-    [
-        ("site_settings", "site_settings_kept"),
-        ("scan_settings", "scan_settings_kept"),
-        ("sign_in_settings", "sign_in_settings_kept"),
-    ],
-)
-def test_tables_kept_whole_cannot_be_truncated(
-    owner_session: Session, table: str, rule: str
-) -> None:
-    """Even by the owner, who alone may TRUNCATE (test_database_role.py)."""
-    with violates(owner_session, rule):
-        owner_session.execute(text(f"TRUNCATE {table}"))

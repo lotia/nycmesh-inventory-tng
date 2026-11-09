@@ -35,8 +35,8 @@ NOTICES.update(
     }
 )
 
-# The catalogue's rules, by the name db.attempt gives one that a change
-# broke (db.RuleBroken's), in words. A page passes its own words for
+# The rules domain functions check, by the name db.attempt gives one that a
+# change broke (db.RuleBroken's), in words. A page passes its own words for
 # "unique", which depend on what it is naming.
 RULES = {
     "location_area_parent": "An area goes inside a store or another area.",
@@ -50,6 +50,7 @@ RULES = {
     "item_category_current": "Its category is retired: bring that back, or "
     "pick another, first.",
     "category_has_items": "Move or retire its items first.",
+    "site_settings_time_zone": "Pick a zone from the list.",
 }
 
 

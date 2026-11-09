@@ -1,7 +1,8 @@
 """Each catalogue table is written by one module, its owner, whose domain
 functions take the catalogue lock and check the rules (db.locked_row); the
 ledger, by ledger.insert_transaction alone, which checks its rules and
-writes a transaction's movements with it.
+writes a transaction's movements with it. Each settings table has one row,
+made by its migration, which nothing makes again or deletes.
 
 Two checks hold that: the app refuses a flush that writes a catalogue row
 without the catalogue lock (db.LOCK_INFO), tested here on PostgreSQL; and
@@ -42,6 +43,9 @@ OWNERS: dict[str, str | None] = {
     "vendor_price": None,
     "ledger_transaction": None,
     "movement": None,
+    "scan_settings": None,
+    "sign_in_settings": None,
+    "site_settings": None,
 }
 # The functions that may write any table: one deletes an administrator's
 # password, as it is reset; the other is the ledger's one writer.
@@ -97,6 +101,12 @@ def test_each_owner_is_a_module() -> None:
             True,
         ),
         ("admin/counts.py", "text('INSERT INTO movement VALUES (1)')", True),
+        ("admin/settings.py", "SiteSettings(id=2)", True),
+        (
+            "admin/settings.py",
+            "from sqlalchemy import delete\ndelete(ScanSettings)",
+            True,
+        ),
         # Not the catalogue's, and not a write.
         ("admin/items.py", "AdjustmentReason(name='x')", False),
         ("admin/items.py", "select(Item).where(Item.name == 'x')", False),

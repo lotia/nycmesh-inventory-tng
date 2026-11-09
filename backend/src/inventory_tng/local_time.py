@@ -20,19 +20,10 @@ log = structlog.get_logger(__name__)
 DEFAULT_ZONE = "America/New_York"
 
 
-def is_time_zone(name: str) -> bool:
-    """An IANA zone such as America/New_York that these rules know, as
-    site_zone reads it: what a form setting the zone checks first."""
-    try:
-        ZoneInfo(name)
-    except zoneinfo.ZoneInfoNotFoundError, ValueError:
-        return False
-    return True
-
-
 def site_zone(session: Session) -> ZoneInfo:
-    """The site's zone. One PostgreSQL knows but these rules do not (their
-    lists can differ) falls back to the default, so no page breaks over it."""
+    """The site's zone. One these rules no longer know, such as one a newer
+    tzdata dropped or one set by hand, falls back to the default, so no page
+    breaks over it."""
     name = session.get_one(SiteSettings, 1).time_zone
     try:
         return ZoneInfo(name)

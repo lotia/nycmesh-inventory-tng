@@ -223,9 +223,9 @@ def record_last_seen(
 
 
 class RuleBroken(Exception):
-    """A change the catalogue's or the ledger's rules refuse, by the rule's
-    name (as admin.common.RULES puts the catalogue's into words). Raised
-    before anything is written."""
+    """A change the app's rules refuse (the catalogue's, the ledger's, the
+    site settings'), by the rule's name, as admin.common.RULES puts into
+    words. Raised before anything is written."""
 
     def __init__(self, rule: str) -> None:
         super().__init__(rule)

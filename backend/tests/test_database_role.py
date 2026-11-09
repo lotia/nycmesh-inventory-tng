@@ -1,5 +1,6 @@
-"""The app runs only as a login that cannot change the ledger or history and
-owns no table (database_role.py; DEPLOYMENT.md, Database roles)."""
+"""The app runs only as a login that cannot change the ledger or history,
+cannot empty a settings table, and owns no table (database_role.py;
+DEPLOYMENT.md, Database roles)."""
 
 import uuid
 from collections.abc import Iterator
@@ -14,9 +15,11 @@ from inventory_tng.app import create_app
 from inventory_tng.database_role import (
     APPEND_ONLY,
     FORBIDDEN,
+    KEPT,
     NEEDED,
     RefusedLogin,
     check,
+    named,
     refusals,
 )
 from inventory_tng.db import Base, make_engine
@@ -26,18 +29,13 @@ from databases import OWNER, as_role, superuser_url
 from helpers.rows import refused
 
 
-def on_append_only(privileges: tuple[str, ...]) -> list[str]:
-    """As refusals() names them: "UPDATE movement"."""
-    return [f"{privilege} {table}" for table in APPEND_ONLY for privilege in privileges]
-
-
 def test_the_apps_login_is_allowed(session: Session) -> None:
     assert refusals(session.connection()) == {}
 
 
 def test_the_owners_login_is_refused(owner_session: Session) -> None:
     found = refusals(owner_session.connection())
-    assert found["may"] == on_append_only(FORBIDDEN)
+    assert found["may"] == named(FORBIDDEN)
     assert {*APPEND_ONLY, "item"} <= set(found["owns"])
     assert "lacks" not in found
 
@@ -55,7 +53,7 @@ def superuser(database_url: str) -> Iterator[Connection]:
 
 
 def test_a_superuser_is_refused(superuser: Connection) -> None:
-    assert refusals(superuser)["may"] == on_append_only(FORBIDDEN)
+    assert refusals(superuser)["may"] == named(FORBIDDEN)
 
 
 def test_a_login_that_cannot_record_is_refused(superuser: Connection) -> None:
@@ -64,7 +62,7 @@ def test_a_login_that_cannot_record_is_refused(superuser: Connection) -> None:
     stranger = f"stranger_{uuid.uuid4().hex[:8]}"
     superuser.execute(text(f"CREATE ROLE {stranger}"))
     superuser.execute(text(f"SET LOCAL ROLE {stranger}"))
-    assert refusals(superuser) == {"lacks": on_append_only(NEEDED)}
+    assert refusals(superuser) == {"lacks": named(NEEDED)}
 
 
 def test_the_app_starts_as_its_own_login(engine: Engine) -> None:
@@ -79,7 +77,7 @@ def test_the_app_refuses_to_start_as_the_owner(database_url: str) -> None:
         pass
     (error,) = [entry for entry in logs if entry["log_level"] == "error"]
     assert error["event"] == "database login refused"
-    assert error["may"] == on_append_only(FORBIDDEN)
+    assert error["may"] == named(FORBIDDEN)
     assert "item" in error["owns"]
 
 
@@ -107,7 +105,14 @@ def test_the_app_may_truncate_no_table(
 ) -> None:
     """Migration 0001 never grants it; the owner, who may, finds the tables."""
     assert session.scalars(TRUNCATABLE).all() == []
-    assert {*APPEND_ONLY, "item"} <= set(owner_session.scalars(TRUNCATABLE))
+    assert {*APPEND_ONLY, *KEPT, "item"} <= set(owner_session.scalars(TRUNCATABLE))
+
+
+@pytest.mark.parametrize("table", KEPT)
+def test_the_app_may_not_delete_a_settings_row(session: Session, table: str) -> None:
+    """Their one row is changed, never deleted (migrations 0005 to 0007)."""
+    with refused(session):
+        session.execute(text(f"DELETE FROM {table}"))
 
 
 # Columns the app may not change once a row is made (migration 0002), so the

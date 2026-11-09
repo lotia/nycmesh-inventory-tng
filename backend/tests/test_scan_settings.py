@@ -53,21 +53,18 @@ def test_a_change_is_history_with_who_made_it(session: Session) -> None:
     [
         ["set"],
         ["set", "--name-check-minutes", "-1"],
-        ["set", "--name-check-minutes", "99999999999"],
+        ["set", "--name-check-minutes", "1441"],
+        ["set", "--name-check-minutes", "²"],
     ],
 )
-def test_the_command_refuses_nothing_to_set_or_a_negative(argv: list[str]) -> None:
+def test_the_command_refuses_nothing_to_set_or_out_of_range(argv: list[str]) -> None:
     with pytest.raises(SystemExit):
         scan_settings.parse(argv)
 
 
-def test_the_database_keeps_one_row_and_no_negatives(session: Session) -> None:
+@pytest.mark.parametrize("minutes", [-5, 24 * 60 + 1])
+def test_the_database_keeps_one_row_in_range(session: Session, minutes: int) -> None:
     with violates(session, "ck_scan_settings_one_row"):
         session.add(ScanSettings(id=2))
     with violates(session, "ck_scan_settings_name_check_minutes"):
-        session.get_one(ScanSettings, 1).name_check_minutes = -5
-
-
-def test_the_row_is_never_deleted(session: Session) -> None:
-    with violates(session, "scan_settings_kept"):
-        session.delete(session.get_one(ScanSettings, 1))
+        session.get_one(ScanSettings, 1).name_check_minutes = minutes

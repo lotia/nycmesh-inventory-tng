@@ -2,6 +2,7 @@
 
 Administrators, their passwords, authenticators, recovery codes, sessions and
 reset links, and the one-row sign_in_settings, made here with its defaults.
+The app's login may change its row but not delete it.
 
 Revision ID: 0006
 Revises: 0005
@@ -18,20 +19,8 @@ down_revision: str | Sequence[str] | None = "0005"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-# For every one-row settings table from here on: refuses deleting the row,
-# naming the table in its error and constraint.
-KEPT = r"""
-CREATE FUNCTION settings_row_kept() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-    RAISE EXCEPTION 'the % row is changed, never deleted', TG_TABLE_NAME
-        USING ERRCODE = 'check_violation', CONSTRAINT = TG_TABLE_NAME || '_kept';
-END
-$$;
-CREATE TRIGGER sign_in_settings_kept BEFORE DELETE ON sign_in_settings
-    FOR EACH ROW EXECUTE FUNCTION settings_row_kept();
-CREATE TRIGGER sign_in_settings_kept_truncate BEFORE TRUNCATE ON sign_in_settings
-    FOR EACH STATEMENT EXECUTE FUNCTION settings_row_kept();
-"""
+# 0001's: migrations do not import one another.
+APP_ROLE = "inventory_app"
 
 
 def upgrade() -> None:
@@ -96,10 +85,11 @@ def upgrade() -> None:
             name=op.f("ck_sign_in_settings_totp_policy"),
         ),
         sa.CheckConstraint(
-            "confirm_hours > 0", name=op.f("ck_sign_in_settings_confirm_hours")
+            "confirm_hours BETWEEN 1 AND 168",
+            name=op.f("ck_sign_in_settings_confirm_hours"),
         ),
         sa.CheckConstraint(
-            "confirm_idle_minutes > 0",
+            "confirm_idle_minutes BETWEEN 1 AND 10080",
             name=op.f("ck_sign_in_settings_confirm_idle_minutes"),
         ),
         sa.CheckConstraint("id = 1", name=op.f("ck_sign_in_settings_one_row")),
@@ -278,12 +268,12 @@ def upgrade() -> None:
     op.create_index(
         op.f("ix_reset_link_made_by_id"), "reset_link", ["made_by_id"], unique=False
     )
-    op.execute(KEPT)
     op.execute("INSERT INTO sign_in_settings DEFAULT VALUES")
+    op.execute(f"REVOKE DELETE ON sign_in_settings FROM {APP_ROLE}")
 
 
 def downgrade() -> None:
-    # Their triggers go with them; their history stays.
+    # Their history stays.
     op.drop_index(op.f("ix_reset_link_made_by_id"), table_name="reset_link")
     op.drop_index(op.f("ix_reset_link_admin_id"), table_name="reset_link")
     op.drop_table("reset_link")
@@ -307,4 +297,3 @@ def downgrade() -> None:
         postgresql_where=sa.text("email IS NOT NULL"),
     )
     op.drop_table("admin")
-    op.execute("DROP FUNCTION settings_row_kept()")

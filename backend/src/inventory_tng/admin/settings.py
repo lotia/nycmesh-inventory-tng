@@ -7,7 +7,6 @@ every administrator with an address is told, since one who could weaken
 them could otherwise do it unseen."""
 
 import functools
-import zoneinfo
 from typing import Annotated, NamedTuple
 
 import structlog
@@ -19,16 +18,20 @@ from sqlalchemy.orm import Session
 from inventory_tng import accounts, mail
 from inventory_tng.admin.common import (
     ADMIN,
+    RULES,
     admin_page,
     name_problem,
     now,
     text_form,
     whole,
 )
-from inventory_tng.db import DbSession, attempt, get_locked, unique
-from inventory_tng.local_time import is_time_zone
+from inventory_tng.db import DbSession, get_locked, refusal, unique
 from inventory_tng.mail import Notify
 from inventory_tng.models import (
+    CONFIRM_HOURS,
+    CONFIRM_IDLE_MINUTES,
+    NAME_CHECK_MINUTES,
+    SESSION_DAYS,
     TOTP_POLICIES,
     AdjustmentReason,
     Admin,
@@ -37,14 +40,13 @@ from inventory_tng.models import (
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
+from inventory_tng.time_zones import known_zones
 
 log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
 SETTINGS = f"{ADMIN}/settings"
-# A day: longer would hardly ever ask.
-NAME_CHECK_MAX = 24 * 60
 
 NOTICES.update(
     {
@@ -67,29 +69,25 @@ class Number(NamedTuple):
     hint: str
 
 
-# Limits a person could mean: a session a year at most, as browsers keep a
-# cookie 400 days; a confirmation a week at most.
+# Their ranges are the model's, which its check constraints hold.
 NUMBERS = (
     Number(
         "session_days",
-        1,
-        400,
+        *SESSION_DAYS,
         "days",
         "Sessions last",
         "days, used or not; from the next sign-in",
     ),
     Number(
         "confirm_hours",
-        1,
-        7 * 24,
+        *CONFIRM_HOURS,
         "hours",
         "A code for a sensitive change lasts",
         "hours",
     ),
     Number(
         "confirm_idle_minutes",
-        1,
-        7 * 24 * 60,
+        *CONFIRM_IDLE_MINUTES,
         "minutes",
         "…or until unused for",
         "minutes",
@@ -99,11 +97,10 @@ NUMBERS = (
 
 @functools.cache
 def zones() -> list[str]:
-    """The zones to pick from, by name: read once, as the list is long and
-    does not change while the server runs."""
+    """The zones to pick from, by name."""
     return sorted(
         name
-        for name in zoneinfo.available_timezones()
+        for name in known_zones()
         if name == "UTC"
         or ("/" in name and not name.startswith(("Etc/", "SystemV/", "US/")))
     )
@@ -144,7 +141,8 @@ def _page(
             "zones": names if site.time_zone in names else [site.time_zone, *names],
             "policies": TOTP_POLICIES,
             "numbers": NUMBERS,
-            "name_check_max": NAME_CHECK_MAX,
+            "name_check_min": NAME_CHECK_MINUTES[0],
+            "name_check_max": NAME_CHECK_MINUTES[1],
             "reasons": reasons,
             "problems": problems,
         },
@@ -164,9 +162,10 @@ def save_scan_settings(
     session: DbSession,
     name_check_minutes: Annotated[str, Form()] = "",
 ) -> Response:
-    minutes = whole(name_check_minutes, 0, NAME_CHECK_MAX)
+    minutes = whole(name_check_minutes, *NAME_CHECK_MINUTES)
     if minutes is None:
-        problem = f"A whole number of minutes, from 0 to {NAME_CHECK_MAX}."
+        low, high = NAME_CHECK_MINUTES
+        problem = f"A whole number of minutes, from {low} to {high}."
         return _page(
             request,
             session,
@@ -283,24 +282,21 @@ def save_site_settings(
     session: DbSession,
     time_zone: Annotated[str, Form()] = "",
 ) -> Response:
-    """The zone times are shown in: checked against these rules, which show
-    them, and PostgreSQL's, by its trigger."""
+    """The zone times are shown in, which SiteSettings checks."""
     site = session.get_one(SiteSettings, 1)
     if time_zone == site.time_zone:
         return redirect(SETTINGS, notice="site_saved")
-    problem = None if is_time_zone(time_zone) else "Pick a zone from the list."
 
     def save() -> None:
         site.time_zone = time_zone
 
-    if problem is None and attempt(session, save)[1]:
-        problem = "The database doesn't know that zone: pick another nearby."
-    if problem is not None:
+    _, broken = refusal(session, save, "site_settings_time_zone")
+    if broken is not None:
         return _page(
             request,
             session,
             signed,
-            problems={"time_zone": problem},
+            problems={"time_zone": RULES[broken]},
             values={"time_zone": time_zone},
         )
     session.commit()
