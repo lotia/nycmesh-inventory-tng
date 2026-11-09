@@ -166,6 +166,13 @@ class MailConfig:
 
 @dataclass(frozen=True)
 class Settings:
+    """The app's settings, from the environment (from_environ).
+
+    Plain frozen dataclasses on purpose, not pydantic: most of the checking
+    is cross-field (_refuse_development_only) and worded for an operator,
+    which validators would only restate. Reconsider if settings start
+    coming from more than the environment, such as a file."""
+
     database_url: str
     # APP_ENV=development. Anything else is production, so forgetting it is
     # safe (docs/decisions/0008). What it changes is listed under APP_ENV in
