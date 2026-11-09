@@ -178,6 +178,53 @@ Count the total before scaling: processes × 20, plus one for a migration,
 must stay under PostgreSQL's `max_connections` (100 by default, less 3 kept
 for superusers and CloudNativePG's own).
 
+## Backups
+
+CloudNativePG backs the database up to an object store: base backups, on a
+`ScheduledBackup`, and the write-ahead log as it is written, so it can be
+restored to any moment. A backup is a copy of everything, not only the
+inventory: administrators' usernames, emails and password hashes, their
+sealed TOTP keys, volunteers' names, devices' first addresses, sign-in
+sessions' browsers, and the database roles' password hashes.
+
+- **Encrypted at rest.** Turn on the object store's server-side encryption
+  for both the base backups and the write-ahead log (`encryption: AES256`,
+  or `aws:kms` with a key of the deployment's own), or use a bucket that
+  encrypts everything by default.
+- **Few can read or restore it.** The cluster's credentials may write to its
+  bucket and path only. Reading the bucket, and so restoring, is for the
+  operators who run the cluster, through credentials kept in the cluster
+  namespace's Secrets, never on a laptop. Turn on the bucket's object
+  versioning or lock, so that the cluster's own credentials cannot delete
+  what it wrote.
+- **Never with the TOTP keys.** The `TOTP_KEYS_DIR` Secret is backed up
+  apart (TOTP keys, below): a backup alone cannot make anyone's codes.
+- **No copies by hand.** Restore into a new cluster (`bootstrap.recovery`)
+  rather than download a dump. If a dump is ever needed, encrypt it as it is
+  made, for example `pg_dump ... | age -r <recipient>`, and delete it once
+  used.
+
+Before a deploy that migrates a database holding people's data, such as the
+test environment once volunteers use it, take an on-demand backup
+(`kubectl cnpg backup <cluster>`) and wait for it to complete. A migration
+that goes wrong is undone by restoring that backup into a new cluster, not
+by downgrading.
+
+### If a backup leaks
+
+1. Rotate what the backup lets someone use straight away: every database
+   role's password (their hashes are in it), then roll out.
+2. If the `TOTP_KEYS_DIR` Secret may have leaked with it, rotate the TOTP key
+   and reseal (TOTP keys, below), and every administrator replaces their
+   authenticator.
+3. Every administrator, from their account page, changes their password
+   (argon2 hashes are slow, but can be guessed offline) and makes new
+   recovery codes. Their old codes' hashes cannot be guessed back, but new
+   ones cost nothing. Session, device and reset-link tokens are stored only
+   as hashes of random values, so nobody signs in or registers with them.
+4. Tell the people whose personal data it held: administrators, and the
+   volunteers named in it.
+
 ## The first administrator
 
 Administrators do everything else in the browser, so the first one sets up
