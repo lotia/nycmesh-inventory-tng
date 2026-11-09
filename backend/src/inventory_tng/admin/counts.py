@@ -8,6 +8,11 @@ it once. A count also carries the place's latest ledger entry as it was
 shown: the count is true for that moment, so a save made at the place
 meanwhile still applies, and an item it moved comes back to count again.
 
+The pages check what was typed before writing, but an item's unit may
+change to each between that check and the write: the ledger then refuses
+the line (movement_whole_units), and the form is shown again with that
+line marked, and nothing written.
+
 A count names each item once: a form naming one on two fields (counted_5
 and counted_05, or the select at the foot choosing an item listed above) is
 refused and shown again saying why, as it isn't clear which number is
@@ -28,6 +33,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admin.common import (
     ADMIN,
+    RULES,
     admin_page,
     chosen,
     current_rows,
@@ -35,8 +41,9 @@ from inventory_tng.admin.common import (
     text_form,
 )
 from inventory_tng.admin.settings import SETTINGS
-from inventory_tng.db import DbSession
+from inventory_tng.db import DbSession, refusal
 from inventory_tng.ledger import (
+    corrected,
     expected,
     moment,
     record_adjustment,
@@ -68,6 +75,8 @@ ADJUSTMENTS = f"{COUNTS}/adjustments"
 RECENT = 30
 COUNTED = "counted_"
 EXTRA = "extra_quantity"
+# The ledger rule a race can break past the page's check (module docstring).
+WHOLE = "movement_whole_units"
 TWICE = (
     "An item is on this form more than once. Each item is counted once, so "
     "it isn't clear which number is right: nothing was saved."
@@ -313,6 +322,11 @@ def count(
     if place is None or key is None or as_of is None:
         return not_found()
     found = lines(form)
+    sent_items = {
+        item_id
+        for typed in form.get("items", "").split()
+        if (item_id := whole(typed, 1, INTEGER_MAX)) is not None
+    }
     counted, problems = _counted(session, found)
     if repeats := named_twice(found):
         problems |= dict.fromkeys(repeats, "This item is on the form more than once.")
@@ -333,14 +347,32 @@ def count(
             problems=problems,
             values=form,
             alert=TWICE if repeats else None,
-            items={
-                item_id
-                for typed in form.get("items", "").split()
-                if (item_id := whole(typed, 1, INTEGER_MAX)) is not None
-            },
+            items=sent_items,
         )
-    result = record_count(session, key, signed.admin.id, place.id, counted, as_of)
+    result, broken = refusal(
+        session,
+        lambda: record_count(session, key, signed.admin.id, place.id, counted, as_of),
+        WHOLE,
+    )
+    if broken is not None:
+        log.info("count refused by a rule", location_id=place.id, rule=broken)
+        # Checked again, the units as they are now mark the lines it broke.
+        _, problems = _counted(session, found)
+        return _count_page(
+            request,
+            session,
+            signed,
+            place,
+            as_of,
+            problems=problems,
+            values=form,
+            alert=None if problems else RULES[broken],
+            items=sent_items,
+            status_code=400,
+        )
+    assert result is not None
     session.commit()
+    corrected(signed.admin.id, place.id, result.written, result.withheld)
     if not result.moved:
         return redirect(COUNTS, notice="counted" if result.differed else "counted_same")
     saved = len(counted) - len(result.moved)
@@ -394,15 +426,25 @@ def adjust(
         or not isinstance(amount, Decimal)
     ):
         return _counts_page(request, session, signed, problems=problems, values=form)
-    record_adjustment(
+    written, broken = refusal(
         session,
-        key,
-        signed.admin.id,
-        place.id,
-        item.id,
-        amount,
-        found=direction == "found",
-        reason_id=reason.id,
+        lambda: record_adjustment(
+            session,
+            key,
+            signed.admin.id,
+            place.id,
+            item.id,
+            amount,
+            found=direction == "found",
+            reason_id=reason.id,
+        ),
+        WHOLE,
     )
+    if broken is not None:
+        log.info("adjustment refused by a rule", item_id=item.id, rule=broken)
+        return _counts_page(
+            request, session, signed, problems={"amount": RULES[broken]}, values=form
+        )
     session.commit()
+    corrected(signed.admin.id, place.id, written or [])
     return redirect(COUNTS, notice="adjusted")

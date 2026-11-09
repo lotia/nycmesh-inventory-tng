@@ -14,6 +14,8 @@ from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
+from inventory_tng import items
+from inventory_tng.admin.common import RULES
 from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS, lines, named_twice
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.ledger import expected, lock_place, moment
@@ -21,13 +23,14 @@ from inventory_tng.models import (
     INTEGER_MAX,
     AdjustmentReason,
     Admin,
+    Item,
     LedgerTransaction,
     Movement,
 )
 
 from helpers.concurrency import Committed
 from helpers.rows import violates
-from helpers.sign_in import text
+from helpers.sign_in import code, new_admin, sign_in_with, text
 from helpers.stock import Place, committed_place, received, stocked, write
 
 
@@ -582,3 +585,51 @@ def test_leftovers_of_a_retired_item_can_be_written_off(
     }
     assert admin_client.post(ADJUSTMENTS, data=form).status_code == 303
     assert expected(session, place.store.id) == {}
+
+
+@pytest.mark.concurrency
+@pytest.mark.end_to_end
+@pytest.mark.parametrize("kind", ["count", "adjustment"])
+def test_a_unit_changed_to_each_as_the_page_writes_is_said_and_nothing_is_written(
+    own_committed: Committed, make_client: Callable[..., TestClient], kind: str
+) -> None:
+    """The page finds 1.5 m of cable fine, then waits for the cable, held by
+    a change of its unit to each; once that commits, the ledger refuses the
+    line, and the page says why, as for any other problem, and writes
+    nothing (inventory-tng-8i4.104). On a database of its own, as it would
+    write the ledger if it were wrong."""
+    place = committed_place(own_committed)
+    setup = own_committed.session()
+    _, totp = new_admin(setup)
+    reason_id = setup.scalars(select(AdjustmentReason.id)).first()
+    setup.commit()
+    page = own_committed.session()
+    client = make_client(on=page)
+    assert sign_in_with(client, code=code(totp)).status_code == 303
+    if kind == "count":
+        path = f"{COUNTS}/{place.store.id}"
+        form = count_form(client, path) | {
+            "extra_item_id": str(place.cable.id),
+            "extra_quantity": "1.5",
+        }
+    else:
+        path = ADJUSTMENTS
+        form = {
+            "key": key_on(client.get(COUNTS)),
+            "location_id": str(place.store.id),
+            "item_id": str(place.cable.id),
+            "amount": "1.5",
+            "direction": "found",
+            "reason_id": str(reason_id),
+        }
+    changing = own_committed.session()
+    cable = changing.get_one(Item, place.cable.id)
+    items.save(changing, cable, {"unit": "each"})
+    changing.flush()
+    worker = own_committed.blocked(page, lambda: client.post(path, data=form))
+    changing.commit()
+    answer = worker.finished().result
+    assert isinstance(answer, Response)
+    assert answer.status_code == 400
+    assert RULES["movement_whole_units"] in text(answer)
+    assert counts_written(own_committed.session()) == []
