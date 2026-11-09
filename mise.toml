@@ -52,6 +52,20 @@ run = [
     "npx playwright test",
 ]
 
+[tasks.browser-webkit]
+description = "The browser tests in WebKit, in Playwright's container, for systems its WebKit does not run on"
+dir = "frontend"
+run = [
+    "mise run compose -- --profile webkit up -d --wait db webkit",
+    "npm run build",
+    # The server's port as compose publishes it: the shell's, else .env's.
+    """
+    port=$(cd ../backend && uv run python -m inventory_tng.local_env INVENTORY_WEBKIT_PORT)
+    PLAYWRIGHT_WEBKIT=1 PLAYWRIGHT_WEBKIT_SERVER="ws://127.0.0.1:${port:-3000}/" \
+      npx playwright test --project=webkit
+    """,
+]
+
 [tasks.check-changed-lines]
 description = "Every line changed since origin/main is run by a test"
 depends = ["check-backend", "check-frontend"]

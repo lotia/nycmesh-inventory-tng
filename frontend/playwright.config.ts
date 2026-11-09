@@ -1,6 +1,8 @@
 /**
  * The browser tests, in browser/ (CONTRIBUTING.md, Running the checks).
- * WebKit runs in CI, and wherever PLAYWRIGHT_WEBKIT=1.
+ * WebKit runs in CI, and wherever PLAYWRIGHT_WEBKIT=1: on this machine, or
+ * in Playwright's container when PLAYWRIGHT_WEBKIT_SERVER names its server
+ * (mise run browser-webkit).
  */
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -24,6 +26,7 @@ const phone = {
   hasTouch: true,
 };
 const webkit = Boolean(process.env.CI) || process.env.PLAYWRIGHT_WEBKIT === "1";
+const webkitServer = process.env.PLAYWRIGHT_WEBKIT_SERVER;
 
 export default defineConfig({
   testDir: "browser",
@@ -77,6 +80,16 @@ export default defineConfig({
             use: {
               browserName: "webkit" as const,
               storageState: signedIn,
+              // In the container, the app on this machine's 127.0.0.1 is
+              // reached through this connection.
+              ...(webkitServer
+                ? {
+                    connectOptions: {
+                      wsEndpoint: webkitServer,
+                      exposeNetwork: "<loopback>",
+                    },
+                  }
+                : {}),
             },
           },
         ]

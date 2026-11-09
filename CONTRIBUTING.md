@@ -430,7 +430,18 @@ They run in Chromium; also in WebKit, Safari's engine, in CI and with
 `PLAYWRIGHT_WEBKIT=1`. `mise run setup-browsers` installs any that is
 missing, as after Playwright changes; `mise run check-browser` runs it.
 Playwright's WebKit is built for Ubuntu and may not start on other systems
-(installing it says what it lacks).
+(installing it says what it lacks, as on Arch or CachyOS). There, run them in
+WebKit in Playwright's own container instead:
+
+```sh
+mise run browser-webkit          # pulls the image (about 2 GB) the first time
+```
+
+Only the browser runs in the container, from Playwright's server, published
+on `INVENTORY_WEBKIT_PORT` (3000); the tests and the app run here, and the
+browser reaches the app through the tests' connection. The image's version
+is `@playwright/test`'s in `package-lock.json`, which a test keeps in step
+with `compose.yaml`: change both together.
 Playwright starts the backend itself, with a database of its own, on a port
 chosen for the run, so runs from two clones do not meet.
 
