@@ -311,7 +311,12 @@ def _database_url(value: str, name: str = "DATABASE_URL") -> str:
     # stand in for a real value.
     value = value.strip()
     if not value:
-        raise SettingsError(f"{name} is not set")
+        # Name where each value is described, for a .env older than a new
+        # setting as much as for a first run.
+        raise SettingsError(
+            f"{name} is not set: development's is in .env.example, and"
+            " DEPLOYMENT.md (Settings) says what production needs"
+        )
     try:
         url = make_url(value)
     except ArgumentError as error:
