@@ -61,6 +61,7 @@ this list rather than inventing one on the spot.
 | `needs-decision` | Waits on a maintainer's choice or input; remove it once given |
 | `manual-test` | Steps someone does by hand |
 | `revisit` | An idea set aside, to look at again |
+| `race` | A bug only requests at once can cause, unlikely but possible; P1, ahead of features |
 
 To find them: `bd list --label needs-decision`, `bd list --label area:stock`,
 `bd ready --label-any research,manual-test`, and `bd label list-all` for
