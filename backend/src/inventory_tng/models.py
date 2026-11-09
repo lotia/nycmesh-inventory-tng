@@ -26,7 +26,7 @@ written only by its own module (locations, volunteers, categories, items,
 labels), under the catalogue lock (db.locked_row), which raises
 db.RuleBroken named for the rule. So are the ledger's, which
 ledger.insert_transaction, its one writer, checks. The database holds no
-trigger, function or view (CONTRIBUTING.md, Migrations).
+trigger, function or view (docs/decisions/0016).
 """
 
 import secrets
