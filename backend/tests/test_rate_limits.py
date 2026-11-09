@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.db import make_engine
 from inventory_tng.models import RateLimit
-from inventory_tng.rate_limits import PostgresStorage, limiter
+from inventory_tng.rate_limits import PostgresStorage, limiter, refund
 
 TEN = RateLimitItemPerMinute(10)
 
@@ -138,3 +138,14 @@ def test_the_fixed_window_is_not_offered(
 ) -> None:
     with pytest.raises(NotImplementedError):
         use(PostgresStorage(engine))
+
+
+def test_a_refund_takes_back_one_attempt(app_session: Session) -> None:
+    for _ in range(3):
+        limiter(app_session).hit(TEN, "register", "192.0.2.9")
+    refund(app_session, TEN, "register", "192.0.2.9")
+    stats = limiter(app_session).get_window_stats(TEN, "register", "192.0.2.9")
+    assert stats.remaining == 8
+    # A key never counted has nothing to take back.
+    refund(app_session, TEN, "register", "192.0.2.10")
+    assert limiter(app_session).test(TEN, "register", "192.0.2.10")

@@ -58,5 +58,7 @@ fingerprinting (unreliable, and hostile to privacy).
   Short expiries and small use limits keep that window small.
 - The cookie can be copied off a phone. Something stronger, such as passkeys
   or device-bound cookies, is researched in inventory-tng-8i4.43.
-- Guessing a phrase is limited to ten attempts a minute per address, per
-  process. At about 64 bits per phrase that is far more than enough.
+- Guessing a phrase is limited to ten wrong attempts a minute per address,
+  shared by every instance (0012, Amendment): each counts before it is
+  checked and a good one is taken back, so a room of phones can register.
+  At about 64 bits per phrase that is far more than enough.

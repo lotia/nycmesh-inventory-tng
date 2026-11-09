@@ -13,9 +13,13 @@ not implemented, as nothing here uses them. A row past its window is
 deleted after each attempt is counted, in a transaction of its own, so the
 table holds only keys tried within their window, and a count never holds
 locks on other keys' rows that another count could be waiting on.
+
+refund() is ours, not the library's: it takes back the newest attempt
+counted against a key, for one that turned out not to be a guess.
 """
 
 import structlog
+from limits import RateLimitItem
 from limits.storage import MovingWindowSupport, Storage
 from limits.strategies import MovingWindowRateLimiter
 from sqlalchemy import Engine, delete, exc, func, select, text
@@ -30,7 +34,7 @@ log = structlog.get_logger(__name__)
 # statement's now().
 _INSIDE = (
     "array(SELECT hit FROM unnest(rate_limit.hits) hit"
-    " WHERE hit > now() - make_interval(secs => :expiry))"
+    " WHERE hit > now() - make_interval(secs => :expiry) ORDER BY hit)"
 )
 _ACQUIRE = text(
     "INSERT INTO rate_limit (key, hits, expires_at)"
@@ -40,6 +44,10 @@ _ACQUIRE = text(
     f" SET hits = {_INSIDE} || EXCLUDED.hits, expires_at = EXCLUDED.expires_at"
     f" WHERE cardinality({_INSIDE}) + :amount <= :limit"
     " RETURNING true"
+)
+_REFUND = text(
+    "UPDATE rate_limit SET hits = hits[1:cardinality(hits) - 1]"
+    " WHERE key = :key AND cardinality(hits) > 0"
 )
 _WINDOW = text(
     "SELECT extract(epoch FROM coalesce(min(hit), now())), count(hit)"
@@ -97,6 +105,13 @@ class PostgresStorage(Storage, MovingWindowSupport):
             return False
         return True
 
+    def refund(self, key: str) -> None:
+        """Take back the newest attempt counted against `key`. Not part of
+        the library's contract."""
+        with self.engine.begin() as connection:
+            refunded = connection.execute(_REFUND, {"key": key}).rowcount
+        log.debug("attempt refunded", refunded=refunded)
+
     # The fixed window's: not used here (MovingWindowRateLimiter).
     def incr(self, key: str, expiry: int, amount: int = 1) -> int:
         raise NotImplementedError
@@ -108,10 +123,20 @@ class PostgresStorage(Storage, MovingWindowSupport):
         raise NotImplementedError
 
 
+def refund(session: Session, item: RateLimitItem, *identifiers: str) -> None:
+    """Take back an attempt counted (hit) that turned out not to be a guess,
+    such as a registration with a good code: counted first, so attempts at
+    once cannot all pass the limit before any is counted, and refunded, so
+    a good one never uses it up (inventory-tng-8i4.126)."""
+    _storage(session).refund(item.key_for(*identifiers))
+
+
 def limiter(session: Session) -> MovingWindowRateLimiter:
     """The rate limits, on the database `session` uses, in transactions of
     their own, on its side pool (db.side_engine): counting never waits on
     the pool the request's own connection came from."""
-    return MovingWindowRateLimiter(
-        PostgresStorage(side_engine(session.get_bind().engine))
-    )
+    return MovingWindowRateLimiter(_storage(session))
+
+
+def _storage(session: Session) -> PostgresStorage:
+    return PostgresStorage(side_engine(session.get_bind().engine))

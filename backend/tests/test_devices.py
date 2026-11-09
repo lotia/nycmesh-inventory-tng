@@ -3,6 +3,7 @@
 
 import json
 from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from ipaddress import ip_address
 
@@ -14,6 +15,7 @@ from sqlalchemy import Engine, select, update
 from sqlalchemy.orm import Session
 
 from inventory_tng import devices, registration_codes
+from inventory_tng.db import get_locked
 from inventory_tng.devices import COOKIE, RegisteredDevice, RegistrationRejected
 from inventory_tng.logs import configure_logging
 from inventory_tng.models import CatalogueHistory, Device, RegistrationCode
@@ -338,3 +340,50 @@ def test_the_command_line_makes_a_code_that_registers(
     assert f"https://inventory.example/register?code={phrase}" in out
     device, _ = devices.register(committed.session(), phrase, ADDRESS)
     assert device.id
+
+
+def test_guesses_sent_at_once_get_no_more_than_the_limit(engine: Engine) -> None:
+    """Each counts before its code is checked, so none slips under the limit
+    while another is being checked (inventory-tng-8i4.126)."""
+
+    def guess(_: int) -> str:
+        with Session(engine) as session:
+            try:
+                devices.register(session, "not-a-code-at-all", "192.0.2.80")
+            except RegistrationRejected as rejected:
+                return rejected.reason
+        return "registered"
+
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        reasons = list(pool.map(guess, range(25)))
+    assert reasons.count("rate_limited") == 15
+    assert reasons.count("unknown") == 10
+
+
+def test_good_codes_waiting_on_the_code_all_register(committed: Committed) -> None:
+    """A room of phones scanning one code: each counts, then is refunded
+    before it waits for the code's row, which a registration under way
+    holds, so phones queued behind it are not refused for the others."""
+    with committed.session() as setup, setup.begin():
+        code, phrase = devices.create_code(
+            setup, max_uses=20, lifetime=timedelta(days=1)
+        )
+        code_id = code.id
+    holding = committed.session()
+    get_locked(holding, RegistrationCode, code_id)
+    workers = []
+    # Past the limit, and within the test pool's connections.
+    for _ in range(devices.ATTEMPTS.amount + 2):
+        session = committed.session()
+
+        def scan(session: Session = session) -> str:
+            try:
+                devices.register(session, phrase, "192.0.2.81")
+            except RegistrationRejected as rejected:
+                return rejected.reason
+            session.commit()
+            return "registered"
+
+        workers.append(committed.blocked(session, scan))
+    holding.rollback()
+    assert [w.finished().result for w in workers] == ["registered"] * len(workers)
