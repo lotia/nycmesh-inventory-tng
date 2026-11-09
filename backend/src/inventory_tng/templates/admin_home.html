@@ -3,8 +3,9 @@
 {% for warning in warnings %}
 <p class="warning">{{ warning.words }} <a href="{{ warning.path }}">{{ warning.action }}</a>.</p>
 {% endfor %}
+{% include "_retired_holding.html" %}
 <ul>
-  {% for path, label in sections %}
+  {% for path, label, _ in sections %}
   <li><a href="{{ path }}">{{ label }}</a>{% if current.get(label) is not none %}: {{ current[label] }}{% endif %}</li>
   {% endfor %}
   <li><a href="{{ paths.account }}">Your account</a></li>

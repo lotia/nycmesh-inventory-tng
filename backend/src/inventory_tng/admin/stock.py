@@ -1,7 +1,8 @@
 """What is where, from the ledger's balance (docs/decisions/0003):
 read-only, by place or by item; what to reorder; and what needs counting. A
 negative balance means the records are wrong somewhere, so it is shown as
-needing a count (inventory-tng-8i4.15)."""
+needing a count (inventory-tng-8i4.15). Any stock at a retired place is
+warned of, with a link to count it."""
 
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -13,12 +14,17 @@ from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.admin.common import ADMIN, admin_page
-from inventory_tng.admin.counts import COUNTS
+from inventory_tng.admin.counts import COUNTS, badge
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.db import DbSession
-from inventory_tng.ledger import SHORT, balance, in_stores
+from inventory_tng.ledger import (
+    SHORT,
+    balance,
+    in_stores,
+    retired_places_holding_stock,
+)
 from inventory_tng.models import Item, Location
-from inventory_tng.pages import templates
+from inventory_tng.pages import sections, templates
 from inventory_tng.sign_in import AdminSignedIn
 
 router = APIRouter(include_in_schema=False)
@@ -93,6 +99,7 @@ def stock(
     by: Literal["place", "item"] = "place",
 ) -> Response:
     groups = _grouped(_holdings(session, balance.c.quantity != 0), by)
+    retired = retired_places_holding_stock(session)
     return admin_page(
         request,
         signed,
@@ -102,6 +109,8 @@ def stock(
             "view": by,
             "groups": groups,
             "needing_count": sum(group.needs_count for group in groups),
+            "retired_places": retired,
+            "sections": sections(signed.admin, {COUNTS: badge(retired)}),
         },
     )
 
@@ -164,6 +173,5 @@ def needs_counting(
             "title": "Needs counting",
             "view": "needs-counting",
             "places": _grouped(_holdings(session, SHORT), "place"),
-            "counts": COUNTS,
         },
     )

@@ -140,8 +140,9 @@ def retire(session: Session, location: Location, at: datetime) -> None:
 
 def retire_held(session: Session, location: Location, at: datetime) -> None:
     """retire(), for a caller that holds the catalogue lock and the row
-    (volunteers.stop_holding_stock). Once retired, a place cannot be
-    counted or adjusted, so nothing at it could be put right."""
+    (volunteers.stop_holding_stock). A place is retired only once it holds
+    nothing: a retired place is offered for a count or an adjustment only
+    while a late save leaves stock there."""
     enforce("location_holds_stock", when=holds_stock(session, location.id))
     if location.kind in STORE_KINDS:  # Only these have areas.
         has_areas = exists_where(

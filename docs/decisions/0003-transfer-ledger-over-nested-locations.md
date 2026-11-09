@@ -3,7 +3,7 @@
 **Status:** accepted · 2026-10-30 · amended 2026-11-01 by 0009 (an
 unregistered device is blocked), 2026-11-03 (counts, retired items),
 2026-11-06 (counting while stock moves), 2026-11-08 by 0016 (where the
-rules live, balance)
+rules live, balance), 2026-11-09 (stock at a retired place)
 
 ## Context
 
@@ -48,7 +48,12 @@ while. So we need more than one location from the start.
 - **Nothing is deleted: retiring is the soft delete**, and bringing back
   undoes it. A retired item that still has stock is never received again,
   but volunteers may take what is left, until it runs out (Ali,
-  2026-11-03).
+  2026-11-03). A place is retired only once it holds nothing, but a save
+  that waited in an outbox can still bring stock to it or take some from
+  it, and is accepted. Such a save is logged and counted, and the place
+  shows on the home page, beside Counts in the navigation and on the stock
+  page, and can be counted or adjusted, until it holds nothing again (Ali,
+  2026-11-09; inventory-tng-8i4.51.2).
 
 We rejected keeping one quantity per item, because it cannot say where stock
 is or how it got there.

@@ -40,6 +40,7 @@ from helpers.sign_in import (
     sign_in_with,
     text,
 )
+from helpers.stock import at_retired_van
 
 TOKEN = "t" * 40
 NOW = datetime(2026, 11, 2, 12, tzinfo=UTC)
@@ -484,6 +485,20 @@ def test_a_sensitive_page_asks_for_a_code_then_carries_on(
     )
     assert done.headers["location"] == sign_in.NEW_AUTHENTICATOR
     assert client.get(sign_in.NEW_AUTHENTICATOR).status_code == 200
+
+
+def test_a_form_asked_to_confirm_shows_the_navigations_badge(
+    client: TestClient, session: Session
+) -> None:
+    """The page is drawn once the request's session has closed, so its
+    badge is read as the form is held up (sign_in.ConfirmHere)."""
+    row = signed_in_row(client, session)
+    at_retired_van(session)
+    row.confirmed_at = row.last_sensitive_at = datetime.now(UTC) - timedelta(hours=2)
+    session.flush()
+    held = client.post(sign_in.NEW_AUTHENTICATOR, data={"authenticator_name": "x"})
+    assert held.status_code == 403
+    assert ": 1 retired place holds stock" in text(held)
 
 
 def test_without_totp_the_password_confirms(

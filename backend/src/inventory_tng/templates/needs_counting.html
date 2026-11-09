@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_retired.html" import retired %}
 {% block main %}
 {% include "_stock_views.html" %}
 <p class="hint">Places that show less than nothing of an item: the records are
@@ -12,11 +13,7 @@ wrong there until someone counts it.</p>
     <tr><td>{{ row.item.name }}</td><td>{{ row.quantity | amount }} {{ row.item.unit }}</td></tr>
     {% endfor %}
   {% endcall %}
-  {% if group.heading.retired_at %}
-  <p class="hint">Retired: it can't be counted.</p>
-  {% else %}
-  <p><a href="{{ counts }}/{{ group.heading.id }}">Count {{ group.heading.name }}</a></p>
-  {% endif %}
+  <p><a href="{{ counts_path }}/{{ group.heading.id }}">Count {{ group.heading.name }}</a>{{ retired(group.heading) }}</p>
 </section>
 {% else %}
 <p>Nothing shows less than nothing.</p>

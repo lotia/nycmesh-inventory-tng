@@ -23,7 +23,7 @@ so it cannot be sent a repeat: the check is here, where fields become items.
 import uuid
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 import structlog
 from fastapi import APIRouter, Depends, Request
@@ -44,11 +44,14 @@ from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.db import DbSession, refusal
 from inventory_tng.ledger import (
     corrected,
+    countable,
     expected,
     moment,
     record_adjustment,
     record_count,
     repeated,
+    retired_places_holding_stock,
+    sent_keys,
     takeable,
 )
 from inventory_tng.local_time import site_zone
@@ -63,7 +66,15 @@ from inventory_tng.models import (
     whole,
 )
 from inventory_tng.once import form_key
-from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.pages import (
+    BADGES,
+    NOTICES,
+    Badge,
+    not_found,
+    redirect,
+    retired_holding,
+    templates,
+)
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
 log = structlog.get_logger(__name__)
@@ -93,12 +104,50 @@ NOTICES.update(
 TextForm = Annotated[dict[str, str], Depends(text_form)]
 
 
+def badge(retired_places: Sequence[Location]) -> Badge | None:
+    """Beside Counts: how many retired places hold stock, to count
+    (ledger.retired_places_holding_stock)."""
+    many = len(retired_places)
+    return Badge(many, retired_holding(many)) if many else None
+
+
+BADGES[COUNTS] = lambda session: badge(retired_places_holding_stock(session))
+# For the links to a place's count on other pages.
+cast(dict[str, Any], templates.env.globals)["counts_path"] = COUNTS
+
+
 def _items(session: Session) -> list[Item]:
     """What can be counted or adjusted: current items, and retired ones with
     stock left, which may still be written off."""
     return list(
         session.scalars(select(Item).where(takeable()).order_by(func.lower(Item.name)))
     )
+
+
+def _places(session: Session) -> list[Location]:
+    """Where can be counted or adjusted (ledger.countable)."""
+    return list(
+        session.scalars(
+            select(Location).where(countable()).order_by(func.lower(Location.name))
+        )
+    )
+
+
+def _place(
+    session: Session, location_id: int | None, key: uuid.UUID | None = None
+) -> Location | None:
+    """The place to count or adjust, if ledger.countable allows it; or,
+    with the key of a form already written, whichever it named, so a form
+    sent again gets its first answer."""
+    if location_id is None:
+        return None
+    allowed = countable()
+    if key is not None:
+        written = select(LedgerTransaction.id).where(
+            LedgerTransaction.idempotency_key.in_(sent_keys(key))
+        )
+        allowed |= written.exists()
+    return session.scalar(select(Location).where(Location.id == location_id, allowed))
 
 
 def _recent(session: Session) -> list[dict[str, Any]]:
@@ -154,7 +203,7 @@ def _counts_page(
             "title": "Counts and adjustments",
             "here": COUNTS,
             "settings_path": SETTINGS,
-            "places": current_rows(session, Location),
+            "places": _places(session),
             "items": _items(session),
             "reasons": current_rows(session, AdjustmentReason),
             "recent": _recent(session),
@@ -244,7 +293,7 @@ def _count_page(
 def count_form(
     request: Request, signed: AdminSignedIn, session: DbSession, location_id: int
 ) -> Response:
-    place = chosen(session, Location, str(location_id))
+    place = _place(session, location_id)
     if place is None:
         return not_found()
     return _count_page(request, session, signed, place, moment(session, place.id))
@@ -316,8 +365,8 @@ def count(
     location_id: int,
     form: TextForm,
 ) -> Response:
-    place = chosen(session, Location, str(location_id))
     key = form_key(form.get("key", ""))
+    place = _place(session, location_id, key)
     as_of = whole(form.get("as_of", ""), 0, INTEGER_MAX)
     if place is None or key is None or as_of is None:
         return not_found()
@@ -397,7 +446,8 @@ def adjust(
     request: Request, signed: AdminSignedIn, session: DbSession, form: TextForm
 ) -> Response:
     problems: dict[str, str] = {}
-    place = chosen(session, Location, form.get("location_id", ""))
+    key = form_key(form.get("key", ""))
+    place = _place(session, whole(form.get("location_id", ""), 1, INTEGER_MAX), key)
     if place is None:
         problems["location_id"] = "Pick a place."
     item = chosen(session, Item, form.get("item_id", ""), current=False)
@@ -417,7 +467,6 @@ def adjust(
     reason = chosen(session, AdjustmentReason, form.get("reason_id", ""))
     if reason is None:
         problems["reason_id"] = "Pick a reason."
-    key = form_key(form.get("key", ""))
     if key is None:
         problems["amount"] = "This form is out of date: try again."
     if (

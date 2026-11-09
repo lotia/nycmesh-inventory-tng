@@ -1,6 +1,12 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% block main %}
+{% if place.retired_at %}
+<p class="warning">{{ place.name }} is retired, but the records say something
+is here: a save brought or took it after it was retired. Count what is really
+there: usually nothing. Anything you find, take to a current place, count
+this one as empty, and record it found there.</p>
+{% endif %}
 {% if items %}
 <p>Something came in or went out of each of these after you started, so it's
 not clear whether you counted it before or after. Count them again now.</p>
