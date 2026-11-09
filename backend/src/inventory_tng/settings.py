@@ -12,6 +12,7 @@ from sqlalchemy import make_url
 from sqlalchemy.exc import ArgumentError
 
 from inventory_tng.local_env import CLONE
+from inventory_tng.totp_keys import TotpKeys, TotpKeysError, keys_dir
 
 LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 ENVIRONMENTS = ("development", "production")
@@ -189,6 +190,9 @@ class Settings:
     # Password resets and notices by mail; None sends none.
     mail: MailConfig | None = None
     traces: TraceRedaction = field(default_factory=TraceRedaction)
+    # What authenticators' keys are sealed with (totp_keys.py). None only
+    # for Settings built in code, as tests do: from_environ always loads them.
+    totp_keys: TotpKeys | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         # Every Settings passes through here, however it was built.
@@ -206,15 +210,21 @@ class Settings:
 
     @classmethod
     def from_environ(cls, environ: Mapping[str, str] = os.environ) -> Self:
+        development = _environment(environ.get("APP_ENV") or "") == "development"
+        try:
+            totp_keys = TotpKeys.load(keys_dir(environ, development=development))
+        except TotpKeysError as error:
+            raise SettingsError(str(error)) from None
         return cls(
             database_url=environ.get("DATABASE_URL", ""),
-            development=_environment(environ.get("APP_ENV") or "") == "development",
+            development=development,
             logging=LogConfig.from_environ(environ),
             frontend=FrontendConfig.from_environ(environ),
             setup_token=environ.get("SETUP_TOKEN", "").strip() or None,
             recovery_token=environ.get("RECOVERY_TOKEN", "").strip() or None,
             mail=MailConfig.from_environ(environ),
             traces=TraceRedaction.from_environ(environ),
+            totp_keys=totp_keys,
         )
 
 

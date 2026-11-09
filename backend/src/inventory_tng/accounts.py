@@ -2,9 +2,10 @@
 the first administrator (docs/decisions/0012). The pages are in sign_in.py.
 
 Only established calls here (AGENTS.md rule 3): argon2-cffi hashes and
-checks passwords, pyotp makes TOTP keys and checks codes, `secrets` makes
-tokens, and devices.digest (hashlib's SHA-256) hashes tokens and recovery
-codes for the database. Comparing the setup token is secrets.compare_digest.
+checks passwords, pyotp makes TOTP keys and checks codes, totp_keys seals
+them with cryptography's AES-GCM, `secrets` makes tokens, and
+devices.digest (hashlib's SHA-256) hashes tokens and recovery codes for the
+database. Comparing the setup token is secrets.compare_digest.
 """
 
 import re
@@ -40,6 +41,7 @@ from inventory_tng.models import (
     mint_code,
 )
 from inventory_tng.rate_limits import limiter
+from inventory_tng.totp_keys import TotpKeys, Unreadable
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -274,7 +276,8 @@ def step_time(step: int) -> datetime:
 
 def retire(authenticator: Authenticator, now: datetime) -> None:
     """Removed, its key wiped: every path that removes one comes here."""
-    authenticator.totp_key, authenticator.retired_at = None, now
+    authenticator.sealed_key = authenticator.key_version = None
+    authenticator.retired_at = now
 
 
 def authenticator_name_problem(name: str) -> str | None:
@@ -314,10 +317,15 @@ def locked_authenticators(session: Session, admin_id: int) -> list[Authenticator
 
 
 def add_authenticator(
-    session: Session, admin_id: int, name: str, key: str, step: int
+    session: Session, keys: TotpKeys, admin_id: int, name: str, key: str, step: int
 ) -> Authenticator:
+    version, sealed = keys.seal(key, admin_id)
     authenticator = Authenticator(
-        admin_id=admin_id, name=name, totp_key=key, last_step=step
+        admin_id=admin_id,
+        name=name,
+        sealed_key=sealed,
+        key_version=version,
+        last_step=step,
     )
     session.add(authenticator)
     session.flush()
@@ -325,6 +333,67 @@ def add_authenticator(
         "authenticator added", admin_id=admin_id, authenticator_id=authenticator.id
     )
     return authenticator
+
+
+def _opened(keys: TotpKeys, authenticator: Authenticator) -> str | None:
+    """Its key, or None if it cannot be read (its key version is gone from
+    TOTP_KEYS_DIR): it then takes no code, and recovery codes and reset links
+    still let its administrator in (DEPLOYMENT.md, TOTP keys)."""
+    # Current ones keep theirs.
+    assert authenticator.sealed_key is not None
+    assert authenticator.key_version is not None
+    try:
+        return keys.open(
+            authenticator.key_version, authenticator.sealed_key, authenticator.admin_id
+        )
+    except Unreadable:
+        log.error(
+            "authenticator unreadable",
+            admin_id=authenticator.admin_id,
+            authenticator_id=authenticator.id,
+            key_version=authenticator.key_version,
+        )
+        return None
+
+
+def unreadable_authenticators(session: Session, keys: TotpKeys) -> int:
+    """Current authenticators sealed with a key version TOTP_KEYS_DIR lacks."""
+    return (
+        session.scalar(
+            select(func.count()).where(
+                CURRENT_TOTP, Authenticator.key_version.not_in(list(keys.keys))
+            )
+        )
+        or 0
+    )
+
+
+def reseal_authenticators(session: Session, keys: TotpKeys) -> tuple[int, int]:
+    """Every current authenticator's key sealed again with the newest version,
+    so older ones can leave TOTP_KEYS_DIR: how many were, and how many could
+    not be read (left as they are). The caller commits."""
+    set_actor(session, "system:reseal")
+    resealed = unreadable = 0
+    current = session.scalars(
+        locked(select(Authenticator).where(CURRENT_TOTP).order_by(Authenticator.id))
+    )
+    for authenticator in current:
+        key = _opened(keys, authenticator)
+        if key is None:
+            unreadable += 1
+        elif authenticator.key_version != keys.newest:
+            authenticator.key_version, authenticator.sealed_key = keys.seal(
+                key, authenticator.admin_id
+            )
+            resealed += 1
+    session.flush()
+    log.info(
+        "authenticators resealed",
+        key_version=keys.newest,
+        resealed=resealed,
+        unreadable=unreadable,
+    )
+    return resealed, unreadable
 
 
 # Recovery codes
@@ -351,6 +420,7 @@ def make_recovery_codes(session: Session, admin_id: int, now: datetime) -> list[
 
 def check_second_factor(
     session: Session,
+    keys: TotpKeys,
     admin_id: int,
     authenticators: list[Authenticator],
     typed: str,
@@ -360,10 +430,10 @@ def check_second_factor(
     locked_authenticators), or one of their recovery codes, used up as it is
     accepted."""
     for authenticator in authenticators:
-        assert authenticator.totp_key is not None  # Current ones keep theirs.
-        step = accepted_step(
-            authenticator.totp_key, typed, authenticator.last_step, now
-        )
+        key = _opened(keys, authenticator)
+        if key is None:
+            continue
+        step = accepted_step(key, typed, authenticator.last_step, now)
         if step is not None:
             authenticator.last_step = step
             return "totp"
@@ -406,6 +476,7 @@ def sign_in(
     address: str,
     user_agent: str | None,
     now: datetime,
+    keys: TotpKeys,
 ) -> tuple[AdminSession, str, Factor]:
     """Check all three at once and start a session, or SignInRefused. Returns
     the session, its token and the second factor used. The caller commits,
@@ -432,7 +503,7 @@ def sign_in(
     if authenticators := locked_authenticators(session, admin.id):
         if not limits.hit(PER_ACCOUNT, "code", str(admin.id)):
             _refuse_sign_in("rate_limited", admin)
-        factor = check_second_factor(session, admin.id, authenticators, code, now)
+        factor = check_second_factor(session, keys, admin.id, authenticators, code, now)
     if factor is None:
         _refuse_sign_in("bad_code", admin)
     row, token = start_session(session, admin.id, user_agent, now)
@@ -543,7 +614,7 @@ Confirmation = Literal["confirmed", "refused", "rate_limited"]
 
 
 def confirm(
-    session: Session, row: AdminSession, typed: str, now: datetime
+    session: Session, keys: TotpKeys, row: AdminSession, typed: str, now: datetime
 ) -> tuple[Confirmation, Factor | None]:
     """A code (or, without TOTP, the password) for sensitive actions. Every
     attempt counts against the administrator's codes, shared with signing
@@ -556,7 +627,7 @@ def confirm(
     if uses_totp(session, row.admin_id):
         if authenticators := locked_authenticators(session, row.admin_id):
             factor = check_second_factor(
-                session, row.admin_id, authenticators, typed, now
+                session, keys, row.admin_id, authenticators, typed, now
             )
     # Checked again once locked: TOTP may have been set up meanwhile.
     elif check_password(session, row.admin_id, typed) and not uses_totp(
@@ -649,6 +720,7 @@ def create_first_admin(
     step: int | None,
     user_agent: str | None,
     now: datetime,
+    keys: TotpKeys,
 ) -> FirstAdmin:
     """The first administrator, signed in, with their authenticator and
     recovery codes if a code from it was accepted (`step`, the time step it
@@ -665,7 +737,7 @@ def create_first_admin(
     _set_password(session, admin.id, password, now)
     codes: list[str] = []
     if step is not None:
-        add_authenticator(session, admin.id, authenticator_name, totp_key, step)
+        add_authenticator(session, keys, admin.id, authenticator_name, totp_key, step)
         codes = make_recovery_codes(session, admin.id, now)
     row, token = start_session(session, admin.id, user_agent, now)
     log.info("first administrator set up", admin_id=admin.id, sign_in_id=row.id)

@@ -88,8 +88,9 @@ mise run setup
 
 It installs the tools in `mise.toml` (uv then installs the Python version the
 backend asks for), the backend's and frontend's dependencies, and makes a
-`.env` from `.env.example` if there is none. Every command below runs Python
-through `uv run`.
+`.env` from `.env.example` and a key in `.local/totp-keys` (DEPLOYMENT.md,
+TOTP keys) if there are none. Git ignores `.local/`. Every command below
+runs Python through `uv run`.
 
 ## Local settings
 

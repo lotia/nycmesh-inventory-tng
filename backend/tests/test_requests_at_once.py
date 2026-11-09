@@ -68,7 +68,14 @@ from inventory_tng.models import (
 from helpers.concurrency import Committed, Worker, delete_made, made, newest_ids
 from helpers.mail import SentMail
 from helpers.rows import item_fields, tag
-from helpers.sign_in import PASSWORD, code, new_admin, reset_link, sign_in_with
+from helpers.sign_in import (
+    PASSWORD,
+    TOTP_KEYS,
+    code,
+    new_admin,
+    reset_link,
+    sign_in_with,
+)
 from helpers.stock import committed_place
 
 NEW_PASSWORD = "a long passphrase of their own"
@@ -97,6 +104,7 @@ def signing_in(
         address="192.0.2.80",
         user_agent=None,
         now=datetime.now(UTC),
+        keys=TOTP_KEYS,
     )
 
 
@@ -290,7 +298,7 @@ def test_a_code_being_confirmed_while_a_reset_is_made_does_not_deadlock(
     row = confirming.get_one(AdminSession, session_id)
     # Later than the session's start, so confirming writes its session row.
     later = now + timedelta(seconds=1)
-    assert accounts.confirm(confirming, row, code(key, later), later)[0] == (
+    assert accounts.confirm(confirming, TOTP_KEYS, row, code(key, later), later)[0] == (
         "confirmed"
     )
     reset, worker = reset_blocked(committed, ada, ben)
@@ -411,7 +419,9 @@ def setting_up_totp(committed: Committed, admin_id: int) -> Session:
     """An authenticator being added for them, not yet committed."""
     session = committed.session()
     accounts.lock_admin(session, admin_id)
-    accounts.add_authenticator(session, admin_id, "Phone", accounts.new_totp_key(), 0)
+    accounts.add_authenticator(
+        session, TOTP_KEYS, admin_id, "Phone", accounts.new_totp_key(), 0
+    )
     return session
 
 
@@ -427,7 +437,9 @@ def test_a_password_confirmed_while_totp_is_set_up_is_refused(
     row = confirming.get_one(AdminSession, session_id)
     worker = committed.blocked(
         confirming,
-        lambda: accounts.confirm(confirming, row, PASSWORD, datetime.now(UTC))[0],
+        lambda: accounts.confirm(
+            confirming, TOTP_KEYS, row, PASSWORD, datetime.now(UTC)
+        )[0],
     )
     adding.commit()
     assert worker.finished().result == "refused"

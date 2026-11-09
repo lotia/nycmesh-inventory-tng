@@ -34,8 +34,10 @@ from inventory_tng.models import (
 from helpers.sign_in import (
     PASSWORD,
     RECOVERY_CODE,
+    TOTP_KEYS,
     code,
     new_admin,
+    opened,
     policy,
     sign_in_with,
     text,
@@ -89,7 +91,7 @@ def test_setup_makes_the_first_admin_signed_in_with_recovery_codes(
     admin = session.scalars(select(Admin)).one()
     assert admin.username == "ada"
     (authenticator,) = session.scalars(select(Authenticator)).all()
-    assert authenticator.totp_key == key
+    assert opened(authenticator) == key
     # Signed in: the cookie opens the administrator pages.
     assert client.get(sign_in.HOME).status_code == 200
     # And setup is gone for good.
@@ -174,6 +176,7 @@ def test_setup_refuses_once_any_admin_exists_even_retired(
             step=None,
             user_agent=None,
             now=NOW,
+            keys=TOTP_KEYS,
         )
 
 
@@ -229,6 +232,7 @@ def test_an_unknown_name_is_checked_against_a_password_all_the_same(
             address="192.0.2.1",
             user_agent=None,
             now=NOW,
+            keys=TOTP_KEYS,
         )
     assert len(checked) == 1
 
@@ -243,7 +247,9 @@ def test_a_code_works_once(client: TestClient, session: Session) -> None:
 
 def second_factor(session: Session, admin_id: int, typed: str) -> str | None:
     authenticators = accounts.locked_authenticators(session, admin_id)
-    return accounts.check_second_factor(session, admin_id, authenticators, typed, NOW)
+    return accounts.check_second_factor(
+        session, TOTP_KEYS, admin_id, authenticators, typed, NOW
+    )
 
 
 def test_an_earlier_code_is_refused_after_a_later_one(session: Session) -> None:
@@ -458,7 +464,7 @@ def test_a_sensitive_page_asks_for_a_code_then_carries_on(
 ) -> None:
     row = signed_in_row(client, session)
     authenticator = session.scalars(select(Authenticator)).one()
-    key = authenticator.totp_key
+    key = opened(authenticator)
     # Signing in counts as confirming, so it goes straight through...
     assert client.get(sign_in.NEW_AUTHENTICATOR).status_code == 200
     # ...until the window closes. That does not sign anyone out.

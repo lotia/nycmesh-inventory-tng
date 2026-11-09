@@ -38,7 +38,7 @@ from helpers.devices import new_device
 from helpers.mail import FailingMail, SentMail
 from helpers.pools import small_database
 from helpers.rows import add, shown, tag
-from helpers.sign_in import PASSWORD, code, new_admin, sign_in_with
+from helpers.sign_in import PASSWORD, TOTP_KEYS, code, new_admin, sign_in_with
 from helpers.stock import Place, adjustment_form, received, retire, stocked, write
 
 ENDPOINT = {"OTEL_EXPORTER_OTLP_ENDPOINT": "http://collector:4318"}
@@ -110,7 +110,7 @@ def recorded(database_url: str) -> Iterator[Recorded]:
     reader, exporter = InMemoryMetricReader(), InMemoryLogRecordExporter()
     telemetry = Telemetry.create({}, metric_reader=reader, log_exporter=exporter)
     telemetry.make_global()
-    app = create_app(Settings(database_url=database_url))
+    app = create_app(Settings(database_url=database_url, totp_keys=TOTP_KEYS))
     telemetry.instrument(app, app.state.db)
     telemetry.attach_logs(Masker())
     root = logging.getLogger()

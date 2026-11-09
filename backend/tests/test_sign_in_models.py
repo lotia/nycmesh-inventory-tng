@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from inventory_tng import accounts
 from inventory_tng.models import (
     Admin,
     AdminPassword,
@@ -101,14 +102,24 @@ def test_emails_are_optional_unique_and_look_like_addresses(
 def test_an_authenticator_keeps_its_key_only_until_removed(
     session: Session, admin: Admin
 ) -> None:
-    current = add(session, Authenticator(admin_id=admin.id, name="Pixel", totp_key="K"))
+    current = add(
+        session,
+        Authenticator(admin_id=admin.id, name="Pixel", sealed_key=b"K", key_version=1),
+    )
     with violates(session, "ck_authenticator_key_until_retired"):
         current.retired_at = datetime.now(UTC)
     with violates(session, "uq_authenticator_name"):
-        session.add(Authenticator(admin_id=admin.id, name="pixel", totp_key="L"))
+        session.add(
+            Authenticator(
+                admin_id=admin.id, name="pixel", sealed_key=b"L", key_version=1
+            )
+        )
     # Another administrator may use the same name.
     other = add(session, Admin(username="ben"))
-    add(session, Authenticator(admin_id=other.id, name="Pixel", totp_key="M"))
+    add(
+        session,
+        Authenticator(admin_id=other.id, name="Pixel", sealed_key=b"M", key_version=1),
+    )
 
 
 def test_a_reset_links_kind_says_who_made_it(
@@ -143,7 +154,10 @@ def test_history_holds_no_secret(session: Session, admin: Admin, other: Admin) -
     password = add(session, AdminPassword(id=admin.id, password_hash="$argon2id$x"))
     password.password_hash = "$argon2id$y"
     authenticator = add(
-        session, Authenticator(admin_id=admin.id, name="Pixel", totp_key="KEY")
+        session,
+        Authenticator(
+            admin_id=admin.id, name="Pixel", sealed_key=b"KEY", key_version=1
+        ),
     )
     add(session, RecoveryCode(admin_id=admin.id, code_hash=b"code"))
     add(
@@ -156,7 +170,7 @@ def test_history_holds_no_secret(session: Session, admin: Admin, other: Admin) -
             expires_at=LATER,
         ),
     )
-    authenticator.totp_key, authenticator.retired_at = None, datetime.now(UTC)
+    accounts.retire(authenticator, datetime.now(UTC))
     session.flush()
     # Which those are is test_history.py's to pin; each has rows here.
     for table, columns in flagged_columns("secret").items():
@@ -185,7 +199,10 @@ def test_history_records_the_rest_of_each_row(session: Session, admin: Admin) ->
 
 def test_a_code_accepted_is_not_history(session: Session, admin: Admin) -> None:
     authenticator = add(
-        session, Authenticator(admin_id=admin.id, name="Pixel", totp_key="KEY")
+        session,
+        Authenticator(
+            admin_id=admin.id, name="Pixel", sealed_key=b"KEY", key_version=1
+        ),
     )
     authenticator.last_step = 12345
     session.flush()

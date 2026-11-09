@@ -12,6 +12,8 @@ from inventory_tng.masking import MASK, Masker, scrub_database_message
 from inventory_tng.server import create_server
 from inventory_tng.settings import Settings, SettingsError
 
+from helpers.settings import from_environ
+
 # Written out, not read from masking.py, so shrinking a list fails a test.
 SECRETS = {
     "password": "hunter2-password",
@@ -73,7 +75,7 @@ def configure(**environ: str) -> None:
 
 
 def settings(**environ: str) -> Settings:
-    return Settings.from_environ({"DATABASE_URL": "postgresql://db/x", **environ})
+    return from_environ({"DATABASE_URL": "postgresql://db/x", **environ})
 
 
 @pytest.mark.usefixtures("restore_logging")

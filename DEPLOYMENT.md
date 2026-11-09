@@ -20,13 +20,15 @@ There is no production container image or Helm chart yet
 
 ## Settings
 
-Set these in the environment. Only `DATABASE_URL` is required, and for
-migrations only `MIGRATION_DATABASE_URL`.
+Set these in the environment. Only `DATABASE_URL` and `TOTP_KEYS_DIR` are
+required, and for migrations only `MIGRATION_DATABASE_URL`.
 
 - `DATABASE_URL`: `postgresql://user:password@host:port/database`, logging
   in as the app's role (Database roles, below).
 - `MIGRATION_DATABASE_URL`: the same, logging in as the owner. Only
   migrations read it; the app never needs it.
+- `TOTP_KEYS_DIR`: the folder holding the keys that seal administrators'
+  authenticators (TOTP keys, below).
 - `APP_ENV`: leave unset in production. `development` is for local work
   only: it stops masking personal data in logs and redacting traces, lets the
   cookie travel over http, re-reads the scan page's build on every page, and
@@ -207,6 +209,43 @@ once, so make a new one for another try. `/recover` exists only
 while `RECOVERY_TOKEN` is set: remove it and restart afterwards. Anyone who
 can read the token's Secret can already read `DATABASE_URL`, so it trusts
 nobody new.
+
+## TOTP keys
+
+Each authenticator's key is stored sealed (AES-GCM), so a copy of the
+database or a backup cannot make anyone's codes (docs/decisions/0017). The
+keys that seal them live outside the database, in `TOTP_KEYS_DIR`: one file
+per version, named `1`, `2` and so on, each holding a key. The highest
+version seals; every version present opens.
+
+Make a key and put it in a Secret, mounted as a folder into the app's pods
+only:
+
+```sh
+uv run python -m inventory_tng.totp_keys new > 1
+kubectl create secret generic inventory-totp-keys --from-file=1
+```
+
+Back the Secret up apart from the database's backups, and keep it as
+carefully: the two together can make codes.
+
+**Rotating.** Add the next version to the Secret, roll out, then seal every
+authenticator with it:
+
+```sh
+kubectl exec deploy/inventory -- python -m inventory_tng.totp_keys reseal
+```
+
+It says how many it resealed and how many it could not read. Once none is
+left on the old version, remove that version from the Secret and roll out
+again.
+
+**If a key is lost.** The app starts with whatever versions are present, and
+logs at startup how many authenticators it cannot read. Those take no code,
+and each one's administrator still signs in with their password and a
+recovery code, or a reset link (A locked-out administrator, above), then
+removes it and adds a new one on their account page. A key that may have
+leaked is rotated as above.
 
 ## Mail
 
