@@ -420,8 +420,12 @@ Playwright's WebKit is built for Ubuntu and may not start on other systems
 Playwright starts the backend itself, with a database of its own, on a port
 chosen for the run, so runs from two clones do not meet.
 
-CI runs these checks, in this order, on pushes to `main` and on pull requests,
-and builds the frontend.
+CI runs each of these checks as a job named for its task, on pushes to `main`
+and on pull requests, and builds the frontend. It calls each tool directly,
+not through mise. A task named `check-…` is a check CI runs too, as a job of
+the same name; one that only makes sense on your machine, such as setting it
+up, is named otherwise. A test fails on a job not named for a task, or a
+`check-…` task without a job.
 
 Only the backend's tests and the browser tests need the database; the other
 checks take about a second each. Start the database first. Then
