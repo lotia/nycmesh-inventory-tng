@@ -1,6 +1,6 @@
 import logging
 import uuid
-from collections.abc import Generator, Iterator
+from collections.abc import Callable, Generator, Iterator, Mapping
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -9,26 +9,31 @@ import pyotp
 import pytest
 import structlog
 from fastapi.testclient import TestClient
+from httpx2 import Response as Answer
 from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 from opentelemetry.sdk.metrics.export import (
     InMemoryMetricReader,
     Metric,
     NumberDataPoint,
 )
-from sqlalchemy import exc
+from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
+from structlog.testing import capture_logs
 
 from inventory_tng import accounts, devices, labels, ledger, mail
+from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS
 from inventory_tng.app import create_app
+from inventory_tng.db import RuleBroken
 from inventory_tng.devices import RegisteredDevice
 from inventory_tng.masking import MASK, Masker
+from inventory_tng.models import AdjustmentReason, LedgerTransaction
 from inventory_tng.settings import Settings
 from inventory_tng.telemetry import Telemetry, enabled
 
 from helpers.apps import on_session
 from helpers.devices import new_device
 from helpers.mail import FailingMail, SentMail
-from helpers.sign_in import PASSWORD, new_admin
+from helpers.sign_in import PASSWORD, code, new_admin, sign_in_with
 from helpers.stock import Place, received, stocked, write
 
 ENDPOINT = {"OTEL_EXPORTER_OTLP_ENDPOINT": "http://collector:4318"}
@@ -347,7 +352,88 @@ def test_counts_count_lines_withheld(rolled_back: Recorded, session: Session) ->
         session, uuid.uuid4(), ada.id, place.store.id, radios, as_of
     )
     assert result.moved == {place.item.id: (Decimal(0), Decimal(3))}
+    ledger.corrected(ada.id, place.store.id, result.written, result.withheld)
     assert counted(reader, "inventory.count.lines.withheld")[()] >= 1
+
+
+def recorded_by_kind(reader: InMemoryMetricReader) -> tuple[int, int]:
+    """inventory.counts.recorded's totals so far: counts, adjustments."""
+    totals = counted(reader, "inventory.counts.recorded")
+    return totals.get((("kind", "count"),), 0), totals.get((("kind", "adjustment"),), 0)
+
+
+def counting(
+    client: TestClient, session: Session
+) -> tuple[Place, Callable[[], Answer]]:
+    """Ada signed in, and a count of five radios that finds three, and a
+    metre of cable: two transactions, one out of the store, one into it."""
+    _, key = new_admin(session)
+    sign_in_with(client, code=code(key))
+    place = stocked(session)
+    form = {
+        "key": str(uuid.uuid4()),
+        "as_of": str(ledger.moment(session, place.store.id)),
+        f"counted_{place.item.id}": "3",
+        f"counted_{place.cable.id}": "1",
+    }
+    path = f"{COUNTS}/{place.store.id}"
+    return place, lambda: client.post(path, data=form, follow_redirects=False)
+
+
+def test_counts_counts_and_adjustments_written_once(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """Each transaction once it is committed; sent again, none."""
+    client, _, reader, _ = rolled_back
+    place, count = counting(client, session)
+    before = recorded_by_kind(reader)
+    assert count().status_code == 303
+    assert count().status_code == 303
+    reason = session.scalars(select(AdjustmentReason.id)).first()
+    form = {
+        "key": str(uuid.uuid4()),
+        "location_id": str(place.store.id),
+        "item_id": str(place.item.id),
+        "amount": "1",
+        "direction": "off",
+        "reason_id": str(reason),
+    }
+    for _ in range(2):
+        adjusted = client.post(ADJUSTMENTS, data=form, follow_redirects=False)
+        assert adjusted.status_code == 303
+    counts, adjustments = recorded_by_kind(reader)
+    assert (counts - before[0], adjustments - before[1]) == (2, 1)
+
+
+def test_a_count_refused_after_its_first_transaction_records_nothing(
+    rolled_back: Recorded, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The count into the store is written, then the count out of it is
+    refused: neither is kept, counted or logged (inventory-tng-8i4.104).
+    No rule can refuse that second one for real, as what it takes out has
+    moved, which fixes its unit, so a stand-in refuses it."""
+    client, _, reader, _ = rolled_back
+    place, count = counting(client, session)
+    real = ledger.insert_transaction
+
+    def refusing_the_second(
+        session: Session,
+        key: uuid.UUID,
+        header: Mapping[str, object],
+        lines: Mapping[int, Decimal],
+    ) -> LedgerTransaction | None:
+        if header.get("from_location_id") is not None:
+            raise RuleBroken("movement_whole_units")
+        return real(session, key, header, lines)
+
+    monkeypatch.setattr(ledger, "insert_transaction", refusing_the_second)
+    before = recorded_by_kind(reader)
+    with capture_logs() as logs:
+        refused = count()
+    assert refused.status_code == 400
+    assert recorded_by_kind(reader) == before
+    assert not [line for line in logs if line["event"] == "count recorded"]
+    assert ledger.expected(session, place.store.id) == {place.item.id: Decimal(5)}
 
 
 def needs_a_device(device: RegisteredDevice) -> int:

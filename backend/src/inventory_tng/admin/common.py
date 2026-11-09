@@ -52,6 +52,7 @@ RULES = {
     "item_unit_fixed": "Its unit is fixed, as stock has moved in it.",
     "category_has_items": "Move or retire its items first.",
     "site_settings_time_zone": "Pick a zone from the list.",
+    "movement_whole_units": "This item is counted in whole units.",
 }
 
 
@@ -151,5 +152,5 @@ def quantity(
     if value < 0 or (positive and value == 0):
         return "Use a number above 0." if positive else "Use 0 or more."
     if unit is not None and not whole_enough(unit, value):
-        return "This item is counted in whole units."
+        return RULES["movement_whole_units"]
     return value

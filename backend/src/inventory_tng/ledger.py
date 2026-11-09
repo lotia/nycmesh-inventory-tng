@@ -590,23 +590,25 @@ withheld = meter.create_counter(
 )
 
 
+class Written(NamedTuple):
+    """A count's or an adjustment's transaction, as written."""
+
+    id: int
+    kind: str
+    lines: int
+
+
 def _correct(
     session: Session,
     key: uuid.UUID,
     kind: Literal["count", "adjustment"],
     header: Mapping[str, object],
     lines: Mapping[int, Decimal],
-) -> None:
+) -> Written | None:
+    """A count's or an adjustment's transaction, unless its key is written
+    already."""
     transaction = insert_transaction(session, key, {"kind": kind, **header}, lines)
-    if transaction is None:
-        return
-    counted.add(1, {"kind": kind})
-    log.info(
-        f"{kind} recorded",
-        ledger_transaction_id=transaction.id,
-        admin_id=header["admin_id"],
-        lines=len(lines),
-    )
+    return None if transaction is None else Written(transaction.id, kind, len(lines))
 
 
 class Counted(NamedTuple):
@@ -614,6 +616,33 @@ class Counted(NamedTuple):
     # Items counted that moved at the place since the form was shown, with
     # what came in and what went out since. Not written: count them again.
     moved: dict[int, tuple[Decimal, Decimal]]
+    # What this send wrote: nothing if an earlier send of it did.
+    written: list[Written]
+    # How many lines it withheld that no earlier send of it did.
+    withheld: int
+
+
+def corrected(
+    admin_id: int, location_id: int, written: Iterable[Written], withheld_lines: int = 0
+) -> None:
+    """Measure and log a count or an adjustment once committed, as
+    save_batch does, so a failed commit and its retry count once."""
+    for transaction in written:
+        counted.add(1, {"kind": transaction.kind})
+        log.info(
+            f"{transaction.kind} recorded",
+            ledger_transaction_id=transaction.id,
+            admin_id=admin_id,
+            lines=transaction.lines,
+        )
+    if withheld_lines:
+        withheld.add(withheld_lines)
+        log.info(
+            "count lines withheld",
+            location_id=location_id,
+            admin_id=admin_id,
+            lines=withheld_lines,
+        )
 
 
 def record_count(
@@ -661,22 +690,20 @@ def record_count(
             found[item_id] = difference
         elif difference < 0:
             lost[item_id] = -difference
-    if moved and sent is None:
-        withheld.add(len(moved))
-        log.info(
-            "count lines withheld",
-            location_id=location_id,
-            admin_id=admin_id,
-            lines=len(moved),
-        )
+    written = []
     # A count of nothing at all still says when the place was counted.
     if found or ((kept or not counted_at) and not lost):
         header = {"admin_id": admin_id, "to_location_id": location_id}
-        _correct(session, key, "count", header, found)
+        written.append(_correct(session, key, "count", header, found))
     if lost:
         header = {"admin_id": admin_id, "from_location_id": location_id}
-        _correct(session, lost_key, "count", header, lost)
-    return Counted(bool(found or lost), moved)
+        written.append(_correct(session, lost_key, "count", header, lost))
+    return Counted(
+        bool(found or lost),
+        moved,
+        [transaction for transaction in written if transaction is not None],
+        len(moved) if sent is None else 0,
+    )
 
 
 def record_adjustment(
@@ -689,11 +716,13 @@ def record_adjustment(
     *,
     found: bool,
     reason_id: int,
-) -> None:
-    """Stock found at a place, or written off from it, for a reason."""
+) -> list[Written]:
+    """Stock found at a place, or written off from it, for a reason. What
+    it wrote: nothing if its key was written already."""
     side = "to_location_id" if found else "from_location_id"
     header = {"admin_id": admin_id, "reason_id": reason_id, side: location_id}
-    _correct(session, key, "adjustment", header, {item_id: amount})
+    written = _correct(session, key, "adjustment", header, {item_id: amount})
+    return [] if written is None else [written]
 
 
 def _header(batch: Batch) -> dict[str, object]:
