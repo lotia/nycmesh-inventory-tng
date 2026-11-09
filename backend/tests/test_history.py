@@ -22,7 +22,7 @@ from sqlalchemy import Executable, delete, exc, text, update
 from sqlalchemy.orm import Session
 
 from inventory_tng import devices
-from inventory_tng.db import Base, set_actor
+from inventory_tng.db import Base, Flag, set_actor
 from inventory_tng.history import (
     Change,
     change,
@@ -166,10 +166,11 @@ def test_every_table_has_history_but_those_named() -> None:
             "not_a_change",
             {"device": {"last_seen_at"}, "authenticator": {"last_step"}},
         ),
+        ("row_lock_only", {"item": {"on_order"}}),
     ],
 )
-def test_the_columns_history_treats_apart_are_on_tables_with_history(
-    flag: str, columns: dict[str, set[str]]
+def test_the_flagged_columns_are_on_tables_with_history(
+    flag: Flag, columns: dict[str, set[str]]
 ) -> None:
     assert flagged_columns(flag) == columns
     assert set(columns) <= HISTORY_TABLES

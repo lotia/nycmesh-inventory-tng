@@ -123,18 +123,19 @@ def _rehash(row: AdminPassword, password: str) -> None:
 
 
 def check_password(session: Session, admin_id: int | None, password: str) -> bool:
-    """argon2's work with nothing locked, so guessing holds up nobody; then
-    their row locked (lock_admin), as a reset of their sign-in locks it
-    too, and the password must still be there and still match: a reset
-    done meanwhile took it, a link or a rehash may have changed it. One that
-    comes after waits for this request (inventory-tng-8i4.50.4)."""
+    """argon2's work with nothing locked, so guessing holds up nobody; then,
+    in the order a reset and _set_password take them, their row
+    (lock_admin) and their password's, which must still be there and still
+    match: a reset done meanwhile took it, a link or a rehash may have
+    changed it. One that comes after waits for this request
+    (inventory-tng-8i4.50.4), and a rehash changes it only once locked."""
     stored = session.get(AdminPassword, admin_id) if admin_id is not None else None
     verified = stored.password_hash if stored else None
     if not _matches(verified, password):
         return False
     assert admin_id is not None  # _matches is False without a password.
     lock_admin(session, admin_id)
-    current = session.get(AdminPassword, admin_id, populate_existing=True)
+    current = get_locked(session, AdminPassword, admin_id)
     if current is None:
         return False
     if current.password_hash != verified and not _matches(

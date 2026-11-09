@@ -78,25 +78,17 @@ lock's, and each table's protection was in four lists nothing tied together
   holds (`"catalogue"`, `"row"` or none) and whether it has history; and on
   a column, `secret`, `not_a_change` or `row_lock_only`. The guard, history
   and `tests/test_write_owners.py` read `Base.metadata`.
-- **One flush guard** replaces the catalogue lock's: a changed or deleted
-  row of a table with a lock was locked in this transaction (`db.locked`,
-  `get_locked` and the helpers on them note it), or added in it; a catalogue
-  write holds the catalogue lock too, but to `item.on_order`. A savepoint
-  rolled back forgets what was locked or written in it, as PostgreSQL
-  lets go of those locks. Tables
-  only added to (the ledger, history, sent forms) or changed on every
-  request (administrators' sessions) need none. The static test is kept
-  for what the guard cannot see: where a row was made, and deletes.
+- **One flush guard** replaces the catalogue lock's: every write to a table
+  whose protection names a lock holds it; `db.py` gives the rules. The
+  static test is kept for what the guard cannot see: where a row was made,
+  and deletes.
 - **Single-row rules**: a check constraint where PostgreSQL can check it;
   else `@validates` on the model (the site's time zone). Rules that read
   other rows stay in domain functions.
-- **History still reads each row before a flush.** Taking it from a locked,
-  loaded object was tried and dropped: it saved one primary-key read per
-  table per flush, on writes made at an administrator's pace, but made
-  history's correctness depend on the lock record, and recorded values
-  PostgreSQL never stored (5.0004 in a numeric(12,3), after an earlier
-  flush in the same transaction).
 
-We rejected a flag per owner module set while its functions run: it says
-who wrote, not that the row was locked, which is what history and the
-rules rely on.
+We rejected a flag per owner module set while its functions run, as it
+says who wrote, not that the row was locked, which is what history and the
+rules rely on; and taking history's row before a flush from the locked,
+loaded object rather than reading it, which saved one read per table per
+flush but tied history to the lock record and recorded values PostgreSQL
+never stored (5.0004 in a numeric(12,3)).

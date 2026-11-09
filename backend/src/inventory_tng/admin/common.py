@@ -9,11 +9,11 @@ from urllib.parse import urlencode
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import Base
+from inventory_tng.db import Base, by_name
 from inventory_tng.ledger import whole_enough
+from inventory_tng.models import INTEGER_MAX, whole
 from inventory_tng.pages import NOTICES, page, templates
 from inventory_tng.sign_in import SignedIn
 
@@ -53,6 +53,7 @@ RULES = {
     "category_has_items": "Move or retire its items first.",
     "site_settings_time_zone": "Pick a zone from the list.",
     "movement_whole_units": "This item is counted in whole units.",
+    "location_countable": "That place is retired and holds nothing: pick another.",
 }
 
 
@@ -94,12 +95,18 @@ async def text_form(request: Request) -> dict[str, str]:
     return {k: v for k, v in (await request.form()).items() if isinstance(v, str)}
 
 
+def row_id(typed: str) -> int | None:
+    """The id a form sent, or None if it is not one."""
+    return whole(typed, 1, INTEGER_MAX)
+
+
 def chosen[T: Base](
     session: Session, model: type[T], typed: str, *, current: bool = True
 ) -> T | None:
     """The row a form's select sent the id of: None if it sent none, there
     is no such row, or (if `current`) it is retired."""
-    row = session.get(model, int(typed)) if typed.isdigit() else None
+    ident = row_id(typed)
+    row = session.get(model, ident) if ident is not None else None
     if row is None or (current and getattr(row, "retired_at", None) is not None):
         return None
     return row
@@ -108,13 +115,7 @@ def chosen[T: Base](
 def current_rows[T: Base](session: Session, model: type[T]) -> list[T]:
     """A model's current rows, by name as people sort them."""
     table: Any = model
-    return list(
-        session.scalars(
-            select(model)
-            .where(table.retired_at.is_(None))
-            .order_by(func.lower(table.name))
-        )
-    )
+    return by_name(session, model, table.retired_at.is_(None))
 
 
 def name_problem(name: str) -> str | None:

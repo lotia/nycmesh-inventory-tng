@@ -11,7 +11,9 @@ meanwhile still applies, and an item it moved comes back to count again.
 The pages check what was typed before writing, but an item's unit may
 change to each between that check and the write: the ledger then refuses
 the line (movement_whole_units), and the form is shown again with that
-line marked, and nothing written.
+line marked, and nothing written. So too a place retired meanwhile, which
+the ledger refuses (location_countable) unless the form was written there
+before.
 
 A count names each item once: a form naming one on two fields (counted_5
 and counted_05, or the select at the foot choosing an item listed above) is
@@ -23,7 +25,7 @@ so it cannot be sent a repeat: the check is here, where fields become items.
 import uuid
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
-from typing import Annotated, Any, cast
+from typing import Annotated, Any
 
 import structlog
 from fastapi import APIRouter, Depends, Request
@@ -38,10 +40,11 @@ from inventory_tng.admin.common import (
     chosen,
     current_rows,
     quantity,
+    row_id,
     text_form,
 )
 from inventory_tng.admin.settings import SETTINGS
-from inventory_tng.db import DbSession, refusal
+from inventory_tng.db import DbSession, by_name, refusal
 from inventory_tng.ledger import (
     corrected,
     countable,
@@ -50,8 +53,7 @@ from inventory_tng.ledger import (
     record_adjustment,
     record_count,
     repeated,
-    retired_places_holding_stock,
-    sent_keys,
+    retired_holding_stock_count,
     takeable,
 )
 from inventory_tng.local_time import site_zone
@@ -67,13 +69,11 @@ from inventory_tng.models import (
 )
 from inventory_tng.once import form_key
 from inventory_tng.pages import (
-    BADGES,
     NOTICES,
     Badge,
     not_found,
     redirect,
     retired_holding,
-    templates,
 )
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
@@ -86,8 +86,10 @@ ADJUSTMENTS = f"{COUNTS}/adjustments"
 RECENT = 30
 COUNTED = "counted_"
 EXTRA = "extra_quantity"
-# The ledger rule a race can break past the page's check (module docstring).
+# The ledger rules a race can break past the page's checks (module
+# docstring).
 WHOLE = "movement_whole_units"
+COUNTABLE = "location_countable"
 TWICE = (
     "An item is on this form more than once. Each item is counted once, so "
     "it isn't clear which number is right: nothing was saved."
@@ -104,50 +106,22 @@ NOTICES.update(
 TextForm = Annotated[dict[str, str], Depends(text_form)]
 
 
-def badge(retired_places: Sequence[Location]) -> Badge | None:
+def badge(session: Session) -> Badge | None:
     """Beside Counts: how many retired places hold stock, to count
-    (ledger.retired_places_holding_stock)."""
-    many = len(retired_places)
+    (ledger.retired_holding_stock)."""
+    many = retired_holding_stock_count(session)
     return Badge(many, retired_holding(many)) if many else None
-
-
-BADGES[COUNTS] = lambda session: badge(retired_places_holding_stock(session))
-# For the links to a place's count on other pages.
-cast(dict[str, Any], templates.env.globals)["counts_path"] = COUNTS
 
 
 def _items(session: Session) -> list[Item]:
     """What can be counted or adjusted: current items, and retired ones with
     stock left, which may still be written off."""
-    return list(
-        session.scalars(select(Item).where(takeable()).order_by(func.lower(Item.name)))
-    )
+    return by_name(session, Item, takeable())
 
 
 def _places(session: Session) -> list[Location]:
     """Where can be counted or adjusted (ledger.countable)."""
-    return list(
-        session.scalars(
-            select(Location).where(countable()).order_by(func.lower(Location.name))
-        )
-    )
-
-
-def _place(
-    session: Session, location_id: int | None, key: uuid.UUID | None = None
-) -> Location | None:
-    """The place to count or adjust, if ledger.countable allows it; or,
-    with the key of a form already written, whichever it named, so a form
-    sent again gets its first answer."""
-    if location_id is None:
-        return None
-    allowed = countable()
-    if key is not None:
-        written = select(LedgerTransaction.id).where(
-            LedgerTransaction.idempotency_key.in_(sent_keys(key))
-        )
-        allowed |= written.exists()
-    return session.scalar(select(Location).where(Location.id == location_id, allowed))
+    return by_name(session, Location, countable())
 
 
 def _recent(session: Session) -> list[dict[str, Any]]:
@@ -251,8 +225,8 @@ def _count_page(
     was = expected(session, place.id, as_of=as_of, items=items or None)
     if items:
         was = {item_id: was.get(item_id, Decimal(0)) for item_id in items}
-    countable = _items(session)
-    named = {item.id: item for item in countable}
+    listed = _items(session)
+    named = {item.id: item for item in listed}
     if missing := was.keys() - named.keys():
         # What the records had then but cannot be counted now, or what the
         # form's items, sent back, name that is no item at all.
@@ -278,7 +252,7 @@ def _count_page(
             "rows": rows,
             "recount": recount,
             "items": sorted(items),
-            "others": [item for item in countable if item.id not in was],
+            "others": [item for item in listed if item.id not in was],
             "key": (values or {}).get("key") or uuid.uuid4(),
             "as_of": as_of,
             "alert": alert,
@@ -293,7 +267,9 @@ def _count_page(
 def count_form(
     request: Request, signed: AdminSignedIn, session: DbSession, location_id: int
 ) -> Response:
-    place = _place(session, location_id)
+    place = session.scalar(
+        select(Location).where(Location.id == location_id, countable())
+    )
     if place is None:
         return not_found()
     return _count_page(request, session, signed, place, moment(session, place.id))
@@ -306,7 +282,7 @@ Line = tuple[str, int | None, str]
 
 def _item_id(typed: str) -> int | None:
     """The item named by digits, however many zeros lead them."""
-    return whole(typed.lstrip("0"), 1, INTEGER_MAX)
+    return row_id(typed.lstrip("0"))
 
 
 def lines(form: Mapping[str, str]) -> list[Line]:
@@ -366,7 +342,7 @@ def count(
     form: TextForm,
 ) -> Response:
     key = form_key(form.get("key", ""))
-    place = _place(session, location_id, key)
+    place = session.get(Location, location_id)
     as_of = whole(form.get("as_of", ""), 0, INTEGER_MAX)
     if place is None or key is None or as_of is None:
         return not_found()
@@ -374,7 +350,7 @@ def count(
     sent_items = {
         item_id
         for typed in form.get("items", "").split()
-        if (item_id := whole(typed, 1, INTEGER_MAX)) is not None
+        if (item_id := row_id(typed)) is not None
     }
     counted, problems = _counted(session, found)
     if repeats := named_twice(found):
@@ -402,9 +378,13 @@ def count(
         session,
         lambda: record_count(session, key, signed.admin.id, place.id, counted, as_of),
         WHOLE,
+        COUNTABLE,
     )
     if broken is not None:
         log.info("count refused by a rule", location_id=place.id, rule=broken)
+        if broken == COUNTABLE:
+            # As for a place there is not, as the form's own page answers.
+            return not_found()
         # Checked again, the units as they are now mark the lines it broke.
         _, problems = _counted(session, found)
         return _count_page(
@@ -447,7 +427,8 @@ def adjust(
 ) -> Response:
     problems: dict[str, str] = {}
     key = form_key(form.get("key", ""))
-    place = _place(session, whole(form.get("location_id", ""), 1, INTEGER_MAX), key)
+    location_id = row_id(form.get("location_id", ""))
+    place = session.get(Location, location_id) if location_id is not None else None
     if place is None:
         problems["location_id"] = "Pick a place."
     item = chosen(session, Item, form.get("item_id", ""), current=False)
@@ -488,12 +469,15 @@ def adjust(
             reason_id=reason.id,
         ),
         WHOLE,
+        COUNTABLE,
     )
     if broken is not None:
         log.info("adjustment refused by a rule", item_id=item.id, rule=broken)
+        field = "location_id" if broken == COUNTABLE else "amount"
         return _counts_page(
-            request, session, signed, problems={"amount": RULES[broken]}, values=form
+            request, session, signed, problems={field: RULES[broken]}, values=form
         )
+    assert written is not None
     session.commit()
-    corrected(signed.admin.id, place.id, written or [])
+    corrected(signed.admin.id, place.id, written)
     return redirect(COUNTS, notice="adjusted")

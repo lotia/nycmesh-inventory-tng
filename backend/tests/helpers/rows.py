@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.db import (
     UNGUARDED_INFO,
     Base,
+    Flag,
     RuleBroken,
     describe_error,
     flagged,
@@ -89,7 +90,7 @@ def setting_up(session: Session) -> Session:
     return session
 
 
-def flagged_columns(flag: str) -> dict[str, set[str]]:
+def flagged_columns(flag: Flag) -> dict[str, set[str]]:
     """The columns whose info sets `flag`, by table, as the models declare
     them: those with any."""
     return {

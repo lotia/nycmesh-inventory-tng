@@ -34,6 +34,7 @@ from sqlalchemy.orm import (
     QueryContext,
     Session,
     SessionTransaction,
+    UOWTransaction,
 )
 
 if TYPE_CHECKING:
@@ -140,6 +141,16 @@ def current_actor(session: Session) -> str | None:
 def exists_where(session: Session, *criteria: ColumnElement[bool]) -> bool:
     """Whether any row matches, as one EXISTS query."""
     return bool(session.scalar(select(exists().where(*criteria))))
+
+
+def by_name[M: Base](
+    session: Session, model: type[M], *where: ColumnElement[bool]
+) -> list[M]:
+    """The rows of `model` that `where` picks, by name as people sort them."""
+    named: Any = model
+    return list(
+        session.scalars(select(model).where(*where).order_by(func.lower(named.name)))
+    )
 
 
 # Where a gated request (sign_in.confirmed) keeps the transaction its lock
@@ -414,12 +425,15 @@ def lock_catalogue(session: Session) -> None:
 #   columns marked row_lock_only alone. None: no lock, for what is only
 #   added to or changes on every request.
 # - history: whether history.py records its rows' changes.
-# And on a column, mapped_column(info=...): "secret" (left out of history),
-# "not_a_change" (a change to it alone is no history) and "row_lock_only".
+# And on a column, mapped_column(info=...), a Flag: "secret", left out of
+# history (what would let someone sign in, or copy a second factor,
+# docs/decisions/0012); "not_a_change", which changing alone is no history
+# (it moves with use); and "row_lock_only" (above).
 #
 # A test's own session, which writes rows to set up what it tests, is left
 # alone (UNGUARDED_INFO; tests/helpers/rows.py, setting_up).
 type Lock = Literal["catalogue", "row"]
+type Flag = Literal["secret", "not_a_change", "row_lock_only"]
 type Action = Literal["insert", "update", "delete"]
 
 
@@ -431,19 +445,20 @@ def protection(
 
 
 @functools.cache
-def flagged(table: Table, flag: str) -> frozenset[str]:
+def flagged(table: Table, flag: Flag) -> frozenset[str]:
     """The names of the table's columns whose info sets `flag`: read once
     per table, as every flush asks for each row it writes."""
     return frozenset(c.name for c in table.columns if c.info.get(flag))
 
 
 class Write(NamedTuple):
-    """A row a flush is about to write: its table, its id if it has one
-    yet, what is done to it, and for an update the columns set to
-    something new, by name."""
+    """A row a flush is about to write: its table, its identity key and id
+    if it has them yet, what is done to it, and for an update the columns
+    set to something new, by name."""
 
     row: Base
     table: Table
+    key: object
     row_id: int | None
     action: Action
     changed: frozenset[str]
@@ -469,36 +484,42 @@ def flushed_id(row: Base) -> int | None:
     return state.identity[0] if state.identity else state.dict.get("id")
 
 
-def flush_writes(session: Session) -> list[Write]:
-    """What the next flush writes: rows added, rows changed to something
-    new, and rows deleted. Loads nothing."""
-    found: list[Write] = []
+def _table(row: Base) -> Table:
+    table = inspect(row).mapper.local_table
+    assert isinstance(table, Table)
+    return table
+
+
+_WRITES = "inventory.writes"
+
+
+def flush_writes(session: Session, context: UOWTransaction) -> list[Write]:
+    """What this flush writes: rows added, rows changed to something new,
+    and rows deleted. Loads nothing. Found once per flush, for the guard
+    and history.py: no before_flush listener here changes a row."""
+    if (found := context.attributes.get(_WRITES)) is not None:
+        return found
+    found = []
     for rows, action in (
         (session.new, "insert"),
         (session.dirty, "update"),
         (session.deleted, "delete"),
     ):
         for row in rows:
-            state = inspect(row)
             changed = changed_columns(row) if action == "update" else frozenset()
             if action == "update" and not changed:
                 continue
-            table = state.mapper.local_table
-            assert isinstance(table, Table)
-            found.append(Write(row, table, flushed_id(row), action, changed))
+            key = inspect(row).key
+            found.append(Write(row, _table(row), key, flushed_id(row), action, changed))
+    context.attributes[_WRITES] = found
     return found
 
 
 # Where the locks this transaction holds are noted: the catalogue lock as
 # CATALOGUE, a row by its identity key, each with the transaction or
-# savepoint it was taken in; and, for a row held, each savepoint or
-# transaction a change or delete of it was flushed in. A savepoint rolled
-# back lets go of the locks taken in it, as PostgreSQL does, and of a row's
-# lock taken before it but written in it, as PostgreSQL also does ("Avoid
-# locking a row and then modifying it within a later savepoint", its SELECT
-# page). The transaction's end lets go of all.
+# savepoint it was taken in. A savepoint rolled back lets go of the locks
+# taken in it, as PostgreSQL does; the transaction's end lets go of all.
 LOCKS_INFO = "inventory.locks"
-WRITTEN_INFO = "inventory.written"
 CATALOGUE = "catalogue"
 # The execution option locked marks a locking read with: the class whose
 # rows it locks.
@@ -535,18 +556,14 @@ event.listen(Base, "refresh", _locked_as_read, propagate=True, raw=True)
 def _added(session: Session, row: Base) -> None:
     """A row this transaction added is its own until it commits: no other
     can see it. Only where a write to its table needs a lock."""
-    state = inspect(row)
-    table = state.mapper.local_table
-    assert isinstance(table, Table)
-    if table.info["lock"] is not None:
-        _hold(session, state.key)
+    if _table(row).info["lock"] is not None:
+        _hold(session, inspect(row).key)
 
 
 @event.listens_for(Session, "after_transaction_end")
 def _locks_released(session: Session, transaction: SessionTransaction) -> None:
     if transaction.parent is None:
         session.info.pop(LOCKS_INFO, None)
-        session.info.pop(WRITTEN_INFO, None)
 
 
 def _within(taken: SessionTransaction | None, savepoint: SessionTransaction) -> bool:
@@ -560,22 +577,17 @@ def _savepoint_locks_released(
     session: Session, transaction: SessionTransaction
 ) -> None:
     """Forget the locks taken in a savepoint rolled back, or in one
-    released into it, and those of rows written in it. A flush that fails
-    rolls back its own transaction within the savepoint, which rolls back
-    the savepoint: so the savepoint is the nearest one around the
-    transaction rolled back."""
+    released into it. A flush that fails rolls back its own transaction
+    within the savepoint, which rolls back the savepoint: so the savepoint
+    is the nearest one around the transaction rolled back."""
     while not transaction.nested and transaction.parent is not None:
         transaction = transaction.parent
     if not transaction.nested:
         return
     held = session.info.get(LOCKS_INFO, {})
-    written = session.info.get(WRITTEN_INFO, {})
     for key, taken in list(held.items()):
-        if _within(taken, transaction) or any(
-            _within(at, transaction) for at in written.get(key, ())
-        ):
+        if _within(taken, transaction):
             del held[key]
-            written.pop(key, None)
 
 
 def missing_lock(
@@ -605,25 +617,21 @@ GUARD_FIXES: dict[Lock, str] = {
 
 
 @event.listens_for(Session, "before_flush")
-def _written_under_lock(session: Session, _context: object, _instances: object) -> None:
+def _written_under_lock(
+    session: Session, context: UOWTransaction, _instances: object
+) -> None:
     """A write to a table whose protection names a lock holds it (above):
-    anything else is a bug, refused before it is written. Notes where each
-    held row is written, for _savepoint_locks_released."""
+    anything else is a bug, refused before it is written."""
+    if session.info.get(UNGUARDED_INFO):
+        return
     held = session.info.get(LOCKS_INFO, {})
-    unguarded = session.info.get(UNGUARDED_INFO)
-    for write in flush_writes(session):
-        key = inspect(write.row).key
-        if write.action != "insert" and key in held:
-            written = session.info.setdefault(WRITTEN_INFO, {})
-            written.setdefault(key, []).append(_innermost(session))
-        if unguarded:
-            continue
+    for write in flush_writes(session, context):
         missing = missing_lock(
             write.table.info["lock"],
             write.action,
             write.changed - flagged(write.table, "row_lock_only"),
             catalogue=CATALOGUE in held,
-            row=key in held,
+            row=write.key in held,
         )
         if missing is not None:
             log.error(

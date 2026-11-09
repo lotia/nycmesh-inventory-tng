@@ -370,8 +370,7 @@ def test_items_counted_in_each_move_in_whole_units(
 
 def test_a_retired_item_is_never_received(session: Session, place: Place) -> None:
     """Whoever writes it: not only the batch endpoint."""
-    place.item.retired_at = datetime.now(UTC)
-    session.flush()
+    retire(session, place.item)
     header = {"kind": "receipt", "to_location_id": place.store.id}
     with breaks(session, "receipt_retired_item"):
         insert_transaction(session, uuid.uuid4(), header, {place.item.id: Decimal(1)})
@@ -517,8 +516,7 @@ def test_a_retired_item_is_taken_never_received(
 ) -> None:
     """What is left of it may go out; nothing more comes in."""
     received(session, place)
-    place.item.retired_at = datetime.now(UTC)
-    session.flush()
+    retire(session, place.item)
     receipt = place.batch(
         kind="receipt", from_location_id=None, to_location_id=place.store.id
     )

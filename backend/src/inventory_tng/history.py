@@ -1,6 +1,7 @@
-"""History: every row the app adds, changes or deletes through the ORM, in a
-table that has history (db.protection), is written to catalogue_history in the same
-transaction, with who did it (db.set_actor) and the row before and after.
+"""History: every row the app adds, changes or deletes through the ORM, in
+a table that has history (db.protection), is written to catalogue_history in
+the same transaction, with who did it (db.set_actor) and the row before and
+after.
 
 What to record is decided by pure functions (change, json_value); the flush
 listeners below only read the rows and write what those return. A row
@@ -9,9 +10,9 @@ SQL an operator types, is not recorded: tests/test_history.py fails on a
 statement that writes to a table with history in the app.
 
 Only the rows the session was given to add, change or delete are seen, not
-any the flush changes by itself (a cascade, or a relationship() setting a
-foreign key to NULL); models.py has no relationship(). models.py imports
-this module, so any session that can write these tables has the listeners.
+any the flush changes by itself, as a relationship() would: no model has
+one (tests/test_write_owners.py). models.py imports this module, so any
+session that can write these tables has the listeners.
 """
 
 from collections.abc import Iterable, Mapping
@@ -38,11 +39,6 @@ log = structlog.get_logger(__name__)
 HISTORY_TABLE = "catalogue_history"
 # The ledger's tables, which the app only adds to (database_role.py).
 LEDGER = ("ledger_transaction", "movement")
-# Which tables have history, and the columns it leaves out ("secret": what
-# would let someone sign in, or copy a second factor, docs/decisions/0012)
-# or does not count as a change alone ("not_a_change": each moves with use),
-# are declared on the models (db.protection). A secret changing is still
-# history; a column not a change stays in the rows recorded.
 
 type Row = Mapping[str, object]
 type Image = dict[str, object]
@@ -147,7 +143,7 @@ def _before_flush(
 ) -> None:
     keys: dict[Key, None] = {}
     added: list[tuple[Table, Base]] = []
-    for write in flush_writes(session):
+    for write in flush_writes(session, context):
         table = write.table
         # Not history: a table without it, or a change only to columns not
         # a change, so a sign-in moving an authenticator's last step reads

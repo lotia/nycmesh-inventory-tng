@@ -167,11 +167,11 @@ the app's, and `tests/test_models.py` fails on one.
 
 ### History
 
-Every row added, changed or deleted through the ORM, in any table but the
-ledger, sent forms and sessions, is written to `catalogue_history` as the
-session flushes, with who did it (`db.set_actor`); each model declares
-what it leaves out (`db.protection`). So write those tables through the
-ORM: `session.add`, an object's attributes, `session.delete`. A statement
+Every row added, changed or deleted through the ORM, in a table with
+history (see [The catalogue's rules](#the-catalogues-rules)), is written
+to `catalogue_history` as the session flushes, with who did it
+(`db.set_actor`). So write those tables through the ORM: `session.add`,
+an object's attributes, `session.delete`. A statement
 such as `update(Item)` is never recorded, and `tests/test_history.py`
 fails on one. The app may only add to the history.
 
@@ -191,8 +191,8 @@ A rule about one row's own values is a check constraint, or, where
 PostgreSQL cannot check it, the model's own `@validates`, as
 `SiteSettings` checks the site's time zone.
 
-Each model declares who writes its table and holding what, with
-`db.protection`; `db.py` gives the rules, which the flush and
+Each model declares who writes its table, holding what, and whether it has
+history, with `db.protection`; `db.py` gives the rules, which the flush and
 `tests/test_write_owners.py` enforce.
 
 ### Locking a row
@@ -204,7 +204,7 @@ says why; `tests/test_locking.py` fails on `with_for_update` anywhere else.
 Catalogue rows are locked with `db.locked_row` or `db.relock`, which take
 the catalogue lock first; `locked_row`'s docstring gives the order every
 change takes its locks in. A row is changed or deleted only once this
-transaction has locked it (`db.protection`).
+transaction has locked it.
 
 ### The scan page
 
