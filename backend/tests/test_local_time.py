@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import local_time, registration_codes
-from inventory_tng.local_time import DEFAULT_ZONE, local, show, site_zone
+from inventory_tng.local_time import DEFAULT_ZONE, local, parse_local, show, site_zone
 from inventory_tng.models import SiteSettings
 from inventory_tng.time_zones import is_time_zone, known_zones
 
@@ -132,3 +132,16 @@ def test_a_zone_these_rules_do_not_know_falls_back(
     with capture_logs() as logs:
         assert site_zone(session).key == DEFAULT_ZONE
     assert any("unknown here" in line["event"] for line in logs)
+
+
+def test_a_time_typed_in_the_sites_zone_is_kept_in_utc() -> None:
+    zone = ZoneInfo("America/New_York")
+    assert parse_local("2026-11-02T13:05", zone) == datetime(
+        2026, 11, 2, 18, 5, tzinfo=UTC
+    )
+    # In the hour a clock goes back, the first of the two (EDT).
+    assert parse_local("2026-11-01T01:30", zone) == datetime(
+        2026, 11, 1, 5, 30, tzinfo=UTC
+    )
+    assert parse_local("soon", zone) is None
+    assert parse_local("2026-11-02T13:05+00:00", zone) is None

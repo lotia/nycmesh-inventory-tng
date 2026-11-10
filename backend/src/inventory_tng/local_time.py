@@ -7,7 +7,7 @@ so they do not depend on the operating system's.
 """
 
 import zoneinfo
-from datetime import datetime
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 import structlog
@@ -43,3 +43,19 @@ def show(moment: datetime, zone: ZoneInfo) -> str:
     """ "2026-11-02 13:05 EST": to the minute, with the zone's abbreviation,
     so a reader can tell EST from EDT."""
     return f"{local(moment, zone):%Y-%m-%d %H:%M %Z}"
+
+
+def parse_local(typed: str, zone: ZoneInfo) -> datetime | None:
+    """A time typed as the clock on the wall in `zone` showed it, such as a
+    datetime-local field sends ("2026-11-02T13:05"), in UTC; None if it is
+    not one. In the hour a clock goes back, the first of the two."""
+    try:
+        moment = datetime.fromisoformat(typed.strip())
+    except ValueError:
+        return None
+    if moment.tzinfo is not None:
+        return None
+    try:
+        return moment.replace(tzinfo=zone).astimezone(UTC)
+    except OverflowError:  # Past what a datetime holds, once in UTC.
+        return None

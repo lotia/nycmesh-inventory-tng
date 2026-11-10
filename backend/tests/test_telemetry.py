@@ -360,6 +360,19 @@ def test_counts_recovery_codes_made_and_reminders(
     assert events[(("event", "reminded"),)] >= 1
 
 
+def test_counts_devices_revoked(rolled_back: Recorded, session: Session) -> None:
+    _, _, reader, _ = rolled_back
+    one, _ = new_device(session)
+    many, _ = new_device(session)
+    devices.revoke_device(session, one.id)
+    devices.revoke_devices(
+        session, devices.DeviceFilter(), [many.id], datetime.now(UTC)
+    )
+    revoked = counted(reader, "inventory.devices.revoked")
+    assert revoked[(("how", "one"),)] >= 1
+    assert revoked[(("how", "bulk"),)] >= 1
+
+
 def test_counts_activity(rolled_back: Recorded, session: Session) -> None:
     _, _, reader, _ = rolled_back
     ada, _ = new_admin(session)

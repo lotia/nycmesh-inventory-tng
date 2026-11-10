@@ -24,7 +24,7 @@ from inventory_tng.admin.common import (
     site_link,
 )
 from inventory_tng.db import DbSession
-from inventory_tng.local_time import site_zone
+from inventory_tng.local_time import parse_local, site_zone
 from inventory_tng.models import Device, RegistrationCode, whole
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect
@@ -85,6 +85,7 @@ def _list_page(
             "title": "Devices",
             "here": DEVICES,
             "codes_path": CODES,
+            "device_list": DEVICE_LIST,
             "codes": [
                 (code, state(code, at), counts.get(code.id, 0)) for code in codes
             ],
@@ -197,3 +198,106 @@ def revoke_device(
     changed(signed, session)
     code_id = device.registration_code_id
     return redirect(f"{CODES}/{code_id}", notice="device_revoked", section="devices")
+
+
+# Every device, filtered, and revoking many at once (inventory-tng-ph9): after
+# a compromise, the devices registered since, with codes the compromised
+# administrators made, are the ones to look at.
+
+DEVICE_LIST = f"{DEVICES}/all"
+# Not under DEVICE_LIST: {DEVICES}/{device_id}/revoke would take it.
+BULK_REVOKE = f"{DEVICES}/revoke"
+STATES: dict[str, bool | None] = {"current": True, "revoked": False, "all": None}
+
+NOTICES.update({"devices_revoked": "Revoked: they can't save anything now."})
+
+
+def _chosen(
+    session: Session, since: str, code: str, shown: str
+) -> tuple[devices.DeviceFilter, dict[str, str], dict[str, str]]:
+    """The filter a form or link chose, what was wrong with it, and the
+    filter as the page carries it (an unknown `shown` is current)."""
+    shown = shown if shown in STATES else "current"
+    problems: dict[str, str] = {}
+    moment = None
+    if since.strip():
+        moment = parse_local(since, site_zone(session))
+        if moment is None:
+            problems["since"] = "A date and time, such as 2026-11-02 13:05."
+    code_id = whole(code, 1, 2**31 - 1) if code.strip() else None
+    if code.strip() and code_id is None:
+        problems["code"] = "A code's number."
+    chosen = devices.DeviceFilter(since=moment, code_id=code_id, current=STATES[shown])
+    return chosen, problems, {"since": since, "code": code, "state": shown}
+
+
+@router.get(DEVICE_LIST)
+def device_list(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    since: str = "",
+    code: str = "",
+    state: str = "current",
+) -> Response:
+    chosen, problems, query = _chosen(session, since, code, state)
+    found = [] if problems else devices.find_devices(session, chosen)
+    return admin_page(
+        request,
+        signed,
+        "device_list.html",
+        {
+            "title": "Registered devices",
+            "here": DEVICE_LIST,
+            "revoke": BULK_REVOKE,
+            "list": DEVICES,
+            "codes_path": CODES,
+            "filter": query,
+            "states": list(STATES),
+            "devices": found,
+            "listed": devices.LISTED,
+            "zone": site_zone(session),
+            "problems": problems or None,
+        },
+        400 if problems else 200,
+    )
+
+
+@router.post(BULK_REVOKE)
+def revoke_devices(
+    request: Request,
+    signed: ConfirmedAdmin,
+    session: DbSession,
+    device: Annotated[list[int] | None, Form()] = None,
+    since: Annotated[str, Form()] = "",
+    code: Annotated[str, Form()] = "",
+    state: Annotated[str, Form()] = "current",
+    sure: Annotated[str, Form()] = "",
+    once: OnceKey = "",
+) -> Response:
+    """Asks first, saying how many, then revokes those ticked that the
+    filter still matches, once."""
+    chosen, problems, query = _chosen(session, since, code, state)
+    current = [] if problems else devices.current_among(session, chosen, device or [])
+    if not current:
+        return redirect(DEVICE_LIST, **query)
+    if sure != "yes":
+        many = f"{len(current)} device{'' if len(current) == 1 else 's'}"
+        return admin_page(
+            request,
+            signed,
+            "device_revoke.html",
+            {
+                "title": f"Revoke {many}?",
+                "here": BULK_REVOKE,
+                "back": DEVICE_LIST,
+                "filter": query,
+                "devices": current,
+                "once": once,
+            },
+        )
+    if again := sent_before(request, session, signed, once, "change", DEVICE_LIST):
+        return again
+    devices.revoke_devices(session, chosen, [d.id for d in current], now())
+    changed(signed, session)
+    return redirect(DEVICE_LIST, notice="devices_revoked", **query)

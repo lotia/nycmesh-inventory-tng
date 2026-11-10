@@ -1,0 +1,22 @@
+{% extends "admin_base.html" %}
+{% block main %}
+<p>These can't save anything once revoked, and stay revoked: each would
+have to register again with a new code.</p>
+<ul>
+  {% for device in devices %}<li>{{ device.name }}</li>{% endfor %}
+</ul>
+<form method="post" action="{{ here }}">
+  {% for name, value in filter.items() %}
+  <input type="hidden" name="{{ name }}" value="{{ value }}">
+  {% endfor %}
+  {% for device in devices %}
+  <input type="hidden" name="device" value="{{ device.id }}">
+  {% endfor %}
+  <input type="hidden" name="sure" value="yes">
+  <input type="hidden" name="once" value="{{ once }}">
+  <div class="actions">
+    <button>Revoke {{ devices | length }}</button>
+    <a href="{{ back }}?{{ filter | urlencode }}">Keep them</a>
+  </div>
+</form>
+{% endblock %}
