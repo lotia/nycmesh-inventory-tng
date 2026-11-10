@@ -418,7 +418,7 @@ kubectl exec deploy/inventory -- python -m inventory_tng.registration_codes \
 
 ## Scan page settings
 
-Administrators set how the scan page behaves on the Settings page; the
+Administrators set how the scan page behaves under Site settings; the
 settings live in the database (docs/decisions/0011). If no administrator
 can, the operator can (Operator commands, above):
 

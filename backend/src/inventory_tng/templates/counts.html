@@ -46,7 +46,7 @@
       <label><input type="radio" name="direction" value="off" {% if values.get('direction') == 'off' %}checked{% endif %}> written off from there</label>
       {% with name = "direction" %}{% include "_field_problem.html" %}{% endwith %}
     </fieldset>
-    <label>Why <span class="hint">the list is on the <a href="{{ settings_path }}">Settings</a> page</span>
+    <label>Why <span class="hint">the list is under <a href="{{ settings_path }}">Site settings</a></span>
       <select name="reason_id" required>
         <option value="">Pick one</option>
         {% for reason in reasons %}<option value="{{ reason.id }}" {% if values.get('reason_id') == reason.id | string %}selected{% endif %}>{{ reason.name }}</option>{% endfor %}

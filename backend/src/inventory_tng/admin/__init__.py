@@ -37,7 +37,7 @@ pages.SECTIONS[:] = (
     (counts.COUNTS, "Counts"),
     (devices.DEVICES, "Devices"),
     (admins.ADMINS, "Administrators"),
-    (settings.SETTINGS, "Settings"),
+    (settings.SETTINGS, "Site settings"),
 )
 pages.BADGES[counts.COUNTS] = counts.badge
 

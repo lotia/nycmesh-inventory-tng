@@ -17,9 +17,12 @@ its own page, "true" on a page inside it (docs/decisions/0019). -#}
 </a>{% endfor %}
 {% endmacro %}
 
-{% macro signed_in_as() %}
-<span>Signed in as <a href="{{ paths.account }}"><strong>{{ admin.username }}</strong></a></span>
-<form method="post" action="{{ paths.sign_out }}"><button>Sign out</button></form>
+{#- One's own account, apart from the sections (docs/decisions/0019). -#}
+{% macro your_account(classes) %}
+<nav class="signed-in {{ classes }}" aria-label="Your account">
+  <span>Signed in as <a href="{{ paths.account }}" aria-label="{{ admin.username }}, your account"{{ current(paths.account) }}><strong>{{ admin.username }}</strong></a></span>
+  <form method="post" action="{{ paths.sign_out }}"><button>Sign out</button></form>
+</nav>
 {% endmacro %}
 
 <header class="masthead">
@@ -29,11 +32,12 @@ its own page, "true" on a page inside it (docs/decisions/0019). -#}
       <span>NYC Mesh</span><span class="brand-rule"></span><span>Inventory</span>
     </a>
     {% if admin %}
-    <div class="signed-in hidden md:flex">{{ signed_in_as() }}</div>
+    {{ your_account("hidden md:flex") }}
     <button class="md:hidden" popovertarget="menu">Menu</button>
     <div id="menu" class="menu-panel" popover>
-      <nav aria-label="Sections">{{ sections_links() }}</nav>
-      <div class="signed-in mt-3 border-t border-line pt-3">{{ signed_in_as() }}</div>
+      <nav class="menu-sections" aria-label="Sections">{{ sections_links() }}</nav>
+      <p class="hint mt-4 mb-1" aria-hidden="true">Your account</p>
+      {{ your_account("") }}
     </div>
     {% endif %}
   </div>

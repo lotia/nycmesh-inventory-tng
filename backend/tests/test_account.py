@@ -79,6 +79,24 @@ def test_the_page_shows_the_account(
     assert re.search(r"\d{4}-\d\d-\d\d \d\d:\d\d E[SD]T", page)
 
 
+def test_the_page_starts_with_links_to_each_section(
+    client: TestClient,
+    ada: tuple[Admin, str],
+) -> None:
+    """Each leads to a section on the page (docs/decisions/0019)."""
+    page = text(client.get(ACCOUNT))
+    jumps = re.findall(r'<li><a href="#([\w-]+)">', page)
+    assert jumps == [
+        "email",
+        "password",
+        "authenticators",
+        "recovery-codes",
+        "sessions",
+    ]
+    for section in jumps:
+        assert f'<section id="{section}">' in page
+
+
 def test_viewing_it_needs_signing_in(
     make_client_without_database: Callable[..., TestClient],
 ) -> None:

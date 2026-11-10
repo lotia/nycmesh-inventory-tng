@@ -1,6 +1,16 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% block main %}
+<nav aria-label="On this page">
+  <ul class="actions list-none pl-0">
+    <li><a href="#email">Email</a></li>
+    <li><a href="#password">Password</a></li>
+    <li><a href="#authenticators">Authenticators</a></li>
+    {% if authenticators %}<li><a href="#recovery-codes">Recovery codes</a></li>{% endif %}
+    <li><a href="#sessions">Where you're signed in</a></li>
+  </ul>
+</nav>
+
 <section id="email">
   <h2>Email</h2>
   {% with section_id="email" %}{% include "_notice.html" %}{% endwith %}

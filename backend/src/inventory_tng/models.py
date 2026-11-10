@@ -640,7 +640,7 @@ class Movement(Base):
 
 
 class ScanSettings(Versioned, Base):
-    """How the scan page behaves, which administrators set on the Settings
+    """How the scan page behaves, which administrators set on the Site settings
     page (admin/settings.py, through scan_settings.py). One row, id 1, made
     by its migration. Changes are history like everything else."""
 

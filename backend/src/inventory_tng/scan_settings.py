@@ -1,5 +1,5 @@
 """How the scan page behaves: every write to the scan_settings table, by
-the Settings page (admin/settings.py) and from the command line, the
+the Site settings page (admin/settings.py) and from the command line, the
 operator's fallback:
 
     uv run python -m inventory_tng.scan_settings show

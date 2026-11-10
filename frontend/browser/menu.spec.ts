@@ -17,11 +17,26 @@ test("the menu opens on a phone and leads to each section", async ({
   page,
 }) => {
   await page.goto("/admin");
-  await expect(shown(page, "link", "Settings")).toHaveCount(0);
+  await expect(shown(page, "link", "Site settings")).toHaveCount(0);
   await shown(page, "button", "Menu").click();
-  await expect(shown(page, "button", "Sign out")).toHaveCount(1);
-  await shown(page, "link", "Settings").click();
-  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  // One's own account comes after the sections, in an area of its own.
+  const account = page
+    .getByRole("navigation", { name: "Your account" })
+    .filter({ visible: true });
+  await expect(account.getByRole("button", { name: "Sign out" })).toHaveCount(
+    1,
+  );
+  await expect(
+    account.getByRole("link", { name: "dev, your account" }),
+  ).toBeVisible();
+  const areas = await page
+    .locator("#menu nav")
+    .evaluateAll((navs) => navs.map((nav) => nav.getAttribute("aria-label")));
+  expect(areas).toEqual(["Sections", "Your account"]);
+  await shown(page, "link", "Site settings").click();
+  await expect(
+    page.getByRole("heading", { name: "Site settings" }),
+  ).toBeVisible();
   await expect(shown(page, "button", "Sign out")).toHaveCount(0);
 });
 
@@ -47,7 +62,15 @@ test.describe("on a wide screen", () => {
   test("the sections show, with no menu", async ({ page }) => {
     await page.goto("/admin");
     await expect(shown(page, "button", "Menu")).toHaveCount(0);
-    await expect(shown(page, "link", "Settings")).toHaveCount(1);
+    await expect(shown(page, "link", "Site settings")).toHaveCount(1);
     await expect(shown(page, "button", "Sign out")).toHaveCount(1);
+    await page
+      .getByRole("navigation", { name: "Your account" })
+      .filter({ visible: true })
+      .getByRole("link", { name: "dev, your account" })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Your account" }),
+    ).toBeVisible();
   });
 });
