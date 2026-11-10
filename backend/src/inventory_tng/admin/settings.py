@@ -6,7 +6,6 @@ Sign-in settings are sensitive: changing them asks for a fresh code, and
 every administrator with an address is told, since one who could weaken
 them could otherwise do it unseen."""
 
-import functools
 from typing import Annotated, NamedTuple
 
 import structlog
@@ -43,7 +42,7 @@ from inventory_tng.models import (
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
-from inventory_tng.time_zones import known_zones
+from inventory_tng.time_zones import zones
 
 log = structlog.get_logger(__name__)
 
@@ -107,17 +106,6 @@ NUMBERS = (
 )
 
 
-@functools.cache
-def zones() -> list[str]:
-    """The zones to pick from, by name."""
-    return sorted(
-        name
-        for name in known_zones()
-        if name == "UTC"
-        or ("/" in name and not name.startswith(("Etc/", "SystemV/", "US/")))
-    )
-
-
 def _page(
     request: Request,
     session: Session,
@@ -130,7 +118,6 @@ def _page(
     scan = session.get_one(ScanSettings, 1)
     sign_in = accounts.sign_in_settings(session)
     site = session.get_one(SiteSettings, 1)
-    names = zones()
     reasons = session.scalars(
         select(AdjustmentReason).order_by(
             AdjustmentReason.retired_at.is_not(None), AdjustmentReason.id
@@ -156,7 +143,7 @@ def _page(
             | {n.field: str(getattr(sign_in, n.field)) for n in NUMBERS}
             | (values or {}),
             # A zone set outside this page, such as US/Eastern, still shows.
-            "zones": names if site.time_zone in names else [site.time_zone, *names],
+            "zones": zones(site.time_zone),
             "policies": TOTP_POLICIES,
             "numbers": NUMBERS,
             "name_check_min": NAME_CHECK_MINUTES[0],

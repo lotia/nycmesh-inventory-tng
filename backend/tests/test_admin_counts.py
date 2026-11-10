@@ -27,6 +27,7 @@ from inventory_tng.ledger import (
     record_adjustment,
     record_count,
 )
+from inventory_tng.local_time import DEFAULT_ZONE, show
 from inventory_tng.models import (
     INTEGER_MAX,
     AdjustmentReason,
@@ -304,6 +305,7 @@ def test_the_database_holds_counts_to_their_rules(session: Session) -> None:
     with violates(session, "ck_ledger_transaction_admin_counts"):
         session.add(
             LedgerTransaction(
+                time_zone=DEFAULT_ZONE,
                 idempotency_key=uuid.uuid4(),
                 kind="count",
                 to_location_id=place.store.id,
@@ -315,6 +317,7 @@ def test_the_database_holds_counts_to_their_rules(session: Session) -> None:
     with violates(session, "ck_ledger_transaction_adjustment_reason"):
         session.add(
             LedgerTransaction(
+                time_zone=DEFAULT_ZONE,
                 idempotency_key=uuid.uuid4(),
                 kind="adjustment",
                 to_location_id=place.store.id,
@@ -791,3 +794,19 @@ def test_a_place_retired_as_it_is_counted_is_refused(
     assert isinstance(error, RuleBroken)
     assert error.rule == "location_countable"
     counting.rollback()
+
+
+def test_a_count_shows_in_the_zone_of_its_place(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Recorded in its place's zone, shown in it: CST beside the site's EST."""
+    place = stocked(session)
+    place.store.time_zone = "America/Chicago"
+    session.flush()
+    path = f"{COUNTS}/{place.store.id}"
+    admin_client.post(
+        path, data=count_form(admin_client, path) | {f"counted_{place.item.id}": "5"}
+    )
+    (counted,) = counts_written(session)
+    assert counted.time_zone == "America/Chicago"
+    assert show(counted.created_at, "America/Chicago") in text(admin_client.get(COUNTS))

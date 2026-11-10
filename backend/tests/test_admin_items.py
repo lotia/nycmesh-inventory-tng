@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admin.common import quantity
 from inventory_tng.admin.items import ITEMS
+from inventory_tng.local_time import DEFAULT_ZONE
 from inventory_tng.models import (
     Category,
     Item,
@@ -136,7 +137,10 @@ def test_the_unit_is_fixed_once_stock_has_moved(
     batch = add(
         session,
         LedgerTransaction(
-            idempotency_key=uuid.uuid4(), kind="receipt", to_location_id=store.id
+            time_zone=DEFAULT_ZONE,
+            idempotency_key=uuid.uuid4(),
+            kind="receipt",
+            to_location_id=store.id,
         ),
     )
     add(session, Movement(transaction_id=batch.id, item_id=item.id, quantity=1))
@@ -232,7 +236,10 @@ def test_a_retired_item_says_what_is_left(
     batch = add(
         session,
         LedgerTransaction(
-            idempotency_key=uuid.uuid4(), kind="receipt", to_location_id=store.id
+            time_zone=DEFAULT_ZONE,
+            idempotency_key=uuid.uuid4(),
+            kind="receipt",
+            to_location_id=store.id,
         ),
     )
     add(session, Movement(transaction_id=batch.id, item_id=item.id, quantity=3))

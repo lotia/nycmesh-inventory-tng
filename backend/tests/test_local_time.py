@@ -145,3 +145,10 @@ def test_a_time_typed_in_the_sites_zone_is_kept_in_utc() -> None:
     )
     assert parse_local("soon", zone) is None
     assert parse_local("2026-11-02T13:05+00:00", zone) is None
+
+
+def test_a_time_is_shown_in_a_zone_an_event_recorded() -> None:
+    noon = datetime(2026, 1, 15, 18, 0, tzinfo=UTC)
+    assert show(noon, "America/Chicago") == "2026-01-15 12:00 CST"
+    # One these rules no longer know: the default's, rather than no page.
+    assert show(noon, "Gone/Away") == "2026-01-15 13:00 EST"

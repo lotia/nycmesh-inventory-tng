@@ -121,9 +121,12 @@ def save(
     name: str,
     parent_id: int | None = None,
     *,
+    time_zone: str | None = None,
     seen: Seen,
 ) -> None:
-    """Renamed, and moved under `parent_id` if one is given."""
+    """Renamed, moved under `parent_id` if one is given, and in `time_zone`
+    (None: its parent's, or the site's). Events already recorded keep the
+    zone they happened in."""
     relock(session, location, seen=seen)
     if parent_id is not None and parent_id != location.parent_id:
         current = location.retired_at is None
@@ -131,6 +134,9 @@ def save(
         enforce(no_cycle(_ancestors(session, parent_id), location.id, parent_id))
         location.parent_id = parent_id
     location.name = name
+    # Checked only when changed: one tzdata no longer knows may stay.
+    if time_zone != location.time_zone:
+        location.time_zone = time_zone
 
 
 def rename_custody(session: Session, custody: Location, name: str) -> None:

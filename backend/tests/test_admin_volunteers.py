@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.admin.volunteers import VOLUNTEERS
+from inventory_tng.local_time import DEFAULT_ZONE
 from inventory_tng.models import (
     Category,
     Item,
@@ -37,7 +38,10 @@ def give(session: Session, location: Location) -> None:
     batch = add(
         session,
         LedgerTransaction(
-            idempotency_key=uuid.uuid4(), kind="receipt", to_location_id=location.id
+            time_zone=DEFAULT_ZONE,
+            idempotency_key=uuid.uuid4(),
+            kind="receipt",
+            to_location_id=location.id,
         ),
     )
     add(session, Movement(transaction_id=batch.id, item_id=item.id, quantity=1))

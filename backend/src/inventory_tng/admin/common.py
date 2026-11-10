@@ -52,6 +52,7 @@ RULES = {
     "item_unit_fixed": "Its unit is fixed, as stock has moved in it.",
     "category_has_items": "Move or retire its items first.",
     "site_settings_time_zone": "Pick a zone from the list.",
+    "location_time_zone": "Pick a zone from the list.",
     "movement_whole_units": "This item is counted in whole units.",
     "location_countable": "That place is retired and holds nothing: pick another.",
     "changed_since_shown": "Not saved: someone else saved this after you opened "

@@ -57,7 +57,6 @@ from inventory_tng.ledger import (
     retired_holding_stock_count,
     takeable,
 )
-from inventory_tng.local_time import site_zone
 from inventory_tng.models import (
     INTEGER_MAX,
     AdjustmentReason,
@@ -182,7 +181,6 @@ def _counts_page(
             "items": _items(session),
             "reasons": current_rows(session, AdjustmentReason),
             "recent": _recent(session),
-            "zone": site_zone(session),
             "key": uuid.uuid4(),
             "problems": problems,
             "values": values,
