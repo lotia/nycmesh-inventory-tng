@@ -128,7 +128,7 @@ def _page(
         signed,
         "settings.html",
         {
-            "title": "Settings",
+            "title": "Site settings",
             "here": SETTINGS,
             "values": {
                 "name_check_minutes": str(scan.name_check_minutes),

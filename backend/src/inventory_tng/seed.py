@@ -98,7 +98,7 @@ def run(session: Session, args: argparse.Namespace) -> int:
     accounts.set_password(session, admin.id, password, datetime.now(UTC))
     print(f"Sign in at /admin as {USERNAME}, password {password}")
     if seeding:
-        print("Sign-in codes are optional here: turn them on under Settings.")
+        print("Sign-in codes are optional here: turn them on under Site settings.")
     return 0
 
 

@@ -258,7 +258,7 @@
 
   /* A section's link: no underline, a finger's height, and the one this
      page is in bold over a brand line (0019). */
-  :is(.sections, .menu-panel nav) a {
+  :is(.sections, .menu-sections) a {
     @apply inline-flex min-h-11 items-center border-b-4 border-transparent no-underline;
 
     &[aria-current] {
@@ -293,7 +293,7 @@
     }
   }
 
-  .menu-panel nav a {
+  .menu-sections a {
     @apply flex py-2;
   }
 

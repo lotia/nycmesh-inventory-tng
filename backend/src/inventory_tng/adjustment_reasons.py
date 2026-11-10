@@ -1,5 +1,5 @@
 """The reasons an adjustment may give (admin/counts.py): every write to the
-adjustment_reason table, which administrators change on the Settings page.
+adjustment_reason table, which administrators change under Site settings.
 A current reason's name is unique, ignoring case (its index refuses a
 second); a retired one is no longer offered, and adjustments that gave it
 keep it. Each change but an add is to a row locked first (locked)."""
