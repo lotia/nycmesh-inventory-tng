@@ -1,6 +1,7 @@
 """POST /api/telemetry: what the scan and register pages report about
 themselves (page_telemetry.py, frontend/src/telemetry.ts)."""
 
+import re
 from collections.abc import Callable
 
 import pytest
@@ -8,6 +9,7 @@ from fastapi.testclient import TestClient
 from structlog.testing import capture_logs
 
 from inventory_tng import page_telemetry
+from inventory_tng.local_env import CLONE
 
 PATH = "/api/telemetry"
 RETRY = {"kind": "outbox_retry", "reason": "unavailable"}
@@ -77,3 +79,19 @@ def test_reports_count_against_their_address(client: TestClient) -> None:
     refused = client.post(PATH, json={"events": [RETRY]})
     assert refused.status_code == 429
     assert refused.json() == {"reason": "rate_limited"}
+
+
+@pytest.mark.clone
+def test_the_page_clamps_scan_to_save_to_what_is_taken() -> None:
+    """frontend/src/telemetry.ts clamps it to the bound the schema has, which
+    the generated client types cannot carry: a value past it would have the
+    whole report refused."""
+    source = (CLONE / "frontend" / "src" / "telemetry.ts").read_text()
+    clamp = re.search(r"MOST_SECONDS_TO_SAVE = ([\d_]+);", source)
+    assert clamp is not None
+    (bound,) = (
+        meta.le
+        for meta in page_telemetry.ScanToSave.model_fields["seconds"].metadata
+        if hasattr(meta, "le")
+    )
+    assert int(clamp.group(1).replace("_", "")) == bound

@@ -10,7 +10,9 @@ from sqlalchemy import exc
 from inventory_tng.logs import configure_logging
 from inventory_tng.masking import MASK, Masker, scrub_database_message
 from inventory_tng.server import create_server
-from inventory_tng.settings import Settings, SettingsError
+from inventory_tng.settings import SettingsError
+
+from helpers.settings import settings
 
 # Written out, not read from masking.py, so shrinking a list fails a test.
 SECRETS = {
@@ -70,10 +72,6 @@ def lines(capsys: pytest.CaptureFixture[str]) -> list[dict[str, object]]:
 
 def configure(**environ: str) -> None:
     configure_logging(settings(**{"LOG_FORMAT": "json", **environ}))
-
-
-def settings(**environ: str) -> Settings:
-    return Settings.from_environ({"DATABASE_URL": "postgresql://db/x", **environ})
 
 
 @pytest.mark.usefixtures("restore_logging")
