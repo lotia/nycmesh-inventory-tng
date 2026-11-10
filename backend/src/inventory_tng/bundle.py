@@ -38,6 +38,8 @@ PAGES = {
 }
 # The stylesheet the server-rendered pages load: an entry of its own.
 STYLES = "src/styles.css"
+# Their script: what they do beyond plain HTML (docs/decisions/0019).
+SCRIPT = "src/admin.ts"
 
 
 @dataclass(frozen=True)
@@ -92,7 +94,7 @@ class Bundle:
         build."""
         try:
             manifest = json.loads((self.config.dist / MANIFEST).read_text())
-            entries = [entry for _, entry in PAGES.values()] + [STYLES]
+            entries = [entry for _, entry in PAGES.values()] + [STYLES, SCRIPT]
             return {entry: _from_manifest(manifest, entry) for entry in entries}
         except FileNotFoundError:
             return None
@@ -154,8 +156,15 @@ def shared_styles(request: Request) -> Tags:
     return request.app.state.bundle.tags(STYLES) or Tags()
 
 
+def shared_script(request: Request) -> Tags:
+    """What a server-rendered page loads for its script, as shared_styles."""
+    return request.app.state.bundle.tags(SCRIPT) or Tags()
+
+
 # Jinja types its globals by its own defaults' types; any value will do.
-cast(dict[str, Any], templates.env.globals)["shared_styles"] = shared_styles
+_globals = cast(dict[str, Any], templates.env.globals)
+_globals["shared_styles"] = shared_styles
+_globals["shared_script"] = shared_script
 
 
 @router.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)

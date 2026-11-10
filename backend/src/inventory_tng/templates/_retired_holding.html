@@ -5,7 +5,7 @@ each to count; gone once each is counted to nothing. -#}
   <p>{{ retired_places | length | retired_holding }} that a save brought or
   took after retirement: count each to put the records right.</p>
   <ul>
-    {% for place in retired_places %}<li><a href="{{ counts_path }}/{{ place.id }}">Count {{ place.name }}</a></li>{% endfor %}
+    {% for place in retired_places %}<li><a href="{{ counts_path }}/{{ place.id }}">Start counting {{ place.name }}</a></li>{% endfor %}
   </ul>
 </div>
 {% endif %}

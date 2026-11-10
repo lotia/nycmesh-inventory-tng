@@ -7,6 +7,7 @@
   <title>{{ title }} · NYC Mesh Inventory</title>
   {#- The shared stylesheet (docs/decisions/0014); without a build, none. #}
   {% with tags = shared_styles(request) %}{% include "_tags.html" %}{% endwith %}
+  {% with tags = shared_script(request) %}{% include "_tags.html" %}{% endwith %}
   {#- A form that makes something shown once (once.py) is sent once: a
   double-click would show only the second answer, "Already sent". The flag
   stops it; disabling the buttons shows it, once the form's data is taken,
@@ -30,10 +31,20 @@
 <body>
   {% include "_masthead.html" %}
   <main class="admin page-width">
+    {#- The way back, above the title (docs/decisions/0019): back = (path, words). #}
+    {% if back %}<p class="back"><a href="{{ back[0] }}"><span aria-hidden="true">‹&nbsp;</span><span class="sr-only">Back to </span>{{ back[1] }}</a></p>{% endif %}
     <h1>{{ title }}</h1>
     {% if alert %}<p role="alert">{{ alert }}</p>{% endif %}
-    {#- A notice about one section is said by its heading (_notice.html). #}
-    {% if notice and not notice_section %}<p role="status">{{ notice }}</p>{% endif %}
+    {#- A notice about one section is said by its heading (_notice.html). One
+    that a change can be undone from offers it: `undo`, the path to post to. #}
+    {% if notice and not notice_section %}
+    {% if undo %}
+    <div role="status" class="flex flex-wrap items-center gap-3">
+      <span>{{ notice }}</span>
+      <form method="post" action="{{ undo }}"><button>{{ undo_words | default("Bring it back") }}</button></form>
+    </div>
+    {% else %}<p role="status">{{ notice }}</p>{% endif %}
+    {% endif %}
     {% block main %}{% endblock %}
   </main>
 </body>

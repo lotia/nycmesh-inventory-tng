@@ -309,6 +309,14 @@ utilities. When you style a page:
 - Use the tokens in `@theme` (`bg-band`, `text-heading`, …), not colours of
   your own: the dark scheme gives each token its own value.
 - Make markup that repeats a Jinja macro or a Preact component.
+- Follow docs/decisions/0019 for links, buttons and lists. A button is
+  secondary unless it is its form's main one, `class="primary"`, or the one
+  a confirmation page asks for, `class="danger"`. A page's way back is
+  `back`, a path and its words, in its context, which shows a link above
+  its title. A retire form has `data-retire`, so a page with changes not
+  yet saved asks before it retires.
+- What administrator pages do in the browser beyond plain HTML is in
+  `frontend/src/admin.ts`; each still works without it.
 - A page that prints a QR code puts a `.printable` in its `main`: the
   `print_controls` macro (`_print_controls.html`: the paper and a Print
   button), then a `.print-sheet` for each page, what prints

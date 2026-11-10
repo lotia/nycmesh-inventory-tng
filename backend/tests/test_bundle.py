@@ -40,6 +40,11 @@ BUILD = {
         "src": "src/styles.css",
         "isEntry": True,
     },
+    "src/admin.ts": {
+        "file": "assets/admin-Hq3sV8kD.js",
+        "src": "src/admin.ts",
+        "isEntry": True,
+    },
 }
 SCRIPT = b"export const answer = 42;\n" * 40
 WASM = b"\0asm\1\0\0\0" + b"\0" * 2000
@@ -101,14 +106,17 @@ def test_the_shared_stylesheet_is_its_own_entry(dist: Path) -> None:
     assert bundle.tags(STYLES) == Tags(styles=("/static/assets/styles-BXvLJlQA.css",))
 
 
-def test_server_rendered_pages_load_the_shared_stylesheet(
+def test_server_rendered_pages_load_the_shared_stylesheet_and_script(
     pages: TestClient, make_app_without_database: Callable[..., FastAPI]
 ) -> None:
-    link = '<link rel="stylesheet" href="/static/assets/styles-BXvLJlQA.css">'
-    assert link in pages.get("/admin/sign-in").text
+    page = pages.get("/admin/sign-in").text
+    assert '<link rel="stylesheet" href="/static/assets/styles-BXvLJlQA.css">' in page
+    assert '<script type="module" src="/static/assets/admin-Hq3sV8kD.js">' in page
     # Without a build, a plain page.
     with TestClient(make_app_without_database()) as unbuilt:
-        assert "stylesheet" not in unbuilt.get("/admin/sign-in").text
+        plain = unbuilt.get("/admin/sign-in").text
+        assert "stylesheet" not in plain
+        assert "/static/" not in plain
 
 
 def test_the_dev_server_serves_the_sources_instead(dist: Path) -> None:

@@ -21,7 +21,7 @@ someone remote. Making one asks for a fresh code.</p>
       <input name="days" type="number" min="1" max="{{ max_days }}" value="{{ values.get('days', '1') }}" required>
       {% with name = "days" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    <button>Make a code</button>
+    <button class="primary">Make a code</button>
   </form>
 </section>
 

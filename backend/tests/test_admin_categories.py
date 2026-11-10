@@ -131,4 +131,4 @@ def test_a_page_shown_again_after_a_refusal_still_links_right(
     assert refused.status_code == 400
     page = refused.text
     assert f'action="{CATEGORIES}/{radios.id}/name"' in page
-    assert f'href="{CATEGORIES}">All categories' in page
+    assert f'<p class="back"><a href="{CATEGORIES}">' in page

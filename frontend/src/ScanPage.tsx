@@ -470,7 +470,7 @@ function CartForm({
           </button>
         </p>
       )}
-      <button type="submit" class="w-full text-xl">
+      <button type="submit" class="primary w-full text-xl">
         Save
       </button>
     </form>

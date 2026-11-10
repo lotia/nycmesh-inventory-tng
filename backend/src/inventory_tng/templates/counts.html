@@ -13,7 +13,7 @@
         {% for place in places %}<option value="{{ place.id }}">{{ place.name }}{{ retired(place) }}</option>{% endfor %}
       </select>
     </label>
-    <button>Count it</button>
+    <button>Start a count</button>
   </form>
 </section>
 
@@ -53,7 +53,7 @@
       </select>
       {% with name = "reason_id" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    <button>Record it</button>
+    <button class="primary">Record it</button>
   </form>
 </section>
 

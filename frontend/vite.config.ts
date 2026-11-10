@@ -16,8 +16,9 @@ import { defineConfig } from "vitest/config";
 
 const DEFAULT_ORIGIN = "http://localhost:5173";
 
-// Each page's entry: what the build bundles.
-const pages = ["src/scan.tsx", "src/register.tsx"];
+// Each page's entry: what the build bundles. admin.ts is the server-rendered
+// pages' script (backend bundle.py).
+const pages = ["src/scan.tsx", "src/register.tsx", "src/admin.ts"];
 /**
  * VITE_DEV_SERVER as the backend reads it: from the shell, else from the
  * repository's .env and no other file, wherever Vite is started from.

@@ -27,7 +27,7 @@
     </select>
     {% with name = "time_zone" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <button>Save</button>
+  <button class="primary">Save</button>
 </form>
 {% endif %}
 
@@ -44,14 +44,16 @@
 {% endcall %}
 {% endif %}
 
-<section class="actions">
-  {% if location.kind != "custody" %}
-  {% if location.retired_at %}
-  <form method="post" action="{{ here }}/restore"><button>Bring back</button></form>
-  {% else %}
-  <form method="post" action="{{ here }}/retire"><button>Retire</button></form>
-  {% endif %}
-  {% endif %}
-  <a href="{{ list }}">All locations</a>
+{% if location.kind != "custody" %}
+{% if location.retired_at %}
+<form method="post" action="{{ here }}/restore"><button>Bring it back</button></form>
+{% else %}
+<section id="retire">
+  <h2>Retire this location</h2>
+  <p class="hint">Nobody can pick it any more. Move what is here elsewhere, or
+  count it, first. You can bring it back.</p>
+  <form method="post" action="{{ here }}/retire" data-retire><button>Retire</button></form>
 </section>
+{% endif %}
+{% endif %}
 {% endblock %}

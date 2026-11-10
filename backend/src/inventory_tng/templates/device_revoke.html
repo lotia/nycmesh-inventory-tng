@@ -15,8 +15,8 @@ have to register again with a new code.</p>
   <input type="hidden" name="sure" value="yes">
   <input type="hidden" name="once" value="{{ once }}">
   <div class="actions">
-    <button>Revoke {{ devices | length }}</button>
-    <a href="{{ back }}?{{ filter | urlencode }}">Keep them</a>
+    <button class="danger">Revoke {{ devices | length }}</button>
+    <a href="{{ keep }}?{{ filter | urlencode }}">Keep them</a>
   </div>
 </form>
 {% endblock %}

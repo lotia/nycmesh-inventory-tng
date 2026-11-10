@@ -14,6 +14,8 @@
   --color-line: #dee2e6;
   --color-highlight: #f9e79f;
   --color-brand: #f1b013;
+  /* Text on the brand fill, dark in either scheme, as the fill is. */
+  --color-on-brand: #212529;
   --color-problem: #b00020;
   --color-done: #2e7d32;
   --color-caution: #b8860b;
@@ -107,8 +109,10 @@
     @apply inline-block w-auto;
   }
 
+  /* A button is secondary unless it says otherwise (.primary, .danger), and
+     a finger's height (docs/decisions/0019). */
   button {
-    @apply cursor-pointer rounded border border-heading bg-band px-5 py-2 text-base hover:bg-highlight;
+    @apply inline-flex min-h-11 cursor-pointer items-center justify-center rounded border border-heading bg-band px-5 py-2 text-base hover:bg-highlight;
   }
 
   fieldset {
@@ -187,7 +191,7 @@
   }
 
   /* Above, not below; not in a table's cell or a row, which space their own. */
-  .admin form:not(td > form, .actions > form) {
+  .admin form:not(td > form, .actions > form, [role="status"] > form) {
     @apply mt-4;
   }
 
@@ -210,6 +214,30 @@
 
   .actions {
     @apply flex flex-wrap items-end gap-3;
+
+    /* A link in a row of actions is as easy to tap as a button. */
+    & a {
+      @apply inline-flex min-h-11 items-center;
+    }
+  }
+
+  /* One per form: what it is for, such as Save or Invite. */
+  button.primary {
+    @apply border-brand bg-brand font-semibold text-on-brand hover:bg-highlight hover:text-ink;
+  }
+
+  /* Only on a confirmation page, for what cannot be undone. */
+  button.danger {
+    @apply border-2 border-problem bg-page font-semibold text-problem hover:bg-problem/10;
+  }
+
+  /* The way back, above a page's title. */
+  .back {
+    @apply mb-1;
+
+    & a {
+      @apply inline-flex min-h-11 items-center;
+    }
   }
 
   /* The scan and registration pages' main part (frontend/src). What a

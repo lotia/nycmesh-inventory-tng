@@ -25,6 +25,7 @@ from inventory_tng.admin.common import (
     name_problem,
     now,
     rule_words,
+    undo_retire,
 )
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.models import Location, Volunteer
@@ -54,6 +55,7 @@ def _list_page(
     *,
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
+    undo: str | None = None,
 ) -> HTMLResponse:
     rows = session.scalars(select(Volunteer).order_by(func.lower(Volunteer.name))).all()
     holders = set(
@@ -69,6 +71,8 @@ def _list_page(
         "volunteers.html",
         {
             "title": "Volunteers",
+            "undo": undo,
+            "undo_words": "Bring them back",
             "here": VOLUNTEERS,
             "current": [v for v in rows if v.retired_at is None],
             "retired": [v for v in rows if v.retired_at is not None],
@@ -109,6 +113,7 @@ def _volunteer_page(
             "title": volunteer.name,
             "here": f"{VOLUNTEERS}/{volunteer.id}",
             "list": VOLUNTEERS,
+            "back": (VOLUNTEERS, "Volunteers"),
             "volunteer": volunteer,
             "custody": volunteers.custody(session, volunteer.id),
             "merged_into": merged_into,
@@ -144,9 +149,10 @@ def _checked(name: str, email: str) -> dict[str, str]:
 
 @router.get(VOLUNTEERS)
 def list_volunteers(
-    request: Request, signed: AdminSignedIn, session: DbSession
+    request: Request, signed: AdminSignedIn, session: DbSession, undo: str = ""
 ) -> Response:
-    return _list_page(request, session, signed)
+    back = undo_retire(session, Volunteer, undo, VOLUNTEERS)
+    return _list_page(request, session, signed, undo=back)
 
 
 @router.post(VOLUNTEERS)
@@ -271,7 +277,7 @@ def retire_volunteer(
         return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
     log.info("volunteer retired", volunteer_id=volunteer_id)
-    return redirect(VOLUNTEERS, notice="retired", section="retired")
+    return redirect(VOLUNTEERS, notice="retired", undo=str(volunteer_id))
 
 
 @router.post(f"{VOLUNTEERS}/{{volunteer_id}}/merge")

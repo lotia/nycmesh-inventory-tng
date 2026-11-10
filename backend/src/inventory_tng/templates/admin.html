@@ -33,7 +33,7 @@
   <form method="post" action="{{ here }}/restore">
     {{ once_field() }}
     {% if code_needed %}{% include "_code_field.html" %}{% endif %}
-    <div class="actions"><button>Bring back</button></div>
+    <div class="actions"><button>Bring them back</button></div>
   </form>
 </section>
 {% elif not themselves %}
@@ -49,5 +49,4 @@
   </form>
 </section>
 {% endif %}
-<p><a href="{{ list }}">All administrators</a></p>
 {% endblock %}

@@ -19,7 +19,7 @@
       <input name="email" type="email" value="{{ values.get('email', admin.email or '') }}" autocomplete="email">
       {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    <button>Save email</button>
+    <button class="primary">Save email</button>
   </form>
 </section>
 
@@ -34,7 +34,7 @@
     <label>New password again
       <input name="password_again" type="password" autocomplete="new-password" required>
     </label>
-    <button>Change password</button>
+    <button class="primary">Change password</button>
   </form>
   <p class="hint">Changing it signs you out everywhere else.</p>
 </section>

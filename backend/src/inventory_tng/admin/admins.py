@@ -105,7 +105,7 @@ def _admin_page(
         {
             "title": other.username,
             "here": f"{ADMINS}/{other.id}",
-            "list": ADMINS,
+            "back": (ADMINS, "Administrators"),
             "other": other,
             "uses_totp": accounts.uses_totp(session, other.id),
             "has_password": accounts.has_password(session, other.id),
@@ -133,7 +133,7 @@ def _link_page(
         "link_made.html",
         {
             "title": f"A link for {other.username}",
-            "list": ADMINS,
+            "back": (ADMINS, "Administrators"),
             "other": other,
             "link": link,
             "qr": accounts.qr_svg(link),
