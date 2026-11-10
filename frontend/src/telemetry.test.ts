@@ -8,13 +8,7 @@ vi.mock("web-vitals", () => ({
   onCLS: (report: (metric: object) => void) => vitals.set("CLS", report),
 }));
 
-import {
-  type Event,
-  FLUSH_AT,
-  MOST_PER_PAGE,
-  PATH,
-  Telemetry,
-} from "./telemetry";
+import { type Event, FLUSH_AT, PATH, PER_HOUR, Telemetry } from "./telemetry";
 
 const RETRY: Event = { kind: "outbox_retry", reason: "no_answer" };
 
@@ -94,15 +88,35 @@ describe("reporting", () => {
     ]);
   });
 
-  test("a page sends no more than its share, however much happens", async () => {
-    const { telemetry, reports } = kept();
-    started(telemetry, "scan");
-    for (let i = 0; i < MOST_PER_PAGE * 2; i++) {
+  test("each kind has its own share an hour, so none crowds out the rest", async () => {
+    let now = 0;
+    const reports: Promise<Event[]>[] = [];
+    const telemetry = new Telemetry(
+      (body) =>
+        reports.push(body.text().then((text) => JSON.parse(text).events)),
+      () => now,
+    );
+    started(telemetry);
+    const error: Event = { kind: "error", page: "scan", source: "error" };
+    // Offline all hour: retries use up their share, and only theirs.
+    for (let i = 0; i < PER_HOUR.outbox_retry * 3; i++) {
       telemetry.record(RETRY);
     }
+    telemetry.record(error);
     telemetry.flush();
-    const sent = await Promise.all(reports);
-    expect(sent.flat()).toHaveLength(MOST_PER_PAGE);
+    const kinds = async () =>
+      (await Promise.all(reports)).flat().map((e) => e.kind);
+    expect(
+      (await kinds()).filter((kind) => kind === "outbox_retry"),
+    ).toHaveLength(PER_HOUR.outbox_retry);
+    expect(await kinds()).toContain("error");
+    // An hour on, each kind has its share again.
+    now += 3_600_000;
+    telemetry.record(RETRY);
+    telemetry.flush();
+    expect(
+      (await kinds()).filter((kind) => kind === "outbox_retry"),
+    ).toHaveLength(PER_HOUR.outbox_retry + 1);
   });
 });
 
