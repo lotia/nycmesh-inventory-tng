@@ -29,13 +29,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import __main__ as server
-from inventory_tng import devices, seed, totp_keys, volunteers
-from inventory_tng.models import Item, Label, Volunteer
+from inventory_tng import accounts, devices, seed, totp_keys, volunteers
+from inventory_tng.models import Admin, AdminPassword, Item, Label, Volunteer
 
 from databases import migrated_engine, new_database
 
 # What a run writes in its folder: these, and the signed-in session
 # sign-in.setup.ts keeps (frontend/browser/prepared.ts, adminState).
+# The other administrator's username.
+OTHER_ADMIN = "browser-other"
 RUN_FILES = ("prepared.json", "camera.y4m", "admin.json", "totp-keys/1")
 # The run's own TOTP key (totp_keys.py), as a clone may have none in
 # .local/totp-keys: CI runs no `mise run setup`.
@@ -100,6 +102,13 @@ def prepare(url: str, video: Path) -> dict[str, str]:
         assert kept is not None  # The seed adds volunteers.
         duplicate = volunteers.add(session, f"{kept.name} (twice)", None)
         volunteers.merge(session, duplicate, kept.id, datetime.now(UTC))
+        # Another administrator, whose sign-in links.spec.ts resets.
+        other = Admin(username=OTHER_ADMIN)
+        session.add(other)
+        session.flush()
+        session.add(
+            AdminPassword(id=other.id, password_hash=accounts.hash_password(password))
+        )
         # The one device the tests share, registered by sign-in.setup.ts.
         _, phrase = devices.create_code(
             session, max_uses=1, lifetime=timedelta(hours=1), label="browser tests"
@@ -109,6 +118,7 @@ def prepare(url: str, video: Path) -> dict[str, str]:
         "password": password,
         "phrase": phrase,
         "labelled": seed.LABELLED,
+        "other": OTHER_ADMIN,
     }
 
 

@@ -1,6 +1,7 @@
 """Administrators: inviting, resetting sign-in, retiring and bringing back
 (admin/admins.py)."""
 
+import html
 import re
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -14,6 +15,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import accounts, activity, sign_in
+from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.admins import ADMINS
 from inventory_tng.models import ACTIVITY_KINDS, Admin, AdminSession, SignInSettings
 
@@ -583,3 +585,14 @@ def test_the_first_change_after_signing_in_asks_for_a_code(
     assert admin_client.post(f"{ADMINS}/{ben.id}/retire", data=form).status_code == 303
     retire_carol = admin_client.post(f"{ADMINS}/{carol.id}/retire", data=once())
     assert retire_carol.status_code == 303
+
+
+def test_a_link_page_offers_a_copy_and_a_qr_code(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Passed on by hand still: one click copies it, or a phone scans it."""
+    ben, _ = new_admin(session, "ben")
+    made = admin_client.post(f"{ADMINS}/{ben.id}/reset", data=with_code(session))
+    link = html.unescape(link_on(made.text))
+    assert 'id="copy"' in made.text
+    assert str(qr_svg(link)) in made.text

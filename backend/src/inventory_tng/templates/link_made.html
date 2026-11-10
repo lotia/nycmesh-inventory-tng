@@ -10,6 +10,35 @@ password, authenticators and recovery codes no longer work.</p>
 yourself, in person or in a message only they read. It works once,
 within a day, and with it they choose {% if kind == "invite" %}their{% else %}a new{% endif %} password.</p>
 <p class="key">{{ link }}</p>
+<p class="actions">
+  <button type="button" id="copy" hidden>Copy the link</button>
+  <span id="copied" aria-live="polite"></span>
+</p>
+<p class="hint">A copied link stays in any clipboard history: once it is
+passed on, copy something else.</p>
+<details>
+  <summary>Show a QR code for their phone</summary>
+  <p class="hint">Only with them beside you: any camera in view can read it.</p>
+  <div class="qr">{{ qr }}</div>
+</details>
+{#- Copying needs the clipboard, so the button shows only where it can be
+used; the link above can always be copied by hand. #}
+<script>
+  (() => {
+    const button = document.getElementById("copy");
+    const status = document.getElementById("copied");
+    if (!navigator.clipboard) return;
+    button.hidden = false;
+    button.addEventListener("click", () => {
+      // Emptied first, so the same words are said again.
+      status.textContent = "";
+      navigator.clipboard.writeText(document.querySelector(".key").textContent).then(
+        () => { status.textContent = "Copied."; },
+        () => { status.textContent = "Couldn't copy: select it and copy it by hand."; },
+      );
+    });
+  })();
+</script>
 {% include "_shown_once.html" %}
 <p><a href="{{ list }}">All administrators</a></p>
 {% endblock %}

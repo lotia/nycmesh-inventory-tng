@@ -126,6 +126,7 @@ def _link_page(
     *,
     brought_back: bool = False,
 ) -> HTMLResponse:
+    link = site_link(request, RESET, token=token)
     return admin_page(
         request,
         signed,
@@ -134,7 +135,8 @@ def _link_page(
             "title": f"A link for {other.username}",
             "list": ADMINS,
             "other": other,
-            "link": site_link(request, RESET, token=token),
+            "link": link,
+            "qr": accounts.qr_svg(link),
             "kind": kind,
             "brought_back": brought_back,
         },
