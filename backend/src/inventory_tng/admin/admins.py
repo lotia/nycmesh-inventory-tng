@@ -1,7 +1,9 @@
-"""Administrators (docs/decisions/0012): the list, inviting one, resetting
-one's sign-in with a link, retiring, and bringing back, which resets it
-too. Every change here is sensitive, so it asks for a fresh code
-(sign_in.ConfirmedAdmin).
+"""Administrators (docs/decisions/0012): the list and what changed lately,
+inviting one, resetting one's sign-in with a link, retiring, and bringing
+back. Every change here is sensitive, so it asks for a fresh code
+(sign_in.ConfirmedAdmin); resetting, retiring and bringing back ask for one
+each time (sign_in.ConfirmedEachTime). Every change is told to every
+administrator (activity.py).
 
 A link is shown once, to pass on however the administrator likes; only its
 hash is kept. Whoever it is for is told by mail, if they gave an address.
@@ -16,17 +18,20 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, mail
+from inventory_tng import accounts, activity, mail
 from inventory_tng.admin.common import ADMINS, admin_page, now, rule_words, site_link
 from inventory_tng.db import DbSession, attempt
+from inventory_tng.local_time import site_zone
 from inventory_tng.mail import Notify
 from inventory_tng.models import Admin
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import (
+    CONFIRM_FIELD,
     RESET,
     AdminSignedIn,
     ConfirmedAdmin,
+    ConfirmedEachTime,
     SignedIn,
     changed,
 )
@@ -66,6 +71,8 @@ def _list_page(
             "current": [a for a in admins if a.retired_at is None],
             "retired": [a for a in admins if a.retired_at is not None],
             "with_totp": accounts.admins_using_totp(session),
+            "changes": activity.recent(session),
+            "zone": site_zone(session),
             "problems": problems,
             "values": values,
         },
@@ -92,6 +99,9 @@ def _admin_page(
             "uses_totp": accounts.uses_totp(session, other.id),
             "has_password": accounts.has_password(session, other.id),
             "themselves": other.id == signed.admin.id,
+            # The code each change here asks for, the one acting's.
+            "code_totp": signed.uses_totp,
+            "field": CONFIRM_FIELD,
             "problems": {"admin": problem} if problem else None,
         },
         400 if problem else 200,
@@ -176,7 +186,7 @@ def invite(
 
     def make() -> None:
         invited.append(
-            accounts.invite(session, username, email, signed.admin.id, now())
+            accounts.invite(session, username, email, signed.admin.id, now(), notify)
         )
 
     if not problems and (
@@ -210,19 +220,14 @@ def admin(
 @router.post(f"{ADMINS}/{{admin_id}}/reset")
 def reset(
     request: Request,
-    signed: ConfirmedAdmin,
+    signed: ConfirmedEachTime,
     session: DbSession,
     notify: Notify,
     admin_id: int,
-    once: OnceKey = "",
 ) -> Response:
-    if again := sent_before(
-        request, session, signed, once, "link", f"{ADMINS}/{admin_id}"
-    ):
-        return again
     try:
         other, token, kind = accounts.reset_admin_sign_in(
-            session, admin_id, signed.admin.id, now()
+            session, admin_id, signed.admin.id, now(), notify
         )
     except accounts.AdminRefused as refused:
         return _refused(request, session, signed, refused, OWN_RESET)
@@ -232,10 +237,14 @@ def reset(
 
 @router.post(f"{ADMINS}/{{admin_id}}/retire")
 def retire(
-    request: Request, signed: ConfirmedAdmin, session: DbSession, admin_id: int
+    request: Request,
+    signed: ConfirmedEachTime,
+    session: DbSession,
+    notify: Notify,
+    admin_id: int,
 ) -> Response:
     try:
-        accounts.retire_admin(session, admin_id, signed.admin.id, now())
+        accounts.retire_admin(session, admin_id, signed.admin.id, now(), notify)
     except accounts.AdminRefused as refused:
         return _refused(request, session, signed, refused, OWN_RETIRE)
     changed(signed, session)
@@ -245,18 +254,15 @@ def retire(
 @router.post(f"{ADMINS}/{{admin_id}}/restore")
 def restore(
     request: Request,
-    signed: ConfirmedAdmin,
+    signed: ConfirmedEachTime,
     session: DbSession,
     notify: Notify,
     admin_id: int,
-    once: OnceKey = "",
 ) -> Response:
-    if again := sent_before(
-        request, session, signed, once, "link", f"{ADMINS}/{admin_id}"
-    ):
-        return again
     try:
-        other, token = accounts.restore_admin(session, admin_id, signed.admin.id, now())
+        other, token = accounts.restore_admin(
+            session, admin_id, signed.admin.id, now(), notify
+        )
     except accounts.AdminRefused:
         # Whatever the reason: oneself is never retired, so never found here.
         return not_found()

@@ -305,8 +305,11 @@ removes it and adds a new one on their account page.
 The app mails administrators reset links they ask for. It tells them when
 they are invited, when another administrator resets their sign-in or
 brings their account back, when the recovery token is used for them, and
-when their password changes or a recovery code is used. It sends through a
-provider's authenticated SMTP, such as Mailgun's or Gmail's:
+when their password changes or a recovery code is used. Every
+administrator, the one who did it too, is told when one is invited, reset,
+retired, brought back or given a link with the recovery token.
+It sends through a provider's authenticated SMTP, such as Mailgun's or
+Gmail's:
 
 - `MAIL_HOST`, such as `smtp.mailgun.org`.
 - `MAIL_FROM`: the sender, such as `inventory@nycmesh.net`. Its domain needs

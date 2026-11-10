@@ -25,8 +25,10 @@ from typing import Annotated, Literal, Protocol
 import structlog
 from fastapi import BackgroundTasks, Depends, Request
 from opentelemetry import metrics
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from inventory_tng.models import SignInSettings
+from inventory_tng.models import Admin, SignInSettings
 from inventory_tng.settings import MailConfig
 
 log = structlog.get_logger(__name__)
@@ -42,6 +44,7 @@ Kind = Literal[
     "email_changed",
     "recovery_code_used",
     "sign_in_settings_changed",
+    "activity",
 ]
 # Per network step. Mail goes out from the same threads as requests, so a
 # provider that has gone quiet holds one only briefly.
@@ -132,6 +135,24 @@ class Notifier:
         address."""
         if self.mailer is not None and to:
             self.tasks.add_task(deliver, self.mailer, build(to, admin_id))
+
+    def tell_admins(
+        self,
+        session: Session,
+        build: Callable[[str, int], Message],
+        *,
+        but: int | None = None,
+    ) -> None:
+        """Mail every current administrator with an address, `but` one."""
+        if not self.on:
+            return
+        query = select(Admin.id, Admin.email).where(
+            Admin.retired_at.is_(None), Admin.email.is_not(None)
+        )
+        if but is not None:
+            query = query.where(Admin.id != but)
+        for admin_id, email in session.execute(query):
+            self.tell(email, admin_id, build)
 
     def tell_now(
         self, to: str | None, admin_id: int, build: Callable[[str, int], Message]
@@ -284,6 +305,23 @@ def recovery_code_used(left: int) -> Callable[[str, int], Message]:
             f"account on NYC Mesh Inventory. {left} are left: make new ones from "
             f"your account page if you are running low.\n\n{IF_NOT_YOU}",
             "recovery_code_used",
+            admin_id,
+        )
+
+    return build
+
+
+def activity(words: str) -> Callable[[str, int], Message]:
+    """Told to every administrator (activity.py): one who could change who
+    may sign in could otherwise do it unseen."""
+
+    def build(to: str, admin_id: int) -> Message:
+        return Message(
+            to,
+            "An administrator account on NYC Mesh Inventory changed",
+            f"On NYC Mesh Inventory: {words}.\n\n"
+            "If this was not agreed, check with the other administrators.",
+            "activity",
             admin_id,
         )
 

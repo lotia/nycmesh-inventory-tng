@@ -2,7 +2,8 @@
 
 **Status:** accepted · 2026-11-02 · amends 0004 (TOTP may be optional in
 production) · amended 2026-11-10 (retiring removes the sign-in; nobody is
-deleted)
+deleted; a code for each change to another administrator, and everyone
+told)
 
 ## Context
 
@@ -109,6 +110,26 @@ without a deployment.
   whatever they were retired for. We rejected keeping the password until
   they come back: nothing could use it meanwhile, but a leaked database
   would still hold it.
+- **Resetting, retiring or bringing back another administrator asks for a
+  code each time**, typed with the form, whether or not a recent one is
+  still open, so a stolen session cannot do it without the code too. The
+  form is sent once: sent again, it is answered so before a code is asked
+  for, so none is spent on it. An
+  honest administrator can still do several in a minute. We rejected a
+  limit per hour on these: it held back the administrators trying to
+  retire a malicious one as much as it slowed the attacker, and cannot
+  stop an administrator with their own code at all. That is the
+  operator's to stop.
+- **Every administrator is told of these changes**, of an invite, of a
+  link made with the recovery token and of a change to the sign-in
+  settings: mailed if they gave an address (the
+  one who did it too, in case it was not them; not the one it was done to,
+  who gets their own mail), and shown on the administrators page ("Recent
+  changes") and, for what others did since they last signed in, on the
+  home page, so those without an address hear of it too. Each is kept in
+  `activity`, which the app may only add to, by kind, who did it and to
+  whom, for good. A new kind is a name, its words (activity.py) and its
+  migration's check.
 - **Only an administrator who can still sign in changes another.** A
   request already waiting when its session was cut off, by a reset or by
   retiring, changes nothing. So two resetting each other at once leave one
@@ -164,7 +185,7 @@ deployment settings, where administrators could not change it.
   machine can still change the catalogue for a week, unless ended from the
   account page.
 - Any administrator can take over another's account with a reset link. The
-  history shows who made it.
+  history shows who made it, and every administrator is told.
 - Anyone who reads the database can copy the TOTP keys, until they are
   encrypted at rest (inventory-tng-8i4.48).
 - The page's words never reveal that a password was right, but its timing

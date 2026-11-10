@@ -3,6 +3,13 @@
 {% for warning in warnings %}
 <p class="warning">{{ warning.words }} <a href="{{ warning.path }}">{{ warning.action }}</a>.</p>
 {% endfor %}
+{% if changes %}
+<section id="since">
+  <h2>Since you last signed in</h2>
+  {% include "_activity.html" %}
+  <p><a href="{{ admins_path }}#changes">Recent changes</a></p>
+</section>
+{% endif %}
 {% include "_retired_holding.html" %}
 <ul>
   {% for path, label, _ in sections %}

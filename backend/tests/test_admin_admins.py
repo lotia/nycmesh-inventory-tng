@@ -13,12 +13,21 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts, sign_in
+from inventory_tng import accounts, activity, sign_in
 from inventory_tng.admin.admins import ADMINS
-from inventory_tng.models import Admin, AdminSession
+from inventory_tng.models import ACTIVITY_KINDS, Admin, AdminSession
 
 from helpers.mail import SentMail
-from helpers.sign_in import code, new_admin, once, reset_link, sign_in_with, text
+from helpers.sign_in import (
+    admin_named,
+    code,
+    new_admin,
+    once,
+    reset_link,
+    sign_in_with,
+    text,
+    with_code,
+)
 
 NEW_PASSWORD = "a long passphrase of their own"
 
@@ -31,10 +40,6 @@ def link_on(page: str) -> str:
 
 def token_of(link: str) -> str:
     return link.split("token=")[1]
-
-
-def admin_named(session: Session, username: str) -> Admin:
-    return session.scalars(select(Admin).where(Admin.username == username)).one()
 
 
 def assert_sign_in_was_reset(
@@ -99,7 +104,7 @@ def test_resetting_an_invite_replaces_its_link(
     me = admin_named(session, "ada")
     now = datetime.now(UTC)
     grace, first = accounts.invite(session, "grace", None, me.id, now)
-    made = admin_client.post(f"{ADMINS}/{grace.id}/reset", data=once())
+    made = admin_client.post(f"{ADMINS}/{grace.id}/reset", data=with_code(session))
     assert made.status_code == 200
     # Nothing to reset: a new invite, which tells them nothing changed.
     assert "they choose their password" in text(made)
@@ -149,7 +154,7 @@ def test_resetting_another_admins_sign_in(
     assert theirs.get(sign_in.HOME).status_code == 200
     emailed = accounts.emailed_reset(session, "ben", datetime.now(UTC))
     assert emailed is not None
-    made = client.post(f"{ADMINS}/{ben.id}/reset", data=once())
+    made = client.post(f"{ADMINS}/{ben.id}/reset", data=with_code(session))
     assert [m.kind for m in sent_mail] == ["reset_link_made"]
     assert theirs.get(sign_in.HOME).headers["location"].startswith(sign_in.SIGN_IN)
     now = datetime.now(UTC)
@@ -162,7 +167,7 @@ def test_your_own_reset_is_on_your_account_page(
     admin_client: TestClient, session: Session
 ) -> None:
     me = admin_named(session, "ada")
-    refused = admin_client.post(f"{ADMINS}/{me.id}/reset", data=once())
+    refused = admin_client.post(f"{ADMINS}/{me.id}/reset", data=with_code(session))
     assert "Change your own on your account page." in text(refused)
 
 
@@ -178,7 +183,7 @@ def test_retiring_another_removes_their_sign_in(
     accounts.make_recovery_codes(session, ben.id, now)
     theirs = accounts.start_session(session, ben.id, None, now)[0]
     token = reset_link(session, ben)
-    done = admin_client.post(f"{ADMINS}/{ben.id}/retire")
+    done = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=with_code(session))
     assert (
         done.headers["location"]
         == f"{ADMINS}?notice=admin_retired&section=retired#retired"
@@ -201,8 +206,13 @@ def test_bringing_one_back_starts_their_sign_in_again(
     sign_in_with(admin_client, code=code(key))
     ben, ben_key = new_admin(session, "ben", email="ben@example.org")
     accounts.make_recovery_codes(session, ben.id, datetime.now(UTC))
-    assert admin_client.post(f"{ADMINS}/{ben.id}/retire").status_code == 303
-    made = admin_client.post(f"{ADMINS}/{ben.id}/restore", data=once())
+    assert (
+        admin_client.post(
+            f"{ADMINS}/{ben.id}/retire", data=with_code(session)
+        ).status_code
+        == 303
+    )
+    made = admin_client.post(f"{ADMINS}/{ben.id}/restore", data=with_code(session))
     assert "Brought back. Retiring removed anything they" in text(made)
     assert "they choose their password" in text(made)
     assert ben.retired_at is None
@@ -229,15 +239,28 @@ def test_retiring_or_bringing_back_one_there_is_not_is_not_found(
     admin_client: TestClient, session: Session
 ) -> None:
     current, _ = new_admin(session, "ben")
-    assert admin_client.post(f"{ADMINS}/999999/retire").status_code == 404
-    assert admin_client.post(f"{ADMINS}/999999/reset", data=once()).status_code == 404
+    assert (
+        admin_client.post(
+            f"{ADMINS}/999999/retire", data=with_code(session)
+        ).status_code
+        == 404
+    )
+    assert (
+        admin_client.post(f"{ADMINS}/999999/reset", data=with_code(session)).status_code
+        == 404
+    )
     me = admin_named(session, "ada")
     assert (
-        admin_client.post(f"{ADMINS}/{me.id}/restore", data=once()).status_code == 404
+        admin_client.post(
+            f"{ADMINS}/{me.id}/restore", data=with_code(session)
+        ).status_code
+        == 404
     )
     # Bringing back one who is not retired finds nobody to bring back.
     assert (
-        admin_client.post(f"{ADMINS}/{current.id}/restore", data=once()).status_code
+        admin_client.post(
+            f"{ADMINS}/{current.id}/restore", data=with_code(session)
+        ).status_code
         == 404
     )
     assert current.retired_at is None
@@ -246,7 +269,7 @@ def test_retiring_or_bringing_back_one_there_is_not_is_not_found(
 
 def test_nobody_retires_themselves(admin_client: TestClient, session: Session) -> None:
     me = admin_named(session, "ada")
-    refused = admin_client.post(f"{ADMINS}/{me.id}/retire")
+    refused = admin_client.post(f"{ADMINS}/{me.id}/retire", data=with_code(session))
     assert "Another administrator must retire you." in text(refused)
 
 
@@ -288,7 +311,12 @@ def test_an_invite_not_taken_up_may_always_go(
 ) -> None:
     me = admin_named(session, "ada")
     grace, _ = accounts.invite(session, "grace", None, me.id, datetime.now(UTC))
-    assert admin_client.post(f"{ADMINS}/{grace.id}/retire").status_code == 303
+    assert (
+        admin_client.post(
+            f"{ADMINS}/{grace.id}/retire", data=with_code(session)
+        ).status_code
+        == 303
+    )
 
 
 def test_changes_here_ask_for_a_fresh_code(
@@ -329,7 +357,10 @@ def test_bringing_one_back_voids_their_links(
     ben.retired_at = now
     session.flush()
     assert (
-        admin_client.post(f"{ADMINS}/{ben.id}/restore", data=once()).status_code == 200
+        admin_client.post(
+            f"{ADMINS}/{ben.id}/restore", data=with_code(session)
+        ).status_code
+        == 200
     )
     assert accounts.find_reset_link(session, token, now) is None
 
@@ -340,3 +371,124 @@ def test_only_a_retired_administrator_is_brought_back(session: Session) -> None:
     with pytest.raises(accounts.AdminRefused, match="not_found"):
         accounts.restore_admin(session, ben.id, ada.id, datetime.now(UTC))
     assert accounts.has_password(session, ben.id)
+
+
+def test_resetting_retiring_and_bringing_back_ask_for_a_code_each_time(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Even with the confirmation window open, as a stolen session's may be:
+    the form is asked for a code, and nothing changes without one."""
+    ben, _ = new_admin(session, "ben")
+    for action in ("reset", "retire"):
+        asked = admin_client.post(f"{ADMINS}/{ben.id}/{action}", data=once())
+        assert asked.status_code == 403
+        assert 'name="confirm_code"' in asked.text
+    assert accounts.has_password(session, ben.id)
+    assert ben.retired_at is None
+    me = admin_named(session, "ada")
+    accounts.retire_admin(session, ben.id, me.id, datetime.now(UTC))
+    asked = admin_client.post(f"{ADMINS}/{ben.id}/restore", data=once())
+    assert asked.status_code == 403
+    assert ben.retired_at is not None
+
+
+def test_the_administrator_page_asks_for_the_code_with_each_change(
+    admin_client: TestClient, session: Session
+) -> None:
+    ben, _ = new_admin(session, "ben")
+    page = text(admin_client.get(f"{ADMINS}/{ben.id}"))
+    assert page.count('name="confirm_code"') == 2
+    assert "Your code" in page
+
+
+def test_every_administrator_is_told_of_a_change(
+    make_client: Callable[..., TestClient], session: Session, sent_mail: SentMail
+) -> None:
+    """By mail if they gave an address, but not the one it was done to, who
+    is told in their own words; and on the administrators page."""
+    client = make_client(mailer=sent_mail)
+    _, key = new_admin(session, email="ada@example.org")
+    sign_in_with(client, code=code(key))
+    ben, _ = new_admin(session, "ben", email="ben@example.org")
+    new_admin(session, "carol", email="carol@example.org")
+    new_admin(session, "dan")
+    made = client.post(f"{ADMINS}/{ben.id}/reset", data=with_code(session))
+    assert made.status_code == 200
+    told = {m.to: m for m in sent_mail if m.kind == "activity"}
+    assert set(told) == {"ada@example.org", "carol@example.org"}
+    assert "ada reset ben's sign-in." in told["carol@example.org"].body
+    assert [m.to for m in sent_mail if m.kind == "reset_link_made"] == [
+        "ben@example.org"
+    ]
+    listed = text(client.get(ADMINS))
+    assert "Recent changes" in listed
+    assert "ada reset ben's sign-in" in listed
+
+
+def test_since_you_last_signed_in(
+    make_client: Callable[..., TestClient], session: Session
+) -> None:
+    """What others changed since one's previous sign-in, on the home page;
+    nothing on a first sign-in, and nothing one did oneself."""
+    ada, _ = new_admin(session)
+    ben, ben_key = new_admin(session, "ben")
+    carol, _ = new_admin(session, "carol")
+    theirs = make_client(address="192.0.2.80")
+    assert sign_in_with(theirs, "ben", code=code(ben_key)).status_code == 303
+    assert "Since you last signed in" not in text(theirs.get(sign_in.HOME))
+    now = datetime.now(UTC)
+    accounts.retire_admin(session, carol.id, ada.id, now)
+    accounts.restore_admin(session, carol.id, ben.id, now)
+    later = make_client(address="192.0.2.81")
+    again = code(ben_key, now + timedelta(seconds=30))
+    assert sign_in_with(later, "ben", code=again).status_code == 303
+    home = text(later.get(sign_in.HOME))
+    assert "Since you last signed in" in home
+    assert "ada retired carol" in home
+    assert "ben brought back carol" not in home
+
+
+def test_the_operators_changes_say_so(session: Session) -> None:
+    ben, _ = new_admin(session, "ben")
+    activity.record(session, "retired", None, ben.id, None)
+    assert activity.recent(session)[0].words == "The operator retired ben"
+
+
+def test_every_kind_of_activity_has_its_words() -> None:
+    assert set(activity.WORDS) == set(ACTIVITY_KINDS)
+
+
+def test_a_change_sent_again_spends_no_code(
+    admin_client: TestClient, session: Session
+) -> None:
+    """As Back then Forward sends it, with the code already used: it says it
+    was sent, and nothing is done again."""
+    ben, _ = new_admin(session, "ben")
+    form = with_code(session)
+    assert admin_client.post(f"{ADMINS}/{ben.id}/retire", data=form).status_code == 303
+    again = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=form)
+    assert again.status_code == 409
+    assert "nothing was done again" in text(again)
+
+
+def test_a_key_spent_by_another_form_does_not_skip_the_code(
+    admin_client: TestClient, session: Session
+) -> None:
+    ben, _ = new_admin(session, "ben")
+    carol, _ = new_admin(session, "carol")
+    form = with_code(session)
+    assert admin_client.post(f"{ADMINS}/{ben.id}/reset", data=form).status_code == 200
+    taken = admin_client.post(
+        f"{ADMINS}/{carol.id}/retire", data={"once": form["once"]}
+    )
+    assert taken.status_code == 409
+    assert carol.retired_at is None
+
+
+def test_the_operators_recovery_link_is_told(session: Session) -> None:
+    new_admin(session)
+    token = "a recovery token the operator set, long"
+    accounts.recover(session, token, token, "ada", "192.0.2.90", datetime.now(UTC))
+    assert activity.recent(session)[0].words == (
+        "The operator made a link for ada with the recovery token"
+    )

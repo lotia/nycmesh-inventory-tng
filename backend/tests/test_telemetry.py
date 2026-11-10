@@ -341,6 +341,15 @@ def test_counts_sign_in_resets(rolled_back: Recorded, session: Session) -> None:
     assert resets[(("action", "reset"),)] >= 1
 
 
+def test_counts_activity(rolled_back: Recorded, session: Session) -> None:
+    _, _, reader, _ = rolled_back
+    ada, _ = new_admin(session)
+    ben, _ = new_admin(session, "ben")
+    accounts.retire_admin(session, ben.id, ada.id, datetime.now(UTC))
+    told = counted(reader, "inventory.admin.activity")
+    assert told[(("kind", "retired"),)] >= 1
+
+
 def test_counts_count_lines_withheld(rolled_back: Recorded, session: Session) -> None:
     """Radios counted while three of them moved are not written: they are
     counted again."""

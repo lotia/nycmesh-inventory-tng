@@ -102,6 +102,18 @@ STORE_KINDS = ("store", "area")
 # What a transaction is. A count or an adjustment fixes the records, with
 # stock found (NULL to a location) or lost (a location to NULL).
 TRANSACTION_KINDS = ("move", "receipt", "install", "count", "adjustment")
+# What administrators are told of (activity.py): changes to who may sign
+# in. A new kind is added here, to activity.WORDS and to its migration's
+# check.
+ActivityKind = Literal[
+    "invited",
+    "sign_in_reset",
+    "retired",
+    "restored",
+    "recovery_link_made",
+    "sign_in_settings_changed",
+]
+ACTIVITY_KINDS: tuple[ActivityKind, ...] = get_args(ActivityKind)
 
 # Label codes: no 0/O, 1/I/L or U, so a code read aloud or off a smudged label
 # is not misread. 30^10 codes, about 5.9e14.
@@ -867,6 +879,29 @@ class SentForm(Base):
     id: Mapped[IntId]
     created_at: Mapped[CreatedAt]
     key: Mapped[uuid.UUID] = mapped_column(unique=True)
+
+
+class Activity(Base):
+    """Something every administrator is told of (activity.py), such as an
+    administrator retired: shown on the administrators page and, since
+    their last sign-in, on the home page. Only ever added to, so it is its
+    own history, as the ledger is."""
+
+    __tablename__ = "activity"
+    __table_args__ = (
+        CheckConstraint(_one_of("kind", ACTIVITY_KINDS), name="kind"),
+        # "Since you last signed in" reads from a time on.
+        Index("ix_activity_at", "at"),
+        protection(owner="activity.py", lock=None, history=False),
+    )
+
+    id: Mapped[IntId]
+    at: Mapped[CreatedAt]
+    kind: Mapped[ActivityKind] = mapped_column(Text)
+    # Who did it; NULL for the operator, through a command.
+    by_admin_id: Mapped[int | None] = _reference("admin.id")
+    # The administrator it was done to, if it was done to one.
+    admin_id: Mapped[int | None] = _reference("admin.id")
 
 
 class RateLimit(Base):

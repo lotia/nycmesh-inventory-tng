@@ -33,6 +33,13 @@
   </form>
 </section>
 
+{% if changes %}
+<section id="changes">
+  <h2>Recent changes</h2>
+  {% include "_activity.html" %}
+</section>
+{% endif %}
+
 {% if retired %}
 <section class="retired" id="retired">
   <h2>Retired</h2>
