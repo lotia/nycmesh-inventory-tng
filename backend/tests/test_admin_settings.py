@@ -65,6 +65,7 @@ SIGN_IN_FORM = {
     "session_days": "3",
     "confirm_hours": "12",
     "confirm_idle_minutes": "30",
+    "account_change_minutes": "5",
 }
 
 
@@ -89,7 +90,8 @@ def test_sign_in_settings_change_and_everyone_is_told(
         settings.session_days,
         settings.confirm_hours,
         settings.confirm_idle_minutes,
-    ) == ("optional", 3, 12, 30)
+        settings.account_change_minutes,
+    ) == ("optional", 3, 12, 30, 5)
     assert sorted(m.to for m in sent_mail) == ["ada@example.org", "ben@example.org"]
     assert "TOTP is now optional" in sent_mail[0].body
     assert (history(session, "sign_in_settings")[-1].actor or "").startswith("admin:")
@@ -165,6 +167,7 @@ def test_saving_the_same_sign_in_settings_tells_nobody(
     sign_in_with(client, code=code(key))
     same = SIGN_IN_FORM | {"totp_policy": "required", "session_days": "7"}
     same |= {"confirm_hours": "24", "confirm_idle_minutes": "60"}
+    same |= {"account_change_minutes": "30"}
     same |= {"sign_in_version": shown(session.get_one(SignInSettings, 1))}
     assert client.post(f"{SETTINGS}/sign-in", data=same).status_code == 303
     assert list(sent_mail) == []

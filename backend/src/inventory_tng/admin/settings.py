@@ -29,6 +29,7 @@ from inventory_tng.admin.common import (
 from inventory_tng.db import DbSession, RuleBroken, refusal, settings_row
 from inventory_tng.mail import Notify
 from inventory_tng.models import (
+    ACCOUNT_CHANGE_MINUTES,
     CONFIRM_HOURS,
     CONFIRM_IDLE_MINUTES,
     NAME_CHECK_MINUTES,
@@ -93,6 +94,15 @@ NUMBERS = (
         "minutes",
         "…or until unused for",
         "minutes",
+    ),
+    Number(
+        "account_change_minutes",
+        *ACCOUNT_CHANGE_MINUTES,
+        "minutes",
+        "Inviting, resetting, retiring or bringing back an administrator needs a"
+        " code typed within",
+        "minutes, and only while the code above lasts; 0 asks each time, and an"
+        " authenticator gives a new code only every 30 seconds",
     ),
 )
 

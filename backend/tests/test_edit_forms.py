@@ -82,6 +82,7 @@ def _sign_in(session: Session) -> Form:
         "session_days": "3",
         "confirm_hours": "12",
         "confirm_idle_minutes": "30",
+        "account_change_minutes": "5",
     }
     row = session.get_one(SignInSettings, 1)
     return Form(f"{SETTINGS}/sign-in", form, row, "sign_in_version")

@@ -21,6 +21,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException
 
+from inventory_tng.db import exists_where
 from inventory_tng.models import SentForm
 from inventory_tng.pages import page, templates
 
@@ -34,8 +35,8 @@ FIELD = "once"
 OnceKey = Annotated[str, Form(alias=FIELD)]
 
 # What was made, for the log and the page: a fixed list. "change": what a
-# form that asks for a code each time did (sign_in.ConfirmedEachTime), which
-# may or may not have shown something.
+# form that showed nothing made, or what one sent again is answered with
+# before its route says more (sign_in.ConfirmedAccountChange).
 Made = Literal["registration_code", "recovery_codes", "link", "change"]
 WORDS: dict[Made, str] = {
     "registration_code": "a registration code",
@@ -59,8 +60,10 @@ cast(dict[str, Any], templates.env.globals).update(
 )
 
 
-def form_key(typed: str) -> uuid.UUID | None:
+def form_key(typed: object) -> uuid.UUID | None:
     """A form's key, as its page made it, or None if it isn't one."""
+    if not isinstance(typed, str):
+        return None
     try:
         return uuid.UUID(typed)
     except ValueError:
@@ -80,7 +83,7 @@ def sent_before(
     transaction, so a form refused without a commit can be sent again, and
     a second sending at once waits on the first, then finds it. A key that
     isn't one is a bad request."""
-    key = form_key(typed) if isinstance(typed, str) else None
+    key = form_key(typed)
     if key is None:
         log.info("form key missing", made=made, admin_id=signed.admin.id)
         raise HTTPException(status_code=400)
@@ -92,6 +95,20 @@ def sent_before(
     )
     if added.first() is not None:
         return None
+    return sent_again(request, signed, made, back)
+
+
+def spent(session: Session, typed: object) -> bool:
+    """Whether the form with this key was sent before, without spending it:
+    so one sent again is answered before a code is spent on it."""
+    key = form_key(typed)
+    return key is not None and exists_where(session, SentForm.key == key)
+
+
+def sent_again(
+    request: Request, signed: SignedIn, made: Made, back: str
+) -> HTMLResponse:
+    """The page saying a form was already sent, with a way `back`."""
     log.info("form sent again", made=made, admin_id=signed.admin.id)
     return page(
         request,

@@ -2,8 +2,8 @@
 
 **Status:** accepted · 2026-11-02 · amends 0004 (TOTP may be optional in
 production) · amended 2026-11-10 (retiring removes the sign-in; nobody is
-deleted; a code for each change to another administrator, and everyone
-told), 2026-11-10 by 0018 (the operator's commands; a code asked for while
+deleted; a recent code for each change to another administrator, and
+everyone told), 2026-11-10 by 0018 (the operator's commands; a code asked for while
 recovery codes remain)
 
 ## Context
@@ -83,7 +83,7 @@ without a deployment.
 
 ### Settings and resets
 
-- **The TOTP policy and the three times live in the database**, in one row
+- **The TOTP policy and the four times live in the database**, in one row
   that administrators change from a page. Changing them is a sensitive
   action, is recorded in the history, and is emailed to every administrator
   with an address.
@@ -111,16 +111,19 @@ without a deployment.
   whatever they were retired for. We rejected keeping the password until
   they come back: nothing could use it meanwhile, but a leaked database
   would still hold it.
-- **Resetting, retiring or bringing back another administrator asks for a
-  code each time**, typed with the form, whether or not a recent one is
-  still open, so a stolen session cannot do it without the code too. The
-  form is sent once: sent again, it is answered so before a code is asked
-  for, so none is spent on it. An
-  honest administrator can still do several in a minute. We rejected a
-  limit per hour on these: it held back the administrators trying to
-  retire a malicious one as much as it slowed the attacker, and cannot
-  stop an administrator with their own code at all. That is the
-  operator's to stop.
+- **Inviting, resetting, retiring or bringing back another administrator
+  needs a code typed recently**: within a number of minutes set on the
+  Settings page (0 to 60, 30 by default; 0 asks each time), counted from
+  the code, not the last action, and only while the window above is open.
+  A stolen session gets at most those minutes, and an honest administrator
+  retiring several malicious ones types one code. The form is sent once:
+  sent again, it is answered so before a code is asked for, so none is
+  spent on it. We rejected a code each time: an authenticator gives a new
+  one only every 30 seconds, so honest administrators racing malicious ones
+  could change about two a minute. We rejected a limit per hour on these
+  too: it held back the administrators trying to retire a malicious one as
+  much as it slowed the attacker, and cannot stop an administrator with
+  their own code at all. That is the operator's to stop.
 - **Every administrator is told of these changes**, of an invite, of a
   link made with the recovery token and of a change to the sign-in
   settings: mailed if they gave an address (the

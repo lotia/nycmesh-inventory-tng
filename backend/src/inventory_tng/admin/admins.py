@@ -1,9 +1,8 @@
 """Administrators (docs/decisions/0012): the list and what changed lately,
 inviting one, resetting one's sign-in with a link, retiring, and bringing
-back. Every change here is sensitive, so it asks for a fresh code
-(sign_in.ConfirmedAdmin); resetting, retiring and bringing back ask for one
-each time (sign_in.ConfirmedEachTime). Every change is told to every
-administrator (activity.py).
+back. Each asks for a code typed within the sign-in settings'
+account_change_minutes (sign_in.ConfirmedAccountChange), and is told to
+every administrator (activity.py).
 
 A link is shown once, to pass on however the administrator likes; only its
 hash is kept. Whoever it is for is told by mail, if they gave an address.
@@ -30,8 +29,7 @@ from inventory_tng.sign_in import (
     CONFIRM_FIELD,
     RESET,
     AdminSignedIn,
-    ConfirmedAdmin,
-    ConfirmedEachTime,
+    ConfirmedAccountChange,
     SignedIn,
     changed,
 )
@@ -50,6 +48,18 @@ NOTICES.update(
         "authenticators and recovery codes are removed.",
     }
 )
+
+
+def _code_field(signed: SignedIn) -> dict[str, object]:
+    """For a form here: whether it needs a code (none was typed within
+    account_change_minutes), and whose kind, the one acting's."""
+    return {
+        "code_needed": not accounts.account_change_open(
+            signed.row, signed.settings, now()
+        ),
+        "code_totp": signed.asks_code,
+        "field": CONFIRM_FIELD,
+    }
 
 
 def _list_page(
@@ -71,6 +81,7 @@ def _list_page(
             "current": [a for a in admins if a.retired_at is None],
             "retired": [a for a in admins if a.retired_at is not None],
             "with_totp": accounts.admins_using_totp(session),
+            **_code_field(signed),
             "changes": activity.recent(session),
             "zone": site_zone(session),
             "problems": problems,
@@ -99,9 +110,7 @@ def _admin_page(
             "uses_totp": accounts.uses_totp(session, other.id),
             "has_password": accounts.has_password(session, other.id),
             "themselves": other.id == signed.admin.id,
-            # The code each change here asks for, the one acting's.
-            "code_totp": signed.uses_totp,
-            "field": CONFIRM_FIELD,
+            **_code_field(signed),
             "problems": {"admin": problem} if problem else None,
         },
         400 if problem else 200,
@@ -169,7 +178,7 @@ def admins(request: Request, signed: AdminSignedIn, session: DbSession) -> Respo
 @router.post(ADMINS)
 def invite(
     request: Request,
-    signed: ConfirmedAdmin,
+    signed: ConfirmedAccountChange,
     session: DbSession,
     notify: Notify,
     username: Annotated[str, Form()] = "",
@@ -220,11 +229,16 @@ def admin(
 @router.post(f"{ADMINS}/{{admin_id}}/reset")
 def reset(
     request: Request,
-    signed: ConfirmedEachTime,
+    signed: ConfirmedAccountChange,
     session: DbSession,
     notify: Notify,
     admin_id: int,
+    once: OnceKey = "",
 ) -> Response:
+    if again := sent_before(
+        request, session, signed, once, "link", f"{ADMINS}/{admin_id}"
+    ):
+        return again
     try:
         other, token, kind = accounts.reset_admin_sign_in(
             session, admin_id, signed.admin.id, now(), notify
@@ -238,11 +252,16 @@ def reset(
 @router.post(f"{ADMINS}/{{admin_id}}/retire")
 def retire(
     request: Request,
-    signed: ConfirmedEachTime,
+    signed: ConfirmedAccountChange,
     session: DbSession,
     notify: Notify,
     admin_id: int,
+    once: OnceKey = "",
 ) -> Response:
+    if again := sent_before(
+        request, session, signed, once, "change", f"{ADMINS}/{admin_id}"
+    ):
+        return again
     try:
         accounts.retire_admin(session, admin_id, signed.admin.id, now(), notify)
     except accounts.AdminRefused as refused:
@@ -254,11 +273,16 @@ def retire(
 @router.post(f"{ADMINS}/{{admin_id}}/restore")
 def restore(
     request: Request,
-    signed: ConfirmedEachTime,
+    signed: ConfirmedAccountChange,
     session: DbSession,
     notify: Notify,
     admin_id: int,
+    once: OnceKey = "",
 ) -> Response:
+    if again := sent_before(
+        request, session, signed, once, "link", f"{ADMINS}/{admin_id}"
+    ):
+        return again
     try:
         other, token = accounts.restore_admin(
             session, admin_id, signed.admin.id, now(), notify

@@ -612,6 +612,22 @@ def confirmation_open(
     return now < last + timedelta(minutes=settings.confirm_idle_minutes)
 
 
+def account_change_open(
+    row: AdminSession, settings: SignInSettings, now: datetime
+) -> bool:
+    """Whether inviting, resetting, retiring or bringing back another
+    administrator may go ahead without asking for a code: the window is
+    open, and the code was typed within account_change_minutes, counted
+    from the code, not from the last action, so a stolen session gets at
+    most that long. 0: never."""
+    minutes = timedelta(minutes=settings.account_change_minutes)
+    return (
+        confirmation_open(row, settings, now)
+        and row.confirmed_at is not None
+        and now < row.confirmed_at + minutes
+    )
+
+
 Confirmation = Literal["confirmed", "refused", "rate_limited"]
 
 
