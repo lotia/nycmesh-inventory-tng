@@ -125,6 +125,8 @@ without a deployment.
   needs a code typed recently**: within a number of minutes set on the
   Settings page (0 to 60, 30 by default; 0 asks each time), counted from
   the code, not the last action, and only while the window above is open.
+  Only a code typed for such a change counts, not the one typed to sign in
+  or for another sensitive action, so the first in a session always asks.
   A stolen session gets at most those minutes, and an honest administrator
   retiring several malicious ones types one code. The form is sent once:
   sent again, it is answered so before a code is asked for, so none is

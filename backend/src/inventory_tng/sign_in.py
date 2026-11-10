@@ -368,7 +368,14 @@ async def _confirmed(
             )
         # Its queries, and argon2's work, off the event loop.
         outcome = await run_in_threadpool(
-            _confirm, keys, session, signed, typed, notify, recovery=recovery
+            _confirm,
+            keys,
+            session,
+            signed,
+            typed,
+            notify,
+            recovery=recovery,
+            account_change=need == "account_change",
         )
         if outcome != "confirmed":
             raise await run_in_threadpool(
@@ -411,10 +418,18 @@ def _confirm(
     notify: Notify,
     *,
     recovery: bool,
+    account_change: bool,
 ) -> accounts.Confirmation:
-    """Confirm, keep it, and tell the owner if a recovery code did it."""
+    """Confirm, keep it, and tell the owner if a recovery code did it. For a
+    change to another administrator, it opens that shorter window too."""
     outcome, factor = accounts.confirm(
-        session, keys, signed.row, typed, _now(), recovery=recovery
+        session,
+        keys,
+        signed.row,
+        typed,
+        _now(),
+        recovery=recovery,
+        account_change=account_change,
     )
     if outcome == "confirmed":
         left = _codes_left(session, signed.admin, factor)
@@ -832,7 +847,9 @@ def confirm(
     confirm_code: Annotated[str, Form()] = "",
     next: Annotated[str, Form()] = HOME,
 ) -> Response:
-    outcome = _confirm(keys, session, signed, confirm_code, notify, recovery=True)
+    outcome = _confirm(
+        keys, session, signed, confirm_code, notify, recovery=True, account_change=False
+    )
     if outcome == "confirmed":
         return redirect(_local(next))
     return _confirm_page(

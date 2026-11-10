@@ -299,7 +299,13 @@ def test_a_code_being_confirmed_while_a_reset_is_made_does_not_deadlock(
     # Later than the session's start, so confirming writes its session row.
     later = now + timedelta(seconds=1)
     confirmed = accounts.confirm(
-        confirming, TOTP_KEYS, row, code(key, later), later, recovery=True
+        confirming,
+        TOTP_KEYS,
+        row,
+        code(key, later),
+        later,
+        recovery=True,
+        account_change=False,
     )
     assert confirmed[0] == "confirmed"
     reset, worker = reset_blocked(committed, ada, ben)
@@ -439,7 +445,13 @@ def test_a_password_confirmed_while_totp_is_set_up_is_refused(
     worker = committed.blocked(
         confirming,
         lambda: accounts.confirm(
-            confirming, TOTP_KEYS, row, PASSWORD, datetime.now(UTC), recovery=True
+            confirming,
+            TOTP_KEYS,
+            row,
+            PASSWORD,
+            datetime.now(UTC),
+            recovery=True,
+            account_change=False,
         )[0],
     )
     adding.commit()
@@ -1149,6 +1161,14 @@ def test_custody_ended_twice_at_once_is_ended_once(
     assert checking.get_one(Location, custody.id).retired_at == NOW
 
 
+def changes_open(committed: Committed, session_id: int) -> None:
+    """A code typed for a change to another administrator, just now: the
+    session may invite without one."""
+    setup = committed.session()
+    setup.get_one(AdminSession, session_id).account_confirmed_at = datetime.now(UTC)
+    setup.commit()
+
+
 def inviting(client: TestClient, key: str, username: str) -> Answer:
     return client.post(ADMINS, data={"once": key, "username": username})
 
@@ -1161,7 +1181,7 @@ def test_a_form_refused_after_its_key_is_spent_can_be_sent_again(
     commit, nothing is kept, so the same form, put right, goes through
     (once.py, inventory-tng-8i4.74)."""
     client, _ = real_client
-    signed_in_as_ben(committed, client, admins[2])
+    changes_open(committed, signed_in_as_ben(committed, client, admins[2]))
     key = str(uuid.uuid4())
     assert inviting(client, key, "ADA").status_code == 400
     assert inviting(client, key, "grace").status_code == 200
@@ -1173,7 +1193,7 @@ def test_a_form_sent_twice_at_once_waits_then_makes_nothing(
     committed: Committed, admins: Admins, real_client: tuple[TestClient, SentMail]
 ) -> None:
     client, _ = real_client
-    signed_in_as_ben(committed, client, admins[2])
+    changes_open(committed, signed_in_as_ben(committed, client, admins[2]))
     key = uuid.uuid4()
     first = committed.session()
     first.add(SentForm(key=key))
