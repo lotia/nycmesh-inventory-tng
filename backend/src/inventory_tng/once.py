@@ -11,7 +11,7 @@ first's secret never.
 """
 
 import uuid
-from typing import Annotated, Any, Literal, cast
+from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 import structlog
 from fastapi import Form, Request
@@ -23,7 +23,9 @@ from starlette.exceptions import HTTPException
 
 from inventory_tng.models import SentForm
 from inventory_tng.pages import page, templates
-from inventory_tng.sign_in import SignedIn
+
+if TYPE_CHECKING:  # sign_in imports this module.
+    from inventory_tng.sign_in import SignedIn
 
 log = structlog.get_logger(__name__)
 
@@ -31,12 +33,15 @@ FIELD = "once"
 # A route's parameter for the key: name it `once`.
 OnceKey = Annotated[str, Form(alias=FIELD)]
 
-# What was made, for the log and the page: a fixed list.
-Made = Literal["registration_code", "recovery_codes", "link"]
+# What was made, for the log and the page: a fixed list. "change": what a
+# form that asks for a code each time did (sign_in.ConfirmedEachTime), which
+# may or may not have shown something.
+Made = Literal["registration_code", "recovery_codes", "link", "change"]
 WORDS: dict[Made, str] = {
     "registration_code": "a registration code",
     "recovery_codes": "recovery codes",
     "link": "a sign-in link",
+    "change": "its change",
 }
 
 
@@ -66,7 +71,7 @@ def sent_before(
     request: Request,
     session: Session,
     signed: SignedIn,
-    typed: str,
+    typed: object,
     made: Made,
     back: str,
 ) -> HTMLResponse | None:
@@ -75,7 +80,7 @@ def sent_before(
     transaction, so a form refused without a commit can be sent again, and
     a second sending at once waits on the first, then finds it. A key that
     isn't one is a bad request."""
-    key = form_key(typed)
+    key = form_key(typed) if isinstance(typed, str) else None
     if key is None:
         log.info("form key missing", made=made, admin_id=signed.admin.id)
         raise HTTPException(status_code=400)
@@ -94,7 +99,8 @@ def sent_before(
         {
             "title": "Already sent",
             "admin": signed.admin,
-            "made": WORDS[made],
+            "made": made,
+            "words": WORDS[made],
             "back": back,
         },
         409,

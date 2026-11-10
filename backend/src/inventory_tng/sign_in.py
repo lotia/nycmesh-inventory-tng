@@ -9,6 +9,11 @@ An administrator page takes one of:
 - `ConfirmedAdmin`: that, for a sensitive action, with a code typed recently
   (accounts.confirmation_open); otherwise the page asks for one first. Once
   the action is done, the route calls changed(), which commits.
+- `ConfirmedEachTime`: that, with a code typed for this action alone, the
+  window aside: resetting, retiring or bringing back another administrator,
+  so a stolen session cannot do them unless it has the code too. Each of
+  their forms is sent once (once.py): sent again, it is answered so before
+  any code is asked for.
 
 A form through ConfirmedAdmin (or ConfirmedAny) also holds every
 administrator's lock (accounts.lock_admins) until it commits, so it runs
@@ -31,7 +36,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from inventory_tng import accounts, mail, request_logging
+from inventory_tng import accounts, mail, once, request_logging
 from inventory_tng.db import (
     DbSession,
     hold_until_commit,
@@ -199,6 +204,14 @@ AdminSignedIn = Annotated[SignedIn, Depends(admin_signed_in)]
 CONFIRM_FIELD = "confirm_code"
 
 
+class Answered(Exception):
+    """A form's answer, given before its route runs."""
+
+    def __init__(self, response: Response) -> None:
+        super().__init__()
+        self.response = response
+
+
 class ConfirmHere(Exception):
     """A form sent once the window had closed: shown again as a code field,
     carrying what was typed, so it goes on once the code is accepted. Its
@@ -233,6 +246,30 @@ async def confirmed(
 
     A form then passes the gate (_hold), after the commit a code makes, as
     the module's docstring says."""
+    return await _confirmed(request, signed, session, notify, keys, each_time=False)
+
+
+async def confirmed_each_time(
+    request: Request,
+    signed: AnySignedIn,
+    session: DbSession,
+    notify: Notify,
+    keys: Keys,
+) -> SignedIn:
+    """As confirmed, for a form only, but as if the window were always
+    closed: it goes on only with a code sent with it."""
+    return await _confirmed(request, signed, session, notify, keys, each_time=True)
+
+
+async def _confirmed(
+    request: Request,
+    signed: SignedIn,
+    session: Session,
+    notify: Notify,
+    keys: TotpKeys,
+    *,
+    each_time: bool,
+) -> SignedIn:
     if request.method == "GET":
         if not accounts.confirmation_open(signed.row, signed.settings, _now()):
             raise Redirect(_then(CONFIRM, request))
@@ -245,7 +282,24 @@ async def confirmed(
         for name, value in form.multi_items()
         if isinstance(value, str) and name != CONFIRM_FIELD
     ]
-    was_open = accounts.confirmation_open(signed.row, signed.settings, _now())
+    was_open = not each_time and accounts.confirmation_open(
+        signed.row, signed.settings, _now()
+    )
+    # Sent once: sent again, as Back then Forward offers, it is said so
+    # before any code is spent on it. Its key is spent with the code's
+    # commit, or not at all.
+    if each_time and (
+        again := await run_in_threadpool(
+            once.sent_before,
+            request,
+            session,
+            signed,
+            form.get(once.FIELD),
+            "change",
+            request.url.path.rsplit("/", 1)[0],
+        )
+    ):
+        raise Answered(again)
     if not was_open:
         typed = form.get(CONFIRM_FIELD)
         if not isinstance(typed, str):
@@ -335,6 +389,15 @@ def confirmed_admin(signed: ConfirmedAny) -> SignedIn:
 ConfirmedAdmin = Annotated[SignedIn, Depends(confirmed_admin)]
 
 
+def confirmed_each_time_admin(
+    signed: Annotated[SignedIn, Depends(confirmed_each_time)],
+) -> SignedIn:
+    return admin_signed_in(signed)
+
+
+ConfirmedEachTime = Annotated[SignedIn, Depends(confirmed_each_time_admin)]
+
+
 def changed(signed: SignedIn, session: Session) -> None:
     """After a sensitive change: counted for the confirmation window, and
     committed."""
@@ -383,6 +446,10 @@ def install(app: FastAPI) -> None:
     @app.exception_handler(Redirect)
     def redirected(_request: Request, error: Redirect) -> Response:
         return redirect(error.location)
+
+    @app.exception_handler(Answered)
+    def answered(_request: Request, error: Answered) -> Response:
+        return error.response
 
     @app.exception_handler(ConfirmHere)
     def confirm_here(request: Request, error: ConfirmHere) -> Response:

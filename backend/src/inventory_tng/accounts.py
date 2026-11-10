@@ -26,8 +26,10 @@ from opentelemetry import metrics
 from sqlalchemy import ColumnElement, exists, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
+from inventory_tng import activity
 from inventory_tng.db import exists_where, get_locked, locked, set_actor, unique
 from inventory_tng.devices import digest
+from inventory_tng.mail import Notifier
 from inventory_tng.models import (
     MADE_BY_ADMIN,
     Admin,
@@ -863,6 +865,15 @@ def _reset_authenticators(session: Session, admin_id: int, now: datetime) -> Non
     _void_recovery_codes(session, admin_id, now)
 
 
+def previous_sign_in(session: Session, row: AdminSession) -> datetime | None:
+    """When they signed in before this session; None if they never did."""
+    return session.scalar(
+        select(func.max(AdminSession.created_at)).where(
+            AdminSession.admin_id == row.admin_id, AdminSession.id < row.id
+        )
+    )
+
+
 def current_sessions(
     session: Session, admin_id: int, now: datetime
 ) -> list[AdminSession]:
@@ -1073,6 +1084,7 @@ def recover(
     username: str,
     address: str,
     now: datetime,
+    notify: Notifier | None = None,
 ) -> tuple[Admin, str]:
     """A one-use link, made with the operator's RECOVERY_TOKEN, that resets
     a current administrator's password and authenticators. Each token works
@@ -1103,6 +1115,7 @@ def recover(
         _refuse("recovery", "used")
     recoveries.add(1, {"outcome": "made"})
     log.warning("recovery link made", admin_id=admin.id)
+    activity.record(session, "recovery_link_made", None, admin.id, notify)
     return admin, link
 
 
@@ -1172,7 +1185,11 @@ def _remove_sign_in(session: Session, admin_id: int, now: datetime) -> int:
 
 
 def reset_admin_sign_in(
-    session: Session, admin_id: int, by_admin_id: int, now: datetime
+    session: Session,
+    admin_id: int,
+    by_admin_id: int,
+    now: datetime,
+    notify: Notifier | None = None,
 ) -> tuple[Admin, str, LinkKind]:
     """Reset another administrator's sign-in, at once (_remove_sign_in), even
     if the link is never used: never one's own, which the account page
@@ -1194,11 +1211,17 @@ def reset_admin_sign_in(
         kind=kind,
         sessions_ended=ended,
     )
+    activity.record(session, "sign_in_reset", by_admin_id, admin.id, notify)
     return admin, token, kind
 
 
 def invite(
-    session: Session, username: str, email: str | None, made_by_id: int, now: datetime
+    session: Session,
+    username: str,
+    email: str | None,
+    made_by_id: int,
+    now: datetime,
+    notify: Notifier | None = None,
 ) -> tuple[Admin, str]:
     """A new administrator, with no password yet, so nobody can sign in as
     them, and the one-use link that lets them choose one. They set up TOTP
@@ -1218,6 +1241,7 @@ def invite(
         made_by_id=made_by_id,
     )
     log.info("administrator invited", admin_id=admin.id, made_by_id=made_by_id)
+    activity.record(session, "invited", made_by_id, admin.id, notify)
     return admin, token
 
 
@@ -1299,7 +1323,11 @@ def _locked_other(
 
 
 def retire_admin(
-    session: Session, admin_id: int, by_admin_id: int, now: datetime
+    session: Session,
+    admin_id: int,
+    by_admin_id: int,
+    now: datetime,
+    notify: Notifier | None = None,
 ) -> None:
     """Retire another administrator, removing everything they sign in with
     (_remove_sign_in) and voiding their links, so a retired account holds no
@@ -1315,10 +1343,15 @@ def retire_admin(
         by_admin_id=by_admin_id,
         sessions_ended=ended,
     )
+    activity.record(session, "retired", by_admin_id, admin.id, notify)
 
 
 def restore_admin(
-    session: Session, admin_id: int, by_admin_id: int, now: datetime
+    session: Session,
+    admin_id: int,
+    by_admin_id: int,
+    now: datetime,
+    notify: Notifier | None = None,
 ) -> tuple[Admin, str]:
     """Bring a retired administrator back. Retiring removed everything they
     signed in with, so they start again as if invited: returns them and a
@@ -1332,4 +1365,5 @@ def restore_admin(
     log.info(
         "administrator restored", target_admin_id=admin_id, by_admin_id=by_admin_id
     )
+    activity.record(session, "restored", by_admin_id, admin.id, notify)
     return admin, token

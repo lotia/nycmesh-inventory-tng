@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, adjustment_reasons, mail, scan_settings
+from inventory_tng import accounts, activity, adjustment_reasons, mail, scan_settings
 from inventory_tng.admin.common import (
     ADMIN,
     CHANGED,
@@ -35,7 +35,6 @@ from inventory_tng.models import (
     SESSION_DAYS,
     TOTP_POLICIES,
     AdjustmentReason,
-    Admin,
     ScanSettings,
     SignInSettings,
     SiteSettings,
@@ -297,15 +296,11 @@ def save_sign_in_settings(
         return redirect(SETTINGS, notice="saved", section="sign-in")
     for field, value in chosen.items():
         setattr(current, field, value)
+    # In the feed for those without an address; mailed in its own words.
+    activity.record(session, "sign_in_settings_changed", signed.admin.id, None, None)
     changed(signed, session)
     log.info("sign-in settings changed", **chosen)
-    told = mail.sign_in_settings_changed(current)
-    for admin_id, email in session.execute(
-        select(Admin.id, Admin.email).where(
-            Admin.retired_at.is_(None), Admin.email.is_not(None)
-        )
-    ):
-        notify.tell(email, admin_id, told)
+    notify.tell_admins(session, mail.sign_in_settings_changed(current))
     return redirect(SETTINGS, notice="saved", section="sign-in")
 
 

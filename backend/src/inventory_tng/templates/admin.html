@@ -14,24 +14,40 @@
   <p class="hint">Resetting their sign-in signs them out everywhere at once:
   their password, authenticators and recovery codes stop working. You get a
   link to pass on, which works once, within a day, for them to choose a new
-  password.</p>
-  <form method="post" action="{{ here }}/reset" class="actions">
+  password. Each reset, retire and bring back asks for your code, and every
+  administrator is told.</p>
+  <form method="post" action="{{ here }}/reset">
     {{ once_field() }}
-    <button>Reset their sign-in</button>
+    {% include "_code_field.html" %}
+    <div class="actions"><button>Reset their sign-in</button></div>
   </form>
 </section>
 {% endif %}
 
 {% if other.retired_at %}
-<p class="hint">Bringing them back resets their sign-in, as Reset does: you
-get a link to pass on.</p>
-{% endif %}
-<section class="actions">
-  {% if other.retired_at %}
-  <form method="post" action="{{ here }}/restore">{{ once_field() }}<button>Bring back</button></form>
-  {% elif not themselves %}
-  <form method="post" action="{{ here }}/retire"><button>Retire</button></form>
-  {% endif %}
-  <a href="{{ list }}">All administrators</a>
+<section>
+  <h2>Bring them back</h2>
+  <p class="hint">Retiring removed anything they signed in with, so you get
+  a link to pass on, which works once, within a day, for them to choose a
+  password.</p>
+  <form method="post" action="{{ here }}/restore">
+    {{ once_field() }}
+    {% include "_code_field.html" %}
+    <div class="actions"><button>Bring back</button></div>
+  </form>
 </section>
+{% elif not themselves %}
+<section>
+  <h2>Retire them</h2>
+  <p class="hint">They can no longer sign in, and their password,
+  authenticators and recovery codes are removed. You can bring them back
+  later.</p>
+  <form method="post" action="{{ here }}/retire">
+    {{ once_field() }}
+    {% include "_code_field.html" %}
+    <div class="actions"><button>Retire</button></div>
+  </form>
+</section>
+{% endif %}
+<p><a href="{{ list }}">All administrators</a></p>
 {% endblock %}

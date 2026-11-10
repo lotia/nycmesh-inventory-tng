@@ -1,0 +1,10 @@
+{# The code a sensitive action asks for: `code_totp` whether the one acting uses TOTP, `field` the field's name (sign_in.CONFIRM_FIELD). #}
+{% if code_totp %}
+<label>Your code <span class="hint">from your authenticator, or a recovery code</span>
+  <input name="{{ field }}" autocomplete="one-time-code" maxlength="{{ limits.code_max }}" required{% if autofocus %} autofocus{% endif %}>
+</label>
+{% else %}
+<label>Your password
+  <input name="{{ field }}" type="password" autocomplete="current-password" required{% if autofocus %} autofocus{% endif %}>
+</label>
+{% endif %}

@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 import pyotp
 from fastapi.testclient import TestClient
 from httpx2 import Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, sign_in, totp_keys
@@ -44,6 +45,19 @@ def once(**form: str) -> dict[str, str]:
     """A form that makes something shown once, with the new key its page
     gives it (once.py)."""
     return {"once": str(uuid.uuid4())} | form
+
+
+def admin_named(session: Session, username: str) -> Admin:
+    return session.scalars(select(Admin).where(Admin.username == username)).one()
+
+
+def with_code(session: Session, username: str = "ada", **form: str) -> dict[str, str]:
+    """A form that asks for a code each time (sign_in.ConfirmedEachTime),
+    with one: the first of new recovery codes made for `username`, so each
+    form gets one never used. Sent once, as once() is."""
+    admin = admin_named(session, username)
+    first = accounts.make_recovery_codes(session, admin.id, datetime.now(UTC))[0]
+    return once(**form) | {sign_in.CONFIRM_FIELD: first}
 
 
 def new_admin(

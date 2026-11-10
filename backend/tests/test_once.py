@@ -19,7 +19,7 @@ from inventory_tng.models import Admin, RegistrationCode, ResetLink
 
 from helpers.mail import SentMail
 from helpers.rows import tag
-from helpers.sign_in import code, new_admin, sign_in_with, text
+from helpers.sign_in import code, new_admin, sign_in_with, text, with_code
 
 AGAIN = "That form was already sent"
 CANT_SHOW = "Back and Forward can't show this page again"
@@ -41,6 +41,19 @@ def sent_twice(
 ) -> tuple[Response, Response]:
     form["once"] = key_on(client.get(page), action)
     return client.post(action, data=form), client.post(action, data=form)
+
+
+def sent_twice_with_codes(
+    client: TestClient, session: Session, page: str, action: str
+) -> tuple[Response, Response]:
+    """As sent_twice, for a form that asks for a code each time: the second
+    send would be asked for one again, so each comes with a new one of
+    Ada's."""
+    key = key_on(client.get(page), action)
+    made, again = (
+        client.post(action, data=with_code(session) | {"once": key}) for _ in "12"
+    )
+    return made, again
 
 
 def assert_sent_again(again: Response, back: str) -> None:
@@ -96,7 +109,7 @@ def test_a_reset_link_is_made_and_mailed_once(
     sign_in_with(client, code=code(key))
     ben, _ = new_admin(session, "ben", email="ben@example.org")
     page = f"{ADMINS}/{ben.id}"
-    made, again = sent_twice(client, page, f"{page}/reset")
+    made, again = sent_twice_with_codes(client, session, page, f"{page}/reset")
     assert CANT_SHOW in text(made)
     assert_sent_again(again, page)
     assert link_count(session, ben) == 1
@@ -110,7 +123,7 @@ def test_bringing_back_and_inviting_are_sent_once(
     ben, _ = new_admin(session, "ben")
     accounts.retire_admin(session, ben.id, me.id, datetime.now(UTC))
     page = f"{ADMINS}/{ben.id}"
-    made, again = sent_twice(admin_client, page, f"{page}/restore")
+    made, again = sent_twice_with_codes(admin_client, session, page, f"{page}/restore")
     assert made.status_code == 200
     assert_sent_again(again, page)
     made, again = sent_twice(admin_client, ADMINS, ADMINS, username="grace")

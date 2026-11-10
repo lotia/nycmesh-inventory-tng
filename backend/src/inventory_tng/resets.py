@@ -212,7 +212,7 @@ def recover(
         return not_found()
     try:
         admin, link = accounts.recover(
-            session, expected, token, username, rate_key(request), _now()
+            session, expected, token, username, rate_key(request), _now(), notify
         )
     except accounts.TokenRefused as refused:
         if refused.reason == "rate_limited":

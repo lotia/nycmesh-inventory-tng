@@ -7,15 +7,7 @@ Then type the passwords you gave again: passwords are never kept in a page.{% en
   {% for name, value in carried %}
   <input type="hidden" name="{{ name }}" value="{{ value }}">
   {% endfor %}
-  {% if uses_totp %}
-  <label>Code <span class="hint">from your authenticator, or a recovery code</span>
-    <input name="{{ field }}" autocomplete="one-time-code" maxlength="{{ limits.code_max }}" required autofocus>
-  </label>
-  {% else %}
-  <label>Your password
-    <input name="{{ field }}" type="password" autocomplete="current-password" required autofocus>
-  </label>
-  {% endif %}
+  {% with code_totp = uses_totp, autofocus = true %}{% include "_code_field.html" %}{% endwith %}
   {% for secret in retype %}
   <label>{{ secret | replace("_", " ") | capitalize }}
     <input name="{{ secret }}" type="password" autocomplete="new-password" required>
