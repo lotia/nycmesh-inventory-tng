@@ -59,7 +59,7 @@ None is left, so nobody can pick it.{% endif %}</p>
     <tr {% if package.retired_at %}class="retired"{% endif %}>
       <td>{{ package.name }}</td><td>{{ package.size | amount }} {{ item.unit }}</td>
       <td>{% if not package.retired_at %}
-        <form method="post" action="{{ here }}/packages/{{ package.id }}/retire"><button>Retire</button></form>
+        <form method="post" action="{{ here }}/packages/{{ package.id }}/retire"><button>Retire<span class="sr-only"> {{ package.name }}</span></button></form>
       {% else %}retired{% endif %}</td>
     </tr>
     {% else %}

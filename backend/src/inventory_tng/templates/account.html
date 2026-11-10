@@ -41,7 +41,7 @@
       <td>
         <form method="post" action="{{ paths.account }}/authenticators/{{ authenticator.id }}/name" class="actions">
           <input name="authenticator_name" value="{{ authenticator.name }}" maxlength="{{ limits.authenticator_name_max }}" aria-label="Name" required>
-          <button>Rename</button>
+          <button>Rename<span class="sr-only"> {{ authenticator.name }}</span></button>
         </form>
         {% with name = "authenticator_" ~ authenticator.id %}{% include "_field_problem.html" %}{% endwith %}
       </td>
@@ -49,7 +49,7 @@
       <td>{{ last_used | when(zone) if last_used else "never" }}</td>
       <td>
         <form method="post" action="{{ paths.account }}/authenticators/{{ authenticator.id }}/remove">
-          <button>Remove</button>
+          <button>Remove<span class="sr-only"> {{ authenticator.name }}</span></button>
         </form>
       </td>
     </tr>
@@ -59,7 +59,7 @@
   <p class="hint">Removing your only one turns TOTP off: your password alone
   will sign you in.</p>
   {% endif %}
-  <p><a href="{{ paths.new_authenticator }}">Add another</a>, such as a new
+  <p><a href="{{ paths.new_authenticator }}">Add another<span class="sr-only"> authenticator</span></a>, such as a new
   phone, before removing the old one.</p>
   {% else %}
   <p>You sign in with your password alone.
@@ -96,7 +96,7 @@
       <td>{{ row.last_seen_at | when(zone) }}</td>
       <td>
         <form method="post" action="{{ paths.account }}/sessions/{{ row.id }}/end">
-          <button>{{ "Sign out" if row.id == this_session else "End" }}</button>
+          <button>{% if row.id == this_session %}Sign out<span class="sr-only"> here</span>{% else %}End<span class="sr-only"> the session signed in {{ row.created_at | when(zone) }}</span>{% endif %}</button>
         </form>
       </td>
     </tr>

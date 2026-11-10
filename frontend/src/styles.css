@@ -76,8 +76,20 @@
     @apply list-disc;
   }
 
+  /* Links are ink, underlined; hover thickens the line. No link colour and
+     no visited state (docs/decisions/0019). */
   a {
-    @apply underline decoration-muted underline-offset-2 hover:decoration-brand;
+    @apply underline decoration-ink decoration-1 underline-offset-2 hover:decoration-2;
+  }
+
+  /* Keyboard focus shows on everything: a link the highlight behind it and
+     a thick underline, anything else a 3 px outline. */
+  :focus-visible {
+    @apply outline-3 outline-offset-2 outline-ink;
+  }
+
+  a:focus-visible {
+    @apply bg-highlight decoration-ink decoration-3 outline-none;
   }
 
   label {
@@ -215,6 +227,13 @@
     @apply mb-1;
   }
 
+  /* Muted text, not opacity, which would take a hint inside below 4.5:1
+     (WCAG 1.4.3); each retired row or section says so in words too. */
+  .retired,
+  .retired a {
+    @apply text-muted;
+  }
+
   /* The band at the top of every page, as MeshDB's. */
   .masthead {
     @apply border-b border-line bg-band;
@@ -234,7 +253,17 @@
   }
 
   .sections {
-    @apply hidden flex-wrap gap-x-4 gap-y-1 pb-2 md:flex;
+    @apply hidden flex-wrap gap-x-4 md:flex;
+  }
+
+  /* A section's link: no underline, a finger's height, and the one this
+     page is in bold over a brand line (0019). */
+  :is(.sections, .menu-panel nav) a {
+    @apply inline-flex min-h-11 items-center border-b-4 border-transparent no-underline;
+
+    &[aria-current] {
+      @apply border-brand font-semibold;
+    }
   }
 
   /*
@@ -265,18 +294,11 @@
   }
 
   .menu-panel nav a {
-    @apply block border-b border-line py-3 no-underline;
+    @apply flex py-2;
   }
 
   .signed-in {
     @apply flex flex-wrap items-center gap-3;
-  }
-
-  /* Muted text, not opacity, which would take a hint inside below 4.5:1
-     (WCAG 1.4.3); each retired row or section says so in words too. */
-  .retired,
-  .retired a {
-    @apply text-muted;
   }
 
   .hint {
