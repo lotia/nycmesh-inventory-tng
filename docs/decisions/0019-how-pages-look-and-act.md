@@ -105,3 +105,10 @@ list's box.
 - "Settings" moves to "Site settings" in the masthead and its page title.
 - Each kind of list gains search, filters and paging as it grows past what
   one screen shows.
+- A retired record being read only, a name a retired one holds would keep
+  it from coming back. So the names of items, categories and places are
+  unique among retired ones too (Ali, 2026-11-10,
+  inventory-tng-8i4.60.21). Volunteers' and packages' are unique among
+  current ones only: a new volunteer may share a retired one's name, and a
+  retired package never comes back. A volunteer's custody location is
+  made again under their name each time they hold stock.

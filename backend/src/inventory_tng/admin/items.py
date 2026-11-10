@@ -45,10 +45,9 @@ router = APIRouter(include_in_schema=False)
 ITEMS = f"{ADMIN}/items"
 TEXT_FIELDS = ("manufacturer", "part_number", "old_code", "notes", "ordering_notes")
 TAKEN = (
-    "Another item already has that name, that manufacturer and part number, "
-    "or that old code."
+    "Another item, perhaps a retired one, already has that name, that "
+    "manufacturer and part number, or that old code."
 )
-RESTORE_TAKEN = "A current item already has its name or part number: change one first."
 
 
 # The rules a change to an item may break, and the field each is shown by.
@@ -300,15 +299,13 @@ def restore_item(
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
+    # Its name and codes are its own still: unique, retired ones too.
     _, broken = refusal(
-        session,
-        lambda: items.restore(session, found),
-        "unique",
-        "item_category_current",
+        session, lambda: items.restore(session, found), "item_category_current"
     )
     # Beside the name: the category list shows only current categories.
     if broken:
-        problem = rule_words(broken, RESTORE_TAKEN)
+        problem = RULES[broken]
         return _item_page(request, session, signed, found, problems={"name": problem})
     session.commit()
     log.info("item restored", item_id=item_id)

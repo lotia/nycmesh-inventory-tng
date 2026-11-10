@@ -172,15 +172,23 @@ def _between(column: str, bounds: tuple[int, int]) -> CheckConstraint:
     return CheckConstraint(f"{column} BETWEEN {low} AND {high}", name=column)
 
 
-def _unique_current_name(table: str, *scope: str) -> Index:
-    """Names unique, ignoring case, among current rows (within `scope`)."""
+def _unique_name(
+    table: str, *scope: str, where: str | None = None, name: str = "name"
+) -> Index:
+    """Names unique, ignoring case (within `scope`), among the rows `where`
+    says, or all of them."""
     return Index(
-        f"uq_{table}_name",
+        f"uq_{table}_{name}",
         *(text(column) for column in scope),
         text("lower(name)"),
         unique=True,
-        postgresql_where=text("retired_at IS NULL"),
+        postgresql_where=None if where is None else text(where),
     )
+
+
+def _unique_current_name(table: str, *scope: str) -> Index:
+    """Names unique, ignoring case, among current rows (within `scope`)."""
+    return _unique_name(table, *scope, where="retired_at IS NULL")
 
 
 class Versioned:
@@ -201,7 +209,9 @@ class Versioned:
 class Category(Versioned, Base):
     __tablename__ = "category"
     __table_args__ = (
-        _unique_current_name("category"),
+        # Retired ones too, so one can always be brought back
+        # (docs/decisions/0019).
+        _unique_name("category"),
         protection(owner="categories.py", lock="catalogue", history=True),
     )
 
@@ -217,7 +227,7 @@ class Item(Versioned, Base):
 
     __tablename__ = "item"
     __table_args__ = (
-        _unique_current_name("item"),
+        _unique_name("item"),
         Index(
             "uq_item_manufacturer_part_number",
             text("lower(manufacturer)"),
@@ -393,8 +403,17 @@ class Location(Versioned, Base):
     __tablename__ = "location"
     __table_args__ = (
         # Among siblings of a kind, not the whole tree: two stores may each
-        # have "Shelf A", and a van may share a volunteer's name.
-        _unique_current_name("location", "kind", "coalesce(parent_id, 0)"),
+        # have "Shelf A", and a van may share a volunteer's name. Retired
+        # ones too, but a volunteer's custody, retired and made again under
+        # their name, only among current ones.
+        _unique_name(
+            "location", "kind", "coalesce(parent_id, 0)", where="kind <> 'custody'"
+        ),
+        _unique_name(
+            "location",
+            where="kind = 'custody' AND retired_at IS NULL",
+            name="custody_name",
+        ),
         Index(
             "uq_location_custody_volunteer_id",
             "volunteer_id",

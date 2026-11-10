@@ -62,14 +62,33 @@ def store(session: Session) -> Location:
     return add(session, Location(name="Main store", kind="store"))
 
 
-def test_names_are_unique_ignoring_case_among_current_rows(
-    session: Session, category: Category
+def test_names_are_unique_ignoring_case_retired_ones_too(
+    session: Session, category: Category, store: Location
 ) -> None:
+    """So a retired one can always be brought back (docs/decisions/0019)."""
     with violates(session, "uq_category_name"):
         session.add(Category(name="RADIOS"))
     category.retired_at = NOW
     session.flush()
-    add(session, Category(name="radios"))
+    with violates(session, "uq_category_name"):
+        session.add(Category(name="radios"))
+    store.retired_at = NOW
+    session.flush()
+    with violates(session, "uq_location_name"):
+        session.add(Location(name=store.name.upper(), kind=store.kind))
+
+
+def test_a_custody_name_is_unique_only_among_current_ones(session: Session) -> None:
+    """Retired, and made again, each time its volunteer stops and starts
+    holding stock."""
+    sam = add(session, Volunteer(name="Sam"))
+    held = add(session, Location(name="Sam", kind="custody", volunteer_id=sam.id))
+    held.retired_at = NOW
+    session.flush()
+    add(session, Location(name="Sam", kind="custody", volunteer_id=sam.id))
+    other = add(session, Volunteer(name="Sam B"))
+    with violates(session, "uq_location_custody_name"):
+        session.add(Location(name="sam", kind="custody", volunteer_id=other.id))
 
 
 def test_location_names_are_unique_among_siblings(

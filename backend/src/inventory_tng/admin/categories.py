@@ -22,7 +22,7 @@ from inventory_tng.admin.common import (
     retirement,
     undo_retire,
 )
-from inventory_tng.db import DbSession, refusal, unique
+from inventory_tng.db import DbSession, refusal
 from inventory_tng.models import Category, Item
 from inventory_tng.pages import not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
@@ -32,7 +32,10 @@ log = structlog.get_logger(__name__)
 router = APIRouter(include_in_schema=False)
 
 CATEGORIES = f"{ADMIN}/categories"
-TAKEN = "There is already a category by that name."
+TAKEN = (
+    "There is already a category by that name, perhaps a retired one: "
+    "bring that back instead."
+)
 
 
 def _items(session: Session) -> dict[int, int]:
@@ -200,11 +203,8 @@ def restore_category(
     found = session.get(Category, category_id)
     if found is None:
         return not_found()
-    if not unique(session, lambda: categories.restore(session, found)):
-        problem = (
-            f"A current category is already called {found.name}: rename one first."
-        )
-        return _category_page(request, session, signed, found, problem)
+    # Its name is its own still: names are unique, retired ones too.
+    categories.restore(session, found)
     session.commit()
     log.info("category restored", category_id=category_id)
     return redirect(f"{CATEGORIES}/{category_id}", notice="restored")

@@ -80,7 +80,6 @@ def upgrade() -> None:
         "category",
         [sa.literal_column("lower(name)")],
         unique=True,
-        postgresql_where=sa.text("retired_at IS NULL"),
     )
     op.create_table(
         "vendor",
@@ -210,7 +209,6 @@ def upgrade() -> None:
         "item",
         [sa.literal_column("lower(name)")],
         unique=True,
-        postgresql_where=sa.text("retired_at IS NULL"),
     )
     op.create_index(
         "uq_item_old_code",
@@ -275,7 +273,14 @@ def upgrade() -> None:
             sa.literal_column("lower(name)"),
         ],
         unique=True,
-        postgresql_where=sa.text("retired_at IS NULL"),
+        postgresql_where=sa.text("kind <> 'custody'"),
+    )
+    op.create_index(
+        "uq_location_custody_name",
+        "location",
+        [sa.literal_column("lower(name)")],
+        unique=True,
+        postgresql_where=sa.text("kind = 'custody' AND retired_at IS NULL"),
     )
     op.create_table(
         "item_package",
