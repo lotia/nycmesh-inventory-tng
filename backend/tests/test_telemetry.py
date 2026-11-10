@@ -335,14 +335,10 @@ def test_counts_sign_in_resets(rolled_back: Recorded, session: Session) -> None:
     _, _, reader, _ = rolled_back
     ada, _ = new_admin(session)
     ben, _ = new_admin(session, "ben")
-    carol, _ = new_admin(session, "carol")
     now = datetime.now(UTC)
     accounts.reset_admin_sign_in(session, ben.id, ada.id, now)
-    carol.retired_at = now
-    accounts.restore_admin(session, carol.id, ada.id, now)
     resets = counted(reader, "inventory.admin.sign_in_resets")
     assert resets[(("action", "reset"),)] >= 1
-    assert resets[(("action", "restore"),)] >= 1
 
 
 def test_counts_count_lines_withheld(rolled_back: Recorded, session: Session) -> None:

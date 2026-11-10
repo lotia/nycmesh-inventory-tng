@@ -166,14 +166,18 @@ def test_your_own_reset_is_on_your_account_page(
     assert "Change your own on your account page." in text(refused)
 
 
-def test_retiring_another_ends_their_sessions(
+def test_retiring_another_removes_their_sign_in(
     make_client: Callable[..., TestClient], session: Session, sent_mail: SentMail
 ) -> None:
+    """Nothing to steal or crack is left on a retired account."""
     admin_client = make_client(mailer=sent_mail)
     _, key = new_admin(session)
     sign_in_with(admin_client, code=code(key))
     ben, _ = new_admin(session, "ben", email="ben@example.org")
-    theirs = accounts.start_session(session, ben.id, None, datetime.now(UTC))[0]
+    now = datetime.now(UTC)
+    accounts.make_recovery_codes(session, ben.id, now)
+    theirs = accounts.start_session(session, ben.id, None, now)[0]
+    token = reset_link(session, ben)
     done = admin_client.post(f"{ADMINS}/{ben.id}/retire")
     assert (
         done.headers["location"]
@@ -181,10 +185,14 @@ def test_retiring_another_ends_their_sessions(
     )
     assert ben.retired_at is not None
     assert theirs.ended_at is not None
+    assert not accounts.has_password(session, ben.id)
+    assert not accounts.uses_totp(session, ben.id)
+    assert accounts.recovery_codes_left(session, ben.id) == 0
+    assert accounts.find_reset_link(session, token, now) is None
     assert [m.kind for m in sent_mail] == []
 
 
-def test_bringing_one_back_resets_their_sign_in(
+def test_bringing_one_back_starts_their_sign_in_again(
     make_client: Callable[..., TestClient], session: Session, sent_mail: SentMail
 ) -> None:
     """Retired for a stolen password or phone, say: neither works again."""
@@ -195,8 +203,8 @@ def test_bringing_one_back_resets_their_sign_in(
     accounts.make_recovery_codes(session, ben.id, datetime.now(UTC))
     assert admin_client.post(f"{ADMINS}/{ben.id}/retire").status_code == 303
     made = admin_client.post(f"{ADMINS}/{ben.id}/restore", data=once())
-    assert "Brought back." in text(made)
-    assert "Their sign-in is reset" in text(made)
+    assert "Brought back. Retiring removed anything they" in text(made)
+    assert "they choose their password" in text(made)
     assert ben.retired_at is None
     assert [m.kind for m in sent_mail] == ["restored"]
     theirs = make_client(admin_client.app, address="192.0.2.72")
@@ -332,17 +340,3 @@ def test_only_a_retired_administrator_is_brought_back(session: Session) -> None:
     with pytest.raises(accounts.AdminRefused, match="not_found"):
         accounts.restore_admin(session, ben.id, ada.id, datetime.now(UTC))
     assert accounts.has_password(session, ben.id)
-
-
-def test_bringing_back_an_invite_invites_them_again(
-    admin_client: TestClient, session: Session
-) -> None:
-    me = admin_named(session, "ada")
-    now = datetime.now(UTC)
-    grace, _ = accounts.invite(session, "grace", None, me.id, now)
-    grace.retired_at = now
-    session.flush()
-    made = admin_client.post(f"{ADMINS}/{grace.id}/restore", data=once())
-    assert "Brought back." in text(made)
-    assert "they choose their password" in text(made)
-    assert "Their sign-in is reset" not in text(made)

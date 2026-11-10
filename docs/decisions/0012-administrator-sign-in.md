@@ -1,7 +1,8 @@
 # 0012 — How administrators sign in
 
 **Status:** accepted · 2026-11-02 · amends 0004 (TOTP may be optional in
-production)
+production) · amended 2026-11-10 (retiring removes the sign-in; nobody is
+deleted)
 
 ## Context
 
@@ -96,9 +97,18 @@ without a deployment.
   link while the account has no password: otherwise a mailbox alone would
   undo the reset. One who never chose a password has nothing to reset and
   gets a new invite instead.
-- **Bringing a retired administrator back resets their sign-in** the same
-  way, whatever they were retired for, so a stolen password or phone never
-  works again because the account came back.
+- **Administrators are retired, never deleted**, and can always be brought
+  back. Their counts, adjustments, links and history keep pointing at the
+  account, and the administrators page lists retired ones apart. We
+  rejected deleting them: the ledger names who counted, and a deleted
+  account would leave those rows pointing nowhere.
+- **Retiring removes everything they sign in with**, as a reset does, and
+  voids their links, so a retired account holds no password hash to crack
+  and no TOTP key, even in a backup. Bringing them back makes a link that
+  works as an invite: they choose a new password and set up TOTP again,
+  whatever they were retired for. We rejected keeping the password until
+  they come back: nothing could use it meanwhile, but a leaked database
+  would still hold it.
 - **Only an administrator who can still sign in changes another.** A
   request already waiting when its session was cut off, by a reset or by
   retiring, changes nothing. So two resetting each other at once leave one

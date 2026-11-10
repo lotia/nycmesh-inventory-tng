@@ -201,7 +201,8 @@ def test_a_sign_in_under_way_waits_for_a_reset_then_is_refused(
 def test_a_sign_in_under_way_waits_for_a_retire_then_is_refused(
     committed: Committed, admins: Admins
 ) -> None:
-    """Retiring keeps the password: the account itself must be read again."""
+    """Retiring removes the password, which the sign-in reads again once it
+    holds the account's lock."""
     ada, ben, key = admins
     retiring = committed.session()
     accounts.retire_admin(retiring, ben, ada, datetime.now(UTC))
@@ -209,8 +210,7 @@ def test_a_sign_in_under_way_waits_for_a_retire_then_is_refused(
     retiring.commit()
     error = worker.finished().error
     assert isinstance(error, accounts.SignInRefused)
-    # Retired, they are no administrator, as a moment later.
-    assert error.reason == "unknown_user"
+    assert error.reason == "bad_password"
 
 
 @pytest.mark.concurrency
