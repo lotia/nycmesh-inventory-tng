@@ -632,14 +632,15 @@ def account_change_open(
 ) -> bool:
     """Whether inviting, resetting, retiring or bringing back another
     administrator may go ahead without asking for a code: the window is
-    open, and the code was typed within account_change_minutes, counted
-    from the code, not from the last action, so a stolen session gets at
-    most that long. 0: never."""
+    open, and a code was typed for such a change (not at sign-in, nor for
+    another sensitive action) within account_change_minutes, counted from
+    the code, not from the last action, so a stolen session gets at most
+    that long. 0: never."""
     minutes = timedelta(minutes=settings.account_change_minutes)
     return (
         confirmation_open(row, settings, now)
-        and row.confirmed_at is not None
-        and now < row.confirmed_at + minutes
+        and row.account_confirmed_at is not None
+        and now < row.account_confirmed_at + minutes
     )
 
 
@@ -654,6 +655,7 @@ def confirm(
     now: datetime,
     *,
     recovery: bool,
+    account_change: bool,
 ) -> tuple[Confirmation, Factor | None]:
     """A code (or, without TOTP, the password) for sensitive actions; not a
     recovery code unless `recovery`. Every attempt counts against the
@@ -676,6 +678,8 @@ def confirm(
     if factor is None:
         return _confirmation(row, "refused"), None
     row.confirmed_at, row.last_sensitive_at = now, None
+    if account_change:
+        row.account_confirmed_at = now
     return _confirmation(row, "confirmed"), factor
 
 

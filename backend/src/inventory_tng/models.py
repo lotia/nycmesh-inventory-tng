@@ -766,6 +766,12 @@ class AdminSession(Base):
     # sensitive action, and when the last sensitive action was done.
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_sensitive_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # When a code was last typed for a change to another administrator
+    # (accounts.account_change_open): not at sign-in, so the first such
+    # change in a session always asks for one.
+    account_confirmed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     # The browser's User-Agent, to tell sessions apart on the account page.
     user_agent: Mapped[str | None] = mapped_column(Text)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

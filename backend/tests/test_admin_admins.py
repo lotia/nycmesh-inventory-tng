@@ -70,7 +70,7 @@ def test_inviting_an_administrator(
     _, key = new_admin(session)
     sign_in_with(admin_client, code=code(key))
     form = {"username": "grace", "email": "grace@example.org"}
-    made = admin_client.post(ADMINS, data=once(**form))
+    made = admin_client.post(ADMINS, data=with_code(session, **form))
     assert made.status_code == 200
     assert made.headers["cache-control"] == "no-store"
     link = link_on(made.text)
@@ -113,7 +113,7 @@ def test_resetting_an_invite_replaces_its_link(
 
 
 def test_an_invite_by_one_who_can_no_longer_sign_in_is_not_found(
-    admin_client: TestClient, monkeypatch: pytest.MonkeyPatch
+    admin_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Their sign-in reset after the page let them in, and before invite
     took the lock: a race, which the page's own check stops otherwise, so
@@ -123,7 +123,10 @@ def test_an_invite_by_one_who_can_no_longer_sign_in_is_not_found(
         raise accounts.AdminRefused("not_found")
 
     monkeypatch.setattr(accounts, "invite", refuse)
-    assert admin_client.post(ADMINS, data=once(username="grace")).status_code == 404
+    assert (
+        admin_client.post(ADMINS, data=with_code(session, username="grace")).status_code
+        == 404
+    )
 
 
 def test_an_invite_needs_a_free_username(
@@ -134,7 +137,7 @@ def test_an_invite_needs_a_free_username(
         ({"username": "two words"}, "Use 1 to 64"),
         ({"username": "grace", "email": "nope"}, "doesn't look like an email"),
     ):
-        refused = admin_client.post(ADMINS, data=once(**form))
+        refused = admin_client.post(ADMINS, data=with_code(session, **form))
         assert refused.status_code == 400
         assert problem in text(refused)
 
@@ -374,10 +377,11 @@ def test_only_a_retired_administrator_is_brought_back(session: Session) -> None:
 
 
 def code_typed_ago(session: Session, minutes: int) -> None:
-    """Every session's last code typed so long ago, the window otherwise
-    open."""
+    """Every session's last code typed so long ago, for a change to another
+    administrator too, the window otherwise open."""
     for row in session.scalars(select(AdminSession)):
-        row.confirmed_at = datetime.now(UTC) - timedelta(minutes=minutes)
+        typed = datetime.now(UTC) - timedelta(minutes=minutes)
+        row.confirmed_at = row.account_confirmed_at = typed
         row.last_sensitive_at = datetime.now(UTC)
     session.flush()
 
@@ -555,3 +559,27 @@ def test_a_change_sent_again_once_its_code_lapsed_spends_none(
     assert "nothing was done again" in text(again)
     assert f'href="{ADMINS}/{ben.id}"' in again.text
     assert accounts.recovery_codes_left(session, me.id) == left
+
+
+def test_the_first_change_after_signing_in_asks_for_a_code(
+    admin_client: TestClient, session: Session
+) -> None:
+    """The code typed to sign in, or for another sensitive action, does not
+    count: a session stolen just after sign-in gets nothing without one."""
+    ben, _ = new_admin(session, "ben")
+    carol, _ = new_admin(session, "carol")
+    assert 'name="confirm_code"' in text(admin_client.get(f"{ADMINS}/{ben.id}"))
+    asked = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=once())
+    assert asked.status_code == 403
+    me = admin_named(session, "ada")
+    first = accounts.make_recovery_codes(session, me.id, datetime.now(UTC))[0]
+    confirmed = admin_client.post(
+        sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: first, "next": ADMINS}
+    )
+    assert confirmed.status_code == 303
+    asked = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=once())
+    assert asked.status_code == 403
+    form = with_code(session)
+    assert admin_client.post(f"{ADMINS}/{ben.id}/retire", data=form).status_code == 303
+    retire_carol = admin_client.post(f"{ADMINS}/{carol.id}/retire", data=once())
+    assert retire_carol.status_code == 303
