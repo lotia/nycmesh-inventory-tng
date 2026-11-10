@@ -13,12 +13,13 @@ from sqlalchemy.orm import Session
 from inventory_tng import categories
 from inventory_tng.admin.common import (
     ADMIN,
-    CHANGED,
+    ALERTS,
     RULES,
     admin_page,
     form_version,
     name_problem,
     now,
+    retirement,
     undo_retire,
 )
 from inventory_tng.db import DbSession, refusal, unique
@@ -94,6 +95,7 @@ def _category_page(
             "here": f"{CATEGORIES}/{category.id}",
             "back": (CATEGORIES, "Categories"),
             "category": category,
+            **retirement(session, category),
             "items": items,
             "problems": {"name": problem} if problem else None,
             "alert": alert,
@@ -159,10 +161,10 @@ def rename_category(
             session,
             lambda: categories.rename(session, found, name, seen=seen),
             "unique",
-            CHANGED,
+            *ALERTS,
         )
-        if broken == CHANGED:
-            return _category_page(request, session, signed, found, alert=RULES[CHANGED])
+        if broken in ALERTS:
+            return _category_page(request, session, signed, found, alert=RULES[broken])
         problem = broken and TAKEN
     if problem is not None:
         return _category_page(request, session, signed, found, problem)

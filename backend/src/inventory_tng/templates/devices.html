@@ -35,7 +35,7 @@ they registered, and revoke many at once.</p>
     {% for code, state, registered in codes %}
     <tr>
       <td><a href="{{ codes_path }}/{{ code.id }}">{{ code.label or "Code " ~ code.id }}</a></td>
-      <td>{{ state }}</td>
+      <td>{% if state == "open" %}open{% else %}<span class="tag">{{ state | capitalize }}</span>{% endif %}</td>
       <td>{{ code.uses }} of {{ code.max_uses }}</td>
       <td>{{ code.expires_at | when(zone) }}</td>
     </tr>

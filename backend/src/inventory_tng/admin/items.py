@@ -17,7 +17,8 @@ from inventory_tng import items, labels
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.common import (
     ADMIN,
-    CHANGED,
+    ALERTS,
+    RETIRED,
     RULES,
     admin_page,
     chosen,
@@ -25,6 +26,7 @@ from inventory_tng.admin.common import (
     name_problem,
     now,
     quantity,
+    retirement,
     rule_words,
     text_form,
     undo_retire,
@@ -61,8 +63,8 @@ def _change_or_note[T](
 ) -> tuple[T | None, str | None]:
     """Makes the change: what it did, and None; or, if it breaks one of
     REFUSED_FIELDS' rules, None, and the rule, which `problems` then says
-    beside its field, or CHANGED (db.unchanged)."""
-    done, broken = refusal(session, change, *REFUSED_FIELDS, CHANGED)
+    beside its field, or one of ALERTS."""
+    done, broken = refusal(session, change, *REFUSED_FIELDS, *ALERTS)
     if broken in REFUSED_FIELDS:
         problems[REFUSED_FIELDS[broken]] = rule_words(broken, TAKEN)
     return done, broken
@@ -156,6 +158,7 @@ def _item_page(
             "here": f"{ITEMS}/{item.id}",
             "back": (ITEMS, "Items"),
             "item": item,
+            **retirement(session, item),
             "packages": packages,
             "categories": [c for c in _categories(session) if c.retired_at is None],
             "units": UNITS,
@@ -250,8 +253,8 @@ def save_item(
         _, broken = _change_or_note(
             session, lambda: items.save(session, found, fields, seen=seen), problems
         )
-        if broken == CHANGED:
-            alert = RULES[CHANGED]
+        if broken in ALERTS:
+            alert = RULES[broken]
             return _item_page(request, session, signed, found, alert=alert)
     if problems:
         return _item_page(
@@ -318,9 +321,14 @@ def add_package(
         problems["size"] = parsed
     if not problems:
         assert isinstance(parsed, Decimal)  # Checked above; narrows the type.
-        package, _ = refusal(
-            session, lambda: items.add_package(session, found, name, parsed), "unique"
+        package, broken = refusal(
+            session,
+            lambda: items.add_package(session, found, name, parsed),
+            "unique",
+            RETIRED,
         )
+        if broken == RETIRED:
+            return _item_page(request, session, signed, found, alert=RULES[RETIRED])
         if package is not None:
             session.commit()
             log.info("package added", item_package_id=package.id)

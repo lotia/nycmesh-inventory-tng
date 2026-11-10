@@ -18,7 +18,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, activity
-from inventory_tng.admin.common import ADMINS, admin_page, now, rule_words, site_link
+from inventory_tng.admin.common import (
+    ADMINS,
+    admin_page,
+    now,
+    retirement,
+    rule_words,
+    site_link,
+)
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.local_time import site_zone
 from inventory_tng.mail import Notify
@@ -81,6 +88,7 @@ def _list_page(
             "current": [a for a in admins if a.retired_at is None],
             "retired": [a for a in admins if a.retired_at is not None],
             "with_totp": accounts.admins_using_totp(session),
+            "with_password": accounts.admins_with_passwords(session),
             **_code_field(signed),
             "changes": activity.recent(session),
             "zone": site_zone(session),
@@ -107,6 +115,7 @@ def _admin_page(
             "here": f"{ADMINS}/{other.id}",
             "back": (ADMINS, "Administrators"),
             "other": other,
+            **retirement(session, other),
             "uses_totp": accounts.uses_totp(session, other.id),
             "has_password": accounts.has_password(session, other.id),
             "themselves": other.id == signed.admin.id,

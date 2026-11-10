@@ -9,11 +9,22 @@ from urllib.parse import urlencode
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import Base, by_name
 from inventory_tng.ledger import whole_enough
-from inventory_tng.models import INTEGER_MAX, whole
+from inventory_tng.local_time import site_zone
+from inventory_tng.models import (
+    INTEGER_MAX,
+    Admin,
+    CatalogueHistory,
+    Category,
+    Item,
+    Location,
+    Volunteer,
+    whole,
+)
 from inventory_tng.pages import NOTICES, page, templates
 from inventory_tng.sign_in import SignedIn
 
@@ -57,10 +68,16 @@ RULES = {
     "location_countable": "That place is retired and holds nothing: pick another.",
     "changed_since_shown": "Not saved: someone else saved this after you opened "
     "it. Here it is as it is now: make your change again.",
+    "retired_read_only": "Not saved: it's retired. Bring it back first to change it.",
 }
 # A save refused as its row changed since its form was shown (db.unchanged):
 # the page shows it again as it is now, with RULES' words as an alert.
 CHANGED = "changed_since_shown"
+# A change to a retired row, which is read only until brought back
+# (docs/decisions/0019): said the same way.
+RETIRED = "retired_read_only"
+# The refusals said as an alert above the page, not beside a field.
+ALERTS = frozenset({CHANGED, RETIRED})
 
 
 def rule_words(broken: str, unique: str) -> str:
@@ -141,6 +158,41 @@ def undo_retire[T: Base](
     if row is None or getattr(row, "retired_at", None) is None:
         return None
     return f"{base}/{row_id(typed)}/restore"
+
+
+# A kind of record an administrator retires from its own page.
+type Retirable = Item | Category | Location | Volunteer | Admin
+
+
+def retired_by(session: Session, row: Retirable) -> str | None:
+    """Who retired `row`, as its page says it (docs/decisions/0019): the
+    administrator's username, or "the operator" for a command, from the
+    history of the change that last set its retired_at; None if the
+    history names nobody, as for a row retired by a migration."""
+    actor = session.scalar(
+        select(CatalogueHistory.actor)
+        .where(
+            CatalogueHistory.table_name == row.__tablename__,
+            CatalogueHistory.row_id == row.id,
+            CatalogueHistory.action == "update",
+            CatalogueHistory.old_row["retired_at"].astext.is_(None),
+            CatalogueHistory.new_row["retired_at"].astext.is_not(None),
+        )
+        .order_by(CatalogueHistory.id.desc())
+        .limit(1)
+    )
+    kind, _, ident = (actor or "").partition(":")
+    if kind == "system":
+        return "the operator"
+    admin = session.get(Admin, int(ident)) if kind == "admin" else None
+    return admin.username if admin else None
+
+
+def retirement(session: Session, row: Retirable) -> dict[str, Any]:
+    """What a record's page needs to say it is retired (_retired_record.html):
+    the site's zone, and who retired it."""
+    by = retired_by(session, row) if row.retired_at is not None else None
+    return {"zone": site_zone(session), "retired_by": by}
 
 
 def current_rows[T: Base](session: Session, model: type[T]) -> list[T]:

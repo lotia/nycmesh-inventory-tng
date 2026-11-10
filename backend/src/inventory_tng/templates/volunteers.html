@@ -29,7 +29,7 @@
 </section>
 
 {% if retired %}
-<section class="retired" id="retired">
+<section id="retired">
   <h2>Retired</h2>
   {% with section_id="retired" %}{% include "_notice.html" %}{% endwith %}
   <ul>{% for volunteer in retired %}<li><a href="{{ here }}/{{ volunteer.id }}">{{ volunteer.name }}</a>

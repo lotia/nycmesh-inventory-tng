@@ -31,8 +31,8 @@ registered since it began, then revoke the ones that look wrong.</p>
   {% call table() %}
     <tr><th>Revoke</th><th>Device</th><th>Registered</th><th>Last used</th><th>Code</th></tr>
     {% for device in devices %}
-    <tr {% if device.revoked_at %}class="retired"{% endif %}>
-      <td>{% if device.revoked_at %}revoked{% else %}<input type="checkbox" name="device" value="{{ device.id }}" checked aria-label="Revoke {{ device.name }}">{% endif %}</td>
+    <tr>
+      <td>{% if device.revoked_at %}<span class="tag">Revoked</span>{% else %}<input type="checkbox" name="device" value="{{ device.id }}" checked aria-label="Revoke {{ device.name }}">{% endif %}</td>
       <td>{{ device.name }}</td>
       <td>{{ device.created_at | when(zone) }}</td>
       <td>{{ device.last_seen_at | when(zone) }}</td>

@@ -1,13 +1,17 @@
 {% extends "admin_base.html" %}
+{% from "_retired_record.html" import retired_record with context %}
 {% block main %}
+{% set retired = volunteer.retired_at is not none %}
 {% with name = "volunteer" %}{% if problems.get(name) %}<p role="alert">{{ problems[name] }}</p>{% endif %}{% endwith %}
-{% if merged_into %}
-<p>A duplicate, merged into <a href="{{ list }}/{{ merged_into.id }}">{{ merged_into.name }}</a>: their past records count as theirs.</p>
-{% elif volunteer.retired_at %}
-<p>Retired: the scan page doesn't offer them.</p>
+{% if retired %}
+{% call retired_record(volunteer, person=true) %}{% if merged_into %}A duplicate, merged into
+<a href="{{ list }}/{{ merged_into.id }}">{{ merged_into.name }}</a>: their past records
+count as theirs.{% else %}The scan page doesn't offer them.{% endif %}{% endcall %}
+<form method="post" action="{{ here }}/restore"><button class="primary">Bring them back</button></form>
 {% endif %}
 
 <form method="post" action="{{ here }}">
+  <fieldset class="contents" {% if retired %}disabled{% endif %}>
   <input type="hidden" name="version" value="{{ values.get('version', volunteer.edit_version) }}">
   <label>Name
     <input name="name" value="{{ values.get('name', volunteer.name) }}" maxlength="{{ name_max }}" required>
@@ -17,10 +21,11 @@
     <input name="email" type="email" value="{{ values.get('email', volunteer.email or '') }}">
     {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <button class="primary">Save</button>
+  </fieldset>
+  {% if not retired %}<button class="primary">Save</button>{% endif %}
 </form>
 
-{% if not volunteer.retired_at %}
+{% if not retired %}
 <section id="holding">
   <h2>Holding stock</h2>
   {% with section_id="holding" %}{% include "_notice.html" %}{% endwith %}
@@ -49,9 +54,7 @@
 {% endif %}
 {% endif %}
 
-{% if volunteer.retired_at %}
-<form method="post" action="{{ here }}/restore"><button>Bring them back</button></form>
-{% else %}
+{% if not retired %}
 <section id="retire">
   <h2>Retire this volunteer</h2>
   <p class="hint">The scan page stops offering them; their past records stay

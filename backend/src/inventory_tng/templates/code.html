@@ -1,7 +1,7 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% block main %}
-<p>{{ state | capitalize }}: {{ code.uses }} of {{ code.max_uses }} used,
+<p>{% if state == "open" %}Open{% else %}<span class="tag">{{ state | capitalize }}</span>{% endif %}: {{ code.uses }} of {{ code.max_uses }} used,
 until {{ code.expires_at | when(zone) }}.</p>
 {% if not code.revoked_at %}
 <form method="post" action="{{ here }}/revoke"><button>Revoke</button></form>
@@ -15,12 +15,12 @@ registered; revoke any that look wrong below.</p>
   {% call table() %}
     <tr><th>Device</th><th>Registered</th><th>Last used</th><th>From</th><th></th></tr>
     {% for device, before in devices %}
-    <tr {% if device.revoked_at %}class="retired"{% endif %}>
+    <tr>
       <td>{{ device.name }}</td>
       <td>{{ device.created_at | when(zone) }}{% if before is not none %} <span class="hint">{{ before }} before revoking</span>{% endif %}</td>
       <td>{{ device.last_seen_at | when(zone) }}</td>
       <td><span class="wrap-anywhere">{{ device.first_seen_from or "" }}</span></td>
-      <td>{% if device.revoked_at %}revoked{% else %}
+      <td>{% if device.revoked_at %}<span class="tag">Revoked</span>{% else %}
         <form method="post" action="{{ list }}/{{ device.id }}/revoke"><button>Revoke<span class="sr-only"> {{ device.name }}</span></button></form>
       {% endif %}</td>
     </tr>

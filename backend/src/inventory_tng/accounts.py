@@ -1335,6 +1335,10 @@ def has_password(session: Session, admin_id: int) -> bool:
     return exists_where(session, AdminPassword.id == admin_id)
 
 
+def admins_with_passwords(session: Session) -> set[int]:
+    return set(session.scalars(select(AdminPassword.id)))
+
+
 def admin_can_sign_in(session: Session, admin: Admin) -> bool:
     return admin.retired_at is None and has_password(session, admin.id)
 

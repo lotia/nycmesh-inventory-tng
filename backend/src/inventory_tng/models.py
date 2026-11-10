@@ -472,8 +472,9 @@ class Label(Base):
 
 
 class CatalogueHistory(Base):
-    """Every change to the tables above (history.py). Nothing reads it until
-    there is a screen for it. The app may only add to it (migration 0002)."""
+    """Every change to the tables above (history.py). A retired record's
+    page reads who retired it (admin/common.retired_by). The app may only add
+    to it (migration 0002)."""
 
     __tablename__ = "catalogue_history"
     __table_args__ = (

@@ -255,11 +255,10 @@
     @apply mb-1;
   }
 
-  /* Muted text, not opacity, which would take a hint inside below 4.5:1
-     (WCAG 1.4.3); each retired row or section says so in words too. */
-  .retired,
-  .retired a {
-    @apply text-muted;
+  /* A record's status, as a word (docs/decisions/0019): "Retired",
+     "Invited", "Used up". Never faded text, which fails contrast. */
+  .tag {
+    @apply inline-block rounded border border-line bg-band px-1.5 text-sm font-semibold text-ink;
   }
 
   /* The band at the top of every page, as MeshDB's. */

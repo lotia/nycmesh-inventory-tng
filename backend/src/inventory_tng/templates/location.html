@@ -1,11 +1,19 @@
 {% extends "admin_base.html" %}
 {% from "_labels.html" import labels_section with context %}
+{% from "_retired_record.html" import retired_record with context %}
 {% block main %}
-<p>{{ kind }}{% if location.retired_at %}, retired: nobody can pick it{% endif %}.</p>
+{% set retired = location.retired_at is not none %}
+<p>{{ kind }}.</p>
 {% if location.kind == "custody" %}
+{% if retired %}<p><span class="tag">Retired</span></p>{% endif %}
 <p>A volunteer's custody: change it with the volunteer.</p>
 {% else %}
+{% if retired %}
+{% call retired_record(location) %}Nobody can pick it.{% endcall %}
+<form method="post" action="{{ here }}/restore"><button class="primary">Bring it back</button></form>
+{% endif %}
 <form method="post" action="{{ here }}">
+  <fieldset class="contents" {% if retired %}disabled{% endif %}>
   <input type="hidden" name="version" value="{{ values.get('version', location.edit_version) }}">
   <label>Name
     <input name="name" value="{{ values.get('name', location.name) }}" maxlength="{{ name_max }}" required>
@@ -27,7 +35,8 @@
     </select>
     {% with name = "time_zone" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <button class="primary">Save</button>
+  </fieldset>
+  {% if not retired %}<button class="primary">Save</button>{% endif %}
 </form>
 {% endif %}
 
@@ -38,22 +47,18 @@
 </section>
 {% endif %}
 
-{% if location.kind != "custody" and not location.retired_at %}
+{% if location.kind != "custody" and not retired %}
 {% call labels_section(labels) %}
   <input type="hidden" name="location_id" value="{{ location.id }}">
 {% endcall %}
 {% endif %}
 
-{% if location.kind != "custody" %}
-{% if location.retired_at %}
-<form method="post" action="{{ here }}/restore"><button>Bring it back</button></form>
-{% else %}
+{% if location.kind != "custody" and not retired %}
 <section id="retire">
   <h2>Retire this location</h2>
   <p class="hint">Nobody can pick it any more. Move what is here elsewhere, or
   count it, first. You can bring it back.</p>
   <form method="post" action="{{ here }}/retire" data-retire><button>Retire</button></form>
 </section>
-{% endif %}
 {% endif %}
 {% endblock %}

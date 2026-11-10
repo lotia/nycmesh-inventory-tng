@@ -338,11 +338,10 @@ def test_current_items_sit_in_current_categories(session: Session) -> None:
     categories.retire(session, radios, NOW)
     with breaks(session, "item_category_current"):
         items.restore(session, item)
-    # A retired item may sit in a retired category, and still be changed
-    # there, or moved to another.
-    items.save(session, item, item_fields(item, notes="kept for parts"), seen=None)
-    items.save(session, item, item_fields(item, category_id=old.id), seen=None)
-    assert item.category_id == old.id
+    # A retired item may sit in a retired category, but is read only there
+    # until brought back (docs/decisions/0019).
+    with breaks(session, "retired_read_only"):
+        items.save(session, item, item_fields(item, notes="kept for parts"), seen=None)
 
 
 # What the migrations made that runs inside PostgreSQL, by kind: triggers

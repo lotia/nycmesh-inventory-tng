@@ -1,15 +1,18 @@
 {% extends "admin_base.html" %}
+{% from "_retired_record.html" import retired_record with context %}
 {% block main %}
-{% if category.retired_at %}
-<p>Retired: nobody can pick it.</p>
+{% set retired = category.retired_at is not none %}
+{% if retired %}
+{% call retired_record(category) %}Nobody can pick it for an item.{% endcall %}
+<form method="post" action="{{ here }}/restore"><button class="primary">Bring it back</button></form>
 {% endif %}
 <form method="post" action="{{ here }}/name" class="actions">
   <input type="hidden" name="version" value="{{ category.edit_version }}">
   <label>Name
-    <input name="name" value="{{ category.name }}" maxlength="{{ name_max }}" required>
+    <input name="name" value="{{ category.name }}" maxlength="{{ name_max }}" required {% if retired %}disabled{% endif %}>
     {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <button class="primary">Rename</button>
+  {% if not retired %}<button class="primary">Rename</button>{% endif %}
 </form>
 
 <section>
@@ -21,9 +24,7 @@
   {% endif %}
 </section>
 
-{% if category.retired_at %}
-<form method="post" action="{{ here }}/restore"><button>Bring it back</button></form>
-{% else %}
+{% if not retired %}
 <section id="retire">
   <h2>Retire this category</h2>
   <p class="hint">Nobody can pick it for an item any more. Move or retire its
