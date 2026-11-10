@@ -20,13 +20,11 @@ from sqlalchemy import (
     SQLColumnExpression,
     case,
     func,
-    literal,
-    or_,
     select,
 )
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import INTEGER_MAX, whole
+from inventory_tng.models import INTEGER_MAX, fuzzy, holds, whole
 
 log = structlog.get_logger(__name__)
 
@@ -39,20 +37,9 @@ SUGGESTED = 8
 SEARCH_MAX = 200
 
 
-def fuzzy(column: SQLColumnExpression[str], search: str) -> ColumnElement[bool]:
-    """Whether `column` matches what was typed, forgiving typos: it holds it
-    as typed, or pg_trgm finds it close, as a whole (`%`) or as a word in it
-    (`<%`, so "litebeem" finds "LiteBeam 5AC")."""
-    return or_(
-        column.icontains(search, autoescape=True),
-        column.op("%", is_comparison=True)(search),
-        literal(search).op("<%", is_comparison=True)(column),
-    )
-
-
 def closeness(column: SQLColumnExpression[str], search: str) -> ColumnElement[float]:
     """How close a match is, best highest: holding it as typed first."""
-    return case((column.icontains(search, autoescape=True), 2.0), else_=0.0) + (
+    return case((holds(column, search), 2.0), else_=0.0) + (
         func.greatest(
             func.similarity(column, search), func.word_similarity(search, column)
         )
@@ -154,15 +141,18 @@ class Listing[T]:
         table: Any = searched.model
         query = self._shown(table, query)
         total = _count(session, query)
-        picked = None
         if self.pick is not None:
-            query = query.where(table.id == self.pick)
-            picked = session.scalar(query.with_only_columns(searched.name))
-        elif self.search:
+            # One record at most: no count, nor a page, to work out.
+            rows = session.scalars(query.where(table.id == self.pick)).all()
+            picked = getattr(rows[0], "name") if rows else None  # noqa: B009
+            return replace(
+                self, rows=rows, found=len(rows), total=total, page=1, picked=picked
+            )
+        if self.search:
             query = query.where(fuzzy(searched.text, self.search)).order_by(
                 closeness(searched.text, self.search).desc()
             )
-        found = _count(session, query) if self.narrowed else total
+        found = _count(session, query) if self.search else total
         page = min(self.page, max(1, ceil(found / PER_PAGE)))
         rows = session.scalars(
             query.order_by(func.lower(searched.name), table.id)
@@ -170,9 +160,7 @@ class Listing[T]:
             .offset((page - 1) * PER_PAGE)
         ).all()
         log.debug("listed", found=found, total=total, page=page)
-        return replace(
-            self, rows=rows, found=found, total=total, page=page, picked=picked
-        )
+        return replace(self, rows=rows, found=found, total=total, page=page)
 
     def suggest(
         self,

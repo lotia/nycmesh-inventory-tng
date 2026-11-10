@@ -88,6 +88,26 @@ describe("the search box", () => {
     );
   });
 
+  it("starts from the last with the up arrow", async () => {
+    await type("lite");
+    press("ArrowUp");
+    expect(input.getAttribute("aria-activedescendant")).toBe(
+      list().children[1]?.id,
+    );
+    press("ArrowUp");
+    expect(input.getAttribute("aria-activedescendant")).toBe(
+      list().children[0]?.id,
+    );
+  });
+
+  it("sends the form on Enter once closed, though one was picked", async () => {
+    await type("lite");
+    press("ArrowDown");
+    press("Escape");
+    expect(press("Enter").defaultPrevented).toBe(false);
+    expect(went).toEqual([]);
+  });
+
   it("goes to the one picked with Enter", async () => {
     await type("lite");
     press("ArrowDown");
@@ -139,6 +159,17 @@ describe("the search box", () => {
       throw new TypeError("offline");
     };
     await type("liteb");
+    expect(list().hidden).toBe(true);
+  });
+});
+
+describe("closing", () => {
+  it("drops what typing had started", async () => {
+    input.value = "lite";
+    input.dispatchEvent(new Event("input"));
+    input.dispatchEvent(new Event("blur"));
+    await vi.runAllTimersAsync();
+    expect(asked).toHaveLength(0);
     expect(list().hidden).toBe(true);
   });
 });

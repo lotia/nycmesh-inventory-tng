@@ -31,8 +31,8 @@
 <body>
   {% include "_masthead.html" %}
   <main class="admin page-width">
-    {#- The way back, above the title (docs/decisions/0019): back = (path, words). #}
-    {% if back %}<p class="back"><a href="{{ back[0] }}"><span aria-hidden="true">‹&nbsp;</span><span class="sr-only">Back to </span>{{ back[1] }}</a></p>{% endif %}
+    {#- The way back, above the title (docs/decisions/0019): back_link = (path, words). #}
+    {% if back_link %}<p class="back"><a href="{{ back_link[0] }}"><span aria-hidden="true">‹&nbsp;</span><span class="sr-only">Back to </span>{{ back_link[1] }}</a></p>{% endif %}
     <h1>{{ title }}</h1>
     {% if alert %}<p role="alert">{{ alert }}</p>{% endif %}
     {#- A notice about one section is said by its heading (_notice.html). One

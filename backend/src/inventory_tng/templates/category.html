@@ -1,10 +1,9 @@
 {% extends "admin_base.html" %}
-{% from "_retired_record.html" import retired_record with context %}
+{% from "_retired_record.html" import retired_record, retire_section with context %}
 {% block main %}
 {% set retired = category.retired_at is not none %}
 {% if retired %}
 {% call retired_record(category) %}Nobody can pick it for an item.{% endcall %}
-<form method="post" action="{{ here }}/restore"><button class="primary">Bring it back</button></form>
 {% endif %}
 <form method="post" action="{{ here }}/name" class="actions">
   <input type="hidden" name="version" value="{{ category.edit_version }}">
@@ -25,11 +24,7 @@
 </section>
 
 {% if not retired %}
-<section id="retire">
-  <h2>Retire this category</h2>
-  <p class="hint">Nobody can pick it for an item any more. Move or retire its
-  items first. You can bring it back.</p>
-  <form method="post" action="{{ here }}/retire" data-retire><button>Retire</button></form>
-</section>
+{% call retire_section("category") %}Nobody can pick it for an item any more. Move or retire its
+  items first.{% endcall %}
 {% endif %}
 {% endblock %}

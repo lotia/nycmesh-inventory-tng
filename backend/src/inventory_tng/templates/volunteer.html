@@ -1,13 +1,12 @@
 {% extends "admin_base.html" %}
-{% from "_retired_record.html" import retired_record with context %}
+{% from "_retired_record.html" import retired_record, retire_section with context %}
 {% block main %}
 {% set retired = volunteer.retired_at is not none %}
 {% with name = "volunteer" %}{% if problems.get(name) %}<p role="alert">{{ problems[name] }}</p>{% endif %}{% endwith %}
 {% if retired %}
 {% call retired_record(volunteer, person=true) %}{% if merged_into %}A duplicate, merged into
-<a href="{{ list }}/{{ merged_into.id }}">{{ merged_into.name }}</a>: their past records
+<a href="{{ back_link[0] }}/{{ merged_into.id }}">{{ merged_into.name }}</a>: their past records
 count as theirs.{% else %}The scan page doesn't offer them.{% endif %}{% endcall %}
-<form method="post" action="{{ here }}/restore"><button class="primary">Bring them back</button></form>
 {% endif %}
 
 <form method="post" action="{{ here }}">
@@ -55,11 +54,7 @@ count as theirs.{% else %}The scan page doesn't offer them.{% endif %}{% endcall
 {% endif %}
 
 {% if not retired %}
-<section id="retire">
-  <h2>Retire this volunteer</h2>
-  <p class="hint">The scan page stops offering them; their past records stay
-  theirs. You can bring them back.</p>
-  <form method="post" action="{{ here }}/retire" data-retire><button>Retire</button></form>
-</section>
+{% call retire_section("volunteer", person=true) %}The scan page stops offering them; their past records stay
+  theirs.{% endcall %}
 {% endif %}
 {% endblock %}

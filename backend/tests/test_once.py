@@ -61,6 +61,9 @@ def assert_sent_again(again: Response, back: str) -> None:
     words = text(again)
     assert AGAIN in words
     assert f'href="{back}"' in words
+    # Its own link back is not taken for the way back above the title
+    # (admin_base.html's back_link), which it has none of.
+    assert 'class="back"' not in words
 
 
 def test_a_registration_code_is_made_once(

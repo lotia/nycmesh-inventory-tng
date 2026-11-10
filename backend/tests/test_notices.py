@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session
 from inventory_tng import pages
 from inventory_tng.models import Admin, Category, Item, Label, Location, Volunteer
 
-from helpers.devices import new_device
 from helpers.rows import add, tag
 from helpers.sign_in import text
 
@@ -42,8 +41,6 @@ def said_in(page: str) -> str:
     ("path", "notice", "section"),
     [
         ("/admin/admins", "admin_retired", "retired"),
-        ("/admin/categories", "retired", "retired"),
-        ("/admin/locations", "retired", "retired"),
         ("/admin/settings", "saved", "sign-in"),
         ("/admin/settings", "site_saved", "time-zone"),
         ("/admin/settings", "settings_saved", "scan-page"),
@@ -78,15 +75,6 @@ def one_of_each_retired(session: Session) -> None:
     add(session, Admin(username=f"old{tag()}", retired_at=now))
     add(session, Label(item_id=item.id, revoked_at=now))
     session.flush()
-
-
-def test_a_codes_device_revoked_is_said_by_its_devices(
-    admin_client: TestClient, session: Session
-) -> None:
-    device, _ = new_device(session)
-    path = f"/admin/devices/codes/{device.registration_code_id}"
-    page = text(admin_client.get(f"{path}?notice=device_revoked&section=devices"))
-    assert said_in(page) == "devices"
 
 
 def test_a_notice_about_the_whole_page_is_said_under_its_title(

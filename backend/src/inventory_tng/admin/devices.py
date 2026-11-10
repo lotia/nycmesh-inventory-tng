@@ -148,7 +148,7 @@ def make_code(
         "code_made.html",
         {
             "title": "A new registration code",
-            "back": (DEVICES, "Devices"),
+            "back_link": (DEVICES, "Devices"),
             "code": code,
             "phrase": phrase,
             "link": link,
@@ -174,8 +174,7 @@ def code(
         {
             "title": found.label or f"Code {found.id}",
             "here": f"{CODES}/{found.id}",
-            "list": DEVICES,
-            "back": (DEVICES, "Devices"),
+            "back_link": (DEVICES, "Devices"),
             "code": found,
             "state": state(found, now()),
             "devices": registered,
@@ -215,7 +214,7 @@ def _device_page(
         {
             "title": device.name,
             "here": f"{DEVICES}/{device.id}",
-            "back": (DEVICE_LIST, "Registered devices"),
+            "back_link": (DEVICE_LIST, "Registered devices"),
             "codes_path": CODES,
             "device": device,
             "zone": site_zone(session),
@@ -386,7 +385,7 @@ def device_list(
             "title": "Registered devices",
             "here": DEVICE_LIST,
             "revoke": BULK_REVOKE,
-            "back": (DEVICES, "Devices"),
+            "back_link": (DEVICES, "Devices"),
             "codes_path": CODES,
             "devices_path": DEVICES,
             "filter": query,

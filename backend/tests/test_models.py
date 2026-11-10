@@ -448,13 +448,11 @@ def test_search_is_fuzzy_and_indexed(
     # cannot compare this index, so this is what checks it.
     session.execute(text("SET LOCAL enable_seqscan = off"))
     query = select(Item.id).where(Item.matches("litebeam"))
-    plan = "\n".join(
-        session.scalars(
-            text(
-                "EXPLAIN " + str(query.compile(compile_kwargs={"literal_binds": True}))
-            )
-        )
+    compiled = query.compile(dialect=session.get_bind().dialect)
+    explained = session.connection().exec_driver_sql(
+        "EXPLAIN " + compiled.string, compiled.params
     )
+    plan = "\n".join(line for (line,) in explained)
     assert "ix_item_search" in plan
 
 

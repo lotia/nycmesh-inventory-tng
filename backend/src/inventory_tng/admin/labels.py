@@ -143,7 +143,7 @@ def print_labels(
         "labels_print.html",
         {
             "title": "Print labels",
-            "back": (LABELS, "Labels"),
+            "back_link": (LABELS, "Labels"),
             "picked": picked,
             "copies": count,
             "total": total,
@@ -170,7 +170,7 @@ def confirm_revoke(
         {
             "title": f"Revoke {found.code}?",
             "here": f"{LABELS}/{label_id}/revoke",
-            "list": LABELS,
+            "keep": LABELS,
             "named": named,
         },
     )

@@ -3,7 +3,7 @@
 {% block main %}
 {% with name = "admin" %}{% if problems.get(name) %}<p role="alert">{{ problems[name] }}</p>{% endif %}{% endwith %}
 {% if other.retired_at %}
-{% call retired_record(other, person=true) %}They can't sign in.{% if other.email %} They gave an email address.{% endif %}{% endcall %}
+{% call retired_record(other, person=true, restore=false) %}They can't sign in.{% if other.email %} They gave an email address.{% endif %}{% endcall %}
 {% else %}
 <p>
   {% if not has_password %}<span class="tag">Invited</span> No password yet: they choose one with the link they were given.

@@ -1,8 +1,24 @@
-{#- At the top of a retired record's page (docs/decisions/0019): its tag,
-when and by whom it was retired (admin/common.retired_by), and the call's
-body, what that means. The page is read only; the caller follows this
-with its one action, bringing it back. -#}
-{% macro retired_record(row, person=false) -%}
+{#- A record's retiring (docs/decisions/0019). Imported with context, for
+`here`, `zone` and `retired_by`. A person is "them", anything else "it". -#}
+
+{#- At the top of a retired record's page: its tag, when and by whom it was
+retired (admin/common.retired_by), the call's body, what that means, and
+its one action, bringing it back, unless `restore` is false, for a page
+whose own form does that. -#}
+{% macro retired_record(row, person=false, restore=true) -%}
+{% set them = "them" if person else "it" %}
 <p><span class="tag">Retired</span> on {{ row.retired_at | when(zone) }}{% if retired_by %} by {{ retired_by }}{% endif %}.</p>
-<p>{{ caller() }} Bring {{ "them" if person else "it" }} back to change anything here.</p>
+<p>{{ caller() }} Bring {{ them }} back to change anything here.</p>
+{% if restore %}<form method="post" action="{{ here }}/restore"><button class="primary">Bring {{ them }} back</button></form>{% endif %}
+{%- endmacro %}
+
+{#- The last section of a current record's page: retiring it, one tap, as
+it can be undone; frontend/src/retire.ts asks first while the page has
+changes not saved. The call's body says what retiring means. -#}
+{% macro retire_section(kind, person=false) -%}
+<section id="retire">
+  <h2>Retire this {{ kind }}</h2>
+  <p class="hint">{{ caller() }} You can bring {{ "them" if person else "it" }} back.</p>
+  <form method="post" action="{{ here }}/retire" data-retire><button>Retire</button></form>
+</section>
 {%- endmacro %}
