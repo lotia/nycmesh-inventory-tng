@@ -23,7 +23,7 @@ TEMPLATES = SOURCE / "templates"
 pytestmark = pytest.mark.usefixtures("admin_client")
 
 
-def said_in(page: str, section: str | None) -> str:
+def said_in(page: str) -> str:
     """Where the page says its notice: the id of the section it sits in, or
     "top" under the title. The page says it once."""
     (status,) = re.finditer(r'<p role="status">', page)
@@ -66,7 +66,7 @@ def test_a_notice_is_said_by_its_sections_heading(
 ) -> None:
     page = text(admin_client.get(f"{path}?notice={notice}&section={section}"))
     assert pages.NOTICES[notice] in page
-    assert said_in(page, section) == section
+    assert said_in(page) == section
 
 
 @pytest.fixture
@@ -89,14 +89,14 @@ def test_a_codes_device_revoked_is_said_by_its_devices(
     device, _ = new_device(session)
     path = f"/admin/devices/codes/{device.registration_code_id}"
     page = text(admin_client.get(f"{path}?notice=device_revoked&section=devices"))
-    assert said_in(page, "devices") == "devices"
+    assert said_in(page) == "devices"
 
 
 def test_a_notice_about_the_whole_page_is_said_under_its_title(
     admin_client: TestClient,
 ) -> None:
     page = text(admin_client.get("/admin/categories?notice=added"))
-    assert said_in(page, None) == "top"
+    assert said_in(page) == "top"
 
 
 def test_a_section_the_page_lacks_says_nothing_but_breaks_nothing(
@@ -124,8 +124,6 @@ def test_every_section_a_redirect_names_is_on_a_page() -> None:
     for module in SOURCE.rglob("*.py"):
         source = module.read_text()
         named |= set(re.findall(r'section="([a-z-]+)"', source))
-        if module.name == "account.py":
-            named |= set(re.findall(r'^\s+"\w+": "([a-z-]+)",$', source, re.MULTILINE))
     shown = set()
     for template in TEMPLATES.glob("*.html"):
         shown |= set(re.findall(r'with section_id="([a-z-]+)"', template.read_text()))

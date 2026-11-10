@@ -178,6 +178,14 @@ def signed_in(request: Request, session: DbSession) -> SignedIn:
 AnySignedIn = Annotated[SignedIn, Depends(signed_in)]
 
 
+def _totp_keys(request: Request) -> TotpKeys:
+    """What the app seals authenticators' keys with (totp_keys.py)."""
+    return request.app.state.totp_keys
+
+
+Keys = Annotated[TotpKeys, Depends(_totp_keys)]
+
+
 def admin_signed_in(signed: AnySignedIn) -> SignedIn:
     if signed.must_set_up_totp:
         raise Redirect(NEW_AUTHENTICATOR)
@@ -216,6 +224,7 @@ async def confirmed(
     signed: AnySignedIn,
     session: DbSession,
     notify: Notify,
+    keys: Keys,
 ) -> SignedIn:
     """Within the window, goes on; viewing a page keeps nothing open. A page
     asked for once it has closed sends the browser to confirm first. A form
@@ -243,7 +252,7 @@ async def confirmed(
             raise await run_in_threadpool(ConfirmHere, signed, carried)
         # Its queries, and argon2's work, off the event loop.
         outcome = await run_in_threadpool(
-            _confirm, request, session, signed, typed, notify
+            _confirm, keys, session, signed, typed, notify
         )
         if outcome != "confirmed":
             raise await run_in_threadpool(
@@ -277,22 +286,11 @@ def _hold(session: Session, signed: SignedIn) -> SignedIn:
     )
 
 
-def totp_keys(request: Request) -> TotpKeys:
-    """What the app seals authenticators' keys with (totp_keys.py)."""
-    keys = request.app.state.settings.totp_keys
-    if keys is None:
-        # Only Settings built in code lack them; from_environ always loads.
-        raise RuntimeError("the app's Settings have no totp_keys")
-    return keys
-
-
 def _confirm(
-    request: Request, session: Session, signed: SignedIn, typed: str, notify: Notify
+    keys: TotpKeys, session: Session, signed: SignedIn, typed: str, notify: Notify
 ) -> accounts.Confirmation:
     """Confirm, keep it, and tell the owner if a recovery code did it."""
-    outcome, factor = accounts.confirm(
-        session, totp_keys(request), signed.row, typed, _now()
-    )
+    outcome, factor = accounts.confirm(session, keys, signed.row, typed, _now())
     if outcome == "confirmed":
         left = _codes_left(session, signed.admin, factor)
         session.commit()
@@ -456,6 +454,7 @@ def setup_form(request: Request, session: DbSession) -> Response:
 def setup(
     request: Request,
     session: DbSession,
+    keys: Keys,
     token: Annotated[str, Form()] = "",
     username: Annotated[str, Form()] = "",
     email: Annotated[str, Form()] = "",
@@ -527,7 +526,7 @@ def setup(
             step=step,
             user_agent=request.headers.get("user-agent"),
             now=now,
-            keys=totp_keys(request),
+            keys=keys,
         )
     except accounts.TokenRefused:
         # Someone else finished setting up first, while this waited.
@@ -603,6 +602,7 @@ def sign_in(
     request: Request,
     session: DbSession,
     notify: Notify,
+    keys: Keys,
     username: Annotated[str, Form()] = "",
     password: Annotated[str, Form()] = "",
     code: Annotated[str, Form()] = "",
@@ -617,7 +617,7 @@ def sign_in(
             address=rate_key(request),
             user_agent=request.headers.get("user-agent"),
             now=_now(),
-            keys=totp_keys(request),
+            keys=keys,
         )
     except accounts.SignInRefused as refused:
         limited = refused.reason == "rate_limited"
@@ -662,10 +662,11 @@ def confirm(
     signed: AnySignedIn,
     session: DbSession,
     notify: Notify,
+    keys: Keys,
     confirm_code: Annotated[str, Form()] = "",
     next: Annotated[str, Form()] = HOME,
 ) -> Response:
-    outcome = _confirm(request, session, signed, confirm_code, notify)
+    outcome = _confirm(keys, session, signed, confirm_code, notify)
     if outcome == "confirmed":
         return redirect(_local(next))
     return _confirm_page(
@@ -718,6 +719,7 @@ def new_authenticator(
     request: Request,
     signed: ConfirmedAny,
     session: DbSession,
+    keys: Keys,
     authenticator_name: Annotated[str, Form()] = "",
     key: Annotated[str, Form()] = "",
     code: Annotated[str, Form()] = "",
@@ -743,9 +745,7 @@ def new_authenticator(
         try:
             # A savepoint: PostgreSQL may compare names its own way.
             with session.begin_nested():
-                accounts.add_authenticator(
-                    session, totp_keys(request), admin_id, name, key, step
-                )
+                accounts.add_authenticator(session, keys, admin_id, name, key, step)
         except IntegrityError:
             problems["authenticator_name"] = NAME_TAKEN
     if problems:

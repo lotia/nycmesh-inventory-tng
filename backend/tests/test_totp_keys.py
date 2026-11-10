@@ -6,23 +6,20 @@ import runpy
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from types import SimpleNamespace
-from typing import cast
 
 import pytest
-from fastapi import Request
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts, sign_in, totp_keys
+from inventory_tng import accounts, totp_keys
 from inventory_tng.app import check_totp_keys
 from inventory_tng.db import Database
 from inventory_tng.models import Authenticator
-from inventory_tng.settings import Settings
+from inventory_tng.settings import SettingsError
 from inventory_tng.totp_keys import TotpKeys, TotpKeysError, Unreadable, keys_dir
 
-from helpers.sign_in import TOTP_KEYS, code, new_admin
+from helpers.sign_in import TOTP_KEYS, code, new_admin, raw_key
 
 KEY = "JBSWY3DPEHPK3PXP"
 URL = "postgresql://u:p@db/x"
@@ -46,7 +43,7 @@ def test_a_sealed_key_opens_only_for_its_administrator() -> None:
 
 def test_a_key_version_that_is_gone_is_unreadable() -> None:
     version, one = TOTP_KEYS.seal(KEY, 1)
-    newer = TotpKeys({version + 1: base64.b64decode(totp_keys.new_key())})
+    newer = TotpKeys({version + 1: raw_key()})
     with pytest.raises(Unreadable, match="not in TOTP_KEYS_DIR"):
         newer.open(version, one, 1)
 
@@ -94,10 +91,16 @@ def test_a_missing_or_empty_directory_is_refused(tmp_path: Path) -> None:
 
 def test_the_directory_is_needed_outside_development(tmp_path: Path) -> None:
     given = {"TOTP_KEYS_DIR": str(tmp_path)}
-    assert keys_dir(given, development=False) == tmp_path
-    assert keys_dir({}, development=True) == totp_keys.DEVELOPMENT_DIR
+    assert keys_dir(given) == tmp_path
+    development = {"APP_ENV": "development"}
+    assert keys_dir(development) == totp_keys.DEVELOPMENT_DIR
     with pytest.raises(TotpKeysError, match="needed outside APP_ENV=development"):
-        keys_dir({}, development=False)
+        keys_dir({})
+    # A bad APP_ENV is named, not taken for production.
+    with pytest.raises(SettingsError, match="APP_ENV must be one of"):
+        keys_dir({"APP_ENV": "staging"})
+    (tmp_path / "1").write_text(totp_keys.new_key())
+    assert TotpKeys.from_environ(given).newest == 1
 
 
 def test_new_prints_a_key_that_loads(
@@ -132,7 +135,7 @@ def test_an_unreadable_authenticator_still_lets_a_recovery_code_in(
     but its administrator still gets in with a recovery code."""
     admin, key = new_admin(session)
     (recovery,) = accounts.make_recovery_codes(session, admin.id, datetime.now(UTC))[:1]
-    lost = TotpKeys({9: base64.b64decode(totp_keys.new_key())})
+    lost = TotpKeys({9: raw_key()})
     authenticators = accounts.locked_authenticators(session, admin.id)
     now = datetime.now(UTC)
     with capture_logs() as logs:
@@ -164,7 +167,7 @@ def test_resealing_moves_every_readable_key_to_the_newest_version(
 ) -> None:
     ada, ada_key = new_admin(session)
     ben, _ = new_admin(session, "ben")
-    newer = TotpKeys(dict(TOTP_KEYS.keys) | {2: base64.b64decode(totp_keys.new_key())})
+    newer = TotpKeys(dict(TOTP_KEYS.keys) | {2: raw_key()})
     # Sealed with a version this ring lacks: left as it is, and counted.
     lost = session.scalars(
         select(Authenticator).where(Authenticator.admin_id == ben.id)
@@ -218,10 +221,3 @@ def test_reseal_runs_as_an_operator_command(
     assert (
         capsys.readouterr().out.splitlines()[-1] == "Resealed 0; 0 could not be read."
     )
-
-
-def test_an_app_without_keys_refuses_rather_than_storing_a_key_plainly() -> None:
-    """Only Settings built in code can lack them."""
-    app = SimpleNamespace(state=SimpleNamespace(settings=Settings(URL)))
-    with pytest.raises(RuntimeError, match="no totp_keys"):
-        sign_in.totp_keys(cast("Request", SimpleNamespace(app=app)))

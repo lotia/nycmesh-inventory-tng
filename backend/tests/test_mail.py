@@ -17,10 +17,9 @@ from structlog.testing import capture_logs
 
 from inventory_tng import accounts, mail, sign_in
 from inventory_tng.models import Admin, AdminSession, ResetLink
-from inventory_tng.settings import MailConfig, SettingsError
+from inventory_tng.settings import MailConfig, Settings, SettingsError
 
 from helpers.mail import SITE_MAIL, FailingMail, SentMail
-from helpers.settings import from_environ
 from helpers.sign_in import (
     TOTP_KEYS,
     code,
@@ -71,7 +70,9 @@ def token_of(link: str) -> str:
 
 
 def test_mail_is_off_without_a_host() -> None:
-    assert from_environ({"DATABASE_URL": MAIL_ENV["DATABASE_URL"]}).mail is None
+    assert (
+        Settings.from_environ({"DATABASE_URL": MAIL_ENV["DATABASE_URL"]}).mail is None
+    )
 
 
 def test_mail_settings() -> None:
@@ -81,7 +82,7 @@ def test_mail_settings() -> None:
         "MAIL_PASSWORD": "s3cret",
         "SITE_URL": "https://inventory.example.org/",
     }
-    config = from_environ(environ).mail
+    config = Settings.from_environ(environ).mail
     assert config == MailConfig(
         host="smtp.mailgun.org",
         site_url="https://inventory.example.org",
@@ -92,7 +93,7 @@ def test_mail_settings() -> None:
         security="starttls",
     )
     assert "s3cret" not in repr(config)
-    tls = from_environ(environ | {"MAIL_SECURITY": "tls"}).mail
+    tls = Settings.from_environ(environ | {"MAIL_SECURITY": "tls"}).mail
     assert tls is not None
     assert tls.port == 465
 
@@ -113,7 +114,7 @@ def test_mail_settings_that_cannot_work_are_refused(
 ) -> None:
     environ = MAIL_ENV | extra
     with pytest.raises(SettingsError, match=message):
-        from_environ(environ)
+        Settings.from_environ(environ)
 
 
 def test_mail_in_the_clear_is_for_development() -> None:
@@ -125,7 +126,7 @@ def test_mail_in_the_clear_is_for_development() -> None:
         "MAIL_FROM": "inventory@localhost",
         "SITE_URL": "http://127.0.0.1:8000",
     }
-    config = from_environ(environ).mail
+    config = Settings.from_environ(environ).mail
     assert config is not None
     assert (config.port, config.security) == (1025, "none")
 
@@ -499,10 +500,10 @@ def test_a_password_smtplib_cannot_encode_is_logged_not_raised() -> None:
 def test_site_url_is_https_outside_development() -> None:
     environ = MAIL_ENV | {"SITE_URL": "http://inventory.example.org"}
     with pytest.raises(SettingsError, match="SITE_URL must be https"):
-        from_environ(environ)
+        Settings.from_environ(environ)
     for bad in ("https://u@inventory.example.org", "https://x.org/#frag"):
         with pytest.raises(SettingsError, match="SITE_URL is needed"):
-            from_environ(environ | {"SITE_URL": bad})
+            Settings.from_environ(environ | {"SITE_URL": bad})
 
 
 def test_using_reset_links_is_rate_limited(

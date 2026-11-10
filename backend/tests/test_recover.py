@@ -12,11 +12,10 @@ from sqlalchemy.orm import Session
 from inventory_tng import accounts, sign_in
 from inventory_tng.models import ResetLink
 from inventory_tng.resets import RECOVER
-from inventory_tng.settings import SettingsError
+from inventory_tng.settings import Settings, SettingsError
 
 from helpers.mail import SentMail
 from helpers.rows import history
-from helpers.settings import from_environ
 from helpers.sign_in import new_admin, sign_in_with
 
 TOKEN = "the operator's recovery token, long enough"
@@ -108,7 +107,9 @@ def test_the_page_is_there_with_the_setting(
 
 def test_a_short_token_is_refused() -> None:
     with pytest.raises(SettingsError, match="RECOVERY_TOKEN"):
-        from_environ({"DATABASE_URL": "postgresql://x/y", "RECOVERY_TOKEN": "short"})
+        Settings.from_environ(
+            {"DATABASE_URL": "postgresql://x/y", "RECOVERY_TOKEN": "short"}
+        )
 
 
 def test_two_at_once_make_one_link(

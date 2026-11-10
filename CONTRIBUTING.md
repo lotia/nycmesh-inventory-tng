@@ -439,9 +439,7 @@ mise run browser-webkit          # pulls the image (about 2 GB) the first time
 
 Only the browser runs in the container, from Playwright's server, published
 on `INVENTORY_WEBKIT_PORT` (3000); the tests and the app run here, and the
-browser reaches the app through the tests' connection. The image's version
-is `@playwright/test`'s in `package-lock.json`, which a test keeps in step
-with `compose.yaml`: change both together.
+browser reaches the app through the tests' connection.
 Playwright starts the backend itself, with a database of its own, on a port
 chosen for the run, so runs from two clones do not meet.
 

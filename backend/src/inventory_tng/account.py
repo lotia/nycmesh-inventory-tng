@@ -103,21 +103,10 @@ def _refused(
     )
 
 
-# Each notice by the section of the page it is about.
-SECTIONS = {
-    "email": "email",
-    "password": "password",
-    "renamed": "authenticators",
-    "removed": "authenticators",
-    "totp_off": "authenticators",
-    "session": "sessions",
-    "others": "sessions",
-}
-
-
-def _done(signed: SignedIn, session: Session, notice: str) -> Response:
+def _done(signed: SignedIn, session: Session, notice: str, section: str) -> Response:
+    """Back to the page, saying `notice` by `section`'s heading."""
     changed(signed, session)
-    return redirect(ACCOUNT, notice=notice, section=SECTIONS[notice])
+    return redirect(ACCOUNT, notice=notice, section=section)
 
 
 @router.get(ACCOUNT)
@@ -143,7 +132,7 @@ def change_email(
     ):
         taken = "Another administrator uses that address."
         return _refused(request, session, signed, "email", taken, values)
-    response = _done(signed, session, "email")
+    response = _done(signed, session, "email", section="email")
     # Told at the old address, in case it was not them: someone with their
     # session could otherwise take resets over unseen.
     if old and old.lower() != email.lower():
@@ -163,7 +152,7 @@ def change_password(
     if problem := accounts.password_problem(password, password_again):
         return _refused(request, session, signed, "password", problem)
     accounts.change_password(session, signed.row, password, _now())
-    response = _done(signed, session, "password")
+    response = _done(signed, session, "password", section="password")
     notify.tell(signed.admin.email, signed.admin.id, mail.password_changed)
     return response
 
@@ -192,7 +181,7 @@ def rename_authenticator(
         return _refused(request, session, signed, field, NAME_TAKEN)
     if not found[0]:
         return not_found()  # Someone else's, or gone: ids reveal nothing.
-    return _done(signed, session, "renamed")
+    return _done(signed, session, "renamed", section="authenticators")
 
 
 @router.post(f"{ACCOUNT}/authenticators/{{authenticator_id}}/remove")
@@ -210,7 +199,7 @@ def remove_authenticator(
             "Add another first to replace it."
         )
         return _refused(request, session, signed, "authenticators", problem)
-    return _done(signed, session, outcome)
+    return _done(signed, session, outcome, section="authenticators")
 
 
 @router.post(f"{ACCOUNT}/recovery-codes")
@@ -243,10 +232,10 @@ def end_session(
     if session_id == signed.row.id:
         session.commit()
         return signed_out()
-    return _done(signed, session, "session")
+    return _done(signed, session, "session", section="sessions")
 
 
 @router.post(f"{ACCOUNT}/sessions/end-others")
 def end_other_sessions(signed: ConfirmedAdmin, session: DbSession) -> Response:
     accounts.end_sessions(session, signed.admin.id, _now(), keep=signed.row.id)
-    return _done(signed, session, "others")
+    return _done(signed, session, "others", section="sessions")

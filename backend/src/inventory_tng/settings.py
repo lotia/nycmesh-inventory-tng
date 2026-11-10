@@ -12,7 +12,6 @@ from sqlalchemy import make_url
 from sqlalchemy.exc import ArgumentError
 
 from inventory_tng.local_env import CLONE
-from inventory_tng.totp_keys import TotpKeys, TotpKeysError, keys_dir
 
 LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 ENVIRONMENTS = ("development", "production")
@@ -31,6 +30,23 @@ class SettingsError(Exception):
 REDACTION_OFF_MAX_HOURS = 6
 # How often a process says redaction is off, while it is.
 REDACTION_WARN_EVERY = timedelta(hours=1)
+
+
+class HourlyWarning:
+    """When a process last said a signal's redaction is off: at most once
+    every REDACTION_WARN_EVERY. Starts as said, since the server's starting
+    line says it first."""
+
+    def __init__(self, now: datetime) -> None:
+        self.last = now
+
+    def due(self, now: datetime) -> bool:
+        """Whether to say it again now; if so, noted as said."""
+        if now - self.last < REDACTION_WARN_EVERY:
+            return False
+        self.last = now
+        return True
+
 
 # Each has its own switches: LOG_REDACTION and LOG_REDACTION_OFF_UNTIL, and
 # TRACE_REDACTION and TRACE_REDACTION_OFF_UNTIL.
@@ -206,9 +222,6 @@ class Settings:
     # Password resets and notices by mail; None sends none.
     mail: MailConfig | None = None
     traces: Redaction = field(default_factory=Redaction)
-    # What authenticators' keys are sealed with (totp_keys.py). None only
-    # for Settings built in code, as tests do: from_environ always loads them.
-    totp_keys: TotpKeys | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         # Every Settings passes through here, however it was built.
@@ -226,11 +239,7 @@ class Settings:
 
     @classmethod
     def from_environ(cls, environ: Mapping[str, str] = os.environ) -> Self:
-        development = _environment(environ.get("APP_ENV") or "") == "development"
-        try:
-            totp_keys = TotpKeys.load(keys_dir(environ, development=development))
-        except TotpKeysError as error:
-            raise SettingsError(str(error)) from None
+        development = is_development(environ)
         return cls(
             database_url=environ.get("DATABASE_URL", ""),
             development=development,
@@ -240,19 +249,18 @@ class Settings:
             recovery_token=environ.get("RECOVERY_TOKEN", "").strip() or None,
             mail=MailConfig.from_environ(environ),
             traces=Redaction.from_environ("TRACE", environ),
-            totp_keys=totp_keys,
         )
 
 
 def migration_settings(environ: Mapping[str, str] = os.environ) -> Settings:
     """What migrations need, and only that: MIGRATION_DATABASE_URL, the
     owner's login (DEPLOYMENT.md, Database roles), and how to log. A
-    migration Job is given none of the app's other settings, but
-    TOTP_KEYS_DIR while it upgrades past 0016, which reads it itself."""
+    migration Job is given none of the app's other settings (migration 0016
+    reads TOTP_KEYS_DIR itself, DEPLOYMENT.md, TOTP keys)."""
     name = "MIGRATION_DATABASE_URL"
     return Settings(
         database_url=_database_url(environ.get(name, ""), name),
-        development=_environment(environ.get("APP_ENV") or "") == "development",
+        development=is_development(environ),
         logging=LogConfig.from_environ(environ),
     )
 
@@ -387,6 +395,12 @@ def _levels(value: str) -> dict[str, str]:
             )
         levels[logger] = _level(level, f"LOG_LEVELS for {logger}")
     return levels
+
+
+def is_development(environ: Mapping[str, str]) -> bool:
+    """APP_ENV says development (docs/decisions/0008); refused if it names
+    neither."""
+    return _environment(environ.get("APP_ENV") or "") == "development"
 
 
 def _environment(value: str) -> str:

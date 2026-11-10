@@ -38,16 +38,23 @@ API = "/api"
 
 
 def create_app(
-    settings: Settings | None = None, *, startup_checks: bool = True
+    settings: Settings | None = None,
+    *,
+    totp_keys: TotpKeys | None = None,
+    startup_checks: bool = True,
 ) -> FastAPI:
-    """`startup_checks=False` skips what startup reads from the database: the
+    """`totp_keys` are what authenticators' keys are sealed with
+    (app.state.totp_keys); without them, read from TOTP_KEYS_DIR as the app
+    starts, not as it is built, so building one for its schema needs none.
+    `startup_checks=False` skips what startup reads from the database: the
     check of its login (database_role.py) and of the authenticators' keys.
     For tests, which check the login they use once, and test those apart."""
     settings = settings or Settings.from_environ()
     database = make_database(settings.database_url)
 
     @asynccontextmanager
-    async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+        app.state.totp_keys = keys = totp_keys or TotpKeys.from_environ()
         # Before serving anything: never as a login that could change the
         # ledger.
         if startup_checks:
@@ -56,8 +63,7 @@ def create_app(
             except database_role.RefusedLogin:
                 database.dispose()
                 raise
-            if settings.totp_keys is not None:
-                check_totp_keys(database, settings.totp_keys)
+            check_totp_keys(database, keys)
         log.info("started")
         try:
             yield
@@ -103,6 +109,7 @@ def create_app(
     db.install(app)
     devices.install(app)
     ledger.install(app)
+    page_telemetry.install(app)
     sign_in.install(app)
     return app
 

@@ -42,5 +42,3 @@ through a process listing or a crash report than a mounted file.
   up apart from it (DEPLOYMENT.md, TOTP keys).
 - Every deployment needs `TOTP_KEYS_DIR`; development uses
   `.local/totp-keys`, which `mise run setup` fills.
-- A migration that reads keys needs the Secret too. Only migration 0016
-  does, and only for a database that already has authenticators.

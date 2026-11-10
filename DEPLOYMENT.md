@@ -21,8 +21,7 @@ There is no production container image or Helm chart yet
 ## Settings
 
 Set these in the environment. Only `DATABASE_URL` and `TOTP_KEYS_DIR` are
-required, and for migrations only `MIGRATION_DATABASE_URL`, with
-`TOTP_KEYS_DIR` too for the migration that seals authenticators' keys (TOTP
+required, and for migrations only `MIGRATION_DATABASE_URL` (but see TOTP
 keys, below).
 
 - `DATABASE_URL`: `postgresql://user:password@host:port/database`, logging
@@ -204,8 +203,7 @@ sessions' browsers, and the database roles' password hashes.
   namespace's Secrets, never on a laptop. Turn on the bucket's object
   versioning or lock, so that the cluster's own credentials cannot delete
   what it wrote.
-- **Never with the TOTP keys.** The `TOTP_KEYS_DIR` Secret is backed up
-  apart (TOTP keys, below): a backup alone cannot make anyone's codes.
+- **Never with the TOTP keys** (TOTP keys, below).
 - **No copies by hand.** Restore into a new cluster (`bootstrap.recovery`)
   rather than download a dump. If a dump is ever needed, encrypt it as it is
   made, for example `pg_dump ... | age -r <recipient>`, and delete it once
@@ -300,8 +298,7 @@ again.
 logs at startup how many authenticators it cannot read. Those take no code,
 and each one's administrator still signs in with their password and a
 recovery code, or a reset link (A locked-out administrator, above), then
-removes it and adds a new one on their account page. A key that may have
-leaked is rotated as above.
+removes it and adds a new one on their account page.
 
 ## Mail
 

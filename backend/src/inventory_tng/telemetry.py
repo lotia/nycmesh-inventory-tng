@@ -46,7 +46,7 @@ from inventory_tng import request_logging
 from inventory_tng.db import Database
 from inventory_tng.logs import ADDED_FIELDS
 from inventory_tng.masking import Masker, mask_query
-from inventory_tng.settings import REDACTION_WARN_EVERY, Redaction
+from inventory_tng.settings import HourlyWarning, Redaction
 
 SERVICE_NAME = "inventory-tng"
 
@@ -138,8 +138,7 @@ class RedactingSpanExporter(SpanExporter):
         # is what being unredacted is for.
         self.secrets = Masker.unredacting(secrets=secrets)
         self.now = now
-        # The server's starting line has said so already.
-        self._warned: datetime | None = now()
+        self.warning = HourlyWarning(now())
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
         now = self.now()
@@ -148,10 +147,7 @@ class RedactingSpanExporter(SpanExporter):
         mark = self.traces.off_outside_development(
             development=self.development, now=now
         )
-        if mark and (
-            self._warned is None or now - self._warned >= REDACTION_WARN_EVERY
-        ):
-            self._warned = now
+        if mark and self.warning.due(now):
             log.warning("trace redaction is off", until=self.traces.off_until)
         return self.exporter.export([self._unredacted(span, mark) for span in spans])
 
