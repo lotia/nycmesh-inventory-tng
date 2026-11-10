@@ -356,12 +356,21 @@ def add_package(
 
 @router.post(f"{ITEMS}/{{item_id}}/packages/{{package_id}}/retire")
 def retire_package(
-    signed: AdminSignedIn, session: DbSession, item_id: int, package_id: int
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    item_id: int,
+    package_id: int,
 ) -> Response:
     package = session.get(ItemPackage, package_id)
     if package is None or package.item_id != item_id:
         return not_found()
-    items.retire_package(session, package, now())
+    _, broken = refusal(
+        session, lambda: items.retire_package(session, package, now()), RETIRED
+    )
+    if broken:
+        found = session.get_one(Item, item_id)
+        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
     session.commit()
     log.info("package retired", item_package_id=package_id)
     return redirect(f"{ITEMS}/{item_id}", notice="package_retired", section="packages")
