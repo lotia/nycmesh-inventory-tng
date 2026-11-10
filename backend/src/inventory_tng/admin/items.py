@@ -155,7 +155,7 @@ def _item_page(
         {
             "title": item.name,
             "here": f"{ITEMS}/{item.id}",
-            "back": (ITEMS, "Items"),
+            "back_link": (ITEMS, "Items"),
             "item": item,
             **retirement(session, item),
             "packages": packages,

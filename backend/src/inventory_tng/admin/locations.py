@@ -135,8 +135,7 @@ def _location_page(
         {
             "title": location.name,
             "here": f"{LOCATIONS}/{location.id}",
-            "list": LOCATIONS,
-            "back": (LOCATIONS, "Locations"),
+            "back_link": (LOCATIONS, "Locations"),
             "location": location,
             **retirement(session, location),
             "kind": KINDS.get(location.kind, "Volunteer's custody"),

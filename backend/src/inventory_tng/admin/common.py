@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from inventory_tng.activity import OPERATOR
 from inventory_tng.db import Base, by_name
 from inventory_tng.ledger import whole_enough
 from inventory_tng.local_time import site_zone
@@ -154,10 +155,11 @@ def undo_retire[T: Base](
     """Where a list's "Retired." notice posts to bring back the row just
     retired, whose id the retire sent it (?undo=), while it is still
     retired (docs/decisions/0019); else None, and the notice offers none."""
-    row = chosen(session, model, typed, current=False)
-    if row is None or getattr(row, "retired_at", None) is None:
+    ident = row_id(typed)
+    row = session.get(model, ident) if ident is not None else None
+    if getattr(row, "retired_at", None) is None:
         return None
-    return f"{base}/{row_id(typed)}/restore"
+    return f"{base}/{ident}/restore"
 
 
 # A kind of record an administrator retires from its own page.
@@ -183,7 +185,7 @@ def retired_by(session: Session, row: Retirable) -> str | None:
     )
     kind, _, ident = (actor or "").partition(":")
     if kind == "system":
-        return "the operator"
+        return OPERATOR[0].lower() + OPERATOR[1:]
     admin = session.get(Admin, int(ident)) if kind == "admin" else None
     return admin.username if admin else None
 
@@ -191,8 +193,9 @@ def retired_by(session: Session, row: Retirable) -> str | None:
 def retirement(session: Session, row: Retirable) -> dict[str, Any]:
     """What a record's page needs to say it is retired (_retired_record.html):
     the site's zone, and who retired it."""
-    by = retired_by(session, row) if row.retired_at is not None else None
-    return {"zone": site_zone(session), "retired_by": by}
+    if row.retired_at is None:
+        return {}
+    return {"zone": site_zone(session), "retired_by": retired_by(session, row)}
 
 
 def current_rows[T: Base](session: Session, model: type[T]) -> list[T]:

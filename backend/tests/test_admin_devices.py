@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import devices
 from inventory_tng.admin.common import NAME_MAX
 from inventory_tng.admin.devices import BULK_REVOKE, CODES, DEVICE_LIST, DEVICES
-from inventory_tng.models import AdminSession, Device, RegistrationCode
+from inventory_tng.models import AdminSession, Device, RegistrationCode, SiteSettings
 
 from helpers.devices import new_device
 from helpers.rows import history
@@ -362,3 +362,15 @@ def test_a_revoke_keeps_the_window_and_sort(
     page = text(admin_client.get(DEVICE_LIST))
     assert "Every current one listed is selected: clear any to keep." in page
     assert "Revoke selected" in page
+
+
+def test_an_end_at_the_last_minute_there_is_lists_without_an_end(
+    admin_client: TestClient, session: Session
+) -> None:
+    """In UTC, the last minute a time holds has no minute after it."""
+    session.get_one(SiteSettings, 1).time_zone = "UTC"
+    session.flush()
+    device = device_at(session, datetime(2026, 11, 5, 12, tzinfo=UTC))
+    listed = admin_client.get(DEVICE_LIST, params={"until": "9999-12-31T23:59"})
+    assert listed.status_code == 200
+    assert device.id in listed_ids(text(listed))

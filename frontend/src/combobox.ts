@@ -18,7 +18,8 @@ export interface Options {
   /** How long typing must pause before asking, in milliseconds. */
   wait?: number;
   fetch?: typeof fetch;
-  go?: (href: string) => void;
+  /** Goes to a picked suggestion's address. */
+  go: (href: string) => void;
 }
 
 let made = 0;
@@ -26,11 +27,7 @@ let made = 0;
 /** Makes `input` a combobox suggesting from its `data-suggest` address. */
 export function suggest(
   input: HTMLInputElement,
-  {
-    wait = 150,
-    fetch: get = fetch,
-    go = (href) => location.assign(href),
-  }: Options = {},
+  { wait = 150, fetch: get = fetch, go }: Options,
 ): void {
   const document = input.ownerDocument;
   const id = `suggestions-${++made}`;
@@ -53,6 +50,9 @@ export function suggest(
   let asking: AbortController | undefined;
 
   function close() {
+    // Nothing still waiting may open it again.
+    clearTimeout(timer);
+    asking?.abort();
     list.hidden = true;
     input.setAttribute("aria-expanded", "false");
     input.removeAttribute("aria-activedescendant");
@@ -108,7 +108,8 @@ export function suggest(
       return;
     }
     asking = new AbortController();
-    const url = new URL(input.dataset.suggest ?? "", location.href);
+    // admin.ts makes a combobox only of a box with an address.
+    const url = new URL(String(input.dataset.suggest), location.href);
     url.searchParams.set("q", typed);
     try {
       const answer = await get(url, { signal: asking.signal });

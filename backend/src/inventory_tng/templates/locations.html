@@ -49,7 +49,6 @@
 {% if retired %}
 <section id="retired">
   <h2>Retired</h2>
-  {% with section_id="retired" %}{% include "_notice.html" %}{% endwith %}
   <ul>{% for location in retired %}<li><a href="{{ here }}/{{ location.id }}">{{ location.name }}</a></li>{% endfor %}</ul>
 </section>
 {% endif %}

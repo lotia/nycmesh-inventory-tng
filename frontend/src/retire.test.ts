@@ -22,6 +22,7 @@ beforeEach(() => {
       <input type="hidden" name="version" value="3">
       <input type="checkbox" name="fragile">
       <select name="unit"><option selected>each</option><option>m</option></select>
+      <select name="kind"><option>store</option><option>van</option></select>
       <textarea name="notes">Grey</textarea>
       <button>Save</button>
     </form>
@@ -53,6 +54,10 @@ describe("unsaved", () => {
     ["typed in", () => (field("name").value = "Cable, grey")],
     ["ticked", () => ((field("fragile") as HTMLInputElement).checked = true)],
     ["picked", () => (field("unit").value = "m")],
+    [
+      "picked from a list sent with none marked",
+      () => (field("kind").value = "van"),
+    ],
     ["noted", () => (field("notes").value = "Black")],
   ])("is true once %s", (_how, change) => {
     change();

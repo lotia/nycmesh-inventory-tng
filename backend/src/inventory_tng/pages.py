@@ -81,7 +81,6 @@ NOTICE_SECTIONS = frozenset(
         "authenticators",
         "count",
         "current",
-        "devices",
         "email",
         "holding",
         "inactive",

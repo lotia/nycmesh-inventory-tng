@@ -67,16 +67,23 @@ def _list_page(
     listing = (listing or Listing(VOLUNTEERS)).find(
         session, SEARCHED, select(Volunteer)
     )
+    shown = [v.id for v in listing.rows]
     holders = set(
         session.scalars(
             select(Location.volunteer_id).where(
-                Location.kind == "custody", Location.retired_at.is_(None)
+                Location.kind == "custody",
+                Location.retired_at.is_(None),
+                Location.volunteer_id.in_(shown),
             )
         )
     )
     merged_into = {v.merged_into_id for v in listing.rows} - {None}
-    names = session.execute(
-        select(Volunteer.id, Volunteer.name).where(Volunteer.id.in_(merged_into))
+    names = (
+        session.execute(
+            select(Volunteer.id, Volunteer.name).where(Volunteer.id.in_(merged_into))
+        )
+        if merged_into
+        else ()
     )
     return admin_page(
         request,
@@ -124,8 +131,7 @@ def _volunteer_page(
         {
             "title": volunteer.name,
             "here": f"{VOLUNTEERS}/{volunteer.id}",
-            "list": VOLUNTEERS,
-            "back": (VOLUNTEERS, "Volunteers"),
+            "back_link": (VOLUNTEERS, "Volunteers"),
             "volunteer": volunteer,
             **retirement(session, volunteer),
             "custody": volunteers.custody(session, volunteer.id),

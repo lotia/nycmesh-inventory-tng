@@ -113,7 +113,7 @@ def _admin_page(
         {
             "title": other.username,
             "here": f"{ADMINS}/{other.id}",
-            "back": (ADMINS, "Administrators"),
+            "back_link": (ADMINS, "Administrators"),
             "other": other,
             **retirement(session, other),
             "uses_totp": accounts.uses_totp(session, other.id),
@@ -142,7 +142,7 @@ def _link_page(
         "link_made.html",
         {
             "title": f"A link for {other.username}",
-            "back": (ADMINS, "Administrators"),
+            "back_link": (ADMINS, "Administrators"),
             "other": other,
             "link": link,
             "qr": accounts.qr_svg(link),

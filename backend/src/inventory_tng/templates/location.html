@@ -1,6 +1,6 @@
 {% extends "admin_base.html" %}
 {% from "_labels.html" import labels_section with context %}
-{% from "_retired_record.html" import retired_record with context %}
+{% from "_retired_record.html" import retired_record, retire_section with context %}
 {% block main %}
 {% set retired = location.retired_at is not none %}
 <p>{{ kind }}.</p>
@@ -10,7 +10,6 @@
 {% else %}
 {% if retired %}
 {% call retired_record(location) %}Nobody can pick it.{% endcall %}
-<form method="post" action="{{ here }}/restore"><button class="primary">Bring it back</button></form>
 {% endif %}
 <form method="post" action="{{ here }}">
   <fieldset class="contents" {% if retired %}disabled{% endif %}>
@@ -43,7 +42,7 @@
 {% if areas %}
 <section>
   <h2>Areas inside</h2>
-  <ul>{% for area in areas %}<li><a href="{{ list }}/{{ area.id }}">{{ area.name }}</a></li>{% endfor %}</ul>
+  <ul>{% for area in areas %}<li><a href="{{ back_link[0] }}/{{ area.id }}">{{ area.name }}</a></li>{% endfor %}</ul>
 </section>
 {% endif %}
 
@@ -54,11 +53,7 @@
 {% endif %}
 
 {% if location.kind != "custody" and not retired %}
-<section id="retire">
-  <h2>Retire this location</h2>
-  <p class="hint">Nobody can pick it any more. Move what is here elsewhere, or
-  count it, first. You can bring it back.</p>
-  <form method="post" action="{{ here }}/retire" data-retire><button>Retire</button></form>
-</section>
+{% call retire_section("location") %}Nobody can pick it any more. Move what is here elsewhere, or
+  count it, first.{% endcall %}
 {% endif %}
 {% endblock %}

@@ -96,7 +96,7 @@ def _category_page(
         {
             "title": category.name,
             "here": f"{CATEGORIES}/{category.id}",
-            "back": (CATEGORIES, "Categories"),
+            "back_link": (CATEGORIES, "Categories"),
             "category": category,
             **retirement(session, category),
             "items": items,

@@ -9,5 +9,5 @@ guardRetire(document);
 for (const input of document.querySelectorAll<HTMLInputElement>(
   "input[data-suggest]",
 )) {
-  suggest(input);
+  suggest(input, { go: (href) => location.assign(href) });
 }

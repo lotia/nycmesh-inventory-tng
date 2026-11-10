@@ -43,8 +43,11 @@ from sqlalchemy import (
     LargeBinary,
     Numeric,
     SmallInteger,
+    SQLColumnExpression,
     Text,
     func,
+    literal,
+    or_,
     text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB
@@ -165,6 +168,24 @@ def _reference(target: str, *, index: bool = True) -> MappedColumn[Any]:
 
 def _one_of(column: str, values: tuple[str, ...]) -> str:
     return f"{column} IN ({', '.join(repr(v) for v in values)})"
+
+
+def holds(column: SQLColumnExpression[str], search: str) -> ColumnElement[bool]:
+    """Whether `column` holds `search` as typed, ignoring case: ILIKE, which
+    a gin_trgm_ops index serves, as icontains's lower() LIKE is not."""
+    escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return column.ilike(f"%{escaped}%", escape="\\")
+
+
+def fuzzy(column: SQLColumnExpression[str], search: str) -> ColumnElement[bool]:
+    """Whether `column` matches what was typed, forgiving typos: it holds it
+    as typed, or pg_trgm finds it close, as a whole (`%`) or as a word in it
+    (`<%`, so "litebeem" finds "LiteBeam 5AC")."""
+    return or_(
+        holds(column, search),
+        column.op("%", is_comparison=True)(search),
+        literal(search).op("<%", is_comparison=True)(column),
+    )
 
 
 def _between(column: str, bounds: tuple[int, int]) -> CheckConstraint:
@@ -290,9 +311,8 @@ class Item(Versioned, Base):
 
     @classmethod
     def matches(cls, search: str) -> ColumnElement[bool]:
-        """Fuzzy: pg_trgm's `%`, so a search is fuzzy where uniqueness is
-        exact."""
-        return cls.search_text.op("%", is_comparison=True)(search)
+        """Fuzzy (fuzzy()), where uniqueness is exact."""
+        return fuzzy(cls.search_text, search)
 
 
 class ItemPackage(Base):
