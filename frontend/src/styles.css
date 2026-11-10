@@ -272,8 +272,10 @@
     @apply flex flex-wrap items-center gap-3;
   }
 
+  /* Muted text, not opacity, which would take a hint inside below 4.5:1
+     (WCAG 1.4.3); each retired row or section says so in words too. */
   .retired {
-    @apply opacity-70;
+    @apply text-muted;
   }
 
   .hint {
