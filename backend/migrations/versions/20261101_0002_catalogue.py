@@ -62,6 +62,11 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_catalogue_history")),
     )
+    op.create_index(
+        "ix_catalogue_history_table_name_row_id",
+        "catalogue_history",
+        ["table_name", "row_id"],
+    )
     op.create_table(
         "category",
         sa.Column("id", sa.Integer(), sa.Identity(always=True), nullable=False),

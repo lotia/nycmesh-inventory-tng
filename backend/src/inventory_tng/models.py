@@ -500,6 +500,8 @@ class CatalogueHistory(Base):
         CheckConstraint("action IN ('insert', 'update', 'delete')", name="action"),
         # Ids, never names, whoever sets it (db.set_actor checks it first).
         CheckConstraint(f"actor ~ '^({ACTOR_PATTERN})$'", name="actor"),
+        # A row's history, such as who retired it (admin/common.retired_by).
+        Index("ix_catalogue_history_table_name_row_id", "table_name", "row_id"),
         protection(owner="history.py", lock=None, history=False),
     )
 
