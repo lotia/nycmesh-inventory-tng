@@ -90,7 +90,7 @@ def test_names_and_part_numbers_are_unique(
             ITEMS, data={"category_id": str(radios.id), "unit": "each"} | form
         )
         assert refused.status_code == 400
-        assert "Another item already has" in text(refused)
+        assert "Another item, perhaps a retired one, already has" in text(refused)
 
 
 def test_searching(
@@ -188,11 +188,14 @@ def test_retiring_and_bringing_back(
     item = new_item(session, radios)
     admin_client.post(f"{ITEMS}/{item.id}/retire")
     assert item.retired_at is not None
-    assert "Retired" in text(admin_client.get(ITEMS))
-    new_item(session, radios)  # Its name, taken while it was retired.
-    clash = admin_client.post(f"{ITEMS}/{item.id}/restore")
-    assert clash.status_code == 400
-    assert "change one first" in text(clash)
+    assert "Retired" in text(admin_client.get(ITEMS, params={"show": "retired"}))
+    # Its name stays its own while it is retired, so it can come back.
+    taken = admin_client.post(
+        ITEMS, data={"name": item.name, "category_id": str(radios.id), "unit": "each"}
+    )
+    assert taken.status_code == 400
+    assert "perhaps a retired one" in text(taken)
+    assert admin_client.post(f"{ITEMS}/{item.id}/restore").status_code == 303
 
 
 def test_unknown_items_and_others_packages_are_not_found(

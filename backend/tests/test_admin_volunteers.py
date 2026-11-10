@@ -128,7 +128,9 @@ def test_merging_a_duplicate(admin_client: TestClient, session: Session) -> None
         == 303
     )
     assert (dup.merged_into_id, dup.retired_at is not None) == (ada.id, True)
-    assert "merged into Ada" in text(admin_client.get(VOLUNTEERS, params={"show": "retired"}))
+    assert "merged into Ada" in text(
+        admin_client.get(VOLUNTEERS, params={"show": "retired"})
+    )
     # The one others are merged into cannot be retired from under them.
     refused = admin_client.post(f"{VOLUNTEERS}/{ada.id}/retire")
     assert "Others are merged into them" in text(refused)

@@ -42,7 +42,7 @@ router = APIRouter(include_in_schema=False)
 LOCATIONS = f"{ADMIN}/locations"
 # What an administrator makes here; custody comes with a volunteer.
 KINDS = {"store": "Store", "area": "Area inside another", "vehicle": "Vehicle"}
-TAKEN = "Another place beside it already has that name."
+TAKEN = "Another place beside it, perhaps a retired one, already has that name."
 
 
 @dataclass
@@ -287,10 +287,7 @@ def restore_location(
         return not_found()
     _, broken = attempt(session, lambda: locations.restore(session, found))
     if broken:
-        taken = "A current place beside it already has its name: rename one first."
-        return _location_page(
-            request, session, signed, found, rule_words(broken, taken)
-        )
+        return _location_page(request, session, signed, found, RULES[broken])
     session.commit()
     log.info("location restored", location_id=location_id)
     return redirect(f"{LOCATIONS}/{location_id}", notice="restored")
