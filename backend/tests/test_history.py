@@ -177,7 +177,7 @@ VERSIONED = (
         (
             "not_a_change",
             {
-                "device": {"last_seen_at"},
+                "device": {"last_seen_at", "edit_version"},
                 # Resealing (totp_keys.py) changes nothing anyone did.
                 "authenticator": {"last_step", "sealed_key", "key_version"},
             }

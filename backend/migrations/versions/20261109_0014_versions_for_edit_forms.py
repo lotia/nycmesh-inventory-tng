@@ -27,6 +27,7 @@ APP_ROLE = "inventory_app"
 TABLES = (
     "adjustment_reason",
     "category",
+    "device",
     "item",
     "location",
     "scan_settings",

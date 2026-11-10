@@ -6,26 +6,23 @@ until {{ code.expires_at | when(zone) }}.</p>
 {% if not code.revoked_at %}
 <form method="post" action="{{ here }}/revoke"><button>Revoke</button></form>
 <p class="hint">Revoking stops new registrations. Devices it registered stay
-registered; revoke any that look wrong below.</p>
+registered; revoke any that look wrong from its own page.</p>
 {% endif %}
 
 <section id="devices">
   <h2>Devices it registered</h2>
   {% with section_id="devices" %}{% include "_notice.html" %}{% endwith %}
   {% call table() %}
-    <tr><th>Device</th><th>Registered</th><th>Last used</th><th>From</th><th></th></tr>
+    <tr><th>Device</th><th>Registered</th><th>Last used</th><th>From</th></tr>
     {% for device, before in devices %}
     <tr>
-      <td>{{ device.name }}</td>
+      <td><a href="{{ list }}/{{ device.id }}">{{ device.name }}</a>{% if device.revoked_at %} <span class="tag">Revoked</span>{% endif %}</td>
       <td>{{ device.created_at | when(zone) }}{% if before is not none %} <span class="hint">{{ before }} before revoking</span>{% endif %}</td>
       <td>{{ device.last_seen_at | when(zone) }}</td>
       <td><span class="wrap-anywhere">{{ device.first_seen_from or "" }}</span></td>
-      <td>{% if device.revoked_at %}<span class="tag">Revoked</span>{% else %}
-        <form method="post" action="{{ list }}/{{ device.id }}/revoke"><button>Revoke<span class="sr-only"> {{ device.name }}</span></button></form>
-      {% endif %}</td>
     </tr>
     {% else %}
-    <tr><td colspan="5">None yet.</td></tr>
+    <tr><td colspan="4">None yet.</td></tr>
     {% endfor %}
   {% endcall %}
 </section>

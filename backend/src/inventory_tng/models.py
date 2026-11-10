@@ -543,7 +543,7 @@ class RegistrationCode(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class Device(Base):
+class Device(Versioned, Base):
     """One registered browser, told apart by a cookie (docs/decisions/0009).
     Holds no person: who did what is on the ledger, which records the device
     beside the volunteer picked. Only the cookie's hash is kept."""
