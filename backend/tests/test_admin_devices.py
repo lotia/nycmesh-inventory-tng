@@ -281,3 +281,84 @@ def test_a_device_is_revoked_after_a_confirmation(
         path, data={"label": "Lost", "version": str(device.edit_version)}
     )
     assert refused.status_code == 409
+
+
+def listed_ids(page: str) -> list[int]:
+    """The devices a list shows, in its order."""
+    return [int(found) for found in re.findall(rf'href="{DEVICES}/(\d+)"', page)]
+
+
+def test_devices_are_listed_between_two_times(
+    admin_client: TestClient, session: Session
+) -> None:
+    """In the site's zone (America/New_York, UTC-5 in November); the end
+    takes in the whole minute it names."""
+    before = device_at(session, datetime(2026, 11, 5, 13, 59, tzinfo=UTC))
+    first = device_at(session, datetime(2026, 11, 5, 14, 0, tzinfo=UTC))
+    last = device_at(session, datetime(2026, 11, 5, 15, 30, 59, tzinfo=UTC))
+    after = device_at(session, datetime(2026, 11, 5, 15, 31, tzinfo=UTC))
+    window = {"since": "2026-11-05T09:00", "until": "2026-11-05T10:30"}
+    page = text(admin_client.get(DEVICE_LIST, params=window))
+    shown = listed_ids(page)
+    assert first.id in shown
+    assert last.id in shown
+    assert before.id not in shown
+    assert after.id not in shown
+    assert f"{len(shown)} listed" in page
+    backwards = {"since": "2026-11-05T10:30", "until": "2026-11-05T09:00"}
+    refused = admin_client.get(DEVICE_LIST, params=backwards)
+    assert refused.status_code == 400
+    assert "A time after the one it is from" in text(refused)
+    bad = admin_client.get(DEVICE_LIST, params={"until": "later"})
+    assert bad.status_code == 400
+
+
+def test_devices_are_sorted_by_registered_or_last_used(
+    admin_client: TestClient, session: Session
+) -> None:
+    early = device_at(session, datetime(2026, 11, 5, 12, tzinfo=UTC))
+    late = device_at(session, datetime(2026, 11, 5, 13, tzinfo=UTC))
+    early.last_seen_at = datetime(2026, 11, 6, 12, tzinfo=UTC)
+    late.last_seen_at = datetime(2026, 11, 5, 13, tzinfo=UTC)
+    session.flush()
+    window = {"since": "2026-11-05T07:00", "until": "2026-11-05T08:00"}
+
+    def order(sort: str) -> list[int]:
+        page = text(admin_client.get(DEVICE_LIST, params=window | {"sort": sort}))
+        return [i for i in listed_ids(page) if i in (early.id, late.id)]
+
+    assert order("registered") == [late.id, early.id]
+    assert order("registered-oldest") == [early.id, late.id]
+    assert order("used") == [early.id, late.id]
+    assert order("used-oldest") == [late.id, early.id]
+    assert order("nonsense") == [late.id, early.id]
+    # The headings sort, the filter kept, and say how it is sorted now.
+    page = admin_client.get(DEVICE_LIST, params=window).text
+    assert 'aria-sort="descending"' in page
+    assert "sort=registered-oldest" in page
+    assert "until=2026-11-05T08%3A00" in page
+
+
+def test_a_revoke_keeps_the_window_and_sort(
+    admin_client: TestClient, session: Session
+) -> None:
+    device = device_at(session, datetime(2026, 11, 5, 12, tzinfo=UTC))
+    form = once(
+        since="2026-11-05T06:00",
+        until="2026-11-05T08:00",
+        code="",
+        state="current",
+        sort="used",
+    )
+    asked = admin_client.post(BULK_REVOKE, data=form | {"device": str(device.id)})
+    assert 'name="until" value="2026-11-05T08:00"' in asked.text
+    assert 'name="sort" value="used"' in asked.text
+    done = admin_client.post(
+        BULK_REVOKE, data=form | {"device": str(device.id), "sure": "yes"}
+    )
+    assert "until=2026-11-05T08%3A00" in done.headers["location"]
+    assert "sort=used" in done.headers["location"]
+    new_device(session)
+    page = text(admin_client.get(DEVICE_LIST))
+    assert "Every current one listed is selected: clear any to keep." in page
+    assert "Revoke selected" in page

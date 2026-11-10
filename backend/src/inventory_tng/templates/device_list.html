@@ -2,12 +2,17 @@
 {% from "_table.html" import table %}
 {% block main %}
 <p>Every registered phone or computer. After a compromise, list those
-registered since it began, then revoke the ones that look wrong.</p>
+registered while it lasted, then revoke the ones that look wrong.</p>
 
 <form method="get" action="{{ here }}">
-  <label>Registered since <span class="hint">{{ zone.key }} time, optional</span>
+  <input type="hidden" name="sort" value="{{ filter.sort }}">
+  <label>Registered from <span class="hint">{{ zone.key }} time, optional</span>
     <input name="since" type="datetime-local" value="{{ filter.since }}">
     {% with name = "since" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  <label>to <span class="hint">that minute included, optional</span>
+    <input name="until" type="datetime-local" value="{{ filter.until }}">
+    {% with name = "until" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <label>With code <span class="hint">its number, optional</span>
     <input name="code" inputmode="numeric" value="{{ filter.code }}">
@@ -28,11 +33,18 @@ registered since it began, then revoke the ones that look wrong.</p>
   {% for name, value in filter.items() %}
   <input type="hidden" name="{{ name }}" value="{{ value }}">
   {% endfor %}
+  {% if not problems %}<p class="hint">{{ devices | length }} listed{% if devices | length >= listed %}, the first
+  {{ listed }}: narrow it to see the rest{% endif %}.</p>{% endif %}
   {% call table() %}
-    <tr><th>Revoke</th><th>Device</th><th>Registered</th><th>Last used</th><th>Code</th></tr>
+    <tr><th>Select</th><th>Device</th>
+      {%- for column, words in [("registered", "Registered"), ("used", "Last used")] %}
+      {%- set link, order = sorting[column] %}
+      <th{% if order %} aria-sort="{{ order }}"{% endif %}><a href="{{ link }}">{{ words }}
+        {%- if order %} <span aria-hidden="true">{{ "↓" if order == "descending" else "↑" }}</span>{% endif %}</a></th>
+      {%- endfor %}<th>Code</th></tr>
     {% for device in devices %}
     <tr>
-      <td>{% if device.revoked_at %}<span class="tag">Revoked</span>{% else %}<input type="checkbox" name="device" value="{{ device.id }}" checked aria-label="Revoke {{ device.name }}">{% endif %}</td>
+      <td>{% if device.revoked_at %}<span class="tag">Revoked</span>{% else %}<input type="checkbox" name="device" value="{{ device.id }}" checked aria-label="Select {{ device.name }}">{% endif %}</td>
       <td><a href="{{ devices_path }}/{{ device.id }}">{{ device.name }}</a></td>
       <td>{{ device.created_at | when(zone) }}</td>
       <td>{{ device.last_seen_at | when(zone) }}</td>
@@ -42,10 +54,9 @@ registered since it began, then revoke the ones that look wrong.</p>
     <tr><td colspan="5">None.</td></tr>
     {% endfor %}
   {% endcall %}
-  {% if devices | length >= listed %}<p class="hint">Showing the newest {{ listed }}: narrow it to see the rest.</p>{% endif %}
   {% if devices | selectattr("revoked_at", "none") | list %}
-  <p class="hint">Every current one listed is ticked: untick any to keep.</p>
-  <div class="actions"><button>Revoke the ticked ones</button></div>
+  <p class="hint">Every current one listed is selected: clear any to keep.</p>
+  <div class="actions"><button>Revoke selected</button></div>
   {% endif %}
 </form>
 {% endblock %}

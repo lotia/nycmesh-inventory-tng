@@ -7,7 +7,8 @@ open the registration page with it filled in; only its hash is kept.
 """
 
 from datetime import datetime, timedelta
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
@@ -309,23 +310,58 @@ STATES: dict[str, bool | None] = {"current": True, "revoked": False, "all": None
 NOTICES.update({"devices_revoked": "Revoked: they can't save anything now."})
 
 
+A_TIME = "A date and time, such as 2026-11-02 13:05."
+
+
 def _chosen(
-    session: Session, since: str, code: str, shown: str
+    session: Session, since: str, until: str, code: str, shown: str, sort: str
 ) -> tuple[devices.DeviceFilter, dict[str, str], dict[str, str]]:
     """The filter a form or link chose, what was wrong with it, and the
-    filter as the page carries it (an unknown `shown` is current)."""
+    filter and sort as the page carries them (an unknown `shown` is
+    current, an unknown `sort` newest registered first). `until` takes in
+    the whole minute it names."""
     shown = shown if shown in STATES else "current"
+    sort = sort if sort in devices.SORTS else "registered"
+    zone = site_zone(session)
     problems: dict[str, str] = {}
-    moment = None
-    if since.strip():
-        moment = parse_local(since, site_zone(session))
-        if moment is None:
-            problems["since"] = "A date and time, such as 2026-11-02 13:05."
+    start = end = None
+    if since.strip() and (start := parse_local(since, zone)) is None:
+        problems["since"] = A_TIME
+    if until.strip():
+        end = parse_local(until, zone)
+        if end is None:
+            problems["until"] = A_TIME
+        elif start is not None and end < start:
+            problems["until"] = "A time after the one it is from."
+        else:
+            # Whatever seconds were typed. At the last minute a datetime
+            # holds, no end at all.
+            try:
+                end = end.replace(second=0, microsecond=0) + timedelta(minutes=1)
+            except OverflowError:
+                end = None
     code_id = whole(code, 1, 2**31 - 1) if code.strip() else None
     if code.strip() and code_id is None:
         problems["code"] = "A code's number."
-    chosen = devices.DeviceFilter(since=moment, code_id=code_id, current=STATES[shown])
-    return chosen, problems, {"since": since, "code": code, "state": shown}
+    chosen = devices.DeviceFilter(
+        since=start, until=end, code_id=code_id, current=STATES[shown]
+    )
+    query = {"since": since, "until": until, "code": code, "state": shown, "sort": sort}
+    return chosen, problems, query
+
+
+def _sorting(query: dict[str, str]) -> dict[str, tuple[str, str | None]]:
+    """Each sortable column's heading link, which sorts by it newest first,
+    or oldest first if it is so already, the filter kept; and its aria-sort,
+    if the list is sorted by it."""
+    links: dict[str, tuple[str, str | None]] = {}
+    for column in ("registered", "used"):
+        newest = query["sort"] == column
+        oldest = query["sort"] == f"{column}-oldest"
+        to = f"{column}-oldest" if newest else column
+        order = "descending" if newest else "ascending" if oldest else None
+        links[column] = (f"{DEVICE_LIST}?{urlencode(query | {'sort': to})}", order)
+    return links
 
 
 @router.get(DEVICE_LIST)
@@ -334,11 +370,14 @@ def device_list(
     signed: AdminSignedIn,
     session: DbSession,
     since: str = "",
+    until: str = "",
     code: str = "",
     state: str = "current",
+    sort: str = "registered",
 ) -> Response:
-    chosen, problems, query = _chosen(session, since, code, state)
-    found = [] if problems else devices.find_devices(session, chosen)
+    chosen, problems, query = _chosen(session, since, until, code, state, sort)
+    by = cast(devices.Sort, query["sort"])  # One of SORTS: _chosen checked it.
+    found = [] if problems else devices.find_devices(session, chosen, by)
     return admin_page(
         request,
         signed,
@@ -351,6 +390,7 @@ def device_list(
             "codes_path": CODES,
             "devices_path": DEVICES,
             "filter": query,
+            "sorting": _sorting(query),
             "states": list(STATES),
             "devices": found,
             "listed": devices.LISTED,
@@ -368,14 +408,16 @@ def revoke_devices(
     session: DbSession,
     device: Annotated[list[int] | None, Form()] = None,
     since: Annotated[str, Form()] = "",
+    until: Annotated[str, Form()] = "",
     code: Annotated[str, Form()] = "",
     state: Annotated[str, Form()] = "current",
+    sort: Annotated[str, Form()] = "registered",
     sure: Annotated[str, Form()] = "",
     once: OnceKey = "",
 ) -> Response:
-    """Asks first, saying how many, then revokes those ticked that the
+    """Asks first, saying how many, then revokes those selected that the
     filter still matches, once."""
-    chosen, problems, query = _chosen(session, since, code, state)
+    chosen, problems, query = _chosen(session, since, until, code, state, sort)
     current = [] if problems else devices.current_among(session, chosen, device or [])
     if not current:
         return redirect(DEVICE_LIST, **query)
