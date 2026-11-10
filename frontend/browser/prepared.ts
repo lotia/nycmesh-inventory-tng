@@ -11,6 +11,8 @@ export type Prepared = {
   password: string;
   phrase: string;
   labelled: string;
+  /** Another administrator, with the same password. */
+  other: string;
 };
 
 /** A file in this run's folder. */
