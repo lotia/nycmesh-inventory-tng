@@ -14,7 +14,7 @@ them must not hold one up from those.
 from typing import Annotated, Literal
 
 import structlog
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from limits import RateLimitItemPerMinute
 from limits.storage import MemoryStorage
@@ -34,8 +34,6 @@ PATH = "/telemetry"
 # A page flushes at ten events and sends fifty at most; a few pages open at
 # once on one network share an address.
 REPORTS = RateLimitItemPerMinute(30)
-report_counts = MemoryStorage()
-reports = MovingWindowRateLimiter(report_counts)
 MOST_EVENTS = 50
 
 Page = Literal["scan", "register"]
@@ -71,9 +69,8 @@ class ScanToSave(Strict):
     seconds: Annotated[float, Field(ge=0, le=86_400)]
 
 
-Event = Annotated[
-    WebVital | PageError | OutboxRetry | ScanToSave, Field(discriminator="kind")
-]
+AnyEvent = WebVital | PageError | OutboxRetry | ScanToSave
+Event = Annotated[AnyEvent, Field(discriminator="kind")]
 
 
 class Report(Strict):
@@ -114,7 +111,7 @@ scan_to_save = meter.create_histogram(
 )
 
 
-def record(event: WebVital | PageError | OutboxRetry | ScanToSave) -> None:
+def record(event: AnyEvent) -> None:
     match event:
         case WebVital(name="CLS"):
             layout_shifts.record(
@@ -138,6 +135,8 @@ def record(event: WebVital | PageError | OutboxRetry | ScanToSave) -> None:
             scan_to_save.record(event.seconds)
 
 
+# Async: it works in memory only, so it holds no thread a request for the
+# database would want.
 @router.post(
     PATH,
     status_code=204,
@@ -145,8 +144,9 @@ def record(event: WebVital | PageError | OutboxRetry | ScanToSave) -> None:
         429: {"model": RateLimitedReply, "description": "Too many reports from here"}
     },
 )
-def report(report: Report, request: Request) -> Response:
+async def report(report: Report, request: Request) -> Response:
     """Record what a page reports about itself."""
+    reports: MovingWindowRateLimiter = request.app.state.page_reports
     if not reports.hit(REPORTS, "telemetry", rate_key(request)):
         log.info("page report refused", reason="rate_limited")
         body = RateLimitedReply(reason="rate_limited").model_dump()
@@ -157,3 +157,8 @@ def report(report: Report, request: Request) -> Response:
     if errors := sum(isinstance(event, PageError) for event in report.events):
         log.warning("page errors", count=errors)
     return Response(status_code=204)
+
+
+def install(app: FastAPI) -> None:
+    """This app's count of reports by address, in this process's memory."""
+    app.state.page_reports = MovingWindowRateLimiter(MemoryStorage())

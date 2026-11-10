@@ -11,7 +11,8 @@
  * sends at most MOST_PER_PAGE, so a loop of errors cannot flood the server.
  * Nothing is sent until start(), which only the pages' entry points call.
  */
-import { type Metric, onCLS, onINP, onLCP } from "web-vitals";
+import { onCLS, onINP, onLCP } from "web-vitals";
+import type { Schemas } from "./api/client";
 
 export const PATH = "/api/telemetry";
 export const FLUSH_AT = 10;
@@ -20,23 +21,10 @@ export const MOST_PER_PAGE = 50;
  * an event outside its bounds would have the whole report refused. */
 export const MOST_SECONDS_TO_SAVE = 86_400;
 
-export type Page = "scan" | "register";
-export type Retry = "no_answer" | "unavailable" | "unexpected";
-
-export type Event =
-  | {
-      kind: "web_vital";
-      page: Page;
-      name: "LCP" | "INP" | "CLS";
-      value: number;
-      rating: Metric["rating"];
-    }
-  | { kind: "error"; page: Page; source: "error" | "unhandledrejection" }
-  | { kind: "outbox_retry"; reason: Retry }
-  | { kind: "scan_to_save"; seconds: number };
-
+/** As POST /api/telemetry takes them: its schema is the list. */
+export type Event = Schemas["Report"]["events"][number];
+type Page = Schemas["PageError"]["page"];
 type Send = (body: Blob) => void;
-type Vital = Pick<Metric, "value" | "rating"> & { name: "LCP" | "INP" | "CLS" };
 
 /** By sendBeacon, or by a fetch that outlives the page where there is none;
  * a report that cannot go is dropped. */
@@ -60,23 +48,24 @@ export class Telemetry {
   start(page: Page, target: Window = window): () => void {
     this.page = page;
     // Each of LCPMetric, INPMetric and CLSMetric is one of these.
-    const vital = ({ name, value, rating }: Vital) =>
+    const vital = ({
+      name,
+      value,
+      rating,
+    }: Omit<Schemas["WebVital"], "kind" | "page">) =>
       this.record({ kind: "web_vital", page, name, value, rating });
     onLCP(vital);
     onINP(vital);
     onCLS(vital);
     const listening = new AbortController();
     const { signal } = listening;
-    target.addEventListener(
-      "error",
-      () => this.record({ kind: "error", page, source: "error" }),
-      { signal },
-    );
-    target.addEventListener(
-      "unhandledrejection",
-      () => this.record({ kind: "error", page, source: "unhandledrejection" }),
-      { signal },
-    );
+    for (const source of ["error", "unhandledrejection"] as const) {
+      target.addEventListener(
+        source,
+        () => this.record({ kind: "error", page, source }),
+        { signal },
+      );
+    }
     target.document.addEventListener(
       "visibilitychange",
       () => {

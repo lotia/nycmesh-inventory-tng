@@ -24,7 +24,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy import exc
 from structlog.typing import EventDict, ExcInfo
 
-from inventory_tng.settings import REDACTION_WARN_EVERY, Redaction, Settings
+from inventory_tng.settings import HourlyWarning, Redaction, Settings
 
 log = structlog.get_logger(__name__)
 
@@ -122,11 +122,10 @@ class Masker:
     development: bool = False
     secrets: bool = True
     now: Callable[[], datetime] = field(default=_now, compare=False, repr=False)
-    # When it last warned that redaction is off: one, changed in place.
-    _warned: list[datetime] = field(default_factory=list, compare=False, repr=False)
+    warning: HourlyWarning = field(init=False, compare=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._warned.append(self.now())
+        object.__setattr__(self, "warning", HourlyWarning(self.now()))
 
     @classmethod
     def from_settings(cls, settings: Settings) -> Self:
@@ -145,25 +144,18 @@ class Masker:
     def redact(self) -> bool:
         return self.redaction.redacting(development=self.development, now=self.now())
 
-    def off_outside_development(self) -> bool:
-        """Unredacted where it matters: what is marked and warned about."""
-        return not self.development and not self.redact
-
     def __call__(self, _logger: object, _method: str, event: EventDict) -> EventDict:
-        redact = self.redact
-        masked = self.fields(event, redact=redact)
-        if not redact and not self.development:
-            masked[REDACTION_FIELD] = "off"
-            self._warn_hourly()
-        return masked
-
-    def _warn_hourly(self) -> None:
         now = self.now()
-        if now - self._warned[0] < REDACTION_WARN_EVERY:
-            return
-        # Before logging, so the warning's own line does not warn again.
-        self._warned[0] = now
-        log.warning("log redaction is off", until=self.redaction.off_until)
+        redact = self.redaction.redacting(development=self.development, now=now)
+        masked = self.fields(event, redact=redact)
+        if self.redaction.off_outside_development(
+            development=self.development, now=now
+        ):
+            masked[REDACTION_FIELD] = "off"
+            # Noted as said before it is logged, so its own line is quiet.
+            if self.warning.due(now):
+                log.warning("log redaction is off", until=self.redaction.off_until)
+        return masked
 
     def fields(
         self, fields: Mapping[str, object], *, redact: bool | None = None

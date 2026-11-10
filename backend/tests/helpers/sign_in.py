@@ -1,16 +1,16 @@
 """Administrators, and signing them in."""
 
+import base64
 import html
 import uuid
 from datetime import UTC, datetime
 
 import pyotp
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, sign_in
+from inventory_tng import accounts, sign_in, totp_keys
 from inventory_tng.models import (
     Admin,
     AdminPassword,
@@ -26,8 +26,18 @@ _GROUP = f"[A-Z0-9]{{{accounts.RECOVERY_CODE_GROUP}}}"
 _MORE = accounts.RECOVERY_CODE_LENGTH // accounts.RECOVERY_CODE_GROUP - 1
 RECOVERY_CODE = rf"<li>({_GROUP}(?:-{_GROUP}){{{_MORE}}})</li>"
 PASSWORD = "correct horse battery staple"
-# What the tests' apps seal authenticators' keys with (conftest's make_app).
-TOTP_KEYS = TotpKeys({1: AESGCM.generate_key(256)})
+
+
+def raw_key() -> bytes:
+    """A new key, as TotpKeys holds one."""
+    return base64.b64decode(totp_keys.new_key())
+
+
+# What the tests seal authenticators' keys with: version 1, given to their
+# apps (conftest's make_app), and as text in TOTP_KEYS_DIR for the rest
+# (conftest's no_settings_from_the_shell), as new_key() writes it.
+TOTP_KEY = totp_keys.new_key()
+TOTP_KEYS = TotpKeys({1: base64.b64decode(TOTP_KEY)})
 
 
 def once(**form: str) -> dict[str, str]:

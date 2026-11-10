@@ -30,6 +30,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from sqlalchemy.orm import Session
 
 from inventory_tng.local_env import CLONE
+from inventory_tng.settings import SettingsError, is_development
 
 DEVELOPMENT_DIR = CLONE / ".local" / "totp-keys"
 KEY_BITS = 256
@@ -42,7 +43,7 @@ VERSION = re.compile(r"[1-9][0-9]*")
 MOST_VERSION = 32767
 
 
-class TotpKeysError(Exception):
+class TotpKeysError(SettingsError):
     """TOTP_KEYS_DIR is missing, empty or holds something unusable."""
 
 
@@ -128,12 +129,17 @@ class TotpKeys:
             )
         return cls(keys)
 
+    @classmethod
+    def from_environ(cls, environ: Mapping[str, str] = os.environ) -> TotpKeys:
+        """TOTP_KEYS_DIR's, or development's (keys_dir)."""
+        return cls.load(keys_dir(environ))
 
-def keys_dir(environ: Mapping[str, str], *, development: bool) -> Path:
+
+def keys_dir(environ: Mapping[str, str]) -> Path:
     """TOTP_KEYS_DIR, or development's default; needed anywhere else."""
     if value := environ.get("TOTP_KEYS_DIR", "").strip():
         return Path(value)
-    if development:
+    if is_development(environ):
         return DEVELOPMENT_DIR
     raise TotpKeysError("TOTP_KEYS_DIR is needed outside APP_ENV=development")
 
@@ -164,11 +170,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _reseal(session: Session, _args: argparse.Namespace) -> int:
     from inventory_tng.accounts import reseal_authenticators
-    from inventory_tng.settings import Settings
 
-    keys = Settings.from_environ().totp_keys
-    assert keys is not None  # from_environ always loads them.
-    resealed, unreadable = reseal_authenticators(session, keys)
+    resealed, unreadable = reseal_authenticators(session, TotpKeys.from_environ())
     print(f"Resealed {resealed}; {unreadable} could not be read.")
     return 1 if unreadable else 0
 

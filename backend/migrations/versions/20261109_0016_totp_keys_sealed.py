@@ -10,13 +10,12 @@ Revises: 0015
 Create Date: 2026-11-09 18:00:00
 """
 
-import os
 from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
 
-from inventory_tng.totp_keys import TotpKeys, keys_dir
+from inventory_tng.totp_keys import TotpKeys
 
 revision: str = "0016"
 down_revision: str | Sequence[str] | None = "0015"
@@ -31,11 +30,6 @@ SEALED = (
 CONSTRAINT = "key_until_retired"
 
 
-def _keys() -> TotpKeys:
-    development = os.environ.get("APP_ENV", "").strip().lower() == "development"
-    return TotpKeys.load(keys_dir(os.environ, development=development))
-
-
 def upgrade() -> None:
     op.add_column("authenticator", sa.Column("sealed_key", sa.LargeBinary()))
     op.add_column("authenticator", sa.Column("key_version", sa.SmallInteger()))
@@ -46,9 +40,9 @@ def upgrade() -> None:
             " WHERE totp_key IS NOT NULL ORDER BY id"
         )
     ).all()
-    keys = _keys() if current else None
+    # The keys only where there is something to seal.
+    keys = TotpKeys.from_environ() if current else TotpKeys({})
     for id_, admin_id, totp_key in current:
-        assert keys is not None
         version, sealed = keys.seal(totp_key, admin_id)
         connection.execute(
             sa.text(
@@ -71,9 +65,8 @@ def downgrade() -> None:
             " WHERE sealed_key IS NOT NULL ORDER BY id"
         )
     ).all()
-    keys = _keys() if current else None
+    keys = TotpKeys.from_environ() if current else TotpKeys({})
     for id_, admin_id, version, sealed in current:
-        assert keys is not None
         connection.execute(
             sa.text("UPDATE authenticator SET totp_key = :key WHERE id = :id"),
             {"key": keys.open(version, sealed, admin_id), "id": id_},

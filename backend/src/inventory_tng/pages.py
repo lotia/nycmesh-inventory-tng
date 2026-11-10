@@ -94,7 +94,8 @@ def page(
         "problems": {},
         "values": {},
         "notice": notice,
-        "notice_section": section if notice and SECTION.fullmatch(section) else None,
+        # Only its section's heading says it (_notice.html), if there is one.
+        "notice_section": (section or None) if notice else None,
     } | dict(context)
     if full.get("admin") is not None and full.get("sections") is None:
         full["sections"] = sections(full["admin"])

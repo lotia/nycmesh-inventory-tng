@@ -111,7 +111,7 @@ def recorded(database_url: str) -> Iterator[Recorded]:
     reader, exporter = InMemoryMetricReader(), InMemoryLogRecordExporter()
     telemetry = Telemetry.create({}, metric_reader=reader, log_exporter=exporter)
     telemetry.make_global()
-    app = create_app(Settings(database_url=database_url, totp_keys=TOTP_KEYS))
+    app = create_app(Settings(database_url=database_url), totp_keys=TOTP_KEYS)
     telemetry.instrument(app, app.state.db)
     telemetry.attach_logs(Masker())
     root = logging.getLogger()

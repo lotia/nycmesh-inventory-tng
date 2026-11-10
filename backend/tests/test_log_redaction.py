@@ -17,14 +17,12 @@ from inventory_tng.server import create_server
 from inventory_tng.settings import Redaction, Settings, SettingsError
 from inventory_tng.telemetry import StructlogBridge, Telemetry
 
-from helpers.settings import from_environ
-
 NOW = datetime(2026, 11, 9, 12, tzinfo=UTC)
 LINE = {"event": "x", "email": "jane@example.org", "password": "hunter2"}
 
 
 def settings(**environ: str) -> Settings:
-    return from_environ({"DATABASE_URL": "postgresql://db/x", **environ})
+    return Settings.from_environ({"DATABASE_URL": "postgresql://db/x", **environ})
 
 
 def masker_at(

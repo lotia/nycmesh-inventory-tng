@@ -1,7 +1,6 @@
 """Each test run gets a database of its own, created on the compose PostgreSQL
 server and dropped when the run ends. Each test's writes are rolled back."""
 
-import base64
 import contextlib
 import dataclasses
 import functools
@@ -21,7 +20,7 @@ from sqlalchemy import Engine, TextClause, delete, event, exc, make_url, text
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, db, devices, local_env, page_telemetry
+from inventory_tng import accounts, db, devices, local_env
 from inventory_tng.app import create_app
 from inventory_tng.database_role import refusals
 from inventory_tng.db import (
@@ -53,7 +52,7 @@ from helpers.concurrency import LOCK_TIMEOUT, Committed, delete_made, newest_ids
 from helpers.devices import new_device
 from helpers.mail import SITE_MAIL, SentMail
 from helpers.rows import setting_up
-from helpers.sign_in import TOTP_KEYS, code, new_admin, sign_in_with
+from helpers.sign_in import TOTP_KEY, TOTP_KEYS, code, new_admin, sign_in_with
 
 # structlog's lines go through the standard library, where caplog sees them.
 configure_structlog()
@@ -101,8 +100,7 @@ def no_settings_from_the_shell(
         # The tests' TOTP keys, for what reads its settings from the
         # environment, as the tests' apps are given them.
         keys = tmp_path_factory.mktemp("totp-keys")
-        for version, key in TOTP_KEYS.keys.items():
-            (keys / str(version)).write_text(base64.b64encode(key).decode())
+        (keys / "1").write_text(TOTP_KEY)
         monkeypatch.setenv("TOTP_KEYS_DIR", str(keys))
         yield
 
@@ -117,14 +115,6 @@ def cheap_password_hashing() -> Iterator[None]:
         monkeypatch.setattr(accounts, "_hasher", cheap)
         monkeypatch.setattr(accounts, "_DUMMY_HASH", cheap.hash("not a password"))
         yield
-
-
-@pytest.fixture(autouse=True)
-def no_page_reports_counted() -> None:
-    """Page reports count against their address in memory
-    (page_telemetry.report_counts), shared by every test in the process: each
-    starts with none."""
-    page_telemetry.report_counts.reset()
 
 
 @pytest.fixture(autouse=True)
@@ -532,12 +522,11 @@ def _app(
         recovery_token=recovery_token,
         logging=logging or LogConfig(),
         frontend=frontend or FrontendConfig(),
-        totp_keys=TOTP_KEYS,
     )
     if mailer is not None:
         settings = dataclasses.replace(settings, mail=SITE_MAIL)
     # Its login is checked once, by `engine`, if it has a database at all.
-    app = create_app(settings, startup_checks=False)
+    app = create_app(settings, totp_keys=TOTP_KEYS, startup_checks=False)
     app.dependency_overrides[get_mailer] = lambda: mailer
     if reached is not None:
         for name, pool in app.state.db.pools.items():
