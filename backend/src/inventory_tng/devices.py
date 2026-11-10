@@ -39,10 +39,13 @@ from sqlalchemy.orm import Session
 from inventory_tng import request_logging
 from inventory_tng.db import (
     DbSession,
+    Seen,
+    enforce,
     exists_where,
     get_locked,
     locked,
     record_last_seen,
+    unchanged,
 )
 from inventory_tng.models import Device, RegistrationCode
 from inventory_tng.rate_limits import limiter, refund
@@ -241,6 +244,18 @@ def revoke_device(session: Session, device_id: int) -> bool:
     if done := _revoke(session, Device, device_id, "device_id"):
         revoked.add(1, {"how": "one"})
     return done
+
+
+def name_device(
+    session: Session, device: Device, label: str | None, *, seen: Seen
+) -> None:
+    """Named, such as "Store tablet", or by its number again if `label` is
+    None. A revoked device is read only (docs/decisions/0019)."""
+    get_locked(session, Device, device.id, key_share=True)
+    unchanged(device, seen)
+    enforce("retired_read_only", when=device.revoked_at is not None)
+    device.label = label
+    log.info("device named", device_id=device.id)
 
 
 # How many devices a page lists, newest first.

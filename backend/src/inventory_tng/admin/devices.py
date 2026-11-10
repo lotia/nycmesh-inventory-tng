@@ -19,11 +19,13 @@ from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.common import (
     ADMIN,
     NAME_MAX,
+    RULES,
     admin_page,
+    form_version,
     now,
     site_link,
 )
-from inventory_tng.db import DbSession
+from inventory_tng.db import DbSession, attempt
 from inventory_tng.local_time import parse_local, site_zone
 from inventory_tng.models import Device, RegistrationCode, whole
 from inventory_tng.once import OnceKey, sent_before
@@ -189,16 +191,110 @@ def revoke_code(signed: ConfirmedAdmin, session: DbSession, code_id: int) -> Res
     return redirect(f"{CODES}/{code_id}", notice="code_revoked")
 
 
-@router.post(f"{DEVICES}/{{device_id}}/revoke")
+# A device's own page (inventory-tng-8i4.60.13): what is known of it, its
+# name, and revoking it alone, after a confirmation. `:int`, so the list's
+# own paths under DEVICES are never taken for a device's.
+DEVICE = f"{DEVICES}/{{device_id:int}}"
+
+
+def _device_page(
+    request: Request,
+    signed: SignedIn,
+    session: Session,
+    device: Device,
+    *,
+    problems: dict[str, str] | None = None,
+    values: dict[str, str] | None = None,
+    alert: str | None = None,
+) -> HTMLResponse:
+    return admin_page(
+        request,
+        signed,
+        "device.html",
+        {
+            "title": device.name,
+            "here": f"{DEVICES}/{device.id}",
+            "back": (DEVICE_LIST, "Registered devices"),
+            "codes_path": CODES,
+            "device": device,
+            "zone": site_zone(session),
+            "problems": problems,
+            "values": values,
+            "alert": alert,
+        },
+    )
+
+
+@router.get(DEVICE)
+def device_page(
+    request: Request, signed: AdminSignedIn, session: DbSession, device_id: int
+) -> Response:
+    device = session.get(Device, device_id)
+    if device is None:
+        return not_found()
+    return _device_page(request, signed, session, device)
+
+
+@router.post(DEVICE)
+def name_device(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    device_id: int,
+    label: Annotated[str, Form()] = "",
+    version: Annotated[str, Form()] = "",
+) -> Response:
+    device = session.get(Device, device_id)
+    if device is None:
+        return not_found()
+    label = label.strip()
+    if len(label) > NAME_MAX:
+        problems = {"label": f"Up to {NAME_MAX} characters."}
+        values = {"label": label, "version": version}
+        return _device_page(
+            request, signed, session, device, problems=problems, values=values
+        )
+    seen = form_version(version)
+    _, broken = attempt(
+        session, lambda: devices.name_device(session, device, label or None, seen=seen)
+    )
+    if broken:
+        return _device_page(request, signed, session, device, alert=RULES[broken])
+    session.commit()
+    return redirect(f"{DEVICES}/{device_id}", notice="saved")
+
+
+@router.get(f"{DEVICE}/revoke")
+def revoke_device_page(
+    request: Request, signed: AdminSignedIn, session: DbSession, device_id: int
+) -> Response:
+    """Asks first: revoking cannot be undone."""
+    device = session.get(Device, device_id)
+    if device is None or device.revoked_at is not None:
+        return not_found()
+    return admin_page(
+        request,
+        signed,
+        "device_revoke_one.html",
+        {
+            "title": f"Revoke {device.name}?",
+            "here": f"{DEVICES}/{device.id}/revoke",
+            "keep": f"{DEVICES}/{device.id}",
+            "device": device,
+        },
+    )
+
+
+@router.post(f"{DEVICE}/revoke")
 def revoke_device(
     signed: ConfirmedAdmin, session: DbSession, device_id: int
 ) -> Response:
-    device = session.get(Device, device_id)
-    if device is None or not devices.revoke_device(session, device_id):
+    if session.get(Device, device_id) is None or not devices.revoke_device(
+        session, device_id
+    ):
         return not_found()
     changed(signed, session)
-    code_id = device.registration_code_id
-    return redirect(f"{CODES}/{code_id}", notice="device_revoked", section="devices")
+    return redirect(f"{DEVICES}/{device_id}", notice="device_revoked")
 
 
 # Every device, filtered, and revoking many at once (inventory-tng-ph9): after
@@ -253,6 +349,7 @@ def device_list(
             "revoke": BULK_REVOKE,
             "back": (DEVICES, "Devices"),
             "codes_path": CODES,
+            "devices_path": DEVICES,
             "filter": query,
             "states": list(STATES),
             "devices": found,

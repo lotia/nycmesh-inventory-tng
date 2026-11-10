@@ -87,10 +87,7 @@ def test_revoking_a_code_and_a_device(
     assert code.revoked_at is not None
     assert device.revoked_at is None  # Its devices stay registered.
     done = admin_client.post(f"{DEVICES}/{device.id}/revoke")
-    assert (
-        done.headers["location"]
-        == f"{CODES}/{code.id}?notice=device_revoked&section=devices#devices"
-    )
+    assert done.headers["location"] == f"{DEVICES}/{device.id}?notice=device_revoked"
     session.refresh(device)
     assert device.revoked_at is not None
 
@@ -223,3 +220,64 @@ def test_a_bulk_revoke_is_sent_once(admin_client: TestClient, session: Session) 
     again = admin_client.post(BULK_REVOKE, data=form | {"device": str(b.id)})
     assert again.status_code == 409
     assert b.revoked_at is None
+
+
+def test_each_device_has_a_page_reached_from_both_lists(
+    admin_client: TestClient, session: Session
+) -> None:
+    device, _ = new_device(session)
+    link = f'<a href="{DEVICES}/{device.id}">{device.name}</a>'
+    assert link in admin_client.get(DEVICE_LIST).text
+    assert link in admin_client.get(f"{CODES}/{device.registration_code_id}").text
+    page = text(admin_client.get(f"{DEVICES}/{device.id}"))
+    assert f'href="{CODES}/{device.registration_code_id}"' in page
+    assert "Revoke this device" in page
+    assert admin_client.get(f"{DEVICES}/999999").status_code == 404
+
+
+def test_naming_a_device(admin_client: TestClient, session: Session) -> None:
+    device, _ = new_device(session)
+    path = f"{DEVICES}/{device.id}"
+    version = str(device.edit_version)
+    done = admin_client.post(path, data={"label": " Store tablet ", "version": version})
+    assert done.headers["location"] == f"{path}?notice=saved"
+    session.refresh(device)
+    assert device.label == "Store tablet"
+    # A form shown before that save is refused, not undoing it.
+    stale = admin_client.post(path, data={"label": "Old", "version": version})
+    assert stale.status_code == 409
+    long = admin_client.post(
+        path, data={"label": "x" * (NAME_MAX + 1), "version": str(device.edit_version)}
+    )
+    assert long.status_code == 400
+    # Blank, it goes by its number again.
+    admin_client.post(path, data={"label": "", "version": str(device.edit_version)})
+    session.refresh(device)
+    assert device.label is None
+    assert (
+        admin_client.post(f"{DEVICES}/999999", data={"label": "x"}).status_code == 404
+    )
+
+
+def test_a_device_is_revoked_after_a_confirmation(
+    admin_client: TestClient, session: Session
+) -> None:
+    device, _ = new_device(session)
+    path = f"{DEVICES}/{device.id}"
+    asked = text(admin_client.get(f"{path}/revoke"))
+    assert '<button class="danger">Revoke</button>' in asked
+    assert f'<a href="{path}">Keep it</a>' in asked
+    assert device.revoked_at is None
+    admin_client.post(f"{path}/revoke")
+    session.refresh(device)
+    assert device.revoked_at is not None
+    # Revoked: read only, and not asked about again.
+    page = text(admin_client.get(path))
+    assert '<span class="tag">Revoked</span>' in page
+    assert "Revoke this device" not in page
+    assert '<button class="primary">Save</button>' not in page
+    assert admin_client.get(f"{path}/revoke").status_code == 404
+    refused = admin_client.post(
+        path, data={"label": "Lost", "version": str(device.edit_version)}
+    )
+    assert refused.status_code == 409

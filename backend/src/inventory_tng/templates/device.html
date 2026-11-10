@@ -1,0 +1,36 @@
+{% extends "admin_base.html" %}
+{% block main %}
+{% set revoked = device.revoked_at is not none %}
+{% if revoked %}
+<p><span class="tag">Revoked</span> on {{ device.revoked_at | when(zone) }}. It
+can't save anything, and stays revoked: it would have to register again
+with a new code.</p>
+{% endif %}
+<dl class="facts">
+  <dt>Registered</dt>
+  <dd>{{ device.created_at | when(zone) }}, with
+    <a href="{{ codes_path }}/{{ device.registration_code_id }}">code {{ device.registration_code_id }}</a></dd>
+  <dt>Last used</dt>
+  <dd>{{ device.last_seen_at | when(zone) }}</dd>
+  <dt>First seen from</dt>
+  <dd><span class="wrap-anywhere">{{ device.first_seen_from or "not known" }}</span></dd>
+</dl>
+
+<form method="post" action="{{ here }}">
+  <input type="hidden" name="version" value="{{ values.get('version', device.edit_version) }}">
+  <label>Name <span class="hint">optional, such as "Store tablet"; without one, it is {{ "Device " ~ device.id }}</span>
+    <input name="label" value="{{ values.get('label', device.label or '') }}" maxlength="{{ name_max }}" {% if revoked %}disabled{% endif %}>
+    {% with name = "label" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  {% if not revoked %}<button class="primary">Save</button>{% endif %}
+</form>
+
+{% if not revoked %}
+<section id="revoke">
+  <h2>Revoke this device</h2>
+  <p class="hint">It can't save anything once revoked, and stays revoked: it
+  would have to register again with a new code. You'll be asked first.</p>
+  <form method="get" action="{{ here }}/revoke"><button>Revoke</button></form>
+</section>
+{% endif %}
+{% endblock %}

@@ -245,6 +245,20 @@
     }
   }
 
+  /* What is known of a record, a term beside each value; stacked on a
+     phone. */
+  .facts {
+    @apply my-3 grid gap-x-4 sm:grid-cols-[auto_1fr];
+
+    & dt {
+      @apply font-semibold;
+    }
+
+    & dd {
+      @apply mb-2 sm:mb-1;
+    }
+  }
+
   /* The way back, above a page's title. */
   .back {
     @apply mb-1;
