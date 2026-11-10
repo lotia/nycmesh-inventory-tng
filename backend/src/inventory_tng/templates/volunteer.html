@@ -17,7 +17,7 @@
     <input name="email" type="email" value="{{ values.get('email', volunteer.email or '') }}">
     {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <button>Save</button>
+  <button class="primary">Save</button>
 </form>
 
 {% if not volunteer.retired_at %}
@@ -49,12 +49,14 @@
 {% endif %}
 {% endif %}
 
-<section class="actions">
-  {% if volunteer.retired_at %}
-  <form method="post" action="{{ here }}/restore"><button>Bring back</button></form>
-  {% else %}
-  <form method="post" action="{{ here }}/retire"><button>Retire</button></form>
-  {% endif %}
-  <a href="{{ list }}">All volunteers</a>
+{% if volunteer.retired_at %}
+<form method="post" action="{{ here }}/restore"><button>Bring them back</button></form>
+{% else %}
+<section id="retire">
+  <h2>Retire this volunteer</h2>
+  <p class="hint">The scan page stops offering them; their past records stay
+  theirs. You can bring them back.</p>
+  <form method="post" action="{{ here }}/retire" data-retire><button>Retire</button></form>
 </section>
+{% endif %}
 {% endblock %}

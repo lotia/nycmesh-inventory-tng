@@ -47,7 +47,7 @@ None is left, so nobody can pick it.{% endif %}</p>
     {% include "_field_problem.html" %}
   </label>
   {% endfor %}
-  <button>Save</button>
+  <button class="primary">Save</button>
 </form>
 
 <section id="packages">
@@ -73,7 +73,7 @@ None is left, so nobody can pick it.{% endif %}</p>
     <label>Holds <input name="size" value="{{ values.get('size', '') }}" inputmode="decimal" required>
       {% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
-    <button>Add package</button>
+    <button class="primary">Add package</button>
   </form>
 </section>
 
@@ -91,12 +91,14 @@ None is left, so nobody can pick it.{% endif %}</p>
 {% endcall %}
 {% endif %}
 
-<section class="actions">
-  {% if item.retired_at %}
-  <form method="post" action="{{ here }}/restore"><button>Bring back</button></form>
-  {% else %}
-  <form method="post" action="{{ here }}/retire"><button>Retire</button></form>
-  {% endif %}
-  <a href="{{ list }}">All items</a>
+{% if item.retired_at %}
+<form method="post" action="{{ here }}/restore"><button>Bring it back</button></form>
+{% else %}
+<section id="retire">
+  <h2>Retire this item</h2>
+  <p class="hint">It can't be received any more, though volunteers can still
+  take what is left. You can bring it back.</p>
+  <form method="post" action="{{ here }}/retire" data-retire><button>Retire</button></form>
 </section>
+{% endif %}
 {% endblock %}

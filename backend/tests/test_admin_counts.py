@@ -810,3 +810,12 @@ def test_a_count_shows_in_the_zone_of_its_place(
     (counted,) = counts_written(session)
     assert counted.time_zone == "America/Chicago"
     assert show(counted.created_at, "America/Chicago") in text(admin_client.get(COUNTS))
+
+
+def test_the_counts_page_says_its_links_start_a_task(admin_client: TestClient) -> None:
+    """Only the button that changes the records promises a change
+    (docs/decisions/0019)."""
+    page = text(admin_client.get(COUNTS))
+    assert "<button>Start a count</button>" in page
+    assert '<button class="primary">Record it</button>' in page
+    assert "Count it" not in page

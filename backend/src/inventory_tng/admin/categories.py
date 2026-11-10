@@ -19,6 +19,7 @@ from inventory_tng.admin.common import (
     form_version,
     name_problem,
     now,
+    undo_retire,
 )
 from inventory_tng.db import DbSession, refusal, unique
 from inventory_tng.models import Category, Item
@@ -49,6 +50,8 @@ def _list_page(
     signed: SignedIn,
     problem: str | None = None,
     name: str | None = None,
+    *,
+    undo: str | None = None,
 ) -> HTMLResponse:
     rows = session.scalars(select(Category).order_by(func.lower(Category.name))).all()
     return admin_page(
@@ -57,6 +60,7 @@ def _list_page(
         "categories.html",
         {
             "title": "Categories",
+            "undo": undo,
             "here": CATEGORIES,
             "current": [c for c in rows if c.retired_at is None],
             "retired": [c for c in rows if c.retired_at is not None],
@@ -88,7 +92,7 @@ def _category_page(
         {
             "title": category.name,
             "here": f"{CATEGORIES}/{category.id}",
-            "list": CATEGORIES,
+            "back": (CATEGORIES, "Categories"),
             "category": category,
             "items": items,
             "problems": {"name": problem} if problem else None,
@@ -99,9 +103,10 @@ def _category_page(
 
 @router.get(CATEGORIES)
 def list_categories(
-    request: Request, signed: AdminSignedIn, session: DbSession
+    request: Request, signed: AdminSignedIn, session: DbSession, undo: str = ""
 ) -> Response:
-    return _list_page(request, session, signed)
+    back = undo_retire(session, Category, undo, CATEGORIES)
+    return _list_page(request, session, signed, undo=back)
 
 
 @router.post(CATEGORIES)
@@ -183,7 +188,7 @@ def retire_category(
         )
     session.commit()
     log.info("category retired", category_id=category_id)
-    return redirect(CATEGORIES, notice="retired", section="retired")
+    return redirect(CATEGORIES, notice="retired", undo=str(category_id))
 
 
 @router.post(f"{CATEGORIES}/{{category_id}}/restore")

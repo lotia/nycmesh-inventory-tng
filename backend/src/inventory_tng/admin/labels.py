@@ -143,7 +143,7 @@ def print_labels(
         "labels_print.html",
         {
             "title": "Print labels",
-            "list": LABELS,
+            "back": (LABELS, "Labels"),
             "picked": picked,
             "copies": count,
             "total": total,

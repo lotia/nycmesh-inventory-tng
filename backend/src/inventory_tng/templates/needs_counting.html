@@ -13,7 +13,7 @@ wrong there until someone counts it.</p>
     <tr><td>{{ row.item.name }}</td><td>{{ row.quantity | amount }} {{ row.item.unit }}</td></tr>
     {% endfor %}
   {% endcall %}
-  <p><a href="{{ counts_path }}/{{ group.heading.id }}">Count {{ group.heading.name }}</a>{{ retired(group.heading) }}</p>
+  <p><a href="{{ counts_path }}/{{ group.heading.id }}">Start counting {{ group.heading.name }}</a>{{ retired(group.heading) }}</p>
 </section>
 {% else %}
 <p>Nothing shows less than nothing.</p>

@@ -124,3 +124,51 @@ def test_the_notice_sections_are_the_sections_pages_say_notices_by() -> None:
     for template in TEMPLATES.glob("*.html"):
         shown |= set(re.findall(r'with section_id="([a-z-]+)"', template.read_text()))
     assert shown == pages.NOTICE_SECTIONS
+
+
+@pytest.mark.parametrize(
+    ("path", "row", "words"),
+    [
+        ("/admin/items", "item", "Bring it back"),
+        ("/admin/categories", "category", "Bring it back"),
+        ("/admin/locations", "location", "Bring it back"),
+        ("/admin/volunteers", "volunteer", "Bring them back"),
+    ],
+)
+def test_a_retire_is_undone_from_its_notice(
+    admin_client: TestClient, session: Session, path: str, row: str, words: str
+) -> None:
+    """One tap retires, and its notice offers a button to bring it back,
+    while it is retired (docs/decisions/0019)."""
+    category = add(session, Category(name=f"Spare {tag()}"))
+    made = {
+        "item": lambda: Item(name=f"Spare {tag()}", category_id=category.id),
+        "category": lambda: Category(name=f"Spare {tag()}"),
+        "location": lambda: Location(name=f"Spare {tag()}", kind="store"),
+        "volunteer": lambda: Volunteer(name=f"Spare {tag()}"),
+    }[row]
+    retiring = add(session, made())
+    retired = admin_client.post(f"{path}/{retiring.id}/retire")
+    assert retired.status_code == 303
+    landed = retired.headers["location"]
+    assert landed == f"{path}?undo={retiring.id}&notice=retired"
+    undo = (
+        f'<form method="post" action="{path}/{retiring.id}/restore">'
+        f"<button>{words}</button></form>"
+    )
+    assert undo in text(admin_client.get(landed))
+    assert admin_client.post(f"{path}/{retiring.id}/restore").status_code == 303
+    # Back already: the notice says what was done, and offers nothing more.
+    page = text(admin_client.get(landed))
+    assert '<p role="status">Retired.</p>' in page
+    assert "/restore" not in page
+
+
+@pytest.mark.parametrize("undo", ["", "nonsense", "999999"])
+def test_an_undo_for_nothing_retired_offers_nothing(
+    admin_client: TestClient, session: Session, undo: str
+) -> None:
+    current = add(session, Category(name=f"Current {tag()}"))
+    for asked in (undo, str(current.id)):
+        page = text(admin_client.get(f"/admin/categories?notice=retired&undo={asked}"))
+        assert "/restore" not in page

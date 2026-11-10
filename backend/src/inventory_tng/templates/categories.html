@@ -6,7 +6,7 @@
     <input name="name" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required>
     {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <button>Add</button>
+  <button class="primary">Add</button>
 </form>
 
 <section>

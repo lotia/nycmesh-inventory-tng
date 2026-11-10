@@ -9,7 +9,7 @@
     <input name="name" value="{{ category.name }}" maxlength="{{ name_max }}" required>
     {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
-  <button>Rename</button>
+  <button class="primary">Rename</button>
 </form>
 
 <section>
@@ -21,12 +21,14 @@
   {% endif %}
 </section>
 
-<section class="actions">
-  {% if category.retired_at %}
-  <form method="post" action="{{ here }}/restore"><button>Bring back</button></form>
-  {% else %}
-  <form method="post" action="{{ here }}/retire"><button>Retire</button></form>
-  {% endif %}
-  <a href="{{ list }}">All categories</a>
+{% if category.retired_at %}
+<form method="post" action="{{ here }}/restore"><button>Bring it back</button></form>
+{% else %}
+<section id="retire">
+  <h2>Retire this category</h2>
+  <p class="hint">Nobody can pick it for an item any more. Move or retire its
+  items first. You can bring it back.</p>
+  <form method="post" action="{{ here }}/retire" data-retire><button>Retire</button></form>
 </section>
+{% endif %}
 {% endblock %}

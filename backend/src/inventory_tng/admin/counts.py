@@ -246,7 +246,7 @@ def _count_page(
         {
             "title": f"Count {place.name}",
             "here": f"{COUNTS}/{place.id}",
-            "list": COUNTS,
+            "back": (COUNTS, "Counts"),
             "place": place,
             "rows": rows,
             "recount": recount,

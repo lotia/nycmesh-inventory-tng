@@ -64,7 +64,9 @@ def test_retired_places_holding_stock_are_told_and_counted_in_the_navigation(
     page = text(admin_client.get("/admin"))
     assert "2 retired places hold stock" in page
     for retired in (place.van, shelf):
-        assert f'<a href="{COUNTS}/{retired.id}">Count {retired.name}</a>' in page
+        assert (
+            f'<a href="{COUNTS}/{retired.id}">Start counting {retired.name}</a>' in page
+        )
     assert badge_html(2) in page
 
 

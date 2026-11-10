@@ -27,6 +27,7 @@ from inventory_tng.admin.common import (
     quantity,
     rule_words,
     text_form,
+    undo_retire,
 )
 from inventory_tng.db import DbSession, exists_where, refusal
 from inventory_tng.ledger import balance
@@ -90,6 +91,7 @@ def _list_page(
     search: str = "",
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
+    undo: str | None = None,
 ) -> HTMLResponse:
     query = select(Item).order_by(func.lower(Item.name))
     if search:
@@ -102,6 +104,7 @@ def _list_page(
         "items.html",
         {
             "title": "Items",
+            "undo": undo,
             "here": ITEMS,
             "categories_path": CATEGORIES,
             "search": search,
@@ -151,7 +154,7 @@ def _item_page(
         {
             "title": item.name,
             "here": f"{ITEMS}/{item.id}",
-            "list": ITEMS,
+            "back": (ITEMS, "Items"),
             "item": item,
             "packages": packages,
             "categories": [c for c in _categories(session) if c.retired_at is None],
@@ -195,9 +198,14 @@ def _fields(
 
 @router.get(ITEMS)
 def list_items(
-    request: Request, signed: AdminSignedIn, session: DbSession, q: str = ""
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    q: str = "",
+    undo: str = "",
 ) -> Response:
-    return _list_page(request, session, signed, search=q.strip())
+    back = undo_retire(session, Item, undo, ITEMS)
+    return _list_page(request, session, signed, search=q.strip(), undo=back)
 
 
 @router.post(ITEMS)
@@ -262,7 +270,7 @@ def retire_item(signed: AdminSignedIn, session: DbSession, item_id: int) -> Resp
     items.retire(session, found, now())
     session.commit()
     log.info("item retired", item_id=item_id)
-    return redirect(ITEMS, notice="retired", section="retired")
+    return redirect(ITEMS, notice="retired", undo=str(item_id))
 
 
 @router.post(f"{ITEMS}/{{item_id}}/restore")

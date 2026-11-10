@@ -109,7 +109,7 @@ export function RegisterPage({
             />
           )}
         </Field>
-        <button type="submit" disabled={sending.value}>
+        <button type="submit" class="primary" disabled={sending.value}>
           {sending.value ? "Registering…" : "Register"}
         </button>
       </form>

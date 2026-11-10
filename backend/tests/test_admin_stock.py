@@ -142,7 +142,7 @@ def test_a_retired_place_short_is_offered_for_a_count(
     page = needs_counting_page(admin_client)
     van = page[page.index(f"<h2>{place.van.name}</h2>") :].split("</section>")[0]
     assert f'href="{COUNTS}/{place.van.id}"' in van
-    assert f"Count {place.van.name}</a> (retired)" in van
+    assert f"Start counting {place.van.name}</a> (retired)" in van
 
 
 def test_the_stock_page_warns_of_stock_at_a_retired_place(
@@ -152,7 +152,9 @@ def test_the_stock_page_warns_of_stock_at_a_retired_place(
     place = at_retired_van(session)
     page = text(admin_client.get(STOCK))
     assert "1 retired place holds" in page
-    assert f'<a href="{COUNTS}/{place.van.id}">Count {place.van.name}</a>' in page
+    assert (
+        f'<a href="{COUNTS}/{place.van.id}">Start counting {place.van.name}</a>' in page
+    )
     assert f"<h2>{place.van.name} (retired)</h2>" in page
     by_item = text(admin_client.get(STOCK, params={"by": "item"}))
     assert "1 retired place holds" in by_item

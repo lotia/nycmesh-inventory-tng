@@ -30,7 +30,7 @@ NOTICES.update(
     {
         "added": "Added.",
         "saved": "Saved.",
-        "retired": "Retired. Bring it back from the list if you need it.",
+        "retired": "Retired.",
         "restored": "Brought back.",
     }
 )
@@ -129,6 +129,18 @@ def chosen[T: Base](
     if row is None or (current and getattr(row, "retired_at", None) is not None):
         return None
     return row
+
+
+def undo_retire[T: Base](
+    session: Session, model: type[T], typed: str, base: str
+) -> str | None:
+    """Where a list's "Retired." notice posts to bring back the row just
+    retired, whose id the retire sent it (?undo=), while it is still
+    retired (docs/decisions/0019); else None, and the notice offers none."""
+    row = chosen(session, model, typed, current=False)
+    if row is None or getattr(row, "retired_at", None) is None:
+        return None
+    return f"{base}/{row_id(typed)}/restore"
 
 
 def current_rows[T: Base](session: Session, model: type[T]) -> list[T]:

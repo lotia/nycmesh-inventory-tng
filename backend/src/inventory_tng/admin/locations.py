@@ -25,6 +25,7 @@ from inventory_tng.admin.common import (
     name_problem,
     now,
     rule_words,
+    undo_retire,
 )
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.local_time import zone_at
@@ -76,6 +77,7 @@ def _list_page(
     *,
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
+    undo: str | None = None,
 ) -> HTMLResponse:
     current = current_rows(session, Location)
     custody = [loc for loc in current if loc.kind == "custody"]
@@ -92,6 +94,7 @@ def _list_page(
         "locations.html",
         {
             "title": "Locations",
+            "undo": undo,
             "here": LOCATIONS,
             "tree": _tree([loc for loc in current if loc.kind != "custody"]),
             "custody": [(loc, volunteers.get(loc.volunteer_id, "")) for loc in custody],
@@ -132,6 +135,7 @@ def _location_page(
             "title": location.name,
             "here": f"{LOCATIONS}/{location.id}",
             "list": LOCATIONS,
+            "back": (LOCATIONS, "Locations"),
             "location": location,
             "kind": KINDS.get(location.kind, "Volunteer's custody"),
             "areas": areas,
@@ -149,9 +153,10 @@ def _location_page(
 
 @router.get(LOCATIONS)
 def list_locations(
-    request: Request, signed: AdminSignedIn, session: DbSession
+    request: Request, signed: AdminSignedIn, session: DbSession, undo: str = ""
 ) -> Response:
-    return _list_page(request, session, signed)
+    back = undo_retire(session, Location, undo, LOCATIONS)
+    return _list_page(request, session, signed, undo=back)
 
 
 @router.post(LOCATIONS)
@@ -268,7 +273,7 @@ def retire_location(
         return _location_page(request, session, signed, found, problem)
     session.commit()
     log.info("location retired", location_id=location_id)
-    return redirect(LOCATIONS, notice="retired", section="retired")
+    return redirect(LOCATIONS, notice="retired", undo=str(location_id))
 
 
 @router.post(f"{LOCATIONS}/{{location_id}}/restore")

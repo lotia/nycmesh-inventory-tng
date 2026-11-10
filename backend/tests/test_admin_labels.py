@@ -204,7 +204,8 @@ def test_revoking_asks_to_confirm_first(
     assert f'<span class="key">{label.code}</span>, names Cat6 cable.' in words
     assert "can't be undone" in words
     assert (
-        f'<form method="post" action="{confirm}"><button>Revoke</button>' in page.text
+        f'<form method="post" action="{confirm}"><button class="danger">Revoke</button>'
+        in page.text
     )
     session.refresh(label)
     assert label.revoked_at is None  # Only its button revokes.

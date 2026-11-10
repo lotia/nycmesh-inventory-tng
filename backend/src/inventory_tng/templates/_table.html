@@ -1,7 +1,8 @@
 {#- Every table: one that cannot fit scrolls in its own box, never the
-page. Its rows are the call's body. -#}
+page. Its rows are the call's body. The box is positioned, so words only a
+screen reader reads (sr-only, absolute) stay inside it too. -#}
 {% macro table() -%}
-<div class="overflow-x-auto">
+<div class="relative overflow-x-auto">
   <table>
     {{- caller() -}}
   </table>

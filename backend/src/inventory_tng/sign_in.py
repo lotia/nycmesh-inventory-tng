@@ -863,6 +863,8 @@ def _new_authenticator_page(
             "title": "Set up an authenticator",
             "admin": signed.admin,
             "required": signed.needs_totp_setup,
+            # Set up when first signing in, there is nowhere yet to go back to.
+            "back": None if signed.needs_totp_setup else (ACCOUNT, "Your account"),
             "values": {} if name is None else {"authenticator_name": name},
             "problems": problems or {},
         }
