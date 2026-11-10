@@ -26,7 +26,7 @@ export const PER_HOUR: Record<Event["kind"], number> = {
   outbox_retry: 10,
   scan_to_save: 20,
 };
-const HOUR_MS = 3_600_000;
+export const HOUR_MS = 3_600_000;
 /** The longest scan_to_save the backend takes (page_telemetry.ScanToSave):
  * an event outside its bounds would have the whole report refused. */
 export const MOST_SECONDS_TO_SAVE = 86_400;
