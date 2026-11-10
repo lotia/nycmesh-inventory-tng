@@ -1,12 +1,15 @@
 """Locations: stores, areas and vehicles (admin/locations.py)."""
 
+import re
+
 from fastapi.testclient import TestClient
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.models import Location, Volunteer
 
-from helpers.rows import add, history, named, shown
+from helpers.rows import add, history, named, shown, tag
 from helpers.sign_in import text
 from helpers.stock import Place, write
 
@@ -145,3 +148,41 @@ def test_a_place_needs_a_name(admin_client: TestClient, session: Session) -> Non
     refused = admin_client.post(f"{LOCATIONS}/{hub.id}", data={"name": " "})
     assert refused.status_code == 400
     assert hub.name == "Hub"
+
+
+def test_a_location_has_a_zone_of_its_own_or_its_parents(
+    admin_client: TestClient, session: Session
+) -> None:
+    store = add(session, Location(name=f"Hub {tag()}", kind="store"))
+    page = text(admin_client.get(f"{LOCATIONS}/{store.id}"))
+    assert "The site's (America/New_York)" in page
+    form = {"name": store.name, "time_zone": "America/Chicago", "version": shown(store)}
+    assert admin_client.post(f"{LOCATIONS}/{store.id}", data=form).status_code == 303
+    assert store.time_zone == "America/Chicago"
+    area = add(session, Location(name="Shelf", kind="area", parent_id=store.id))
+    assert "Its parent's (America/Chicago)" in text(
+        admin_client.get(f"{LOCATIONS}/{area.id}")
+    )
+    refused = admin_client.post(
+        f"{LOCATIONS}/{store.id}",
+        data=form | {"time_zone": "Mars/Olympus", "version": shown(store)},
+    )
+    assert refused.status_code == 400
+    # Under the zone, not the name.
+    assert re.search(r"Time zone.*Pick a zone from the list", text(refused), re.DOTALL)
+
+
+def test_a_zone_these_rules_dropped_stays_through_a_rename(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Shown first in the list, so a save keeps it; checked only if changed."""
+    store = add(session, Location(name=f"Hub {tag()}", kind="store"))
+    session.execute(
+        update(Location).where(Location.id == store.id).values(time_zone="Gone/Away")
+    )
+    session.expire(store)
+    page = admin_client.get(f"{LOCATIONS}/{store.id}").text
+    assert "<option selected>Gone/Away</option>" in page
+    form = {"name": "Renamed", "time_zone": "Gone/Away", "version": shown(store)}
+    assert admin_client.post(f"{LOCATIONS}/{store.id}", data=form).status_code == 303
+    assert (store.name, store.time_zone) == ("Renamed", "Gone/Away")

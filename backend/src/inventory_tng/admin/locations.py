@@ -27,9 +27,11 @@ from inventory_tng.admin.common import (
     rule_words,
 )
 from inventory_tng.db import DbSession, attempt
+from inventory_tng.local_time import zone_at
 from inventory_tng.models import STORE_KINDS, Label, Location, Volunteer
 from inventory_tng.pages import not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
+from inventory_tng.time_zones import zones
 
 log = structlog.get_logger(__name__)
 
@@ -115,6 +117,7 @@ def _location_page(
     problem: str | None = None,
     values: Mapping[str, str] | None = None,
     alert: str | None = None,
+    field: str = "name",
 ) -> HTMLResponse:
     areas = session.scalars(
         select(Location)
@@ -134,7 +137,10 @@ def _location_page(
             "areas": areas,
             "labels": labels.current_of(session, Label.location_id == location.id),
             "parents": _parents(current_rows(session, Location), location),
-            "problems": {"name": problem} if problem else None,
+            "zones": zones(location.time_zone),
+            # What it takes when it has no zone of its own.
+            "inherited": zone_at(session, location.parent_id),
+            "problems": {field: problem} if problem else None,
             "values": values,
             "alert": alert,
         },
@@ -207,13 +213,14 @@ def save_location(
     location_id: int,
     name: Annotated[str, Form()] = "",
     parent_id: Annotated[str, Form()] = "",
+    time_zone: Annotated[str, Form()] = "",
     version: Annotated[str, Form()] = "",
 ) -> Response:
     found = _changeable(session, location_id)
     if found is None:
         return not_found()
     name = name.strip()
-    problem = name_problem(name)
+    problem, broken = name_problem(name), None
     parent = chosen(session, Location, parent_id) if found.kind == "area" else None
     if found.kind == "area" and parent is None:
         problem = "Pick where it is."
@@ -221,16 +228,28 @@ def save_location(
     if problem is None:
         under = parent.id if parent else None
         seen = form_version(version)
-        _, broken = attempt(
-            session, lambda: locations.save(session, found, name, under, seen=seen)
-        )
+        zone = time_zone or None
+
+        def save() -> None:
+            locations.save(session, found, name, under, time_zone=zone, seen=seen)
+
+        _, broken = attempt(session, save)
         if broken == CHANGED:
             alert = RULES[CHANGED]
             return _location_page(request, session, signed, found, alert=alert)
         problem = broken and rule_words(broken, TAKEN)
     if problem is not None:
-        values = {"name": name, "parent_id": parent_id, "version": version}
-        return _location_page(request, session, signed, found, problem, values)
+        values = {
+            "name": name,
+            "parent_id": parent_id,
+            "time_zone": time_zone,
+            "version": version,
+        }
+        # A refused zone is said by the zone; anything else by the name.
+        field = "time_zone" if broken == "location_time_zone" else "name"
+        return _location_page(
+            request, session, signed, found, problem, values, field=field
+        )
     session.commit()
     log.info("location saved", location_id=location_id)
     return redirect(f"{LOCATIONS}/{location_id}", notice="saved")

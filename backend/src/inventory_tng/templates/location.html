@@ -19,6 +19,14 @@
     </select>
   </label>
   {% endif %}
+  <label>Time zone <span class="hint">what its times are shown in; times already recorded keep theirs</span>
+    <select name="time_zone">
+      {% set zone = values.get('time_zone', location.time_zone or '') %}
+      <option value="" {% if not zone %}selected{% endif %}>{{ "Its parent's" if location.parent_id else "The site's" }} ({{ inherited }})</option>
+      {% for name in zones %}<option {% if zone == name %}selected{% endif %}>{{ name }}</option>{% endfor %}
+    </select>
+    {% with name = "time_zone" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
   <button>Save</button>
 </form>
 {% endif %}

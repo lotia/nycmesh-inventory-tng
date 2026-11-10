@@ -31,6 +31,7 @@ from inventory_tng.ledger import (
     retired_sides,
     whole_enough,
 )
+from inventory_tng.local_time import DEFAULT_ZONE, zone_at
 from inventory_tng.models import (
     AdjustmentReason,
     Admin,
@@ -41,8 +42,8 @@ from inventory_tng.models import (
     Movement,
 )
 
-from helpers.rows import add, breaks, item_fields, named, refused, violates
-from helpers.stock import Place, received, retire, write
+from helpers.rows import add, breaks, item_fields, named, refused, tag, violates
+from helpers.stock import Place, received, retire, stocked, write
 
 URL = "/api/transactions"
 
@@ -507,6 +508,7 @@ def test_transaction_checks(
 ) -> None:
     row = {
         "idempotency_key": uuid.uuid4(),
+        "time_zone": DEFAULT_ZONE,
         "kind": "move",
         "from_location_id": place.store.id,
         "to_location_id": place.van.id,
@@ -519,6 +521,7 @@ def test_a_transaction_goes_between_two_places(session: Session, place: Place) -
     with violates(session, "ck_ledger_transaction_two_places"):
         session.add(
             LedgerTransaction(
+                time_zone=DEFAULT_ZONE,
                 idempotency_key=uuid.uuid4(),
                 kind="move",
                 from_location_id=place.store.id,
@@ -642,3 +645,60 @@ def test_only_current_places_and_retired_ones_holding_stock_are_countable(
     assert {place.store.id, place.van.id} <= countable_ids()
     write(session, place, from_location_id=place.van.id, to_location_id=place.store.id)
     assert {place.store.id, place.van.id}.isdisjoint(countable_ids())
+
+
+# Time zones per location (dp5)
+
+
+def test_a_transaction_keeps_the_zone_of_where_it_happened(
+    session: Session,
+) -> None:
+    """Where stock left (a move), where it arrived (a receipt): the place's
+    own zone, else its parent's, else the site's; kept when a zone is set
+    later."""
+    place = stocked(session)
+    area = add(
+        session, Location(name=f"Shelf {tag()}", kind="area", parent_id=place.store.id)
+    )
+    place.store.time_zone = "America/Chicago"
+    session.flush()
+    assert received(session, place).time_zone == "America/Chicago"
+    moved = write(session, place)
+    assert moved.time_zone == "America/Chicago"
+    # The van has no zone of its own, nor a parent: the site's.
+    left = write(session, place, from_location_id=place.van.id, to_location_id=area.id)
+    assert left.time_zone == DEFAULT_ZONE
+    # Into the area, out of the store, or found there by a count: the
+    # store's, as its parent's.
+    back = write(session, place, from_location_id=area.id, to_location_id=place.van.id)
+    assert back.time_zone == "America/Chicago"
+    place.store.time_zone = "America/Denver"
+    session.flush()
+    assert moved.time_zone == "America/Chicago"
+
+
+def test_a_move_out_of_custody_keeps_the_zone_where_it_arrived(
+    session: Session,
+) -> None:
+    """A volunteer's custody is a person, not a place with a clock."""
+    place = stocked(session)
+    place.store.time_zone = "America/Chicago"
+    custody = add(
+        session,
+        Location(name=f"Held {tag()}", kind="custody", volunteer_id=place.volunteer.id),
+    )
+    write(session, place, to_location_id=custody.id)
+    back = write(
+        session, place, from_location_id=custody.id, to_location_id=place.store.id
+    )
+    assert back.time_zone == "America/Chicago"
+
+
+def test_a_zone_is_found_even_if_parents_loop(session: Session) -> None:
+    """locations.no_cycle stops a loop; were one made by hand, the site's."""
+    place = Place(session)
+    a = add(session, Location(name=f"A {tag()}", kind="area", parent_id=place.store.id))
+    b = add(session, Location(name=f"B {tag()}", kind="area", parent_id=a.id))
+    a.parent_id = b.id
+    session.flush()
+    assert zone_at(session, a.id) == DEFAULT_ZONE

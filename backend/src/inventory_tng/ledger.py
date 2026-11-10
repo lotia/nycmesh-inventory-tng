@@ -59,6 +59,7 @@ from inventory_tng.db import (
     set_actor,
 )
 from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
+from inventory_tng.local_time import zone_at
 from inventory_tng.models import (
     INTEGER_MAX,
     STORE_KINDS,
@@ -527,14 +528,16 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
 #    is on order, which KEY SHARE does not wait for.
 
 
-def _hold_places(session: Session, header: Mapping[str, object]) -> dict[int, bool]:
+def _hold_places(
+    session: Session, header: Mapping[str, object]
+) -> tuple[dict[int, bool], frozenset[int]]:
     """A save's places, held before it has an id: a count (lock_place) then
     waits for it whole, so none can draw an id, wait, and commit after a
     count's moment that it falls inside. Those that exist, by id, and
-    whether each is retired."""
+    whether each is retired; and which are volunteers' custody."""
     rows = session.execute(
         locked(
-            select(Location.id, Location.retired_at.is_not(None)).where(
+            select(Location.id, Location.retired_at.is_not(None), Location.kind).where(
                 Location.id.in_(
                     {header.get("from_location_id"), header.get("to_location_id")}
                     - {None}
@@ -544,27 +547,42 @@ def _hold_places(session: Session, header: Mapping[str, object]) -> dict[int, bo
             shared=True,
         )
     )
-    return {location_id: retired for location_id, retired in rows}
+    found = rows.all()
+    custody = frozenset(i for i, _, kind in found if kind == "custody")
+    return {location_id: retired for location_id, retired, _ in found}, custody
 
 
 class Held(NamedTuple):
     """The rows hold() holds that exist: places by id, whether retired, and
-    items."""
+    items; and which places are volunteers' custody."""
 
     places: dict[int, bool]
     items: dict[int, Item]
+    custody: frozenset[int] = frozenset()
 
 
 def hold(
     session: Session, header: Mapping[str, object], item_ids: Collection[int]
 ) -> Held:
     """Hold a transaction's places, then its items."""
-    places = _hold_places(session, header)
+    places, custody = _hold_places(session, header)
     if not item_ids:
-        return Held(places, {})
+        return Held(places, {}, custody)
     query = select(Item).where(Item.id.in_(list(item_ids))).order_by(Item.id)
     held = session.scalars(locked(query, key_share=True, shared=True))
-    return Held(places, {item.id: item for item in held})
+    return Held(places, {item.id: item for item in held}, custody)
+
+
+def _where(header: Mapping[str, object], custody: frozenset[int]) -> int | None:
+    """The place whose zone a transaction happened in: where stock left,
+    else where it arrived (a receipt, or stock a count or adjustment
+    found); where it arrived, too, from a volunteer's `custody`, which is a
+    person, not a place with a clock."""
+    left, arrived = header.get("from_location_id"), header.get("to_location_id")
+    arrives = arrived if isinstance(arrived, int) else None
+    if isinstance(left, int) and not (left in custody and arrives is not None):
+        return left
+    return arrives
 
 
 def insert_transaction(
@@ -579,19 +597,29 @@ def insert_transaction(
     transaction with no lines but a count, or a line that breaks a rule.
     Its rows are held here (hold), so every caller's lines are checked as
     locked; a caller that held them already only takes its own locks
-    again. created_at is the database's now(), whatever the header says. A
+    again. created_at is the database's now(), whatever the header says;
+    time_zone the zone of its place then (local_time.zone_at). A
     receipt lowers what is on order of each item it brings. RuleBroken
     (movement_item_once) for an item on more than one line."""
     kind = str(header["kind"])
     enforce("ledger_transaction_lines", when=not lines and kind != "count")
-    items = hold(session, header, _each_once(lines)).items
+    held = hold(session, header, _each_once(lines))
+    items = held.items
     for broken in lines_break(kind, items, lines):
         # An item that does not exist is the foreign key's to refuse.
         for rule in broken or ():
             enforce(rule)
+    zone = zone_at(session, _where(header, held.custody))
     transaction = session.scalar(
         pg_insert(LedgerTransaction)
-        .values({**header, "idempotency_key": key, "created_at": func.now()})
+        .values(
+            {
+                **header,
+                "idempotency_key": key,
+                "created_at": func.now(),
+                "time_zone": zone,
+            }
+        )
         .on_conflict_do_nothing(index_elements=["idempotency_key"])
         .returning(LedgerTransaction)
     )

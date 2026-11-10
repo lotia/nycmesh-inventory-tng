@@ -419,6 +419,18 @@ class Location(Versioned, Base):
     parent_id: Mapped[int | None] = _reference("location.id")
     volunteer_id: Mapped[int | None] = _reference("volunteer.id")
     retired_at: Mapped[RetiredAt]
+    # Its IANA zone, if not its parent's, or the site's at the top
+    # (local_time.zone_at; docs/decisions/0013).
+    time_zone: Mapped[str | None] = mapped_column(Text)
+
+    @validates("time_zone")
+    def _known_zone(self, _key: str, value: str | None) -> str | None:
+        """Refuses, as it is set, a zone tzdata does not know (RuleBroken
+        "location_time_zone")."""
+        enforce(
+            "location_time_zone", when=value is not None and not is_time_zone(value)
+        )
+        return value
 
 
 class Label(Base):
@@ -597,6 +609,10 @@ class LedgerTransaction(Base):
     # Who recorded a count or adjustment, and why an adjustment was made.
     admin_id: Mapped[int | None] = _reference("admin.id")
     reason_id: Mapped[int | None] = _reference("adjustment_reason.id")
+    # The IANA zone it happened in, as its place had then: where stock left,
+    # or arrived for a receipt (local_time.zone_at). Kept, so a zone set
+    # later does not change the clock it happened at.
+    time_zone: Mapped[str] = mapped_column(Text)
 
 
 class Movement(Base):
