@@ -40,8 +40,7 @@ WORDS: Mapping[ActivityKind, Callable[[str, str], str]] = {
     ),
     "let_in": lambda by, admin: f"{by} let {admin} back in",
     "authenticators_retired": lambda by, _: (
-        f"{by} removed authenticators: sign in with a recovery code and set one "
-        "up again"
+        f"{by} retired the authenticators a lost or leaked key sealed"
     ),
 }
 # Who did it, when no administrator did: a command run by the operator.
@@ -85,7 +84,7 @@ def record(
         by_admin_id=by_admin_id,
         target_admin_id=admin_id,
     )
-    if notify is not None:
+    if notify is not None and notify.on:
         notify.tell_admins(session, mail.activity(words(session, row)), but=admin_id)
     return row
 

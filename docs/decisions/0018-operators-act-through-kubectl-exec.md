@@ -32,17 +32,24 @@ after a key rotation. NYC Mesh's clusters allow `kubectl exec`
 - **Break-glass is two commands** (inventory-tng-8i4.50.2): `lockdown`
   retires every current administrator, as retiring one does, and revokes
   every registration code; `let-in` brings one back, retired or not, with
-  everything they signed in with removed, and prints a reset link made by
-  nobody (`made_by_id` NULL), which lasts an hour; `invite` makes an
-  invite link the same way. A link's kind says what it does, and its maker
+  everything they signed in with removed, as a reset and bringing back do
+  (`accounts._reissue`), and prints a link made by nobody (`made_by_id`
+  NULL), which lasts an hour: an invite, for one with no password left,
+  as after a lockdown, else a reset. `invite` makes an invite link the
+  same way. A link's kind says what it does, and its maker
   who made it, so the pages and mails need nothing new for these.
   `lockdown` asks for how many administrators are current, so a slip
   refuses rather than surprises. Both are told to every administrator
   (0012) and kept in the history as `system:operator`.
 - **A lost or leaked TOTP key retires authenticators in bulk**, the
-  unreadable ones or all, keeping recovery codes. Sign-in asks for a code
-  while any recovery code is unused, even with no authenticator left, so
-  the password alone never gets in and lets its holder set up their own.
+  unreadable ones or all, keeping recovery codes, and signs those
+  administrators out, as a session may be a thief's. Each is marked to set
+  up TOTP again whatever the policy (`admin.must_set_up_totp`), signs in
+  with a recovery code, and keeps the printed ones left; once none is left,
+  the password alone does not get them in, and one with none to start with
+  has their sign-in removed, for the operator to let in. A lasting mark,
+  not a guess from the codes left, as the last code used would otherwise
+  leave the password alone. Each is mailed what to do.
 
 We rejected a Kubernetes Job for these, whose logs are kept and often
 shipped elsewhere, so a printed link would be stored; a Job that mails the

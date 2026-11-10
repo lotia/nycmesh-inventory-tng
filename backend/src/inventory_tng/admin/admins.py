@@ -143,21 +143,6 @@ def _link_page(
     )
 
 
-def _reset_made(
-    request: Request,
-    signed: SignedIn,
-    notify: Notify,
-    other: Admin,
-    token: str,
-    kind: accounts.LinkKind,
-) -> HTMLResponse:
-    """The link a reset made, shown once, and the mail: one who never chose
-    a password is invited again instead."""
-    told = mail.invited if kind == "invite" else mail.reset_link_made
-    notify.tell(other.email, other.id, told)
-    return _link_page(request, signed, other, token, kind)
-
-
 def _refused(
     request: Request,
     session: Session,
@@ -248,7 +233,10 @@ def reset(
     except accounts.AdminRefused as refused:
         return _refused(request, session, signed, refused, OWN_RESET)
     changed(signed, session)
-    return _reset_made(request, signed, notify, other, token, kind)
+    # One who never chose a password is invited again instead.
+    told = mail.invited if kind == "invite" else mail.reset_link_made
+    notify.tell(other.email, other.id, told)
+    return _link_page(request, signed, other, token, kind)
 
 
 @router.post(f"{ADMINS}/{{admin_id}}/retire")
@@ -265,10 +253,11 @@ def retire(
     ):
         return again
     try:
-        accounts.retire_admin(session, admin_id, signed.admin.id, now(), notify)
+        other = accounts.retire_admin(session, admin_id, signed.admin.id, now(), notify)
     except accounts.AdminRefused as refused:
         return _refused(request, session, signed, refused, OWN_RETIRE)
     changed(signed, session)
+    notify.tell(other.email, other.id, mail.retired)
     return redirect(ADMINS, notice="admin_retired", section="retired")
 
 

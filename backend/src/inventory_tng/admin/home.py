@@ -60,7 +60,7 @@ def home(request: Request, signed: AdminSignedIn, session: DbSession) -> Respons
         warnings.append(Advice(NO_EMAIL, ACCOUNT, "Add one"))
     # What others changed of who may sign in since this administrator last
     # signed in, so those without an email hear of it too.
-    since = accounts.previous_sign_in(session, signed.row)
+    since = signed.row.signed_in_before
     changes = (
         activity.recent(session, since=since, not_by=signed.admin.id)
         if since is not None

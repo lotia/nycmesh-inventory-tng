@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 import structlog
 from fastapi import Form, Request
 from fastapi.responses import HTMLResponse
+from jinja2 import pass_context
+from jinja2.runtime import Context
 from markupsafe import Markup
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
@@ -46,13 +48,20 @@ WORDS: dict[Made, str] = {
 }
 
 
-def once_field() -> Markup:
-    """The hidden field with a new key, for a form to send once. Never
-    filled in by the browser, which may otherwise put back a spent key when
-    the form's page is shown again."""
+# The page a form was on, which a page saying it was sent before links back
+# to: browsers send no Referer to these pages (admin_base.html).
+BACK = "back"
+
+
+@pass_context
+def once_field(context: Context) -> Markup:
+    """The hidden field with a new key, for a form to send once, and the
+    page it is on (BACK). Never filled in by the browser, which may
+    otherwise put back a spent key when the form's page is shown again."""
     return Markup(
         '<input type="hidden" name="{}" value="{}" autocomplete="off">'
-    ).format(FIELD, uuid.uuid4())
+        '<input type="hidden" name="{}" value="{}">'
+    ).format(FIELD, uuid.uuid4(), BACK, context["request"].url.path)
 
 
 cast(dict[str, Any], templates.env.globals).update(

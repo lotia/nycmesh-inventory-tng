@@ -58,5 +58,8 @@ def run_command_telling(
 
     code = run_command(telling, args)
     if code == 0:
+        # What it prints first, such as a link that lasts an hour: mail
+        # waits on a provider, which may be down when the operator needs it.
+        tasks.tasks.sort(key=lambda task: task.func is not print)
         asyncio.run(tasks())
     return code

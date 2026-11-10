@@ -199,7 +199,8 @@ def test_retiring_another_removes_their_sign_in(
     assert not accounts.uses_totp(session, ben.id)
     assert accounts.recovery_codes_left(session, ben.id) == 0
     assert accounts.find_reset_link(session, token, now) is None
-    assert [m.kind for m in sent_mail] == []
+    # Told, in case it was not agreed.
+    assert [m.kind for m in sent_mail] == ["retired"]
 
 
 def test_bringing_one_back_starts_their_sign_in_again(
@@ -221,7 +222,7 @@ def test_bringing_one_back_starts_their_sign_in_again(
     assert "Brought back. Retiring removed anything they" in text(made)
     assert "they choose their password" in text(made)
     assert ben.retired_at is None
-    assert [m.kind for m in sent_mail] == ["restored"]
+    assert [m.kind for m in sent_mail] == ["retired", "restored"]
     theirs = make_client(admin_client.app, address="192.0.2.72")
     assert_sign_in_was_reset(session, theirs, made, ben, ben_key)
 
@@ -553,9 +554,9 @@ def test_a_change_sent_again_once_its_code_lapsed_spends_none(
     code_typed_ago(session, 31)
     me = admin_named(session, "ada")
     left = accounts.recovery_codes_left(session, me.id)
-    page = f"https://testserver{ADMINS}/{ben.id}"
+    # The page it was on, as its form carries it (once.once_field).
     again = admin_client.post(
-        f"{ADMINS}/{ben.id}/retire", data=form, headers={"referer": page}
+        f"{ADMINS}/{ben.id}/retire", data=form | {"back": f"{ADMINS}/{ben.id}"}
     )
     assert again.status_code == 409
     assert "nothing was done again" in text(again)

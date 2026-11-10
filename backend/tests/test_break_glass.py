@@ -19,7 +19,14 @@ from inventory_tng.mail import Notifier
 from inventory_tng.models import Authenticator, RegistrationCode, ResetLink
 
 from helpers.mail import SentMail
-from helpers.sign_in import TOTP_KEYS, code, new_admin, policy, sign_in_with
+from helpers.sign_in import (
+    TOTP_KEYS,
+    code,
+    codes_with_left,
+    new_admin,
+    policy,
+    sign_in_with,
+)
 
 NOW = datetime.now(UTC)
 NEW_PASSWORD = "a long passphrase of their own"
@@ -84,7 +91,8 @@ def test_let_in_brings_one_back_with_a_link_that_resets_everything(
     assert admin.id == ada.id
     assert ada.retired_at is None
     link = session.scalars(select(ResetLink).where(ResetLink.admin_id == ada.id)).one()
-    assert (link.kind, link.made_by_id) == ("reset", None)
+    # Locked out, they have no password left: invited to choose one.
+    assert (link.kind, link.made_by_id) == ("invite", None)
     assert link.expires_at - NOW == timedelta(hours=1)
     # Ben is retired, so not told; Ada is, in her own words.
     assert [(m.to, m.kind) for m in sent_mail] == [("ada@example.org", "let_in")]
@@ -234,3 +242,69 @@ def test_retiring_authenticators_names_who_must_be_let_in(
     assert capsys.readouterr().out.splitlines()[-1] == (
         "No second factor left, so let them in: ada, ben."
     )
+
+
+def test_retiring_authenticators_asks_each_to_set_one_up_again(
+    session: Session, sent_mail: SentMail, make_client: Callable[..., TestClient]
+) -> None:
+    """Signed out, told how, and asked to set one up again whatever the
+    policy: not let in by the password alone once the last code is used."""
+    ada, _ = new_admin(session, email="ada@example.org")
+    ben, _ = new_admin(session, "ben", email="ben@example.org")
+    left = codes_with_left(session, ada.id, 1)
+    accounts.start_session(session, ada.id, None, NOW)
+    notify, send = told(sent_mail)
+    accounts.retire_authenticators(session, TOTP_KEYS, NOW, every=True, notify=notify)
+    send()
+    assert ada.must_set_up_totp
+    assert accounts.current_sessions(session, ada.id, NOW) == []
+    assert {(m.to, m.kind) for m in sent_mail} == {
+        ("ada@example.org", "authenticators_retired"),
+        ("ben@example.org", "left_without_a_factor"),
+    }
+    assert not accounts.has_password(session, ben.id)
+    policy(session, "optional")
+    client = make_client()
+    assert sign_in_with(client, code=left[0]).status_code == 303
+    assert client.get(sign_in.HOME).headers["location"] == sign_in.NEW_AUTHENTICATOR
+    # The last code used, not set up: the password alone does not get in.
+    assert sign_in_with(make_client(address="192.0.2.95")).status_code == 400
+
+
+def test_setting_up_again_keeps_the_printed_codes(
+    session: Session, make_client: Callable[..., TestClient]
+) -> None:
+    ada, _ = new_admin(session)
+    left = codes_with_left(session, ada.id, 3)
+    accounts.retire_authenticators(session, TOTP_KEYS, NOW, every=True, notify=QUIET)
+    client = make_client()
+    sign_in_with(client, code=left[0])
+    new_key = accounts.new_totp_key()
+    form = {"authenticator_name": "Laptop", "key": new_key, "code": code(new_key)}
+    assert client.post(sign_in.NEW_AUTHENTICATOR, data=form).status_code == 303
+    assert not ada.must_set_up_totp
+    assert accounts.recovery_codes_left(session, ada.id) == 2
+
+
+def test_let_in_clears_the_ask_to_set_up_again(session: Session) -> None:
+    ada, _ = new_admin(session)
+    codes_with_left(session, ada.id, 2)
+    accounts.retire_authenticators(session, TOTP_KEYS, NOW, every=True, notify=QUIET)
+    assert ada.must_set_up_totp
+    accounts.let_in(session, "ada", NOW, QUIET)
+    assert not ada.must_set_up_totp
+
+
+def test_one_with_a_readable_authenticator_left_is_not_asked(session: Session) -> None:
+    ada, _ = new_admin(session)
+    accounts.add_authenticator(
+        session, TOTP_KEYS, ada.id, "Spare", accounts.new_totp_key(), 0
+    )
+    lost = session.scalars(
+        select(Authenticator).where(Authenticator.name == "Phone")
+    ).one()
+    lost.key_version = 9
+    session.flush()
+    accounts.retire_authenticators(session, TOTP_KEYS, NOW, every=False, notify=QUIET)
+    assert accounts.uses_totp(session, ada.id)
+    assert not ada.must_set_up_totp
