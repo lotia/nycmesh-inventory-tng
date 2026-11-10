@@ -364,6 +364,11 @@ def sign_in_settings_changed(settings: SignInSettings) -> Callable[[str, int], M
     totp, session_days = settings.totp_policy, settings.session_days
     confirm_hours = settings.confirm_hours
     confirm_idle_minutes = settings.confirm_idle_minutes
+    account_change = (
+        f"within {settings.account_change_minutes} minutes"
+        if settings.account_change_minutes
+        else "each time"
+    )
 
     def build(to: str, admin_id: int) -> Message:
         return Message(
@@ -372,7 +377,8 @@ def sign_in_settings_changed(settings: SignInSettings) -> Callable[[str, int], M
             "An administrator just changed how administrators sign in to NYC "
             f"Mesh Inventory. TOTP is now {totp}; sessions last {session_days} "
             f"days; a code typed for a sensitive change lasts {confirm_hours} "
-            f"hours, or {confirm_idle_minutes} minutes unused.\n\n"
+            f"hours, or {confirm_idle_minutes} minutes unused; changing another "
+            f"administrator needs a code typed {account_change}.\n\n"
             "If this was not agreed, check with the other administrators.",
             "sign_in_settings_changed",
             admin_id,

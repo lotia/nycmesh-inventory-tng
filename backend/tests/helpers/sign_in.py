@@ -52,9 +52,9 @@ def admin_named(session: Session, username: str) -> Admin:
 
 
 def with_code(session: Session, username: str = "ada", **form: str) -> dict[str, str]:
-    """A form that asks for a code each time (sign_in.ConfirmedEachTime),
-    with one: the first of new recovery codes made for `username`, so each
-    form gets one never used. Sent once, as once() is."""
+    """A form that may ask for a code (sign_in.ConfirmedAccountChange), with
+    one: the first of new recovery codes made for `username`, so each form
+    gets one never used. Sent once, as once() is."""
     admin = admin_named(session, username)
     first = accounts.make_recovery_codes(session, admin.id, datetime.now(UTC))[0]
     return once(**form) | {sign_in.CONFIRM_FIELD: first}

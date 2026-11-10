@@ -14,11 +14,11 @@
   <p class="hint">Resetting their sign-in signs them out everywhere at once:
   their password, authenticators and recovery codes stop working. You get a
   link to pass on, which works once, within a day, for them to choose a new
-  password. Each reset, retire and bring back asks for your code, and every
-  administrator is told.</p>
+  password. Changing another administrator asks for your code, unless you
+  typed one recently, and every administrator is told.</p>
   <form method="post" action="{{ here }}/reset">
     {{ once_field() }}
-    {% include "_code_field.html" %}
+    {% if code_needed %}{% include "_code_field.html" %}{% endif %}
     <div class="actions"><button>Reset their sign-in</button></div>
   </form>
 </section>
@@ -32,7 +32,7 @@
   password.</p>
   <form method="post" action="{{ here }}/restore">
     {{ once_field() }}
-    {% include "_code_field.html" %}
+    {% if code_needed %}{% include "_code_field.html" %}{% endif %}
     <div class="actions"><button>Bring back</button></div>
   </form>
 </section>
@@ -44,7 +44,7 @@
   later.</p>
   <form method="post" action="{{ here }}/retire">
     {{ once_field() }}
-    {% include "_code_field.html" %}
+    {% if code_needed %}{% include "_code_field.html" %}{% endif %}
     <div class="actions"><button>Retire</button></div>
   </form>
 </section>

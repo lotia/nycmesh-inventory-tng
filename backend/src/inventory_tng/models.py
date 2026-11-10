@@ -72,6 +72,8 @@ NAME_CHECK_MINUTES = (0, 24 * 60)
 SESSION_DAYS = (1, 400)
 CONFIRM_HOURS = (1, 7 * 24)
 CONFIRM_IDLE_MINUTES = (1, 7 * 24 * 60)
+# 0: a code each time. At most an hour: longer is what confirm_hours is for.
+ACCOUNT_CHANGE_MINUTES = (0, 60)
 
 
 def whole(typed: str, low: int, high: int) -> int | None:
@@ -811,6 +813,7 @@ class SignInSettings(Versioned, Base):
         _between("session_days", SESSION_DAYS),
         _between("confirm_hours", CONFIRM_HOURS),
         _between("confirm_idle_minutes", CONFIRM_IDLE_MINUTES),
+        _between("account_change_minutes", ACCOUNT_CHANGE_MINUTES),
         protection(owner=None, lock="row", history=True),
     )
 
@@ -824,6 +827,10 @@ class SignInSettings(Versioned, Base):
     # long, so long as each comes within confirm_idle_minutes of the last.
     confirm_hours: Mapped[int] = mapped_column(server_default=text("24"))
     confirm_idle_minutes: Mapped[int] = mapped_column(server_default=text("60"))
+    # Inviting, resetting, retiring or bringing back another administrator
+    # needs a code typed this many minutes ago at most, whatever the above:
+    # a stolen session gets at most this long (inventory-tng-8i4.50.11).
+    account_change_minutes: Mapped[int] = mapped_column(server_default=text("30"))
 
     @property
     def totp_required(self) -> bool:

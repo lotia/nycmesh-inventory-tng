@@ -9,11 +9,12 @@ An administrator page takes one of:
 - `ConfirmedAdmin`: that, for a sensitive action, with a code typed recently
   (accounts.confirmation_open); otherwise the page asks for one first. Once
   the action is done, the route calls changed(), which commits.
-- `ConfirmedEachTime`: that, with a code typed for this action alone, the
-  window aside: resetting, retiring or bringing back another administrator,
-  so a stolen session cannot do them unless it has the code too. Each of
-  their forms is sent once (once.py): sent again, it is answered so before
-  any code is asked for.
+- `ConfirmedAccountChange`: that, for inviting, resetting, retiring or
+  bringing back another administrator, with a code typed within the sign-in
+  settings' account_change_minutes (accounts.account_change_open), so a
+  stolen session gets at most that long. Their routes send each form once
+  (once.sent_before); sent again, it is answered so before any code is
+  asked for (once.spent).
 
 A form through ConfirmedAdmin (or ConfirmedAny) also holds every
 administrator's lock (accounts.lock_admins) until it commits, so it runs
@@ -27,7 +28,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Any, cast
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import structlog
 from fastapi import APIRouter, Depends, FastAPI, Form, Request
@@ -139,6 +140,12 @@ class SignedIn:
     # whatever the policy, or sign-in would ask for a code until the codes
     # ran out, then for the password alone.
     codes_only: bool = False
+
+    @property
+    def asks_code(self) -> bool:
+        """A code is asked for to confirm, not the password, while any
+        second factor remains."""
+        return self.uses_totp or self.codes_only
 
     @property
     def must_set_up_totp(self) -> bool:
@@ -254,19 +261,23 @@ async def confirmed(
 
     A form then passes the gate (_hold), after the commit a code makes, as
     the module's docstring says."""
-    return await _confirmed(request, signed, session, notify, keys, each_time=False)
+    return await _confirmed(
+        request, signed, session, notify, keys, account_change=False
+    )
 
 
-async def confirmed_each_time(
+async def confirmed_account_change(
     request: Request,
     signed: AnySignedIn,
     session: DbSession,
     notify: Notify,
     keys: Keys,
 ) -> SignedIn:
-    """As confirmed, for a form only, but as if the window were always
-    closed: it goes on only with a code sent with it."""
-    return await _confirmed(request, signed, session, notify, keys, each_time=True)
+    """As confirmed, for a form only, with the shorter window that changes
+    to other administrators have (accounts.account_change_open), and a form
+    sent again answered so before any code is spent on it (once.spent). Its
+    route still spends the form's key (once.sent_before) as it acts."""
+    return await _confirmed(request, signed, session, notify, keys, account_change=True)
 
 
 async def _confirmed(
@@ -276,7 +287,7 @@ async def _confirmed(
     notify: Notify,
     keys: TotpKeys,
     *,
-    each_time: bool,
+    account_change: bool,
 ) -> SignedIn:
     if request.method == "GET":
         if not accounts.confirmation_open(signed.row, signed.settings, _now()):
@@ -290,24 +301,19 @@ async def _confirmed(
         for name, value in form.multi_items()
         if isinstance(value, str) and name != CONFIRM_FIELD
     ]
-    was_open = not each_time and accounts.confirmation_open(
-        signed.row, signed.settings, _now()
+    window = (
+        accounts.account_change_open if account_change else accounts.confirmation_open
     )
-    # Sent once: sent again, as Back then Forward offers, it is said so
-    # before any code is spent on it. Its key is spent with the code's
-    # commit, or not at all.
-    if each_time and (
-        again := await run_in_threadpool(
-            once.sent_before,
-            request,
-            session,
-            signed,
-            form.get(once.FIELD),
-            "change",
-            request.url.path.rsplit("/", 1)[0],
-        )
+    was_open = window(signed.row, signed.settings, _now())
+    # Sent again while a code would be asked for: said so before one is
+    # spent on it. Otherwise its route says so (once.sent_before).
+    if (
+        account_change
+        and not was_open
+        and await run_in_threadpool(once.spent, session, form.get(once.FIELD))
     ):
-        raise Answered(again)
+        back = _local(urlsplit(request.headers.get("referer", "")).path)
+        raise Answered(once.sent_again(request, signed, "change", back))
     if not was_open:
         typed = form.get(CONFIRM_FIELD)
         if not isinstance(typed, str):
@@ -327,7 +333,7 @@ async def _confirmed(
     signed = await run_in_threadpool(_hold, session, signed)
     # The window, again, with what the lock read: shorter settings may have
     # come first.
-    if was_open and not accounts.confirmation_open(signed.row, signed.settings, _now()):
+    if was_open and not window(signed.row, signed.settings, _now()):
         log.info("form asked for a code", admin_id=signed.admin.id, reason="waited")
         raise await run_in_threadpool(ConfirmHere, signed, carried)
     hold_until_commit(session)
@@ -378,7 +384,7 @@ def _codes_left(
 def _refused(outcome: accounts.Confirmation, signed: SignedIn) -> str:
     if outcome == "rate_limited":
         return TOO_MANY
-    if signed.uses_totp or signed.codes_only:
+    if signed.asks_code:
         return "That didn't match."
     return "That isn't your password."
 
@@ -399,13 +405,13 @@ def confirmed_admin(signed: ConfirmedAny) -> SignedIn:
 ConfirmedAdmin = Annotated[SignedIn, Depends(confirmed_admin)]
 
 
-def confirmed_each_time_admin(
-    signed: Annotated[SignedIn, Depends(confirmed_each_time)],
+def confirmed_account_change_admin(
+    signed: Annotated[SignedIn, Depends(confirmed_account_change)],
 ) -> SignedIn:
     return admin_signed_in(signed)
 
 
-ConfirmedEachTime = Annotated[SignedIn, Depends(confirmed_each_time_admin)]
+ConfirmedAccountChange = Annotated[SignedIn, Depends(confirmed_account_change_admin)]
 
 
 def changed(signed: SignedIn, session: Session) -> None:
@@ -439,8 +445,7 @@ def _confirm_page(
         "confirm.html",
         {
             "title": "Confirm it's you",
-            # A code is asked for while any second factor remains.
-            "uses_totp": signed.uses_totp or signed.codes_only,
+            "uses_totp": signed.asks_code,
             "admin": signed.admin,
             "alert": alert,
             "action": action,

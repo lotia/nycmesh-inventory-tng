@@ -15,7 +15,7 @@ from structlog.testing import capture_logs
 
 from inventory_tng import accounts, activity, sign_in
 from inventory_tng.admin.admins import ADMINS
-from inventory_tng.models import ACTIVITY_KINDS, Admin, AdminSession
+from inventory_tng.models import ACTIVITY_KINDS, Admin, AdminSession, SignInSettings
 
 from helpers.mail import SentMail
 from helpers.sign_in import (
@@ -373,32 +373,73 @@ def test_only_a_retired_administrator_is_brought_back(session: Session) -> None:
     assert accounts.has_password(session, ben.id)
 
 
-def test_resetting_retiring_and_bringing_back_ask_for_a_code_each_time(
+def code_typed_ago(session: Session, minutes: int) -> None:
+    """Every session's last code typed so long ago, the window otherwise
+    open."""
+    for row in session.scalars(select(AdminSession)):
+        row.confirmed_at = datetime.now(UTC) - timedelta(minutes=minutes)
+        row.last_sensitive_at = datetime.now(UTC)
+    session.flush()
+
+
+def test_changing_another_needs_a_recent_code(
     admin_client: TestClient, session: Session
 ) -> None:
-    """Even with the confirmation window open, as a stolen session's may be:
-    the form is asked for a code, and nothing changes without one."""
+    """Within account_change_minutes of the code (30 by default), several
+    changes go ahead without one; after, each is asked for one, even with
+    the window for other sensitive actions open, as a stolen session's may
+    be, and nothing changes without it."""
     ben, _ = new_admin(session, "ben")
+    carol, _ = new_admin(session, "carol")
+    code_typed_ago(session, 29)
+    page = text(admin_client.get(f"{ADMINS}/{ben.id}"))
+    assert 'name="confirm_code"' not in page
+    retire = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=once())
+    assert retire.status_code == 303
+    assert ben.retired_at is not None
+    code_typed_ago(session, 31)
+    page = text(admin_client.get(f"{ADMINS}/{carol.id}"))
+    assert page.count('name="confirm_code"') == 2
+    assert "Your code" in page
     for action in ("reset", "retire"):
-        asked = admin_client.post(f"{ADMINS}/{ben.id}/{action}", data=once())
+        asked = admin_client.post(f"{ADMINS}/{carol.id}/{action}", data=once())
         assert asked.status_code == 403
         assert 'name="confirm_code"' in asked.text
-    assert accounts.has_password(session, ben.id)
-    assert ben.retired_at is None
-    me = admin_named(session, "ada")
-    accounts.retire_admin(session, ben.id, me.id, datetime.now(UTC))
     asked = admin_client.post(f"{ADMINS}/{ben.id}/restore", data=once())
     assert asked.status_code == 403
+    asked = admin_client.post(ADMINS, data=once(username="grace"))
+    assert asked.status_code == 403
+    assert accounts.has_password(session, carol.id)
+    assert carol.retired_at is None
     assert ben.retired_at is not None
 
 
-def test_the_administrator_page_asks_for_the_code_with_each_change(
+def test_at_0_minutes_each_change_asks_for_a_code(
+    admin_client: TestClient, session: Session
+) -> None:
+    session.get_one(SignInSettings, 1).account_change_minutes = 0
+    ben, _ = new_admin(session, "ben")
+    code_typed_ago(session, 0)
+    assert 'name="confirm_code"' in text(admin_client.get(ADMINS))
+    asked = admin_client.post(f"{ADMINS}/{ben.id}/retire", data=once())
+    assert asked.status_code == 403
+    assert ben.retired_at is None
+
+
+def test_a_code_typed_on_one_change_covers_the_next(
     admin_client: TestClient, session: Session
 ) -> None:
     ben, _ = new_admin(session, "ben")
-    page = text(admin_client.get(f"{ADMINS}/{ben.id}"))
-    assert page.count('name="confirm_code"') == 2
-    assert "Your code" in page
+    carol, _ = new_admin(session, "carol")
+    code_typed_ago(session, 31)
+    form = with_code(session)
+    assert admin_client.post(f"{ADMINS}/{ben.id}/retire", data=form).status_code == 303
+    again = admin_client.post(f"{ADMINS}/{carol.id}/retire", data=once())
+    assert again.status_code == 303
+    assert carol.retired_at is not None
+    # And an invite, within the window, needs none.
+    invited = admin_client.post(ADMINS, data=once(username="grace"))
+    assert invited.status_code == 200
 
 
 def test_every_administrator_is_told_of_a_change(
@@ -492,3 +533,25 @@ def test_the_operators_recovery_link_is_told(session: Session) -> None:
     assert activity.recent(session)[0].words == (
         "The operator made a link for ada with the recovery token"
     )
+
+
+def test_a_change_sent_again_once_its_code_lapsed_spends_none(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Back then Forward, half an hour on: said so before a code is asked
+    for, with a way back to the page it came from."""
+    ben, _ = new_admin(session, "ben")
+    code_typed_ago(session, 31)
+    form = with_code(session)
+    assert admin_client.post(f"{ADMINS}/{ben.id}/retire", data=form).status_code == 303
+    code_typed_ago(session, 31)
+    me = admin_named(session, "ada")
+    left = accounts.recovery_codes_left(session, me.id)
+    page = f"https://testserver{ADMINS}/{ben.id}"
+    again = admin_client.post(
+        f"{ADMINS}/{ben.id}/retire", data=form, headers={"referer": page}
+    )
+    assert again.status_code == 409
+    assert "nothing was done again" in text(again)
+    assert f'href="{ADMINS}/{ben.id}"' in again.text
+    assert accounts.recovery_codes_left(session, me.id) == left

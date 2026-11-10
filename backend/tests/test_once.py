@@ -46,9 +46,8 @@ def sent_twice(
 def sent_twice_with_codes(
     client: TestClient, session: Session, page: str, action: str
 ) -> tuple[Response, Response]:
-    """As sent_twice, for a form that asks for a code each time: the second
-    send would be asked for one again, so each comes with a new one of
-    Ada's."""
+    """As sent_twice, for a form that may ask for a code: each send comes
+    with a new one of Ada's."""
     key = key_on(client.get(page), action)
     made, again = (
         client.post(action, data=with_code(session) | {"once": key}) for _ in "12"
