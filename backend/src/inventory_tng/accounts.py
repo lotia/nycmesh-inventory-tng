@@ -528,7 +528,7 @@ def _set_password(
     session: Session, admin_id: int, password: str, now: datetime
 ) -> None:
     """Their row, then their password's, locked in the order every path
-    takes them (lock_admin, _reset_sign_in)."""
+    takes them (lock_admin, _remove_sign_in)."""
     lock_admin(session, admin_id)
     stored = get_locked(session, AdminPassword, admin_id)
     if stored is None:
@@ -1157,57 +1157,43 @@ sign_in_resets = meter.create_counter(
 )
 
 
-def _reset_sign_in(
-    session: Session,
-    admin_id: int,
-    by_admin_id: int,
-    now: datetime,
-    *,
-    action: Literal["reset", "restore"],
-) -> tuple[str, LinkKind]:
-    """Another administrator resets their sign-in, at once: their password
-    goes, their authenticators are retired, their recovery codes and other
-    links voided and their sessions ended, so nothing a thief may hold
-    works, even if the link is never used. Returns a one-use link that sets
-    a new password, for the one acting to pass on, and its kind: one who
-    never chose a password has nothing to reset, so gets a new invite.
-    TOTP is set up again at sign-in while required. Counted by the action
-    that did it, unless it invited again. The caller holds the
-    administrators lock."""
-    kind: LinkKind = "reset" if has_password(session, admin_id) else "invite"
-    # The link first, which voids every other, as use_reset_link locks its
-    # link before the password: a link being used meanwhile finishes, then
-    # this undoes it.
-    token = make_reset_link(
-        session,
-        admin_id,
-        now,
-        kind=kind,
-        made_by_id=by_admin_id,
-    )
-    end_sessions(session, admin_id, now)
+def _remove_sign_in(session: Session, admin_id: int, now: datetime) -> int:
+    """Their password goes, their authenticators are retired (keys wiped),
+    their recovery codes voided and their sessions ended, so nothing a thief
+    may hold works. Their links are the caller's: voided before this, as
+    use_reset_link locks its link before the password, so a link being used
+    meanwhile finishes, then this undoes it. The caller holds the
+    administrators lock. How many sessions ended."""
+    ended = end_sessions(session, admin_id, now)
     if (password := get_locked(session, AdminPassword, admin_id)) is not None:
         session.delete(password)
     _reset_authenticators(session, admin_id, now)
-    log.info(
-        "sign-in reset",
-        target_admin_id=admin_id,
-        by_admin_id=by_admin_id,
-        kind=kind,
-    )
-    if kind == "reset":
-        sign_in_resets.add(1, {"action": action})
-    return token, kind
+    return ended
 
 
 def reset_admin_sign_in(
     session: Session, admin_id: int, by_admin_id: int, now: datetime
 ) -> tuple[Admin, str, LinkKind]:
-    """Reset another administrator's sign-in (_reset_sign_in): never one's
-    own, which the account page changes. Returns them, the link and its
-    kind. Raises AdminRefused."""
+    """Reset another administrator's sign-in, at once (_remove_sign_in), even
+    if the link is never used: never one's own, which the account page
+    changes. Returns them, a one-use link that sets a new password, for the
+    one acting to pass on, and its kind: one who never chose a password has
+    nothing to reset, so is invited again. TOTP is set up again at sign-in
+    while required. Raises AdminRefused."""
     admin = _locked_other(session, "reset", admin_id, by_admin_id, retired=False)
-    token, kind = _reset_sign_in(session, admin.id, by_admin_id, now, action="reset")
+    kind: LinkKind = "reset" if has_password(session, admin.id) else "invite"
+    # The link first, which voids every other.
+    token = make_reset_link(session, admin.id, now, kind=kind, made_by_id=by_admin_id)
+    ended = _remove_sign_in(session, admin.id, now)
+    if kind == "reset":
+        sign_in_resets.add(1, {"action": "reset"})
+    log.info(
+        "sign-in reset",
+        target_admin_id=admin.id,
+        by_admin_id=by_admin_id,
+        kind=kind,
+        sessions_ended=ended,
+    )
     return admin, token, kind
 
 
@@ -1315,13 +1301,14 @@ def _locked_other(
 def retire_admin(
     session: Session, admin_id: int, by_admin_id: int, now: datetime
 ) -> None:
-    """Retire another administrator, ending their sessions and any reset
-    link. Never oneself; someone who can sign in always remains
-    (lock_admins). Raises AdminRefused."""
+    """Retire another administrator, removing everything they sign in with
+    (_remove_sign_in) and voiding their links, so a retired account holds no
+    credential to steal or crack. Never oneself; someone who can sign in
+    always remains (lock_admins). Raises AdminRefused."""
     admin = _locked_other(session, "retire", admin_id, by_admin_id, retired=False)
     admin.retired_at = now
-    ended = end_sessions(session, admin.id, now)
     void_reset_links(session, admin.id, now)
+    ended = _remove_sign_in(session, admin.id, now)
     log.info(
         "administrator retired",
         target_admin_id=admin.id,
@@ -1332,15 +1319,17 @@ def retire_admin(
 
 def restore_admin(
     session: Session, admin_id: int, by_admin_id: int, now: datetime
-) -> tuple[Admin, str, LinkKind]:
-    """Bring a retired administrator back with their sign-in reset
-    (_reset_sign_in), whatever they were retired for: a stolen password or
-    phone never works again because the account came back. Returns them,
-    the link to pass on and its kind. Raises AdminRefused."""
+) -> tuple[Admin, str]:
+    """Bring a retired administrator back. Retiring removed everything they
+    signed in with, so they start again as if invited: returns them and a
+    one-use link that lets them choose a password, for the one acting to
+    pass on. Raises AdminRefused."""
     admin = _locked_other(session, "restore", admin_id, by_admin_id, retired=True)
     admin.retired_at = None
-    token, kind = _reset_sign_in(session, admin.id, by_admin_id, now, action="restore")
+    token = make_reset_link(
+        session, admin.id, now, kind="invite", made_by_id=by_admin_id
+    )
     log.info(
         "administrator restored", target_admin_id=admin_id, by_admin_id=by_admin_id
     )
-    return admin, token, kind
+    return admin, token

@@ -41,7 +41,8 @@ OWN_RETIRE = "Another administrator must retire you."
 
 NOTICES.update(
     {
-        "admin_retired": "Retired: they can no longer sign in.",
+        "admin_retired": "Retired: they can no longer sign in, and their password, "
+        "authenticators and recovery codes are removed.",
     }
 )
 
@@ -128,17 +129,12 @@ def _reset_made(
     other: Admin,
     token: str,
     kind: accounts.LinkKind,
-    *,
-    brought_back: bool = False,
 ) -> HTMLResponse:
-    """The link a reset or Bring back made, shown once, and the mail: one
-    who never chose a password is invited again instead."""
-    if kind == "invite":
-        told = mail.invited
-    else:
-        told = mail.restored if brought_back else mail.reset_link_made
+    """The link a reset made, shown once, and the mail: one who never chose
+    a password is invited again instead."""
+    told = mail.invited if kind == "invite" else mail.reset_link_made
     notify.tell(other.email, other.id, told)
-    return _link_page(request, signed, other, token, kind, brought_back=brought_back)
+    return _link_page(request, signed, other, token, kind)
 
 
 def _refused(
@@ -260,9 +256,10 @@ def restore(
     ):
         return again
     try:
-        restored = accounts.restore_admin(session, admin_id, signed.admin.id, now())
+        other, token = accounts.restore_admin(session, admin_id, signed.admin.id, now())
     except accounts.AdminRefused:
         # Whatever the reason: oneself is never retired, so never found here.
         return not_found()
     changed(signed, session)
-    return _reset_made(request, signed, notify, *restored, brought_back=True)
+    notify.tell(other.email, other.id, mail.restored)
+    return _link_page(request, signed, other, token, "invite", brought_back=True)
