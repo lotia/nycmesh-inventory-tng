@@ -8,7 +8,14 @@ vi.mock("web-vitals", () => ({
   onCLS: (report: (metric: object) => void) => vitals.set("CLS", report),
 }));
 
-import { type Event, FLUSH_AT, PATH, PER_HOUR, Telemetry } from "./telemetry";
+import {
+  type Event,
+  FLUSH_AT,
+  HOUR_MS,
+  PATH,
+  PER_HOUR,
+  Telemetry,
+} from "./telemetry";
 
 const RETRY: Event = { kind: "outbox_retry", reason: "no_answer" };
 
@@ -111,7 +118,7 @@ describe("reporting", () => {
     ).toHaveLength(PER_HOUR.outbox_retry);
     expect(await kinds()).toContain("error");
     // An hour on, each kind has its share again.
-    now += 3_600_000;
+    now += HOUR_MS;
     telemetry.record(RETRY);
     telemetry.flush();
     expect(

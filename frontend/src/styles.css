@@ -274,7 +274,8 @@
 
   /* Muted text, not opacity, which would take a hint inside below 4.5:1
      (WCAG 1.4.3); each retired row or section says so in words too. */
-  .retired {
+  .retired,
+  .retired a {
     @apply text-muted;
   }
 
