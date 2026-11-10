@@ -16,13 +16,16 @@ from inventory_tng import accounts, mail
 from inventory_tng.db import DbSession, unique
 from inventory_tng.local_time import site_zone
 from inventory_tng.mail import Notify
+from inventory_tng.models import running_low
 from inventory_tng.once import OnceKey, sent_before
 from inventory_tng.pages import NOTICES, not_found, page, redirect
 from inventory_tng.sign_in import (
     ACCOUNT,
+    CONFIRM_FIELD,
     NAME_TAKEN,
     AdminSignedIn,
     ConfirmedAdmin,
+    ConfirmedByAuthenticator,
     SignedIn,
     changed,
     signed_out,
@@ -58,6 +61,7 @@ def _account_page(
 ) -> HTMLResponse:
     admin_id = signed.admin.id
     authenticators = accounts.authenticators(session, admin_id)
+    left = accounts.recovery_codes_left(session, admin_id) if authenticators else 0
     return page(
         request,
         "account.html",
@@ -73,9 +77,9 @@ def _account_page(
                 for a in authenticators
             ],
             # Shown only with an authenticator.
-            "recovery_codes_left": accounts.recovery_codes_left(session, admin_id)
-            if authenticators
-            else 0,
+            "recovery_codes_left": left,
+            "codes_low": running_low(left),
+            "field": CONFIRM_FIELD,
             "sessions": accounts.current_sessions(session, admin_id, _now()),
             "this_session": signed.row.id,
         },
@@ -186,7 +190,11 @@ def rename_authenticator(
 
 @router.post(f"{ACCOUNT}/authenticators/{{authenticator_id}}/remove")
 def remove_authenticator(
-    request: Request, signed: ConfirmedAdmin, session: DbSession, authenticator_id: int
+    request: Request,
+    signed: ConfirmedAdmin,
+    session: DbSession,
+    notify: Notify,
+    authenticator_id: int,
 ) -> Response:
     outcome = accounts.remove_authenticator(
         session, signed.admin.id, authenticator_id, _now()
@@ -199,16 +207,23 @@ def remove_authenticator(
             "Add another first to replace it."
         )
         return _refused(request, session, signed, "authenticators", problem)
-    return _done(signed, session, outcome, section="authenticators")
+    done = _done(signed, session, outcome, section="authenticators")
+    notify.tell(
+        signed.admin.email, signed.admin.id, mail.authenticators_changed(added=False)
+    )
+    return done
 
 
 @router.post(f"{ACCOUNT}/recovery-codes")
 def new_recovery_codes(
     request: Request,
-    signed: ConfirmedAdmin,
+    signed: ConfirmedByAuthenticator,
     session: DbSession,
+    notify: Notify,
     once: OnceKey = "",
 ) -> Response:
+    """With a code from an authenticator each time (ConfirmedByAuthenticator),
+    and told to the owner: new codes void the old."""
     if not signed.uses_totp:
         problem = "Recovery codes come with an authenticator."
         return _refused(request, session, signed, "recovery_codes", problem)
@@ -216,6 +231,7 @@ def new_recovery_codes(
         return again
     codes = accounts.make_recovery_codes(session, signed.admin.id, _now())
     changed(signed, session)
+    notify.tell(signed.admin.email, signed.admin.id, mail.recovery_codes_made)
     return page(
         request,
         "recovery_codes.html",

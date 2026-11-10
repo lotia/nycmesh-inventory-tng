@@ -405,6 +405,18 @@ def _recovery_digest(typed: str) -> bytes:
     return digest(re.sub(r"[^A-Z0-9]", "", typed.upper()))
 
 
+recovery_code_events = meter.create_counter(
+    "inventory.admin.recovery_codes",
+    unit="{event}",
+    description="Recovery codes made, and reminders that few are left, by event",
+)
+
+
+def reminded() -> None:
+    """Told, after signing in with one, that few recovery codes are left."""
+    recovery_code_events.add(1, {"event": "reminded"})
+
+
 def make_recovery_codes(session: Session, admin_id: int, now: datetime) -> list[str]:
     """New codes, which void any still unused: the only time they are
     known."""
@@ -416,6 +428,7 @@ def make_recovery_codes(session: Session, admin_id: int, now: datetime) -> list[
     )
     session.flush()
     log.info("recovery codes made", admin_id=admin_id)
+    recovery_code_events.add(1, {"event": "made"})
     return [grouped(code, RECOVERY_CODE_GROUP, "-") for code in codes]
 
 
@@ -426,10 +439,12 @@ def check_second_factor(
     authenticators: list[Authenticator],
     typed: str,
     now: datetime,
+    *,
+    recovery: bool = True,
 ) -> Factor | None:
     """A code from one of the administrator's authenticators (from
-    locked_authenticators), or one of their recovery codes, used up as it is
-    accepted."""
+    locked_authenticators), or one of their recovery codes unless not
+    `recovery`, used up as it is accepted."""
     for authenticator in authenticators:
         key = _opened(keys, authenticator)
         if key is None:
@@ -438,9 +453,9 @@ def check_second_factor(
         if step is not None:
             authenticator.last_step = step
             return "totp"
-    if _totp_code(typed) is not None or len(typed) > CODE_FIELD_MAX:
+    if not recovery or _totp_code(typed) is not None or len(typed) > CODE_FIELD_MAX:
         return None
-    recovery = session.scalar(
+    used = session.scalar(
         locked(
             select(RecoveryCode).where(
                 *_unused_codes(admin_id),
@@ -448,10 +463,10 @@ def check_second_factor(
             )
         )
     )
-    if recovery is None:
+    if used is None:
         return None
-    recovery.used_at = now
-    log.warning("recovery code used", admin_id=admin_id, recovery_code_id=recovery.id)
+    used.used_at = now
+    log.warning("recovery code used", admin_id=admin_id, recovery_code_id=used.id)
     return "recovery"
 
 
@@ -632,12 +647,18 @@ Confirmation = Literal["confirmed", "refused", "rate_limited"]
 
 
 def confirm(
-    session: Session, keys: TotpKeys, row: AdminSession, typed: str, now: datetime
+    session: Session,
+    keys: TotpKeys,
+    row: AdminSession,
+    typed: str,
+    now: datetime,
+    *,
+    recovery: bool,
 ) -> tuple[Confirmation, Factor | None]:
-    """A code (or, without TOTP, the password) for sensitive actions. Every
-    attempt counts against the administrator's codes, shared with signing
-    in, so a stolen session cannot guess them. Returns the outcome and the
-    factor used."""
+    """A code (or, without TOTP, the password) for sensitive actions; not a
+    recovery code unless `recovery`. Every attempt counts against the
+    administrator's codes, shared with signing in, so a stolen session
+    cannot guess them. Returns the outcome and the factor used."""
     if not limiter(session).hit(PER_ACCOUNT, "code", str(row.admin_id)):
         return _confirmation(row, "rate_limited"), None
     set_actor(session, f"admin:{row.admin_id}")
@@ -645,7 +666,7 @@ def confirm(
     if has_second_factor(session, row.admin_id):
         authenticators = locked_authenticators(session, row.admin_id)
         factor = check_second_factor(
-            session, keys, row.admin_id, authenticators, typed, now
+            session, keys, row.admin_id, authenticators, typed, now, recovery=recovery
         )
     # Checked again once locked: TOTP may have been set up meanwhile.
     elif check_password(session, row.admin_id, typed) and not has_second_factor(

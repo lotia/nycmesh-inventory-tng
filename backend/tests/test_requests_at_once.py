@@ -298,9 +298,10 @@ def test_a_code_being_confirmed_while_a_reset_is_made_does_not_deadlock(
     row = confirming.get_one(AdminSession, session_id)
     # Later than the session's start, so confirming writes its session row.
     later = now + timedelta(seconds=1)
-    assert accounts.confirm(confirming, TOTP_KEYS, row, code(key, later), later)[0] == (
-        "confirmed"
+    confirmed = accounts.confirm(
+        confirming, TOTP_KEYS, row, code(key, later), later, recovery=True
     )
+    assert confirmed[0] == "confirmed"
     reset, worker = reset_blocked(committed, ada, ben)
     confirming.commit()
     assert worker.finished().error is None
@@ -438,7 +439,7 @@ def test_a_password_confirmed_while_totp_is_set_up_is_refused(
     worker = committed.blocked(
         confirming,
         lambda: accounts.confirm(
-            confirming, TOTP_KEYS, row, PASSWORD, datetime.now(UTC)
+            confirming, TOTP_KEYS, row, PASSWORD, datetime.now(UTC), recovery=True
         )[0],
     )
     adding.commit()

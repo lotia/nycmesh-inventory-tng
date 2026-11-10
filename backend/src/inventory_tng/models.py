@@ -72,6 +72,16 @@ NAME_CHECK_MINUTES = (0, 24 * 60)
 SESSION_DAYS = (1, 400)
 CONFIRM_HOURS = (1, 7 * 24)
 CONFIRM_IDLE_MINUTES = (1, 7 * 24 * 60)
+# At this many recovery codes left or fewer, an administrator is told to
+# make new ones: on the account page, in the mail when one is used, and
+# after signing in with one.
+RECOVERY_CODES_LOW = 3
+
+
+def running_low(left: int) -> bool:
+    return left <= RECOVERY_CODES_LOW
+
+
 # 0: a code each time. At most an hour: longer is what confirm_hours is for.
 ACCOUNT_CHANGE_MINUTES = (0, 60)
 

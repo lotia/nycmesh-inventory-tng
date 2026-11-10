@@ -3,7 +3,7 @@
 import base64
 import html
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pyotp
 from fastapi.testclient import TestClient
@@ -101,6 +101,21 @@ def opened(authenticator: Authenticator) -> str:
 def code(key: str | None, at: datetime | None = None) -> str:
     assert key is not None
     return pyotp.TOTP(key).at(at or datetime.now(UTC))
+
+
+def later_code(key: str | None) -> str:
+    """A code from the next step: the one that just signed in is spent."""
+    return code(key, datetime.now(UTC) + timedelta(seconds=30))
+
+
+def codes_with_left(session: Session, admin_id: int, left: int) -> list[str]:
+    """New recovery codes, all but the last `left` used: those are returned."""
+    codes = accounts.make_recovery_codes(session, admin_id, datetime.now(UTC))
+    for used in codes[: len(codes) - left]:
+        accounts.check_second_factor(
+            session, TOTP_KEYS, admin_id, [], used, datetime.now(UTC)
+        )
+    return codes[len(codes) - left :]
 
 
 def policy(session: Session, value: str) -> None:

@@ -88,6 +88,7 @@ NOTICE_SECTIONS = frozenset(
         "packages",
         "password",
         "reasons",
+        "recovery-codes",
         "retired",
         "scan-page",
         "sessions",

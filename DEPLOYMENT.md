@@ -375,7 +375,8 @@ of `--unreadable`, and remove the leaked version.
 The app mails administrators reset links they ask for. It tells them when
 they are invited, when another administrator resets their sign-in or
 brings their account back, when the recovery token is used for them, and
-when their password changes or a recovery code is used. Every
+when their password changes, an authenticator is added or removed, a
+recovery code is used or new ones are made. Every
 administrator, the one who did it too, is told when one is invited, reset,
 retired, brought back or given a link with the recovery token.
 It sends through a provider's authenticated SMTP, such as Mailgun's or

@@ -3,8 +3,8 @@
 **Status:** accepted · 2026-11-02 · amends 0004 (TOTP may be optional in
 production) · amended 2026-11-10 (retiring removes the sign-in; nobody is
 deleted; a recent code for each change to another administrator, and
-everyone told), 2026-11-10 by 0018 (the operator's commands; a code asked for while
-recovery codes remain)
+everyone told; new recovery codes need an authenticator's code), 2026-11-10 by 0018
+(the operator's commands; a code asked for while recovery codes remain)
 
 ## Context
 
@@ -63,6 +63,16 @@ without a deployment.
   characters, about 98 bits, so the SHA-256 kept of it cannot be guessed
   back from a stolen database, as a shorter code's could. The ten-character
   codes made at first were voided (migration 0008).
+- **Making new recovery codes needs a code from an authenticator, each
+  time**, never a recovery code, and the owner is mailed: new codes void
+  the old, so one who signed in with a stolen recovery code cannot lock
+  the owner's printed ones out directly. They could still add an
+  authenticator of their own first, as an owner who lost their phone must
+  be able to; so adding or removing one is mailed to the owner too, and that
+  mail is what catches it. With three or fewer left, the account page
+  says so; signing in with one then lands there, saying how few are left,
+  as does the mail sent when one is used. Nothing shows the count before
+  sign-in is complete.
 
 ### Sessions
 
