@@ -1,7 +1,7 @@
 # 0014 — One stylesheet, in NYC Mesh's look, from Tailwind
 
 **Status:** accepted · 2026-11-06 · builds on 0010 (Vite builds the
-frontend)
+frontend); 0019 builds on it (how pages look and act)
 
 ## Context
 
