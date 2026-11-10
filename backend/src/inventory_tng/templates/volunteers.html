@@ -1,16 +1,28 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_listing.html" import search_box, filters, summary, empty, pager %}
 {% block main %}
+{{ search_box(listing, "volunteers") }}
+{{ filters(listing) }}
+
 <section>
+  {{ summary(listing, "volunteer", "volunteers") }}
   {% call table() %}
-    <tr><th>Volunteer</th><th>Holds stock</th></tr>
-    {% for volunteer in current %}
-    <tr><td><a href="{{ here }}/{{ volunteer.id }}">{{ volunteer.name }}</a></td>
-      <td>{{ "yes" if volunteer.id in holders else "" }}</td></tr>
+    <tr><th>Volunteer</th><th class="hidden sm:table-cell">Holds stock</th></tr>
+    {% for volunteer in listing.rows %}
+    {% set holds = volunteer.id in holders %}
+    <tr>
+      <td><a href="{{ here }}/{{ volunteer.id }}">{{ volunteer.name }}</a>
+        {%- if volunteer.retired_at %} <span class="tag">Retired</span>{% endif %}
+        {%- if volunteer.merged_into_id %} <span class="hint">merged into {{ names.get(volunteer.merged_into_id, "") }}</span>{% endif %}
+        {%- if holds %} <span class="hint block sm:hidden">holds stock</span>{% endif %}</td>
+      <td class="hidden sm:table-cell">{{ "yes" if holds else "" }}</td>
+    </tr>
     {% else %}
-    <tr><td colspan="2">None yet.</td></tr>
+    {{ empty(listing, 2, "None yet: add one below.") }}
     {% endfor %}
   {% endcall %}
+  {{ pager(listing) }}
 </section>
 
 <section>
@@ -27,13 +39,4 @@
     <button class="primary">Add</button>
   </form>
 </section>
-
-{% if retired %}
-<section id="retired">
-  <h2>Retired</h2>
-  {% with section_id="retired" %}{% include "_notice.html" %}{% endwith %}
-  <ul>{% for volunteer in retired %}<li><a href="{{ here }}/{{ volunteer.id }}">{{ volunteer.name }}</a>
-    {% if volunteer.merged_into_id %}<span class="hint">merged into {{ names.get(volunteer.merged_into_id, "") }}</span>{% endif %}</li>{% endfor %}</ul>
-</section>
-{% endif %}
 {% endblock %}

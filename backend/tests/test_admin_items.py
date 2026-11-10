@@ -1,15 +1,17 @@
 """Items and their packages (admin/items.py)."""
 
+import re
 import uuid
 from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.admin.common import quantity
 from inventory_tng.admin.items import ITEMS
+from inventory_tng.admin.listing import PER_PAGE
 from inventory_tng.local_time import DEFAULT_ZONE
 from inventory_tng.models import (
     Category,
@@ -299,3 +301,107 @@ def test_changes_are_logged_by_id(
     (line,) = [line for line in logs if line["event"] == "item added"]
     assert line["item_id"] == named(session, Item, "Radio X").id
     assert "Radio X" not in str(line)
+
+
+def items_named(page: str) -> list[str]:
+    """The items the list shows, in its order."""
+    return re.findall(r'<td><a href="/admin/items/\d+">([^<]+)</a>', page)
+
+
+def test_a_search_forgives_typos_best_first(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    for name in ("LiteAP AC", "LiteBeam 5AC", "Patch cable", "NanoBeam"):
+        new_item(session, radios, name)
+    page = text(admin_client.get(ITEMS, params={"q": "litebeam"}))
+    shown = items_named(page)
+    assert shown[0] == "LiteBeam 5AC"
+    assert "Patch cable" not in shown
+    total = session.scalar(
+        select(func.count()).select_from(Item).where(Item.retired_at.is_(None))
+    )
+    said = " ".join(page.split())
+    assert f"{len(shown)} of {total} items, matching “litebeam”" in said
+    assert 'href="/admin/items">Clear search</a>' in page
+
+
+def test_suggestions_come_from_the_filter_the_list_shows(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    beam = new_item(session, radios, f"LiteBeam {uuid.uuid4().hex[:6]}")
+    old = new_item(session, radios, f"LiteBeam {uuid.uuid4().hex[:6]}")
+    admin_client.post(f"{ITEMS}/{old.id}/retire")
+    current = admin_client.get(f"{ITEMS}/suggest", params={"q": "litebem"}).json()
+    names = [each["name"] for each in current]
+    assert beam.name in names
+    assert old.name not in names
+    assert current[names.index(beam.name)] == {
+        "name": beam.name,
+        "hint": radios.name,
+        "href": f"{ITEMS}?pick={beam.id}",
+    }
+    retired = admin_client.get(
+        f"{ITEMS}/suggest", params={"q": "litebem", "show": "retired"}
+    ).json()
+    assert [each["name"] for each in retired] == [old.name]
+    assert retired[0]["href"] == f"{ITEMS}?show=retired&pick={old.id}"
+    assert admin_client.get(f"{ITEMS}/suggest").json() == []
+
+
+def test_picking_a_suggestion_narrows_the_list_to_it(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    beam = new_item(session, radios, "LiteBeam 5AC")
+    new_item(session, radios, "LiteBeam M5")
+    page = text(admin_client.get(ITEMS, params={"pick": str(beam.id)}))
+    assert items_named(page) == ["LiteBeam 5AC"]
+    assert "matching “LiteBeam 5AC”" in " ".join(page.split())
+
+
+def test_current_retired_and_all(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    kept = new_item(session, radios, "Kept")
+    gone = new_item(session, radios, "Gone")
+    admin_client.post(f"{ITEMS}/{gone.id}/retire")
+    for show, expected in (
+        ("", {"Kept"}),
+        ("retired", {"Gone"}),
+        ("all", {"Kept", "Gone"}),
+    ):
+        page = text(admin_client.get(ITEMS, params={"show": show}))
+        assert {kept.name, gone.name} & set(items_named(page)) == expected
+        chosen = show or "current"
+        link = f'href="{ITEMS}{"?show=" + show if show else ""}" aria-current="page"'
+        assert link in page, chosen
+    assert '<span class="tag">Retired</span>' in text(
+        admin_client.get(ITEMS, params={"show": "all"})
+    )
+
+
+def test_pages_of_fifty(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    for number in range(PER_PAGE + 5):
+        new_item(session, radios, f"Paged {number:03}")
+    first = text(admin_client.get(ITEMS, params={"q": "Paged"}))
+    assert len(items_named(first)) == PER_PAGE
+    assert "Page 1 of 2" in first
+    assert (
+        f'href="{ITEMS}?q=Paged&amp;page=2"'
+        in admin_client.get(ITEMS, params={"q": "Paged"}).text
+    )
+    second = text(admin_client.get(ITEMS, params={"q": "Paged", "page": "2"}))
+    assert len(items_named(second)) == 5
+    # A page past the end, or none, is the last or the first.
+    assert "Page 2 of 2" in text(
+        admin_client.get(ITEMS, params={"q": "Paged", "page": "9"})
+    )
+    assert "Page 1 of 2" in text(
+        admin_client.get(ITEMS, params={"q": "Paged", "page": "x"})
+    )
+
+
+def test_an_empty_list_says_what_to_do_next(admin_client: TestClient) -> None:
+    page = text(admin_client.get(ITEMS, params={"q": "zzzqqqxxx"}))
+    assert "Nothing matches. Check the spelling" in page

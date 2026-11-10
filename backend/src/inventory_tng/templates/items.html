@@ -1,26 +1,30 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_listing.html" import search_box, filters, summary, empty, pager %}
 {% block main %}
-<form method="get" action="{{ here }}" class="actions">
-  <label>Find <input name="q" value="{{ search }}" type="search"></label>
-  <button>Find</button>
-  {% if search %}<a href="{{ here }}">All items</a>{% endif %}
-</form>
+{{ search_box(listing, "items") }}
+{{ filters(listing) }}
 
 <section>
+  {{ summary(listing, "item", "items") }}
   {% call table() %}
-    <tr><th>Item</th><th>Category</th><th>Unit</th><th>Part</th></tr>
-    {% for item in current %}
+    <tr><th>Item</th><th class="hidden sm:table-cell">Category</th><th class="hidden sm:table-cell">Unit</th><th class="hidden sm:table-cell">Part</th></tr>
+    {% for item in listing.rows %}
+    {% set category = category_names.get(item.category_id, "") %}
+    {% set part = ((item.manufacturer or "") ~ " " ~ (item.part_number or "")) | trim %}
     <tr>
-      <td><a href="{{ here }}/{{ item.id }}">{{ item.name }}</a></td>
-      <td>{{ category_names.get(item.category_id, "") }}</td>
-      <td>{{ item.unit }}</td>
-      <td>{{ item.manufacturer or "" }} {{ item.part_number or "" }}</td>
+      <td><a href="{{ here }}/{{ item.id }}">{{ item.name }}</a>
+        {%- if item.retired_at %} <span class="tag">Retired</span>{% endif %}
+        <span class="hint block sm:hidden">{{ [category, item.unit, part] | select | join(" · ") }}</span></td>
+      <td class="hidden sm:table-cell">{{ category }}</td>
+      <td class="hidden sm:table-cell">{{ item.unit }}</td>
+      <td class="hidden sm:table-cell">{{ part }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="4">{{ "Nothing matches." if search else "None yet." }}</td></tr>
+    {{ empty(listing, 4, "None yet: add one below.") }}
     {% endfor %}
   {% endcall %}
+  {{ pager(listing) }}
 </section>
 
 <section>
@@ -57,11 +61,4 @@
   </form>
 </section>
 
-{% if retired %}
-<section id="retired">
-  <h2>Retired</h2>
-  {% with section_id="retired" %}{% include "_notice.html" %}{% endwith %}
-  <ul>{% for item in retired %}<li><a href="{{ here }}/{{ item.id }}">{{ item.name }}</a></li>{% endfor %}</ul>
-</section>
-{% endif %}
 {% endblock %}

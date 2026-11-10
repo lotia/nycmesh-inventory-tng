@@ -315,6 +315,10 @@ utilities. When you style a page:
   `back`, a path and its words, in its context, which shows a link above
   its title. A retire form has `data-retire`, so a page with changes not
   yet saved asks before it retires.
+- A list that grows past a screen, as items and volunteers do, is a
+  `Listing` (`admin/listing.py`), drawn with `_listing.html`'s macros:
+  search that forgives typos, with suggestions from its own `/suggest`;
+  "Current · Retired · All"; and pages of 50.
 - What administrator pages do in the browser beyond plain HTML is in
   `frontend/src/admin.ts`; each still works without it.
 - A page that prints a QR code puts a `.printable` in its `main`: the

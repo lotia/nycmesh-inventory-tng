@@ -42,10 +42,8 @@ def said_in(page: str) -> str:
     ("path", "notice", "section"),
     [
         ("/admin/admins", "admin_retired", "retired"),
-        ("/admin/items", "retired", "retired"),
         ("/admin/categories", "retired", "retired"),
         ("/admin/locations", "retired", "retired"),
-        ("/admin/volunteers", "retired", "retired"),
         ("/admin/settings", "saved", "sign-in"),
         ("/admin/settings", "site_saved", "time-zone"),
         ("/admin/settings", "settings_saved", "scan-page"),

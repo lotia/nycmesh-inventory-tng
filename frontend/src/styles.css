@@ -231,6 +231,20 @@
     @apply border-2 border-problem bg-page font-semibold text-problem hover:bg-problem/10;
   }
 
+  /* "Current · Retired · All" above a list: the one shown marked as a
+     section is (docs/decisions/0019). */
+  .filters {
+    @apply my-3 flex flex-wrap items-center gap-x-2;
+
+    & a {
+      @apply inline-flex min-h-11 items-center border-b-4 border-transparent no-underline;
+
+      &[aria-current] {
+        @apply border-brand font-semibold;
+      }
+    }
+  }
+
   /* The way back, above a page's title. */
   .back {
     @apply mb-1;

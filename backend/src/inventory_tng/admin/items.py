@@ -9,7 +9,7 @@ from typing import Annotated
 
 import structlog
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,7 @@ from inventory_tng.admin.common import (
     text_form,
     undo_retire,
 )
+from inventory_tng.admin.listing import Listing, Searched
 from inventory_tng.db import DbSession, exists_where, refusal
 from inventory_tng.ledger import balance
 from inventory_tng.models import UNITS, Category, Item, ItemPackage, Label, Movement
@@ -85,20 +86,21 @@ def _categories(session: Session) -> list[Category]:
     return list(session.scalars(select(Category).order_by(func.lower(Category.name))))
 
 
+# How the items list finds an item: by anything a volunteer might type.
+SEARCHED = Searched(Item, Item.search_text, Item.name)
+
+
 def _list_page(
     request: Request,
     session: Session,
     signed: SignedIn,
     *,
-    search: str = "",
+    listing: Listing[Item] | None = None,
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
     undo: str | None = None,
 ) -> HTMLResponse:
-    query = select(Item).order_by(func.lower(Item.name))
-    if search:
-        query = query.where(Item.matches(search))
-    rows = session.scalars(query).all()
+    listing = (listing or Listing(ITEMS)).find(session, SEARCHED, select(Item))
     categories = _categories(session)
     return admin_page(
         request,
@@ -109,9 +111,7 @@ def _list_page(
             "undo": undo,
             "here": ITEMS,
             "categories_path": CATEGORIES,
-            "search": search,
-            "current": [i for i in rows if i.retired_at is None],
-            "retired": [i for i in rows if i.retired_at is not None],
+            "listing": listing,
             "categories": [c for c in categories if c.retired_at is None],
             "category_names": {c.id: c.name for c in categories},
             "units": UNITS,
@@ -205,10 +205,27 @@ def list_items(
     signed: AdminSignedIn,
     session: DbSession,
     q: str = "",
+    show: str = "",
+    page: str = "",
+    pick: str = "",
     undo: str = "",
 ) -> Response:
+    listing = Listing[Item].read(ITEMS, q, show, page, pick)
     back = undo_retire(session, Item, undo, ITEMS)
-    return _list_page(request, session, signed, search=q.strip(), undo=back)
+    return _list_page(request, session, signed, listing=listing, undo=back)
+
+
+@router.get(f"{ITEMS}/suggest")
+def suggest_items(
+    session: DbSession, signed: AdminSignedIn, q: str = "", show: str = ""
+) -> JSONResponse:
+    """What the search box offers as one types (_listing.html)."""
+    listing = Listing[Item].read(ITEMS, q, show)
+    names = {c.id: c.name for c in _categories(session)}
+    offered = listing.suggest(
+        session, SEARCHED, select(Item), lambda item: names.get(item.category_id, "")
+    )
+    return JSONResponse(offered, headers={"Cache-Control": "no-store"})
 
 
 @router.post(ITEMS)

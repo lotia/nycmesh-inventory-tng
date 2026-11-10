@@ -1,0 +1,56 @@
+{#- A long list's parts (admin/listing.py, docs/decisions/0019), each
+given the page's Listing. `one` and `many` name the kind of record, such
+as "item" and "items". -#}
+
+{#- The search box. Without JavaScript, Find lists every close match, best
+first; with it (frontend/src/combobox.ts), suggestions come from
+`here`/suggest as one types, and picking one narrows the list to it. -#}
+{% macro search_box(listing, many) -%}
+<form method="get" action="{{ listing.here }}" role="search" class="actions">
+  {% if listing.show != "current" %}<input type="hidden" name="show" value="{{ listing.show }}">{% endif %}
+  <label class="relative grow">Find {{ many }}
+    <input name="q" type="search" value="{{ listing.search }}" maxlength="200" autocomplete="off" data-suggest="{{ listing.here }}/suggest{% if listing.show != 'current' %}?show={{ listing.show }}{% endif %}">
+  </label>
+  <button>Find</button>
+</form>
+{%- endmacro %}
+
+{#- Which records: links, the one shown marked. -#}
+{% macro filters(listing) -%}
+<nav aria-label="Show" class="filters">
+  {% for show, words in [("current", "Current"), ("retired", "Retired"), ("all", "All")] %}
+  <a href="{{ listing.link(show=show) }}"{% if listing.show == show %} aria-current="page"{% endif %}>{{ words }}</a>
+  {%- if not loop.last %} <span aria-hidden="true">·</span>{% endif %}
+  {% endfor %}
+</nav>
+{%- endmacro %}
+
+{#- How many there are, and how many a search or a pick left. -#}
+{% macro summary(listing, one, many) -%}
+{% set kind = "retired " if listing.show == "retired" else "" %}
+<p class="hint">
+  {%- if listing.narrowed %}{{ listing.found }} of {{ listing.total }} {{ kind }}{{ one if listing.total == 1 else many }},
+  matching “{{ listing.picked or listing.search }}”. <a href="{{ listing.link(search='') }}">Clear search</a>
+  {%- else %}{{ listing.total }} {{ kind }}{{ one if listing.total == 1 else many }}{% endif -%}
+</p>
+{%- endmacro %}
+
+{#- A table row saying why the list is empty, and what to do next. -#}
+{% macro empty(listing, columns, none_yet) -%}
+<tr><td colspan="{{ columns }}">
+  {%- if listing.narrowed %}Nothing matches. Check the spelling, or <a href="{{ listing.link(search='') }}">clear the search</a>.
+  {%- elif listing.show == "retired" %}None is retired.
+  {%- else %}{{ none_yet }}{% endif -%}
+</td></tr>
+{%- endmacro %}
+
+{#- Pages of 50, once there are more. -#}
+{% macro pager(listing) -%}
+{% if listing.pages > 1 %}
+<nav aria-label="Pages" class="actions">
+  {% if listing.page > 1 %}<a href="{{ listing.link(page=listing.page - 1) }}" rel="prev"><span aria-hidden="true">‹&nbsp;</span>Previous</a>{% endif %}
+  <span>Page {{ listing.page }} of {{ listing.pages }}</span>
+  {% if listing.page < listing.pages %}<a href="{{ listing.link(page=listing.page + 1) }}" rel="next">Next<span aria-hidden="true">&nbsp;›</span></a>{% endif %}
+</nav>
+{% endif %}
+{%- endmacro %}
