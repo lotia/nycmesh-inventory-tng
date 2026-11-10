@@ -1,7 +1,6 @@
 """Server-rendered pages (docs/decisions/0002): their templates, and how a
 page or a redirect is sent."""
 
-import re
 from collections.abc import Callable, Mapping
 from decimal import Decimal
 from pathlib import Path
@@ -72,10 +71,30 @@ def sections(admin: object) -> list[tuple[str, str, Badge | None]]:
 # What a page says after a change, by the ?notice= it was sent back with
 # (redirect(..., notice=)). A fixed list: a link can only show one of these.
 NOTICES: dict[str, str] = {}
-# Where on the page a notice is said: by the heading of the section with this
-# id (_notice.html), which the redirect also scrolls to. Without one, under
-# the page's title.
-SECTION = re.compile(r"[a-z][a-z-]{0,39}")
+# Where on a page a notice is said: by the heading of the section with this
+# id (_notice.html), which the redirect also scrolls to; without one, under
+# the page's title. A fixed list, which a test checks against the templates'
+# sections both ways.
+NOTICE_SECTIONS = frozenset(
+    {
+        "adjust",
+        "authenticators",
+        "count",
+        "current",
+        "devices",
+        "email",
+        "holding",
+        "inactive",
+        "packages",
+        "password",
+        "reasons",
+        "retired",
+        "scan-page",
+        "sessions",
+        "sign-in",
+        "time-zone",
+    }
+)
 
 
 def page(
@@ -95,7 +114,7 @@ def page(
         "values": {},
         "notice": notice,
         # Only its section's heading says it (_notice.html), if there is one.
-        "notice_section": (section or None) if notice else None,
+        "notice_section": section if notice and section in NOTICE_SECTIONS else None,
     } | dict(context)
     if full.get("admin") is not None and full.get("sections") is None:
         full["sections"] = sections(full["admin"])
@@ -119,13 +138,13 @@ def redirect(
 ) -> RedirectResponse:
     """After a form, so reloading does not send it again; `notice`, one of
     NOTICES, is said on the page it goes to, by the heading of `section` if
-    given (SECTION), which the browser scrolls to."""
+    given (one of NOTICE_SECTIONS), which the browser scrolls to."""
     if notice is not None:
         if notice not in NOTICES:
             raise ValueError(f"no such notice: {notice}")
         query["notice"] = notice
     if section is not None:
-        if notice is None or not SECTION.fullmatch(section):
+        if notice is None or section not in NOTICE_SECTIONS:
             raise ValueError(f"no notice for section {section!r}")
         query["section"] = section
     if query:

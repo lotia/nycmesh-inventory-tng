@@ -17,8 +17,7 @@ from helpers.devices import new_device
 from helpers.rows import add, tag
 from helpers.sign_in import text
 
-SOURCE = Path(pages.__file__).parent
-TEMPLATES = SOURCE / "templates"
+TEMPLATES = Path(pages.__file__).parent / "templates"
 
 pytestmark = pytest.mark.usefixtures("admin_client")
 
@@ -99,12 +98,12 @@ def test_a_notice_about_the_whole_page_is_said_under_its_title(
     assert said_in(page) == "top"
 
 
-def test_a_section_the_page_lacks_says_nothing_but_breaks_nothing(
+def test_a_section_no_page_has_says_the_notice_under_the_title(
     admin_client: TestClient,
 ) -> None:
-    page = admin_client.get("/admin/settings?notice=saved&section=no-such-place")
-    assert page.status_code == 200
-    assert '<p role="status">' not in page.text
+    """A link with any other section, made by hand, loses no notice."""
+    page = text(admin_client.get("/admin/settings?notice=saved&section=no-such-place"))
+    assert said_in(page) == "top"
 
 
 def test_the_redirect_goes_to_the_section() -> None:
@@ -118,14 +117,10 @@ def test_the_redirect_goes_to_the_section() -> None:
         pages.redirect("/admin/settings", notice="saved", section="Sign In")
 
 
-def test_every_section_a_redirect_names_is_on_a_page() -> None:
-    """So no notice is sent where no page says it."""
-    named = set()
-    for module in SOURCE.rglob("*.py"):
-        source = module.read_text()
-        named |= set(re.findall(r'section="([a-z-]+)"', source))
+def test_the_notice_sections_are_the_sections_pages_say_notices_by() -> None:
+    """Both ways: no notice is sent where no page says it, and no page
+    waits for a section no redirect may name."""
     shown = set()
     for template in TEMPLATES.glob("*.html"):
         shown |= set(re.findall(r'with section_id="([a-z-]+)"', template.read_text()))
-    assert named
-    assert named <= shown
+    assert shown == pages.NOTICE_SECTIONS

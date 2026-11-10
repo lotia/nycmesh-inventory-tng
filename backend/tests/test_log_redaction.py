@@ -14,15 +14,13 @@ from structlog.testing import capture_logs
 from inventory_tng.logs import configure_logging
 from inventory_tng.masking import MASK, REDACTION_FIELD, Masker
 from inventory_tng.server import create_server
-from inventory_tng.settings import Redaction, Settings, SettingsError
+from inventory_tng.settings import Redaction, SettingsError
 from inventory_tng.telemetry import StructlogBridge, Telemetry
+
+from helpers.settings import settings
 
 NOW = datetime(2026, 11, 9, 12, tzinfo=UTC)
 LINE = {"event": "x", "email": "jane@example.org", "password": "hunter2"}
-
-
-def settings(**environ: str) -> Settings:
-    return Settings.from_environ({"DATABASE_URL": "postgresql://db/x", **environ})
 
 
 def masker_at(
