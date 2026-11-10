@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import labels, locations
 from inventory_tng.admin.common import (
     ADMIN,
-    CHANGED,
+    ALERTS,
     RULES,
     admin_page,
     chosen,
@@ -24,6 +24,7 @@ from inventory_tng.admin.common import (
     form_version,
     name_problem,
     now,
+    retirement,
     rule_words,
     undo_retire,
 )
@@ -137,6 +138,7 @@ def _location_page(
             "list": LOCATIONS,
             "back": (LOCATIONS, "Locations"),
             "location": location,
+            **retirement(session, location),
             "kind": KINDS.get(location.kind, "Volunteer's custody"),
             "areas": areas,
             "labels": labels.current_of(session, Label.location_id == location.id),
@@ -239,8 +241,8 @@ def save_location(
             locations.save(session, found, name, under, time_zone=zone, seen=seen)
 
         _, broken = attempt(session, save)
-        if broken == CHANGED:
-            alert = RULES[CHANGED]
+        if broken in ALERTS:
+            alert = RULES[broken]
             return _location_page(request, session, signed, found, alert=alert)
         problem = broken and rule_words(broken, TAKEN)
     if problem is not None:

@@ -102,13 +102,20 @@ def test_retiring_and_bringing_back(admin_client: TestClient, session: Session) 
     page = text(admin_client.get(CATEGORIES))
     assert "Retired" in page
     # Its name is free again while it is retired...
-    add(session, Category(name="Radios"))
+    taken = add(session, Category(name="Radios"))
     # ...so bringing it back clashes, and says so.
     clash = admin_client.post(f"{path}/restore")
     assert clash.status_code == 400
     assert "rename one first" in text(clash)
-    admin_client.post(
+    # Retired, it is read only: the current one is renamed instead.
+    refused = admin_client.post(
         f"{path}/name", data={"name": "Old radios", "version": shown(radios)}
+    )
+    assert refused.status_code == 409
+    assert "Bring it back first" in text(refused)
+    admin_client.post(
+        f"{CATEGORIES}/{taken.id}/name",
+        data={"name": "New radios", "version": shown(taken)},
     )
     assert admin_client.post(f"{path}/restore").status_code == 303
     assert radios.retired_at is None

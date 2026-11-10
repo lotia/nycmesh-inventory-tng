@@ -20,6 +20,7 @@ def add(session: Session, name: str) -> Category:
 
 def rename(session: Session, category: Category, name: str, *, seen: Seen) -> None:
     relock(session, category, seen=seen)
+    enforce("retired_read_only", when=category.retired_at is not None)
     category.name = name
 
 

@@ -87,6 +87,7 @@ def save(
 ) -> None:
     """Renamed, with their custody location."""
     held = _lock(session, volunteer, seen=seen)
+    enforce("retired_read_only", when=volunteer.retired_at is not None)
     volunteer.name, volunteer.email = name, email
     if held is not None:
         locations.rename_custody(session, held, name)

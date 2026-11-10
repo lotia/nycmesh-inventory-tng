@@ -3,7 +3,8 @@ item_package tables, and their rules. A current item is in a current
 category (categories.retire is the other side), and an item's unit is
 fixed once stock has moved in it, as the ledger's quantities are in that
 unit. The app may not move a package to another item (migration 0002),
-so its labels always name its item."""
+so its labels always name its item. A retired item is read only until it
+is brought back (docs/decisions/0019)."""
 
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -86,10 +87,11 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> None:
     """Every one of `fields` set."""
     # FOR UPDATE waits for any movement of it being written.
     relock(session, item, seen=seen)
+    enforce("retired_read_only", when=item.retired_at is not None)
     if fields.unit != item.unit:
         moved = exists_where(session, Movement.item_id == item.id)
         enforce("item_unit_fixed", when=moved)
-    if item.retired_at is None and fields.category_id != item.category_id:
+    if fields.category_id != item.category_id:
         _in_current_category(session, fields.category_id)
     for column, value in asdict(fields).items():
         setattr(item, column, value)
@@ -108,6 +110,7 @@ def restore(session: Session, item: Item) -> None:
 
 def add_package(session: Session, item: Item, name: str, size: Decimal) -> ItemPackage:
     relock(session, item)
+    enforce("retired_read_only", when=item.retired_at is not None)
     package = ItemPackage(item_id=item.id, name=name, size=size)
     session.add(package)
     session.flush()

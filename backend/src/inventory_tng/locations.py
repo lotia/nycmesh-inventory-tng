@@ -128,9 +128,9 @@ def save(
     (None: its parent's, or the site's). Events already recorded keep the
     zone they happened in."""
     relock(session, location, seen=seen)
+    enforce("retired_read_only", when=location.retired_at is not None)
     if parent_id is not None and parent_id != location.parent_id:
-        current = location.retired_at is None
-        enforce(placing(_parent(session, parent_id), current=current))
+        enforce(placing(_parent(session, parent_id), current=True))
         enforce(no_cycle(_ancestors(session, parent_id), location.id, parent_id))
         location.parent_id = parent_id
     location.name = name

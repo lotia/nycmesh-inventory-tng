@@ -63,11 +63,12 @@
   {% call table() %}
     {% for reason in reasons %}
     {% set field = "reason_" ~ reason.id %}
-    <tr {% if reason.retired_at %}class="retired"{% endif %}>
+    <tr>
       <td>
         <form method="post" action="{{ here }}/reasons/{{ reason.id }}" class="actions">
           <input type="hidden" name="version" value="{{ reason.edit_version }}">
           <input name="name" value="{{ reason.name }}" maxlength="{{ name_max }}" aria-label="Reason" required>
+          {% if reason.retired_at %}<span class="tag">Retired</span>{% endif %}
           <button name="action" value="rename">Rename<span class="sr-only"> {{ reason.name }}</span></button>
           {% if reason.retired_at %}
           <button name="action" value="restore">Bring it back<span class="sr-only"> {{ reason.name }}</span></button>

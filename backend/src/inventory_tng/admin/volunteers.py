@@ -17,13 +17,14 @@ from inventory_tng import volunteers
 from inventory_tng.accounts import email_problem
 from inventory_tng.admin.common import (
     ADMIN,
-    CHANGED,
+    ALERTS,
     RULES,
     admin_page,
     chosen,
     form_version,
     name_problem,
     now,
+    retirement,
     rule_words,
     undo_retire,
 )
@@ -115,6 +116,7 @@ def _volunteer_page(
             "list": VOLUNTEERS,
             "back": (VOLUNTEERS, "Volunteers"),
             "volunteer": volunteer,
+            **retirement(session, volunteer),
             "custody": volunteers.custody(session, volunteer.id),
             "merged_into": merged_into,
             "others": others,
@@ -211,8 +213,8 @@ def save_volunteer(
             session,
             lambda: volunteers.save(session, found, name, email or None, seen=seen),
         )
-        if broken == CHANGED:
-            alert = RULES[CHANGED]
+        if broken in ALERTS:
+            alert = RULES[broken]
             return _volunteer_page(request, session, signed, found, alert=alert)
         if broken:
             problems["name"] = rule_words(broken, TAKEN)

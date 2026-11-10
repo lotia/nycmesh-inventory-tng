@@ -1,0 +1,8 @@
+{#- At the top of a retired record's page (docs/decisions/0019): its tag,
+when and by whom it was retired (admin/common.retired_by), and the call's
+body, what that means. The page is read only; the caller follows this
+with its one action, bringing it back. -#}
+{% macro retired_record(row, person=false) -%}
+<p><span class="tag">Retired</span> on {{ row.retired_at | when(zone) }}{% if retired_by %} by {{ retired_by }}{% endif %}.</p>
+<p>{{ caller() }} Bring {{ "them" if person else "it" }} back to change anything here.</p>
+{%- endmacro %}

@@ -1,12 +1,16 @@
 {% extends "admin_base.html" %}
+{% from "_retired_record.html" import retired_record with context %}
 {% block main %}
 {% with name = "admin" %}{% if problems.get(name) %}<p role="alert">{{ problems[name] }}</p>{% endif %}{% endwith %}
+{% if other.retired_at %}
+{% call retired_record(other, person=true) %}They can't sign in.{% if other.email %} They gave an email address.{% endif %}{% endcall %}
+{% else %}
 <p>
-  {% if other.retired_at %}Retired: they can't sign in.
-  {% elif not has_password %}No password yet: they choose one with the link they were given.
+  {% if not has_password %}<span class="tag">Invited</span> No password yet: they choose one with the link they were given.
   {% else %}Signs in with a password{{ " and an authenticator" if uses_totp else "" }}.{% endif %}
   {% if other.email %}They gave an email address.{% endif %}
 </p>
+{% endif %}
 
 {% if not other.retired_at and not themselves %}
 <section>

@@ -48,7 +48,7 @@ often as needed; pick some here to print them again.</p>
   {% call table() %}
     <tr><th>Code</th><th>Names</th><th>Why</th></tr>
     {% for named in inactive %}
-    <tr class="retired">
+    <tr>
       <td class="key">{{ named.label.code }}</td>
       <td>{{ named.words }}</td>
       <td>{{ named.why | capitalize }}{% if named.label.revoked_at %} {{ named.label.revoked_at | when(zone) }}{% endif %}</td>
