@@ -1,4 +1,5 @@
-"""What every operator command shares (registration_codes, scan_settings):
+"""What every operator command shares (registration_codes, scan_settings,
+totp_keys; docs/decisions/0018):
 the process is set up as the server sets itself up (docs/decisions/0007),
 then the command runs in one transaction, committed if it returns.
 """

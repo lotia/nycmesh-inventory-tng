@@ -230,6 +230,29 @@ by downgrading.
 4. Tell the people whose personal data it held: administrators, and the
    volunteers named in it.
 
+## Operator commands
+
+Some things only the operator can do, with a command run where the app
+runs, with its settings. On Kubernetes, that means `kubectl exec` into the
+app's Deployment (`inventory` below; docs/decisions/0018); from a checkout,
+`uv run python -m …` in `backend/`:
+
+```sh
+kubectl exec deploy/inventory -- python -m inventory_tng.<command> --help
+```
+
+They are:
+
+- making a registration code when no administrator can (Registering
+  devices, below);
+- changing the scan page's settings when no administrator can (Scan page
+  settings, below);
+- sealing every authenticator with a new TOTP key (TOTP keys, below).
+
+What a command makes, such as a code, and its log lines are printed to
+your terminal only, not to the app's logs; what it changed is in the
+history. A cluster that forbids `kubectl exec` cannot run these.
+
 ## The first administrator
 
 Administrators do everything else in the browser, so the first one sets up
@@ -336,13 +359,21 @@ Devices page. Links in its QR codes start with `SITE_URL` when mail is set
 up; otherwise with the address the administrator reached the site at, so
 behind a proxy set `FORWARDED_ALLOW_IPS`, or the link may say http.
 
-If no administrator can, the operator can make one on the server:
-`uv run python -m inventory_tng.registration_codes create --uses 5 --days 1
---base-url https://<your host>` (`--help` lists the rest).
+If no administrator can, the operator can make one (Operator commands,
+above):
+
+```sh
+kubectl exec deploy/inventory -- python -m inventory_tng.registration_codes \
+  create --uses 5 --days 1 --base-url https://<your host>
+```
 
 ## Scan page settings
 
 Administrators set how the scan page behaves on the Settings page; the
 settings live in the database (docs/decisions/0011). If no administrator
-can, the operator can on the server: `uv run python -m
-inventory_tng.scan_settings set --name-check-minutes 20`.
+can, the operator can (Operator commands, above):
+
+```sh
+kubectl exec deploy/inventory -- python -m inventory_tng.scan_settings \
+  set --name-check-minutes 20
+```
