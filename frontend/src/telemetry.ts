@@ -7,8 +7,10 @@
  * volunteer, an item or a place, and an error sends only that one happened.
  *
  * Events wait in memory and go together: when ten are waiting, and when the
- * page is hidden or left, by sendBeacon, which outlives the page. A page
- * sends at most MOST_PER_PAGE, so a loop of errors cannot flood the server.
+ * page is hidden or left, by sendBeacon, which outlives the page. Each kind
+ * has its own budget an hour (PER_HOUR), so a loop of errors cannot flood
+ * the server, retries while offline cannot crowd out the rest, and a scan
+ * page left open all day still reports.
  * Nothing is sent until start(), which only the pages' entry points call.
  */
 import { onCLS, onINP, onLCP } from "web-vitals";
@@ -16,7 +18,15 @@ import type { Schemas } from "./api/client";
 
 export const PATH = "/api/telemetry";
 export const FLUSH_AT = 10;
-export const MOST_PER_PAGE = 50;
+/** How many of each kind a page sends an hour: 50 in all, under the
+ * server's limit (page_telemetry.REPORTS). */
+export const PER_HOUR: Record<Event["kind"], number> = {
+  web_vital: 10,
+  error: 10,
+  outbox_retry: 10,
+  scan_to_save: 20,
+};
+const HOUR_MS = 3_600_000;
 /** The longest scan_to_save the backend takes (page_telemetry.ScanToSave):
  * an event outside its bounds would have the whole report refused. */
 export const MOST_SECONDS_TO_SAVE = 86_400;
@@ -38,9 +48,14 @@ function beacon(body: Blob): void {
 export class Telemetry {
   private page: Page | null = null;
   private waiting: Event[] = [];
-  private recorded = 0;
+  /** This hour's events of each kind, and when the hour began. */
+  private recorded = new Map<Event["kind"], number>();
+  private hourFrom = 0;
 
-  constructor(private readonly send: Send = beacon) {}
+  constructor(
+    private readonly send: Send = beacon,
+    private readonly now: () => number = Date.now,
+  ) {}
 
   /** Report from now on, as `page`; what was recorded before is dropped.
    * Returns what stops listening to the page (the Web Vitals aside, which
@@ -80,10 +95,19 @@ export class Telemetry {
   }
 
   record(event: Event): void {
-    if (this.page === null || this.recorded >= MOST_PER_PAGE) {
+    if (this.page === null) {
       return;
     }
-    this.recorded += 1;
+    const now = this.now();
+    if (now - this.hourFrom >= HOUR_MS) {
+      this.recorded.clear();
+      this.hourFrom = now;
+    }
+    const recorded = this.recorded.get(event.kind) ?? 0;
+    if (recorded >= PER_HOUR[event.kind]) {
+      return;
+    }
+    this.recorded.set(event.kind, recorded + 1);
     this.waiting.push(event);
     if (this.waiting.length >= FLUSH_AT) {
       this.flush();
