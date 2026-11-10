@@ -19,7 +19,6 @@ import argparse
 import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from urllib.parse import urlencode
 
 from sqlalchemy.orm import Session
 
@@ -27,7 +26,7 @@ from inventory_tng import accounts
 from inventory_tng.command import run_command_telling
 from inventory_tng.mail import Notifier
 from inventory_tng.settings import Settings
-from inventory_tng.sign_in import RESET
+from inventory_tng.sign_in import reset_url
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -79,7 +78,7 @@ def run(session: Session, args: argparse.Namespace, notify: Notifier) -> int:
         print(refused, file=sys.stderr)
         return 1
     done(f"A link for {admin.username}, once, within the hour:")
-    done(f"{site.rstrip('/')}{RESET}?{urlencode({'token': token})}")
+    done(reset_url(site, token))
     return 0
 
 

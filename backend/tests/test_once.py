@@ -147,3 +147,9 @@ def test_a_form_without_its_key_is_a_bad_request(admin_client: TestClient) -> No
 def test_a_key_that_is_not_text_is_none() -> None:
     """As a form without the field gives (form.get)."""
     assert once.form_key(None) is None
+
+
+def test_a_form_sent_once_carries_its_page(admin_client: TestClient) -> None:
+    """For the page saying it was sent before to link back: browsers send
+    no Referer here."""
+    assert f'name="back" value="{ACCOUNT}"' in admin_client.get(ACCOUNT).text

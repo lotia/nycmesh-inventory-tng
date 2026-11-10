@@ -45,6 +45,9 @@ Kind = Literal[
     "recovery_code_used",
     "recovery_codes_made",
     "authenticators_changed",
+    "authenticators_retired",
+    "left_without_a_factor",
+    "retired",
     "sign_in_settings_changed",
     "activity",
     "let_in",
@@ -371,6 +374,45 @@ def authenticators_changed(*, added: bool) -> Callable[[str, int], Message]:
         )
 
     return build
+
+
+def authenticators_retired(to: str, admin_id: int) -> Message:
+    return Message(
+        to,
+        "Set up your authenticator again on NYC Mesh Inventory",
+        "Whoever runs NYC Mesh Inventory retired your authenticator, as the "
+        "key it was kept with was lost or leaked, and signed you out. Sign in "
+        "with your password and one of your recovery codes, then set up an "
+        f"authenticator again.\n\n{IF_NOT_YOU}",
+        "authenticators_retired",
+        admin_id,
+    )
+
+
+def left_without_a_factor(to: str, admin_id: int) -> Message:
+    return Message(
+        to,
+        "Your NYC Mesh Inventory sign-in was reset",
+        "Whoever runs NYC Mesh Inventory retired your authenticator, as the "
+        "key it was kept with was lost or leaked. You had no recovery code "
+        "left, so your password was removed too: ask them to let you back in.",
+        "left_without_a_factor",
+        admin_id,
+    )
+
+
+def retired(to: str, admin_id: int) -> Message:
+    return Message(
+        to,
+        "Your NYC Mesh Inventory account was retired",
+        "Another administrator just retired your administrator account on NYC "
+        "Mesh Inventory: you can no longer sign in, and anything you signed in "
+        "with was removed. Another administrator can bring you back.\n\n"
+        "If this was not agreed, tell the other administrators, or whoever runs "
+        "NYC Mesh Inventory, at once.",
+        "retired",
+        admin_id,
+    )
 
 
 def recovery_codes_made(to: str, admin_id: int) -> Message:

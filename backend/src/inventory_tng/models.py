@@ -100,7 +100,8 @@ def whole(typed: str, low: int, high: int) -> int | None:
 # What a reset link is for (docs/decisions/0012): an invite; asking by mail;
 # a reset of the account's sign-in; the operator's recovery token. An
 # invite or a reset is made by another administrator (made_by_id), or by
-# the operator's command (NULL; accounts.let_in). Every one sets a password.
+# the operator's commands (NULL; accounts.let_in, invite_by_operator). Every
+# one sets a password.
 # Using a reset or recovery one removes the authenticators too: a reset removed them when it was made
 # already, and again catches any added from a session cut off meanwhile
 # (inventory-tng-8i4.50.4 closes that properly; then reset can go).
@@ -670,6 +671,11 @@ class Admin(Base):
     # Optional: only for password resets and notices.
     email: Mapped[str | None] = mapped_column(Text)
     retired_at: Mapped[RetiredAt]
+    # Their authenticators retired by the operator (accounts.
+    # retire_authenticators): they sign in with a recovery code and must set
+    # one up again, whatever the TOTP policy; with no code left, not with
+    # the password alone. Cleared by a new authenticator or a reset.
+    must_set_up_totp: Mapped[bool] = mapped_column(server_default=text("false"))
 
 
 class AdminPassword(Base):
@@ -772,6 +778,9 @@ class AdminSession(Base):
     account_confirmed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
+    # When they last signed in before this session (None: never), kept as
+    # it starts, for "Since you last signed in".
+    signed_in_before: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # The browser's User-Agent, to tell sessions apart on the account page.
     user_agent: Mapped[str | None] = mapped_column(Text)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -22,7 +22,7 @@ from inventory_tng.db import DbSession, SessionFactory, Sessions
 from inventory_tng.mail import Notify
 from inventory_tng.models import ResetLink
 from inventory_tng.pages import NOTICES, not_found, page, redirect
-from inventory_tng.sign_in import FORGOT, RESET, SIGN_IN, TOO_MANY
+from inventory_tng.sign_in import FORGOT, RESET, SIGN_IN, TOO_MANY, reset_url
 from inventory_tng.web import rate_key
 
 router = APIRouter(include_in_schema=False)
@@ -98,7 +98,7 @@ def _email_reset(
         if found is None:
             return
         session.commit()
-    link = f"{site_url}{RESET}?token={found.token}"
+    link = reset_url(site_url, found.token)
     mail.deliver(mailer, mail.reset_link(found.email, found.admin_id, link))
 
 

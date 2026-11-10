@@ -116,7 +116,8 @@ without a deployment.
   account would leave those rows pointing nowhere.
 - **Retiring removes everything they sign in with**, as a reset does, and
   voids their links, so a retired account holds no password hash to crack
-  and no TOTP key, even in a backup. Bringing them back makes a link that
+  and no TOTP key, even in a backup. They are mailed, in case it was not
+  agreed. Bringing them back makes a link that
   works as an invite: they choose a new password and set up TOTP again,
   whatever they were retired for. We rejected keeping the password until
   they come back: nothing could use it meanwhile, but a leaked database

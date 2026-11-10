@@ -359,10 +359,11 @@ kubectl exec deploy/inventory -- python -m inventory_tng.totp_keys \
   retire-authenticators --unreadable
 ```
 
-Each of those administrators then signs in with their password and a
-recovery code, and sets up a new authenticator. One with no recovery code
-left has their sign-in removed, so their password alone gets nobody in:
-the command names them, for you to let in (Break-glass, above).
+Each of those administrators is signed out and mailed what to do: sign in
+with their password and a recovery code, and set up a new authenticator.
+One with no recovery code left has their sign-in removed, so their
+password alone gets nobody in: the command names them, for you to let in
+(Break-glass, above).
 
 **If a key leaks** with a copy of the database, anyone holding both can
 make codes, and resealing does not change what the codes are. Add the next
