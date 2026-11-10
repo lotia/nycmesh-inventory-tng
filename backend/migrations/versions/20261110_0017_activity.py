@@ -26,6 +26,9 @@ KINDS = (
     "restored",
     "recovery_link_made",
     "sign_in_settings_changed",
+    "locked_down",
+    "let_in",
+    "authenticators_retired",
 )
 
 

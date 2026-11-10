@@ -211,6 +211,23 @@ def revoke_code(session: Session, code_id: int) -> bool:
     return _revoke(session, RegistrationCode, code_id, "registration_code_id")
 
 
+def revoke_every_code(session: Session, now: datetime) -> int:
+    """Stop every current code registering anything more, as revoke_code
+    does each: how many. Devices stay registered."""
+    current = session.scalars(
+        locked(
+            select(RegistrationCode)
+            .where(RegistrationCode.revoked_at.is_(None))
+            .order_by(RegistrationCode.id),
+            key_share=True,
+        )
+    ).all()
+    for code in current:
+        code.revoked_at = now
+    log.info("registration codes revoked", count=len(current))
+    return len(current)
+
+
 def revoke_device(session: Session, device_id: int) -> bool:
     """Refuse this device from its next request. False if there is no such
     current device."""

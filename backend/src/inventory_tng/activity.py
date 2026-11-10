@@ -35,6 +35,14 @@ WORDS: Mapping[ActivityKind, Callable[[str, str], str]] = {
         f"{by} made a link for {admin} with the recovery token"
     ),
     "sign_in_settings_changed": lambda by, _: f"{by} changed the sign-in settings",
+    "locked_down": lambda by, _: (
+        f"{by} retired every administrator and revoked every registration code"
+    ),
+    "let_in": lambda by, admin: f"{by} let {admin} back in",
+    "authenticators_retired": lambda by, _: (
+        f"{by} removed authenticators: sign in with a recovery code and set one "
+        "up again"
+    ),
 }
 # Who did it, when no administrator did: a command run by the operator.
 OPERATOR = "The operator"
@@ -60,7 +68,7 @@ def record(
     by_admin_id: int | None,
     admin_id: int | None,
     notify: Notifier | None,
-) -> None:
+) -> Activity:
     """Keep it, and mail every current administrator with an address but
     the one it was done to, whom the caller tells in their own words. Mail
     goes after the reply, so only once the caller has committed; without
@@ -78,8 +86,13 @@ def record(
         target_admin_id=admin_id,
     )
     if notify is not None:
-        words = _words(row, _usernames(session, (by_admin_id, admin_id)))
-        notify.tell_admins(session, mail.activity(words), but=admin_id)
+        notify.tell_admins(session, mail.activity(words(session, row)), but=admin_id)
+    return row
+
+
+def words(session: Session, row: Activity) -> str:
+    """How one reads."""
+    return _words(row, _usernames(session, (row.by_admin_id, row.admin_id)))
 
 
 def recent(

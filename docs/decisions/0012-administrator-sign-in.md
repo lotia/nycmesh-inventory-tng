@@ -3,7 +3,8 @@
 **Status:** accepted · 2026-11-02 · amends 0004 (TOTP may be optional in
 production) · amended 2026-11-10 (retiring removes the sign-in; nobody is
 deleted; a code for each change to another administrator, and everyone
-told), 2026-11-10 by 0018 (the operator's commands)
+told), 2026-11-10 by 0018 (the operator's commands; a code asked for while
+recovery codes remain)
 
 ## Context
 

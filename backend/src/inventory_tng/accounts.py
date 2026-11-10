@@ -26,12 +26,11 @@ from opentelemetry import metrics
 from sqlalchemy import ColumnElement, exists, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
-from inventory_tng import activity
+from inventory_tng import activity, devices, mail
 from inventory_tng.db import exists_where, get_locked, locked, set_actor, unique
 from inventory_tng.devices import digest
 from inventory_tng.mail import Notifier
 from inventory_tng.models import (
-    MADE_BY_ADMIN,
     Admin,
     AdminPassword,
     AdminSession,
@@ -502,7 +501,8 @@ def sign_in(
         _refuse_sign_in("unknown_user", None)
     set_actor(session, f"admin:{admin.id}")
     factor: Factor | None = "password"
-    if authenticators := locked_authenticators(session, admin.id):
+    authenticators = locked_authenticators(session, admin.id)
+    if authenticators or has_recovery_codes(session, admin.id):
         if not limits.hit(PER_ACCOUNT, "code", str(admin.id)):
             _refuse_sign_in("rate_limited", admin)
         factor = check_second_factor(session, keys, admin.id, authenticators, code, now)
@@ -626,13 +626,13 @@ def confirm(
         return _confirmation(row, "rate_limited"), None
     set_actor(session, f"admin:{row.admin_id}")
     factor: Factor | None = None
-    if uses_totp(session, row.admin_id):
-        if authenticators := locked_authenticators(session, row.admin_id):
-            factor = check_second_factor(
-                session, keys, row.admin_id, authenticators, typed, now
-            )
+    if has_second_factor(session, row.admin_id):
+        authenticators = locked_authenticators(session, row.admin_id)
+        factor = check_second_factor(
+            session, keys, row.admin_id, authenticators, typed, now
+        )
     # Checked again once locked: TOTP may have been set up meanwhile.
-    elif check_password(session, row.admin_id, typed) and not uses_totp(
+    elif check_password(session, row.admin_id, typed) and not has_second_factor(
         session, row.admin_id
     ):
         factor = "password"
@@ -842,6 +842,18 @@ def remove_authenticator(
     return "totp_off" if last else "removed"
 
 
+def has_recovery_codes(session: Session, admin_id: int) -> bool:
+    return exists_where(session, *_unused_codes(admin_id))
+
+
+def has_second_factor(session: Session, admin_id: int) -> bool:
+    """A current authenticator, or unused recovery codes: then a code is
+    asked for, at sign-in and to confirm. Codes come only with an
+    authenticator, but for after the operator retired them
+    (retire_authenticators)."""
+    return uses_totp(session, admin_id) or has_recovery_codes(session, admin_id)
+
+
 def recovery_codes_left(session: Session, admin_id: int) -> int:
     return session.scalar(select(func.count()).where(*_unused_codes(admin_id))) or 0
 
@@ -931,8 +943,8 @@ def make_reset_link(
     links still unused, so the newest works: an emailed one voids only
     emailed ones, so asking by mail, which anyone may do, never undoes a
     link another administrator or the recovery token made. One another
-    administrator passes on lasts a day; any other, an hour."""
-    lifetime = MADE_LINK_LIFETIME if kind in MADE_BY_ADMIN else EMAILED_LINK_LIFETIME
+    administrator made, to pass on, lasts a day; any other, an hour."""
+    lifetime = MADE_LINK_LIFETIME if made_by_id is not None else EMAILED_LINK_LIFETIME
     void_reset_links(session, admin_id, now, emailed_only=kind == "emailed")
     token, token_hash = _new_token()
     link = ResetLink(
@@ -1171,12 +1183,13 @@ sign_in_resets = meter.create_counter(
 
 
 def _remove_sign_in(session: Session, admin_id: int, now: datetime) -> int:
-    """Their password goes, their authenticators are retired (keys wiped),
-    their recovery codes voided and their sessions ended, so nothing a thief
-    may hold works. Their links are the caller's: voided before this, as
-    use_reset_link locks its link before the password, so a link being used
-    meanwhile finishes, then this undoes it. The caller holds the
-    administrators lock. How many sessions ended."""
+    """Their links are voided, their password goes, their authenticators are
+    retired (keys wiped), their recovery codes voided and their sessions
+    ended, so nothing a thief may hold works. Links first, as use_reset_link
+    locks its link before the password: a link being used meanwhile
+    finishes, then this undoes it. A link made after this is the only one.
+    The caller holds the administrators lock. How many sessions ended."""
+    void_reset_links(session, admin_id, now)
     ended = end_sessions(session, admin_id, now)
     if (password := get_locked(session, AdminPassword, admin_id)) is not None:
         session.delete(password)
@@ -1199,9 +1212,8 @@ def reset_admin_sign_in(
     while required. Raises AdminRefused."""
     admin = _locked_other(session, "reset", admin_id, by_admin_id, retired=False)
     kind: LinkKind = "reset" if has_password(session, admin.id) else "invite"
-    # The link first, which voids every other.
-    token = make_reset_link(session, admin.id, now, kind=kind, made_by_id=by_admin_id)
     ended = _remove_sign_in(session, admin.id, now)
+    token = make_reset_link(session, admin.id, now, kind=kind, made_by_id=by_admin_id)
     if kind == "reset":
         sign_in_resets.add(1, {"action": "reset"})
     log.info(
@@ -1219,26 +1231,26 @@ def invite(
     session: Session,
     username: str,
     email: str | None,
-    made_by_id: int,
+    made_by_id: int | None,
     now: datetime,
     notify: Notifier | None = None,
 ) -> tuple[Admin, str]:
     """A new administrator, with no password yet, so nobody can sign in as
-    them, and the one-use link that lets them choose one. They set up TOTP
-    at their first sign-in while it is required. A username or email already
-    taken is an IntegrityError on flush; AdminRefused if the one inviting can
-    no longer sign in (retired, or their sign-in reset, meanwhile)."""
-    if not lock_admins(session, made_by_id):
+    them, and the one-use link that lets them choose one: made by another
+    administrator, or by the operator (None), whose link lasts an hour. They
+    set up TOTP at their first sign-in while it is required. A username or
+    email already taken is an IntegrityError on flush; AdminRefused if the
+    one inviting can no longer sign in (retired, or their sign-in reset,
+    meanwhile)."""
+    if made_by_id is None:
+        _lock_every_admin(session)
+    elif not lock_admins(session, made_by_id):
         _refuse_action("invite", "signed_out", made_by_id)
     admin = Admin(username=username, email=email or None)
     session.add(admin)
     session.flush()
     token = make_reset_link(
-        session,
-        admin.id,
-        now,
-        kind="invite",
-        made_by_id=made_by_id,
+        session, admin.id, now, kind="invite", made_by_id=made_by_id
     )
     log.info("administrator invited", admin_id=admin.id, made_by_id=made_by_id)
     activity.record(session, "invited", made_by_id, admin.id, notify)
@@ -1292,8 +1304,15 @@ def lock_admins(session: Session, by_admin_id: int) -> bool:
     sign-in reset meanwhile, so a request already waiting from a session
     just cut off changes nothing. As the one acting can always sign in and
     is never the one acted on, someone who can sign in always remains."""
-    session.scalars(locked(select(Admin).order_by(Admin.id), key_share=True)).all()
+    _lock_every_admin(session)
     return admin_can_sign_in(session, session.get_one(Admin, by_admin_id))
+
+
+def _lock_every_admin(session: Session) -> list[Admin]:
+    """Every administrator row, locked in one order and read again."""
+    return list(
+        session.scalars(locked(select(Admin).order_by(Admin.id), key_share=True))
+    )
 
 
 def _locked_other(
@@ -1329,14 +1348,10 @@ def retire_admin(
     now: datetime,
     notify: Notifier | None = None,
 ) -> None:
-    """Retire another administrator, removing everything they sign in with
-    (_remove_sign_in) and voiding their links, so a retired account holds no
-    credential to steal or crack. Never oneself; someone who can sign in
-    always remains (lock_admins). Raises AdminRefused."""
+    """Retire another administrator (_retire). Never oneself; someone who
+    can sign in always remains (lock_admins). Raises AdminRefused."""
     admin = _locked_other(session, "retire", admin_id, by_admin_id, retired=False)
-    admin.retired_at = now
-    void_reset_links(session, admin.id, now)
-    ended = _remove_sign_in(session, admin.id, now)
+    ended = _retire(session, admin, now)
     log.info(
         "administrator retired",
         target_admin_id=admin.id,
@@ -1344,6 +1359,14 @@ def retire_admin(
         sessions_ended=ended,
     )
     activity.record(session, "retired", by_admin_id, admin.id, notify)
+
+
+def _retire(session: Session, admin: Admin, now: datetime) -> int:
+    """Retired, with everything they sign in with removed (_remove_sign_in),
+    so a retired account holds no credential to steal or crack. How many
+    sessions ended."""
+    admin.retired_at = now
+    return _remove_sign_in(session, admin.id, now)
 
 
 def restore_admin(
@@ -1367,3 +1390,128 @@ def restore_admin(
     )
     activity.record(session, "restored", by_admin_id, admin.id, notify)
     return admin, token
+
+
+# The operator's break-glass (docs/decisions/0018), from python -m
+# inventory_tng.admins: no administrator acts, so none needs to sign in.
+# Their links are made by nobody (made_by_id NULL), so last an hour.
+
+
+# In the history and the logs as the one who did it.
+OPERATOR_ACTOR = "system:operator"
+
+
+class OperatorRefused(Exception):
+    """An operator command refused, and why, as its words to the operator."""
+
+
+def lock_down(
+    session: Session, expected: int, now: datetime, notify: Notifier
+) -> list[Admin]:
+    """Retire every current administrator at once, as retiring one does
+    (_retire), and revoke every registration code they may have made, for
+    when several may be compromised. `expected` is how many the operator
+    believes are current, so a typo or a stale belief refuses rather than
+    surprises. Those retired are told by mail, as nobody is left to see it
+    in the app. Returns them. Raises OperatorRefused."""
+    current = [a for a in _lock_every_admin(session) if a.retired_at is None]
+    if len(current) != expected:
+        log.warning("lockdown refused", current=len(current), expected=expected)
+        raise OperatorRefused(
+            f"{len(current)} administrators are current, not {expected}."
+        )
+    set_actor(session, OPERATOR_ACTOR)
+    for admin in current:
+        _retire(session, admin, now)
+    codes = devices.revoke_every_code(session, now)
+    log.warning(
+        "administrators locked out",
+        admin_ids=[a.id for a in current],
+        registration_codes_revoked=codes,
+    )
+    row = activity.record(session, "locked_down", None, None, None)
+    told = mail.activity(activity.words(session, row))
+    for admin in current:
+        notify.tell(admin.email, admin.id, told)
+    return current
+
+
+def let_in(
+    session: Session, username: str, now: datetime, notify: Notifier
+) -> tuple[Admin, str]:
+    """Let one administrator back in, retired or not, with everything they
+    signed in with removed (_remove_sign_in): returns them and a one-use
+    reset link, lasting an hour, for the operator to pass on, with which
+    they choose a password and set up TOTP again. Raises OperatorRefused."""
+    wanted = username.strip().lower()
+    found = [a for a in _lock_every_admin(session) if a.username.lower() == wanted]
+    if not found:
+        raise OperatorRefused(f"No administrator is called {username}.")
+    (admin,) = found
+    set_actor(session, OPERATOR_ACTOR)
+    admin.retired_at = None
+    _remove_sign_in(session, admin.id, now)
+    token = make_reset_link(session, admin.id, now, kind="reset")
+    log.warning("administrator let in", admin_id=admin.id)
+    activity.record(session, "let_in", None, admin.id, notify)
+    notify.tell(admin.email, admin.id, mail.let_in)
+    return admin, token
+
+
+def invite_by_operator(
+    session: Session, username: str, email: str | None, now: datetime, notify: Notifier
+) -> tuple[Admin, str]:
+    """A new administrator, invited by the operator (invite). Raises
+    OperatorRefused for a username or email taken or not allowed."""
+    if problem := username_problem(username) or email_problem(email or ""):
+        raise OperatorRefused(problem)
+    set_actor(session, OPERATOR_ACTOR)
+    made: list[tuple[Admin, str]] = []
+    if not unique(
+        session,
+        lambda: made.append(invite(session, username, email, None, now, notify)),
+    ):
+        raise OperatorRefused("Another administrator has that username or email.")
+    admin, token = made[0]
+    notify.tell(admin.email, admin.id, mail.invited_by_operator)
+    return admin, token
+
+
+def retire_authenticators(
+    session: Session, keys: TotpKeys, now: datetime, *, every: bool, notify: Notifier
+) -> tuple[int, list[str]]:
+    """Retire every authenticator that cannot be read (a lost TOTP key), or
+    `every` one (a leaked key: resealing does not change TOTP secrets).
+    Recovery codes stay, and sign-in asks for one while any is unused, so
+    each administrator signs in with a password and a recovery code and
+    sets up TOTP again. One left with no second factor has their sign-in
+    removed, as the password alone must not get in: returns how many
+    authenticators were retired, and the usernames of those, to let in."""
+    admins = _lock_every_admin(session)
+    set_actor(session, OPERATOR_ACTOR)
+    retired, stranded = 0, []
+    for admin in admins:
+        chosen = [
+            a
+            for a in locked_authenticators(session, admin.id)
+            if every or _opened(keys, a) is None
+        ]
+        for authenticator in chosen:
+            retire(authenticator, now)
+        retired += len(chosen)
+        if (
+            chosen
+            and admin.retired_at is None
+            and not has_second_factor(session, admin.id)
+        ):
+            _remove_sign_in(session, admin.id, now)
+            stranded.append(admin.username)
+    log.warning(
+        "authenticators retired",
+        retired=retired,
+        every=every,
+        stranded=len(stranded),
+    )
+    if retired:
+        activity.record(session, "authenticators_retired", None, None, notify)
+    return retired, stranded

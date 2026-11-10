@@ -85,10 +85,11 @@ def whole(typed: str, low: int, high: int) -> int | None:
     return number if low <= number <= high else None
 
 
-# What made a reset link (docs/decisions/0012): an invite; asking by mail;
-# another administrator resetting the account's sign-in; the operator's
-# recovery token. Every one sets a password. Using a reset or recovery one
-# removes the authenticators too: a reset removed them when it was made
+# What a reset link is for (docs/decisions/0012): an invite; asking by mail;
+# a reset of the account's sign-in; the operator's recovery token. An
+# invite or a reset is made by another administrator (made_by_id), or by
+# the operator's command (NULL; accounts.let_in). Every one sets a password.
+# Using a reset or recovery one removes the authenticators too: a reset removed them when it was made
 # already, and again catches any added from a session cut off meanwhile
 # (inventory-tng-8i4.50.4 closes that properly; then reset can go).
 ResetKind = Literal["invite", "emailed", "reset", "recovery"]
@@ -112,6 +113,9 @@ ActivityKind = Literal[
     "restored",
     "recovery_link_made",
     "sign_in_settings_changed",
+    "locked_down",
+    "let_in",
+    "authenticators_retired",
 ]
 ACTIVITY_KINDS: tuple[ActivityKind, ...] = get_args(ActivityKind)
 
@@ -758,7 +762,7 @@ class ResetLink(Base):
     __table_args__ = (
         CheckConstraint(_one_of("kind", RESET_KINDS), name="kind"),
         CheckConstraint(
-            f"(made_by_id IS NOT NULL) = ({_one_of('kind', MADE_BY_ADMIN)})",
+            f"made_by_id IS NULL OR {_one_of('kind', MADE_BY_ADMIN)}",
             name="made_by",
         ),
         CheckConstraint(
