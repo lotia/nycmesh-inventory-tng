@@ -24,10 +24,10 @@ fails (db.hold_until_commit). Work after the reply opens its own session.
 """
 
 import dataclasses
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Annotated, Any, cast
+from typing import Annotated, Any, Literal, cast
 from urllib.parse import quote, urlsplit
 
 import structlog
@@ -46,8 +46,9 @@ from inventory_tng.db import (
 )
 from inventory_tng.mail import Notify
 from inventory_tng.masking import is_secret_name
-from inventory_tng.models import Admin, AdminSession, SignInSettings
+from inventory_tng.models import Admin, AdminSession, SignInSettings, running_low
 from inventory_tng.pages import (
+    NOTICES,
     Badge,
     not_found,
     page,
@@ -124,6 +125,19 @@ def _set_cookie(
     set_private_cookie(
         request, response, COOKIE, token, expires=row.expires_at.astimezone(UTC)
     )
+
+
+NOTICES.update(
+    {
+        "codes_low": "You signed in with a recovery code, and few are left: "
+        "make new ones now, with a code from your authenticator. Lost your "
+        "phone? Set up a new authenticator first.",
+        "codes_none": "That was your last recovery code. Make new ones now, "
+        "with a code from your authenticator (lost your phone? set up a new "
+        "one first): without them, a lost phone locks you out until another "
+        "administrator resets your sign-in.",
+    }
+)
 
 
 # What administrator pages depend on
@@ -240,11 +254,32 @@ class ConfirmHere(Exception):
         carried: list[tuple[str, str]],
         alert: str | None = None,
         status_code: int = 403,
+        *,
+        recovery: bool = True,
     ) -> None:
         super().__init__()
         self.signed, self.carried = signed, carried
         self.alert, self.status_code = alert, status_code
+        self.recovery = recovery
         self.sections = sections(signed.admin)
+
+
+Need = Literal["window", "account_change", "authenticator"]
+
+
+def _never(*_: object) -> bool:
+    """A window that is never open: a code each time."""
+    return False
+
+
+# The window a form's code must have been typed within: sensitive actions;
+# changes to other administrators; making new recovery codes, with a code
+# each time, and from an authenticator only.
+WINDOWS: dict[Need, Callable[[AdminSession, SignInSettings, datetime], bool]] = {
+    "window": accounts.confirmation_open,
+    "account_change": accounts.account_change_open,
+    "authenticator": _never,
+}
 
 
 async def confirmed(
@@ -261,9 +296,7 @@ async def confirmed(
 
     A form then passes the gate (_hold), after the commit a code makes, as
     the module's docstring says."""
-    return await _confirmed(
-        request, signed, session, notify, keys, account_change=False
-    )
+    return await _confirmed(request, signed, session, notify, keys, "window")
 
 
 async def confirmed_account_change(
@@ -277,7 +310,21 @@ async def confirmed_account_change(
     to other administrators have (accounts.account_change_open), and a form
     sent again answered so before any code is spent on it (once.spent). Its
     route still spends the form's key (once.sent_before) as it acts."""
-    return await _confirmed(request, signed, session, notify, keys, account_change=True)
+    return await _confirmed(request, signed, session, notify, keys, "account_change")
+
+
+async def confirmed_by_authenticator(
+    request: Request,
+    signed: AnySignedIn,
+    session: DbSession,
+    notify: Notify,
+    keys: Keys,
+) -> SignedIn:
+    """As confirmed, for a form only, with a code from an authenticator
+    each time, never a recovery code: for making new recovery codes, which
+    void the old, so one who signed in with a stolen code cannot lock its
+    owner's printed ones out."""
+    return await _confirmed(request, signed, session, notify, keys, "authenticator")
 
 
 async def _confirmed(
@@ -286,8 +333,7 @@ async def _confirmed(
     session: Session,
     notify: Notify,
     keys: TotpKeys,
-    *,
-    account_change: bool,
+    need: Need,
 ) -> SignedIn:
     if request.method == "GET":
         if not accounts.confirmation_open(signed.row, signed.settings, _now()):
@@ -301,14 +347,14 @@ async def _confirmed(
         for name, value in form.multi_items()
         if isinstance(value, str) and name != CONFIRM_FIELD
     ]
-    window = (
-        accounts.account_change_open if account_change else accounts.confirmation_open
-    )
+    window, recovery = WINDOWS[need], need != "authenticator"
     was_open = window(signed.row, signed.settings, _now())
-    # Sent again while a code would be asked for: said so before one is
-    # spent on it. Otherwise its route says so (once.sent_before).
+    # A form needing a code each time or within the short window, sent
+    # again, as Back then Forward offers, while a code would be asked for:
+    # said so before one is spent on it. Otherwise its route says so
+    # (once.sent_before).
     if (
-        account_change
+        need != "window"
         and not was_open
         and await run_in_threadpool(once.spent, session, form.get(once.FIELD))
     ):
@@ -317,10 +363,12 @@ async def _confirmed(
     if not was_open:
         typed = form.get(CONFIRM_FIELD)
         if not isinstance(typed, str):
-            raise await run_in_threadpool(ConfirmHere, signed, carried)
+            raise await run_in_threadpool(
+                ConfirmHere, signed, carried, recovery=recovery
+            )
         # Its queries, and argon2's work, off the event loop.
         outcome = await run_in_threadpool(
-            _confirm, keys, session, signed, typed, notify
+            _confirm, keys, session, signed, typed, notify, recovery=recovery
         )
         if outcome != "confirmed":
             raise await run_in_threadpool(
@@ -329,6 +377,7 @@ async def _confirmed(
                 carried,
                 _refused(outcome, signed),
                 _status(outcome),
+                recovery=recovery,
             )
     signed = await run_in_threadpool(_hold, session, signed)
     # The window, again, with what the lock read: shorter settings may have
@@ -355,10 +404,18 @@ def _hold(session: Session, signed: SignedIn) -> SignedIn:
 
 
 def _confirm(
-    keys: TotpKeys, session: Session, signed: SignedIn, typed: str, notify: Notify
+    keys: TotpKeys,
+    session: Session,
+    signed: SignedIn,
+    typed: str,
+    notify: Notify,
+    *,
+    recovery: bool,
 ) -> accounts.Confirmation:
     """Confirm, keep it, and tell the owner if a recovery code did it."""
-    outcome, factor = accounts.confirm(session, keys, signed.row, typed, _now())
+    outcome, factor = accounts.confirm(
+        session, keys, signed.row, typed, _now(), recovery=recovery
+    )
     if outcome == "confirmed":
         left = _codes_left(session, signed.admin, factor)
         session.commit()
@@ -385,7 +442,10 @@ def _refused(outcome: accounts.Confirmation, signed: SignedIn) -> str:
     if outcome == "rate_limited":
         return TOO_MANY
     if signed.asks_code:
-        return "That didn't match."
+        return (
+            "That didn't match. Each code works once: if you just used it, "
+            "wait for the next."
+        )
     return "That isn't your password."
 
 
@@ -414,6 +474,17 @@ def confirmed_account_change_admin(
 ConfirmedAccountChange = Annotated[SignedIn, Depends(confirmed_account_change_admin)]
 
 
+def confirmed_by_authenticator_admin(
+    signed: Annotated[SignedIn, Depends(confirmed_by_authenticator)],
+) -> SignedIn:
+    return admin_signed_in(signed)
+
+
+ConfirmedByAuthenticator = Annotated[
+    SignedIn, Depends(confirmed_by_authenticator_admin)
+]
+
+
 def changed(signed: SignedIn, session: Session) -> None:
     """After a sensitive change: counted for the confirmation window, and
     committed."""
@@ -436,8 +507,10 @@ def _confirm_page(
     alert: str | None = None,
     status_code: int = 200,
     navigation: list[tuple[str, str, Badge | None]] | None = None,
+    recovery: bool = True,
 ) -> HTMLResponse:
-    """Asks for a code, then sends `carried` on to `action`. Fields whose
+    """Asks for a code (a recovery code too, unless not `recovery`), then
+    sends `carried` on to `action`. Fields whose
     names say they are secret, as the log masker reads them (masking.py), are
     never written into the page: they are asked for again, empty."""
     return page(
@@ -452,6 +525,7 @@ def _confirm_page(
             "carried": [(n, v) for n, v in carried if not is_secret_name(n)],
             "retype": list(dict.fromkeys(n for n, _ in carried if is_secret_name(n))),
             "field": CONFIRM_FIELD,
+            "totp_only": not recovery,
             "sections": navigation,
         },
         status_code,
@@ -477,6 +551,7 @@ def install(app: FastAPI) -> None:
             alert=error.alert,
             status_code=error.status_code,
             navigation=error.sections,
+            recovery=error.recovery,
         )
 
 
@@ -716,9 +791,17 @@ def sign_in(
     session.commit()
     request_logging.bind(admin_id=row.admin_id, sign_in_id=row.id)
     admin = session.get_one(Admin, row.admin_id)  # Loaded: no query.
+    target = _local(next)
+    response = redirect(target)
     if (left := _codes_left(session, admin, factor)) is not None:
         notify.tell(admin.email, admin.id, mail.recovery_code_used(left))
-    response = redirect(_local(next))
+        # Once, at this sign-in, so it is not lost among other pages: to the
+        # account page, where new ones are made, unless a page was asked
+        # for. Never shown before the sign-in is complete.
+        if running_low(left) and target == HOME:
+            accounts.reminded()
+            notice = "codes_none" if left == 0 else "codes_low"
+            response = redirect(ACCOUNT, notice=notice, section="recovery-codes")
     _set_cookie(request, response, token, row)
     return response
 
@@ -749,7 +832,7 @@ def confirm(
     confirm_code: Annotated[str, Form()] = "",
     next: Annotated[str, Form()] = HOME,
 ) -> Response:
-    outcome = _confirm(keys, session, signed, confirm_code, notify)
+    outcome = _confirm(keys, session, signed, confirm_code, notify, recovery=True)
     if outcome == "confirmed":
         return redirect(_local(next))
     return _confirm_page(
@@ -802,6 +885,7 @@ def new_authenticator(
     request: Request,
     signed: ConfirmedAny,
     session: DbSession,
+    notify: Notify,
     keys: Keys,
     authenticator_name: Annotated[str, Form()] = "",
     key: Annotated[str, Form()] = "",
@@ -838,6 +922,7 @@ def new_authenticator(
         )
     codes = accounts.make_recovery_codes(session, admin_id, now) if first else []
     changed(signed, session)
+    notify.tell(signed.admin.email, admin_id, mail.authenticators_changed(added=True))
     if codes:
         return _recovery_codes_page(request, signed.admin, codes)
     return redirect(HOME)

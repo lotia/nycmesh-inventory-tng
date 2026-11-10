@@ -39,7 +39,14 @@ from helpers.devices import new_device
 from helpers.mail import FailingMail, SentMail
 from helpers.pools import small_database
 from helpers.rows import add, shown, tag
-from helpers.sign_in import PASSWORD, TOTP_KEYS, code, new_admin, sign_in_with
+from helpers.sign_in import (
+    PASSWORD,
+    TOTP_KEYS,
+    code,
+    codes_with_left,
+    new_admin,
+    sign_in_with,
+)
 from helpers.stock import Place, adjustment_form, received, retire, stocked, write
 
 ENDPOINT = {"OTEL_EXPORTER_OTLP_ENDPOINT": "http://collector:4318"}
@@ -339,6 +346,18 @@ def test_counts_sign_in_resets(rolled_back: Recorded, session: Session) -> None:
     accounts.reset_admin_sign_in(session, ben.id, ada.id, now)
     resets = counted(reader, "inventory.admin.sign_in_resets")
     assert resets[(("action", "reset"),)] >= 1
+
+
+def test_counts_recovery_codes_made_and_reminders(
+    rolled_back: Recorded, session: Session
+) -> None:
+    client, _, reader, _ = rolled_back
+    ada, _ = new_admin(session)
+    left = codes_with_left(session, ada.id, 2)[0]
+    sign_in_with(client, code=left)
+    events = counted(reader, "inventory.admin.recovery_codes")
+    assert events[(("event", "made"),)] >= 1
+    assert events[(("event", "reminded"),)] >= 1
 
 
 def test_counts_activity(rolled_back: Recorded, session: Session) -> None:

@@ -24,6 +24,8 @@ from helpers.sign_in import (
     RECOVERY_CODE,
     TOTP_KEYS,
     code,
+    codes_with_left,
+    later_code,
     new_admin,
     once,
     other_session,
@@ -228,11 +230,92 @@ def test_new_recovery_codes(
     session: Session,
     ada: tuple[Admin, str],
 ) -> None:
-    made = client.post(f"{ACCOUNT}/recovery-codes", data=once())
+    """With a code from the authenticator, each time, even with the window
+    open."""
+    asked = client.post(f"{ACCOUNT}/recovery-codes", data=once())
+    assert asked.status_code == 403
+    assert "or a recovery code" not in text(asked)
+    form = once(**{sign_in.CONFIRM_FIELD: later_code(ada[1])})
+    made = client.post(f"{ACCOUNT}/recovery-codes", data=form)
     codes = re.findall(RECOVERY_CODE, made.text)
     assert len(codes) == accounts.RECOVERY_CODES
     assert made.headers["cache-control"] == "no-store"
     assert accounts.recovery_codes_left(session, ada[0].id) == accounts.RECOVERY_CODES
+
+
+def test_a_recovery_code_does_not_make_new_ones(
+    make_client: Callable[..., TestClient], session: Session, sent_mail: SentMail
+) -> None:
+    """One who signed in with a stolen code cannot void its owner's printed
+    ones; the owner is told when new ones are made."""
+    client = make_client(mailer=sent_mail)
+    ada, key = new_admin(session, email="ada@example.org")
+    assert key is not None
+    first, second, *_ = accounts.make_recovery_codes(session, ada.id, datetime.now(UTC))
+    sign_in_with(client, code=first)
+    form = once(**{sign_in.CONFIRM_FIELD: second})
+    refused = client.post(f"{ACCOUNT}/recovery-codes", data=form)
+    assert refused.status_code == 400
+    assert accounts.recovery_codes_left(session, ada.id) == accounts.RECOVERY_CODES - 1
+    form = once(**{sign_in.CONFIRM_FIELD: later_code(key)})
+    assert client.post(f"{ACCOUNT}/recovery-codes", data=form).status_code == 200
+    assert "recovery_codes_made" in [m.kind for m in sent_mail]
+
+
+def test_signing_in_with_one_of_few_codes_left_goes_to_make_more(
+    make_client: Callable[..., TestClient], session: Session, sent_mail: SentMail
+) -> None:
+    client = make_client(mailer=sent_mail)
+    ada, _ = new_admin(session, email="ada@example.org")
+    codes = codes_with_left(session, ada.id, 4)
+    signed = sign_in_with(client, code=codes[0])
+    assert signed.headers["location"] == (
+        f"{ACCOUNT}?notice=codes_low&section=recovery-codes#recovery-codes"
+    )
+    assert "Only 3 are left" in sent_mail[-1].body
+    assert sign_in_with(make_client(address="192.0.2.91"), code=codes[1])
+    assert sign_in_with(
+        make_client(mailer=sent_mail, address="192.0.2.92"), code=codes[2]
+    )
+    assert "Only 1 is left" in sent_mail[-1].body
+    other = make_client(mailer=sent_mail, address="192.0.2.90")
+    last = sign_in_with(other, code=codes[3])
+    assert "notice=codes_none" in last.headers["location"]
+    assert "That was your last one" in sent_mail[-1].body
+    page = text(client.get(ACCOUNT + "?notice=codes_low&section=recovery-codes"))
+    assert "few are left" in page
+
+
+def test_the_owner_is_told_when_an_authenticator_comes_or_goes(
+    make_client: Callable[..., TestClient], session: Session, sent_mail: SentMail
+) -> None:
+    """One who signed in with a stolen recovery code could add their own,
+    then make new recovery codes with it: the owner hears of it."""
+    client = make_client(mailer=sent_mail)
+    _, key = new_admin(session, email="ada@example.org")
+    sign_in_with(client, code=code(key))
+    new_key = accounts.new_totp_key()
+    form = {"authenticator_name": "Laptop", "key": new_key, "code": code(new_key)}
+    assert client.post(sign_in.NEW_AUTHENTICATOR, data=form).status_code == 303
+    laptop = session.scalars(
+        select(Authenticator).where(Authenticator.name == "Laptop")
+    ).one()
+    client.post(f"{ACCOUNT}/authenticators/{laptop.id}/remove")
+    told = [m.subject for m in sent_mail if m.kind == "authenticators_changed"]
+    assert told == [
+        "An authenticator was added to your NYC Mesh Inventory account",
+        "An authenticator was removed from your NYC Mesh Inventory account",
+    ]
+
+
+def test_a_page_asked_for_wins_over_the_codes_reminder(
+    make_client: Callable[..., TestClient], session: Session
+) -> None:
+    client = make_client()
+    ada, _ = new_admin(session)
+    left = codes_with_left(session, ada.id, 2)[0]
+    signed = sign_in_with(client, code=left, next=ACCOUNT + "/x")
+    assert signed.headers["location"] == ACCOUNT + "/x"
 
 
 def test_ending_another_session_and_this_one(

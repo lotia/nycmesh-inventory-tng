@@ -69,14 +69,17 @@
 </section>
 
 {% if authenticators %}
-<section>
+<section id="recovery-codes">
   <h2>Recovery codes</h2>
+  {% with section_id="recovery-codes" %}{% include "_notice.html" %}{% endwith %}
   {% with name = "recovery_codes" %}{% include "_field_problem.html" %}{% endwith %}
-  <p>{{ recovery_codes_left }} left{% if recovery_codes_left < 4 %}: make new ones
-  soon{% endif %}. Making new ones voids the old.</p>
+  <p>{{ recovery_codes_left }} left{% if codes_low %}: make new ones
+  soon{% endif %}. Making new ones voids the old, and asks for a code from
+  your authenticator, not a recovery code.</p>
   <form method="post" action="{{ paths.account }}/recovery-codes">
     {{ once_field() }}
-    <button>Make new recovery codes</button>
+    {% with code_totp = true, totp_only = true %}{% include "_code_field.html" %}{% endwith %}
+    <div class="actions"><button>Make new recovery codes</button></div>
   </form>
 </section>
 {% endif %}

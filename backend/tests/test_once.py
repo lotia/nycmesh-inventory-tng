@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts
+from inventory_tng import accounts, once
 from inventory_tng.account import ACCOUNT
 from inventory_tng.admin.admins import ADMINS
 from inventory_tng.admin.devices import CODES, DEVICES
@@ -19,7 +19,7 @@ from inventory_tng.models import Admin, RegistrationCode, ResetLink
 
 from helpers.mail import SentMail
 from helpers.rows import tag
-from helpers.sign_in import code, new_admin, sign_in_with, text, with_code
+from helpers.sign_in import code, later_code, new_admin, sign_in_with, text, with_code
 
 AGAIN = "That form was already sent"
 CANT_SHOW = "Back and Forward can't show this page again"
@@ -82,10 +82,19 @@ def test_a_registration_code_is_made_once(
 
 
 def test_recovery_codes_are_made_once(
-    admin_client: TestClient, session: Session
+    make_client: Callable[..., TestClient], session: Session
 ) -> None:
+    """Sent again, it is answered before a code is asked for, with a way
+    back to the page it came from."""
+    client = make_client()
+    _, key = new_admin(session)
+    sign_in_with(client, code=code(key))
     action = f"{ACCOUNT}/recovery-codes"
-    made, again = sent_twice(admin_client, ACCOUNT, action)
+    later = later_code(key)
+    referer = {"referer": f"https://testserver{ACCOUNT}"}
+    form = {"once": key_on(client.get(ACCOUNT), action), "confirm_code": later}
+    made = client.post(action, data=form, headers=referer)
+    again = client.post(action, data=form, headers=referer)
     assert CANT_SHOW in text(made)
     assert_sent_again(again, ACCOUNT)
     # The codes shown the first time still work.
@@ -133,4 +142,8 @@ def test_bringing_back_and_inviting_are_sent_once(
 def test_a_form_without_its_key_is_a_bad_request(admin_client: TestClient) -> None:
     refused = admin_client.post(CODES, data={"uses": "1", "once": "not a key"})
     assert refused.status_code == 400
-    assert admin_client.post(f"{ACCOUNT}/recovery-codes").status_code == 400
+
+
+def test_a_key_that_is_not_text_is_none() -> None:
+    """As a form without the field gives (form.get)."""
+    assert once.form_key(None) is None

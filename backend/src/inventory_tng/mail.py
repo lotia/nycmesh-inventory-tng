@@ -28,7 +28,7 @@ from opentelemetry import metrics
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import Admin, SignInSettings
+from inventory_tng.models import Admin, SignInSettings, running_low
 from inventory_tng.settings import MailConfig
 
 log = structlog.get_logger(__name__)
@@ -43,6 +43,8 @@ Kind = Literal[
     "password_changed",
     "email_changed",
     "recovery_code_used",
+    "recovery_codes_made",
+    "authenticators_changed",
     "sign_in_settings_changed",
     "activity",
     "let_in",
@@ -328,17 +330,59 @@ def email_changed(to: str, admin_id: int) -> Message:
 
 def recovery_code_used(left: int) -> Callable[[str, int], Message]:
     def build(to: str, admin_id: int) -> Message:
+        if left == 0:
+            then = (
+                "That was your last one: make new ones from your account page "
+                "now, with a code from your authenticator."
+            )
+        elif running_low(left):
+            then = (
+                f"Only {left} {'is' if left == 1 else 'are'} left: make new ones "
+                "from your account page soon, with a code from your authenticator."
+            )
+        else:
+            then = f"{left} are left."
         return Message(
             to,
             "A recovery code was used on your NYC Mesh Inventory account",
             "One of your recovery codes was just used on your administrator "
-            f"account on NYC Mesh Inventory. {left} are left: make new ones from "
-            f"your account page if you are running low.\n\n{IF_NOT_YOU}",
+            f"account on NYC Mesh Inventory. {then} If you lost your phone, set "
+            f"up a new authenticator there first.\n\n{IF_NOT_YOU}",
             "recovery_code_used",
             admin_id,
         )
 
     return build
+
+
+def authenticators_changed(*, added: bool) -> Callable[[str, int], Message]:
+    """Told to the owner: one who signed in with a stolen recovery code could
+    otherwise add their own authenticator, then make new recovery codes."""
+    what = "added to" if added else "removed from"
+
+    def build(to: str, admin_id: int) -> Message:
+        return Message(
+            to,
+            f"An authenticator was {what} your NYC Mesh Inventory account",
+            f"An authenticator was just {what} your administrator account on "
+            f"NYC Mesh Inventory.\n\n{IF_NOT_YOU}",
+            "authenticators_changed",
+            admin_id,
+        )
+
+    return build
+
+
+def recovery_codes_made(to: str, admin_id: int) -> Message:
+    return Message(
+        to,
+        "New recovery codes for your NYC Mesh Inventory account",
+        "New recovery codes were just made for your administrator account on "
+        "NYC Mesh Inventory. The ones you had no longer work.\n\n"
+        f"{IF_NOT_YOU}",
+        "recovery_codes_made",
+        admin_id,
+    )
 
 
 def activity(words: str) -> Callable[[str, int], Message]:
