@@ -3,7 +3,7 @@
 **Status:** accepted · 2026-11-02 · amends 0004 (TOTP may be optional in
 production) · amended 2026-11-10 (retiring removes the sign-in; nobody is
 deleted; a code for each change to another administrator, and everyone
-told)
+told), 2026-11-10 by 0018 (the operator's commands)
 
 ## Context
 
@@ -151,9 +151,8 @@ without a deployment.
   it and a username and makes a reset link for the password and
   authenticators, which lasts an hour. Each token works once: its hash is
   kept on the link. It is rate limited, recorded in the history and logs,
-  and mailed to the administrator if they have an address. We rejected a
-  server command: on Kubernetes that means exec into a pod, which GitOps
-  setups often forbid, or a Job whose logs would keep the link.
+  and mailed to the administrator if they have an address. It needs no
+  `kubectl exec`; other recoveries do (0018).
 - **An administrator with an email can reset their own password** from the
   sign-in page. The page answers the same whether or not a mail was sent.
   At most three are sent an hour per account, and asking never voids a link
