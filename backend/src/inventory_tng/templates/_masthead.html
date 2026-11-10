@@ -3,10 +3,16 @@ sections fold into a menu on a phone (inventory-tng-8i4.60.2): a
 popover, which the browser closes on Escape or a tap outside, and keeps
 hidden without a stylesheet. A section may have a badge: how many things
 to put right there (pages.sections), its words read in place of the
-number. -#}
+number. The section this page is in is marked aria-current: "page" on
+its own page, "true" on a page inside it (docs/decisions/0019). -#}
+{% macro current(path, exact=false) -%}
+{%- set at = request.url.path -%}
+{%- if at == path %} aria-current="page"{% elif not exact and at.startswith(path ~ "/") %} aria-current="true"{% endif -%}
+{%- endmacro %}
+
 {% macro sections_links() %}
-<a href="{{ paths.home }}">Home</a>
-{% for path, label, badge in sections %}<a href="{{ path }}">{{ label }}
+<a href="{{ paths.home }}"{{ current(paths.home, exact=true) }}>Home</a>
+{% for path, label, badge in sections %}<a href="{{ path }}"{{ current(path) }}>{{ label }}
 {%- if badge %} <span class="badge"><span aria-hidden="true">{{ badge.count }}</span><span class="sr-only">: {{ badge.words }}</span></span>{% endif -%}
 </a>{% endfor %}
 {% endmacro %}

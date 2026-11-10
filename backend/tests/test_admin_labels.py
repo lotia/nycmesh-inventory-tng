@@ -196,7 +196,8 @@ def test_revoking_asks_to_confirm_first(
 ) -> None:
     label = add(session, Label(item_id=cable.id))
     confirm = f"{LABELS}/{label.id}/revoke"
-    assert f'<a href="{confirm}">Revoke</a>' in admin_client.get(LABELS).text
+    link = f'<a href="{confirm}">Revoke<span class="sr-only"> {label.code}</span></a>'
+    assert link in admin_client.get(LABELS).text
     page = admin_client.get(confirm)
     assert page.status_code == 200
     words = " ".join(text(page).split())

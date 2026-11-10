@@ -21,7 +21,7 @@ registered; revoke any that look wrong below.</p>
       <td>{{ device.last_seen_at | when(zone) }}</td>
       <td><span class="wrap-anywhere">{{ device.first_seen_from or "" }}</span></td>
       <td>{% if device.revoked_at %}revoked{% else %}
-        <form method="post" action="{{ list }}/{{ device.id }}/revoke"><button>Revoke</button></form>
+        <form method="post" action="{{ list }}/{{ device.id }}/revoke"><button>Revoke<span class="sr-only"> {{ device.name }}</span></button></form>
       {% endif %}</td>
     </tr>
     {% else %}

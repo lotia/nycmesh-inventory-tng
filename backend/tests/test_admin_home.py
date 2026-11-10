@@ -66,3 +66,18 @@ def test_retired_places_holding_stock_are_told_and_counted_in_the_navigation(
     for retired in (place.van, shelf):
         assert f'<a href="{COUNTS}/{retired.id}">Count {retired.name}</a>' in page
     assert badge_html(2) in page
+
+
+def test_the_navigation_marks_the_section_a_page_is_in(
+    admin_client: TestClient,
+) -> None:
+    """Its own page as the page, one inside it as within it, and Home only
+    on itself (docs/decisions/0019)."""
+    home = text(admin_client.get("/admin"))
+    assert '<a href="/admin" aria-current="page">Home</a>' in home
+    assert 'href="/admin/items" aria-current' not in home
+    items = text(admin_client.get("/admin/items"))
+    assert '<a href="/admin/items" aria-current="page">Items' in items
+    assert '<a href="/admin" aria-current' not in items
+    stock = text(admin_client.get("/admin/stock/reorder"))
+    assert '<a href="/admin/stock" aria-current="true">Stock' in stock
