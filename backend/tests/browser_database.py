@@ -21,7 +21,7 @@ import os
 import secrets
 import signal
 import sys
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import segno
@@ -29,8 +29,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import __main__ as server
-from inventory_tng import devices, seed, totp_keys
-from inventory_tng.models import Item, Label
+from inventory_tng import devices, seed, totp_keys, volunteers
+from inventory_tng.models import Item, Label, Volunteer
 
 from databases import migrated_engine, new_database
 
@@ -94,6 +94,12 @@ def prepare(url: str, video: Path) -> dict[str, str]:
             select(Label.code).join(Item).where(Item.name == seed.LABELLED)
         ).one()
         write_camera_video(video, label)
+        # A duplicate merged into another, so a Retired list has a hint in
+        # it (contrast.spec.ts).
+        kept = session.scalars(select(Volunteer).order_by(Volunteer.id)).first()
+        assert kept is not None  # The seed adds volunteers.
+        duplicate = volunteers.add(session, f"{kept.name} (twice)", None)
+        volunteers.merge(session, duplicate, kept.id, datetime.now(UTC))
         # The one device the tests share, registered by sign-in.setup.ts.
         _, phrase = devices.create_code(
             session, max_uses=1, lifetime=timedelta(hours=1), label="browser tests"
