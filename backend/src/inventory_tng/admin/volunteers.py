@@ -9,7 +9,7 @@ from typing import Annotated
 
 import structlog
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -28,6 +28,7 @@ from inventory_tng.admin.common import (
     rule_words,
     undo_retire,
 )
+from inventory_tng.admin.listing import Listing, Searched
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.models import Location, Volunteer
 from inventory_tng.pages import NOTICES, not_found, redirect
@@ -49,22 +50,33 @@ NOTICES.update(
 )
 
 
+# How the volunteers list finds one: by name.
+SEARCHED = Searched(Volunteer, Volunteer.name, Volunteer.name)
+
+
 def _list_page(
     request: Request,
     session: Session,
     signed: SignedIn,
     *,
+    listing: Listing[Volunteer] | None = None,
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
     undo: str | None = None,
 ) -> HTMLResponse:
-    rows = session.scalars(select(Volunteer).order_by(func.lower(Volunteer.name))).all()
+    listing = (listing or Listing(VOLUNTEERS)).find(
+        session, SEARCHED, select(Volunteer)
+    )
     holders = set(
         session.scalars(
             select(Location.volunteer_id).where(
                 Location.kind == "custody", Location.retired_at.is_(None)
             )
         )
+    )
+    merged_into = {v.merged_into_id for v in listing.rows} - {None}
+    names = session.execute(
+        select(Volunteer.id, Volunteer.name).where(Volunteer.id.in_(merged_into))
     )
     return admin_page(
         request,
@@ -75,10 +87,9 @@ def _list_page(
             "undo": undo,
             "undo_words": "Bring them back",
             "here": VOLUNTEERS,
-            "current": [v for v in rows if v.retired_at is None],
-            "retired": [v for v in rows if v.retired_at is not None],
+            "listing": listing,
             "holders": holders,
-            "names": {v.id: v.name for v in rows},
+            "names": {ident: name for ident, name in names},
             "problems": problems,
             "values": values,
         },
@@ -151,10 +162,28 @@ def _checked(name: str, email: str) -> dict[str, str]:
 
 @router.get(VOLUNTEERS)
 def list_volunteers(
-    request: Request, signed: AdminSignedIn, session: DbSession, undo: str = ""
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    q: str = "",
+    show: str = "",
+    page: str = "",
+    pick: str = "",
+    undo: str = "",
 ) -> Response:
+    listing = Listing[Volunteer].read(VOLUNTEERS, q, show, page, pick)
     back = undo_retire(session, Volunteer, undo, VOLUNTEERS)
-    return _list_page(request, session, signed, undo=back)
+    return _list_page(request, session, signed, listing=listing, undo=back)
+
+
+@router.get(f"{VOLUNTEERS}/suggest")
+def suggest_volunteers(
+    session: DbSession, signed: AdminSignedIn, q: str = "", show: str = ""
+) -> JSONResponse:
+    """What the search box offers as one types (_listing.html)."""
+    listing = Listing[Volunteer].read(VOLUNTEERS, q, show)
+    offered = listing.suggest(session, SEARCHED, select(Volunteer))
+    return JSONResponse(offered, headers={"Cache-Control": "no-store"})
 
 
 @router.post(VOLUNTEERS)

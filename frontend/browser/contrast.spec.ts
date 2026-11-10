@@ -1,6 +1,6 @@
 /**
  * Text keeps WCAG 2.2 AA's 4.5:1 against what is behind it, in the light
- * scheme and the dark: a Retired list (inventory-tng-7sy, where fading a
+ * scheme and the dark: retired records (inventory-tng-7sy, where fading a
  * whole section with opacity took its hints below it), and a link or
  * section with keyboard focus (docs/decisions/0019), which also shows it
  * plainly.
@@ -40,13 +40,17 @@ for (const colorScheme of ["light", "dark"] as const) {
   test.describe(`in the ${colorScheme} scheme`, () => {
     test.use({ colorScheme });
 
-    test("a Retired list's hints are readable", async ({ page }) => {
-      await page.goto("/admin/volunteers");
-      const hint = page.locator("#retired .hint").first();
-      await expect(hint).toBeVisible();
-      const { faded, ratio } = await contrast(hint);
-      expect(faded).toBe(1);
-      expect(ratio).toBeGreaterThanOrEqual(4.5);
+    test("retired records' tags and hints are readable", async ({ page }) => {
+      await page.goto("/admin/volunteers?show=retired");
+      for (const text of [
+        page.getByRole("main").locator("td .hint").first(),
+        page.getByRole("main").locator(".tag").first(),
+      ]) {
+        await expect(text).toBeVisible();
+        const { faded, ratio } = await contrast(text);
+        expect(faded).toBe(1);
+        expect(ratio).toBeGreaterThanOrEqual(4.5);
+      }
     });
 
     test("a focused link is highlighted, and readable", async ({ page }) => {
