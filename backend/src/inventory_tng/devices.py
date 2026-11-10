@@ -258,16 +258,18 @@ def name_device(
     log.info("device named", device_id=device.id)
 
 
-# How many devices a page lists, newest first.
+# How many devices a page lists at most.
 LISTED = 500
 
 
 @dataclass(frozen=True)
 class DeviceFilter:
-    """Which devices to list or revoke: registered at or after `since`,
-    with registration code `code_id`, current or not; None is any."""
+    """Which devices to list or revoke: registered at or after `since` and
+    before `until`, with registration code `code_id`, current or not; None
+    is any."""
 
     since: datetime | None = None
+    until: datetime | None = None
     code_id: int | None = None
     current: bool | None = True
 
@@ -275,6 +277,8 @@ class DeviceFilter:
         found: list[ColumnElement[bool]] = []
         if self.since is not None:
             found.append(Device.created_at >= self.since)
+        if self.until is not None:
+            found.append(Device.created_at < self.until)
         if self.code_id is not None:
             found.append(Device.registration_code_id == self.code_id)
         if self.current is not None:
@@ -286,13 +290,26 @@ class DeviceFilter:
         return found
 
 
-def find_devices(session: Session, chosen: DeviceFilter) -> list[Device]:
-    """The devices the filter matches, newest first, at most LISTED."""
+# How a list of devices may be sorted: by when each registered or was last
+# used, newest or oldest first.
+type Sort = Literal["registered", "registered-oldest", "used", "used-oldest"]
+SORTS: tuple[Sort, ...] = ("registered", "registered-oldest", "used", "used-oldest")
+
+
+def find_devices(
+    session: Session, chosen: DeviceFilter, sort: Sort = "registered"
+) -> list[Device]:
+    """The devices the filter matches, sorted, at most LISTED."""
+    column = Device.last_seen_at if sort.startswith("used") else Device.created_at
+    oldest = sort.endswith("oldest")
     return list(
         session.scalars(
             select(Device)
             .where(*chosen.where())
-            .order_by(Device.created_at.desc(), Device.id.desc())
+            .order_by(
+                column.asc() if oldest else column.desc(),
+                Device.id.asc() if oldest else Device.id.desc(),
+            )
             .limit(LISTED)
         )
     )
