@@ -138,6 +138,13 @@ class Listing[T]:
         kept = {key: value for key, value in query.items() if value}
         return self.here + (f"?{urlencode(kept)}" if kept else "")
 
+    def _shown(self, model: type[T], query: Select) -> Select:
+        """`query` narrowed to the records `show` asks for."""
+        if self.show == "all":
+            return query
+        table: Any = model
+        return query.where(table.retired_at.is_(None) == (self.show == "current"))
+
     def find(
         self, session: Session, searched: Searched[T], query: Select
     ) -> Listing[T]:
@@ -145,8 +152,7 @@ class Listing[T]:
         joined): filtered, searched or picked, best match first, then by
         name, one page of them."""
         table: Any = searched.model
-        if self.show != "all":
-            query = query.where(table.retired_at.is_(None) == (self.show == "current"))
+        query = self._shown(table, query)
         total = _count(session, query)
         picked = None
         if self.pick is not None:
@@ -156,7 +162,7 @@ class Listing[T]:
             query = query.where(fuzzy(searched.text, self.search)).order_by(
                 closeness(searched.text, self.search).desc()
             )
-        found = _count(session, query)
+        found = _count(session, query) if self.narrowed else total
         page = min(self.page, max(1, ceil(found / PER_PAGE)))
         rows = session.scalars(
             query.order_by(func.lower(searched.name), table.id)
@@ -180,9 +186,7 @@ class Listing[T]:
         apart, and the link that narrows the list to it."""
         if not self.search:
             return []
-        table: Any = searched.model
-        if self.show != "all":
-            query = query.where(table.retired_at.is_(None) == (self.show == "current"))
+        query = self._shown(searched.model, query)
         rows = session.scalars(
             query.where(fuzzy(searched.text, self.search))
             .order_by(

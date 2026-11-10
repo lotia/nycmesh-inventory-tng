@@ -13,7 +13,14 @@ from sqlalchemy.orm import Session
 from inventory_tng import categories
 from inventory_tng.admin.common import RETIRED, RULES, retired_by
 from inventory_tng.db import set_actor
-from inventory_tng.models import Admin, Category, Item, Location, Volunteer
+from inventory_tng.models import (
+    Admin,
+    Category,
+    Item,
+    ItemPackage,
+    Location,
+    Volunteer,
+)
 
 from helpers.rows import add, shown, tag
 from helpers.sign_in import text
@@ -101,6 +108,19 @@ def test_a_package_is_not_added_to_a_retired_item(
     )
     assert refused.status_code == 409
     assert RULES[RETIRED] in text(refused)
+
+
+def test_a_retired_items_package_is_not_retired(
+    admin_client: TestClient, session: Session
+) -> None:
+    item = made(session, "item")
+    package = add(session, ItemPackage(item_id=item.id, name="Box", size=10))
+    admin_client.post(f"/admin/items/{item.id}/retire")
+    refused = admin_client.post(f"/admin/items/{item.id}/packages/{package.id}/retire")
+    assert refused.status_code == 409
+    assert RULES[RETIRED] in text(refused)
+    session.refresh(package)
+    assert package.retired_at is None
 
 
 def test_a_retired_administrators_page_says_who_retired_them(

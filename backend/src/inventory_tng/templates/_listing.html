@@ -29,8 +29,8 @@ first; with it (frontend/src/combobox.ts), suggestions come from
 {% macro summary(listing, one, many) -%}
 {% set kind = "retired " if listing.show == "retired" else "" %}
 <p class="hint">
-  {%- if listing.narrowed %}{{ listing.found }} of {{ listing.total }} {{ kind }}{{ one if listing.total == 1 else many }},
-  matching “{{ listing.picked or listing.search }}”. <a href="{{ listing.link(search='') }}">Clear search</a>
+  {%- if listing.narrowed %}{{ listing.found }} of {{ listing.total }} {{ kind }}{{ one if listing.total == 1 else many }}
+  {%- if listing.picked or listing.search %}, matching “{{ listing.picked or listing.search }}”{% endif %}. <a href="{{ listing.link(search='') }}">Clear search</a>
   {%- else %}{{ listing.total }} {{ kind }}{{ one if listing.total == 1 else many }}{% endif -%}
 </p>
 {%- endmacro %}

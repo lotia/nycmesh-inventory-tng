@@ -118,5 +118,8 @@ def add_package(session: Session, item: Item, name: str, size: Decimal) -> ItemP
 
 
 def retire_package(session: Session, package: ItemPackage, at: datetime) -> None:
+    """Retired, unless its item is: a retired item is read only."""
     relock(session, package, current=True)
+    retired = Item.id == package.item_id, Item.retired_at.is_not(None)
+    enforce("retired_read_only", when=exists_where(session, *retired))
     package.retired_at = at
