@@ -1,6 +1,8 @@
 """Stand-in mailers, and mail as a site sets it up."""
 
-from inventory_tng.mail import Message
+from fastapi import BackgroundTasks
+
+from inventory_tng.mail import Message, Notifier
 from inventory_tng.settings import MailConfig
 
 # Mail as a site sets it up, for apps given a mailer. Links start here.
@@ -26,3 +28,8 @@ class FailingMail:
 
     def send(self, message: Message) -> None:
         raise self.error
+
+
+# A notifier with no mail set up: what an account change is told with
+# where its test does not read the mail.
+NO_MAIL = Notifier(None, BackgroundTasks())

@@ -73,6 +73,10 @@ class Message:
     admin_id: int
 
 
+# What a mail is made from: whom to, and the administrator it is for.
+Told = Callable[[str, int], Message]
+
+
 class Mailer(Protocol):
     def send(self, message: Message) -> None: ...
 
@@ -135,9 +139,7 @@ class Notifier:
     def on(self) -> bool:
         return self.mailer is not None
 
-    def tell(
-        self, to: str | None, admin_id: int, build: Callable[[str, int], Message]
-    ) -> None:
+    def tell(self, to: str | None, admin_id: int, build: Told) -> None:
         """Mail `to` what `build` makes, if mail is set up and there is an
         address."""
         if self.mailer is not None and to:
@@ -146,7 +148,7 @@ class Notifier:
     def tell_admins(
         self,
         session: Session,
-        build: Callable[[str, int], Message],
+        build: Told,
         *,
         but: int | None = None,
     ) -> None:
@@ -161,9 +163,7 @@ class Notifier:
         for admin_id, email in session.execute(query):
             self.tell(email, admin_id, build)
 
-    def tell_now(
-        self, to: str | None, admin_id: int, build: Callable[[str, int], Message]
-    ) -> None:
+    def tell_now(self, to: str | None, admin_id: int, build: Told) -> None:
         """As tell, but before the reply: for the one notice whose cause is
         already kept while the reply may yet be an error page, which sends
         nothing after it (sign_in._confirm). The reply then waits for the
@@ -331,7 +331,7 @@ def email_changed(to: str, admin_id: int) -> Message:
     )
 
 
-def recovery_code_used(left: int) -> Callable[[str, int], Message]:
+def recovery_code_used(left: int) -> Told:
     def build(to: str, admin_id: int) -> Message:
         if left == 0:
             then = (
@@ -358,7 +358,7 @@ def recovery_code_used(left: int) -> Callable[[str, int], Message]:
     return build
 
 
-def authenticators_changed(*, added: bool) -> Callable[[str, int], Message]:
+def authenticators_changed(*, added: bool) -> Told:
     """Told to the owner: one who signed in with a stolen recovery code could
     otherwise add their own authenticator, then make new recovery codes."""
     what = "added to" if added else "removed from"
@@ -427,7 +427,7 @@ def recovery_codes_made(to: str, admin_id: int) -> Message:
     )
 
 
-def activity(words: str) -> Callable[[str, int], Message]:
+def activity(words: str) -> Told:
     """Told to every administrator (activity.py): one who could change who
     may sign in could otherwise do it unseen."""
 
@@ -444,7 +444,7 @@ def activity(words: str) -> Callable[[str, int], Message]:
     return build
 
 
-def sign_in_settings_changed(settings: SignInSettings) -> Callable[[str, int], Message]:
+def sign_in_settings_changed(settings: SignInSettings) -> Told:
     """Told to every administrator: one who could weaken these could
     otherwise do it unseen. The values are read now, not when it is sent."""
     totp, session_days = settings.totp_policy, settings.session_days

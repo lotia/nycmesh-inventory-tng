@@ -19,7 +19,7 @@ from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.admins import ADMINS
 from inventory_tng.models import ACTIVITY_KINDS, Admin, AdminSession, SignInSettings
 
-from helpers.mail import SentMail
+from helpers.mail import NO_MAIL, SentMail
 from helpers.sign_in import (
     admin_named,
     code,
@@ -105,7 +105,7 @@ def test_resetting_an_invite_replaces_its_link(
 ) -> None:
     me = admin_named(session, "ada")
     now = datetime.now(UTC)
-    grace, first = accounts.invite(session, "grace", None, me.id, now)
+    grace, first = accounts.invite(session, "grace", None, me.id, now, NO_MAIL)
     made = admin_client.post(f"{ADMINS}/{grace.id}/reset", data=with_code(session))
     assert made.status_code == 200
     # Nothing to reset: a new invite, which tells them nothing changed.
@@ -236,7 +236,7 @@ def test_an_administrator_retired_meanwhile_retires_nobody(
     me.retired_at = datetime.now(UTC)
     session.flush()
     with pytest.raises(accounts.AdminRefused, match="not_found"):
-        accounts.retire_admin(session, ben.id, me.id, datetime.now(UTC))
+        accounts.retire_admin(session, ben.id, me.id, datetime.now(UTC), NO_MAIL)
     assert ben.retired_at is None
     assert carol.retired_at is None
 
@@ -287,23 +287,23 @@ def test_one_who_cannot_sign_in_changes_nobody(session: Session) -> None:
     ben, _ = new_admin(session, "ben")
     carol, _ = new_admin(session, "carol")
     now = datetime.now(UTC)
-    grace, _ = accounts.invite(session, "grace", None, ada.id, now)
+    grace, _ = accounts.invite(session, "grace", None, ada.id, now, NO_MAIL)
     with pytest.raises(accounts.AdminRefused, match="not_found"):
-        accounts.retire_admin(session, ada.id, grace.id, now)
+        accounts.retire_admin(session, ada.id, grace.id, now, NO_MAIL)
     carol.retired_at = now
-    accounts.reset_admin_sign_in(session, ada.id, ben.id, now)
+    accounts.reset_admin_sign_in(session, ada.id, ben.id, now, NO_MAIL)
     with pytest.raises(accounts.AdminRefused, match="not_found"):
-        accounts.retire_admin(session, ben.id, ada.id, now)
+        accounts.retire_admin(session, ben.id, ada.id, now, NO_MAIL)
     with pytest.raises(accounts.AdminRefused, match="not_found"):
-        accounts.restore_admin(session, carol.id, ada.id, now)
+        accounts.restore_admin(session, carol.id, ada.id, now, NO_MAIL)
     with pytest.raises(accounts.AdminRefused, match="not_found"):
-        accounts.invite(session, "mallory", None, ada.id, now)
+        accounts.invite(session, "mallory", None, ada.id, now, NO_MAIL)
     # Two resetting each other at once: the second finds itself reset.
     with (
         capture_logs() as logs,
         pytest.raises(accounts.AdminRefused, match="not_found"),
     ):
-        accounts.reset_admin_sign_in(session, ben.id, ada.id, now)
+        accounts.reset_admin_sign_in(session, ben.id, ada.id, now, NO_MAIL)
     # Told apart from a stale id: a session cut off, still at work.
     assert [(e["log_level"], e["action"], e["why"]) for e in logs] == [
         ("warning", "reset", "signed_out")
@@ -316,7 +316,9 @@ def test_an_invite_not_taken_up_may_always_go(
     admin_client: TestClient, session: Session
 ) -> None:
     me = admin_named(session, "ada")
-    grace, _ = accounts.invite(session, "grace", None, me.id, datetime.now(UTC))
+    grace, _ = accounts.invite(
+        session, "grace", None, me.id, datetime.now(UTC), NO_MAIL
+    )
     assert (
         admin_client.post(
             f"{ADMINS}/{grace.id}/retire", data=with_code(session)
@@ -375,7 +377,7 @@ def test_only_a_retired_administrator_is_brought_back(session: Session) -> None:
     ada, _ = new_admin(session)
     ben, _ = new_admin(session, "ben")
     with pytest.raises(accounts.AdminRefused, match="not_found"):
-        accounts.restore_admin(session, ben.id, ada.id, datetime.now(UTC))
+        accounts.restore_admin(session, ben.id, ada.id, datetime.now(UTC), NO_MAIL)
     assert accounts.has_password(session, ben.id)
 
 
@@ -485,8 +487,8 @@ def test_since_you_last_signed_in(
     assert sign_in_with(theirs, "ben", code=code(ben_key)).status_code == 303
     assert "Since you last signed in" not in text(theirs.get(sign_in.HOME))
     now = datetime.now(UTC)
-    accounts.retire_admin(session, carol.id, ada.id, now)
-    accounts.restore_admin(session, carol.id, ben.id, now)
+    accounts.retire_admin(session, carol.id, ada.id, now, NO_MAIL)
+    accounts.restore_admin(session, carol.id, ben.id, now, NO_MAIL)
     later = make_client(address="192.0.2.81")
     again = code(ben_key, now + timedelta(seconds=30))
     assert sign_in_with(later, "ben", code=again).status_code == 303
@@ -498,7 +500,7 @@ def test_since_you_last_signed_in(
 
 def test_the_operators_changes_say_so(session: Session) -> None:
     ben, _ = new_admin(session, "ben")
-    activity.record(session, "retired", None, ben.id, None)
+    activity.record(session, "retired", None, ben.id, NO_MAIL)
     assert activity.recent(session)[0].words == "The operator retired ben"
 
 
@@ -536,7 +538,9 @@ def test_a_key_spent_by_another_form_does_not_skip_the_code(
 def test_the_operators_recovery_link_is_told(session: Session) -> None:
     new_admin(session)
     token = "a recovery token the operator set, long"
-    accounts.recover(session, token, token, "ada", "192.0.2.90", datetime.now(UTC))
+    accounts.recover(
+        session, token, token, "ada", "192.0.2.90", datetime.now(UTC), NO_MAIL
+    )
     assert activity.recent(session)[0].words == (
         "The operator made a link for ada with the recovery token"
     )
