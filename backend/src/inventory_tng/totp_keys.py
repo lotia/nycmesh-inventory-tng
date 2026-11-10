@@ -11,6 +11,8 @@ clone's .local/totp-keys, which `mise run setup` fills.
 
     python -m inventory_tng.totp_keys new     # print a new key
     python -m inventory_tng.totp_keys reseal  # seal every key with the newest
+    python -m inventory_tng.totp_keys retire-authenticators --unreadable
+    python -m inventory_tng.totp_keys retire-authenticators --all
 
 DEPLOYMENT.md, TOTP keys, says how to rotate them and what to do if one is
 lost.
@@ -23,7 +25,9 @@ import re
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -31,6 +35,9 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.local_env import CLONE
 from inventory_tng.settings import SettingsError, is_development
+
+if TYPE_CHECKING:  # Imported by the command, which needs no mail for `new`.
+    from inventory_tng.mail import Notifier
 
 DEVELOPMENT_DIR = CLONE / ".local" / "totp-keys"
 KEY_BITS = 256
@@ -154,6 +161,14 @@ def parse(argv: Sequence[str] | None = None) -> argparse.Namespace:
     commands.add_parser(
         "reseal", help="seal every current authenticator's key with the newest"
     )
+    retire = commands.add_parser(
+        "retire-authenticators",
+        help="retire authenticators, for a lost or leaked key: each is set up again",
+    ).add_mutually_exclusive_group(required=True)
+    retire.add_argument(
+        "--unreadable", action="store_true", help="those a lost key sealed"
+    )
+    retire.add_argument("--all", action="store_true", help="every one: a leaked key")
     return parser.parse_args(argv)
 
 
@@ -163,9 +178,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(new_key())
         return 0
     # Imported here: `new` needs no database or settings.
-    from inventory_tng.command import run_command
+    from inventory_tng.command import run_command, run_command_telling
 
-    return run_command(_reseal, args)
+    if args.command == "reseal":
+        return run_command(_reseal, args)
+    return run_command_telling(_retire, args)
 
 
 def _reseal(session: Session, _args: argparse.Namespace) -> int:
@@ -174,6 +191,24 @@ def _reseal(session: Session, _args: argparse.Namespace) -> int:
     resealed, unreadable = reseal_authenticators(session, TotpKeys.from_environ())
     print(f"Resealed {resealed}; {unreadable} could not be read.")
     return 1 if unreadable else 0
+
+
+def _retire(session: Session, args: argparse.Namespace, notify: Notifier) -> int:
+    from inventory_tng.accounts import retire_authenticators
+
+    retired, stranded = retire_authenticators(
+        session,
+        TotpKeys.from_environ(),
+        datetime.now(UTC),
+        every=args.all,
+        notify=notify,
+    )
+    # Printed once committed.
+    notify.tasks.add_task(print, f"Retired {retired} authenticators.")
+    if stranded:
+        names = ", ".join(stranded)
+        notify.tasks.add_task(print, f"No second factor left, so let them in: {names}.")
+    return 0
 
 
 if __name__ == "__main__":

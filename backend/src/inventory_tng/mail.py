@@ -45,6 +45,8 @@ Kind = Literal[
     "recovery_code_used",
     "sign_in_settings_changed",
     "activity",
+    "let_in",
+    "invited_by_operator",
 ]
 # Per network step. Mail goes out from the same threads as requests, so a
 # provider that has gone quiet holds one only briefly.
@@ -269,6 +271,34 @@ def recovery_link_made(to: str, admin_id: int) -> Message:
         "set just made a link that resets your password and authenticators. "
         f"It works once, within the hour.\n\n{IF_NOT_YOU}",
         "recovery_link_made",
+        admin_id,
+    )
+
+
+def invited_by_operator(to: str, admin_id: int) -> Message:
+    return Message(
+        to,
+        "You were invited to administer NYC Mesh Inventory",
+        "Whoever runs NYC Mesh Inventory just invited you to be one of its "
+        "administrators, and will pass you a link to choose your password "
+        "with. It works once, within the hour.\n\n"
+        "If you weren't expecting this, ignore this mail.",
+        "invited_by_operator",
+        admin_id,
+    )
+
+
+def let_in(to: str, admin_id: int) -> Message:
+    return Message(
+        to,
+        "You are being let back in to NYC Mesh Inventory",
+        "Whoever runs NYC Mesh Inventory just made a link that lets you back "
+        "in to your administrator account: anything you signed in with no "
+        "longer works. With the link they pass on, you choose a new password "
+        "and set up TOTP again. It works once, within the hour.\n\n"
+        "If you weren't expecting this, tell whoever runs NYC Mesh Inventory at "
+        "once.",
+        "let_in",
         admin_id,
     )
 

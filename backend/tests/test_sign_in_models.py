@@ -139,8 +139,6 @@ def test_a_reset_links_kind_says_who_made_it(
         session.add(link(kind="other"))
     with violates(session, "ck_reset_link_made_by"):
         session.add(link(kind="emailed"))
-    with violates(session, "ck_reset_link_made_by"):
-        session.add(link(made_by_id=None))
     with violates(session, "ck_reset_link_recovery"):
         session.add(link(made_by_id=None, kind="recovery"))
     with violates(session, "ck_reset_link_recovery"):
@@ -148,6 +146,8 @@ def test_a_reset_links_kind_says_who_made_it(
     with violates(session, "ck_reset_link_not_made_for_oneself"):
         session.add(link(made_by_id=admin.id))
     add(session, link(made_by_id=None, kind="emailed"))
+    # The operator's (accounts.let_in).
+    add(session, link(made_by_id=None, token_hash=b"o"))
 
 
 def test_history_holds_no_secret(session: Session, admin: Admin, other: Admin) -> None:

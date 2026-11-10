@@ -1,0 +1,236 @@
+"""The operator's break-glass (accounts.lock_down, let_in, invite_by_operator,
+retire_authenticators; python -m inventory_tng.admins and totp_keys):
+docs/decisions/0018."""
+
+import asyncio
+import runpy
+import sys
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
+
+import pytest
+from fastapi import BackgroundTasks
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from inventory_tng import accounts, activity, admins, devices, sign_in, totp_keys
+from inventory_tng.mail import Notifier
+from inventory_tng.models import Authenticator, RegistrationCode, ResetLink
+
+from helpers.mail import SentMail
+from helpers.sign_in import TOTP_KEYS, code, new_admin, policy, sign_in_with
+
+NOW = datetime.now(UTC)
+NEW_PASSWORD = "a long passphrase of their own"
+
+
+# A notifier with no mail, as a command's where mail is not set up.
+QUIET = Notifier(None, BackgroundTasks())
+
+
+def told(sent_mail: SentMail) -> tuple[Notifier, Callable[[], None]]:
+    """A notifier as a command's, and what sends its mail once committed."""
+    tasks = BackgroundTasks()
+    return Notifier(sent_mail, tasks), lambda: asyncio.run(tasks())
+
+
+def test_lockdown_retires_everyone_and_revokes_every_code(
+    session: Session, sent_mail: SentMail
+) -> None:
+    ada, _ = new_admin(session, email="ada@example.org")
+    ben, _ = new_admin(session, "ben")
+    accounts.make_recovery_codes(session, ada.id, NOW)
+    code_row, _ = devices.create_code(
+        session, max_uses=1, lifetime=timedelta(days=1), label=None
+    )
+    notify, send = told(sent_mail)
+    retired = accounts.lock_down(session, 2, NOW, notify)
+    send()
+    assert {a.id for a in retired} == {ada.id, ben.id}
+    for admin in (ada, ben):
+        assert admin.retired_at is not None
+        assert not accounts.has_password(session, admin.id)
+        assert not accounts.uses_totp(session, admin.id)
+    assert accounts.recovery_codes_left(session, ada.id) == 0
+    assert code_row.revoked_at is not None
+    current_codes = select(RegistrationCode).where(
+        RegistrationCode.revoked_at.is_(None)
+    )
+    assert session.scalars(current_codes).all() == []
+    # Told by mail, as nobody is left to see it in the app.
+    assert [(m.to, m.kind) for m in sent_mail] == [("ada@example.org", "activity")]
+    assert activity.recent(session)[0].words == (
+        "The operator retired every administrator and revoked every registration code"
+    )
+
+
+def test_lockdown_refuses_a_count_that_is_wrong(session: Session) -> None:
+    ada, _ = new_admin(session)
+    with pytest.raises(accounts.OperatorRefused, match="1 administrators"):
+        accounts.lock_down(session, 2, NOW, QUIET)
+    assert ada.retired_at is None
+
+
+def test_let_in_brings_one_back_with_a_link_that_resets_everything(
+    session: Session, sent_mail: SentMail, make_client: Callable[..., TestClient]
+) -> None:
+    ada, key = new_admin(session, email="ada@example.org")
+    new_admin(session, "ben", email="ben@example.org")
+    accounts.lock_down(session, 2, NOW, QUIET)
+    notify, send = told(sent_mail)
+    admin, token = accounts.let_in(session, "ADA", NOW, notify)
+    send()
+    assert admin.id == ada.id
+    assert ada.retired_at is None
+    link = session.scalars(select(ResetLink).where(ResetLink.admin_id == ada.id)).one()
+    assert (link.kind, link.made_by_id) == ("reset", None)
+    assert link.expires_at - NOW == timedelta(hours=1)
+    # Ben is retired, so not told; Ada is, in her own words.
+    assert [(m.to, m.kind) for m in sent_mail] == [("ada@example.org", "let_in")]
+    form = {"token": token, "password": NEW_PASSWORD, "password_again": NEW_PASSWORD}
+    client = make_client()
+    assert client.post(sign_in.RESET, data=form).status_code == 303
+    # The old authenticator is gone: in with the password, then set one up.
+    assert sign_in_with(client, "ada", code=code(key)).status_code == 400
+    assert sign_in_with(client, "ada", NEW_PASSWORD).status_code == 303
+    assert client.get(sign_in.HOME).headers["location"] == sign_in.NEW_AUTHENTICATOR
+
+
+def test_let_in_works_without_a_lockdown(session: Session) -> None:
+    ada, _ = new_admin(session)
+    accounts.let_in(session, "ada", NOW, QUIET)
+    assert not accounts.has_password(session, ada.id)
+    assert activity.recent(session)[0].words == "The operator let ada back in"
+
+
+def test_let_in_refuses_nobody(session: Session) -> None:
+    with pytest.raises(accounts.OperatorRefused, match="No administrator"):
+        accounts.let_in(session, "nobody", NOW, QUIET)
+
+
+def test_the_operator_invites_an_administrator(
+    session: Session, sent_mail: SentMail
+) -> None:
+    new_admin(session, email="ada@example.org")
+    notify, send = told(sent_mail)
+    grace, _ = accounts.invite_by_operator(
+        session, "grace", "grace@example.org", NOW, notify
+    )
+    send()
+    assert not accounts.has_password(session, grace.id)
+    assert sorted((m.to, m.kind) for m in sent_mail) == [
+        ("ada@example.org", "activity"),
+        ("grace@example.org", "invited_by_operator"),
+    ]
+    with pytest.raises(accounts.OperatorRefused, match="has that"):
+        accounts.invite_by_operator(session, "grace", None, NOW, QUIET)
+    with pytest.raises(accounts.OperatorRefused):
+        accounts.invite_by_operator(session, "not a username", None, NOW, QUIET)
+
+
+def unreadable(session: Session, admin_id: int) -> Authenticator:
+    """Sealed with a key version TOTP_KEYS lacks, as after a key is lost."""
+    authenticator = session.scalars(
+        select(Authenticator).where(Authenticator.admin_id == admin_id)
+    ).one()
+    authenticator.key_version = 9
+    session.flush()
+    return authenticator
+
+
+def test_retiring_unreadable_authenticators_keeps_the_rest(session: Session) -> None:
+    ada, _ = new_admin(session)
+    ben, _ = new_admin(session, "ben")
+    accounts.make_recovery_codes(session, ben.id, NOW)
+    lost = unreadable(session, ada.id)
+    retired, stranded = accounts.retire_authenticators(
+        session, TOTP_KEYS, NOW, every=False, notify=QUIET
+    )
+    assert (retired, stranded) == (1, ["ada"])
+    assert lost.retired_at is not None
+    # With no recovery code either, the password alone must not get in.
+    assert not accounts.has_password(session, ada.id)
+    assert accounts.uses_totp(session, ben.id)
+    retired, stranded = accounts.retire_authenticators(
+        session, TOTP_KEYS, NOW, every=True, notify=QUIET
+    )
+    # Ben still has recovery codes, so can sign in with one.
+    assert (retired, stranded) == (1, [])
+
+
+def test_with_authenticators_retired_a_recovery_code_is_still_asked_for(
+    session: Session, client: TestClient
+) -> None:
+    """Not the password alone: its holder could then set up their own."""
+    ada, _ = new_admin(session)
+    first = accounts.make_recovery_codes(session, ada.id, NOW)[0]
+    accounts.retire_authenticators(session, TOTP_KEYS, NOW, every=True, notify=QUIET)
+    assert sign_in_with(client).status_code == 400
+    # In, and asked to set up an authenticator there and then, even with
+    # TOTP optional: else a code each sign-in until none were left.
+    policy(session, "optional")
+    assert "Set up an authenticator" in sign_in_with(client, code=first).text
+
+
+@pytest.mark.usefixtures("restore_logging")
+def test_the_commands_run_as_operator_commands(
+    own_database: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Through kubectl exec (DEPLOYMENT.md, Break-glass); its own database,
+    as they commit."""
+    monkeypatch.setenv("DATABASE_URL", own_database)
+    monkeypatch.delenv("MAIL_HOST", raising=False)
+    site = "https://inventory.example.org"
+    assert admins.main(["invite", "grace", "--base-url", site]) == 0
+    assert (
+        capsys.readouterr()
+        .out.splitlines()[-1]
+        .startswith(f"{site}{sign_in.RESET}?token=")
+    )
+    assert admins.main(["invite", "grace", "--base-url", site]) == 1
+    assert admins.main(["let-in", "grace"]) == 1
+    assert "Give --base-url" in capsys.readouterr().err
+    assert admins.main(["lockdown", "--expect", "2"]) == 1
+    assert admins.main(["lockdown", "--expect", "1"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == "Retired 1 administrators."
+    assert admins.main(["let-in", "grace", "--base-url", site]) == 0
+    assert totp_keys.main(["retire-authenticators", "--all"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == "Retired 0 authenticators."
+
+
+def test_the_operator_invites_without_mail(session: Session) -> None:
+    grace, _ = accounts.invite_by_operator(session, "grace", None, NOW, QUIET)
+    assert activity.recent(session)[0].words == "The operator invited grace"
+    assert grace.retired_at is None
+
+
+def test_admins_runs_as_a_module(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["admins", "--help"])
+    with (
+        pytest.warns(RuntimeWarning, match="found in sys.modules"),
+        pytest.raises(SystemExit) as done,
+    ):
+        runpy.run_module("inventory_tng.admins", run_name="__main__")
+    assert done.value.code == 0
+    assert "lockdown" in capsys.readouterr().out
+
+
+@pytest.mark.usefixtures("restore_logging")
+def test_retiring_authenticators_names_who_must_be_let_in(
+    own_database: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", own_database)
+    monkeypatch.setattr(
+        accounts, "retire_authenticators", lambda *_, **__: (2, ["ada", "ben"])
+    )
+    assert totp_keys.main(["retire-authenticators", "--unreadable"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == (
+        "No second factor left, so let them in: ada, ben."
+    )

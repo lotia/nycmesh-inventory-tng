@@ -5,8 +5,8 @@
 ## Context
 
 Administrators work only in the browser. Some things cannot be done there:
-when no administrator can sign in, or when every administrator's account
-may be compromised at once (break-glass, inventory-tng-8i4.50.2, to come).
+when no administrator can sign in, when every administrator's account may
+be compromised at once, or when the key that seals authenticators is lost.
 0012 gave the operator one way in without a command, `RECOVERY_TOKEN`, and
 rejected a server command because on Kubernetes that means `kubectl exec`
 into a pod, which GitOps setups often forbid, or a Job whose logs would
@@ -29,6 +29,20 @@ after a key rotation. NYC Mesh's clusters allow `kubectl exec`
   records the command line.
 - **Some things require `kubectl exec`**, and DEPLOYMENT.md says which.
   `RECOVERY_TOKEN` stays for letting one administrator back in without it.
+- **Break-glass is two commands** (inventory-tng-8i4.50.2): `lockdown`
+  retires every current administrator, as retiring one does, and revokes
+  every registration code; `let-in` brings one back, retired or not, with
+  everything they signed in with removed, and prints a reset link made by
+  nobody (`made_by_id` NULL), which lasts an hour; `invite` makes an
+  invite link the same way. A link's kind says what it does, and its maker
+  who made it, so the pages and mails need nothing new for these.
+  `lockdown` asks for how many administrators are current, so a slip
+  refuses rather than surprises. Both are told to every administrator
+  (0012) and kept in the history as `system:operator`.
+- **A lost or leaked TOTP key retires authenticators in bulk**, the
+  unreadable ones or all, keeping recovery codes. Sign-in asks for a code
+  while any recovery code is unused, even with no authenticator left, so
+  the password alone never gets in and lets its holder set up their own.
 
 We rejected a Kubernetes Job for these, whose logs are kept and often
 shipped elsewhere, so a printed link would be stored; a Job that mails the

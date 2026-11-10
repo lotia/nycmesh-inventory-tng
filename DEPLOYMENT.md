@@ -247,7 +247,10 @@ They are:
   devices, below);
 - changing the scan page's settings when no administrator can (Scan page
   settings, below);
-- sealing every authenticator with a new TOTP key (TOTP keys, below).
+- sealing every authenticator with a new TOTP key, or retiring them when a
+  key is lost or leaked (TOTP keys, below);
+- locking every administrator out, and letting one back in (Break-glass,
+  below).
 
 What a command makes, such as a code, and its log lines are printed to
 your terminal only, not to the app's logs; what it changed is in the
@@ -285,6 +288,35 @@ while `RECOVERY_TOKEN` is set: remove it and restart afterwards. Anyone who
 can read the token's Secret can already read `DATABASE_URL`, so it trusts
 nobody new.
 
+## Break-glass
+
+When several administrators may be compromised, the administrator pages
+cannot be trusted to put it right: one of them could undo it. Lock every
+administrator out, then let one trusted person back in:
+
+```sh
+kubectl exec deploy/inventory -- python -m inventory_tng.admins \
+  lockdown --expect 3
+kubectl exec deploy/inventory -- python -m inventory_tng.admins \
+  let-in ada
+```
+
+`--expect` is how many administrators you believe are current; it refuses
+if that is wrong. `lockdown` retires all of them, removing everything they
+sign in with, ends their sessions, voids their links, and revokes every
+registration code. Devices already registered stay so: look them over on
+the Devices page once someone is back in. Each administrator with an email
+is told.
+
+`let-in` brings one administrator back, retired or not, with everything
+they signed in with removed, and prints a link for them, which works once,
+within the hour: pass it on yourself. With it they choose a password and
+set up TOTP. They then bring back, or invite, the others from the
+administrator pages. `let-in` also works without a lockdown, for one
+administrator nobody else can let back in. `invite USERNAME [--email
+ADDRESS]` makes a new administrator the same way. Links start with
+`--base-url` if given, else with `SITE_URL`.
+
 ## TOTP keys
 
 Each authenticator's key is stored sealed (AES-GCM), so a copy of the
@@ -317,11 +349,26 @@ It says how many it resealed and how many it could not read. Once none is
 left on the old version, remove that version from the Secret and roll out
 again.
 
-**If a key is lost.** The app starts with whatever versions are present, and
-logs at startup how many authenticators it cannot read. Those take no code,
-and each one's administrator still signs in with their password and a
-recovery code, or a reset link (A locked-out administrator, above), then
-removes it and adds a new one on their account page.
+**If a key is lost.** The authenticators it sealed cannot be read again, and
+must be set up again: all of them, if no other version was ever used. The
+app starts with whatever versions are present, and logs at startup how
+many it cannot read. Retire them:
+
+```sh
+kubectl exec deploy/inventory -- python -m inventory_tng.totp_keys \
+  retire-authenticators --unreadable
+```
+
+Each of those administrators then signs in with their password and a
+recovery code, and sets up a new authenticator. One with no recovery code
+left has their sign-in removed, so their password alone gets nobody in:
+the command names them, for you to let in (Break-glass, above).
+
+**If a key leaks** with a copy of the database, anyone holding both can
+make codes, and resealing does not change what the codes are. Add the next
+version to the Secret and roll out (Rotating, above), so new authenticators
+are sealed with it; then retire every authenticator with `--all` in place
+of `--unreadable`, and remove the leaked version.
 
 ## Mail
 

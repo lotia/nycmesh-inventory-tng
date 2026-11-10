@@ -134,10 +134,16 @@ class SignedIn:
     row: AdminSession
     settings: SignInSettings
     uses_totp: bool
+    # Recovery codes but no authenticator, as after the operator retired
+    # authenticators (accounts.retire_authenticators): set one up again,
+    # whatever the policy, or sign-in would ask for a code until the codes
+    # ran out, then for the password alone.
+    codes_only: bool = False
 
     @property
     def must_set_up_totp(self) -> bool:
-        return self.settings.totp_policy == "required" and not self.uses_totp
+        required = self.settings.totp_policy == "required"
+        return not self.uses_totp and (required or self.codes_only)
 
 
 class Redirect(Exception):
@@ -172,11 +178,13 @@ def signed_in(request: Request, session: DbSession) -> SignedIn:
     request_logging.bind(admin_id=admin.id, sign_in_id=row.id)
     # Every change this request makes is theirs, in the history.
     set_actor(session, f"admin:{admin.id}")
+    uses_totp = accounts.uses_totp(session, admin.id)
     return SignedIn(
         admin=admin,
         row=row,
         settings=accounts.sign_in_settings(session),
-        uses_totp=accounts.uses_totp(session, admin.id),
+        uses_totp=uses_totp,
+        codes_only=not uses_totp and accounts.has_recovery_codes(session, admin.id),
     )
 
 
@@ -370,7 +378,9 @@ def _codes_left(
 def _refused(outcome: accounts.Confirmation, signed: SignedIn) -> str:
     if outcome == "rate_limited":
         return TOO_MANY
-    return "That didn't match." if signed.uses_totp else "That isn't your password."
+    if signed.uses_totp or signed.codes_only:
+        return "That didn't match."
+    return "That isn't your password."
 
 
 def _status(outcome: accounts.Confirmation) -> int:
@@ -429,7 +439,8 @@ def _confirm_page(
         "confirm.html",
         {
             "title": "Confirm it's you",
-            "uses_totp": signed.uses_totp,
+            # A code is asked for while any second factor remains.
+            "uses_totp": signed.uses_totp or signed.codes_only,
             "admin": signed.admin,
             "alert": alert,
             "action": action,
