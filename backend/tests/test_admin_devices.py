@@ -11,9 +11,10 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import devices
 from inventory_tng.admin.common import NAME_MAX
-from inventory_tng.admin.devices import CODES, DEVICES
-from inventory_tng.models import AdminSession, RegistrationCode
+from inventory_tng.admin.devices import BULK_REVOKE, CODES, DEVICE_LIST, DEVICES
+from inventory_tng.models import AdminSession, Device, RegistrationCode
 
+from helpers.devices import new_device
 from helpers.rows import history
 from helpers.sign_in import once, text
 
@@ -111,3 +112,114 @@ def test_unknown_codes_and_devices_are_not_found(admin_client: TestClient) -> No
     assert admin_client.get(f"{CODES}/999999").status_code == 404
     assert admin_client.post(f"{CODES}/999999/revoke").status_code == 404
     assert admin_client.post(f"{DEVICES}/999999/revoke").status_code == 404
+
+
+# Every device, filtered, and revoking many at once (ph9)
+
+
+def device_at(session: Session, at: datetime) -> Device:
+    """A registered device, as if registered `at`."""
+    device, _ = new_device(session)
+    device.created_at = at
+    session.flush()
+    return device
+
+
+def test_devices_are_listed_by_when_they_registered(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Since is typed in the site's time zone (America/New_York here)."""
+    old = device_at(session, datetime(2026, 11, 1, 12, tzinfo=UTC))
+    new = device_at(session, datetime(2026, 11, 5, 12, tzinfo=UTC))
+    listed = text(admin_client.get(DEVICE_LIST, params={"since": "2026-11-03T00:00"}))
+    assert f"Device {new.id}" in listed
+    assert f"Device {old.id}" not in listed
+    by_code = admin_client.get(
+        DEVICE_LIST, params={"code": str(old.registration_code_id)}
+    )
+    assert f"Device {old.id}" in text(by_code)
+    assert f"Device {new.id}" not in text(by_code)
+    bad = admin_client.get(DEVICE_LIST, params={"since": "soon", "code": "x"})
+    assert bad.status_code == 400
+    assert "A date and time" in text(bad)
+    assert "A code&#39;s number" in bad.text
+
+
+def test_revoking_the_ticked_ones_asks_first(
+    admin_client: TestClient, session: Session
+) -> None:
+    """With how many, then only those ticked that the filter still matches."""
+    a = device_at(session, datetime(2026, 11, 5, 12, tzinfo=UTC))
+    b = device_at(session, datetime(2026, 11, 5, 13, tzinfo=UTC))
+    kept = device_at(session, datetime(2026, 11, 5, 14, tzinfo=UTC))
+    old = device_at(session, datetime(2026, 11, 1, 12, tzinfo=UTC))
+    form = once(since="2026-11-03T00:00", code="", state="current")
+    ticked = form | {"device": [str(a.id), str(b.id), str(old.id)]}
+    asked = admin_client.post(BULK_REVOKE, data=ticked)
+    assert "Revoke 2 devices?" in text(asked)
+    assert a.revoked_at is None
+    done = admin_client.post(BULK_REVOKE, data=ticked | {"sure": "yes"})
+    assert done.status_code == 303
+    assert "notice=devices_revoked" in done.headers["location"]
+    assert a.revoked_at is not None
+    assert b.revoked_at is not None
+    assert kept.revoked_at is None
+    # Out of the filter: not revoked, though ticked.
+    assert old.revoked_at is None
+    # Sent again: those ticked are revoked already, so nothing is done again.
+    again = admin_client.post(BULK_REVOKE, data=ticked | {"sure": "yes"})
+    assert again.headers["location"].startswith(DEVICE_LIST)
+    nothing = admin_client.post(BULK_REVOKE, data=form)
+    assert nothing.headers["location"].startswith(DEVICE_LIST)
+
+
+def test_one_device_is_asked_about_in_the_singular(
+    admin_client: TestClient, session: Session
+) -> None:
+    a = device_at(session, datetime(2026, 11, 5, 12, tzinfo=UTC))
+    asked = admin_client.post(BULK_REVOKE, data=once(device=str(a.id)))
+    assert "Revoke 1 device?" in text(asked)
+
+
+def test_a_date_past_what_a_time_holds_is_refused(admin_client: TestClient) -> None:
+    refused = admin_client.get(DEVICE_LIST, params={"since": "9999-12-31T23:59"})
+    assert refused.status_code == 400
+
+
+def test_the_devices_page_links_to_every_device(admin_client: TestClient) -> None:
+    assert f'href="{DEVICE_LIST}"' in admin_client.get(DEVICES).text
+
+
+def test_revoked_and_all_devices_are_listed_too(
+    admin_client: TestClient, session: Session
+) -> None:
+    current = device_at(session, datetime(2026, 11, 5, 12, tzinfo=UTC))
+    gone = device_at(session, datetime(2026, 11, 5, 13, tzinfo=UTC))
+    devices.revoke_device(session, gone.id)
+    # Revoking it again finds no current device.
+    assert not devices.revoke_device(session, gone.id)
+    revoked = text(admin_client.get(DEVICE_LIST, params={"state": "revoked"}))
+    assert f"Device {gone.id}" in revoked
+    assert f"Device {current.id}" not in revoked
+    every = text(admin_client.get(DEVICE_LIST, params={"state": "all"}))
+    assert f"Device {gone.id}" in every
+    assert f"Device {current.id}" in every
+    # Nothing current among those ticked: nothing revoked, nothing counted.
+    none = devices.revoke_devices(
+        session, devices.DeviceFilter(), [gone.id], datetime.now(UTC)
+    )
+    assert none == 0
+
+
+def test_a_bulk_revoke_is_sent_once(admin_client: TestClient, session: Session) -> None:
+    """Its key spent, the same form names a device still current: refused."""
+    a = device_at(session, datetime(2026, 11, 5, 12, tzinfo=UTC))
+    b = device_at(session, datetime(2026, 11, 5, 13, tzinfo=UTC))
+    form = once(sure="yes")
+    assert (
+        admin_client.post(BULK_REVOKE, data=form | {"device": str(a.id)}).status_code
+        == 303
+    )
+    again = admin_client.post(BULK_REVOKE, data=form | {"device": str(b.id)})
+    assert again.status_code == 409
+    assert b.revoked_at is None

@@ -1,0 +1,52 @@
+{% extends "admin_base.html" %}
+{% from "_table.html" import table %}
+{% block main %}
+<p>Every registered phone or computer. After a compromise, list those
+registered since it began, then revoke the ones that look wrong.</p>
+
+<form method="get" action="{{ here }}">
+  <label>Registered since <span class="hint">{{ zone.key }} time, optional</span>
+    <input name="since" type="datetime-local" value="{{ filter.since }}">
+    {% with name = "since" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  <label>With code <span class="hint">its number, optional</span>
+    <input name="code" inputmode="numeric" value="{{ filter.code }}">
+    {% with name = "code" %}{% include "_field_problem.html" %}{% endwith %}
+  </label>
+  <label>Showing
+    <select name="state">
+      {% for state in states %}
+      <option value="{{ state }}"{% if state == filter.state %} selected{% endif %}>{{ state }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <div class="actions"><button>List them</button></div>
+</form>
+
+<form method="post" action="{{ revoke }}">
+  {{ once_field() }}
+  {% for name, value in filter.items() %}
+  <input type="hidden" name="{{ name }}" value="{{ value }}">
+  {% endfor %}
+  {% call table() %}
+    <tr><th>Revoke</th><th>Device</th><th>Registered</th><th>Last used</th><th>Code</th></tr>
+    {% for device in devices %}
+    <tr {% if device.revoked_at %}class="retired"{% endif %}>
+      <td>{% if device.revoked_at %}revoked{% else %}<input type="checkbox" name="device" value="{{ device.id }}" checked aria-label="Revoke {{ device.name }}">{% endif %}</td>
+      <td>{{ device.name }}</td>
+      <td>{{ device.created_at | when(zone) }}</td>
+      <td>{{ device.last_seen_at | when(zone) }}</td>
+      <td><a href="{{ codes_path }}/{{ device.registration_code_id }}">{{ device.registration_code_id }}</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5">None.</td></tr>
+    {% endfor %}
+  {% endcall %}
+  {% if devices | length >= listed %}<p class="hint">Showing the newest {{ listed }}: narrow it to see the rest.</p>{% endif %}
+  {% if devices | selectattr("revoked_at", "none") | list %}
+  <p class="hint">Every current one listed is ticked: untick any to keep.</p>
+  <div class="actions"><button>Revoke the ticked ones</button></div>
+  {% endif %}
+</form>
+<p><a href="{{ list }}">Registration codes</a></p>
+{% endblock %}

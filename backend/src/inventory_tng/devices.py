@@ -19,6 +19,8 @@ import functools
 import hashlib
 import re
 import secrets
+from collections.abc import Collection
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from importlib import resources
 from ipaddress import IPv4Address, IPv6Address, ip_address
@@ -31,7 +33,7 @@ from fastapi.security import APIKeyCookie
 from limits import RateLimitItemPerMinute
 from opentelemetry import metrics
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, Select, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import request_logging
@@ -74,6 +76,11 @@ rejected = meter.create_counter(
     "inventory.registrations.rejected",
     unit="{registration}",
     description="Registration attempts refused, by reason",
+)
+revoked = meter.create_counter(
+    "inventory.devices.revoked",
+    unit="{device}",
+    description="Devices revoked by an administrator, by how: one, or in bulk",
 )
 refused = meter.create_counter(
     "inventory.devices.refused",
@@ -231,7 +238,84 @@ def revoke_every_code(session: Session, now: datetime) -> int:
 def revoke_device(session: Session, device_id: int) -> bool:
     """Refuse this device from its next request. False if there is no such
     current device."""
-    return _revoke(session, Device, device_id, "device_id")
+    if done := _revoke(session, Device, device_id, "device_id"):
+        revoked.add(1, {"how": "one"})
+    return done
+
+
+# How many devices a page lists, newest first.
+LISTED = 500
+
+
+@dataclass(frozen=True)
+class DeviceFilter:
+    """Which devices to list or revoke: registered at or after `since`,
+    with registration code `code_id`, current or not; None is any."""
+
+    since: datetime | None = None
+    code_id: int | None = None
+    current: bool | None = True
+
+    def where(self) -> list[ColumnElement[bool]]:
+        found: list[ColumnElement[bool]] = []
+        if self.since is not None:
+            found.append(Device.created_at >= self.since)
+        if self.code_id is not None:
+            found.append(Device.registration_code_id == self.code_id)
+        if self.current is not None:
+            found.append(
+                Device.revoked_at.is_(None)
+                if self.current
+                else Device.revoked_at.is_not(None)
+            )
+        return found
+
+
+def find_devices(session: Session, chosen: DeviceFilter) -> list[Device]:
+    """The devices the filter matches, newest first, at most LISTED."""
+    return list(
+        session.scalars(
+            select(Device)
+            .where(*chosen.where())
+            .order_by(Device.created_at.desc(), Device.id.desc())
+            .limit(LISTED)
+        )
+    )
+
+
+def _current_among(chosen: DeviceFilter, device_ids: Collection[int]) -> Select[Device]:
+    """The current devices of `device_ids` the filter still matches, in one
+    order: one revoked or out of it meanwhile is left out."""
+    current = replace(chosen, current=True)
+    return (
+        select(Device)
+        .where(*current.where(), Device.id.in_(device_ids))
+        .order_by(Device.id)
+    )
+
+
+def current_among(
+    session: Session, chosen: DeviceFilter, device_ids: Collection[int]
+) -> list[Device]:
+    """Those revoke_devices would revoke now, however many."""
+    return list(session.scalars(_current_among(chosen, device_ids)))
+
+
+def revoke_devices(
+    session: Session, chosen: DeviceFilter, device_ids: Collection[int], now: datetime
+) -> int:
+    """Refuse every current device of `device_ids` the filter still matches
+    (_current_among), as revoke_device does each, locked in one order: how
+    many."""
+    current = session.scalars(
+        locked(_current_among(chosen, device_ids), key_share=True)
+    ).all()
+    for device in current:
+        device.revoked_at = now
+    if current:
+        revoked.add(len(current), {"how": "bulk"})
+    log.info("devices revoked", device_ids=[d.id for d in current], count=len(current))
+    return len(current)
 
 
 def _revoke(

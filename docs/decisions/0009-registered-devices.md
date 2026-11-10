@@ -1,7 +1,7 @@
 # 0009 — Devices register with a code, and the ledger records them
 
 **Status:** accepted · 2026-11-01 · amends 0003 (an unregistered device is
-blocked)
+blocked) · amended 2026-11-10 (revoking ticked devices at once)
 
 ## Context
 
@@ -32,8 +32,11 @@ decide which devices may record anything at all.
 - **Revoking a code stops new registrations only.** Its devices stay
   registered. Each device records the code it used, when and from where, and
   an administrator reviews a code's devices by how long before the revocation
-  they registered, revoking suspicious ones one at a time. There is no bulk
-  de-register, which would stop honest volunteers mid-shift.
+  they registered, revoking suspicious ones one at a time, or, after a
+  compromise, lists every device registered since it began and revokes
+  those ticked at once, after saying how many (inventory-tng-ph9). Nothing
+  revokes every device unasked, which would stop honest volunteers
+  mid-shift.
 - **Each ledger transaction records its device** beside the volunteer picked
   (inventory-tng-8i4.11). A device id therefore comes close to identifying
   whose phone it is: it may be logged, as any id, and is never a metric

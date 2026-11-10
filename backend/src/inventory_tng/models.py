@@ -532,6 +532,11 @@ class Device(Base):
     label: Mapped[str | None] = mapped_column(Text)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    @property
+    def name(self) -> str:
+        """As pages show it: its label, or its number."""
+        return self.label or f"Device {self.id}"
+
 
 class LedgerTransaction(Base):
     """One batch: everything one volunteer moved from one place to another at
