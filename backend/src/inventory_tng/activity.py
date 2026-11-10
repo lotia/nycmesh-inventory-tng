@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import mail
-from inventory_tng.mail import Notifier
+from inventory_tng.mail import Notifier, Told
 from inventory_tng.models import Activity, ActivityKind, Admin
 
 log = structlog.get_logger(__name__)
@@ -66,13 +66,22 @@ def record(
     kind: ActivityKind,
     by_admin_id: int | None,
     admin_id: int | None,
-    notify: Notifier | None,
+    notify: Notifier,
+    *,
+    them: Told | None = None,
+    others: Told | None = None,
+    quiet: bool = False,
 ) -> Activity:
-    """Keep it, and mail every current administrator with an address but
-    the one it was done to, whom the caller tells in their own words. Mail
-    goes after the reply, so only once the caller has committed; without
-    `notify`, as from a command or where the caller mails its own words to
-    everyone, nobody is mailed here."""
+    """Keep it, and send the mail it calls for: `them` to the administrator
+    it was done to, if given; to every other current administrator with an
+    address, `others`, or the change in the feed's words, unless `quiet`,
+    where the caller mails each one affected in their own words, as
+    accounts.retire_authenticators does. Account changes are mailed from
+    here, so none forgets one of the two. Mail goes after the reply, or
+    after a command commits, so only if it does."""
+    if them is not None and admin_id is None:
+        raise ValueError("a mail for the one it was done to needs them")
+    target = session.get(Admin, admin_id) if admin_id is not None else None
     row = Activity(kind=kind, by_admin_id=by_admin_id, admin_id=admin_id)
     session.add(row)
     session.flush()
@@ -84,8 +93,13 @@ def record(
         by_admin_id=by_admin_id,
         target_admin_id=admin_id,
     )
-    if notify is not None and notify.on:
-        notify.tell_admins(session, mail.activity(words(session, row)), but=admin_id)
+    if not notify.on:
+        return row
+    if them is not None and target is not None:
+        notify.tell(target.email, target.id, them)
+    if not quiet:
+        told = others or mail.activity(words(session, row))
+        notify.tell_admins(session, told, but=admin_id)
     return row
 
 

@@ -1144,8 +1144,8 @@ def recover(
     username: str,
     address: str,
     now: datetime,
-    notify: Notifier | None = None,
-) -> tuple[Admin, str]:
+    notify: Notifier,
+) -> str:
     """A one-use link, made with the operator's RECOVERY_TOKEN, that resets
     a current administrator's password and authenticators. Each token works
     once: its hash is kept on the link it made. Raises TokenRefused."""
@@ -1175,8 +1175,15 @@ def recover(
         _refuse("recovery", "used")
     recoveries.add(1, {"outcome": "made"})
     log.warning("recovery link made", admin_id=admin.id)
-    activity.record(session, "recovery_link_made", None, admin.id, notify)
-    return admin, link
+    activity.record(
+        session,
+        "recovery_link_made",
+        None,
+        admin.id,
+        notify,
+        them=mail.recovery_link_made,
+    )
+    return link
 
 
 # Other administrators (admin/admins.py)
@@ -1252,7 +1259,7 @@ def reset_admin_sign_in(
     admin_id: int,
     by_admin_id: int,
     now: datetime,
-    notify: Notifier | None = None,
+    notify: Notifier,
 ) -> tuple[Admin, str, LinkKind]:
     """Reset another administrator's sign-in, at once (_remove_sign_in), even
     if the link is never used: never one's own, which the account page
@@ -1271,7 +1278,9 @@ def reset_admin_sign_in(
         kind=kind,
         sessions_ended=ended,
     )
-    activity.record(session, "sign_in_reset", by_admin_id, admin.id, notify)
+    # One who never chose a password is invited again instead.
+    them = mail.invited if kind == "invite" else mail.reset_link_made
+    activity.record(session, "sign_in_reset", by_admin_id, admin.id, notify, them=them)
     return admin, token, kind
 
 
@@ -1297,7 +1306,7 @@ def invite(
     email: str | None,
     made_by_id: int | None,
     now: datetime,
-    notify: Notifier | None = None,
+    notify: Notifier,
 ) -> tuple[Admin, str]:
     """A new administrator, with no password yet, so nobody can sign in as
     them, and the one-use link that lets them choose one: made by another
@@ -1317,7 +1326,8 @@ def invite(
         session, admin.id, now, kind="invite", made_by_id=made_by_id
     )
     log.info("administrator invited", admin_id=admin.id, made_by_id=made_by_id)
-    activity.record(session, "invited", made_by_id, admin.id, notify)
+    them = mail.invited if made_by_id is not None else mail.invited_by_operator
+    activity.record(session, "invited", made_by_id, admin.id, notify, them=them)
     return admin, token
 
 
@@ -1410,9 +1420,9 @@ def retire_admin(
     admin_id: int,
     by_admin_id: int,
     now: datetime,
-    notify: Notifier | None = None,
-) -> Admin:
-    """Retire another administrator (_retire), and return them. Never oneself; someone who
+    notify: Notifier,
+) -> None:
+    """Retire another administrator (_retire). Never oneself; someone who
     can sign in always remains (lock_admins). Raises AdminRefused."""
     admin = _locked_other(session, "retire", admin_id, by_admin_id, retired=False)
     ended = _retire(session, admin, now)
@@ -1422,8 +1432,9 @@ def retire_admin(
         by_admin_id=by_admin_id,
         sessions_ended=ended,
     )
-    activity.record(session, "retired", by_admin_id, admin.id, notify)
-    return admin
+    activity.record(
+        session, "retired", by_admin_id, admin.id, notify, them=mail.retired
+    )
 
 
 def _retire(session: Session, admin: Admin, now: datetime) -> int:
@@ -1439,7 +1450,7 @@ def restore_admin(
     admin_id: int,
     by_admin_id: int,
     now: datetime,
-    notify: Notifier | None = None,
+    notify: Notifier,
 ) -> tuple[Admin, str]:
     """Bring a retired administrator back (_reissue). Retiring removed
     everything they signed in with, so they start again as if invited:
@@ -1450,7 +1461,9 @@ def restore_admin(
     log.info(
         "administrator restored", target_admin_id=admin_id, by_admin_id=by_admin_id
     )
-    activity.record(session, "restored", by_admin_id, admin.id, notify)
+    activity.record(
+        session, "restored", by_admin_id, admin.id, notify, them=mail.restored
+    )
     return admin, token
 
 
@@ -1483,6 +1496,8 @@ def lock_down(
             f"{len(current)} administrators are current, not {expected}."
         )
     set_actor(session, OPERATOR_ACTOR)
+    # Recorded, and so mailed, while they are still current.
+    activity.record(session, "locked_down", None, None, notify)
     for admin in current:
         _retire(session, admin, now)
     codes = devices.revoke_every_code(session, now)
@@ -1491,10 +1506,6 @@ def lock_down(
         admin_ids=[a.id for a in current],
         registration_codes_revoked=codes,
     )
-    row = activity.record(session, "locked_down", None, None, None)
-    told = mail.activity(activity.words(session, row))
-    for admin in current:
-        notify.tell(admin.email, admin.id, told)
     return current
 
 
@@ -1512,8 +1523,7 @@ def let_in(
     set_actor(session, OPERATOR_ACTOR)
     token, _, _ = _reissue(session, admin, None, now)
     log.warning("administrator let in", admin_id=admin.id)
-    activity.record(session, "let_in", None, admin.id, notify)
-    notify.tell(admin.email, admin.id, mail.let_in)
+    activity.record(session, "let_in", None, admin.id, notify, them=mail.let_in)
     return admin, token
 
 
@@ -1531,9 +1541,7 @@ def invite_by_operator(
         lambda: made.append(invite(session, username, email, None, now, notify)),
     ):
         raise OperatorRefused("Another administrator has that username or email.")
-    admin, token = made[0]
-    notify.tell(admin.email, admin.id, mail.invited_by_operator)
-    return admin, token
+    return made[0]
 
 
 def retire_authenticators(
@@ -1578,5 +1586,8 @@ def retire_authenticators(
         stranded=len(stranded),
     )
     if retired:
-        activity.record(session, "authenticators_retired", None, None, None)
+        # Each told in their own words, above.
+        activity.record(
+            session, "authenticators_retired", None, None, notify, quiet=True
+        )
     return retired, stranded

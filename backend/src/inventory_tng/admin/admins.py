@@ -17,7 +17,7 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, activity, mail
+from inventory_tng import accounts, activity
 from inventory_tng.admin.common import ADMINS, admin_page, now, rule_words, site_link
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.local_time import site_zone
@@ -199,7 +199,6 @@ def invite(
         return _list_page(request, session, signed, problems=problems, values=values)
     other, token = invited[0]
     changed(signed, session)
-    notify.tell(other.email, other.id, mail.invited)
     return _link_page(request, signed, other, token, "invite")
 
 
@@ -233,9 +232,6 @@ def reset(
     except accounts.AdminRefused as refused:
         return _refused(request, session, signed, refused, OWN_RESET)
     changed(signed, session)
-    # One who never chose a password is invited again instead.
-    told = mail.invited if kind == "invite" else mail.reset_link_made
-    notify.tell(other.email, other.id, told)
     return _link_page(request, signed, other, token, kind)
 
 
@@ -253,11 +249,10 @@ def retire(
     ):
         return again
     try:
-        other = accounts.retire_admin(session, admin_id, signed.admin.id, now(), notify)
+        accounts.retire_admin(session, admin_id, signed.admin.id, now(), notify)
     except accounts.AdminRefused as refused:
         return _refused(request, session, signed, refused, OWN_RETIRE)
     changed(signed, session)
-    notify.tell(other.email, other.id, mail.retired)
     return redirect(ADMINS, notice="admin_retired", section="retired")
 
 
@@ -282,5 +277,4 @@ def restore(
         # Whatever the reason: oneself is never retired, so never found here.
         return not_found()
     changed(signed, session)
-    notify.tell(other.email, other.id, mail.restored)
     return _link_page(request, signed, other, token, "invite", brought_back=True)

@@ -36,7 +36,7 @@ from inventory_tng.telemetry import Telemetry, enabled
 
 from helpers.apps import on_session
 from helpers.devices import new_device
-from helpers.mail import FailingMail, SentMail
+from helpers.mail import NO_MAIL, FailingMail, SentMail
 from helpers.pools import small_database
 from helpers.rows import add, shown, tag
 from helpers.sign_in import (
@@ -331,8 +331,8 @@ def test_counts_recoveries(rolled_back: Recorded, session: Session) -> None:
     new_admin(session)
     token, now = "a recovery token the operator set, long", datetime.now(UTC)
     with pytest.raises(accounts.TokenRefused):
-        accounts.recover(session, token, "nope", "ada", "192.0.2.90", now)
-    accounts.recover(session, token, token, "ada", "192.0.2.90", now)
+        accounts.recover(session, token, "nope", "ada", "192.0.2.90", now, NO_MAIL)
+    accounts.recover(session, token, token, "ada", "192.0.2.90", now, NO_MAIL)
     recoveries = counted(reader, "inventory.admin.recoveries")
     assert recoveries[(("outcome", "bad_token"),)] >= 1
     assert recoveries[(("outcome", "made"),)] >= 1
@@ -343,7 +343,7 @@ def test_counts_sign_in_resets(rolled_back: Recorded, session: Session) -> None:
     ada, _ = new_admin(session)
     ben, _ = new_admin(session, "ben")
     now = datetime.now(UTC)
-    accounts.reset_admin_sign_in(session, ben.id, ada.id, now)
+    accounts.reset_admin_sign_in(session, ben.id, ada.id, now, NO_MAIL)
     resets = counted(reader, "inventory.admin.sign_in_resets")
     assert resets[(("action", "reset"),)] >= 1
 
@@ -377,7 +377,7 @@ def test_counts_activity(rolled_back: Recorded, session: Session) -> None:
     _, _, reader, _ = rolled_back
     ada, _ = new_admin(session)
     ben, _ = new_admin(session, "ben")
-    accounts.retire_admin(session, ben.id, ada.id, datetime.now(UTC))
+    accounts.retire_admin(session, ben.id, ada.id, datetime.now(UTC), NO_MAIL)
     told = counted(reader, "inventory.admin.activity")
     assert told[(("kind", "retired"),)] >= 1
 

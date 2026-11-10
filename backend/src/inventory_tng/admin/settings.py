@@ -306,11 +306,17 @@ def save_sign_in_settings(
         return redirect(SETTINGS, notice="saved", section="sign-in")
     for field, value in chosen.items():
         setattr(current, field, value)
-    # In the feed for those without an address; mailed in its own words.
-    activity.record(session, "sign_in_settings_changed", signed.admin.id, None, None)
+    # Mailed to every administrator in its own words, with the new values.
+    activity.record(
+        session,
+        "sign_in_settings_changed",
+        signed.admin.id,
+        None,
+        notify,
+        others=mail.sign_in_settings_changed(current),
+    )
     changed(signed, session)
     log.info("sign-in settings changed", **chosen)
-    notify.tell_admins(session, mail.sign_in_settings_changed(current))
     return redirect(SETTINGS, notice="saved", section="sign-in")
 
 

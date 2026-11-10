@@ -14,11 +14,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, activity, admins, devices, sign_in, totp_keys
+from inventory_tng import accounts, activity, admins, devices, mail, sign_in, totp_keys
 from inventory_tng.mail import Notifier
-from inventory_tng.models import Authenticator, RegistrationCode, ResetLink
+from inventory_tng.models import Admin, Authenticator, RegistrationCode, ResetLink
 
-from helpers.mail import SentMail
+from helpers.mail import NO_MAIL, SentMail
 from helpers.sign_in import (
     TOTP_KEYS,
     code,
@@ -30,10 +30,6 @@ from helpers.sign_in import (
 
 NOW = datetime.now(UTC)
 NEW_PASSWORD = "a long passphrase of their own"
-
-
-# A notifier with no mail, as a command's where mail is not set up.
-QUIET = Notifier(None, BackgroundTasks())
 
 
 def told(sent_mail: SentMail) -> tuple[Notifier, Callable[[], None]]:
@@ -75,7 +71,7 @@ def test_lockdown_retires_everyone_and_revokes_every_code(
 def test_lockdown_refuses_a_count_that_is_wrong(session: Session) -> None:
     ada, _ = new_admin(session)
     with pytest.raises(accounts.OperatorRefused, match="1 administrators"):
-        accounts.lock_down(session, 2, NOW, QUIET)
+        accounts.lock_down(session, 2, NOW, NO_MAIL)
     assert ada.retired_at is None
 
 
@@ -84,7 +80,7 @@ def test_let_in_brings_one_back_with_a_link_that_resets_everything(
 ) -> None:
     ada, key = new_admin(session, email="ada@example.org")
     new_admin(session, "ben", email="ben@example.org")
-    accounts.lock_down(session, 2, NOW, QUIET)
+    accounts.lock_down(session, 2, NOW, NO_MAIL)
     notify, send = told(sent_mail)
     admin, token = accounts.let_in(session, "ADA", NOW, notify)
     send()
@@ -107,14 +103,14 @@ def test_let_in_brings_one_back_with_a_link_that_resets_everything(
 
 def test_let_in_works_without_a_lockdown(session: Session) -> None:
     ada, _ = new_admin(session)
-    accounts.let_in(session, "ada", NOW, QUIET)
+    accounts.let_in(session, "ada", NOW, NO_MAIL)
     assert not accounts.has_password(session, ada.id)
     assert activity.recent(session)[0].words == "The operator let ada back in"
 
 
 def test_let_in_refuses_nobody(session: Session) -> None:
     with pytest.raises(accounts.OperatorRefused, match="No administrator"):
-        accounts.let_in(session, "nobody", NOW, QUIET)
+        accounts.let_in(session, "nobody", NOW, NO_MAIL)
 
 
 def test_the_operator_invites_an_administrator(
@@ -132,9 +128,9 @@ def test_the_operator_invites_an_administrator(
         ("grace@example.org", "invited_by_operator"),
     ]
     with pytest.raises(accounts.OperatorRefused, match="has that"):
-        accounts.invite_by_operator(session, "grace", None, NOW, QUIET)
+        accounts.invite_by_operator(session, "grace", None, NOW, NO_MAIL)
     with pytest.raises(accounts.OperatorRefused):
-        accounts.invite_by_operator(session, "not a username", None, NOW, QUIET)
+        accounts.invite_by_operator(session, "not a username", None, NOW, NO_MAIL)
 
 
 def unreadable(session: Session, admin_id: int) -> Authenticator:
@@ -153,7 +149,7 @@ def test_retiring_unreadable_authenticators_keeps_the_rest(session: Session) -> 
     accounts.make_recovery_codes(session, ben.id, NOW)
     lost = unreadable(session, ada.id)
     retired, stranded = accounts.retire_authenticators(
-        session, TOTP_KEYS, NOW, every=False, notify=QUIET
+        session, TOTP_KEYS, NOW, every=False, notify=NO_MAIL
     )
     assert (retired, stranded) == (1, ["ada"])
     assert lost.retired_at is not None
@@ -161,7 +157,7 @@ def test_retiring_unreadable_authenticators_keeps_the_rest(session: Session) -> 
     assert not accounts.has_password(session, ada.id)
     assert accounts.uses_totp(session, ben.id)
     retired, stranded = accounts.retire_authenticators(
-        session, TOTP_KEYS, NOW, every=True, notify=QUIET
+        session, TOTP_KEYS, NOW, every=True, notify=NO_MAIL
     )
     # Ben still has recovery codes, so can sign in with one.
     assert (retired, stranded) == (1, [])
@@ -173,7 +169,7 @@ def test_with_authenticators_retired_a_recovery_code_is_still_asked_for(
     """Not the password alone: its holder could then set up their own."""
     ada, _ = new_admin(session)
     first = accounts.make_recovery_codes(session, ada.id, NOW)[0]
-    accounts.retire_authenticators(session, TOTP_KEYS, NOW, every=True, notify=QUIET)
+    accounts.retire_authenticators(session, TOTP_KEYS, NOW, every=True, notify=NO_MAIL)
     assert sign_in_with(client).status_code == 400
     # In, and asked to set up an authenticator there and then, even with
     # TOTP optional: else a code each sign-in until none were left.
@@ -210,7 +206,7 @@ def test_the_commands_run_as_operator_commands(
 
 
 def test_the_operator_invites_without_mail(session: Session) -> None:
-    grace, _ = accounts.invite_by_operator(session, "grace", None, NOW, QUIET)
+    grace, _ = accounts.invite_by_operator(session, "grace", None, NOW, NO_MAIL)
     assert activity.recent(session)[0].words == "The operator invited grace"
     assert grace.retired_at is None
 
@@ -276,7 +272,7 @@ def test_setting_up_again_keeps_the_printed_codes(
 ) -> None:
     ada, _ = new_admin(session)
     left = codes_with_left(session, ada.id, 3)
-    accounts.retire_authenticators(session, TOTP_KEYS, NOW, every=True, notify=QUIET)
+    accounts.retire_authenticators(session, TOTP_KEYS, NOW, every=True, notify=NO_MAIL)
     client = make_client()
     sign_in_with(client, code=left[0])
     new_key = accounts.new_totp_key()
@@ -289,9 +285,9 @@ def test_setting_up_again_keeps_the_printed_codes(
 def test_let_in_clears_the_ask_to_set_up_again(session: Session) -> None:
     ada, _ = new_admin(session)
     codes_with_left(session, ada.id, 2)
-    accounts.retire_authenticators(session, TOTP_KEYS, NOW, every=True, notify=QUIET)
+    accounts.retire_authenticators(session, TOTP_KEYS, NOW, every=True, notify=NO_MAIL)
     assert ada.must_set_up_totp
-    accounts.let_in(session, "ada", NOW, QUIET)
+    accounts.let_in(session, "ada", NOW, NO_MAIL)
     assert not ada.must_set_up_totp
 
 
@@ -305,6 +301,80 @@ def test_one_with_a_readable_authenticator_left_is_not_asked(session: Session) -
     ).one()
     lost.key_version = 9
     session.flush()
-    accounts.retire_authenticators(session, TOTP_KEYS, NOW, every=False, notify=QUIET)
+    accounts.retire_authenticators(session, TOTP_KEYS, NOW, every=False, notify=NO_MAIL)
     assert accounts.uses_totp(session, ada.id)
     assert not ada.must_set_up_totp
+
+
+ADA, BEN, GRACE = "ada@example.org", "ben@example.org", "g@example.org"
+
+
+@pytest.mark.parametrize(
+    ("act", "expected"),
+    [
+        (
+            lambda s, ada, ben, n: accounts.invite(s, "grace", GRACE, ada.id, NOW, n),
+            [(ADA, "activity"), (BEN, "activity"), (GRACE, "invited")],
+        ),
+        (
+            lambda s, ada, ben, n: accounts.reset_admin_sign_in(
+                s, ben.id, ada.id, NOW, n
+            ),
+            [(ADA, "activity"), (BEN, "reset_link_made")],
+        ),
+        (
+            # Retired, Ben is no longer current: told once, as the one.
+            lambda s, ada, ben, n: accounts.retire_admin(s, ben.id, ada.id, NOW, n),
+            [(ADA, "activity"), (BEN, "retired")],
+        ),
+        (
+            lambda s, ada, ben, n: accounts.let_in(s, "ben", NOW, n),
+            [(ADA, "activity"), (BEN, "let_in")],
+        ),
+        (
+            lambda s, ada, ben, n: accounts.invite_by_operator(
+                s, "grace", GRACE, NOW, n
+            ),
+            [(ADA, "activity"), (BEN, "activity"), (GRACE, "invited_by_operator")],
+        ),
+    ],
+)
+def test_each_account_change_tells_the_one_it_was_done_to_and_everyone(
+    session: Session,
+    sent_mail: SentMail,
+    act: Callable[[Session, Admin, Admin, Notifier], object],
+    expected: list[tuple[str, str]],
+) -> None:
+    """From one place (activity.record), each told once: the one it was done
+    to in their own words, every other administrator with an address in
+    the feed's."""
+    ada, _ = new_admin(session, email=ADA)
+    ben, _ = new_admin(session, "ben", email=BEN)
+    notify, send = told(sent_mail)
+    act(session, ada, ben, notify)
+    send()
+    assert sorted((m.to, m.kind) for m in sent_mail) == expected
+
+
+def test_bringing_back_and_a_recovery_link_tell_them_too(
+    session: Session, sent_mail: SentMail
+) -> None:
+    ada, _ = new_admin(session, email="ada@example.org")
+    ben, _ = new_admin(session, "ben", email="ben@example.org")
+    accounts.retire_admin(session, ben.id, ada.id, NOW, NO_MAIL)
+    notify, send = told(sent_mail)
+    accounts.restore_admin(session, ben.id, ada.id, NOW, notify)
+    token = "a recovery token the operator set, long"
+    accounts.recover(session, token, token, "ada", "192.0.2.90", NOW, notify)
+    send()
+    assert sorted((m.to, m.kind) for m in sent_mail) == [
+        ("ada@example.org", "activity"),
+        ("ada@example.org", "recovery_link_made"),
+        ("ben@example.org", "activity"),
+        ("ben@example.org", "restored"),
+    ]
+
+
+def test_a_mail_for_nobody_is_refused(session: Session) -> None:
+    with pytest.raises(ValueError, match="needs them"):
+        activity.record(session, "locked_down", None, None, NO_MAIL, them=mail.let_in)

@@ -17,7 +17,7 @@ from inventory_tng.admin.admins import ADMINS
 from inventory_tng.admin.devices import CODES, DEVICES
 from inventory_tng.models import Admin, RegistrationCode, ResetLink
 
-from helpers.mail import SentMail
+from helpers.mail import NO_MAIL, SentMail
 from helpers.rows import tag
 from helpers.sign_in import code, later_code, new_admin, sign_in_with, text, with_code
 
@@ -129,7 +129,7 @@ def test_bringing_back_and_inviting_are_sent_once(
 ) -> None:
     me = session.scalars(select(Admin)).one()
     ben, _ = new_admin(session, "ben")
-    accounts.retire_admin(session, ben.id, me.id, datetime.now(UTC))
+    accounts.retire_admin(session, ben.id, me.id, datetime.now(UTC), NO_MAIL)
     page = f"{ADMINS}/{ben.id}"
     made, again = sent_twice_with_codes(admin_client, session, page, f"{page}/restore")
     assert made.status_code == 200

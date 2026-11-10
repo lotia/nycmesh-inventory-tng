@@ -66,7 +66,7 @@ from inventory_tng.models import (
 )
 
 from helpers.concurrency import Committed, Worker, delete_made, made, newest_ids
-from helpers.mail import SentMail
+from helpers.mail import NO_MAIL, SentMail
 from helpers.rows import item_fields, tag
 from helpers.sign_in import (
     PASSWORD,
@@ -111,7 +111,9 @@ def signing_in(
 def resetting(committed: Committed, ada: int, ben: int) -> tuple[Session, str]:
     """Ada resetting Ben's sign-in, not yet committed, and its link."""
     session = committed.session()
-    _, token, _ = accounts.reset_admin_sign_in(session, ben, ada, datetime.now(UTC))
+    _, token, _ = accounts.reset_admin_sign_in(
+        session, ben, ada, datetime.now(UTC), NO_MAIL
+    )
     return session, token
 
 
@@ -125,7 +127,10 @@ def reset_blocked(committed: Committed, ada: int, ben: int) -> tuple[Session, Wo
     """Ada resetting Ben's sign-in, once it waits for a lock."""
     reset = committed.session()
     worker = committed.blocked(
-        reset, lambda: accounts.reset_admin_sign_in(reset, ben, ada, datetime.now(UTC))
+        reset,
+        lambda: accounts.reset_admin_sign_in(
+            reset, ben, ada, datetime.now(UTC), NO_MAIL
+        ),
     )
     return reset, worker
 
@@ -205,7 +210,7 @@ def test_a_sign_in_under_way_waits_for_a_retire_then_is_refused(
     holds the account's lock."""
     ada, ben, key = admins
     retiring = committed.session()
-    accounts.retire_admin(retiring, ben, ada, datetime.now(UTC))
+    accounts.retire_admin(retiring, ben, ada, datetime.now(UTC), NO_MAIL)
     worker = signing_in_blocked(committed, key)
     retiring.commit()
     error = worker.finished().error
@@ -362,12 +367,12 @@ def test_a_recovery_under_way_waits_for_a_retire_then_is_refused(
     ada, ben, _ = admins
     token = "a recovery token the operator set, long"
     retiring = committed.session()
-    accounts.retire_admin(retiring, ben, ada, datetime.now(UTC))
+    accounts.retire_admin(retiring, ben, ada, datetime.now(UTC), NO_MAIL)
     recovering = committed.session()
     worker = committed.blocked(
         recovering,
         lambda: accounts.recover(
-            recovering, token, token, "ben", "192.0.2.82", datetime.now(UTC)
+            recovering, token, token, "ben", "192.0.2.82", datetime.now(UTC), NO_MAIL
         ),
     )
     retiring.commit()

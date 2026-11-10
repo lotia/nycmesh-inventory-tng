@@ -19,7 +19,7 @@ from inventory_tng import accounts, mail, sign_in
 from inventory_tng.models import Admin, AdminSession, ResetLink
 from inventory_tng.settings import MailConfig, Settings, SettingsError
 
-from helpers.mail import SITE_MAIL, FailingMail, SentMail
+from helpers.mail import NO_MAIL, SITE_MAIL, FailingMail, SentMail
 from helpers.sign_in import (
     TOTP_KEYS,
     code,
@@ -402,7 +402,7 @@ def made_link(session: Session, admin: Admin) -> str:
     authenticators already."""
     colleague, _ = new_admin(session, "colleague")
     _, token, _ = accounts.reset_admin_sign_in(
-        session, admin.id, colleague.id, datetime.now(UTC)
+        session, admin.id, colleague.id, datetime.now(UTC), NO_MAIL
     )
     return token
 

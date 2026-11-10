@@ -14,7 +14,7 @@ from inventory_tng.models import ResetLink
 from inventory_tng.resets import RECOVER
 from inventory_tng.settings import Settings, SettingsError
 
-from helpers.mail import SentMail
+from helpers.mail import NO_MAIL, SentMail
 from helpers.rows import history
 from helpers.sign_in import new_admin, sign_in_with
 
@@ -119,9 +119,9 @@ def test_two_at_once_make_one_link(
     refuses the second, as "used", not as an error."""
     new_admin(session)
     now = datetime.now(UTC)
-    accounts.recover(session, TOKEN, TOKEN, "ada", "192.0.2.91", now)
+    accounts.recover(session, TOKEN, TOKEN, "ada", "192.0.2.91", now, NO_MAIL)
     monkeypatch.setattr(accounts, "exists_where", lambda *_: False)
     with pytest.raises(accounts.TokenRefused) as refused:
-        accounts.recover(session, TOKEN, TOKEN, "ada", "192.0.2.91", now)
+        accounts.recover(session, TOKEN, TOKEN, "ada", "192.0.2.91", now, NO_MAIL)
     assert refused.value.reason == "used"
     assert len(session.scalars(select(ResetLink)).all()) == 1

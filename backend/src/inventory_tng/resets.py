@@ -211,7 +211,7 @@ def recover(
     if expected is None:
         return not_found()
     try:
-        admin, link = accounts.recover(
+        link = accounts.recover(
             session, expected, token, username, rate_key(request), _now(), notify
         )
     except accounts.TokenRefused as refused:
@@ -224,5 +224,4 @@ def recover(
             request, username=username, problems={field: words}, status_code=400
         )
     session.commit()
-    notify.tell(admin.email, admin.id, mail.recovery_link_made)
     return redirect(RESET, token=link)
