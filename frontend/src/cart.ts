@@ -12,7 +12,7 @@ import * as v from "valibot";
 import type { Schemas } from "./api/client";
 import { id } from "./api/replies";
 import { BatchBody, type Draft } from "./outbox";
-import { count, decimal, thousandths } from "./quantity";
+import { count, decimal, sent, thousandths } from "./quantity";
 import { onStoredChange, readStored, writeStored } from "./stored";
 
 export const STORAGE_KEY = "inventory.cart.v1";
@@ -564,40 +564,74 @@ function openings(item: Item, sealed: Map<number, Packs>): Draft["lines"] {
 }
 
 export type OpenPackage = Catalogue["open_packages"][number];
+/** An open package a cart can take from, as it will be once the batches
+ * waiting are saved: where it is, and what is left on it, in thousandths. */
+export type Offered = Omit<OpenPackage, "left"> & { left: number };
 
 /**
- * The open packages of an item at a place a cart can take from: the
- * catalogue's, and those opened in batches still waiting to be sent, under
- * the keys this page made, so they can be taken from before the server has
- * seen them (docs/decisions/0020).
+ * The open packages carts can take from: the catalogue's, and those opened
+ * in batches still waiting to be sent, under the keys this page made, so
+ * they can be taken from before the server has seen them; each as the
+ * waiting batches leave it, cut from or moved whole (docs/decisions/0020).
+ * Worked out once for every line of a cart (offeredAt).
  */
-export function openAt(
+export function offered(
   catalogue: Catalogue,
   outbox: readonly { state: string; body: Draft; queuedAt: number }[],
+): Offered[] {
+  const byKey = new Map<string, Offered>(
+    catalogue.open_packages.map((each) => [
+      each.key,
+      { ...each, left: sent(each.left) },
+    ]),
+  );
+  const known = new Set(byKey.keys());
+  for (const { state, body: draft, queuedAt } of outbox) {
+    if (state !== "waiting") {
+      continue;
+    }
+    for (const line of draft.lines) {
+      const key = line.open_package_key;
+      const amount = sent(String(line.quantity));
+      if (key == null) {
+        continue;
+      }
+      if (draft.kind === "open") {
+        if (!known.has(key)) {
+          byKey.set(key, {
+            id: 0,
+            key,
+            item_id: line.item_id,
+            package_id: line.package_id ?? 0,
+            location_id: draft.from_location_id ?? 0,
+            opened_at: new Date(queuedAt).toISOString(),
+            left: amount,
+          });
+        }
+        continue;
+      }
+      const open = byKey.get(key);
+      const to = line.whole ? draft.to_location_id : undefined;
+      if (open === undefined) {
+        continue;
+      }
+      if (to == null) {
+        open.left -= amount;
+      } else {
+        open.location_id = to;
+      }
+    }
+  }
+  return [...byKey.values()];
+}
+
+/** offered's open packages of an item at a place. */
+export function offeredAt(
+  all: readonly Offered[],
   itemId: number,
   placeId: number | null,
-): OpenPackage[] {
-  const known = new Set(catalogue.open_packages.map((each) => each.key));
-  const pending = outbox.flatMap(({ state, body: draft, queuedAt }) =>
-    state !== "waiting" || draft.kind !== "open"
-      ? []
-      : draft.lines.flatMap((line) =>
-          line.open_package_key == null || known.has(line.open_package_key)
-            ? []
-            : [
-                {
-                  id: 0,
-                  key: line.open_package_key,
-                  item_id: line.item_id,
-                  package_id: line.package_id ?? 0,
-                  location_id: draft.from_location_id ?? 0,
-                  opened_at: new Date(queuedAt).toISOString(),
-                  left: String(line.quantity),
-                },
-              ],
-        ),
-  );
-  return [...catalogue.open_packages, ...pending].filter(
+): Offered[] {
+  return all.filter(
     (each) => each.item_id === itemId && each.location_id === placeId,
   );
 }

@@ -12,8 +12,9 @@ import {
   freshCart,
   indexOf,
   type Line,
-  type OpenPackage,
-  openAt,
+  type Offered,
+  offered,
+  offeredAt,
   quantityOf,
   RETIRED,
   SIDES,
@@ -199,7 +200,16 @@ function CartForm({
   }
 
   function set(fields: Partial<Cart>) {
-    change({ ...cart.value, ...fields });
+    const next = { ...cart.value, ...fields };
+    // What was taken from open packages was where it came from, as it was:
+    // another place, or another kind, leaves none of it.
+    const moved =
+      next.kind !== cart.value.kind || next.fromId !== cart.value.fromId;
+    change(
+      moved
+        ? { ...next, lines: next.lines.map(({ open: _, ...line }) => line) }
+        : next,
+    );
   }
 
   /** Add one, and say what: opening, an item of one package is one of
@@ -287,6 +297,7 @@ function CartForm({
   }
 
   const sides = SIDES[cart.value.kind];
+  const opens = offered(catalogue, outbox.entries.value);
   const { items, volunteers } = indexOf(catalogue);
   const name =
     cart.value.volunteerId === null
@@ -422,12 +433,7 @@ function CartForm({
                 item={item}
                 opens={
                   sides.from && cart.value.kind !== "open"
-                    ? openAt(
-                        catalogue,
-                        outbox.entries.value,
-                        line.itemId,
-                        cart.value.fromId,
-                      )
+                    ? offeredAt(opens, line.itemId, cart.value.fromId)
                     : []
                 }
                 moving={cart.value.kind === "move"}
@@ -572,7 +578,7 @@ function CartLine({
   line: Line;
   item: Catalogue["items"][number] | undefined;
   /** Its open packages where it comes from, to take from. */
-  opens: OpenPackage[];
+  opens: Offered[];
   /** Whether an open package can move whole. */
   moving: boolean;
   onChange: (line: Line) => void;
@@ -644,7 +650,7 @@ function CartLine({
         const taken = line.open?.[open.key] ?? { amount: "", whole: false };
         const take = (next: typeof taken) =>
           onChange({ ...line, open: { ...line.open, [open.key]: next } });
-        const left = decimal(Math.round(Number(open.left) * 1000));
+        const left = decimal(open.left);
         const pack = item.packages.find((each) => each.id === open.package_id);
         const since = `, opened ${open.opened_at.slice(0, 10)}`;
         return (

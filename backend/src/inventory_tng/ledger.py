@@ -545,6 +545,12 @@ packages_opened = meter.create_counter(
     description="Sealed packages opened, by what each became: an open package "
     "followed until used up, or loose units",
 )
+taken_from = meter.create_counter(
+    "inventory.open_packages.taken",
+    unit="{line}",
+    description="Lines of batches taken from an open package, by how: cut "
+    "loose, or the package moved whole",
+)
 replayed = meter.create_counter(
     "inventory.transactions.replayed",
     unit="{transaction}",
@@ -656,8 +662,8 @@ class Batch(BaseModel):
                 raise ValueError("an opening's lines each name a package")
         elif self.from_location_id == self.to_location_id:
             raise ValueError("from and to must be different locations")
-        for line in self.lines if self.kind != "open" else ():
-            taken = line.open_package_key is not None
+        for line in self.lines:
+            taken = line.open_package_key is not None and self.kind != "open"
             if taken and (line.package_id is not None or self.kind == "receipt"):
                 raise ValueError("a line is taken from an open package, or not")
             if line.whole and not (taken and self.kind == "move"):
@@ -760,6 +766,11 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
         and line.open_package_key is not None
         and number not in taken
     ]
+    if batch.kind != "open":
+        twice = repeated([line.open_package_key for line in batch.lines])
+        problems += [
+            (("lines", number, "open_package_key"), "repeated") for number in twice
+        ]
     if problems:
         refused.add(1, {"reason": "invalid"})
         log.info("batch refused", problems=sorted({kind for _, kind in problems}))
@@ -1398,7 +1409,7 @@ def _open_packages_named(session: Session, batch: Batch) -> dict[int, int]:
     opening's made under them, another's taken from. A key with none is
     left out."""
     keys = {
-        key: number
+        number: key
         for number, line in enumerate(batch.lines)
         if (
             key := _opening_key(batch, number)
@@ -1409,10 +1420,16 @@ def _open_packages_named(session: Session, batch: Batch) -> dict[int, int]:
     }
     if not keys:
         return {}
-    found = session.execute(
-        select(OpenPackage.key, OpenPackage.id).where(OpenPackage.key.in_(keys))
+    found = dict(
+        session.execute(
+            select(OpenPackage.key, OpenPackage.id).where(
+                OpenPackage.key.in_(list(keys.values()))
+            )
+        ).all()
     )
-    return {keys[key]: open_id for key, open_id in found}
+    # Every line naming one, so two naming it are both found (and refused
+    # as naming it twice, movement_open_package_once).
+    return {number: found[key] for number, key in keys.items() if key in found}
 
 
 def _written_as(session: Session, batch: Batch) -> list[Entry]:
@@ -1477,6 +1494,10 @@ def save_batch(
     lines_per_batch.record(len(batch.lines), {"kind": batch.kind})
     for into, packages in opened.items():
         packages_opened.add(packages, {"into": into})
+    if batch.kind != "open":
+        for line in batch.lines:
+            if line.open_package_key is not None:
+                taken_from.add(1, {"how": "whole" if line.whole else "cut"})
     log.info(
         "transaction recorded",
         transaction_id=transaction_id,

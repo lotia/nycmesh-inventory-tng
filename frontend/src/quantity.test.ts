@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { count, decimal, thousandths } from "./quantity";
+import { count, decimal, sent, thousandths } from "./quantity";
 
 test.each([
   ["", 0],
@@ -44,4 +44,9 @@ test.each([
   ["x", null],
 ])("count(%j) is %j", (text, expected) => {
   expect(count(text)).toBe(expected);
+});
+
+test("a decimal the server sent is read exactly, or is a bug", () => {
+  expect(sent("120.500")).toBe(120500);
+  expect(() => sent("lots")).toThrow("not a decimal: lots");
 });
