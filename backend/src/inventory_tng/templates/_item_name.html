@@ -10,5 +10,8 @@
   <a href="{{ items_path }}/{{ other.id }}">{{ other.name }}</a>
   {%- if other.retired_at %} <span class="tag">Retired</span>{% endif %}{{ ", " if not loop.last }}
   {%- endfor %}. A different item? {{ again }} again.</p>
-<input type="hidden" name="{{ different }}" value="{{ values.get('name', '') }}">
+<input type="hidden" name="{{ different }}" value="{{ values.get('name', '') | trim }}">
+{% elif values.get(different) %}
+{#- Asked about already, and refused since for something else: kept. #}
+<input type="hidden" name="{{ different }}" value="{{ values[different] }}">
 {% endif %}

@@ -48,7 +48,7 @@ TAKEN = (
     "Another item, perhaps a retired one, already has that name, that "
     "manufacturer and part number, or that old code."
 )
-NO_LETTERS = "Give it a name with a letter or a digit in it."
+NO_LETTERS = "Give it a name with more than spaces and punctuation in it."
 # The form's field holding the name an administrator was shown close names
 # for, and sent again: a different item's, so not asked about again.
 DIFFERENT = "different"
@@ -101,26 +101,30 @@ def _change_or_note[T](
     fields: items.Fields,
     item_id: int | None = None,
     *,
-    ask: bool = False,
+    asked: list[Item] | None = None,
 ) -> tuple[T | None, str | None]:
     """Makes the change to `fields`: what it did, and None; or, if it
     breaks a unique index or one of REFUSED_FIELDS' rules, None, and the
     rule, which `problems` then says beside its field; or one of ALERTS;
-    or, if `ask` and every rule allows it, CLOSE when other items' names are
-    close to its (docs/decisions/0021), and nothing of it is kept."""
+    or, given `asked` and every rule allowing it, CLOSE when other items'
+    names are close to its (docs/decisions/0021), those items put in
+    `asked`, and nothing of it kept."""
 
     def asking() -> T:
         done = change()
-        session.flush()
-        made = getattr(done, "id", None) or item_id
-        if ask and items.similar(session, fields.name, made):
-            raise _AskFirst
+        if asked is not None:
+            session.flush()
+            # An add returns its item; a save is of item_id's.
+            made = done.id if isinstance(done, Item) else item_id or 0
+            if near := items.similar(session, fields.name, made):
+                asked.extend(near)
+                raise _AskFirst
         return done
 
     try:
         done, broken = refusal(session, asking, "unique", *REFUSED_FIELDS, *ALERTS)
     except _AskFirst:
-        log.debug("close names asked about", item_id=item_id)
+        log.debug("close names asked about", item_id=item_id, found=len(asked or ()))
         return None, CLOSE
     if broken == "unique":
         field, words = _taken(session, fields, item_id)
@@ -239,6 +243,12 @@ def _item_page(
     )
 
 
+def _confirmed(form: Mapping[str, str], fields: items.Fields) -> bool:
+    """Whether the name was sent before and asked about, then sent again
+    unchanged: a different item's, whatever is close."""
+    return form.get(DIFFERENT, "").strip() == fields.name
+
+
 def _fields(
     session: Session, form: Mapping[str, str]
 ) -> tuple[items.Fields | None, dict[str, str]]:
@@ -247,8 +257,7 @@ def _fields(
     problems: dict[str, str] = {}
     if problem := name_problem(name):
         problems["name"] = problem
-    elif not any(c.isalnum() for c in name):
-        # Spaces and punctuation alone would all be one name (models.name_key).
+    elif items.nameless(session, name):
         problems["name"] = NO_LETTERS
     category = chosen(session, Category, form.get("category_id", ""))
     if category is None:
@@ -303,13 +312,14 @@ def add_item(
     fields, problems = _fields(session, form)
     item = None
     if fields is not None:
-        ask = form.get(DIFFERENT) != fields.name
+        asked = None if _confirmed(form, fields) else []
         item, broken = _change_or_note(
-            session, lambda: items.add(session, fields), problems, fields, ask=ask
+            session, lambda: items.add(session, fields), problems, fields, asked=asked
         )
         if broken == CLOSE:
-            near = items.similar(session, fields.name)
-            return _list_page(request, session, signed, values=form, similar=near)
+            return _list_page(
+                request, session, signed, values=form, similar=asked or ()
+            )
     if item is None:
         return _list_page(request, session, signed, problems=problems, values=form)
     session.commit()
@@ -342,22 +352,21 @@ def save_item(
     if fields is not None:
         seen = form_version(form.get("version", ""))
         # Its own name, or a respelling of it, asks nothing: it is the same.
-        renamed = fields.name != found.name and not items.same_name(
-            session, fields.name, found.name
+        same = fields.name == found.name or _confirmed(form, fields)
+        asked = (
+            None if same or items.same_name(session, fields.name, found.name) else []
         )
-        ask = renamed and form.get(DIFFERENT) != fields.name
         _, broken = _change_or_note(
             session,
             lambda: items.save(session, found, fields, seen=seen),
             problems,
             fields,
             item_id,
-            ask=ask,
+            asked=asked,
         )
         if broken == CLOSE:
-            near = items.similar(session, fields.name, item_id)
             return _item_page(
-                request, session, signed, found, values=form, similar=near
+                request, session, signed, found, values=form, similar=asked or ()
             )
         if broken in ALERTS:
             alert = RULES[broken]
