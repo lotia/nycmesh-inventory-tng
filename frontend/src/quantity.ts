@@ -19,6 +19,15 @@ export function thousandths(text: string): number | null {
 }
 
 /** A count of whole things, such as packages. Blank is none. */
+/** A decimal the server sent, in thousandths: it is always one. */
+export function sent(text: string): number {
+  const parsed = thousandths(text);
+  if (parsed === null) {
+    throw new Error(`not a decimal: ${text}`);
+  }
+  return parsed;
+}
+
 export function count(text: string): number | null {
   const trimmed = text.trim() || "0";
   return WHOLE.test(trimmed) ? Number(trimmed) : null;

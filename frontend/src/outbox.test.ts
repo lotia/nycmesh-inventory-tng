@@ -299,6 +299,35 @@ describe("refusals", () => {
     );
   });
 
+  test("a batch taking from an opening not yet saved waits for it", async () => {
+    const key = "33333333-3333-4333-8333-333333333333";
+    const opening = draft({
+      kind: "open",
+      to_location_id: 1,
+      lines: [
+        { item_id: 5, quantity: "305", package_id: 9, open_package_key: key },
+        // A box its item does not follow: no key.
+        { item_id: 6, quantity: "100", package_id: 8 },
+      ],
+    });
+    const cut = draft({
+      lines: [{ item_id: 5, quantity: "20", open_package_key: key }],
+    });
+    // The opening gets no good answer: the cut is not tried behind it.
+    const { api, sent } = answering(
+      replies(() => new Response("", { status: 500 })),
+    );
+    const outbox = new Outbox(api);
+    outbox.queue(opening, "opening");
+    outbox.queue(cut, "cut");
+    await vi.waitFor(() => expect(sent.length).toBeGreaterThan(0));
+    await outbox.send();
+    expect((await bodies(sent)).map((body) => body.kind)).toEqual(["open"]);
+    expect(states(outbox)).toEqual(["waiting", "waiting"]);
+    await outbox.send();
+    expect(states(outbox)).toEqual(["saved", "saved"]);
+  });
+
   test("a settled batch can be dismissed; a waiting one cannot", () => {
     const refused = entry({ state: "refused", note: "no" });
     const waiting = entry();

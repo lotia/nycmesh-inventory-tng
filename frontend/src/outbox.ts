@@ -198,8 +198,14 @@ export class Outbox {
     const tried = new Set<string>();
     try {
       for (;;) {
-        const entry = this.read().find(
-          (each) => each.state === "waiting" && !tried.has(each.body.key),
+        const waiting = this.read().filter((each) => each.state === "waiting");
+        // An open package an opening still waiting makes: a batch taking
+        // from it waits too, or the server would refuse it for good.
+        const unmade = new Set(waiting.flatMap((each) => keysMade(each.body)));
+        const entry = waiting.find(
+          (each) =>
+            !tried.has(each.body.key) &&
+            !keysNamed(each.body).some((key) => unmade.has(key)),
         );
         if (entry === undefined) {
           return;
@@ -327,6 +333,20 @@ export class Outbox {
       clearTimeout(this.retry);
     };
   }
+}
+
+/** The open packages an opening makes, by the keys the page gave them. */
+function keysMade(body: Body): string[] {
+  return body.kind !== "open"
+    ? []
+    : body.lines.flatMap((line) => line.open_package_key ?? []);
+}
+
+/** The open packages another batch takes from. */
+function keysNamed(body: Body): string[] {
+  return body.kind === "open"
+    ? []
+    : body.lines.flatMap((line) => line.open_package_key ?? []);
 }
 
 /** A batch as first kept: waiting, and not yet tried. */

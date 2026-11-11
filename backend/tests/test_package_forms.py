@@ -779,3 +779,18 @@ def test_a_line_taken_from_an_open_package_that_cannot_be_is_refused(
         ),
     ):
         assert registered_client.post(URL, json=batch).status_code == 422
+
+
+def test_an_open_package_named_on_two_lines_is_refused_as_twice(
+    registered_client: TestClient, spools: Spools
+) -> None:
+    made = spools.opened()
+    both = spools.place.batch(lines=[taken(made, "305", whole=True), taken(made, "20")])
+    response = registered_client.post(URL, json=both)
+    assert response.status_code == 422
+    assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
+        (["lines", 0, "open_package_key"], "repeated"),
+        (["lines", 1, "open_package_key"], "repeated"),
+    ]
+    whole_opening = opening(spools, opened_line(spools, whole=True))
+    assert registered_client.post(URL, json=whole_opening).status_code == 422

@@ -7,7 +7,8 @@ import {
   freshCart,
   indexOf,
   loadCart,
-  openAt,
+  offered,
+  offeredAt,
   quantityOf,
   STORAGE_KEY,
   search,
@@ -271,7 +272,7 @@ describe("turning a cart into a batch", () => {
     });
   });
 
-  test("open packages are the catalogue's and those waiting to be opened", () => {
+  test("open packages offered: the catalogue's, and as waiting batches leave them", () => {
     const known = {
       id: 5,
       key: "11111111-1111-4111-8111-111111111111",
@@ -281,9 +282,10 @@ describe("turning a cart into a batch", () => {
       opened_at: "2026-11-03T10:00:00Z",
       left: "120.000",
     };
+    const fresh = "33333333-3333-4333-8333-333333333333";
     const catalogue = { ...CATALOGUE, open_packages: [known] };
-    const waiting = {
-      kind: "open" as const,
+    const opening: Draft = {
+      kind: "open",
       volunteer_id: 1,
       from_location_id: 10,
       to_location_id: 10,
@@ -292,7 +294,7 @@ describe("turning a cart into a batch", () => {
           item_id: 101,
           quantity: "305",
           package_id: 1001,
-          open_package_key: "33333333-3333-4333-8333-333333333333",
+          open_package_key: fresh,
         },
         // Sent already, so the catalogue's: not twice.
         {
@@ -304,31 +306,43 @@ describe("turning a cart into a batch", () => {
         { item_id: 101, quantity: "305", package_id: 1001 },
       ],
     };
-    const moved = { ...waiting, kind: "move" as const };
+    const cut: Draft = {
+      kind: "move",
+      volunteer_id: 1,
+      from_location_id: 10,
+      to_location_id: 12,
+      lines: [
+        { item_id: 101, quantity: "20", open_package_key: known.key },
+        { item_id: 101, quantity: "305", open_package_key: fresh, whole: true },
+        { item_id: 101, quantity: "1" },
+        // Opened on another phone: the catalogue's, once loaded again.
+        {
+          item_id: 101,
+          quantity: "1",
+          open_package_key: "44444444-4444-4444-8444-444444444444",
+        },
+      ],
+    };
     const queuedAt = Date.parse("2026-11-04T09:00:00Z");
-    const outbox: { state: string; body: Draft; queuedAt: number }[] = [
-      { state: "waiting", body: waiting, queuedAt },
-      { state: "waiting", body: moved, queuedAt },
-      // Saved: the catalogue has it, once loaded again.
-      {
-        state: "saved",
-        body: { ...waiting, lines: waiting.lines.slice(0, 1) },
-        queuedAt,
-      },
+    const outbox = [
+      { state: "waiting", body: opening, queuedAt },
+      { state: "waiting", body: cut, queuedAt },
+      // Saved: the catalogue has what it did, once loaded again.
+      { state: "saved", body: cut, queuedAt },
     ];
-    expect(openAt(catalogue, outbox, 101, 10)).toEqual([
-      known,
+    const all = offered(catalogue, outbox);
+    expect(offeredAt(all, 101, 10)).toEqual([{ ...known, left: 100000 }]);
+    expect(offeredAt(all, 101, 12)).toEqual([
       {
         id: 0,
-        key: "33333333-3333-4333-8333-333333333333",
+        key: fresh,
         item_id: 101,
         package_id: 1001,
-        location_id: 10,
+        location_id: 12,
         opened_at: "2026-11-04T09:00:00.000Z",
-        left: "305",
+        left: 305000,
       },
     ]);
-    expect(openAt(catalogue, outbox, 101, 12)).toEqual([]);
   });
 
   test("an opening opens whole packages only", () => {

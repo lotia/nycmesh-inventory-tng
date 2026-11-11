@@ -164,6 +164,11 @@ describe("filling and saving a cart", () => {
     expect(field.disabled).toBe(true);
     fireEvent.click(screen.getByLabelText("All of it, moved still open"));
     expect(field.value).toBe("");
+    fireEvent.input(field, { target: { value: "20" } });
+    // Another place: what was taken from this one's packages goes.
+    pick("From", "12");
+    pick("From", "10");
+    expect((screen.getByLabelText(label) as HTMLInputElement).value).toBe("");
   });
 
   test("opening packages asks where, not from and to; an item adds its package", async () => {

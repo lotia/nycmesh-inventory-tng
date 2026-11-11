@@ -19,7 +19,7 @@ from opentelemetry.sdk.metrics.export import (
     Metric,
     NumberDataPoint,
 )
-from sqlalchemy import exc
+from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
@@ -30,7 +30,7 @@ from inventory_tng.app import create_app
 from inventory_tng.db import NoSession, RuleBroken
 from inventory_tng.devices import RegisteredDevice
 from inventory_tng.masking import MASK, Masker
-from inventory_tng.models import Category, Device, LedgerTransaction
+from inventory_tng.models import Category, Device, LedgerTransaction, OpenPackage
 from inventory_tng.settings import Settings
 from inventory_tng.telemetry import Telemetry, enabled
 
@@ -550,6 +550,24 @@ def test_counts_packages_opened_by_what_they_became(
     assert client.post("/api/transactions", json=opening).status_code == 201
     client.cookies.clear()
     assert counted(reader, "inventory.packages.opened")[(("into", "open"),)] == 1
+    made = session.scalars(
+        select(OpenPackage).where(OpenPackage.item_id == spools.cable.id)
+    ).one()
+    client.cookies.set(devices.COOKIE, token)
+    cut = {
+        "item_id": spools.cable.id,
+        "quantity": "5",
+        "open_package_key": str(made.key),
+    }
+    whole = cut | {"quantity": "300", "whole": True}
+    for line in (cut, whole):
+        batch = spools.place.batch(lines=[line])
+        assert client.post("/api/transactions", json=batch).status_code == 201
+    client.cookies.clear()
+    assert counted(reader, "inventory.open_packages.taken") == {
+        (("how", "cut"),): 1,
+        (("how", "whole"),): 1,
+    }
 
 
 def test_counts_mail_sent_and_failed(recorded: Recorded) -> None:
