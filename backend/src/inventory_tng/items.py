@@ -6,7 +6,9 @@ unit. The app may not move a package to another item (migration 0002),
 so its labels always name its item. A retired item is read only until it
 is brought back (docs/decisions/0019). An item's name, its manufacturer
 and part number together, and its old code are each its own, retired items'
-too (models.Item); taken_by says which another item has."""
+too (models.Item); taken_by says which another item has. similar finds
+items whose names are close, to ask whether a new name is a different item
+(docs/decisions/0021)."""
 
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -23,7 +25,14 @@ from inventory_tng.db import (
     relock,
     require_current,
 )
-from inventory_tng.models import Category, Item, ItemPackage, Movement, name_key
+from inventory_tng.models import (
+    Category,
+    Item,
+    ItemPackage,
+    Movement,
+    fuzzy,
+    name_key,
+)
 
 
 def _in_current_category(session: Session, category_id: int) -> None:
@@ -101,6 +110,20 @@ def taken_by(
         if (other := session.scalars(query.limit(1)).first()) is not None:
             return field, other
     return None
+
+
+# How many close names an administrator is shown at most.
+SIMILAR = 5
+
+
+def similar(session: Session, name: str, item_id: int | None = None) -> list[Item]:
+    """Items other than `item_id` whose names are close to `name`, as search
+    finds them (models.fuzzy), closest first, retired ones too."""
+    query = select(Item).where(fuzzy(Item.name, name))
+    if item_id is not None:
+        query = query.where(Item.id != item_id)
+    closest = func.similarity(Item.name, name).desc(), func.lower(Item.name)
+    return list(session.scalars(query.order_by(*closest).limit(SIMILAR)))
 
 
 def add(session: Session, fields: Fields) -> Item:
