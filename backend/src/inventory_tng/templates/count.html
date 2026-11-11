@@ -21,13 +21,15 @@ if you didn't count it. Anything else here, add below.</p>
   {% call table() %}
     <tr><th>Item</th><th>Records say</th>{% if recount %}<th>While you counted</th>{% endif %}<th>Counted</th></tr>
     {% for item, amount in rows %}
-    {% if item.id in forms and not recount %}
+    {% if item.id in forms %}
     {#- In more than loose units: each form counted on its own (0020). #}
-    <tr><td colspan="3"><strong>{{ item.name }}</strong> <span class="hint">{{ amount | amount }} {{ item.unit }} in all</span></td></tr>
+    <tr><td colspan="{{ 4 if recount else 3 }}"><strong>{{ item.name }}</strong> <span class="hint">{{ amount | amount }} {{ item.unit }} in all
+      {%- if recount %}{% set typed, came, went = recount[item.id] %}; while you counted, {{ came | amount }} in, {{ went | amount }} out; you typed {{ typed | amount }}{% endif %}</span></td></tr>
     {% for row in forms[item.id] %}
     <tr>
       <td>{{ row.words }}</td>
       <td>{{ row.amount | amount }}{% if not row.field.startswith("sealed_") %} {{ item.unit }}{% endif %}</td>
+      {% if recount %}<td></td>{% endif %}
       <td><input name="{{ row.field }}" inputmode="decimal" value="{{ values.get(row.field, row.amount | amount if row.amount > 0 else '0') }}" aria-label="{{ item.name }}, {{ row.words }}">
         {% if row.open_id %}
         <select name="state_{{ row.open_id }}" aria-label="{{ item.name }}, {{ row.words }}: is it here?">
@@ -69,7 +71,7 @@ if you didn't count it. Anything else here, add below.</p>
       {% with name = "extra_quantity" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
   </fieldset>
-  {% if found_packages and not items %}
+  {% if found_packages %}
   <fieldset>
     <legend>An open package nobody recorded</legend>
     <label>Package

@@ -37,6 +37,7 @@ from inventory_tng import open_packages
 from inventory_tng.adjustment_reasons import LOST, USED_UP
 from inventory_tng.admin.common import (
     ADMIN,
+    QUANTITY_MAX,
     RULES,
     admin_page,
     chosen,
@@ -57,6 +58,7 @@ from inventory_tng.ledger import (
     countable,
     expected,
     expected_forms,
+    lock_place,
     moment,
     record_adjustment,
     record_count,
@@ -104,6 +106,7 @@ COUNTABLE = "location_countable"
 # form counted twice: said as rules are.
 UNTRACKED = "open_package_untracked"
 ONCE = "movement_item_once"
+CLOSED_MEANWHILE = "movement_open_package_closed"
 TWICE = (
     "An item is on this form more than once. Each item is counted once, so "
     "it isn't clear which number is right: nothing was saved."
@@ -454,7 +457,10 @@ def _by_form(
         for item in session.scalars(select(Item).where(Item.id.in_(item_ids)))
     }
     for field, typed in form.items():
-        if not typed.strip():
+        state = form.get(f"{STATE}{field.removeprefix(OPENED)}", "here")
+        # A blank line is not counted, but one said used up or not here is
+        # closed, whatever is typed.
+        if not typed.strip() and not (field.startswith(OPENED) and state != "here"):
             continue
         if field.startswith(SEALED):
             item_part, _, package_part = field.removeprefix(SEALED).partition("_")
@@ -464,6 +470,8 @@ def _by_form(
                 problems[field] = "No such package."
             elif count is None:
                 problems[field] = "A whole number of packages."
+            elif count * package.size > QUANTITY_MAX:
+                problems[field] = "That is more than the inventory can count."
             else:
                 lines.append(
                     (package.item_id, Form(package_id=package.id), count * package.size)
@@ -481,10 +489,13 @@ def _by_form(
                 lines.append((item.id, LOOSE, amount))
         elif field.startswith(OPENED):
             row = session.get(OpenPackage, row_id(field.removeprefix(OPENED)) or 0)
-            state = form.get(f"{STATE}{row.id if row else ''}", "here")
-            amount = quantity(typed, positive=False)
+            unit = session.get_one(Item, row.item_id).unit if row else "m"
+            amount = quantity(typed, positive=False, unit=unit)
             if row is None or row.location_id != place_id or state not in STATES:
                 problems[field] = "No such open package here."
+            elif row.closed_at is not None:
+                # Its line is gone from the form, so said above it.
+                problems[CLOSED_MEANWHILE] = RULES[CLOSED_MEANWHILE]
             elif (reason := STATES[state]) is not None:
                 close.append((row.id, reason))
             elif isinstance(amount, str):
@@ -495,8 +506,12 @@ def _by_form(
     found = None
     if form.get(FOUND_PACKAGE, "").strip():
         package = session.get(ItemPackage, row_id(form[FOUND_PACKAGE]) or 0)
+        unit = session.get_one(Item, package.item_id).unit if package else "m"
         left = quantity(
-            form.get(FOUND_LEFT, ""), positive=True, required="How much is left on it."
+            form.get(FOUND_LEFT, ""),
+            positive=True,
+            unit=unit,
+            required="How much is left on it.",
         )
         if package is None:
             problems[FOUND_PACKAGE] = "No such package."
@@ -574,22 +589,46 @@ def count(
             as_of,
             problems=problems,
             values=form,
-            alert=TWICE if repeats else None,
+            alert=TWICE if repeats else problems.get(CLOSED_MEANWHILE),
             items=sent_items,
         )
     closed: list[bool] = []
 
+    # An item counted by its total holds loose units alone (_forms): with
+    # an open package of it found, its total is its loose units.
+    found_item = forms.found[0].item_id if forms.found else None
+    totals = [(item_id, amount) for item_id, amount in counted if item_id != found_item]
+    loose = [
+        (item_id, LOOSE, amount) for item_id, amount in counted if item_id == found_item
+    ]
+
     def put_right() -> Counted:
-        lines = list(forms.lines)
+        # The place first, as every count and save takes it (ledger.py).
+        lock_place(session, place.id)
+        lines = [*forms.lines, *loose]
         if forms.found is not None:
             package, left = forms.found
-            made = open_packages.make(
-                session, uuid.uuid5(key, "found"), package.id, place.id
+            with session.begin_nested() as finding:
+                made = open_packages.make(
+                    session, uuid.uuid5(key, "found"), package.id, place.id
+                )
+                found = (package.item_id, Form(open_package_id=made.id), left)
+                counted_now = record_count(
+                    session,
+                    key,
+                    signed.admin.id,
+                    place.id,
+                    totals,
+                    as_of,
+                    by_form=[*lines, found],
+                )
+                if package.item_id in counted_now.moved:
+                    # Its item moved meanwhile: asked again, found again then.
+                    finding.rollback()
+        if forms.found is None or package.item_id in counted_now.moved:
+            counted_now = record_count(
+                session, key, signed.admin.id, place.id, totals, as_of, by_form=lines
             )
-            lines.append((package.item_id, Form(open_package_id=made.id), left))
-        counted_now = record_count(
-            session, key, signed.admin.id, place.id, counted, as_of, by_form=lines
-        )
         # Closed after the count: one not there, or used up, as said.
         for open_id, reason in forms.close:
             closed.append(
@@ -599,7 +638,9 @@ def count(
             )
         return counted_now
 
-    result, broken = refusal(session, put_right, WHOLE, COUNTABLE, UNTRACKED, ONCE)
+    result, broken = refusal(
+        session, put_right, WHOLE, COUNTABLE, UNTRACKED, ONCE, CLOSED_MEANWHILE
+    )
     if broken is not None:
         log.info("count refused by a rule", location_id=place.id, rule=broken)
         if broken == COUNTABLE:
@@ -629,8 +670,11 @@ def count(
             notice="counted" if result.differed else "counted_same",
             section="count",
         )
-    saved = len(counted) - len(result.moved)
+    # What was typed of each item withheld: its total, or its forms'.
     amounts = dict(counted)
+    for item_id, _, amount in forms.lines:
+        amounts[item_id] = amounts.get(item_id, Decimal(0)) + amount
+    saved = len(amounts) - len(result.moved)
     return _count_page(
         request,
         session,
