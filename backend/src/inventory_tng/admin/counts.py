@@ -58,6 +58,7 @@ from inventory_tng.ledger import (
     countable,
     expected,
     expected_forms,
+    hold,
     lock_place,
     moment,
     record_adjustment,
@@ -342,7 +343,15 @@ def _forms(
         if set(forms) <= {LOOSE}:
             continue
         each = rows.setdefault(item_id, [])
-        for form, amount in sorted(forms.items(), key=lambda pair: str(pair[0])):
+
+        # Sealed by package, then open ones oldest first, then loose.
+        def order(pair: tuple[Form, Decimal]) -> tuple[int, int]:
+            form = pair[0]
+            if form.package_id is not None:
+                return 0, form.package_id
+            return (1, form.open_package_id) if form.open_package_id else (2, 0)
+
+        for form, amount in sorted(forms.items(), key=order):
             if form.package_id is not None:
                 package = packages[form.package_id]
                 each.append(
@@ -603,8 +612,11 @@ def count(
     ]
 
     def put_right() -> Counted:
-        # The place first, as every count and save takes it (ledger.py).
+        # The place, then the items, as every count and save takes them
+        # (ledger.py), before a package found is held.
         lock_place(session, place.id)
+        if forms.found is not None:
+            hold(session, {"to_location_id": place.id}, [forms.found[0].item_id])
         lines = [*forms.lines, *loose]
         if forms.found is not None:
             package, left = forms.found

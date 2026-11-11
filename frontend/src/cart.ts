@@ -433,8 +433,9 @@ export const RETIRED = "retired: taking only";
 export function toBatch(
   filled: Cart,
   catalogue: Catalogue,
+  offeredKeys?: ReadonlySet<string>,
 ): { draft: Draft; what: string } | { problems: string[] } {
-  const cart = reconcile(filled, catalogue);
+  const cart = withOffered(reconcile(filled, catalogue), offeredKeys);
   const index = indexOf(catalogue);
   // Open packages said to be used up: with what is taken, or alone, when
   // nothing else is in the cart: a report, at the From place.
@@ -667,6 +668,16 @@ export function offered(
   return [...byKey.values()];
 }
 
+/** The keys of offered's open packages at a place, of any item. */
+export function keysAt(
+  all: readonly Offered[],
+  placeId: number | null,
+): Set<string> {
+  return new Set(
+    all.filter((each) => each.location_id === placeId).map((each) => each.key),
+  );
+}
+
 /** offered's open packages of an item at a place. */
 export function offeredAt(
   all: readonly Offered[],
@@ -676,6 +687,24 @@ export function offeredAt(
   return all.filter(
     (each) => each.item_id === itemId && each.location_id === placeId,
   );
+}
+
+/** The cart with what it takes from open packages no longer offered left
+ * out: reported or closed elsewhere, or moved, since it was typed, its
+ * field is gone from the page, so what was typed there goes too. */
+function withOffered(cart: Cart, keys?: ReadonlySet<string>): Cart {
+  if (keys === undefined) {
+    return cart;
+  }
+  return {
+    ...cart,
+    lines: cart.lines.map((line) => ({
+      ...line,
+      open: Object.fromEntries(
+        Object.entries(line.open ?? {}).filter(([key]) => keys.has(key)),
+      ),
+    })),
+  };
 }
 
 /** Items whose name, maker, part number, code or category holds every word. */

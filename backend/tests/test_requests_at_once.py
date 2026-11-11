@@ -1124,6 +1124,34 @@ def test_the_used_up_reason_made_twice_at_once_is_made_once(
 
 
 @pytest.mark.concurrency
+def test_a_whole_move_sent_twice_at_once_is_written_once(
+    own_committed: Committed,
+) -> None:
+    """The second waits on the open package's lock, then finds the first
+    written, rather than refusing it as somewhere else now (ledger.record)."""
+    setup = own_committed.session()
+    spools = Spools(setup)
+    made = spools.opened()
+    setup.commit()
+    line = {
+        "item_id": spools.cable.id,
+        "quantity": "305",
+        "open_package_key": str(made.key),
+        "whole": True,
+    }
+    batch = Batch.model_validate(spools.place.batch(lines=[line]))
+    one, two = own_committed.session(), own_committed.session()
+    first, wrote, *_ = record(one, batch, device_id=None)
+    worker = own_committed.blocked(two, lambda: record(two, batch, device_id=None))
+    one.commit()
+    finished = worker.finished()
+    two.rollback()
+    assert finished.error is None, finished.error
+    second, wrote_again, *_ = cast(Recorded, finished.result)
+    assert (wrote, wrote_again, second.id) == (True, False, first.id)
+
+
+@pytest.mark.concurrency
 def test_a_receipt_while_its_item_is_retired_waits_then_is_refused(
     own_committed: Committed,
 ) -> None:

@@ -114,9 +114,12 @@ deployed, so the migrations may be rewritten (0016).
 
 ### Saved offline
 
-- **An open package made in a batch gets the batch's key for it**, made
-  by the scan page, so the same batch sent again opens it once, and a later
-  line in the outbox can name it before the server has seen it.
+- **The scan page makes each open package's key**, one for every package
+  it opens, so the same batch sent again opens it once, and a later batch
+  in the outbox can take from it before the server has seen it; the
+  outbox sends a batch naming an open package only after the batches
+  before it that make it, take from it or report it are saved. A batch
+  with no key for a package it opens gets one made from the batch's own.
 
 ## Rejected
 
@@ -153,6 +156,9 @@ deployed, so the migrations may be rewritten (0016).
 - Open packages can be listed, so stock shows what is on each.
 - Opening is a transaction of its own kind, `open`, whose from and to are
   the same place, the one kind that may name one place twice.
+- A volunteer's report of open packages used up, alone, is a transaction
+  of its own kind too, `report`, at the place, with no lines: it moves
+  nothing, and the open packages say who reported them and when.
 - Metrics: packages opened; reported used up, by how (`cut`, `button`);
   closed, by how (`confirmed`, `direct`, `count`); and reports cleared as
   not used up.

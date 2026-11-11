@@ -49,4 +49,7 @@ test.each([
 test("a decimal the server sent is read exactly, or is a bug", () => {
   expect(sent("120.500")).toBe(120500);
   expect(() => sent("lots")).toThrow("not a decimal: lots");
+  // Less than nothing, as the records may say of an open package.
+  expect(sent("-2.500")).toBe(-2500);
+  expect(decimal(-2500)).toBe("-2.5");
 });

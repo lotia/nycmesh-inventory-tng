@@ -202,11 +202,12 @@ def retired_holding_stock() -> Select[int]:
     """The ids of retired places the records say hold something, more or
     less than nothing: what a save brought or took after the place was
     retired, for an administrator to count."""
+    # By form, as holds_stock.
     return (
-        select(balance.c.location_id)
+        select(by_form.c.location_id)
         .where(
-            balance.c.location_id == any_(_retired(Location)),
-            balance.c.quantity != 0,
+            by_form.c.location_id == any_(_retired(Location)),
+            by_form.c.quantity != 0,
         )
         .distinct()
     )
@@ -241,8 +242,9 @@ def _require_countable(session: Session, location_id: int) -> None:
 def holds_stock(session: Session, location_id: int) -> bool:
     """Whether the records say anything is at a place, of any item, more or
     less than nothing."""
+    # By form: sealed and loose that net to nothing still hold something.
     return exists_where(
-        session, balance.c.location_id == location_id, balance.c.quantity != 0
+        session, by_form.c.location_id == location_id, by_form.c.quantity != 0
     )
 
 
@@ -786,6 +788,10 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
     reports = _keyed(session, batch.used_up or [])
     # Those reported too, with the lines', in one order (ledger.py's).
     packages, opens, _ = _hold_forms(session, lines, also=reports.values())
+    # Its open packages' locks waited for any request writing it, which a
+    # form rule would refuse, as it changed them: found as written instead.
+    if opens and (written := _replay(session, batch)) is not None:
+        return Recorded(written, False)
     problems = _problems(session, batch, held, lines, packages, opens)
     problems += [
         (("lines", number, "open_package_key"), "not_found")
