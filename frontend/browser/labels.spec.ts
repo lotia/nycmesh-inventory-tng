@@ -3,11 +3,14 @@
  * (inventory-tng-8i4.16), on US Letter or A4.
  */
 import { expect, type Page, test } from "@playwright/test";
+import { prepared } from "./prepared";
 
 /** Prints `copies` labels of the seed's labelled item, from its page. */
 async function printLabels(page: Page, copies: number): Promise<void> {
-  await page.goto("/admin/items");
-  await page.getByRole("link", { name: "LiteBeam 5AC Gen2" }).click();
+  const { labelled } = prepared();
+  // Found by name: other tests add items, which may push it off a page.
+  await page.goto(`/admin/items?q=${encodeURIComponent(labelled)}`);
+  await page.getByRole("link", { name: labelled, exact: true }).click();
   await page.getByLabel("Copies").fill(String(copies));
   await page.getByRole("button", { name: "Print labels" }).click();
   await expect(
@@ -26,7 +29,7 @@ test("printing shows only the labels, with their codes", async ({ page }) => {
   await expect(page.getByRole("banner")).toBeHidden();
   const labels = page.locator(".print-label").filter({ visible: true });
   await expect(labels).toHaveCount(3);
-  await expect(labels.first()).toContainText("LiteBeam 5AC Gen2");
+  await expect(labels.first()).toContainText(prepared().labelled);
   // An inch and a half across: 96 pixels to the inch.
   expect((await labels.first().locator("svg").boundingBox())?.width).toBe(
     1.5 * 96,
