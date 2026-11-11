@@ -720,12 +720,57 @@ def test_items_ticked_are_set_together_and_packages_keep_their_own(
     )
     assert own.track_opened is False
     assert '<span class="tag">Opened followed</span>' in text(admin_client.get(ITEMS))
-    # Ticked again: nothing to change, and nothing counted.
+    # Ticked again, or kept: nothing to change, and it says so.
     again = admin_client.post(
-        f"{ITEMS}/tracking", data={"item": [str(cable.id)], "track": "on"}
+        f"{ITEMS}/tracking",
+        data={
+            "item": [str(cable.id)],
+            "track": "on",
+            "q": "cable",
+            "pick": str(cable.id),
+        },
     )
-    assert again.headers["location"] == f"{ITEMS}?notice=tracking_on"
+    assert again.headers["location"] == (
+        f"{ITEMS}?q=cable&pick={cable.id}&notice=tracking_same"
+    )
+    retired = text(admin_client.get(ITEMS, params={"show": "retired"}))
+    assert "Track opened packages" not in retired
     none = admin_client.post(f"{ITEMS}/tracking", data={"track": "off"})
     assert none.headers["location"] == f"{ITEMS}?notice=tracking_none"
     bad = admin_client.post(f"{ITEMS}/tracking", data={"item": [str(cable.id)]})
     assert bad.status_code == 404
+
+
+def test_a_refused_package_keeps_the_items_setting_shown(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Else Save on the item's form, after, would turn it off unasked."""
+    item = new_item(session, radios, "Cat6 cable")
+    item.track_opened = True
+    session.flush()
+    refused = admin_client.post(
+        f"{ITEMS}/{item.id}/packages", data={"package_name": "Spool", "size": "lots"}
+    )
+    assert refused.status_code == 400
+    assert 'name="track_opened" checked' in text(refused)
+
+
+def test_a_package_shows_its_own_setting_only_where_it_differs(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios, "Cat6 cable")
+    spool = add(
+        session,
+        ItemPackage(
+            item_id=item.id, name="Spool", size=Decimal(305), track_opened=True
+        ),
+    )
+    page = f"{ITEMS}/{item.id}"
+    assert "(set on this package)" in text(admin_client.get(page))
+    item.track_opened = True
+    session.flush()
+    assert "(set on this package)" not in text(admin_client.get(page))
+    spool.retired_at = NOW
+    session.flush()
+    path = f"{page}/packages/{spool.id}/tracking"
+    assert admin_client.post(path, data={"track": "off"}).status_code == 404

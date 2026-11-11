@@ -11,6 +11,7 @@ back to. #}
   {% if listing.search %}<input type="hidden" name="q" value="{{ listing.search }}">{% endif %}
   {% if listing.show != "current" %}<input type="hidden" name="show" value="{{ listing.show }}">{% endif %}
   {% if listing.page > 1 %}<input type="hidden" name="page" value="{{ listing.page }}">{% endif %}
+  {% if listing.pick %}<input type="hidden" name="pick" value="{{ listing.pick }}">{% endif %}
 </form>
 <section>
   {{ summary(listing, "item", "items") }}
@@ -34,7 +35,7 @@ back to. #}
     {% endfor %}
   {% endcall %}
   {{ pager(listing) }}
-  {% if listing.rows %}
+  {% if listing.rows | rejectattr("retired_at") | list %}
   <div class="actions">
     <button name="track" value="on" form="track-items">Track opened packages</button>
     <button name="track" value="off" form="track-items">Don't</button>

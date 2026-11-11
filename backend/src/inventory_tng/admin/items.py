@@ -146,12 +146,14 @@ NOTICES.update(
         "tracking_off": "Their opened packages become loose units now, where "
         "a package does not say otherwise.",
         "tracking_none": "Tick the items to change first.",
+        "tracking_same": "Nothing changed: those ticked were set so already, "
+        "or are retired.",
     }
 )
 
 tracking_changed = meter.create_counter(
     "inventory.package_tracking.changed",
-    unit="{item}",
+    unit="{change}",
     description="Items or packages whose opened packages are followed, or "
     "no longer, set by an administrator, by where it was set",
 )
@@ -160,17 +162,14 @@ TRACKING = {"": None, "on": True, "off": False}
 
 
 def _tracking_changed(
-    scope: Literal["item", "package", "bulk"], ids: Sequence[int], track: bool | None
+    scope: Literal["item", "package", "bulk"],
+    changed: int,
+    track: bool | None,
+    **ids: int | list[int],
 ) -> None:
-    """Measure and log a change once committed."""
-    tracking_changed.add(len(ids), {"scope": scope})
-    log.info(
-        "package tracking changed",
-        scope=scope,
-        changed=len(ids),
-        track=track,
-        **({"ids": list(ids)} if scope != "package" else {"item_package_id": ids[0]}),
-    )
+    """Measure and log changes once committed: `ids` names what changed."""
+    tracking_changed.add(changed, {"scope": scope})
+    log.info("package tracking changed", scope=scope, track=track, **ids)
 
 
 TextForm = Annotated[dict[str, str], Depends(text_form)]
@@ -378,18 +377,20 @@ def track_items(
     q: Annotated[str, Form()] = "",
     show: Annotated[str, Form()] = "",
     page: Annotated[str, Form()] = "",
+    pick: Annotated[str, Form()] = "",
 ) -> Response:
     """Set "track each opened package" on the items ticked, on the page
     shown, and come back to it as it was."""
-    back = SEARCHED.read(q, show, page).link()
-    if track not in ("on", "off"):
+    back = SEARCHED.read(q, show, page, pick).link()
+    if TRACKING.get(track) is None:
         return not_found()
     if not item:
         return redirect(back, notice="tracking_none")
     changed = items.track_items(session, item, track == "on")
     session.commit()
-    if changed:
-        _tracking_changed("bulk", changed, track == "on")
+    if not changed:
+        return redirect(back, notice="tracking_same")
+    _tracking_changed("bulk", len(changed), track == "on", item_ids=changed)
     return redirect(back, notice=f"tracking_{track}")
 
 
@@ -445,7 +446,7 @@ def save_item(
     session.commit()
     log.info("item saved", item_id=item_id)
     if fields is not None and fields.track_opened != tracked:
-        _tracking_changed("item", [item_id], fields.track_opened)
+        _tracking_changed("item", 1, fields.track_opened, item_id=item_id)
     return redirect(f"{ITEMS}/{item_id}", notice="saved")
 
 
@@ -557,6 +558,7 @@ def track_package(
     package = session.get(ItemPackage, package_id)
     if package is None or package.item_id != item_id or track not in TRACKING:
         return not_found()
+    before = package.track_opened
     _, broken = refusal(
         session, lambda: items.track_package(session, package, TRACKING[track]), RETIRED
     )
@@ -564,5 +566,6 @@ def track_package(
         found = session.get_one(Item, item_id)
         return _item_page(request, session, signed, found, alert=RULES[RETIRED])
     session.commit()
-    _tracking_changed("package", [package_id], TRACKING[track])
+    if TRACKING[track] != before:
+        _tracking_changed("package", 1, TRACKING[track], item_package_id=package_id)
     return redirect(f"{ITEMS}/{item_id}", notice="package_tracking", section="packages")

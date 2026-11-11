@@ -736,6 +736,12 @@ def test_counts_package_tracking_changed_by_where(
         f"{items_path}/{cable.id}/packages/{spools.spool.id}/tracking",
         data={"track": "off"},
     )
+    # Sent again, nothing changes, and nothing more is counted.
+    client.post(f"{items_path}/tracking", data={"item": [str(cable.id)], "track": "on"})
+    client.post(
+        f"{items_path}/{cable.id}/packages/{spools.spool.id}/tracking",
+        data={"track": "off"},
+    )
     session.refresh(cable)
     form = {
         "name": cable.name,
@@ -745,5 +751,10 @@ def test_counts_package_tracking_changed_by_where(
     }
     client.post(f"{items_path}/{cable.id}", data=form)
     changed = counted(reader, "inventory.package_tracking.changed")
-    for scope in ("bulk", "package", "item"):
-        assert changed[(("scope", scope),)] >= 1
+    assert {
+        scope: changed[(("scope", scope),)] for scope in ("bulk", "package", "item")
+    } == {
+        "bulk": 1,
+        "package": 1,
+        "item": 1,
+    }
