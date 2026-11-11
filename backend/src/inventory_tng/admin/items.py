@@ -5,11 +5,12 @@ received (docs/decisions/0003)."""
 
 from collections.abc import Callable, Mapping, Sequence
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 import structlog
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
+from opentelemetry import metrics
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -38,6 +39,7 @@ from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
 log = structlog.get_logger(__name__)
+meter = metrics.get_meter(__name__)
 
 router = APIRouter(include_in_schema=False)
 
@@ -138,8 +140,38 @@ NOTICES.update(
     {
         "package_added": "Package added.",
         "package_retired": "Package retired.",
+        "package_tracking": "Saved: how its opened packages are followed.",
+        "tracking_on": "Their opened packages are followed now, where a "
+        "package does not say otherwise.",
+        "tracking_off": "Their opened packages become loose units now, where "
+        "a package does not say otherwise.",
+        "tracking_none": "Tick the items to change first.",
     }
 )
+
+tracking_changed = meter.create_counter(
+    "inventory.package_tracking.changed",
+    unit="{item}",
+    description="Items or packages whose opened packages are followed, or "
+    "no longer, set by an administrator, by where it was set",
+)
+# What "Same as the item", "Track" and "Don't track" send for a package.
+TRACKING = {"": None, "on": True, "off": False}
+
+
+def _tracking_changed(
+    scope: Literal["item", "package", "bulk"], ids: Sequence[int], track: bool | None
+) -> None:
+    """Measure and log a change once committed."""
+    tracking_changed.add(len(ids), {"scope": scope})
+    log.info(
+        "package tracking changed",
+        scope=scope,
+        changed=len(ids),
+        track=track,
+        **({"ids": list(ids)} if scope != "package" else {"item_package_id": ids[0]}),
+    )
+
 
 TextForm = Annotated[dict[str, str], Depends(text_form)]
 
@@ -275,7 +307,14 @@ def _fields(
         return None, problems
     texts = {field: form.get(field, "").strip() or None for field in TEXT_FIELDS}
     fields = items.Fields(
-        name=name, category_id=category.id, unit=unit, minimum=minimum, **texts
+        name=name,
+        category_id=category.id,
+        unit=unit,
+        minimum=minimum,
+        # A box left unticked is not sent: so is the add form's, which has
+        # none, and a new item does not follow its opened packages.
+        track_opened=form.get("track_opened") == "on",
+        **texts,
     )
     return fields, problems
 
@@ -329,6 +368,31 @@ def add_item(
     return redirect(f"{ITEMS}/{item.id}", notice="added")
 
 
+# Before the routes of one item, whose id would take "tracking".
+@router.post(f"{ITEMS}/tracking")
+def track_items(
+    signed: AdminSignedIn,
+    session: DbSession,
+    item: Annotated[list[int], Form()] = [],  # noqa: B006  FastAPI copies it.
+    track: Annotated[str, Form()] = "",
+    q: Annotated[str, Form()] = "",
+    show: Annotated[str, Form()] = "",
+    page: Annotated[str, Form()] = "",
+) -> Response:
+    """Set "track each opened package" on the items ticked, on the page
+    shown, and come back to it as it was."""
+    back = SEARCHED.read(q, show, page).link()
+    if track not in ("on", "off"):
+        return not_found()
+    if not item:
+        return redirect(back, notice="tracking_none")
+    changed = items.track_items(session, item, track == "on")
+    session.commit()
+    if changed:
+        _tracking_changed("bulk", changed, track == "on")
+    return redirect(back, notice=f"tracking_{track}")
+
+
 @router.get(f"{ITEMS}/{{item_id}}")
 def item(
     request: Request, signed: AdminSignedIn, session: DbSession, item_id: int
@@ -351,6 +415,7 @@ def save_item(
     if found is None:
         return not_found()
     fields, problems = _fields(session, form)
+    tracked = found.track_opened
     if fields is not None:
         seen = form_version(form.get("version", ""))
         # Its own name, or a respelling of it, asks nothing: it is the same.
@@ -379,6 +444,8 @@ def save_item(
         )
     session.commit()
     log.info("item saved", item_id=item_id)
+    if fields is not None and fields.track_opened != tracked:
+        _tracking_changed("item", [item_id], fields.track_opened)
     return redirect(f"{ITEMS}/{item_id}", notice="saved")
 
 
@@ -475,3 +542,27 @@ def retire_package(
     session.commit()
     log.info("package retired", item_package_id=package_id)
     return redirect(f"{ITEMS}/{item_id}", notice="package_retired", section="packages")
+
+
+@router.post(f"{ITEMS}/{{item_id}}/packages/{{package_id}}/tracking")
+def track_package(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    item_id: int,
+    package_id: int,
+    track: Annotated[str, Form()] = "",
+) -> Response:
+    """A package's own "track each opened package", or as its item says."""
+    package = session.get(ItemPackage, package_id)
+    if package is None or package.item_id != item_id or track not in TRACKING:
+        return not_found()
+    _, broken = refusal(
+        session, lambda: items.track_package(session, package, TRACKING[track]), RETIRED
+    )
+    if broken:
+        found = session.get_one(Item, item_id)
+        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
+    session.commit()
+    _tracking_changed("package", [package_id], TRACKING[track])
+    return redirect(f"{ITEMS}/{item_id}", notice="package_tracking", section="packages")

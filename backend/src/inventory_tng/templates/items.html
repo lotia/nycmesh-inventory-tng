@@ -5,15 +5,24 @@
 {{ search_box(listing, "items") }}
 {{ filters(listing) }}
 
+{#- The items ticked belong to this form, and the list as shown, to come
+back to. #}
+<form method="post" action="{{ here }}/tracking" id="track-items">
+  {% if listing.search %}<input type="hidden" name="q" value="{{ listing.search }}">{% endif %}
+  {% if listing.show != "current" %}<input type="hidden" name="show" value="{{ listing.show }}">{% endif %}
+  {% if listing.page > 1 %}<input type="hidden" name="page" value="{{ listing.page }}">{% endif %}
+</form>
 <section>
   {{ summary(listing, "item", "items") }}
   {% call table() %}
-    <tr><th>Item</th><th class="hidden sm:table-cell">Category</th><th class="hidden sm:table-cell">Unit</th><th class="hidden sm:table-cell">Part</th></tr>
+    <tr><th>Pick</th><th>Item</th><th class="hidden sm:table-cell">Category</th><th class="hidden sm:table-cell">Unit</th><th class="hidden sm:table-cell">Part</th></tr>
     {% for item in listing.rows %}
     {% set category = category_names.get(item.category_id, "") %}
     {% set part = ((item.manufacturer or "") ~ " " ~ (item.part_number or "")) | trim %}
     <tr>
+      <td>{% if not item.retired_at %}<input type="checkbox" name="item" value="{{ item.id }}" form="track-items" aria-label="Pick {{ item.name }}">{% endif %}</td>
       <td><a href="{{ here }}/{{ item.id }}">{{ item.name }}</a>
+        {%- if item.track_opened %} <span class="tag">Opened followed</span>{% endif %}
         {%- if item.retired_at %} <span class="tag">Retired</span>{% endif %}
         <span class="hint block sm:hidden">{{ [category, item.unit, part] | select | join(" · ") }}</span></td>
       <td class="hidden sm:table-cell">{{ category }}</td>
@@ -21,10 +30,19 @@
       <td class="hidden sm:table-cell">{{ part }}</td>
     </tr>
     {% else %}
-    {{ empty(listing, 4, "None yet: add one below.") }}
+    {{ empty(listing, 5, "None yet: add one below.") }}
     {% endfor %}
   {% endcall %}
   {{ pager(listing) }}
+  {% if listing.rows %}
+  <div class="actions">
+    <button name="track" value="on" form="track-items">Track opened packages</button>
+    <button name="track" value="off" form="track-items">Don't</button>
+  </div>
+  <p class="hint">For the items ticked on this page: whether a package of
+  theirs, opened, is followed until used up. A package that says otherwise
+  keeps its own.</p>
+  {% endif %}
 </section>
 
 <section>

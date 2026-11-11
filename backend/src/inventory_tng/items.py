@@ -10,6 +10,7 @@ too (models.Item); taken_by says which another item has. similar finds
 items whose names are close, to ask whether a new name is a different item
 (docs/decisions/0021)."""
 
+from collections.abc import Collection
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -22,6 +23,7 @@ from inventory_tng.db import (
     enforce,
     exists_where,
     lock_catalogue,
+    locked,
     relock,
     require_current,
 )
@@ -57,6 +59,9 @@ class Fields:
     old_code: str | None
     notes: str | None
     ordering_notes: str | None
+    # Whether opening one of its packages makes an open package, followed
+    # until used up (docs/decisions/0020): each package's default.
+    track_opened: bool
 
     @classmethod
     def new(
@@ -71,8 +76,10 @@ class Fields:
         old_code: str | None = None,
         notes: str | None = None,
         ordering_notes: str | None = None,
+        track_opened: bool = False,
     ) -> Fields:
-        """A new item's: those not given are blank, and its unit each."""
+        """A new item's: those not given are blank, its unit each, and its
+        opened packages not followed."""
         return cls(
             name=name,
             category_id=category_id,
@@ -83,6 +90,7 @@ class Fields:
             old_code=old_code,
             notes=notes,
             ordering_notes=ordering_notes,
+            track_opened=track_opened,
         )
 
 
@@ -190,3 +198,32 @@ def retire_package(session: Session, package: ItemPackage, at: datetime) -> None
     retired = Item.id == package.item_id, Item.retired_at.is_not(None)
     enforce("retired_read_only", when=exists_where(session, *retired))
     package.retired_at = at
+
+
+def track_package(session: Session, package: ItemPackage, track: bool | None) -> None:
+    """Whether opening one of this package makes an open package, followed
+    until used up, or None: as its item says (docs/decisions/0020)."""
+    relock(session, package)
+    retired = Item.id == package.item_id, Item.retired_at.is_not(None)
+    enforce("retired_read_only", when=exists_where(session, *retired))
+    package.track_opened = track
+
+
+def track_items(session: Session, item_ids: Collection[int], track: bool) -> list[int]:
+    """Set "track each opened package" on the current items of `item_ids`,
+    never a package's own setting. The ids of those it changed."""
+    lock_catalogue(session)
+    changing = session.scalars(
+        locked(
+            select(Item)
+            .where(
+                Item.id.in_(list(item_ids)),
+                Item.retired_at.is_(None),
+                Item.track_opened.is_not(track),
+            )
+            .order_by(Item.id)
+        )
+    ).all()
+    for item in changing:
+        item.track_opened = track
+    return [item.id for item in changing]
