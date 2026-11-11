@@ -202,8 +202,9 @@ def retire_package(session: Session, package: ItemPackage, at: datetime) -> None
 
 def track_package(session: Session, package: ItemPackage, track: bool | None) -> None:
     """Whether opening one of this package makes an open package, followed
-    until used up, or None: as its item says (docs/decisions/0020)."""
-    relock(session, package)
+    until used up, or None: as its item says (docs/decisions/0020). Gone
+    for a retired package, read only as a retired item is."""
+    relock(session, package, current=True)
     retired = Item.id == package.item_id, Item.retired_at.is_not(None)
     enforce("retired_read_only", when=exists_where(session, *retired))
     package.track_opened = track

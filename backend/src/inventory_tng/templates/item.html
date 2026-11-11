@@ -47,7 +47,9 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
     {% include "_field_problem.html" %}
   </label>
   {% endfor %}
-  {% set tracking = values.get('track_opened') == 'on' if values else item.track_opened %}
+  {#- The item's form sent back (it has a version): the box as sent; any
+  other form's page, such as a package refused, shows the item's own. #}
+  {% set tracking = values.get('track_opened') == 'on' if 'version' in values else item.track_opened %}
   <label class="flex items-center gap-2 font-normal">
     <input type="checkbox" name="track_opened" {% if tracking %}checked{% endif %}>
     Track each opened package
@@ -70,7 +72,7 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
     <tr>
       <td>{{ package.name }}
         <span class="hint block">{{ "Opened ones followed" if followed else "Opened ones loose" }}
-        ({{ "set on this package" if own else "as the item" }})</span></td>
+        ({{ "set on this package" if own and followed != item.track_opened else "as the item" }})</span></td>
       <td>{{ package.size | amount }} {{ item.unit }}</td>
       <td>{% if not package.retired_at and not retired %}
         <form method="post" action="{{ here }}/packages/{{ package.id }}/tracking" class="actions">
