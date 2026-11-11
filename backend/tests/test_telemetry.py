@@ -47,7 +47,15 @@ from helpers.sign_in import (
     new_admin,
     sign_in_with,
 )
-from helpers.stock import Place, adjustment_form, received, retire, stocked, write
+from helpers.stock import (
+    Place,
+    Spools,
+    adjustment_form,
+    received,
+    retire,
+    stocked,
+    write,
+)
 
 ENDPOINT = {"OTEL_EXPORTER_OTLP_ENDPOINT": "http://collector:4318"}
 
@@ -516,6 +524,32 @@ def test_counts_batches_written_replayed_and_refused(
         counted(reader, "inventory.transactions.refused")[(("reason", "invalid"),)] >= 1
     )
     assert "inventory.transaction.lines" in metric_names(reader)
+
+
+def test_counts_packages_opened_by_what_they_became(
+    rolled_back: Recorded, session: Session
+) -> None:
+    client, _, reader, _ = rolled_back
+    spools = Spools(session)
+    _, token = new_device(session)
+    client.cookies.set(devices.COOKIE, token)
+    store = spools.store.id
+    opening = spools.place.batch(
+        kind="open",
+        from_location_id=store,
+        to_location_id=store,
+        lines=[
+            {
+                "item_id": spools.cable.id,
+                "quantity": "305",
+                "package_id": spools.spool.id,
+                "open_package_key": str(uuid.uuid4()),
+            }
+        ],
+    )
+    assert client.post("/api/transactions", json=opening).status_code == 201
+    client.cookies.clear()
+    assert counted(reader, "inventory.packages.opened")[(("into", "open"),)] == 1
 
 
 def test_counts_mail_sent_and_failed(recorded: Recorded) -> None:

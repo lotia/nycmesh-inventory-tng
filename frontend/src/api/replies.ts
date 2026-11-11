@@ -50,6 +50,20 @@ export const PackageEntry = v.object({
   id,
   name: v.string(),
   size: v.string(),
+  // Opening one makes an open package, followed, rather than loose units.
+  track_opened: v.boolean(),
+});
+
+/** A package opened and followed, not reported used up (0020). */
+export const OpenPackageEntry = v.object({
+  id,
+  key: v.pipe(v.string(), v.uuid()),
+  item_id: id,
+  package_id: id,
+  location_id: id,
+  opened_at: v.string(),
+  // What is left on it, in the item's unit.
+  left: v.string(),
 });
 
 export const ItemEntry = v.object({
@@ -78,4 +92,5 @@ export const Catalogue = v.object({
   locations: v.array(LocationEntry),
   items: v.array(ItemEntry),
   labels: v.array(LabelEntry),
+  open_packages: v.array(OpenPackageEntry),
 });

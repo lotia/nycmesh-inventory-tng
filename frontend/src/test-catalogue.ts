@@ -9,7 +9,7 @@ export const radio: Item = {
   manufacturer: "Ubiquiti",
   part_number: "LBE-5AC-Gen2",
   old_code: "LB5",
-  packages: [{ id: 1000, name: "Box", size: "4.000" }],
+  packages: [{ id: 1000, name: "Box", size: "4.000", track_opened: false }],
   retired: false,
 };
 
@@ -21,7 +21,7 @@ export const cable: Item = {
   manufacturer: null,
   part_number: null,
   old_code: null,
-  packages: [{ id: 1001, name: "Spool", size: "305.000" }],
+  packages: [{ id: 1001, name: "Spool", size: "305.000", track_opened: true }],
   retired: false,
 };
 
@@ -37,6 +37,7 @@ export const CATALOGUE: Catalogue = {
     { id: 12, name: "Van", kind: "vehicle", parent_id: null },
   ],
   items: [radio, cable],
+  open_packages: [],
   labels: [
     { code: "K7QX2M", item_id: 101, package_id: 1001, location_id: null },
     { code: "B3ZT9W", item_id: 100, package_id: null, location_id: null },

@@ -295,7 +295,7 @@
           },
           "kind": {
             "type": "string",
-            "enum": ["move", "receipt", "install"],
+            "enum": ["move", "receipt", "install", "open"],
             "title": "Kind"
           },
           "volunteer_id": {
@@ -390,10 +390,24 @@
             },
             "type": "array",
             "title": "Labels"
+          },
+          "open_packages": {
+            "items": {
+              "$ref": "#/components/schemas/OpenPackageEntry"
+            },
+            "type": "array",
+            "title": "Open Packages"
           }
         },
         "type": "object",
-        "required": ["settings", "volunteers", "locations", "items", "labels"],
+        "required": [
+          "settings",
+          "volunteers",
+          "locations",
+          "items",
+          "labels",
+          "open_packages"
+        ],
         "title": "Catalogue"
       },
       "CodeRefusedReply": {
@@ -610,7 +624,20 @@
               }
             ],
             "title": "Package Id",
-            "description": "Sealed packages of this package of the item, kept sealed (docs/decisions/0020): `quantity` is a whole number of them, in units. None: loose units."
+            "description": "Sealed packages of this package of the item, kept sealed (docs/decisions/0020): `quantity` is a whole number of them, in units. None: loose units. An opening's lines name the package opened."
+          },
+          "open_package_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Package Key",
+            "description": "An opening's: the key of the open package made, if its item tracks opened packages, made by the page so a later line can name it. One package a line, then."
           }
         },
         "type": "object",
@@ -647,6 +674,52 @@
         "required": ["id", "name", "kind", "parent_id"],
         "title": "LocationEntry"
       },
+      "OpenPackageEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Key"
+          },
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "package_id": {
+            "type": "integer",
+            "title": "Package Id"
+          },
+          "location_id": {
+            "type": "integer",
+            "title": "Location Id"
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Opened At"
+          },
+          "left": {
+            "type": "string",
+            "title": "Left"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "item_id",
+          "package_id",
+          "location_id",
+          "opened_at",
+          "left"
+        ],
+        "title": "OpenPackageEntry",
+        "description": "A package opened and followed, not reported used up: one a cart can\ntake from where it is."
+      },
       "OutboxRetry": {
         "properties": {
           "kind": {
@@ -678,10 +751,14 @@
           "size": {
             "type": "string",
             "title": "Size"
+          },
+          "track_opened": {
+            "type": "boolean",
+            "title": "Track Opened"
           }
         },
         "type": "object",
-        "required": ["id", "name", "size"],
+        "required": ["id", "name", "size", "track_opened"],
         "title": "PackageEntry"
       },
       "PageError": {

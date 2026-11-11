@@ -135,6 +135,14 @@ describe("loading", () => {
 });
 
 describe("filling and saving a cart", () => {
+  test("opening packages asks where, not from and to", async () => {
+    open();
+    await ready();
+    fireEvent.click(screen.getByLabelText("Opening packages"));
+    expect(screen.getByLabelText("Where")).toBeDefined();
+    expect(screen.queryByLabelText("To")).toBeNull();
+  });
+
   test("a move is saved, sent, and a new cart keeps the choices", async () => {
     const record = vi.spyOn(telemetry, "record");
     const { api, sent } = server();

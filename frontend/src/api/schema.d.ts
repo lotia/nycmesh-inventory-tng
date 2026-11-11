@@ -124,7 +124,7 @@ export interface components {
        * Kind
        * @enum {string}
        */
-      kind: "move" | "receipt" | "install";
+      kind: "move" | "receipt" | "install" | "open";
       /** Volunteer Id */
       volunteer_id: number;
       /** From Location Id */
@@ -150,6 +150,8 @@ export interface components {
       items: components["schemas"]["ItemEntry"][];
       /** Labels */
       labels: components["schemas"]["LabelEntry"][];
+      /** Open Packages */
+      open_packages: components["schemas"]["OpenPackageEntry"][];
     };
     /** CodeRefusedReply */
     CodeRefusedReply: {
@@ -228,9 +230,14 @@ export interface components {
       quantity: number | string;
       /**
        * Package Id
-       * @description Sealed packages of this package of the item, kept sealed (docs/decisions/0020): `quantity` is a whole number of them, in units. None: loose units.
+       * @description Sealed packages of this package of the item, kept sealed (docs/decisions/0020): `quantity` is a whole number of them, in units. None: loose units. An opening's lines name the package opened.
        */
       package_id?: number | null;
+      /**
+       * Open Package Key
+       * @description An opening's: the key of the open package made, if its item tracks opened packages, made by the page so a later line can name it. One package a line, then.
+       */
+      open_package_key?: string | null;
     };
     /** LocationEntry */
     LocationEntry: {
@@ -242,6 +249,33 @@ export interface components {
       kind: string;
       /** Parent Id */
       parent_id: number | null;
+    };
+    /**
+     * OpenPackageEntry
+     * @description A package opened and followed, not reported used up: one a cart can
+     *     take from where it is.
+     */
+    OpenPackageEntry: {
+      /** Id */
+      id: number;
+      /**
+       * Key
+       * Format: uuid
+       */
+      key: string;
+      /** Item Id */
+      item_id: number;
+      /** Package Id */
+      package_id: number;
+      /** Location Id */
+      location_id: number;
+      /**
+       * Opened At
+       * Format: date-time
+       */
+      opened_at: string;
+      /** Left */
+      left: string;
     };
     /** OutboxRetry */
     OutboxRetry: {
@@ -264,6 +298,8 @@ export interface components {
       name: string;
       /** Size */
       size: string;
+      /** Track Opened */
+      track_opened: boolean;
     };
     /** PageError */
     PageError: {

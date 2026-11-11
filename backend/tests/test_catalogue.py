@@ -135,8 +135,8 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
     packages = [p | {"size": Decimal(p["size"])} for p in cable.pop("packages")]
     # Smallest first; the retired reel is left out.
     assert packages == [
-        {"id": rows.box.id, "name": "Box", "size": 50},
-        {"id": rows.spool.id, "name": "Spool", "size": 300},
+        {"id": rows.box.id, "name": "Box", "size": 50, "track_opened": False},
+        {"id": rows.spool.id, "name": "Spool", "size": 300, "track_opened": False},
     ]
     assert cable == {
         "id": rows.cable.id,
