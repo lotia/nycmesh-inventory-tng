@@ -667,6 +667,8 @@ class Batch(BaseModel):
             raise ValueError("a report has no lines; every other batch has some")
         if self.kind == "report" and not self.used_up:
             raise ValueError("a report names the open packages used up")
+        if self.used_up and self.kind not in ("move", "install", "report"):
+            raise ValueError("only a batch taking from where it is reports used up")
         has_from, has_to = SIDES[self.kind]
         if (self.from_location_id is not None) != has_from or (
             self.to_location_id is not None
@@ -702,6 +704,7 @@ ProblemKind = Literal[
     "open_package_closed",
     "open_package_elsewhere",
     "open_package_whole",
+    "moved_whole",
     "refused",
     "retired",
     "retired_package",
@@ -714,6 +717,7 @@ MESSAGES = {
     "open_package_elsewhere": "That open package is at another place now",
     "open_package_whole": "Moving an open package whole takes all that is "
     "left on it, which changed: load the page again",
+    "moved_whole": "That open package moves whole, still open: it is not used up",
     "refused": "The inventory's rules refuse this as sent: it changed since "
     "the page loaded. Load the page again, and do it again",
     "not_found": "There is no such row",
@@ -759,8 +763,8 @@ class Recorded(NamedTuple):
     retired: Sequence[Side] = ()
     # How many packages an opening opened, by what they became.
     opened: Mapping[Into, int] = MappingProxyType({})
-    # How many open packages it reported used up.
-    reported: int = 0
+    # How many open packages it reported used up, by how.
+    reported: Mapping[Reported, int] = MappingProxyType({})
 
 
 def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded:
@@ -779,7 +783,9 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
         for number, line in enumerate(batch.lines)
     ]
     held = hold(session, header, [line.item_id for line in lines])
-    packages, opens, _ = _hold_forms(session, lines)
+    reports = _keyed(session, batch.used_up or [])
+    # Those reported too, with the lines', in one order (ledger.py's).
+    packages, opens, _ = _hold_forms(session, lines, also=reports.values())
     problems = _problems(session, batch, held, lines, packages, opens)
     problems += [
         (("lines", number, "open_package_key"), "not_found")
@@ -793,12 +799,15 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
         problems += [
             (("lines", number, "open_package_key"), "repeated") for number in twice
         ]
-    reports = _keyed(session, batch.used_up or [])
-    problems += [
-        (("used_up", number), "not_found")
-        for number, key in enumerate(batch.used_up or [])
-        if key not in reports
-    ]
+    whole = {line.open_package_key for line in batch.lines if line.whole}
+    for number, key in enumerate(batch.used_up or []):
+        opened = opens.get(reports.get(key, 0))
+        if opened is None:
+            problems.append((("used_up", number), "not_found"))
+        elif opened.location_id != batch.from_location_id:
+            problems.append((("used_up", number), "open_package_elsewhere"))
+        elif key in whole:
+            problems.append((("used_up", number), "moved_whole"))
     if problems:
         refused.add(1, {"reason": "invalid"})
         log.info("batch refused", problems=sorted({kind for _, kind in problems}))
@@ -821,11 +830,20 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
     reported = open_packages.report(
         session, reports.values(), batch.volunteer_id, transaction.created_at
     )
-    return Recorded(transaction, True, retired, opened, len(reported))
+    # Asked as a cut took all it showed, or by its button, taking nothing.
+    cut = {line.open_package_key for line in batch.lines}
+    how: dict[Reported, int] = {}
+    for key, open_id in reports.items():
+        if open_id in reported:
+            way: Reported = "cut" if key in cut else "button"
+            how[way] = how.get(way, 0) + 1
+    return Recorded(transaction, True, retired, opened, how)
 
 
 # What an opened package became: an open package, followed, or loose units.
 Into = Literal["open", "loose"]
+# How an open package was reported used up.
+Reported = Literal["cut", "button"]
 
 
 def _opening_key(batch: Batch, number: int) -> uuid.UUID:
@@ -945,14 +963,15 @@ def hold(
 
 
 def _hold_forms(
-    session: Session, lines: Sequence[Entry]
+    session: Session, lines: Sequence[Entry], *, also: Iterable[int] = ()
 ) -> tuple[dict[int, PackageFacts], dict[int, OpenFacts], dict[int, OpenPackage]]:
-    """Hold the packages and open packages a transaction's lines name, in
-    that order (above), and read what form_breaks needs of them."""
+    """Hold the packages and open packages a transaction's lines name, and
+    the open packages `also`, in that order (above), and read what
+    form_breaks needs of them."""
     forms = [form for line in lines for form in (line.leaves, line.arrives)]
     package_ids = sorted({f.package_id for f in forms if f.package_id is not None})
     open_ids = sorted(
-        {f.open_package_id for f in forms if f.open_package_id is not None}
+        {f.open_package_id for f in forms if f.open_package_id is not None} | set(also)
     )
     packages: dict[int, PackageFacts] = {}
     if package_ids:
@@ -1528,17 +1547,16 @@ def save_batch(
         return Saved(transaction_id=transaction_id)
     # Counted once committed, so a failed commit and its retry count once.
     recorded.add(1, {"kind": batch.kind})
-    lines_per_batch.record(len(batch.lines), {"kind": batch.kind})
+    if batch.lines:
+        lines_per_batch.record(len(batch.lines), {"kind": batch.kind})
     for into, packages in opened.items():
         packages_opened.add(packages, {"into": into})
     if batch.kind != "open":
         for line in batch.lines:
             if line.open_package_key is not None:
                 taken_from.add(1, {"how": "whole" if line.whole else "cut"})
-    if reported:
-        # A report alone is the button; with lines, a cut that took all.
-        how = "button" if batch.kind == "report" else "cut"
-        packages_reported.add(reported, {"how": how})
+    for how, packages in reported.items():
+        packages_reported.add(packages, {"how": how})
     log.info(
         "transaction recorded",
         transaction_id=transaction_id,

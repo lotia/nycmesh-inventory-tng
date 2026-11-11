@@ -289,13 +289,18 @@ describe("refusals", () => {
       },
       // No words of the server's: said plainly.
       { type: "missing", loc: ["body", "lines", 0, "quantity"] },
+      {
+        type: "not_found",
+        loc: ["body", "used_up", 0],
+        msg: "There is no such row",
+      },
     ];
     const { api } = answering(() => json({ detail }, 422));
     const outbox = new Outbox(api);
     outbox.queue(draft({ lines }), "a");
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
     expect(outbox.entries.value[0]?.note).toBe(
-      "Not saved. Line 2: There is no such row Value error, a move has only a from and to location Line 1: Not accepted",
+      "Not saved. Line 2: There is no such row Value error, a move has only a from and to location Line 1: Not accepted Open package said used up, 1: There is no such row",
     );
   });
 

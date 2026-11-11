@@ -102,6 +102,11 @@ function problems(
     .map(({ loc, msg }) => {
       const line = loc[0] === "body" && loc[1] === "lines" ? loc[2] : undefined;
       const words = typeof msg === "string" ? msg : "Not accepted";
+      const usedUp =
+        loc[0] === "body" && loc[1] === "used_up" ? loc[2] : undefined;
+      if (typeof usedUp === "number") {
+        return `Open package said used up, ${usedUp + 1}: ${words}`;
+      }
       const sent = typeof line === "number" ? body.lines[line] : undefined;
       return sent === undefined
         ? words

@@ -26,9 +26,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 KINDS_BEFORE = "kind IN ('move', 'receipt', 'install', 'count', 'adjustment')"
-KINDS = (
-    "kind IN ('move', 'receipt', 'install', 'count', 'adjustment', 'open', 'report')"
-)
+KINDS = "kind IN ('move', 'receipt', 'install', 'count', 'adjustment', 'open')"
 SIDES_BEFORE = (
     "CASE kind"
     " WHEN 'move' THEN num_nulls(from_location_id, to_location_id) = 0"
@@ -195,7 +193,7 @@ def downgrade() -> None:
         " WHERE movement.transaction_id = ledger_transaction.id"
         " AND ledger_transaction.kind = 'open'"
     )
-    op.execute("DELETE FROM ledger_transaction WHERE kind IN ('open', 'report')")
+    op.execute("DELETE FROM ledger_transaction WHERE kind = 'open'")
     _checks(
         "ledger_transaction",
         {
