@@ -52,6 +52,8 @@ export const PackageEntry = v.object({
   size: v.string(),
   // Opening one makes an open package, followed, rather than loose units.
   track_opened: v.boolean(),
+  // An open one with less left is a short end; null, none is.
+  short_below: v.nullable(v.string()),
 });
 
 /** A package opened and followed, not reported used up (0020). */

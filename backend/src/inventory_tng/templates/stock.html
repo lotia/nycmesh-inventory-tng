@@ -1,6 +1,7 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% from "_retired.html" import retired %}
+{% from "_forms.html" import forms_words %}
 {% block main %}
 {% include "_stock_views.html" %}
 {% include "_retired_holding.html" %}
@@ -16,7 +17,9 @@ less than nothing somewhere: the records are wrong there, so count it
     {% for row in group.rows %}
     <tr>
       <td>{% if view == "place" %}{{ row.item.name }}{% else %}{{ row.location.name }}{{ retired(row.location) }}{% endif %}</td>
-      <td>{{ row.quantity | amount }} {{ row.item.unit }}{% if row.quantity < 0 %} <strong>count it</strong>{% endif %}</td>
+      <td>{{ row.quantity | amount }} {{ row.item.unit }}{% if row.quantity < 0 %} <strong>count it</strong>{% endif %}
+        {%- set held = forms.get((row.item.id, row.location.id)) %}
+        {%- if held and not held.plain %}<span class="hint block">{{ forms_words(held, row.item.unit) }}</span>{% endif %}</td>
     </tr>
     {% endfor %}
   {% endcall %}

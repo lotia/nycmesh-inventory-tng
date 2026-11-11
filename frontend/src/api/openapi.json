@@ -783,10 +783,21 @@
           "track_opened": {
             "type": "boolean",
             "title": "Track Opened"
+          },
+          "short_below": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Short Below"
           }
         },
         "type": "object",
-        "required": ["id", "name", "size", "track_opened"],
+        "required": ["id", "name", "size", "track_opened", "short_below"],
         "title": "PackageEntry"
       },
       "PageError": {

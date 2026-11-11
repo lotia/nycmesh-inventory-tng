@@ -86,6 +86,17 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
           <button>Set<span class="sr-only"> for {{ package.name }}</span></button>
         </form>
       {% endif %}</td>
+      <td>{% if not package.retired_at and not retired %}
+        <form method="post" action="{{ here }}/packages/{{ package.id }}/settings" class="actions">
+          <label>Too short to use <span class="hint">below, in {{ item.unit }}; blank: none</span>
+            <input name="short_below" inputmode="decimal" value="{{ package.short_below | amount if package.short_below is not none else '' }}">
+          </label>
+          <label>Keep sealed <span class="hint">in the stores; blank: no minimum</span>
+            <input name="minimum_sealed" inputmode="numeric" value="{{ package.minimum_sealed if package.minimum_sealed is not none else '' }}">
+          </label>
+          <button>Save<span class="sr-only"> {{ package.name }}</span></button>
+        </form>
+      {% endif %}</td>
       <td>{% if package.retired_at %}<span class="tag">Retired</span>
       {% elif not retired %}
         <form method="post" action="{{ here }}/packages/{{ package.id }}/retire"><button>Retire<span class="sr-only"> {{ package.name }}</span></button></form>

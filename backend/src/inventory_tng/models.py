@@ -351,6 +351,8 @@ class ItemPackage(Base):
     __table_args__ = (
         _unique_current_name("item_package", "item_id"),
         CheckConstraint("size > 0", name="size"),
+        CheckConstraint("short_below > 0", name="short_below"),
+        CheckConstraint("minimum_sealed >= 0", name="minimum_sealed"),
         protection(owner="items.py", lock="catalogue", history=True),
     )
 
@@ -361,8 +363,14 @@ class ItemPackage(Base):
     # In the item's unit.
     size: Mapped[Decimal] = mapped_column(QUANTITY)
     # NULL: as the item's track_opened says; else this package's own
-    # (items.tracks_opened).
+    # (open_packages.tracks_opened).
     track_opened: Mapped[bool | None]
+    # Too short to use, in the item's unit: an open package with less left
+    # is a short end (docs/decisions/0020). NULL: none is.
+    short_below: Mapped[Decimal | None] = mapped_column(QUANTITY)
+    # How many sealed in the stores to keep: fewer shows on reorder. NULL:
+    # no minimum.
+    minimum_sealed: Mapped[int | None]
     retired_at: Mapped[RetiredAt]
 
 

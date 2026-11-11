@@ -13,6 +13,7 @@ from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import adjustment_reasons, ledger, open_packages
+from inventory_tng.admin import stock
 from inventory_tng.ledger import (
     LOOSE,
     Entry,
@@ -1072,3 +1073,96 @@ def test_whats_left_is_where_it_is_now(session: Session, spools: Spools) -> None
     whole = Form(open_package_id=made.id)
     spools.move(Entry(spools.cable.id, Decimal(305), whole, whole))
     assert ledger.left_on(session, [made]) == {made.id: 305}
+
+
+# Stock by form, short ends, minimum sealed and reorder (8i4.133.7).
+
+
+def test_stock_splits_into_forms_and_short_ends_are_not_usable() -> None:
+    packages = {
+        SPOOL: open_packages.PackageSize("Spool", Decimal(305), Decimal(15)),
+        BOX: open_packages.PackageSize("Box", Decimal(100), None),
+    }
+    rows = [
+        (SPOOL, None, Decimal(915)),
+        (None, OPEN, Decimal(120)),
+        (None, GONE, Decimal(12)),
+        (None, FRESH, Decimal(3)),
+        (None, None, Decimal(85)),
+    ]
+    forms = open_packages.split(rows, packages, {OPEN: SPOOL, GONE: SPOOL, FRESH: BOX})
+    assert forms.sealed == [("Spool", Decimal(3), Decimal(915))]
+    assert (forms.open, forms.short_ends) == ([Decimal(120), Decimal(3)], [Decimal(12)])
+    assert (forms.loose, forms.total, forms.usable) == (85, 1135, 1123)
+    assert not forms.plain
+    assert open_packages.split([(None, None, Decimal(4))], {}, {}).plain
+
+
+def test_reorder_on_usable_stock_and_sealed_minimums() -> None:
+    cable = Item(id=1, name="Cable", minimum=Decimal(400))
+    rope = Item(id=2, name="Rope", minimum=None)
+    spool = ItemPackage(id=10, item_id=1, name="Spool", minimum_sealed=3)
+    coil = ItemPackage(id=11, item_id=2, name="Coil", minimum_sealed=1)
+    usable = {1: Decimal(500), 2: Decimal(50)}
+    sealed = {1: {10: Decimal(2)}, 2: {11: Decimal(1)}}
+    loose = ItemPackage(id=12, item_id=1, name="Box", minimum_sealed=None)
+    (row,) = stock.reorder_rows(
+        [cable, rope], usable, sealed, [spool, coil, loose], {1}
+    )
+    assert (row.item, row.in_stores, row.count_first) == (cable, 500, True)
+    assert row.low_sealed == [("Spool", Decimal(2), 3)]
+    assert (
+        stock.reorder_rows([cable], {1: Decimal(400)}, {}, [], set())[0].item is cable
+    )
+
+
+def test_stock_and_reorder_pages_show_forms(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    spools.spool.short_below, spools.spool.minimum_sealed = Decimal(15), 2
+    spools.cable.minimum = Decimal(400)
+    made = spools.opened()
+    spools.move(Entry(spools.cable.id, Decimal(295), Form(open_package_id=made.id)))
+    session.flush()
+    words = " ".join(text(admin_client.get("/admin/stock")).split())
+    assert "1 sealed Spool · short ends: 10 m · usable 305 m" in words
+    reorder = " ".join(text(admin_client.get("/admin/stock/reorder")).split())
+    assert spools.cable.name in reorder
+    assert "1 sealed Spool, of 2 to keep" in reorder
+
+
+def test_a_packages_settings_are_set_on_its_items_page(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    spools: Spools,
+) -> None:
+    path = f"/admin/items/{spools.cable.id}/packages/{spools.spool.id}/settings"
+    done = admin_client.post(path, data={"short_below": "15", "minimum_sealed": "2"})
+    assert done.headers["location"].endswith(
+        "notice=package_settings&section=packages#packages"
+    )
+    session.refresh(spools.spool)
+    assert (spools.spool.short_below, spools.spool.minimum_sealed) == (15, 2)
+    entry = next(
+        pack
+        for item in registered_client.get("/api/catalogue").json()["items"]
+        if item["id"] == spools.cable.id
+        for pack in item["packages"]
+    )
+    assert entry["short_below"] == "15.000"
+    admin_client.post(path, data={"short_below": "", "minimum_sealed": ""})
+    session.refresh(spools.spool)
+    assert (spools.spool.short_below, spools.spool.minimum_sealed) == (None, None)
+    for bad in ({"short_below": "-1"}, {"minimum_sealed": "lots"}):
+        assert admin_client.post(path, data=bad).status_code == 409
+    other = f"/admin/items/{spools.place.item.id}/packages/{spools.spool.id}/settings"
+    assert admin_client.post(other, data={}).status_code == 404
+    # Its item retired: read only.
+    spools.cable.retired_at = datetime.now(UTC)
+    session.flush()
+    assert admin_client.post(path, data={}).status_code == 409
+    spools.cable.retired_at = None
+    spools.spool.retired_at = datetime.now(UTC)
+    session.flush()
+    assert admin_client.post(path, data={}).status_code == 404
