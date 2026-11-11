@@ -269,11 +269,17 @@ describe("refusals", () => {
     expect(outbox.entries.value[0]?.note).toContain("Please report this");
   });
 
-  test("a 422 says which line, in the server's words", async () => {
+  test("a 422 says which line of the cart, in the server's words", async () => {
+    // The cart's first line went as two, a box and loose units.
+    const lines = [
+      { item_id: 5, quantity: "4", package_id: 9 },
+      { item_id: 5, quantity: "1" },
+      { item_id: 6, quantity: "2" },
+    ];
     const detail = [
       {
         type: "not_found",
-        loc: ["body", "lines", 1, "item_id"],
+        loc: ["body", "lines", 2, "item_id"],
         msg: "There is no such row",
       },
       {
@@ -284,7 +290,7 @@ describe("refusals", () => {
     ];
     const { api } = answering(() => json({ detail }, 422));
     const outbox = new Outbox(api);
-    outbox.queue(draft(), "a");
+    outbox.queue(draft({ lines }), "a");
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
     expect(outbox.entries.value[0]?.note).toBe(
       "Not saved. Line 2: There is no such row Value error, a move has only a from and to location",
@@ -325,6 +331,20 @@ describe("storage", () => {
     expect(outbox.entries.value).toEqual([waiting]);
     await outbox.send();
     expect((await bodies(sent))[0].lines).toEqual(lines);
+  });
+
+  test("an older build's batches are read, and left for its tabs", async () => {
+    const waiting = entry();
+    localStorage.setItem("inventory.outbox.v1", JSON.stringify([waiting]));
+    const outbox = new Outbox(answering(() => saved()).api);
+    expect(outbox.entries.value).toEqual([waiting]);
+    await outbox.send();
+    expect(states(outbox)).toEqual(["saved"]);
+    // Written to this build's key only: an older tab's reader would drop a
+    // package from a line it wrote back.
+    expect(
+      JSON.parse(localStorage.getItem("inventory.outbox.v1") ?? ""),
+    ).toEqual([waiting]);
   });
 
   test("an unreadable entry is dropped, and only that one", () => {

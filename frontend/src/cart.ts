@@ -21,6 +21,8 @@ export const STORAGE_KEY = "inventory.cart.v1";
 const MAX_ID = 2 ** 31 - 1;
 /** numeric(12,3): under a billion units, in thousandths. */
 const MAX_AMOUNT = 10 ** 12;
+/** Lines in a batch (ledger.MAX_LINES): a cart line may be several. */
+const MAX_LINES = 500;
 
 export type Catalogue = Schemas["Catalogue"];
 export type Item = Schemas["ItemEntry"];
@@ -359,7 +361,9 @@ export function quantityOf(
     };
   }
   amount += loose;
-  if (item.unit === "each" && amount % 1000 !== 0) {
+  // Each part is a line of its own (toBatch), so each is whole.
+  const parts = [loose, ...sealed.values()];
+  if (item.unit === "each" && parts.some((part) => part % 1000 !== 0)) {
     return { problem: "Counted in whole units." };
   }
   return { amount, sealed, loose };
@@ -446,6 +450,9 @@ export function toBatch(
   }
   if (lines.length === 0 && problems.length === 0) {
     problems.push("Add something to the cart.");
+  }
+  if (lines.length > MAX_LINES) {
+    problems.push("That is too much for one batch: save some, then the rest.");
   }
   // The volunteer check again only narrows the type; it was reported above.
   if (problems.length > 0 || cart.volunteerId === null) {
