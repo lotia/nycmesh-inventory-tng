@@ -3,7 +3,7 @@ has moved in it (items.save): the form shows it, and does not offer to
 change it. A retired item with stock left may still be taken, never
 received (docs/decisions/0003)."""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from decimal import Decimal
 from typing import Annotated
 
@@ -49,6 +49,8 @@ TAKEN = (
     "manufacturer and part number, or that old code."
 )
 NO_LETTERS = "Give it a name with a letter or a digit in it."
+# The form's field saying a name close to others' is a different item's.
+DIFFERENT = "different"
 # After another item's name, what of it is taken (items.taken_by).
 TAKEN_FIELDS = {
     "name": "already has that name, or one differing from it only in case, "
@@ -132,6 +134,7 @@ def _list_page(
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
     undo: str | None = None,
+    similar: Sequence[Item] = (),
 ) -> HTMLResponse:
     listing = (listing or SEARCHED.read()).find(session)
     categories = _categories(session)
@@ -150,6 +153,7 @@ def _list_page(
             "units": UNITS,
             "problems": problems,
             "values": values,
+            "similar": similar,
         },
         400 if problems else 200,
     )
@@ -176,6 +180,7 @@ def _item_page(
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
     alert: str | None = None,
+    similar: Sequence[Item] = (),
 ) -> HTMLResponse:
     packages = session.scalars(
         select(ItemPackage)
@@ -201,8 +206,31 @@ def _item_page(
             "problems": problems,
             "values": values,
             "alert": alert,
+            "similar": similar,
         },
     )
+
+
+def _similar(
+    session: Session,
+    form: Mapping[str, str],
+    fields: items.Fields | None,
+    item_id: int | None = None,
+) -> list[Item]:
+    """Items with names close to `fields`', to ask whether it is a different
+    item before saving it (docs/decisions/0021): none if the form says so
+    already, or if another item has what it asks for, which saving refuses,
+    naming it."""
+    if (
+        fields is None
+        or form.get(DIFFERENT) == "yes"
+        or items.taken_by(session, fields, item_id)
+    ):
+        return []
+    near = items.similar(session, fields.name, item_id)
+    if near:
+        log.debug("similar items shown", item_id=item_id, found=len(near))
+    return near
 
 
 def _fields(
@@ -267,6 +295,8 @@ def add_item(
     request: Request, signed: AdminSignedIn, session: DbSession, form: TextForm
 ) -> Response:
     fields, problems = _fields(session, form)
+    if near := _similar(session, form, fields):
+        return _list_page(request, session, signed, values=form, similar=near)
     item = None
     if fields is not None:
         item, _ = _change_or_note(
@@ -301,6 +331,9 @@ def save_item(
     if found is None:
         return not_found()
     fields, problems = _fields(session, form)
+    renamed = fields is not None and fields.name != found.name
+    if renamed and (near := _similar(session, form, fields, item_id)):
+        return _item_page(request, session, signed, found, values=form, similar=near)
     if fields is not None:
         seen = form_version(form.get("version", ""))
         _, broken = _change_or_note(

@@ -1,0 +1,14 @@
+{#- An item's name field, as adding and saving one show it: the naming convention as a hint, and items with similar names, when the name was close to theirs, to send again if it is a different item (docs/decisions/0021). `default` is the name shown with nothing sent. #}
+<label>Name <span class="hint">what it is, then what tells it apart from the
+  items nearest it, such as LiteBeam 5AC Gen2, or Cat6 cable, outdoor,
+  shielded; the maker goes in Manufacturer</span>
+  <input name="name" value="{{ values.get('name', default) }}" maxlength="{{ name_max }}" required>
+  {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
+</label>
+{% if similar %}
+<p class="warning" role="status">Similar: {% for other in similar -%}
+  <a href="{{ items_path }}/{{ other.id }}">{{ other.name }}</a>
+  {%- if other.retired_at %} <span class="tag">Retired</span>{% endif %}{{ ", " if not loop.last }}
+  {%- endfor %}. A different item? {{ again }} again.</p>
+<input type="hidden" name="different" value="yes">
+{% endif %}

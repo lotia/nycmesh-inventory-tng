@@ -157,9 +157,8 @@ def test_a_clash_gone_meanwhile_is_said_in_general(
     """The other item renamed between the refusal and the look for it."""
     new_item(session, radios, "LiteBeam")
     monkeypatch.setattr(items, "taken_by", lambda *_: None)
-    refused = admin_client.post(
-        ITEMS, data={"name": "litebeam", "category_id": str(radios.id), "unit": "each"}
-    )
+    form = {"name": "litebeam", "category_id": str(radios.id), "unit": "each"}
+    refused = admin_client.post(ITEMS, data=form | {"different": "yes"})
     assert "Another item, perhaps a retired one, already has" in text(refused)
 
 
@@ -490,3 +489,68 @@ def test_taken_by_skips_the_item_itself(session: Session, radios: Category) -> N
     # Its own name and old code are no clash with itself.
     assert items.taken_by(session, asked, item.id) is None
     assert items.taken_by(session, asked) == ("name", item)
+
+
+def test_a_name_close_to_others_asks_first(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Similar items are listed, retired ones too, and the form sent again
+    adds it: a close name may be a different item (docs/decisions/0021)."""
+    gen1 = new_item(session, radios, "LiteBeam 5AC Gen1")
+    old = add(
+        session, Item(name="LiteBeam 5AC Gen0", category_id=radios.id, retired_at=NOW)
+    )
+    new_item(session, radios, "Patch cable")
+    form = {"name": "LiteBeam 5AC Gen2", "category_id": str(radios.id), "unit": "each"}
+    asked = admin_client.post(ITEMS, data=form)
+    assert asked.status_code == 200
+    page = text(asked)
+    found = re.search(r'<p class="warning" role="status">(.*?)</p>', page, re.DOTALL)
+    assert found is not None
+    said = found[1]
+    assert f'<a href="{ITEMS}/{gen1.id}">LiteBeam 5AC Gen1</a>' in said
+    assert (
+        f'<a href="{ITEMS}/{old.id}">LiteBeam 5AC Gen0</a> <span class="tag">Retired'
+        in said
+    )
+    assert "Patch cable" not in said
+    assert "A different item? Add it again." in said
+    assert 'value="LiteBeam 5AC Gen2"' in page
+    assert session.scalar(select(Item).where(Item.name == form["name"])) is None
+    added = admin_client.post(ITEMS, data=form | {"different": "yes"})
+    assert added.status_code == 303
+    named(session, Item, "LiteBeam 5AC Gen2")
+
+
+def test_renaming_close_to_another_asks_first(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Only a new name asks; saving the other fields does not."""
+    new_item(session, radios, "LiteBeam 5AC Gen1")
+    item = new_item(session, radios, "Radio")
+    form = {
+        "name": "Radio",
+        "category_id": str(radios.id),
+        "unit": "each",
+        "version": str(item.edit_version),
+        "notes": "On the shelf",
+    }
+    path = f"{ITEMS}/{item.id}"
+    assert admin_client.post(path, data=form).status_code == 303
+    form["version"] = str(item.edit_version)
+    asked = admin_client.post(path, data=form | {"name": "LiteBeam 5AC Gen2"})
+    assert "A different item? Save it again." in text(asked)
+    session.refresh(item)
+    assert item.name == "Radio"
+    form |= {"name": "LiteBeam 5AC Gen2", "different": "yes"}
+    assert admin_client.post(path, data=form).status_code == 303
+    session.refresh(item)
+    assert item.name == "LiteBeam 5AC Gen2"
+
+
+def test_the_add_form_says_how_to_name_an_item(
+    admin_client: TestClient, radios: Category
+) -> None:
+    page = " ".join(text(admin_client.get(ITEMS)).split())
+    assert "what it is, then what tells it apart from the items nearest it" in page
+    assert "the maker goes in Manufacturer" in page
