@@ -875,11 +875,24 @@ Into = Literal["open", "loose"]
 Reported = Literal["cut", "button"]
 
 
-def _opening_key(batch: Batch, number: int) -> uuid.UUID:
-    """The key an opening's line makes its open package under: the page's,
-    or one made from the batch's, so it is the same however often sent."""
+def _packages_in(line: Line, size: Decimal) -> int:
+    """How many whole packages of `size` a line holds."""
+    return int(line.quantity / size)
+
+
+def _opening_keys(batch: Batch, number: int, count: int) -> list[uuid.UUID]:
+    """The keys an opening's line makes its open packages under, one for
+    each of the `count` packages it opens: the page's, for its one, or made from
+    the batch's, so they are the same however often sent. A line of several
+    is a page's that thought the package not followed (_opening)."""
     line = batch.lines[number]
-    return line.open_package_key or uuid.uuid5(batch.key, f"open {number}")
+    if line.open_package_key is not None:
+        return [line.open_package_key]
+    return [
+        uuid.uuid5(batch.key, f"open {number} {each}" if each else f"open {number}")
+        # A page never sent more: a replay of more is another batch's.
+        for each in range(min(count, MAX_LINES))
+    ]
 
 
 def _opening(
@@ -890,33 +903,50 @@ def _opening(
 ) -> tuple[list[Entry], dict[Into, int]]:
     """A batch's lines (`lines`, as Line.entry makes them) as the ledger
     writes them: an opening's packages its items track opened become open
-    packages (open_packages.make), and the rest loose units, one line for
-    each package however many lines the page sent, as it may have thought
-    them followed. And how many packages it opened, by what each became."""
+    packages (open_packages.make), one for each, however many a line opens,
+    as the page may have thought them not followed; and the rest loose
+    units, one line for each package however many lines the page sent, as
+    it may have thought them followed. And how many packages it opened, by
+    what each became."""
     if batch.kind != "open":
         return lines, {}
     opened: dict[Into, int] = {}
-    made: dict[int, int] = {}
+    made: dict[int, list[int]] = {}
     for number, line in enumerate(batch.lines):
         assert line.package_id is not None  # Batch's validator.
         package = packages[line.package_id]
         into: Into = "open" if package.tracked else "loose"
-        opened[into] = opened.get(into, 0) + int(line.quantity / package.size)
+        count = _packages_in(line, package.size)
+        opened[into] = opened.get(into, 0) + count
         if package.tracked:
-            key = _opening_key(batch, number)
             where = batch.from_location_id or 0
-            made[number] = open_packages.make(session, key, line.package_id, where).id
+            ids = [
+                open_packages.make(session, key, line.package_id, where).id
+                for key in _opening_keys(batch, number, count)
+            ]
+            if len(ids) > 1:
+                log.info(
+                    "opening line split into open packages",
+                    item_package_id=line.package_id,
+                    packages=len(ids),
+                )
+            made[number] = ids
     return _as_opened(batch, made), opened
 
 
-def _as_opened(batch: Batch, made: Mapping[int, int]) -> list[Entry]:
-    """An opening's lines, the open package `made` for a line by its
-    number, if any; the others loose, one line for each package."""
+def _as_opened(batch: Batch, made: Mapping[int, Sequence[int]]) -> list[Entry]:
+    """An opening's lines, into the open packages `made` for a line by its
+    number, if any, a line for each and its share; the others loose, one
+    line for each package."""
     written: list[Entry] = []
     loose: dict[int | None, Entry] = {}
     for number, line in enumerate(batch.lines):
-        if number in made:
-            written.append(line.entry(batch.kind, made[number]))
+        if ids := made.get(number):
+            share = line.quantity / len(ids)
+            written += [
+                line.entry(batch.kind, opened)._replace(quantity=share)
+                for opened in ids
+            ]
         elif (before := loose.get(line.package_id)) is None:
             loose[line.package_id] = line.entry(batch.kind)
         else:
@@ -1223,16 +1253,19 @@ def _line_form_breaks(
     places: tuple[int | None, int | None],
     packages: Mapping[int, PackageFacts],
     opens: Mapping[int, OpenFacts],
+    *,
+    keyed: bool,
 ) -> list[str]:
     """form_breaks' rules a batch's line breaks, before an opening's open
-    packages are made: one opened into one, if its item tracks them, is one
-    whole package (open_package_full)."""
+    packages are made: one opened into one under the page's key, if its
+    item tracks them, is one whole package (open_package_full). One without
+    a key, from a page that thought them loose, may be several (_opening)."""
     package = packages.get(line.leaves.package_id or 0)
     if kind != "open" or package is None or not package.tracked:
         return form_breaks(kind, line, places, packages, opens)
     sealed = Entry(line.item_id, line.quantity, line.leaves, line.leaves)
     broken = form_breaks("move", sealed, places, packages, {})
-    if line.quantity != package.size:
+    if keyed and line.quantity != package.size:
         broken.append("open_package_full")
     return broken
 
@@ -1254,6 +1287,16 @@ LINE_PROBLEMS: dict[str, tuple[str, ProblemKind]] = {
     "movement_open_package_place": ("open_package_key", "open_package_elsewhere"),
     "movement_open_package_whole": ("quantity", "open_package_whole"),
 }
+
+
+def _packages_opened(batch: Batch, packages: Mapping[int, PackageFacts]) -> int:
+    """How many open packages an opening would make (_opening)."""
+    return sum(
+        _packages_in(line, package.size)
+        for line in batch.lines
+        if (package := packages.get(line.package_id or 0)) is not None
+        and package.tracked
+    )
 
 
 def _problems(
@@ -1286,10 +1329,24 @@ def _problems(
         if broken is None:
             problems.append((("lines", number, "item_id"), "not_found"))
             continue
-        broken += _line_form_breaks(batch.kind, lines[number], places, packages, opens)
+        broken += _line_form_breaks(
+            batch.kind,
+            lines[number],
+            places,
+            packages,
+            opens,
+            keyed=batch.lines[number].open_package_key is not None,
+        )
         for rule in dict.fromkeys(broken):
             field, kind = LINE_PROBLEMS[rule]
             problems.append((("lines", number, field), kind))
+    # Never more open packages than a page could have sent a line each for.
+    if batch.kind == "open" and _packages_opened(batch, packages) > MAX_LINES:
+        problems += [
+            (("lines", number, "quantity"), "one_package")
+            for number, line in enumerate(batch.lines)
+            if line.open_package_key is None
+        ]
     # Two rules may say one thing of one field: said once.
     return list(dict.fromkeys(problems))
 
@@ -1626,18 +1683,12 @@ def _keyed(session: Session, keys: Collection[uuid.UUID]) -> dict[uuid.UUID, int
 
 
 def _open_packages_named(session: Session, batch: Batch) -> dict[int, int]:
-    """The open packages a batch's lines name by key, by line number: an
-    opening's made under them, another's taken from. A key with none is
-    left out."""
+    """The open packages a batch's lines take from, by key, by line number.
+    A key with none is left out."""
     keys = {
-        number: key
+        number: line.open_package_key
         for number, line in enumerate(batch.lines)
-        if (
-            key := _opening_key(batch, number)
-            if batch.kind == "open"
-            else line.open_package_key
-        )
-        is not None
+        if line.open_package_key is not None
     }
     found = _keyed(session, keys.values())
     # Every line naming one, so two naming it are both found (and refused
@@ -1645,13 +1696,42 @@ def _open_packages_named(session: Session, batch: Batch) -> dict[int, int]:
     return {number: found[key] for number, key in keys.items() if key in found}
 
 
+def _made_by_opening(session: Session, batch: Batch) -> dict[int, list[int]]:
+    """The open packages an opening's lines made, under their keys
+    (_opening_keys), by line number."""
+    unkeyed = {line.package_id for line in batch.lines if line.open_package_key is None}
+    sizes: dict[int, Decimal] = (
+        dict(
+            session.execute(
+                select(ItemPackage.id, ItemPackage.size).where(
+                    ItemPackage.id.in_(unkeyed)
+                )
+            ).all()
+        )
+        if unkeyed
+        else {}
+    )
+    keys: dict[int, list[uuid.UUID]] = {}
+    for number, line in enumerate(batch.lines):
+        if line.open_package_key is not None:
+            keys[number] = _opening_keys(batch, number, 1)
+        # A package that is not there made none: the key was another batch's.
+        elif (size := sizes.get(line.package_id or 0)) is not None:
+            keys[number] = _opening_keys(batch, number, _packages_in(line, size))
+    found = _keyed(session, [key for each in keys.values() for key in each])
+    return {
+        number: [found[key] for key in each if key in found]
+        for number, each in keys.items()
+    }
+
+
 def _written_as(session: Session, batch: Batch) -> list[Entry]:
     """A batch's lines as written once, to compare with what was: an
     opening's with the open packages made under their keys (_opening),
     another's taken from the open packages they name."""
-    named = _open_packages_named(session, batch)
     if batch.kind == "open":
-        return _as_opened(batch, named)
+        return _as_opened(batch, _made_by_opening(session, batch))
+    named = _open_packages_named(session, batch)
     return [
         line.entry(batch.kind, named.get(number))
         for number, line in enumerate(batch.lines)

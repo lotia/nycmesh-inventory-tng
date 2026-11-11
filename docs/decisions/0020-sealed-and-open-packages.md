@@ -119,7 +119,9 @@ deployed, so the migrations may be rewritten (0016).
   in the outbox can take from it before the server has seen it; the
   outbox sends a batch naming an open package only after the batches
   before it that make it, take from it or report it are saved. A batch
-  with no key for a package it opens gets one made from the batch's own.
+  with no key for a package it opens gets one made from the batch's own,
+  one for each package its line opens, up to as many as a batch may have
+  lines.
 
 ## Rejected
 
@@ -181,6 +183,10 @@ wants this to be easy for administrators.
 - **Not tracked**: opening turns the sealed package into loose units, in
   one transaction; there is no open package and nothing to confirm.
 - **An open package is made only for a package whose setting is on.**
+  The server's setting decides, not the page's: an opening a page sent
+  as tracked, of packages since set to not tracked, becomes loose units,
+  and one it sent as not tracked, of several packages since set to
+  tracked, becomes one open package each.
 - **Bulk actions**, so administrators need not go one by one: the items
   list sets "Track each opened package" for the items ticked (never a
   package's own choice), and the confirm page confirms or clears the
