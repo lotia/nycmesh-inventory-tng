@@ -373,10 +373,27 @@ describe("turning a cart into a batch", () => {
       },
       what: "Used up: 1 open package at Hub",
     });
-    expect(
-      toBatch(cart({ lines: line("120", { whole: true }) }), CATALOGUE),
-    ).toEqual({
-      problems: ["An open package moved whole is not used up: untick one."],
+    // A cart of nothing else, on an install with its number: a report
+    // still, where it is, asking nothing of the install.
+    const install = toBatch(
+      cart({
+        kind: "install",
+        installNumber: "1234",
+        toId: null,
+        lines: line(""),
+      }),
+      CATALOGUE,
+    );
+    expect(install).toMatchObject({
+      draft: { kind: "report", from_location_id: 10, used_up: [key] },
+    });
+    expect("draft" in install && install.draft.install_number).toBe(undefined);
+    // A move with no To yet: a report needs none.
+    const noTo = toBatch(cart({ toId: null, lines: line("") }), CATALOGUE);
+    expect(noTo).toMatchObject({ draft: { kind: "report" } });
+    // With a cut, the words say so.
+    expect(toBatch(cart({ lines: line("120") }), CATALOGUE)).toMatchObject({
+      what: "Move: 1 item from Hub to Van (1 open package said used up)",
     });
   });
 

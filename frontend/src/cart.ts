@@ -49,7 +49,9 @@ const LineSchema = v.object({
 });
 
 const CartSchema = v.object({
-  kind: BatchBody.entries.kind,
+  /** What a cart is filled for: the batch's kind, but a report, which
+   * toBatch makes of a cart that only says open packages are used up. */
+  kind: v.picklist(["move", "receipt", "install", "open"]),
   volunteerId: v.nullable(id),
   fromId: v.nullable(id),
   toId: v.nullable(id),
@@ -78,8 +80,6 @@ export const SIDES: Record<Kind, Record<Side, boolean>> = {
   install: { from: true, to: false },
   // At one place, picked as From; the batch names it on both sides.
   open: { from: true, to: false },
-  // Only used up open packages, at the From place: made by toBatch.
-  report: { from: true, to: false },
 };
 
 /** A new, empty cart that keeps the last one's choices. */
@@ -414,7 +414,7 @@ export function quantityOf(
   return { amount, sealed, loose, taken };
 }
 
-const KINDS: Record<Kind, string> = {
+const KINDS: Record<Draft["kind"], string> = {
   move: "Move",
   receipt: "Receipt",
   install: "Install",
@@ -436,7 +436,24 @@ export function toBatch(
 ): { draft: Draft; what: string } | { problems: string[] } {
   const cart = reconcile(filled, catalogue);
   const index = indexOf(catalogue);
-  const sides = SIDES[cart.kind];
+  // Open packages said to be used up: with what is taken, or alone, when
+  // nothing else is in the cart: a report, at the From place.
+  const usedUp = cart.lines.flatMap((line) =>
+    Object.entries(line.open ?? {}).flatMap(([key, taken]) =>
+      taken.usedUp ? [key] : [],
+    ),
+  );
+  const reporting =
+    usedUp.length > 0 &&
+    cart.lines.every((line) => {
+      const item = index.items.get(line.itemId);
+      const quantity = item && quantityOf(line, item);
+      return (
+        quantity !== undefined && "amount" in quantity && quantity.amount === 0
+      );
+    });
+  const kind: Draft["kind"] = reporting ? "report" : cart.kind;
+  const sides = reporting ? { from: true, to: false } : SIDES[cart.kind];
   const fromId = sides.from ? cart.fromId : null;
   const toId = sides.to ? cart.toId : null;
   const problems: string[] = [];
@@ -452,8 +469,7 @@ export function toBatch(
   if (fromId !== null && fromId === toId) {
     problems.push("From and to must be different places.");
   }
-  const installNumber =
-    cart.kind === "install" ? cart.installNumber.trim() : "";
+  const installNumber = kind === "install" ? cart.installNumber.trim() : "";
   const install = count(installNumber);
   if (install === null) {
     problems.push("An install number is digits only.");
@@ -516,15 +532,6 @@ export function toBatch(
       items += 1;
     }
   }
-  // Open packages said to be used up: with what is taken, or alone.
-  const usedUp = cart.lines.flatMap((line) =>
-    Object.entries(line.open ?? {}).flatMap(([key, taken]) =>
-      taken.usedUp ? [{ key, whole: taken.whole }] : [],
-    ),
-  );
-  if (usedUp.some((each) => each.whole)) {
-    problems.push("An open package moved whole is not used up: untick one.");
-  }
   if (lines.length === 0 && usedUp.length === 0 && problems.length === 0) {
     problems.push("Add something to the cart.");
   }
@@ -535,8 +542,6 @@ export function toBatch(
   if (problems.length > 0 || cart.volunteerId === null) {
     return { problems };
   }
-  const reporting = lines.length === 0;
-  const kind = reporting ? "report" : cart.kind;
   const packages =
     usedUp.length === 1 ? "1 open package" : `${usedUp.length} open packages`;
   const things = reporting
@@ -547,7 +552,7 @@ export function toBatch(
   const words = [`${KINDS[kind]}: ${things}`];
   const draft: Draft = { kind, volunteer_id: cart.volunteerId, lines };
   if (usedUp.length > 0) {
-    draft.used_up = usedUp.map((each) => each.key);
+    draft.used_up = usedUp;
   }
   if (fromId !== null && (kind === "open" || kind === "report")) {
     draft.from_location_id = fromId;
@@ -559,13 +564,16 @@ export function toBatch(
     draft.from_location_id = fromId;
     words.push(`from ${index.places.get(fromId)}`);
   }
-  if (toId !== null && !reporting) {
+  if (toId !== null) {
     draft.to_location_id = toId;
     words.push(`to ${index.places.get(toId)}`);
   }
   if (installNumber !== "") {
     draft.install_number = Number(installNumber);
     words.push(`for install ${installNumber}`);
+  }
+  if (usedUp.length > 0 && !reporting) {
+    words.push(`(${packages} said used up)`);
   }
   return { draft, what: words.join(" ") };
 }

@@ -857,3 +857,33 @@ def test_a_report_that_cannot_be_is_refused(
         ),
     ):
         assert registered_client.post(URL, json=batch).status_code == 422
+
+
+def test_a_report_names_what_is_where_it_is_said_and_not_moving(
+    registered_client: TestClient, spools: Spools
+) -> None:
+    made = spools.opened()
+    key = str(made.key)
+
+    def refused(batch: dict[str, object]) -> list[object]:
+        response = registered_client.post(URL, json=batch)
+        assert response.status_code == 422
+        return [(p["loc"][1:], p["type"]) for p in response.json()["detail"]]
+
+    elsewhere = spools.place.batch(
+        kind="report",
+        from_location_id=spools.van.id,
+        to_location_id=None,
+        lines=[],
+        used_up=[key],
+    )
+    assert refused(elsewhere) == [(["used_up", 0], "open_package_elsewhere")]
+    moving = spools.place.batch(lines=[taken(made, "305", whole=True)], used_up=[key])
+    assert refused(moving) == [(["used_up", 0], "moved_whole")]
+    receipt = spools.place.batch(
+        kind="receipt",
+        from_location_id=None,
+        to_location_id=spools.store.id,
+        used_up=[key],
+    )
+    assert registered_client.post(URL, json=receipt).status_code == 422
