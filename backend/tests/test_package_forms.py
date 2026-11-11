@@ -653,3 +653,35 @@ def test_only_an_opening_names_an_open_package_key(
 ) -> None:
     batch = spools.place.batch(lines=[opened_line(spools)])
     assert registered_client.post(URL, json=batch).status_code == 422
+
+
+def test_an_opening_the_server_cannot_take_is_refused_saying_why(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """Never a 500, which the outbox would send again and again."""
+    gone = opening(spools, opened_line(spools, package_id=999999))
+    response = registered_client.post(URL, json=gone)
+    assert response.status_code == 422
+    assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
+        (["lines", 0, "package_id"], "not_found")
+    ]
+    # A key used for another place: a rule only the write can see.
+    key = uuid.uuid4()
+    open_packages.make(session, key, spools.spool.id, spools.van.id)
+    reused = opening(spools, opened_line(spools, open_package_key=str(key)))
+    response = registered_client.post(URL, json=reused)
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["type"] == "refused"
+
+
+def test_packages_the_page_thought_followed_open_loose_together(
+    registered_client: TestClient, session: Session
+) -> None:
+    """The setting changed since the page loaded: two lines, one each,
+    become one loose line, and sent again, are found written."""
+    spools = Spools(session, tracked=False)
+    batch = opening(spools, opened_line(spools), opened_line(spools))
+    assert registered_client.post(URL, json=batch).status_code == 201
+    assert registered_client.post(URL, json=batch).status_code == 200
+    store = spools.store.id
+    assert forms(session, spools.cable) == {(store, None, None): 610}
