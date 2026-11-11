@@ -1,7 +1,8 @@
 # 0020 — Sealed and open packages: spools in stock
 
 **Status:** accepted · 2026-11-11 · amends 0003 (what a ledger line holds,
-reorder) and adds the home page's "Waiting for you"
+reorder) and adds the home page's "Waiting for you" ·
+amended 2026-11-11 (tracking opened packages is a setting; bulk actions)
 
 ## Context
 
@@ -126,7 +127,8 @@ deployed, so the migrations may be rewritten (0016).
   cannot tell sealed from used.
 - **A label on each open package**: nobody would scan it (Ali).
 - **Only some packages tracked sealed**: one rule for every package is
-  simpler to explain and to count (Ali).
+  simpler to explain and to count (Ali). Sealed packages are always
+  counted; only tracking each opened one is a setting (Amendment).
 - **A default "too short to use" length**: a sensible one depends on the
   cable and its runs.
 - **Volunteers closing packages themselves**, by a volunteer adjustment or
@@ -152,3 +154,34 @@ deployed, so the migrations may be rewritten (0016).
 - Metrics: packages opened; reported used up, by how (`cut`, `button`);
   closed, by how (`confirmed`, `direct`, `count`); and reports cleared as
   not used up.
+
+## Amendment: tracking opened packages is a setting (2026-11-11)
+
+Tracking every opened package would make each opened box of connectors or
+bag of zip ties an open package to pick from and to confirm used up, which
+would fill "Waiting for you" with small confirmations every shift. Ali
+wants this to be easy for administrators.
+
+- **Sealed packages are always counted**, as above.
+- **"Track each opened package" is set on an item**, on or off, off for a
+  new item, and is the default for all its packages. **Each package** is
+  "Same as the item" (the default), "Track" or "Don't track"; its own
+  choice wins, and changing the item never overrides it. The item's page
+  shows each package's effective setting and where it differs.
+- **Tracked**: opening makes an open package, as decided above: picked
+  when taking from it, reported used up, confirmed by an administrator.
+- **Not tracked**: opening turns the sealed package into loose units, in
+  one transaction; there is no open package and nothing to confirm.
+- **An open package is made only for a package whose setting is on.**
+- **Bulk actions**, so administrators need not go one by one: the items
+  list sets "Track each opened package" for the items ticked (never a
+  package's own choice), and the confirm page confirms or clears the
+  reported packages ticked, besides each row's own buttons. "Confirm used
+  up" is a plain button, not 0019's danger pattern: the confirm page is
+  already the administrator's check, and a count puts a mistake right.
+- **A count that finds an open package missing** closes it with the reason
+  Lost or stolen, kept apart from Used up.
+
+We rejected the setting per package alone (each size decided separately,
+though spools or boxes of one item behave alike) and per category alone
+(a category can mix spools with things sold each).
