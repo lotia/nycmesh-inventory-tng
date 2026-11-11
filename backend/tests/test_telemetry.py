@@ -560,14 +560,17 @@ def test_counts_packages_opened_by_what_they_became(
         "open_package_key": str(made.key),
     }
     whole = cut | {"quantity": "300", "whole": True}
-    for line in (cut, whole):
-        batch = spools.place.batch(lines=[line])
-        assert client.post("/api/transactions", json=batch).status_code == 201
+    # The cut asked whether it is used up, and was told so.
+    used = spools.place.batch(lines=[cut], used_up=[str(made.key)])
+    assert client.post("/api/transactions", json=used).status_code == 201
+    batch = spools.place.batch(lines=[whole])
+    assert client.post("/api/transactions", json=batch).status_code == 201
     client.cookies.clear()
     assert counted(reader, "inventory.open_packages.taken") == {
         (("how", "cut"),): 1,
         (("how", "whole"),): 1,
     }
+    assert counted(reader, "inventory.packages.reported") == {(("how", "cut"),): 1}
 
 
 def test_counts_mail_sent_and_failed(recorded: Recorded) -> None:

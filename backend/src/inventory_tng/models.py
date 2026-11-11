@@ -123,7 +123,17 @@ STORE_KINDS = ("store", "area")
 # stock found (NULL to a location) or lost (a location to NULL).
 # Opening a package turns a sealed one into an open one, or into loose
 # units, at one place: its from and to are that place (docs/decisions/0020).
-TRANSACTION_KINDS = ("move", "receipt", "install", "count", "adjustment", "open")
+# A report moves nothing: a volunteer says an open package at a place is
+# used up, for an administrator to confirm (open_packages.report).
+TRANSACTION_KINDS = (
+    "move",
+    "receipt",
+    "install",
+    "count",
+    "adjustment",
+    "open",
+    "report",
+)
 # What administrators are told of (activity.py): changes to who may sign
 # in. A new kind is added here, to activity.WORDS and to its migration's
 # check.

@@ -45,7 +45,7 @@ const nullableId = v.exactOptional(v.nullable(id));
 /** A batch as POST /api/transactions takes it. */
 export const BatchBody = v.object({
   key: v.pipe(v.string(), v.uuid()),
-  kind: v.picklist(["move", "receipt", "install", "open"]),
+  kind: v.picklist(["move", "receipt", "install", "open", "report"]),
   volunteer_id: id,
   from_location_id: nullableId,
   to_location_id: nullableId,
@@ -65,6 +65,8 @@ export const BatchBody = v.object({
       ),
     }),
   ),
+  /** Open packages said to be used up, by key (docs/decisions/0020). */
+  used_up: v.exactOptional(v.nullable(v.array(v.pipe(v.string(), v.uuid())))),
 });
 
 export type Body = Schemas["Batch"];
@@ -342,11 +344,14 @@ function keysMade(body: Body): string[] {
     : body.lines.flatMap((line) => line.open_package_key ?? []);
 }
 
-/** The open packages another batch takes from. */
+/** The open packages another batch takes from, or says are used up. */
 function keysNamed(body: Body): string[] {
   return body.kind === "open"
     ? []
-    : body.lines.flatMap((line) => line.open_package_key ?? []);
+    : [
+        ...body.lines.flatMap((line) => line.open_package_key ?? []),
+        ...(body.used_up ?? []),
+      ];
 }
 
 /** A batch as first kept: waiting, and not yet tried. */
