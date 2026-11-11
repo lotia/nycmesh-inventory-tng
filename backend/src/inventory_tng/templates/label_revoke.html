@@ -1,12 +1,10 @@
 {% extends "admin_base.html" %}
+{% from "_confirm.html" import confirm %}
 {% block main %}
 <p>Its code, <span class="key">{{ named.label.code }}</span>, names
 {{ named.words }}.</p>
 <p>Revoking it stops every printed copy scanning, wherever it is stuck.
 It can't be undone: labels made for it after get a new code, to print and
 stick on again.</p>
-<section class="actions">
-  <form method="post" action="{{ here }}"><button class="danger">Revoke</button></form>
-  <a href="{{ keep }}">Keep it</a>
-</section>
+{{ confirm(here, "Revoke", keep, "Keep it") }}
 {% endblock %}

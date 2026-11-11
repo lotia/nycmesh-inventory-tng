@@ -86,7 +86,7 @@ def _categories(session: Session) -> list[Category]:
 
 
 # How the items list finds an item: by anything a volunteer might type.
-SEARCHED = Searched(Item, Item.search_text, Item.name)
+SEARCHED = Searched(ITEMS, Item, Item.search_text, Item.name)
 
 
 def _list_page(
@@ -99,7 +99,7 @@ def _list_page(
     values: Mapping[str, str] | None = None,
     undo: str | None = None,
 ) -> HTMLResponse:
-    listing = (listing or Listing(ITEMS)).find(session, SEARCHED, select(Item))
+    listing = (listing or SEARCHED.read()).find(session)
     categories = _categories(session)
     return admin_page(
         request,
@@ -209,7 +209,7 @@ def list_items(
     pick: str = "",
     undo: str = "",
 ) -> Response:
-    listing = Listing[Item].read(ITEMS, q, show, page, pick)
+    listing = SEARCHED.read(q, show, page, pick)
     back = undo_retire(session, Item, undo, ITEMS)
     return _list_page(request, session, signed, listing=listing, undo=back)
 
@@ -219,11 +219,9 @@ def suggest_items(
     session: DbSession, signed: AdminSignedIn, q: str = "", show: str = ""
 ) -> JSONResponse:
     """What the search box offers as one types (_listing.html)."""
-    listing = Listing[Item].read(ITEMS, q, show)
+    listing = SEARCHED.read(q, show)
     names = {c.id: c.name for c in _categories(session)}
-    offered = listing.suggest(
-        session, SEARCHED, select(Item), lambda item: names.get(item.category_id, "")
-    )
+    offered = listing.suggest(session, lambda item: names.get(item.category_id, ""))
     return JSONResponse(offered, headers={"Cache-Control": "no-store"})
 
 

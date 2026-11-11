@@ -1,8 +1,8 @@
 """Labels, from the browser (docs/decisions/0015): find (a Listing, with
 "Current · Inactive · All"), reprint and revoke them here; make them from
 an item's or a place's page. Labels print twelve to a page, cut apart or on
-sticker paper. Printing is a page to open, not a
-change, so a sheet can be printed again from its address."""
+sticker paper. Printing is a page to open, not a change, so a sheet can be
+printed again from its address."""
 
 from typing import Annotated, Any, cast
 
@@ -47,25 +47,23 @@ NOTICES.update(
 )
 
 
-# Each label with what it names, and the place around a place: what the
-# list's search, filter and order read.
+# The place around a place, which a label's search reads too.
 _parent = aliased(Location)
-LISTED = (
-    select(Label)
-    .outerjoin(Item, Item.id == Label.item_id)
-    .outerjoin(ItemPackage, ItemPackage.id == Label.package_id)
-    .outerjoin(Location, Location.id == Label.location_id)
-    .outerjoin(_parent, _parent.id == Location.parent_id)
-)
 
-
-# How the labels list finds one: by its whole code, or the words naming it.
+# How the labels list finds one: by its whole code, or the words naming it,
+# reading each label with what it names.
 SEARCHED = Searched(
+    LABELS,
     Label,
     func.concat_ws(
         " ", Item.search_text, ItemPackage.name, Location.name, _parent.name
     ),
     func.coalesce(Location.name, Item.name),
+    query=select(Label)
+    .outerjoin(Item, Item.id == Label.item_id)
+    .outerjoin(ItemPackage, ItemPackage.id == Label.package_id)
+    .outerjoin(Location, Location.id == Label.location_id)
+    .outerjoin(_parent, _parent.id == Location.parent_id),
     whole=Label.code,
     current=labels.scanned(),
     lapsed="inactive",
@@ -83,7 +81,7 @@ def list_labels(
     page: str = "",
     pick: str = "",
 ) -> Response:
-    listing = SEARCHED.read(LABELS, q, show, page, pick).find(session, SEARCHED, LISTED)
+    listing = SEARCHED.read(q, show, page, pick).find(session)
     return admin_page(
         request,
         signed,
@@ -105,8 +103,7 @@ def suggest_labels(
     session: DbSession, signed: AdminSignedIn, q: str = "", show: str = ""
 ) -> JSONResponse:
     """What the search box offers as one types (_listing.html)."""
-    listing = SEARCHED.read(LABELS, q, show)
-    offered = listing.suggest(session, SEARCHED, LISTED, lambda label: label.code)
+    offered = SEARCHED.read(q, show).suggest(session, lambda label: label.code)
     return JSONResponse(offered, headers={"Cache-Control": "no-store"})
 
 
@@ -148,7 +145,7 @@ def print_labels(
     pick: str = "",
 ) -> Response:
     # A refusal goes back to the list as it was, picked from (labels.html).
-    back = SEARCHED.read(LABELS, q, show, page, pick).link()
+    back = SEARCHED.read(q, show, page, pick).link()
     count = whole(copies, 1, labels.MAX_COPIES)
     if count is None:
         return redirect(back, notice="copies")

@@ -1,11 +1,12 @@
 {% extends "admin_base.html" %}
+{% from "_confirm.html" import confirm %}
 {% block main %}
 <p>These can't save anything once revoked, and stay revoked: each would
 have to register again with a new code.</p>
 <ul>
   {% for device in devices %}<li>{{ device.name }}</li>{% endfor %}
 </ul>
-<form method="post" action="{{ here }}">
+{% call confirm(here, "Revoke " ~ devices | length, keep ~ "?" ~ filter | urlencode, "Keep them") %}
   {% for name, value in filter.items() %}
   <input type="hidden" name="{{ name }}" value="{{ value }}">
   {% endfor %}
@@ -14,9 +15,5 @@ have to register again with a new code.</p>
   {% endfor %}
   <input type="hidden" name="sure" value="yes">
   <input type="hidden" name="once" value="{{ once }}">
-  <div class="actions">
-    <button class="danger">Revoke {{ devices | length }}</button>
-    <a href="{{ keep }}?{{ filter | urlencode }}">Keep them</a>
-  </div>
-</form>
+{% endcall %}
 {% endblock %}
