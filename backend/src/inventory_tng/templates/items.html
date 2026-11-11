@@ -56,6 +56,7 @@
     </label>
     <label>Part number <span class="hint">optional</span>
       <input name="part_number" value="{{ values.get('part_number', '') }}">
+      {% with name = "part_number" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <button class="primary">Add</button>
   </form>

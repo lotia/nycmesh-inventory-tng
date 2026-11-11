@@ -27,7 +27,6 @@ from inventory_tng.admin.common import (
     now,
     quantity,
     retirement,
-    rule_words,
     text_form,
     undo_retire,
 )
@@ -44,29 +43,56 @@ router = APIRouter(include_in_schema=False)
 
 ITEMS = f"{ADMIN}/items"
 TEXT_FIELDS = ("manufacturer", "part_number", "old_code", "notes", "ordering_notes")
+# Said when another item had what was asked for, but no longer does.
 TAKEN = (
     "Another item, perhaps a retired one, already has that name, that "
     "manufacturer and part number, or that old code."
 )
+# After another item's name, what of it is taken (items.taken_by).
+TAKEN_FIELDS = {
+    "name": "already has that name, or one differing from it only in case, "
+    "spaces or punctuation.",
+    "part_number": "already has that manufacturer and part number.",
+    "old_code": "already has that old code.",
+}
 
 
-# The rules a change to an item may break, and the field each is shown by.
+# The rules a change to an item may break, besides "unique", and the field
+# each is shown by.
 REFUSED_FIELDS = {
-    "unique": "name",
     "item_category_current": "category_id",
     "item_unit_fixed": "unit",
 }
 
 
+def _taken(
+    session: Session, fields: items.Fields, item_id: int | None
+) -> tuple[str, str]:
+    """The field another item already has, and words naming that item."""
+    found = items.taken_by(session, fields, item_id)
+    if found is None:
+        return "name", TAKEN
+    field, other = found
+    retired = " It is retired." if other.retired_at is not None else ""
+    return field, f"{other.name} {TAKEN_FIELDS[field]}{retired}"
+
+
 def _change_or_note[T](
-    session: Session, change: Callable[[], T], problems: dict[str, str]
+    session: Session,
+    change: Callable[[], T],
+    problems: dict[str, str],
+    fields: items.Fields,
+    item_id: int | None = None,
 ) -> tuple[T | None, str | None]:
-    """Makes the change: what it did, and None; or, if it breaks one of
-    REFUSED_FIELDS' rules, None, and the rule, which `problems` then says
-    beside its field, or one of ALERTS."""
-    done, broken = refusal(session, change, *REFUSED_FIELDS, *ALERTS)
-    if broken in REFUSED_FIELDS:
-        problems[REFUSED_FIELDS[broken]] = rule_words(broken, TAKEN)
+    """Makes the change to `fields`: what it did, and None; or, if it
+    breaks a unique index or one of REFUSED_FIELDS' rules, None, and the
+    rule, which `problems` then says beside its field; or one of ALERTS."""
+    done, broken = refusal(session, change, "unique", *REFUSED_FIELDS, *ALERTS)
+    if broken == "unique":
+        field, words = _taken(session, fields, item_id)
+        problems[field] = words
+    elif broken in REFUSED_FIELDS:
+        problems[REFUSED_FIELDS[broken]] = RULES[broken]
     return done, broken
 
 
@@ -232,7 +258,9 @@ def add_item(
     fields, problems = _fields(session, form)
     item = None
     if fields is not None:
-        item, _ = _change_or_note(session, lambda: items.add(session, fields), problems)
+        item, _ = _change_or_note(
+            session, lambda: items.add(session, fields), problems, fields
+        )
     if item is None:
         return _list_page(request, session, signed, problems=problems, values=form)
     session.commit()
@@ -265,7 +293,11 @@ def save_item(
     if fields is not None:
         seen = form_version(form.get("version", ""))
         _, broken = _change_or_note(
-            session, lambda: items.save(session, found, fields, seen=seen), problems
+            session,
+            lambda: items.save(session, found, fields, seen=seen),
+            problems,
+            fields,
+            item_id,
         )
         if broken in ALERTS:
             alert = RULES[broken]

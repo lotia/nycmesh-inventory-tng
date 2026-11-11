@@ -14,7 +14,8 @@ Conventions, on every table with history:
 - Nothing is deleted. A row is retired (`retired_at`; NULL means current) and
   every foreign key is ON DELETE RESTRICT, in PostgreSQL itself.
 - Quantities are numeric(12,3); money is numeric(10,2).
-- Names are unique, ignoring case, among current rows.
+- Names are unique, ignoring case, among current rows; an item's ignore
+  spaces and punctuation too (name_key).
 
 A rule about one row's own values is a check constraint, which raises a
 check violation (SQLSTATE 23514) named for the rule, as describe_error()
@@ -47,6 +48,7 @@ from sqlalchemy import (
     Text,
     func,
     literal,
+    literal_column,
     or_,
     text,
 )
@@ -207,6 +209,17 @@ def _unique_name(
     )
 
 
+# What two item names may differ by and still be one name: case, spaces and
+# punctuation, so "ToughCable" and "Tough cable" clash (docs/decisions/0021).
+NAME_IGNORED = "[^[:alnum:]]+"
+
+
+def name_key(name: SQLColumnExpression[str]) -> ColumnElement[str]:
+    """`name` as item names are compared: lower case, with every run of
+    anything but letters and digits removed."""
+    return func.lower(func.regexp_replace(name, NAME_IGNORED, "", "g"))
+
+
 def _unique_current_name(table: str, *scope: str) -> Index:
     """Names unique, ignoring case, among current rows (within `scope`)."""
     return _unique_name(table, *scope, where="retired_at IS NULL")
@@ -248,7 +261,8 @@ class Item(Versioned, Base):
 
     __tablename__ = "item"
     __table_args__ = (
-        _unique_name("item"),
+        # Retired ones too, as for categories (docs/decisions/0019).
+        Index("uq_item_name", name_key(literal_column("name")), unique=True),
         Index(
             "uq_item_manufacturer_part_number",
             text("lower(manufacturer)"),
