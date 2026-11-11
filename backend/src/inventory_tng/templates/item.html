@@ -108,12 +108,13 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
   {% endif %}
 </section>
 
-{% if open_packages %}
+{#- Shown too when its notice is, as after the last one closed. #}
+{% if open_packages or notice_section == "open-packages" %}
 <section id="open-packages">
   <h2>Open packages</h2>
   {% with section_id="open-packages" %}{% include "_notice.html" %}{% endwith %}
   <p class="hint">Opened and followed until used up. Closing one writes off
-  what it still shows, with the reason Used up.</p>
+  what it still shows, with the reason Used up; you'll be asked first.</p>
   {% call table() %}
     {% for each in open_packages %}
     <tr>
@@ -121,7 +122,7 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
         {%- if each.row.reported_at %} <span class="tag">Reported used up</span>{% endif %}
         <span class="hint block">opened {{ each.row.opened_at | when(zone) }}</span></td>
       <td>{{ each.left | amount }} {{ each.unit }}</td>
-      <td><form method="post" action="{{ here }}/open-packages/{{ each.row.id }}/close"><button>Close as used up<span class="sr-only"> {{ each.package }} at {{ each.place }}</span></button></form></td>
+      <td><form method="get" action="{{ here }}/open-packages/{{ each.row.id }}/close"><button>Close as used up<span class="sr-only"> {{ each.package }} at {{ each.place }}</span></button></form></td>
     </tr>
     {% endfor %}
   {% endcall %}

@@ -15,10 +15,10 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import labels
+from inventory_tng import labels, ledger
 from inventory_tng.db import DbSession
 from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
-from inventory_tng.ledger import by_form, takeable
+from inventory_tng.ledger import takeable
 from inventory_tng.models import (
     Category,
     Item,
@@ -201,16 +201,7 @@ def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]
         )
         .order_by(OpenPackage.opened_at, OpenPackage.id)
     ).all()
-    # Their balances alone, by id, so only their movements are summed.
-    ids = [row.id for row in rows]
-    left = {
-        (open_id, place): quantity
-        for open_id, place, quantity in session.execute(
-            select(
-                by_form.c.open_package_id, by_form.c.location_id, by_form.c.quantity
-            ).where(by_form.c.open_package_id.in_(ids))
-        )
-    }
+    left = ledger.left_on(session, rows)
     return [
         OpenPackageEntry(
             id=row.id,
@@ -219,7 +210,7 @@ def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]
             package_id=row.package_id,
             location_id=row.location_id,
             opened_at=row.opened_at,
-            left=left.get((row.id, row.location_id), Decimal(0)),
+            left=left[row.id],
         )
         for row in rows
     ]

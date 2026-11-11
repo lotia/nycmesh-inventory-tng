@@ -114,30 +114,34 @@ def report(
     return reported
 
 
-class Closed(NamedTuple):
-    """An open package closed: what it still showed, written off (or found,
-    if less than nothing), and whether this call closed it."""
-
-    open_package_id: int
-    left: Decimal
-    closed: bool
-
-
-def close(session: Session, open_id: int, admin_id: int, at: datetime) -> Closed | None:
+def close(
+    session: Session,
+    open_id: int,
+    admin_id: int,
+    at: datetime,
+    *,
+    reported: bool = False,
+) -> bool:
     """Close an open package as used up (docs/decisions/0020): an
     adjustment, under the administrator's name, for whatever it still
-    showed, with the reason Used up, so it shows nothing; then closed. None
-    if there is no such package; one closed already is left as it was. Its
-    place is locked first, then it, as a save's are (ledger.py)."""
+    showed, with the reason Used up, so it shows nothing; then closed.
+    Whether it closed it: not if there is no such package, it is closed
+    already, it moved since it was read, or, with `reported`, it is no
+    longer reported (a report cleared meanwhile). Its place is locked
+    first, then it, as a save's are (ledger.py). RuleBroken as
+    ledger.record_adjustment refuses."""
     found = session.get(OpenPackage, open_id)
     if found is None:
-        return None
-    ledger.lock_place(session, found.location_id)
+        return False
+    place = found.location_id
+    ledger.lock_place(session, place)
     row = get_locked(session, OpenPackage, open_id, key_share=True)
     assert row is not None  # Read just now; open packages are never deleted.
-    left = ledger.left_on(session, row)
-    if row.closed_at is not None:
-        return Closed(row.id, left, closed=False)
+    if row.closed_at is not None or row.location_id != place:
+        return False
+    if reported and row.reported_at is None:
+        return False
+    left = ledger.left_on(session, [row])[row.id]
     if left != 0:
         ledger.record_adjustment(
             session,
@@ -152,7 +156,7 @@ def close(session: Session, open_id: int, admin_id: int, at: datetime) -> Closed
         )
     row.closed_at, row.closed_by_admin_id = at, admin_id
     log.info("open package closed", open_package_id=row.id, admin_id=admin_id)
-    return Closed(row.id, left, closed=True)
+    return True
 
 
 def clear(session: Session, open_id: int) -> bool:
@@ -196,7 +200,8 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         .where(OpenPackage.closed_at.is_(None), *where)
         .order_by(OpenPackage.reported_at, OpenPackage.opened_at, OpenPackage.id)
     ).all()
+    left = ledger.left_on(session, [row for row, *_ in rows])
     return [
-        Shown(row, item, package, unit, place, ledger.left_on(session, row), by)
+        Shown(row, item, package, unit, place, left[row.id], by)
         for row, item, package, unit, place, by in rows
     ]

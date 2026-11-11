@@ -91,7 +91,7 @@ def test_the_reasons_come_seeded(session: Session) -> None:
         "Found",
         "Used for testing",
         "Records were wrong",
-        # Closing an open package's (migration 0024).
+        # Closing an open package's (migration 0026).
         "Used up",
     ]
 

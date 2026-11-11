@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import adjustment_reasons, open_packages
+from inventory_tng import adjustment_reasons, ledger, open_packages
 from inventory_tng.ledger import (
     LOOSE,
     Entry,
@@ -985,10 +985,19 @@ def test_an_open_package_is_closed_from_its_items_page(
     spools.move(Entry(spools.cable.id, Decimal(310), Form(open_package_id=made.id)))
     page = f"/admin/items/{spools.cable.id}"
     assert "Close as used up" in text(admin_client.get(page))
-    done = admin_client.post(f"{page}/open-packages/{made.id}/close")
+    path = f"{page}/open-packages/{made.id}/close"
+    # Asked first: it writes off what it shows.
+    asked = text(admin_client.get(path))
+    assert "it shows\n-5 m" in asked or "it shows -5 m" in " ".join(asked.split())
+    assert '<button class="danger">Close as used up</button>' in asked
+    done = admin_client.post(path)
     assert done.headers["location"] == (
         f"{page}?notice=open_package_closed&section=open-packages#open-packages"
     )
+    # The last one closed: its section is there to say so.
+    shown = text(admin_client.get(done.headers["location"]))
+    assert 'id="open-packages"' in shown
+    assert admin_client.get(path).status_code == 404
     session.refresh(made)
     assert made.closed_at is not None
     assert (spools.store.id, None, made.id) not in forms(session, spools.cable)
@@ -999,7 +1008,7 @@ def test_an_open_package_is_closed_from_its_items_page(
 def test_the_used_up_reason_is_there_whatever_administrators_did(
     session: Session,
 ) -> None:
-    """Seeded by migration 0024; brought back if retired; made again if
+    """Seeded by migration 0026; brought back if retired; made again if
     renamed away."""
     reason = adjustment_reasons.used_up(session)
     assert reason.name == "Used up"
@@ -1018,17 +1027,17 @@ def test_closing_or_clearing_twice_changes_nothing_more(
 ) -> None:
     made = reported(session, spools)
     closer = add(session, Admin(username=f"closer-{tag()}"))
-    assert open_packages.close(session, 999999, closer.id, datetime.now(UTC)) is None
+    assert open_packages.close(session, 999999, closer.id, datetime.now(UTC)) is False
     assert open_packages.clear(session, made.id) is True
     assert open_packages.clear(session, made.id) is False
     first = open_packages.close(session, made.id, closer.id, datetime.now(UTC))
     again = open_packages.close(session, made.id, closer.id, datetime.now(UTC))
-    assert (first and first.closed, again and again.closed) == (True, False)
+    assert (first, again) == (True, False)
     # Ticked when no longer reported: left as it is.
     done = admin_client.post(
         USED_UP, data={"open_package": [str(made.id)], "do": "clear"}
     )
-    assert done.headers["location"] == f"{USED_UP}?notice=used_up_cleared"
+    assert done.headers["location"] == f"{USED_UP}?notice=used_up_unchanged"
 
 
 def test_an_open_package_showing_nothing_closes_with_nothing_written_off(
@@ -1037,8 +1046,29 @@ def test_an_open_package_showing_nothing_closes_with_nothing_written_off(
     made = spools.opened()
     spools.move(Entry(spools.cable.id, Decimal(305), Form(open_package_id=made.id)))
     closer = add(session, Admin(username=f"closer-{tag()}"))
-    closed = open_packages.close(session, made.id, closer.id, datetime.now(UTC))
-    assert closed == open_packages.Closed(made.id, Decimal(0), closed=True)
+    assert open_packages.close(session, made.id, closer.id, datetime.now(UTC))
     assert not session.scalars(
         select(LedgerTransaction).where(LedgerTransaction.admin_id == closer.id)
     ).first()
+
+
+def test_a_confirm_after_a_clear_closes_nothing(
+    session: Session, spools: Spools
+) -> None:
+    """Confirming checks the report still stands, once the package is locked."""
+    made = spools.opened()
+    closer = add(session, Admin(username=f"closer-{tag()}"))
+    when = datetime.now(UTC)
+    assert (
+        open_packages.close(session, made.id, closer.id, when, reported=True) is False
+    )
+    assert made.closed_at is None
+    assert ledger.left_on(session, []) == {}
+
+
+def test_whats_left_is_where_it_is_now(session: Session, spools: Spools) -> None:
+    """Moved whole, its old place keeps a row, at nothing."""
+    made = spools.opened()
+    whole = Form(open_package_id=made.id)
+    spools.move(Entry(spools.cable.id, Decimal(305), whole, whole))
+    assert ledger.left_on(session, [made]) == {made.id: 305}

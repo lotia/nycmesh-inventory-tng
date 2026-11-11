@@ -157,11 +157,6 @@ def upgrade() -> None:
         "GRANT UPDATE (location_id, reported_at, reported_by_volunteer_id,"
         f" closed_at, closed_by_admin_id) ON open_package TO {APP_ROLE}"
     )
-    # The reason closing an open package gives, beside 0009's.
-    op.execute(
-        "INSERT INTO adjustment_reason (name) SELECT 'Used up' WHERE NOT EXISTS"
-        " (SELECT 1 FROM adjustment_reason WHERE lower(name) = 'used up')"
-    )
     _checks(
         "ledger_transaction",
         {
