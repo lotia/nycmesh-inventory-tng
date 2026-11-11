@@ -165,6 +165,19 @@ describe("filling and saving a cart", () => {
     fireEvent.click(screen.getByLabelText("All of it, moved still open"));
     expect(field.value).toBe("");
     fireEvent.input(field, { target: { value: "20" } });
+    // All of it typed: asked whether it is used up.
+    fireEvent.input(field, { target: { value: "120" } });
+    fireEvent.click(
+      screen.getByLabelText("That takes all it shows: is it used up?"),
+    );
+    fireEvent.input(field, { target: { value: "20" } });
+    expect(
+      (
+        screen.getByLabelText(
+          "Used up: what is left is no use",
+        ) as HTMLInputElement
+      ).checked,
+    ).toBe(true);
     // Another place: what was taken from this one's packages goes.
     pick("From", "12");
     pick("From", "10");

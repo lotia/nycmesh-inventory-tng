@@ -36,7 +36,15 @@ const LineSchema = v.object({
   /** Taken from open packages, by key: how much, as typed, and whether
    * all of one moves with it, whole (docs/decisions/0020). */
   open: v.exactOptional(
-    v.record(v.string(), v.object({ amount: v.string(), whole: v.boolean() })),
+    v.record(
+      v.string(),
+      v.object({
+        amount: v.string(),
+        whole: v.boolean(),
+        /** Said to be used up, for an administrator to confirm. */
+        usedUp: v.exactOptional(v.boolean()),
+      }),
+    ),
   ),
 });
 
@@ -70,6 +78,8 @@ export const SIDES: Record<Kind, Record<Side, boolean>> = {
   install: { from: true, to: false },
   // At one place, picked as From; the batch names it on both sides.
   open: { from: true, to: false },
+  // Only used up open packages, at the From place: made by toBatch.
+  report: { from: true, to: false },
 };
 
 /** A new, empty cart that keeps the last one's choices. */
@@ -409,6 +419,7 @@ const KINDS: Record<Kind, string> = {
   receipt: "Receipt",
   install: "Install",
   open: "Opening",
+  report: "Used up",
 };
 
 /** What the page says beside a retired item. */
@@ -505,7 +516,16 @@ export function toBatch(
       items += 1;
     }
   }
-  if (lines.length === 0 && problems.length === 0) {
+  // Open packages said to be used up: with what is taken, or alone.
+  const usedUp = cart.lines.flatMap((line) =>
+    Object.entries(line.open ?? {}).flatMap(([key, taken]) =>
+      taken.usedUp ? [{ key, whole: taken.whole }] : [],
+    ),
+  );
+  if (usedUp.some((each) => each.whole)) {
+    problems.push("An open package moved whole is not used up: untick one.");
+  }
+  if (lines.length === 0 && usedUp.length === 0 && problems.length === 0) {
     problems.push("Add something to the cart.");
   }
   if (lines.length > MAX_LINES) {
@@ -515,22 +535,31 @@ export function toBatch(
   if (problems.length > 0 || cart.volunteerId === null) {
     return { problems };
   }
-  const things = items === 1 ? "1 item" : `${items} items`;
-  const words = [`${KINDS[cart.kind]}: ${things}`];
-  const draft: Draft = {
-    kind: cart.kind,
-    volunteer_id: cart.volunteerId,
-    lines,
-  };
-  if (fromId !== null && cart.kind === "open") {
+  const reporting = lines.length === 0;
+  const kind = reporting ? "report" : cart.kind;
+  const packages =
+    usedUp.length === 1 ? "1 open package" : `${usedUp.length} open packages`;
+  const things = reporting
+    ? packages
+    : items === 1
+      ? "1 item"
+      : `${items} items`;
+  const words = [`${KINDS[kind]}: ${things}`];
+  const draft: Draft = { kind, volunteer_id: cart.volunteerId, lines };
+  if (usedUp.length > 0) {
+    draft.used_up = usedUp.map((each) => each.key);
+  }
+  if (fromId !== null && (kind === "open" || kind === "report")) {
     draft.from_location_id = fromId;
-    draft.to_location_id = fromId;
+    if (kind === "open") {
+      draft.to_location_id = fromId;
+    }
     words.push(`at ${index.places.get(fromId)}`);
   } else if (fromId !== null) {
     draft.from_location_id = fromId;
     words.push(`from ${index.places.get(fromId)}`);
   }
-  if (toId !== null) {
+  if (toId !== null && !reporting) {
     draft.to_location_id = toId;
     words.push(`to ${index.places.get(toId)}`);
   }
@@ -589,6 +618,10 @@ export function offered(
   for (const { state, body: draft, queuedAt } of outbox) {
     if (state !== "waiting") {
       continue;
+    }
+    // Said to be used up: offered no more.
+    for (const key of draft.used_up ?? []) {
+      byKey.delete(key);
     }
     for (const line of draft.lines) {
       const key = line.open_package_key;

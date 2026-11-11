@@ -345,6 +345,65 @@ describe("turning a cart into a batch", () => {
     ]);
   });
 
+  test("open packages said used up go with a cut, or alone as a report", () => {
+    const key = "11111111-1111-4111-8111-111111111111";
+    const line = (amount: string, extra = {}) => [
+      {
+        itemId: 101,
+        packages: {},
+        loose: "",
+        open: { [key]: { amount, whole: false, usedUp: true, ...extra } },
+      },
+    ];
+    expect(toBatch(cart({ lines: line("120") }), CATALOGUE)).toMatchObject({
+      draft: {
+        kind: "move",
+        lines: [{ item_id: 101, quantity: "120", open_package_key: key }],
+        used_up: [key],
+      },
+    });
+    const alone = toBatch(cart({ lines: line("") }), CATALOGUE);
+    expect(alone).toEqual({
+      draft: {
+        kind: "report",
+        volunteer_id: 1,
+        from_location_id: 10,
+        lines: [],
+        used_up: [key],
+      },
+      what: "Used up: 1 open package at Hub",
+    });
+    expect(
+      toBatch(cart({ lines: line("120", { whole: true }) }), CATALOGUE),
+    ).toEqual({
+      problems: ["An open package moved whole is not used up: untick one."],
+    });
+  });
+
+  test("an open package said used up is offered no more", () => {
+    const key = "11111111-1111-4111-8111-111111111111";
+    const known = {
+      id: 5,
+      key,
+      item_id: 101,
+      package_id: 1001,
+      location_id: 10,
+      opened_at: "2026-11-03T10:00:00Z",
+      left: "120.000",
+    };
+    const report: Draft = {
+      kind: "report",
+      volunteer_id: 1,
+      from_location_id: 10,
+      lines: [],
+      used_up: [key],
+    };
+    const catalogue = { ...CATALOGUE, open_packages: [known] };
+    expect(
+      offered(catalogue, [{ state: "waiting", body: report, queuedAt: 0 }]),
+    ).toEqual([]);
+  });
+
   test("an opening opens whole packages only", () => {
     const lines = [{ itemId: 101, packages: { 1001: "1" }, loose: "3" }];
     expect(

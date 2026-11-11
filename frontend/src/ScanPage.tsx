@@ -647,7 +647,12 @@ function CartLine({
         )}
       </Field>
       {opens.map((open) => {
-        const taken = line.open?.[open.key] ?? { amount: "", whole: false };
+        const taken: NonNullable<Line["open"]>[string] = line.open?.[
+          open.key
+        ] ?? {
+          amount: "",
+          whole: false,
+        };
         const take = (next: typeof taken) =>
           onChange({ ...line, open: { ...line.open, [open.key]: next } });
         const left = decimal(open.left);
@@ -666,7 +671,11 @@ function CartLine({
                   value={taken.amount}
                   disabled={taken.whole}
                   onInput={(event) =>
-                    take({ amount: event.currentTarget.value, whole: false })
+                    take({
+                      ...taken,
+                      amount: event.currentTarget.value,
+                      whole: false,
+                    })
                   }
                 />
               )}
@@ -685,6 +694,20 @@ function CartLine({
                   }
                 />
                 All of it, moved still open
+              </label>
+            )}
+            {!taken.whole && (
+              <label class="flex items-center gap-2 font-normal">
+                <input
+                  type="checkbox"
+                  checked={taken.usedUp === true}
+                  onChange={(event) =>
+                    take({ ...taken, usedUp: event.currentTarget.checked })
+                  }
+                />
+                {(thousandths(taken.amount) ?? 0) >= open.left
+                  ? "That takes all it shows: is it used up?"
+                  : "Used up: what is left is no use"}
               </label>
             )}
           </div>

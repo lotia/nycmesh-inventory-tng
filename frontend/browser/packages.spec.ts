@@ -84,4 +84,27 @@ test("a package opened on the scan page is saved as an opening", async ({
   expect(cut.request().postDataJSON().lines).toEqual([
     { item_id: expect.any(Number), quantity: "20", open_package_key: key },
   ]);
+  // Said to be used up by its button, alone: a report (8i4.133.5).
+  await page.goto("/scan");
+  await page
+    .getByLabel("From", { exact: true })
+    .selectOption({ label: "Supernode 1 › Shelf A" });
+  await page.getByLabel(/Find an item/).fill("Cat6");
+  await page.getByRole("button", { name: "Outdoor Cat6 cable" }).click();
+  await page.getByLabel(/^Box of 305 m/).fill("");
+  await page.getByLabel(/^Loose/).fill("");
+  await page.getByLabel("Used up: what is left is no use").check();
+  const reporting = page.waitForResponse(
+    (each) =>
+      each.url().endsWith("/api/transactions") &&
+      each.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Save" }).click();
+  const report = await reporting;
+  expect(report.status()).toBe(201);
+  expect(report.request().postDataJSON()).toMatchObject({
+    kind: "report",
+    lines: [],
+    used_up: [key],
+  });
 });

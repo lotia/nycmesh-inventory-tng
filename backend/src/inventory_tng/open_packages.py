@@ -6,6 +6,8 @@ which administrator closed it.
 """
 
 import uuid
+from collections.abc import Collection
+from datetime import datetime
 
 import structlog
 from sqlalchemy import exc, select
@@ -78,3 +80,32 @@ def make(
         when=(made.package_id, made.location_id) != (package_id, location_id),
     )
     return made
+
+
+def report(
+    session: Session, open_ids: Collection[int], volunteer_id: int, at: datetime
+) -> list[int]:
+    """Open packages a volunteer says are used up: shown as reported, no
+    longer offered to take from, until an administrator confirms or clears
+    it (docs/decisions/0020). One reported already, or closed, is left as
+    it is. The ids of those it reported. Locked as a save's open packages
+    are (ledger.py's lock order), after its places and items."""
+    rows = session.scalars(
+        locked(
+            select(OpenPackage)
+            .where(OpenPackage.id.in_(list(open_ids)))
+            .order_by(OpenPackage.id),
+            key_share=True,
+        )
+    ).all()
+    reported = []
+    for row in rows:
+        if row.reported_at is None and row.closed_at is None:
+            row.reported_at, row.reported_by_volunteer_id = at, volunteer_id
+            reported.append(row.id)
+            log.info(
+                "open package reported used up",
+                open_package_id=row.id,
+                volunteer_id=volunteer_id,
+            )
+    return reported

@@ -794,3 +794,66 @@ def test_an_open_package_named_on_two_lines_is_refused_as_twice(
     ]
     whole_opening = opening(spools, opened_line(spools, whole=True))
     assert registered_client.post(URL, json=whole_opening).status_code == 422
+
+
+# Volunteers report an open package used up (8i4.133.5).
+
+
+def test_a_cut_reports_its_open_package_used_up_and_it_is_offered_no_more(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    made = spools.opened()
+    cut = spools.place.batch(lines=[taken(made, "305")], used_up=[str(made.key)])
+    assert registered_client.post(URL, json=cut).status_code == 201
+    assert registered_client.post(URL, json=cut).status_code == 200
+    session.refresh(made)
+    assert made.reported_by_volunteer_id == spools.place.volunteer.id
+    assert made.reported_at is not None
+    listed = registered_client.get("/api/catalogue").json()["open_packages"]
+    assert made.id not in [entry["id"] for entry in listed]
+    # Its metres stay in stock: no adjustment is written.
+    assert not session.scalars(
+        select(LedgerTransaction).where(LedgerTransaction.kind == "adjustment")
+    ).first()
+
+
+def test_the_button_reports_one_alone(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    made = spools.opened()
+    report = spools.place.batch(
+        kind="report", to_location_id=None, lines=[], used_up=[str(made.key)]
+    )
+    response = registered_client.post(URL, json=report)
+    assert response.status_code == 201
+    written = session.get_one(LedgerTransaction, response.json()["transaction_id"])
+    assert (written.kind, written.from_location_id) == ("report", spools.store.id)
+    session.refresh(made)
+    reported_at = made.reported_at
+    assert reported_at is not None
+    # Reported again, by another batch: as it was.
+    again = report | {"key": str(uuid.uuid4())}
+    assert registered_client.post(URL, json=again).status_code == 201
+    session.refresh(made)
+    assert made.reported_at == reported_at
+
+
+def test_a_report_that_cannot_be_is_refused(
+    registered_client: TestClient, spools: Spools
+) -> None:
+    unknown = spools.place.batch(
+        kind="report", to_location_id=None, lines=[], used_up=[str(uuid.uuid4())]
+    )
+    response = registered_client.post(URL, json=unknown)
+    assert response.status_code == 422
+    assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
+        (["used_up", 0], "not_found")
+    ]
+    for batch in (
+        spools.place.batch(kind="report", to_location_id=None, lines=[]),
+        spools.place.batch(lines=[]),
+        spools.place.batch(
+            kind="report", to_location_id=None, used_up=[str(uuid.uuid4())]
+        ),
+    ):
+        assert registered_client.post(URL, json=batch).status_code == 422

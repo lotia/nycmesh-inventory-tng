@@ -124,7 +124,7 @@ export interface components {
        * Kind
        * @enum {string}
        */
-      kind: "move" | "receipt" | "install" | "open";
+      kind: "move" | "receipt" | "install" | "open" | "report";
       /** Volunteer Id */
       volunteer_id: number;
       /** From Location Id */
@@ -135,9 +135,14 @@ export interface components {
       install_number?: number | null;
       /**
        * Lines
-       * @description One line per item and package (or loose): a batch naming one on more than one line is refused, 422 with type repeated on each of those lines.
+       * @description One line per item and package (or loose): a batch naming one on more than one line is refused, 422 with type repeated on each of those lines. None only in a report.
        */
       lines: components["schemas"]["Line"][];
+      /**
+       * Used Up
+       * @description Keys of open packages the volunteer says are used up, for an administrator to confirm (docs/decisions/0020): with a cut that took all they showed, or alone, in a report.
+       */
+      used_up?: string[] | null;
     };
     /** Catalogue */
     Catalogue: {
