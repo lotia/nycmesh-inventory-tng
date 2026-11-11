@@ -8,13 +8,16 @@ which administrator closed it.
 import uuid
 from collections.abc import Collection
 from datetime import datetime
+from decimal import Decimal
+from typing import NamedTuple
 
 import structlog
-from sqlalchemy import exc, select
+from sqlalchemy import ColumnElement, exc, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.db import enforce, locked
-from inventory_tng.models import Item, ItemPackage, OpenPackage
+from inventory_tng import adjustment_reasons, ledger
+from inventory_tng.db import enforce, get_locked, locked
+from inventory_tng.models import Item, ItemPackage, Location, OpenPackage, Volunteer
 
 log = structlog.get_logger(__name__)
 
@@ -109,3 +112,91 @@ def report(
                 volunteer_id=volunteer_id,
             )
     return reported
+
+
+class Closed(NamedTuple):
+    """An open package closed: what it still showed, written off (or found,
+    if less than nothing), and whether this call closed it."""
+
+    open_package_id: int
+    left: Decimal
+    closed: bool
+
+
+def close(session: Session, open_id: int, admin_id: int, at: datetime) -> Closed | None:
+    """Close an open package as used up (docs/decisions/0020): an
+    adjustment, under the administrator's name, for whatever it still
+    showed, with the reason Used up, so it shows nothing; then closed. None
+    if there is no such package; one closed already is left as it was. Its
+    place is locked first, then it, as a save's are (ledger.py)."""
+    found = session.get(OpenPackage, open_id)
+    if found is None:
+        return None
+    ledger.lock_place(session, found.location_id)
+    row = get_locked(session, OpenPackage, open_id, key_share=True)
+    assert row is not None  # Read just now; open packages are never deleted.
+    left = ledger.left_on(session, row)
+    if row.closed_at is not None:
+        return Closed(row.id, left, closed=False)
+    if left != 0:
+        ledger.record_adjustment(
+            session,
+            uuid.uuid5(row.key, "closed"),
+            admin_id,
+            row.location_id,
+            row.item_id,
+            abs(left),
+            found=left < 0,
+            reason_id=adjustment_reasons.used_up(session).id,
+            form=ledger.Form(open_package_id=row.id),
+        )
+    row.closed_at, row.closed_by_admin_id = at, admin_id
+    log.info("open package closed", open_package_id=row.id, admin_id=admin_id)
+    return Closed(row.id, left, closed=True)
+
+
+def clear(session: Session, open_id: int) -> bool:
+    """A report taken back, as wrong: the package is offered again. False
+    if there is no such package, or nothing to clear."""
+    row = get_locked(session, OpenPackage, open_id, key_share=True)
+    if row is None or row.reported_at is None or row.closed_at is not None:
+        return False
+    row.reported_at, row.reported_by_volunteer_id = None, None
+    log.info("open package report cleared", open_package_id=row.id)
+    return True
+
+
+class Shown(NamedTuple):
+    """An open package as the pages show it."""
+
+    row: OpenPackage
+    item: str
+    package: str
+    unit: str
+    place: str
+    left: Decimal
+    reported_by: str | None
+
+
+def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
+    """Open packages not closed, `where` says which, oldest first."""
+    rows = session.execute(
+        select(
+            OpenPackage,
+            Item.name,
+            ItemPackage.name,
+            Item.unit,
+            Location.name,
+            Volunteer.name,
+        )
+        .join(Item, Item.id == OpenPackage.item_id)
+        .join(ItemPackage, ItemPackage.id == OpenPackage.package_id)
+        .join(Location, Location.id == OpenPackage.location_id)
+        .outerjoin(Volunteer, Volunteer.id == OpenPackage.reported_by_volunteer_id)
+        .where(OpenPackage.closed_at.is_(None), *where)
+        .order_by(OpenPackage.reported_at, OpenPackage.opened_at, OpenPackage.id)
+    ).all()
+    return [
+        Shown(row, item, package, unit, place, ledger.left_on(session, row), by)
+        for row, item, package, unit, place, by in rows
+    ]

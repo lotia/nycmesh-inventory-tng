@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import open_packages
+from inventory_tng import adjustment_reasons, open_packages
 from inventory_tng.ledger import (
     LOOSE,
     Entry,
@@ -27,6 +27,7 @@ from inventory_tng.ledger import (
     record_count,
 )
 from inventory_tng.models import (
+    AdjustmentReason,
     Admin,
     Item,
     ItemPackage,
@@ -36,6 +37,7 @@ from inventory_tng.models import (
 from inventory_tng.open_packages import tracks_opened
 
 from helpers.rows import add, breaks, tag, violates
+from helpers.sign_in import text
 from helpers.stock import Spools
 
 CABLE, OTHER = 1, 2
@@ -887,3 +889,156 @@ def test_a_report_names_what_is_where_it_is_said_and_not_moving(
         used_up=[key],
     )
     assert registered_client.post(URL, json=receipt).status_code == 422
+
+
+# Administrators confirm or clear reports, or close directly (8i4.133.6).
+
+
+USED_UP = "/admin/stock/used-up"
+
+
+def reported(session: Session, spools: Spools) -> OpenPackage:
+    made = spools.opened()
+    spools.move(Entry(spools.cable.id, Decimal(300), Form(open_package_id=made.id)))
+    open_packages.report(
+        session, [made.id], spools.place.volunteer.id, datetime.now(UTC)
+    )
+    session.flush()
+    return made
+
+
+def test_waiting_for_you_until_each_report_is_answered(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    made = reported(session, spools)
+    home = text(admin_client.get("/admin"))
+    assert "Waiting for you" in home
+    assert f'<a href="{USED_UP}">Confirm</a>' in home
+    page = text(admin_client.get(USED_UP))
+    assert f'name="open_package" value="{made.id}"' in page
+    done = admin_client.post(f"{USED_UP}/{made.id}/confirm")
+    assert done.headers["location"] == f"{USED_UP}?notice=used_up_confirmed"
+    session.refresh(made)
+    assert made.closed_at is not None
+    # What it still showed, 5 m, is written off as used up: it shows nothing.
+    assert (spools.store.id, None, made.id) not in forms(session, spools.cable)
+    adjustment = session.scalars(
+        select(LedgerTransaction).where(
+            LedgerTransaction.kind == "adjustment",
+            LedgerTransaction.from_location_id == spools.store.id,
+        )
+    ).one()
+    reason = session.get_one(AdjustmentReason, adjustment.reason_id)
+    assert reason.name == "Used up"
+    assert "Waiting for you" not in text(admin_client.get("/admin"))
+    # Asked again, nothing more is written.
+    admin_client.post(f"{USED_UP}/{made.id}/confirm")
+    assert (
+        len(
+            session.scalars(
+                select(LedgerTransaction).where(
+                    LedgerTransaction.reason_id == reason.id
+                )
+            ).all()
+        )
+        == 1
+    )
+
+
+def test_a_report_cleared_is_offered_again(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    spools: Spools,
+) -> None:
+    made = reported(session, spools)
+    admin_client.post(f"{USED_UP}/{made.id}/clear")
+    session.refresh(made)
+    assert (made.reported_at, made.closed_at) == (None, None)
+    listed = registered_client.get("/api/catalogue").json()["open_packages"]
+    assert made.id in [entry["id"] for entry in listed]
+
+
+def test_reports_ticked_are_answered_together(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    one, two = reported(session, spools), reported(session, spools)
+    done = admin_client.post(
+        USED_UP, data={"open_package": [str(one.id), str(two.id)], "do": "confirm"}
+    )
+    assert done.headers["location"] == f"{USED_UP}?notice=used_up_confirmed"
+    for row in (one, two):
+        session.refresh(row)
+        assert row.closed_at is not None
+    none = admin_client.post(USED_UP, data={"do": "clear"})
+    assert none.headers["location"] == f"{USED_UP}?notice=used_up_none"
+    assert admin_client.post(USED_UP, data={"do": "maybe"}).status_code == 404
+    assert admin_client.post(f"{USED_UP}/{one.id}/maybe").status_code == 404
+    assert admin_client.post(f"{USED_UP}/999999/confirm").status_code == 404
+
+
+def test_an_open_package_is_closed_from_its_items_page(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """Reported or not: nothing waits. Less than nothing is found."""
+    made = spools.opened()
+    spools.move(Entry(spools.cable.id, Decimal(310), Form(open_package_id=made.id)))
+    page = f"/admin/items/{spools.cable.id}"
+    assert "Close as used up" in text(admin_client.get(page))
+    done = admin_client.post(f"{page}/open-packages/{made.id}/close")
+    assert done.headers["location"] == (
+        f"{page}?notice=open_package_closed&section=open-packages#open-packages"
+    )
+    session.refresh(made)
+    assert made.closed_at is not None
+    assert (spools.store.id, None, made.id) not in forms(session, spools.cable)
+    other = f"/admin/items/{spools.place.item.id}/open-packages/{made.id}/close"
+    assert admin_client.post(other).status_code == 404
+
+
+def test_the_used_up_reason_is_there_whatever_administrators_did(
+    session: Session,
+) -> None:
+    """Seeded by migration 0024; brought back if retired; made again if
+    renamed away."""
+    reason = adjustment_reasons.used_up(session)
+    assert reason.name == "Used up"
+    reason.retired_at = datetime.now(UTC)
+    session.flush()
+    assert adjustment_reasons.used_up(session) is reason
+    assert reason.retired_at is None
+    reason.name = "Spent"
+    session.flush()
+    again = adjustment_reasons.used_up(session)
+    assert (again.name, again.id != reason.id) == ("Used up", True)
+
+
+def test_closing_or_clearing_twice_changes_nothing_more(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    made = reported(session, spools)
+    closer = add(session, Admin(username=f"closer-{tag()}"))
+    assert open_packages.close(session, 999999, closer.id, datetime.now(UTC)) is None
+    assert open_packages.clear(session, made.id) is True
+    assert open_packages.clear(session, made.id) is False
+    first = open_packages.close(session, made.id, closer.id, datetime.now(UTC))
+    again = open_packages.close(session, made.id, closer.id, datetime.now(UTC))
+    assert (first and first.closed, again and again.closed) == (True, False)
+    # Ticked when no longer reported: left as it is.
+    done = admin_client.post(
+        USED_UP, data={"open_package": [str(made.id)], "do": "clear"}
+    )
+    assert done.headers["location"] == f"{USED_UP}?notice=used_up_cleared"
+
+
+def test_an_open_package_showing_nothing_closes_with_nothing_written_off(
+    session: Session, spools: Spools
+) -> None:
+    made = spools.opened()
+    spools.move(Entry(spools.cable.id, Decimal(305), Form(open_package_id=made.id)))
+    closer = add(session, Admin(username=f"closer-{tag()}"))
+    closed = open_packages.close(session, made.id, closer.id, datetime.now(UTC))
+    assert closed == open_packages.Closed(made.id, Decimal(0), closed=True)
+    assert not session.scalars(
+        select(LedgerTransaction).where(LedgerTransaction.admin_id == closer.id)
+    ).first()

@@ -3,6 +3,15 @@
 {% for warning in warnings %}
 <p class="warning">{{ warning.words }} <a href="{{ warning.path }}">{{ warning.action }}</a>.</p>
 {% endfor %}
+{% if waiting %}
+<section id="waiting">
+  <h2>Waiting for you</h2>
+  <ul>
+    <li>{{ waiting }} open package{{ "s" if waiting != 1 else "" }} reported used up:
+      <a href="{{ used_up_path }}">Confirm</a></li>
+  </ul>
+</section>
+{% endif %}
 {% if changes %}
 <section id="since">
   <h2>Since you last signed in</h2>

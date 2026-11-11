@@ -23,6 +23,7 @@ from inventory_tng.admin import (
     locations,
     settings,
     stock,
+    used_up,
     volunteers,
 )
 
@@ -50,6 +51,7 @@ for module in (
     labels,
     volunteers,
     stock,
+    used_up,
     counts,
     devices,
     admins,

@@ -1,0 +1,36 @@
+{% extends "admin_base.html" %}
+{% from "_table.html" import table %}
+{% block main %}
+<p class="hint">Volunteers said these open packages are used up. Confirm
+one to close it: what it still shows is written off, with the reason Used
+up. Not used up offers it again, for a box ticked by mistake.</p>
+{#- The packages ticked belong to this form. #}
+<form method="post" action="{{ here }}" id="answer-ticked"></form>
+{% call table() %}
+  <tr><th>Pick</th><th>Open package</th><th class="hidden sm:table-cell">Shows</th><th class="hidden sm:table-cell">Reported</th><th></th></tr>
+  {% for each in reported %}
+  {% set row = each.row %}
+  <tr>
+    <td><input type="checkbox" name="open_package" value="{{ row.id }}" form="answer-ticked" aria-label="Pick {{ each.item }}, {{ each.package }}, at {{ each.place }}"></td>
+    <td>{{ each.item }}, {{ each.package }} · {{ each.place }}
+      <span class="hint block sm:hidden">shows {{ each.left | amount }} {{ each.unit }}; {{ each.reported_by or "someone" }}, {{ row.reported_at | when(zone) }}</span></td>
+    <td class="hidden sm:table-cell">{{ each.left | amount }} {{ each.unit }}</td>
+    <td class="hidden sm:table-cell">{{ each.reported_by or "someone" }}, {{ row.reported_at | when(zone) }}</td>
+    <td>
+      <form method="post" action="{{ here }}/{{ row.id }}/confirm" class="actions">
+        <button>Confirm used up<span class="sr-only"> {{ each.item }} at {{ each.place }}</span></button>
+        <button formaction="{{ here }}/{{ row.id }}/clear">Not used up<span class="sr-only"> {{ each.item }} at {{ each.place }}</span></button>
+      </form>
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="5">Nothing waits.</td></tr>
+  {% endfor %}
+{% endcall %}
+{% if reported %}
+<div class="actions">
+  <button name="do" value="confirm" form="answer-ticked">Confirm the ones ticked</button>
+  <button name="do" value="clear" form="answer-ticked">Not used up, the ones ticked</button>
+</div>
+{% endif %}
+{% endblock %}
