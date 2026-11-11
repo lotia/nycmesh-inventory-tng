@@ -1436,3 +1436,33 @@ def test_an_open_package_found_while_its_item_moved_is_asked_again(
     assert admin_client.post(f"{COUNTS}/{van}", data=form).status_code == 409
     made = select(OpenPackage).where(OpenPackage.key == uuid.uuid5(key, "found"))
     assert session.scalars(made).first() is None
+
+
+# What only both batches together show (the combined review).
+
+
+def test_a_place_holding_forms_that_net_to_nothing_holds_stock(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """A sealed spool there, and as much taken loose: not empty."""
+    store = spools.store.id
+    spools.move(Entry(spools.cable.id, Decimal(610)))  # Loose, though sealed.
+    assert ledger.holds_stock(session, store)
+    page = text(admin_client.get("/admin/stock"))
+    assert "count it" in page
+
+
+@pytest.mark.parametrize("amount", ["-2.000", "-0.500"])
+def test_an_open_package_showing_less_than_nothing_is_listed(
+    registered_client: TestClient, session: Session, spools: Spools, amount: str
+) -> None:
+    made = spools.opened()
+    spools.move(
+        Entry(
+            spools.cable.id,
+            Decimal(305) - Decimal(amount),
+            Form(open_package_id=made.id),
+        )
+    )
+    listed = registered_client.get("/api/catalogue").json()["open_packages"]
+    assert [entry["left"] for entry in listed if entry["id"] == made.id] == [amount]

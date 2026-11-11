@@ -333,6 +333,30 @@ describe("refusals", () => {
     expect(states(outbox)).toEqual(["saved", "saved"]);
   });
 
+  test("a batch naming an open package an earlier unsaved one names waits", async () => {
+    const key = "33333333-3333-4333-8333-333333333333";
+    const cut = draft({
+      lines: [{ item_id: 5, quantity: "50", open_package_key: key }],
+    });
+    const whole = draft({
+      lines: [
+        { item_id: 5, quantity: "255", open_package_key: key, whole: true },
+      ],
+    });
+    const { api, sent } = answering(
+      replies(() => new Response("", { status: 500 })),
+    );
+    const outbox = new Outbox(api);
+    outbox.queue(cut, "cut");
+    outbox.queue(whole, "whole");
+    await vi.waitFor(() => expect(sent.length).toBeGreaterThan(0));
+    await outbox.send();
+    // Only the cut was tried: the whole move waits behind it.
+    expect((await bodies(sent)).map((body) => body.lines[0].quantity)).toEqual([
+      "50",
+    ]);
+  });
+
   test("a settled batch can be dismissed; a waiting one cannot", () => {
     const refused = entry({ state: "refused", note: "no" });
     const waiting = entry();

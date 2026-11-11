@@ -11,6 +11,7 @@ import {
   type Catalogue,
   freshCart,
   indexOf,
+  keysAt,
   type Line,
   type Offered,
   offered,
@@ -272,7 +273,12 @@ function CartForm({
       ];
       return;
     }
-    const batch = toBatch(current, catalogue);
+    // Only what the page offers to take from, where it comes from.
+    const offeredKeys = keysAt(
+      offered(catalogue, outbox.entries.value),
+      current.fromId,
+    );
+    const batch = toBatch(current, catalogue, offeredKeys);
     if ("problems" in batch) {
       problems.value = batch.problems;
       return;

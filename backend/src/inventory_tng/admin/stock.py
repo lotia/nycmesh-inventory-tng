@@ -53,6 +53,9 @@ class Holding:
     item: Item
     location: Location
     quantity: Decimal
+    # Less than nothing in some form, though the total may not be: the
+    # records are wrong there too.
+    negative: bool = False
 
 
 @dataclass
@@ -68,7 +71,7 @@ class Group:
 
     @property
     def needs_count(self) -> bool:
-        return any(row.quantity < 0 for row in self.rows)
+        return any(row.quantity < 0 or row.negative for row in self.rows)
 
 
 def _holdings(session: Session, where: ColumnElement[bool]) -> list[Holding]:
@@ -116,7 +119,7 @@ def stock(
         )
     }
     holdings = [
-        Holding(items[item_id], places[place], held.total)
+        Holding(items[item_id], places[place], held.total, held.negative)
         for (item_id, place), held in forms.items()
     ]
     groups = _grouped(sorted(holdings, key=_by_names), by)

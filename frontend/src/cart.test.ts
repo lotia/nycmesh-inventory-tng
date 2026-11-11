@@ -6,6 +6,7 @@ import {
   CartStore,
   freshCart,
   indexOf,
+  keysAt,
   loadCart,
   offered,
   offeredAt,
@@ -340,6 +341,7 @@ describe("turning a cart into a batch", () => {
     ];
     const all = offered(catalogue, outbox);
     expect(offeredAt(all, 101, 10)).toEqual([{ ...known, left: 100000 }]);
+    expect(keysAt(all, 12)).toEqual(new Set([fresh]));
     expect(offeredAt(all, 101, 12)).toEqual([
       {
         id: 0,
@@ -429,6 +431,26 @@ describe("turning a cart into a batch", () => {
     expect(
       offered(catalogue, [{ state: "waiting", body: report, queuedAt: 0 }]),
     ).toEqual([]);
+  });
+
+  test("what is taken from an open package no longer offered is not sent", () => {
+    const shown = "11111111-1111-4111-8111-111111111111";
+    const gone = "22222222-2222-4222-8222-222222222222";
+    const lines = [
+      {
+        itemId: 101,
+        packages: {},
+        loose: "",
+        open: {
+          [shown]: { amount: "5", whole: false },
+          [gone]: { amount: "20", whole: false },
+        },
+      },
+    ];
+    const batch = toBatch(cart({ lines }), CATALOGUE, new Set([shown]));
+    expect("draft" in batch && batch.draft.lines).toEqual([
+      { item_id: 101, quantity: "5", open_package_key: shown },
+    ]);
   });
 
   test("an opening opens whole packages only", () => {

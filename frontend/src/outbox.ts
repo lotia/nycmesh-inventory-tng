@@ -206,14 +206,20 @@ export class Outbox {
     try {
       for (;;) {
         const waiting = this.read().filter((each) => each.state === "waiting");
-        // An open package an opening still waiting makes: a batch taking
-        // from it waits too, or the server would refuse it for good.
-        const unmade = new Set(waiting.flatMap((each) => keysMade(each.body)));
-        const entry = waiting.find(
-          (each) =>
-            !tried.has(each.body.key) &&
-            !keysNamed(each.body).some((key) => unmade.has(key)),
-        );
+        // An open package an earlier batch still waiting makes, takes from
+        // or reports: a later one naming it waits too, in order, or the
+        // server, which checks what is left on it and where, would refuse
+        // it for good.
+        const before = new Set<string>();
+        const entry = waiting.find((each) => {
+          const named = keysNamed(each.body);
+          const ready =
+            !tried.has(each.body.key) && !named.some((key) => before.has(key));
+          for (const key of [...keysMade(each.body), ...named]) {
+            before.add(key);
+          }
+          return ready;
+        });
         if (entry === undefined) {
           return;
         }

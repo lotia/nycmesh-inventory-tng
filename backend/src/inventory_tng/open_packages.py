@@ -152,7 +152,9 @@ def close(
     if found is None:
         return False
     place = found.location_id
+    # In the ledger's order: its place, its item, then it.
     ledger.lock_place(session, place)
+    ledger.hold(session, {"from_location_id": place}, [found.item_id])
     row = get_locked(session, OpenPackage, open_id, key_share=True)
     assert row is not None  # Read just now; open packages are never deleted.
     if row.closed_at is not None or row.location_id != place:
@@ -248,6 +250,12 @@ class Forms:
             + self.loose
             + sum(self.short_ends, Decimal(0))
         )
+
+    @property
+    def negative(self) -> bool:
+        """Less than nothing in some form."""
+        amounts = [amount for _, _, amount in self.sealed]
+        return any(each < 0 for each in [*amounts, *self.open, self.loose])
 
     @property
     def usable(self) -> Decimal:

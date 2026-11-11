@@ -18,9 +18,12 @@ export function thousandths(text: string): number | null {
   return Number(units) * 1000 + Number(fraction.padEnd(3, "0"));
 }
 
-/** A count of whole things, such as packages. Blank is none. */
-/** A decimal the server sent, in thousandths: it is always one. */
+/** A decimal the server sent, in thousandths: it is always one, and may
+ * be less than nothing, as the records may say (docs/decisions/0020). */
 export function sent(text: string): number {
+  if (text.startsWith("-")) {
+    return -sent(text.slice(1));
+  }
   const parsed = thousandths(text);
   if (parsed === null) {
     throw new Error(`not a decimal: ${text}`);
@@ -28,6 +31,7 @@ export function sent(text: string): number {
   return parsed;
 }
 
+/** A count of whole things, such as packages. Blank is none. */
 export function count(text: string): number | null {
   const trimmed = text.trim() || "0";
   return WHOLE.test(trimmed) ? Number(trimmed) : null;
@@ -35,6 +39,9 @@ export function count(text: string): number | null {
 
 /** 12500 as "12.5", and 3000 as "3". */
 export function decimal(amount: number): string {
+  if (amount < 0) {
+    return `-${decimal(-amount)}`;
+  }
   const units = Math.trunc(amount / 1000);
   const fraction = String(amount % 1000)
     .padStart(3, "0")

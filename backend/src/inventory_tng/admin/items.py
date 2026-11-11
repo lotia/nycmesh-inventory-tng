@@ -613,7 +613,7 @@ def package_settings(
         problems["short_below"] = "Shorter than a whole one, or blank."
     if minimum_sealed.strip() and minimum is None:
         problems["minimum_sealed"] = "A whole number of packages, or blank."
-    if problems or isinstance(short, str):
+    if problems or isinstance(short, str):  # The second narrows the type.
         # Beside the fields of the package it was sent for.
         values = {
             "package_id": str(package_id),
