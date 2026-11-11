@@ -181,6 +181,8 @@ wants this to be easy for administrators.
   reported packages ticked, besides each row's own buttons. "Confirm used
   up" is a plain button, not 0019's danger pattern: the confirm page is
   already the administrator's check, and a count puts a mistake right.
+  Closing one directly, from its item's page, asks first, as 0019 says:
+  that page is no check of its own.
 - **A count that finds an open package missing** closes it with the reason
   Lost or stolen, kept apart from Used up.
 

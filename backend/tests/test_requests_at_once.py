@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import (
     accounts,
+    adjustment_reasons,
     categories,
     items,
     locations,
@@ -1098,6 +1099,25 @@ def test_an_open_package_made_twice_at_once_is_made_once(
     worker = own_committed.blocked(
         two, lambda: open_packages.make(two, key, spool, store).id
     )
+    one.commit()
+    assert worker.finished().result == first.id
+    two.rollback()
+
+
+@pytest.mark.concurrency
+def test_the_used_up_reason_made_twice_at_once_is_made_once(
+    own_committed: Committed,
+) -> None:
+    """Renamed away, two closes at once each make it: the second waits on
+    the first's name, then finds it (adjustment_reasons.used_up)."""
+    setup = own_committed.session()
+    seeded = adjustment_reasons.used_up(setup)
+    seeded.name = "Spent"
+    setup.commit()
+    one, two = own_committed.session(), own_committed.session()
+    first = adjustment_reasons.used_up(one)
+    one.flush()
+    worker = own_committed.blocked(two, lambda: adjustment_reasons.used_up(two).id)
     one.commit()
     assert worker.finished().result == first.id
     two.rollback()

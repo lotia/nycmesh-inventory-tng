@@ -962,15 +962,22 @@ def hold(
     return Held(places, {item.id: item for item in held}, custody)
 
 
-def left_on(session: Session, row: OpenPackage) -> Decimal:
-    """What the records say is left on an open package, where it is."""
-    left = session.scalar(
-        select(by_form.c.quantity).where(
-            by_form.c.open_package_id == row.id,
-            by_form.c.location_id == row.location_id,
-        )
+def left_on(session: Session, rows: Sequence[OpenPackage]) -> dict[int, Decimal]:
+    """What the records say is left on each open package, where it is, by
+    id: one query, of their balances alone."""
+    if not rows:
+        return {}
+    where = {row.id: row.location_id for row in rows}
+    found = session.execute(
+        select(
+            by_form.c.open_package_id, by_form.c.location_id, by_form.c.quantity
+        ).where(by_form.c.open_package_id.in_(list(where)))
     )
-    return Decimal(left or 0)
+    left = {row.id: Decimal(0) for row in rows}
+    for open_id, location_id, quantity in found:
+        if where[open_id] == location_id:
+            left[open_id] = quantity
+    return left
 
 
 def _hold_forms(

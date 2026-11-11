@@ -6,11 +6,14 @@ keep it. Each change but an add is to a row locked first (locked)."""
 
 from datetime import datetime
 
-from sqlalchemy import func, select
+import structlog
+from sqlalchemy import exc, func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import Seen, get_locked, unchanged
 from inventory_tng.models import AdjustmentReason
+
+log = structlog.get_logger(__name__)
 
 # The reason closing an open package gives (docs/decisions/0020): kept
 # apart from Lost or stolen, so cable used is told from cable lost.
@@ -18,19 +21,31 @@ USED_UP = "Used up"
 
 
 def used_up(session: Session) -> AdjustmentReason:
-    """The Used up reason, current, as migration 0024 seeds it; made again
+    """The Used up reason, current, as migration 0026 seeds it; made again
     if an administrator renamed it, and brought back if retired."""
+    named = select(AdjustmentReason).where(
+        func.lower(AdjustmentReason.name) == USED_UP.lower()
+    )
+    # A current one first: only a current name is unique.
     reason = session.scalars(
-        select(AdjustmentReason).where(
-            func.lower(AdjustmentReason.name) == USED_UP.lower()
-        )
+        named.order_by(AdjustmentReason.retired_at.is_not(None), AdjustmentReason.id)
     ).first()
     if reason is None:
-        return add(session, USED_UP)
+        try:
+            with session.begin_nested():
+                reason = add(session, USED_UP)
+        except exc.IntegrityError:
+            # Made by a close at the same time, now committed.
+            return session.scalars(
+                named.where(AdjustmentReason.retired_at.is_(None))
+            ).one()
+        log.info("adjustment reason added", adjustment_reason_id=reason.id)
+        return reason
     if reason.retired_at is not None:
         relocked = locked(session, reason.id)
         assert relocked is not None  # Read just now; reasons are never deleted.
         restore(relocked)
+        log.info("adjustment reason restored", adjustment_reason_id=reason.id)
     return reason
 
 

@@ -11,14 +11,14 @@ import structlog
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import Response
 from opentelemetry import metrics
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import open_packages
+from inventory_tng import ledger, open_packages
 from inventory_tng.admin.common import admin_page, now
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.stock import STOCK
-from inventory_tng.db import DbSession
+from inventory_tng.db import DbSession, attempt
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import OpenPackage
 from inventory_tng.pages import NOTICES, not_found, redirect
@@ -37,6 +37,8 @@ NOTICES.update(
         "used_up_cleared": "Offered again: not used up.",
         "used_up_none": "Tick the open packages first.",
         "open_package_closed": "Closed: what it showed is written off as used up.",
+        "used_up_unchanged": "Nothing changed: it was answered meanwhile, moved, "
+        "or its place can't be adjusted until counted.",
     }
 )
 
@@ -54,34 +56,26 @@ cleared = meter.create_counter(
 )
 
 
-def waiting(session: Session) -> int:
-    """How many open packages wait for an administrator: reported used up,
-    not yet closed."""
-    return len(_reported(session))
-
-
-def _reported(session: Session) -> Sequence[int]:
-    return session.scalars(
-        select(OpenPackage.id).where(
-            OpenPackage.reported_at.is_not(None), OpenPackage.closed_at.is_(None)
-        )
-    ).all()
-
-
 def _closed(how: Literal["confirmed", "direct"], count: int) -> None:
     """Measured once committed."""
     if count:
         closed.add(count, {"how": how})
 
 
+def waiting(session: Session) -> int:
+    """How many open packages wait for an administrator: reported used up,
+    not yet closed."""
+    return session.scalar(select(func.count()).where(*REPORTED)) or 0
+
+
+# Reported used up, and waiting.
+REPORTED = (OpenPackage.reported_at.is_not(None), OpenPackage.closed_at.is_(None))
+
+
 @router.get(USED_UP)
 def used_up_page(
     request: Request, signed: AdminSignedIn, session: DbSession
 ) -> Response:
-    return _page(request, signed, session)
-
-
-def _page(request: Request, signed: SignedIn, session: Session) -> Response:
     return admin_page(
         request,
         signed,
@@ -90,39 +84,54 @@ def _page(request: Request, signed: SignedIn, session: Session) -> Response:
             "title": "Reported used up",
             "here": USED_UP,
             "back_link": (STOCK, "Stock"),
-            "reported": open_packages.shown(
-                session, OpenPackage.reported_at.is_not(None)
-            ),
+            "reported": open_packages.shown(session, *REPORTED),
             "zone": site_zone(session),
         },
     )
 
 
 Doing = Literal["confirm", "clear"]
+DONE: dict[Doing, str] = {"confirm": "used_up_confirmed", "clear": "used_up_cleared"}
 
 
-def _do(session: Session, signed: SignedIn, ids: Sequence[int], do: Doing) -> int:
-    """Confirm or clear each, by id: how many it changed. One no longer
-    reported is left as it is."""
+def _answer(
+    session: Session, signed: SignedIn, ids: Sequence[int], do: str
+) -> Response:
+    """Confirm, or clear, each of `ids` still reported, and say so. Their
+    places locked first, by id, as saves take places, so none waits on
+    another the wrong way round; then each closes or clears."""
+    if do not in DONE:
+        return not_found()
+    answer: Doing = "confirm" if do == "confirm" else "clear"
+    rows = session.scalars(
+        select(OpenPackage).where(OpenPackage.id.in_(list(ids)), *REPORTED)
+    ).all()
+    for place in sorted({row.location_id for row in rows}):
+        ledger.lock_place(session, place)
     changed = 0
-    reported = set(_reported(session))
-    for open_id in sorted(ids):
-        if open_id not in reported:
+    for row in sorted(rows, key=lambda each: each.id):
+        if answer == "clear":
+            changed += open_packages.clear(session, row.id)
             continue
-        if do == "clear":
-            changed += open_packages.clear(session, open_id)
-            continue
-        done = open_packages.close(session, open_id, signed.admin.id, now())
-        changed += bool(done and done.closed)
-    return changed
-
-
-def _done(do: Doing, changed: int, admin_id: int) -> None:
-    if do == "confirm":
+        done, broken = attempt(
+            session,
+            lambda row=row: open_packages.close(
+                session, row.id, signed.admin.id, now(), reported=True
+            ),
+        )
+        changed += bool(done) and broken is None
+    session.commit()
+    if answer == "confirm":
         _closed("confirmed", changed)
     elif changed:
         cleared.add(changed)
-    log.info("reports of used up answered", do=do, changed=changed, admin_id=admin_id)
+    log.info(
+        "reports of used up answered",
+        do=answer,
+        changed=changed,
+        admin_id=signed.admin.id,
+    )
+    return redirect(USED_UP, notice=DONE[answer] if changed else "used_up_unchanged")
 
 
 @router.post(USED_UP)
@@ -133,16 +142,9 @@ def answer_ticked(
     do: Annotated[str, Form()] = "",
 ) -> Response:
     """Confirm, or clear, the open packages ticked."""
-    if do not in ("confirm", "clear"):
-        return not_found()
-    if not open_package:
+    if do in DONE and not open_package:
         return redirect(USED_UP, notice="used_up_none")
-    answer: Doing = "confirm" if do == "confirm" else "clear"
-    changed = _do(session, signed, open_package, answer)
-    session.commit()
-    _done(answer, changed, signed.admin.id)
-    notice = "used_up_confirmed" if answer == "confirm" else "used_up_cleared"
-    return redirect(USED_UP, notice=notice)
+    return _answer(session, signed, open_package, do)
 
 
 @router.post(f"{USED_UP}/{{open_id}}/{{do}}")
@@ -150,27 +152,59 @@ def answer_one(
     signed: AdminSignedIn, session: DbSession, open_id: int, do: str
 ) -> Response:
     """Confirm, or clear, one."""
-    if do not in ("confirm", "clear") or session.get(OpenPackage, open_id) is None:
+    if session.get(OpenPackage, open_id) is None:
         return not_found()
-    answer: Doing = "confirm" if do == "confirm" else "clear"
-    changed = _do(session, signed, [open_id], answer)
-    session.commit()
-    _done(answer, changed, signed.admin.id)
-    notice = "used_up_confirmed" if answer == "confirm" else "used_up_cleared"
-    return redirect(USED_UP, notice=notice)
+    return _answer(session, signed, [open_id], do)
 
 
-@router.post(f"{ITEMS}/{{item_id}}/open-packages/{{open_id}}/close")
+CLOSE = f"{ITEMS}/{{item_id}}/open-packages/{{open_id}}/close"
+
+
+def _closable(session: Session, item_id: int, open_id: int) -> OpenPackage | None:
+    row = session.get(OpenPackage, open_id)
+    if row is None or row.item_id != item_id or row.closed_at is not None:
+        return None
+    return row
+
+
+@router.get(CLOSE)
+def confirm_close(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    item_id: int,
+    open_id: int,
+) -> Response:
+    """Closing one writes off what it shows: asked first (decision 0019),
+    as the item's page is no check of its own."""
+    row = _closable(session, item_id, open_id)
+    if row is None:
+        return not_found()
+    (each,) = open_packages.shown(session, OpenPackage.id == open_id)
+    return admin_page(
+        request,
+        signed,
+        "open_package_close.html",
+        {
+            "title": f"Close this {each.package} as used up?",
+            "here": f"{ITEMS}/{item_id}/open-packages/{open_id}/close",
+            "keep": f"{ITEMS}/{item_id}",
+            "shown": each,
+        },
+    )
+
+
+@router.post(CLOSE)
 def close_directly(
     signed: AdminSignedIn, session: DbSession, item_id: int, open_id: int
 ) -> Response:
     """Closed from its item's page, reported or not: nothing waits."""
-    row = session.get(OpenPackage, open_id)
-    if row is None or row.item_id != item_id:
+    if _closable(session, item_id, open_id) is None:
         return not_found()
-    done = open_packages.close(session, open_id, signed.admin.id, now())
-    session.commit()
-    _closed("direct", int(bool(done and done.closed)))
-    return redirect(
-        f"{ITEMS}/{item_id}", notice="open_package_closed", section="open-packages"
+    done, broken = attempt(
+        session, lambda: open_packages.close(session, open_id, signed.admin.id, now())
     )
+    session.commit()
+    _closed("direct", int(bool(done) and broken is None))
+    notice = "open_package_closed" if done and broken is None else "used_up_unchanged"
+    return redirect(f"{ITEMS}/{item_id}", notice=notice, section="open-packages")
