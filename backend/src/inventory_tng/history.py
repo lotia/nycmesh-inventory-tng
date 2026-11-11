@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from ipaddress import IPv4Address, IPv4Interface, IPv6Address, IPv6Interface
+from uuid import UUID
 
 import structlog
 from sqlalchemy import Table, event, insert, select
@@ -65,7 +66,7 @@ def json_value(value: object) -> object:
             return moment.rstrip("0").rstrip(".") + offset
         case bytes():
             return "\\x" + value.hex()
-        case IPv4Address() | IPv6Address() | IPv4Interface() | IPv6Interface():
+        case IPv4Address() | IPv6Address() | IPv4Interface() | IPv6Interface() | UUID():
             return str(value)
         case _:
             raise TypeError(f"history has no JSON for {type(value).__name__}")

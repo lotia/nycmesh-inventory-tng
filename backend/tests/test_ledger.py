@@ -398,7 +398,7 @@ def test_an_item_once_in_a_transaction_is_the_databases_too(
     lines = [(place.item.id, Decimal(1))]
     transaction = insert_transaction(session, uuid.uuid4(), header, lines)
     assert transaction is not None
-    with violates(session, "uq_movement_transaction_id_item_id"):
+    with violates(session, "uq_movement_line"):
         session.execute(
             insert(Movement).values(
                 transaction_id=transaction.id, item_id=place.item.id, quantity=1

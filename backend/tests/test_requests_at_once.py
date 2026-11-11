@@ -36,6 +36,7 @@ from inventory_tng import (
     items,
     locations,
     mail,
+    open_packages,
     sign_in,
     volunteers,
 )
@@ -50,7 +51,14 @@ from inventory_tng.db import (
     locked_row,
     release_hold,
 )
-from inventory_tng.ledger import Batch, Recorded, insert_transaction, record
+from inventory_tng.ledger import (
+    Batch,
+    Entry,
+    Form,
+    Recorded,
+    insert_transaction,
+    record,
+)
 from inventory_tng.mail import Message, Notify
 from inventory_tng.models import (
     Admin,
@@ -76,7 +84,7 @@ from helpers.sign_in import (
     reset_link,
     sign_in_with,
 )
-from helpers.stock import committed_place
+from helpers.stock import Spools, committed_place
 
 NEW_PASSWORD = "a long passphrase of their own"
 
@@ -1041,6 +1049,58 @@ def test_a_unit_changed_while_stock_moves_waits_then_is_refused(
     )
     receipt = receiving(place.cable, place.store, "1.5")
     assert either_first(own_committed, receipt, to_each, swapped=swapped) == refused
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize(
+    ("swapped", "refused"),
+    [(False, "movement_open_package_whole"), (True, "movement_open_package_place")],
+)
+def test_a_cut_and_a_whole_move_of_one_open_package_go_one_at_a_time(
+    own_committed: Committed, swapped: bool, refused: str
+) -> None:
+    """Each holds the open package FOR NO KEY UPDATE (ledger._hold_forms)
+    until it commits: the second waits, then reads it afresh. A move of all
+    that was left, second, is refused, as some was cut meanwhile; a cut,
+    second, as the package is in the van now (docs/decisions/0020). On a
+    database of its own, as it writes the ledger."""
+    setup = own_committed.session()
+    spools = Spools(setup)
+    open_id = spools.opened().id
+    setup.commit()
+    cable, opened = spools.cable.id, Form(open_package_id=open_id)
+    header = {
+        "kind": "move",
+        "from_location_id": spools.store.id,
+        "to_location_id": spools.van.id,
+    }
+
+    def moving(amount: int, arrives: Form) -> Write:
+        line = Entry(cable, Decimal(amount), opened, arrives)
+        return lambda session: insert_transaction(session, uuid.uuid4(), header, [line])
+
+    cut, whole = moving(20, Form()), moving(305, opened)
+    assert either_first(own_committed, cut, whole, swapped=swapped) == refused
+
+
+@pytest.mark.concurrency
+def test_an_open_package_made_twice_at_once_is_made_once(
+    own_committed: Committed,
+) -> None:
+    """Neither finds its key, so both insert: the second waits on the
+    first's key, then finds the first's (open_packages.make)."""
+    setup = own_committed.session()
+    spools = Spools(setup)
+    setup.commit()
+    key, spool, store = uuid.uuid4(), spools.spool.id, spools.store.id
+    one, two = own_committed.session(), own_committed.session()
+    first = open_packages.make(one, key, spool, store)
+    worker = own_committed.blocked(
+        two, lambda: open_packages.make(two, key, spool, store).id
+    )
+    one.commit()
+    assert worker.finished().result == first.id
+    two.rollback()
 
 
 @pytest.mark.concurrency
