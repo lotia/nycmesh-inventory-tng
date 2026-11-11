@@ -1345,6 +1345,87 @@ def _first_sent(session: Session, location_id: int, *keys: uuid.UUID) -> int | N
     )
 
 
+# A count's line of a form (docs/decisions/0020): an item, the form it is
+# in at the place, and how much was counted of it.
+FormLines = Sequence[tuple[int, Form, Decimal]]
+
+
+def _form_flows(
+    session: Session,
+    location_id: int,
+    windows: Sequence[ColumnElement[bool]],
+    items: Collection[int],
+) -> list[dict[tuple[int, Form], tuple[Decimal, Decimal]]]:
+    """_flows, by form too: for each window, what came into a place and
+    went out of it, by item and the form it was in there. Openings are
+    moves here, as they change forms."""
+    flows: list[dict[tuple[int, Form], tuple[Decimal, Decimal]]] = [{} for _ in windows]
+    if not items:
+        return flows
+    sides = (
+        (
+            True,
+            LedgerTransaction.to_location_id,
+            Movement.to_package_id,
+            Movement.to_open_package_id,
+        ),
+        (
+            False,
+            LedgerTransaction.from_location_id,
+            Movement.from_package_id,
+            Movement.from_open_package_id,
+        ),
+    )
+    for into, place, package, opened in sides:
+        rows = session.execute(
+            select(
+                Movement.item_id,
+                package,
+                opened,
+                *(func.sum(Movement.quantity).filter(each) for each in windows),
+            )
+            .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+            .where(place == location_id, or_(*windows), Movement.item_id.in_(items))
+            .group_by(Movement.item_id, package, opened)
+        )
+        for item_id, package_id, open_id, *sums in rows:
+            for flow, total in zip(flows, sums, strict=True):
+                if total is None:
+                    continue
+                form = (item_id, Form(package_id, open_id))
+                came, went = flow.get(form, (Decimal(0), Decimal(0)))
+                flow[form] = (came + total, went) if into else (came, went + total)
+    return flows
+
+
+def expected_forms(
+    session: Session, location_id: int, as_of: int, items: Collection[int]
+) -> dict[tuple[int, Form], Decimal]:
+    """What the records said was at a place at moment `as_of`, by item and
+    form, of `items`: only what was not zero."""
+    (flows,) = _form_flows(
+        session, location_id, (LedgerTransaction.id <= as_of,), items
+    )
+    return {form: came - went for form, (came, went) in flows.items() if came != went}
+
+
+def count_corrections(
+    counted: FormLines, then: Mapping[tuple[int, Form], Decimal]
+) -> tuple[list[Entry], list[Entry]]:
+    """What a count by form finds and loses: for each form counted, the
+    difference from what the records said (`then`), into the place in that
+    form, or out of it."""
+    found: list[Entry] = []
+    lost: list[Entry] = []
+    for item_id, form, amount in counted:
+        difference = amount - then.get((item_id, form), Decimal(0))
+        if difference > 0:
+            found.append(Entry(item_id, difference, LOOSE, form))
+        elif difference < 0:
+            lost.append(Entry(item_id, -difference, form, LOOSE))
+    return found, lost
+
+
 def record_count(
     session: Session,
     key: uuid.UUID,
@@ -1352,6 +1433,8 @@ def record_count(
     location_id: int,
     counted: ItemLines,
     as_of: int,
+    *,
+    by_form: FormLines = (),
 ) -> Counted:
     """Put the records right for what was counted at a place, as they stood
     when the form was shown: as of `as_of`, the place's latest ledger
@@ -1368,10 +1451,21 @@ def record_count(
     twice writes it once, and finds what moved as the first send did. A
     count whose every line moved writes nothing.
 
+    Items counted `by_form` (docs/decisions/0020) are put right form by
+    form: sealed packages of each, each open package, loose; and withheld,
+    as moved, if anything of them moved there, an opening too.
+
     RuleBroken (location_countable) at a place that may not be counted,
     unless the form was sent there before, so it gets its first answer;
-    RuleBroken (movement_item_once) for an item counted on two lines."""
+    RuleBroken (movement_item_once) for an item counted on two lines, or
+    both by total and by form."""
     _each_once(entries(counted))
+    forms_counted = [(item_id, form) for item_id, form, _ in by_form]
+    enforce("movement_item_once", when=bool(repeated(forms_counted)))
+    enforce(
+        "movement_item_once",
+        when=bool({item_id for item_id, _ in counted} & {i for i, _ in forms_counted}),
+    )
     counted_at = dict(counted)
     lock_place(session, location_id)
     lost_key = uuid.uuid5(key, "lost")
@@ -1385,6 +1479,19 @@ def record_count(
         session, location_id, after, LedgerTransaction.id <= as_of, items=counted_at
     )
     then = {item_id: came - went for item_id, (came, went) in flows.items()}
+    form_items = {item_id for item_id, _ in forms_counted}
+    form_moved, form_then = _form_flows(
+        session, location_id, (after, LedgerTransaction.id <= as_of), form_items
+    )
+    for item_id, _ in form_moved:
+        came, went = moved.get(item_id, (Decimal(0), Decimal(0)))
+        flow = form_moved[(item_id, _)]
+        moved[item_id] = (came + flow[0], went + flow[1])
+    kept_forms = [line for line in by_form if line[0] not in moved]
+    found_forms, lost_forms = count_corrections(
+        kept_forms,
+        {form: came - went for form, (came, went) in form_then.items()},
+    )
     kept = counted_at.keys() - moved.keys()
     found: dict[int, Decimal] = {}
     lost: dict[int, Decimal] = {}
@@ -1395,16 +1502,17 @@ def record_count(
         elif difference < 0:
             lost[item_id] = -difference
     written: list[Written] = []
+    into = [*entries(list(found.items())), *found_forms]
+    out = [*entries(list(lost.items())), *lost_forms]
     # A count of nothing at all still says when the place was counted.
-    if found or ((kept or not counted_at) and not lost):
+    anything = counted_at or by_form
+    if into or ((kept or kept_forms or not anything) and not out):
         header = {"admin_id": admin_id, "to_location_id": location_id}
-        written += _correct(session, key, "count", header, list(found.items()))
-    if lost:
+        written += _correct(session, key, "count", header, into)
+    if out:
         header = {"admin_id": admin_id, "from_location_id": location_id}
-        written += _correct(session, lost_key, "count", header, list(lost.items()))
-    return Counted(
-        bool(found or lost), moved, written, len(moved) if sent is None else 0
-    )
+        written += _correct(session, lost_key, "count", header, out)
+    return Counted(bool(into or out), moved, written, len(moved) if sent is None else 0)
 
 
 def record_adjustment(

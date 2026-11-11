@@ -10,9 +10,10 @@ from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import structlog
+from opentelemetry import metrics
 from sqlalchemy import ColumnElement, exc, select
 from sqlalchemy.orm import Session
 
@@ -21,6 +22,20 @@ from inventory_tng.db import enforce, get_locked, locked
 from inventory_tng.models import Item, ItemPackage, Location, OpenPackage, Volunteer
 
 log = structlog.get_logger(__name__)
+meter = metrics.get_meter(__name__)
+
+closed = meter.create_counter(
+    "inventory.open_packages.closed",
+    unit="{package}",
+    description="Open packages an administrator closed, by how: confirming a "
+    "volunteer's report, directly, or counting",
+)
+
+
+def measure_closed(how: Literal["confirmed", "direct", "count"], count: int) -> None:
+    """Measured once committed."""
+    if count:
+        closed.add(count, {"how": how})
 
 
 def tracks_opened(item: bool, package: bool | None) -> bool:
@@ -122,13 +137,15 @@ def close(
     at: datetime,
     *,
     reported: bool = False,
+    reason: str = adjustment_reasons.USED_UP,
 ) -> bool:
     """Close an open package as used up (docs/decisions/0020): an
     adjustment, under the administrator's name, for whatever it still
     showed, with the reason Used up, so it shows nothing; then closed.
     Whether it closed it: not if there is no such package, it is closed
     already, it moved since it was read, or, with `reported`, it is no
-    longer reported (a report cleared meanwhile). Its place is locked
+    longer reported (a report cleared meanwhile). A count closes one not
+    there with the reason Lost or stolen (`reason`). Its place is locked
     first, then it, as a save's are (ledger.py). RuleBroken as
     ledger.record_adjustment refuses."""
     found = session.get(OpenPackage, open_id)
@@ -152,7 +169,7 @@ def close(
             row.item_id,
             abs(left),
             found=left < 0,
-            reason_id=adjustment_reasons.used_up(session).id,
+            reason_id=adjustment_reasons.seeded(session, reason).id,
             form=ledger.Form(open_package_id=row.id),
         )
     row.closed_at, row.closed_by_admin_id = at, admin_id

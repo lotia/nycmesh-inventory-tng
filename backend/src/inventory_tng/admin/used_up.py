@@ -42,24 +42,12 @@ NOTICES.update(
     }
 )
 
-closed = meter.create_counter(
-    "inventory.open_packages.closed",
-    unit="{package}",
-    description="Open packages an administrator closed as used up, by how: "
-    "confirming a volunteer's report, or directly",
-)
 cleared = meter.create_counter(
     "inventory.open_packages.cleared",
     unit="{package}",
     description="Volunteers' reports of open packages used up that an "
     "administrator cleared, as not used up",
 )
-
-
-def _closed(how: Literal["confirmed", "direct"], count: int) -> None:
-    """Measured once committed."""
-    if count:
-        closed.add(count, {"how": how})
 
 
 def waiting(session: Session) -> int:
@@ -122,7 +110,7 @@ def _answer(
         changed += bool(done) and broken is None
     session.commit()
     if answer == "confirm":
-        _closed("confirmed", changed)
+        open_packages.measure_closed("confirmed", changed)
     elif changed:
         cleared.add(changed)
     log.info(
@@ -205,6 +193,6 @@ def close_directly(
         session, lambda: open_packages.close(session, open_id, signed.admin.id, now())
     )
     session.commit()
-    _closed("direct", int(bool(done) and broken is None))
+    open_packages.measure_closed("direct", int(bool(done) and broken is None))
     notice = "open_package_closed" if done and broken is None else "used_up_unchanged"
     return redirect(f"{ITEMS}/{item_id}", notice=notice, section="open-packages")

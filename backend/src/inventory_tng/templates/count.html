@@ -21,6 +21,26 @@ if you didn't count it. Anything else here, add below.</p>
   {% call table() %}
     <tr><th>Item</th><th>Records say</th>{% if recount %}<th>While you counted</th>{% endif %}<th>Counted</th></tr>
     {% for item, amount in rows %}
+    {% if item.id in forms and not recount %}
+    {#- In more than loose units: each form counted on its own (0020). #}
+    <tr><td colspan="3"><strong>{{ item.name }}</strong> <span class="hint">{{ amount | amount }} {{ item.unit }} in all</span></td></tr>
+    {% for row in forms[item.id] %}
+    <tr>
+      <td>{{ row.words }}</td>
+      <td>{{ row.amount | amount }}{% if not row.field.startswith("sealed_") %} {{ item.unit }}{% endif %}</td>
+      <td><input name="{{ row.field }}" inputmode="decimal" value="{{ values.get(row.field, row.amount | amount if row.amount > 0 else '0') }}" aria-label="{{ item.name }}, {{ row.words }}">
+        {% if row.open_id %}
+        <select name="state_{{ row.open_id }}" aria-label="{{ item.name }}, {{ row.words }}: is it here?">
+          {% set state = values.get("state_" ~ row.open_id, "here") %}
+          <option value="here" {% if state == "here" %}selected{% endif %}>Here</option>
+          <option value="used_up" {% if state == "used_up" %}selected{% endif %}>Used up: close it</option>
+          <option value="missing" {% if state == "missing" %}selected{% endif %}>Not here: close it, lost</option>
+        </select>
+        {% endif %}
+        {% with name = row.field %}{% include "_field_problem.html" %}{% endwith %}</td>
+    </tr>
+    {% endfor %}
+    {% else %}
     {% set field = "counted_" ~ item.id %}
     <tr>
       <td>{{ item.name }}</td>
@@ -31,6 +51,7 @@ if you didn't count it. Anything else here, add below.</p>
       <td><input name="{{ field }}" inputmode="decimal" value="{{ values.get(field, amount | amount if amount > 0 else '0') }}" aria-label="{{ item.name }} counted">
         {% with name = field %}{% include "_field_problem.html" %}{% endwith %}</td>
     </tr>
+    {% endif %}
     {% else %}
     <tr><td colspan="3">The records say nothing is here.</td></tr>
     {% endfor %}
@@ -48,6 +69,22 @@ if you didn't count it. Anything else here, add below.</p>
       {% with name = "extra_quantity" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
   </fieldset>
+  {% if found_packages and not items %}
+  <fieldset>
+    <legend>An open package nobody recorded</legend>
+    <label>Package
+      <select name="found_package_id">
+        <option value="">None</option>
+        {% for package, name in found_packages %}<option value="{{ package.id }}" {% if values.get('found_package_id') == package.id | string %}selected{% endif %}>{{ name }}, {{ package.name }}</option>{% endfor %}
+      </select>
+      {% with name = "found_package_id" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+    <label>Left on it
+      <input name="found_left" inputmode="decimal" value="{{ values.get('found_left', '') }}">
+      {% with name = "found_left" %}{% include "_field_problem.html" %}{% endwith %}
+    </label>
+  </fieldset>
+  {% endif %}
   <button class="primary">Save the count</button>
 </form>
 {% endblock %}

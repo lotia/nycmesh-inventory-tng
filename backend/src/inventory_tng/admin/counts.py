@@ -25,7 +25,7 @@ right. The page itself never sends one. The ledger refuses a repeat too
 import uuid
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Annotated, Any, NamedTuple
 
 import structlog
 from fastapi import APIRouter, Depends, Request
@@ -33,12 +33,15 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from inventory_tng import open_packages
+from inventory_tng.adjustment_reasons import LOST, USED_UP
 from inventory_tng.admin.common import (
     ADMIN,
     RULES,
     admin_page,
     chosen,
     current_rows,
+    now,
     quantity,
     row_id,
     text_form,
@@ -46,10 +49,14 @@ from inventory_tng.admin.common import (
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.db import DbSession, by_name, refusal
 from inventory_tng.ledger import (
+    LOOSE,
+    Counted,
+    Form,
     ItemLines,
     corrected,
     countable,
     expected,
+    expected_forms,
     moment,
     record_adjustment,
     record_count,
@@ -62,12 +69,15 @@ from inventory_tng.models import (
     AdjustmentReason,
     Admin,
     Item,
+    ItemPackage,
     LedgerTransaction,
     Location,
     Movement,
+    OpenPackage,
     whole,
 )
 from inventory_tng.once import form_key
+from inventory_tng.open_packages import tracks_opened
 from inventory_tng.pages import (
     NOTICES,
     Badge,
@@ -90,6 +100,10 @@ EXTRA = "extra_quantity"
 # docstring).
 WHOLE = "movement_whole_units"
 COUNTABLE = "location_countable"
+# An open package found that its item does not follow once opened, and a
+# form counted twice: said as rules are.
+UNTRACKED = "open_package_untracked"
+ONCE = "movement_item_once"
 TWICE = (
     "An item is on this form more than once. Each item is counted once, so "
     "it isn't clear which number is right: nothing was saved."
@@ -239,6 +253,7 @@ def _count_page(
         ),
         key=lambda row: row[0].name.lower(),
     )
+    forms = _forms(session, place.id, as_of, [item.id for item, _ in rows])
     return admin_page(
         request,
         signed,
@@ -249,6 +264,8 @@ def _count_page(
             "back_link": (COUNTS, "Counts"),
             "place": place,
             "rows": rows,
+            "forms": forms,
+            "found_packages": _followed(session),
             "recount": recount,
             "items": sorted(items),
             "others": [item for item in listed if item.id not in was],
@@ -272,6 +289,108 @@ def count_form(
     if place is None:
         return not_found()
     return _count_page(request, session, signed, place, moment(session, place.id))
+
+
+class FormRow(NamedTuple):
+    """One form of an item at a place, as the count form asks for it
+    (docs/decisions/0020): its field, words, and the records as of the
+    form; for an open package, its id."""
+
+    field: str
+    words: str
+    amount: Decimal
+    open_id: int | None = None
+
+
+def _forms(
+    session: Session, place_id: int, as_of: int, item_ids: Sequence[int]
+) -> dict[int, list[FormRow]]:
+    """The items at the place whose stock was in more than loose units, as
+    of the form, each form a row: sealed packages, by how many; open
+    packages; loose. Others are counted by their total, as before."""
+    found = expected_forms(session, place_id, as_of, item_ids)
+    packages = {
+        package.id: package
+        for package in session.scalars(
+            select(ItemPackage).where(ItemPackage.item_id.in_(item_ids))
+        )
+    }
+    opened = {
+        row.id: row
+        for row in session.scalars(
+            select(OpenPackage).where(
+                OpenPackage.location_id == place_id,
+                OpenPackage.closed_at.is_(None),
+                OpenPackage.item_id.in_(item_ids),
+            )
+        )
+    }
+    held: dict[int, dict[Form, Decimal]] = {}
+    for (item_id, form), amount in found.items():
+        # One closed since is not counted: its row is gone from the place.
+        if form.open_package_id is None or form.open_package_id in opened:
+            held.setdefault(item_id, {})[form] = amount
+    for row in opened.values():
+        held.setdefault(row.item_id, {}).setdefault(
+            Form(open_package_id=row.id), Decimal(0)
+        )
+    rows: dict[int, list[FormRow]] = {}
+    for item_id, forms in held.items():
+        if set(forms) <= {LOOSE}:
+            continue
+        each = rows.setdefault(item_id, [])
+        for form, amount in sorted(forms.items(), key=lambda pair: str(pair[0])):
+            if form.package_id is not None:
+                package = packages[form.package_id]
+                each.append(
+                    FormRow(
+                        f"{SEALED}{item_id}_{package.id}",
+                        f"{package.name}, sealed: how many",
+                        amount / package.size,
+                    )
+                )
+            elif form.open_package_id is not None:
+                row = opened[form.open_package_id]
+                name = packages[row.package_id].name
+                each.append(
+                    FormRow(
+                        f"{OPENED}{row.id}",
+                        f"{name}, opened {row.opened_at:%Y-%m-%d}: left",
+                        amount,
+                        row.id,
+                    )
+                )
+            else:
+                each.append(FormRow(f"{LOOSE_FIELD}{item_id}", "Loose", amount))
+        if not any(row.field.startswith(LOOSE_FIELD) for row in each):
+            each.append(FormRow(f"{LOOSE_FIELD}{item_id}", "Loose", Decimal(0)))
+    return rows
+
+
+def _followed(session: Session) -> list[tuple[ItemPackage, str]]:
+    """Current packages of current items followed once opened, with their
+    item's name: what an open package nobody recorded may be."""
+    rows = session.execute(
+        select(ItemPackage, Item.name, Item.track_opened)
+        .join(Item, Item.id == ItemPackage.item_id)
+        .where(ItemPackage.retired_at.is_(None), Item.retired_at.is_(None))
+        .order_by(func.lower(Item.name), ItemPackage.size)
+    )
+    return [
+        (package, name)
+        for package, name, item_tracks in rows
+        if tracks_opened(item_tracks, package.track_opened)
+    ]
+
+
+# The count form's fields of forms: sealed packages, by item and package;
+# an open package, by its id, and what became of it; loose units, by item;
+# and an open package nobody recorded.
+SEALED, OPENED, STATE, LOOSE_FIELD = "sealed_", "opened_", "state_", "loose_"
+FOUND_PACKAGE, FOUND_LEFT = "found_package_id", "found_left"
+# What became of an open package counted: here, with what is left on it,
+# or closed, as used up or not there.
+STATES = {"here": None, "used_up": USED_UP, "missing": LOST}
 
 
 # A field of the count form: its name, the item it names (None for no
@@ -305,6 +424,88 @@ def named_twice(found: Sequence[Line]) -> dict[str, int | None]:
         found[number][0]: found[number][1]
         for number in repeated([item_id for _, item_id, _ in found])
     }
+
+
+class ByForm(NamedTuple):
+    """What a count form says of forms: lines of an item, a form and how
+    much; open packages to close, each with the reason; an open package
+    nobody recorded, its package and what is left on it."""
+
+    lines: list[tuple[int, Form, Decimal]]
+    close: list[tuple[int, str]]
+    found: tuple[ItemPackage, Decimal] | None
+
+
+def _by_form(
+    session: Session, form: Mapping[str, str], place_id: int
+) -> tuple[ByForm, dict[str, str]]:
+    """The count form's forms (_forms), as lines, and what is wrong."""
+    problems: dict[str, str] = {}
+    lines: list[tuple[int, Form, Decimal]] = []
+    close: list[tuple[int, str]] = []
+    item_ids = [
+        item_id
+        for field in form
+        if field.startswith(LOOSE_FIELD)
+        and (item_id := row_id(field.removeprefix(LOOSE_FIELD))) is not None
+    ]
+    items = {
+        item.id: item
+        for item in session.scalars(select(Item).where(Item.id.in_(item_ids)))
+    }
+    for field, typed in form.items():
+        if not typed.strip():
+            continue
+        if field.startswith(SEALED):
+            item_part, _, package_part = field.removeprefix(SEALED).partition("_")
+            package = session.get(ItemPackage, row_id(package_part) or 0)
+            count = whole(typed, 0, INTEGER_MAX)
+            if package is None or package.item_id != row_id(item_part):
+                problems[field] = "No such package."
+            elif count is None:
+                problems[field] = "A whole number of packages."
+            else:
+                lines.append(
+                    (package.item_id, Form(package_id=package.id), count * package.size)
+                )
+        elif field.startswith(LOOSE_FIELD):
+            item = items.get(row_id(field.removeprefix(LOOSE_FIELD)) or 0)
+            if item is None:
+                problems[field] = "No such item."
+                continue
+            amount = quantity(typed, positive=False, unit=item.unit)
+            if isinstance(amount, str):
+                problems[field] = amount
+            else:
+                assert amount is not None  # Typed, so not blank.
+                lines.append((item.id, LOOSE, amount))
+        elif field.startswith(OPENED):
+            row = session.get(OpenPackage, row_id(field.removeprefix(OPENED)) or 0)
+            state = form.get(f"{STATE}{row.id if row else ''}", "here")
+            amount = quantity(typed, positive=False)
+            if row is None or row.location_id != place_id or state not in STATES:
+                problems[field] = "No such open package here."
+            elif (reason := STATES[state]) is not None:
+                close.append((row.id, reason))
+            elif isinstance(amount, str):
+                problems[field] = amount
+            else:
+                assert amount is not None  # Typed, so not blank.
+                lines.append((row.item_id, Form(open_package_id=row.id), amount))
+    found = None
+    if form.get(FOUND_PACKAGE, "").strip():
+        package = session.get(ItemPackage, row_id(form[FOUND_PACKAGE]) or 0)
+        left = quantity(
+            form.get(FOUND_LEFT, ""), positive=True, required="How much is left on it."
+        )
+        if package is None:
+            problems[FOUND_PACKAGE] = "No such package."
+        elif isinstance(left, str):
+            problems[FOUND_LEFT] = left
+        else:
+            assert left is not None  # Required, so a problem if blank.
+            found = (package, left)
+    return ByForm(lines, close, found), problems
 
 
 def _counted(
@@ -353,6 +554,8 @@ def count(
         if (item_id := row_id(typed)) is not None
     }
     counted, problems = _counted(session, found)
+    forms, form_problems = _by_form(session, form, place.id)
+    problems |= form_problems
     if repeats := named_twice(found):
         problems |= dict.fromkeys(repeats, "This item is on the form more than once.")
         log.info(
@@ -374,12 +577,29 @@ def count(
             alert=TWICE if repeats else None,
             items=sent_items,
         )
-    result, broken = refusal(
-        session,
-        lambda: record_count(session, key, signed.admin.id, place.id, counted, as_of),
-        WHOLE,
-        COUNTABLE,
-    )
+    closed: list[bool] = []
+
+    def put_right() -> Counted:
+        lines = list(forms.lines)
+        if forms.found is not None:
+            package, left = forms.found
+            made = open_packages.make(
+                session, uuid.uuid5(key, "found"), package.id, place.id
+            )
+            lines.append((package.item_id, Form(open_package_id=made.id), left))
+        counted_now = record_count(
+            session, key, signed.admin.id, place.id, counted, as_of, by_form=lines
+        )
+        # Closed after the count: one not there, or used up, as said.
+        for open_id, reason in forms.close:
+            closed.append(
+                open_packages.close(
+                    session, open_id, signed.admin.id, now(), reason=reason
+                )
+            )
+        return counted_now
+
+    result, broken = refusal(session, put_right, WHOLE, COUNTABLE, UNTRACKED, ONCE)
     if broken is not None:
         log.info("count refused by a rule", location_id=place.id, rule=broken)
         if broken == COUNTABLE:
@@ -402,6 +622,7 @@ def count(
     assert result is not None
     session.commit()
     corrected(signed.admin.id, place.id, result.written, result.withheld)
+    open_packages.measure_closed("count", sum(closed))
     if not result.moved:
         return redirect(
             COUNTS,
