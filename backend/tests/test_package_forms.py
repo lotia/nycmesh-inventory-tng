@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages
@@ -21,6 +21,9 @@ from inventory_tng.ledger import (
     balance,
     by_form,
     form_breaks,
+    insert_transaction,
+    moment,
+    record_count,
     tracks_opened,
 )
 from inventory_tng.models import Admin, Item, ItemPackage, LedgerTransaction
@@ -32,9 +35,11 @@ CABLE, OTHER = 1, 2
 SPOOL, BOX = 10, 11
 OPEN, GONE, ELSEWHERE, FRESH = 20, 21, 22, 23
 STORE, VAN = 100, 101
+OLD = 12
 PACKAGES = {
     SPOOL: PackageFacts(CABLE, Decimal(305), tracked=True),
     BOX: PackageFacts(CABLE, Decimal(100), tracked=False),
+    OLD: PackageFacts(CABLE, Decimal(50), tracked=False, retired=True),
 }
 OPENS = {
     OPEN: OpenFacts(CABLE, SPOOL, STORE, closed=False, left=Decimal(120), new=False),
@@ -92,6 +97,8 @@ def test_a_package_tracks_opened_as_set_on_it_else_as_its_item(
         (line(200, SEALED_BOX), "open", (STORE, STORE)),
         (line(3, LOOSE, opened(OPEN)), "count", (None, STORE)),
         (line(5, opened(OPEN)), "count", (STORE, None)),
+        (line(50, Form(package_id=OLD), Form(package_id=OLD)), "move", (STORE, VAN)),
+        (line(7, LOOSE, opened(FRESH)), "count", (None, STORE)),
     ],
 )
 def test_lines_keeping_the_rules(
@@ -135,6 +142,18 @@ def test_lines_keeping_the_rules(
             "install",
             (STORE, None),
             "movement_open_package_closed",
+        ),
+        (
+            line(5, opened(FRESH)),
+            "install",
+            (STORE, None),
+            "movement_open_package_unopened",
+        ),
+        (
+            line(50, LOOSE, Form(package_id=OLD)),
+            "receipt",
+            (None, STORE),
+            "receipt_retired_package",
         ),
         (line(5, opened(OPEN)), "move", (VAN, STORE), "movement_open_package_place"),
         (
@@ -370,3 +389,58 @@ def test_the_database_keeps_one_form_a_side_and_opening_at_one_place(
                 time_zone="UTC",
             )
         )
+
+
+def test_an_opening_sent_again_is_written_once(
+    session: Session, spools: Spools
+) -> None:
+    """Its rules read what it changed itself, so the key is found first."""
+    store, key = spools.store.id, uuid.uuid4()
+    made = open_packages.make(session, uuid.uuid4(), spools.spool.id, store)
+    here = {"kind": "open", "from_location_id": store, "to_location_id": store}
+    opening = Entry(
+        spools.cable.id, Decimal(305), spools.sealed, Form(open_package_id=made.id)
+    )
+    assert insert_transaction(session, key, here, [opening]) is not None
+    assert insert_transaction(session, key, here, [opening]) is None
+
+
+def test_an_open_package_is_on_one_line_of_a_transaction(
+    session: Session, spools: Spools
+) -> None:
+    """Each line is checked against what was left before it: a whole move
+    and a cut together would take more than there is."""
+    opened = Form(open_package_id=spools.opened().id)
+    cable = spools.cable.id
+    with breaks(session, "movement_open_package_once"):
+        spools.move(
+            Entry(cable, Decimal(305), opened, opened),
+            Entry(cable, Decimal(20), opened),
+        )
+
+
+def test_an_open_package_needs_a_place_that_is_there(
+    session: Session, spools: Spools
+) -> None:
+    """Not a race on its key: the database's refusal, as it is."""
+    with pytest.raises(exc.IntegrityError), session.begin_nested():
+        open_packages.make(session, uuid.uuid4(), spools.spool.id, 999999)
+
+
+def test_opening_a_package_is_no_move_to_a_count(
+    session: Session, spools: Spools
+) -> None:
+    """The total at the place is the same, so a count's line for it is
+    written, not asked for again."""
+    as_of = moment(session, spools.store.id)
+    spools.opened()
+    counter = add(session, Admin(username=f"counter-{tag()}"))
+    counted = record_count(
+        session,
+        uuid.uuid4(),
+        counter.id,
+        spools.store.id,
+        [(spools.cable.id, Decimal(610))],
+        as_of,
+    )
+    assert counted.moved == {}
