@@ -98,15 +98,13 @@ def test_item_names_differing_only_by_punctuation_are_named_first(
     category_id = connection.scalar(
         text("INSERT INTO category (name) VALUES ('Cables') RETURNING id")
     )
-    ids = connection.execute(
-        text(
-            "INSERT INTO item (name, category_id) VALUES "
-            "('ToughCable', :c), ('Tough cable', :c), ('Patch lead', :c) "
-            "RETURNING id"
-        ),
-        {"c": category_id},
-    ).scalars()
-    tough, spaced, _ = ids.all()
+    tough, spaced, _ = (
+        connection.scalar(
+            text("INSERT INTO item (name, category_id) VALUES (:n, :c) RETURNING id"),
+            {"n": name, "c": category_id},
+        )
+        for name in ("ToughCable", "Tough cable", "Patch lead")
+    )
     with pytest.raises(RuntimeError, match=f"by id: {tough}, {spaced}\\. Rename"):
         command.upgrade(alembic_config, "head")
     connection.execute(
