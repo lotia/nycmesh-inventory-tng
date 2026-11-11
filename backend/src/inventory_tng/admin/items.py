@@ -71,10 +71,16 @@ def _taken(
 ) -> tuple[str, str]:
     """The field another item already has, and words naming that item."""
     found = items.taken_by(session, fields, item_id)
-    if found is None:
-        return "name", TAKEN
-    field, other = found
-    log.debug("item taken", field=field, other_item_id=other.id)
+    field, other = found or ("name", None)
+    log.debug(
+        "item refused",
+        rule="unique",
+        field=field,
+        item_id=item_id,
+        other_item_id=other and other.id,
+    )
+    if other is None:
+        return field, TAKEN
     retired = " It is retired." if other.retired_at is not None else ""
     return field, f"{other.name} {TAKEN_FIELDS[field]}{retired}"
 
@@ -93,7 +99,6 @@ def _change_or_note[T](
     if broken == "unique":
         field, words = _taken(session, fields, item_id)
         problems[field] = words
-        log.debug("item refused", rule="unique", field=field, item_id=item_id)
     elif broken in REFUSED_FIELDS:
         problems[REFUSED_FIELDS[broken]] = RULES[broken]
     return done, broken
