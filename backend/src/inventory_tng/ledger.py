@@ -284,8 +284,7 @@ def lines_break(
 # item in each form on one line only (repeated), as its movements' unique
 # index keeps them.
 Lines = Sequence[Entry | tuple[int, Decimal]]
-# Lines of an item and an amount alone, loose: a volunteer's batch, as yet,
-# and a count's.
+# Lines of an item and an amount alone, loose: a count's.
 ItemLines = Sequence[tuple[int, Decimal]]
 
 
@@ -532,7 +531,8 @@ recorded = meter.create_counter(
 lines_per_batch = meter.create_histogram(
     "inventory.transaction.lines",
     unit="{line}",
-    description="Lines in each batch written, by kind",
+    description="Lines in each batch written, by kind: an item is on one "
+    "line for each package and one loose",
 )
 replayed = meter.create_counter(
     "inventory.transactions.replayed",
@@ -619,16 +619,24 @@ class Batch(BaseModel):
 
 
 # Where in the batch, as pydantic gives it ("lines", 2, "item_id"), and what.
-Problem = tuple[
-    tuple[str | int, ...],
-    Literal["not_found", "not_whole", "not_whole_packages", "retired", "repeated"],
+ProblemKind = Literal[
+    "not_found",
+    "not_whole",
+    "not_whole_packages",
+    "retired",
+    "retired_package",
+    "repeated",
 ]
+Problem = tuple[tuple[str | int, ...], ProblemKind]
 MESSAGES = {
     "not_found": "There is no such row",
-    "repeated": "This item is on another line too: put it on one line",
+    "repeated": "This item, in this package or loose, is on another line too: "
+    "put it on one line",
     "not_whole": "This item is counted in whole units",
     "not_whole_packages": "Whole packages only",
     "retired": "This item is retired: what is left may be taken, never received",
+    "retired_package": "This package is retired: what is left may be taken, "
+    "never received",
 }
 
 
@@ -969,14 +977,12 @@ def _receive(session: Session, lines: Sequence[Entry]) -> None:
 # Each of the rules a batch's line can break, as its problem: which field,
 # and what. A batch's forms are sealed or loose alike on both sides
 # (Line.entry), so no other form rule can be broken by one.
-LINE_PROBLEMS: dict[
-    str, tuple[str, Literal["not_found", "not_whole", "not_whole_packages", "retired"]]
-] = {
+LINE_PROBLEMS: dict[str, tuple[str, ProblemKind]] = {
     "movement_whole_units": ("quantity", "not_whole"),
     "receipt_retired_item": ("item_id", "retired"),
     "movement_package_of_item": ("package_id", "not_found"),
     "movement_whole_packages": ("quantity", "not_whole_packages"),
-    "receipt_retired_package": ("package_id", "retired"),
+    "receipt_retired_package": ("package_id", "retired_package"),
 }
 
 
@@ -1247,9 +1253,11 @@ def save_batch(
     batch: Batch, device: RegisteredDevice, session: DbSession, response: Response
 ) -> Saved:
     """Write a whole batch, or none of it. A 422 names each bad line, as
-    FastAPI's own do: an item, location or volunteer that does not exist, a
-    fraction of an item counted in each, a retired item received, or an item
-    another line names too (repeated): send each item on one line."""
+    FastAPI's own do: an item, package, location or volunteer that does not
+    exist, a fraction of an item counted in each or of a package, a retired
+    item or package received, or an item another line names in the same
+    package, or loose, too (repeated): send each item on one line for each
+    package it is in, sealed, and one loose (docs/decisions/0020)."""
     # So the history of anything the batch changes, such as on_order, says who.
     set_actor(session, f"volunteer:{batch.volunteer_id}")
     transaction, written, retired = record(session, batch, device_id=device.id)

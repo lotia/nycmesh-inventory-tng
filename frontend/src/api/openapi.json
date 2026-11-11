@@ -106,7 +106,7 @@
     "/api/transactions": {
       "post": {
         "summary": "Save Batch",
-        "description": "Write a whole batch, or none of it. A 422 names each bad line, as\nFastAPI's own do: an item, location or volunteer that does not exist, a\nfraction of an item counted in each, a retired item received, or an item\nanother line names too (repeated): send each item on one line.",
+        "description": "Write a whole batch, or none of it. A 422 names each bad line, as\nFastAPI's own do: an item, package, location or volunteer that does not\nexist, a fraction of an item counted in each or of a package, a retired\nitem or package received, or an item another line names in the same\npackage, or loose, too (repeated): send each item on one line for each\npackage it is in, sealed, and one loose (docs/decisions/0020).",
         "operationId": "save_batch_api_transactions_post",
         "requestBody": {
           "content": {

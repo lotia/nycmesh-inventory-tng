@@ -534,5 +534,5 @@ def test_a_retired_package_is_never_received(
     response = registered_client.post(URL, json=receipt)
     assert response.status_code == 422
     assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
-        (["lines", 0, "package_id"], "retired")
+        (["lines", 0, "package_id"], "retired_package")
     ]

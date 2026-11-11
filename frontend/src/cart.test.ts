@@ -88,6 +88,18 @@ describe("quantities", () => {
     });
   });
 
+  test("each part of an item counted in units is whole", () => {
+    // A box of 2.5, and a half loose: 3 in all, but each is a line.
+    const halves = {
+      ...radio,
+      packages: [{ id: 7, name: "Half box", size: "2.5" }],
+    };
+    const line = { itemId: 100, packages: { 7: "1" }, loose: "0.5" };
+    expect(quantityOf(line, halves)).toEqual({
+      problem: "Counted in whole units.",
+    });
+  });
+
   test("an unreadable amount says what is wanted", () => {
     const line = { itemId: 101, packages: {}, loose: "lots" };
     expect(quantityOf(line, cable)).toEqual({
@@ -118,6 +130,33 @@ describe("turning a cart into a batch", () => {
         ],
       },
       what: "Move: 2 items from Hub to Van",
+    });
+  });
+
+  test("a batch of more lines than the server takes is held back", () => {
+    const lines = Array.from({ length: 251 }, () => ({
+      itemId: 101,
+      packages: { 1001: "1" },
+      loose: "1",
+    }));
+    // Each item twice: once a spool, once loose.
+    const many = cart({
+      lines: lines.map((line, number) => ({ ...line, itemId: 101 + number })),
+    });
+    const items = Array.from({ length: 251 }, (_, number) => ({
+      ...cable,
+      id: 101 + number,
+      name: `Cable ${number}`,
+    }));
+    expect(toBatch(many, { ...CATALOGUE, items })).toEqual({
+      problems: ["That is too much for one batch: save some, then the rest."],
+    });
+  });
+
+  test("a line that can't be counted is named", () => {
+    const lines = [{ itemId: 100, packages: {}, loose: "1.5" }];
+    expect(toBatch(cart({ lines }), CATALOGUE)).toEqual({
+      problems: ["LiteBeam 5AC: Counted in whole units."],
     });
   });
 

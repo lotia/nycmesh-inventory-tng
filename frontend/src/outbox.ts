@@ -27,8 +27,12 @@ import { NOT_REGISTERED } from "./registration";
 import { onStoredChange, readStored, writeStored } from "./stored";
 import { telemetry } from "./telemetry";
 
-/** Versioned: a later build that changes the shape reads this one too. */
-export const STORAGE_KEY = "inventory.outbox.v1";
+/** Versioned: a later build that changes the shape reads the one before.
+ * v2's lines may name a package (docs/decisions/0020), which v1's reader
+ * would drop if it wrote them back, so a tab of an older build keeps to
+ * v1's. */
+export const STORAGE_KEY = "inventory.outbox.v2";
+const BEFORE = "inventory.outbox.v1";
 /** How long to wait before trying again after no answer. */
 export const RETRY_MS = 30_000;
 /** Unexpected answers to one batch before its note asks for a report. */
@@ -77,13 +81,22 @@ const Entry = v.object({
 
 export type Entry = v.InferOutput<typeof Entry>;
 
-/** A 422's problems, in words a volunteer can act on. */
-function problems(detail: v.InferOutput<typeof ValidationFailed>["detail"]) {
+/** A 422's problems, in words a volunteer can act on. A line of the cart
+ * may be sent as several, one for each package and one loose (cart.ts,
+ * toBatch), so a line is named as the cart's: by its item's place in it. */
+function problems(
+  detail: v.InferOutput<typeof ValidationFailed>["detail"],
+  body: Body,
+) {
+  const items = [...new Set(body.lines.map((line) => line.item_id))];
   return detail
     .map(({ loc, msg }) => {
       const line = loc[0] === "body" && loc[1] === "lines" ? loc[2] : undefined;
       const words = typeof msg === "string" ? msg : "Not accepted";
-      return typeof line === "number" ? `Line ${line + 1}: ${words}` : words;
+      const sent = typeof line === "number" ? body.lines[line] : undefined;
+      return sent === undefined
+        ? words
+        : `Line ${items.indexOf(sent.item_id) + 1}: ${words}`;
     })
     .join(" ");
 }
@@ -104,7 +117,9 @@ export class Outbox {
   /** What storage holds, minus any entry that cannot be read: one bad entry
    * loses one batch, not every batch on the device. */
   private read(): Entry[] {
-    const stored = readStored(this.storage, STORAGE_KEY);
+    // Until this build first writes, what an older one kept, to send.
+    const stored =
+      readStored(this.storage, STORAGE_KEY) ?? readStored(this.storage, BEFORE);
     if (!Array.isArray(stored)) {
       return [];
     }
@@ -248,7 +263,7 @@ export class Outbox {
         this.settle(key, {
           state: "refused",
           waitingFor: null,
-          note: `Not saved. ${problems(reply.body.detail)}`,
+          note: `Not saved. ${problems(reply.body.detail, entry.body)}`,
         });
         return "next";
       case "unexpected": {
