@@ -1,6 +1,6 @@
 {% extends "admin_base.html" %}
 {% block main %}
-<p>Once revoked, {{ name }} registers no more devices, and stays revoked:
+<p>Once revoked, {{ code.name }} registers no more devices, and stays revoked:
 make a new code to register more. Devices it registered stay registered.</p>
 <form method="post" action="{{ here }}" class="actions">
   <button class="danger">Revoke</button>

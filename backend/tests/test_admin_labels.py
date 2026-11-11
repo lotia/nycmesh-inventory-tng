@@ -240,12 +240,12 @@ def test_finding_labels_by_code_or_by_name(
         return {x.code for x in (item_label, place_label) if x.code in page}
 
     assert found(item_label.code.lower()) == {item_label.code}
+    # Only a whole code: part of one is no match, whatever it shares.
+    assert found(item_label.code[:4]) == set()
     assert found("cat6") == {item_label.code}
     assert found("shelf") == {place_label.code}
     assert found("100%") == set()
-    # No code holds an O, an I or an L (models.LABEL_ALPHABET).
-    nothing = text(admin_client.get(LABELS, params={"q": "oil"}))
-    assert "Nothing matches." in nothing
+    assert "Nothing matches." in text(admin_client.get(LABELS, params={"q": "x"}))
 
 
 def test_a_sheet_has_a_limit(
@@ -341,6 +341,8 @@ def test_labels_list_current_inactive_and_all(
     page = text(admin_client.get(LABELS, params={"show": "all"}))
     assert f'href="{LABELS}?show=inactive">Inactive</a>' in page
     assert "Retired</a>" not in page
+    assert "The scan page doesn't read a label tagged here." in page
+    assert "doesn't read a label tagged" not in text(admin_client.get(LABELS))
 
 
 def test_label_suggestions_name_it_and_narrow_the_list(
@@ -382,3 +384,17 @@ def test_labels_come_in_pages_of_fifty_each_printed_from_its_own(
     assert "Page 1 of 2" in first
     second = text(admin_client.get(LABELS, params={"q": "Paged", "page": "2"}))
     assert len(codes_listed(second)) == 5
+
+
+def test_printing_refused_goes_back_to_the_list_as_it_was(
+    admin_client: TestClient, session: Session, cable: Item
+) -> None:
+    add(session, Label(item_id=cable.id))
+    page = text(admin_client.get(LABELS, params={"q": "cat6", "show": "all"}))
+    assert '<input type="hidden" name="q" value="cat6">' in page
+    assert '<input type="hidden" name="show" value="all">' in page
+    sent = admin_client.get(PRINT, params={"q": "cat6", "show": "all", "page": "2"})
+    assert (
+        sent.headers["location"]
+        == f"{LABELS}?q=cat6&show=all&page=2&notice=pick_labels"
+    )

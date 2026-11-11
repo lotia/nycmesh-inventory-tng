@@ -1,22 +1,22 @@
 """Labels, from the browser (docs/decisions/0015): find (a Listing, with
-"Current · Inactive · All"), reprint and revoke them here; make them from an item's or a place's page. Labels print twelve
-to a page, cut apart or on sticker paper. Printing is a page to open, not a
+"Current · Inactive · All"), reprint and revoke them here; make them from
+an item's or a place's page. Labels print twelve to a page, cut apart or on
+sticker paper. Printing is a page to open, not a
 change, so a sheet can be printed again from its address."""
 
-from collections.abc import Sequence
 from typing import Annotated, Any, cast
 
 import structlog
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import aliased
 
 from inventory_tng import labels
 from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.common import LABELS, admin_page, now
 from inventory_tng.admin.items import ITEMS
-from inventory_tng.admin.listing import Listing, Searched
+from inventory_tng.admin.listing import Searched
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.db import DbSession
 from inventory_tng.local_time import site_zone
@@ -59,19 +59,17 @@ LISTED = (
 )
 
 
-def _words(session: Session, rows: Sequence[Label]) -> list[str]:
-    return [each.words for each in labels.named(session, rows)]
-
-
-# How the labels list finds one: by its code, or the words naming it.
+# How the labels list finds one: by its whole code, or the words naming it.
 SEARCHED = Searched(
     Label,
     func.concat_ws(
-        " ", Label.code, Item.search_text, ItemPackage.name, Location.name, _parent.name
+        " ", Item.search_text, ItemPackage.name, Location.name, _parent.name
     ),
     func.coalesce(Location.name, Item.name),
+    whole=Label.code,
     current=labels.scanned(),
-    words=_words,
+    lapsed="inactive",
+    shown=labels.named,
 )
 
 
@@ -85,8 +83,7 @@ def list_labels(
     page: str = "",
     pick: str = "",
 ) -> Response:
-    listing = Listing[Label].read(LABELS, q, show, page, pick, lapsed="inactive")
-    listing = listing.find(session, SEARCHED, LISTED)
+    listing = SEARCHED.read(LABELS, q, show, page, pick).find(session, SEARCHED, LISTED)
     return admin_page(
         request,
         signed,
@@ -98,7 +95,6 @@ def list_labels(
             "items_path": ITEMS,
             "locations_path": LOCATIONS,
             "listing": listing,
-            "shown": labels.named(session, listing.rows),
             "zone": site_zone(session),
         },
     )
@@ -109,7 +105,7 @@ def suggest_labels(
     session: DbSession, signed: AdminSignedIn, q: str = "", show: str = ""
 ) -> JSONResponse:
     """What the search box offers as one types (_listing.html)."""
-    listing = Listing[Label].read(LABELS, q, show, lapsed="inactive")
+    listing = SEARCHED.read(LABELS, q, show)
     offered = listing.suggest(session, SEARCHED, LISTED, lambda label: label.code)
     return JSONResponse(offered, headers={"Cache-Control": "no-store"})
 
@@ -146,15 +142,21 @@ def print_labels(
     session: DbSession,
     label: Annotated[list[int] | None, Query()] = None,
     copies: str = "1",
+    q: str = "",
+    show: str = "",
+    page: str = "",
+    pick: str = "",
 ) -> Response:
+    # A refusal goes back to the list as it was, picked from (labels.html).
+    back = SEARCHED.read(LABELS, q, show, page, pick).link()
     count = whole(copies, 1, labels.MAX_COPIES)
     if count is None:
-        return redirect(LABELS, notice="copies")
+        return redirect(back, notice="copies")
     picked = labels.printable(session, label or [])
     if not picked:
-        return redirect(LABELS, notice="pick_labels")
+        return redirect(back, notice="pick_labels")
     if len(picked) * count > labels.MAX_LABELS:
-        return redirect(LABELS, notice="too_many")
+        return redirect(back, notice="too_many")
     total = labels.record_printing(picked, count)
     return admin_page(
         request,

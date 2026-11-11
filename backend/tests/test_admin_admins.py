@@ -434,7 +434,11 @@ def test_changing_another_needs_a_recent_code(
     page = text(admin_client.get(f"{ADMINS}/{carol.id}"))
     assert page.count('name="confirm_code"') == 1  # Retiring; reset asks on its page.
     assert "Your code" in page
-    assert 'name="confirm_code"' in admin_client.get(f"{ADMINS}/{carol.id}/reset").text
+    asked = text(admin_client.get(f"{ADMINS}/{carol.id}/reset"))
+    assert 'name="confirm_code"' in asked
+    assert "it needs your code: you haven't typed one recently" in " ".join(
+        asked.split()
+    )
     for action in ("reset", "retire"):
         asked = admin_client.post(f"{ADMINS}/{carol.id}/{action}", data=once())
         assert asked.status_code == 403

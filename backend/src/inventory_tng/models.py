@@ -299,7 +299,8 @@ class Item(Versioned, Base):
     retired_at: Mapped[RetiredAt]
 
     # Everything a volunteer might type to find an item, as one string, kept
-    # by PostgreSQL. ix_item_search makes `%` on it fast; matches() is that.
+    # by PostgreSQL. ix_item_search makes fuzzy() on it fast, as the items
+    # list searches it (admin/items.py).
     search_text: Mapped[str] = mapped_column(
         Text,
         Computed(
@@ -308,11 +309,6 @@ class Item(Versioned, Base):
             persisted=True,
         ),
     )
-
-    @classmethod
-    def matches(cls, search: str) -> ColumnElement[bool]:
-        """Fuzzy (fuzzy()), where uniqueness is exact."""
-        return fuzzy(cls.search_text, search)
 
 
 class ItemPackage(Base):
@@ -563,6 +559,11 @@ class RegistrationCode(Base):
     uses: Mapped[int] = mapped_column(server_default="0")
     # Stops new registrations. Devices already registered with it stay so.
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    @property
+    def name(self) -> str:
+        """As pages show it: its label, or its number."""
+        return self.label or f"Code {self.id}"
 
 
 class Device(Versioned, Base):

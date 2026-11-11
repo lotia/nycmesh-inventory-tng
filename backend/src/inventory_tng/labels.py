@@ -97,6 +97,11 @@ class Named:
     def current(self) -> bool:
         return self.why is None
 
+    @property
+    def name(self) -> str:
+        """What a list calls it (admin/listing.py)."""
+        return self.words
+
 
 def _package_words(item: Item, package: ItemPackage) -> str:
     unit = "" if item.unit == "each" else f" {item.unit}"
