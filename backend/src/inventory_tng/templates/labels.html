@@ -1,60 +1,45 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_listing.html" import search_box, filters, summary, empty, pager %}
 {% block main %}
-<form method="get" action="{{ here }}" class="actions">
-  <label>Find <input name="q" value="{{ search }}" type="search"></label>
-  <button>Find</button>
-  {% if search %}<a href="{{ here }}">All labels</a>{% endif %}
-</form>
+{{ search_box(listing, "labels") }}
+{{ filters(listing) }}
 <p class="hint">Make labels from an <a href="{{ items_path }}">item's</a> or a
 <a href="{{ locations_path }}">location's</a> page. Each has one code, printed as
 often as needed; pick some here to print them again.</p>
 
 {#- The picks and copies belong to this form, from wherever they are. #}
 <form method="get" action="{{ print_path }}" id="print-labels"></form>
-<section id="current">
-  {% with section_id="current" %}{% include "_notice.html" %}{% endwith %}
+<section>
+  {{ summary(listing, "label", "labels") }}
   {% call table() %}
-    <tr><th>Print</th><th>Code</th><th>Names</th><th>Made</th><th></th></tr>
-    {% for named in current %}
+    <tr><th>Print</th><th>Code</th><th>Names</th><th class="hidden sm:table-cell">Made</th><th></th></tr>
+    {% for named in shown %}
     {% set label = named.label %}
     <tr>
-      <td><input type="checkbox" name="label" value="{{ label.id }}" form="print-labels" aria-label="Print {{ label.code }}"></td>
+      <td>{% if named.current %}<input type="checkbox" name="label" value="{{ label.id }}" form="print-labels" aria-label="Print {{ label.code }}">{% endif %}</td>
       <td class="key">{{ label.code }}</td>
-      <td><a href="{{ items_path ~ '/' ~ label.item_id if label.item_id else locations_path ~ '/' ~ label.location_id }}">{{ named.words }}</a></td>
-      <td>{{ label.created_at | when(zone) }}</td>
-      <td><a href="{{ here }}/{{ label.id }}/revoke">Revoke<span class="sr-only"> {{ label.code }}</span></a></td>
+      <td><a href="{{ items_path ~ '/' ~ label.item_id if label.item_id else locations_path ~ '/' ~ label.location_id }}">{{ named.words }}</a>
+        {%- if named.why %} <span class="tag">{{ named.why | capitalize }}</span>{% endif %}
+        {%- if label.revoked_at %} <span class="hint">on {{ label.revoked_at | when(zone) }}</span>{% endif %}
+        <span class="hint block sm:hidden">made {{ label.created_at | when(zone) }}</span></td>
+      <td class="hidden sm:table-cell">{{ label.created_at | when(zone) }}</td>
+      <td>{% if named.current %}<a href="{{ here }}/{{ label.id }}/revoke">Revoke<span class="sr-only"> {{ label.code }}</span></a>{% endif %}</td>
     </tr>
     {% else %}
-    <tr><td colspan="5">{{ "Nothing matches." if search else "None yet." }}</td></tr>
+    {{ empty(listing, 5, "None yet: make one from an item's or a place's page.") }}
     {% endfor %}
   {% endcall %}
-  {% if current %}
+  {{ pager(listing) }}
+  {% if shown | selectattr("current") | first %}
   <div class="actions">
     <label>Copies of each
       <input name="copies" form="print-labels" type="number" inputmode="numeric" min="1" max="{{ max_copies }}" value="1" required>
     </label>
     <button class="primary" form="print-labels">Print the ones picked</button>
   </div>
-  <p class="hint">Revoking a code stops every copy of it scanning.</p>
+  <p class="hint">Picks on this page print; search to bring the ones you want
+  onto one page. Revoking a code stops every copy of it scanning.</p>
   {% endif %}
 </section>
-
-{% if inactive %}
-<section id="inactive">
-  <h2>Inactive</h2>
-  {% with section_id="inactive" %}{% include "_notice.html" %}{% endwith %}
-  <p class="hint">The scan page doesn't read these.</p>
-  {% call table() %}
-    <tr><th>Code</th><th>Names</th><th>Why</th></tr>
-    {% for named in inactive %}
-    <tr>
-      <td class="key">{{ named.label.code }}</td>
-      <td>{{ named.words }}</td>
-      <td>{{ named.why | capitalize }}{% if named.label.revoked_at %} {{ named.label.revoked_at | when(zone) }}{% endif %}</td>
-    </tr>
-    {% endfor %}
-  {% endcall %}
-</section>
-{% endif %}
 {% endblock %}

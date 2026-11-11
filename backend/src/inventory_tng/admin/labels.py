@@ -1,20 +1,22 @@
-"""Labels, from the browser (docs/decisions/0015): find, reprint and revoke
-them here; make them from an item's or a place's page. Labels print twelve
+"""Labels, from the browser (docs/decisions/0015): find (a Listing, with
+"Current · Inactive · All"), reprint and revoke them here; make them from an item's or a place's page. Labels print twelve
 to a page, cut apart or on sticker paper. Printing is a page to open, not a
 change, so a sheet can be printed again from its address."""
 
+from collections.abc import Sequence
 from typing import Annotated, Any, cast
 
 import structlog
 from fastapi import APIRouter, Form, Query, Request
-from fastapi.responses import Response
-from sqlalchemy import or_, select
+from fastapi.responses import JSONResponse, Response
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, aliased
 
 from inventory_tng import labels
 from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.common import LABELS, admin_page, now
 from inventory_tng.admin.items import ITEMS
+from inventory_tng.admin.listing import Listing, Searched
 from inventory_tng.admin.locations import LOCATIONS
 from inventory_tng.db import DbSession
 from inventory_tng.local_time import site_zone
@@ -45,38 +47,46 @@ NOTICES.update(
 )
 
 
-def _found(session: Session, search: str) -> list[labels.Named]:
-    """Labels whose code is the search, or whose words name it: the item,
-    its package, the place or the place it is in."""
-    parent = aliased(Location)
-    query = (
-        select(Label)
-        .outerjoin(Item, Item.id == Label.item_id)
-        .outerjoin(ItemPackage, ItemPackage.id == Label.package_id)
-        .outerjoin(Location, Location.id == Label.location_id)
-        .outerjoin(parent, parent.id == Location.parent_id)
-    )
-    if search:
-        query = query.where(
-            or_(
-                Label.code == search.upper(),
-                Item.matches(search),
-                *(
-                    name.icontains(search, autoescape=True)
-                    for name in (ItemPackage.name, Location.name, parent.name)
-                ),
-            )
-        )
-    found = labels.named(session, session.scalars(query).all())
-    return sorted(found, key=lambda each: (each.words.lower(), each.label.id))
+# Each label with what it names, and the place around a place: what the
+# list's search, filter and order read.
+_parent = aliased(Location)
+LISTED = (
+    select(Label)
+    .outerjoin(Item, Item.id == Label.item_id)
+    .outerjoin(ItemPackage, ItemPackage.id == Label.package_id)
+    .outerjoin(Location, Location.id == Label.location_id)
+    .outerjoin(_parent, _parent.id == Location.parent_id)
+)
+
+
+def _words(session: Session, rows: Sequence[Label]) -> list[str]:
+    return [each.words for each in labels.named(session, rows)]
+
+
+# How the labels list finds one: by its code, or the words naming it.
+SEARCHED = Searched(
+    Label,
+    func.concat_ws(
+        " ", Label.code, Item.search_text, ItemPackage.name, Location.name, _parent.name
+    ),
+    func.coalesce(Location.name, Item.name),
+    current=labels.scanned(),
+    words=_words,
+)
 
 
 @router.get(LABELS)
 def list_labels(
-    request: Request, signed: AdminSignedIn, session: DbSession, q: str = ""
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    q: str = "",
+    show: str = "",
+    page: str = "",
+    pick: str = "",
 ) -> Response:
-    search = q.strip()
-    found = _found(session, search)
+    listing = Listing[Label].read(LABELS, q, show, page, pick, lapsed="inactive")
+    listing = listing.find(session, SEARCHED, LISTED)
     return admin_page(
         request,
         signed,
@@ -87,12 +97,21 @@ def list_labels(
             "print_path": PRINT,
             "items_path": ITEMS,
             "locations_path": LOCATIONS,
-            "search": search,
-            "current": [each for each in found if each.current],
-            "inactive": [each for each in found if not each.current],
+            "listing": listing,
+            "shown": labels.named(session, listing.rows),
             "zone": site_zone(session),
         },
     )
+
+
+@router.get(f"{LABELS}/suggest")
+def suggest_labels(
+    session: DbSession, signed: AdminSignedIn, q: str = "", show: str = ""
+) -> JSONResponse:
+    """What the search box offers as one types (_listing.html)."""
+    listing = Listing[Label].read(LABELS, q, show, lapsed="inactive")
+    offered = listing.suggest(session, SEARCHED, LISTED, lambda label: label.code)
+    return JSONResponse(offered, headers={"Cache-Control": "no-store"})
 
 
 @router.post(LABELS)
@@ -107,7 +126,7 @@ def make_labels(
     """Makes the code if it has none, then opens its sheet to print."""
     count = whole(copies, 1, labels.MAX_COPIES)
     if count is None:
-        return redirect(LABELS, notice="copies", section="current")
+        return redirect(LABELS, notice="copies")
     if item_id is not None and location_id is None:
         label = labels.make_for_item(session, item_id, package_id)
     elif location_id is not None and item_id is None and package_id is None:
@@ -130,12 +149,12 @@ def print_labels(
 ) -> Response:
     count = whole(copies, 1, labels.MAX_COPIES)
     if count is None:
-        return redirect(LABELS, notice="copies", section="current")
+        return redirect(LABELS, notice="copies")
     picked = labels.printable(session, label or [])
     if not picked:
-        return redirect(LABELS, notice="pick_labels", section="current")
+        return redirect(LABELS, notice="pick_labels")
     if len(picked) * count > labels.MAX_LABELS:
-        return redirect(LABELS, notice="too_many", section="current")
+        return redirect(LABELS, notice="too_many")
     total = labels.record_printing(picked, count)
     return admin_page(
         request,
@@ -181,4 +200,4 @@ def revoke_label(signed: AdminSignedIn, session: DbSession, label_id: int) -> Re
     if not labels.revoke(session, label_id, now()):
         return not_found()
     session.commit()
-    return redirect(LABELS, notice="label_revoked", section="inactive")
+    return redirect(LABELS, notice="label_revoked")

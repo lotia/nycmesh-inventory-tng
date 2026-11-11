@@ -1,6 +1,7 @@
 """A long list of records (docs/decisions/0019): search that forgives
-typos, with suggestions as one types; "Current · Retired · All"; and pages
-of PER_PAGE. Each list page says how to search its kind (Searched) and
+typos, with suggestions as one types; "Current · Retired · All" (or
+another word than Retired, such as labels' Inactive); and pages of
+PER_PAGE. Each list page says how to search its kind (Searched) and
 reads the query with Listing.read; _listing.html draws it.
 
 The query string carries it all, so every view is a link: `q`, the search;
@@ -20,6 +21,7 @@ from sqlalchemy import (
     SQLColumnExpression,
     case,
     func,
+    not_,
     select,
 )
 from sqlalchemy.orm import Session
@@ -28,8 +30,9 @@ from inventory_tng.models import INTEGER_MAX, fuzzy, holds, whole
 
 log = structlog.get_logger(__name__)
 
-type Show = Literal["current", "retired", "all"]
-SHOWS: tuple[Show, ...] = ("current", "retired", "all")
+type Show = Literal["current", "retired", "inactive", "all"]
+# What the filter between Current and All shows: the records not current.
+type Lapsed = Literal["retired", "inactive"]
 PER_PAGE = 50
 # How many suggestions the search box offers.
 SUGGESTED = 8
@@ -50,11 +53,24 @@ def closeness(column: SQLColumnExpression[str], search: str) -> ColumnElement[fl
 class Searched[T]:
     """How a list page finds its kind of record: the model, the text a
     search reads (such as an item's search_text) and its name, by which the
-    list is sorted and which a suggestion shows."""
+    list is sorted. Which are current, if not those with no retired_at; and
+    each row's name in words, which a suggestion and a pick show, if not its
+    name column's."""
 
     model: type[T]
     text: SQLColumnExpression[str]
     name: SQLColumnExpression[str]
+    current: ColumnElement[bool] | None = None
+    words: Callable[[Session, Sequence[T]], Sequence[str]] | None = None
+
+    def is_current(self) -> ColumnElement[bool]:
+        table: Any = self.model
+        return table.retired_at.is_(None) if self.current is None else self.current
+
+    def names(self, session: Session, rows: Sequence[T]) -> Sequence[str]:
+        if self.words is not None:
+            return self.words(session, rows)
+        return [getattr(row, "name") for row in rows]  # noqa: B009
 
 
 @dataclass(frozen=True)
@@ -63,6 +79,7 @@ class Listing[T]:
     finds there."""
 
     here: str
+    lapsed: Lapsed = "retired"
     search: str = ""
     show: Show = "current"
     page: int = 1
@@ -76,14 +93,23 @@ class Listing[T]:
 
     @classmethod
     def read(
-        cls, here: str, q: str = "", show: str = "", page: str = "", pick: str = ""
+        cls,
+        here: str,
+        q: str = "",
+        show: str = "",
+        page: str = "",
+        pick: str = "",
+        *,
+        lapsed: Lapsed = "retired",
     ) -> Listing[T]:
         """As a list page's query string asks: anything odd is the plain
         list's, never an error, as a link may have been typed by hand."""
+        shows: dict[str, Show] = {"current": "current", lapsed: lapsed, "all": "all"}
         return cls(
             here=here,
+            lapsed=lapsed,
             search=" ".join(q.split())[:SEARCH_MAX],
-            show=show if show in SHOWS else "current",
+            show=shows.get(show, "current"),
             page=whole(page, 1, INTEGER_MAX) or 1,
             pick=whole(pick, 1, INTEGER_MAX),
         )
@@ -125,12 +151,12 @@ class Listing[T]:
         kept = {key: value for key, value in query.items() if value}
         return self.here + (f"?{urlencode(kept)}" if kept else "")
 
-    def _shown(self, model: type[T], query: Select) -> Select:
+    def _shown(self, searched: Searched[T], query: Select) -> Select:
         """`query` narrowed to the records `show` asks for."""
         if self.show == "all":
             return query
-        table: Any = model
-        return query.where(table.retired_at.is_(None) == (self.show == "current"))
+        current = searched.is_current()
+        return query.where(current if self.show == "current" else not_(current))
 
     def find(
         self, session: Session, searched: Searched[T], query: Select
@@ -139,12 +165,12 @@ class Listing[T]:
         joined): filtered, searched or picked, best match first, then by
         name, one page of them."""
         table: Any = searched.model
-        query = self._shown(table, query)
+        query = self._shown(searched, query)
         total = _count(session, query)
         if self.pick is not None:
             # One record at most: no count, nor a page, to work out.
             rows = session.scalars(query.where(table.id == self.pick)).all()
-            picked = getattr(rows[0], "name") if rows else None  # noqa: B009
+            picked = searched.names(session, rows)[0] if rows else None
             return replace(
                 self, rows=rows, found=len(rows), total=total, page=1, picked=picked
             )
@@ -174,7 +200,7 @@ class Listing[T]:
         apart, and the link that narrows the list to it."""
         if not self.search:
             return []
-        query = self._shown(searched.model, query)
+        query = self._shown(searched, query)
         rows = session.scalars(
             query.where(fuzzy(searched.text, self.search))
             .order_by(
@@ -186,11 +212,11 @@ class Listing[T]:
         log.debug("suggested", found=len(rows))
         return [
             {
-                "name": getattr(row, "name"),  # noqa: B009
+                "name": name,
                 "hint": hint(row),
                 "href": self.link(pick=getattr(row, "id"), search=""),  # noqa: B009
             }
-            for row in rows
+            for row, name in zip(rows, searched.names(session, rows), strict=True)
         ]
 
 
