@@ -12,7 +12,7 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
 <form method="post" action="{{ here }}">
   <fieldset class="contents" {% if retired %}disabled{% endif %}>
   <input type="hidden" name="version" value="{{ values.get('version', item.edit_version) }}">
-  {% with default = item.name, again = "Save it", items_path = back_link[0] %}{% include "_item_name.html" %}{% endwith %}
+  {% with default = item.name, again = "Save it" %}{% include "_item_name.html" %}{% endwith %}
   <label>Category
     <select name="category_id" required>
       {% set chosen = values.get('category_id', item.category_id | string) %}
