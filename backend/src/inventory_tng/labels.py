@@ -13,7 +13,7 @@ from typing import Literal
 
 import structlog
 from opentelemetry import metrics
-from sqlalchemy import ColumnElement, select
+from sqlalchemy import ColumnElement, and_, or_, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import get_locked, locked_row
@@ -71,6 +71,18 @@ def inactive(label: Label, sent: Sent) -> Inactive | None:
     if label.package_id is not None and label.package_id not in sent.packages:
         return "package retired"
     return None
+
+
+def scanned() -> ColumnElement[bool]:
+    """inactive() is None, in SQL, for a select of labels outer-joined to
+    the item, package and place each names (unaliased): whether the scan
+    page reads it."""
+    return and_(
+        Label.revoked_at.is_(None),
+        or_(Label.location_id.is_(None), Location.retired_at.is_(None)),
+        or_(Label.item_id.is_(None), takeable()),
+        or_(Label.package_id.is_(None), ItemPackage.retired_at.is_(None)),
+    )
 
 
 @dataclass(frozen=True)

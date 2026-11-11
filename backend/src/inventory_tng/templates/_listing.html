@@ -18,8 +18,8 @@ first; with it (frontend/src/combobox.ts), suggestions come from
 {#- Which records: links, the one shown marked. -#}
 {% macro filters(listing) -%}
 <nav aria-label="Show" class="filters">
-  {% for show, words in [("current", "Current"), ("retired", "Retired"), ("all", "All")] %}
-  <a href="{{ listing.link(show=show) }}"{% if listing.show == show %} aria-current="page"{% endif %}>{{ words }}</a>
+  {% for show in ["current", listing.lapsed, "all"] %}
+  <a href="{{ listing.link(show=show) }}"{% if listing.show == show %} aria-current="page"{% endif %}>{{ show | capitalize }}</a>
   {%- if not loop.last %} <span aria-hidden="true">·</span>{% endif %}
   {% endfor %}
 </nav>
@@ -27,7 +27,7 @@ first; with it (frontend/src/combobox.ts), suggestions come from
 
 {#- How many there are, and how many a search or a pick left. -#}
 {% macro summary(listing, one, many) -%}
-{% set kind = "retired " if listing.show == "retired" else "" %}
+{% set kind = listing.show ~ " " if listing.show == listing.lapsed else "" %}
 <p class="hint">
   {%- if listing.narrowed %}{{ listing.found }} of {{ listing.total }} {{ kind }}{{ one if listing.total == 1 else many }}
   {%- if listing.picked or listing.search %}, matching “{{ listing.picked or listing.search }}”{% endif %}. <a href="{{ listing.link(search='') }}">Clear search</a>
@@ -39,7 +39,7 @@ first; with it (frontend/src/combobox.ts), suggestions come from
 {% macro empty(listing, columns, none_yet) -%}
 <tr><td colspan="{{ columns }}">
   {%- if listing.narrowed %}Nothing matches. Check the spelling, or <a href="{{ listing.link(search='') }}">clear the search</a>.
-  {%- elif listing.show == "retired" %}None is retired.
+  {%- elif listing.show == listing.lapsed %}None is {{ listing.lapsed }}.
   {%- else %}{{ none_yet }}{% endif -%}
 </td></tr>
 {%- endmacro %}

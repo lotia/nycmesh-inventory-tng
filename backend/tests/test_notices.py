@@ -47,8 +47,6 @@ def said_in(page: str) -> str:
         ("/admin/settings", "added", "reasons"),
         ("/admin/counts", "counted", "count"),
         ("/admin/counts", "adjusted", "adjust"),
-        ("/admin/labels", "too_many", "current"),
-        ("/admin/labels", "label_revoked", "inactive"),
         ("/admin/account", "email", "email"),
         ("/admin/account", "removed", "authenticators"),
         ("/admin/account", "others", "sessions"),

@@ -43,7 +43,10 @@ prefilled Google Form links, which the new app cannot read.
 
 - Labels are made from an item's or a place's page and found, printed
   again and revoked on the labels page (inventory-tng-8i4.16); revoking
-  asks to confirm first, as it can't be undone (8i4.88). Each shows
+  asks to confirm first, as it can't be undone (8i4.88). The labels page
+  is one of 0019's long lists, "Current · Inactive · All"; the labels
+  picked to print are those on the page shown, so a search brings the ones
+  wanted onto one page (8i4.60.23). Each printed label shows
   the bare code as a full QR code, the code in words beneath it for typing,
   and what it names.
 - Chromium's fake camera, showing a seeded label, tests scanning end to end
