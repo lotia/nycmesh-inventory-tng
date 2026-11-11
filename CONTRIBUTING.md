@@ -438,6 +438,12 @@ only a real browser can, such as that no page scrolls sideways:
 mise run check-browser           # builds, starts the app, runs them
 ```
 
+The tests run at once, in several workers, against that one database, so
+none may change rows another reads: a test that changes data first makes
+the rows it changes, such as an item to move (`frontend/browser/own.ts`).
+The crawl of every page (`phone-width.spec.ts`), which reads them all,
+runs in each browser before any other test starts.
+
 They run in Chromium; also in WebKit, Safari's engine, in CI and with
 `PLAYWRIGHT_WEBKIT=1`. `mise run setup-browsers` installs any that is
 missing, as after Playwright changes; `mise run check-browser` runs it.

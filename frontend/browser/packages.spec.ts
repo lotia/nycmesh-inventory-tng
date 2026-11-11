@@ -1,19 +1,27 @@
 /**
  * Packages on the scan page (docs/decisions/0020): a package counted is
  * saved as sealed packages of it, so stock keeps them sealed where they
- * arrive (inventory-tng-8i4.133.2).
+ * arrive (inventory-tng-8i4.133.2). Each test has a cable of its own
+ * (own.ts), so none sees another's open packages.
  */
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
+import { ownCable } from "./own";
+
+/** Picks `cable` on the scan page, from a search for it. */
+async function pick(page: Page, cable: string): Promise<void> {
+  await page.getByLabel(/Find an item/).fill(cable);
+  await page.getByRole("button", { name: cable, exact: true }).click();
+}
 
 test("a package counted on the scan page is saved sealed", async ({ page }) => {
+  const cable = await ownCable(page);
   await page.goto("/scan");
   await page.getByLabel("Your name").selectOption({ label: "Sam Example" });
   await page
     .getByLabel("From", { exact: true })
     .selectOption({ label: "Supernode 1 › Shelf A" });
   await page.getByLabel("To", { exact: true }).selectOption({ label: "Van" });
-  await page.getByLabel(/Find an item/).fill("Cat6");
-  await page.getByRole("button", { name: "Outdoor Cat6 cable" }).click();
+  await pick(page, cable);
   // Picking it adds a metre; a box instead.
   await page.getByLabel(/^Box of 305 m/).fill("1");
   await page.getByLabel(/^Loose/).fill("");
@@ -37,14 +45,14 @@ test("a package counted on the scan page is saved sealed", async ({ page }) => {
 test("a package opened on the scan page is saved as an opening", async ({
   page,
 }) => {
+  const cable = await ownCable(page);
   await page.goto("/scan");
   await page.getByLabel("Your name").selectOption({ label: "Sam Example" });
   await page.getByLabel("Opening packages").check();
   await page
     .getByLabel("Where", { exact: true })
     .selectOption({ label: "Supernode 1 › Shelf A" });
-  await page.getByLabel(/Find an item/).fill("Cat6");
-  await page.getByRole("button", { name: "Outdoor Cat6 cable" }).click();
+  await pick(page, cable);
   await page.getByLabel(/^Box of 305 m/).fill("1");
   await page.getByLabel(/^Loose/).fill("");
   const saving = page.waitForResponse(
@@ -58,7 +66,7 @@ test("a package opened on the scan page is saved as an opening", async ({
   const body = response.request().postDataJSON();
   expect(body.kind).toBe("open");
   expect(body.from_location_id).toBe(body.to_location_id);
-  // The seed's cable is followed once opened: the box is an open one now,
+  // The cable is followed once opened: the box is an open one now,
   // to cut from (inventory-tng-8i4.133.4).
   const key = body.lines[0].open_package_key;
   expect(key).toEqual(expect.any(String));
@@ -68,8 +76,7 @@ test("a package opened on the scan page is saved as an opening", async ({
     .getByLabel("From", { exact: true })
     .selectOption({ label: "Supernode 1 › Shelf A" });
   await page.getByLabel("To", { exact: true }).selectOption({ label: "Van" });
-  await page.getByLabel(/Find an item/).fill("Cat6");
-  await page.getByRole("button", { name: "Outdoor Cat6 cable" }).click();
+  await pick(page, cable);
   await page.getByLabel(/^Box of 305 m/).fill("");
   await page.getByLabel(/^Loose/).fill("");
   await page.getByLabel(/^From the open Box of 305 m: 305 m left/).fill("20");
@@ -89,8 +96,7 @@ test("a package opened on the scan page is saved as an opening", async ({
   await page
     .getByLabel("From", { exact: true })
     .selectOption({ label: "Supernode 1 › Shelf A" });
-  await page.getByLabel(/Find an item/).fill("Cat6");
-  await page.getByRole("button", { name: "Outdoor Cat6 cable" }).click();
+  await pick(page, cable);
   await page.getByLabel(/^Box of 305 m/).fill("");
   await page.getByLabel(/^Loose/).fill("");
   await page.getByLabel("Used up: what is left is no use").check();

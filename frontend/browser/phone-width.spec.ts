@@ -111,7 +111,7 @@ test("every administrator page fits a phone", async ({ page }) => {
       continue;
     }
     const response = await page.goto(path);
-    expect(response?.ok(), `${path} answers`).toBe(true);
+    expect(response?.ok(), `${path} answers ${response?.status()}`).toBe(true);
     const links = await linksOn(page);
     await longWords(page);
     widths.set(path, await overflow(page));

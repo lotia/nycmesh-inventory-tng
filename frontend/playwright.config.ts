@@ -7,7 +7,7 @@
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { defineConfig } from "@playwright/test";
+import { defineConfig, type Project } from "@playwright/test";
 import { adminState, inRun } from "./browser/prepared";
 
 // This run's folder (backend/tests/browser_database.py) and port, chosen
@@ -27,6 +27,49 @@ const phone = {
 };
 const webkit = Boolean(process.env.CI) || process.env.PLAYWRIGHT_WEBKIT === "1";
 const webkitServer = process.env.PLAYWRIGHT_WEBKIT_SERVER;
+// The pages that follow every link (phone-width.spec.ts).
+const CRAWL = /phone-width\.spec\.ts/;
+const browsers: { name: string; use: NonNullable<Project["use"]> }[] = [
+  {
+    name: "chromium",
+    use: {
+      browserName: "chromium",
+      storageState: signedIn,
+      // Full Chromium, headless: Playwright's lighter headless shell has
+      // no camera, fake or not.
+      channel: "chromium",
+      permissions: ["camera"],
+      launchOptions: {
+        args: [
+          "--use-fake-device-for-media-stream",
+          // A label's QR code (browser_database.py).
+          `--use-file-for-fake-video-capture=${inRun("camera.y4m")}`,
+        ],
+      },
+    },
+  },
+  ...(webkit
+    ? [
+        {
+          name: "webkit",
+          use: {
+            browserName: "webkit" as const,
+            storageState: signedIn,
+            // In the container, the app on this machine's 127.0.0.1 is
+            // reached through this connection.
+            ...(webkitServer
+              ? {
+                  connectOptions: {
+                    wsEndpoint: webkitServer,
+                    exposeNetwork: "<loopback>",
+                  },
+                }
+              : {}),
+          },
+        },
+      ]
+    : []),
+];
 
 export default defineConfig({
   testDir: "browser",
@@ -53,47 +96,20 @@ export default defineConfig({
       testMatch: /sign-in\.setup\.ts/,
       use: { browserName: "chromium", channel: "chromium" },
     },
-    {
-      name: "chromium",
+    // The crawl reads every row there is, so it runs in each browser before
+    // any test that changes one; those make rows of their own (browser/own.ts).
+    ...browsers.map(({ name, use }) => ({
+      name: `${name} crawl`,
+      testMatch: CRAWL,
       dependencies: ["sign-in"],
-      use: {
-        browserName: "chromium",
-        storageState: signedIn,
-        // Full Chromium, headless: Playwright's lighter headless shell has
-        // no camera, fake or not.
-        channel: "chromium",
-        permissions: ["camera"],
-        launchOptions: {
-          args: [
-            "--use-fake-device-for-media-stream",
-            // A label's QR code (browser_database.py).
-            `--use-file-for-fake-video-capture=${inRun("camera.y4m")}`,
-          ],
-        },
-      },
-    },
-    ...(webkit
-      ? [
-          {
-            name: "webkit",
-            dependencies: ["sign-in"],
-            use: {
-              browserName: "webkit" as const,
-              storageState: signedIn,
-              // In the container, the app on this machine's 127.0.0.1 is
-              // reached through this connection.
-              ...(webkitServer
-                ? {
-                    connectOptions: {
-                      wsEndpoint: webkitServer,
-                      exposeNetwork: "<loopback>",
-                    },
-                  }
-                : {}),
-            },
-          },
-        ]
-      : []),
+      use,
+    })),
+    ...browsers.map(({ name, use }) => ({
+      name,
+      testIgnore: CRAWL,
+      dependencies: browsers.map((each) => `${each.name} crawl`),
+      use,
+    })),
   ],
 });
 
