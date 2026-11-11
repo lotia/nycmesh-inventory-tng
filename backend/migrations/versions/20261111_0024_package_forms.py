@@ -168,6 +168,26 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    twice = (
+        op.get_bind()
+        .execute(
+            sa.text(
+                "SELECT DISTINCT transaction_id FROM movement m"
+                " JOIN ledger_transaction t ON t.id = m.transaction_id"
+                " WHERE t.kind <> 'open'"
+                " GROUP BY transaction_id, item_id HAVING count(*) > 1"
+                " ORDER BY transaction_id"
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if twice:
+        # Before 0024 an item was on one line of a transaction.
+        raise RuntimeError(
+            "Transactions with an item on two lines, in different forms, by id: "
+            f"{', '.join(map(str, twice))}. 0023 cannot hold them."
+        )
     op.execute(
         "DELETE FROM movement USING ledger_transaction"
         " WHERE movement.transaction_id = ledger_transaction.id"

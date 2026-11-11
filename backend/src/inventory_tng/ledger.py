@@ -312,12 +312,14 @@ def on_order_after(on_order: Decimal, received: Decimal) -> Decimal:
 
 
 class PackageFacts(NamedTuple):
-    """What the ledger's rules read of a package: its item, its size, and
-    whether opening one makes an open package (items.tracks_opened)."""
+    """What the ledger's rules read of a package: its item, its size,
+    whether opening one makes an open package (tracks_opened), and whether
+    it is retired."""
 
     item_id: int
     size: Decimal
     tracked: bool
+    retired: bool = False
 
 
 class OpenFacts(NamedTuple):
@@ -345,10 +347,12 @@ def form_breaks(
 
     - No form outside: what comes from or goes outside is loose.
     - A sealed side names a package of the line's item, and moves a whole
-      number of them.
+      number of them; a retired package is never received, as a retired
+      item is not (0003).
     - An open side names an open package of the line's item, not closed,
       at that side's place, but for one moved whole: all that is left on it
-      leaves one place and arrives at the other.
+      leaves one place and arrives at the other. One not yet filled is
+      named only by its opening, or by a count that finds it.
     - Between two places, stock keeps its form, or leaves an open package
       loose (a cut); only opening changes it otherwise, a sealed package
       into an open one, made for it and full, if its item tracks opened
@@ -364,6 +368,8 @@ def form_breaks(
                 broken.append("movement_package_of_item")
             elif entry.quantity % package.size != 0:
                 broken.append("movement_whole_packages")
+            if package is not None and package.retired and kind == "receipt":
+                broken.append("receipt_retired_package")
         if form.open_package_id is not None:
             opened = opens.get(form.open_package_id)
             if opened is None or opened.item_id != entry.item_id:
@@ -371,6 +377,8 @@ def form_breaks(
                 continue
             if opened.closed:
                 broken.append("movement_open_package_closed")
+            if opened.new and kind not in ("open", "count"):
+                broken.append("movement_open_package_unopened")
             whole = arriving and entry.leaves == entry.arrives
             if not whole and place is not None and place != opened.location_id:
                 broken.append("movement_open_package_place")
@@ -479,7 +487,8 @@ def _flows(
     into = LedgerTransaction.to_location_id == location_id
     out = LedgerTransaction.from_location_id == location_id
     windows = (window, *more)
-    where = [_at_place(location_id), or_(*windows)]
+    # An opening changes the form of stock at a place, not how much is there.
+    where = [_at_place(location_id), or_(*windows), LedgerTransaction.kind != "open"]
     if items is not None:
         where.append(Movement.item_id.in_(items))
     rows = session.execute(
@@ -750,6 +759,7 @@ def _hold_forms(
                 package.item_id,
                 package.size,
                 tracks_opened(item_tracks, package.track_opened),
+                package.retired_at is not None,
             )
             for package, item_tracks in rows
         }
@@ -849,6 +859,10 @@ def insert_transaction(
         for rule in broken or ():
             enforce(rule)
     packages, opens, opened = _hold_forms(session, lines)
+    # The form rules read what the transaction itself changes, so one sent
+    # again is found before them: the open packages' locks waited for it.
+    if opens and exists_where(session, LedgerTransaction.idempotency_key == key):
+        return None
     places = (_place(header, "from_location_id"), _place(header, "to_location_id"))
     for line in lines:
         for rule in form_breaks(kind, line, places, packages, opens):
@@ -883,7 +897,15 @@ def insert_transaction(
                 for line in lines
             ],
         )
-        _move_whole(opened, lines, places[1])
+        # An open package moved whole is where it arrived: form_breaks
+        # checked that all of it did. Through the ORM, so it is history.
+        for line in lines:
+            open_id = line.arrives.open_package_id
+            if open_id is not None and line.leaves == line.arrives and places[1]:
+                opened[open_id].location_id = places[1]
+                log.info(
+                    "open package moved", open_package_id=open_id, location_id=places[1]
+                )
         if transaction.kind == "receipt":
             _receive(session, lines)
     return transaction
@@ -894,25 +916,23 @@ def _place(header: Mapping[str, object], side: str) -> int | None:
     return place if isinstance(place, int) else None
 
 
-def _move_whole(
-    opened: Mapping[int, OpenPackage], lines: Sequence[Entry], to: int | None
-) -> None:
-    """An open package moved whole is where it arrived (form_breaks checked
-    that all of it did). Through the ORM, so it is history; locked by
-    _hold_forms."""
-    for line in lines:
-        open_id = line.arrives.open_package_id
-        if open_id is not None and line.leaves == line.arrives and to is not None:
-            opened[open_id].location_id = to
-            log.info("open package moved", open_package_id=open_id, location_id=to)
-
-
 def _each_once(lines: Sequence[Entry]) -> list[int]:
     """The lines' items, each in each form on one line, or RuleBroken
-    (movement_item_once)."""
+    (movement_item_once); and each open package on one line, as each line
+    is checked against what was left on it before the transaction
+    (movement_open_package_once)."""
     keys = [(line.item_id, line.leaves, line.arrives) for line in lines]
     enforce("movement_item_once", when=bool(repeated(keys)))
+    enforce("movement_open_package_once", when=bool(repeated(open_packages_of(lines))))
     return list(dict.fromkeys(line.item_id for line in lines))
+
+
+def open_packages_of(lines: Sequence[Entry]) -> list[int | None]:
+    """The open package each line names, if any: one, on either side or
+    both."""
+    return [
+        line.leaves.open_package_id or line.arrives.open_package_id for line in lines
+    ]
 
 
 def _receive(session: Session, lines: Sequence[Entry]) -> None:
@@ -1144,14 +1164,25 @@ def _replay(session: Session, batch: Batch) -> LedgerTransaction | None:
     )
     if transaction is None:
         return None
-    written = sorted(
-        session.execute(
-            select(Movement.item_id, Movement.quantity).where(
-                Movement.transaction_id == transaction.id
-            )
-        )
+    rows = session.execute(
+        select(
+            Movement.item_id,
+            Movement.quantity,
+            Movement.from_package_id,
+            Movement.from_open_package_id,
+            Movement.to_package_id,
+            Movement.to_open_package_id,
+        ).where(Movement.transaction_id == transaction.id)
     )
-    sent = sorted((line.item_id, line.quantity) for line in batch.lines)
+    # As many of each line, whatever their order: an item may be on several
+    # lines, in different forms.
+    written = Counter(
+        Entry(
+            item_id, quantity, Form(from_package, from_open), Form(to_package, to_open)
+        )
+        for item_id, quantity, from_package, from_open, to_package, to_open in rows
+    )
+    sent = Counter(Entry(line.item_id, line.quantity) for line in batch.lines)
     same = written == sent and all(
         getattr(transaction, field) == value for field, value in _header(batch).items()
     )

@@ -55,7 +55,8 @@ TABLES = Base.metadata.tables
 # ALLOWED's functions (or its migration).
 OWNERS: dict[str, str | None] = {t.name: t.info["owner"] for t in TABLES.values()}
 # The functions that may write any table: one deletes an administrator's
-# password, as it is reset or retired; one is the ledger's one writer; and the seed
+# password, as it is reset or retired; one is the ledger's one writer, which also
+# says where an open package moved whole is now; and the seed
 # makes its administrator, in a development database only.
 ALLOWED = {
     SOURCE / "accounts.py": ("_remove_sign_in",),

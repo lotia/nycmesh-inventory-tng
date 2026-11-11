@@ -111,3 +111,45 @@ def test_item_names_differing_only_by_punctuation_are_named_first(
         text("UPDATE item SET name = 'Tough cable Pro' WHERE id = :i"), {"i": spaced}
     )
     command.upgrade(alembic_config, "head")
+
+
+def test_going_back_before_package_forms_names_what_it_cannot_hold(
+    alembic_config: Config,
+) -> None:
+    """Migration 0024's downgrade: before it, an item was on one line of a
+    transaction, so one on two, in different forms, is named by id."""
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Cables') RETURNING id")
+    )
+    item_id = connection.scalar(
+        text("INSERT INTO item (name, category_id) VALUES ('Cat6', :c) RETURNING id"),
+        {"c": category_id},
+    )
+    package_id = connection.scalar(
+        text(
+            "INSERT INTO item_package (item_id, name, size)"
+            " VALUES (:i, 'Spool', 305) RETURNING id"
+        ),
+        {"i": item_id},
+    )
+    place = connection.scalar(
+        text("INSERT INTO location (name, kind) VALUES ('Store', 'store') RETURNING id")
+    )
+    receipt = connection.scalar(
+        text(
+            "INSERT INTO ledger_transaction"
+            " (idempotency_key, kind, to_location_id, time_zone)"
+            " VALUES (gen_random_uuid(), 'receipt', :p, 'UTC') RETURNING id"
+        ),
+        {"p": place},
+    )
+    connection.execute(
+        text(
+            "INSERT INTO movement (transaction_id, item_id, quantity, to_package_id)"
+            " VALUES (:t, :i, 305, :k), (:t, :i, 5, NULL)"
+        ),
+        {"t": receipt, "i": item_id, "k": package_id},
+    )
+    with pytest.raises(RuntimeError, match=f"by id: {receipt}\\. 0023"):
+        command.downgrade(alembic_config, "0023")

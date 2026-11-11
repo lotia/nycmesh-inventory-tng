@@ -56,10 +56,12 @@ def make(
             with session.begin_nested():
                 session.add(made)
         except exc.IntegrityError:
-            # The same key, made by a request at the same time, now committed.
-            made = session.scalars(
-                select(OpenPackage).where(OpenPackage.key == key)
-            ).one()
+            # The same key, made by a request at the same time, now committed;
+            # anything else is not this function's to answer.
+            found = session.scalar(select(OpenPackage).where(OpenPackage.key == key))
+            if found is None:
+                raise
+            made = found
         else:
             log.info(
                 "open package made",
