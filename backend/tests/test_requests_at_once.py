@@ -1126,13 +1126,13 @@ def test_a_batch_sent_twice_at_once_is_written_once(
     place = committed_place(own_committed)
     batch = Batch.model_validate(place.batch())
     one, two = own_committed.session(), own_committed.session()
-    first, wrote, _ = record(one, batch, device_id=None)
+    first, wrote, *_ = record(one, batch, device_id=None)
     worker = own_committed.blocked(two, lambda: record(two, batch, device_id=None))
     one.commit()
     finished = worker.finished()
     two.rollback()
     assert finished.error is None
-    second, wrote_again, _ = cast(Recorded, finished.result)
+    second, wrote_again, *_ = cast(Recorded, finished.result)
     assert (wrote, wrote_again, second.id) == (True, False, first.id)
     checking = own_committed.session()
     keyed = LedgerTransaction.idempotency_key == batch.key

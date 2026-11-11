@@ -350,6 +350,7 @@ function CartForm({
             ["move", "Moving stock"],
             ["receipt", "Receiving stock"],
             ["install", "Taking it to an install"],
+            ["open", "Opening packages"],
           ] as const
         ).map(([kind, words]) => (
           <label key={kind} class="flex items-center gap-2 py-1 font-normal">
@@ -367,7 +368,7 @@ function CartForm({
 
       {sides.from && (
         <Place
-          label="From"
+          label={cart.value.kind === "open" ? "Where" : "From"}
           catalogue={catalogue}
           value={cart.value.fromId}
           onPick={(fromId) => set({ fromId })}

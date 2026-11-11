@@ -69,7 +69,7 @@ describe("quantities", () => {
     const line = { itemId: 101, packages: { 1001: "2" }, loose: "12.5" };
     expect(quantityOf(line, cable)).toEqual({
       amount: 622500,
-      sealed: new Map([[1001, 610000]]),
+      sealed: new Map([[1001, { count: 2, size: 305000 }]]),
       loose: 12500,
     });
   });
@@ -92,7 +92,7 @@ describe("quantities", () => {
     // A box of 2.5, and a half loose: 3 in all, but each is a line.
     const halves = {
       ...radio,
-      packages: [{ id: 7, name: "Half box", size: "2.5" }],
+      packages: [{ id: 7, name: "Half box", size: "2.5", track_opened: false }],
     };
     const line = { itemId: 100, packages: { 7: "1" }, loose: "0.5" };
     expect(quantityOf(line, halves)).toEqual({
@@ -157,6 +157,49 @@ describe("turning a cart into a batch", () => {
     const lines = [{ itemId: 100, packages: {}, loose: "1.5" }];
     expect(toBatch(cart({ lines }), CATALOGUE)).toEqual({
       problems: ["LiteBeam 5AC: Counted in whole units."],
+    });
+  });
+
+  test("an opening names its place on both sides; a followed package opens one a line", () => {
+    const lines = [
+      { itemId: 101, packages: { 1001: "2" }, loose: "" },
+      { itemId: 100, packages: { 1000: "3" }, loose: "" },
+    ];
+    const opened = toBatch(
+      cart({ kind: "open", lines, fromId: 10 }),
+      CATALOGUE,
+    );
+    expect(opened).toMatchObject({
+      draft: { kind: "open", from_location_id: 10, to_location_id: 10 },
+      what: "Opening: 2 items at Hub",
+    });
+    const sent = "draft" in opened ? opened.draft.lines : [];
+    // The spool is followed: one a line, each with a key of its own.
+    expect(sent).toEqual([
+      {
+        item_id: 101,
+        package_id: 1001,
+        quantity: "305",
+        open_package_key: expect.any(String),
+      },
+      {
+        item_id: 101,
+        package_id: 1001,
+        quantity: "305",
+        open_package_key: expect.any(String),
+      },
+      // The box is not: its radios become loose units.
+      { item_id: 100, package_id: 1000, quantity: "12" },
+    ]);
+    expect(sent[0]?.open_package_key).not.toBe(sent[1]?.open_package_key);
+  });
+
+  test("an opening opens whole packages only", () => {
+    const lines = [{ itemId: 101, packages: { 1001: "1" }, loose: "3" }];
+    expect(
+      toBatch(cart({ kind: "open", lines, fromId: 10 }), CATALOGUE),
+    ).toEqual({
+      problems: ["Cat6 cable: Open whole packages: leave loose empty."],
     });
   });
 

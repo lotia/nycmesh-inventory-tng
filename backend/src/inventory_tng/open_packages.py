@@ -12,10 +12,16 @@ from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import enforce, locked
-from inventory_tng.ledger import tracks_opened
 from inventory_tng.models import Item, ItemPackage, OpenPackage
 
 log = structlog.get_logger(__name__)
+
+
+def tracks_opened(item: bool, package: bool | None) -> bool:
+    """Whether opening a package makes an open package, followed until used
+    up (docs/decisions/0020, Amendment): the package's own setting, if it
+    has one, else its item's."""
+    return item if package is None else package
 
 
 def make(

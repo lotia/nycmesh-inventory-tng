@@ -287,13 +287,15 @@ describe("refusals", () => {
         loc: ["body"],
         msg: "Value error, a move has only a from and to location",
       },
+      // No words of the server's: said plainly.
+      { type: "missing", loc: ["body", "lines", 0, "quantity"] },
     ];
     const { api } = answering(() => json({ detail }, 422));
     const outbox = new Outbox(api);
     outbox.queue(draft({ lines }), "a");
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
     expect(outbox.entries.value[0]?.note).toBe(
-      "Not saved. Line 2: There is no such row Value error, a move has only a from and to location",
+      "Not saved. Line 2: There is no such row Value error, a move has only a from and to location Line 1: Not accepted",
     );
   });
 

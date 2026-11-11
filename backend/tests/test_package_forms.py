@@ -25,9 +25,15 @@ from inventory_tng.ledger import (
     insert_transaction,
     moment,
     record_count,
-    tracks_opened,
 )
-from inventory_tng.models import Admin, Item, ItemPackage, LedgerTransaction
+from inventory_tng.models import (
+    Admin,
+    Item,
+    ItemPackage,
+    LedgerTransaction,
+    OpenPackage,
+)
+from inventory_tng.open_packages import tracks_opened
 
 from helpers.rows import add, breaks, tag, violates
 from helpers.stock import Spools
@@ -536,3 +542,114 @@ def test_a_retired_package_is_never_received(
     assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
         (["lines", 0, "package_id"], "retired_package")
     ]
+
+
+# Opening on the scan page.
+
+
+def opening(spools: Spools, *lines: dict[str, object]) -> dict[str, object]:
+    store = spools.store.id
+    return spools.place.batch(
+        kind="open", from_location_id=store, to_location_id=store, lines=list(lines)
+    )
+
+
+def opened_line(spools: Spools, **fields: object) -> dict[str, object]:
+    return sealed_line(spools, "305") | {"open_package_key": str(uuid.uuid4())} | fields
+
+
+def test_a_package_opened_and_followed_is_made_once(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    line = opened_line(spools)
+    batch = opening(spools, line)
+    assert registered_client.post(URL, json=batch).status_code == 201
+    assert registered_client.post(URL, json=batch).status_code == 200
+    made = session.scalars(
+        select(OpenPackage).where(
+            OpenPackage.key == uuid.UUID(str(line["open_package_key"]))
+        )
+    ).one()
+    store, spool = spools.store.id, spools.spool.id
+    assert (made.package_id, made.location_id) == (spool, store)
+    assert forms(session, spools.cable) == {
+        (store, spool, None): 305,
+        (store, None, made.id): 305,
+    }
+    listed = registered_client.get("/api/catalogue").json()["open_packages"]
+    mine = [entry for entry in listed if entry["id"] == made.id]
+    assert mine == [
+        {
+            "id": made.id,
+            "key": str(made.key),
+            "item_id": spools.cable.id,
+            "package_id": spool,
+            "location_id": store,
+            "opened_at": mine[0]["opened_at"],
+            "left": "305.000",
+        }
+    ]
+    package = next(
+        pack
+        for item in registered_client.get("/api/catalogue").json()["items"]
+        if item["id"] == spools.cable.id
+        for pack in item["packages"]
+    )
+    assert package["track_opened"] is True
+
+
+def test_a_package_its_item_does_not_follow_opens_loose(
+    registered_client: TestClient, session: Session
+) -> None:
+    """Whatever key the page sent: the server's setting decides."""
+    spools = Spools(session, tracked=False)
+    batch = opening(spools, opened_line(spools, quantity="610"))
+    assert registered_client.post(URL, json=batch).status_code == 201
+    store = spools.store.id
+    assert forms(session, spools.cable) == {(store, None, None): 610}
+
+
+def test_an_opening_without_a_key_makes_one_from_the_batch(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    batch = opening(spools, sealed_line(spools, "305"))
+    assert registered_client.post(URL, json=batch).status_code == 201
+    assert registered_client.post(URL, json=batch).status_code == 200
+    made = session.scalars(
+        select(OpenPackage).where(OpenPackage.item_id == spools.cable.id)
+    ).all()
+    assert len(made) == 1
+
+
+def test_a_followed_package_opens_one_a_line(
+    registered_client: TestClient, spools: Spools
+) -> None:
+    batch = opening(spools, opened_line(spools, quantity="610"))
+    response = registered_client.post(URL, json=batch)
+    assert response.status_code == 422
+    assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
+        (["lines", 0, "quantity"], "one_package")
+    ]
+
+
+def test_an_opening_that_cannot_be_is_refused(
+    registered_client: TestClient, spools: Spools
+) -> None:
+    """At one place, of packages: else FastAPI's 422, before anything."""
+    batch = opening(spools, opened_line(spools))
+    for change in (
+        {"to_location_id": None},
+        {"to_location_id": spools.van.id},
+        {"lines": [{"item_id": spools.cable.id, "quantity": "1"}]},
+    ):
+        response = registered_client.post(URL, json=batch | change)
+        assert response.status_code == 422, change
+    same = spools.place.batch(to_location_id=spools.store.id)
+    assert registered_client.post(URL, json=same).status_code == 422
+
+
+def test_only_an_opening_names_an_open_package_key(
+    registered_client: TestClient, spools: Spools
+) -> None:
+    batch = spools.place.batch(lines=[opened_line(spools)])
+    assert registered_client.post(URL, json=batch).status_code == 422

@@ -63,6 +63,8 @@ export const SIDES: Record<Kind, Record<Side, boolean>> = {
   move: { from: true, to: true },
   receipt: { from: false, to: true },
   install: { from: true, to: false },
+  // At one place, picked as From; the batch names it on both sides.
+  open: { from: true, to: false },
 };
 
 /** A new, empty cart that keeps the last one's choices. */
@@ -324,13 +326,17 @@ export function addOne(cart: Cart, itemId: number, packageId?: number): Cart {
   };
 }
 
-/** A line's quantity in thousandths of the item's unit, and of it, how
- * much in each package counted and how much loose; or why it has none. */
+/** Whole packages of one size: how many, and each one's size in
+ * thousandths of the item's unit. */
+type Packs = { count: number; size: number };
+
+/** A line's quantity in thousandths of the item's unit, and of it, the
+ * packages counted, by package, and how much loose; or why it has none. */
 export function quantityOf(
   line: Line,
   item: Item,
 ):
-  | { amount: number; sealed: Map<number, number>; loose: number }
+  | { amount: number; sealed: Map<number, Packs>; loose: number }
   | { problem: string } {
   const current = new Set(item.packages.map((pack) => String(pack.id)));
   for (const [packageId, typed] of Object.entries(line.packages)) {
@@ -342,7 +348,7 @@ export function quantityOf(
     }
   }
   let amount = 0;
-  const sealed = new Map<number, number>();
+  const sealed = new Map<number, Packs>();
   for (const pack of item.packages) {
     const packs = count(line.packages[pack.id] ?? "");
     const size = thousandths(pack.size);
@@ -350,7 +356,7 @@ export function quantityOf(
       return { problem: `Count whole packages: ${pack.name}.` };
     }
     if (packs > 0) {
-      sealed.set(pack.id, packs * size);
+      sealed.set(pack.id, { count: packs, size });
     }
     amount += packs * size;
   }
@@ -362,7 +368,7 @@ export function quantityOf(
   }
   amount += loose;
   // Each part is a line of its own (toBatch), so each is whole.
-  const parts = [loose, ...sealed.values()];
+  const parts = [loose, ...[...sealed.values()].map((p) => p.count * p.size)];
   if (item.unit === "each" && parts.some((part) => part % 1000 !== 0)) {
     return { problem: "Counted in whole units." };
   }
@@ -373,6 +379,7 @@ const KINDS: Record<Kind, string> = {
   move: "Move",
   receipt: "Receipt",
   install: "Install",
+  open: "Opening",
 };
 
 /** What the page says beside a retired item. */
@@ -432,13 +439,18 @@ export function toBatch(
       problems.push(`${item.name}: ${quantity.problem}`);
     } else if (quantity.amount >= MAX_AMOUNT) {
       problems.push(`${item.name}: That is more than the inventory can count.`);
+    } else if (cart.kind === "open" && quantity.loose > 0) {
+      problems.push(`${item.name}: Open whole packages: leave loose empty.`);
+    } else if (cart.kind === "open") {
+      lines.push(...openings(item, quantity.sealed));
+      items += 1;
     } else if (quantity.amount > 0) {
       // Each package counted on a line of its own, sealed, so stock keeps
       // them sealed where they arrive (docs/decisions/0020); then loose.
-      for (const [packageId, amount] of quantity.sealed) {
+      for (const [packageId, { count, size }] of quantity.sealed) {
         lines.push({
           item_id: item.id,
-          quantity: decimal(amount),
+          quantity: decimal(count * size),
           package_id: packageId,
         });
       }
@@ -465,7 +477,11 @@ export function toBatch(
     volunteer_id: cart.volunteerId,
     lines,
   };
-  if (fromId !== null) {
+  if (fromId !== null && cart.kind === "open") {
+    draft.from_location_id = fromId;
+    draft.to_location_id = fromId;
+    words.push(`at ${index.places.get(fromId)}`);
+  } else if (fromId !== null) {
     draft.from_location_id = fromId;
     words.push(`from ${index.places.get(fromId)}`);
   }
@@ -478,6 +494,28 @@ export function toBatch(
     words.push(`for install ${installNumber}`);
   }
   return { draft, what: words.join(" ") };
+}
+
+/**
+ * An opening's lines (docs/decisions/0020): a package its item follows
+ * once opened becomes an open package, one a line, under a key made here,
+ * so a later batch in the outbox can name it before the server has seen
+ * it; others become loose units, one line of all of them.
+ */
+function openings(item: Item, sealed: Map<number, Packs>): Draft["lines"] {
+  const followed = new Set(
+    item.packages.filter((pack) => pack.track_opened).map((pack) => pack.id),
+  );
+  return [...sealed].flatMap(([packageId, { count, size }]) => {
+    const each = { item_id: item.id, package_id: packageId };
+    return followed.has(packageId)
+      ? Array.from({ length: count }, () => ({
+          ...each,
+          quantity: decimal(size),
+          open_package_key: uuid(),
+        }))
+      : [{ ...each, quantity: decimal(count * size) }];
+  });
 }
 
 /** Items whose name, maker, part number, code or category holds every word. */

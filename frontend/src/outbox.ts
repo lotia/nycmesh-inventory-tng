@@ -45,7 +45,7 @@ const nullableId = v.exactOptional(v.nullable(id));
 /** A batch as POST /api/transactions takes it. */
 export const BatchBody = v.object({
   key: v.pipe(v.string(), v.uuid()),
-  kind: v.picklist(["move", "receipt", "install"]),
+  kind: v.picklist(["move", "receipt", "install", "open"]),
   volunteer_id: id,
   from_location_id: nullableId,
   to_location_id: nullableId,
@@ -56,6 +56,10 @@ export const BatchBody = v.object({
       quantity: v.union([v.number(), v.string()]),
       /** Sealed packages of it, kept sealed; absent (an older page's): loose. */
       package_id: nullableId,
+      /** An opening's: the key of the open package it makes, followed. */
+      open_package_key: v.exactOptional(
+        v.nullable(v.pipe(v.string(), v.uuid())),
+      ),
     }),
   ),
 });
