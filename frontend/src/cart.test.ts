@@ -10,6 +10,7 @@ import {
   loadCart,
   offered,
   offeredAt,
+  onlyPackage,
   quantityOf,
   STORAGE_KEY,
   search,
@@ -111,6 +112,7 @@ describe("quantities", () => {
           name: "Half box",
           size: "2.5",
           track_opened: false,
+          retired: false,
         },
       ],
     };
@@ -503,6 +505,63 @@ describe("turning a cart into a batch", () => {
     expect(toBatch(cart({ lines }), retired)).toMatchObject({
       what: "Move: 1 item from Hub to Van",
     });
+  });
+
+  test("a retired package's sealed stock can be taken but not received", () => {
+    const retired = {
+      ...CATALOGUE,
+      items: CATALOGUE.items.map((item) =>
+        item.id === 100
+          ? {
+              ...item,
+              packages: item.packages.map((pack) => ({
+                ...pack,
+                retired: true,
+              })),
+            }
+          : item,
+      ),
+    };
+    const boxed = [{ itemId: 100, packages: { 1000: "1" }, loose: "" }];
+    expect(toBatch(cart({ kind: "receipt", lines: boxed }), retired)).toEqual({
+      problems: [
+        "LiteBeam 5AC, Box: retired: taking only, so it can't be received.",
+      ],
+    });
+    // A count that isn't one is said as such, not as retired.
+    const unreadable = [{ itemId: 100, packages: { 1000: "x" }, loose: "" }];
+    expect(
+      toBatch(cart({ kind: "receipt", lines: unreadable }), retired),
+    ).toEqual({ problems: ["LiteBeam 5AC: Count whole packages: Box."] });
+    // And what else is wrong with the line, at once.
+    const typo = [{ itemId: 100, packages: { 1000: "1" }, loose: "x" }];
+    expect(toBatch(cart({ kind: "receipt", lines: typo }), retired)).toEqual({
+      problems: [
+        "LiteBeam 5AC, Box: retired: taking only, so it can't be received.",
+        "LiteBeam 5AC: Enter the loose amount in each, up to 3 decimals.",
+      ],
+    });
+    expect(toBatch(cart({ lines: boxed }), retired)).toMatchObject({
+      draft: { lines: [{ item_id: 100, quantity: "4", package_id: 1000 }] },
+    });
+    // Loose units of its item are received as ever.
+    const loose = [{ itemId: 100, packages: {}, loose: "2" }];
+    expect(
+      toBatch(cart({ kind: "receipt", lines: loose }), retired),
+    ).toMatchObject({ what: "Receipt: 1 item to Van" });
+  });
+
+  test("opening an item opens its one package, a current one first", () => {
+    const [box] = radio.packages;
+    if (box === undefined) throw new Error("the radio comes in a box");
+    const old = { ...box, id: 2, retired: true };
+    expect(onlyPackage(radio)).toBe(box);
+    expect(onlyPackage({ ...radio, packages: [box, old] })).toBe(box);
+    expect(onlyPackage({ ...radio, packages: [old] })).toBe(old);
+    expect(onlyPackage({ ...radio, packages: [box, { ...box, id: 3 }] })).toBe(
+      undefined,
+    );
+    expect(onlyPackage(undefined)).toBe(undefined);
   });
 
   test("lines with nothing in them are left out", () => {

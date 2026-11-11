@@ -312,6 +312,8 @@ export interface components {
       size: string;
       /** Track Opened */
       track_opened: boolean;
+      /** Retired */
+      retired: boolean;
     };
     /** PageError */
     PageError: {

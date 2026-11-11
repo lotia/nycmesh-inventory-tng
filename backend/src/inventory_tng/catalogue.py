@@ -1,7 +1,8 @@
 """What the scan page fills a cart from: GET /api/catalogue.
 
 One reply, loaded once per page, holding what is current: retired rows,
-merged volunteers and revoked labels are left out. Registered devices only,
+merged volunteers and revoked labels are left out, but for retired items
+and packages with stock left, which may be taken. Registered devices only,
 since it names volunteers, and those names are never logged.
 """
 
@@ -18,7 +19,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import labels, ledger
 from inventory_tng.db import DbSession
 from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
-from inventory_tng.ledger import takeable
+from inventory_tng.ledger import takeable, takeable_package
 from inventory_tng.models import (
     Category,
     Item,
@@ -64,6 +65,9 @@ class PackageEntry(Entry):
     # Whether opening one makes an open package, followed until used up, or
     # loose units: its own setting, else its item's (docs/decisions/0020).
     track_opened: bool
+    # Retired, but with sealed packages left: they may be taken, never
+    # received.
+    retired: bool
 
 
 class OpenPackageEntry(Entry):
@@ -134,7 +138,7 @@ def catalogue(session: Session) -> Catalogue:
     for package, item_tracks in session.execute(
         select(ItemPackage, Item.track_opened)
         .join(Item, Item.id == ItemPackage.item_id)
-        .where(ItemPackage.retired_at.is_(None))
+        .where(takeable_package())
         .order_by(ItemPackage.size)
     ):
         packages.setdefault(package.item_id, []).append(
@@ -143,6 +147,7 @@ def catalogue(session: Session) -> Catalogue:
                 name=package.name,
                 size=package.size,
                 track_opened=tracks_opened(item_tracks, package.track_opened),
+                retired=package.retired_at is not None,
             )
         )
     # A retired item stays while it has stock, so what is left can be taken.

@@ -30,7 +30,7 @@ from inventory_tng.models import (
 
 from helpers.rows import add, history
 from helpers.sign_in import text
-from helpers.stock import stocked
+from helpers.stock import stocked, write
 
 
 @pytest.fixture
@@ -279,19 +279,34 @@ def test_inactive_labels_say_why_and_agree_with_the_scan_page(
     rows["Package retired"] = add(
         session, Label(item_id=place.item.id, package_id=radio_box.id)
     )
+    # A retired package with some still sealed scans too (inventory-tng-96a).
+    crate = add(
+        session, ItemPackage(item_id=place.item.id, name="Crate", size=Decimal(8))
+    )
+    write(
+        session,
+        place,
+        kind="receipt",
+        from_location_id=None,
+        to_location_id=place.store.id,
+        lines=[{"item_id": place.item.id, "quantity": "8", "package_id": crate.id}],
+    )
+    sealed = add(session, Label(item_id=place.item.id, package_id=crate.id))
     # Retired with stock left, the radios still scan: volunteers may take them.
     place.item.retired_at = cable.retired_at = place.van.retired_at = when
-    radio_box.retired_at = when
+    radio_box.retired_at = crate.retired_at = when
     session.flush()
     scanned = {entry.code for entry in catalogue(session).labels}
-    assert still_stocked.code in scanned
+    assert {still_stocked.code, sealed.code} <= scanned
     assert scanned.isdisjoint(label.code for label in rows.values())
     # The list's filter (labels.scanned, in SQL) agrees with each row's why.
     current = text(admin_client.get(LABELS))
     assert still_stocked.code in current
+    assert sealed.code in current
     assert not any(label.code in current for label in rows.values())
     page = " ".join(text(admin_client.get(LABELS, params={"show": "inactive"})).split())
     assert still_stocked.code not in page
+    assert sealed.code not in page
     for why, label in rows.items():
         row = page[page.index(label.code) :].split("</tr>")[0]
         assert f'<span class="tag">{why}</span>' in row, why

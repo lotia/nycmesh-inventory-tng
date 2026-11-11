@@ -788,10 +788,14 @@
           "track_opened": {
             "type": "boolean",
             "title": "Track Opened"
+          },
+          "retired": {
+            "type": "boolean",
+            "title": "Retired"
           }
         },
         "type": "object",
-        "required": ["id", "name", "size", "track_opened"],
+        "required": ["id", "name", "size", "track_opened", "retired"],
         "title": "PackageEntry"
       },
       "PageError": {

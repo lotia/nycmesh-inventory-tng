@@ -54,11 +54,12 @@ while. So we need more than one location from the start.
   for closing an open package (0020). A volunteer only reports an open package
   used up; an administrator closes it.
 - **Nothing is deleted: retiring is the soft delete**, and bringing back
-  undoes it. A retired item that still has stock is never received again,
-  but volunteers may take what is left, until it runs out (Ali,
-  2026-11-03). A place is retired only once it holds nothing, but a save
-  that waited in an outbox can still bring stock to it or take some from
-  it, and is accepted. Such a save is logged and counted, and the place
+  undoes it. A retired item that still has stock, or a retired package
+  with some still sealed, is never received again, but volunteers may take
+  what is left, until it runs out (Ali, 2026-11-03; packages, 2026-11-11). A
+  place is retired only once it holds nothing, but a save that waited in
+  an outbox can still bring stock to it or take some from it, and is
+  accepted. Such a save is logged and counted, and the place
   shows on the home page, beside Counts in the navigation and on the stock
   page, and can be counted or adjusted, until it holds nothing again (Ali,
   2026-11-09; inventory-tng-8i4.51.2).

@@ -16,6 +16,7 @@ import {
   type Offered,
   offered,
   offeredAt,
+  onlyPackage,
   quantityOf,
   RETIRED,
   SIDES,
@@ -217,10 +218,9 @@ function CartForm({
    * those, as only whole packages are opened. */
   function add(itemId: number, packageId?: number): string {
     const item = indexOf(catalogue).items.get(itemId);
-    const only = item?.packages.find((_, __, all) => all.length === 1);
     const pack =
       packageId === undefined && cart.value.kind === "open"
-        ? only
+        ? onlyPackage(item)
         : item?.packages.find((each) => each.id === packageId);
     change(addOne(cart.value, itemId, pack?.id));
     query.value = "";
@@ -611,7 +611,7 @@ function CartLine({
         <Field
           key={pack.id}
           quiet
-          label={`${pack.name} (${decimal(thousandths(pack.size) ?? 0)} ${item.unit})`}
+          label={`${pack.name} (${decimal(thousandths(pack.size) ?? 0)} ${item.unit})${pack.retired ? `, ${RETIRED}` : ""}`}
         >
           {(id) => (
             <input

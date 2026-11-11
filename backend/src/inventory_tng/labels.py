@@ -17,7 +17,7 @@ from sqlalchemy import ColumnElement, and_, or_, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import get_locked, locked_row
-from inventory_tng.ledger import takeable
+from inventory_tng.ledger import takeable, takeable_package
 from inventory_tng.models import Item, ItemPackage, Label, Location
 from inventory_tng.pages import amount
 
@@ -81,7 +81,7 @@ def scanned() -> ColumnElement[bool]:
         Label.revoked_at.is_(None),
         or_(Label.location_id.is_(None), Location.retired_at.is_(None)),
         or_(Label.item_id.is_(None), takeable()),
-        or_(Label.package_id.is_(None), ItemPackage.retired_at.is_(None)),
+        or_(Label.package_id.is_(None), takeable_package()),
     )
 
 
@@ -134,13 +134,22 @@ def named(session: Session, labels: Sequence[Label]) -> list[Named]:
     sent_items = set(
         session.scalars(select(Item.id).where(Item.id.in_(items), takeable()))
     )
+    # A retired package scans while some are sealed (takeable_package).
+    takeable_packages = set(
+        session.scalars(
+            select(ItemPackage.id).where(
+                ItemPackage.id.in_(packages), takeable_package()
+            )
+        )
+    )
+    sent_packages = {
+        i
+        for i, package in packages.items()
+        if package.item_id in sent_items and i in takeable_packages
+    }
     sent = Sent(
         sent_items,
-        {
-            i
-            for i, package in packages.items()
-            if package.retired_at is None and package.item_id in sent_items
-        },
+        sent_packages,
         {i for i, place in places.items() if place.retired_at is None},
     )
     found = []
