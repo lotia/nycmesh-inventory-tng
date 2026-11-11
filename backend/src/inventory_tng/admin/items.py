@@ -153,6 +153,11 @@ def _categories(session: Session) -> list[Category]:
 SEARCHED = Searched(ITEMS, Item, Item.search_text, Item.name)
 
 
+def _name_field(similar: Sequence[Item]) -> dict[str, object]:
+    """What _item_name.html needs besides the form's values."""
+    return {"similar": similar, "items_path": ITEMS, "different": DIFFERENT}
+
+
 def _list_page(
     request: Request,
     session: Session,
@@ -181,9 +186,7 @@ def _list_page(
             "units": UNITS,
             "problems": problems,
             "values": values,
-            "similar": similar,
-            "items_path": ITEMS,
-            "different": DIFFERENT,
+            **_name_field(similar),
         },
         400 if problems else 200,
     )
@@ -236,9 +239,7 @@ def _item_page(
             "problems": problems,
             "values": values,
             "alert": alert,
-            "similar": similar,
-            "items_path": ITEMS,
-            "different": DIFFERENT,
+            **_name_field(similar),
         },
     )
 
@@ -257,7 +258,8 @@ def _fields(
     problems: dict[str, str] = {}
     if problem := name_problem(name):
         problems["name"] = problem
-    elif items.nameless(session, name):
+    # A letter is never punctuation: only a name without one asks.
+    elif not any(c.isalpha() for c in name) and items.nameless(session, name):
         problems["name"] = NO_LETTERS
     category = chosen(session, Category, form.get("category_id", ""))
     if category is None:

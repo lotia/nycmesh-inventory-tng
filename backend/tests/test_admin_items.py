@@ -70,6 +70,7 @@ def test_an_item_name_needs_more_than_punctuation(
         refused
     )
     assert admin_client.post(ITEMS, data=form | {"name": "Câble ½"}).status_code == 303
+    assert admin_client.post(ITEMS, data=form | {"name": "1234"}).status_code == 303
 
 
 def test_an_item_needs_a_name_and_a_current_category(
