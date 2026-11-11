@@ -143,6 +143,7 @@ HISTORY_TABLES = {
     "reset_link",
     "site_settings",
     "adjustment_reason",
+    "open_package",
 }
 
 

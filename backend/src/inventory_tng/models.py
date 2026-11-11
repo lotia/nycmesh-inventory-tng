@@ -121,7 +121,9 @@ LOCATION_KINDS = ("store", "area", "vehicle", "custody")
 STORE_KINDS = ("store", "area")
 # What a transaction is. A count or an adjustment fixes the records, with
 # stock found (NULL to a location) or lost (a location to NULL).
-TRANSACTION_KINDS = ("move", "receipt", "install", "count", "adjustment")
+# Opening a package turns a sealed one into an open one, or into loose
+# units, at one place: its from and to are that place (docs/decisions/0020).
+TRANSACTION_KINDS = ("move", "receipt", "install", "count", "adjustment", "open")
 # What administrators are told of (activity.py): changes to who may sign
 # in. A new kind is added here, to activity.WORDS and to its migration's
 # check.
@@ -313,6 +315,10 @@ class Item(Versioned, Base):
     )
     notes: Mapped[str | None] = mapped_column(Text)
     ordering_notes: Mapped[str | None] = mapped_column(Text)
+    # Whether opening one of its packages makes an open package, followed
+    # until used up, or loose units: each package's default
+    # (docs/decisions/0020, Amendment).
+    track_opened: Mapped[bool] = mapped_column(server_default=text("false"))
     retired_at: Mapped[RetiredAt]
 
     # Everything a volunteer might type to find an item, as one string, kept
@@ -344,7 +350,45 @@ class ItemPackage(Base):
     name: Mapped[str] = mapped_column(Text)
     # In the item's unit.
     size: Mapped[Decimal] = mapped_column(QUANTITY)
+    # NULL: as the item's track_opened says; else this package's own
+    # (items.tracks_opened).
+    track_opened: Mapped[bool | None]
     retired_at: Mapped[RetiredAt]
+
+
+class OpenPackage(Base):
+    """A package opened at a place and followed until used up: what is left
+    on it is its balance in the ledger, where movements name it
+    (docs/decisions/0020). Made only for a package whose item tracks opened
+    ones (items.tracks_opened). A volunteer reports it used up; an
+    administrator closes it, with an adjustment of what it still showed."""
+
+    __tablename__ = "open_package"
+    __table_args__ = (
+        CheckConstraint(
+            "(reported_at IS NULL) = (reported_by_volunteer_id IS NULL)",
+            name="reported_by",
+        ),
+        CheckConstraint(
+            "(closed_at IS NULL) = (closed_by_admin_id IS NULL)", name="closed_by"
+        ),
+        protection(owner="open_packages.py", lock="row", history=True),
+    )
+
+    id: Mapped[IntId]
+    # Made by whoever opened it, the scan page or a count, so the same
+    # opening sent again makes it once, and a later line can name it first.
+    key: Mapped[uuid.UUID] = mapped_column(unique=True)
+    opened_at: Mapped[CreatedAt]
+    item_id: Mapped[int] = _reference("item.id")
+    package_id: Mapped[int] = _reference("item_package.id")
+    # Where it is now: where it was opened, until moved whole
+    # (ledger.insert_transaction moves it).
+    location_id: Mapped[int] = _reference("location.id")
+    reported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reported_by_volunteer_id: Mapped[int | None] = _reference("volunteer.id")
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    closed_by_admin_id: Mapped[int | None] = _reference("admin.id")
 
 
 class Vendor(Base):
@@ -623,10 +667,14 @@ class LedgerTransaction(Base):
     __tablename__ = "ledger_transaction"
     __table_args__ = (
         CheckConstraint(_one_of("kind", TRANSACTION_KINDS), name="kind"),
-        CheckConstraint("from_location_id <> to_location_id", name="two_places"),
+        CheckConstraint(
+            "from_location_id <> to_location_id OR kind = 'open'", name="two_places"
+        ),
         CheckConstraint(
             "CASE kind"
             " WHEN 'move' THEN num_nulls(from_location_id, to_location_id) = 0"
+            " WHEN 'open' THEN from_location_id IS NOT NULL"
+            " AND from_location_id = to_location_id"
             " WHEN 'receipt' THEN from_location_id IS NULL"
             " AND to_location_id IS NOT NULL"
             " WHEN 'install' THEN from_location_id IS NOT NULL"
@@ -677,17 +725,31 @@ class LedgerTransaction(Base):
 
 class Movement(Base):
     """One line of a transaction: an item and how much of it, in the item's
-    unit."""
+    unit, and the form it leaves in and arrives in (docs/decisions/0020): a
+    sealed package (package_id), an open package (open_package_id), or
+    neither, loose. ledger.Form is one side's."""
 
     __tablename__ = "movement"
     __table_args__ = (
         CheckConstraint("quantity > 0", name="quantity"),
-        # An item once in a transaction (ledger.insert_transaction refuses a
-        # repeat first); it also serves look-ups by transaction.
+        CheckConstraint(
+            "num_nonnulls(from_package_id, from_open_package_id) <= 1",
+            name="one_form_leaving",
+        ),
+        CheckConstraint(
+            "num_nonnulls(to_package_id, to_open_package_id) <= 1",
+            name="one_form_arriving",
+        ),
+        # An item in a form once in a transaction (ledger.insert_transaction
+        # refuses a repeat first); it also serves look-ups by transaction.
         Index(
-            "uq_movement_transaction_id_item_id",
+            "uq_movement_line",
             "transaction_id",
             "item_id",
+            text("coalesce(from_package_id, 0)"),
+            text("coalesce(from_open_package_id, 0)"),
+            text("coalesce(to_package_id, 0)"),
+            text("coalesce(to_open_package_id, 0)"),
             unique=True,
         ),
         protection(owner=None, lock=None, history=False),
@@ -697,6 +759,10 @@ class Movement(Base):
     transaction_id: Mapped[int] = _reference("ledger_transaction.id", index=False)
     item_id: Mapped[int] = _reference("item.id")
     quantity: Mapped[Decimal] = mapped_column(QUANTITY)
+    from_package_id: Mapped[int | None] = _reference("item_package.id")
+    from_open_package_id: Mapped[int | None] = _reference("open_package.id")
+    to_package_id: Mapped[int | None] = _reference("item_package.id")
+    to_open_package_id: Mapped[int | None] = _reference("open_package.id")
 
 
 class ScanSettings(Versioned, Base):

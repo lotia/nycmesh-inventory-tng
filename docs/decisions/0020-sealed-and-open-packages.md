@@ -151,6 +151,8 @@ deployed, so the migrations may be rewritten (0016).
 - A volunteer cutting cable picks an open package; with two at a place,
   picking the wrong one is possible, and the next count corrects it.
 - Open packages can be listed, so stock shows what is on each.
+- Opening is a transaction of its own kind, `open`, whose from and to are
+  the same place, the one kind that may name one place twice.
 - Metrics: packages opened; reported used up, by how (`cut`, `button`);
   closed, by how (`confirmed`, `direct`, `count`); and reports cleared as
   not used up.

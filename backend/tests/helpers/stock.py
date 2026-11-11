@@ -2,19 +2,24 @@
 and signs of the pages that put stock right."""
 
 import uuid
+from collections.abc import Mapping
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any, Protocol
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.ledger import Batch, record
+from inventory_tng import open_packages
+from inventory_tng.ledger import LOOSE, Batch, Entry, Form, insert_transaction, record
 from inventory_tng.models import (
     AdjustmentReason,
     Category,
     Item,
+    ItemPackage,
     LedgerTransaction,
     Location,
+    OpenPackage,
     Volunteer,
 )
 from inventory_tng.pages import retired_holding
@@ -135,3 +140,57 @@ def at_retired_van(session: Session) -> Place:
     retire(session, place.van)
     write(session, place)
     return place
+
+
+class Spools:
+    """A Place whose cable comes in spools of 305 m, tracked when opened
+    (docs/decisions/0020), and two sealed ones received into its store."""
+
+    def __init__(self, session: Session, *, tracked: bool = True) -> None:
+        self.session = session
+        self.place = Place(session)
+        self.cable = self.place.cable
+        self.cable.track_opened = tracked
+        self.spool = add(
+            session, ItemPackage(item_id=self.cable.id, name="Spool", size=305)
+        )
+        self.store, self.van = self.place.store, self.place.van
+        self.write(
+            {"kind": "receipt", "to_location_id": self.store.id},
+            Entry(self.cable.id, Decimal(610), LOOSE, self.sealed),
+        )
+
+    @property
+    def sealed(self) -> Form:
+        return Form(package_id=self.spool.id)
+
+    def write(
+        self, header: Mapping[str, object], *lines: Entry
+    ) -> LedgerTransaction | None:
+        return insert_transaction(self.session, uuid.uuid4(), header, lines)
+
+    def opened(self) -> OpenPackage:
+        """One spool opened in the store: an open package of all 305 m."""
+        made = open_packages.make(
+            self.session, uuid.uuid4(), self.spool.id, self.store.id
+        )
+        self.write(
+            {
+                "kind": "open",
+                "from_location_id": self.store.id,
+                "to_location_id": self.store.id,
+            },
+            Entry(
+                self.cable.id, Decimal(305), self.sealed, Form(open_package_id=made.id)
+            ),
+        )
+        return made
+
+    def move(self, *lines: Entry, kind: str = "move") -> LedgerTransaction | None:
+        """From the store to the van."""
+        header = {
+            "kind": kind,
+            "from_location_id": self.store.id,
+            "to_location_id": self.van.id,
+        }
+        return self.write(header, *lines)

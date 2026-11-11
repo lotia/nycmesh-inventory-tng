@@ -46,7 +46,7 @@ from inventory_tng.admin.common import (
 from inventory_tng.admin.settings import SETTINGS
 from inventory_tng.db import DbSession, by_name, refusal
 from inventory_tng.ledger import (
-    Lines,
+    ItemLines,
     corrected,
     countable,
     expected,
@@ -307,7 +307,9 @@ def named_twice(found: Sequence[Line]) -> dict[str, int | None]:
     }
 
 
-def _counted(session: Session, found: Collection[Line]) -> tuple[Lines, dict[str, str]]:
+def _counted(
+    session: Session, found: Collection[Line]
+) -> tuple[ItemLines, dict[str, str]]:
     """What was typed, as lines of an item and an amount, and what is wrong
     with it."""
     units = dict(

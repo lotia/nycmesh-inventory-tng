@@ -64,9 +64,11 @@ from inventory_tng.models import (
     INTEGER_MAX,
     STORE_KINDS,
     Item,
+    ItemPackage,
     LedgerTransaction,
     Location,
     Movement,
+    OpenPackage,
     Volunteer,
 )
 
@@ -76,36 +78,69 @@ meter = metrics.get_meter(__name__)
 router = APIRouter()
 
 
-def _balance() -> Subquery:
-    """In minus out, for every item and place stock has been at: a place
-    whose stock all left keeps its row, at zero. Each side of a transaction
-    is a select of its own, joined by UNION ALL, so a filter on a place or
-    an item reaches the indexes on each side, instead of summing the whole
-    ledger first."""
+class Form(NamedTuple):
+    """The form stock is in on one side of a ledger line
+    (docs/decisions/0020): sealed packages of `package_id`, the open package
+    `open_package_id`, or neither: loose units."""
+
+    package_id: int | None = None
+    open_package_id: int | None = None
+
+
+LOOSE = Form()
+
+
+class Entry(NamedTuple):
+    """A line of a transaction: so much of an item, in its unit, leaving in
+    one form and arriving in another. A line given as just an item and an
+    amount is loose on both sides."""
+
+    item_id: int
+    quantity: Decimal
+    leaves: Form = LOOSE
+    arrives: Form = LOOSE
+
+
+def _sides() -> Subquery:
+    """Each side of every line, as stock into a place (+) or out of it (-),
+    in the form it is in there. Each side is a select of its own, joined by
+    UNION ALL, so a filter on a place or an item reaches the indexes on each
+    side, instead of summing the whole ledger first."""
     moved = select(Movement.item_id).join(
         LedgerTransaction, LedgerTransaction.id == Movement.transaction_id
     )
     into = moved.add_columns(
         LedgerTransaction.to_location_id.label("location_id"),
+        Movement.to_package_id.label("package_id"),
+        Movement.to_open_package_id.label("open_package_id"),
         Movement.quantity.label("quantity"),
     ).where(LedgerTransaction.to_location_id.is_not(None))
     out = moved.add_columns(
-        LedgerTransaction.from_location_id, -Movement.quantity
+        LedgerTransaction.from_location_id,
+        Movement.from_package_id,
+        Movement.from_open_package_id,
+        -Movement.quantity,
     ).where(LedgerTransaction.from_location_id.is_not(None))
-    side = union_all(into, out).subquery("side")
+    return union_all(into, out).subquery("side")
+
+
+def _summed(name: str, *by: str) -> Subquery:
+    side = _sides()
+    columns = [side.c[column] for column in ("item_id", "location_id", *by)]
     return (
-        select(
-            side.c.item_id,
-            side.c.location_id,
-            func.sum(side.c.quantity).label("quantity"),
-        )
-        .group_by(side.c.item_id, side.c.location_id)
-        .subquery("balance")
+        select(*columns, func.sum(side.c.quantity).label("quantity"))
+        .group_by(*columns)
+        .subquery(name)
     )
 
 
-# Read as a table: select(balance.c.quantity).where(balance.c.item_id == ...).
-balance = _balance()
+# In minus out, for every item and place stock has been at, whatever its
+# form: a place whose stock all left keeps its row, at zero. Read as a
+# table: select(balance.c.quantity).where(balance.c.item_id == ...).
+balance = _summed("balance")
+# The same, by form too: package_id for sealed packages, open_package_id
+# for an open one, neither for loose units (Form).
+by_form = _summed("by_form", "package_id", "open_package_id")
 
 
 # Less than nothing at a place: the records are wrong there until it is
@@ -233,33 +268,40 @@ def line_breaks(kind: str, item: Item, amount: Decimal) -> list[str]:
 
 
 def lines_break(
-    kind: str, items: Mapping[int, Item], lines: Iterable[tuple[int, Decimal]]
+    kind: str, items: Mapping[int, Item], lines: Lines
 ) -> list[list[str] | None]:
-    """For each line, of an item id and an amount, the rules it breaks
-    (line_breaks), or None if its item is not in `items`."""
+    """For each line the rules of its item it breaks (line_breaks), or None
+    if its item is not in `items`."""
     return [
         None
-        if (item := items.get(item_id)) is None
-        else line_breaks(kind, item, amount)
-        for item_id, amount in lines
+        if (item := items.get(line.item_id)) is None
+        else line_breaks(kind, item, line.quantity)
+        for line in entries(lines)
     ]
 
 
-# A transaction's lines, each an item id and an amount, an item on one line
-# only (repeated), as its movements' unique index keeps them.
-Lines = Sequence[tuple[int, Decimal]]
+# A transaction's lines: Entry, or just an item id and an amount, loose. An
+# item in each form on one line only (repeated), as its movements' unique
+# index keeps them.
+Lines = Sequence[Entry | tuple[int, Decimal]]
+# Lines of an item and an amount alone, loose: a volunteer's batch, as yet,
+# and a count's.
+ItemLines = Sequence[tuple[int, Decimal]]
 
 
-def repeated(item_ids: Sequence[int | None]) -> set[int]:
-    """The positions of the lines whose item another line names too (None
-    names no item, so repeats none). A batch or a count names each item on
-    one line: the ledger refuses a second (movement_item_once), so a page
-    or the scan API says which lines, before it would."""
-    times = Counter(item_ids)
+def entries(lines: Lines) -> list[Entry]:
+    return [Entry(*line) for line in lines]
+
+
+def repeated[K](keys: Sequence[K | None]) -> set[int]:
+    """The positions of the lines whose key, such as an item, another line
+    has too (None is no key, so repeats none). A batch or a count names each
+    item, in each form, on one line: the ledger refuses a second
+    (movement_item_once), so a page or the scan API says which lines,
+    before it would."""
+    times = Counter(keys)
     return {
-        number
-        for number, item_id in enumerate(item_ids)
-        if item_id is not None and times[item_id] > 1
+        number for number, key in enumerate(keys) if key is not None and times[key] > 1
     }
 
 
@@ -267,6 +309,107 @@ def on_order_after(on_order: Decimal, received: Decimal) -> Decimal:
     """An item's on_order once `received` of it arrives: down by that much,
     never below zero."""
     return max(on_order - received, Decimal(0))
+
+
+class PackageFacts(NamedTuple):
+    """What the ledger's rules read of a package: its item, its size, and
+    whether opening one makes an open package (items.tracks_opened)."""
+
+    item_id: int
+    size: Decimal
+    tracked: bool
+
+
+class OpenFacts(NamedTuple):
+    """What the ledger's rules read of an open package: its item and
+    package, where it is, whether closed, what is left on it there, and
+    whether any line names it yet."""
+
+    item_id: int
+    package_id: int
+    location_id: int
+    closed: bool
+    left: Decimal
+    new: bool
+
+
+def form_breaks(
+    kind: str,
+    entry: Entry,
+    places: tuple[int | None, int | None],
+    packages: Mapping[int, PackageFacts],
+    opens: Mapping[int, OpenFacts],
+) -> list[str]:
+    """The rules of docs/decisions/0020 a line breaks, in a transaction of
+    `kind` between `places` (from, to; None outside). Empty if none.
+
+    - No form outside: what comes from or goes outside is loose.
+    - A sealed side names a package of the line's item, and moves a whole
+      number of them.
+    - An open side names an open package of the line's item, not closed,
+      at that side's place, but for one moved whole: all that is left on it
+      leaves one place and arrives at the other.
+    - Between two places, stock keeps its form, or leaves an open package
+      loose (a cut); only opening changes it otherwise, a sealed package
+      into an open one, made for it and full, if its item tracks opened
+      packages, else into loose units."""
+    broken: list[str] = []
+    sides = list(zip(places, (entry.leaves, entry.arrives), strict=True))
+    if any(place is None and form != LOOSE for place, form in sides):
+        broken.append("movement_form_outside")
+    for arriving, (place, form) in enumerate(sides):
+        if form.package_id is not None:
+            package = packages.get(form.package_id)
+            if package is None or package.item_id != entry.item_id:
+                broken.append("movement_package_of_item")
+            elif entry.quantity % package.size != 0:
+                broken.append("movement_whole_packages")
+        if form.open_package_id is not None:
+            opened = opens.get(form.open_package_id)
+            if opened is None or opened.item_id != entry.item_id:
+                broken.append("movement_open_package_of_item")
+                continue
+            if opened.closed:
+                broken.append("movement_open_package_closed")
+            whole = arriving and entry.leaves == entry.arrives
+            if not whole and place is not None and place != opened.location_id:
+                broken.append("movement_open_package_place")
+    leaves, arrives = entry.leaves, entry.arrives
+    if kind == "open":
+        broken += _opening_breaks(entry, packages, opens)
+    elif None not in places:
+        cut = leaves.open_package_id is not None and arrives == LOOSE
+        if leaves != arrives and not cut:
+            broken.append("movement_form_change")
+        elif leaves.open_package_id is not None and leaves == arrives:
+            opened = opens.get(leaves.open_package_id)
+            if opened is not None and entry.quantity != opened.left:
+                broken.append("movement_open_package_whole")
+    return list(dict.fromkeys(broken))
+
+
+def _opening_breaks(
+    entry: Entry, packages: Mapping[int, PackageFacts], opens: Mapping[int, OpenFacts]
+) -> list[str]:
+    """form_breaks' rules of opening: a sealed package becomes an open one,
+    made for it, unopened before, and full; or loose units, as its item
+    says (opening_follows_setting)."""
+    package = packages.get(entry.leaves.package_id or 0)
+    if package is None or entry.leaves.open_package_id is not None:
+        return ["opening_from_sealed"]
+    if entry.arrives.package_id is not None:
+        return ["opening_from_sealed"]
+    opened_id = entry.arrives.open_package_id
+    if (opened_id is not None) != package.tracked:
+        return ["opening_follows_setting"]
+    opened = opens.get(opened_id or 0)
+    if opened is None:
+        return []
+    if not opened.new or opened.package_id != entry.leaves.package_id:
+        return ["open_package_opened_once"]
+    if entry.quantity != package.size:
+        return ["open_package_full"]
+    return []
 
 
 def expected(
@@ -524,7 +667,13 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
 #    (items.save, items.retire), which waits for it, and it for that.
 # 3. Its volunteer, device and administrator, FOR KEY SHARE, as the
 #    transaction's foreign keys take them.
-# 4. A receipt's items, FOR NO KEY UPDATE, by id (_receive), to lower what
+# 4. Its packages, FOR KEY SHARE, by id: their item, size and whether
+#    tracked opened, which a change to one waits for (items.py).
+# 5. Its open packages, FOR NO KEY UPDATE, by id: where each is and whether
+#    closed, which a report or close waits for (open_packages.py), and what
+#    is left on it, which another line on it waits for; and so a whole move
+#    changes where it is.
+# 6. A receipt's items, FOR NO KEY UPDATE, by id (_receive), to lower what
 #    is on order, which KEY SHARE does not wait for.
 
 
@@ -573,6 +722,95 @@ def hold(
     return Held(places, {item.id: item for item in held}, custody)
 
 
+def _hold_forms(
+    session: Session, lines: Sequence[Entry]
+) -> tuple[dict[int, PackageFacts], dict[int, OpenFacts], dict[int, OpenPackage]]:
+    """Hold the packages and open packages a transaction's lines name, in
+    that order (above), and read what form_breaks needs of them."""
+    forms = [form for line in lines for form in (line.leaves, line.arrives)]
+    package_ids = sorted({f.package_id for f in forms if f.package_id is not None})
+    open_ids = sorted(
+        {f.open_package_id for f in forms if f.open_package_id is not None}
+    )
+    packages: dict[int, PackageFacts] = {}
+    if package_ids:
+        rows = session.execute(
+            locked(
+                select(ItemPackage, Item.track_opened)
+                .join(Item, Item.id == ItemPackage.item_id)
+                .where(ItemPackage.id.in_(package_ids))
+                .order_by(ItemPackage.id),
+                key_share=True,
+                shared=True,
+                of=ItemPackage,
+            )
+        )
+        packages = {
+            package.id: PackageFacts(
+                package.item_id,
+                package.size,
+                tracks_opened(item_tracks, package.track_opened),
+            )
+            for package, item_tracks in rows
+        }
+    if not open_ids:
+        return packages, {}, {}
+    opened = {
+        row.id: row
+        for row in session.scalars(
+            locked(
+                select(OpenPackage)
+                .where(OpenPackage.id.in_(open_ids))
+                .order_by(OpenPackage.id),
+                key_share=True,
+            )
+        )
+    }
+    left = dict(
+        session.execute(
+            select(by_form.c.open_package_id, by_form.c.quantity).where(
+                by_form.c.open_package_id.in_(open_ids),
+                by_form.c.location_id
+                == select(OpenPackage.location_id)
+                .where(OpenPackage.id == by_form.c.open_package_id)
+                .scalar_subquery(),
+            )
+        ).all()
+    )
+    named = set(
+        session.scalars(
+            select(Movement.from_open_package_id).where(
+                Movement.from_open_package_id.in_(open_ids)
+            )
+        )
+    ) | set(
+        session.scalars(
+            select(Movement.to_open_package_id).where(
+                Movement.to_open_package_id.in_(open_ids)
+            )
+        )
+    )
+    facts = {
+        row.id: OpenFacts(
+            row.item_id,
+            row.package_id,
+            row.location_id,
+            row.closed_at is not None,
+            left.get(row.id, Decimal(0)),
+            row.id not in named,
+        )
+        for row in opened.values()
+    }
+    return packages, facts, opened
+
+
+def tracks_opened(item: bool, package: bool | None) -> bool:
+    """Whether opening a package makes an open package, followed until used
+    up (docs/decisions/0020, Amendment): the package's own setting, if it
+    has one, else its item's."""
+    return item if package is None else package
+
+
 def _where(header: Mapping[str, object], custody: frozenset[int]) -> int | None:
     """The place whose zone a transaction happened in: where stock left,
     else where it arrived (a receipt, or stock a count or adjustment
@@ -602,12 +840,18 @@ def insert_transaction(
     receipt lowers what is on order of each item it brings. RuleBroken
     (movement_item_once) for an item on more than one line."""
     kind = str(header["kind"])
+    lines = entries(lines)
     enforce("ledger_transaction_lines", when=not lines and kind != "count")
     held = hold(session, header, _each_once(lines))
     items = held.items
     for broken in lines_break(kind, items, lines):
         # An item that does not exist is the foreign key's to refuse.
         for rule in broken or ():
+            enforce(rule)
+    packages, opens, opened = _hold_forms(session, lines)
+    places = (_place(header, "from_location_id"), _place(header, "to_location_id"))
+    for line in lines:
+        for rule in form_breaks(kind, line, places, packages, opens):
             enforce(rule)
     zone = zone_at(session, _where(header, held.custody))
     transaction = session.scalar(
@@ -629,29 +873,54 @@ def insert_transaction(
             [
                 {
                     "transaction_id": transaction.id,
-                    "item_id": item_id,
-                    "quantity": amount,
+                    "item_id": line.item_id,
+                    "quantity": line.quantity,
+                    "from_package_id": line.leaves.package_id,
+                    "from_open_package_id": line.leaves.open_package_id,
+                    "to_package_id": line.arrives.package_id,
+                    "to_open_package_id": line.arrives.open_package_id,
                 }
-                for item_id, amount in lines
+                for line in lines
             ],
         )
+        _move_whole(opened, lines, places[1])
         if transaction.kind == "receipt":
             _receive(session, lines)
     return transaction
 
 
-def _each_once(lines: Lines) -> list[int]:
-    """The lines' items, each on one line, or RuleBroken
+def _place(header: Mapping[str, object], side: str) -> int | None:
+    place = header.get(side)
+    return place if isinstance(place, int) else None
+
+
+def _move_whole(
+    opened: Mapping[int, OpenPackage], lines: Sequence[Entry], to: int | None
+) -> None:
+    """An open package moved whole is where it arrived (form_breaks checked
+    that all of it did). Through the ORM, so it is history; locked by
+    _hold_forms."""
+    for line in lines:
+        open_id = line.arrives.open_package_id
+        if open_id is not None and line.leaves == line.arrives and to is not None:
+            opened[open_id].location_id = to
+            log.info("open package moved", open_package_id=open_id, location_id=to)
+
+
+def _each_once(lines: Sequence[Entry]) -> list[int]:
+    """The lines' items, each in each form on one line, or RuleBroken
     (movement_item_once)."""
-    item_ids = [item_id for item_id, _ in lines]
-    enforce("movement_item_once", when=bool(repeated(item_ids)))
-    return item_ids
+    keys = [(line.item_id, line.leaves, line.arrives) for line in lines]
+    enforce("movement_item_once", when=bool(repeated(keys)))
+    return list(dict.fromkeys(line.item_id for line in lines))
 
 
-def _receive(session: Session, lines: Lines) -> None:
+def _receive(session: Session, lines: Sequence[Entry]) -> None:
     """Through the ORM, so it is history. The items locked by id, so two
     receipts of the same items take them in one order."""
-    received = dict(lines)
+    received: dict[int, Decimal] = {}
+    for line in lines:
+        received[line.item_id] = received.get(line.item_id, Decimal(0)) + line.quantity
     items = session.scalars(
         locked(
             select(Item)
@@ -673,7 +942,7 @@ LINE_PROBLEMS: dict[str, tuple[str, Literal["not_whole", "retired"]]] = {
 
 
 def _problems(
-    session: Session, batch: Batch, held: Held, lines: Lines
+    session: Session, batch: Batch, held: Held, lines: ItemLines
 ) -> list[Problem]:
     """What is wrong with a batch, line by line (`lines`, its own), with its
     rows held (hold)."""
@@ -782,7 +1051,7 @@ def record_count(
     key: uuid.UUID,
     admin_id: int,
     location_id: int,
-    counted: Lines,
+    counted: ItemLines,
     as_of: int,
 ) -> Counted:
     """Put the records right for what was counted at a place, as they stood
@@ -803,7 +1072,7 @@ def record_count(
     RuleBroken (location_countable) at a place that may not be counted,
     unless the form was sent there before, so it gets its first answer;
     RuleBroken (movement_item_once) for an item counted on two lines."""
-    _each_once(counted)
+    _each_once(entries(counted))
     counted_at = dict(counted)
     lock_place(session, location_id)
     lost_key = uuid.uuid5(key, "lost")
