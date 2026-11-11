@@ -1173,3 +1173,167 @@ def test_a_packages_settings_are_set_on_its_items_page(
     spools.spool.retired_at = datetime.now(UTC)
     session.flush()
     assert admin_client.post(path, data={}).status_code == 404
+
+
+# Counting by form (8i4.133.8).
+
+
+def test_a_count_by_form_finds_and_loses_form_by_form() -> None:
+    then = {(CABLE, SEALED): Decimal(610), (CABLE, opened(OPEN)): Decimal(120)}
+    counted = [
+        (CABLE, SEALED, Decimal(305)),
+        (CABLE, opened(OPEN), Decimal(120)),
+        (CABLE, LOOSE, Decimal(40)),
+    ]
+    found, lost = ledger.count_corrections(counted, then)
+    assert found == [Entry(CABLE, Decimal(40), LOOSE, LOOSE)]
+    assert lost == [Entry(CABLE, Decimal(305), SEALED, LOOSE)]
+
+
+def counter(session: Session) -> int:
+    return add(session, Admin(username=f"counter-{tag()}")).id
+
+
+def test_record_count_by_form(session: Session, spools: Spools) -> None:
+    made = spools.opened()
+    store, cable = spools.store.id, spools.cable.id
+    as_of = ledger.moment(session, store)
+    lines = [
+        (cable, spools.sealed, Decimal(0)),
+        (cable, Form(open_package_id=made.id), Decimal(250)),
+        (cable, LOOSE, Decimal(20)),
+    ]
+    done = ledger.record_count(
+        session, uuid.uuid4(), counter(session), store, [], as_of, by_form=lines
+    )
+    assert (done.differed, done.moved) == (True, {})
+    assert forms(session, spools.cable) == {
+        (store, None, made.id): 250,
+        (store, None, None): 20,
+    }
+    with breaks(session, "movement_item_once"):
+        ledger.record_count(
+            session,
+            uuid.uuid4(),
+            counter(session),
+            store,
+            [(cable, Decimal(1))],
+            ledger.moment(session, store),
+            by_form=lines[:1],
+        )
+    with breaks(session, "movement_item_once"):
+        ledger.record_count(
+            session,
+            uuid.uuid4(),
+            counter(session),
+            store,
+            [],
+            ledger.moment(session, store),
+            by_form=[lines[2], lines[2]],
+        )
+
+
+def test_an_opening_while_counting_by_form_asks_again(
+    session: Session, spools: Spools
+) -> None:
+    store, cable = spools.store.id, spools.cable.id
+    as_of = ledger.moment(session, store)
+    spools.opened()
+    done = ledger.record_count(
+        session,
+        uuid.uuid4(),
+        counter(session),
+        store,
+        [],
+        as_of,
+        by_form=[(cable, spools.sealed, Decimal(610))],
+    )
+    assert cable in done.moved
+    assert done.written == [] or all(each.lines == 0 for each in done.written)
+
+
+COUNTS = "/admin/counts"
+
+
+def test_the_count_page_counts_forms_finds_and_closes(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    store, cable = spools.store.id, spools.cable.id
+    one, two = spools.opened(), spools.opened()
+    page = text(admin_client.get(f"{COUNTS}/{store}"))
+    assert f'name="sealed_{cable}_{spools.spool.id}"' not in page  # None sealed now.
+    assert f'name="opened_{one.id}"' in page
+    assert f'name="state_{two.id}"' in page
+    form = {
+        "key": str(uuid.uuid4()),
+        "as_of": str(ledger.moment(session, store)),
+        f"opened_{one.id}": "300",
+        f"opened_{two.id}": "305",
+        f"state_{two.id}": "missing",
+        f"loose_{cable}": "7",
+        "found_package_id": str(spools.spool.id),
+        "found_left": "40",
+    }
+    done = admin_client.post(f"{COUNTS}/{store}", data=form)
+    assert done.status_code == 303, text(done)
+    session.refresh(two)
+    assert two.closed_at is not None
+    held = forms(session, spools.cable)
+    assert held[(store, None, one.id)] == 300
+    assert held[(store, None, None)] == 7
+    found = session.scalars(
+        select(OpenPackage).where(
+            OpenPackage.key == uuid.uuid5(uuid.UUID(form["key"]), "found")
+        )
+    ).one()
+    assert held[(store, None, found.id)] == 40
+    lost = session.scalars(
+        select(LedgerTransaction).where(LedgerTransaction.kind == "adjustment")
+    ).one()
+    assert session.get_one(AdjustmentReason, lost.reason_id).name == "Lost or stolen"
+    bad = form | {"key": str(uuid.uuid4()), f"opened_{one.id}": "lots"}
+    assert admin_client.post(f"{COUNTS}/{store}", data=bad).status_code == 400
+
+
+def test_the_count_page_counts_sealed_and_says_whats_wrong(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    store, cable, spool = spools.store.id, spools.cable.id, spools.spool.id
+    spools.write({"kind": "receipt", "to_location_id": store}, Entry(cable, Decimal(5)))
+    field = f"sealed_{cable}_{spool}"
+    assert f'name="{field}"' in text(admin_client.get(f"{COUNTS}/{store}"))
+    as_of = str(ledger.moment(session, store))
+    base = {"as_of": as_of}
+    done = admin_client.post(
+        f"{COUNTS}/{store}", data=base | {"key": str(uuid.uuid4()), field: "1"}
+    )
+    assert done.status_code == 303
+    # Its loose line, left as the records had it, is counted as it was.
+    assert forms(session, spools.cable) == {
+        (store, spool, None): 305,
+        (store, None, None): 5,
+    }
+    elsewhere = spools.opened()
+    whole = Form(open_package_id=elsewhere.id)
+    spools.move(Entry(cable, Decimal(305), whole, whole))
+    bad = base | {
+        "key": str(uuid.uuid4()),
+        f"sealed_{cable}_999999": "1",
+        field: "half",
+        "loose_999999": "1",
+        f"loose_{cable}": "lots",
+        f"opened_{elsewhere.id}": "1",
+        "found_package_id": "999999",
+    }
+    response = admin_client.post(f"{COUNTS}/{store}", data=bad)
+    # Refused whole; what the page shows a field for is said by it.
+    assert response.status_code == 400
+    assert "A whole number of packages." in text(response)
+    left = base | {
+        "key": str(uuid.uuid4()),
+        "found_package_id": str(spool),
+        "found_left": "",
+    }
+    assert "How much is left on it." in text(
+        admin_client.post(f"{COUNTS}/{store}", data=left)
+    )

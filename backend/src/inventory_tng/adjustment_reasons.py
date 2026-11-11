@@ -20,11 +20,21 @@ log = structlog.get_logger(__name__)
 USED_UP = "Used up"
 
 
+# The reason a count gives for an open package not there (0020).
+LOST = "Lost or stolen"
+
+
 def used_up(session: Session) -> AdjustmentReason:
     """The Used up reason, current, as migration 0026 seeds it; made again
     if an administrator renamed it, and brought back if retired."""
+    return seeded(session, USED_UP)
+
+
+def seeded(session: Session, name: str) -> AdjustmentReason:
+    """A reason the app gives itself, current: made again if an
+    administrator renamed it, and brought back if retired."""
     named = select(AdjustmentReason).where(
-        func.lower(AdjustmentReason.name) == USED_UP.lower()
+        func.lower(AdjustmentReason.name) == name.lower()
     )
     # A current one first: only a current name is unique.
     reason = session.scalars(
@@ -33,7 +43,7 @@ def used_up(session: Session) -> AdjustmentReason:
     if reason is None:
         try:
             with session.begin_nested():
-                reason = add(session, USED_UP)
+                reason = add(session, name)
         except exc.IntegrityError:
             # Made by a close at the same time, now committed.
             return session.scalars(
