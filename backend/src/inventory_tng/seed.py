@@ -114,6 +114,8 @@ def _catalogue(session: Session) -> None:
                 unit=unit,
                 manufacturer=maker,
                 part_number=part,
+                # The cable's opened boxes are followed (docs/decisions/0020).
+                track_opened=name == PACKAGE[0],
             ),
         )
         for name, category, unit, maker, part in ITEMS

@@ -56,7 +56,10 @@ export const BatchBody = v.object({
       quantity: v.union([v.number(), v.string()]),
       /** Sealed packages of it, kept sealed; absent (an older page's): loose. */
       package_id: nullableId,
-      /** An opening's: the key of the open package it makes, followed. */
+      /** A move's taken from an open package: all of it, moved whole. */
+      whole: v.exactOptional(v.nullable(v.boolean())),
+      /** An opening's: the key of the open package it makes, followed;
+       * another's, the open package it is taken from. */
       open_package_key: v.exactOptional(
         v.nullable(v.pipe(v.string(), v.uuid())),
       ),

@@ -685,3 +685,97 @@ def test_packages_the_page_thought_followed_open_loose_together(
     assert registered_client.post(URL, json=batch).status_code == 200
     store = spools.store.id
     assert forms(session, spools.cable) == {(store, None, None): 610}
+
+
+# Cutting from an open package, and moving one whole, on the scan page.
+
+
+def taken(made: OpenPackage, quantity: str, **fields: object) -> dict[str, object]:
+    return {
+        "item_id": made.item_id,
+        "quantity": quantity,
+        "open_package_key": str(made.key),
+    } | fields
+
+
+def test_cut_from_an_open_package_or_moved_whole_by_its_key(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    made = spools.opened()
+    store, van = spools.store.id, spools.van.id
+    cut = spools.place.batch(lines=[taken(made, "20")])
+    assert registered_client.post(URL, json=cut).status_code == 201
+    assert registered_client.post(URL, json=cut).status_code == 200
+    assert forms(session, spools.cable)[(store, None, made.id)] == 285
+    assert forms(session, spools.cable)[(van, None, None)] == 20
+    whole = spools.place.batch(lines=[taken(made, "285", whole=True)])
+    assert registered_client.post(URL, json=whole).status_code == 201
+    session.refresh(made)
+    assert made.location_id == van
+    assert forms(session, spools.cable)[(van, None, made.id)] == 285
+    # Cut at an install, from the van.
+    install = spools.place.batch(
+        kind="install",
+        from_location_id=van,
+        to_location_id=None,
+        lines=[taken(made, "30")],
+    )
+    assert registered_client.post(URL, json=install).status_code == 201
+    assert forms(session, spools.cable)[(van, None, made.id)] == 255
+
+
+def test_taking_from_an_open_package_is_refused_saying_why(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    made = spools.opened()
+    van = spools.van.id
+
+    def refused(batch: dict[str, object]) -> list[tuple[list[object], str]]:
+        response = registered_client.post(URL, json=batch)
+        assert response.status_code == 422
+        return [(p["loc"][1:], p["type"]) for p in response.json()["detail"]]
+
+    unknown = taken(made, "1", open_package_key=str(uuid.uuid4()))
+    assert refused(spools.place.batch(lines=[unknown])) == [
+        (["lines", 0, "open_package_key"], "not_found")
+    ]
+    assert refused(spools.place.batch(lines=[taken(made, "5", whole=True)])) == [
+        (["lines", 0, "quantity"], "open_package_whole")
+    ]
+    elsewhere = spools.place.batch(
+        from_location_id=van, to_location_id=spools.store.id, lines=[taken(made, "1")]
+    )
+    assert refused(elsewhere) == [
+        (["lines", 0, "open_package_key"], "open_package_elsewhere")
+    ]
+    closer = add(session, Admin(username=f"closer-{tag()}"))
+    made.closed_at, made.closed_by_admin_id = datetime.now(UTC), closer.id
+    session.flush()
+    assert refused(spools.place.batch(lines=[taken(made, "1")])) == [
+        (["lines", 0, "open_package_key"], "open_package_closed")
+    ]
+
+
+def test_a_line_taken_from_an_open_package_that_cannot_be_is_refused(
+    registered_client: TestClient, spools: Spools
+) -> None:
+    made = spools.opened()
+    store = spools.store.id
+    for batch in (
+        spools.place.batch(lines=[taken(made, "1", package_id=spools.spool.id)]),
+        spools.place.batch(
+            kind="receipt",
+            from_location_id=None,
+            to_location_id=store,
+            lines=[taken(made, "1")],
+        ),
+        spools.place.batch(
+            kind="install",
+            to_location_id=None,
+            lines=[taken(made, "1", whole=True)],
+        ),
+        spools.place.batch(
+            lines=[{"item_id": made.item_id, "quantity": "1", "whole": True}]
+        ),
+    ):
+        assert registered_client.post(URL, json=batch).status_code == 422
