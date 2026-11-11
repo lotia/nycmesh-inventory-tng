@@ -235,9 +235,14 @@ export interface components {
       package_id?: number | null;
       /**
        * Open Package Key
-       * @description An opening's: the key of the open package made, if its item tracks opened packages, made by the page so a later line can name it. One package a line, then.
+       * @description An opening's: the key of the open package made, if its item tracks opened packages, made by the page so a later line can name it. One package a line, then. Any other line's: the open package it is taken from, cut loose, or moved whole.
        */
       open_package_key?: string | null;
+      /**
+       * Whole
+       * @description A move's line taken from an open package: all that is left on it, `quantity`, moves with it, and it stays open there.
+       */
+      whole?: boolean | null;
     };
     /** LocationEntry */
     LocationEntry: {

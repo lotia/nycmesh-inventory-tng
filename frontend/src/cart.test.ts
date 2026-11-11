@@ -7,12 +7,14 @@ import {
   freshCart,
   indexOf,
   loadCart,
+  openAt,
   quantityOf,
   STORAGE_KEY,
   search,
   storeCart,
   toBatch,
 } from "./cart";
+import type { Draft } from "./outbox";
 import { CATALOGUE, cable, radio } from "./test-catalogue";
 
 function cart(fields: Partial<Cart> = {}): Cart {
@@ -64,6 +66,14 @@ describe("adding", () => {
   });
 });
 
+test("adding to one line of several leaves the others", () => {
+  const two = addOne(addOne(cart(), 100), 101);
+  expect(addOne(two, 101).lines).toEqual([
+    { itemId: 100, packages: {}, loose: "1" },
+    { itemId: 101, packages: {}, loose: "2" },
+  ]);
+});
+
 describe("quantities", () => {
   test("packages and loose units add up exactly", () => {
     const line = { itemId: 101, packages: { 1001: "2" }, loose: "12.5" };
@@ -71,6 +81,7 @@ describe("quantities", () => {
       amount: 622500,
       sealed: new Map([[1001, { count: 2, size: 305000 }]]),
       loose: 12500,
+      taken: new Map(),
     });
   });
 
@@ -202,6 +213,122 @@ describe("turning a cart into a batch", () => {
     expect(
       toBatch(cart({ kind: "open", lines, fromId: 10 }), CATALOGUE),
     ).toMatchObject({ what: "Opening: 1 item at Hub" });
+  });
+
+  test("taken from an open package: cut loose, or moved whole", () => {
+    const key = "11111111-1111-4111-8111-111111111111";
+    const other = "22222222-2222-4222-8222-222222222222";
+    const lines = [
+      {
+        itemId: 101,
+        packages: {},
+        loose: "",
+        open: {
+          [key]: { amount: "20", whole: false },
+          [other]: { amount: "120", whole: true },
+        },
+      },
+    ];
+    expect(toBatch(cart({ lines }), CATALOGUE)).toMatchObject({
+      draft: {
+        lines: [
+          { item_id: 101, quantity: "20", open_package_key: key },
+          {
+            item_id: 101,
+            quantity: "120",
+            open_package_key: other,
+            whole: true,
+          },
+        ],
+      },
+    });
+    // At an install nothing moves whole: it is cut.
+    const install = toBatch(
+      cart({ kind: "install", lines, fromId: 10 }),
+      CATALOGUE,
+    );
+    expect("draft" in install && install.draft.lines[1]).toEqual({
+      item_id: 101,
+      quantity: "120",
+      open_package_key: other,
+    });
+    const receipt = toBatch(cart({ kind: "receipt", lines }), CATALOGUE);
+    expect(receipt).toEqual({
+      problems: ["Cat6 cable: Nothing is taken from an open package here."],
+    });
+    const bad = [
+      {
+        itemId: 101,
+        packages: {},
+        loose: "",
+        open: { [key]: { amount: "x", whole: false } },
+      },
+    ];
+    expect(toBatch(cart({ lines: bad }), CATALOGUE)).toEqual({
+      problems: [
+        "Cat6 cable: Enter how much from the open package, up to 3 decimals.",
+      ],
+    });
+  });
+
+  test("open packages are the catalogue's and those waiting to be opened", () => {
+    const known = {
+      id: 5,
+      key: "11111111-1111-4111-8111-111111111111",
+      item_id: 101,
+      package_id: 1001,
+      location_id: 10,
+      opened_at: "2026-11-03T10:00:00Z",
+      left: "120.000",
+    };
+    const catalogue = { ...CATALOGUE, open_packages: [known] };
+    const waiting = {
+      kind: "open" as const,
+      volunteer_id: 1,
+      from_location_id: 10,
+      to_location_id: 10,
+      lines: [
+        {
+          item_id: 101,
+          quantity: "305",
+          package_id: 1001,
+          open_package_key: "33333333-3333-4333-8333-333333333333",
+        },
+        // Sent already, so the catalogue's: not twice.
+        {
+          item_id: 101,
+          quantity: "305",
+          package_id: 1001,
+          open_package_key: known.key,
+        },
+        { item_id: 101, quantity: "305", package_id: 1001 },
+      ],
+    };
+    const moved = { ...waiting, kind: "move" as const };
+    const queuedAt = Date.parse("2026-11-04T09:00:00Z");
+    const outbox: { state: string; body: Draft; queuedAt: number }[] = [
+      { state: "waiting", body: waiting, queuedAt },
+      { state: "waiting", body: moved, queuedAt },
+      // Saved: the catalogue has it, once loaded again.
+      {
+        state: "saved",
+        body: { ...waiting, lines: waiting.lines.slice(0, 1) },
+        queuedAt,
+      },
+    ];
+    expect(openAt(catalogue, outbox, 101, 10)).toEqual([
+      known,
+      {
+        id: 0,
+        key: "33333333-3333-4333-8333-333333333333",
+        item_id: 101,
+        package_id: 1001,
+        location_id: 10,
+        opened_at: "2026-11-04T09:00:00.000Z",
+        left: "305",
+      },
+    ]);
+    expect(openAt(catalogue, outbox, 101, 12)).toEqual([]);
   });
 
   test("an opening opens whole packages only", () => {
@@ -336,6 +463,7 @@ describe("what has changed since the cart was filled", () => {
       amount: 1000,
       sealed: new Map(),
       loose: 1000,
+      taken: new Map(),
     });
   });
 });

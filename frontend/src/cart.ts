@@ -33,6 +33,11 @@ const LineSchema = v.object({
   packages: v.record(v.string(), v.string()),
   /** Loose units, in the item's unit, as typed. */
   loose: v.string(),
+  /** Taken from open packages, by key: how much, as typed, and whether
+   * all of one moves with it, whole (docs/decisions/0020). */
+  open: v.exactOptional(
+    v.record(v.string(), v.object({ amount: v.string(), whole: v.boolean() })),
+  ),
 });
 
 const CartSchema = v.object({
@@ -336,7 +341,12 @@ export function quantityOf(
   line: Line,
   item: Item,
 ):
-  | { amount: number; sealed: Map<number, Packs>; loose: number }
+  | {
+      amount: number;
+      sealed: Map<number, Packs>;
+      loose: number;
+      taken: Map<string, { amount: number; whole: boolean }>;
+    }
   | { problem: string } {
   const current = new Set(item.packages.map((pack) => String(pack.id)));
   for (const [packageId, typed] of Object.entries(line.packages)) {
@@ -367,12 +377,31 @@ export function quantityOf(
     };
   }
   amount += loose;
+  const taken = new Map<string, { amount: number; whole: boolean }>();
+  for (const [key, { amount: typed, whole }] of Object.entries(
+    line.open ?? {},
+  )) {
+    const part = thousandths(typed);
+    if (part === null) {
+      return {
+        problem: `Enter how much from the open package, up to 3 decimals.`,
+      };
+    }
+    if (part > 0) {
+      taken.set(key, { amount: part, whole });
+    }
+    amount += part;
+  }
   // Each part is a line of its own (toBatch), so each is whole.
-  const parts = [loose, ...[...sealed.values()].map((p) => p.count * p.size)];
+  const parts = [
+    loose,
+    ...[...sealed.values()].map((p) => p.count * p.size),
+    ...[...taken.values()].map((t) => t.amount),
+  ];
   if (item.unit === "each" && parts.some((part) => part % 1000 !== 0)) {
     return { problem: "Counted in whole units." };
   }
-  return { amount, sealed, loose };
+  return { amount, sealed, loose, taken };
 }
 
 const KINDS: Record<Kind, string> = {
@@ -439,6 +468,13 @@ export function toBatch(
       problems.push(`${item.name}: ${quantity.problem}`);
     } else if (quantity.amount >= MAX_AMOUNT) {
       problems.push(`${item.name}: That is more than the inventory can count.`);
+    } else if (
+      (cart.kind === "open" || cart.kind === "receipt") &&
+      quantity.taken.size > 0
+    ) {
+      problems.push(
+        `${item.name}: Nothing is taken from an open package here.`,
+      );
     } else if (cart.kind === "open" && quantity.loose > 0) {
       problems.push(`${item.name}: Open whole packages: leave loose empty.`);
     } else if (cart.kind === "open" && quantity.amount > 0) {
@@ -456,6 +492,15 @@ export function toBatch(
       }
       if (quantity.loose > 0) {
         lines.push({ item_id: item.id, quantity: decimal(quantity.loose) });
+      }
+      // From an open package: cut loose, or, moving it, all of it whole.
+      for (const [key, { amount, whole }] of quantity.taken) {
+        lines.push({
+          item_id: item.id,
+          quantity: decimal(amount),
+          open_package_key: key,
+          ...(whole && cart.kind === "move" ? { whole: true } : {}),
+        });
       }
       items += 1;
     }
@@ -516,6 +561,45 @@ function openings(item: Item, sealed: Map<number, Packs>): Draft["lines"] {
         }))
       : [{ ...each, quantity: decimal(count * size) }];
   });
+}
+
+export type OpenPackage = Catalogue["open_packages"][number];
+
+/**
+ * The open packages of an item at a place a cart can take from: the
+ * catalogue's, and those opened in batches still waiting to be sent, under
+ * the keys this page made, so they can be taken from before the server has
+ * seen them (docs/decisions/0020).
+ */
+export function openAt(
+  catalogue: Catalogue,
+  outbox: readonly { state: string; body: Draft; queuedAt: number }[],
+  itemId: number,
+  placeId: number | null,
+): OpenPackage[] {
+  const known = new Set(catalogue.open_packages.map((each) => each.key));
+  const pending = outbox.flatMap(({ state, body: draft, queuedAt }) =>
+    state !== "waiting" || draft.kind !== "open"
+      ? []
+      : draft.lines.flatMap((line) =>
+          line.open_package_key == null || known.has(line.open_package_key)
+            ? []
+            : [
+                {
+                  id: 0,
+                  key: line.open_package_key,
+                  item_id: line.item_id,
+                  package_id: line.package_id ?? 0,
+                  location_id: draft.from_location_id ?? 0,
+                  opened_at: new Date(queuedAt).toISOString(),
+                  left: String(line.quantity),
+                },
+              ],
+        ),
+  );
+  return [...catalogue.open_packages, ...pending].filter(
+    (each) => each.item_id === itemId && each.location_id === placeId,
+  );
 }
 
 /** Items whose name, maker, part number, code or category holds every word. */

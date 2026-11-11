@@ -586,7 +586,15 @@ class Line(BaseModel):
         Field(
             description="An opening's: the key of the open package made, if "
             "its item tracks opened packages, made by the page so a later "
-            "line can name it. One package a line, then."
+            "line can name it. One package a line, then. Any other line's: "
+            "the open package it is taken from, cut loose, or moved whole."
+        ),
+    ] = None
+    whole: Annotated[
+        bool | None,
+        Field(
+            description="A move's line taken from an open package: all that "
+            "is left on it, `quantity`, moves with it, and it stays open there."
         ),
     ] = None
 
@@ -598,6 +606,12 @@ class Line(BaseModel):
         if kind == "open":
             arrives = Form(open_package_id=opened) if opened else LOOSE
             return Entry(self.item_id, self.quantity, sealed, arrives)
+        if opened is not None:
+            # Taken from an open package: cut loose, or moved whole.
+            taken = Form(open_package_id=opened)
+            return Entry(
+                self.item_id, self.quantity, taken, taken if self.whole else LOOSE
+            )
         has_from, has_to = SIDES[kind]
         return Entry(
             self.item_id,
@@ -642,8 +656,12 @@ class Batch(BaseModel):
                 raise ValueError("an opening's lines each name a package")
         elif self.from_location_id == self.to_location_id:
             raise ValueError("from and to must be different locations")
-        elif any(line.open_package_key for line in self.lines):
-            raise ValueError("only an opening's lines have an open package key")
+        for line in self.lines if self.kind != "open" else ():
+            taken = line.open_package_key is not None
+            if taken and (line.package_id is not None or self.kind == "receipt"):
+                raise ValueError("a line is taken from an open package, or not")
+            if line.whole and not (taken and self.kind == "move"):
+                raise ValueError("only a move's open package moves whole")
         if self.install_number is not None and self.kind != "install":
             raise ValueError("only an install has an install number")
         return self
@@ -655,6 +673,9 @@ ProblemKind = Literal[
     "not_whole",
     "not_whole_packages",
     "one_package",
+    "open_package_closed",
+    "open_package_elsewhere",
+    "open_package_whole",
     "refused",
     "retired",
     "retired_package",
@@ -663,6 +684,10 @@ ProblemKind = Literal[
 Problem = tuple[tuple[str | int, ...], ProblemKind]
 MESSAGES = {
     "one_package": "Open one package a line: it is followed until used up",
+    "open_package_closed": "That open package was closed as used up: take from another",
+    "open_package_elsewhere": "That open package is at another place now",
+    "open_package_whole": "Moving an open package whole takes all that is "
+    "left on it, which changed: load the page again",
     "refused": "The inventory's rules refuse this as sent: it changed since "
     "the page loaded. Load the page again, and do it again",
     "not_found": "There is no such row",
@@ -719,10 +744,22 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
     if (written := _replay(session, batch)) is not None:
         return Recorded(written, False)
     header = {"device_id": device_id, **_header(batch)}
-    lines = [line.entry(batch.kind) for line in batch.lines]
+    # An opening's are made later (_opening); another's are taken from.
+    taken = {} if batch.kind == "open" else _open_packages_named(session, batch)
+    lines = [
+        line.entry(batch.kind, taken.get(number))
+        for number, line in enumerate(batch.lines)
+    ]
     held = hold(session, header, [line.item_id for line in lines])
-    packages, _, _ = _hold_forms(session, lines)
-    problems = _problems(session, batch, held, lines, packages)
+    packages, opens, _ = _hold_forms(session, lines)
+    problems = _problems(session, batch, held, lines, packages, opens)
+    problems += [
+        (("lines", number, "open_package_key"), "not_found")
+        for number, line in enumerate(batch.lines)
+        if batch.kind != "open"
+        and line.open_package_key is not None
+        and number not in taken
+    ]
     if problems:
         refused.add(1, {"reason": "invalid"})
         log.info("batch refused", problems=sorted({kind for _, kind in problems}))
@@ -1075,13 +1112,14 @@ def _line_form_breaks(
     line: Entry,
     places: tuple[int | None, int | None],
     packages: Mapping[int, PackageFacts],
+    opens: Mapping[int, OpenFacts],
 ) -> list[str]:
     """form_breaks' rules a batch's line breaks, before an opening's open
     packages are made: one opened into one, if its item tracks them, is one
     whole package (open_package_full)."""
     package = packages.get(line.leaves.package_id or 0)
     if kind != "open" or package is None or not package.tracked:
-        return form_breaks(kind, line, places, packages, {})
+        return form_breaks(kind, line, places, packages, opens)
     sealed = Entry(line.item_id, line.quantity, line.leaves, line.leaves)
     broken = form_breaks("move", sealed, places, packages, {})
     if line.quantity != package.size:
@@ -1100,6 +1138,11 @@ LINE_PROBLEMS: dict[str, tuple[str, ProblemKind]] = {
     "receipt_retired_package": ("package_id", "retired_package"),
     "open_package_full": ("quantity", "one_package"),
     "opening_from_sealed": ("package_id", "not_found"),
+    "movement_open_package_of_item": ("open_package_key", "not_found"),
+    "movement_open_package_unopened": ("open_package_key", "not_found"),
+    "movement_open_package_closed": ("open_package_key", "open_package_closed"),
+    "movement_open_package_place": ("open_package_key", "open_package_elsewhere"),
+    "movement_open_package_whole": ("quantity", "open_package_whole"),
 }
 
 
@@ -1109,6 +1152,7 @@ def _problems(
     held: Held,
     lines: Sequence[Entry],
     packages: Mapping[int, PackageFacts],
+    opens: Mapping[int, OpenFacts],
 ) -> list[Problem]:
     """What is wrong with a batch, line by line (`lines`, its own), with its
     rows held (hold)."""
@@ -1132,7 +1176,7 @@ def _problems(
         if broken is None:
             problems.append((("lines", number, "item_id"), "not_found"))
             continue
-        broken += _line_form_breaks(batch.kind, lines[number], places, packages)
+        broken += _line_form_breaks(batch.kind, lines[number], places, packages, opens)
         for rule in dict.fromkeys(broken):
             field, kind = LINE_PROBLEMS[rule]
             problems.append((("lines", number, field), kind))
@@ -1349,16 +1393,39 @@ def _replay(session: Session, batch: Batch) -> LedgerTransaction | None:
     return transaction
 
 
-def _written_as(session: Session, batch: Batch) -> list[Entry]:
-    """A batch's lines as written once, to compare with what was: an
-    opening's with the open packages made under their keys (_opening)."""
-    if batch.kind != "open":
-        return [line.entry(batch.kind) for line in batch.lines]
-    keys = {_opening_key(batch, n): n for n in range(len(batch.lines))}
+def _open_packages_named(session: Session, batch: Batch) -> dict[int, int]:
+    """The open packages a batch's lines name by key, by line number: an
+    opening's made under them, another's taken from. A key with none is
+    left out."""
+    keys = {
+        key: number
+        for number, line in enumerate(batch.lines)
+        if (
+            key := _opening_key(batch, number)
+            if batch.kind == "open"
+            else line.open_package_key
+        )
+        is not None
+    }
+    if not keys:
+        return {}
     found = session.execute(
         select(OpenPackage.key, OpenPackage.id).where(OpenPackage.key.in_(keys))
     )
-    return _as_opened(batch, {keys[key]: open_id for key, open_id in found})
+    return {keys[key]: open_id for key, open_id in found}
+
+
+def _written_as(session: Session, batch: Batch) -> list[Entry]:
+    """A batch's lines as written once, to compare with what was: an
+    opening's with the open packages made under their keys (_opening),
+    another's taken from the open packages they name."""
+    named = _open_packages_named(session, batch)
+    if batch.kind == "open":
+        return _as_opened(batch, named)
+    return [
+        line.entry(batch.kind, named.get(number))
+        for number, line in enumerate(batch.lines)
+    ]
 
 
 class Saved(BaseModel):

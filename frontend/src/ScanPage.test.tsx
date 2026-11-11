@@ -135,6 +135,37 @@ describe("loading", () => {
 });
 
 describe("filling and saving a cart", () => {
+  test("an open package where it comes from can be cut, or taken whole", async () => {
+    const opened = {
+      id: 5,
+      key: "11111111-1111-4111-8111-111111111111",
+      item_id: 101,
+      package_id: 1001,
+      location_id: 10,
+      opened_at: "2026-11-03T10:00:00Z",
+      left: "120.000",
+    };
+    const { api } = answering((request) =>
+      new URL(request.url).pathname === "/api/catalogue"
+        ? json({ ...CATALOGUE, open_packages: [opened] }, 200)
+        : saved(),
+    );
+    open(api);
+    await ready();
+    pick("From", "10");
+    find("cat6");
+    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    const label = "From the open Spool: 120 m left, opened 2026-11-03";
+    const field = screen.getByLabelText(label) as HTMLInputElement;
+    fireEvent.input(field, { target: { value: "20" } });
+    expect(field.value).toBe("20");
+    fireEvent.click(screen.getByLabelText("All of it, moved still open"));
+    expect(field.value).toBe("120");
+    expect(field.disabled).toBe(true);
+    fireEvent.click(screen.getByLabelText("All of it, moved still open"));
+    expect(field.value).toBe("");
+  });
+
   test("opening packages asks where, not from and to; an item adds its package", async () => {
     open();
     await ready();

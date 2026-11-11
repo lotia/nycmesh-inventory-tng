@@ -12,6 +12,8 @@ import {
   freshCart,
   indexOf,
   type Line,
+  type OpenPackage,
+  openAt,
   quantityOf,
   RETIRED,
   SIDES,
@@ -418,6 +420,17 @@ function CartForm({
                 key={line.itemId}
                 line={line}
                 item={item}
+                opens={
+                  sides.from && cart.value.kind !== "open"
+                    ? openAt(
+                        catalogue,
+                        outbox.entries.value,
+                        line.itemId,
+                        cart.value.fromId,
+                      )
+                    : []
+                }
+                moving={cart.value.kind === "move"}
                 onChange={(next) =>
                   set({
                     lines: cart.value.lines.map((each) =>
@@ -551,11 +564,17 @@ function Place({
 function CartLine({
   line,
   item,
+  opens,
+  moving,
   onChange,
   onRemove,
 }: {
   line: Line;
   item: Catalogue["items"][number] | undefined;
+  /** Its open packages where it comes from, to take from. */
+  opens: OpenPackage[];
+  /** Whether an open package can move whole. */
+  moving: boolean;
   onChange: (line: Line) => void;
   onRemove: () => void;
 }) {
@@ -621,6 +640,50 @@ function CartLine({
           />
         )}
       </Field>
+      {opens.map((open) => {
+        const taken = line.open?.[open.key] ?? { amount: "", whole: false };
+        const take = (next: typeof taken) =>
+          onChange({ ...line, open: { ...line.open, [open.key]: next } });
+        const left = decimal(Math.round(Number(open.left) * 1000));
+        const pack = item.packages.find((each) => each.id === open.package_id);
+        const since = `, opened ${open.opened_at.slice(0, 10)}`;
+        return (
+          <div key={open.key} class="flex flex-col gap-1">
+            <Field
+              quiet
+              label={`From the open ${pack?.name ?? "package"}: ${left} ${item.unit} left${since}`}
+            >
+              {(id) => (
+                <input
+                  id={id}
+                  inputMode="decimal"
+                  value={taken.amount}
+                  disabled={taken.whole}
+                  onInput={(event) =>
+                    take({ amount: event.currentTarget.value, whole: false })
+                  }
+                />
+              )}
+            </Field>
+            {moving && (
+              <label class="flex items-center gap-2 font-normal">
+                <input
+                  type="checkbox"
+                  checked={taken.whole}
+                  onChange={(event) =>
+                    take(
+                      event.currentTarget.checked
+                        ? { amount: left, whole: true }
+                        : { amount: "", whole: false },
+                    )
+                  }
+                />
+                All of it, moved still open
+              </label>
+            )}
+          </div>
+        );
+      })}
       <div>
         {"problem" in quantity
           ? quantity.problem
