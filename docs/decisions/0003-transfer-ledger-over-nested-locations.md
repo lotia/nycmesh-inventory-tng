@@ -3,7 +3,8 @@
 **Status:** accepted · 2026-10-30 · amended 2026-11-01 by 0009 (an
 unregistered device is blocked), 2026-11-03 (counts, retired items),
 2026-11-06 (counting while stock moves), 2026-11-08 by 0016 (where the
-rules live, balance), 2026-11-09 (stock at a retired place)
+rules live, balance), 2026-11-09 (stock at a retired place), 2026-11-11
+by 0020 (sealed and open packages)
 
 ## Context
 
@@ -15,7 +16,9 @@ while. So we need more than one location from the start.
 
 - **A transaction is one batch.** It has an actor, a time, a kind, one *from*
   location, one *to* location, an idempotency key, and lines of item and
-  positive quantity. It is written atomically: all lines or none.
+  positive quantity. It is written atomically: all lines or none. A line
+  also says the form its stock leaves in and arrives in: a sealed package,
+  an open package or loose (0020).
 - **A NULL side means outside the system**: a vendor delivery coming in, or an
   install going out. A transaction going to an install can carry its MeshDB
   install number, so "what went up on that roof?" has an answer.
@@ -26,25 +29,30 @@ while. So we need more than one location from the start.
   has left the inventory: it moves to the NULL side.
 - **The ledger is append-only.** Mistakes are fixed with a count or adjustment
   transaction, never by editing a row.
-- **Balance is in minus out**, computed by a query (0016).
+- **Balance is in minus out**, computed by a query (0016), per item, place
+  and form (0020).
 - **Negative balances are allowed.** They mean the records are wrong
   somewhere, so the item needs counting. A volunteer is never blocked.
-- **Reorder is a separate signal**: total stock in stores at or below the
-  minimum. An item with a negative balance shows on reorder as "count first".
+- **Reorder is a separate signal**: usable stock in stores (all but short
+  ends, 0020) at or below the minimum, and, where a package sets one, sealed
+  packages below their own minimum. An item with a negative balance shows
+  on reorder as "count first".
 - **The rules are the app's**, checked by the one function that writes each
   table, with constraints and privileges in PostgreSQL (0016).
-- **Counts and adjustments are an administrator's**, and record whose. A
-  count of a place writes what differs, found or lost, and a count that
-  matches is written with no lines, so when a place was last counted is
-  known. A count is true for the moment its form was shown, so moves saved
-  while it is under way still apply. An item that moved at the place
-  meanwhile might have been counted before or after the move, so its line is
-  not saved; the page asks for it again, and saves every other line (Ali,
-  2026-11-03). A count names each item once: a form naming one twice is
-  refused, saying why, as it isn't clear which number is right (Ali,
-  2026-11-08). An adjustment gives a reason from a list administrators extend,
-  seeded with Damaged, Lost or stolen, Found, Used for testing and Records
-  were wrong (Ali, 2026-11-03).
+- **Counts and adjustments are an administrator's**, and record whose. A count
+  of a place writes what differs, found or lost, and a count that matches is
+  written with no lines, so when a place was last counted is known. A count is
+  true for the moment its form was shown, so moves saved while it is under way
+  still apply. An item that moved at the place meanwhile might have been counted
+  before or after the move, so its line is not saved; the page asks for it
+  again, and saves every other line (Ali, 2026-11-03). A count asks for each
+  form of an item separately, and may add or close an open package (0020). A
+  count names each item once: a form naming one twice is refused, saying why, as
+  it isn't clear which number is right (Ali, 2026-11-08). An adjustment gives a
+  reason from a list administrators extend, seeded with Damaged, Lost or stolen,
+  Found, Used for testing and Records were wrong (Ali, 2026-11-03), and Used up,
+  for closing an open package (0020). A volunteer only reports an open package
+  used up; an administrator closes it.
 - **Nothing is deleted: retiring is the soft delete**, and bringing back
   undoes it. A retired item that still has stock is never received again,
   but volunteers may take what is left, until it runs out (Ali,
