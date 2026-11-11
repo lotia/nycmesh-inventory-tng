@@ -29,7 +29,7 @@ from inventory_tng.models import (
     ScanSettings,
     Volunteer,
 )
-from inventory_tng.open_packages import tracks_opened
+from inventory_tng.open_packages import is_short_end, tracks_opened
 
 log = structlog.get_logger(__name__)
 
@@ -221,7 +221,7 @@ def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]
             location_id=row.location_id,
             opened_at=row.opened_at,
             left=left[row.id],
-            short=0 < left[row.id] < (short_below.get(row.package_id) or 0),
+            short=is_short_end(left[row.id], short_below.get(row.package_id)),
         )
         for row in rows
     ]

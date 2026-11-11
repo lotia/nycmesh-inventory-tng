@@ -262,6 +262,13 @@ class Forms:
         return self.total - sum(self.short_ends, Decimal(0))
 
 
+def is_short_end(left: Decimal, short_below: Decimal | None) -> bool:
+    """Whether an open package with `left` on it is a short end: some
+    left, but less than its package's too-short-to-use length. Less than
+    nothing is the records', not a short end."""
+    return short_below is not None and 0 < left < short_below
+
+
 class PackageSize(NamedTuple):
     name: str
     size: Decimal
@@ -285,8 +292,7 @@ def split(
             forms.sealed_by_package[package_id] = count
         elif open_id is not None:
             short = packages[opened_from[open_id]].short_below
-            # Less than nothing left is the records', not a short end.
-            short_end = short is not None and 0 < amount < short
+            short_end = is_short_end(amount, short)
             (forms.short_ends if short_end else forms.open).append(amount)
         else:
             forms.loose += amount
