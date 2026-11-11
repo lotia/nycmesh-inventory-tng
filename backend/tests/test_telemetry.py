@@ -720,3 +720,30 @@ def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
         "inventory.page.web_vital.duration": {page_telemetry.VITAL_SECONDS},
         "inventory.page.web_vital.layout_shift": {page_telemetry.LAYOUT_SHIFTS},
     }
+
+
+def test_counts_package_tracking_changed_by_where(
+    rolled_back: Recorded, session: Session
+) -> None:
+    client, _, reader, _ = rolled_back
+    _, key = new_admin(session)
+    sign_in_with(client, code=code(key))
+    spools = Spools(session, tracked=False)
+    cable = spools.cable
+    items_path = "/admin/items"
+    client.post(f"{items_path}/tracking", data={"item": [str(cable.id)], "track": "on"})
+    client.post(
+        f"{items_path}/{cable.id}/packages/{spools.spool.id}/tracking",
+        data={"track": "off"},
+    )
+    session.refresh(cable)
+    form = {
+        "name": cable.name,
+        "category_id": str(cable.category_id),
+        "unit": cable.unit,
+        "version": str(cable.edit_version),
+    }
+    client.post(f"{items_path}/{cable.id}", data=form)
+    changed = counted(reader, "inventory.package_tracking.changed")
+    for scope in ("bulk", "package", "item"):
+        assert changed[(("scope", scope),)] >= 1

@@ -47,6 +47,14 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
     {% include "_field_problem.html" %}
   </label>
   {% endfor %}
+  {% set tracking = values.get('track_opened') == 'on' if values else item.track_opened %}
+  <label class="flex items-center gap-2 font-normal">
+    <input type="checkbox" name="track_opened" {% if tracking %}checked{% endif %}>
+    Track each opened package
+  </label>
+  <p class="hint">On: a package opened is followed until used up, for
+  spools and the like. Off: it becomes loose units, for boxes of small
+  things. Each package below can say otherwise.</p>
   </fieldset>
   {% if not retired %}<button class="primary">Save</button>{% endif %}
 </form>
@@ -57,8 +65,25 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
   <p class="hint">Sizes it comes in, so one scan or pick counts the whole package.</p>
   {% call table() %}
     {% for package in packages %}
+    {% set own = package.track_opened is not none %}
+    {% set followed = package.track_opened if own else item.track_opened %}
     <tr>
-      <td>{{ package.name }}</td><td>{{ package.size | amount }} {{ item.unit }}</td>
+      <td>{{ package.name }}
+        <span class="hint block">{{ "Opened ones followed" if followed else "Opened ones loose" }}
+        ({{ "set on this package" if own else "as the item" }})</span></td>
+      <td>{{ package.size | amount }} {{ item.unit }}</td>
+      <td>{% if not package.retired_at and not retired %}
+        <form method="post" action="{{ here }}/packages/{{ package.id }}/tracking" class="actions">
+          <label><span class="sr-only">When one of {{ package.name }} is opened</span>
+            <select name="track">
+              <option value="" {% if not own %}selected{% endif %}>Same as the item</option>
+              <option value="on" {% if own and package.track_opened %}selected{% endif %}>Track</option>
+              <option value="off" {% if own and not package.track_opened %}selected{% endif %}>Don't track</option>
+            </select>
+          </label>
+          <button>Set<span class="sr-only"> for {{ package.name }}</span></button>
+        </form>
+      {% endif %}</td>
       <td>{% if package.retired_at %}<span class="tag">Retired</span>
       {% elif not retired %}
         <form method="post" action="{{ here }}/packages/{{ package.id }}/retire"><button>Retire<span class="sr-only"> {{ package.name }}</span></button></form>

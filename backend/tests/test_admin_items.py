@@ -627,3 +627,105 @@ def test_a_name_asked_about_stays_answered_through_another_refusal(
     assert "A different item?" not in text(refused)
     added = admin_client.post(ITEMS, data=form | {"part_number": "Q"})
     assert added.status_code == 303
+
+
+# Whether opened packages are followed (docs/decisions/0020, Amendment).
+
+
+def saving(item: Item, **fields: str) -> dict[str, str]:
+    """The item's form as shown, with `fields` changed."""
+    return {
+        "name": item.name,
+        "category_id": str(item.category_id),
+        "unit": item.unit,
+        "version": shown(item),
+    } | fields
+
+
+def test_an_items_opened_packages_are_followed_when_ticked(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios, "Cat6 cable")
+    assert item.track_opened is False  # A new item's are not.
+    page = text(admin_client.get(f"{ITEMS}/{item.id}"))
+    assert 'name="track_opened" >' in page or 'name="track_opened">' in page
+    path = f"{ITEMS}/{item.id}"
+    admin_client.post(path, data=saving(item, track_opened="on"))
+    session.refresh(item)
+    assert item.track_opened is True
+    assert 'name="track_opened" checked' in text(admin_client.get(path))
+    # A box left unticked is not sent: the form says off.
+    admin_client.post(path, data=saving(item))
+    session.refresh(item)
+    assert item.track_opened is False
+
+
+def test_a_package_says_whether_its_opened_ones_are_followed(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios, "Cat6 cable")
+    spool = add(session, ItemPackage(item_id=item.id, name="Spool", size=Decimal(305)))
+    path = f"{ITEMS}/{item.id}/packages/{spool.id}/tracking"
+    assert "Opened ones loose\n        (as the item)" in text(
+        admin_client.get(f"{ITEMS}/{item.id}")
+    )
+    for sent, kept in (("on", True), ("off", False), ("", None)):
+        done = admin_client.post(path, data={"track": sent})
+        assert done.headers["location"] == (
+            f"{ITEMS}/{item.id}?notice=package_tracking&section=packages#packages"
+        )
+        session.refresh(spool)
+        assert spool.track_opened is kept
+    admin_client.post(path, data={"track": "on"})
+    assert "Opened ones followed\n        (set on this package)" in text(
+        admin_client.get(f"{ITEMS}/{item.id}")
+    )
+    assert admin_client.post(path, data={"track": "maybe"}).status_code == 404
+    other = new_item(session, radios, "Other")
+    wrong = f"{ITEMS}/{other.id}/packages/{spool.id}/tracking"
+    assert admin_client.post(wrong, data={"track": "on"}).status_code == 404
+    item.retired_at = NOW
+    session.flush()
+    refused = admin_client.post(path, data={"track": "off"})
+    assert refused.status_code == 409
+    session.refresh(spool)
+    assert spool.track_opened is True
+
+
+def test_items_ticked_are_set_together_and_packages_keep_their_own(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    cable = new_item(session, radios, "Cat6 cable")
+    rope = new_item(session, radios, "Rope")
+    gone = new_item(session, radios, "Old cable")
+    gone.retired_at = NOW
+    own = add(
+        session,
+        ItemPackage(item_id=cable.id, name="Box", size=Decimal(10), track_opened=False),
+    )
+    page = text(admin_client.get(ITEMS))
+    assert f'name="item" value="{cable.id}"' in page
+    assert f'name="item" value="{gone.id}"' not in page
+    done = admin_client.post(
+        f"{ITEMS}/tracking",
+        data={"item": [str(cable.id), str(gone.id)], "track": "on", "q": "cable"},
+    )
+    assert done.headers["location"] == f"{ITEMS}?q=cable&notice=tracking_on"
+    for row in (cable, rope, gone, own):
+        session.refresh(row)
+    assert (cable.track_opened, rope.track_opened, gone.track_opened) == (
+        True,
+        False,
+        False,
+    )
+    assert own.track_opened is False
+    assert '<span class="tag">Opened followed</span>' in text(admin_client.get(ITEMS))
+    # Ticked again: nothing to change, and nothing counted.
+    again = admin_client.post(
+        f"{ITEMS}/tracking", data={"item": [str(cable.id)], "track": "on"}
+    )
+    assert again.headers["location"] == f"{ITEMS}?notice=tracking_on"
+    none = admin_client.post(f"{ITEMS}/tracking", data={"track": "off"})
+    assert none.headers["location"] == f"{ITEMS}?notice=tracking_none"
+    bad = admin_client.post(f"{ITEMS}/tracking", data={"item": [str(cable.id)]})
+    assert bad.status_code == 404
