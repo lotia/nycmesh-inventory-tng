@@ -1337,3 +1337,102 @@ def test_the_count_page_counts_sealed_and_says_whats_wrong(
     assert "How much is left on it." in text(
         admin_client.post(f"{COUNTS}/{store}", data=left)
     )
+
+
+def test_counting_by_form_asks_again_for_what_moved(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    store, cable, spool = spools.store.id, spools.cable.id, spools.spool.id
+    form = {
+        "key": str(uuid.uuid4()),
+        "as_of": str(ledger.moment(session, store)),
+        f"sealed_{cable}_{spool}": "2",
+    }
+    spools.opened()  # While it was counted.
+    again = admin_client.post(f"{COUNTS}/{store}", data=form)
+    assert again.status_code == 409
+    page = text(again)
+    assert "These moved while you counted" in page
+    # Asked again by form.
+    assert f'name="sealed_{cable}_{spool}"' in page
+
+
+def test_an_open_package_found_where_its_item_was_counted_by_total(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    van, cable = spools.van.id, spools.cable.id
+    spools.move(Entry(cable, Decimal(10)))  # Loose, alone, in the van.
+    form = {
+        "key": str(uuid.uuid4()),
+        "as_of": str(ledger.moment(session, van)),
+        f"counted_{cable}": "10",
+        "found_package_id": str(spools.spool.id),
+        "found_left": "40",
+    }
+    assert admin_client.post(f"{COUNTS}/{van}", data=form).status_code == 303
+    held = forms(session, spools.cable)
+    assert held[(van, None, None)] == 10
+    assert sorted(
+        amount for (place, _, opened), amount in held.items() if place == van and opened
+    ) == [40]
+
+
+def test_open_packages_closed_by_a_count_and_refusals_said(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    store, cable, spool = spools.store.id, spools.cable.id, spools.spool.id
+    one, two = spools.opened(), spools.opened()
+    as_of = str(ledger.moment(session, store))
+    # Not here, its left box cleared: closed all the same.
+    gone = {
+        "key": str(uuid.uuid4()),
+        "as_of": as_of,
+        f"opened_{one.id}": "",
+        f"state_{one.id}": "used_up",
+    }
+    assert admin_client.post(f"{COUNTS}/{store}", data=gone).status_code == 303
+    session.refresh(one)
+    assert one.closed_at is not None
+    closed = {"key": str(uuid.uuid4()), "as_of": as_of, f"opened_{one.id}": "5"}
+    assert "was closed meanwhile" in text(
+        admin_client.post(f"{COUNTS}/{store}", data=closed)
+    )
+    huge = {
+        "key": str(uuid.uuid4()),
+        "as_of": as_of,
+        f"sealed_{cable}_{spool}": "9999999",
+    }
+    # None sealed is here now, so no line shows it: refused whole.
+    assert admin_client.post(f"{COUNTS}/{store}", data=huge).status_code == 400
+    spools.cable.track_opened = False
+    session.flush()
+    untracked = {
+        "key": str(uuid.uuid4()),
+        "as_of": str(ledger.moment(session, store)),
+        "found_package_id": str(spool),
+        "found_left": "40",
+    }
+    refused = admin_client.post(f"{COUNTS}/{store}", data=untracked)
+    assert refused.status_code == 400
+    assert "isn't followed once opened" in text(refused)
+    assert two.closed_at is None
+
+
+def test_an_open_package_found_while_its_item_moved_is_asked_again(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """Nothing of it is kept, the open package neither: found again then."""
+    van, cable = spools.van.id, spools.cable.id
+    spools.move(Entry(cable, Decimal(10)))
+    key = uuid.uuid4()
+    form = {
+        "key": str(key),
+        "as_of": str(ledger.moment(session, van)),
+        f"counted_{cable}": "10",
+        "found_package_id": str(spools.spool.id),
+        "found_left": "40",
+    }
+    spools.move(Entry(cable, Decimal(5)))  # While it was counted.
+    assert admin_client.post(f"{COUNTS}/{van}", data=form).status_code == 409
+    made = select(OpenPackage).where(OpenPackage.key == uuid.uuid5(key, "found"))
+    assert session.scalars(made).first() is None

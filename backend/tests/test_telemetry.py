@@ -805,8 +805,18 @@ def test_counts_open_packages_closed_and_cleared(
     client.post(f"{used_up}/{one.id}/confirm")
     client.post(f"{used_up}/{two.id}/clear")
     client.post(f"/admin/items/{spools.cable.id}/open-packages/{three.id}/close")
+    four = spools.opened()
+    store = spools.store.id
+    count = {
+        "key": str(uuid.uuid4()),
+        "as_of": str(ledger.moment(session, store)),
+        f"opened_{four.id}": "",
+        f"state_{four.id}": "missing",
+    }
+    client.post(f"/admin/counts/{store}", data=count)
     assert counted(reader, "inventory.open_packages.closed") == {
         (("how", "confirmed"),): 1,
         (("how", "direct"),): 1,
+        (("how", "count"),): 1,
     }
     assert counted(reader, "inventory.open_packages.cleared") == {(): 1}

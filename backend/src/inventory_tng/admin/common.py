@@ -66,6 +66,11 @@ RULES = {
     "site_settings_time_zone": "Pick a zone from the list.",
     "location_time_zone": "Pick a zone from the list.",
     "movement_whole_units": "This item is counted in whole units.",
+    "open_package_untracked": "That package isn't followed once opened any "
+    "more: count what is on it as loose.",
+    "movement_item_once": "An item is on the count twice: count it once.",
+    "movement_open_package_closed": "An open package was closed meanwhile: "
+    "count what is on it as loose.",
     "location_countable": "That place is retired and holds nothing: pick another.",
     "changed_since_shown": "Not saved: someone else saved this after you opened "
     "it. Here it is as it is now: make your change again.",
