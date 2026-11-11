@@ -39,13 +39,10 @@ def make(
                 of=ItemPackage,
             )
         ).one_or_none()
-        enforce("open_package_untracked", when=row is None)
+        tracked = row is not None and tracks_opened(row[1], row[0].track_opened)
+        enforce("open_package_untracked", when=not tracked)
         assert row is not None
-        package, item_tracks = row
-        enforce(
-            "open_package_untracked",
-            when=not tracks_opened(item_tracks, package.track_opened),
-        )
+        package = row[0]
         made = OpenPackage(
             key=key,
             item_id=package.item_id,

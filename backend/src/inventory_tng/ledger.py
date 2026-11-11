@@ -776,30 +776,19 @@ def _hold_forms(
             )
         )
     }
-    left = dict(
-        session.execute(
-            select(by_form.c.open_package_id, by_form.c.quantity).where(
-                by_form.c.open_package_id.in_(open_ids),
-                by_form.c.location_id
-                == select(OpenPackage.location_id)
-                .where(OpenPackage.id == by_form.c.open_package_id)
-                .scalar_subquery(),
-            )
-        ).all()
-    )
-    named = set(
-        session.scalars(
-            select(Movement.from_open_package_id).where(
-                Movement.from_open_package_id.in_(open_ids)
-            )
-        )
-    ) | set(
-        session.scalars(
-            select(Movement.to_open_package_id).where(
-                Movement.to_open_package_id.in_(open_ids)
-            )
-        )
-    )
+    # What is left on each where it is. One no line names yet has no row
+    # in by_form at all.
+    rows = session.execute(
+        select(
+            by_form.c.open_package_id, by_form.c.location_id, by_form.c.quantity
+        ).where(by_form.c.open_package_id.in_(open_ids))
+    ).all()
+    named = {open_id for open_id, _, _ in rows}
+    left = {
+        open_id: quantity
+        for open_id, location_id, quantity in rows
+        if location_id == opened[open_id].location_id
+    }
     facts = {
         row.id: OpenFacts(
             row.item_id,
@@ -826,9 +815,9 @@ def _where(header: Mapping[str, object], custody: frozenset[int]) -> int | None:
     else where it arrived (a receipt, or stock a count or adjustment
     found); where it arrived, too, from a volunteer's `custody`, which is a
     person, not a place with a clock."""
-    left, arrived = header.get("from_location_id"), header.get("to_location_id")
-    arrives = arrived if isinstance(arrived, int) else None
-    if isinstance(left, int) and not (left in custody and arrives is not None):
+    left = _place(header, "from_location_id")
+    arrives = _place(header, "to_location_id")
+    if left is not None and not (left in custody and arrives is not None):
         return left
     return arrives
 
