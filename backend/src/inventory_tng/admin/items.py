@@ -341,10 +341,11 @@ def save_item(
     fields, problems = _fields(session, form)
     if fields is not None:
         seen = form_version(form.get("version", ""))
-        # Respelling its own name asks nothing: it is the same name.
-        ask = form.get(DIFFERENT) != fields.name and not items.same_name(
+        # Its own name, or a respelling of it, asks nothing: it is the same.
+        renamed = fields.name != found.name and not items.same_name(
             session, fields.name, found.name
         )
+        ask = renamed and form.get(DIFFERENT) != fields.name
         _, broken = _change_or_note(
             session,
             lambda: items.save(session, found, fields, seen=seen),
