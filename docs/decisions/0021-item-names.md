@@ -52,3 +52,9 @@ so admins would type half a name in each field.
   before the index can be made.
 - Categories, places and volunteers still compare names ignoring case
   only.
+- An item's name needs a letter or a digit: spaces and punctuation alone
+  would all be one name.
+- Which characters are spaces and punctuation, and how case folds, is the
+  database's locale's. Under a C locale, as CloudNativePG makes by default,
+  that is ASCII's: letters such as `â` are kept, but `Â` and `â` are not
+  folded together.

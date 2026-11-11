@@ -14,8 +14,9 @@ Conventions, on every table with history:
 - Nothing is deleted. A row is retired (`retired_at`; NULL means current) and
   every foreign key is ON DELETE RESTRICT, in PostgreSQL itself.
 - Quantities are numeric(12,3); money is numeric(10,2).
-- Names are unique, ignoring case, among current rows; an item's ignore
-  spaces and punctuation too (name_key).
+- Names are unique, ignoring case: among current rows, or all of them,
+  retired ones too, as each table says. An item's ignore spaces and
+  punctuation too (name_key).
 
 A rule about one row's own values is a check constraint, which raises a
 check violation (SQLSTATE 23514) named for the rule, as describe_error()
@@ -211,12 +212,14 @@ def _unique_name(
 
 # What two item names may differ by and still be one name: case, spaces and
 # punctuation, so "ToughCable" and "Tough cable" clash (docs/decisions/0021).
-NAME_IGNORED = "[^[:alnum:]]+"
+# Named classes, not "all but [:alnum:]": under a C locale, as CloudNativePG
+# makes by default, [:alnum:] is ASCII only, and a letter such as â would go.
+NAME_IGNORED = "[[:space:][:punct:]]+"
 
 
 def name_key(name: SQLColumnExpression[str]) -> ColumnElement[str]:
     """`name` as item names are compared: lower case, with every run of
-    anything but letters and digits removed."""
+    spaces and punctuation removed."""
     return func.lower(func.regexp_replace(name, NAME_IGNORED, "", "g"))
 
 

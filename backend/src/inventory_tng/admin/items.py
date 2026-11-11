@@ -48,6 +48,7 @@ TAKEN = (
     "Another item, perhaps a retired one, already has that name, that "
     "manufacturer and part number, or that old code."
 )
+NO_LETTERS = "Give it a name with a letter or a digit in it."
 # After another item's name, what of it is taken (items.taken_by).
 TAKEN_FIELDS = {
     "name": "already has that name, or one differing from it only in case, "
@@ -73,6 +74,7 @@ def _taken(
     if found is None:
         return "name", TAKEN
     field, other = found
+    log.debug("item taken", field=field, other_item_id=other.id)
     retired = " It is retired." if other.retired_at is not None else ""
     return field, f"{other.name} {TAKEN_FIELDS[field]}{retired}"
 
@@ -91,6 +93,7 @@ def _change_or_note[T](
     if broken == "unique":
         field, words = _taken(session, fields, item_id)
         problems[field] = words
+        log.debug("item refused", rule="unique", field=field, item_id=item_id)
     elif broken in REFUSED_FIELDS:
         problems[REFUSED_FIELDS[broken]] = RULES[broken]
     return done, broken
@@ -205,6 +208,9 @@ def _fields(
     problems: dict[str, str] = {}
     if problem := name_problem(name):
         problems["name"] = problem
+    elif not any(c.isalnum() for c in name):
+        # Spaces and punctuation alone would all be one name (models.name_key).
+        problems["name"] = NO_LETTERS
     category = chosen(session, Category, form.get("category_id", ""))
     if category is None:
         problems["category_id"] = "Pick a category."

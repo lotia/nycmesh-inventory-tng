@@ -59,6 +59,17 @@ def test_adding_an_item(
     assert "LiteBeam 5AC" in text(admin_client.get(ITEMS))
 
 
+def test_an_item_name_needs_a_letter_or_a_digit(
+    admin_client: TestClient, radios: Category
+) -> None:
+    """Punctuation alone would be one name with every other such."""
+    form = {"category_id": str(radios.id), "unit": "each"}
+    refused = admin_client.post(ITEMS, data=form | {"name": "- ?"})
+    assert refused.status_code == 400
+    assert "Give it a name with a letter or a digit in it." in text(refused)
+    assert admin_client.post(ITEMS, data=form | {"name": "Câble ½"}).status_code == 303
+
+
 def test_an_item_needs_a_name_and_a_current_category(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
@@ -470,9 +481,7 @@ def test_an_empty_list_says_what_to_do_next(admin_client: TestClient) -> None:
     assert "Nothing matches. Check the spelling" in page
 
 
-def test_taken_by_finds_nothing_where_nothing_clashes(
-    session: Session, radios: Category
-) -> None:
+def test_taken_by_skips_the_item_itself(session: Session, radios: Category) -> None:
     item = add(
         session,
         Item(name="LiteBeam", category_id=radios.id, old_code="NYCM-1"),

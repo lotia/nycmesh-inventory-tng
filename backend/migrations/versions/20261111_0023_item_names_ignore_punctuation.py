@@ -22,7 +22,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 # models.name_key's, written out: migrations do not import the app.
-KEY = "lower(regexp_replace(name, '[^[:alnum:]]+', '', 'g'))"
+KEY = "lower(regexp_replace(name, '[[:space:][:punct:]]+', '', 'g'))"
 
 
 def upgrade() -> None:

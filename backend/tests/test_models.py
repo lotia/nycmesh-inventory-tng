@@ -96,8 +96,10 @@ def test_item_names_are_unique_ignoring_case_spaces_and_punctuation(
     session.flush()
     with violates(session, "uq_item_name"):
         new_item("tough cable")
-    # Letters and digits still tell names apart.
+    # Letters and digits still tell names apart, beyond ASCII too.
     new_item("Tough cable Pro")
+    new_item("Câble")
+    new_item("Cble")
     new_item("LiteBeam 5AC Gen1")
     new_item("LiteBeam 5AC Gen2")
 
