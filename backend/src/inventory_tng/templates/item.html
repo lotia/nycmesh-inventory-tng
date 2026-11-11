@@ -87,12 +87,16 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
         </form>
       {% endif %}</td>
       <td>{% if not package.retired_at and not retired %}
+        {#- What was sent, and its problems, beside the package it was for. #}
+        {% set mine = values.get('package_id') == package.id | string %}
         <form method="post" action="{{ here }}/packages/{{ package.id }}/settings" class="actions">
           <label>Too short to use <span class="hint">below, in {{ item.unit }}; blank: none</span>
-            <input name="short_below" inputmode="decimal" value="{{ package.short_below | amount if package.short_below is not none else '' }}">
+            <input name="short_below" inputmode="decimal" value="{{ values.get('short_below') if mine else (package.short_below | amount if package.short_below is not none else '') }}">
+            {% if mine %}{% with name = "short_below" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           <label>Keep sealed <span class="hint">in the stores; blank: no minimum</span>
-            <input name="minimum_sealed" inputmode="numeric" value="{{ package.minimum_sealed if package.minimum_sealed is not none else '' }}">
+            <input name="minimum_sealed" inputmode="numeric" value="{{ values.get('minimum_sealed') if mine else (package.minimum_sealed if package.minimum_sealed is not none else '') }}">
+            {% if mine %}{% with name = "minimum_sealed" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           <button>Save<span class="sr-only"> {{ package.name }}</span></button>
         </form>

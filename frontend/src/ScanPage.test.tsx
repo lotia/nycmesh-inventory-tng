@@ -144,6 +144,7 @@ describe("filling and saving a cart", () => {
       location_id: 10,
       opened_at: "2026-11-03T10:00:00Z",
       left: "120.000",
+      short: false,
     };
     const { api } = answering((request) =>
       new URL(request.url).pathname === "/api/catalogue"
@@ -178,7 +179,7 @@ describe("filling and saving a cart", () => {
         ) as HTMLInputElement
       ).checked,
     ).toBe(true);
-    // A short end, below the spool's 15 m: asked about as one.
+    // 120 m left is no short end: the question is the button's own.
     fireEvent.input(field, { target: { value: "" } });
     expect(screen.queryByLabelText("A short end: is it used up?")).toBeNull();
     // Another place: what was taken from this one's packages goes.
@@ -196,6 +197,7 @@ describe("filling and saving a cart", () => {
       location_id: 10,
       opened_at: "2026-11-03T10:00:00Z",
       left: "12.000",
+      short: true,
     };
     const { api } = answering((request) =>
       new URL(request.url).pathname === "/api/catalogue"

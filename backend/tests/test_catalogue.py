@@ -140,14 +140,12 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
             "name": "Box",
             "size": 50,
             "track_opened": False,
-            "short_below": None,
         },
         {
             "id": rows.spool.id,
             "name": "Spool",
             "size": 300,
             "track_opened": False,
-            "short_below": None,
         },
     ]
     assert cable == {

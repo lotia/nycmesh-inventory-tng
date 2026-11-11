@@ -590,6 +590,7 @@ def test_a_package_opened_and_followed_is_made_once(
             "location_id": store,
             "opened_at": mine[0]["opened_at"],
             "left": "305.000",
+            "short": False,
         }
     ]
     package = next(
@@ -1094,8 +1095,9 @@ def test_stock_splits_into_forms_and_short_ends_are_not_usable() -> None:
     assert forms.sealed == [("Spool", Decimal(3), Decimal(915))]
     assert (forms.open, forms.short_ends) == ([Decimal(120), Decimal(3)], [Decimal(12)])
     assert (forms.loose, forms.total, forms.usable) == (85, 1135, 1123)
-    assert not forms.plain
-    assert open_packages.split([(None, None, Decimal(4))], {}, {}).plain
+    # Less than nothing left is the records', not a short end.
+    below = open_packages.split([(None, OPEN, Decimal(-8))], packages, {OPEN: SPOOL})
+    assert (below.open, below.short_ends) == ([Decimal(-8)], [])
 
 
 def test_reorder_on_usable_stock_and_sealed_minimums() -> None:
@@ -1124,8 +1126,9 @@ def test_stock_and_reorder_pages_show_forms(
     made = spools.opened()
     spools.move(Entry(spools.cable.id, Decimal(295), Form(open_package_id=made.id)))
     session.flush()
-    words = " ".join(text(admin_client.get("/admin/stock")).split())
-    assert "1 sealed Spool · short ends: 10 m · usable 305 m" in words
+    page = text(admin_client.get("/admin/stock"))
+    for line in ("1 sealed Spool", "short end: 10 m", "usable: 305 m"):
+        assert f'<span class="hint block">{line}</span>' in page
     reorder = " ".join(text(admin_client.get("/admin/stock/reorder")).split())
     assert spools.cable.name in reorder
     assert "1 sealed Spool, of 2 to keep" in reorder
@@ -1144,18 +1147,22 @@ def test_a_packages_settings_are_set_on_its_items_page(
     )
     session.refresh(spools.spool)
     assert (spools.spool.short_below, spools.spool.minimum_sealed) == (15, 2)
-    entry = next(
-        pack
-        for item in registered_client.get("/api/catalogue").json()["items"]
-        if item["id"] == spools.cable.id
-        for pack in item["packages"]
-    )
-    assert entry["short_below"] == "15.000"
+    # An open one below it is a short end, as the scan page is told.
+    made = spools.opened()
+    spools.move(Entry(spools.cable.id, Decimal(295), Form(open_package_id=made.id)))
+    listed = registered_client.get("/api/catalogue").json()["open_packages"]
+    assert [entry["short"] for entry in listed if entry["id"] == made.id] == [True]
     admin_client.post(path, data={"short_below": "", "minimum_sealed": ""})
     session.refresh(spools.spool)
     assert (spools.spool.short_below, spools.spool.minimum_sealed) == (None, None)
-    for bad in ({"short_below": "-1"}, {"minimum_sealed": "lots"}):
-        assert admin_client.post(path, data=bad).status_code == 409
+    for bad, words in (
+        ({"short_below": "-1"}, None),
+        ({"short_below": "305"}, "Shorter than a whole one, or blank."),
+        ({"minimum_sealed": "lots"}, "A whole number of packages, or blank."),
+    ):
+        refused = admin_client.post(path, data=bad)
+        assert refused.status_code == 400
+        assert words is None or words in text(refused)
     other = f"/admin/items/{spools.place.item.id}/packages/{spools.spool.id}/settings"
     assert admin_client.post(other, data={}).status_code == 404
     # Its item retired: read only.

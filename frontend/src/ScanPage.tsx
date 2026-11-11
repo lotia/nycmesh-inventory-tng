@@ -25,7 +25,7 @@ import {
 import { Field } from "./Field";
 import { placeSides, readLabel, type Scanned } from "./labels";
 import { type Outbox, sharedOutbox } from "./outbox";
-import { decimal, sent, thousandths } from "./quantity";
+import { decimal, thousandths } from "./quantity";
 import { NOT_REGISTERED } from "./registration";
 import { Scanner } from "./Scanner";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
@@ -707,8 +707,7 @@ function CartLine({
                 />
                 {(thousandths(taken.amount) ?? 0) >= open.left
                   ? "That takes all it shows: is it used up?"
-                  : pack?.short_below != null &&
-                      open.left < sent(pack.short_below)
+                  : open.short
                     ? "A short end: is it used up?"
                     : "Used up: what is left is no use"}
               </label>

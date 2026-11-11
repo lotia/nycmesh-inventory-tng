@@ -647,6 +647,7 @@ export function offered(
             location_id: draft.from_location_id ?? 0,
             opened_at: new Date(queuedAt).toISOString(),
             left: amount,
+            short: false,
           });
         }
         continue;

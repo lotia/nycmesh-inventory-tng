@@ -11,7 +11,7 @@ from typing import Any, Literal, cast
 
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
-from sqlalchemy import ColumnElement, func, select, true
+from sqlalchemy import ColumnElement, any_, func, or_, select, true
 from sqlalchemy.orm import Session
 
 from inventory_tng import open_packages
@@ -23,7 +23,6 @@ from inventory_tng.ledger import (
     SHORT,
     balance,
     by_form,
-    in_stores,
     retired_places_holding_stock,
 )
 from inventory_tng.models import STORE_KINDS, Item, ItemPackage, Location
@@ -101,7 +100,26 @@ def stock(
     session: DbSession,
     by: Literal["place", "item"] = "place",
 ) -> Response:
-    groups = _grouped(_holdings(session, balance.c.quantity != 0), by)
+    """Every item at every place it is, each form on its own line, from one
+    read of the ledger by form (open_packages.forms_of)."""
+    forms = open_packages.forms_of(session, true())
+    items = {
+        item.id: item
+        for item in session.scalars(
+            select(Item).where(Item.id.in_({item_id for item_id, _ in forms}))
+        )
+    }
+    places = {
+        place.id: place
+        for place in session.scalars(
+            select(Location).where(Location.id.in_({place for _, place in forms}))
+        )
+    }
+    holdings = [
+        Holding(items[item_id], places[place], held.total)
+        for (item_id, place), held in forms.items()
+    ]
+    groups = _grouped(sorted(holdings, key=_by_names), by)
     return admin_page(
         request,
         signed,
@@ -110,13 +128,17 @@ def stock(
             "title": "Stock",
             "view": by,
             "groups": groups,
-            # Each line's forms, where it has more than loose units.
-            "forms": open_packages.forms_of(session, true()),
+            "forms": forms,
             "needing_count": sum(group.needs_count for group in groups),
             "retired_places": retired_places_holding_stock(session),
             "counts_path": COUNTS,
         },
     )
+
+
+def _by_names(holding: Holding) -> tuple[str, str]:
+    """By place then item, as people sort them."""
+    return holding.location.name.lower(), holding.item.name.lower()
 
 
 @dataclass
@@ -151,10 +173,10 @@ def reorder_rows(
     for item in items:
         in_stock = usable.get(item.id, Decimal(0))
         low = [
-            (package.name, count, package.minimum_sealed or 0)
+            (package.name, count, minimum)
             for package in minimums.get(item.id, [])
-            if (count := sealed.get(item.id, {}).get(package.id, Decimal(0)))
-            < (package.minimum_sealed or 0)
+            if (minimum := package.minimum_sealed) is not None
+            and (count := sealed.get(item.id, {}).get(package.id, Decimal(0))) < minimum
         ]
         if (item.minimum is not None and in_stock <= item.minimum) or low:
             rows.append(Reorder(item, in_stock, item.id in short, low))
@@ -165,29 +187,41 @@ def reorder_rows(
 def reorder(request: Request, signed: AdminSignedIn, session: DbSession) -> Response:
     """Current items with a reorder level, at or below it in usable stock
     across the stores, or with a package's sealed below its minimum."""
-    items = session.scalars(
-        select(Item).where(Item.retired_at.is_(None)).order_by(func.lower(Item.name))
+    packages = session.scalars(
+        select(ItemPackage).where(
+            ItemPackage.minimum_sealed.is_not(None), ItemPackage.retired_at.is_(None)
+        )
     ).all()
-    stores = select(Location.id).where(
-        Location.kind.in_(STORE_KINDS), Location.retired_at.is_(None)
+    items = session.scalars(
+        select(Item)
+        .where(
+            Item.retired_at.is_(None),
+            or_(
+                Item.minimum.is_not(None),
+                Item.id.in_([package.item_id for package in packages]),
+            ),
+        )
+        .order_by(func.lower(Item.name))
+    ).all()
+    # The stores' ids as an array, so only their balances are summed, as
+    # ledger.in_stores does.
+    stores = func.array(
+        select(Location.id)
+        .where(Location.kind.in_(STORE_KINDS), Location.retired_at.is_(None))
+        .scalar_subquery()
     )
     usable: dict[int, Decimal] = {}
     sealed: dict[int, dict[int, Decimal]] = {}
+    short: set[int] = set()
     for (item_id, _), held in open_packages.forms_of(
-        session, by_form.c.location_id.in_(stores)
+        session, by_form.c.location_id == any_(stores)
     ).items():
         usable[item_id] = usable.get(item_id, Decimal(0)) + held.usable
+        if held.total < 0:
+            short.add(item_id)
         for package_id, count in held.sealed_by_package.items():
             counts = sealed.setdefault(item_id, {})
             counts[package_id] = counts.get(package_id, Decimal(0)) + count
-    short = {
-        item_id
-        for item_id, _, is_short in session.execute(
-            in_stores(select(Item.id).where(Item.retired_at.is_(None)))
-        )
-        if is_short
-    }
-    packages = session.scalars(select(ItemPackage)).all()
     rows = reorder_rows(items, usable, sealed, packages, short)
     return admin_page(
         request,

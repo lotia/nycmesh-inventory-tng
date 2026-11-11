@@ -110,7 +110,6 @@ describe("quantities", () => {
           name: "Half box",
           size: "2.5",
           track_opened: false,
-          short_below: null,
         },
       ],
     };
@@ -289,6 +288,7 @@ describe("turning a cart into a batch", () => {
       location_id: 10,
       opened_at: "2026-11-03T10:00:00Z",
       left: "120.000",
+      short: false,
     };
     const fresh = "33333333-3333-4333-8333-333333333333";
     const catalogue = { ...CATALOGUE, open_packages: [known] };
@@ -349,6 +349,7 @@ describe("turning a cart into a batch", () => {
         location_id: 12,
         opened_at: "2026-11-04T09:00:00.000Z",
         left: 305000,
+        short: false,
       },
     ]);
   });
@@ -415,6 +416,7 @@ describe("turning a cart into a batch", () => {
       location_id: 10,
       opened_at: "2026-11-03T10:00:00Z",
       left: "120.000",
+      short: false,
     };
     const report: Draft = {
       kind: "report",
