@@ -59,14 +59,16 @@ def test_adding_an_item(
     assert "LiteBeam 5AC" in text(admin_client.get(ITEMS))
 
 
-def test_an_item_name_needs_a_letter_or_a_digit(
+def test_an_item_name_needs_more_than_punctuation(
     admin_client: TestClient, radios: Category
 ) -> None:
     """Punctuation alone would be one name with every other such."""
     form = {"category_id": str(radios.id), "unit": "each"}
     refused = admin_client.post(ITEMS, data=form | {"name": "- ?"})
     assert refused.status_code == 400
-    assert "Give it a name with a letter or a digit in it." in text(refused)
+    assert "Give it a name with more than spaces and punctuation in it." in text(
+        refused
+    )
     assert admin_client.post(ITEMS, data=form | {"name": "Câble ½"}).status_code == 303
 
 
@@ -585,3 +587,42 @@ def test_the_add_form_says_how_to_name_an_item(
     page = " ".join(text(admin_client.get(ITEMS)).split())
     assert "what it is, then what tells it apart from the items nearest it" in page
     assert "the maker goes in Manufacturer" in page
+
+
+def test_a_name_asked_about_saves_however_it_was_spaced(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Sent again with spaces around it, as typed, it is the name asked
+    about, so it saves rather than asking again."""
+    new_item(session, radios, "LiteBeam 5AC Gen1")
+    form = {"name": "LiteBeam 5AC Gen2 ", "category_id": str(radios.id), "unit": "each"}
+    asked = admin_client.post(ITEMS, data=form)
+    assert 'name="different" value="LiteBeam 5AC Gen2"' in asked.text
+    again = admin_client.post(ITEMS, data=form | {"different": "LiteBeam 5AC Gen2"})
+    assert again.status_code == 303
+
+
+def test_a_name_asked_about_stays_answered_through_another_refusal(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Refused for its part number after the question, the form keeps the
+    answer, so fixing the part number saves it."""
+    new_item(session, radios, "LiteBeam 5AC Gen1")
+    add(
+        session,
+        Item(name="Omni", category_id=radios.id, manufacturer="U", part_number="P"),
+    )
+    form = {
+        "name": "LiteBeam 5AC Gen2",
+        "category_id": str(radios.id),
+        "unit": "each",
+        "manufacturer": "U",
+        "part_number": "P",
+        "different": "LiteBeam 5AC Gen2",
+    }
+    refused = admin_client.post(ITEMS, data=form)
+    assert refused.status_code == 400
+    assert 'name="different" value="LiteBeam 5AC Gen2"' in refused.text
+    assert "A different item?" not in text(refused)
+    added = admin_client.post(ITEMS, data=form | {"part_number": "Q"})
+    assert added.status_code == 303

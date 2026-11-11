@@ -97,8 +97,9 @@ def taken_by(
     ]
     if fields.manufacturer is not None and fields.part_number is not None:
         both = and_(
-            func.lower(Item.manufacturer) == fields.manufacturer.lower(),
-            func.lower(Item.part_number) == fields.part_number.lower(),
+            # PostgreSQL's lower(), as the index's: Python's folds more.
+            func.lower(Item.manufacturer) == func.lower(literal(fields.manufacturer)),
+            func.lower(Item.part_number) == func.lower(literal(fields.part_number)),
         )
         wanted.append(("part_number", both))
     if fields.old_code is not None:
@@ -116,16 +117,22 @@ def taken_by(
 SIMILAR = 5
 
 
-def similar(session: Session, name: str, item_id: int | None = None) -> list[Item]:
-    """Items other than `item_id` whose names are close to `name`, closest
-    first, retired ones too: as search finds them (models.fuzzy), or with a
-    name found in `name`, as "mast" is in "Mast, telescopic"."""
+def similar(session: Session, name: str, item_id: int) -> list[Item]:
+    """Items other than `item_id`, the one named `name` now, whose names are
+    close to it, closest first, retired ones too: as search finds them
+    (models.fuzzy), or with a name found in `name`, as "mast" is in "Mast,
+    telescopic"."""
     within = Item.name.op("<%", is_comparison=True)(literal(name))
-    query = select(Item).where(or_(fuzzy(Item.name, name), within))
-    if item_id is not None:
-        query = query.where(Item.id != item_id)
+    close = or_(fuzzy(Item.name, name), within)
+    query = select(Item).where(close, Item.id != item_id)
     closest = func.similarity(Item.name, name).desc(), func.lower(Item.name)
     return list(session.scalars(query.order_by(*closest).limit(SIMILAR)))
+
+
+def nameless(session: Session, name: str) -> bool:
+    """Whether `name` is spaces and punctuation alone, as name_key finds
+    them: every such name would be one name."""
+    return session.scalar(select(name_key(literal(name)) == "")) is True
 
 
 def same_name(session: Session, one: str, other: str) -> bool:

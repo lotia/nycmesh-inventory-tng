@@ -534,8 +534,8 @@ def attempt[T](
 ) -> tuple[T | None, str | None]:
     """Run `change` in a savepoint, with nothing of it kept if it breaks a
     rule: what it returned, and None; or None, and "unique" if it broke a
-    unique index (as PostgreSQL compares names, ignoring case among current
-    rows), the name of the check constraint it broke, or the rule a domain
+    unique index (as each table's index compares, such as an item's name
+    ignoring case, spaces and punctuation, retired items' too), the name of the check constraint it broke, or the rule a domain
     function refused it by (RuleBroken), so a page can say why in its own
     words. Any other failure is raised. Locks taken in `change` go with
     the savepoint, however it failed (_savepoint_locks_released)."""
