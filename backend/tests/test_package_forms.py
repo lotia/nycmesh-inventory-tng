@@ -11,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
+from structlog.testing import capture_logs
 
 from inventory_tng import adjustment_reasons, ledger, open_packages
 from inventory_tng.admin import stock
@@ -633,6 +634,76 @@ def test_a_followed_package_opens_one_a_line(
     assert response.status_code == 422
     assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
         (["lines", 0, "quantity"], "one_package")
+    ]
+
+
+def test_packages_the_page_thought_loose_open_one_each(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """Tracking turned on since the page loaded (inventory-tng-1o0): its
+    one line of two spools, with no key, becomes two open packages, under
+    keys made from the batch's, and sent again, is found written."""
+    batch = opening(spools, sealed_line(spools, "610"))
+    with capture_logs() as logs:
+        assert registered_client.post(URL, json=batch).status_code == 201
+    assert registered_client.post(URL, json=batch).status_code == 200
+    made = session.scalars(
+        select(OpenPackage)
+        .where(OpenPackage.item_id == spools.cable.id)
+        .order_by(OpenPackage.id)
+    ).all()
+    assert len(made) == 2
+    store = spools.store.id
+    assert forms(session, spools.cable) == {
+        (store, None, made[0].id): 305,
+        (store, None, made[1].id): 305,
+    }
+    (split,) = [
+        x for x in logs if x["event"] == "opening line split into open packages"
+    ]
+    assert (split["item_package_id"], split["packages"]) == (spools.spool.id, 2)
+    # The same key with one spool fewer is another batch, as is one of
+    # more than a batch could open, found so without making their keys.
+    for quantity in ("305", "305000000"):
+        other = batch | {"lines": [sealed_line(spools, quantity)]}
+        assert registered_client.post(URL, json=other).status_code == 409
+    # And one of a package there is none of.
+    gone = batch | {"lines": [sealed_line(spools, "610") | {"package_id": 999999}]}
+    assert registered_client.post(URL, json=gone).status_code == 409
+
+
+def test_an_opening_written_loose_is_found_after_tracking_is_turned_on(
+    registered_client: TestClient, session: Session
+) -> None:
+    spools = Spools(session, tracked=False)
+    batch = opening(spools, sealed_line(spools, "610"))
+    assert registered_client.post(URL, json=batch).status_code == 201
+    spools.cable.track_opened = True
+    session.flush()
+    assert registered_client.post(URL, json=batch).status_code == 200
+    assert forms(session, spools.cable) == {(spools.store.id, None, None): 610}
+
+
+def test_an_opening_of_more_packages_than_lines_is_refused(
+    registered_client: TestClient, spools: Spools, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(ledger, "MAX_LINES", 1)
+    batch = opening(spools, sealed_line(spools, "610"))
+    response = registered_client.post(URL, json=batch)
+    assert response.status_code == 422
+    assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
+        (["lines", 0, "quantity"], "one_package")
+    ]
+
+
+def test_an_opening_of_part_of_a_package_is_refused(
+    registered_client: TestClient, spools: Spools
+) -> None:
+    batch = opening(spools, sealed_line(spools, "400"))
+    response = registered_client.post(URL, json=batch)
+    assert response.status_code == 422
+    assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
+        (["lines", 0, "quantity"], "not_whole_packages")
     ]
 
 
