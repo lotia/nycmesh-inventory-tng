@@ -15,8 +15,10 @@ async function overflow(page: Page): Promise<number> {
 }
 
 /**
- * This site's pages that a page leads to, path and query: its links, and
- * each choice of a form that only picks a page (a GET form with a list).
+ * This site's pages that a page leads to, path and query: its links, each
+ * choice of a form that only picks a page (a GET form with a list), and
+ * each page a lone button opens (a GET form with nothing to fill in, such
+ * as one asking to confirm).
  */
 async function linksOn(page: Page): Promise<string[]> {
   const links = await page
@@ -44,7 +46,12 @@ async function linksOn(page: Page): Promise<string[]> {
           });
       }),
     );
-  const hrefs = [...links, ...choices];
+  const buttons = await page
+    .locator('form[method="get"]:has(button):not(:has(input, select))')
+    .evaluateAll((found) =>
+      found.map((form) => (form as HTMLFormElement).action),
+    );
+  const hrefs = [...links, ...choices, ...buttons];
   const here = new URL(page.url()).origin;
   return hrefs
     .map((href) => new URL(href))
@@ -114,6 +121,13 @@ test("every administrator page fits a phone", async ({ page }) => {
   expect([...widths.keys()].filter((path) => /\/\d+$/.test(path))).not.toEqual(
     [],
   );
+  // And the pages asking to confirm what can't be undone.
+  for (const asks of ["/revoke", "/reset", "/merge?"]) {
+    expect(
+      [...widths.keys()].some((path) => path.includes(asks)),
+      asks,
+    ).toBe(true);
+  }
   fits(widths);
 });
 

@@ -183,6 +183,28 @@ def code(
     )
 
 
+@router.get(f"{CODES}/{{code_id}}/revoke")
+def confirm_revoke_code(
+    request: Request, signed: AdminSignedIn, session: DbSession, code_id: int
+) -> Response:
+    """Asks first: revoking cannot be undone."""
+    found = session.get(RegistrationCode, code_id)
+    if found is None or found.revoked_at is not None:
+        return not_found()
+    name = found.label or f"Code {found.id}"
+    return admin_page(
+        request,
+        signed,
+        "code_revoke.html",
+        {
+            "title": f"Revoke {name}?",
+            "here": f"{CODES}/{code_id}/revoke",
+            "keep": f"{CODES}/{code_id}",
+            "name": name,
+        },
+    )
+
+
 @router.post(f"{CODES}/{{code_id}}/revoke")
 def revoke_code(signed: ConfirmedAdmin, session: DbSession, code_id: int) -> Response:
     if not devices.revoke_code(session, code_id):

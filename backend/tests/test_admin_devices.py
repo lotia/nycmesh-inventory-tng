@@ -92,6 +92,25 @@ def test_revoking_a_code_and_a_device(
     assert device.revoked_at is not None
 
 
+def test_a_code_is_revoked_after_a_confirmation(
+    admin_client: TestClient, session: Session
+) -> None:
+    make_code(admin_client)
+    code = session.scalars(select(RegistrationCode)).one()
+    path = f"{CODES}/{code.id}"
+    assert f'<form method="get" action="{path}/revoke">' in admin_client.get(path).text
+    asked = admin_client.get(f"{path}/revoke")
+    assert asked.status_code == 200
+    words = " ".join(text(asked).split())
+    assert "Once revoked, Open day registers no more devices" in words
+    assert '<button class="danger">Revoke</button>' in asked.text
+    assert f'<a href="{path}">Keep it</a>' in asked.text
+    assert code.revoked_at is None  # Only its button revokes.
+    admin_client.post(f"{path}/revoke")
+    assert admin_client.get(f"{path}/revoke").status_code == 404
+    assert admin_client.get(f"{CODES}/999999/revoke").status_code == 404
+
+
 def test_changes_here_ask_for_a_fresh_code(
     admin_client: TestClient, session: Session
 ) -> None:

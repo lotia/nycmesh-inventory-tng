@@ -1,0 +1,11 @@
+{% extends "admin_base.html" %}
+{% block main %}
+<p>{{ volunteer.name }} is retired as a duplicate of {{ into.name }}: their
+past records count as {{ into.name }}'s, and the scan page doesn't offer
+them. Bringing them back later makes them themselves again.</p>
+<form method="post" action="{{ here }}" class="actions">
+  <input type="hidden" name="into_id" value="{{ into.id }}">
+  <button class="danger">Merge</button>
+  <a href="{{ keep }}">Keep them apart</a>
+</form>
+{% endblock %}

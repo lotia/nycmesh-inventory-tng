@@ -40,6 +40,7 @@ router = APIRouter(include_in_schema=False)
 
 VOLUNTEERS = f"{ADMIN}/volunteers"
 TAKEN = "Another current volunteer already has that name or email."
+PICK_INTO = "Pick who they duplicate."
 
 NOTICES.update(
     {
@@ -317,6 +318,47 @@ def retire_volunteer(
     return redirect(VOLUNTEERS, notice="retired", undo=str(volunteer_id))
 
 
+def _merging(
+    session: Session, volunteer_id: int, into_id: str
+) -> tuple[Volunteer | None, Volunteer | None]:
+    """The duplicate, if current, and who it is merged into, if another
+    current volunteer."""
+    found = session.get(Volunteer, volunteer_id)
+    # Before `into` is checked, so a retired one is not found whatever it is.
+    if found is None or found.retired_at is not None:
+        return None, None
+    into = chosen(session, Volunteer, into_id)
+    return found, (None if into is None or into.id == found.id else into)
+
+
+@router.get(f"{VOLUNTEERS}/{{volunteer_id}}/merge")
+def confirm_merge(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    volunteer_id: int,
+    into_id: str = "",
+) -> Response:
+    """Merging can't be undone as such: say what it does first."""
+    found, into = _merging(session, volunteer_id, into_id)
+    if found is None:
+        return not_found()
+    if into is None:
+        return _refused(request, session, signed, found, PICK_INTO)
+    return admin_page(
+        request,
+        signed,
+        "volunteer_merge.html",
+        {
+            "title": f"Merge {found.name} into {into.name}?",
+            "here": f"{VOLUNTEERS}/{volunteer_id}/merge",
+            "keep": f"{VOLUNTEERS}/{volunteer_id}",
+            "volunteer": found,
+            "into": into,
+        },
+    )
+
+
 @router.post(f"{VOLUNTEERS}/{{volunteer_id}}/merge")
 def merge_volunteer(
     request: Request,
@@ -326,13 +368,11 @@ def merge_volunteer(
     into_id: Annotated[str, Form()] = "",
 ) -> Response:
     """This one is a duplicate of `into_id`: retired, pointing at it."""
-    found = session.get(Volunteer, volunteer_id)
-    # Before `into` is checked, so a retired one is not found whatever it is.
-    if found is None or found.retired_at is not None:
+    found, into = _merging(session, volunteer_id, into_id)
+    if found is None:
         return not_found()
-    into = chosen(session, Volunteer, into_id)
-    if into is None or into.id == found.id:
-        return _refused(request, session, signed, found, "Pick who they duplicate.")
+    if into is None:
+        return _refused(request, session, signed, found, PICK_INTO)
     _, broken = attempt(
         session, lambda: volunteers.merge(session, found, into.id, now())
     )

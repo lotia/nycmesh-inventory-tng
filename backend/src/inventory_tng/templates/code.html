@@ -4,9 +4,10 @@
 <p>{% if state == "open" %}Open{% else %}<span class="tag">{{ state | capitalize }}</span>{% endif %}: {{ code.uses }} of {{ code.max_uses }} used,
 until {{ code.expires_at | when(zone) }}.</p>
 {% if not code.revoked_at %}
-<form method="post" action="{{ here }}/revoke"><button>Revoke</button></form>
+<form method="get" action="{{ here }}/revoke"><button>Revoke</button></form>
 <p class="hint">Revoking stops new registrations. Devices it registered stay
-registered; revoke any that look wrong from its own page.</p>
+registered; revoke any that look wrong from its own page. You'll be asked
+first.</p>
 {% endif %}
 
 <section id="devices">

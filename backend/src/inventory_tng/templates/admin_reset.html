@@ -1,0 +1,15 @@
+{% extends "admin_base.html" %}
+{% block main %}
+<p>Resetting {{ other.username }}'s sign-in signs them out everywhere at
+once: their password, authenticators and recovery codes stop working. It
+can't be undone. You get a link to pass on, which works once, within a day,
+for them to choose a new password. Every administrator is told.</p>
+<form method="post" action="{{ here }}">
+  {{ once_field() }}
+  {% if code_needed %}{% include "_code_field.html" %}{% endif %}
+  <div class="actions">
+    <button class="danger">Reset their sign-in</button>
+    <a href="{{ keep }}">Keep it as it is</a>
+  </div>
+</form>
+{% endblock %}

@@ -20,9 +20,10 @@ test("a reset link is copied in one click, its QR code shown when asked", async 
   const { other, password } = prepared();
   await page.goto("/admin/admins");
   await page.getByRole("link", { name: other }).click();
-  // The first change to another administrator in a session asks for a
-  // code: without TOTP, the password.
-  const reset = page.locator('form[action$="/reset"]');
+  // Asked first, on a page of its own. The first change to another
+  // administrator in a session asks for a code: without TOTP, the password.
+  await page.getByRole("button", { name: "Reset their sign-in" }).click();
+  const reset = page.locator('form[method="post"][action$="/reset"]');
   await reset.getByLabel("Your password").fill(password);
   await reset.getByRole("button", { name: "Reset their sign-in" }).click();
   const link = (await page.locator(".key").textContent()) ?? "";
