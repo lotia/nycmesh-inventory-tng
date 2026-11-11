@@ -1,0 +1,12 @@
+{#- A confirmation page's form (docs/decisions/0019): the fields it carries,
+from a call block if any; the danger button first, then a link to keep
+things as they are. -#}
+{% macro confirm(action, button, keep, keep_words) -%}
+<form method="post" action="{{ action }}">
+  {% if caller %}{{ caller() }}{% endif %}
+  <div class="actions">
+    <button class="danger">{{ button }}</button>
+    <a href="{{ keep }}">{{ keep_words }}</a>
+  </div>
+</form>
+{%- endmacro %}

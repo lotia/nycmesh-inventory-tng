@@ -1,8 +1,8 @@
 """A long list of records (docs/decisions/0019): search that forgives
 typos, with suggestions as one types; "Current · Retired · All" (or
 another word than Retired, such as labels' Inactive); and pages of
-PER_PAGE. Each list page says how to search its kind (Searched) and
-reads the query with Listing.read; _listing.html draws it.
+PER_PAGE. Each list page says how to search its kind (Searched) and reads
+its query string with Searched.read; _listing.html draws the Listing.
 
 The query string carries it all, so every view is a link: `q`, the search;
 `show`, which records; `page`; and `pick`, the one record a suggestion
@@ -52,27 +52,51 @@ def closeness(column: SQLColumnExpression[str], search: str) -> ColumnElement[fl
 
 @dataclass(frozen=True)
 class Searched[T]:
-    """How a list page finds its kind of record: the model, the text a
-    search reads (such as an item's search_text) and its name, by which the
-    list is sorted. Optionally: a column a search matches only whole, held
-    in capitals, such as a label's code, put first; which are current, if
-    not those with no retired_at; what the filter between Current and All
-    calls the rest; and each row as the page shows it, with a `name`, if
-    not the row itself."""
+    """How a list page, at `here`, finds its kind of record: the model, the
+    text a search reads (such as an item's search_text) and its name, by
+    which the list is sorted. Optionally: the select of the model it reads,
+    if joined to more; a column a search matches only whole, held in
+    capitals, such as a label's code, put first; which are current, if not
+    those with no retired_at; what the filter between Current and All calls
+    the rest; and each row as the page shows it, with a `name`, if not the
+    row itself."""
 
+    here: str
     model: type[T]
     text: SQLColumnExpression[str]
     name: SQLColumnExpression[str]
+    query: Select | None = None
     whole: SQLColumnExpression[str] | None = None
     current: ColumnElement[bool] | None = None
     lapsed: Lapsed = "retired"
     shown: Callable[[Session, Sequence[T]], Sequence[Any]] | None = None
 
     def read(
-        self, here: str, q: str = "", show: str = "", page: str = "", pick: str = ""
+        self, q: str = "", show: str = "", page: str = "", pick: str = ""
     ) -> Listing[T]:
-        """The view of this kind's list that a query string asks for."""
-        return Listing[T].read(here, q, show, page, pick, lapsed=self.lapsed)
+        """The view of the list a query string asks for: anything odd is
+        the plain list's, never an error, as a link may have been typed by
+        hand."""
+        shows: dict[str, Show] = {
+            "current": "current",
+            self.lapsed: self.lapsed,
+            "all": "all",
+        }
+        return Listing(
+            self,
+            search=" ".join(q.split())[:SEARCH_MAX],
+            show=shows.get(show, "current"),
+            page=whole(page, 1, INTEGER_MAX) or 1,
+            pick=whole(pick, 1, INTEGER_MAX),
+        )
+
+    def base(self, show: Show) -> Select:
+        """The records `show` asks for."""
+        query = select(self.model) if self.query is None else self.query
+        if show == "all":
+            return query
+        current = self.is_current()
+        return query.where(current if show == "current" else not_(current))
 
     def matching(self, search: str) -> ColumnElement[bool]:
         found = fuzzy(self.text, search)
@@ -97,11 +121,10 @@ class Searched[T]:
 
 @dataclass(frozen=True)
 class Listing[T]:
-    """One view of a list, as its query string asks for it, and what it
-    finds there."""
+    """One view of a list, as its query string asks for it
+    (Searched.read), and what it finds there."""
 
-    here: str
-    lapsed: Lapsed = "retired"
+    searched: Searched[T]
     search: str = ""
     show: Show = "current"
     page: int = 1
@@ -115,28 +138,13 @@ class Listing[T]:
     # The picked record's name, when one was picked.
     picked: str | None = None
 
-    @classmethod
-    def read(
-        cls,
-        here: str,
-        q: str = "",
-        show: str = "",
-        page: str = "",
-        pick: str = "",
-        *,
-        lapsed: Lapsed = "retired",
-    ) -> Listing[T]:
-        """As a list page's query string asks: anything odd is the plain
-        list's, never an error, as a link may have been typed by hand."""
-        shows: dict[str, Show] = {"current": "current", lapsed: lapsed, "all": "all"}
-        return cls(
-            here=here,
-            lapsed=lapsed,
-            search=" ".join(q.split())[:SEARCH_MAX],
-            show=shows.get(show, "current"),
-            page=whole(page, 1, INTEGER_MAX) or 1,
-            pick=whole(pick, 1, INTEGER_MAX),
-        )
+    @property
+    def here(self) -> str:
+        return self.searched.here
+
+    @property
+    def lapsed(self) -> Lapsed:
+        return self.searched.lapsed
 
     @property
     def pages(self) -> int:
@@ -175,21 +183,12 @@ class Listing[T]:
         kept = {key: value for key, value in query.items() if value}
         return self.here + (f"?{urlencode(kept)}" if kept else "")
 
-    def _shown(self, searched: Searched[T], query: Select) -> Select:
-        """`query` narrowed to the records `show` asks for."""
-        if self.show == "all":
-            return query
-        current = searched.is_current()
-        return query.where(current if self.show == "current" else not_(current))
-
-    def find(
-        self, session: Session, searched: Searched[T], query: Select
-    ) -> Listing[T]:
-        """This view's rows, of `query` (a select of searched.model, perhaps
-        joined): filtered, searched or picked, best match first, then by
-        name, one page of them."""
+    def find(self, session: Session) -> Listing[T]:
+        """This view's rows: filtered, searched or picked, best match first,
+        then by name, one page of them."""
+        searched = self.searched
         table: Any = searched.model
-        query = self._shown(searched, query)
+        query = searched.base(self.show)
         total = _count(session, query)
         if self.pick is not None:
             # One record at most: no count, nor a page, to work out.
@@ -222,20 +221,17 @@ class Listing[T]:
         )
 
     def suggest(
-        self,
-        session: Session,
-        searched: Searched[T],
-        query: Select,
-        hint: Callable[[T], str] = lambda _row: "",
+        self, session: Session, hint: Callable[[T], str] = lambda _row: ""
     ) -> list[dict[str, str]]:
         """What the search box offers for what is typed so far: the closest
         records the filter shows, each with its name, a hint to tell it
         apart, and the link that narrows the list to it."""
         if not self.search:
             return []
-        query = self._shown(searched, query)
+        searched = self.searched
         rows = session.scalars(
-            query.where(searched.matching(self.search))
+            searched.base(self.show)
+            .where(searched.matching(self.search))
             .order_by(
                 searched.closeness(self.search).desc(),
                 func.lower(searched.name),

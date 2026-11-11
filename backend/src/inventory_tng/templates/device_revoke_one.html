@@ -1,9 +1,7 @@
 {% extends "admin_base.html" %}
+{% from "_confirm.html" import confirm %}
 {% block main %}
 <p>{{ device.name }} can't save anything once revoked, and stays revoked: it
 would have to register again with a new code.</p>
-<form method="post" action="{{ here }}" class="actions">
-  <button class="danger">Revoke</button>
-  <a href="{{ keep }}">Keep it</a>
-</form>
+{{ confirm(here, "Revoke", keep, "Keep it") }}
 {% endblock %}

@@ -52,7 +52,7 @@ NOTICES.update(
 
 
 # How the volunteers list finds one: by name.
-SEARCHED = Searched(Volunteer, Volunteer.name, Volunteer.name)
+SEARCHED = Searched(VOLUNTEERS, Volunteer, Volunteer.name, Volunteer.name)
 
 
 def _list_page(
@@ -65,9 +65,7 @@ def _list_page(
     values: Mapping[str, str] | None = None,
     undo: str | None = None,
 ) -> HTMLResponse:
-    listing = (listing or Listing(VOLUNTEERS)).find(
-        session, SEARCHED, select(Volunteer)
-    )
+    listing = (listing or SEARCHED.read()).find(session)
     shown = [v.id for v in listing.rows]
     holders = set(
         session.scalars(
@@ -178,7 +176,7 @@ def list_volunteers(
     pick: str = "",
     undo: str = "",
 ) -> Response:
-    listing = Listing[Volunteer].read(VOLUNTEERS, q, show, page, pick)
+    listing = SEARCHED.read(q, show, page, pick)
     back = undo_retire(session, Volunteer, undo, VOLUNTEERS)
     return _list_page(request, session, signed, listing=listing, undo=back)
 
@@ -188,8 +186,8 @@ def suggest_volunteers(
     session: DbSession, signed: AdminSignedIn, q: str = "", show: str = ""
 ) -> JSONResponse:
     """What the search box offers as one types (_listing.html)."""
-    listing = Listing[Volunteer].read(VOLUNTEERS, q, show)
-    offered = listing.suggest(session, SEARCHED, select(Volunteer))
+    listing = SEARCHED.read(q, show)
+    offered = listing.suggest(session)
     return JSONResponse(offered, headers={"Cache-Control": "no-store"})
 
 
