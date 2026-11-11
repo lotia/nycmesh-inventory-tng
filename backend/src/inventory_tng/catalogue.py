@@ -64,9 +64,6 @@ class PackageEntry(Entry):
     # Whether opening one makes an open package, followed until used up, or
     # loose units: its own setting, else its item's (docs/decisions/0020).
     track_opened: bool
-    # An open one with less left is a short end, asked about on the next
-    # cut. None: none is.
-    short_below: Decimal | None
 
 
 class OpenPackageEntry(Entry):
@@ -81,6 +78,9 @@ class OpenPackageEntry(Entry):
     opened_at: datetime
     # What is left on it, in the item's unit, as the records say.
     left: Decimal
+    # Less left than its package's too-short-to-use length, retired
+    # package or not: asked about as a short end on the next cut.
+    short: bool
 
 
 class ItemEntry(BaseModel):
@@ -143,7 +143,6 @@ def catalogue(session: Session) -> Catalogue:
                 name=package.name,
                 size=package.size,
                 track_opened=tracks_opened(item_tracks, package.track_opened),
-                short_below=package.short_below,
             )
         )
     # A retired item stays while it has stock, so what is left can be taken.
@@ -206,6 +205,13 @@ def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]
         .order_by(OpenPackage.opened_at, OpenPackage.id)
     ).all()
     left = ledger.left_on(session, rows)
+    short_below = dict(
+        session.execute(
+            select(ItemPackage.id, ItemPackage.short_below).where(
+                ItemPackage.id.in_({row.package_id for row in rows})
+            )
+        ).all()
+    )
     return [
         OpenPackageEntry(
             id=row.id,
@@ -215,6 +221,7 @@ def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]
             location_id=row.location_id,
             opened_at=row.opened_at,
             left=left[row.id],
+            short=0 < left[row.id] < (short_below.get(row.package_id) or 0),
         )
         for row in rows
     ]

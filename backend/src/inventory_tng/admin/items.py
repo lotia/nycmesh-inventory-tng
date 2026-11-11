@@ -604,16 +604,24 @@ def package_settings(
     if package is None or package.item_id != item_id:
         return not_found()
     found = session.get_one(Item, item_id)
-    short = quantity(short_below, positive=True) if short_below.strip() else None
+    short = quantity(short_below, positive=True, unit=found.unit)
     minimum = whole(minimum_sealed, 0, INTEGER_MAX) if minimum_sealed.strip() else None
     problems = {}
     if isinstance(short, str):
         problems["short_below"] = short
+    elif short is not None and short >= package.size:
+        problems["short_below"] = "Shorter than a whole one, or blank."
     if minimum_sealed.strip() and minimum is None:
         problems["minimum_sealed"] = "A whole number of packages, or blank."
     if problems or isinstance(short, str):
+        # Beside the fields of the package it was sent for.
+        values = {
+            "package_id": str(package_id),
+            "short_below": short_below,
+            "minimum_sealed": minimum_sealed,
+        }
         return _item_page(
-            request, session, signed, found, alert=" ".join(problems.values())
+            request, session, signed, found, problems=problems, values=values
         )
     _, broken = refusal(
         session,

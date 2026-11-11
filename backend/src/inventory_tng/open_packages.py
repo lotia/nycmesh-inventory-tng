@@ -236,11 +236,6 @@ class Forms:
     def usable(self) -> Decimal:
         return self.total - sum(self.short_ends, Decimal(0))
 
-    @property
-    def plain(self) -> bool:
-        """Loose units alone: said as a total, as before packages."""
-        return not (self.sealed or self.open or self.short_ends)
-
 
 class PackageSize(NamedTuple):
     name: str
@@ -265,7 +260,8 @@ def split(
             forms.sealed_by_package[package_id] = count
         elif open_id is not None:
             short = packages[opened_from[open_id]].short_below
-            short_end = short is not None and amount < short
+            # Less than nothing left is the records', not a short end.
+            short_end = short is not None and 0 < amount < short
             (forms.short_ends if short_end else forms.open).append(amount)
         else:
             forms.loose += amount

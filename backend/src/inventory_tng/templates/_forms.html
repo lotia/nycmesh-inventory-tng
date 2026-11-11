@@ -1,18 +1,11 @@
-{#- An item's stock at a place, form by form, each on its own labelled part
+{#- An item's stock at a place, form by form, each on its own labelled line
 (open_packages.Forms, docs/decisions/0020): sealed packages, open ones,
-loose units, short ends, and what is usable. -#}
-{% macro forms_words(forms, unit) -%}
-{%- set parts = [] -%}
-{%- for name, count, amount in forms.sealed -%}
-{%- set _ = parts.append(count | amount ~ " sealed " ~ name) -%}
-{%- endfor -%}
-{%- if forms.open -%}
-{%- set _ = parts.append("open: " ~ (forms.open | map("amount") | map("string") | join(" " ~ unit ~ ", ")) ~ " " ~ unit) -%}
-{%- endif -%}
-{%- if forms.loose -%}{%- set _ = parts.append("loose: " ~ forms.loose | amount ~ " " ~ unit) -%}{%- endif -%}
-{%- if forms.short_ends -%}
-{%- set _ = parts.append("short ends: " ~ (forms.short_ends | map("amount") | map("string") | join(" " ~ unit ~ ", ")) ~ " " ~ unit) -%}
-{%- endif -%}
-{%- set _ = parts.append("usable " ~ forms.usable | amount ~ " " ~ unit) -%}
-{{ parts | join(" · ") }}
+loose units, short ends, and what is usable, loose units included, so a
+total never hides what it is made of. -#}
+{% macro forms_lines(forms, unit) -%}
+{%- for name, count, amount in forms.sealed %}<span class="hint block">{{ count | amount }} sealed {{ name }}</span>{% endfor -%}
+{%- for left in forms.open %}<span class="hint block">open: {{ left | amount }} {{ unit }} left</span>{% endfor -%}
+{%- if forms.loose %}<span class="hint block">loose: {{ forms.loose | amount }} {{ unit }}</span>{% endif -%}
+{%- for left in forms.short_ends %}<span class="hint block">short end: {{ left | amount }} {{ unit }}</span>{% endfor -%}
+{%- if forms.short_ends %}<span class="hint block">usable: {{ forms.usable | amount }} {{ unit }}</span>{% endif -%}
 {%- endmacro %}

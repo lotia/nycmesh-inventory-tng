@@ -733,6 +733,10 @@
           "left": {
             "type": "string",
             "title": "Left"
+          },
+          "short": {
+            "type": "boolean",
+            "title": "Short"
           }
         },
         "type": "object",
@@ -743,7 +747,8 @@
           "package_id",
           "location_id",
           "opened_at",
-          "left"
+          "left",
+          "short"
         ],
         "title": "OpenPackageEntry",
         "description": "A package opened and followed, not reported used up: one a cart can\ntake from where it is."
@@ -783,21 +788,10 @@
           "track_opened": {
             "type": "boolean",
             "title": "Track Opened"
-          },
-          "short_below": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Short Below"
           }
         },
         "type": "object",
-        "required": ["id", "name", "size", "track_opened", "short_below"],
+        "required": ["id", "name", "size", "track_opened"],
         "title": "PackageEntry"
       },
       "PageError": {

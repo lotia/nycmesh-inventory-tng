@@ -52,8 +52,6 @@ export const PackageEntry = v.object({
   size: v.string(),
   // Opening one makes an open package, followed, rather than loose units.
   track_opened: v.boolean(),
-  // An open one with less left is a short end; null, none is.
-  short_below: v.nullable(v.string()),
 });
 
 /** A package opened and followed, not reported used up (0020). */
@@ -66,6 +64,8 @@ export const OpenPackageEntry = v.object({
   opened_at: v.string(),
   // What is left on it, in the item's unit.
   left: v.string(),
+  // Below its package's too-short-to-use length: a short end.
+  short: v.boolean(),
 });
 
 export const ItemEntry = v.object({

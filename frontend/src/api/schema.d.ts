@@ -286,6 +286,8 @@ export interface components {
       opened_at: string;
       /** Left */
       left: string;
+      /** Short */
+      short: boolean;
     };
     /** OutboxRetry */
     OutboxRetry: {
@@ -310,8 +312,6 @@ export interface components {
       size: string;
       /** Track Opened */
       track_opened: boolean;
-      /** Short Below */
-      short_below: string | null;
     };
     /** PageError */
     PageError: {
