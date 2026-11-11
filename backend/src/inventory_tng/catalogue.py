@@ -12,7 +12,7 @@ from decimal import Decimal
 import structlog
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import and_, func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import labels
@@ -190,23 +190,27 @@ def catalogue(session: Session) -> Catalogue:
 def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]:
     """The open packages of these items a cart can take from: not closed,
     not reported used up, with what is left on each where it is, oldest
-    first."""
-    rows = session.execute(
-        select(OpenPackage, func.coalesce(by_form.c.quantity, 0))
-        .outerjoin(
-            by_form,
-            and_(
-                by_form.c.open_package_id == OpenPackage.id,
-                by_form.c.location_id == OpenPackage.location_id,
-            ),
-        )
+    first. One whose records say nothing is left is sent too, at that: it
+    is where a volunteer says it is used up."""
+    rows = session.scalars(
+        select(OpenPackage)
         .where(
             OpenPackage.closed_at.is_(None),
             OpenPackage.reported_at.is_(None),
             OpenPackage.item_id.in_(item_ids),
         )
         .order_by(OpenPackage.opened_at, OpenPackage.id)
-    )
+    ).all()
+    # Their balances alone, by id, so only their movements are summed.
+    ids = [row.id for row in rows]
+    left = {
+        (open_id, place): quantity
+        for open_id, place, quantity in session.execute(
+            select(
+                by_form.c.open_package_id, by_form.c.location_id, by_form.c.quantity
+            ).where(by_form.c.open_package_id.in_(ids))
+        )
+    }
     return [
         OpenPackageEntry(
             id=row.id,
@@ -215,9 +219,9 @@ def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]
             package_id=row.package_id,
             location_id=row.location_id,
             opened_at=row.opened_at,
-            left=left,
+            left=left.get((row.id, row.location_id), Decimal(0)),
         )
-        for row, left in rows
+        for row in rows
     ]
 
 

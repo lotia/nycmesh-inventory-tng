@@ -200,9 +200,18 @@ function CartForm({
     change({ ...cart.value, ...fields });
   }
 
-  function add(itemId: number, packageId?: number) {
-    change(addOne(cart.value, itemId, packageId));
+  /** Add one, and say what: opening, an item of one package is one of
+   * those, as only whole packages are opened. */
+  function add(itemId: number, packageId?: number): string {
+    const item = indexOf(catalogue).items.get(itemId);
+    const only = item?.packages.find((_, __, all) => all.length === 1);
+    const pack =
+      packageId === undefined && cart.value.kind === "open"
+        ? only
+        : item?.packages.find((each) => each.id === packageId);
+    change(addOne(cart.value, itemId, pack?.id));
     query.value = "";
+    return `Added ${pack === undefined ? "one" : `a ${pack.name}`}: ${item?.name}.`;
   }
 
   // The camera, while open, and a place it read, asking From or To.
@@ -216,24 +225,23 @@ function CartForm({
       return `That label isn't in the inventory (${read.code}).`;
     }
     placeRead.value = null;
-    const { items: byId, places } = indexOf(catalogue);
+    const { places } = indexOf(catalogue);
     if (read.kind === "place") {
       const place = places.get(read.locationId);
       const [only, other] = placeSides(cart.value);
       query.value = "";
       if (only !== undefined && other === undefined) {
         placeOn(only, read.locationId);
-        return `${place}: ${only === "from" ? "from here" : "to here"}.`;
+        const here = cart.value.kind === "open" ? "here" : "from here";
+        return `${place}: ${only === "from" ? here : "to here"}.`;
       }
       placeRead.value = read.locationId;
       return `${place}: from here, or to here?`;
     }
-    add(read.itemId, read.packageId);
+    const added = add(read.itemId, read.packageId);
     // A buzz where the phone has one (not iOS Safari).
     navigator.vibrate?.(60);
-    const item = byId.get(read.itemId);
-    const pack = item?.packages.find((each) => each.id === read.packageId);
-    return `Added ${pack === undefined ? "one" : `a ${pack.name}`}: ${item?.name}.`;
+    return added;
   }
 
   function placeOn(side: Side, locationId: number) {

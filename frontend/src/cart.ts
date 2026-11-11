@@ -441,7 +441,7 @@ export function toBatch(
       problems.push(`${item.name}: That is more than the inventory can count.`);
     } else if (cart.kind === "open" && quantity.loose > 0) {
       problems.push(`${item.name}: Open whole packages: leave loose empty.`);
-    } else if (cart.kind === "open") {
+    } else if (cart.kind === "open" && quantity.amount > 0) {
       lines.push(...openings(item, quantity.sealed));
       items += 1;
     } else if (quantity.amount > 0) {

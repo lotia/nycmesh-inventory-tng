@@ -28,6 +28,7 @@ import uuid
 from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from decimal import Decimal
+from types import MappingProxyType
 from typing import Annotated, Literal, NamedTuple
 
 import structlog
@@ -52,6 +53,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import open_packages
 from inventory_tng.db import (
     DbSession,
+    RuleBroken,
     by_name,
     enforce,
     exists_where,
@@ -653,6 +655,7 @@ ProblemKind = Literal[
     "not_whole",
     "not_whole_packages",
     "one_package",
+    "refused",
     "retired",
     "retired_package",
     "repeated",
@@ -660,6 +663,8 @@ ProblemKind = Literal[
 Problem = tuple[tuple[str | int, ...], ProblemKind]
 MESSAGES = {
     "one_package": "Open one package a line: it is followed until used up",
+    "refused": "The inventory's rules refuse this as sent: it changed since "
+    "the page loaded. Load the page again, and do it again",
     "not_found": "There is no such row",
     "repeated": "This item, in this package or loose, is on another line too: "
     "put it on one line",
@@ -702,7 +707,7 @@ class Recorded(NamedTuple):
     written: bool
     retired: Sequence[Side] = ()
     # How many packages an opening opened, by what they became.
-    opened: Mapping[Into, int] = {}
+    opened: Mapping[Into, int] = MappingProxyType({})
 
 
 def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded:
@@ -722,8 +727,16 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
         refused.add(1, {"reason": "invalid"})
         log.info("batch refused", problems=sorted({kind for _, kind in problems}))
         raise BatchRefused(problems)
-    lines, opened = _opening(session, batch, packages)
-    transaction = insert_transaction(session, batch.key, header, lines)
+    try:
+        lines, opened = _opening(session, batch, packages, lines)
+        transaction = insert_transaction(session, batch.key, header, lines)
+    except RuleBroken as broken:
+        # A rule _problems could not see: the catalogue changed since the
+        # page's, as a package's setting, or a key used elsewhere. Said, so
+        # the outbox shows it rather than sending it again and again.
+        refused.add(1, {"reason": "invalid"})
+        log.info("batch refused", rule=broken.rule)
+        raise BatchRefused([(("lines",), "refused")]) from broken
     if transaction is None:
         written = _replay(session, batch)
         assert written is not None  # The conflict was on this key.
@@ -744,30 +757,47 @@ def _opening_key(batch: Batch, number: int) -> uuid.UUID:
 
 
 def _opening(
-    session: Session, batch: Batch, packages: Mapping[int, PackageFacts]
+    session: Session,
+    batch: Batch,
+    packages: Mapping[int, PackageFacts],
+    lines: list[Entry],
 ) -> tuple[list[Entry], dict[Into, int]]:
-    """A batch's lines as the ledger writes them, with an opening's open
-    packages made (open_packages.make), for packages its items track
-    opened, and how many packages it opened, by what each became."""
+    """A batch's lines (`lines`, as Line.entry makes them) as the ledger
+    writes them: an opening's packages its items track opened become open
+    packages (open_packages.make), and the rest loose units, one line for
+    each package however many lines the page sent, as it may have thought
+    them followed. And how many packages it opened, by what each became."""
     if batch.kind != "open":
-        return [line.entry(batch.kind) for line in batch.lines], {}
-    lines: list[Entry] = []
+        return lines, {}
     opened: dict[Into, int] = {}
+    made: dict[int, int] = {}
     for number, line in enumerate(batch.lines):
         assert line.package_id is not None  # Batch's validator.
         package = packages[line.package_id]
-        made = None
-        if package.tracked:
-            made = open_packages.make(
-                session,
-                _opening_key(batch, number),
-                line.package_id,
-                batch.from_location_id or 0,
-            ).id
-        into: Into = "open" if made else "loose"
+        into: Into = "open" if package.tracked else "loose"
         opened[into] = opened.get(into, 0) + int(line.quantity / package.size)
-        lines.append(line.entry(batch.kind, made))
-    return lines, opened
+        if package.tracked:
+            key = _opening_key(batch, number)
+            where = batch.from_location_id or 0
+            made[number] = open_packages.make(session, key, line.package_id, where).id
+    return _as_opened(batch, made), opened
+
+
+def _as_opened(batch: Batch, made: Mapping[int, int]) -> list[Entry]:
+    """An opening's lines, the open package `made` for a line by its
+    number, if any; the others loose, one line for each package."""
+    written: list[Entry] = []
+    loose: dict[int | None, Entry] = {}
+    for number, line in enumerate(batch.lines):
+        if number in made:
+            written.append(line.entry(batch.kind, made[number]))
+        elif (before := loose.get(line.package_id)) is None:
+            loose[line.package_id] = line.entry(batch.kind)
+        else:
+            loose[line.package_id] = before._replace(
+                quantity=before.quantity + line.quantity
+            )
+    return written + list(loose.values())
 
 
 # A save, count or adjustment holds the rows it refers to until it ends, so
@@ -1069,6 +1099,7 @@ LINE_PROBLEMS: dict[str, tuple[str, ProblemKind]] = {
     "movement_whole_packages": ("quantity", "not_whole_packages"),
     "receipt_retired_package": ("package_id", "retired_package"),
     "open_package_full": ("quantity", "one_package"),
+    "opening_from_sealed": ("package_id", "not_found"),
 }
 
 
@@ -1105,7 +1136,8 @@ def _problems(
         for rule in dict.fromkeys(broken):
             field, kind = LINE_PROBLEMS[rule]
             problems.append((("lines", number, field), kind))
-    return problems
+    # Two rules may say one thing of one field: said once.
+    return list(dict.fromkeys(problems))
 
 
 # Counts and adjustments: an administrator's, from admin/counts.py
@@ -1304,17 +1336,7 @@ def _replay(session: Session, batch: Batch) -> LedgerTransaction | None:
         )
         for item_id, quantity, from_package, from_open, to_package, to_open in rows
     )
-    made = {
-        number: session.scalar(
-            select(OpenPackage.id).where(OpenPackage.key == _opening_key(batch, number))
-        )
-        for number in range(len(batch.lines))
-        if batch.kind == "open"
-    }
-    sent = Counter(
-        line.entry(batch.kind, made.get(number))
-        for number, line in enumerate(batch.lines)
-    )
+    sent = Counter(_written_as(session, batch))
     same = written == sent and all(
         getattr(transaction, field) == value for field, value in _header(batch).items()
     )
@@ -1325,6 +1347,18 @@ def _replay(session: Session, batch: Batch) -> LedgerTransaction | None:
     replayed.add(1, {"kind": batch.kind})
     log.info("transaction replayed", transaction_id=transaction.id)
     return transaction
+
+
+def _written_as(session: Session, batch: Batch) -> list[Entry]:
+    """A batch's lines as written once, to compare with what was: an
+    opening's with the open packages made under their keys (_opening)."""
+    if batch.kind != "open":
+        return [line.entry(batch.kind) for line in batch.lines]
+    keys = {_opening_key(batch, n): n for n in range(len(batch.lines))}
+    found = session.execute(
+        select(OpenPackage.key, OpenPackage.id).where(OpenPackage.key.in_(keys))
+    )
+    return _as_opened(batch, {keys[key]: open_id for key, open_id in found})
 
 
 class Saved(BaseModel):

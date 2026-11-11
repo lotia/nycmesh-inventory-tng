@@ -194,6 +194,16 @@ describe("turning a cart into a batch", () => {
     expect(sent[0]?.open_package_key).not.toBe(sent[1]?.open_package_key);
   });
 
+  test("an opening counts only the items it opens", () => {
+    const lines = [
+      { itemId: 101, packages: { 1001: "1" }, loose: "" },
+      { itemId: 100, packages: {}, loose: "" },
+    ];
+    expect(
+      toBatch(cart({ kind: "open", lines, fromId: 10 }), CATALOGUE),
+    ).toMatchObject({ what: "Opening: 1 item at Hub" });
+  });
+
   test("an opening opens whole packages only", () => {
     const lines = [{ itemId: 101, packages: { 1001: "1" }, loose: "3" }];
     expect(

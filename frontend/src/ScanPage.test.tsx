@@ -135,12 +135,18 @@ describe("loading", () => {
 });
 
 describe("filling and saving a cart", () => {
-  test("opening packages asks where, not from and to", async () => {
+  test("opening packages asks where, not from and to; an item adds its package", async () => {
     open();
     await ready();
     fireEvent.click(screen.getByLabelText("Opening packages"));
     expect(screen.getByLabelText("Where")).toBeDefined();
     expect(screen.queryByLabelText("To")).toBeNull();
+    // Only whole packages are opened: the radio's one box, not a radio.
+    find("beam");
+    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    expect(
+      (screen.getByLabelText("Box (4 each)") as HTMLInputElement).value,
+    ).toBe("1");
   });
 
   test("a move is saved, sent, and a new cart keeps the choices", async () => {
@@ -534,6 +540,14 @@ describe("scanning labels with the camera", () => {
     scan("S4HELF");
     await screen.findByText("Hub › Shelf A: from here.");
     expect(selected("From")).toBe("11");
+  });
+
+  test("opening, a place's label is where", async () => {
+    storeCart({ ...freshCart(), kind: "open" });
+    await opened();
+    scan("S4HELF");
+    await screen.findByText("Hub › Shelf A: here.");
+    expect(selected("Where")).toBe("11");
   });
 
   test("an item read next puts a place's question away", async () => {
