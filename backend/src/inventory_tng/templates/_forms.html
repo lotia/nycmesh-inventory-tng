@@ -1,0 +1,18 @@
+{#- An item's stock at a place, form by form, each on its own labelled part
+(open_packages.Forms, docs/decisions/0020): sealed packages, open ones,
+loose units, short ends, and what is usable. -#}
+{% macro forms_words(forms, unit) -%}
+{%- set parts = [] -%}
+{%- for name, count, amount in forms.sealed -%}
+{%- set _ = parts.append(count | amount ~ " sealed " ~ name) -%}
+{%- endfor -%}
+{%- if forms.open -%}
+{%- set _ = parts.append("open: " ~ (forms.open | map("amount") | map("string") | join(" " ~ unit ~ ", ")) ~ " " ~ unit) -%}
+{%- endif -%}
+{%- if forms.loose -%}{%- set _ = parts.append("loose: " ~ forms.loose | amount ~ " " ~ unit) -%}{%- endif -%}
+{%- if forms.short_ends -%}
+{%- set _ = parts.append("short ends: " ~ (forms.short_ends | map("amount") | map("string") | join(" " ~ unit ~ ", ")) ~ " " ~ unit) -%}
+{%- endif -%}
+{%- set _ = parts.append("usable " ~ forms.usable | amount ~ " " ~ unit) -%}
+{{ parts | join(" · ") }}
+{%- endmacro %}

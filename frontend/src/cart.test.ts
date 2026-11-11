@@ -104,7 +104,15 @@ describe("quantities", () => {
     // A box of 2.5, and a half loose: 3 in all, but each is a line.
     const halves = {
       ...radio,
-      packages: [{ id: 7, name: "Half box", size: "2.5", track_opened: false }],
+      packages: [
+        {
+          id: 7,
+          name: "Half box",
+          size: "2.5",
+          track_opened: false,
+          short_below: null,
+        },
+      ],
     };
     const line = { itemId: 100, packages: { 7: "1" }, loose: "0.5" };
     expect(quantityOf(line, halves)).toEqual({

@@ -64,6 +64,9 @@ class PackageEntry(Entry):
     # Whether opening one makes an open package, followed until used up, or
     # loose units: its own setting, else its item's (docs/decisions/0020).
     track_opened: bool
+    # An open one with less left is a short end, asked about on the next
+    # cut. None: none is.
+    short_below: Decimal | None
 
 
 class OpenPackageEntry(Entry):
@@ -140,6 +143,7 @@ def catalogue(session: Session) -> Catalogue:
                 name=package.name,
                 size=package.size,
                 track_opened=tracks_opened(item_tracks, package.track_opened),
+                short_below=package.short_below,
             )
         )
     # A retired item stays while it has stock, so what is left can be taken.

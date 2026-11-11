@@ -178,10 +178,36 @@ describe("filling and saving a cart", () => {
         ) as HTMLInputElement
       ).checked,
     ).toBe(true);
+    // A short end, below the spool's 15 m: asked about as one.
+    fireEvent.input(field, { target: { value: "" } });
+    expect(screen.queryByLabelText("A short end: is it used up?")).toBeNull();
     // Another place: what was taken from this one's packages goes.
     pick("From", "12");
     pick("From", "10");
     expect((screen.getByLabelText(label) as HTMLInputElement).value).toBe("");
+  });
+
+  test("an open package below its package's short length is a short end", async () => {
+    const opened = {
+      id: 6,
+      key: "22222222-2222-4222-8222-222222222222",
+      item_id: 101,
+      package_id: 1001,
+      location_id: 10,
+      opened_at: "2026-11-03T10:00:00Z",
+      left: "12.000",
+    };
+    const { api } = answering((request) =>
+      new URL(request.url).pathname === "/api/catalogue"
+        ? json({ ...CATALOGUE, open_packages: [opened] }, 200)
+        : saved(),
+    );
+    open(api);
+    await ready();
+    pick("From", "10");
+    find("cat6");
+    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    expect(screen.getByLabelText("A short end: is it used up?")).toBeDefined();
   });
 
   test("opening packages asks where, not from and to; an item adds its package", async () => {

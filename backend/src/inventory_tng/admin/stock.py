@@ -4,15 +4,17 @@ negative balance means the records are wrong somewhere, so it is shown as
 needing a count (inventory-tng-8i4.15). Any stock at a retired place is
 warned of, with a link to count it."""
 
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Literal, cast
 
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import ColumnElement, func, select, true
 from sqlalchemy.orm import Session
 
+from inventory_tng import open_packages
 from inventory_tng.admin.common import ADMIN, admin_page
 from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.items import ITEMS
@@ -20,10 +22,11 @@ from inventory_tng.db import DbSession
 from inventory_tng.ledger import (
     SHORT,
     balance,
+    by_form,
     in_stores,
     retired_places_holding_stock,
 )
-from inventory_tng.models import Item, Location
+from inventory_tng.models import STORE_KINDS, Item, ItemPackage, Location
 from inventory_tng.pages import templates
 from inventory_tng.sign_in import AdminSignedIn
 
@@ -107,6 +110,8 @@ def stock(
             "title": "Stock",
             "view": by,
             "groups": groups,
+            # Each line's forms, where it has more than loose units.
+            "forms": open_packages.forms_of(session, true()),
             "needing_count": sum(group.needs_count for group in groups),
             "retired_places": retired_places_holding_stock(session),
             "counts_path": COUNTS,
@@ -117,33 +122,73 @@ def stock(
 @dataclass
 class Reorder:
     item: Item
+    # Usable in the stores: all but short ends (docs/decisions/0020).
     in_stores: Decimal
     # Less than nothing somewhere in the stores: the total is not to be
     # trusted yet.
     count_first: bool
+    # Packages with fewer sealed in the stores than their minimum: name,
+    # how many, the minimum.
+    low_sealed: list[tuple[str, Decimal, int]] = field(default_factory=list)
+
+
+def reorder_rows(
+    items: Sequence[Item],
+    usable: Mapping[int, Decimal],
+    sealed: Mapping[int, Mapping[int, Decimal]],
+    packages: Sequence[ItemPackage],
+    short: Collection[int],
+) -> list[Reorder]:
+    """The items to reorder: usable stock at or below the item's reorder
+    point, or a package's sealed below its minimum. `usable` and `sealed`
+    (by item, then package) are in the stores; `short`, items less than
+    nothing somewhere there."""
+    minimums: dict[int, list[ItemPackage]] = {}
+    for package in packages:
+        if package.minimum_sealed is not None and package.retired_at is None:
+            minimums.setdefault(package.item_id, []).append(package)
+    rows = []
+    for item in items:
+        in_stock = usable.get(item.id, Decimal(0))
+        low = [
+            (package.name, count, package.minimum_sealed or 0)
+            for package in minimums.get(item.id, [])
+            if (count := sealed.get(item.id, {}).get(package.id, Decimal(0)))
+            < (package.minimum_sealed or 0)
+        ]
+        if (item.minimum is not None and in_stock <= item.minimum) or low:
+            rows.append(Reorder(item, in_stock, item.id in short, low))
+    return rows
 
 
 @router.get(REORDER)
 def reorder(request: Request, signed: AdminSignedIn, session: DbSession) -> Response:
-    """Current items with a reorder level, at or below it across the
-    stores (ledger.in_stores)."""
-    stores = in_stores(
-        select(Item.id).where(Item.retired_at.is_(None), Item.minimum.is_not(None))
-    ).subquery()
-    total = func.coalesce(stores.c.total, 0)
-    rows = [
-        Reorder(item, in_stock, bool(short))
-        for item, in_stock, short in session.execute(
-            select(Item, total, stores.c.short)
-            .outerjoin(stores, stores.c.item_id == Item.id)
-            .where(
-                Item.retired_at.is_(None),
-                Item.minimum.is_not(None),
-                total <= Item.minimum,
-            )
-            .order_by(func.lower(Item.name))
+    """Current items with a reorder level, at or below it in usable stock
+    across the stores, or with a package's sealed below its minimum."""
+    items = session.scalars(
+        select(Item).where(Item.retired_at.is_(None)).order_by(func.lower(Item.name))
+    ).all()
+    stores = select(Location.id).where(
+        Location.kind.in_(STORE_KINDS), Location.retired_at.is_(None)
+    )
+    usable: dict[int, Decimal] = {}
+    sealed: dict[int, dict[int, Decimal]] = {}
+    for (item_id, _), held in open_packages.forms_of(
+        session, by_form.c.location_id.in_(stores)
+    ).items():
+        usable[item_id] = usable.get(item_id, Decimal(0)) + held.usable
+        for package_id, count in held.sealed_by_package.items():
+            counts = sealed.setdefault(item_id, {})
+            counts[package_id] = counts.get(package_id, Decimal(0)) + count
+    short = {
+        item_id
+        for item_id, _, is_short in session.execute(
+            in_stores(select(Item.id).where(Item.retired_at.is_(None)))
         )
-    ]
+        if is_short
+    }
+    packages = session.scalars(select(ItemPackage)).all()
+    rows = reorder_rows(items, usable, sealed, packages, short)
     return admin_page(
         request,
         signed,

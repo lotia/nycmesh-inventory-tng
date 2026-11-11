@@ -6,7 +6,8 @@ which administrator closed it.
 """
 
 import uuid
-from collections.abc import Collection
+from collections.abc import Collection, Iterable, Mapping
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from typing import NamedTuple
@@ -205,3 +206,102 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         Shown(row, item, package, unit, place, left[row.id], by)
         for row, item, package, unit, place, by in rows
     ]
+
+
+@dataclass
+class Forms:
+    """An item's stock at a place, form by form (docs/decisions/0020):
+    sealed packages of each, by name, how many and how much; each open
+    package's left; loose units; short ends, open packages left below
+    their package's too-short-to-use length; and what is usable, all but
+    short ends."""
+
+    sealed: list[tuple[str, Decimal, Decimal]] = field(default_factory=list)
+    # How many sealed of each package, by id.
+    sealed_by_package: dict[int, Decimal] = field(default_factory=dict)
+    open: list[Decimal] = field(default_factory=list)
+    loose: Decimal = Decimal(0)
+    short_ends: list[Decimal] = field(default_factory=list)
+
+    @property
+    def total(self) -> Decimal:
+        return (
+            sum((amount for _, _, amount in self.sealed), Decimal(0))
+            + sum(self.open, Decimal(0))
+            + self.loose
+            + sum(self.short_ends, Decimal(0))
+        )
+
+    @property
+    def usable(self) -> Decimal:
+        return self.total - sum(self.short_ends, Decimal(0))
+
+    @property
+    def plain(self) -> bool:
+        """Loose units alone: said as a total, as before packages."""
+        return not (self.sealed or self.open or self.short_ends)
+
+
+class PackageSize(NamedTuple):
+    name: str
+    size: Decimal
+    short_below: Decimal | None
+
+
+def split(
+    rows: Iterable[tuple[int | None, int | None, Decimal]],
+    packages: Mapping[int, PackageSize],
+    opened_from: Mapping[int, int],
+) -> Forms:
+    """An item's balances at a place, each of a package (sealed), an open
+    package, or neither (loose), as Forms: `packages` by id, and each open
+    package's package by its id, to tell a short end."""
+    forms = Forms()
+    for package_id, open_id, amount in rows:
+        if package_id is not None:
+            package = packages[package_id]
+            count = amount / package.size
+            forms.sealed.append((package.name, count, amount))
+            forms.sealed_by_package[package_id] = count
+        elif open_id is not None:
+            short = packages[opened_from[open_id]].short_below
+            short_end = short is not None and amount < short
+            (forms.short_ends if short_end else forms.open).append(amount)
+        else:
+            forms.loose += amount
+    return forms
+
+
+def forms_of(
+    session: Session, where: ColumnElement[bool]
+) -> dict[tuple[int, int], Forms]:
+    """Stock by item and place, form by form, of the balances `where`
+    picks (on ledger.by_form): those of nothing left are left out."""
+    rows = session.execute(
+        select(
+            ledger.by_form.c.item_id,
+            ledger.by_form.c.location_id,
+            ledger.by_form.c.package_id,
+            ledger.by_form.c.open_package_id,
+            ledger.by_form.c.quantity,
+        ).where(where, ledger.by_form.c.quantity != 0)
+    ).all()
+    item_ids = {row[0] for row in rows}
+    packages = {
+        package.id: PackageSize(package.name, package.size, package.short_below)
+        for package in session.scalars(
+            select(ItemPackage).where(ItemPackage.item_id.in_(item_ids))
+        )
+    }
+    open_ids = {row[3] for row in rows if row[3] is not None}
+    opened_from = dict(
+        session.execute(
+            select(OpenPackage.id, OpenPackage.package_id).where(
+                OpenPackage.id.in_(open_ids)
+            )
+        ).all()
+    )
+    grouped: dict[tuple[int, int], list[tuple[int | None, int | None, Decimal]]] = {}
+    for item_id, place, package_id, open_id, amount in rows:
+        grouped.setdefault((item_id, place), []).append((package_id, open_id, amount))
+    return {key: split(found, packages, opened_from) for key, found in grouped.items()}

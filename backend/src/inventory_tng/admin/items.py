@@ -36,6 +36,7 @@ from inventory_tng.db import DbSession, exists_where, refusal
 from inventory_tng.ledger import balance
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import (
+    INTEGER_MAX,
     UNITS,
     Category,
     Item,
@@ -43,6 +44,7 @@ from inventory_tng.models import (
     Label,
     Movement,
     OpenPackage,
+    whole,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
@@ -150,6 +152,8 @@ NOTICES.update(
         "package_added": "Package added.",
         "package_retired": "Package retired.",
         "package_tracking": "Saved: how its opened packages are followed.",
+        "package_settings": "Saved: when an open one is a short end, and how "
+        "many sealed to keep.",
         "tracking_on": "Their opened packages are followed now, where a "
         "package does not say otherwise.",
         "tracking_off": "Their opened packages become loose units now, where "
@@ -582,3 +586,47 @@ def track_package(
     if TRACKING[track] != before:
         _tracking_changed("package", 1, TRACKING[track], item_package_id=package_id)
     return redirect(f"{ITEMS}/{item_id}", notice="package_tracking", section="packages")
+
+
+@router.post(f"{ITEMS}/{{item_id}}/packages/{{package_id}}/settings")
+def package_settings(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    item_id: int,
+    package_id: int,
+    short_below: Annotated[str, Form()] = "",
+    minimum_sealed: Annotated[str, Form()] = "",
+) -> Response:
+    """A package's too-short-to-use length and minimum sealed, each blank
+    for none."""
+    package = session.get(ItemPackage, package_id)
+    if package is None or package.item_id != item_id:
+        return not_found()
+    found = session.get_one(Item, item_id)
+    short = quantity(short_below, positive=True) if short_below.strip() else None
+    minimum = whole(minimum_sealed, 0, INTEGER_MAX) if minimum_sealed.strip() else None
+    problems = {}
+    if isinstance(short, str):
+        problems["short_below"] = short
+    if minimum_sealed.strip() and minimum is None:
+        problems["minimum_sealed"] = "A whole number of packages, or blank."
+    if problems or isinstance(short, str):
+        return _item_page(
+            request, session, signed, found, alert=" ".join(problems.values())
+        )
+    _, broken = refusal(
+        session,
+        lambda: items.package_settings(session, package, short, minimum),
+        RETIRED,
+    )
+    if broken:
+        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
+    session.commit()
+    log.info(
+        "package settings saved",
+        item_package_id=package_id,
+        short_below=short,
+        minimum_sealed=minimum,
+    )
+    return redirect(f"{ITEMS}/{item_id}", notice="package_settings", section="packages")

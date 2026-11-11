@@ -210,6 +210,20 @@ def track_package(session: Session, package: ItemPackage, track: bool | None) ->
     package.track_opened = track
 
 
+def package_settings(
+    session: Session,
+    package: ItemPackage,
+    short_below: Decimal | None,
+    minimum_sealed: int | None,
+) -> None:
+    """A package's too-short-to-use length and minimum sealed in the
+    stores (docs/decisions/0020), each optional. Gone for a retired one."""
+    relock(session, package, current=True)
+    retired = Item.id == package.item_id, Item.retired_at.is_not(None)
+    enforce("retired_read_only", when=exists_where(session, *retired))
+    package.short_below, package.minimum_sealed = short_below, minimum_sealed
+
+
 def track_items(session: Session, item_ids: Collection[int], track: bool) -> list[int]:
     """Set "track each opened package" on the current items of `item_ids`,
     never a package's own setting. The ids of those it changed."""
