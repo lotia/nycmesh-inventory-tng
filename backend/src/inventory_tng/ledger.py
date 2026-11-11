@@ -962,6 +962,17 @@ def hold(
     return Held(places, {item.id: item for item in held}, custody)
 
 
+def left_on(session: Session, row: OpenPackage) -> Decimal:
+    """What the records say is left on an open package, where it is."""
+    left = session.scalar(
+        select(by_form.c.quantity).where(
+            by_form.c.open_package_id == row.id,
+            by_form.c.location_id == row.location_id,
+        )
+    )
+    return Decimal(left or 0)
+
+
 def _hold_forms(
     session: Session, lines: Sequence[Entry], *, also: Iterable[int] = ()
 ) -> tuple[dict[int, PackageFacts], dict[int, OpenFacts], dict[int, OpenPackage]]:
@@ -1399,17 +1410,21 @@ def record_adjustment(
     *,
     found: bool,
     reason_id: int,
+    form: Form = LOOSE,
 ) -> list[Written]:
-    """Stock found at a place, or written off from it, for a reason. What
-    it wrote: nothing if its key was written already. RuleBroken
-    (location_countable), as record_count."""
+    """Stock found at a place, or written off from it, for a reason, in
+    `form` there (docs/decisions/0020). What it wrote: nothing if its key
+    was written already. RuleBroken (location_countable), as record_count."""
     lock_place(session, location_id)
     if _first_sent(session, location_id, key) is not None:
         return []
     _require_countable(session, location_id)
     side = "to_location_id" if found else "from_location_id"
     header = {"admin_id": admin_id, "reason_id": reason_id, side: location_id}
-    return _correct(session, key, "adjustment", header, [(item_id, amount)])
+    line = (
+        Entry(item_id, amount, LOOSE, form) if found else Entry(item_id, amount, form)
+    )
+    return _correct(session, key, "adjustment", header, [line])
 
 
 def _header(batch: Batch) -> dict[str, object]:

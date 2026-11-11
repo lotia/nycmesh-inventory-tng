@@ -14,7 +14,7 @@ from opentelemetry import metrics
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import items, labels
+from inventory_tng import items, labels, open_packages
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.common import (
     ADMIN,
@@ -34,7 +34,16 @@ from inventory_tng.admin.common import (
 from inventory_tng.admin.listing import Listing, Searched
 from inventory_tng.db import DbSession, exists_where, refusal
 from inventory_tng.ledger import balance
-from inventory_tng.models import UNITS, Category, Item, ItemPackage, Label, Movement
+from inventory_tng.local_time import site_zone
+from inventory_tng.models import (
+    UNITS,
+    Category,
+    Item,
+    ItemPackage,
+    Label,
+    Movement,
+    OpenPackage,
+)
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
@@ -267,6 +276,10 @@ def _item_page(
             "unit_fixed": _moved(session, item.id),
             "in_stock": _in_stock(session, item.id),
             "labels": labels.current_of(session, Label.item_id == item.id),
+            "open_packages": open_packages.shown(
+                session, OpenPackage.item_id == item.id
+            ),
+            "zone": site_zone(session),
             "problems": problems,
             "values": values,
             "alert": alert,

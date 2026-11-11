@@ -108,6 +108,26 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
   {% endif %}
 </section>
 
+{% if open_packages %}
+<section id="open-packages">
+  <h2>Open packages</h2>
+  {% with section_id="open-packages" %}{% include "_notice.html" %}{% endwith %}
+  <p class="hint">Opened and followed until used up. Closing one writes off
+  what it still shows, with the reason Used up.</p>
+  {% call table() %}
+    {% for each in open_packages %}
+    <tr>
+      <td>{{ each.package }} · {{ each.place }}
+        {%- if each.row.reported_at %} <span class="tag">Reported used up</span>{% endif %}
+        <span class="hint block">opened {{ each.row.opened_at | when(zone) }}</span></td>
+      <td>{{ each.left | amount }} {{ each.unit }}</td>
+      <td><form method="post" action="{{ here }}/open-packages/{{ each.row.id }}/close"><button>Close as used up<span class="sr-only"> {{ each.package }} at {{ each.place }}</span></button></form></td>
+    </tr>
+    {% endfor %}
+  {% endcall %}
+</section>
+{% endif %}
+
 {% if not retired %}
 {% call labels_section(labels) %}
   <input type="hidden" name="item_id" value="{{ item.id }}">

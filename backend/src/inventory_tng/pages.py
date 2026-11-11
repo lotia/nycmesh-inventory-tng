@@ -82,6 +82,7 @@ NOTICE_SECTIONS = frozenset(
         "count",
         "email",
         "holding",
+        "open-packages",
         "packages",
         "password",
         "reasons",

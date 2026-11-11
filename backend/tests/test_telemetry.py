@@ -23,7 +23,16 @@ from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import accounts, db, devices, labels, ledger, mail, page_telemetry
+from inventory_tng import (
+    accounts,
+    db,
+    devices,
+    labels,
+    ledger,
+    mail,
+    open_packages,
+    page_telemetry,
+)
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.counts import ADJUSTMENTS, COUNTS
 from inventory_tng.app import create_app
@@ -779,3 +788,25 @@ def test_counts_package_tracking_changed_by_where(
         "package": 1,
         "item": 1,
     }
+
+
+def test_counts_open_packages_closed_and_cleared(
+    rolled_back: Recorded, session: Session
+) -> None:
+    client, _, reader, _ = rolled_back
+    _, key = new_admin(session)
+    sign_in_with(client, code=code(key))
+    spools = Spools(session)
+    one, two, three = spools.opened(), spools.opened(), spools.opened()
+    volunteer = spools.place.volunteer.id
+    open_packages.report(session, [one.id, two.id], volunteer, datetime.now(UTC))
+    session.flush()
+    used_up = "/admin/stock/used-up"
+    client.post(f"{used_up}/{one.id}/confirm")
+    client.post(f"{used_up}/{two.id}/clear")
+    client.post(f"/admin/items/{spools.cable.id}/open-packages/{three.id}/close")
+    assert counted(reader, "inventory.open_packages.closed") == {
+        (("how", "confirmed"),): 1,
+        (("how", "direct"),): 1,
+    }
+    assert counted(reader, "inventory.open_packages.cleared") == {(): 1}
