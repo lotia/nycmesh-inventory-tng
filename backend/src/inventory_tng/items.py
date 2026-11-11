@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import ColumnElement, and_, func, literal, select
+from sqlalchemy import ColumnElement, and_, func, literal, or_, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import (
@@ -117,13 +117,21 @@ SIMILAR = 5
 
 
 def similar(session: Session, name: str, item_id: int | None = None) -> list[Item]:
-    """Items other than `item_id` whose names are close to `name`, as search
-    finds them (models.fuzzy), closest first, retired ones too."""
-    query = select(Item).where(fuzzy(Item.name, name))
+    """Items other than `item_id` whose names are close to `name`, closest
+    first, retired ones too: as search finds them (models.fuzzy), or with a
+    name found in `name`, as "mast" is in "Mast, telescopic"."""
+    within = Item.name.op("<%", is_comparison=True)(literal(name))
+    query = select(Item).where(or_(fuzzy(Item.name, name), within))
     if item_id is not None:
         query = query.where(Item.id != item_id)
     closest = func.similarity(Item.name, name).desc(), func.lower(Item.name)
     return list(session.scalars(query.order_by(*closest).limit(SIMILAR)))
+
+
+def same_name(session: Session, one: str, other: str) -> bool:
+    """Whether two names are one, as items' are compared (name_key)."""
+    same = name_key(literal(one)) == name_key(literal(other))
+    return bool(session.scalar(select(same)))
 
 
 def add(session: Session, fields: Fields) -> Item:

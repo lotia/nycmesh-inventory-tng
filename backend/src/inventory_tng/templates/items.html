@@ -33,7 +33,7 @@
   <p>Add a <a href="{{ categories_path }}">category</a> first: every item has one.</p>
   {% endif %}
   <form method="post" action="{{ here }}">
-    {% with default = "", again = "Add it", items_path = here %}{% include "_item_name.html" %}{% endwith %}
+    {% with default = "", again = "Add it" %}{% include "_item_name.html" %}{% endwith %}
     <label>Category
       <select name="category_id" required>
         <option value="">Pick one</option>

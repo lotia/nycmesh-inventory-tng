@@ -158,7 +158,7 @@ def test_a_clash_gone_meanwhile_is_said_in_general(
     new_item(session, radios, "LiteBeam")
     monkeypatch.setattr(items, "taken_by", lambda *_: None)
     form = {"name": "litebeam", "category_id": str(radios.id), "unit": "each"}
-    refused = admin_client.post(ITEMS, data=form | {"different": "yes"})
+    refused = admin_client.post(ITEMS, data=form)
     assert "Another item, perhaps a retired one, already has" in text(refused)
 
 
@@ -517,9 +517,36 @@ def test_a_name_close_to_others_asks_first(
     assert "A different item? Add it again." in said
     assert 'value="LiteBeam 5AC Gen2"' in page
     assert session.scalar(select(Item).where(Item.name == form["name"])) is None
-    added = admin_client.post(ITEMS, data=form | {"different": "yes"})
+    assert f'name="different" value="{form["name"]}"' in asked.text
+    # Changed after the question: asked about again.
+    gen3 = form | {"name": "LiteBeam 5AC Gen3", "different": form["name"]}
+    assert "A different item?" in text(admin_client.post(ITEMS, data=gen3))
+    added = admin_client.post(ITEMS, data=form | {"different": form["name"]})
     assert added.status_code == 303
     named(session, Item, "LiteBeam 5AC Gen2")
+
+
+def test_a_name_holding_another_items_asks_too(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """ "mast" is close to "Mast, telescopic", though most of it is new."""
+    mast = new_item(session, radios, "mast")
+    form = {"name": "Mast, telescopic", "category_id": str(radios.id), "unit": "each"}
+    asked = text(admin_client.post(ITEMS, data=form))
+    assert f'<a href="{ITEMS}/{mast.id}">mast</a>' in asked
+
+
+def test_other_refusals_come_before_the_question(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """A retired category is said first, rather than asking, then refusing."""
+    new_item(session, radios, "LiteBeam 5AC Gen1")
+    radios.retired_at = NOW
+    session.flush()
+    form = {"name": "LiteBeam 5AC Gen2", "category_id": str(radios.id), "unit": "each"}
+    refused = admin_client.post(ITEMS, data=form)
+    assert refused.status_code == 400
+    assert "A different item?" not in text(refused)
 
 
 def test_renaming_close_to_another_asks_first(
@@ -542,10 +569,14 @@ def test_renaming_close_to_another_asks_first(
     assert "A different item? Save it again." in text(asked)
     session.refresh(item)
     assert item.name == "Radio"
-    form |= {"name": "LiteBeam 5AC Gen2", "different": "yes"}
+    form |= {"name": "LiteBeam 5AC Gen2", "different": "LiteBeam 5AC Gen2"}
     assert admin_client.post(path, data=form).status_code == 303
     session.refresh(item)
     assert item.name == "LiteBeam 5AC Gen2"
+    # Respelling its own name is the same name: nothing is asked.
+    form = {k: v for k, v in form.items() if k != "different"}
+    form |= {"name": "Litebeam-5AC-Gen2", "version": str(item.edit_version)}
+    assert admin_client.post(path, data=form).status_code == 303
 
 
 def test_the_add_form_says_how_to_name_an_item(

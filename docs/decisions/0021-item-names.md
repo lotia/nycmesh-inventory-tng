@@ -35,9 +35,15 @@ identify it. Researched with Ali on 2026-11-11 (inventory-tng-8i4.60.22).
   (Manufacturer), the package or unit (packages), the category. Hardware
   leads with the model as installers say it (`LiteBeam 5AC Gen2`);
   supplies lead with the common noun, then details after commas (`Cat6
-  cable, outdoor, shielded`; `RJ45 coupler, indoor`). The add form says so,
-  and lists items with similar names before saving, without refusing them
-  (inventory-tng-8i4.132).
+  cable, outdoor, shielded`; `RJ45 coupler, indoor`). The add and edit
+  forms say so beside Name.
+- **A name close to other items' asks first** (inventory-tng-8i4.132).
+  Adding an item, or renaming one, lists items whose names are close,
+  retired ones too, and saves nothing; sent again with that name, it saves.
+  A name changed after the question is asked about again. Close is what
+  search finds, or a name held in the new one (`mast` in `Mast,
+  telescopic`). Every other refusal comes first, and respelling an item's
+  own name asks nothing.
 
 We rejected keying on name and category, for the reasons above, and a
 required "variant" field beside the name: most supplies have no variant,
