@@ -22,6 +22,7 @@ from sqlalchemy import (
     case,
     func,
     not_,
+    or_,
     select,
 )
 from sqlalchemy.orm import Session
@@ -53,24 +54,45 @@ def closeness(column: SQLColumnExpression[str], search: str) -> ColumnElement[fl
 class Searched[T]:
     """How a list page finds its kind of record: the model, the text a
     search reads (such as an item's search_text) and its name, by which the
-    list is sorted. Which are current, if not those with no retired_at; and
-    each row's name in words, which a suggestion and a pick show, if not its
-    name column's."""
+    list is sorted. Optionally: a column a search matches only whole, held
+    in capitals, such as a label's code, put first; which are current, if
+    not those with no retired_at; what the filter between Current and All
+    calls the rest; and each row as the page shows it, with a `name`, if
+    not the row itself."""
 
     model: type[T]
     text: SQLColumnExpression[str]
     name: SQLColumnExpression[str]
+    whole: SQLColumnExpression[str] | None = None
     current: ColumnElement[bool] | None = None
-    words: Callable[[Session, Sequence[T]], Sequence[str]] | None = None
+    lapsed: Lapsed = "retired"
+    shown: Callable[[Session, Sequence[T]], Sequence[Any]] | None = None
+
+    def read(
+        self, here: str, q: str = "", show: str = "", page: str = "", pick: str = ""
+    ) -> Listing[T]:
+        """The view of this kind's list that a query string asks for."""
+        return Listing[T].read(here, q, show, page, pick, lapsed=self.lapsed)
+
+    def matching(self, search: str) -> ColumnElement[bool]:
+        found = fuzzy(self.text, search)
+        if self.whole is None:
+            return found
+        return or_(found, self.whole == search.upper())
+
+    def closeness(self, search: str) -> ColumnElement[float]:
+        """As closeness(), and the whole column matched before anything."""
+        near = closeness(self.text, search)
+        if self.whole is None:
+            return near
+        return case((self.whole == search.upper(), 3.0), else_=0.0) + near
 
     def is_current(self) -> ColumnElement[bool]:
         table: Any = self.model
         return table.retired_at.is_(None) if self.current is None else self.current
 
-    def names(self, session: Session, rows: Sequence[T]) -> Sequence[str]:
-        if self.words is not None:
-            return self.words(session, rows)
-        return [getattr(row, "name") for row in rows]  # noqa: B009
+    def as_shown(self, session: Session, rows: Sequence[T]) -> Sequence[Any]:
+        return rows if self.shown is None else self.shown(session, rows)
 
 
 @dataclass(frozen=True)
@@ -85,6 +107,8 @@ class Listing[T]:
     page: int = 1
     pick: int | None = None
     rows: Sequence[T] = ()
+    # The rows as the page shows them (Searched.shown).
+    shown: Sequence[Any] = ()
     # How many the view finds, and how many the filter has, unsearched.
     found: int = 0
     total: int = 0
@@ -170,13 +194,19 @@ class Listing[T]:
         if self.pick is not None:
             # One record at most: no count, nor a page, to work out.
             rows = session.scalars(query.where(table.id == self.pick)).all()
-            picked = searched.names(session, rows)[0] if rows else None
+            shown = searched.as_shown(session, rows)
             return replace(
-                self, rows=rows, found=len(rows), total=total, page=1, picked=picked
+                self,
+                rows=rows,
+                shown=shown,
+                found=len(rows),
+                total=total,
+                page=1,
+                picked=shown[0].name if shown else None,
             )
         if self.search:
-            query = query.where(fuzzy(searched.text, self.search)).order_by(
-                closeness(searched.text, self.search).desc()
+            query = query.where(searched.matching(self.search)).order_by(
+                searched.closeness(self.search).desc()
             )
         found = _count(session, query) if self.search else total
         page = min(self.page, max(1, ceil(found / PER_PAGE)))
@@ -186,7 +216,10 @@ class Listing[T]:
             .offset((page - 1) * PER_PAGE)
         ).all()
         log.debug("listed", found=found, total=total, page=page)
-        return replace(self, rows=rows, found=found, total=total, page=page)
+        shown = searched.as_shown(session, rows)
+        return replace(
+            self, rows=rows, shown=shown, found=found, total=total, page=page
+        )
 
     def suggest(
         self,
@@ -202,9 +235,9 @@ class Listing[T]:
             return []
         query = self._shown(searched, query)
         rows = session.scalars(
-            query.where(fuzzy(searched.text, self.search))
+            query.where(searched.matching(self.search))
             .order_by(
-                closeness(searched.text, self.search).desc(),
+                searched.closeness(self.search).desc(),
                 func.lower(searched.name),
             )
             .limit(SUGGESTED)
@@ -212,11 +245,11 @@ class Listing[T]:
         log.debug("suggested", found=len(rows))
         return [
             {
-                "name": name,
+                "name": shown.name,
                 "hint": hint(row),
                 "href": self.link(pick=getattr(row, "id"), search=""),  # noqa: B009
             }
-            for row, name in zip(rows, searched.names(session, rows), strict=True)
+            for row, shown in zip(rows, searched.as_shown(session, rows), strict=True)
         ]
 
 

@@ -172,7 +172,7 @@ def code(
         signed,
         "code.html",
         {
-            "title": found.label or f"Code {found.id}",
+            "title": found.name,
             "here": f"{CODES}/{found.id}",
             "back_link": (DEVICES, "Devices"),
             "code": found,
@@ -191,16 +191,15 @@ def confirm_revoke_code(
     found = session.get(RegistrationCode, code_id)
     if found is None or found.revoked_at is not None:
         return not_found()
-    name = found.label or f"Code {found.id}"
     return admin_page(
         request,
         signed,
         "code_revoke.html",
         {
-            "title": f"Revoke {name}?",
+            "title": f"Revoke {found.name}?",
             "here": f"{CODES}/{code_id}/revoke",
             "keep": f"{CODES}/{code_id}",
-            "name": name,
+            "code": found,
         },
     )
 

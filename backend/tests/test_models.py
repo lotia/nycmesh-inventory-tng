@@ -25,6 +25,7 @@ from inventory_tng.models import (
     Label,
     Location,
     Volunteer,
+    fuzzy,
     mint_code,
     mint_label_code,
 )
@@ -441,13 +442,13 @@ def test_search_is_fuzzy_and_indexed(
     new_item("LiteBeam 5AC", manufacturer="Ubiquiti", part_number="LBE-5AC-Gen2")
     new_item("Patch cable")
     found = session.scalars(
-        select(Item.name).where(Item.matches("litebeem ubiquity"))
+        select(Item.name).where(fuzzy(Item.search_text, "litebeem ubiquity"))
     ).all()
     assert found == ["LiteBeam 5AC"]
     # The query's expression is the index's, so the planner can use it. Alembic
     # cannot compare this index, so this is what checks it.
     session.execute(text("SET LOCAL enable_seqscan = off"))
-    query = select(Item.id).where(Item.matches("litebeam"))
+    query = select(Item.id).where(fuzzy(Item.search_text, "litebeam"))
     compiled = query.compile(dialect=session.get_bind().dialect)
     explained = session.connection().exec_driver_sql(
         "EXPLAIN " + compiled.string, compiled.params

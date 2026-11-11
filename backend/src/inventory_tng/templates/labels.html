@@ -8,13 +8,20 @@
 <a href="{{ locations_path }}">location's</a> page. Each has one code, printed as
 often as needed; pick some here to print them again.</p>
 
-{#- The picks and copies belong to this form, from wherever they are. #}
-<form method="get" action="{{ print_path }}" id="print-labels"></form>
+{#- The picks and copies belong to this form, from wherever they are; and
+the list as shown, to come back to if printing is refused. #}
+<form method="get" action="{{ print_path }}" id="print-labels">
+  {% if listing.search %}<input type="hidden" name="q" value="{{ listing.search }}">{% endif %}
+  {% if listing.show != "current" %}<input type="hidden" name="show" value="{{ listing.show }}">{% endif %}
+  {% if listing.page > 1 %}<input type="hidden" name="page" value="{{ listing.page }}">{% endif %}
+  {% if listing.pick %}<input type="hidden" name="pick" value="{{ listing.pick }}">{% endif %}
+</form>
 <section>
   {{ summary(listing, "label", "labels") }}
+  {% if listing.show != "current" %}<p class="hint">The scan page doesn't read a label tagged here.</p>{% endif %}
   {% call table() %}
     <tr><th>Print</th><th>Code</th><th>Names</th><th class="hidden sm:table-cell">Made</th><th></th></tr>
-    {% for named in shown %}
+    {% for named in listing.shown %}
     {% set label = named.label %}
     <tr>
       <td>{% if named.current %}<input type="checkbox" name="label" value="{{ label.id }}" form="print-labels" aria-label="Print {{ label.code }}">{% endif %}</td>
@@ -31,7 +38,7 @@ often as needed; pick some here to print them again.</p>
     {% endfor %}
   {% endcall %}
   {{ pager(listing) }}
-  {% if shown | selectattr("current") | first %}
+  {% if listing.shown | selectattr("current") | first %}
   <div class="actions">
     <label>Copies of each
       <input name="copies" form="print-labels" type="number" inputmode="numeric" min="1" max="{{ max_copies }}" value="1" required>
