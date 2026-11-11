@@ -1,3 +1,4 @@
+import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
@@ -85,3 +86,30 @@ def test_totp_keys_are_sealed_and_come_back(alembic_config: Config) -> None:
     assert connection.scalar(text("SELECT totp_key FROM authenticator")) == (
         "JBSWY3DPEHPK3PXP"
     )
+
+
+def test_item_names_differing_only_by_punctuation_are_named_first(
+    alembic_config: Config,
+) -> None:
+    """Migration 0023: the index cannot be made over items it would refuse,
+    so it names them by id to rename."""
+    command.downgrade(alembic_config, "0022")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Cables') RETURNING id")
+    )
+    ids = connection.execute(
+        text(
+            "INSERT INTO item (name, category_id) VALUES "
+            "('ToughCable', :c), ('Tough cable', :c), ('Patch lead', :c) "
+            "RETURNING id"
+        ),
+        {"c": category_id},
+    ).scalars()
+    tough, spaced, _ = ids.all()
+    with pytest.raises(RuntimeError, match=f"by id: {tough}, {spaced}\\. Rename"):
+        command.upgrade(alembic_config, "head")
+    connection.execute(
+        text("UPDATE item SET name = 'Tough cable Pro' WHERE id = :i"), {"i": spaced}
+    )
+    command.upgrade(alembic_config, "head")

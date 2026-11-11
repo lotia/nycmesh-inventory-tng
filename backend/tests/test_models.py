@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import delete, select, text, update
+from sqlalchemy import delete, literal, select, text, update
 from sqlalchemy.orm import Session
 
 from inventory_tng import categories, items, labels, locations, volunteers
@@ -28,6 +28,7 @@ from inventory_tng.models import (
     fuzzy,
     mint_code,
     mint_label_code,
+    name_key,
 )
 
 from helpers.rows import add, breaks, item_fields, violates
@@ -77,6 +78,28 @@ def test_names_are_unique_ignoring_case_retired_ones_too(
     session.flush()
     with violates(session, "uq_location_name"):
         session.add(Location(name=store.name.upper(), kind=store.kind))
+
+
+def test_item_names_are_unique_ignoring_case_spaces_and_punctuation(
+    new_item: Callable[..., Item], session: Session
+) -> None:
+    """ToughCable and Tough cable are one name, retired ones too
+    (docs/decisions/0021)."""
+    tough = new_item("ToughCable")
+    assert session.scalar(select(name_key(literal("Tough-Cable, Pro!")))) == (
+        "toughcablepro"
+    )
+    for clash in ("Tough cable", "TOUGH-CABLE", "tough_cable.", " Tough  Cable "):
+        with violates(session, "uq_item_name"):
+            new_item(clash)
+    tough.retired_at = NOW
+    session.flush()
+    with violates(session, "uq_item_name"):
+        new_item("tough cable")
+    # Letters and digits still tell names apart.
+    new_item("Tough cable Pro")
+    new_item("LiteBeam 5AC Gen1")
+    new_item("LiteBeam 5AC Gen2")
 
 
 def test_a_custody_name_is_unique_only_among_current_ones(session: Session) -> None:

@@ -4,12 +4,15 @@ category (categories.retire is the other side), and an item's unit is
 fixed once stock has moved in it, as the ledger's quantities are in that
 unit. The app may not move a package to another item (migration 0002),
 so its labels always name its item. A retired item is read only until it
-is brought back (docs/decisions/0019)."""
+is brought back (docs/decisions/0019). An item's name, its manufacturer
+and part number together, and its old code are each its own, retired items'
+too (models.Item); taken_by says which another item has."""
 
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
 
+from sqlalchemy import ColumnElement, SQLColumnExpression, and_, func, literal, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import (
@@ -20,7 +23,7 @@ from inventory_tng.db import (
     relock,
     require_current,
 )
-from inventory_tng.models import Category, Item, ItemPackage, Movement
+from inventory_tng.models import Category, Item, ItemPackage, Movement, name_key
 
 
 def _in_current_category(session: Session, category_id: int) -> None:
@@ -72,6 +75,36 @@ class Fields:
             notes=notes,
             ordering_notes=ordering_notes,
         )
+
+
+def _same(column: SQLColumnExpression[str | None], value: str) -> ColumnElement[bool]:
+    return func.lower(column) == func.lower(literal(value))
+
+
+def taken_by(
+    session: Session, fields: Fields, item_id: int | None = None
+) -> tuple[str, Item] | None:
+    """The field of `fields` another item than `item_id` already has, and
+    that item, as the unique indexes compare them: a unique violation says
+    neither. None if none has, as when the other changed meanwhile."""
+    wanted: list[tuple[str, ColumnElement[bool]]] = [
+        ("name", name_key(Item.name) == name_key(literal(fields.name)))
+    ]
+    if fields.manufacturer is not None and fields.part_number is not None:
+        both = and_(
+            _same(Item.manufacturer, fields.manufacturer),
+            _same(Item.part_number, fields.part_number),
+        )
+        wanted.append(("part_number", both))
+    if fields.old_code is not None:
+        wanted.append(("old_code", Item.old_code == fields.old_code))
+    for field, where in wanted:
+        query = select(Item).where(where)
+        if item_id is not None:
+            query = query.where(Item.id != item_id)
+        if (other := session.scalars(query.limit(1)).first()) is not None:
+            return field, other
+    return None
 
 
 def add(session: Session, fields: Fields) -> Item:

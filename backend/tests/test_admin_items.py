@@ -2,6 +2,7 @@
 
 import re
 import uuid
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -9,6 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from inventory_tng import items
 from inventory_tng.admin.common import quantity
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.listing import PER_PAGE
@@ -24,6 +26,8 @@ from inventory_tng.models import (
 
 from helpers.rows import add, history, named, shown
 from helpers.sign_in import text
+
+NOW = datetime(2026, 11, 1, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -70,27 +74,82 @@ def test_an_item_needs_a_name_and_a_current_category(
     assert "Add a" in page  # No current categories: add one first.
 
 
-def test_names_and_part_numbers_are_unique(
+def test_names_and_part_numbers_are_unique_naming_the_other(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
+    """Said beside the field another item has, naming that item."""
     add(
         session,
         Item(
-            name="LiteBeam",
+            name="Lite-Beam 5AC",
             category_id=radios.id,
             manufacturer="Ubiquiti",
             part_number="LBE",
         ),
     )
-    for form in (
-        {"name": "litebeam"},
-        {"name": "Other", "manufacturer": "ubiquiti", "part_number": "lbe"},
+    for form, field, words in (
+        (
+            {"name": "litebeam 5ac"},
+            "name",
+            (
+                "Lite-Beam 5AC already has that name, or one differing from it "
+                "only in case, spaces or punctuation."
+            ),
+        ),
+        (
+            {"name": "Other", "manufacturer": "ubiquiti", "part_number": "lbe"},
+            "part_number",
+            "Lite-Beam 5AC already has that manufacturer and part number.",
+        ),
     ):
         refused = admin_client.post(
             ITEMS, data={"category_id": str(radios.id), "unit": "each"} | form
         )
         assert refused.status_code == 400
-        assert "Another item, perhaps a retired one, already has" in text(refused)
+        assert f'id="{field}-problem">{words}</span>' in refused.text
+
+
+def test_a_saved_item_is_refused_what_another_has_its_own_respelt(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Respelling its own name is no clash; another's old code is, and a
+    retired holder is said to be."""
+    item = new_item(session, radios, "LiteBeam")
+    other = add(
+        session,
+        Item(name="Omni", category_id=radios.id, old_code="NYCM-1", retired_at=NOW),
+    )
+    form = {
+        "name": "Lite Beam",
+        "category_id": str(radios.id),
+        "unit": "each",
+        "version": str(item.edit_version),
+    }
+    path = f"{ITEMS}/{item.id}"
+    refused = admin_client.post(path, data=form | {"old_code": "NYCM-1"})
+    assert refused.status_code == 400
+    assert (
+        f'id="old_code-problem">{other.name} already has that old code. '
+        "It is retired.</span>"
+    ) in refused.text
+    assert admin_client.post(path, data=form).status_code == 303
+    session.refresh(item)
+    assert item.name == "Lite Beam"
+
+
+def test_a_clash_gone_meanwhile_is_said_in_general(
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The other item renamed between the refusal and the look for it."""
+    new_item(session, radios, "LiteBeam")
+    monkeypatch.setattr(items, "taken_by", lambda *_: None)
+    refused = admin_client.post(
+        ITEMS, data={"name": "litebeam", "category_id": str(radios.id), "unit": "each"}
+    )
+    assert "Another item, perhaps a retired one, already has" in text(refused)
 
 
 def test_searching(
@@ -194,7 +253,8 @@ def test_retiring_and_bringing_back(
         ITEMS, data={"name": item.name, "category_id": str(radios.id), "unit": "each"}
     )
     assert taken.status_code == 400
-    assert "perhaps a retired one" in text(taken)
+    assert f"{item.name} already has that name" in text(taken)
+    assert "It is retired." in text(taken)
     assert admin_client.post(f"{ITEMS}/{item.id}/restore").status_code == 303
 
 
@@ -408,3 +468,16 @@ def test_pages_of_fifty(
 def test_an_empty_list_says_what_to_do_next(admin_client: TestClient) -> None:
     page = text(admin_client.get(ITEMS, params={"q": "zzzqqqxxx"}))
     assert "Nothing matches. Check the spelling" in page
+
+
+def test_taken_by_finds_nothing_where_nothing_clashes(
+    session: Session, radios: Category
+) -> None:
+    item = add(
+        session,
+        Item(name="LiteBeam", category_id=radios.id, old_code="NYCM-1"),
+    )
+    asked = items.Fields.new(name="Lite beam", category_id=radios.id, old_code="NYCM-1")
+    # Its own name and old code are no clash with itself.
+    assert items.taken_by(session, asked, item.id) is None
+    assert items.taken_by(session, asked) == ("name", item)
