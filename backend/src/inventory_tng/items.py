@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import ColumnElement, SQLColumnExpression, and_, func, literal, select
+from sqlalchemy import ColumnElement, and_, func, literal, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import (
@@ -77,10 +77,6 @@ class Fields:
         )
 
 
-def _same(column: SQLColumnExpression[str | None], value: str) -> ColumnElement[bool]:
-    return func.lower(column) == func.lower(literal(value))
-
-
 def taken_by(
     session: Session, fields: Fields, item_id: int | None = None
 ) -> tuple[str, Item] | None:
@@ -92,8 +88,8 @@ def taken_by(
     ]
     if fields.manufacturer is not None and fields.part_number is not None:
         both = and_(
-            _same(Item.manufacturer, fields.manufacturer),
-            _same(Item.part_number, fields.part_number),
+            func.lower(Item.manufacturer) == fields.manufacturer.lower(),
+            func.lower(Item.part_number) == fields.part_number.lower(),
         )
         wanted.append(("part_number", both))
     if fields.old_code is not None:
