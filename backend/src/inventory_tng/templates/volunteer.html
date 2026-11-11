@@ -40,7 +40,9 @@ count as theirs.{% else %}The scan page doesn't offer them.{% endif %}{% endcall
 {% if others %}
 <section>
   <h2>A duplicate?</h2>
-  <form method="post" action="{{ here }}/merge" class="actions">
+  <p class="hint">Merging retires them, and their past records count as the
+  other's. You'll be asked first.</p>
+  <form method="get" action="{{ here }}/merge" class="actions">
     <label>Merge into
       <select name="into_id" required>
         <option value="">Pick who they duplicate</option>

@@ -176,6 +176,30 @@ def test_your_own_reset_is_on_your_account_page(
     assert "Change your own on your account page." in text(refused)
 
 
+def test_resetting_another_asks_to_confirm_first(
+    admin_client: TestClient, session: Session
+) -> None:
+    ben, _ = new_admin(session, "ben")
+    path = f"{ADMINS}/{ben.id}"
+    page = admin_client.get(path).text
+    assert f'<form method="get" action="{path}/reset">' in page
+    asked = admin_client.get(f"{path}/reset")
+    assert asked.status_code == 200
+    words = " ".join(text(asked).split())
+    assert "Resetting ben's sign-in signs them out everywhere" in words
+    assert "can't be undone" in words
+    assert '<button class="danger">Reset their sign-in</button>' in asked.text
+    assert f'<a href="{path}">Keep it as it is</a>' in asked.text
+    assert 'name="once"' in asked.text
+    assert accounts.has_password(session, ben.id)  # Only its button resets.
+    me = admin_named(session, "ada")
+    own = admin_client.get(f"{ADMINS}/{me.id}/reset")
+    assert "Change your own on your account page." in text(own)
+    assert admin_client.get(f"{ADMINS}/999999/reset").status_code == 404
+    accounts.retire_admin(session, ben.id, me.id, datetime.now(UTC), NO_MAIL)
+    assert admin_client.get(f"{path}/reset").status_code == 404
+
+
 def test_retiring_another_removes_their_sign_in(
     make_client: Callable[..., TestClient], session: Session, sent_mail: SentMail
 ) -> None:
@@ -408,8 +432,9 @@ def test_changing_another_needs_a_recent_code(
     assert ben.retired_at is not None
     code_typed_ago(session, 31)
     page = text(admin_client.get(f"{ADMINS}/{carol.id}"))
-    assert page.count('name="confirm_code"') == 2
+    assert page.count('name="confirm_code"') == 1  # Retiring; reset asks on its page.
     assert "Your code" in page
+    assert 'name="confirm_code"' in admin_client.get(f"{ADMINS}/{carol.id}/reset").text
     for action in ("reset", "retire"):
         asked = admin_client.post(f"{ADMINS}/{carol.id}/{action}", data=once())
         assert asked.status_code == 403

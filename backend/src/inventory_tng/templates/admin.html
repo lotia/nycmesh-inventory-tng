@@ -15,16 +15,10 @@
 {% if not other.retired_at and not themselves %}
 <section>
   <h2>Locked out, or a password or phone stolen?</h2>
-  <p class="hint">Resetting their sign-in signs them out everywhere at once:
-  their password, authenticators and recovery codes stop working. You get a
-  link to pass on, which works once, within a day, for them to choose a new
-  password. Changing another administrator asks for your code, unless you
-  typed one recently, and every administrator is told.</p>
-  <form method="post" action="{{ here }}/reset">
-    {{ once_field() }}
-    {% if code_needed %}{% include "_code_field.html" %}{% endif %}
-    <div class="actions"><button>Reset their sign-in</button></div>
-  </form>
+  <p class="hint">Resetting their sign-in signs them out everywhere at once,
+  and gives you a link to pass on for them to choose a new password. You'll be
+  asked first.</p>
+  <form method="get" action="{{ here }}/reset"><button>Reset their sign-in</button></form>
 </section>
 {% endif %}
 

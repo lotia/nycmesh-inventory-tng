@@ -139,6 +139,32 @@ def test_merging_a_duplicate(admin_client: TestClient, session: Session) -> None
     assert (dup.merged_into_id, dup.retired_at) == (None, None)
 
 
+def test_merging_asks_to_confirm_first(
+    admin_client: TestClient, session: Session
+) -> None:
+    ada = add(session, Volunteer(name="Ada"))
+    dup = add(session, Volunteer(name="Ada Lovelace"))
+    path = f"{VOLUNTEERS}/{dup.id}"
+    assert f'<form method="get" action="{path}/merge"' in admin_client.get(path).text
+    asked = admin_client.get(f"{path}/merge", params={"into_id": str(ada.id)})
+    assert asked.status_code == 200
+    words = " ".join(text(asked).split())
+    assert "Ada Lovelace is retired as a duplicate of Ada" in words
+    assert f'<input type="hidden" name="into_id" value="{ada.id}">' in asked.text
+    assert '<button class="danger">Merge</button>' in asked.text
+    assert f'<a href="{path}">Keep them apart</a>' in asked.text
+    assert dup.retired_at is None  # Only its button merges.
+    for into in ("", str(dup.id), "999999"):
+        refused = admin_client.get(f"{path}/merge", params={"into_id": into})
+        assert "Pick who they duplicate." in text(refused)
+    admin_client.post(f"{path}/merge", data={"into_id": str(ada.id)})
+    assert (
+        admin_client.get(f"{path}/merge", params={"into_id": str(ada.id)}).status_code
+        == 404
+    )
+    assert admin_client.get(f"{VOLUNTEERS}/999999/merge").status_code == 404
+
+
 def test_merging_needs_a_current_other_volunteer(
     admin_client: TestClient, session: Session
 ) -> None:

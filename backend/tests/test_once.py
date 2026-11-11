@@ -120,7 +120,9 @@ def test_a_reset_link_is_made_and_mailed_once(
     sign_in_with(client, code=code(key))
     ben, _ = new_admin(session, "ben", email="ben@example.org")
     page = f"{ADMINS}/{ben.id}"
-    made, again = sent_twice_with_codes(client, session, page, f"{page}/reset")
+    # The form is on the page asking to confirm; the way back, their page.
+    reset = f"{page}/reset"
+    made, again = sent_twice_with_codes(client, session, reset, reset)
     assert CANT_SHOW in text(made)
     assert_sent_again(again, page)
     assert link_count(session, ben) == 1

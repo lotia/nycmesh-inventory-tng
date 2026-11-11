@@ -221,6 +221,30 @@ def admin(
     return _admin_page(request, session, signed, other)
 
 
+@router.get(f"{ADMINS}/{{admin_id}}/reset")
+def confirm_reset(
+    request: Request, signed: AdminSignedIn, session: DbSession, admin_id: int
+) -> Response:
+    """Resetting can't be undone and signs them out at once: say so first."""
+    other = session.get(Admin, admin_id)
+    if other is None or other.retired_at is not None:
+        return not_found()
+    if other.id == signed.admin.id:
+        return _admin_page(request, session, signed, other, OWN_RESET)
+    return admin_page(
+        request,
+        signed,
+        "admin_reset.html",
+        {
+            "title": f"Reset {other.username}'s sign-in?",
+            "here": f"{ADMINS}/{admin_id}/reset",
+            "keep": f"{ADMINS}/{admin_id}",
+            "other": other,
+            **_code_field(signed),
+        },
+    )
+
+
 @router.post(f"{ADMINS}/{{admin_id}}/reset")
 def reset(
     request: Request,
