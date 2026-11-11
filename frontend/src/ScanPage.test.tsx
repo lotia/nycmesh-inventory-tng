@@ -226,6 +226,38 @@ describe("filling and saving a cart", () => {
     ).toBe("1");
   });
 
+  test("opening, an item adds its one current package, beside a retired one", async () => {
+    const withOld = {
+      ...CATALOGUE,
+      items: CATALOGUE.items.map((item) =>
+        item.id === 100
+          ? {
+              ...item,
+              packages: [
+                ...item.packages,
+                {
+                  id: 1002,
+                  name: "Old crate",
+                  size: "8",
+                  track_opened: false,
+                  retired: true,
+                },
+              ],
+            }
+          : item,
+      ),
+    };
+    const { api } = answering(() => json(withOld, 200));
+    open(api);
+    await ready();
+    fireEvent.click(screen.getByLabelText("Opening packages"));
+    find("beam");
+    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    expect(
+      (screen.getByLabelText("Box (4 each)") as HTMLInputElement).value,
+    ).toBe("1");
+  });
+
   test("a move is saved, sent, and a new cart keeps the choices", async () => {
     const record = vi.spyOn(telemetry, "record");
     const { api, sent } = server();
@@ -321,6 +353,31 @@ describe("filling and saving a cart", () => {
     await ready();
     find("cable");
     expect(screen.getByText(/retired: taking only/)).toBeDefined();
+  });
+
+  test("a retired package says it can only be taken", async () => {
+    const retired = {
+      ...CATALOGUE,
+      items: CATALOGUE.items.map((item) =>
+        item.id === 101
+          ? {
+              ...item,
+              packages: item.packages.map((pack) => ({
+                ...pack,
+                retired: true,
+              })),
+            }
+          : item,
+      ),
+    };
+    const { api } = answering(() => json(retired, 200));
+    open(api);
+    await ready();
+    find("cat6");
+    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    expect(
+      screen.getByLabelText("Spool (305 m), retired: taking only"),
+    ).toBeDefined();
   });
 
   test("an install asks for its number and has no To", async () => {

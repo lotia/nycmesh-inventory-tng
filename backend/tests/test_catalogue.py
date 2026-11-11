@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
+from inventory_tng.ledger import LOOSE, Entry
 from inventory_tng.models import (
     Category,
     Item,
@@ -21,7 +22,7 @@ from inventory_tng.models import (
 )
 
 from helpers.rows import add, tag
-from helpers.stock import Place, retire, write
+from helpers.stock import Place, Spools, retire, write
 
 URL = "/api/catalogue"
 NOW = datetime.now(UTC)
@@ -140,12 +141,14 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
             "name": "Box",
             "size": 50,
             "track_opened": False,
+            "retired": False,
         },
         {
             "id": rows.spool.id,
             "name": "Spool",
             "size": 300,
             "track_opened": False,
+            "retired": False,
         },
     ]
     assert cable == {
@@ -243,3 +246,29 @@ def test_a_retired_item_counts_stock_where_there_is_some(
     )
     retire(session, place.item)
     assert place.item.id in by_id(registered_client.get(URL).json()["items"])
+
+
+def test_a_retired_package_stays_while_some_are_sealed(
+    registered_client: TestClient, session: Session
+) -> None:
+    """Taking only, as a retired item (inventory-tng-96a): two sealed
+    spools in the store, retired."""
+    spools = Spools(session)
+    retire(session, spools.spool)
+
+    def sent() -> dict[int, dict[str, Any]]:
+        items = by_id(registered_client.get(URL).json()["items"])
+        return by_id(items[spools.cable.id]["packages"])
+
+    assert sent()[spools.spool.id]["retired"] is True
+    # One opened: the other is still sealed, and its open one is sent too.
+    opened = spools.opened()
+    assert spools.spool.id in sent()
+    # The last one installed: none sealed is left, so it is gone.
+    spools.write(
+        {"kind": "install", "from_location_id": spools.store.id},
+        Entry(spools.cable.id, Decimal(305), spools.sealed, LOOSE),
+    )
+    assert spools.spool.id not in sent()
+    reply = registered_client.get(URL).json()
+    assert opened.id in {each["id"] for each in reply["open_packages"]}

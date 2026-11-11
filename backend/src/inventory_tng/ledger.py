@@ -174,7 +174,7 @@ def in_stores(items: Select[int]) -> Select[int, Decimal, bool]:
     )
 
 
-def _retired(model: type[Item | Location]) -> ColumnElement[list[int]]:
+def _retired(model: type[Item | ItemPackage | Location]) -> ColumnElement[list[int]]:
     """The ids of a model's retired rows, as an array for balance to take:
     PostgreSQL pushes it down to the ledger's indexes, so only their
     balances are summed, however long the ledger."""
@@ -183,19 +183,33 @@ def _retired(model: type[Item | Location]) -> ColumnElement[list[int]]:
     )
 
 
-def retired_in_stock() -> Select[tuple[int]]:
-    """The ids of retired items with some left at a current place: what
-    volunteers may still take, and administrators write off."""
+def _retired_left(
+    summed: Subquery, column: str, model: type[Item | ItemPackage]
+) -> Select[tuple[int]]:
+    """The ids, in `summed`'s `column`, of `model`'s retired rows with some
+    left at a current place."""
     return (
-        select(balance.c.item_id)
-        .join(Location, Location.id == balance.c.location_id)
+        select(summed.c[column])
+        .join(Location, Location.id == summed.c.location_id)
         .where(
             Location.retired_at.is_(None),
-            balance.c.quantity > 0,
-            balance.c.item_id == any_(_retired(Item)),
+            summed.c.quantity > 0,
+            summed.c[column] == any_(_retired(model)),
         )
         .distinct()
     )
+
+
+def retired_in_stock() -> Select[tuple[int]]:
+    """The ids of retired items with some left at a current place: what
+    volunteers may still take, and administrators write off."""
+    return _retired_left(balance, "item_id", Item)
+
+
+def retired_packages_in_stock() -> Select[tuple[int]]:
+    """The ids of retired packages with some sealed at a current place:
+    what volunteers may still take, as retired_in_stock's items."""
+    return _retired_left(by_form, "package_id", ItemPackage)
 
 
 def retired_holding_stock() -> Select[int]:
@@ -252,6 +266,15 @@ def takeable() -> ColumnElement[bool]:
     """Items volunteers may still pick: current ones, and retired ones with
     some left (retired_in_stock). What the scan page's catalogue holds."""
     return or_(Item.retired_at.is_(None), Item.id.in_(retired_in_stock()))
+
+
+def takeable_package() -> ColumnElement[bool]:
+    """Packages volunteers may still pick: current ones, and retired ones
+    with some sealed left (retired_packages_in_stock), taking only."""
+    return or_(
+        ItemPackage.retired_at.is_(None),
+        ItemPackage.id.in_(retired_packages_in_stock()),
+    )
 
 
 def whole_enough(unit: str, amount: Decimal) -> bool:

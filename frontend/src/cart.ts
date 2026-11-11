@@ -11,7 +11,7 @@ import { v4 as uuid } from "uuid";
 import * as v from "valibot";
 import type { Schemas } from "./api/client";
 import { id } from "./api/replies";
-import { BatchBody, type Draft } from "./outbox";
+import type { Draft } from "./outbox";
 import { count, decimal, sent, thousandths } from "./quantity";
 import { onStoredChange, readStored, writeStored } from "./stored";
 
@@ -341,6 +341,17 @@ export function addOne(cart: Cart, itemId: number, packageId?: number): Cart {
   };
 }
 
+/** An item's one package, as opening the item opens one: its one current
+ * package, beside any retired, else its one package; or none. */
+export function onlyPackage(
+  item: Item | undefined,
+): Item["packages"][number] | undefined {
+  const packs = item?.packages ?? [];
+  const current = packs.filter((each) => !each.retired);
+  const pool = current.length > 0 ? current : packs;
+  return pool.length === 1 ? pool[0] : undefined;
+}
+
 /** Whole packages of one size: how many, and each one's size in
  * thousandths of the item's unit. */
 type Packs = { count: number; size: number };
@@ -422,7 +433,7 @@ const KINDS: Record<Draft["kind"], string> = {
   report: "Used up",
 };
 
-/** What the page says beside a retired item. */
+/** What the page says beside a retired item, or package. */
 export const RETIRED = "retired: taking only";
 
 /**
@@ -490,6 +501,15 @@ export function toBatch(
     if (item.retired && cart.kind === "receipt") {
       problems.push(`${item.name}: ${RETIRED}, so it can't be received.`);
       continue;
+    }
+    if (cart.kind === "receipt") {
+      for (const pack of item.packages) {
+        if (pack.retired && (count(line.packages[pack.id] ?? "") ?? 0) > 0) {
+          problems.push(
+            `${item.name}, ${pack.name}: ${RETIRED}, so it can't be received.`,
+          );
+        }
+      }
     }
     const quantity = quantityOf(line, item);
     if ("problem" in quantity) {

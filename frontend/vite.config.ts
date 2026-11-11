@@ -93,7 +93,7 @@ export default defineConfig({
         autoUpdate: (reached: number, previous: number) =>
           Math.max(previous, Math.floor(reached) - 1),
         statements: 98,
-        branches: 94,
+        branches: 95,
         functions: 98,
         lines: 98,
       },
