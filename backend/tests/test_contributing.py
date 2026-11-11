@@ -37,17 +37,31 @@ def tasks() -> set[str]:
     }
 
 
-def text_files() -> list[Path]:
-    found = []
+def text_files() -> dict[Path, str]:
+    """Each text file in the clone, read once. What a running tool writes
+    and removes as this walks, such as each test process's coverage data,
+    is not the project's: a file gone before it is read, or one that can't
+    be read, is skipped."""
+    found = {}
     for folder, folders, files in os.walk(CLONE):
         folders[:] = [name for name in folders if name not in NOT_OURS]
         for name in files:
             path = Path(folder, name)
             try:
-                found.append((path, path.read_text()))
-            except UnicodeDecodeError:
+                found[path] = path.read_text()
+            except UnicodeDecodeError, OSError:
                 continue
-    return [path for path, _ in found]
+    return found
+
+
+def test_a_file_gone_before_it_is_read_is_skipped(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """As another test process's coverage data is, in a parallel run."""
+    (tmp_path / "kept.md").write_text("text")
+    walked = [(str(tmp_path), [], ["kept.md", "gone"])]
+    monkeypatch.setattr(os, "walk", lambda _: iter(walked))
+    assert text_files() == {tmp_path / "kept.md": "text"}
 
 
 def test_every_mise_task_is_in_contributing() -> None:
@@ -63,8 +77,8 @@ def test_every_mise_task_is_in_contributing() -> None:
 def test_compose_runs_through_mise() -> None:
     direct = {
         str(path.relative_to(CLONE)): hits
-        for path in text_files()
-        if path not in ALLOWED and (hits := DIRECT.findall(path.read_text()))
+        for path, text in text_files().items()
+        if path not in ALLOWED and (hits := DIRECT.findall(text))
     }
     assert direct == {}
 
