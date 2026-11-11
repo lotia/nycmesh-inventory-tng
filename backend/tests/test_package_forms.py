@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 
@@ -444,3 +445,94 @@ def test_opening_a_package_is_no_move_to_a_count(
         as_of,
     )
     assert counted.moved == {}
+
+
+# The scan page's batches (POST /api/transactions): sealed packages stay
+# sealed.
+
+URL = "/api/transactions"
+
+
+def sealed_line(spools: Spools, quantity: str) -> dict[str, object]:
+    return {
+        "item_id": spools.cable.id,
+        "quantity": quantity,
+        "package_id": spools.spool.id,
+    }
+
+
+def test_sealed_packages_saved_arrive_sealed(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    store, van, spool = spools.store.id, spools.van.id, spools.spool.id
+    lines = [sealed_line(spools, "305"), {"item_id": spools.cable.id, "quantity": "5"}]
+    batch = spools.place.batch(lines=lines)
+    assert registered_client.post(URL, json=batch).status_code == 201
+    assert registered_client.post(URL, json=batch).status_code == 200
+    assert forms(session, spools.cable) == {
+        (store, spool, None): 305,
+        (store, None, None): -5,
+        (van, spool, None): 305,
+        (van, None, None): 5,
+    }
+    other = batch | {"lines": [sealed_line(spools, "610")]}
+    assert registered_client.post(URL, json=other).status_code == 409
+    receipt = spools.place.batch(
+        kind="receipt",
+        from_location_id=None,
+        to_location_id=store,
+        lines=[sealed_line(spools, "305")],
+    )
+    assert registered_client.post(URL, json=receipt).status_code == 201
+    assert forms(session, spools.cable)[(store, spool, None)] == 610
+
+
+def test_a_batch_saved_before_packages_were_kept_sealed_saves_loose(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """An outbox's batch from an older page, of units alone."""
+    lines = [{"item_id": spools.cable.id, "quantity": "305"}]
+    response = registered_client.post(URL, json=spools.place.batch(lines=lines))
+    assert response.status_code == 201
+    assert forms(session, spools.cable)[(spools.van.id, None, None)] == 305
+
+
+def test_a_refusal_names_each_bad_package_line(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    other = add(
+        session, ItemPackage(item_id=spools.place.item.id, name=f"Box {tag()}", size=10)
+    )
+    lines = [
+        sealed_line(spools, "300"),
+        {"item_id": spools.cable.id, "quantity": "10", "package_id": other.id},
+        sealed_line(spools, "305"),
+        {"item_id": spools.cable.id, "quantity": "1"},
+    ]
+    response = registered_client.post(URL, json=spools.place.batch(lines=lines))
+    assert response.status_code == 422
+    assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
+        (["lines", 0, "item_id"], "repeated"),
+        (["lines", 0, "quantity"], "not_whole_packages"),
+        (["lines", 1, "package_id"], "not_found"),
+        (["lines", 2, "item_id"], "repeated"),
+    ]
+
+
+def test_a_retired_package_is_never_received(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """As a retired item is not (docs/decisions/0003)."""
+    spools.spool.retired_at = datetime.now(UTC)
+    session.flush()
+    receipt = spools.place.batch(
+        kind="receipt",
+        from_location_id=None,
+        to_location_id=spools.store.id,
+        lines=[sealed_line(spools, "305")],
+    )
+    response = registered_client.post(URL, json=receipt)
+    assert response.status_code == 422
+    assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
+        (["lines", 0, "package_id"], "retired")
+    ]

@@ -161,7 +161,11 @@ describe("filling and saving a cart", () => {
       volunteer_id: 1,
       from_location_id: 10,
       to_location_id: 12,
-      lines: [{ item_id: 100, quantity: "5" }],
+      // The package scanned stays sealed; the one added by hand is loose.
+      lines: [
+        { item_id: 100, quantity: "4", package_id: 1000 },
+        { item_id: 100, quantity: "1" },
+      ],
     });
     expect(outbox.entries.value[0]?.body.key).toBe(body.key);
     // How long it took from its first line, which the page reports.

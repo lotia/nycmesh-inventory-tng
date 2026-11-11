@@ -119,7 +119,7 @@ def _catalogue(session: Session) -> None:
         for name, category, unit, maker, part in ITEMS
     }
     item, package, size = PACKAGE
-    items.add_package(session, things[item], package, size)
+    box = items.add_package(session, things[item], package, size)
     places: dict[str, Location] = {}
     for name, kind, parent in LOCATIONS:
         parent_id = places[parent].id if parent else None
@@ -132,8 +132,13 @@ def _catalogue(session: Session) -> None:
         kind="receipt",
         volunteer_id=people[0].id,
         to_location_id=places["Shelf A"].id,
+        # The cable arrives as a sealed box (docs/decisions/0020).
         lines=[
-            {"item_id": things[name].id, "quantity": quantity}
+            {
+                "item_id": things[name].id,
+                "quantity": quantity,
+                "package_id": box.id if name == item else None,
+            }
             for name, quantity in STOCK.items()
         ],
     )

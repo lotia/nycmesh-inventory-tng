@@ -322,11 +322,14 @@ export function addOne(cart: Cart, itemId: number, packageId?: number): Cart {
   };
 }
 
-/** A line's quantity in thousandths of the item's unit, or why it has none. */
+/** A line's quantity in thousandths of the item's unit, and of it, how
+ * much in each package counted and how much loose; or why it has none. */
 export function quantityOf(
   line: Line,
   item: Item,
-): { amount: number } | { problem: string } {
+):
+  | { amount: number; sealed: Map<number, number>; loose: number }
+  | { problem: string } {
   const current = new Set(item.packages.map((pack) => String(pack.id)));
   for (const [packageId, typed] of Object.entries(line.packages)) {
     if (!current.has(packageId) && (count(typed) ?? 1) !== 0) {
@@ -337,11 +340,15 @@ export function quantityOf(
     }
   }
   let amount = 0;
+  const sealed = new Map<number, number>();
   for (const pack of item.packages) {
     const packs = count(line.packages[pack.id] ?? "");
     const size = thousandths(pack.size);
     if (packs === null || size === null) {
       return { problem: `Count whole packages: ${pack.name}.` };
+    }
+    if (packs > 0) {
+      sealed.set(pack.id, packs * size);
     }
     amount += packs * size;
   }
@@ -355,7 +362,7 @@ export function quantityOf(
   if (item.unit === "each" && amount % 1000 !== 0) {
     return { problem: "Counted in whole units." };
   }
-  return { amount };
+  return { amount, sealed, loose };
 }
 
 const KINDS: Record<Kind, string> = {
@@ -403,6 +410,7 @@ export function toBatch(
     problems.push("That install number is out of range.");
   }
   const lines: Draft["lines"] = [];
+  let items = 0;
   for (const line of cart.lines) {
     const item = index.items.get(line.itemId);
     if (item === undefined) {
@@ -421,7 +429,19 @@ export function toBatch(
     } else if (quantity.amount >= MAX_AMOUNT) {
       problems.push(`${item.name}: That is more than the inventory can count.`);
     } else if (quantity.amount > 0) {
-      lines.push({ item_id: item.id, quantity: decimal(quantity.amount) });
+      // Each package counted on a line of its own, sealed, so stock keeps
+      // them sealed where they arrive (docs/decisions/0020); then loose.
+      for (const [packageId, amount] of quantity.sealed) {
+        lines.push({
+          item_id: item.id,
+          quantity: decimal(amount),
+          package_id: packageId,
+        });
+      }
+      if (quantity.loose > 0) {
+        lines.push({ item_id: item.id, quantity: decimal(quantity.loose) });
+      }
+      items += 1;
     }
   }
   if (lines.length === 0 && problems.length === 0) {
@@ -431,7 +451,7 @@ export function toBatch(
   if (problems.length > 0 || cart.volunteerId === null) {
     return { problems };
   }
-  const things = lines.length === 1 ? "1 item" : `${lines.length} items`;
+  const things = items === 1 ? "1 item" : `${items} items`;
   const words = [`${KINDS[cart.kind]}: ${things}`];
   const draft: Draft = {
     kind: cart.kind,

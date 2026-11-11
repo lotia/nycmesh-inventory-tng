@@ -47,7 +47,12 @@ export const BatchBody = v.object({
   to_location_id: nullableId,
   install_number: nullableId,
   lines: v.array(
-    v.object({ item_id: id, quantity: v.union([v.number(), v.string()]) }),
+    v.object({
+      item_id: id,
+      quantity: v.union([v.number(), v.string()]),
+      /** Sealed packages of it, kept sealed; absent (an older page's): loose. */
+      package_id: nullableId,
+    }),
   ),
 });
 
