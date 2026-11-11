@@ -67,7 +67,11 @@ describe("adding", () => {
 describe("quantities", () => {
   test("packages and loose units add up exactly", () => {
     const line = { itemId: 101, packages: { 1001: "2" }, loose: "12.5" };
-    expect(quantityOf(line, cable)).toEqual({ amount: 622500 });
+    expect(quantityOf(line, cable)).toEqual({
+      amount: 622500,
+      sealed: new Map([[1001, 610000]]),
+      loose: 12500,
+    });
   });
 
   test("a fraction of a package is refused", () => {
@@ -93,7 +97,7 @@ describe("quantities", () => {
 });
 
 describe("turning a cart into a batch", () => {
-  test("a move sends both places and decimal quantities", () => {
+  test("a move sends both places, decimal quantities, and packages sealed", () => {
     const full = {
       ...cart(),
       lines: [
@@ -108,11 +112,19 @@ describe("turning a cart into a batch", () => {
         from_location_id: 10,
         to_location_id: 12,
         lines: [
-          { item_id: 100, quantity: "6" },
+          { item_id: 100, quantity: "4", package_id: 1000 },
+          { item_id: 100, quantity: "2" },
           { item_id: 101, quantity: "0.25" },
         ],
       },
       what: "Move: 2 items from Hub to Van",
+    });
+  });
+
+  test("packages alone send no loose line", () => {
+    const lines = [{ itemId: 101, packages: { 1001: "2" }, loose: "" }];
+    expect(toBatch(cart({ lines }), CATALOGUE)).toMatchObject({
+      draft: { lines: [{ item_id: 101, quantity: "610", package_id: 1001 }] },
     });
   });
 
@@ -230,6 +242,8 @@ describe("what has changed since the cart was filled", () => {
     // A retired package left at nothing is no matter.
     expect(quantityOf({ ...line, packages: { 9999: "" } }, cable)).toEqual({
       amount: 1000,
+      sealed: new Map(),
+      loose: 1000,
     });
   });
 });

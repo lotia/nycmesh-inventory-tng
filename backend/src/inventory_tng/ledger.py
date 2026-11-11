@@ -561,6 +561,26 @@ class Line(BaseModel):
     item_id: Number
     # In the item's unit: the scan page turns packages into units first.
     quantity: Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=3)]
+    package_id: Annotated[
+        Number | None,
+        Field(
+            description="Sealed packages of this package of the item, "
+            "kept sealed (docs/decisions/0020): `quantity` is a whole "
+            "number of them, in units. None: loose units."
+        ),
+    ] = None
+
+    def entry(self, kind: str) -> Entry:
+        """As the ledger writes it: sealed on each side the kind has, loose
+        outside."""
+        sealed = Form(package_id=self.package_id)
+        has_from, has_to = SIDES[kind]
+        return Entry(
+            self.item_id,
+            self.quantity,
+            sealed if has_from else LOOSE,
+            sealed if has_to else LOOSE,
+        )
 
 
 class Batch(BaseModel):
@@ -575,8 +595,9 @@ class Batch(BaseModel):
         Field(
             min_length=1,
             max_length=MAX_LINES,
-            description="One line per item: a batch naming an item on more than "
-            "one line is refused, 422 with type repeated on each of those lines.",
+            description="One line per item and package (or loose): a batch "
+            "naming one on more than one line is refused, 422 with type repeated "
+            "on each of those lines.",
         ),
     ]
 
@@ -599,12 +620,14 @@ class Batch(BaseModel):
 
 # Where in the batch, as pydantic gives it ("lines", 2, "item_id"), and what.
 Problem = tuple[
-    tuple[str | int, ...], Literal["not_found", "not_whole", "retired", "repeated"]
+    tuple[str | int, ...],
+    Literal["not_found", "not_whole", "not_whole_packages", "retired", "repeated"],
 ]
 MESSAGES = {
     "not_found": "There is no such row",
     "repeated": "This item is on another line too: put it on one line",
     "not_whole": "This item is counted in whole units",
+    "not_whole_packages": "Whole packages only",
     "retired": "This item is retired: what is left may be taken, never received",
 }
 
@@ -650,8 +673,8 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
     if (written := _replay(session, batch)) is not None:
         return Recorded(written, False)
     header = {"device_id": device_id, **_header(batch)}
-    lines = [(line.item_id, line.quantity) for line in batch.lines]
-    held = hold(session, header, [item_id for item_id, _ in lines])
+    lines = [line.entry(batch.kind) for line in batch.lines]
+    held = hold(session, header, [line.item_id for line in lines])
     problems = _problems(session, batch, held, lines)
     if problems:
         refused.add(1, {"reason": "invalid"})
@@ -943,15 +966,22 @@ def _receive(session: Session, lines: Sequence[Entry]) -> None:
         item.on_order = on_order_after(item.on_order, received[item.id])
 
 
-# Each of line_breaks' rules, as a batch's problem: which field, and what.
-LINE_PROBLEMS: dict[str, tuple[str, Literal["not_whole", "retired"]]] = {
+# Each of the rules a batch's line can break, as its problem: which field,
+# and what. A batch's forms are sealed or loose alike on both sides
+# (Line.entry), so no other form rule can be broken by one.
+LINE_PROBLEMS: dict[
+    str, tuple[str, Literal["not_found", "not_whole", "not_whole_packages", "retired"]]
+] = {
     "movement_whole_units": ("quantity", "not_whole"),
     "receipt_retired_item": ("item_id", "retired"),
+    "movement_package_of_item": ("package_id", "not_found"),
+    "movement_whole_packages": ("quantity", "not_whole_packages"),
+    "receipt_retired_package": ("package_id", "retired"),
 }
 
 
 def _problems(
-    session: Session, batch: Batch, held: Held, lines: ItemLines
+    session: Session, batch: Batch, held: Held, lines: Sequence[Entry]
 ) -> list[Problem]:
     """What is wrong with a batch, line by line (`lines`, its own), with its
     rows held (hold)."""
@@ -962,14 +992,17 @@ def _problems(
         location_id = getattr(batch, field)
         if location_id is not None and location_id not in held.places:
             problems.append(((field,), "not_found"))
-    twice = repeated([item_id for item_id, _ in lines])
+    twice = repeated([(line.item_id, line.leaves, line.arrives) for line in lines])
+    packages, _, _ = _hold_forms(session, lines)
+    places = (batch.from_location_id, batch.to_location_id)
     for number, broken in enumerate(lines_break(batch.kind, held.items, lines)):
         if number in twice:
             problems.append((("lines", number, "item_id"), "repeated"))
         if broken is None:
             problems.append((("lines", number, "item_id"), "not_found"))
             continue
-        for rule in broken:
+        broken += form_breaks(batch.kind, lines[number], places, packages, {})
+        for rule in dict.fromkeys(broken):
             field, kind = LINE_PROBLEMS[rule]
             problems.append((("lines", number, field), kind))
     return problems
@@ -1171,7 +1204,7 @@ def _replay(session: Session, batch: Batch) -> LedgerTransaction | None:
         )
         for item_id, quantity, from_package, from_open, to_package, to_open in rows
     )
-    sent = Counter(Entry(line.item_id, line.quantity) for line in batch.lines)
+    sent = Counter(line.entry(batch.kind) for line in batch.lines)
     same = written == sent and all(
         getattr(transaction, field) == value for field, value in _header(batch).items()
     )

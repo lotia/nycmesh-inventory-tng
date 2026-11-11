@@ -312,6 +312,21 @@ describe("storage", () => {
     expect(states(outbox)).toEqual(["saved"]);
   });
 
+  test("a batch's sealed packages are kept and sent; an older page's lines too", async () => {
+    // An older page's lines have no package_id: the server takes them loose.
+    const lines = [
+      { item_id: 5, quantity: "305", package_id: 9 },
+      { item_id: 6, quantity: "3" },
+    ];
+    const waiting = entry({ body: { ...entry().body, lines } });
+    store(waiting);
+    const { api, sent } = answering(() => saved());
+    const outbox = new Outbox(api);
+    expect(outbox.entries.value).toEqual([waiting]);
+    await outbox.send();
+    expect((await bodies(sent))[0].lines).toEqual(lines);
+  });
+
   test("an unreadable entry is dropped, and only that one", () => {
     const good = entry();
     store(good, { ...good, body: "not a batch" }, 7, null);

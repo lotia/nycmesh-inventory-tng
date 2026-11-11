@@ -133,7 +133,7 @@ export interface components {
       install_number?: number | null;
       /**
        * Lines
-       * @description One line per item: a batch naming an item on more than one line is refused, 422 with type repeated on each of those lines.
+       * @description One line per item and package (or loose): a batch naming one on more than one line is refused, 422 with type repeated on each of those lines.
        */
       lines: components["schemas"]["Line"][];
     };
@@ -224,6 +224,11 @@ export interface components {
       item_id: number;
       /** Quantity */
       quantity: number | string;
+      /**
+       * Package Id
+       * @description Sealed packages of this package of the item, kept sealed (docs/decisions/0020): `quantity` is a whole number of them, in units. None: loose units.
+       */
+      package_id?: number | null;
     };
     /** LocationEntry */
     LocationEntry: {
