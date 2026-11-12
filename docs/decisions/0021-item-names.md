@@ -101,23 +101,29 @@ type, so `cafe` finds `Café` and `lodz` finds `Łódź`, and the reverse.
 Each searchable table keeps what is searched folded to ASCII, by the
 anyascii library (`models.fold`), which also spells `ø`, `ł`, `æ` and `ß`,
 as decomposing alone would not: items' `search_text` and `name_folded`,
-and volunteers', places' and packages' `search_text`. The app writes them
-as each row is added or changed (`models.Searchable`, before each flush),
-never PostgreSQL (0016), and what is typed is folded alike before it is
-compared. Items' and volunteers' are indexed with `pg_trgm`.
+and volunteers', places' and packages' `search_text`. Compatibility
+characters are first made their canonical ones
+(`unicodedata.normalize("NFKC")`, Ali, 2026-11-12, inventory-tng-gfe),
+so the micro sign in `µF` folds as the Greek `μF` does, the Ohm sign as
+`Ω` and `℃` as `°C`, whichever a keyboard gives. Both `µF` and `μF` fold
+to `mF`, so `uF` typed finds neither (inventory-tng-8g2). The app writes
+them as each row is added or changed (`models.Searchable`, before each
+flush), never PostgreSQL (0016), and what is typed is folded alike before
+it is compared. Items' and volunteers' are indexed with `pg_trgm`.
 
 Each of those rows records what folded it, in `folded_with`, such as
-`anyascii 0.3.3` (Ali, 2026-11-12, inventory-tng-7u4), written with its
+`anyascii 0.3.3, Unicode 17.0.0` (Ali, 2026-11-12, inventory-tng-7u4;
+the Unicode, whose NFKC it is, since inventory-tng-gfe), written with its
 folded text; migration 0033 folded the rows there were again, to fill it.
-A release of anyascii that spells a character otherwise would leave rows
-folded the old way while what is typed is folded the new. So
-`tests/fold_reference.tsv` keeps what `fold` makes of every character in
-the blocks a name is likely to use, and some whole strings, with the
-versions of anyascii and of Python's Unicode, and a test fails with the
-difference when an upgrade changes either. Then decide whether to take
-it; if so, write the file again and, if a spelling changed, fold again in
-a migration the rows whose `folded_with` names the old version
-(CONTRIBUTING.md, Dependency updates).
+A release of anyascii, or a Python with a newer Unicode, that spells a
+character otherwise would leave rows folded the old way while what is
+typed is folded the new. So `tests/fold_reference.tsv` keeps what `fold`
+makes of every character in the blocks a name is likely to use, and some
+whole strings, with the versions of anyascii and of Python's Unicode, and
+a test fails with the difference when an upgrade changes either. Then
+decide whether to take it; if so, write the file again and, if a spelling
+changed, fold again in a migration the rows whose `folded_with` names the
+old version (CONTRIBUTING.md, Dependency updates).
 
 The scan page has no anyascii, which would weigh more than the rest of its
 scripts (Ali, 2026-11-12). The catalogue sends each item's details as

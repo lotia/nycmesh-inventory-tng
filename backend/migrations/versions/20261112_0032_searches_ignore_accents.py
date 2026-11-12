@@ -5,13 +5,15 @@ Items' search_text, which PostgreSQL computed, is the app's now, folded,
 and so is a folded copy of each item's name, for close names; volunteers',
 places' and packages' names get a folded copy too, volunteers' indexed for
 search as items' are (docs/decisions/0021, 2026-11-12). Filled here for
-the rows there are, folded as the app folds them (models.fold).
+the rows there are, folded as the app folds them (models.fold: NFKC, then
+anyascii, inventory-tng-gfe).
 
 Revision ID: 0032
 Revises: 0031
 Create Date: 2026-11-12 14:00:00
 """
 
+import unicodedata
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -74,7 +76,12 @@ def _fill(table: str, columns: dict[str, tuple[str, ...]]) -> None:
         {
             "id": row["id"],
             **{
-                column: anyascii(" ".join(row[field] or "" for field in fields))
+                # models.fold's, written out.
+                column: anyascii(
+                    unicodedata.normalize(
+                        "NFKC", " ".join(row[field] or "" for field in fields)
+                    )
+                )
                 for column, fields in columns.items()
             },
         }

@@ -3,6 +3,7 @@ what is searched is kept folded to ASCII by the app on every save, and what
 is typed is folded alike, so "cafe" finds "Café", and the reverse."""
 
 import importlib.metadata
+import unicodedata
 
 import pytest
 from alembic import command
@@ -68,8 +69,9 @@ def test_what_is_searched_is_folded_on_every_write(session: Session) -> None:
         "Bobine",
     )
     # And what folded each, as installed.
-    installed = f"anyascii {importlib.metadata.version('anyascii')}"
-    assert {row.folded_with for row in (item, place, person, package)} == {installed}
+    assert {row.folded_with for row in (item, place, person, package)} == {FOLDED_WITH}
+    assert importlib.metadata.version("anyascii") in FOLDED_WITH
+    assert unicodedata.unidata_version in FOLDED_WITH
 
 
 def test_a_change_to_nothing_searched_folds_nothing(
@@ -105,6 +107,25 @@ def test_every_list_finds_accented_names_typed_without_and_the_reverse(
     assert label.code in listed
 
 
+def test_compatibility_characters_find_their_canonical_ones(
+    admin_client: TestClient, session: Session
+) -> None:
+    # The micro, Ohm and degree Celsius signs, as some keyboards give them,
+    # and the Greek letters and the degree sign, as others do (gfe).
+    cables = add(session, Category(name=f"Parts {tag()}"))
+    for sign, canonical in (
+        ("10\N{MICRO SIGN}F", "10\N{GREEK SMALL LETTER MU}F"),
+        ("5\N{OHM SIGN} load", "5\N{GREEK CAPITAL LETTER OMEGA} load"),
+        ("85\N{DEGREE CELSIUS} rated", "85\N{DEGREE SIGN}C rated"),
+    ):
+        first = add(session, Item(name=f"{sign} {tag()}", category_id=cables.id))
+        second = add(session, Item(name=f"{canonical} {tag()}", category_id=cables.id))
+        for typed in (sign, canonical):
+            listed = page_text(admin_client.get(ITEMS, params={"q": typed}))
+            assert first.name in listed, typed
+            assert second.name in listed, typed
+
+
 def test_close_names_are_found_whatever_their_accents(session: Session) -> None:
     cables = add(session, Category(name=f"Cables {tag()}"))
     accented = add(session, Item(name="Câble plat", category_id=cables.id))
@@ -122,7 +143,7 @@ def test_rows_there_are_are_folded_by_the_migration(alembic_config: Config) -> N
     item_id = connection.scalar(
         text(
             "INSERT INTO item (name, category_id, manufacturer)"
-            " VALUES ('Câble', :c, 'Ærø') RETURNING id"
+            " VALUES ('Câble', :c, 'Ærø µ') RETURNING id"
         ),
         {"c": category_id},
     )
@@ -137,7 +158,7 @@ def test_rows_there_are_are_folded_by_the_migration(alembic_config: Config) -> N
     command.upgrade(alembic_config, "head")
     assert connection.execute(
         text("SELECT search_text, name_folded FROM item WHERE id = :i"), {"i": item_id}
-    ).one() == ("Cable Aero  ", "Cable")
+    ).one() == ("Cable Aero m  ", "Cable")
     for table, spelt in (
         ("item_package", "Bobine"),
         ("volunteer", "Zoe"),
