@@ -6,15 +6,15 @@ under the administrator's name, as a count does; Leave it clears the
 check."""
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Annotated, NamedTuple
 
 import structlog
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import Response
-from sqlalchemy import ColumnElement, and_, or_, select
+from sqlalchemy import ColumnElement, and_, or_, select, true
 from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, open_packages
@@ -86,7 +86,8 @@ class Cut(NamedTuple):
 class Checked(NamedTuple):
     """An open package to check, as the page shows it: what the
     administrator sees of its check (open_packages.check_seen), and its
-    place's moment then, so Set to N counts as of then (ledger.moment)."""
+    place's latest transaction then (ledger.latest_at), so Set to N counts
+    as of then."""
 
     shown: open_packages.Shown
     # Who said what is really on it, if a volunteer did.
@@ -96,10 +97,15 @@ class Checked(NamedTuple):
     seen: str
 
 
-def recent_cuts(session: Session, open_id: int) -> list[Cut]:
-    """What was last taken from an open package, newest first."""
-    rows = session.execute(
+def recent_cuts(session: Session, open_ids: Collection[int]) -> dict[int, list[Cut]]:
+    """What was last taken from each of these open packages, newest first,
+    RECENT of each: one query, however many."""
+    cuts: dict[int, list[Cut]] = {open_id: [] for open_id in open_ids}
+    if not cuts:
+        return cuts
+    newest = (
         select(
+            LedgerTransaction.id,
             LedgerTransaction.created_at,
             Movement.quantity,
             LedgerTransaction.kind,
@@ -107,11 +113,19 @@ def recent_cuts(session: Session, open_id: int) -> list[Cut]:
         )
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .outerjoin(Volunteer, Volunteer.id == LedgerTransaction.volunteer_id)
-        .where(Movement.from_open_package_id == open_id)
+        .where(Movement.from_open_package_id == OpenPackage.id)
         .order_by(LedgerTransaction.id.desc())
         .limit(RECENT)
+        .lateral()
     )
-    return [Cut(*row) for row in rows]
+    for open_id, _, *cut in session.execute(
+        select(OpenPackage.id, *newest.c)
+        .join(newest, true())
+        .where(OpenPackage.id.in_(list(cuts)))
+        .order_by(OpenPackage.id, newest.c.id.desc())
+    ):
+        cuts[open_id].append(Cut(*cut))
+    return cuts
 
 
 def _checks_page(
@@ -124,9 +138,12 @@ def _checks_page(
 ) -> Response:
     if only:
         where = [*where, OpenPackage.item_id == only.id]
+    # Read, not locked, and first, so a save between the two reads is after
+    # it: an answer locks the place, and refuses a package that changed
+    # since it was shown (_set).
+    latest = ledger.latest_at(session, _places(session, where))
     found = open_packages.shown(session, *where)
-    # Each place's moment once, however many are there.
-    moments: dict[int, int] = {}
+    cuts = recent_cuts(session, [each.row.id for each in found])
     reporters = {each.row.length_reported_by_volunteer_id for each in found}
     volunteers: dict[int | None, str] = {
         volunteer.id: volunteer.name
@@ -136,17 +153,14 @@ def _checks_page(
     }
     checked = []
     for each in found:
-        place = each.row.location_id
-        if place not in moments:
-            moments[place] = ledger.moment(session, place)
         # Set to what was said is as of the report, so a cut since is never
         # undone; else as of the page.
-        as_of = each.row.length_reported_in_id or moments[place]
+        as_of = each.row.length_reported_in_id or latest[each.row.location_id]
         checked.append(
             Checked(
                 each,
                 volunteers.get(each.row.length_reported_by_volunteer_id),
-                recent_cuts(session, each.row.id),
+                cuts[each.row.id],
                 as_of,
                 open_packages.check_seen(each.row),
             )
@@ -191,18 +205,21 @@ def kind_page(
     return _checks_page(request, signed, session, only, kind.title, kind.where)
 
 
-def _set(
-    session: Session,
-    signed: SignedIn,
-    open_id: int,
-    left: Decimal,
-    as_of: int,
-    seen: str,
-) -> bool:
+def _places(session: Session, where: Sequence[ColumnElement[bool]]) -> set[int]:
+    """Where the open packages `where` names are."""
+    return set(
+        session.scalars(select(OpenPackage.location_id).where(*where).distinct())
+    )
+
+
+def _set(session: Session, signed: SignedIn, answer: Answer) -> bool:
     """A count of the open package at what it really has, as of `as_of`,
     under a key of its check, so sending it twice writes it once, and the
     check settled: both, if the check is still as `seen` and the package
-    was not moved or cut from since; else neither."""
+    was not moved or cut from since, nor shows other than it `showed` on
+    the page; else neither."""
+    open_id, seen, left, as_of, showed = answer
+    assert left is not None  # A Set's, never a Leave's.
     row = session.get_one(OpenPackage, open_id)
     key = uuid.uuid5(row.key, f"length {seen}")
 
@@ -210,7 +227,7 @@ def _set(
         if open_packages.settle_check(
             session, open_id, seen
         ) and ledger.count_open_package(
-            session, key, signed.admin.id, row, left, as_of
+            session, key, signed.admin.id, row, left, as_of, showed=showed
         ):
             return True
         # Neither: undone with the savepoint.
@@ -220,14 +237,35 @@ def _set(
     return bool(done) and broken is None
 
 
+def _showed(typed: str) -> tuple[int, Decimal] | None:
+    """Where a package was and what it showed, "place left", as the page
+    sent it back; None if it sent none it could have."""
+    place, _, left = typed.partition(" ")
+    try:
+        found = Decimal(left)
+    except InvalidOperation:
+        return None
+    place_id = row_id(place)
+    if place_id is None or not found.is_finite():
+        return None
+    return place_id, found
+
+
 def _page(sent: str) -> str:
     """The page an answer came from, to go back to: this one or a kind's."""
     return sent if sent in {kind.path for kind in KINDS} else LENGTHS
 
 
-# What to do with a check: set it to a length, as of a moment, or leave it
-# (None); and what was seen of it.
-Answer = tuple[int, Decimal | None, int, str]
+class Answer(NamedTuple):
+    """What to do with a check: set it to a length, as of a moment, or leave
+    it (no length); what was seen of it; and, for a Set from the page's own
+    form (set_one), where the package was and what it showed there."""
+
+    open_id: int
+    seen: str
+    left: Decimal | None = None
+    as_of: int = 0
+    showed: tuple[int, Decimal] | None = None
 
 
 def _answer(
@@ -240,20 +278,17 @@ def _answer(
     page: str = LENGTHS,
 ) -> Response:
     """Set or leave each of `answers` still as seen, and say so. Their
-    places locked first, by id, as saves take places."""
-    places = session.scalars(
-        select(OpenPackage.location_id)
-        .where(OpenPackage.id.in_([open_id for open_id, *_ in answers]))
-        .distinct()
-    ).all()
-    for place in sorted(places):
+    places locked first, by id, as saves take places: only here, never as
+    the page is shown."""
+    named = OpenPackage.id.in_([each.open_id for each in answers])
+    for place in sorted(_places(session, [named])):
         ledger.lock_place(session, place)
     set_, left_ = 0, 0
-    for open_id, left, as_of, seen in sorted(answers):
-        if left is None:
-            left_ += open_packages.settle_check(session, open_id, seen)
+    for each in sorted(answers):
+        if each.left is None:
+            left_ += open_packages.settle_check(session, each.open_id, each.seen)
         else:
-            set_ += _set(session, signed, open_id, left, as_of, seen)
+            set_ += _set(session, signed, each)
     session.commit()
     open_packages.measure_checks_settled("set", set_)
     open_packages.measure_checks_settled("left", left_)
@@ -278,6 +313,7 @@ def set_one(
     left: Annotated[str, Form()] = "",
     as_of: Annotated[str, Form()] = "",
     seen: Annotated[str, Form()] = "",
+    showed: Annotated[str, Form()] = "",
     page: Annotated[str, Form()] = "",
 ) -> Response:
     """Set one to what is typed."""
@@ -288,9 +324,13 @@ def set_one(
     unit = session.get_one(Item, row.item_id).unit
     length = quantity(left, positive=False, unit=unit)
     moment = row_id(as_of)
+    shown = _showed(showed)
     if not isinstance(length, Decimal) or moment is None:
         return redirect(back, notice="length_bad", **query(only))
-    answer = [(open_id, length, moment, seen)]
+    if shown is None:
+        # A form from before it said: its moment cannot be trusted.
+        return redirect(back, notice="length_unchanged", **query(only))
+    answer = [Answer(open_id, seen, length, moment, shown)]
     return _answer(session, signed, answer, query(only), page=back)
 
 
@@ -306,7 +346,7 @@ def leave_one(
     """Leave one as it shows."""
     if session.get(OpenPackage, open_id) is None:
         return not_found()
-    answer = [(open_id, None, 0, seen)]
+    answer = [Answer(open_id, seen)]
     return _answer(session, signed, answer, query(only), page=_page(page))
 
 
@@ -343,13 +383,13 @@ def answer_ticked(
     for row in rows:
         seen = ticked[str(row.id)]
         if do == "leave":
-            answers.append((row.id, None, 0, seen))
+            answers.append(Answer(row.id, seen))
         elif row.length_reported is not None:
             # As of the report: a cut since leaves it to check again.
             # Set with it, reported with it (ck_open_package_length_reported_by).
             assert row.length_reported_in_id is not None
             answers.append(
-                (row.id, row.length_reported, row.length_reported_in_id, seen)
+                Answer(row.id, seen, row.length_reported, row.length_reported_in_id)
             )
         else:
             unsaid += 1
