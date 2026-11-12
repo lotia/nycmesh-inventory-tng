@@ -30,8 +30,10 @@ really has, as a count does, or leave it as it shows.</p>
         <input type="hidden" name="as_of" value="{{ each.as_of }}">
         <input type="hidden" name="seen" value="{{ each.seen }}">
         <input type="hidden" name="page" value="{{ all_path }}">
+        {% set hint = shown.unit | printed_length %}
         <label>Really on it ({{ shown.unit }})
-          <input name="left" inputmode="decimal" value="{{ row.length_reported | amount if row.length_reported is not none else '' }}"></label>
+          <input name="left" inputmode="decimal" value="{{ row.length_reported | amount if row.length_reported is not none else '' }}"{% if hint %} aria-describedby="hint-{{ row.id }}"{% endif %}></label>
+        {% if hint %}<p class="hint" id="hint-{{ row.id }}">{{ hint }}</p>{% endif %}
         <button>Set to it<span class="sr-only"> {{ shown.item }} at {{ shown.place }}</span></button>
         <button formaction="{{ here }}/{{ row.id }}/leave{{ query }}">Leave it<span class="sr-only"> {{ shown.item }} at {{ shown.place }}</span></button>
       </form>

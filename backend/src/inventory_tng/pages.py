@@ -42,6 +42,25 @@ def retired_holding(places: int) -> str:
 templates.env.filters["retired_holding"] = retired_holding
 
 
+# One wording, wherever what is on an open package is typed: the count
+# page, the length checks and the scan page (frontend/src/OpenPackageCard.tsx),
+# which a test keeps the same (docs/decisions/0020, 2026-11-12;
+# inventory-tng-pg7).
+PRINTED_LENGTH = (
+    "Read the length printed on the cable where it leaves the spool. If it "
+    "counts up from the start, what's left is the package size minus the mark."
+)
+
+
+def printed_length(unit: str) -> str:
+    """How to read the length printed on an open package of an item in
+    `unit`, if it is a length (any but each, models.UNITS); else nothing."""
+    return PRINTED_LENGTH if unit != "each" else ""
+
+
+templates.env.filters["printed_length"] = printed_length
+
+
 class Badge(NamedTuple):
     """A number beside a section in the navigation: how many things to put
     right there, and what they are, for a screen reader."""

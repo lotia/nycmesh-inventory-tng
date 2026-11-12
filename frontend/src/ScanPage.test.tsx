@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
 import { openCamera } from "./camera";
 import { STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
+import { PRINTED_LENGTH } from "./OpenPackageCard";
 import { Outbox } from "./outbox";
 import { ScanPage } from "./ScanPage";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
@@ -242,6 +243,11 @@ describe("filling and saving a cart", () => {
     const field = screen.getByLabelText(now) as HTMLInputElement;
     fireEvent.input(field, { target: { value: "90" } });
     expect(field.value).toBe("90");
+    // In metres: how to read the length printed on it (inventory-tng-pg7).
+    const hint = document.getElementById(
+      field.getAttribute("aria-describedby") ?? "",
+    );
+    expect(hint?.textContent).toBe(PRINTED_LENGTH);
   });
 
   test("a cut leaving less than the package's short length ticks the box", async () => {

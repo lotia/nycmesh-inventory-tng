@@ -18,6 +18,13 @@ import { decimal } from "./quantity";
 
 type Taken = NonNullable<Line["open"]>[string];
 
+/** How to read the length printed along an open package of an item in a
+ * length (any unit but each), in the words the count page uses
+ * (pages.PRINTED_LENGTH, which a backend test keeps the same;
+ * inventory-tng-pg7). */
+export const PRINTED_LENGTH =
+  "Read the length printed on the cable where it leaves the spool. If it counts up from the start, what's left is the package size minus the mark.";
+
 /** Nothing taken yet. */
 export const NOTHING_TAKEN: Taken = { amount: "", whole: false };
 
@@ -71,7 +78,9 @@ export function OpenPackageCard({
 }) {
   const nowId = useId();
   const afterId = useId();
+  const hintId = useId();
   const unit = item.unit;
+  const printed = unit !== "each";
   const word = packageWord(open);
   const cut = cutOf(open, taken);
   const usedUp = usedUpOf(open, taken);
@@ -154,14 +163,22 @@ export function OpenPackageCard({
           label={`What's on the ${word} ${cut === null ? "now" : "after this cut"} (${unit}), if you can tell`}
         >
           {(id) => (
-            <input
-              id={id}
-              inputMode="decimal"
-              value={taken.now ?? ""}
-              onInput={(event) =>
-                onTake({ ...taken, now: event.currentTarget.value })
-              }
-            />
+            <>
+              <input
+                id={id}
+                inputMode={printed ? "decimal" : "numeric"}
+                aria-describedby={printed ? hintId : undefined}
+                value={taken.now ?? ""}
+                onInput={(event) =>
+                  onTake({ ...taken, now: event.currentTarget.value })
+                }
+              />
+              {printed && (
+                <small id={hintId} class="hint">
+                  {PRINTED_LENGTH}
+                </small>
+              )}
+            </>
           )}
         </Field>
       ) : (
