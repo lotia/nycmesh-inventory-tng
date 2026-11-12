@@ -1,7 +1,8 @@
 """What models.fold made of a wide sample of text, kept in
-tests/fold_reference.tsv, so a release of anyascii that spells something
-otherwise fails test_fold_reference with the difference, rather than
-leaving rows folded the old way (docs/decisions/0021, 2026-11-12).
+tests/fold_reference.tsv, so a release of anyascii, or a Python with a
+newer Unicode, that spells something otherwise fails test_fold_reference
+with the difference, rather than leaving rows folded the old way
+(docs/decisions/0021, 2026-11-12).
 
 Run from backend/, to write the file again, or with --check to compare
 only, writing nothing, and exit 1 with the difference if it is stale:
@@ -107,11 +108,11 @@ def folded(text: str) -> str:
 
 def reference() -> str:
     """The file, as fold folds now. Its first line names anyascii's version
-    and Python's Unicode's, which says what characters there are."""
+    and Python's Unicode's (FOLDED_WITH): which characters there are, and
+    what NFKC makes of them."""
     lines = [
-        f"# models.fold, with {FOLDED_WITH}, Unicode "
-        + f"{unicodedata.unidata_version}: each input, its code point, what it "
-        + f"folds to (∅: nothing). Written by {COMMANDS}."
+        f"# models.fold, with {FOLDED_WITH}: each input, its code point, what "
+        + f"it folds to (∅: nothing). Written by {COMMANDS}."
     ]
     lines += [
         f"{shown(each)}\tU+{ord(each):04X}\t{folded(each)}" for each in characters()

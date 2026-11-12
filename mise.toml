@@ -84,7 +84,7 @@ run = [
 ]
 
 [tasks.regenerate-fold-reference]
-description = "Write tests/fold_reference.tsv again, after a release of anyascii changes how it folds (CONTRIBUTING.md)"
+description = "Write tests/fold_reference.tsv again, after a release of anyascii, or a Python with a newer Unicode, changes how it folds (CONTRIBUTING.md)"
 dir = "backend"
 run = "uv run python -m tests.helpers.fold_reference"
 

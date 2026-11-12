@@ -1,7 +1,8 @@
 """models.fold spells the sample in tests/fold_reference.tsv as it did
-when the file was written, so a release of anyascii that spells something
-otherwise fails here, not in searches that stop matching rows folded the
-old way (docs/decisions/0021, 2026-11-12)."""
+when the file was written, so a release of anyascii, or a Python with a
+newer Unicode, that spells something otherwise fails here, not in
+searches that stop matching rows folded the old way
+(docs/decisions/0021, 2026-11-12)."""
 
 from pathlib import Path
 

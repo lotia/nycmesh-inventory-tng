@@ -7,23 +7,23 @@
 ¥	U+00A5	Y
 ¦	U+00A6	|
 §	U+00A7	S
-¨	U+00A8	"
+¨	U+00A8	\x20
 ©	U+00A9	(C)
 ª	U+00AA	a
 «	U+00AB	<<
 ¬	U+00AC	!
 \xad	U+00AD	∅
 ®	U+00AE	(R)
-¯	U+00AF	-
+¯	U+00AF	\x20
 °	U+00B0	deg
 ±	U+00B1	+-
 ²	U+00B2	2
 ³	U+00B3	3
-´	U+00B4	'
-µ	U+00B5	u
+´	U+00B4	\x20
+µ	U+00B5	m
 ¶	U+00B6	P
 ·	U+00B7	-
-¸	U+00B8	,
+¸	U+00B8	\x20
 ¹	U+00B9	1
 º	U+00BA	o
 »	U+00BB	>>
@@ -158,8 +158,8 @@
 ļ	U+013C	l
 Ľ	U+013D	L
 ľ	U+013E	l
-Ŀ	U+013F	L
-ŀ	U+0140	l
+Ŀ	U+013F	L-
+ŀ	U+0140	l-
 Ł	U+0141	L
 ł	U+0142	l
 Ń	U+0143	N
@@ -439,16 +439,16 @@
 ͵	U+0375	,
 Ͷ	U+0376	W
 ͷ	U+0377	w
-ͺ	U+037A	i
+ͺ	U+037A	\x20
 ͻ	U+037B	s
 ͼ	U+037C	s.
 ͽ	U+037D	s.
 ;	U+037E	;
 Ϳ	U+037F	J
-΄	U+0384	'
-΅	U+0385	"'
+΄	U+0384	\x20
+΅	U+0385	\x20
 Ά	U+0386	A
-·	U+0387	;
+·	U+0387	-
 Έ	U+0388	E
 Ή	U+0389	I
 Ί	U+038A	I
@@ -518,12 +518,12 @@
 ύ	U+03CD	y
 ώ	U+03CE	o
 Ϗ	U+03CF	&
-ϐ	U+03D0	b
+ϐ	U+03D0	v
 ϑ	U+03D1	th
 ϒ	U+03D2	Y
 ϓ	U+03D3	Y
 ϔ	U+03D4	Y
-ϕ	U+03D5	ph
+ϕ	U+03D5	f
 ϖ	U+03D6	p
 ϗ	U+03D7	&
 Ϙ	U+03D8	Q
@@ -845,7 +845,7 @@
 —	U+2014	-
 ―	U+2015	-
 ‖	U+2016	||
-‗	U+2017	_
+‗	U+2017	\x20
 ‘	U+2018	'
 ’	U+2019	'
 ‚	U+201A	'
@@ -884,7 +884,7 @@
 ※	U+203B	*
 ‼	U+203C	!!
 ‽	U+203D	!?
-‾	U+203E	-
+‾	U+203E	\x20
 ‿	U+203F	_
 ⁀	U+2040	-
 ⁁	U+2041	^
@@ -970,13 +970,13 @@
 ℀	U+2100	a/c
 ℁	U+2101	a/s
 ℂ	U+2102	C
-℃	U+2103	C
+℃	U+2103	degC
 ℄	U+2104	CL
 ℅	U+2105	c/o
 ℆	U+2106	c/u
 ℇ	U+2107	E
 ℈	U+2108	g
-℉	U+2109	F
+℉	U+2109	degF
 ℊ	U+210A	g
 ℋ	U+210B	H
 ℌ	U+210C	H
@@ -1005,7 +1005,7 @@
 ℣	U+2123	V
 ℤ	U+2124	Z
 ℥	U+2125	oz
-Ω	U+2126	Ohm
+Ω	U+2126	O
 ℧	U+2127	Mho
 ℨ	U+2128	Z
 ℩	U+2129	i
@@ -1020,8 +1020,8 @@
 Ⅎ	U+2132	F
 ℳ	U+2133	M
 ℴ	U+2134	o
-ℵ	U+2135	a
-ℶ	U+2136	b
+ℵ	U+2135	'
+ℶ	U+2136	v
 ℷ	U+2137	g
 ℸ	U+2138	d
 ℹ	U+2139	i
@@ -1060,7 +1060,7 @@ è́̂	string	e
 ﬁber ﬂoor ﬀ ﬃ ﬄ	string	fiber floor ff ffi ffl
 ｃａｆｅ ＡＢ１２	string	cafe AB12
 １０ｍ ＲＪ４５	string	10m RJ45
-10µF 10μF	string	10uF 10mF
+10µF 10μF	string	10mF 10mF
 ½ ¼ ¾ in	string	1/2 1/4 3/4 in
 2×4 30° ±5%	string	2*4 30deg +-5%
 Москва кабель	string	Moskva kabel'
@@ -1080,5 +1080,5 @@ Kraków Gdańsk	string	Krakow Gdansk
 Reykjavík Þór	string	Reykjavik Thor
 “Quoted” ‘single’ — dash – en …\x20	string	"Quoted" 'single' - dash - en ...\x20
 Cat6 😀 ok	string	Cat6 :grinning: ok
-™ ® © № ℃	string	TM (R) (C) No C
+™ ® © № ℃	string	TM (R) (C) No degC
 €5 £3 ¥7 ₿1 ₹2	string	EUR5 GBP3 Y7 BTC1 Rs2

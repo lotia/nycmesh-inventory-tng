@@ -28,6 +28,7 @@ catalogue's rules (docs/decisions/0016).
 
 import importlib.metadata
 import secrets
+import unicodedata
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -198,15 +199,21 @@ def holds(column: SQLColumnExpression[str], search: str) -> ColumnElement[bool]:
 
 def fold(text: str) -> str:
     """`text` as searches compare it: in ASCII, as anyascii spells it, so
-    "cafe" finds "Café" and "lodz" "Łódź" (docs/decisions/0021, 2026-11-12).
-    What is searched is kept folded (Searchable); what is typed is folded
-    before it is compared."""
-    return anyascii(text)
+    "cafe" finds "Café" and "lodz" "Łódź" (docs/decisions/0021, 2026-11-12),
+    after compatibility characters are made their canonical ones (NFKC), so
+    the micro sign in "µF" is spelt as the Greek "μF" is. What is searched
+    is kept folded (Searchable); what is typed is folded before it is
+    compared."""
+    return anyascii(unicodedata.normalize("NFKC", text))
 
 
 # What folds (fold), as each folded row records it (Searchable.folded_with),
-# so rows a release of anyascii would spell otherwise can be found.
-FOLDED_WITH = f"anyascii {importlib.metadata.version('anyascii')}"
+# so rows a release of anyascii, or a Python with a newer Unicode, would
+# spell otherwise can be found.
+FOLDED_WITH = (
+    f"anyascii {importlib.metadata.version('anyascii')}, "
+    f"Unicode {unicodedata.unidata_version}"
+)
 
 
 class Searchable:

@@ -1,11 +1,12 @@
 """each searchable row records what folded it: folded_with, such as
-"anyascii 0.3.3" (inventory-tng-7u4)
+"anyascii 0.3.3, Unicode 17.0.0" (inventory-tng-7u4, inventory-tng-gfe)
 
-So rows a release of anyascii spells otherwise can be found and folded
-again (docs/decisions/0021, 2026-11-12). The rows there are are folded
-again here, as the app folds them (models.Searchable), with the anyascii
-installed as this runs, and record it: so what each says folded it did,
-whichever anyascii folded it in 0032.
+So rows a release of anyascii, or a Python with a newer Unicode, spells
+otherwise can be found and folded again (docs/decisions/0021,
+2026-11-12). The rows there are are folded again here, as the app folds
+them (models.Searchable), with the anyascii and Python installed as this
+runs, and record it: so what each says folded it did, whichever folded
+it in 0032.
 
 Revision ID: 0033
 Revises: 0032
@@ -13,6 +14,7 @@ Create Date: 2026-11-12 15:00:00
 """
 
 import importlib.metadata
+import unicodedata
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -41,7 +43,11 @@ GRANTED = ("location", "item_package")
 
 
 def upgrade() -> None:
-    folded_with = f"anyascii {importlib.metadata.version('anyascii')}"
+    # models.FOLDED_WITH's, written out.
+    folded_with = (
+        f"anyascii {importlib.metadata.version('anyascii')}, "
+        f"Unicode {unicodedata.unidata_version}"
+    )
     for table, columns in FOLDED.items():
         op.add_column(table, sa.Column("folded_with", sa.Text(), nullable=True))
         _fold(table, columns, folded_with)
@@ -59,7 +65,12 @@ def _fold(table: str, columns: dict[str, tuple[str, ...]], folded_with: str) -> 
             "id": row["id"],
             "folded_with": folded_with,
             **{
-                column: anyascii(" ".join(row[field] or "" for field in fields))
+                # models.fold's, written out.
+                column: anyascii(
+                    unicodedata.normalize(
+                        "NFKC", " ".join(row[field] or "" for field in fields)
+                    )
+                )
                 for column, fields in columns.items()
             },
         }
