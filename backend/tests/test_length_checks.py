@@ -8,7 +8,7 @@ from functools import partial
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import event, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, open_packages, pages
@@ -21,9 +21,10 @@ from inventory_tng.models import (
     OpenPackage,
 )
 
+from helpers.queries import counting
 from helpers.rows import add, tag
 from helpers.sign_in import text
-from helpers.stock import Spools
+from helpers.stock import Spools, cut, length, report
 
 URL = "/api/transactions"
 LENGTHS = "/admin/stock/length-checks"
@@ -32,24 +33,6 @@ LENGTHS = "/admin/stock/length-checks"
 @pytest.fixture
 def spools(session: Session) -> Spools:
     return Spools(session)
-
-
-def length(made: OpenPackage, left: str) -> dict[str, str]:
-    return {"open_package_key": str(made.key), "left": left}
-
-
-def report(spools: Spools, *lengths: dict[str, str]) -> dict[str, object]:
-    return spools.place.batch(
-        kind="report", to_location_id=None, lines=[], lengths=list(lengths)
-    )
-
-
-def cut(made: OpenPackage, quantity: str) -> dict[str, str]:
-    return {
-        "item_id": str(made.item_id),
-        "quantity": quantity,
-        "open_package_key": str(made.key),
-    }
 
 
 def left_on(session: Session, made: OpenPackage) -> Decimal:
@@ -529,47 +512,28 @@ def test_a_place_with_no_saves_is_at_nothing(session: Session, spools: Spools) -
     assert ledger.moment(session, spools.van.id) == 0
 
 
-def test_the_page_reads_alike_for_one_package_or_ten_and_locks_nothing(
+def test_the_page_locks_nothing(
     admin_client: TestClient,
     registered_client: TestClient,
     session: Session,
     spools: Spools,
 ) -> None:
-    """One query of recent cuts for all, and each place's latest
-    transaction read, not locked (inventory-tng-a34)."""
-
-    def statements() -> list[str]:
-        sent: list[str] = []
-
-        def keep(_c: object, _cur: object, statement: str, *_: object) -> None:
-            sent.append(statement)
-
-        connection = session.connection()
-        event.listen(connection, "before_cursor_execute", keep)
-        assert admin_client.get(LENGTHS).status_code == 200
-        event.remove(connection, "before_cursor_execute", keep)
-        return sent
-
-    def check(count: int) -> None:
-        for _ in range(count):
-            made = spools.opened()
-            registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "1")]))
-            registered_client.post(URL, json=report(spools, length(made, "250")))
-            # Half of them moved whole to the van: a place more to read.
-            if count > 1 and made.id % 2:
-                registered_client.post(
-                    URL,
-                    json=spools.place.batch(lines=[cut(made, "304") | {"whole": True}]),
-                )
-
-    check(1)
-    one = statements()
-    check(9)
+    """Each place's latest transaction read, not locked (inventory-tng-a34);
+    that it reads alike for one package or eleven is test_query_counts'."""
+    for whole in (False, True):
+        made = spools.opened()
+        registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "1")]))
+        registered_client.post(URL, json=report(spools, length(made, "250")))
+        if whole:
+            # Moved whole to the van: a place more to read.
+            moved = cut(made, "304") | {"whole": True}
+            registered_client.post(URL, json=spools.place.batch(lines=[moved]))
     at_van = select(OpenPackage).where(OpenPackage.location_id == spools.van.id)
     assert session.scalars(at_van).first() is not None
-    ten = statements()
-    assert len(ten) == len(one)
-    assert not [each for each in ten if " FOR " in each]
+    with counting(session) as sent:
+        assert admin_client.get(LENGTHS).status_code == 200
+    assert sent
+    assert not [each for each in sent if " FOR " in each]
 
 
 def test_with_nothing_to_check_the_page_says_so(admin_client: TestClient) -> None:

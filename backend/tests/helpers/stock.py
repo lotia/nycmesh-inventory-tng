@@ -202,3 +202,24 @@ class Spools:
             "to_location_id": self.van.id,
         }
         return self.write(header, *lines)
+
+
+def length(made: OpenPackage, left: str) -> dict[str, str]:
+    """A batch's report of what is really on an open package."""
+    return {"open_package_key": str(made.key), "left": left}
+
+
+def report(spools: Spools, *lengths: dict[str, str]) -> dict[str, object]:
+    """A batch of reports alone, of `lengths`, at the spools' store."""
+    return spools.place.batch(
+        kind="report", to_location_id=None, lines=[], lengths=list(lengths)
+    )
+
+
+def cut(made: OpenPackage, quantity: str) -> dict[str, str]:
+    """A batch's line taking `quantity` from an open package, cut loose."""
+    return {
+        "item_id": str(made.item_id),
+        "quantity": quantity,
+        "open_package_key": str(made.key),
+    }
