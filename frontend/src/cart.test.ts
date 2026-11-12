@@ -1086,12 +1086,31 @@ describe("finding", () => {
     ]) {
       expect(found(typed), typed).toEqual(["Café Łódź patch"]);
     }
-    // What decomposing cannot take off, spelt otherwise: the accepted gap.
-    expect(found("łodz")).toEqual([]);
+    // A letter decomposing leaves alone, as spelt, with the accents left off.
+    expect(found("łodz")).toEqual(["Café Łódź patch"]);
     // Each word on its own: one as spelt, one folded.
     expect(found("Câbles Cafe")).toEqual(["Café Łódź patch"]);
     // The category folded by the server, as another is spelt.
     expect(found("cables")).toEqual(["Cat6 cable", "Café Łódź patch"]);
+  });
+
+  test("search ignores compatibility forms, as an IME or a paste may give them", () => {
+    expect(search(WITH_CAFE, "ｃａｆｅ").map((item) => item.name)).toEqual([
+      "Café Łódź patch",
+    ]);
+    // With no folded text from the server, so only the page's stripping
+    // finds it.
+    const name = "Ｃａｆé ﬁlter 10µF";
+    const odd = {
+      ...CATALOGUE,
+      items: [{ ...cable, id: 103, name, search_text: "" }],
+    };
+    for (const typed of ["cafe", "filter", "ﬁlter", "10µf", "10μF"]) {
+      expect(
+        search(odd, typed).map((item) => item.name),
+        typed,
+      ).toEqual([name]);
+    }
   });
 
   test("a lone accent searches for nothing", () => {
