@@ -3,7 +3,7 @@ your action (N)" (docs/decisions/0020, 2026-11-12): by kind, each kind's
 open packages one line per item, linking to its page showing only that
 item. Each kind's page takes the item as `?item=` (OnlyItem)."""
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from decimal import Decimal
 from typing import Annotated, NamedTuple
 from urllib.parse import urlencode
@@ -17,21 +17,8 @@ from inventory_tng.admin.common import row_id
 from inventory_tng.db import DbSession
 from inventory_tng.models import Item
 
-
-def plural(word: str, count: int) -> str:
-    """`count` of a package's word, made plural by English's usual rules,
-    its first letter small unless it is a name of its own, such as RJ45:
-    "3 spools", "2 boxes"."""
-    if word[1:] == word[1:].lower():
-        word = word[:1].lower() + word[1:]
-    if count != 1:
-        if word.endswith(("s", "x", "z", "ch", "sh")):
-            word += "es"
-        elif len(word) > 1 and word.endswith("y") and word[-2] not in "aeiou":
-            word = word[:-1] + "ies"
-        else:
-            word += "s"
-    return f"{count} {word}"
+# Between how many and a package's name, as an administrator reads it.
+TIMES = "\N{MULTIPLICATION SIGN}"
 
 
 class ItemWaiting(NamedTuple):
@@ -40,7 +27,7 @@ class ItemWaiting(NamedTuple):
 
     item_id: int
     item: str
-    # How many, in their package's word: "3 spools".
+    # How many of each package, by its name: 3 TIMES "Spool 305 m".
     packages: str
     count: int
     # How far below zero those showing less than nothing are, together, in
@@ -56,18 +43,15 @@ def by_item(session: Session, *where: ColumnElement[bool]) -> list[ItemWaiting]:
         grouped[each.row.item_id].append(each)
     lines = []
     for item_id, found in grouped.items():
-        # A package's word is the first of its name: "Spool 305 m" is a
-        # spool. Of packages of several words, none's is theirs.
-        words = {each.package.split(" ", 1)[0] for each in found}
-        count = len(found)
+        # Each package as named, never a word made from its name
+        # (inventory-tng-b1z): "2 TIMES Spool 305 m, 1 TIMES Box 100 m".
+        names = Counter(each.package for each in found)
         lines.append(
             ItemWaiting(
                 item_id,
                 found[0].item,
-                plural(words.pop(), count)
-                if len(words) == 1
-                else f"{count} open packages",
-                count,
+                ", ".join(f"{n} {TIMES} {name}" for name, n in sorted(names.items())),
+                len(found),
                 -sum((each.left for each in found if each.left < 0), Decimal(0)),
                 found[0].unit,
             )

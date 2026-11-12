@@ -1,12 +1,7 @@
 import { render, screen } from "@testing-library/preact";
 import { describe, expect, test } from "vitest";
 import { afterCut, cutOf, usedUpOf } from "./cart";
-import {
-  endingNote,
-  OpenPackageCard,
-  PRINTED_LENGTH,
-  packageWord,
-} from "./OpenPackageCard";
+import { endingNote, OpenPackageCard, PRINTED_LENGTH } from "./OpenPackageCard";
 import { cable, radio } from "./test-catalogue";
 
 describe("an open package's card", () => {
@@ -35,14 +30,6 @@ describe("an open package's card", () => {
     ]) {
       expect(cutOf(open, taken)).toBe(null);
     }
-  });
-
-  test("a package's word keeps a name of its own", () => {
-    const word = (name: string) => packageWord({ package_name: name });
-    expect(word("Spool")).toBe("spool");
-    expect(word("Box of 305 m")).toBe("box");
-    expect(word("UniFi Box")).toBe("UniFi");
-    expect(word("RJ45 bag")).toBe("RJ45");
   });
 
   test("things counted each are not cable", () => {
@@ -82,7 +69,7 @@ function card(
 
 test("things counted each get no hint to read a printed length", () => {
   card(radio, { amount: "", whole: false, now: "" });
-  expect(screen.getByLabelText(/^What's on the box now/)).toBeDefined();
+  expect(screen.getByLabelText(/^What's on the Box now/)).toBeDefined();
   expect(screen.queryByText(PRINTED_LENGTH)).toBeNull();
 });
 
@@ -90,7 +77,7 @@ test("an item in a length gets the hint once its field is asked for", () => {
   card(cable, { amount: "", whole: false }).unmount();
   expect(screen.queryByText(PRINTED_LENGTH)).toBeNull();
   card(cable, { amount: "", whole: false, now: "" });
-  const field = screen.getByLabelText(/^What's on the spool now/);
+  const field = screen.getByLabelText(/^What's on the Spool now/);
   expect(
     document.getElementById(field.getAttribute("aria-describedby") ?? "")
       ?.textContent,

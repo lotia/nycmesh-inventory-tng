@@ -505,34 +505,29 @@ def moment(session: Session, location_id: int) -> int:
     with a lower id. The lock is held only for the read."""
     with session.begin_nested() as reading:
         lock_place(session, location_id)
-        latest = latest_at(session, [location_id])[location_id]
+        latest = session.scalar(
+            select(func.max(LedgerTransaction.id)).where(_at_place(location_id))
+        )
         # Rolling back to the savepoint releases the lock.
         reading.rollback()
-    return latest
+    return latest or 0
 
 
-def latest_at(session: Session, location_ids: Collection[int]) -> dict[int, int]:
-    """Each place's latest ledger transaction, or 0: read, not locked, so a
-    save under way there may still commit with a lower id. What counts as
-    of it must also check what it counts is as it was read
-    (count_open_package's `showed`)."""
-    ids = list(location_ids)
-    if not ids:
-        return {}
-    sides = union_all(
-        select(
-            LedgerTransaction.to_location_id.label("place"), LedgerTransaction.id
-        ).where(LedgerTransaction.to_location_id.in_(ids)),
-        select(LedgerTransaction.from_location_id, LedgerTransaction.id).where(
-            LedgerTransaction.from_location_id.in_(ids)
-        ),
-    ).subquery()
-    latest = dict.fromkeys(ids, 0)
-    for place, newest in session.execute(
-        select(sides.c.place, func.max(sides.c.id)).group_by(sides.c.place)
-    ):
-        latest[place] = newest
-    return latest
+def left_at(session: Session, open_id: int, as_of: int) -> Decimal:
+    """What an open package showed just after the ledger transaction
+    `as_of`, wherever it was: all that went into it less all that left it,
+    to then. A save holds the open packages it names before it draws its
+    id (_hold_forms), so none naming it commits later with a lower one."""
+    into = select(func.coalesce(func.sum(Movement.quantity), 0)).where(
+        Movement.to_open_package_id == open_id, Movement.transaction_id <= as_of
+    )
+    out = select(func.coalesce(func.sum(Movement.quantity), 0)).where(
+        Movement.from_open_package_id == open_id, Movement.transaction_id <= as_of
+    )
+    came, went = session.execute(
+        select(into.scalar_subquery(), out.scalar_subquery())
+    ).one()
+    return Decimal(came) - Decimal(went)
 
 
 def _at_place(location_id: int) -> ColumnElement[bool]:
@@ -1716,47 +1711,26 @@ def count_open_package(
     admin_id: int,
     row: OpenPackage,
     left: Decimal,
-    as_of: int,
-    *,
-    showed: tuple[int, Decimal] | None = None,
-) -> bool:
-    """Put an open package right at what it really has (docs/decisions/0020,
-    2026-11-12), as a count of it at its place does (count_corrections), as
-    it stood at `as_of` (a transaction id). False if it was cut from or
-    moved since, so a later cut is never undone, or if it is no longer
-    where and at what it `showed` (place, left) when `as_of` was read,
-    unlocked (latest_at): a save under way then may commit with a lower id; a count of only this
-    package, so another's cut does not stop it, as it would a count of the
-    place. Sent again under its key, written once. RuleBroken
+    showed: Decimal,
+) -> Decimal | None:
+    """Put an open package right (docs/decisions/0020, amended by
+    inventory-tng-b1z): `left` is what it really had when it `showed`
+    this, so what it shows now moves by the difference, and a cut since
+    stays as saved. A count of only this package, at its place, so a cut of
+    another does not stop it. What it shows then; None if sent before
+    under its key, and so written once, then. RuleBroken
     (location_countable), as record_count."""
     place = row.location_id
     lock_place(session, place)
     lost_key = uuid.uuid5(key, "lost")
     if _first_sent(session, place, key, lost_key) is not None:
-        return True
+        return None
     _require_countable(session, place)
-    since = session.scalar(
-        select(func.count())
-        .select_from(Movement)
-        .where(
-            Movement.transaction_id > as_of,
-            or_(
-                Movement.from_open_package_id == row.id,
-                Movement.to_open_package_id == row.id,
-            ),
-        )
-    )
-    now = left_on(session, [row])[row.id]
-    if since or (showed is not None and showed != (row.location_id, now)):
-        log.info(
-            "open package not counted: changed since shown",
-            open_package_id=row.id,
-            moved_since=bool(since),
-        )
-        return False
+    shows = left_on(session, [row])[row.id]
+    now = shows + left - showed
     form = Form(open_package_id=row.id)
     found, lost = count_corrections(
-        [(row.item_id, form, left)], {(row.item_id, form): now}
+        [(row.item_id, form, now)], {(row.item_id, form): shows}
     )
     if found:
         _correct(
@@ -1769,7 +1743,7 @@ def count_open_package(
     if lost:
         header = {"admin_id": admin_id, "from_location_id": place}
         _correct(session, lost_key, "count", header, lost)
-    return True
+    return now
 
 
 def record_adjustment(

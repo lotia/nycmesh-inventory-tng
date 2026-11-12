@@ -1083,7 +1083,7 @@ def test_needs_your_action_until_each_report_is_answered(
     home = text(admin_client.get("/admin"))
     assert "Needs your action (1)" in home
     assert (
-        f'<a href="{USED_UP}?item={spools.cable.id}">{spools.cable.name}: 1 spool</a>'
+        f'<a href="{USED_UP}?item={spools.cable.id}">{spools.cable.name}: 1 \N{MULTIPLICATION SIGN} Spool</a>'
         in home
     )
     assert f'<a href="{USED_UP}">All 1</a>' in home
@@ -1134,8 +1134,11 @@ def test_needs_your_action_lists_each_item_and_what_is_below_zero(
     session.flush()
     home = text(admin_client.get("/admin"))
     assert "Needs your action (3)" in home
-    assert f"{spools.cable.name}: 2 spools</a>, 7 m below zero" in home
-    assert f"{other.cable.name}: 1 spool</a></li>" in home
+    assert (
+        f"{spools.cable.name}: 2 \N{MULTIPLICATION SIGN} Spool</a>, 7 m below zero"
+        in home
+    )
+    assert f"{other.cable.name}: 1 \N{MULTIPLICATION SIGN} Spool</a></li>" in home
     only = f"{USED_UP}?item={other.cable.id}"
     page = text(admin_client.get(only))
     assert f"Only {other.cable.name}." in page
@@ -1152,25 +1155,7 @@ def test_needs_your_action_lists_each_item_and_what_is_below_zero(
         assert "Only" not in shown
 
 
-@pytest.mark.parametrize(
-    ("name", "count", "words"),
-    [
-        ("Spool", 1, "1 spool"),
-        ("Spool", 3, "3 spools"),
-        ("Box", 2, "2 boxes"),
-        ("Bag", 2, "2 bags"),
-        ("RJ45", 2, "2 RJ45s"),
-        ("Battery", 2, "2 batteries"),
-        ("Tray", 2, "2 trays"),
-        ("Bus", 2, "2 buses"),
-        ("Pouch", 2, "2 pouches"),
-    ],
-)
-def test_a_packages_name_in_the_plural(name: str, count: int, words: str) -> None:
-    assert needs_action.plural(name, count) == words
-
-
-def test_an_items_packages_of_several_words_are_open_packages(
+def test_an_items_packages_are_counted_by_name(
     session: Session, spools: Spools
 ) -> None:
     reported(session, spools)
@@ -1192,8 +1177,11 @@ def test_an_items_packages_of_several_words_are_open_packages(
         ]
         return found
 
-    # Spools of two lengths are spools.
-    assert line().packages == "2 spools"
+    # By name, never a word made from it (inventory-tng-b1z).
+    assert (
+        line().packages
+        == "1 \N{MULTIPLICATION SIGN} Spool, 1 \N{MULTIPLICATION SIGN} Spool 150 m"
+    )
     reel = add(
         session, ItemPackage(item_id=spools.cable.id, name="Reel", size=Decimal(100))
     )
@@ -1202,7 +1190,11 @@ def test_an_items_packages_of_several_words_are_open_packages(
         session, [made.id], spools.place.volunteer.id, datetime.now(UTC)
     )
     session.flush()
-    assert (line().packages, line().below) == ("3 open packages", 0)
+    every = (
+        "1 \N{MULTIPLICATION SIGN} Reel, 1 \N{MULTIPLICATION SIGN} Spool,"
+        " 1 \N{MULTIPLICATION SIGN} Spool 150 m"
+    )
+    assert (line().packages, line().below) == (every, 0)
 
 
 def test_a_report_cleared_is_offered_again(
@@ -1287,12 +1279,12 @@ def test_closing_or_clearing_twice_changes_nothing_more(
 ) -> None:
     made = reported(session, spools)
     closer = add(session, Admin(username=f"closer-{tag()}"))
-    assert open_packages.close(session, 999999, closer.id, datetime.now(UTC)) is False
+    assert open_packages.close(session, 999999, closer.id, datetime.now(UTC)) is None
     assert open_packages.clear(session, made.id) is True
     assert open_packages.clear(session, made.id) is False
     first = open_packages.close(session, made.id, closer.id, datetime.now(UTC))
     again = open_packages.close(session, made.id, closer.id, datetime.now(UTC))
-    assert (first, again) == (True, False)
+    assert (first, again) == (open_packages.Closed(check_settled=False), None)
     # Ticked when no longer reported: left as it is.
     done = admin_client.post(
         USED_UP, data={"open_package": [str(made.id)], "do": "clear"}
@@ -1319,9 +1311,7 @@ def test_a_confirm_after_a_clear_closes_nothing(
     made = spools.opened()
     closer = add(session, Admin(username=f"closer-{tag()}"))
     when = datetime.now(UTC)
-    assert (
-        open_packages.close(session, made.id, closer.id, when, reported=True) is False
-    )
+    assert open_packages.close(session, made.id, closer.id, when, reported=True) is None
     assert made.closed_at is None
     assert ledger.left_on(session, []) == {}
 

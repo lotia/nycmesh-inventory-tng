@@ -80,11 +80,15 @@ test("a package opened on the scan page is saved as an opening", async ({
   await page.getByLabel(/^Box of 305 m/).fill("");
   await page.getByLabel(/^Loose/).fill("");
   // A cut of all it shows ticks the box, and says why (inventory-tng-ck0).
-  const cutBox = page.getByLabel(/^Cut or take from the box opened/);
-  const nothingLeft = page.getByLabel("Nothing usable left on this box");
+  const cutBox = page.getByLabel(/^Cut or take from the Box of 305 m opened/);
+  const nothingLeft = page.getByLabel(
+    "Nothing usable left on this Box of 305 m",
+  );
   await cutBox.fill("305");
   await expect(nothingLeft).toBeChecked();
-  await expect(page.getByText("Your cut uses up the box")).toBeVisible();
+  await expect(
+    page.getByText("Your cut uses up the Box of 305 m"),
+  ).toBeVisible();
   await cutBox.fill("20");
   await expect(nothingLeft).not.toBeChecked();
   const cutting = page.waitForResponse(
@@ -106,7 +110,7 @@ test("a package opened on the scan page is saved as an opening", async ({
   await pick(page, cable);
   await page.getByLabel(/^Box of 305 m/).fill("");
   await page.getByLabel(/^Loose/).fill("");
-  await page.getByLabel("Nothing usable left on this box").check();
+  await page.getByLabel("Nothing usable left on this Box of 305 m").check();
   const reporting = page.waitForResponse(
     (each) =>
       each.url().endsWith("/api/transactions") &&
@@ -193,7 +197,7 @@ test("what is on an open package, said, is set by an administrator", async ({
   await page.getByLabel(/^Loose/).fill("");
   await page.getByRole("button", { name: "Shows the wrong length?" }).click();
   await page
-    .getByLabel("What's on the box now (m), if you can tell")
+    .getByLabel("What's on the Box of 305 m now (m), if you can tell")
     .fill("250");
   saved = saving();
   await page.getByRole("button", { name: "Save" }).click();
@@ -204,10 +208,14 @@ test("what is on an open package, said, is set by an administrator", async ({
     lengths: [{ left: "250" }],
   });
   await page.goto("/admin");
-  await page.getByRole("link", { name: `${cable}: 1 box` }).click();
+  await page
+    .getByRole("link", { name: `${cable}: 1 \u00d7 Box of 305 m` })
+    .click();
   await expect(page.getByText("said 250 m is on it")).toBeVisible();
-  await page.getByRole("button", { name: `Set to it ${cable}` }).click();
+  await page.getByRole("button", { name: `Set to 250 m ${cable}` }).click();
   await expect(
-    page.getByText("Set: a count of each writes what it really has."),
+    page.getByText(
+      "Set: a count of each writes the difference from what it showed then; cuts since stay.",
+    ),
   ).toBeVisible();
 });

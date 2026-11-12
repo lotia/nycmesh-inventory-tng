@@ -106,20 +106,22 @@ def _answer(
     for place in sorted({row.location_id for row in rows}):
         ledger.lock_place(session, place)
     changed = 0
+    closed: list[open_packages.Closed | None] = []
     for row in sorted(rows, key=lambda each: each.id):
         if answer == "clear":
             changed += open_packages.clear(session, row.id)
             continue
-        done, broken = attempt(
+        done, _ = attempt(
             session,
             lambda row=row: open_packages.close(
                 session, row.id, signed.admin.id, now(), reported=True
             ),
         )
-        changed += bool(done) and broken is None
+        closed.append(done)
+        changed += done is not None
     session.commit()
     if answer == "confirm":
-        open_packages.measure_closed("confirmed", changed)
+        open_packages.measure_closing("confirmed", closed)
     elif changed:
         cleared.add(changed)
     log.info(
@@ -207,10 +209,10 @@ def close_directly(
     """Closed from its item's page, reported or not: nothing waits."""
     if _closable(session, item_id, open_id) is None:
         return not_found()
-    done, broken = attempt(
+    done, _ = attempt(
         session, lambda: open_packages.close(session, open_id, signed.admin.id, now())
     )
     session.commit()
-    open_packages.measure_closed("direct", int(bool(done) and broken is None))
-    notice = "open_package_closed" if done and broken is None else "used_up_unchanged"
+    open_packages.measure_closing("direct", [done])
+    notice = "open_package_closed" if done is not None else "used_up_unchanged"
     return redirect(f"{ITEMS}/{item_id}", notice=notice, section="open-packages")

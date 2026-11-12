@@ -166,8 +166,8 @@ describe("filling and saving a cart", () => {
     ...fields,
   });
 
-  const CUT = "Cut or take from the spool opened 2026-11-03 (m)";
-  const NOTHING_LEFT = "Nothing usable left on this spool";
+  const CUT = "Cut or take from the Spool opened 2026-11-03 (m)";
+  const NOTHING_LEFT = "Nothing usable left on this Spool";
   const ticked = () =>
     (screen.getByLabelText(NOTHING_LEFT) as HTMLInputElement).checked;
   const note = () =>
@@ -195,7 +195,7 @@ describe("filling and saving a cart", () => {
     fireEvent.input(field, { target: { value: "120" } });
     expect(ticked()).toBe(true);
     expect(note()).toBe(
-      "Your cut uses up the spool, so it's ticked. Untick it if cable is left. An administrator confirms.",
+      "Your cut uses up the Spool, so it's ticked. Untick it if cable is left. An administrator confirms.",
     );
     // Unticked by the volunteer: no note.
     fireEvent.click(screen.getByLabelText(NOTHING_LEFT));
@@ -206,7 +206,7 @@ describe("filling and saving a cart", () => {
     expect(within(card).getByText("30 m over")).toBeDefined();
     expect(ticked()).toBe(true);
     expect(note()).toBe(
-      "Your cut is more than the spool shows, so it's ticked. It's saved as you typed it, and an administrator will check the spool.",
+      "Your cut is more than the Spool shows, so it's ticked. It's saved as you typed it, and an administrator will check the Spool.",
     );
     // Back to a cut that leaves some: unticked again.
     fireEvent.input(field, { target: { value: "20" } });
@@ -227,12 +227,12 @@ describe("filling and saving a cart", () => {
 
   test("what is on it now: asked for when a cut passes it, or by a button", async () => {
     await cableWith(spool());
-    const now = "What's on the spool now (m), if you can tell";
+    const now = "What's on the Spool now (m), if you can tell";
     expect(screen.queryByLabelText(now)).toBeNull();
     fireEvent.input(screen.getByLabelText(CUT), { target: { value: "150" } });
     expect(
       screen.getByLabelText(
-        "What's on the spool after this cut (m), if you can tell",
+        "What's on the Spool after this cut (m), if you can tell",
       ),
     ).toBeDefined();
     fireEvent.input(screen.getByLabelText(CUT), { target: { value: "" } });
@@ -255,7 +255,7 @@ describe("filling and saving a cart", () => {
     fireEvent.input(screen.getByLabelText(CUT), { target: { value: "110" } });
     expect(ticked()).toBe(true);
     expect(note()).toBe(
-      "This spool will be unusable after this cut, so it's ticked. Untick it if you'll keep the short end.",
+      "This Spool will be unusable after this cut, so it's ticked. Untick it if you'll keep the short end.",
     );
   });
 
@@ -287,7 +287,9 @@ describe("filling and saving a cart", () => {
       screen.getByRole("group", { name: /^Old reel open opened 2026-11-03/ }),
     ).toBeDefined();
     expect(
-      screen.getByLabelText("Cut or take from the old opened 2026-11-03 (m)"),
+      screen.getByLabelText(
+        "Cut or take from the Old reel opened 2026-11-03 (m)",
+      ),
     ).toBeDefined();
   });
 
