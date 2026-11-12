@@ -165,9 +165,17 @@ class Spools:
         return Form(package_id=self.spool.id)
 
     def write(
-        self, header: Mapping[str, object], *lines: Entry
+        self, header: Mapping[str, object], *lines: Entry, key: uuid.UUID | None = None
     ) -> LedgerTransaction | None:
-        return insert_transaction(self.session, uuid.uuid4(), header, lines)
+        return insert_transaction(self.session, key or uuid.uuid4(), header, lines)
+
+    def receive(self, key: uuid.UUID, spools: int = 1) -> None:
+        """Sealed spools received into the store, under `key`."""
+        self.write(
+            {"kind": "receipt", "to_location_id": self.store.id},
+            Entry(self.cable.id, Decimal(305 * spools), LOOSE, self.sealed),
+            key=key,
+        )
 
     def opened(self) -> OpenPackage:
         """One spool opened in the store: an open package of all 305 m."""

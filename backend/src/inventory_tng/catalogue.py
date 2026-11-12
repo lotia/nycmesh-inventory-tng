@@ -6,12 +6,15 @@ and packages with stock left, which may be taken. Registered devices only,
 since it names volunteers, and those names are never logged.
 """
 
+import math
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
+from typing import Annotated
 
 import structlog
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -25,6 +28,7 @@ from inventory_tng.models import (
     Item,
     ItemPackage,
     Label,
+    LedgerTransaction,
     Location,
     OpenPackage,
     ScanSettings,
@@ -37,6 +41,9 @@ log = structlog.get_logger(__name__)
 router = APIRouter()
 
 PATH = "/catalogue"
+# Batch keys a page may ask about at once (Catalogue.saved): its outbox's
+# saved batches, which it keeps 10 of, and those still waiting.
+MOST_KEYS = 100
 
 
 class Entry(BaseModel):
@@ -57,6 +64,12 @@ class LocationEntry(Entry):
     parent_id: int | None
 
 
+class SealedAt(BaseModel):
+    location_id: int
+    # Whole packages.
+    count: int
+
+
 class PackageEntry(Entry):
     id: int
     name: str
@@ -68,9 +81,10 @@ class PackageEntry(Entry):
     # Retired, but with sealed packages left: they may be taken, never
     # received.
     retired: bool
-    # The current places with some sealed: opening its item at one of them
-    # opens this package, if it is the item's only one sealed there.
-    sealed_at: list[int]
+    # The current places with some sealed, and how many: opening its item
+    # at one of them opens this package, if it is the item's only one
+    # sealed there (the page takes off what its outbox has moved since).
+    sealed: list[SealedAt]
 
 
 class OpenPackageEntry(Entry):
@@ -128,6 +142,10 @@ class Catalogue(BaseModel):
     items: list[ItemEntry]
     labels: list[LabelEntry]
     open_packages: list[OpenPackageEntry]
+    # Of the batch keys the page asked about, those saved: what the rest of
+    # the reply shows already (with_saved), so the page takes off only what
+    # the others moved (inventory-tng-jlc).
+    saved: list[uuid.UUID] = []
 
 
 def catalogue(session: Session) -> Catalogue:
@@ -155,7 +173,13 @@ def catalogue(session: Session) -> Catalogue:
                 size=package.size,
                 track_opened=tracks_opened(item_tracks, package.track_opened),
                 retired=package.retired_at is not None,
-                sealed_at=sealed.get(package.id, []),
+                sealed=[
+                    # A part of one, as a count may leave, is one to open.
+                    SealedAt(
+                        location_id=place, count=math.ceil(quantity / package.size)
+                    )
+                    for place, quantity in sealed.get(package.id, {}).items()
+                ],
             )
         )
     # A retired item stays while it has stock, so what is left can be taken.
@@ -203,6 +227,42 @@ def catalogue(session: Session) -> Catalogue:
     )
 
 
+# Reads of the catalogue before answering one whose batches changed as it
+# was read.
+TRIES = 3
+
+
+def with_saved(session: Session, keys: Sequence[uuid.UUID]) -> Catalogue:
+    """The catalogue, and which of `keys` are saved batches, so that a batch
+    is in `saved` exactly when the stock shows it. Each read sees what was
+    committed as it began, so the keys are read before and after: a batch
+    saved before is in every read, one saved after in none. One saved
+    meanwhile, as the page's own outbox sends, is read again. Should that
+    keep happening, the keys read before are answered: the page takes off
+    such a batch twice until it asks again, which it does after a save."""
+    for _ in range(TRIES):
+        # Read again, rows too: not as the identity map kept them.
+        session.expire_all()
+        before = saved_of(session, keys)
+        reply = catalogue(session)
+        if saved_of(session, keys) == before:
+            break
+    reply.saved = sorted(before)
+    return reply
+
+
+def saved_of(session: Session, keys: Sequence[uuid.UUID]) -> set[uuid.UUID]:
+    if not keys:
+        return set()
+    return set(
+        session.scalars(
+            select(LedgerTransaction.idempotency_key).where(
+                LedgerTransaction.idempotency_key.in_(list(keys))
+            )
+        )
+    )
+
+
 def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]:
     """The open packages of these items a cart can take from: not closed,
     not reported used up, with what is left on each where it is, oldest
@@ -244,9 +304,14 @@ def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]
         }
     },
 )
-def get_catalogue(device: RegisteredDevice, session: DbSession) -> Catalogue:
-    """Everything current that a cart can hold, and who can fill one."""
-    reply = catalogue(session)
+def get_catalogue(
+    device: RegisteredDevice,
+    session: DbSession,
+    key: Annotated[list[uuid.UUID], Query(max_length=MOST_KEYS)] = [],  # noqa: B006  FastAPI copies it.
+) -> Catalogue:
+    """Everything current that a cart can hold, and who can fill one; and
+    which of the batches `key` names are saved."""
+    reply = with_saved(session, key)
     # The request line already says who asked; counts help trace a short
     # list. Never names.
     log.debug(

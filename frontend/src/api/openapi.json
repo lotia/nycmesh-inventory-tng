@@ -190,8 +190,30 @@
     "/api/catalogue": {
       "get": {
         "summary": "Get Catalogue",
-        "description": "Everything current that a cart can hold, and who can fill one.",
+        "description": "Everything current that a cart can hold, and who can fill one; and\nwhich of the batches `key` names are saved.",
         "operationId": "get_catalogue_api_catalogue_get",
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "maxItems": 100,
+              "default": [],
+              "title": "Key"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -222,13 +244,18 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "device": []
-          }
-        ]
+        }
       }
     },
     "/api/telemetry": {
@@ -413,6 +440,15 @@
             },
             "type": "array",
             "title": "Open Packages"
+          },
+          "saved": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Saved",
+            "default": []
           }
         },
         "type": "object",
@@ -798,23 +834,16 @@
             "type": "boolean",
             "title": "Retired"
           },
-          "sealed_at": {
+          "sealed": {
             "items": {
-              "type": "integer"
+              "$ref": "#/components/schemas/SealedAt"
             },
             "type": "array",
-            "title": "Sealed At"
+            "title": "Sealed"
           }
         },
         "type": "object",
-        "required": [
-          "id",
-          "name",
-          "size",
-          "track_opened",
-          "retired",
-          "sealed_at"
-        ],
+        "required": ["id", "name", "size", "track_opened", "retired", "sealed"],
         "title": "PackageEntry"
       },
       "PageError": {
@@ -942,6 +971,21 @@
         "type": "object",
         "required": ["kind", "seconds"],
         "title": "ScanToSave"
+      },
+      "SealedAt": {
+        "properties": {
+          "location_id": {
+            "type": "integer",
+            "title": "Location Id"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": ["location_id", "count"],
+        "title": "SealedAt"
       },
       "Settings": {
         "properties": {

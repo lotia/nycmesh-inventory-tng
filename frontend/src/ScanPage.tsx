@@ -12,6 +12,7 @@ import {
   freshCart,
   indexOf,
   keysAt,
+  keysToAsk,
   type Line,
   type Offered,
   offered,
@@ -20,14 +21,16 @@ import {
   RETIRED,
   SIDES,
   type Side,
+  sealedCounts,
   sealedHere,
   search,
   toBatch,
+  unseen,
   withLine,
 } from "./cart";
 import { Field } from "./Field";
 import { placeSides, readLabel, type Scanned } from "./labels";
-import { type Outbox, sharedOutbox } from "./outbox";
+import { type Entry, type Outbox, sharedOutbox } from "./outbox";
 import { decimal, thousandths } from "./quantity";
 import { NOT_REGISTERED } from "./registration";
 import { Scanner } from "./Scanner";
@@ -47,11 +50,14 @@ type Loaded =
   | { state: "unregistered"; reason: "unregistered" | "revoked" }
   | { state: "unavailable" };
 
-async function loadCatalogue(api: Api): Promise<Loaded> {
-  const reply = await check(api.GET("/api/catalogue"), {
-    200: CatalogueReply,
-    403: DeviceRefusedReply,
-  });
+/** The catalogue, asked which of the outbox's batches it shows
+ * (cart.ts, unseen). */
+async function loadCatalogue(api: Api, outbox: Outbox): Promise<Loaded> {
+  const key = keysToAsk(outbox.entries.value);
+  const reply = await check(
+    api.GET("/api/catalogue", { params: { query: { key } } }),
+    { 200: CatalogueReply, 403: DeviceRefusedReply },
+  );
   switch (reply.status) {
     case 200:
       return { state: "ready", catalogue: reply.body };
@@ -75,20 +81,43 @@ export function ScanPage({
 }) {
   const loaded = useSignal<Loaded>({ state: "loading" });
   const loadedAt = useRef(0);
+  // One refresh at a time; one asked for meanwhile follows it.
+  const asking = useRef<"no" | "yes" | "again">("no");
 
-  function load() {
-    void loadCatalogue(api).then((result) => {
+  /** Load it; again, keeping the one it has if that fails. */
+  async function fetch(again: boolean) {
+    const result = await loadCatalogue(api, outbox);
+    if (!again || result.state === "ready") {
       loaded.value = result;
       loadedAt.current = Date.now();
-    });
+    }
+  }
+
+  function load() {
+    void fetch(false);
   }
 
   useEffect(load, [api]);
 
-  // A page left open refreshes a stale catalogue; a failed refresh keeps
-  // the one it has.
+  /** Load it again, one at a time. */
+  function refresh() {
+    if (asking.current !== "no") {
+      asking.current = "again";
+      return;
+    }
+    asking.current = "yes";
+    void fetch(true).then(() => {
+      const again = asking.current === "again";
+      asking.current = "no";
+      if (again) {
+        refresh();
+      }
+    });
+  }
+
+  // A page left open refreshes a stale catalogue.
   useEffect(() => {
-    const refresh = () => {
+    const refreshStale = () => {
       const stale = Date.now() - loadedAt.current > CATALOGUE_FRESH_MS;
       if (
         document.visibilityState !== "visible" ||
@@ -97,20 +126,34 @@ export function ScanPage({
       ) {
         return;
       }
-      void loadCatalogue(api).then((result) => {
-        if (result.state === "ready") {
-          loaded.value = result;
-          loadedAt.current = Date.now();
-        }
-      });
+      refresh();
     };
-    const timer = setInterval(refresh, CHECK_EVERY_MS);
-    document.addEventListener("visibilitychange", refresh);
+    const timer = setInterval(refreshStale, CHECK_EVERY_MS);
+    document.addEventListener("visibilitychange", refreshStale);
     return () => {
       clearInterval(timer);
-      document.removeEventListener("visibilitychange", refresh);
+      document.removeEventListener("visibilitychange", refreshStale);
     };
   }, [api]);
+
+  // The outbox's batches the catalogue does not show (cart.ts, unseen).
+  const shown = loaded.value.state === "ready" ? loaded.value.catalogue : null;
+  const entries = outbox.entries.value;
+  const pending = useMemo(
+    () => (shown === null ? [] : unseen(entries, shown)),
+    [shown, entries],
+  );
+  // One saved changed stock: ask again, so what the page fills and offers
+  // follows.
+  const savedSince = pending
+    .filter((each) => each.state === "saved")
+    .map((each) => each.body.key)
+    .join();
+  useEffect(() => {
+    if (savedSince !== "") {
+      refresh();
+    }
+  }, [savedSince]);
 
   useEffect(() => {
     const stop = outbox.listen();
@@ -138,7 +181,11 @@ export function ScanPage({
         </p>
       )}
       {current.state === "ready" && (
-        <CartForm catalogue={current.catalogue} outbox={outbox} />
+        <CartForm
+          catalogue={current.catalogue}
+          pending={pending}
+          outbox={outbox}
+        />
       )}
       <OutboxList outbox={outbox} />
     </main>
@@ -147,12 +194,24 @@ export function ScanPage({
 
 function CartForm({
   catalogue,
+  pending,
   outbox,
 }: {
   catalogue: Catalogue;
+  /** The outbox's batches it does not show (cart.ts, unseen). */
+  pending: readonly Entry[];
   outbox: Outbox;
 }) {
   const store = useMemo(() => new CartStore(catalogue), []);
+  // The open packages to take from, and how many are sealed where, as the
+  // outbox's batches the catalogue does not show leave them.
+  const { opens, sealed } = useMemo(
+    () => ({
+      opens: offered(catalogue, pending),
+      sealed: sealedCounts(catalogue, pending),
+    }),
+    [catalogue, pending],
+  );
   const cart = store.cart;
   const query = useSignal("");
   const problems = useSignal<string[]>([]);
@@ -222,7 +281,7 @@ function CartForm({
     const item = indexOf(catalogue).items.get(itemId);
     const opening = packageId === undefined && cart.value.kind === "open";
     const pack = opening
-      ? sealedHere(item, cart.value.fromId)
+      ? sealedHere(item, cart.value.fromId, sealed)
       : item?.packages.find((each) => each.id === packageId);
     query.value = "";
     if (opening && pack === undefined) {
@@ -283,10 +342,7 @@ function CartForm({
       return;
     }
     // Only what the page offers to take from, where it comes from.
-    const offeredKeys = keysAt(
-      offered(catalogue, outbox.entries.value),
-      current.fromId,
-    );
+    const offeredKeys = keysAt(opens, current.fromId);
     const batch = toBatch(current, catalogue, offeredKeys);
     if ("problems" in batch) {
       problems.value = batch.problems;
@@ -312,7 +368,6 @@ function CartForm({
   }
 
   const sides = SIDES[cart.value.kind];
-  const opens = offered(catalogue, outbox.entries.value);
   const { items, volunteers } = indexOf(catalogue);
   const name =
     cart.value.volunteerId === null

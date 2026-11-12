@@ -54,8 +54,11 @@ export const PackageEntry = v.object({
   track_opened: v.boolean(),
   // Retired, with sealed ones left: taken, never received.
   retired: v.boolean(),
-  // The places with some sealed: where opening its item opens it.
-  sealed_at: v.array(id),
+  // The places with some sealed, and how many: where opening its item
+  // opens it.
+  sealed: v.array(
+    v.object({ location_id: id, count: v.pipe(id, v.minValue(1)) }),
+  ),
 });
 
 /** A package opened and followed, not reported used up (0020). */
@@ -101,4 +104,6 @@ export const Catalogue = v.object({
   items: v.array(ItemEntry),
   labels: v.array(LabelEntry),
   open_packages: v.array(OpenPackageEntry),
+  // Of the batch keys asked about, those saved, which the rest shows.
+  saved: v.array(v.pipe(v.string(), v.uuid())),
 });

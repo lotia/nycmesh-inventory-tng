@@ -1,5 +1,6 @@
 """What the scan page fills a cart from."""
 
+import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -11,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
+from inventory_tng import catalogue
 from inventory_tng.ledger import LOOSE, Entry
 from inventory_tng.models import (
     Category,
@@ -142,7 +144,7 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
             "size": 50,
             "track_opened": False,
             "retired": False,
-            "sealed_at": [],
+            "sealed": [],
         },
         {
             "id": rows.spool.id,
@@ -150,7 +152,7 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
             "size": 300,
             "track_opened": False,
             "retired": False,
-            "sealed_at": [],
+            "sealed": [],
         },
     ]
     assert cable == {
@@ -282,21 +284,79 @@ def test_a_retired_package_stays_while_some_are_sealed(
 def test_a_package_says_where_some_are_sealed(
     registered_client: TestClient, session: Session
 ) -> None:
-    """Where opening its item opens it (inventory-tng-f9h): current places
-    with some sealed, not those whose sealed ones were all opened."""
+    """Where opening its item opens it, and how many (inventory-tng-f9h,
+    jlc): current places with some sealed, not those whose sealed ones
+    were all opened."""
     spools = Spools(session)
     store, van = spools.store.id, spools.van.id
 
-    def sealed_at() -> set[int]:
+    def sealed() -> dict[int, int]:
         items = by_id(registered_client.get(URL).json()["items"])
-        return set(
-            by_id(items[spools.cable.id]["packages"])[spools.spool.id]["sealed_at"]
-        )
+        found = by_id(items[spools.cable.id]["packages"])[spools.spool.id]["sealed"]
+        return {each["location_id"]: each["count"] for each in found}
 
-    assert sealed_at() == {store}
+    assert sealed() == {store: 2}
     spools.move(Entry(spools.cable.id, Decimal(305), spools.sealed, spools.sealed))
-    assert sealed_at() == {store, van}
+    assert sealed() == {store: 1, van: 1}
     spools.opened()
-    assert sealed_at() == {van}
+    assert sealed() == {van: 1}
     retire(session, spools.van)
-    assert sealed_at() == set()
+    assert sealed() == {}
+
+
+def test_says_which_batches_asked_about_are_saved(
+    registered_client: TestClient, session: Session
+) -> None:
+    """So the page takes off only what the others moved (inventory-tng-jlc)."""
+    spools = Spools(session)
+    saved, waiting = uuid.uuid4(), uuid.uuid4()
+    spools.receive(saved)
+    reply = registered_client.get(URL, params={"key": [str(saved), str(waiting)]})
+    assert reply.json()["saved"] == [str(saved)]
+    assert registered_client.get(URL).json()["saved"] == []
+    too_many = [str(uuid.uuid4()) for _ in range(catalogue.MOST_KEYS + 1)]
+    assert registered_client.get(URL, params={"key": too_many}).status_code == 422
+
+
+def test_a_batch_saved_as_the_catalogue_is_read_reads_it_again(
+    registered_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Saved between the reads of its key, its stock may be in some reads
+    and not others: the catalogue is read again, so `saved` and the stock
+    agree."""
+    spools = Spools(session)
+    key = uuid.uuid4()
+    read = catalogue.catalogue
+    reads: list[int] = []
+
+    def saving_meanwhile(session: Session) -> catalogue.Catalogue:
+        reads.append(1)
+        if len(reads) == 1:
+            spools.receive(key)
+        return read(session)
+
+    monkeypatch.setattr(catalogue, "catalogue", saving_meanwhile)
+    reply = registered_client.get(URL, params={"key": [str(key)]}).json()
+    assert len(reads) == 2
+    assert reply["saved"] == [str(key)]
+    [cable] = [each for each in reply["items"] if each["id"] == spools.cable.id]
+    assert cable["packages"][0]["sealed"] == [
+        {"location_id": spools.store.id, "count": 3}
+    ]
+
+
+def test_batches_saved_on_every_read_answer_those_saved_first(
+    registered_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spools = Spools(session)
+    read = catalogue.catalogue
+    keys = [uuid.uuid4() for _ in range(catalogue.TRIES)]
+
+    def saving_each_time(session: Session) -> catalogue.Catalogue:
+        spools.receive(keys.pop())
+        return read(session)
+
+    asked = [str(each) for each in keys]
+    monkeypatch.setattr(catalogue, "catalogue", saving_each_time)
+    reply = registered_client.get(URL, params={"key": asked}).json()
+    assert len(reply["saved"]) == catalogue.TRIES - 1

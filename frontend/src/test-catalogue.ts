@@ -16,7 +16,7 @@ export const radio: Item = {
       size: "4.000",
       track_opened: false,
       retired: false,
-      sealed_at: [10],
+      sealed: [{ location_id: 10, count: 2 }],
     },
   ],
   retired: false,
@@ -37,7 +37,10 @@ export const cable: Item = {
       size: "305.000",
       track_opened: true,
       retired: false,
-      sealed_at: [10, 12],
+      sealed: [
+        { location_id: 10, count: 3 },
+        { location_id: 12, count: 1 },
+      ],
     },
   ],
   retired: false,
@@ -56,6 +59,7 @@ export const CATALOGUE: Catalogue = {
   ],
   items: [radio, cable],
   open_packages: [],
+  saved: [],
   labels: [
     { code: "K7QX2M", item_id: 101, package_id: 1001, location_id: null },
     { code: "B3ZT9W", item_id: 100, package_id: null, location_id: null },
