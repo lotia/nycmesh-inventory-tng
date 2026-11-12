@@ -5,6 +5,7 @@ import pytest
 from inventory_tng import settings
 from inventory_tng.settings import (
     FrontendConfig,
+    RateLimits,
     Settings,
     SettingsError,
     migration_settings,
@@ -88,6 +89,28 @@ def test_refuses_an_unclear_client_address_setting() -> None:
     environ = {"DATABASE_URL": "postgresql://db/x", "LOG_CLIENT_ADDRESS": "maybe"}
     with pytest.raises(SettingsError, match="LOG_CLIENT_ADDRESS"):
         Settings.from_environ(environ)
+
+
+def test_rate_limits_are_ten_unless_set() -> None:
+    limits = Settings.from_environ({"DATABASE_URL": URL}).rate_limits
+    assert limits == RateLimits(per_address=10, per_account=10)
+
+
+def test_reads_rate_limits() -> None:
+    environ = {
+        "DATABASE_URL": URL,
+        "RATE_LIMIT_PER_ADDRESS": " 500 ",
+        "RATE_LIMIT_PER_ACCOUNT": "40",
+    }
+    limits = Settings.from_environ(environ).rate_limits
+    assert limits == RateLimits(per_address=500, per_account=40)
+
+
+@pytest.mark.parametrize("name", ["RATE_LIMIT_PER_ADDRESS", "RATE_LIMIT_PER_ACCOUNT"])
+@pytest.mark.parametrize("value", ["0", "-1", "ten", "1.5", "\uff11", "1000001"])
+def test_refuses_a_rate_limit_that_is_no_count(name: str, value: str) -> None:
+    with pytest.raises(SettingsError, match=f"{name} must be a whole number"):
+        Settings.from_environ({"DATABASE_URL": URL, name: value})
 
 
 def test_the_suite_finds_no_build() -> None:

@@ -20,7 +20,7 @@ import segno
 import structlog
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
-from limits import RateLimitItemPerHour, RateLimitItemPerMinute
+from limits import RateLimitItem, RateLimitItemPerHour, RateLimitItemPerMinute
 from markupsafe import Markup
 from opentelemetry import metrics
 from sqlalchemy import ColumnElement, exists, func, or_, select, text, update
@@ -42,6 +42,7 @@ from inventory_tng.models import (
     mint_code,
 )
 from inventory_tng.rate_limits import limiter
+from inventory_tng.settings import RateLimits
 from inventory_tng.totp_keys import TotpKeys, Unreadable
 
 log = structlog.get_logger(__name__)
@@ -76,10 +77,17 @@ ISSUER = "NYC Mesh Inventory"
 SEEN_EVERY = timedelta(minutes=5)
 USER_AGENT_MAX = 300
 
-# Every attempt per address, and codes per administrator once their
-# password was right.
-PER_ADDRESS = RateLimitItemPerMinute(10)
-PER_ACCOUNT = RateLimitItemPerMinute(10, 15)
+
+def _per_address(limits: RateLimits) -> RateLimitItem:
+    """Every attempt per address, in a minute."""
+    return RateLimitItemPerMinute(limits.per_address)
+
+
+def _per_account(limits: RateLimits) -> RateLimitItem:
+    """Codes per administrator once their password was right, in 15
+    minutes."""
+    return RateLimitItemPerMinute(limits.per_account, 15)
+
 
 Reason = Literal["unknown_user", "bad_password", "bad_code", "rate_limited"]
 Factor = Literal["totp", "recovery", "password"]
@@ -501,6 +509,7 @@ def sign_in(
     user_agent: str | None,
     now: datetime,
     keys: TotpKeys,
+    limits: RateLimits,
 ) -> tuple[AdminSession, str, Factor]:
     """Check all three at once and start a session, or SignInRefused. Returns
     the session, its token and the second factor used. The caller commits,
@@ -510,8 +519,8 @@ def sign_in(
     a burst sent at once cannot all slip under the limit. Codes count
     against the account too, but only once its password was right: someone
     without the password cannot lock its administrator out."""
-    limits = limiter(session)
-    if not limits.hit(PER_ADDRESS, "sign_in", address):
+    counts = limiter(session)
+    if not counts.hit(_per_address(limits), "sign_in", address):
         _refuse_sign_in("rate_limited", None)
     admin = current_admin(session, username)
     if not check_password(session, admin.id if admin else None, password):
@@ -527,7 +536,7 @@ def sign_in(
     # the second factor; with none left, nothing lets them in but the
     # operator, not the password alone.
     if authenticators or admin.must_set_up_totp:
-        if not limits.hit(PER_ACCOUNT, "code", str(admin.id)):
+        if not counts.hit(_per_account(limits), "code", str(admin.id)):
             _refuse_sign_in("rate_limited", admin)
         factor = check_second_factor(session, keys, admin.id, authenticators, code, now)
     if factor is None:
@@ -672,12 +681,13 @@ def confirm(
     *,
     recovery: bool,
     account_change: bool,
+    limits: RateLimits,
 ) -> tuple[Confirmation, Factor | None]:
     """A code (or, without TOTP, the password) for sensitive actions; not a
     recovery code unless `recovery`. Every attempt counts against the
     administrator's codes, shared with signing in, so a stolen session
     cannot guess them. Returns the outcome and the factor used."""
-    if not limiter(session).hit(PER_ACCOUNT, "code", str(row.admin_id)):
+    if not limiter(session).hit(_per_account(limits), "code", str(row.admin_id)):
         return _confirmation(row, "rate_limited"), None
     set_actor(session, f"admin:{row.admin_id}")
     factor: Factor | None = None
@@ -731,9 +741,9 @@ def setup_open(session: Session) -> bool:
 
 
 def check_setup_token(
-    session: Session, expected: str, typed: str, address: str
+    session: Session, expected: str, typed: str, address: str, limits: RateLimits
 ) -> None:
-    _check_operator_token(session, "setup", expected, typed, address)
+    _check_operator_token(session, "setup", expected, typed, address, limits)
 
 
 def _check_operator_token(
@@ -742,10 +752,11 @@ def _check_operator_token(
     expected: str,
     typed: str,
     address: str,
+    limits: RateLimits,
 ) -> None:
     """A token the operator set in the deployment's settings."""
     # Counted before it is compared, so a burst cannot slip under the limit.
-    if not limiter(session).hit(PER_ADDRESS, purpose, address):
+    if not limiter(session).hit(_per_address(limits), purpose, address):
         _refuse(purpose, "rate_limited")
     if not secrets.compare_digest(typed.strip().encode(), expected.encode()):
         _refuse(purpose, "bad_token")
@@ -1035,9 +1046,9 @@ class EmailedReset:
     token: str
 
 
-def may_ask_for_reset(session: Session, address: str) -> bool:
+def may_ask_for_reset(session: Session, address: str, limits: RateLimits) -> bool:
     """Asking by mail, per address, counted before anything else."""
-    return limiter(session).hit(PER_ADDRESS, "forgot", address)
+    return limiter(session).hit(_per_address(limits), "forgot", address)
 
 
 def emailed_reset(
@@ -1070,8 +1081,8 @@ def emailed_reset(
     return EmailedReset(admin.id, admin.email, token)
 
 
-def may_use_reset_link(session: Session, address: str) -> bool:
-    return limiter(session).hit(PER_ADDRESS, "reset", address)
+def may_use_reset_link(session: Session, address: str, limits: RateLimits) -> bool:
+    return limiter(session).hit(_per_address(limits), "reset", address)
 
 
 def find_reset_link(
@@ -1145,11 +1156,12 @@ def recover(
     address: str,
     now: datetime,
     notify: Notifier,
+    limits: RateLimits,
 ) -> str:
     """A one-use link, made with the operator's RECOVERY_TOKEN, that resets
     a current administrator's password and authenticators. Each token works
     once: its hash is kept on the link it made. Raises TokenRefused."""
-    _check_operator_token(session, "recovery", expected, typed, address)
+    _check_operator_token(session, "recovery", expected, typed, address, limits)
     token_hash = digest(typed.strip())
     if exists_where(session, ResetLink.recovery_token_hash == token_hash):
         _refuse("recovery", "used")

@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import accounts, activity, admins, devices, mail, sign_in, totp_keys
 from inventory_tng.mail import Notifier
 from inventory_tng.models import Admin, Authenticator, RegistrationCode, ResetLink
+from inventory_tng.settings import RateLimits
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.sign_in import (
@@ -365,7 +366,9 @@ def test_bringing_back_and_a_recovery_link_tell_them_too(
     notify, send = told(sent_mail)
     accounts.restore_admin(session, ben.id, ada.id, NOW, notify)
     token = "a recovery token the operator set, long"
-    accounts.recover(session, token, token, "ada", "192.0.2.90", NOW, notify)
+    accounts.recover(
+        session, token, token, "ada", "192.0.2.90", NOW, notify, RateLimits()
+    )
     send()
     assert sorted((m.to, m.kind) for m in sent_mail) == [
         ("ada@example.org", "activity"),

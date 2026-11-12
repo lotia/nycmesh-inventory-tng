@@ -1,6 +1,7 @@
 """Administrators signing in (docs/decisions/0012): setup, the one sign-in
 form, sessions, a new authenticator and confirming sensitive actions."""
 
+import dataclasses
 import html
 import itertools
 import math
@@ -30,6 +31,7 @@ from inventory_tng.models import (
     RecoveryCode,
     SignInSettings,
 )
+from inventory_tng.settings import RateLimits
 
 from helpers.sign_in import (
     PASSWORD,
@@ -233,6 +235,7 @@ def test_an_unknown_name_is_checked_against_a_password_all_the_same(
             user_agent=None,
             now=NOW,
             keys=TOTP_KEYS,
+            limits=RateLimits(),
         )
     assert len(checked) == 1
 
@@ -372,6 +375,29 @@ def test_every_attempt_counts_against_its_address(
     """Counted before checking, so a burst cannot all slip under it."""
     _, key = new_admin(session)
     for _ in range(10):
+        sign_in_with(client, "nobody")
+    assert sign_in_with(client, code=code(key)).status_code == 429
+
+
+def limited_to(
+    make_app: Callable[..., FastAPI],
+    make_client: Callable[..., TestClient],
+    limits: RateLimits,
+) -> TestClient:
+    """A client of an app whose settings set these rate limits."""
+    app = make_app()
+    app.state.settings = dataclasses.replace(app.state.settings, rate_limits=limits)
+    return make_client(app)
+
+
+def test_the_limit_per_address_is_a_setting(
+    make_app: Callable[..., FastAPI],
+    make_client: Callable[..., TestClient],
+    session: Session,
+) -> None:
+    _, key = new_admin(session)
+    client = limited_to(make_app, make_client, RateLimits(per_address=3))
+    for _ in range(3):
         sign_in_with(client, "nobody")
     assert sign_in_with(client, code=code(key)).status_code == 429
 
@@ -624,6 +650,20 @@ def test_a_rate_limited_confirmation_says_so(
     limited = client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "nope"})
     assert limited.status_code == 429
     assert "Too many tries" in alert(limited)
+
+
+def test_the_limit_per_account_is_a_setting(
+    make_app: Callable[..., FastAPI],
+    make_client: Callable[..., TestClient],
+    session: Session,
+) -> None:
+    """The code typed to sign in counts, then two wrong ones."""
+    client = limited_to(make_app, make_client, RateLimits(per_account=3))
+    signed_in_row(client, session)
+    for _ in range(2):
+        client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "nope"})
+    limited = client.post(sign_in.CONFIRM, data={sign_in.CONFIRM_FIELD: "nope"})
+    assert limited.status_code == 429
 
 
 def test_the_cookie_lasts_as_long_as_the_session(

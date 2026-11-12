@@ -47,7 +47,7 @@ from inventory_tng.models import (
     LedgerTransaction,
     OpenPackage,
 )
-from inventory_tng.settings import Settings
+from inventory_tng.settings import RateLimits, Settings
 from inventory_tng.telemetry import Telemetry, enabled
 
 from helpers.apps import on_session
@@ -369,8 +369,12 @@ def test_counts_recoveries(rolled_back: Recorded, session: Session) -> None:
     new_admin(session)
     token, now = "a recovery token the operator set, long", datetime.now(UTC)
     with pytest.raises(accounts.TokenRefused):
-        accounts.recover(session, token, "nope", "ada", "192.0.2.90", now, NO_MAIL)
-    accounts.recover(session, token, token, "ada", "192.0.2.90", now, NO_MAIL)
+        accounts.recover(
+            session, token, "nope", "ada", "192.0.2.90", now, NO_MAIL, RateLimits()
+        )
+    accounts.recover(
+        session, token, token, "ada", "192.0.2.90", now, NO_MAIL, RateLimits()
+    )
     recoveries = counted(reader, "inventory.admin.recoveries")
     assert recoveries[(("outcome", "bad_token"),)] >= 1
     assert recoveries[(("outcome", "made"),)] >= 1

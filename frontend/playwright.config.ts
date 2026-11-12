@@ -15,8 +15,7 @@ import { adminState, inRun } from "./browser-tests/prepared";
 process.env.BROWSER_RUN ??= join(tmpdir(), `inventory-browser-${process.pid}`);
 process.env.BROWSER_PORT ??= freePort();
 const base = `http://127.0.0.1:${process.env.BROWSER_PORT}`;
-// The administrator's session, signed in once for every test: signing in
-// again for each would meet the sign-in rate limit.
+// The administrator's session, signed in once for every test.
 const signedIn = adminState();
 
 // A phone's width, the narrowest the pages are made for.

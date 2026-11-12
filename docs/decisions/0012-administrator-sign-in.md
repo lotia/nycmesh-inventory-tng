@@ -225,3 +225,15 @@ PyrateLimiter's PostgreSQL bucket (a table per key, made at runtime, and a
 table lock that refuses attempts under the limit when instances meet), and
 a counter of our own without `limits` (it would change every call site and
 lose the moving window for about 50 fewer lines).
+
+## Amendment: the limits are settings (2026-11-12)
+
+The limit per address and the limit on codes per administrator are
+settings, `RATE_LIMIT_PER_ADDRESS` and `RATE_LIMIT_PER_ACCOUNT`, at 10 as
+before unless set (inventory-tng-1e3). The browser tests raise them: they
+sign in, confirm and use links from one address, many times over when
+repeated, and the shared administrator confirms for them all. A limit they
+set is plainer than one they get around, and is not waited for to break in
+some run: we rejected sending each test's administrator a made-up
+`X-Forwarded-For` address, which worked only while the server trusted the
+tests' own address, and did nothing for the limit on codes.

@@ -82,7 +82,9 @@ def forgot(
     config = request.app.state.settings.mail
     if config is None or not notify.on:
         return _forgot_page(request, status_code=404)
-    if not accounts.may_ask_for_reset(session, rate_key(request)):
+    if not accounts.may_ask_for_reset(
+        session, rate_key(request), request.app.state.settings.rate_limits
+    ):
         return _forgot_page(request, alert=TOO_MANY, status_code=429)
     site_url = config.site_url
     notify.later(lambda mailer: _email_reset(sessions, mailer, site_url, username))
@@ -143,7 +145,9 @@ def reset(
     password_again: Annotated[str, Form()] = "",
 ) -> Response:
     now = _now()
-    if not accounts.may_use_reset_link(session, rate_key(request)):
+    if not accounts.may_use_reset_link(
+        session, rate_key(request), request.app.state.settings.rate_limits
+    ):
         found = accounts.find_reset_link(session, token, now)
         problems = {"password": TOO_MANY}
         link = found[0] if found else None
@@ -212,7 +216,14 @@ def recover(
         return not_found()
     try:
         link = accounts.recover(
-            session, expected, token, username, rate_key(request), _now(), notify
+            session,
+            expected,
+            token,
+            username,
+            rate_key(request),
+            _now(),
+            notify,
+            request.app.state.settings.rate_limits,
         )
     except accounts.TokenRefused as refused:
         if refused.reason == "rate_limited":

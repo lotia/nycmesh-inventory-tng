@@ -43,6 +43,13 @@ keys, below).
   administrators (below). Without `MAIL_HOST`, none is sent.
 - `FORWARDED_ALLOW_IPS`: behind a proxy, the proxy's address, so the client
   address and scheme come from its headers.
+- `RATE_LIMIT_PER_ADDRESS`: attempts from one address in a minute at signing
+  in, setup, recovery, and asking for or using a reset link, each counted
+  apart; 10 unless set. `RATE_LIMIT_PER_ACCOUNT`: codes for one
+  administrator in 15 minutes, or their password where it stands in for
+  one, at signing in and to confirm; 10 unless set. Leave both unset in
+  production: they are raised for the browser tests, which sign in and
+  confirm many times over.
 - `LOG_FORMAT`: `json` for a log collector; the default is `console`.
 - `LOG_LEVEL`, `LOG_LEVELS`: `INFO` by default.
 - `LOG_CLIENT_ADDRESS`: `false` when the proxy logs client addresses itself.
