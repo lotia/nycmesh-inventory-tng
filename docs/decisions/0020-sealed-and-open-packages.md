@@ -52,6 +52,8 @@ deployed, so the migrations may be rewritten (0016).
   outbox has opened or taken that the catalogue does not show yet, plus
   what it brought; the catalogue says which of the outbox's batches it
   shows, and is asked for again after each save (inventory-tng-jlc).
+  A saved batch stays in the outbox, dismissed from its list or not,
+  until a catalogue shows it (inventory-tng-3p4).
   With no place picked yet, an item of one current package adds that
   package; once the place is picked or changed, every opening line the
   volunteer has not typed into is filled again by the rule above. A line

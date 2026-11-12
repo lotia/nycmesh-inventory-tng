@@ -3,7 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import { openCamera } from "./camera";
 import { STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
 import { PRINTED_LENGTH } from "./OpenPackageCard";
-import { Outbox } from "./outbox";
+import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "./outbox";
 import { ScanPage } from "./ScanPage";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
 import { fakeCamera } from "./test-camera";
@@ -888,6 +888,71 @@ describe("scanning labels with the camera", () => {
     await new Promise((done) => setTimeout(done, 0));
     expect(screen.queryByText("Couldn't load the catalogue.")).toBeNull();
     expect(screen.getByLabelText("Your name")).toBeDefined();
+  });
+
+  /** Ada's opening of the van's spool, saved and dismissed while the
+   * catalogue cannot be read again; later catalogues give `answer`. */
+  async function savedThenDismissed() {
+    const later = {
+      answer: (): Response => json({ reason: "database_unavailable" }, 503),
+    };
+    let asked = 0;
+    const { api } = answering((request) => {
+      if (!isCatalogue(request)) {
+        return saved();
+      }
+      asked += 1;
+      return asked === 1 ? json(CATALOGUE, 200) : later.answer();
+    });
+    const outbox = await opened(api);
+    await openSpoolInVan();
+    save();
+    await screen.findByText("In the inventory (transaction 77).");
+    await vi.waitFor(() => expect(asked).toBe(2));
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText(/^In the inventory/)).toBeNull();
+    const [batch] = outbox.entries.value;
+    return { api, outbox, later, key: batch?.body.key ?? "" };
+  }
+
+  /** The van's one sealed spool is taken off: opening fills none. */
+  function spoolTakenOff() {
+    find("cable");
+    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    expect(
+      (screen.getByLabelText("Spool (305 m)") as HTMLInputElement).value,
+    ).toBe("");
+  }
+
+  test("a saved batch dismissed while the catalogue cannot be read still counts, until one shows it", async () => {
+    const { outbox, later, key } = await savedThenDismissed();
+    spoolTakenOff();
+    // The next catalogue, asked for after the next save, shows it: the
+    // outbox forgets it.
+    later.answer = () => json({ ...CATALOGUE, saved: [key] }, 200);
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    // The radio's box, sealed at the hub.
+    pick("Where", "10");
+    find("beam");
+    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    save();
+    await vi.waitFor(() =>
+      expect(outbox.entries.value.map((each) => each.what)).toEqual([
+        "Opening: 1 item at Hub",
+      ]),
+    );
+  });
+
+  test("a saved batch another tab's catalogue let storage forget still counts here", async () => {
+    const { api, outbox, key } = await savedThenDismissed();
+    new Outbox(api).forgetShown([key]);
+    window.dispatchEvent(new StorageEvent("storage", { key: OUTBOX_KEY }));
+    expect(localStorage.getItem(OUTBOX_KEY)).toBe("[]");
+    expect(outbox.shown()).toEqual([]);
+    spoolTakenOff();
+    // This tab's own catalogue shows it: forgotten here too.
+    outbox.forgetShown([key]);
+    expect(outbox.entries.value).toEqual([]);
   });
 
   test("opening, an item of no package is not added", async () => {

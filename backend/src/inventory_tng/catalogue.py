@@ -42,7 +42,7 @@ router = APIRouter()
 
 PATH = "/catalogue"
 # Batch keys a page may ask about at once (Catalogue.saved): its outbox's
-# saved batches, which it keeps 10 of, and those still waiting.
+# saved batches no catalogue has shown, and those still waiting.
 MOST_KEYS = 100
 
 
