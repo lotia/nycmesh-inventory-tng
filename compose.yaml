@@ -9,9 +9,12 @@ services:
     # exec fail under crun 1.31 and later (CONTRIBUTING.md, Podman's exec bug;
     # https://github.com/podman-container-tools/podman/issues/30245).
     oom_score_adj: 200
-    # Room for the tests across processes (CONTRIBUTING.md, Running the
-    # checks) beside a running app; 100 is the default.
-    command: ["postgres", "-c", "max_connections=200"]
+    # Room for a few checkouts' test runs, apps and browser tests at once
+    # (CONTRIBUTING.md, Connections); 100 is the default. An idle connection
+    # costs a few MB, so slots are cheap. A change takes effect when the
+    # container is made again, as `mise run compose -- up -d db` does,
+    # keeping the volume.
+    command: ["postgres", "-c", "max_connections=400"]
     environment:
       # The superuser, which only makes the roles below and the tests'
       # databases: the app and migrations never log in as it.

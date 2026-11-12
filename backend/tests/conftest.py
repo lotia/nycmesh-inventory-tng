@@ -45,6 +45,7 @@ from databases import (
     migrated_as_owner,
     migrated_engine,
     new_database,
+    refused_connection,
 )
 from helpers.apps import on_session
 from helpers.categories import marked_against_its_needs, needs_database
@@ -198,6 +199,19 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
         raise pytest.UsageError(
             f"marked concurrency or end_to_end but needing no database: {wrong}"
         )
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport() -> Generator[
+    None, pytest.TestReport, pytest.TestReport
+]:
+    """A test that failed for a connection PostgreSQL refused, for a limit,
+    says which limit, and where the budget is: from its whole report, so a
+    refusal inside a group of errors, or as another's cause, is found too."""
+    report = yield
+    if report.failed and (said := refused_connection(report.longreprtext)):
+        report.sections.append(("Connection refused", said))
+    return report
 
 
 @pytest.fixture(autouse=True)
