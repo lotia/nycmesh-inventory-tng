@@ -946,7 +946,7 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
             for open_id, cut in cuts.items()
         ),
     }
-    # Asked as a cut took all it showed, or by its button, taking nothing.
+    # Said with a cut from it, or alone, taking nothing from it.
     cut = {line.open_package_key for line in batch.lines}
     how: dict[Reported, int] = {}
     for key, open_id in reports.items():

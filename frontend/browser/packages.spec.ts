@@ -80,15 +80,11 @@ test("a package opened on the scan page is saved as an opening", async ({
   await page.getByLabel(/^Box of 305 m/).fill("");
   await page.getByLabel(/^Loose/).fill("");
   // A cut of all it shows ticks the box, and says why (inventory-tng-ck0).
-  const cutBox = page.getByLabel(/^Cut or take from the box of 305 m opened/);
-  const nothingLeft = page.getByLabel(
-    "Nothing usable left on this box of 305 m",
-  );
+  const cutBox = page.getByLabel(/^Cut or take from the box opened/);
+  const nothingLeft = page.getByLabel("Nothing usable left on this box");
   await cutBox.fill("305");
   await expect(nothingLeft).toBeChecked();
-  await expect(
-    page.getByText("Your cut uses up the box of 305 m"),
-  ).toBeVisible();
+  await expect(page.getByText("Your cut uses up the box")).toBeVisible();
   await cutBox.fill("20");
   await expect(nothingLeft).not.toBeChecked();
   const cutting = page.waitForResponse(
@@ -110,7 +106,7 @@ test("a package opened on the scan page is saved as an opening", async ({
   await pick(page, cable);
   await page.getByLabel(/^Box of 305 m/).fill("");
   await page.getByLabel(/^Loose/).fill("");
-  await page.getByLabel("Nothing usable left on this box of 305 m").check();
+  await page.getByLabel("Nothing usable left on this box").check();
   const reporting = page.waitForResponse(
     (each) =>
       each.url().endsWith("/api/transactions") &&
@@ -197,7 +193,7 @@ test("what is on an open package, said, is set by an administrator", async ({
   await page.getByLabel(/^Loose/).fill("");
   await page.getByRole("button", { name: "Shows the wrong length?" }).click();
   await page
-    .getByLabel("What's on the box of 305 m now (m), if you can tell")
+    .getByLabel("What's on the box now (m), if you can tell")
     .fill("250");
   saved = saving();
   await page.getByRole("button", { name: "Save" }).click();

@@ -9,14 +9,12 @@ import {
   cutOf,
   type Ending,
   type Item,
-  type Line,
   type Offered,
+  type Taken,
   usedUpOf,
 } from "./cart";
 import { Field } from "./Field";
 import { decimal } from "./quantity";
-
-type Taken = NonNullable<Line["open"]>[string];
 
 /** How to read the length printed along an open package of an item in a
  * length (any unit but each), in the words the count page uses
@@ -28,15 +26,15 @@ export const PRINTED_LENGTH =
 /** Nothing taken yet. */
 export const NOTHING_TAKEN: Taken = { amount: "", whole: false };
 
-/** The open package's word, for "this spool": its package's name, its
- * first letter small unless the first word is a name of its own, such as
- * "UniFi" or "RJ45". */
+/** The open package's word, for "this spool": the first of its package's
+ * name ("Spool 305 m" is a spool), its first letter small unless it is a
+ * name of its own, such as "UniFi" or "RJ45"; as "Needs your action" says
+ * it (needs_action.py, by_item and plural). */
 export function packageWord(open: Pick<Offered, "package_name">): string {
-  const name = open.package_name;
-  const [first = ""] = name.split(" ");
-  return first.slice(1) === first.slice(1).toLowerCase()
-    ? name.charAt(0).toLowerCase() + name.slice(1)
-    : name;
+  const [word = ""] = open.package_name.split(" ");
+  return word.slice(1) === word.slice(1).toLowerCase()
+    ? word.charAt(0).toLowerCase() + word.slice(1)
+    : word;
 }
 
 /** The note when the box follows the cut (Ali, 2026-11-12). */

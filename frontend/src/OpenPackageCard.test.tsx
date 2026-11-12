@@ -40,9 +40,9 @@ describe("an open package's card", () => {
   test("a package's word keeps a name of its own", () => {
     const word = (name: string) => packageWord({ package_name: name });
     expect(word("Spool")).toBe("spool");
-    expect(word("Box of 305 m")).toBe("box of 305 m");
-    expect(word("UniFi Box")).toBe("UniFi Box");
-    expect(word("RJ45 bag")).toBe("RJ45 bag");
+    expect(word("Box of 305 m")).toBe("box");
+    expect(word("UniFi Box")).toBe("UniFi");
+    expect(word("RJ45 bag")).toBe("RJ45");
   });
 
   test("things counted each are not cable", () => {

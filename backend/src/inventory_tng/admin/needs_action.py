@@ -76,19 +76,26 @@ def by_item(session: Session, *where: ColumnElement[bool]) -> list[ItemWaiting]:
 
 
 class Kind(NamedTuple):
-    """A kind of decision waiting, its page, each item's waiting, and how
-    many in all."""
+    """A kind of decision, its page, and which open packages wait for it."""
 
     title: str
     path: str
+    where: tuple[ColumnElement[bool], ...]
+
+
+class Waiting(NamedTuple):
+    """A kind of decision waiting: each item's waiting, and how many in
+    all."""
+
+    kind: Kind
     items: list[ItemWaiting]
     total: int
 
 
-def kind(session: Session, title: str, path: str, *where: ColumnElement[bool]) -> Kind:
-    """The kind whose open packages `where` picks."""
-    items = by_item(session, *where)
-    return Kind(title, path, items, sum(line.count for line in items))
+def waiting(session: Session, kind: Kind) -> Waiting:
+    """What waits for a kind of decision."""
+    items = by_item(session, *kind.where)
+    return Waiting(kind, items, sum(line.count for line in items))
 
 
 def only_item(session: DbSession, item: str = "") -> Item | None:
@@ -111,17 +118,11 @@ def query_string(only: Item | None) -> str:
     return f"?{urlencode(query(only))}" if only else ""
 
 
-def needs_action(session: Session) -> list[Kind]:
+def needs_action(session: Session) -> list[Waiting]:
     """What waits for an administrator's decision, by kind, those with
     something waiting: shown on the home page until each is made."""
     # They import this.
     from inventory_tng.admin import length_checks, used_up
 
-    kinds = [
-        kind(session, used_up.TITLE, used_up.USED_UP, *used_up.REPORTED),
-        *(
-            kind(session, each.title, each.path, *each.where)
-            for each in length_checks.KINDS
-        ),
-    ]
-    return [each for each in kinds if each.items]
+    kinds = [used_up.KIND, *length_checks.KINDS]
+    return [found for kind in kinds if (found := waiting(session, kind)).items]

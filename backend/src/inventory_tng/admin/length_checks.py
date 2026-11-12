@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, open_packages
 from inventory_tng.admin.common import admin_page, quantity, row_id
-from inventory_tng.admin.needs_action import OnlyItem, query, query_string
+from inventory_tng.admin.needs_action import Kind, OnlyItem, query, query_string
 from inventory_tng.admin.stock import STOCK
 from inventory_tng.db import DbSession, RuleBroken, attempt
 from inventory_tng.local_time import site_zone
@@ -64,16 +64,9 @@ BELOW_ONLY = (BELOW, ~REPORTED, OpenPackage.reported_at.is_(None))
 CHECKED = (or_(REPORTED, and_(*BELOW_ONLY)), OPEN)
 
 
-class Kind(NamedTuple):
-    """A kind "Needs your action" shows, and its own page: a package a
-    volunteer reported is under the first, whether or not it went below
-    zero too."""
-
-    title: str
-    path: str
-    where: tuple[ColumnElement[bool], ...]
-
-
+# The kinds "Needs your action" shows, each with its own page: a package a
+# volunteer reported is under the first, whether or not it went below zero
+# too.
 KINDS = (
     Kind("Shows the wrong length", f"{LENGTHS}/reported", (REPORTED, OPEN)),
     Kind("Went below zero", f"{LENGTHS}/below-zero", (*BELOW_ONLY, OPEN)),
@@ -192,10 +185,9 @@ def kind_page(
     which: str,
 ) -> Response:
     """One kind's, as "Needs your action" links to it."""
-    kind = next((each for each in KINDS if each.path == request.url.path), None)
+    kind = next((each for each in KINDS if each.path == f"{LENGTHS}/{which}"), None)
     if kind is None:
         return not_found()
-    del which  # The path names the kind.
     return _checks_page(request, signed, session, only, kind.title, kind.where)
 
 
