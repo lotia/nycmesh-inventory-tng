@@ -26,6 +26,7 @@ the app's, checked by each table's one writer: CONTRIBUTING.md, The
 catalogue's rules (docs/decisions/0016).
 """
 
+import importlib.metadata
 import secrets
 import uuid
 from datetime import datetime
@@ -203,18 +204,26 @@ def fold(text: str) -> str:
     return anyascii(text)
 
 
+# What folds (fold), as each folded row records it (Searchable.folded_with),
+# so rows a release of anyascii would spell otherwise can be found.
+FOLDED_WITH = f"anyascii {importlib.metadata.version('anyascii')}"
+
+
 class Searchable:
     """A row a search finds: `search_text`, what it is found by (SEARCHED,
-    its name unless a model says more), spaced and folded. Kept by the app
-    as each row is added or changed (_refold), never by PostgreSQL
-    (docs/decisions/0016); migration 0032 filled the rows there were."""
+    its name unless a model says more), spaced and folded, and
+    `folded_with`, what folded it (FOLDED_WITH). Kept by the app as each row
+    is added or changed (_refold), never by PostgreSQL (docs/decisions/0016);
+    migrations 0032 and 0033 filled the rows there were."""
 
     SEARCHED: ClassVar[tuple[str, ...]] = ("name",)
     search_text: Mapped[str] = mapped_column(Text)
+    folded_with: Mapped[str] = mapped_column(Text)
 
     def refold(self) -> None:
         held = (getattr(self, field) or "" for field in self.SEARCHED)
         self.search_text = fold(" ".join(held))
+        self.folded_with = FOLDED_WITH
 
 
 # First, so the lock guard and the history see the folded columns too. A

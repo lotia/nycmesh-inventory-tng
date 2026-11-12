@@ -83,6 +83,11 @@ run = [
     "uv run pytest tests/measure_catalogue.py -p no:randomly -p no:cacheprovider -q -s",
 ]
 
+[tasks.regenerate-fold-reference]
+description = "Write tests/fold_reference.tsv again, after a release of anyascii changes how it folds (CONTRIBUTING.md)"
+dir = "backend"
+run = "uv run python -m tests.helpers.fold_reference"
+
 [tasks.check-markdown]
 description = "Lint every Markdown file the project writes (AGENTS.md rule 9)"
 run = "markdownlint-cli2"

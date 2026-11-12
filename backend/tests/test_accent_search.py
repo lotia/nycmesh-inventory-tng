@@ -2,6 +2,8 @@
 what is searched is kept folded to ASCII by the app on every save, and what
 is typed is folded alike, so "cafe" finds "Café", and the reverse."""
 
+import importlib.metadata
+
 import pytest
 from alembic import command
 from alembic.config import Config
@@ -15,6 +17,7 @@ from inventory_tng.admin.items import ITEMS, SEARCHED
 from inventory_tng.admin.listing import SEARCH_MAX, folded
 from inventory_tng.admin.volunteers import VOLUNTEERS
 from inventory_tng.models import (
+    FOLDED_WITH,
     Category,
     Item,
     ItemPackage,
@@ -64,6 +67,9 @@ def test_what_is_searched_is_folded_on_every_write(session: Session) -> None:
         "Zoe",
         "Bobine",
     )
+    # And what folded each, as installed.
+    installed = f"anyascii {importlib.metadata.version('anyascii')}"
+    assert {row.folded_with for row in (item, place, person, package)} == {installed}
 
 
 def test_a_change_to_nothing_searched_folds_nothing(
@@ -140,3 +146,8 @@ def test_rows_there_are_are_folded_by_the_migration(alembic_config: Config) -> N
         assert (
             spelt in connection.scalars(text(f"SELECT search_text FROM {table}")).all()
         ), table
+    # 0033 records what folded them, every row.
+    for table in ("item", "item_package", "volunteer", "location"):
+        assert set(
+            connection.scalars(text(f"SELECT DISTINCT folded_with FROM {table}"))
+        ) == {FOLDED_WITH}, table

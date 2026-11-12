@@ -704,6 +704,12 @@ after it.
   `0.0.z` package keeps its patch, there being no minor to name, and a series
   released only as betas, such as OpenTelemetry's instrumentation, floors at
   the minor's first beta (`>=0.66b0`).
+  A new anyascii fails `tests/test_fold_reference.py`, with the difference:
+  the file's first line names the version. If you take it, run
+  `mise run regenerate-fold-reference` (from `backend/`:
+  `uv run python -m tests.helpers.fold_reference`, and `--check` only
+  compares). If a spelling changed, also add a migration that folds again
+  the rows whose `folded_with` names the old version (docs/decisions/0021).
 - **npm packages**: `npm outdated`, then `npm update` (or `npm install
   <name>@<version>`) in `frontend/`; commit `package-lock.json`.
 - **GitHub Actions** in `.github/workflows/ci.yml`: by hand, to a release at
