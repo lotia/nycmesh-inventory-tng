@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import catalogue
+from inventory_tng.db import get_snapshot
 from inventory_tng.ledger import LOOSE, Entry
 from inventory_tng.models import (
     Category,
@@ -320,45 +321,8 @@ def test_says_which_batches_asked_about_are_saved(
     assert registered_client.get(URL, params={"key": too_many}).status_code == 422
 
 
-def test_a_batch_saved_as_the_catalogue_is_read_reads_it_again(
-    registered_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Saved between the reads of its key, its stock may be in some reads
-    and not others: the catalogue is read again, so `saved` and the stock
-    agree."""
-    spools = Spools(session)
-    key = uuid.uuid4()
-    read = catalogue.catalogue
-    reads: list[int] = []
-
-    def saving_meanwhile(session: Session) -> catalogue.Catalogue:
-        reads.append(1)
-        if len(reads) == 1:
-            spools.receive(key)
-        return read(session)
-
-    monkeypatch.setattr(catalogue, "catalogue", saving_meanwhile)
-    reply = registered_client.get(URL, params={"key": [str(key)]}).json()
-    assert len(reads) == 2
-    assert reply["saved"] == [str(key)]
-    [cable] = [each for each in reply["items"] if each["id"] == spools.cable.id]
-    assert cable["packages"][0]["sealed"] == [
-        {"location_id": spools.store.id, "count": 3}
-    ]
-
-
-def test_batches_saved_on_every_read_answer_those_saved_first(
-    registered_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    spools = Spools(session)
-    read = catalogue.catalogue
-    keys = [uuid.uuid4() for _ in range(catalogue.TRIES)]
-
-    def saving_each_time(session: Session) -> catalogue.Catalogue:
-        spools.receive(keys.pop())
-        return read(session)
-
-    asked = [str(each) for each in keys]
-    monkeypatch.setattr(catalogue, "catalogue", saving_each_time)
-    reply = registered_client.get(URL, params={"key": asked}).json()
-    assert len(reply["saved"]) == catalogue.TRIES - 1
+def test_a_snapshot_is_never_asked_for_after_a_change(session: Session) -> None:
+    """Letting go what was read first would drop it (db.get_snapshot)."""
+    session.add(Category(name=f"New {tag()}"))
+    with pytest.raises(RuntimeError, match="after a change"):
+        get_snapshot(session)
