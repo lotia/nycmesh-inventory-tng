@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import delete, literal, select, text, update
+from sqlalchemy import delete, literal, literal_column, select, text, update
 from sqlalchemy.orm import Session
 
 from inventory_tng import categories, items, labels, locations, volunteers
@@ -102,6 +102,69 @@ def test_item_names_are_unique_ignoring_case_spaces_and_punctuation(
     new_item("Cble")
     new_item("LiteBeam 5AC Gen1")
     new_item("LiteBeam 5AC Gen2")
+
+
+def test_a_decimal_point_between_digits_tells_names_apart(
+    new_item: Callable[..., Item], session: Session
+) -> None:
+    """'305 m' and '30.5 m' are two names; a point or comma anywhere else
+    is punctuation (docs/decisions/0021, 2026-11-12), for an item's
+    packages too."""
+    spool = new_item("Spool 305 m")
+    new_item("Spool 30.5 m")
+    new_item("Spool 30,5 m")
+    new_item("Spool 3.05 m")
+    for clash in ("Spool 30. 5 m", "Spool. 305 m.", "spool 30.5 m!"):
+        with violates(session, "uq_item_name"):
+            new_item(clash)
+    add(session, ItemPackage(item_id=spool.id, name="Reel 30.5 m", size=30))
+    add(session, ItemPackage(item_id=spool.id, name="Reel 305 m", size=305))
+    with violates(session, "uq_item_package_name"):
+        add(session, ItemPackage(item_id=spool.id, name="reel 30.5 m.", size=1))
+
+
+# Each compared as items' names are, and what tells them apart.
+TRICKY_NAMES = {
+    "30.5": "30.5",
+    "30,5": "30,5",
+    "3.0.5": "3.0.5",
+    "v1.2": "v1.2",
+    "1. 5": "15",
+    "1 .5": "15",
+    "1.,5": "15",
+    "1..5": "15",
+    ".5": "5",
+    "5.": "5",
+    "a.b": "ab",
+    "Spool 305 m": "spool305m",
+    "Spool 30.5 m": "spool30.5m",
+    "Tough-Cable, Pro!": "toughcablepro",
+    "Câble": "câble",
+    "...": "",
+}
+
+
+@pytest.mark.parametrize("index", ["uq_item_name", "uq_item_package_name"])
+def test_names_are_compared_alike_by_the_app_and_its_indexes(
+    session: Session, index: str
+) -> None:
+    """models.name_key, which the app asks with, and the expression each
+    migrated index keeps, written out in migration 0031, agree."""
+    indexed = session.scalar(
+        text(
+            "SELECT pg_get_expr(indexprs, indrelid) FROM pg_index"
+            " WHERE indexrelid = CAST(:index AS regclass)"
+        ),
+        {"index": index},
+    )
+    names = {"names": list(TRICKY_NAMES)}
+    each = "FROM unnest(CAST(:names AS text[])) AS name"
+    by_index = session.execute(text(f"SELECT name, {indexed} {each}"), names)
+    key = name_key(literal_column("name")).compile(
+        session.get_bind(), compile_kwargs={"literal_binds": True}
+    )
+    by_app = session.execute(text(f"SELECT name, {key} {each}"), names)
+    assert dict(by_index.all()) == dict(by_app.all()) == TRICKY_NAMES
 
 
 def test_a_custody_name_is_unique_only_among_current_ones(session: Session) -> None:

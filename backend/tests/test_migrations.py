@@ -167,6 +167,48 @@ def test_package_names_clashing_with_retired_ones_are_named_first(
     command.downgrade(alembic_config, "0029")
 
 
+def test_going_back_before_decimal_points_names_what_would_clash(
+    alembic_config: Config,
+) -> None:
+    """Migration 0031: back to a key that drops a decimal point, items and
+    packages named so are named by id to rename; nothing is renamed."""
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Cables') RETURNING id")
+    )
+
+    def item(name: str) -> int:
+        return connection.scalar(
+            text("INSERT INTO item (name, category_id) VALUES (:n, :c) RETURNING id"),
+            {"n": name, "c": category_id},
+        )
+
+    long, short = item("Spool 305 m"), item("Spool 30.5 m")
+    reel, half = (
+        connection.scalar(
+            text(
+                "INSERT INTO item_package (item_id, name, size)"
+                " VALUES (:i, :n, 1) RETURNING id"
+            ),
+            {"i": long, "n": name},
+        )
+        for name in ("Reel 1.5", "Reel 15")
+    )
+    with pytest.raises(
+        RuntimeError,
+        match=f"by id: items {long}, {short}; packages {reel}, {half}\\. Rename",
+    ):
+        command.downgrade(alembic_config, "0030")
+    connection.execute(
+        text("UPDATE item SET name = 'Spool, short' WHERE id = :i"), {"i": short}
+    )
+    connection.execute(
+        text("UPDATE item_package SET name = 'Reel, half' WHERE id = :i"), {"i": half}
+    )
+    command.downgrade(alembic_config, "0030")
+    command.upgrade(alembic_config, "head")
+
+
 def test_going_back_before_package_forms_names_what_it_cannot_hold(
     alembic_config: Config,
 ) -> None:

@@ -66,3 +66,15 @@ so admins would type half a name in each field.
   database's locale's. Under a C locale, as CloudNativePG makes by default,
   that is ASCII's: letters such as `â` are kept, but `Â` and `â` are not
   folded together.
+
+## Amendment: a decimal point tells names apart (2026-11-12)
+
+A decimal point between digits is part of a name (Ali, 2026-11-12,
+inventory-tng-0pm): `Spool 305 m` and `Spool 30.5 m` are two names, for
+items and for their packages. A comma between digits is kept too, as a
+decimal comma, so `30,5` is told apart from `305`, and from `30.5`; so,
+too, is a thousands separator: `1,000 ft` and `1000 ft` are two names,
+left to the question about close names. A point or comma anywhere else is
+punctuation as before: `1. 5`, `.5` and `v.2` lose it. `models.name_key`
+and migration 0031, which makes the indexes again, say so in one
+expression, and a test checks they agree.

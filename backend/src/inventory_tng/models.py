@@ -16,7 +16,7 @@ Conventions, on every table with history:
 - Quantities are numeric(12,3); money is numeric(10,2).
 - Names are unique, ignoring case: among current rows, or all of them,
   retired ones too, as each table says. An item's ignore spaces and
-  punctuation too (name_key).
+  punctuation too, but a point or comma between digits (name_key).
 
 A rule about one row's own values is a check constraint, which raises a
 check violation (SQLSTATE 23514) named for the rule, as describe_error()
@@ -224,15 +224,17 @@ def _unique_name(
 
 
 # What two item names may differ by and still be one name: case, spaces and
-# punctuation, so "ToughCable" and "Tough cable" clash (docs/decisions/0021).
-# Named classes, not "all but [:alnum:]": under a C locale, as CloudNativePG
-# makes by default, [:alnum:] is ASCII only, and a letter such as â would go.
-NAME_IGNORED = "[[:space:][:punct:]]+"
+# punctuation, so "ToughCable" and "Tough cable" clash (docs/decisions/0021);
+# but not a point or comma between two digits, so "305 m" and "30.5 m" do
+# not (2026-11-12). Named classes, not "all but [:alnum:]": under a C
+# locale, as CloudNativePG makes by default, [:alnum:] is ASCII only, and a
+# letter such as â would go. Migration 0031 writes it out: change both.
+NAME_IGNORED = "(?![.,](?<=[0-9][.,])(?=[0-9]))[[:space:][:punct:]]"
 
 
 def name_key(name: SQLColumnExpression[str]) -> ColumnElement[str]:
-    """`name` as item names are compared: lower case, with every run of
-    spaces and punctuation removed."""
+    """`name` as item names are compared: lower case, with every space and
+    punctuation mark removed but a point or comma between two digits."""
     return func.lower(func.regexp_replace(name, NAME_IGNORED, "", "g"))
 
 
