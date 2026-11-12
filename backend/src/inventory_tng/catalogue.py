@@ -120,10 +120,9 @@ class ItemEntry(BaseModel):
     manufacturer: str | None
     part_number: str | None
     old_code: str | None
-    # What the page finds it by (its name, maker, part number, old code and
-    # category), folded as the server's searches fold it (models.fold), so
-    # "cafe" finds "Café" with no folding on the page: only ever matched,
-    # never shown (docs/decisions/0021, 2026-11-12).
+    # Its details and category, folded as searches fold them (models.fold):
+    # matched, never shown (0021). The category is folded here, as it is
+    # read, on purpose: categories keep no folded column for so few names.
     search_text: str
     packages: list[PackageEntry]
     # Retired, but with stock left: it may be taken, never received.

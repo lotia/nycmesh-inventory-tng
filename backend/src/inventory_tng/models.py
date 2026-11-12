@@ -266,10 +266,11 @@ def _unique_name(
 # What two item names may differ by and still be one name: case, spaces and
 # punctuation, so "ToughCable" and "Tough cable" clash (docs/decisions/0021);
 # but not a decimal point between two digits, so "305 m" and "30.5 m" do
-# not, while a comma is punctuation, so "1,000 ft" and "1000 ft" do: US
-# number conventions (2026-11-12, inventory-tng-g6u.1). Named classes, not "all but [:alnum:]": under a C
-# locale, as CloudNativePG makes by default, [:alnum:] is ASCII only, and a
-# letter such as â would go. Migration 0031 writes it out: change both.
+# not; a comma is always punctuation, so "1,000 ft" and "1000 ft" clash (US
+# number conventions: 0021, 2026-11-12). Named classes, not "all but
+# [:alnum:]": under a C locale, as CloudNativePG makes by default, [:alnum:]
+# is ASCII only, and a letter such as â would go. Migration 0031 writes it
+# out: change both.
 NAME_IGNORED = "(?!(?<=[0-9])[.][0-9])[[:space:][:punct:]]"
 
 
