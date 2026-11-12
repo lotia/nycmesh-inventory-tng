@@ -261,6 +261,14 @@ A new build is picked up without restarting the backend when
 `APP_ENV=development`. Each backend says where its pages' scripts come from
 in its `frontend` log line at startup: `source=build` or `source=dev_server`.
 
+The scan page's outbox keeps its batches in `localStorage`, under a key
+with a version (`frontend/src/outbox.ts`). A change to what a stored batch
+holds, or a value a field may take, takes a new key, as a tab of the build
+before, open during a deploy, drops what it cannot read from what it writes
+back; `outbox.test.ts` lists both for the key. The new build copies the key
+before's batches into its own and sends them too, and never writes that
+key, so an older tab keeps sending and counting its own.
+
 The scan page needs a registered device, and some catalogue rows to choose
 from. The camera works only over HTTPS or on `localhost`.
 

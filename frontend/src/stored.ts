@@ -14,6 +14,16 @@ export function readStored(storage: Storage, key: string): unknown {
   }
 }
 
+/** Whether anything is stored under `key`, readable or not: a browser
+ * that refuses to say is taken to hold something. */
+export function hasStored(storage: Storage, key: string): boolean {
+  try {
+    return storage.getItem(key) !== null;
+  } catch {
+    return true;
+  }
+}
+
 /** False if the browser would not keep it. */
 export function writeStored(
   storage: Storage,
@@ -28,10 +38,14 @@ export function writeStored(
   }
 }
 
-/** Call `changed` when another tab writes `key`. Returns what stops it. */
-export function onStoredChange(key: string, changed: () => void): () => void {
+/** Call `changed` when another tab writes one of `keys`. Returns what
+ * stops it. */
+export function onStoredChange(
+  keys: readonly string[],
+  changed: () => void,
+): () => void {
   const listener = (event: StorageEvent) => {
-    if (event.key === key) {
+    if (event.key !== null && keys.includes(event.key)) {
       changed();
     }
   };
