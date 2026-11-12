@@ -13,7 +13,13 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, open_packages, pages
 from inventory_tng.local_env import CLONE
-from inventory_tng.models import Admin, LedgerTransaction, OpenPackage
+from inventory_tng.models import (
+    Admin,
+    Item,
+    ItemPackage,
+    LedgerTransaction,
+    OpenPackage,
+)
 
 from helpers.rows import add, tag
 from helpers.sign_in import text
@@ -471,13 +477,30 @@ def test_the_count_page_hints_at_the_printed_length_of_items_in_length(
     spools.opened()
     made = spools.opened()
     page = text(admin_client.get(f"/admin/counts/{store}"))
-    assert page.count(pages.PRINTED_LENGTH) == 2
+    # Each open package's, and under one nobody recorded (inventory-tng-lby).
+    assert page.count(pages.PRINTED_LENGTH) == 3
     assert f'aria-describedby="hint-opened_{made.id}"' in page
-    # Counted each, as a box of plugs: none.
+    assert 'aria-describedby="hint-found_left"' in page
+    # Beside a box of plugs, counted each: only the spool's option is one
+    # the hint fits, as the page follows what is picked.
+    plugs = add(
+        session,
+        Item(
+            name=f"Plugs {tag()}",
+            category_id=spools.cable.category_id,
+            track_opened=True,
+        ),
+    )
+    box = add(session, ItemPackage(item_id=plugs.id, name="Box", size=Decimal(100)))
+    page = admin_client.get(f"/admin/counts/{store}").text
+    assert f'<option value="{spools.spool.id}"  data-hinted>' in page
+    assert f'<option value="{box.id}" >' in page
+    # Counted each, as the plugs are: none.
     spools.cable.unit = "each"
     session.flush()
     page = text(admin_client.get(f"/admin/counts/{store}"))
     assert pages.PRINTED_LENGTH not in page
+    assert "hint-found_left" not in page
 
 
 @pytest.mark.clone

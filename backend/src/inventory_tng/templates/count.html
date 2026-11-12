@@ -74,18 +74,24 @@ if you didn't count it. Anything else here, add below.</p>
     </label>
   </fieldset>
   {% if found_packages %}
+  {#- Under what is left on one: how to read a printed length, if any
+  offered is of an item in a length (inventory-tng-lby). #}
+  {% set found_hint = found_packages | map(attribute=2) | map("printed_length") | select | first | default("") %}
   <fieldset>
     <legend>An open package nobody recorded</legend>
     <label>Package
       <select name="found_package_id">
         <option value="">None</option>
-        {% for package, name in found_packages %}<option value="{{ package.id }}" {% if values.get('found_package_id') == package.id | string %}selected{% endif %}>{{ name }}, {{ package.name }}</option>{% endfor %}
+        {% for package, name, unit in found_packages %}<option value="{{ package.id }}" {% if values.get('found_package_id') == package.id | string %}selected{% endif %}{% if unit | printed_length %} data-hinted{% endif %}>{{ name }}, {{ package.name }}</option>{% endfor %}
       </select>
       {% with name = "found_package_id" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <label>Left on it
-      <input name="found_left" inputmode="decimal" value="{{ values.get('found_left', '') }}">
+      <input name="found_left" inputmode="decimal" value="{{ values.get('found_left', '') }}"{% if found_hint %} aria-describedby="hint-found_left"{% endif %}>
       {% with name = "found_left" %}{% include "_field_problem.html" %}{% endwith %}
+      {#- Any offered of an item in a length: shown, and, in the browser,
+      only while one is picked (frontend/src/hints.ts). #}
+      {% if found_hint %}<span class="hint block" id="hint-found_left" data-hint-for="found_package_id">{{ found_hint }}</span>{% endif %}
     </label>
   </fieldset>
   {% endif %}

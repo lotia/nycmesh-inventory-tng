@@ -379,18 +379,18 @@ def _forms(
     return rows
 
 
-def _followed(session: Session) -> list[tuple[ItemPackage, str]]:
+def _followed(session: Session) -> list[tuple[ItemPackage, str, str]]:
     """Current packages of current items followed once opened, with their
-    item's name: what an open package nobody recorded may be."""
+    item's name and unit: what an open package nobody recorded may be."""
     rows = session.execute(
-        select(ItemPackage, Item.name, Item.track_opened)
+        select(ItemPackage, Item.name, Item.unit, Item.track_opened)
         .join(Item, Item.id == ItemPackage.item_id)
         .where(ItemPackage.retired_at.is_(None), Item.retired_at.is_(None))
         .order_by(func.lower(Item.name), ItemPackage.size)
     )
     return [
-        (package, name)
-        for package, name, item_tracks in rows
+        (package, name, unit)
+        for package, name, unit, item_tracks in rows
         if tracks_opened(item_tracks, package.track_opened)
     ]
 
