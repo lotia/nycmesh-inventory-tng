@@ -563,6 +563,14 @@ app's requests on them meet the lock guard (`db.protection`) as in
 production: a route that changes a row it did not lock fails its test
 (`tests/helpers/apps.py`).
 
+`tests/test_query_counts.py` loads each administrator's page, and the scan
+page's catalogue, with one row of what it lists and with eleven, and fails
+if the second sends more statements: a page reading row by row. A new GET
+route under `/admin` fails there until it has an entry in `PAGES`, saying
+how to add one more of what it lists, or in `EXEMPT`, saying why it lists
+nothing that grows. `tests/helpers/queries.py` counts a request's
+statements for a test of its own.
+
 ### Measuring the catalogue
 
 ```sh
