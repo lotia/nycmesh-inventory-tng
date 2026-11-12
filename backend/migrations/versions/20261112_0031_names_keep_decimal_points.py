@@ -1,5 +1,6 @@
-"""names keep a point or comma between two digits, so '305 m' and
-'30.5 m' are two names, for items and their packages (inventory-tng-0pm)
+"""names keep a decimal point between two digits, so '305 m' and
+'30.5 m' are two names, for items and their packages (inventory-tng-0pm);
+a comma is punctuation still, as US number conventions have it
 
 The key compares names finer than 0023's and 0030's: two names it makes one
 were one before, so no rows can clash on the way up. On the way down, rows
@@ -22,8 +23,7 @@ depends_on: str | Sequence[str] | None = None
 
 # models.name_key's, written out: migrations do not import the app.
 KEY = (
-    "lower(regexp_replace(name, "
-    "'(?![.,](?<=[0-9][.,])(?=[0-9]))[[:space:][:punct:]]', '', 'g'))"
+    "lower(regexp_replace(name, '(?!(?<=[0-9])[.][0-9])[[:space:][:punct:]]', '', 'g'))"
 )
 # 0023's and 0030's.
 BEFORE = "lower(regexp_replace(name, '[[:space:][:punct:]]+', '', 'g'))"
@@ -62,7 +62,7 @@ def downgrade() -> None:
     ]
     if clashing:
         raise RuntimeError(
-            "Names that differ only by a point or comma between digits, by "
+            "Names that differ only by a decimal point between digits, by "
             f"id: {'; '.join(clashing)}. Rename all but one in each, then "
             "downgrade again."
         )

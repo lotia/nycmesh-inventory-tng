@@ -63,7 +63,7 @@ privilege, so neither binds it.
     expressions and `num_nulls()` in CHECKs, identity columns;
   - an index on an expression with `regexp_replace` and POSIX character
     classes and lookaround, `item.name` with spaces and punctuation
-    removed but a point or comma between digits (0021);
+    removed but a decimal point between digits (0021);
   - advisory locks (the catalogue lock), `FOR KEY SHARE` and
     `FOR NO KEY UPDATE`, `LOCK TABLE ... SHARE ROW EXCLUSIVE`;
   - `INSERT ... ON CONFLICT DO NOTHING`, arrays in queries, and

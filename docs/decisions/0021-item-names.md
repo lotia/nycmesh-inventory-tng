@@ -71,13 +71,27 @@ so admins would type half a name in each field.
 
 A decimal point between digits is part of a name (Ali, 2026-11-12,
 inventory-tng-0pm): `Spool 305 m` and `Spool 30.5 m` are two names, for
-items and for their packages. A comma between digits is kept too, as a
-decimal comma, so `30,5` is told apart from `305`, and from `30.5`; so,
-too, is a thousands separator: `1,000 ft` and `1000 ft` are two names,
-left to the question about close names. A point or comma anywhere else is
-punctuation as before: `1. 5`, `.5` and `v.2` lose it. `models.name_key`
-and migration 0031, which makes the indexes again, say so in one
-expression, and a test checks they agree.
+items and for their packages, and so are `v1.2` and `v12`. Only the point
+counts, as US number conventions have it: a comma is punctuation
+wherever it is, so `Box 1,000 ft` and `Box 1000 ft` are one name. A point
+anywhere else is punctuation as before: `1. 5`, `.5` and `5.` lose it,
+and `3.0.5` keeps both. `models.name_key` and migration 0031, which makes
+the indexes again, say so in one expression, and a test checks they
+agree.
+
+**Limitation: where a comma is the decimal mark, this rule is wrong.**
+`Spool 30,5 m` clashes with `Spool 305 m`, so the save is refused and the
+admin has to type `30.5`. And `Spool 30.5 m` and `Spool 30,5 m`, or `1.000`
+and `1000`, are not caught as one name (the question about close names
+may still ask). No one fixed rule is right in both conventions. The app
+is English-only and follows US conventions today: inventory-tng-g6u
+collects what internationalisation would change, inventory-tng-g6u.1 is
+this limitation and the options for it, and inventory-tng-g6u.2 is the
+research into a fully locale-aware app.
+
+Rejected: keeping a comma between digits too, which missed `1,000` and
+`1000`, and treating a point and a comma alike, which misses thousands
+separators.
 
 ## Amendment: searches ignore accents (2026-11-12)
 
