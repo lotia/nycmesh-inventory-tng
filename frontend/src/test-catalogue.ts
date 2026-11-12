@@ -51,7 +51,7 @@ export const cable: Item = {
 };
 
 /** Accented, with its text folded as the server folds it (models.fold). */
-export const cafe: Item = {
+const cafe: Item = {
   ...cable,
   id: 102,
   name: "Café Łódź patch",
