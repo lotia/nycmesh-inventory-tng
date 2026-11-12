@@ -62,6 +62,8 @@ export const OpenPackageEntry = v.object({
   key: v.pipe(v.string(), v.uuid()),
   item_id: id,
   package_id: id,
+  // Its package's name: a retired one may no longer be in the catalogue.
+  package_name: v.string(),
   location_id: id,
   opened_at: v.string(),
   // What is left on it, in the item's unit.

@@ -78,6 +78,9 @@ class OpenPackageEntry(Entry):
     key: uuid.UUID
     item_id: int
     package_id: int
+    # Its package's name, sent here as its package may not be: a retired
+    # one with none sealed left is not (takeable_package).
+    package_name: str
     location_id: int
     opened_at: datetime
     # What is left on it, in the item's unit, as the records say.
@@ -200,8 +203,9 @@ def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]
     not reported used up, with what is left on each where it is, oldest
     first. One whose records say nothing is left is sent too, at that: it
     is where a volunteer says it is used up."""
-    rows = session.scalars(
-        select(OpenPackage)
+    found = session.execute(
+        select(OpenPackage, ItemPackage.name, ItemPackage.short_below)
+        .join(ItemPackage, ItemPackage.id == OpenPackage.package_id)
         .where(
             OpenPackage.closed_at.is_(None),
             OpenPackage.reported_at.is_(None),
@@ -209,26 +213,20 @@ def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]
         )
         .order_by(OpenPackage.opened_at, OpenPackage.id)
     ).all()
-    left = ledger.left_on(session, rows)
-    short_below = dict(
-        session.execute(
-            select(ItemPackage.id, ItemPackage.short_below).where(
-                ItemPackage.id.in_({row.package_id for row in rows})
-            )
-        ).all()
-    )
+    left = ledger.left_on(session, [row for row, *_ in found])
     return [
         OpenPackageEntry(
             id=row.id,
             key=row.key,
             item_id=row.item_id,
             package_id=row.package_id,
+            package_name=name,
             location_id=row.location_id,
             opened_at=row.opened_at,
             left=left[row.id],
-            short=is_short_end(left[row.id], short_below.get(row.package_id)),
+            short=is_short_end(left[row.id], short_below),
         )
-        for row in rows
+        for row, name, short_below in found
     ]
 
 

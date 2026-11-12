@@ -288,6 +288,7 @@ describe("turning a cart into a batch", () => {
       key: "11111111-1111-4111-8111-111111111111",
       item_id: 101,
       package_id: 1001,
+      package_name: "Spool",
       location_id: 10,
       opened_at: "2026-11-03T10:00:00Z",
       left: "120.000",
@@ -350,12 +351,34 @@ describe("turning a cart into a batch", () => {
         key: fresh,
         item_id: 101,
         package_id: 1001,
+        package_name: "Spool",
         location_id: 12,
         opened_at: "2026-11-04T09:00:00.000Z",
         left: 305000,
         short: false,
       },
     ]);
+  });
+
+  test("an opening waiting of a package the catalogue has no more is named 'package'", () => {
+    const opening: Draft = {
+      kind: "open",
+      volunteer_id: 1,
+      from_location_id: 10,
+      to_location_id: 10,
+      lines: [
+        {
+          item_id: 101,
+          quantity: "305",
+          package_id: 1009,
+          open_package_key: "33333333-3333-4333-8333-333333333333",
+        },
+      ],
+    };
+    const [made] = offered(CATALOGUE, [
+      { state: "waiting", body: opening, queuedAt: 0 },
+    ]);
+    expect(made?.package_name).toBe("package");
   });
 
   test("open packages said used up go with a cut, or alone as a report", () => {
@@ -417,6 +440,7 @@ describe("turning a cart into a batch", () => {
       key,
       item_id: 101,
       package_id: 1001,
+      package_name: "Spool",
       location_id: 10,
       opened_at: "2026-11-03T10:00:00Z",
       left: "120.000",

@@ -141,6 +141,7 @@ describe("filling and saving a cart", () => {
       key: "11111111-1111-4111-8111-111111111111",
       item_id: 101,
       package_id: 1001,
+      package_name: "Spool",
       location_id: 10,
       opened_at: "2026-11-03T10:00:00Z",
       left: "120.000",
@@ -194,6 +195,7 @@ describe("filling and saving a cart", () => {
       key: "22222222-2222-4222-8222-222222222222",
       item_id: 101,
       package_id: 1001,
+      package_name: "Spool",
       location_id: 10,
       opened_at: "2026-11-03T10:00:00Z",
       left: "12.000",
@@ -210,6 +212,37 @@ describe("filling and saving a cart", () => {
     find("cat6");
     fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
     expect(screen.getByLabelText("A short end: is it used up?")).toBeDefined();
+  });
+
+  test("an open package is named by its package, though the catalogue has it no more", async () => {
+    // A retired spool with none sealed left is not among the cable's
+    // packages, but its open one is still taken from (inventory-tng-4w4).
+    const opened = {
+      id: 7,
+      key: "55555555-5555-4555-8555-555555555555",
+      item_id: 101,
+      package_id: 1009,
+      package_name: "Old reel",
+      location_id: 10,
+      opened_at: "2026-11-03T10:00:00Z",
+      left: "40.000",
+      short: false,
+    };
+    const { api } = answering((request) =>
+      new URL(request.url).pathname === "/api/catalogue"
+        ? json({ ...CATALOGUE, open_packages: [opened] }, 200)
+        : saved(),
+    );
+    open(api);
+    await ready();
+    pick("From", "10");
+    find("cat6");
+    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    expect(
+      screen.getByLabelText(
+        "From the open Old reel: 40 m left, opened 2026-11-03",
+      ),
+    ).toBeDefined();
   });
 
   test("opening packages asks where, not from and to; an item adds its package", async () => {
