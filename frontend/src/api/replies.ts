@@ -54,6 +54,8 @@ export const PackageEntry = v.object({
   track_opened: v.boolean(),
   // Retired, with sealed ones left: taken, never received.
   retired: v.boolean(),
+  // Too short to use, if set (OpenPackageEntry).
+  short_below: v.nullable(v.string()),
   // The places with some sealed, and how many: where opening its item
   // opens it.
   sealed: v.array(
@@ -73,8 +75,8 @@ export const OpenPackageEntry = v.object({
   opened_at: v.string(),
   // What is left on it, in the item's unit.
   left: v.string(),
-  // Below its package's too-short-to-use length: a short end.
-  short: v.boolean(),
+  // Its package's too-short-to-use length, if set.
+  short_below: v.nullable(v.string()),
 });
 
 export const ItemEntry = v.object({

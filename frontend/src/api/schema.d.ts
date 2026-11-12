@@ -294,8 +294,8 @@ export interface components {
       opened_at: string;
       /** Left */
       left: string;
-      /** Short */
-      short: boolean;
+      /** Short Below */
+      short_below: string | null;
     };
     /** OutboxRetry */
     OutboxRetry: {
@@ -322,6 +322,8 @@ export interface components {
       track_opened: boolean;
       /** Retired */
       retired: boolean;
+      /** Short Below */
+      short_below: string | null;
       /** Sealed */
       sealed: components["schemas"]["SealedAt"][];
     };

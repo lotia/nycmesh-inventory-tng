@@ -774,9 +774,16 @@
             "type": "string",
             "title": "Left"
           },
-          "short": {
-            "type": "boolean",
-            "title": "Short"
+          "short_below": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Short Below"
           }
         },
         "type": "object",
@@ -789,7 +796,7 @@
           "location_id",
           "opened_at",
           "left",
-          "short"
+          "short_below"
         ],
         "title": "OpenPackageEntry",
         "description": "A package opened and followed, not reported used up: one a cart can\ntake from where it is."
@@ -834,6 +841,17 @@
             "type": "boolean",
             "title": "Retired"
           },
+          "short_below": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Short Below"
+          },
           "sealed": {
             "items": {
               "$ref": "#/components/schemas/SealedAt"
@@ -843,7 +861,15 @@
           }
         },
         "type": "object",
-        "required": ["id", "name", "size", "track_opened", "retired", "sealed"],
+        "required": [
+          "id",
+          "name",
+          "size",
+          "track_opened",
+          "retired",
+          "short_below",
+          "sealed"
+        ],
         "title": "PackageEntry"
       },
       "PageError": {

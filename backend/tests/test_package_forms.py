@@ -592,7 +592,7 @@ def test_a_package_opened_and_followed_is_made_once(
             "location_id": store,
             "opened_at": mine[0]["opened_at"],
             "left": "305.000",
-            "short": False,
+            "short_below": None,
         }
     ]
     package = next(
@@ -1318,7 +1318,9 @@ def test_a_packages_settings_are_set_on_its_items_page(
     made = spools.opened()
     spools.move(Entry(spools.cable.id, Decimal(295), Form(open_package_id=made.id)))
     listed = registered_client.get("/api/catalogue").json()["open_packages"]
-    assert [entry["short"] for entry in listed if entry["id"] == made.id] == [True]
+    assert [entry["short_below"] for entry in listed if entry["id"] == made.id] == [
+        "15.000"
+    ]
     admin_client.post(path, data={"short_below": "", "minimum_sealed": ""})
     session.refresh(spools.spool)
     assert (spools.spool.short_below, spools.spool.minimum_sealed) == (None, None)

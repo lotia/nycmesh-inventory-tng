@@ -145,6 +145,7 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
             "track_opened": False,
             "retired": False,
             "sealed": [],
+            "short_below": None,
         },
         {
             "id": rows.spool.id,
@@ -153,6 +154,7 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
             "track_opened": False,
             "retired": False,
             "sealed": [],
+            "short_below": None,
         },
     ]
     assert cable == {

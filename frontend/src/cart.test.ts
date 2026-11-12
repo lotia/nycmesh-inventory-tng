@@ -6,7 +6,6 @@ import {
   CartStore,
   freshCart,
   indexOf,
-  keysAt,
   keysToAsk,
   loadCart,
   offered,
@@ -133,6 +132,7 @@ describe("quantities", () => {
           size: "2.5",
           track_opened: false,
           retired: false,
+          short_below: null,
           sealed: [],
         },
       ],
@@ -313,7 +313,7 @@ describe("turning a cart into a batch", () => {
       location_id: 10,
       opened_at: "2026-11-03T10:00:00Z",
       left: "120.000",
-      short: false,
+      short_below: null,
     };
     const fresh = "33333333-3333-4333-8333-333333333333";
     const catalogue = { ...CATALOGUE, open_packages: [known] };
@@ -368,7 +368,6 @@ describe("turning a cart into a batch", () => {
       unseen(outbox, { ...catalogue, saved: [SHOWN] }),
     );
     expect(offeredAt(all, 101, 10)).toEqual([{ ...known, left: 100000 }]);
-    expect(keysAt(all, 12)).toEqual(new Set([fresh]));
     expect(offeredAt(all, 101, 12)).toEqual([
       {
         id: 0,
@@ -379,7 +378,7 @@ describe("turning a cart into a batch", () => {
         location_id: 12,
         opened_at: "2026-11-04T09:00:00.000Z",
         left: 305000,
-        short: false,
+        short_below: null,
       },
     ]);
   });
@@ -468,7 +467,7 @@ describe("turning a cart into a batch", () => {
       location_id: 10,
       opened_at: "2026-11-03T10:00:00Z",
       left: "120.000",
-      short: false,
+      short_below: null,
     };
     const report: Draft = {
       kind: "report",
@@ -499,10 +498,40 @@ describe("turning a cart into a batch", () => {
         },
       },
     ];
-    const batch = toBatch(cart({ lines }), CATALOGUE, new Set([shown]));
+    const here = {
+      id: 5,
+      key: shown,
+      item_id: 101,
+      package_id: 1001,
+      package_name: "Spool",
+      location_id: 10,
+      opened_at: "2026-11-03T10:00:00Z",
+      left: 120_000,
+      short_below: null,
+    };
+    // Offered elsewhere is not offered here.
+    const elsewhere = { ...here, key: gone, location_id: 12 };
+    const batch = toBatch(cart({ lines }), CATALOGUE, [here, elsewhere]);
     expect("draft" in batch && batch.draft.lines).toEqual([
       { item_id: 101, quantity: "5", open_package_key: shown },
     ]);
+    // A cut of all it shows says it is used up, unless the volunteer
+    // said not.
+    const line = { itemId: 101, packages: {}, loose: "" };
+    const all = [
+      { ...line, open: { [shown]: { amount: "120", whole: false } } },
+    ];
+    expect(toBatch(cart({ lines: all }), CATALOGUE, [here])).toMatchObject({
+      draft: { used_up: [shown] },
+    });
+    const kept = [
+      {
+        ...line,
+        open: { [shown]: { amount: "120", whole: false, usedUp: false } },
+      },
+    ];
+    const notSaid = toBatch(cart({ lines: kept }), CATALOGUE, [here]);
+    expect("draft" in notSaid && notSaid.draft.used_up).toBe(undefined);
   });
 
   test("an opening opens whole packages only", () => {
