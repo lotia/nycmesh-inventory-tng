@@ -12,9 +12,9 @@ services:
     # Room for a few checkouts' test runs, apps and browser tests at once
     # (CONTRIBUTING.md, Connections); 100 is the default. An idle connection
     # costs a few MB, so slots are cheap. Every checkout shares this
-    # container, so the tasks never make it again (`up --no-recreate`): a
-    # change here takes effect with `mise run compose -- up -d
-    # --force-recreate db`, which keeps the volume but ends every
+    # container, so the tasks never make it again (`mise run
+    # start-database`): a change here takes effect with `mise run
+    # recreate-database-container`, which keeps the volume but ends every
     # checkout's connections.
     command: ["postgres", "-c", "max_connections=400"]
     environment:

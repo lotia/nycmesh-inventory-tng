@@ -110,9 +110,14 @@ for the checkout's directory and where that is, `inventory_<directory>_<n>`,
 when it makes `.env`; a `.env` made before names `inventory`, so give any
 second checkout with one a name of its own in both URLs. Never copy a
 `.env` from another checkout. The server's container is every checkout's
-too: a change to it in `compose.yaml` takes effect with
-`mise run compose -- up -d --force-recreate db`, which ends every
-checkout's connections.
+too, so no task makes it again: each that needs the server runs
+`mise run start-database`, which starts it as it is. When `compose.yaml`,
+or `.env`'s `INVENTORY_DB_PORT`, changes its settings, those tasks, the
+browser tests too, stop and say so rather than recreate it. Then
+`mise run recreate-database-container` recreates it: it keeps the volume,
+but restarts the server, ending every checkout's connections, so it asks
+first. An agent asks the person, then runs
+`mise run --yes recreate-database-container`.
 `mise run dev-database` starts the server, makes the database if it is
 missing, and migrates it; `mise run dev` and `mise run seed` run it first.
 It holds each to 30 connections (Connections, below).
@@ -336,7 +341,8 @@ Every page shares one stylesheet, `frontend/src/styles.css`, which Tailwind
 builds (docs/decisions/0014). Under `mise run dev` it comes from Vite's dev
 server and reloads on save; otherwise from the build. Without a build, pages
 are plain HTML. The app container builds it into its image, so a class new
-to a template shows there only after `mise run compose -- up -d --build app`.
+to a template shows there only after
+`mise run compose -- up -d --build --no-deps app`.
 Administrator pages put their content in `<main class="admin page-width">`;
 the scan and registration pages in `<main class="volunteer page-width">`,
 with a label above its text box or list as `Field`
@@ -406,7 +412,8 @@ container, set `INVENTORY_APP_MAIL_HOST=mail` too.
 ### Running the app in a container
 
 ```sh
-mise run compose -- up -d --build --wait app  # http://127.0.0.1:8000/api/docs
+mise run start-database
+mise run compose -- up -d --build --wait --no-deps app  # http://127.0.0.1:8000/api/docs
 mise run compose -- logs -f app
 ```
 
@@ -470,7 +477,7 @@ in CI, whose Docker runs as root, where the bug never shows.
 ## Running the checks
 
 ```sh
-mise run compose -- up -d --wait db
+mise run start-database
 cd backend
 
 # Optional: let the tools fix what they can. Neither changes behaviour.

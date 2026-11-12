@@ -122,7 +122,7 @@ def create_database(template: str | None = None) -> str:
     except OperationalError as error:
         advice = refused_connection(str(error)) or (
             f"Cannot reach PostgreSQL at {make_url(SERVER_URL)}. Start it with "
-            f"`mise run compose -- up -d --wait db`, or run only the tests "
+            f"`mise run start-database`, or run only the tests "
             f"that need none: `uv run pytest -m 'not database'`."
         )
         raise Unreachable(f"{advice}\n{error}") from error

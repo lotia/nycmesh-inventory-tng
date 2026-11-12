@@ -45,9 +45,8 @@ run = ["npm run typecheck", "npm run lint", "npm run coverage"]
 [tasks.check-browser]
 description = "Browser tests: the built app, in a real browser at a phone's width"
 dir = "frontend"
-depends = ["setup-browsers"]
+depends = ["setup-browsers", "start-database"]
 run = [
-    "mise run compose -- up -d --wait db",
     "npm run build",
     "npx playwright test",
 ]
@@ -55,8 +54,9 @@ run = [
 [tasks.browser-webkit]
 description = "The browser tests in WebKit, in Playwright's container, for systems its WebKit does not run on"
 dir = "frontend"
+depends = ["start-database"]
 run = [
-    "mise run compose -- --profile webkit up -d --wait db webkit",
+    "mise run compose -- --profile webkit up -d --wait webkit",
     "npm run build",
     # The server's port as compose publishes it: the shell's, else .env's.
     """
@@ -78,8 +78,8 @@ uv run --project backend diff-cover -c backend/pyproject.toml \
 [tasks.measure-catalogue]
 description = "Time the scan page's catalogue against years of saves, with its ledger queries' plans"
 dir = "backend"
+depends = ["start-database"]
 run = [
-    "mise run compose -- up -d --wait db",
     "uv run pytest tests/measure_catalogue.py -p no:randomly -p no:cacheprovider -q -s",
 ]
 
@@ -128,11 +128,17 @@ run = "uv run python -m inventory_tng.seed"
 [tasks.dev-database]
 description = "This checkout's development database: the server started, the database made if missing, and migrated"
 dir = "backend"
+depends = ["start-database"]
 run = [
-    "../mise-tasks/compose up -d --wait --no-recreate db",
     "uv run python -m inventory_tng.dev_database make",
     "uv run alembic upgrade head",
 ]
+
+# The server every checkout shares (CONTRIBUTING.md, Local settings).
+[tasks.recreate-database-container]
+description = "Recreate the database container every checkout shares, with compose.yaml's settings"
+confirm = "Recreate the database container? It restarts the server every checkout shares, ending every checkout's connections. Its volume, with every database, is kept."
+run = "mise run compose -- up -d --wait --force-recreate db"
 
 [tasks.dev-backend]
 description = "The backend, restarting when its Python changes (mise run dev runs it)"
