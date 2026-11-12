@@ -672,12 +672,7 @@ export function toBatch(
       // Each package counted on a line of its own, sealed, so stock keeps
       // them sealed where they arrive (docs/decisions/0020); then loose.
       for (const [packageId, { count, size }] of quantity.sealed) {
-        lines.push({
-          item_id: item.id,
-          quantity: decimal(count * size),
-          package_id: packageId,
-          package_size: decimal(size),
-        });
+        lines.push(packageLine(item.id, packageId, size, count * size));
       }
       if (quantity.loose > 0) {
         lines.push({ item_id: item.id, quantity: decimal(quantity.loose) });
@@ -763,21 +758,40 @@ function openings(item: Item, sealed: Map<number, Packs>): Draft["lines"] {
   const followed = new Set(
     item.packages.filter((pack) => pack.track_opened).map((pack) => pack.id),
   );
-  return [...sealed].flatMap(([packageId, { count, size }]) => {
-    // The size counted in: one resized since is refused, not recounted.
-    const each = {
-      item_id: item.id,
-      package_id: packageId,
-      package_size: decimal(size),
-    };
-    return followed.has(packageId)
+  return [...sealed].flatMap(([packageId, { count, size }]) =>
+    followed.has(packageId)
       ? Array.from({ length: count }, () => ({
-          ...each,
-          quantity: decimal(size),
+          ...packageLine(item.id, packageId, size, size),
           open_package_key: uuid(),
         }))
-      : [{ ...each, quantity: decimal(count * size) }];
-  });
+      : [packageLine(item.id, packageId, size, count * size)],
+  );
+}
+
+/** A batch's line of sealed packages. The generated types leave its size
+ * optional, as OpenAPI cannot say it is required with package_id, which the
+ * server's Line does: this type says so, for each line packageLine builds,
+ * as every package line here is. */
+type PackageLine = Draft["lines"][number] & {
+  package_id: number;
+  package_size: string;
+};
+
+/** `amount` of the package `packageId`, in thousandths of the item's unit,
+ * with the size it was counted in: one resized since is refused, not
+ * recounted. */
+function packageLine(
+  itemId: number,
+  packageId: number,
+  size: number,
+  amount: number,
+): PackageLine {
+  return {
+    item_id: itemId,
+    quantity: decimal(amount),
+    package_id: packageId,
+    package_size: decimal(size),
+  };
 }
 
 /** A batch in the outbox, as offered and sealedCounts read it. */

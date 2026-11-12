@@ -267,7 +267,7 @@ export interface components {
       package_id?: number | null;
       /**
        * Package Size
-       * @description The size the page took `package_id` to be, from its catalogue: required with `package_id`, and only with it. A line of a package resized since is refused (package_resized), never counted in the new size.
+       * @description Required when `package_id` is given, and only allowed then: the size, in the item's unit, the package was counted in, from the catalogue. Left out with `package_id`, it is refused as package_size_required; given without, as package_size_without_package. A line of a package resized since is refused (package_resized), never counted in the new size.
        */
       package_size?: number | string | null;
       /**

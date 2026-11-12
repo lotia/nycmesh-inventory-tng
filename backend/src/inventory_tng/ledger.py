@@ -35,7 +35,8 @@ import structlog
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from opentelemetry import metrics
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 from sqlalchemy import (
     ColumnElement,
     Select,
@@ -697,10 +698,14 @@ class Line(BaseModel):
     package_size: Annotated[
         Amount | None,
         Field(
-            description="The size the page took `package_id` to be, from its "
-            "catalogue: required with `package_id`, and only with it. A line "
-            "of a package resized since is refused (package_resized), never "
-            "counted in the new size.",
+            description="Required when `package_id` is given, and only allowed "
+            "then: the size, in the item's unit, the package was counted in, "
+            "from the catalogue. Left out with `package_id`, it is refused as "
+            "package_size_required; given without, as "
+            "package_size_without_package. A line of a package resized since "
+            "is refused (package_resized), never counted in the new size.",
+            # Checked when left out too.
+            validate_default=True,
         ),
     ] = None
     open_package_key: Annotated[
@@ -720,16 +725,28 @@ class Line(BaseModel):
         ),
     ] = None
 
-    @model_validator(mode="after")
-    def _size(self) -> Line:
-        if self.package_id is not None and self.package_size is None:
-            raise ValueError(
-                "A line of a package says the size it was counted in: load "
-                "the page again, and count it again"
+    @field_validator("package_size")
+    @classmethod
+    def _size(cls, size: Decimal | None, info: ValidationInfo) -> Decimal | None:
+        """Refused on `package_size` itself, in words naming both fields, for
+        whoever writes a client. `info.data` holds the fields declared before
+        this one that were not refused: so `package_id` stays before it, and
+        one refused already is left at that."""
+        if "package_id" not in info.data:
+            return size
+        if info.data["package_id"] is not None and size is None:
+            raise PydanticCustomError(
+                "package_size_required",
+                "package_size is required when package_id is given: the "
+                "size, in the item's unit, the package was counted in, from "
+                "the catalogue",
             )
-        if self.package_id is None and self.package_size is not None:
-            raise ValueError("only a line of a package says its size")
-        return self
+        if info.data["package_id"] is None and size is not None:
+            raise PydanticCustomError(
+                "package_size_without_package",
+                "package_size is only allowed with package_id",
+            )
+        return size
 
     def entry(self, kind: str, opened: int | None = None) -> Entry:
         """As the ledger writes it: sealed on each side the kind has, loose
