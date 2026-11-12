@@ -2,8 +2,10 @@
 item_package tables, and their rules. A current item is in a current
 category (categories.retire is the other side), and an item's unit is
 fixed once stock has moved in it, as the ledger's quantities are in that
-unit. The app may not move a package to another item (migration 0002),
-so its labels always name its item. A retired item is read only until it
+unit; a package's size, once it has moved, been opened or labelled. The app may not
+move a package to another item (migration 0002), so its labels always name
+its item, and a package's name is its own among its item's, retired ones
+too, so one can always be brought back. A retired item is read only until it
 is brought back (docs/decisions/0019). An item's name, its manufacturer
 and part number together, and its old code are each its own, retired items'
 too (models.Item); taken_by says which another item has. similar finds
@@ -31,7 +33,9 @@ from inventory_tng.models import (
     Category,
     Item,
     ItemPackage,
+    Label,
     Movement,
+    OpenPackage,
     fuzzy,
     name_key,
 )
@@ -192,11 +196,58 @@ def add_package(session: Session, item: Item, name: str, size: Decimal) -> ItemP
     return package
 
 
+def _item_current(session: Session, package: ItemPackage) -> None:
+    """RuleBroken unless the package's item is current: a retired item, its
+    packages too, is read only."""
+    retired = Item.id == package.item_id, Item.retired_at.is_not(None)
+    enforce("retired_read_only", when=exists_where(session, *retired))
+
+
+def save_package(
+    session: Session, package: ItemPackage, name: str, size: Decimal, *, seen: Seen
+) -> None:
+    """A current package renamed, or resized while its size is not fixed
+    (sizes_fixed): the ledger counts sealed ones, an open one starts, and a
+    label says, its size. A name its item's other
+    packages have, retired ones too, is refused by the unique index."""
+    relock(session, package, current=True, seen=seen)
+    _item_current(session, package)
+    if size != package.size:
+        enforce("package_size_fixed", when=bool(sizes_fixed(session, [package.id])))
+    package.name, package.size = name, size
+
+
+def sizes_fixed(session: Session, package_ids: Collection[int]) -> set[int]:
+    """Those of these packages whose size is fixed: some has moved or been
+    opened in it, or a label printed for it says it. Each asks only
+    whether, stopping at the first."""
+    if not package_ids:
+        return set()
+    package = ItemPackage.id
+    used = (
+        select(Movement.id).where(Movement.from_package_id == package),
+        select(Movement.id).where(Movement.to_package_id == package),
+        select(OpenPackage.id).where(OpenPackage.package_id == package),
+        select(Label.id).where(Label.package_id == package),
+    )
+    query = select(package).where(
+        package.in_(list(package_ids)), or_(*(each.exists() for each in used))
+    )
+    return set(session.scalars(query))
+
+
+def restore_package(session: Session, package: ItemPackage) -> None:
+    """A retired package brought back, unless its item is retired. Its name
+    is its own still: unique, retired ones too."""
+    relock(session, package, current=False)
+    _item_current(session, package)
+    package.retired_at = None
+
+
 def retire_package(session: Session, package: ItemPackage, at: datetime) -> None:
     """Retired, unless its item is: a retired item is read only."""
     relock(session, package, current=True)
-    retired = Item.id == package.item_id, Item.retired_at.is_not(None)
-    enforce("retired_read_only", when=exists_where(session, *retired))
+    _item_current(session, package)
     package.retired_at = at
 
 
@@ -205,8 +256,7 @@ def track_package(session: Session, package: ItemPackage, track: bool | None) ->
     until used up, or None: as its item says (docs/decisions/0020). Gone
     for a retired package, read only as a retired item is."""
     relock(session, package, current=True)
-    retired = Item.id == package.item_id, Item.retired_at.is_not(None)
-    enforce("retired_read_only", when=exists_where(session, *retired))
+    _item_current(session, package)
     package.track_opened = track
 
 
@@ -219,8 +269,7 @@ def package_settings(
     """A package's too-short-to-use length and minimum sealed in the
     stores (docs/decisions/0020), each optional. Gone for a retired one."""
     relock(session, package, current=True)
-    retired = Item.id == package.item_id, Item.retired_at.is_not(None)
-    enforce("retired_read_only", when=exists_where(session, *retired))
+    _item_current(session, package)
     package.short_below, package.minimum_sealed = short_below, minimum_sealed
 
 

@@ -62,6 +62,10 @@ RULES = {
     "item_category_current": "Its category is retired: bring that back, or "
     "pick another, first.",
     "item_unit_fixed": "Its unit is fixed, as stock has moved in it.",
+    "package_size_fixed": "Its size is fixed, as some has moved, been opened "
+    "or labelled: add a package of the new size instead.",
+    "ck_item_package_short_below_under_size": "Larger than its too-short "
+    "length, or change that first.",
     "category_has_items": "Move or retire its items first.",
     "site_settings_time_zone": "Pick a zone from the list.",
     "location_time_zone": "Pick a zone from the list.",

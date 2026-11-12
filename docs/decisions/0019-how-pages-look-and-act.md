@@ -1,7 +1,7 @@
 # 0019 — How pages look and act: links, your account, actions and lists
 
 **Status:** accepted · 2026-11-10 · builds on 0014 (one stylesheet in NYC
-Mesh's look)
+Mesh's look) · amended 2026-11-12 (packages renamed and brought back)
 
 ## Context
 
@@ -108,7 +108,10 @@ list's box.
 - A retired record being read only, a name a retired one holds would keep
   it from coming back. So the names of items, categories and places are
   unique among retired ones too (Ali, 2026-11-10,
-  inventory-tng-8i4.60.21). Volunteers' and packages' are unique among
-  current ones only: a new volunteer may share a retired one's name, and a
-  retired package never comes back. A volunteer's custody location is
-  made again under their name each time they hold stock.
+  inventory-tng-8i4.60.21). So are packages' among their item's, compared
+  as items' names are (0021): a package can be renamed, its size changed
+  until some has moved, been opened or labelled, and a retired one
+  brought back (Ali, 2026-11-12, inventory-tng-f4f). Volunteers' are unique among
+  current ones only: a new volunteer may share a retired one's name. A
+  volunteer's custody location is made again under their name each time
+  they hold stock.

@@ -7,18 +7,21 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
+from httpx2 import Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import items
+from inventory_tng import items, open_packages
 from inventory_tng.admin.common import quantity
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.listing import PER_PAGE
+from inventory_tng.db import attempt
 from inventory_tng.local_time import DEFAULT_ZONE
 from inventory_tng.models import (
     Category,
     Item,
     ItemPackage,
+    Label,
     LedgerTransaction,
     Location,
     Movement,
@@ -26,6 +29,7 @@ from inventory_tng.models import (
 
 from helpers.rows import add, history, named, shown
 from helpers.sign_in import text
+from helpers.stock import Spools, retire
 
 NOW = datetime(2026, 11, 1, tzinfo=UTC)
 
@@ -254,6 +258,107 @@ def test_packages(admin_client: TestClient, session: Session, radios: Category) 
     assert box.retired_at is not None
 
 
+def test_a_package_is_renamed_and_resized_until_it_moves(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Its name, as items' are compared, is its own among its item's,
+    retired ones too; its size is fixed once some has moved or been opened
+    (inventory-tng-f4f)."""
+    spools = Spools(session)
+    box = add(session, ItemPackage(item_id=spools.cable.id, name="Box", size=50))
+    add(
+        session,
+        ItemPackage(item_id=spools.cable.id, name="Old reel", size=1, retired_at=NOW),
+    )
+    page = f"{ITEMS}/{spools.cable.id}"
+
+    def send(package: ItemPackage, name: str, size: str) -> Response:
+        return admin_client.post(
+            f"{page}/packages/{package.id}",
+            data={
+                "package_name": name,
+                "size": size,
+                "package_version": shown(package),
+            },
+        )
+
+    assert send(box, "Carton", "25").status_code == 303
+    assert (box.name, box.size) == ("Carton", 25)
+    last = history(session, "item_package", box.id)[-1].new_row
+    assert last is not None
+    assert last["name"] == "Carton"
+    # A retired package's name, spelt another way, is taken.
+    taken = send(box, "old-REEL", "25")
+    assert taken.status_code == 400
+    assert "already has a package by that name" in text(taken)
+    assert 'value="old-REEL"' in taken.text
+    # Moved in its size: renamed, never resized.
+    fixed = send(spools.spool, "Spool", "300")
+    assert "Its size is fixed" in text(fixed)
+    assert send(spools.spool, "Spool 305 m", "305").status_code == 303
+    assert (spools.spool.name, spools.spool.size) == ("Spool 305 m", 305)
+    # A form shown before another's save is refused, as it was changed.
+    stale = admin_client.post(
+        f"{page}/packages/{box.id}",
+        data={"package_name": "Bag", "size": "25", "package_version": "1"},
+    )
+    assert "someone else saved this" in text(stale)
+    for name, size in (("", "25"), ("Bag", "lots"), ("--", "25")):
+        assert send(box, name, size).status_code == 400
+    # Never as short as its too-short length.
+    box.short_below = Decimal(20)
+    session.flush()
+    short = send(box, "Carton", "20")
+    assert "Larger than its too-short length" in text(short)
+    # Labelled, its size is said on boxes: fixed, and offered no more.
+    add(session, Label(item_id=spools.cable.id, package_id=box.id))
+    assert "Its size is fixed" in text(send(box, "Carton", "30"))
+    assert send(box, "Crate", "25").status_code == 303
+
+
+def test_a_package_opened_keeps_its_size(session: Session) -> None:
+    spools = Spools(session, tracked=True)
+    box = add(session, ItemPackage(item_id=spools.cable.id, name="Box", size=50))
+    open_packages.make(session, uuid.uuid4(), box.id, spools.store.id)
+    _, broken = attempt(
+        session, lambda: items.save_package(session, box, "Box", Decimal(25), seen=None)
+    )
+    assert broken == "package_size_fixed"
+
+
+def test_a_retired_package_is_brought_back(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    item = new_item(session, radios)
+    box = add(session, ItemPackage(item_id=item.id, name="Box", size=Decimal(4)))
+    path = f"{ITEMS}/{item.id}/packages/{box.id}"
+    # Its item is counted each: a package holds a whole number.
+    part = admin_client.post(
+        path, data={"package_name": "Box", "size": "2.5", "package_version": "1"}
+    )
+    assert "whole units" in text(part)
+    retired = admin_client.post(f"{path}/retire")
+    assert box.retired_at is not None
+    # The notice offers it back, as the row does.
+    offered = admin_client.get(retired.headers["location"])
+    assert f'action="{path}/restore"' in offered.text
+    assert "Package retired." in text(offered)
+    assert admin_client.post(f"{path}/restore").status_code == 303
+    assert box.retired_at is None
+    # A current one is not brought back.
+    assert admin_client.post(f"{path}/restore").status_code == 404
+    # Under a retired item, its packages are read only.
+    admin_client.post(f"{path}/retire")
+    retire(session, item)
+    refused = admin_client.post(f"{path}/restore")
+    assert "Bring it back first" in text(refused)
+    assert box.retired_at is not None
+    renamed = admin_client.post(
+        f"{path}", data={"package_name": "Bag", "size": "4", "package_version": "1"}
+    )
+    assert renamed.status_code == 404
+
+
 def test_retiring_and_bringing_back(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
@@ -284,8 +389,9 @@ def test_unknown_items_and_others_packages_are_not_found(
     assert admin_client.post(f"{ITEMS}/999999/restore").status_code == 404
     # A current item is not brought back.
     assert admin_client.post(f"{ITEMS}/{item.id}/restore").status_code == 404
-    path = f"{ITEMS}/{item.id}/packages/{theirs.id}/retire"
-    assert admin_client.post(path).status_code == 404
+    path = f"{ITEMS}/{item.id}/packages/{theirs.id}"
+    for action in ("/retire", "/restore", ""):
+        assert admin_client.post(f"{path}{action}").status_code == 404
 
 
 @pytest.mark.parametrize(

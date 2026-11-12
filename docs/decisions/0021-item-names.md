@@ -56,7 +56,9 @@ so admins would type half a name in each field.
   is not.
 - Migration 0023 names, by id, any items already clashing so, to rename
   before the index can be made.
-- Categories, places and volunteers still compare names ignoring case
+- A package's name is compared the same way, among its item's packages,
+  retired ones too (0019; migration 0030 names any clashing by id).
+  Categories, places and volunteers still compare names ignoring case
   only.
 - An item's name needs more than spaces and punctuation, as the database
   classes them: such names alone would all be one name.

@@ -71,6 +71,7 @@ from inventory_tng.models import (
     AdminSession,
     Category,
     Item,
+    ItemPackage,
     LedgerTransaction,
     Location,
     SentForm,
@@ -90,7 +91,7 @@ from helpers.sign_in import (
     reset_link,
     sign_in_with,
 )
-from helpers.stock import Spools, committed_place
+from helpers.stock import Place, Spools, committed_place
 
 NEW_PASSWORD = "a long passphrase of their own"
 
@@ -1087,6 +1088,34 @@ def test_a_cut_and_a_whole_move_of_one_open_package_go_one_at_a_time(
 
     cut, whole = moving(20, Form()), moving(305, opened)
     assert either_first(own_committed, cut, whole, swapped=swapped) == refused
+
+
+@pytest.mark.concurrency
+def test_a_package_resized_while_it_moves_waits_then_is_refused(
+    own_committed: Committed,
+) -> None:
+    """A save holds its packages FOR KEY SHARE (ledger._hold_forms) until it
+    commits, and resizing one holds it FOR UPDATE: the resize waits, then
+    is refused, as some of it has moved in the old size. On a database of
+    its own, as it writes the ledger."""
+    setup = own_committed.session()
+    place = Place(setup)
+    box = ItemPackage(item_id=place.cable.id, name="Box", size=Decimal(50))
+    setup.add(box)
+    setup.commit()
+    spool = box.id
+    header = {"kind": "receipt", "to_location_id": place.store.id}
+    sealed = Form(package_id=spool)
+    line = Entry(place.cable.id, Decimal(50), Form(), sealed)
+    receipt: Write = lambda session: insert_transaction(
+        session, uuid.uuid4(), header, [line]
+    )
+    resize = doing(
+        ItemPackage,
+        spool,
+        lambda s, p: items.save_package(s, p, p.name, Decimal(25), seen=None),
+    )
+    assert at_once(own_committed, receipt, resize) == "package_size_fixed"
 
 
 @pytest.mark.concurrency
