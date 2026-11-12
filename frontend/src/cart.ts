@@ -48,6 +48,12 @@ const LineSchema = v.object({
       }),
     ),
   ),
+  /** Typed into by the volunteer, or a package's label scanned: theirs,
+   * never filled again for the place picked (refilled). */
+  typed: v.exactOptional(v.boolean()),
+  /** How many times the item was picked, by search or label, so a line
+   * filled again opens as many (refilled). */
+  picked: v.exactOptional(v.number()),
 });
 
 const CartSchema = v.object({
@@ -321,11 +327,21 @@ export function reconcile(cart: Cart, catalogue: Catalogue): Cart {
 
 /** Add one of this item, or of this package of it, to the cart. */
 export function addOne(cart: Cart, itemId: number, packageId?: number): Cart {
-  const withIt = withLine(cart, itemId);
+  return withLineChanged(withLine(cart, itemId), itemId, (line) =>
+    bumped(line, packageId),
+  );
+}
+
+/** The cart with its line for this item changed by `change`. */
+export function withLineChanged(
+  cart: Cart,
+  itemId: number,
+  change: (line: Line) => Line,
+): Cart {
   return {
-    ...withIt,
-    lines: withIt.lines.map((line) =>
-      line.itemId === itemId ? bumped(line, packageId) : line,
+    ...cart,
+    lines: cart.lines.map((line) =>
+      line.itemId === itemId ? change(line) : line,
     ),
   };
 }
@@ -343,11 +359,82 @@ function bumped(line: Line, packageId?: number): Line {
       };
 }
 
-/** The cart with a line for this item, nothing in it, if it has none. */
+/** The cart with this item picked once more: its line, made with nothing
+ * in it if it has none, counts the pick (Line.picked). */
 export function withLine(cart: Cart, itemId: number): Cart {
-  return cart.lines.some((line) => line.itemId === itemId)
+  const made = cart.lines.some((line) => line.itemId === itemId)
     ? cart
     : { ...cart, lines: [...cart.lines, { itemId, packages: {}, loose: "" }] };
+  return withLineChanged(made, itemId, (line) => ({
+    ...line,
+    picked: (line.picked ?? 0) + 1,
+  }));
+}
+
+/** The package opening an item opens, for the volunteer to change: with
+ * no place yet, its one current package; at a place, sealedHere's. */
+export function openingPackage(
+  item: Item | undefined,
+  placeId: number | null,
+  sealed: ReadonlyMap<string, number>,
+): Item["packages"][number] | undefined {
+  if (placeId !== null) {
+    return sealedHere(item, placeId, sealed);
+  }
+  const current = (item?.packages ?? []).filter((each) => !each.retired);
+  return current.length === 1 ? current[0] : undefined;
+}
+
+/**
+ * `next`, changed from `before`, put right where its place or kind moved:
+ * what was taken from open packages was where it came from, as it was, so
+ * none of it is kept; and, opening, the lines the volunteer has not typed
+ * into are filled for the place picked or changed (refilled).
+ */
+export function placed(
+  before: Cart,
+  next: Cart,
+  catalogue: Catalogue,
+  sealed: ReadonlyMap<string, number>,
+): Cart {
+  if (next.kind === before.kind && next.fromId === before.fromId) {
+    return next;
+  }
+  const lines = next.lines.map(({ open: _, ...line }) => line);
+  return {
+    ...next,
+    // Only a place picked or changed while opening: lines from another
+    // kind keep what they hold.
+    lines:
+      next.kind === "open" && before.kind === "open"
+        ? refilled(lines, catalogue, next.fromId, sealed)
+        : lines,
+  };
+}
+
+/** An opening's lines the volunteer has not typed into, filled again for
+ * the place now picked (openingPackage): as many as were added, of the
+ * package opened there, or of none (inventory-tng-prp). */
+function refilled(
+  lines: readonly Line[],
+  catalogue: Catalogue,
+  placeId: number | null,
+  sealed: ReadonlyMap<string, number>,
+): Line[] {
+  const { items } = indexOf(catalogue);
+  return lines.map((line) => {
+    if (line.typed) {
+      return line;
+    }
+    const pack = openingPackage(items.get(line.itemId), placeId, sealed);
+    return {
+      ...line,
+      packages:
+        pack === undefined ? {} : { [pack.id]: String(line.picked ?? 1) },
+      // An opening has none loose (toBatch).
+      loose: "",
+    };
+  });
 }
 
 /** The package opening an item at a place opens: its one package with
