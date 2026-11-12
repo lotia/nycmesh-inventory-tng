@@ -289,7 +289,14 @@ def test_inactive_labels_say_why_and_agree_with_the_scan_page(
         kind="receipt",
         from_location_id=None,
         to_location_id=place.store.id,
-        lines=[{"item_id": place.item.id, "quantity": "8", "package_id": crate.id}],
+        lines=[
+            {
+                "item_id": place.item.id,
+                "quantity": "8",
+                "package_id": crate.id,
+                "package_size": "8",
+            }
+        ],
     )
     sealed = add(session, Label(item_id=place.item.id, package_id=crate.id))
     # Retired with stock left, the radios still scan: volunteers may take them.

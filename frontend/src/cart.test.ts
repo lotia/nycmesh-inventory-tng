@@ -334,6 +334,7 @@ describe("turning a cart into a batch", () => {
           item_id: 101,
           quantity: "305",
           package_id: 1001,
+          package_size: "305",
           open_package_key: fresh,
         },
         // Sent already, so the catalogue's: not twice.
@@ -341,9 +342,30 @@ describe("turning a cart into a batch", () => {
           item_id: 101,
           quantity: "305",
           package_id: 1001,
+          package_size: "305",
           open_package_key: known.key,
         },
-        { item_id: 101, quantity: "305", package_id: 1001 },
+        {
+          item_id: 101,
+          quantity: "305",
+          package_id: 1001,
+          package_size: "305",
+        },
+        // Counted in another size, or in none, as an older build's: the
+        // server refuses them, so they open nothing to offer.
+        {
+          item_id: 101,
+          quantity: "610",
+          package_id: 1001,
+          package_size: "610",
+          open_package_key: "55555555-5555-4555-8555-555555555555",
+        },
+        {
+          item_id: 101,
+          quantity: "305",
+          package_id: 1001,
+          open_package_key: "66666666-6666-4666-8666-666666666666",
+        },
       ],
     };
     const cut: Draft = {
@@ -619,7 +641,16 @@ describe("turning a cart into a batch", () => {
   test("packages alone send no loose line", () => {
     const lines = [{ itemId: 101, packages: { 1001: "2" }, loose: "" }];
     expect(toBatch(cart({ lines }), CATALOGUE)).toMatchObject({
-      draft: { lines: [{ item_id: 101, quantity: "610", package_id: 1001 }] },
+      draft: {
+        lines: [
+          {
+            item_id: 101,
+            quantity: "610",
+            package_id: 1001,
+            package_size: "305",
+          },
+        ],
+      },
     });
   });
 
@@ -694,7 +725,11 @@ describe("turning a cart into a batch", () => {
       ],
     });
     expect(toBatch(cart({ lines: boxed }), retired)).toMatchObject({
-      draft: { lines: [{ item_id: 100, quantity: "4", package_id: 1000 }] },
+      draft: {
+        lines: [
+          { item_id: 100, quantity: "4", package_id: 1000, package_size: "4" },
+        ],
+      },
     });
     // Loose units of its item are received as ever.
     const loose = [{ itemId: 100, packages: {}, loose: "2" }];
@@ -809,6 +844,7 @@ describe("turning a cart into a batch", () => {
       item_id: 101,
       quantity: String(305 * n),
       package_id: 1001,
+      package_size: "305",
       ...extra,
     });
     const at = (counts: Map<string, number>, place: number) =>
@@ -887,6 +923,16 @@ describe("turning a cart into a batch", () => {
           kind: "receipt",
           to_location_id: 12,
           lines: [spools(2, { package_size: "610" })],
+        }),
+      },
+      // Stored by a build from before sizes were sent: refused, so none.
+      {
+        state: "waiting" as const,
+        queuedAt: 0,
+        body: batch({
+          kind: "receipt",
+          to_location_id: 12,
+          lines: [spools(1, { package_size: null })],
         }),
       },
     ]);

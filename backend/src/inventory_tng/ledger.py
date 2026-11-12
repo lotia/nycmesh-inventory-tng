@@ -698,9 +698,9 @@ class Line(BaseModel):
         Amount | None,
         Field(
             description="The size the page took `package_id` to be, from its "
-            "catalogue. A line of a package resized since is refused "
-            "(package_resized), never counted in the new size. None: an "
-            "older page's, not checked.",
+            "catalogue: required with `package_id`, and only with it. A line "
+            "of a package resized since is refused (package_resized), never "
+            "counted in the new size.",
         ),
     ] = None
     open_package_key: Annotated[
@@ -719,6 +719,17 @@ class Line(BaseModel):
             "is left on it, `quantity`, moves with it, and it stays open there."
         ),
     ] = None
+
+    @model_validator(mode="after")
+    def _size(self) -> Line:
+        if self.package_id is not None and self.package_size is None:
+            raise ValueError(
+                "A line of a package says the size it was counted in: load "
+                "the page again, and count it again"
+            )
+        if self.package_id is None and self.package_size is not None:
+            raise ValueError("only a line of a package says its size")
+        return self
 
     def entry(self, kind: str, opened: int | None = None) -> Entry:
         """As the ledger writes it: sealed on each side the kind has, loose
@@ -819,8 +830,6 @@ class Batch(BaseModel):
                 raise ValueError("a line is taken from an open package, or not")
             if line.whole and not (taken and self.kind == "move"):
                 raise ValueError("only a move's open package moves whole")
-            if line.package_size is not None and line.package_id is None:
-                raise ValueError("only a line of a package says its size")
         if self.install_number is not None and self.kind != "install":
             raise ValueError("only an install has an install number")
         return self
@@ -1452,12 +1461,13 @@ LINE_PROBLEMS: dict[str, tuple[str, ProblemKind]] = {
 def _as_counted(
     line: Line, packages: Mapping[int, PackageFacts]
 ) -> PackageFacts | None:
-    """The package a line names, in the size it was counted in, if it says
-    and the package is of its item: no quantity in another size says what
-    the volunteer meant (package_resized)."""
+    """The package a line names, in the size it was counted in, if the
+    package is of its item: no quantity in another size says what the
+    volunteer meant (package_resized)."""
     package = packages.get(line.package_id or 0)
-    if package is None or line.package_size is None or package.item_id != line.item_id:
+    if package is None or package.item_id != line.item_id:
         return package
+    assert line.package_size is not None  # Line's validator: with package_id.
     return package._replace(size=line.package_size)
 
 

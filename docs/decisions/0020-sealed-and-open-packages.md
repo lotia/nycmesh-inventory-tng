@@ -40,7 +40,9 @@ deployed, so the migrations may be rewritten (0016).
   page sends the size it counted them in, and a line of a package resized
   since, as one nobody has used may be, is refused, never recounted in the
   new size: whether the volunteer's count or the old size was wrong is not
-  the server's to guess (inventory-tng-5f7).
+  the server's to guess (inventory-tng-5f7). Every line of a package says
+  its size: one kept in an outbox by a page from before is refused, naming
+  its line, as none was ever deployed (Ali, 2026-11-12, inventory-tng-1p8).
 
 ### What volunteers do
 

@@ -581,6 +581,7 @@ def test_counts_packages_opened_by_what_they_became(
                 "item_id": spools.cable.id,
                 "quantity": "305",
                 "package_id": spools.spool.id,
+                "package_size": "305",
                 "open_package_key": str(uuid.uuid4()),
             }
         ],

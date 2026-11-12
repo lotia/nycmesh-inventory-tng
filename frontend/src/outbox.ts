@@ -80,7 +80,9 @@ export const BatchBody = v.object({
       /** Sealed packages of it, kept sealed; absent (an older page's): loose. */
       package_id: nullableId,
       /** The size the page took that package to be: refused if resized
-       * since. Absent (an older page's): not checked. */
+       * since. The server requires it with package_id, but a build from
+       * before it was sent kept lines without: read, so the server's
+       * refusal names the line, never dropped unseen (inventory-tng-1p8). */
       package_size: v.exactOptional(v.nullable(amount)),
       /** A move's taken from an open package: all of it, moved whole. */
       whole: v.exactOptional(v.nullable(v.boolean())),
