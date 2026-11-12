@@ -78,7 +78,8 @@ export interface paths {
     };
     /**
      * Get Catalogue
-     * @description Everything current that a cart can hold, and who can fill one.
+     * @description Everything current that a cart can hold, and who can fill one; and
+     *     which of the batches `key` names are saved.
      */
     get: operations["get_catalogue_api_catalogue_get"];
     put?: never;
@@ -157,6 +158,11 @@ export interface components {
       labels: components["schemas"]["LabelEntry"][];
       /** Open Packages */
       open_packages: components["schemas"]["OpenPackageEntry"][];
+      /**
+       * Saved
+       * @default []
+       */
+      saved: string[];
     };
     /** CodeRefusedReply */
     CodeRefusedReply: {
@@ -316,8 +322,8 @@ export interface components {
       track_opened: boolean;
       /** Retired */
       retired: boolean;
-      /** Sealed At */
-      sealed_at: number[];
+      /** Sealed */
+      sealed: components["schemas"]["SealedAt"][];
     };
     /** PageError */
     PageError: {
@@ -379,6 +385,13 @@ export interface components {
       kind: "scan_to_save";
       /** Seconds */
       seconds: number;
+    };
+    /** SealedAt */
+    SealedAt: {
+      /** Location Id */
+      location_id: number;
+      /** Count */
+      count: number;
     };
     /**
      * Settings
@@ -610,7 +623,9 @@ export interface operations {
   };
   get_catalogue_api_catalogue_get: {
     parameters: {
-      query?: never;
+      query?: {
+        key?: string[];
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -633,6 +648,15 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["DeviceRefusedReply"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
       /** @description The database cannot answer; try again */

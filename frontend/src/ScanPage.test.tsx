@@ -7,7 +7,7 @@ import { ScanPage } from "./ScanPage";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
 import { fakeCamera } from "./test-camera";
 import { CATALOGUE } from "./test-catalogue";
-import { answering, json, saved } from "./test-fetch";
+import { answering, deferred, json, saved } from "./test-fetch";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));
@@ -36,6 +36,9 @@ const pick = (label: string, value: string) =>
 
 const selected = (label: string) =>
   (screen.getByLabelText(label) as HTMLSelectElement).value;
+
+const isCatalogue = (request: Request) =>
+  new URL(request.url).pathname === "/api/catalogue";
 
 const saves = (sent: Request[]) =>
   sent.filter((request) => request.url.endsWith("/api/transactions"));
@@ -276,7 +279,10 @@ describe("filling and saving a cart", () => {
                   size: "8",
                   track_opened: false,
                   retired: true,
-                  sealed_at: [10, 12],
+                  sealed: [
+                    { location_id: 10, count: 1 },
+                    { location_id: 12, count: 1 },
+                  ],
                 },
               ],
             }
@@ -666,6 +672,16 @@ describe("whose name it is", () => {
     await vi.advanceTimersByTimeAsync(IDLE + 60_000);
     expect(screen.getByText(/Are you/)).toBeDefined();
   });
+
+  test("a page left open never asks when administrators set 0", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    usedAgo(0);
+    const never = { ...CATALOGUE, settings: { name_check_minutes: 0 } };
+    open(answering(() => json(never, 200)).api);
+    await ready();
+    await vi.advanceTimersByTimeAsync(IDLE + 60_000);
+    expect(screen.queryByText(/Are you/)).toBeNull();
+  });
 });
 
 describe("scanning labels with the camera", () => {
@@ -675,13 +691,23 @@ describe("scanning labels with the camera", () => {
   }
 
   async function opened(api = server().api) {
-    open(api);
+    const outbox = open(api);
     await ready();
     camera.state.inView = [];
     fireEvent.click(
       screen.getByRole("button", { name: "Scan with the camera" }),
     );
     await screen.findByText("Point the camera at a label.");
+    return outbox;
+  }
+
+  /** Ada opens the van's sealed spool, by its label. */
+  async function openSpoolInVan() {
+    pick("Your name", "1");
+    fireEvent.click(screen.getByLabelText("Opening packages"));
+    pick("Where", "12");
+    scan("K7QX2M");
+    await screen.findByText("Added a Spool: Cat6 cable.");
   }
 
   test("an item's label adds one, and a package's label a package", async () => {
@@ -705,6 +731,89 @@ describe("scanning labels with the camera", () => {
     await screen.findByText(
       "LiteBeam 5AC: type how many of which package to open.",
     );
+  });
+
+  test("opening, the last one sealed there opened, the next fills nothing", async () => {
+    // One spool sealed in the van (test-catalogue); opened, it waits in
+    // the outbox, and the catalogue still says one is sealed there.
+    const { api } = server(() =>
+      Promise.reject(new TypeError("Failed to fetch")),
+    );
+    await opened(api);
+    await openSpoolInVan();
+    save();
+    await screen.findByText(/^Saved: Opening/);
+    find("cable");
+    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    expect(
+      (screen.getByLabelText("Spool (305 m)") as HTMLInputElement).value,
+    ).toBe("");
+  });
+
+  test("a batch saved, the catalogue is asked for again", async () => {
+    const { api, sent } = server();
+    const outbox = await opened(api);
+    const asked = () => sent.filter(isCatalogue).length;
+    expect(asked()).toBe(1);
+    await openSpoolInVan();
+    save();
+    await screen.findByText("In the inventory (transaction 77).");
+    await vi.waitFor(() => expect(asked()).toBe(2));
+    // Asked whether it shows the batch saved.
+    const [, again] = sent.filter(isCatalogue);
+    const [entry] = outbox.entries.value;
+    expect(new URL(again?.url ?? "").searchParams.getAll("key")).toEqual([
+      entry?.body.key,
+    ]);
+  });
+
+  test("a save while the catalogue is asked for asks once more after", async () => {
+    const later = deferred();
+    const catalogues: Request[] = [];
+    const { api } = answering((request) => {
+      if (!isCatalogue(request)) {
+        return saved();
+      }
+      catalogues.push(request);
+      return catalogues.length === 2 ? later.promise : json(CATALOGUE, 200);
+    });
+    await opened(api);
+    await openSpoolInVan();
+    save();
+    await screen.findByText(/^Saved: Opening/);
+    // The radio's box, sealed at the hub.
+    pick("Where", "10");
+    find("beam");
+    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    save();
+    await vi.waitFor(() =>
+      expect(screen.getAllByText(/^In the inventory/)).toHaveLength(2),
+    );
+    // One at a time: the second save waits for the first answer.
+    expect(catalogues).toHaveLength(2);
+    later.resolve(json(CATALOGUE, 200));
+    await vi.waitFor(() => expect(catalogues).toHaveLength(3));
+  });
+
+  test("asked for again and not answered, the catalogue it has is kept", async () => {
+    let asked = 0;
+    const { api } = answering((request) => {
+      if (!isCatalogue(request)) {
+        return saved();
+      }
+      asked += 1;
+      return asked === 1
+        ? json(CATALOGUE, 200)
+        : json({ reason: "database_unavailable" }, 503);
+    });
+    await opened(api);
+    await openSpoolInVan();
+    save();
+    await screen.findByText("In the inventory (transaction 77).");
+    await vi.waitFor(() => expect(asked).toBe(2));
+    await new Promise((done) => setTimeout(done, 0));
+    expect(screen.queryByText("Couldn't load the catalogue.")).toBeNull();
+    expect(screen.getByLabelText("Your name")).toBeDefined();
   });
 
   test("opening, an item of no package is not added", async () => {

@@ -11,7 +11,7 @@ import { v4 as uuid } from "uuid";
 import * as v from "valibot";
 import type { Schemas } from "./api/client";
 import { id } from "./api/replies";
-import type { Draft } from "./outbox";
+import type { Draft, Entry } from "./outbox";
 import { count, decimal, sent, thousandths } from "./quantity";
 import { onStoredChange, readStored, writeStored } from "./stored";
 
@@ -23,6 +23,8 @@ const MAX_ID = 2 ** 31 - 1;
 const MAX_AMOUNT = 10 ** 12;
 /** Lines in a batch (ledger.MAX_LINES): a cart line may be several. */
 const MAX_LINES = 500;
+/** Batch keys a catalogue is asked about (catalogue.py, MOST_KEYS). */
+const MAX_KEYS_ASKED = 100;
 
 export type Catalogue = Schemas["Catalogue"];
 export type Item = Schemas["ItemEntry"];
@@ -349,18 +351,24 @@ export function withLine(cart: Cart, itemId: number): Cart {
 }
 
 /** The package opening an item at a place opens: its one package with
- * some sealed there, current or retired; none if several are, or none. */
+ * some sealed there (sealedCounts), current or retired; none if several
+ * are, or none. */
 export function sealedHere(
   item: Item | undefined,
   placeId: number | null,
+  sealed: ReadonlyMap<string, number>,
 ): Item["packages"][number] | undefined {
   if (placeId === null) {
     return undefined;
   }
-  const here = (item?.packages ?? []).filter((each) =>
-    each.sealed_at.includes(placeId),
+  const here = (item?.packages ?? []).filter(
+    (each) => (sealed.get(sealedKey(each.id, placeId)) ?? 0) > 0,
   );
   return here.length === 1 ? here[0] : undefined;
+}
+
+function sealedKey(packageId: number, placeId: number): string {
+  return `${packageId}@${placeId}`;
 }
 
 /** Whole packages of one size: how many, and each one's size in
@@ -632,6 +640,83 @@ function openings(item: Item, sealed: Map<number, Packs>): Draft["lines"] {
   });
 }
 
+/** A batch in the outbox, as offered and sealedCounts read it. */
+type Pending = Pick<Entry, "state" | "body" | "queuedAt">;
+
+/** The batch keys a catalogue is asked about (catalogue.py, MOST_KEYS):
+ * its outbox's saved ones, then those waiting, oldest first. */
+export function keysToAsk(outbox: readonly Pending[]): string[] {
+  const of = (state: string) =>
+    outbox.filter((each) => each.state === state).map((each) => each.body.key);
+  return [...of("saved"), ...of("waiting")].slice(0, MAX_KEYS_ASKED);
+}
+
+/**
+ * The outbox's batches a catalogue does not show: those waiting or saved
+ * whose keys it does not say are saved (keysToAsk). One saved after it was
+ * read is caught when the page asks again, after every save.
+ */
+export function unseen<T extends Pending>(
+  outbox: readonly T[],
+  catalogue: Catalogue,
+): T[] {
+  const shown = new Set(catalogue.saved);
+  return outbox.filter(
+    (each) => each.state !== "refused" && !shown.has(each.body.key),
+  );
+}
+
+/**
+ * How many of each package are sealed at each place, by sealedKey: the
+ * catalogue's, less what `pending` (unseen) opens or takes and plus what
+ * it brings, so opening the last one sealed at a place leaves none there
+ * to fill the next opening with (sealedHere).
+ */
+export function sealedCounts(
+  catalogue: Catalogue,
+  pending: readonly Pending[],
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  const sizes = new Map<number, number>();
+  const add = (
+    packageId: number,
+    placeId: number | null | undefined,
+    n: number,
+  ) => {
+    if (placeId != null) {
+      const key = sealedKey(packageId, placeId);
+      counts.set(key, (counts.get(key) ?? 0) + n);
+    }
+  };
+  for (const item of catalogue.items) {
+    for (const pack of item.packages) {
+      sizes.set(pack.id, sent(pack.size));
+      for (const { location_id, count } of pack.sealed) {
+        add(pack.id, location_id, count);
+      }
+    }
+  }
+  for (const { body } of pending) {
+    for (const line of body.lines) {
+      // A line from an open package moves no sealed one; nor is one of a
+      // package the catalogue has no more counted.
+      const packageId = line.package_id;
+      const fromOpen = body.kind !== "open" && line.open_package_key != null;
+      const size = packageId == null ? undefined : sizes.get(packageId);
+      if (packageId == null || fromOpen || size === undefined) {
+        continue;
+      }
+      // Rounded up, as the catalogue counts a part of one (catalogue.py).
+      const n = Math.ceil(sent(String(line.quantity)) / size);
+      add(packageId, body.from_location_id, -n);
+      if (body.kind !== "open") {
+        add(packageId, body.to_location_id, n);
+      }
+    }
+  }
+  return counts;
+}
+
 export type OpenPackage = Catalogue["open_packages"][number];
 /** An open package a cart can take from, as it will be once the batches
  * waiting are saved: where it is, and what is left on it, in thousandths. */
@@ -639,14 +724,14 @@ export type Offered = Omit<OpenPackage, "left"> & { left: number };
 
 /**
  * The open packages carts can take from: the catalogue's, and those opened
- * in batches still waiting to be sent, under the keys this page made, so
- * they can be taken from before the server has seen them; each as the
- * waiting batches leave it, cut from or moved whole (docs/decisions/0020).
- * Worked out once for every line of a cart (offeredAt).
+ * in `pending` (unseen), under the keys this page made, so they can be
+ * taken from before the server has seen them; each as those batches leave
+ * it, cut from or moved whole (docs/decisions/0020). Worked out once for
+ * every line of a cart (offeredAt).
  */
 export function offered(
   catalogue: Catalogue,
-  outbox: readonly { state: string; body: Draft; queuedAt: number }[],
+  pending: readonly Pending[],
 ): Offered[] {
   const byKey = new Map<string, Offered>(
     catalogue.open_packages.map((each) => [
@@ -656,10 +741,7 @@ export function offered(
   );
   const known = new Set(byKey.keys());
   const { items } = indexOf(catalogue);
-  for (const { state, body: draft, queuedAt } of outbox) {
-    if (state !== "waiting") {
-      continue;
-    }
+  for (const { body: draft, queuedAt } of pending) {
     // Said to be used up: offered no more.
     for (const key of draft.used_up ?? []) {
       byKey.delete(key);

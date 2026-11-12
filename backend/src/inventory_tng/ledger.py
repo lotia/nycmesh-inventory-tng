@@ -214,17 +214,21 @@ def retired_packages_in_stock() -> Select[tuple[int]]:
     return _retired_left(by_form, "package_id", ItemPackage)
 
 
-def sealed_places(session: Session) -> dict[int, list[int]]:
-    """The current places with some of each package sealed, by package:
-    where opening its item opens that package (docs/decisions/0020)."""
-    found: dict[int, list[int]] = {}
-    for package_id, location_id in session.execute(
-        _left_at_current(select(by_form.c.package_id, by_form.c.location_id), by_form)
+def sealed_places(session: Session) -> dict[int, dict[int, Decimal]]:
+    """How much of each package is sealed at each current place with some,
+    in its item's unit, by package then place: where opening its item opens
+    that package (docs/decisions/0020)."""
+    found: dict[int, dict[int, Decimal]] = {}
+    for package_id, location_id, quantity in session.execute(
+        _left_at_current(
+            select(by_form.c.package_id, by_form.c.location_id, by_form.c.quantity),
+            by_form,
+        )
         .where(by_form.c.package_id.is_not(None))
         # So a reply for the same stock is the same.
         .order_by(by_form.c.location_id)
     ):
-        found.setdefault(package_id, []).append(location_id)
+        found.setdefault(package_id, {})[location_id] = quantity
     return found
 
 

@@ -7,18 +7,33 @@ import {
   freshCart,
   indexOf,
   keysAt,
+  keysToAsk,
   loadCart,
   offered,
   offeredAt,
   quantityOf,
   STORAGE_KEY,
+  sealedCounts,
   sealedHere,
   search,
   storeCart,
   toBatch,
+  unseen,
   withLine,
 } from "./cart";
-import type { Draft } from "./outbox";
+import type { Body, Draft } from "./outbox";
+
+/** A batch with a key, as the outbox keeps it. */
+let keys = 0;
+function keyed(draft: Draft): Body {
+  keys += 1;
+  return {
+    ...draft,
+    key: `00000000-0000-4000-8000-${String(keys).padStart(12, "0")}`,
+  };
+}
+const SHOWN = "99999999-9999-4999-8999-999999999999";
+
 import { CATALOGUE, cable, radio } from "./test-catalogue";
 
 function cart(fields: Partial<Cart> = {}): Cart {
@@ -114,7 +129,7 @@ describe("quantities", () => {
           size: "2.5",
           track_opened: false,
           retired: false,
-          sealed_at: [],
+          sealed: [],
         },
       ],
     };
@@ -339,12 +354,15 @@ describe("turning a cart into a batch", () => {
     };
     const queuedAt = Date.parse("2026-11-04T09:00:00Z");
     const outbox = [
-      { state: "waiting", body: opening, queuedAt },
-      { state: "waiting", body: cut, queuedAt },
-      // Saved: the catalogue has what it did, once loaded again.
-      { state: "saved", body: cut, queuedAt },
+      { state: "waiting" as const, body: keyed(opening), queuedAt },
+      { state: "waiting" as const, body: keyed(cut), queuedAt },
+      // Saved, and the catalogue says it shows it.
+      { state: "saved" as const, body: { ...cut, key: SHOWN }, queuedAt },
     ];
-    const all = offered(catalogue, outbox);
+    const all = offered(
+      { ...catalogue, saved: [SHOWN] },
+      unseen(outbox, { ...catalogue, saved: [SHOWN] }),
+    );
     expect(offeredAt(all, 101, 10)).toEqual([{ ...known, left: 100000 }]);
     expect(keysAt(all, 12)).toEqual(new Set([fresh]));
     expect(offeredAt(all, 101, 12)).toEqual([
@@ -378,7 +396,7 @@ describe("turning a cart into a batch", () => {
       ],
     };
     const [made] = offered(CATALOGUE, [
-      { state: "waiting", body: opening, queuedAt: 0 },
+      { state: "waiting" as const, body: keyed(opening), queuedAt: 0 },
     ]);
     expect(made?.package_name).toBe("package");
   });
@@ -457,7 +475,9 @@ describe("turning a cart into a batch", () => {
     };
     const catalogue = { ...CATALOGUE, open_packages: [known] };
     expect(
-      offered(catalogue, [{ state: "waiting", body: report, queuedAt: 0 }]),
+      offered(catalogue, [
+        { state: "waiting" as const, body: keyed(report), queuedAt: 0 },
+      ]),
     ).toEqual([]);
   });
 
@@ -581,16 +601,140 @@ describe("turning a cart into a batch", () => {
     const [box] = radio.packages;
     if (box === undefined) throw new Error("the radio comes in a box");
     // A retired one too, sealed only at the van (inventory-tng-f9h).
-    const old = { ...box, id: 2, retired: true, sealed_at: [10, 12] };
+    const old = {
+      ...box,
+      id: 2,
+      retired: true,
+      sealed: [
+        { location_id: 10, count: 1 },
+        { location_id: 12, count: 1 },
+      ],
+    };
     const both = { ...radio, packages: [box, old] };
-    expect(sealedHere(radio, 10)).toBe(box);
-    expect(sealedHere(both, 12)).toBe(old);
+    const counts = sealedCounts({ ...CATALOGUE, items: [both] }, []);
+    expect(sealedHere(radio, 10, counts)).toBe(box);
+    expect(sealedHere(both, 12, counts)).toBe(old);
     // Both sealed there, or neither: none is picked.
-    expect(sealedHere(both, 10)).toBe(undefined);
-    expect(sealedHere(both, 11)).toBe(undefined);
+    expect(sealedHere(both, 10, counts)).toBe(undefined);
+    expect(sealedHere(both, 11, counts)).toBe(undefined);
     // No place yet: none is sealed "here".
-    expect(sealedHere(radio, null)).toBe(undefined);
-    expect(sealedHere(undefined, 10)).toBe(undefined);
+    expect(sealedHere(radio, null, counts)).toBe(undefined);
+    expect(sealedHere(undefined, 10, counts)).toBe(undefined);
+  });
+
+  test("sealed counts follow the batches the catalogue does not show yet", () => {
+    // The catalogue: 3 spools sealed at the hub, 1 in the van.
+    const batch = (draft: Partial<Draft>) =>
+      keyed({ kind: "move", volunteer_id: 1, lines: [], ...draft });
+    const spools = (n: number, extra = {}) => ({
+      item_id: 101,
+      quantity: String(305 * n),
+      package_id: 1001,
+      ...extra,
+    });
+    const at = (counts: Map<string, number>, place: number) =>
+      counts.get(`1001@${place}`) ?? 0;
+    const counts = sealedCounts(CATALOGUE, [
+      // Two opened at the hub, each its own open package.
+      {
+        state: "waiting" as const,
+        queuedAt: 0,
+        body: batch({
+          kind: "open",
+          from_location_id: 10,
+          to_location_id: 10,
+          lines: [
+            spools(1, {
+              open_package_key: "11111111-1111-4111-8111-111111111111",
+            }),
+            spools(1, {
+              open_package_key: "22222222-2222-4222-8222-222222222222",
+            }),
+          ],
+        }),
+      },
+      // One moved from the van to the hub, and one received at the van;
+      // a cut from an open package moves no sealed one.
+      {
+        state: "saved" as const,
+        queuedAt: 0,
+        body: batch({
+          from_location_id: 12,
+          to_location_id: 10,
+          lines: [
+            spools(1),
+            {
+              item_id: 101,
+              quantity: "20",
+              package_id: 1001,
+              open_package_key: "33333333-3333-4333-8333-333333333333",
+            },
+          ],
+        }),
+      },
+      {
+        state: "waiting" as const,
+        queuedAt: 0,
+        body: batch({
+          kind: "receipt",
+          to_location_id: 12,
+          lines: [spools(2)],
+        }),
+      },
+      // One taken to an install from the hub, and loose cable: no spool.
+      {
+        state: "waiting" as const,
+        queuedAt: 0,
+        body: batch({
+          kind: "install",
+          from_location_id: 10,
+          lines: [
+            spools(1),
+            { item_id: 101, quantity: "5" },
+            // A package the catalogue has no more: not counted.
+            spools(1, { package_id: 1009 }),
+          ],
+        }),
+      },
+    ]);
+    expect(at(counts, 10)).toBe(3 - 2 + 1 - 1);
+    expect(at(counts, 12)).toBe(1 - 1 + 2);
+    // The last sealed at the hub opened: the next opening there fills none.
+    const opened = sealedCounts(CATALOGUE, [
+      {
+        state: "waiting" as const,
+        queuedAt: 0,
+        body: batch({
+          kind: "open",
+          from_location_id: 10,
+          to_location_id: 10,
+          lines: [spools(3)],
+        }),
+      },
+    ]);
+    expect(sealedHere(cable, 10, opened)).toBe(undefined);
+    expect(sealedHere(cable, 12, opened)).toBe(cable.packages[0]);
+  });
+
+  test("unseen: batches waiting or saved that the catalogue does not show", () => {
+    const entry = (state: "waiting" | "saved" | "refused") => ({
+      state,
+      queuedAt: 0,
+      body: keyed({ kind: "move", volunteer_id: 1, lines: [] }),
+    });
+    const waiting = entry("waiting");
+    const shown = entry("saved");
+    const saved = entry("saved");
+    const refused = entry("refused");
+    const outbox = [waiting, shown, saved, refused];
+    const catalogue = { ...CATALOGUE, saved: [shown.body.key] };
+    expect(unseen(outbox, catalogue)).toEqual([waiting, saved]);
+    // Asked about: saved ones first, then those waiting.
+    expect(keysToAsk(outbox)).toEqual([
+      shown.body.key,
+      saved.body.key,
+      waiting.body.key,
+    ]);
   });
 
   test("a line for an item is added once, with nothing in it", () => {
