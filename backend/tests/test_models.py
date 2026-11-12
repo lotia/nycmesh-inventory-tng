@@ -107,16 +107,19 @@ def test_item_names_are_unique_ignoring_case_spaces_and_punctuation(
 def test_a_decimal_point_between_digits_tells_names_apart(
     new_item: Callable[..., Item], session: Session
 ) -> None:
-    """'305 m' and '30.5 m' are two names; a point or comma anywhere else
-    is punctuation (docs/decisions/0021, 2026-11-12), for an item's
-    packages too."""
+    """'305 m' and '30.5 m' are two names; a point anywhere else, and a
+    comma anywhere, is punctuation, as US number conventions have it
+    (docs/decisions/0021, 2026-11-12), for an item's packages too."""
     spool = new_item("Spool 305 m")
     new_item("Spool 30.5 m")
-    new_item("Spool 30,5 m")
     new_item("Spool 3.05 m")
-    for clash in ("Spool 30. 5 m", "Spool. 305 m.", "spool 30.5 m!"):
+    # '30,5' is a false clash, where a comma is the decimal mark.
+    for clash in ("Spool 30,5 m", "Spool 30. 5 m", "Spool. 305 m.", "spool 30.5 m!"):
         with violates(session, "uq_item_name"):
             new_item(clash)
+    new_item("Box 1000 ft")
+    with violates(session, "uq_item_name"):
+        new_item("Box 1,000 ft")
     add(session, ItemPackage(item_id=spool.id, name="Reel 30.5 m", size=30))
     add(session, ItemPackage(item_id=spool.id, name="Reel 305 m", size=305))
     with violates(session, "uq_item_package_name"):
@@ -126,12 +129,15 @@ def test_a_decimal_point_between_digits_tells_names_apart(
 # Each compared as items' names are, and what tells them apart.
 TRICKY_NAMES = {
     "30.5": "30.5",
-    "30,5": "30,5",
+    "30,5": "305",
+    "1,000": "1000",
+    "1,000.5": "1000.5",
     "3.0.5": "3.0.5",
     "v1.2": "v1.2",
     "1. 5": "15",
     "1 .5": "15",
     "1.,5": "15",
+    "1,.5": "15",
     "1..5": "15",
     ".5": "5",
     "5.": "5",
