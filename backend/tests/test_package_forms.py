@@ -893,6 +893,94 @@ def test_a_cut_reports_its_open_package_used_up_and_it_is_offered_no_more(
     ).first()
 
 
+# A batch sent again is compared with the reports it sent (inventory-tng-ckl).
+
+
+def report_of(spools: Spools, *keys: object) -> dict[str, object]:
+    return spools.place.batch(
+        kind="report",
+        to_location_id=None,
+        lines=[],
+        used_up=[str(key) for key in keys],
+    )
+
+
+# The reports sent first and again, of two open packages, a key nobody
+# made, and (cut) whether the batch is a cut from the first, else a report.
+REPORTS_CHANGED = {
+    "added": ("12", "12x", False),
+    "removed": ("12", "1", False),
+    "swapped": ("12", "1x", False),
+    "none_before": ("", "1", True),
+    "none_after": ("1", "", True),
+}
+
+
+@pytest.mark.parametrize(
+    ("first", "again", "cut"), REPORTS_CHANGED.values(), ids=list(REPORTS_CHANGED)
+)
+def test_a_batch_sent_again_with_other_reports_is_refused(
+    registered_client: TestClient, spools: Spools, first: str, again: str, cut: bool
+) -> None:
+    one = spools.opened()
+    keys = {"1": one.key, "2": spools.opened().key, "x": uuid.uuid4()}
+    batch = spools.place.batch(lines=[taken(one, "5")]) if cut else report_of(spools)
+
+    def reporting(marks: str) -> dict[str, object]:
+        return batch | {"used_up": [str(keys[mark]) for mark in marks]}
+
+    assert registered_client.post(URL, json=reporting(first)).status_code == 201
+    response = registered_client.post(URL, json=reporting(again))
+    assert (response.status_code, response.json()) == (409, {"reason": "key_reused"})
+
+
+def test_a_batch_sent_again_with_its_reports_in_another_order_is_replayed(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    one, two = spools.opened(), spools.opened()
+    first = report_of(spools, one.key, two.key)
+    saved = registered_client.post(URL, json=first)
+    assert saved.status_code == 201
+    again = first | {"used_up": [str(two.key), str(one.key)]}
+    replayed = registered_client.post(URL, json=again)
+    assert (replayed.status_code, replayed.json()) == (200, saved.json())
+    # Kept as sent.
+    written = session.get_one(LedgerTransaction, saved.json()["transaction_id"])
+    assert written.used_up == [one.key, two.key]
+
+
+def test_a_report_sent_again_after_it_was_cleared_is_replayed(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    spools: Spools,
+) -> None:
+    """What the batch said, not what became of its package since."""
+    made = spools.opened()
+    report = report_of(spools, made.key)
+    saved = registered_client.post(URL, json=report)
+    assert saved.status_code == 201
+    cleared = admin_client.post(f"{USED_UP}/{made.id}/clear")
+    assert cleared.status_code == 303
+    replayed = registered_client.post(URL, json=report)
+    assert (replayed.status_code, replayed.json()) == (200, saved.json())
+    # Replayed, not reported again.
+    session.refresh(made)
+    assert made.reported_at is None
+
+
+def test_a_report_of_one_reported_already_sent_again_is_replayed(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """Reported by someone else first, so this batch reported nothing."""
+    made = reported(session, spools)
+    report = report_of(spools, made.key)
+    saved = registered_client.post(URL, json=report)
+    assert saved.status_code == 201
+    replayed = registered_client.post(URL, json=report)
+    assert (replayed.status_code, replayed.json()) == (200, saved.json())
+
+
 def test_the_button_reports_one_alone(
     registered_client: TestClient, session: Session, spools: Spools
 ) -> None:
@@ -924,6 +1012,13 @@ def test_a_report_that_cannot_be_is_refused(
     assert response.status_code == 422
     assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
         (["used_up", 0], "not_found")
+    ]
+    made = spools.opened()
+    twice = report_of(spools, made.key, made.key)
+    response = registered_client.post(URL, json=twice)
+    assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
+        (["used_up", 0], "repeated"),
+        (["used_up", 1], "repeated"),
     ]
     for batch in (
         spools.place.batch(kind="report", to_location_id=None, lines=[]),
