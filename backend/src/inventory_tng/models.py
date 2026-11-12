@@ -391,6 +391,12 @@ class OpenPackage(Base):
         CheckConstraint(
             "(closed_at IS NULL) = (closed_by_admin_id IS NULL)", name="closed_by"
         ),
+        CheckConstraint(
+            "num_nulls(length_reported_at, length_reported_by_volunteer_id,"
+            " length_reported, length_reported_in_id) IN (0, 4)",
+            name="length_reported_by",
+        ),
+        CheckConstraint("length_reported >= 0", name="length_reported"),
         protection(owner="open_packages.py", lock="row", history=True),
     )
 
@@ -408,6 +414,18 @@ class OpenPackage(Base):
     reported_by_volunteer_id: Mapped[int | None] = _reference("volunteer.id")
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_by_admin_id: Mapped[int | None] = _reference("admin.id")
+    # What a volunteer said is really on it, who and when, for an
+    # administrator to check (docs/decisions/0020, 2026-11-12): a report,
+    # never an adjustment. Cleared when the check is settled.
+    length_reported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    length_reported_by_volunteer_id: Mapped[int | None] = _reference("volunteer.id")
+    length_reported: Mapped[Decimal | None] = mapped_column(QUANTITY)
+    # The transaction that reported it: setting it to that counts as of
+    # then, so a cut since is not lost.
+    length_reported_in_id: Mapped[int | None] = _reference("ledger_transaction.id")
+    # When a save took it below zero, which the app asks an administrator
+    # to check, reported or not. Cleared when the check is settled.
+    below_zero_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Vendor(Base):
@@ -744,6 +762,11 @@ class LedgerTransaction(Base):
     # (docs/decisions/0020): a batch sent again is compared with them.
     used_up: Mapped[list[uuid.UUID]] = mapped_column(
         ARRAY(Uuid), server_default=text("'{}'")
+    )
+    # What its batch said is really on open packages, as sent: a list of
+    # {"open_package_key", "left"}, compared as used_up is.
+    lengths: Mapped[list[dict[str, str]]] = mapped_column(
+        JSONB, server_default=text("'[]'")
     )
 
 

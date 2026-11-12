@@ -294,13 +294,18 @@ describe("refusals", () => {
         loc: ["body", "used_up", 0],
         msg: "There is no such row",
       },
+      {
+        type: "not_found",
+        loc: ["body", "lengths", 0, "open_package_key"],
+        msg: "There is no such row",
+      },
     ];
     const { api } = answering(() => json({ detail }, 422));
     const outbox = new Outbox(api);
     outbox.queue(draft({ lines }), "a");
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
     expect(outbox.entries.value[0]?.note).toBe(
-      "Not saved. Line 2: There is no such row Value error, a move has only a from and to location Line 1: Not accepted Open package said used up, 1: There is no such row",
+      "Not saved. Line 2: There is no such row Value error, a move has only a from and to location Line 1: Not accepted Open package said used up, 1: There is no such row What is on an open package, 1: There is no such row",
     );
   });
 
@@ -355,6 +360,32 @@ describe("refusals", () => {
     expect((await bodies(sent)).map((body) => body.lines[0].quantity)).toEqual([
       "50",
     ]);
+  });
+
+  test("a report of what is on an open package waits for its opening", async () => {
+    const key = "33333333-3333-4333-8333-333333333333";
+    const opening = draft({
+      kind: "open",
+      to_location_id: 1,
+      lines: [
+        { item_id: 5, quantity: "305", package_id: 9, open_package_key: key },
+      ],
+    });
+    const report = draft({
+      kind: "report",
+      to_location_id: null,
+      lines: [],
+      lengths: [{ open_package_key: key, left: "250" }],
+    });
+    const { api, sent } = answering(
+      replies(() => new Response("", { status: 500 })),
+    );
+    const outbox = new Outbox(api);
+    outbox.queue(opening, "opening");
+    outbox.queue(report, "report");
+    await vi.waitFor(() => expect(sent.length).toBeGreaterThan(0));
+    await outbox.send();
+    expect((await bodies(sent)).map((body) => body.kind)).toEqual(["open"]);
   });
 
   test("a settled batch can be dismissed; a waiting one cannot", () => {

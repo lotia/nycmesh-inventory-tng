@@ -19,7 +19,14 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import adjustment_reasons, ledger
 from inventory_tng.db import enforce, get_locked, locked
-from inventory_tng.models import Item, ItemPackage, Location, OpenPackage, Volunteer
+from inventory_tng.models import (
+    Item,
+    ItemPackage,
+    LedgerTransaction,
+    Location,
+    OpenPackage,
+    Volunteer,
+)
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -36,6 +43,38 @@ def measure_closed(how: Literal["confirmed", "direct", "count"], count: int) -> 
     """Measured once committed."""
     if count:
         closed.add(count, {"how": how})
+
+
+# How a check of what an open package has was raised: a volunteer's
+# report, or a save that took it below zero (docs/decisions/0020,
+# 2026-11-12); and how an administrator settled it.
+CheckRaised = Literal["volunteer", "below_zero"]
+CheckSettled = Literal["set", "left"]
+
+checks_raised = meter.create_counter(
+    "inventory.open_packages.length_checks.raised",
+    unit="{check}",
+    description="Checks of what an open package really has, by how raised: a "
+    "volunteer's report, or a save taking it below zero",
+)
+checks_settled = meter.create_counter(
+    "inventory.open_packages.length_checks.settled",
+    unit="{check}",
+    description="Checks of what an open package really has that an "
+    "administrator settled, by how: set to a length, or left as it is",
+)
+
+
+def measure_checks_raised(how: CheckRaised, count: int) -> None:
+    """Measured once committed."""
+    if count:
+        checks_raised.add(count, {"how": how})
+
+
+def measure_checks_settled(how: CheckSettled, count: int) -> None:
+    """Measured once committed."""
+    if count:
+        checks_settled.add(count, {"how": how})
 
 
 def tracks_opened(item: bool, package: bool | None) -> bool:
@@ -130,6 +169,76 @@ def report(
     return reported
 
 
+def report_length(
+    row: OpenPackage,
+    left: Decimal,
+    volunteer_id: int,
+    transaction: LedgerTransaction,
+) -> bool:
+    """What a volunteer says is really on an open package, for an
+    administrator to check: a report, never an adjustment (0003). A later
+    report replaces one not yet checked; one of a package closed is left,
+    as nobody would check it. Whether it was kept. Call it holding the
+    row, as a save holds its open packages (ledger.py's lock order)."""
+    if row.closed_at is not None:
+        return False
+    row.length_reported_at = transaction.created_at
+    row.length_reported_by_volunteer_id = volunteer_id
+    row.length_reported = left
+    row.length_reported_in_id = transaction.id
+    log.info(
+        "open package length reported",
+        open_package_id=row.id,
+        volunteer_id=volunteer_id,
+    )
+    return True
+
+
+def went_below_zero(
+    row: OpenPackage, before: Decimal, cut: Decimal, at: datetime
+) -> bool:
+    """Ask an administrator to check an open package a save's `cut` took
+    from nothing or more (`before`) to below zero: its records are wrong,
+    whether or not anyone reported it. Only on going below, so one left
+    below zero, checked and left, is not asked about at every cut. Whether
+    it asked. Call it holding the row, as report_length."""
+    if row.below_zero_at is not None or not before - cut < 0 <= before:
+        return False
+    row.below_zero_at = at
+    log.info("open package went below zero", open_package_id=row.id)
+    return True
+
+
+def _clear_check(row: OpenPackage) -> None:
+    row.length_reported_at = None
+    row.length_reported_by_volunteer_id = None
+    row.length_reported = None
+    row.length_reported_in_id = None
+    row.below_zero_at = None
+
+
+def check_seen(row: OpenPackage) -> str:
+    """What an administrator saw of a check: the report and the fall below
+    zero it was raised by. A page sends it back, so a check raised again
+    since, as by a newer report, is not settled unseen."""
+    below = row.below_zero_at.isoformat() if row.below_zero_at else ""
+    return f"{row.length_reported_in_id or ''}/{below}"
+
+
+def settle_check(session: Session, open_id: int, seen: str) -> bool:
+    """A check of what an open package has, settled: cleared, whoever raised
+    it, if it is still as `seen` (check_seen). False if there is no such
+    package, nothing to settle, or it changed since it was seen."""
+    row = get_locked(session, OpenPackage, open_id, key_share=True)
+    if row is None or (row.length_reported_at is None and row.below_zero_at is None):
+        return False
+    if check_seen(row) != seen:
+        return False
+    _clear_check(row)
+    log.info("open package length check settled", open_package_id=row.id)
+    return True
+
+
 def close(
     session: Session,
     open_id: int,
@@ -175,6 +284,8 @@ def close(
             form=ledger.Form(open_package_id=row.id),
         )
     row.closed_at, row.closed_by_admin_id = at, admin_id
+    # Nobody checks what a closed package has: its check goes with it.
+    _clear_check(row)
     log.info("open package closed", open_package_id=row.id, admin_id=admin_id)
     return True
 

@@ -395,6 +395,22 @@
             ],
             "title": "Used Up",
             "description": "Keys of open packages the volunteer says are used up, for an administrator to confirm (docs/decisions/0020): with a cut that took all they showed, or alone, in a report."
+          },
+          "lengths": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LengthReport"
+                },
+                "type": "array",
+                "maxItems": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lengths",
+            "description": "What the volunteer says is really on open packages, by key, for an administrator to check (docs/decisions/0020): with a cut, or alone, in a report. Never an adjustment."
           }
         },
         "type": "object",
@@ -643,6 +659,31 @@
         "required": ["code", "item_id", "package_id", "location_id"],
         "title": "LabelEntry",
         "description": "A printed code, and the one thing it names."
+      },
+      "LengthReport": {
+        "properties": {
+          "open_package_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Open Package Key"
+          },
+          "left": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Left"
+          }
+        },
+        "type": "object",
+        "required": ["open_package_key", "left"],
+        "title": "LengthReport",
+        "description": "What a volunteer says is really on an open package, for an\nadministrator to check (docs/decisions/0020, 2026-11-12)."
       },
       "Line": {
         "properties": {

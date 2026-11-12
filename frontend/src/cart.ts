@@ -46,6 +46,9 @@ const LineSchema = v.object({
         /** Said to be used up, or not, by the volunteer, for an
          * administrator to confirm; unsaid, as the cut says (usedUpOf). */
         usedUp: v.exactOptional(v.boolean()),
+        /** What the volunteer says is really on it now, as typed, for an
+         * administrator to check (docs/decisions/0020, 2026-11-12). */
+        now: v.exactOptional(v.string()),
       }),
     ),
   ),
@@ -571,8 +574,28 @@ export function toBatch(
       return said ? [key] : [];
     }),
   );
+  // What is really on open packages, said: with what is taken, or alone.
+  const lengths: NonNullable<Draft["lengths"]> = [];
+  const problems: string[] = [];
+  for (const line of cart.lines) {
+    const named = index.items.get(line.itemId)?.name ?? "An item";
+    for (const [key, { now }] of Object.entries(line.open ?? {})) {
+      if (now === undefined || now.trim() === "") {
+        continue;
+      }
+      const left = thousandths(now);
+      const each = index.items.get(line.itemId)?.unit === "each";
+      if (left === null || (each && left % 1000 !== 0)) {
+        problems.push(
+          `${named}: enter what is on the open package${each ? ", in whole units" : ", up to 3 decimals"}, or leave it blank.`,
+        );
+      } else {
+        lengths.push({ open_package_key: key, left: decimal(left) });
+      }
+    }
+  }
   const reporting =
-    usedUp.length > 0 &&
+    (usedUp.length > 0 || lengths.length > 0) &&
     cart.lines.every((line) => {
       const item = index.items.get(line.itemId);
       const quantity = item && quantityOf(line, item);
@@ -584,7 +607,6 @@ export function toBatch(
   const sides = reporting ? { from: true, to: false } : SIDES[cart.kind];
   const fromId = sides.from ? cart.fromId : null;
   const toId = sides.to ? cart.toId : null;
-  const problems: string[] = [];
   if (cart.volunteerId === null) {
     problems.push("Pick your name.");
   }
@@ -669,7 +691,10 @@ export function toBatch(
       items += 1;
     }
   }
-  if (lines.length === 0 && usedUp.length === 0 && problems.length === 0) {
+  if (
+    lines.length + usedUp.length + lengths.length === 0 &&
+    problems.length === 0
+  ) {
     problems.push("Add something to the cart.");
   }
   if (lines.length > MAX_LINES) {
@@ -679,17 +704,20 @@ export function toBatch(
   if (problems.length > 0 || cart.volunteerId === null) {
     return { problems };
   }
-  const packages =
-    usedUp.length === 1 ? "1 open package" : `${usedUp.length} open packages`;
-  const things = reporting
-    ? packages
-    : items === 1
-      ? "1 item"
-      : `${items} items`;
-  const words = [`${KINDS[kind]}: ${things}`];
+  const packages = openPackages(usedUp.length);
+  const measured = openPackages(lengths.length);
+  // A report of lengths alone says so; one of used up, as ever.
+  const lengthsOnly = reporting && usedUp.length === 0;
+  const counted = items === 1 ? "1 item" : `${items} items`;
+  const things = lengthsOnly ? measured : reporting ? packages : counted;
+  const named = lengthsOnly ? "What's on it" : KINDS[kind];
+  const words = [`${named}: ${things}`];
   const draft: Draft = { kind, volunteer_id: cart.volunteerId, lines };
   if (usedUp.length > 0) {
     draft.used_up = usedUp;
+  }
+  if (lengths.length > 0) {
+    draft.lengths = lengths;
   }
   if (fromId !== null && (kind === "open" || kind === "report")) {
     draft.from_location_id = fromId;
@@ -712,7 +740,14 @@ export function toBatch(
   if (usedUp.length > 0 && !reporting) {
     words.push(`(${packages} said used up)`);
   }
+  if (lengths.length > 0 && !lengthsOnly) {
+    words.push(`(what is on ${measured} said)`);
+  }
   return { draft, what: words.join(" ") };
+}
+
+function openPackages(count: number): string {
+  return count === 1 ? "1 open package" : `${count} open packages`;
 }
 
 /**

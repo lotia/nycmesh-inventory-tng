@@ -1,0 +1,50 @@
+{% extends "admin_base.html" %}
+{% from "_table.html" import table %}
+{% block main %}
+<p class="hint">What these open packages show may be wrong: a volunteer said
+what is really on one, or a save took one below zero. Set it to what it
+really has, as a count does, or leave it as it shows.</p>
+{% if only %}
+<p>Only {{ only.name }}. <a href="{{ all_path }}">Show all</a></p>
+{% endif %}
+{#- The packages ticked belong to this form. #}
+<form method="post" action="{{ here }}{{ query }}" id="answer-ticked">
+  <input type="hidden" name="page" value="{{ all_path }}">
+</form>
+{% call table() %}
+  <tr><th>Pick</th><th>Open package</th><th>What it shows, and why</th><th>Recent cuts</th><th>Set it</th></tr>
+  {% for each in checked %}
+  {% set shown = each.shown %}
+  {% set row = shown.row %}
+  <tr>
+    <td><input type="checkbox" name="open_package" value="{{ row.id }} {{ each.seen }}" form="answer-ticked" aria-label="Pick {{ shown.item }}, {{ shown.package }}, at {{ shown.place }}"></td>
+    <td>{{ shown.item }}, {{ shown.package }} · {{ shown.place }}</td>
+    <td>Shows {{ shown.left | amount }} {{ shown.unit }}.
+      {% if row.length_reported is not none %}
+      {{ each.reported_by or "Someone" }} said {{ row.length_reported | amount }} {{ shown.unit }} is on it, {{ row.length_reported_at | when(zone) }}.
+      {% endif %}
+      {% if row.below_zero_at %}Went below zero {{ row.below_zero_at | when(zone) }}.{% endif %}</td>
+    <td>{% for cut in each.cuts %}{{ cut.quantity | amount }} {{ shown.unit }}, {{ cut.volunteer or cut.kind }}, {{ cut.at | when(zone) }}{% if not loop.last %}<br>{% endif %}{% else %}None{% endfor %}</td>
+    <td>
+      <form method="post" action="{{ here }}/{{ row.id }}/set{{ query }}" class="actions">
+        <input type="hidden" name="as_of" value="{{ each.as_of }}">
+        <input type="hidden" name="seen" value="{{ each.seen }}">
+        <input type="hidden" name="page" value="{{ all_path }}">
+        <label>Really on it ({{ shown.unit }})
+          <input name="left" inputmode="decimal" value="{{ row.length_reported | amount if row.length_reported is not none else '' }}"></label>
+        <button>Set to it<span class="sr-only"> {{ shown.item }} at {{ shown.place }}</span></button>
+        <button formaction="{{ here }}/{{ row.id }}/leave{{ query }}">Leave it<span class="sr-only"> {{ shown.item }} at {{ shown.place }}</span></button>
+      </form>
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="5">Nothing to check.</td></tr>
+  {% endfor %}
+{% endcall %}
+{% if checked %}
+<div class="actions">
+  <button name="do" value="set" form="answer-ticked">Set the ones ticked to what was said</button>
+  <button name="do" value="leave" form="answer-ticked">Leave the ones ticked</button>
+</div>
+{% endif %}
+{% endblock %}
