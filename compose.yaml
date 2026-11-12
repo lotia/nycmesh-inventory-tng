@@ -1,14 +1,17 @@
 # Development only; production runs on Kubernetes with Helm.
 # Run it with `mise run compose -- <arguments>`, which picks Podman or Docker.
 #
-# `up db` gives one PostgreSQL server, which every checkout shares. On a new
-# volume it makes the owner and app roles and a database, `inventory`, the
-# owner's, but no other that a checkout's .env names (INVENTORY_DB_NAME).
-# For each job, a mise task (CONTRIBUTING.md, Using compose directly):
-#   mise run dev-database                 this checkout's database, migrated
-#   mise run start-database               start the server, never recreated
-#   mise run recreate-database-container  take up a change to db below
-#   mise run reset-dev-database -- NAME   this checkout's database, made anew
+# Each checkout has a stack of its own: the project .env names
+# (COMPOSE_PROJECT_NAME, which mise run setup sets), else this one, which
+# checkouts whose .env names none share (CONTRIBUTING.md, Local settings).
+# `up db` gives its PostgreSQL server. On a new volume it makes the owner
+# and app roles and a database, `inventory`, the owner's, but no other that
+# .env names (INVENTORY_DB_NAME). For each job, a mise task (CONTRIBUTING.md,
+# Using compose directly):
+#   mise run dev-database                this checkout's database, migrated
+#   mise run start-database              start the server
+#   mise run reset-dev-database -- NAME  this checkout's database, made anew
+#   mise run remove-stale-stacks         stacks of checkouts that are gone
 # The app in a container: `mise run dev-database`, then `up -d --build app`.
 name: inventory-tng
 
@@ -19,13 +22,11 @@ services:
     # exec fail under crun 1.31 and later (CONTRIBUTING.md, Podman's exec bug;
     # https://github.com/podman-container-tools/podman/issues/30245).
     oom_score_adj: 200
-    # Room for a few checkouts' test runs, apps and browser tests at once
-    # (CONTRIBUTING.md, Connections); 100 is the default. An idle connection
-    # costs a few MB, so slots are cheap. Every checkout shares this
-    # container, so the tasks never make it again (`mise run
-    # start-database`): a change here takes effect with `mise run
-    # recreate-database-container`, which keeps the volume but ends every
-    # checkout's connections.
+    # Room for a test run, an app and the browser tests at once, for each
+    # checkout that shares the project (CONTRIBUTING.md, Connections); 100 is
+    # the default. An idle connection costs a few MB, so slots are cheap. A
+    # change here takes effect at the next `mise run start-database`, which
+    # makes the container again, keeping its volume.
     command: ["postgres", "-c", "max_connections=400"]
     environment:
       # The superuser, which only makes the owner and app roles, the tests'
@@ -39,9 +40,8 @@ services:
       - "127.0.0.1:${INVENTORY_DB_PORT:-5433}:5432"
     volumes:
       # Only the named volume: a bind mount would put this checkout's path in
-      # the settings start-database compares, so another checkout's would
-      # differ. A config's file is not in them, though the container mounts
-      # it from the checkout that made it.
+      # its settings, so checkouts sharing the project would each make the
+      # container again. A config's file is not in them.
       - db:/var/lib/postgresql
     # On a new volume only: the owner and app roles, and the inventory
     # database made the owner's (DEPLOYMENT.md, Database roles).
@@ -155,7 +155,8 @@ services:
       start_period: 30s
 
   # Optional: `mise run compose -- --profile telemetry up -d dashboard`, then
-  # http://localhost:18888. It receives OTLP on localhost:4318.
+  # http://localhost:18888. It receives OTLP on localhost:4318. Each port is
+  # .env's, if it names another (CONTRIBUTING.md, Local settings).
   dashboard:
     image: mcr.microsoft.com/dotnet/aspire-dashboard:13.6.2
     profiles: [telemetry]
@@ -163,8 +164,8 @@ services:
       # Local only, so no login.
       ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
     ports:
-      - "127.0.0.1:18888:18888"
-      - "127.0.0.1:4318:18890"
+      - "127.0.0.1:${INVENTORY_DASHBOARD_PORT:-18888}:18888"
+      - "127.0.0.1:${INVENTORY_OTLP_PORT:-4318}:18890"
 
   # Optional: `mise run browser-webkit` (CONTRIBUTING.md, Running the checks).
   # Playwright's own image and server, for WebKit where Playwright's WebKit
@@ -196,13 +197,17 @@ services:
 
   # Optional: `mise run compose -- --profile mail up -d mail`, then
   # http://localhost:8025. It catches mail sent to localhost:1025, and sends
-  # nothing on (CONTRIBUTING.md, Mail).
+  # nothing on (CONTRIBUTING.md, Mail). Each port is .env's, if it names
+  # another; it takes mail on the same one inside, so the app container's
+  # MAIL_PORT is the one .env gives the app here.
   mail:
     image: docker.io/axllent/mailpit:v1.31.6
     profiles: [mail]
+    environment:
+      MP_SMTP_BIND_ADDR: 0.0.0.0:${INVENTORY_SMTP_PORT:-1025}
     ports:
-      - "127.0.0.1:8025:8025"
-      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:${INVENTORY_MAILPIT_PORT:-8025}:8025"
+      - "127.0.0.1:${INVENTORY_SMTP_PORT:-1025}:${INVENTORY_SMTP_PORT:-1025}"
 
   # Optional: `mise run phone` (CONTRIBUTING.md, On a phone). In the app's
   # network, so it reaches the app from 127.0.0.1, which uvicorn trusts by

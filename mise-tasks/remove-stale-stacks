@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+#MISE description="Remove the compose stacks of checkouts that no longer exist, with their volumes, once you confirm the list"
+#MISE depends=["list-stale-stacks"]
+#MISE confirm="Remove the stacks listed above, if any, with their volumes and every database in them?"
+# CONTRIBUTING.md, Local settings. Only those list-stale-stacks showed,
+# which are never the stack checkouts share (inventory-tng), nor this
+# checkout's.
+set -euo pipefail
+here=$(cd "$(dirname "$0")" && pwd)
+root=${MISE_PROJECT_ROOT:-$here/..}
+
+while read -r name _; do
+  # From outside any checkout, so compose takes the project from its
+  # containers' labels alone, not from a compose.yaml here.
+  (cd / && "$here/compose" --project-name "$name" down --volumes </dev/null)
+done <"$root/.local/stale-stacks"
+rm "$root/.local/stale-stacks"

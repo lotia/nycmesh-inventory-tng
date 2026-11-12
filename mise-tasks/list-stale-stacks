@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+#MISE description="List the compose stacks of checkouts that no longer exist, which mise run remove-stale-stacks removes"
+# CONTRIBUTING.md, Local settings. Never the stack checkouts share
+# (inventory-tng), nor this checkout's. The list is kept in
+# .local/stale-stacks, so remove-stale-stacks removes only what it shows.
+set -euo pipefail
+here=$(dirname "$0")
+root=${MISE_PROJECT_ROOT:-$here/..}
+list=$root/.local/stale-stacks
+
+mkdir -p "$root/.local"
+"$here/compose" ls --all --format json |
+  uv run --quiet --frozen --project "$here/../backend" \
+    python -m inventory_tng.stacks stale >"$list"
+if [[ ! -s $list ]]; then
+  echo "No stack's checkout is gone."
+  exit
+fi
+echo "Stacks whose checkout is gone, each with its volume and every database in it:"
+while read -r name checkout; do
+  echo "  $name, from $checkout"
+done <"$list"
