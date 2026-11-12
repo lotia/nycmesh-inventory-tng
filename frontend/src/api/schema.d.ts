@@ -60,7 +60,9 @@ export interface paths {
      *     exist, a fraction of an item counted in each or of a package, a retired
      *     item or package received, or an item another line names in the same
      *     package, or loose, too (repeated): send each item on one line for each
-     *     package it is in, sealed, and one loose (docs/decisions/0020).
+     *     package it is in, sealed, and one loose (docs/decisions/0020). The
+     *     reply's X-Inventory-Build header names the build of the pages this
+     *     server serves, when it has one (page_builds.py).
      */
     post: operations["save_batch_api_transactions_post"];
     delete?: never;
@@ -149,6 +151,14 @@ export interface components {
        * @description What the volunteer says is really on open packages, by key, for an administrator to check (docs/decisions/0020): with a cut, or alone, in a report. Never an adjustment.
        */
       lengths?: components["schemas"]["LengthReport"][] | null;
+    };
+    /** BuildTooOldReply */
+    BuildTooOldReply: {
+      /**
+       * Reason
+       * @constant
+       */
+      reason: "build_too_old";
     };
     /** Catalogue */
     Catalogue: {
@@ -293,6 +303,23 @@ export interface components {
       parent_id: number | null;
     };
     /**
+     * OlderStorage
+     * @description A scan page found what an older build left under its own key, which
+     *     it keeps but does not read: saves not sent, or a cart with lines.
+     */
+    OlderStorage: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "older_storage";
+      /**
+       * Held
+       * @enum {string}
+       */
+      held: "saves" | "cart";
+    };
+    /**
      * OpenPackageEntry
      * @description A package opened and followed, not reported used up: one a cart can
      *     take from where it is.
@@ -322,6 +349,23 @@ export interface components {
       left: string;
       /** Short Below */
       short_below: string | null;
+    };
+    /**
+     * OutOfDate
+     * @description A scan page's tab learned that a newer build is out (page_builds.py),
+     *     once a tab.
+     */
+    OutOfDate: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "out_of_date";
+      /**
+       * Learned
+       * @enum {string}
+       */
+      learned: "other_tab" | "server" | "too_old";
     };
     /** OutboxRetry */
     OutboxRetry: {
@@ -397,6 +441,8 @@ export interface components {
         | components["schemas"]["PageError"]
         | components["schemas"]["OutboxRetry"]
         | components["schemas"]["ScanToSave"]
+        | components["schemas"]["OutOfDate"]
+        | components["schemas"]["OlderStorage"]
       )[];
     };
     /** Saved */
@@ -583,7 +629,10 @@ export interface operations {
   save_batch_api_transactions_post: {
     parameters: {
       query?: never;
-      header?: never;
+      header?: {
+        /** @description The id of the scan page's build that sent it: a build older than the server takes is answered 409 build_too_old, before the batch is checked */
+        "X-Inventory-Build"?: string | null;
+      };
       path?: never;
       cookie?: never;
     };
@@ -620,13 +669,15 @@ export interface operations {
           "application/json": components["schemas"]["DeviceRefusedReply"];
         };
       };
-      /** @description The key was used for another batch */
+      /** @description The key was used for another batch (key_reused), or the page's build is too old for this server (build_too_old): keep the batch, and load the page again */
       409: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["KeyReusedReply"];
+          "application/json":
+            | components["schemas"]["KeyReusedReply"]
+            | components["schemas"]["BuildTooOldReply"];
         };
       };
       /** @description Validation Error */

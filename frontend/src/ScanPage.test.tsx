@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, within } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
+import { BUILD_KEY, Builds } from "./build";
 import { openCamera } from "./camera";
-import { STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
+import { addOne, STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
 import { PRINTED_LENGTH } from "./OpenPackageCard";
 import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "./outbox";
 import { ScanPage } from "./ScanPage";
@@ -26,7 +27,7 @@ function server(save: () => Response | Promise<Response> = () => saved()) {
 
 function open(api = server().api) {
   const outbox = new Outbox(api);
-  render(<ScanPage api={api} outbox={outbox} />);
+  render(<ScanPage api={api} outbox={outbox} reload={vi.fn()} />);
   return outbox;
 }
 
@@ -95,7 +96,9 @@ describe("loading", () => {
     const older = deferred();
     const first = answering(() => older.promise).api;
     const outbox = new Outbox(first);
-    const { rerender } = render(<ScanPage api={first} outbox={outbox} />);
+    const { rerender } = render(
+      <ScanPage api={first} outbox={outbox} reload={vi.fn()} />,
+    );
     const newer = {
       ...CATALOGUE,
       volunteers: [{ id: 3, name: "Hedy" }],
@@ -103,7 +106,7 @@ describe("loading", () => {
     const second = answering((request) =>
       isCatalogue(request) ? json(newer, 200) : saved(),
     ).api;
-    rerender(<ScanPage api={second} outbox={outbox} />);
+    rerender(<ScanPage api={second} outbox={outbox} reload={vi.fn()} />);
     await screen.findByRole("option", { name: "Hedy" });
     older.resolve(json(CATALOGUE, 200));
     await new Promise((done) => setTimeout(done, 0));
@@ -976,7 +979,9 @@ describe("scanning labels with the camera", () => {
     const { api, outbox, key } = await savedThenDismissed();
     new Outbox(api).forgetShown([key]);
     window.dispatchEvent(new StorageEvent("storage", { key: OUTBOX_KEY }));
-    expect(localStorage.getItem(OUTBOX_KEY)).toBe("[]");
+    expect(JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? "")).toMatchObject({
+      entries: [],
+    });
     expect(outbox.shown()).toEqual([]);
     spoolTakenOff();
     // This tab's own catalogue shows it: forgotten here too.
@@ -1071,5 +1076,165 @@ describe("scanning labels with the camera", () => {
     await screen.findByText("That label isn't in the inventory (OLD-FORM).");
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     screen.getByRole("button", { name: "Scan with the camera" });
+  });
+});
+
+describe("a newer build", () => {
+  const MINE = "2026-11-12T10:00:00.000Z";
+  const NEWER = JSON.stringify({ build: "2026-11-12T11:00:00.000Z" });
+
+  /** The page, of the build MINE; `reload` is what loading it again does. */
+  function openMine(api = server().api) {
+    const outbox = new Outbox(api, localStorage, new Builds(MINE));
+    const reload = vi.fn();
+    render(<ScanPage api={api} outbox={outbox} reload={reload} />);
+    return { outbox, reload };
+  }
+
+  /** Another tab, of a newer build, starting. */
+  function newerTab() {
+    localStorage.setItem(BUILD_KEY, NEWER);
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: BUILD_KEY, newValue: NEWER }),
+    );
+  }
+
+  const reloadButton = () =>
+    screen.queryByRole("button", { name: "Load the page again" });
+
+  test("with nothing waiting and the cart empty, it offers the reload", async () => {
+    const { reload } = openMine();
+    await ready();
+    expect(screen.queryByRole("alert")).toBeNull();
+    newerTab();
+    await screen.findByText("A newer version of this page is out.");
+    fireEvent.click(reloadButton() as HTMLElement);
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  test("with the cart filled, it asks for it to be saved first", async () => {
+    openMine();
+    await ready();
+    fillMove();
+    newerTab();
+    await screen.findByText(
+      "A newer version of this page is out. Save the cart, or empty it, then load the page again.",
+    );
+    expect(reloadButton()).toBeNull();
+    save();
+    await screen.findByText("A newer version of this page is out.");
+    expect(reloadButton()).not.toBeNull();
+  });
+
+  test("with the cart filled, then emptied in another tab, it offers the reload", async () => {
+    openMine();
+    await ready();
+    fillMove();
+    newerTab();
+    await screen.findByText(
+      "A newer version of this page is out. Save the cart, or empty it, then load the page again.",
+    );
+    storeCart(freshCart());
+    window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
+    await screen.findByText("A newer version of this page is out.");
+    expect(reloadButton()).not.toBeNull();
+  });
+
+  test("with no catalogue, a cart filled in another tab is still to be saved first", async () => {
+    const { api } = answering(() => json({}, 500));
+    openMine(api);
+    await screen.findByText(/Couldn't load the catalogue/);
+    storeCart(addOne(freshCart(), 100));
+    window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
+    newerTab();
+    await screen.findByText(
+      "A newer version of this page is out. Save the cart, or empty it, then load the page again.",
+    );
+    expect(reloadButton()).toBeNull();
+  });
+
+  test("offline, with saves waiting, it asks to stay, and offers no reload", async () => {
+    const { api } = server(() => Promise.reject(new TypeError("offline")));
+    const { outbox } = openMine(api);
+    await ready();
+    fillMove();
+    save();
+    await vi.waitFor(() =>
+      expect(outbox.entries.value[0]?.waitingFor).toBe("network"),
+    );
+    newerTab();
+    await screen.findByText(
+      "A newer version of this page is out. 1 save waiting to send: stay on this page until they have gone.",
+    );
+    expect(reloadButton()).toBeNull();
+  });
+
+  test("a save from a build too old is kept, not refused, and the reload offered", async () => {
+    const { api } = server(() => json({ reason: "build_too_old" }, 409));
+    const { outbox, reload } = openMine(api);
+    await ready();
+    fillMove();
+    save();
+    await screen.findByText(
+      "This page is out of date, and the inventory no longer takes its saves. The 1 save waiting will be kept on this phone, not sent: tell an administrator.",
+    );
+    expect(outbox.entries.value.map((each) => each.state)).toEqual(["waiting"]);
+    expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
+    fireEvent.click(reloadButton() as HTMLElement);
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  test("too old with nothing waiting, it offers the reload alone", async () => {
+    const { outbox } = openMine();
+    await ready();
+    outbox.builds.learn("too_old");
+    await screen.findByText(
+      "This page is out of date, and the inventory no longer takes its saves.",
+    );
+    expect(reloadButton()).not.toBeNull();
+  });
+
+  test("what older builds left is reported, and kept", async () => {
+    const record = vi.spyOn(telemetry, "record");
+    const waiting = {
+      body: { key: "k", kind: "move", volunteer_id: 1, lines: [] },
+      state: "waiting",
+    };
+    const outboxBefore = JSON.stringify([waiting, waiting]);
+    const cartBefore = JSON.stringify({ ...freshCart(), lines: [{}] });
+    localStorage.setItem("inventory.outbox.v3", outboxBefore);
+    localStorage.setItem("inventory.cart.v1", cartBefore);
+    openMine();
+    await ready();
+    screen.getByText(
+      "This phone holds 2 saves an older version of this page did not send. They are kept here, not sent: tell an administrator.",
+    );
+    screen.getByText(
+      "A cart filled on an older version of this page is kept on this phone, not shown here. Fill it again if it was not saved.",
+    );
+    expect(record).toHaveBeenCalledWith({
+      kind: "older_storage",
+      held: "saves",
+    });
+    expect(record).toHaveBeenCalledWith({
+      kind: "older_storage",
+      held: "cart",
+    });
+    record.mockRestore();
+    fillMove();
+    save();
+    await screen.findByText(/^Saved: /);
+    expect(localStorage.getItem("inventory.outbox.v3")).toBe(outboxBefore);
+    expect(localStorage.getItem("inventory.cart.v1")).toBe(cartBefore);
+  });
+
+  test("one older save is told as one", async () => {
+    localStorage.setItem(
+      "inventory.outbox.v2",
+      JSON.stringify([{ state: "waiting" }]),
+    );
+    openMine();
+    await ready();
+    screen.getByText(/^This phone holds 1 save an older version/);
   });
 });

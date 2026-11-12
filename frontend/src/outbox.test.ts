@@ -1,15 +1,17 @@
 import { v4 as uuid } from "uuid";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { BUILD, Builds, HEADER } from "./build";
 import {
-  BEFORE,
   type Draft,
   Entry,
+  Kept,
   newEntry,
   Outbox,
   REPORT_AFTER,
   RETRY_MS,
   SAVED_MOST,
   STORAGE_KEY,
+  waitingInOlderKeys,
 } from "./outbox";
 import { telemetry } from "./telemetry";
 import { answering, json, saved } from "./test-fetch";
@@ -30,11 +32,17 @@ function entry(fields: Partial<Entry> = {}): Entry {
   return { ...newEntry({ ...draft(), key: uuid() }, "a", 1), ...fields };
 }
 
-function storeAt(key: string, ...entries: unknown[]) {
-  localStorage.setItem(key, JSON.stringify(entries));
+/** Kept as this build keeps them, stamped by `build`. */
+function storeBy(build: string, ...entries: unknown[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ build, entries }));
 }
 
-const store = (...entries: unknown[]) => storeAt(STORAGE_KEY, ...entries);
+const store = (...entries: unknown[]) => storeBy(BUILD, ...entries);
+
+/** Kept as builds before v4 kept them: a list, under an older key. */
+function storeOlder(key: string, ...entries: unknown[]) {
+  localStorage.setItem(key, JSON.stringify(entries));
+}
 
 /** Storage that reads but refuses every write. */
 const full = {
@@ -50,8 +58,8 @@ function replies(...queued: (() => Response | Promise<Response>)[]) {
 }
 
 const states = (outbox: Outbox) => outbox.entries.value.map((e) => e.state);
-const stored = (key = STORAGE_KEY) =>
-  JSON.parse(localStorage.getItem(key) ?? "null");
+const stored = () =>
+  JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null")?.entries;
 const bodies = (sent: Request[]) =>
   Promise.all(sent.map((request) => request.clone().json()));
 
@@ -416,6 +424,79 @@ describe("refusals", () => {
   });
 });
 
+describe("builds", () => {
+  const MINE = "2026-11-12T10:00:00.000Z";
+  const NEWER = "2026-11-12T11:00:00.000Z";
+
+  /** An outbox of the build MINE, whose server answers with `reply`. */
+  function of(reply: () => Response) {
+    const { api, sent } = answering(reply);
+    return { outbox: new Outbox(api, localStorage, new Builds(MINE)), sent };
+  }
+
+  /** A save, from a server whose pages are `build`. */
+  const savedBy = (build: string) => () => {
+    const response = saved();
+    response.headers.set(HEADER, build);
+    return response;
+  };
+
+  test("each batch names this build", async () => {
+    const { outbox, sent } = of(() => saved());
+    outbox.queue(draft(), "a");
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
+    expect(sent[0]?.headers.get(HEADER)).toBe(MINE);
+  });
+
+  test("a reply naming a newer build says one is out, and sending goes on", async () => {
+    const record = vi.spyOn(telemetry, "record");
+    const { outbox } = of(savedBy(NEWER));
+    outbox.queue(draft(), "a");
+    outbox.queue(draft(), "b");
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["saved", "saved"]));
+    expect(outbox.builds.newer.value).toBe("server");
+    expect(record).toHaveBeenCalledWith({
+      kind: "out_of_date",
+      learned: "server",
+    });
+    expect(
+      record.mock.calls.filter(([event]) => event.kind === "out_of_date"),
+    ).toHaveLength(1);
+    record.mockRestore();
+  });
+
+  test.each([
+    ["this build", MINE],
+    ["an older build", "2026-11-12T09:00:00.000Z"],
+    ["no build at all", "not a build"],
+  ])("a reply naming %s says nothing", async (_name, build) => {
+    const { outbox } = of(savedBy(build));
+    outbox.queue(draft(), "a");
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
+    expect(outbox.builds.newer.value).toBeNull();
+  });
+
+  test("a batch from a build too old is kept waiting, not refused, and nothing more is sent", async () => {
+    const { outbox, sent } = of(() => json({ reason: "build_too_old" }, 409));
+    outbox.queue(draft(), "first");
+    outbox.queue(draft(), "second");
+    await vi.waitFor(() => expect(outbox.builds.newer.value).toBe("too_old"));
+    expect(states(outbox)).toEqual(["waiting", "waiting"]);
+    expect(outbox.entries.value[0]?.note).toBe(
+      "Not sent: this page is out of date. Load it again.",
+    );
+    expect(stored().map((each: Entry) => each.state)).toEqual([
+      "waiting",
+      "waiting",
+    ]);
+    // Neither a dismissal nor another round sends or drops it.
+    outbox.dismiss(outbox.entries.value[0]?.body.key ?? "");
+    await outbox.send();
+    expect(sent).toHaveLength(1);
+    expect(states(outbox)).toEqual(["waiting", "waiting"]);
+  });
+});
+
 describe("storage", () => {
   test("waiting batches outlive the page", async () => {
     const waiting = entry({ waitingFor: "registration" });
@@ -496,106 +577,78 @@ describe("storage", () => {
     expect(outbox.entries.value[0]?.note).toBe(`Not saved. Line 1: ${msg}`);
   });
 
-  test("an older build's batches are sent, and copied here, left there for its tabs", async () => {
-    const mine = entry({ queuedAt: 2 });
-    const older = entry({ queuedAt: 1 });
-    store(mine);
-    storeAt(BEFORE, older);
+  test("an older build's keys are neither read, sent, nor written", async () => {
+    const older = entry();
+    storeOlder("inventory.outbox.v3", older);
+    storeOlder("inventory.outbox.v1", entry({ state: "saved" }));
+    const keys = ["inventory.outbox.v3", "inventory.outbox.v1"];
+    const before = keys.map((key) => localStorage.getItem(key));
     const { api, sent } = answering(() => saved());
     const outbox = new Outbox(api);
-    expect(outbox.entries.value).toEqual([older, mine]);
-    await outbox.send();
-    expect(sent).toHaveLength(2);
-    expect(stored().map((e: Entry) => e.state)).toEqual(["saved", "saved"]);
-    // An older tab still sends, settles and counts its own: the server
-    // saves it once, by its key.
-    expect(stored(BEFORE)).toEqual([older]);
-  });
-
-  test("a batch copied here stays here if the list of those copied can't be kept", () => {
-    const older = entry();
-    storeAt(BEFORE, older);
-    const noList = {
-      getItem: (key: string) => localStorage.getItem(key),
-      setItem: (key: string, value: string) => {
-        if (key.endsWith(".copied")) {
-          throw new DOMException("full", "QuotaExceededError");
-        }
-        localStorage.setItem(key, value);
-      },
-    } as unknown as Storage;
-    const outbox = new Outbox(answering(() => saved()).api, noList);
-    outbox.queue(draft(), "mine", 30);
-    expect(stored().map((e: Entry) => e.body.key)).toContain(older.body.key);
-    expect(outbox.entries.value).toHaveLength(2);
-  });
-
-  test("a batch copied here and forgotten is not copied again", () => {
-    const older = entry({ state: "saved", transactionId: 1 });
-    storeAt(BEFORE, older);
-    const outbox = new Outbox(answering(() => saved()).api);
-    outbox.dismiss(older.body.key);
-    outbox.forgetShown([older.body.key]);
     expect(outbox.entries.value).toEqual([]);
-    expect(new Outbox(answering(() => saved()).api).entries.value).toEqual([]);
-    // This build's key unreadable: what the build before holds is copied
-    // again, not left out as copied once.
-    localStorage.setItem(STORAGE_KEY, "not json");
-    storeAt(BEFORE, older);
-    expect(new Outbox(answering(() => saved()).api).entries.value).toEqual([
-      older,
-    ]);
+    outbox.queue(draft(), "mine");
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
+    expect(sent).toHaveLength(1);
+    expect(keys.map((key) => localStorage.getItem(key))).toEqual(before);
   });
 
-  test("the first build's batches are read only while the second's key is absent", () => {
-    const waiting = entry();
-    storeAt("inventory.outbox.v1", waiting);
-    expect(new Outbox(answering(() => saved()).api).entries.value).toEqual([
-      waiting,
-    ]);
-    // Unreadable is not absent: the build before copied the first's.
-    localStorage.setItem(BEFORE, "not json");
-    expect(new Outbox(answering(() => saved()).api).entries.value).toEqual([]);
-    // Nor is a key the browser will not read.
-    localStorage.removeItem(BEFORE);
-    const refusing = {
-      getItem: (key: string) => {
-        if (key === BEFORE) {
-          throw new DOMException("denied", "SecurityError");
-        }
-        return localStorage.getItem(key);
-      },
-    } as unknown as Storage;
-    expect(
-      new Outbox(answering(() => saved()).api, refusing).entries.value,
-    ).toEqual([]);
-  });
-
-  test("an older tab's rewrite drops nothing here: not dismissed, not a saved batch", () => {
-    const saves = Array.from({ length: 12 }, (_, n) =>
-      entry({ state: "saved", transactionId: n + 1, queuedAt: n }),
+  test("the batches waiting under older keys are counted, never removed", () => {
+    storeOlder(
+      "inventory.outbox.v3",
+      entry(),
+      entry({ state: "saved", transactionId: 1 }),
+      entry({ state: "refused" }),
+      "not a batch",
     );
-    store(...saves);
-    const outbox = new Outbox(answering(() => saved()).api);
-    outbox.dismiss(saves[0]?.body.key ?? "");
-    // A tab of the build before keeps 10 saved batches and drops fields it
-    // cannot read from what it rewrites: only its own key.
-    const theirs = entry({ queuedAt: 20 });
-    storeAt(BEFORE, theirs);
-    outbox.queue(draft(), "mine", 30);
-    expect(stored()).toHaveLength(14);
-    expect(stored()[0]).toEqual({ ...saves[0], dismissed: true });
-    expect(outbox.shown().map((e) => e.body.key)).not.toContain(
-      saves[0]?.body.key,
+    localStorage.setItem("inventory.outbox.v1", "not json");
+    expect(waitingInOlderKeys()).toBe(1);
+    // This build's own are not older.
+    store(entry());
+    expect(waitingInOlderKeys()).toBe(1);
+    expect(localStorage.getItem("inventory.outbox.v1")).toBe("not json");
+  });
+
+  test("of v1 to v3, only the newest held is counted, as each build up to v3 took over and sent the key's before", () => {
+    // v3 copied and sent v2's, which still says they wait.
+    const copied = [entry(), entry()];
+    storeOlder("inventory.outbox.v2", ...copied);
+    storeOlder("inventory.outbox.v1", entry());
+    expect(waitingInOlderKeys()).toBe(2);
+    storeOlder("inventory.outbox.v3", entry({ state: "saved" }));
+    expect(waitingInOlderKeys()).toBe(0);
+    expect(localStorage.getItem("inventory.outbox.v2")).toBe(
+      JSON.stringify(copied),
     );
   });
 
-  test("a batch both here and in an older key is this build's", () => {
-    const here = entry({ state: "saved", transactionId: 4 });
-    store(here);
-    storeAt(BEFORE, { ...here, state: "waiting", transactionId: null });
+  test("an older key kept as v4 keeps it is counted too", () => {
+    // What a later build will count, once this key is older than its own.
+    localStorage.setItem(
+      "inventory.outbox.v3",
+      JSON.stringify({ build: BUILD, entries: [entry()] }),
+    );
+    expect(waitingInOlderKeys()).toBe(1);
+    expect(waitingInOlderKeys(full)).toBe(1);
+  });
+
+  test("what is kept is stamped with the build that wrote it", () => {
+    const outbox = new Outbox(
+      answering(() => json({ reason: "unregistered" }, 403)).api,
+      localStorage,
+      new Builds("2026-11-12T10:00:00.000Z"),
+    );
+    outbox.queue(draft(), "a");
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "")).toEqual({
+      build: "2026-11-12T10:00:00.000Z",
+      entries: outbox.entries.value,
+    });
+  });
+
+  test("this key, written by a newer build of the same key, is read", () => {
+    const theirs = entry();
+    storeBy("2999-01-01T00:00:00.000Z", theirs);
     expect(new Outbox(answering(() => saved()).api).entries.value).toEqual([
-      here,
+      theirs,
     ]);
   });
 
@@ -628,8 +681,9 @@ describe("storage", () => {
       const inner = s.options ?? [s.item ?? s.wrapped].filter(Boolean);
       return inner.flatMap((each) => paths(each, at));
     };
+    expect(Object.keys(Kept.entries)).toEqual(["build", "entries"]);
     expect({ [STORAGE_KEY]: paths(Entry).sort() }).toEqual({
-      "inventory.outbox.v3": [
+      "inventory.outbox.v4": [
         "body",
         "body.from_location_id",
         "body.install_number",
@@ -672,7 +726,7 @@ describe("storage", () => {
     ]);
   });
 
-  test.each(["not json", '{"an": "object"}'])(
+  test.each(["not json", '{"an": "object"}', "[]"])(
     "storage holding %j reads as empty",
     (value) => {
       localStorage.setItem(STORAGE_KEY, value);
@@ -806,13 +860,14 @@ describe("listening", () => {
     stop();
   });
 
-  test("an older build's tab's batch shows here", () => {
+  test("an older build's tab's batch does not show here", () => {
     const outbox = new Outbox(answering(() => saved()).api);
     const stop = outbox.listen();
-    const theirs = entry();
-    storeAt(BEFORE, theirs);
-    window.dispatchEvent(new StorageEvent("storage", { key: BEFORE }));
-    expect(outbox.entries.value).toEqual([theirs]);
+    storeOlder("inventory.outbox.v3", entry());
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: "inventory.outbox.v3" }),
+    );
+    expect(outbox.entries.value).toEqual([]);
     stop();
   });
 

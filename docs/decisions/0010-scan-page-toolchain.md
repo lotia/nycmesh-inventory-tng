@@ -94,8 +94,27 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   Python.
 - A tab opened before a deploy can ask for a file the new build no longer
   has. The page treats a failed lazy import as a reason to keep the cart and
-  reload. The cart and outbox keep a versioned storage format that a new
-  build must read, so a deploy never strands a queued batch.
+  reload.
+- **Across a deploy, each build keeps to its own storage** (Ali,
+  2026-11-12, inventory-tng-omi). The cart and the outbox are kept under
+  keys with a version, and a build reads and writes only its own: a new
+  build never copies an older one's batches, so a change to what is kept
+  needs no copying code, and Valibot's objects stay strict. Instead, a tab
+  of an older build sends its own batches and lets the volunteer save the
+  cart, then asks for a reload; offline, it says how many saves wait and
+  to stay on the page. It learns that a newer build is out from another
+  tab's stamp in storage (each build stamps its id, the time it was made,
+  on what it keeps) or from the server, whose reply to a batch names its
+  build. What an older build left under its keys is reported to the
+  volunteer and counted, never read nor removed. So the server keeps
+  taking what older builds send: a field is never made required in the
+  deploy that adds it. When it is, the server answers a batch from a build
+  before that one 409 `build_too_old`, before checking it, and the tab
+  keeps the batch and asks for a reload, where a 422 would have it
+  refused. We rejected copying between keys, which earlier builds did and
+  which every change to what is kept made harder, and reading leniently
+  (`v.looseObject`), which keeps unknown fields but still needs a new key
+  for a changed value.
 - Compression behaves the same in compose and in Kubernetes, because the
   app serves the compressed files itself. The image holds three copies of
   each file; the bundle is small, so that costs little.

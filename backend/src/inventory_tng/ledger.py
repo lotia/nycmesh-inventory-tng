@@ -32,7 +32,7 @@ from types import MappingProxyType
 from typing import Annotated, Literal, NamedTuple
 
 import structlog
-from fastapi import APIRouter, FastAPI, Request, Response
+from fastapi import APIRouter, Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from opentelemetry import metrics
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
@@ -52,7 +52,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from inventory_tng import open_packages
+from inventory_tng import open_packages, page_builds
 from inventory_tng.db import (
     DbSession,
     RuleBroken,
@@ -76,6 +76,7 @@ from inventory_tng.models import (
     OpenPackage,
     Volunteer,
 )
+from inventory_tng.page_builds import BuildTooOldReply
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -2026,10 +2027,13 @@ PATH = "/transactions"
             "description": "This device is not registered",
         },
         409: {
-            "model": KeyReusedReply,
-            "description": "The key was used for another batch",
+            "model": KeyReusedReply | BuildTooOldReply,
+            "description": "The key was used for another batch "
+            "(key_reused), or the page's build is too old for this server "
+            "(build_too_old): keep the batch, and load the page again",
         },
     },
+    dependencies=[Depends(page_builds.checked)],
 )
 def save_batch(
     batch: Batch, device: RegisteredDevice, session: DbSession, response: Response
@@ -2039,7 +2043,9 @@ def save_batch(
     exist, a fraction of an item counted in each or of a package, a retired
     item or package received, or an item another line names in the same
     package, or loose, too (repeated): send each item on one line for each
-    package it is in, sealed, and one loose (docs/decisions/0020)."""
+    package it is in, sealed, and one loose (docs/decisions/0020). The
+    reply's X-Inventory-Build header names the build of the pages this
+    server serves, when it has one (page_builds.py)."""
     # So the history of anything the batch changes, such as on_order, says who.
     set_actor(session, f"volunteer:{batch.volunteer_id}")
     transaction, written, retired, opened, reported, checks = record(

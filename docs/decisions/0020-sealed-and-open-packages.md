@@ -61,8 +61,8 @@ deployed, so the migrations may be rewritten (0016).
   A saved batch stays in the outbox, dismissed from its list or not,
   until a catalogue shows it (inventory-tng-3p4). Reports and dismissals
   took the outbox to a key of its own, as a tab of the build before would
-  drop them; its batches are copied over and sent by both, saved once by
-  their keys, so none waits on that tab alone (inventory-tng-ktj).
+  drop them (inventory-tng-ktj); since inventory-tng-omi a build no longer
+  copies an older one's batches, but that build's tab sends them (0010).
   With no place picked yet, an item of one current package adds that
   package; once the place is picked or changed, every opening line the
   volunteer has not typed into is filled again by the rule above. A line

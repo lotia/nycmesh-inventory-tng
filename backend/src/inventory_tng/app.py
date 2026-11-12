@@ -20,6 +20,7 @@ from inventory_tng import (
     devices,
     health,
     ledger,
+    page_builds,
     page_telemetry,
     pages,
     resets,
@@ -109,6 +110,7 @@ def create_app(
     db.install(app)
     devices.install(app)
     ledger.install(app)
+    page_builds.install(app)
     page_telemetry.install(app)
     sign_in.install(app)
     return app

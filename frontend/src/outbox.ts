@@ -10,38 +10,37 @@
  *
  * Kept in localStorage, which outlives the tab and does not depend on the
  * device cookie, so registering loses no work. Each change rereads storage
- * first, so two tabs do not drop each other's batches.
+ * first, so two tabs do not drop each other's batches. Each build reads and
+ * writes its own key only: a tab of an older build sends its own batches
+ * before it asks for a reload (build.ts), and what an older build left is
+ * reported, never read nor removed (waitingInOlderKeys).
  */
 import { signal } from "@preact/signals";
 import { v4 as uuid } from "uuid";
 import * as v from "valibot";
 import { type Api, check, makeApi, type Schemas } from "./api/client";
 import {
+  BuildTooOldReply,
   DeviceRefusedReply,
   id,
   KeyReusedReply,
   Saved,
   ValidationFailed,
 } from "./api/replies";
+import { Builds, HEADER } from "./build";
 import { NOT_REGISTERED } from "./registration";
-import { hasStored, onStoredChange, readStored, writeStored } from "./stored";
+import {
+  olderVersions,
+  onStoredChange,
+  readStored,
+  writeStored,
+} from "./stored";
 import { telemetry } from "./telemetry";
 
-/** Versioned: a build that changes the shape keeps to a key of its own, as
- * a tab of an older build, open during a deploy, would drop what it cannot
- * read from what it writes back: v3's batches may report what is on an
- * open package (`lengths`), and its saved batches may be dismissed. */
-export const STORAGE_KEY = "inventory.outbox.v3";
-/** The key of the build before, or, absent, of the one before that. Their
- * batches are copied here, never written there, so an older tab, open
- * during a deploy, keeps sending, settling and counting its own, and this
- * build sends them too: the server saves a batch once, by its key. */
-export const BEFORE = "inventory.outbox.v2";
-const LONG_BEFORE = "inventory.outbox.v1";
-/** The keys of the batches under the older build's key (BEFORE, or
- * LONG_BEFORE) already copied here, so one this build has since forgotten
- * is not copied again. */
-const COPIED = `${STORAGE_KEY}.copied`;
+/** Versioned: a build that changes what is kept takes a new key, as a tab
+ * of an older build, open during a deploy, would drop what it cannot read
+ * from what it writes back. v4's is stamped with the build that wrote it. */
+export const STORAGE_KEY = "inventory.outbox.v4";
 /** How long to wait before trying again after no answer. */
 export const RETRY_MS = 30_000;
 /** Unexpected answers to one batch before its note asks for a report. */
@@ -133,6 +132,37 @@ export const Entry = v.object({
 
 export type Entry = v.InferOutput<typeof Entry>;
 
+/** What STORAGE_KEY holds: the batches, and the build that last wrote them.
+ * Each entry is read on its own (parsed). */
+export const Kept = v.object({
+  build: v.string(),
+  entries: v.array(v.unknown()),
+});
+
+/** The builds up to the one keeping v3 each took over the batches under
+ * the key before theirs, and sent them, but left them there as they were:
+ * of v1 to v3, only the newest held stands for what was not sent. */
+const TOOK_OVER = 3;
+/** A stored entry waiting to send, of any version. */
+const Waiting = v.object({ state: v.literal("waiting") });
+
+/** How many batches waiting to send older builds left under their keys,
+ * which this build never reads: kept for their tabs, or for someone to
+ * recover, and reported (ScanPage). Each was a list of entries, as v4's
+ * entries are. */
+export function waitingInOlderKeys(storage: Storage = localStorage): number {
+  const older = olderVersions(storage, STORAGE_KEY);
+  const newest = older
+    .slice(0, TOOK_OVER)
+    .findLastIndex((stored) => stored !== undefined);
+  return older
+    .slice(Math.max(newest, 0))
+    .flatMap((stored) =>
+      Array.isArray(stored) ? stored : v.is(Kept, stored) ? stored.entries : [],
+    )
+    .filter((entry) => v.is(Waiting, entry)).length;
+}
+
 /** A batch's reports, as a 422 names them. */
 const REPORTS: Record<string, string> = {
   used_up: "Open package said used up",
@@ -197,6 +227,8 @@ export class Outbox {
   constructor(
     private readonly api: Api,
     private readonly storage: Storage = localStorage,
+    /** This build, and whether a newer one is out. */
+    readonly builds = new Builds(undefined, storage),
   ) {
     this.show(this.read());
   }
@@ -210,54 +242,20 @@ export class Outbox {
     this.entries.value = oldestFirst(elsewhere, stored);
   }
 
-  /** What storage holds: this build's, and an older build's not yet
-   * copied here, oldest first. */
+  /** What storage holds, oldest first. */
   private read(): Entry[] {
-    return this.readAll().entries;
-  }
-
-  /** What read() returns, and `toCopy`: the keys COPIED is to hold, if it
-   * does not hold them yet. */
-  private readAll(): { entries: Entry[]; toCopy?: string[] } {
-    const kept = readStored(this.storage, STORAGE_KEY);
-    const here = parsed(kept);
-    // LONG_BEFORE only while BEFORE was never written: the build before
-    // copied its batches.
-    const older = parsed(
-      hasStored(this.storage, BEFORE)
-        ? readStored(this.storage, BEFORE)
-        : readStored(this.storage, LONG_BEFORE),
-    );
-    // Trusted only beside what it says was copied: here unreadable, its
-    // copies are gone too, so they are copied again.
-    const listed = Array.isArray(kept) ? readStored(this.storage, COPIED) : [];
-    const copied = new Set(Array.isArray(listed) ? listed : []);
-    const keys = new Set(here.map((entry) => entry.body.key));
-    const copies = older.filter(
-      (entry) => !keys.has(entry.body.key) && !copied.has(entry.body.key),
-    );
-    // Only those older still holds, so COPIED never outgrows it.
-    const toCopy = older.map((entry) => entry.body.key);
-    const same =
-      toCopy.length === copied.size && toCopy.every((key) => copied.has(key));
-    return {
-      entries: oldestFirst(copies, here),
-      ...(same ? {} : { toCopy }),
-    };
+    const kept = v.safeParse(Kept, readStored(this.storage, STORAGE_KEY));
+    return kept.success ? parsed(kept.output.entries) : [];
   }
 
   /** Change what is kept, from what storage holds now. False if the browser
    * would not store it (full, or storage forbidden). */
   private update(change: (entries: Entry[]) => Entry[]): boolean {
-    const { entries, toCopy } = this.readAll();
-    const next = change(entries);
-    const kept = writeStored(this.storage, STORAGE_KEY, next);
-    // Once kept here: listed copied first, a batch would be in neither.
-    // Not listed, one forgotten here is copied again, which only shows it
-    // until a catalogue does once more.
-    if (kept && toCopy !== undefined) {
-      writeStored(this.storage, COPIED, toCopy);
-    }
+    const next = change(this.read());
+    const kept = writeStored(this.storage, STORAGE_KEY, {
+      build: this.builds.build,
+      entries: next,
+    } satisfies v.InferOutput<typeof Kept>);
     // Shown as stored, so the page never shows what was not kept.
     this.show(kept ? next : this.read());
     return kept;
@@ -357,7 +355,8 @@ export class Outbox {
    * down, an unregistered device) stops the round.
    */
   async send(): Promise<void> {
-    if (this.sending) {
+    // Too old, nothing this tab sends is taken: kept until it reloads.
+    if (this.sending || this.builds.newer.value === "too_old") {
       return;
     }
     this.sending = true;
@@ -401,16 +400,23 @@ export class Outbox {
   /** Whether the round goes on to the next batch. */
   private async sendOne(entry: Entry): Promise<"next" | "stop"> {
     const key = entry.body.key;
-    const reply = await check(
-      this.api.POST("/api/transactions", { body: entry.body }),
-      {
-        200: Saved,
-        201: Saved,
-        403: DeviceRefusedReply,
-        409: KeyReusedReply,
-        422: ValidationFailed,
-      },
+    const call = this.api.POST("/api/transactions", {
+      params: { header: { [HEADER]: this.builds.build } },
+      body: entry.body,
+    });
+    // Whatever the answer, it names the server's build: a newer one is out.
+    call.then(
+      ({ response }) =>
+        this.builds.heard(response.headers.get(HEADER), "server"),
+      () => {},
     );
+    const reply = await check(call, {
+      200: Saved,
+      201: Saved,
+      403: DeviceRefusedReply,
+      409: v.variant("reason", [KeyReusedReply, BuildTooOldReply]),
+      422: ValidationFailed,
+    });
     switch (reply.status) {
       case 200:
       case 201:
@@ -439,6 +445,15 @@ export class Outbox {
         );
         return "stop";
       case 409:
+        if (reply.body.reason === "build_too_old") {
+          // Kept, waiting: a newer build of the page reports it (ScanPage).
+          this.builds.learn("too_old");
+          this.settle(key, {
+            waitingFor: null,
+            note: "Not sent: this page is out of date. Load it again.",
+          });
+          return "stop";
+        }
         this.settle(key, {
           state: "refused",
           waitingFor: null,
@@ -504,8 +519,7 @@ export class Outbox {
       }
       this.show(stored);
     };
-    // An older build's tab too, open during a deploy: its batches show here.
-    const stopFollowing = onStoredChange([STORAGE_KEY, BEFORE], follow);
+    const stopFollowing = onStoredChange([STORAGE_KEY], follow);
     target.addEventListener("online", send);
     target.document.addEventListener("visibilitychange", visible);
     return () => {

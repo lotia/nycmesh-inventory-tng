@@ -4,4 +4,4 @@ import { telemetry } from "./telemetry";
 
 telemetry.start("scan");
 
-mount(<ScanPage />);
+mount(<ScanPage reload={() => location.reload()} />);

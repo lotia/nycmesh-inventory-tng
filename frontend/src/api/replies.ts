@@ -23,6 +23,12 @@ export const DeviceRefusedReply = v.object({
 
 export const KeyReusedReply = v.object({ reason: v.literal("key_reused") });
 
+/** A batch from a build of the page older than the server takes: kept,
+ * not refused (backend page_builds.py). */
+export const BuildTooOldReply = v.object({
+  reason: v.literal("build_too_old"),
+});
+
 export const Saved = v.object({ transaction_id: id });
 
 /** FastAPI's 422, and the ledger's, which has the same shape: only the parts

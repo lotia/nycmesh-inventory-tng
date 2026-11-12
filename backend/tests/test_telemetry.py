@@ -31,6 +31,7 @@ from inventory_tng import (
     ledger,
     mail,
     open_packages,
+    page_builds,
     page_telemetry,
 )
 from inventory_tng.admin.categories import CATEGORIES
@@ -561,6 +562,20 @@ def test_counts_batches_written_replayed_and_refused(
     assert "inventory.transaction.lines" in metric_names(reader)
 
 
+def test_counts_batches_from_a_build_too_old(
+    rolled_back: Recorded, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _, reader, _ = rolled_back
+    before = counted(reader, "inventory.transactions.too_old")
+    monkeypatch.setattr(page_builds, "OLDEST_BUILD", "2026-11-12T10:00:00.000Z")
+    _, token = new_device(session)
+    client.cookies.set(devices.COOKIE, token)
+    response = client.post("/api/transactions", json=Place(session).batch())
+    client.cookies.clear()
+    assert response.status_code == 409
+    assert added(reader, "inventory.transactions.too_old", before) == {(): 1}
+
+
 def test_counts_packages_opened_by_what_they_became(
     rolled_back: Recorded, session: Session
 ) -> None:
@@ -746,6 +761,8 @@ def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
         {"kind": "error", "page": "register", "source": "unhandledrejection"},
         {"kind": "outbox_retry", "reason": "no_answer"},
         {"kind": "scan_to_save", "seconds": 42.5},
+        {"kind": "out_of_date", "learned": "too_old"},
+        {"kind": "older_storage", "held": "cart"},
     ]
     assert client.post("/api/telemetry", json={"events": events}).status_code == 204
     durations = histogram_counts(reader, "inventory.page.web_vital.duration")
@@ -765,6 +782,9 @@ def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
     assert errors[(("page", "register"), ("source", "unhandledrejection"))] >= 1
     assert counted(reader, "inventory.outbox.retries")[(("reason", "no_answer"),)] >= 1
     assert histogram_counts(reader, "inventory.scan.to_save.duration")[()] >= 1
+    out_of_date = counted(reader, "inventory.page.out_of_date")
+    assert out_of_date[(("learned", "too_old"),)] >= 1
+    assert counted(reader, "inventory.page.older_storage")[(("held", "cart"),)] >= 1
     # Buckets that fit the values, not the SDK's own from 5 up.
     bounds = {
         name: {

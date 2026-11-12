@@ -9,7 +9,15 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from servestatic.compress import Compressor
 
-from inventory_tng.bundle import MANIFEST, PAGES, SCAN, STYLES, Bundle, Tags
+from inventory_tng.bundle import (
+    BUILD_FILE,
+    MANIFEST,
+    PAGES,
+    SCAN,
+    STYLES,
+    Bundle,
+    Tags,
+)
 from inventory_tng.settings import FrontendConfig
 
 # The shape `vite build` writes: two entries sharing a chunk that carries the
@@ -46,6 +54,8 @@ BUILD = {
         "isEntry": True,
     },
 }
+# Its id, as vite.config.ts writes it beside the manifest.
+BUILD_ID = "2026-11-12T10:00:00.000Z"
 SCRIPT = b"export const answer = 42;\n" * 40
 WASM = b"\0asm\1\0\0\0" + b"\0" * 2000
 
@@ -55,6 +65,7 @@ def build(dist: Path) -> None:
     Brotli and gzip copies, from the compressor the container runs."""
     (dist / MANIFEST).parent.mkdir(parents=True)
     (dist / MANIFEST).write_text(json.dumps(BUILD))
+    (dist / BUILD_FILE).write_text(json.dumps({"build": BUILD_ID}))
     (dist / "assets").mkdir()
     for name, data in [("scan-Bk6ZGfA8.js", SCRIPT), ("decoder-9e1f3a2b.wasm", WASM)]:
         (dist / "assets" / name).write_bytes(data)
@@ -99,6 +110,33 @@ def test_an_entry_loads_its_imports_styles_and_preloads_them(dist: Path) -> None
         ),
         scripts=("/static/assets/scan-Bk6ZGfA8.js",),
     )
+
+
+def test_a_build_is_known_by_its_id(dist: Path) -> None:
+    assert Bundle(FrontendConfig(dist=dist), development=False).build_id() == BUILD_ID
+
+
+@pytest.mark.parametrize(
+    "written",
+    [None, "not json", "[]", "{}", '{"build": 12}', '{"build": "yesterday"}'],
+)
+def test_a_build_without_a_usable_id_has_none(dist: Path, written: str | None) -> None:
+    """As a build from before ids, or a file not Vite's: its pages still
+    load."""
+    if written is None:
+        (dist / BUILD_FILE).unlink()
+    else:
+        (dist / BUILD_FILE).write_text(written)
+    bundle = Bundle(FrontendConfig(dist=dist), development=False)
+    assert bundle.build_id() is None
+    assert bundle.tags(STYLES) is not None
+
+
+def test_no_build_and_the_dev_server_have_no_id(dist: Path, tmp_path: Path) -> None:
+    unbuilt = tmp_path / "unbuilt"
+    assert Bundle(FrontendConfig(dist=unbuilt), development=False).build_id() is None
+    config = FrontendConfig(dist=dist, dev_server="http://localhost:5173/")
+    assert Bundle(config, development=True).build_id() is None
 
 
 def test_the_shared_stylesheet_is_its_own_entry(dist: Path) -> None:
@@ -174,6 +212,15 @@ def test_the_log_says_where_the_pages_scripts_come_from(
         )
     (line,) = [line for line in logs if line["event"] == "frontend"]
     assert line["source"] == source
+
+
+def test_the_log_names_the_build(
+    make_app_without_database: Callable[..., FastAPI], dist: Path
+) -> None:
+    with structlog.testing.capture_logs() as logs:
+        make_app_without_database(frontend=FrontendConfig(dist=dist))
+    (line,) = [line for line in logs if line["event"] == "frontend"]
+    assert line["build"] == BUILD_ID
 
 
 def test_without_a_build_the_pages_say_so(
@@ -310,5 +357,9 @@ def test_development_serves_each_new_build(
         # A rebuild names new files; the page follows it.
         rebuilt = json.loads((tmp_path / MANIFEST).read_text())
         rebuilt["src/scan.tsx"]["file"] = "assets/scan-N3wHa5h0.js"
+        (tmp_path / BUILD_FILE).write_text(
+            json.dumps({"build": "2026-11-13T00:00:00.000Z"})
+        )
         (tmp_path / MANIFEST).write_text(json.dumps(rebuilt))
         assert "/static/assets/scan-N3wHa5h0.js" in client.get("/scan").text
+        assert app.state.bundle.build_id() == "2026-11-13T00:00:00.000Z"
