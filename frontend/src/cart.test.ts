@@ -10,12 +10,13 @@ import {
   loadCart,
   offered,
   offeredAt,
-  onlyPackage,
   quantityOf,
   STORAGE_KEY,
+  sealedHere,
   search,
   storeCart,
   toBatch,
+  withLine,
 } from "./cart";
 import type { Draft } from "./outbox";
 import { CATALOGUE, cable, radio } from "./test-catalogue";
@@ -113,6 +114,7 @@ describe("quantities", () => {
           size: "2.5",
           track_opened: false,
           retired: false,
+          sealed_at: [],
         },
       ],
     };
@@ -575,17 +577,27 @@ describe("turning a cart into a batch", () => {
     ).toMatchObject({ what: "Receipt: 1 item to Van" });
   });
 
-  test("opening an item opens its one package, a current one first", () => {
+  test("opening an item opens its one package sealed where it is opened", () => {
     const [box] = radio.packages;
     if (box === undefined) throw new Error("the radio comes in a box");
-    const old = { ...box, id: 2, retired: true };
-    expect(onlyPackage(radio)).toBe(box);
-    expect(onlyPackage({ ...radio, packages: [box, old] })).toBe(box);
-    expect(onlyPackage({ ...radio, packages: [old] })).toBe(old);
-    expect(onlyPackage({ ...radio, packages: [box, { ...box, id: 3 }] })).toBe(
-      undefined,
-    );
-    expect(onlyPackage(undefined)).toBe(undefined);
+    // A retired one too, sealed only at the van (inventory-tng-f9h).
+    const old = { ...box, id: 2, retired: true, sealed_at: [10, 12] };
+    const both = { ...radio, packages: [box, old] };
+    expect(sealedHere(radio, 10)).toBe(box);
+    expect(sealedHere(both, 12)).toBe(old);
+    // Both sealed there, or neither: none is picked.
+    expect(sealedHere(both, 10)).toBe(undefined);
+    expect(sealedHere(both, 11)).toBe(undefined);
+    // No place yet: none is sealed "here".
+    expect(sealedHere(radio, null)).toBe(undefined);
+    expect(sealedHere(undefined, 10)).toBe(undefined);
+  });
+
+  test("a line for an item is added once, with nothing in it", () => {
+    const empty = cart({ lines: [] });
+    const once = withLine(empty, 100);
+    expect(once.lines).toEqual([{ itemId: 100, packages: {}, loose: "" }]);
+    expect(withLine(once, 100)).toBe(once);
   });
 
   test("lines with nothing in them are left out", () => {

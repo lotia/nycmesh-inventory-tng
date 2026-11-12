@@ -319,37 +319,48 @@ export function reconcile(cart: Cart, catalogue: Catalogue): Cart {
 
 /** Add one of this item, or of this package of it, to the cart. */
 export function addOne(cart: Cart, itemId: number, packageId?: number): Cart {
-  const existing = cart.lines.find((line) => line.itemId === itemId);
-  const line: Line = existing ?? { itemId, packages: {}, loose: "" };
-  const bumped: Line =
-    packageId === undefined
-      ? { ...line, loose: decimal((thousandths(line.loose) ?? 0) + 1000) }
-      : {
-          ...line,
-          packages: {
-            ...line.packages,
-            [packageId]: String(
-              (count(line.packages[packageId] ?? "") ?? 0) + 1,
-            ),
-          },
-        };
+  const withIt = withLine(cart, itemId);
   return {
-    ...cart,
-    lines: existing
-      ? cart.lines.map((each) => (each === existing ? bumped : each))
-      : [...cart.lines, bumped],
+    ...withIt,
+    lines: withIt.lines.map((line) =>
+      line.itemId === itemId ? bumped(line, packageId) : line,
+    ),
   };
 }
 
-/** An item's one package, as opening the item opens one: its one current
- * package, beside any retired, else its one package; or none. */
-export function onlyPackage(
+/** A line with one more of a package of its item, or loose. */
+function bumped(line: Line, packageId?: number): Line {
+  return packageId === undefined
+    ? { ...line, loose: decimal((thousandths(line.loose) ?? 0) + 1000) }
+    : {
+        ...line,
+        packages: {
+          ...line.packages,
+          [packageId]: String((count(line.packages[packageId] ?? "") ?? 0) + 1),
+        },
+      };
+}
+
+/** The cart with a line for this item, nothing in it, if it has none. */
+export function withLine(cart: Cart, itemId: number): Cart {
+  return cart.lines.some((line) => line.itemId === itemId)
+    ? cart
+    : { ...cart, lines: [...cart.lines, { itemId, packages: {}, loose: "" }] };
+}
+
+/** The package opening an item at a place opens: its one package with
+ * some sealed there, current or retired; none if several are, or none. */
+export function sealedHere(
   item: Item | undefined,
+  placeId: number | null,
 ): Item["packages"][number] | undefined {
-  const packs = item?.packages ?? [];
-  const current = packs.filter((each) => !each.retired);
-  const pool = current.length > 0 ? current : packs;
-  return pool.length === 1 ? pool[0] : undefined;
+  if (placeId === null) {
+    return undefined;
+  }
+  const here = (item?.packages ?? []).filter((each) =>
+    each.sealed_at.includes(placeId),
+  );
+  return here.length === 1 ? here[0] : undefined;
 }
 
 /** Whole packages of one size: how many, and each one's size in

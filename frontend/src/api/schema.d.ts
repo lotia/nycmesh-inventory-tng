@@ -316,6 +316,8 @@ export interface components {
       track_opened: boolean;
       /** Retired */
       retired: boolean;
+      /** Sealed At */
+      sealed_at: number[];
     };
     /** PageError */
     PageError: {

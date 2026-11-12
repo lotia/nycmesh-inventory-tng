@@ -41,7 +41,11 @@ deployed, so the migrations may be rewritten (0016).
   kept sealed where it arrives.
 - **Opening**: at a place, a sealed package becomes an open one with its
   full size on it, in one transaction, so nothing appears or disappears.
-  Volunteers open packages on the scan page.
+  Volunteers open packages on the scan page. Picking an item there, by
+  search or its label, adds one of its package sealed at that place,
+  current or retired; if several are sealed there, or none, it fills no
+  package, for the volunteer to type (Ali, 2026-11-12, inventory-tng-f9h).
+  A package's own label adds that package, as ever.
 - **Cutting or taking from an open package**: scan the item's label, pick
   the open package from those at the place ("opened 3 Nov, 120 m left"),
   type how much. It leaves the open package and arrives loose, or goes to

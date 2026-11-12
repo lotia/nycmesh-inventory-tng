@@ -54,6 +54,8 @@ export const PackageEntry = v.object({
   track_opened: v.boolean(),
   // Retired, with sealed ones left: taken, never received.
   retired: v.boolean(),
+  // The places with some sealed: where opening its item opens it.
+  sealed_at: v.array(id),
 });
 
 /** A package opened and followed, not reported used up (0020). */

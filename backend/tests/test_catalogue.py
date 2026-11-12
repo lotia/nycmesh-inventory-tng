@@ -142,6 +142,7 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
             "size": 50,
             "track_opened": False,
             "retired": False,
+            "sealed_at": [],
         },
         {
             "id": rows.spool.id,
@@ -149,6 +150,7 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
             "size": 300,
             "track_opened": False,
             "retired": False,
+            "sealed_at": [],
         },
     ]
     assert cable == {
@@ -275,3 +277,26 @@ def test_a_retired_package_stays_while_some_are_sealed(
     reply = registered_client.get(URL).json()
     [entry] = [each for each in reply["open_packages"] if each["id"] == opened.id]
     assert entry["package_name"] == spools.spool.name
+
+
+def test_a_package_says_where_some_are_sealed(
+    registered_client: TestClient, session: Session
+) -> None:
+    """Where opening its item opens it (inventory-tng-f9h): current places
+    with some sealed, not those whose sealed ones were all opened."""
+    spools = Spools(session)
+    store, van = spools.store.id, spools.van.id
+
+    def sealed_at() -> set[int]:
+        items = by_id(registered_client.get(URL).json()["items"])
+        return set(
+            by_id(items[spools.cable.id]["packages"])[spools.spool.id]["sealed_at"]
+        )
+
+    assert sealed_at() == {store}
+    spools.move(Entry(spools.cable.id, Decimal(305), spools.sealed, spools.sealed))
+    assert sealed_at() == {store, van}
+    spools.opened()
+    assert sealed_at() == {van}
+    retire(session, spools.van)
+    assert sealed_at() == set()

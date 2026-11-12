@@ -797,10 +797,24 @@
           "retired": {
             "type": "boolean",
             "title": "Retired"
+          },
+          "sealed_at": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Sealed At"
           }
         },
         "type": "object",
-        "required": ["id", "name", "size", "track_opened", "retired"],
+        "required": [
+          "id",
+          "name",
+          "size",
+          "track_opened",
+          "retired",
+          "sealed_at"
+        ],
         "title": "PackageEntry"
       },
       "PageError": {
