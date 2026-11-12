@@ -52,6 +52,7 @@ from helpers.categories import marked_against_its_needs, needs_database
 from helpers.concurrency import LOCK_TIMEOUT, Committed, delete_made, newest_ids
 from helpers.devices import new_device
 from helpers.mail import SITE_MAIL, SentMail
+from helpers.pools import checked_out
 from helpers.rows import setting_up
 from helpers.sign_in import TOTP_KEY, TOTP_KEYS, code, new_admin, sign_in_with
 
@@ -201,14 +202,20 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
         )
 
 
+# Whether a test's own body failed, for its fixtures' teardown.
+CALL_FAILED = pytest.StashKey[bool]()
+
+
 @pytest.hookimpl(wrapper=True)
-def pytest_runtest_makereport() -> Generator[
-    None, pytest.TestReport, pytest.TestReport
-]:
+def pytest_runtest_makereport(
+    item: pytest.Item,
+) -> Generator[None, pytest.TestReport, pytest.TestReport]:
     """A test that failed for a connection PostgreSQL refused, for a limit,
     says which limit, and where the budget is: from its whole report, so a
     refusal inside a group of errors, or as another's cause, is found too."""
     report = yield
+    if report.when == "call":
+        item.stash[CALL_FAILED] = report.failed
     if report.failed and (said := refused_connection(report.longreprtext)):
         report.sections.append(("Connection refused", said))
     return report
@@ -228,6 +235,25 @@ def keeps_to_the_pool_order(
     yield
     if request.node.get_closest_marker("breaks_pool_order") is None:
         assert broken == [], f"connections taken out of the pools' order: {broken}"
+
+
+@pytest.fixture(autouse=True)
+def keeps_its_connections(request: pytest.FixtureRequest) -> Iterator[None]:
+    """No test leaves a connection it took out of a pool, so a leak errors
+    in the test that leaks, not in whichever later one meets the database's
+    connection limit. Broader fixtures a test asks for are set up before
+    this one, so what they hold is not its; one it asks for by name as it
+    runs (getfixturevalue) would be. Not after its body failed, whose
+    traceback keeps what it held."""
+    before = set(checked_out)
+    yield
+    if request.node.stash.get(CALL_FAILED, False):
+        return
+    leaked = len(checked_out - before)
+    assert leaked == 0, (
+        f"{request.node.nodeid} left {leaked} connection(s) checked out of a "
+        "pool: close each connection and session it opens"
+    )
 
 
 @pytest.fixture(scope="session")

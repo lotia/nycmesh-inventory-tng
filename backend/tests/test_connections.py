@@ -38,7 +38,7 @@ from inventory_tng.models import Device
 from inventory_tng.rate_limits import limiter
 from inventory_tng.settings import Settings
 
-from helpers.pools import small_database
+from helpers.pools import checked_out, small_database
 
 
 def test_more_requests_than_threads_and_connections_do_not_stall(
@@ -82,6 +82,21 @@ def test_more_requests_than_threads_and_connections_do_not_stall(
     finally:
         app.state.db.dispose()
     assert time.monotonic() - started < db.POOL_TIMEOUT / 2
+
+
+def test_a_connection_taken_is_counted_until_given_back(database_url: str) -> None:
+    """What keeps_its_connections (conftest) counts: from any pool, until
+    checked in or detached."""
+    with small_database(database_url, pool=(2, 0)) as database:
+        before = set(checked_out)
+        connection = database.engine.connect()
+        assert len(checked_out - before) == 1
+        connection.close()
+        assert checked_out - before == set()
+        connection = database.engine.connect()
+        connection.detach()
+        assert checked_out - before == set()
+        connection.close()
 
 
 def test_no_place_for_a_session_in_time_is_a_503(database_url: str) -> None:
