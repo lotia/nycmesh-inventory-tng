@@ -22,18 +22,28 @@ from inventory_tng.settings import Settings
 log = structlog.get_logger(__name__)
 
 
-def run_command(
-    run: Callable[[Session, argparse.Namespace], int],
-    args: argparse.Namespace,
-    *,
-    development_only: bool = False,
-) -> int:
+def set_up(*, development_only: bool = False) -> Settings | None:
+    """The settings, read and logging configured as the server does
+    (docs/decisions/0007); None, said why, for a command only for
+    development, outside it."""
     load_local_env()
     settings = Settings.from_environ()
     configure_logging(settings)
     if development_only and not settings.development:
         log.warning("command refused outside development")
         print("Only with APP_ENV=development.", file=sys.stderr)
+        return None
+    return settings
+
+
+def run_command(
+    run: Callable[[Session, argparse.Namespace], int],
+    args: argparse.Namespace,
+    *,
+    development_only: bool = False,
+) -> int:
+    settings = set_up(development_only=development_only)
+    if settings is None:
         return 1
     database = make_database(settings.database_url)
     try:
