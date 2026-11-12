@@ -18,19 +18,20 @@ from alembic.config import Config
 from sqlalchemy import Connection, Engine, make_url, text
 from sqlalchemy.exc import OperationalError
 
+from inventory_tng import dev_database
 from inventory_tng.db import make_engine
+from inventory_tng.dev_database import OWNER, ROLES_SQL, server_url
 from inventory_tng.local_env import setting
 
 log = structlog.get_logger(__name__)
 
 PYPROJECT = Path(__file__).parents[1] / "pyproject.toml"
-ROLES_SQL = Path(__file__).parents[1] / "migrations" / "initdb" / "1-roles.sql"
 
 # Compose's superuser, which makes the roles and the databases, on the port
 # from the shell, else the repository's .env (CONTRIBUTING.md, Local
 # settings), else compose's default.
 PORT = setting("INVENTORY_DB_PORT") or "5433"
-SERVER = make_url(f"postgresql+psycopg://inventory:inventory@localhost:{PORT}")
+SERVER = make_url(server_url(f"postgresql://localhost:{PORT}"))
 
 
 def superuser_url(database: str) -> str:
@@ -38,9 +39,9 @@ def superuser_url(database: str) -> str:
     return SERVER.set(database=database).render_as_string(hide_password=False)
 
 
-SERVER_URL = superuser_url("inventory")
+# The server's own database, which no checkout's reset can drop.
+SERVER_URL = superuser_url("postgres")
 # The roles ROLES_SQL makes, each with its own name as its password.
-OWNER = "inventory_owner"
 APP = "inventory_app"
 
 TEST_DATABASE = re.compile(r"test_(\d+)_[0-9a-f]{8}")
@@ -150,12 +151,8 @@ def create_database(template: str | None = None) -> str:
 
 
 def drop_database(url: str) -> None:
-    name = make_url(url).database
-    server = superuser()
-    with server.connect() as connection:
-        connection.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
-    server.dispose()
-    log.info("dropped test database", database=name)
+    dev_database.drop(url)
+    log.info("dropped test database", database=make_url(url).database)
 
 
 @contextmanager

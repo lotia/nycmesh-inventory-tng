@@ -103,12 +103,21 @@ database port. A value set in your shell wins over the file.
 The database listens on port 5433, so it can run beside MeshDB's. If that port
 is taken, change `INVENTORY_DB_PORT` in `.env`; both URLs follow it.
 
+Every clone, worktree or agent's checkout shares that one server, and has a
+database of its own on it, `INVENTORY_DB_NAME`, which both URLs name: so
+one's rebuild or seed never touches another's. `mise run setup` names it
+for the checkout's directory and where that is, `inventory_<directory>_<n>`,
+when it makes `.env`; a `.env` made before names `inventory`. So never copy
+a `.env` from another checkout.
+`mise run dev-database` starts the server, makes the database if it is
+missing, and migrates it; `mise run dev` and `mise run seed` run it first.
+It holds each to 30 connections (Connections, below).
+
 The app logs in with `DATABASE_URL`, as `inventory_app`, which may read and
 add to the ledger but never change it. Migrations log in with
 `MIGRATION_DATABASE_URL`, as `inventory_owner`, which owns the schema
-(DEPLOYMENT.md, Database roles). Compose makes both roles, with their names
-as passwords, when it creates the database's volume. If the roles are
-missing, rebuild the database (Migrations, below).
+(DEPLOYMENT.md, Database roles). Both roles have their names as passwords;
+`mise run dev-database` makes them if they are missing.
 
 ## Running the app
 
@@ -119,7 +128,7 @@ mise run dev             # http://127.0.0.1:8000, Ctrl-C stops it
 It runs, in order:
 
 1. `mise run setup`, which installs what a pull changed;
-2. the database, and its migrations;
+2. `mise run dev-database`: the database, and its migrations;
 3. two servers side by side, each line of output marked with which:
    `dev-backend`, which renders every page and restarts when you save its
    Python, and `dev-vite`, Vite's dev server for the frontend (The scan
@@ -152,9 +161,11 @@ container: `mise run compose -- exec app python -m inventory_tng.seed`.
 Until the first production deploy, a change may edit an existing migration
 instead of adding one, so the schema's history stays short. After a pull
 that does, your local database no longer matches its migrations: rebuild
-it, losing its data, with `mise run compose -- down --volumes`, then
-`mise run dev`. Once production runs, a migration is never edited: add a
-new one.
+it, losing its data, with `mise run reset-dev-database -- <its name>`. It
+drops only this checkout's database, which you name to confirm, then makes
+and migrates it again, empty. Never rebuild with `mise run compose -- down
+--volumes`: that removes every checkout's database. Once production runs,
+a migration is never edited: add a new one.
 
 Migrations run as the owner, and every table they create gives the app
 `SELECT`, `INSERT`, `UPDATE` and `DELETE` (migration 0001). A migration
@@ -391,8 +402,9 @@ This runs the backend the way production does, in a container beside the
 database, for when you want to check that it behaves the same there. The
 image builds the scan page too, and serves Brotli and gzip copies of its
 files, as production will. It does not replace uv: the checks, new
-migrations and your editor still use it. The container migrates the
-database when it starts, then serves with `--reload`.
+migrations and your editor still use it. The container migrates this
+checkout's database (`INVENTORY_DB_NAME`, which `mise run dev-database`
+makes) when it starts, then serves with `--reload`.
 Your `backend/src` and `backend/migrations` are mounted into it, so it picks
 up your edits. Pass `--build` again after changing dependencies or
 `frontend/`.
@@ -613,7 +625,8 @@ up to 20, as does the browser tests' server. So three checkouts can run
 the checks at once, each beside its app. Each test database allows 40
 (`tests/databases.py`), so a process that leaks connections is refused at
 its own database, not the server's limit, and a test that fails for either
-limit says which.
+limit says which. Each checkout's development database allows 30
+(`dev_database.py`): one app, and a migration or seed beside it.
 
 ### Measuring the catalogue
 

@@ -99,8 +99,10 @@ services:
       # Its own, where .env's would name localhost, which inside the
       # container is the container. It migrates as the owner, and serves as
       # the app.
-      DATABASE_URL: postgresql://inventory_app:inventory_app@db:5432/inventory
-      MIGRATION_DATABASE_URL: postgresql://inventory_owner:inventory_owner@db:5432/inventory
+      # This checkout's database (.env's INVENTORY_DB_NAME), made by `mise
+      # run dev-database`.
+      DATABASE_URL: postgresql://inventory_app:inventory_app@db:5432/${INVENTORY_DB_NAME:-inventory}
+      MIGRATION_DATABASE_URL: postgresql://inventory_owner:inventory_owner@db:5432/${INVENTORY_DB_NAME:-inventory}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${INVENTORY_APP_OTLP_ENDPOINT:-}
       # Mailpit, when .env sends mail to it on localhost.
       MAIL_HOST: ${INVENTORY_APP_MAIL_HOST:-}

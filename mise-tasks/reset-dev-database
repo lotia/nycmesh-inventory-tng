@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#MISE description="Drop this checkout's development database and make it again, empty and migrated: mise run reset-dev-database -- <its name>"
+# CONTRIBUTING.md, Migrations. Only this checkout's database, named to
+# confirm: never another checkout's, nor the server's volume.
+set -euo pipefail
+cd "$(dirname "$0")/../backend"
+
+../mise-tasks/compose up -d --wait db
+uv run python -m inventory_tng.dev_database drop "$@"
+mise run dev-database

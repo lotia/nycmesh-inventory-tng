@@ -15,8 +15,7 @@ export VITE_DEV_SERVER=${VITE_DEV_SERVER:-http://localhost:5173}
 # Output goes through mise, not a terminal: Vite keeps its colour with this.
 export FORCE_COLOR=1
 
-"$clone/mise-tasks/compose" up -d --wait db
-(cd "$clone/backend" && uv run alembic upgrade head)
+mise run dev-database
 
 # Both at once, each line marked with its task. If either fails, mise stops
 # the other; Ctrl-C stops both.
