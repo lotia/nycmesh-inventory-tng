@@ -4,8 +4,11 @@
 <p class="hint">Volunteers said these open packages are used up. Confirm
 one to close it: what it still shows is written off, with the reason Used
 up. Not used up offers it again, for a box ticked by mistake.</p>
+{% if only %}
+<p>Only {{ only.name }}. <a href="{{ here }}">Show all</a></p>
+{% endif %}
 {#- The packages ticked belong to this form. #}
-<form method="post" action="{{ here }}" id="answer-ticked"></form>
+<form method="post" action="{{ here }}{{ query }}" id="answer-ticked"></form>
 {% call table() %}
   <tr><th>Pick</th><th>Open package</th><th class="hidden sm:table-cell">Shows</th><th class="hidden sm:table-cell">Reported</th><th></th></tr>
   {% for each in reported %}
@@ -17,9 +20,9 @@ up. Not used up offers it again, for a box ticked by mistake.</p>
     <td class="hidden sm:table-cell">{{ each.left | amount }} {{ each.unit }}</td>
     <td class="hidden sm:table-cell">{{ each.reported_by or "someone" }}, {{ row.reported_at | when(zone) }}</td>
     <td>
-      <form method="post" action="{{ here }}/{{ row.id }}/confirm" class="actions">
+      <form method="post" action="{{ here }}/{{ row.id }}/confirm{{ query }}" class="actions">
         <button>Confirm used up<span class="sr-only"> {{ each.item }} at {{ each.place }}</span></button>
-        <button formaction="{{ here }}/{{ row.id }}/clear">Not used up<span class="sr-only"> {{ each.item }} at {{ each.place }}</span></button>
+        <button formaction="{{ here }}/{{ row.id }}/clear{{ query }}">Not used up<span class="sr-only"> {{ each.item }} at {{ each.place }}</span></button>
       </form>
     </td>
   </tr>

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import adjustment_reasons, ledger, open_packages
-from inventory_tng.admin import stock
+from inventory_tng.admin import needs_action, stock, used_up
 from inventory_tng.ledger import (
     LOOSE,
     Entry,
@@ -1076,13 +1076,17 @@ def reported(session: Session, spools: Spools) -> OpenPackage:
     return made
 
 
-def test_waiting_for_you_until_each_report_is_answered(
+def test_needs_your_action_until_each_report_is_answered(
     admin_client: TestClient, session: Session, spools: Spools
 ) -> None:
     made = reported(session, spools)
     home = text(admin_client.get("/admin"))
-    assert "Waiting for you" in home
-    assert f'<a href="{USED_UP}">Confirm</a>' in home
+    assert "Needs your action (1)" in home
+    assert (
+        f'<a href="{USED_UP}?item={spools.cable.id}">{spools.cable.name}: 1 spool</a>'
+        in home
+    )
+    assert f'<a href="{USED_UP}">All 1</a>' in home
     page = text(admin_client.get(USED_UP))
     assert f'name="open_package" value="{made.id}"' in page
     done = admin_client.post(f"{USED_UP}/{made.id}/confirm")
@@ -1099,7 +1103,7 @@ def test_waiting_for_you_until_each_report_is_answered(
     ).one()
     reason = session.get_one(AdjustmentReason, adjustment.reason_id)
     assert reason.name == "Used up"
-    assert "Waiting for you" not in text(admin_client.get("/admin"))
+    assert "Needs your action" not in text(admin_client.get("/admin"))
     # Asked again, nothing more is written.
     admin_client.post(f"{USED_UP}/{made.id}/confirm")
     assert (
@@ -1112,6 +1116,93 @@ def test_waiting_for_you_until_each_report_is_answered(
         )
         == 1
     )
+
+
+def test_needs_your_action_lists_each_item_and_what_is_below_zero(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """One line per item, its packages in their word, a shortfall said; the
+    confirm page shows one item's alone (inventory-tng-pll)."""
+    reported(session, spools)
+    under = spools.opened()
+    spools.move(Entry(spools.cable.id, Decimal(312), Form(open_package_id=under.id)))
+    open_packages.report(
+        session, [under.id], spools.place.volunteer.id, datetime.now(UTC)
+    )
+    other = Spools(session)
+    theirs = reported(session, other)
+    session.flush()
+    home = text(admin_client.get("/admin"))
+    assert "Needs your action (3)" in home
+    assert f"{spools.cable.name}: 2 spools</a>, 7 m below zero" in home
+    assert f"{other.cable.name}: 1 spool</a></li>" in home
+    only = f"{USED_UP}?item={other.cable.id}"
+    page = text(admin_client.get(only))
+    assert f"Only {other.cable.name}." in page
+    assert spools.cable.name not in page.split("Only", 1)[1]
+    # Answered there, it shows that item again.
+    done = admin_client.post(f"{USED_UP}/{theirs.id}/clear?item={other.cable.id}")
+    assert done.headers["location"] == f"{only}&notice=used_up_cleared"
+    none = admin_client.post(f"{USED_UP}?item={other.cable.id}", data={"do": "clear"})
+    assert none.headers["location"] == f"{only}&notice=used_up_none"
+    # Any other item, or none, or no id: all of them.
+    for item in ("", "999999", "abc", "99999999999"):
+        shown = text(admin_client.get(f"{USED_UP}?item={item}"))
+        assert spools.cable.name in shown
+        assert "Only" not in shown
+
+
+@pytest.mark.parametrize(
+    ("name", "count", "words"),
+    [
+        ("Spool", 1, "1 spool"),
+        ("Spool", 3, "3 spools"),
+        ("Box", 2, "2 boxes"),
+        ("Bag", 2, "2 bags"),
+        ("RJ45", 2, "2 RJ45s"),
+        ("Battery", 2, "2 batteries"),
+        ("Tray", 2, "2 trays"),
+        ("Bus", 2, "2 buses"),
+        ("Pouch", 2, "2 pouches"),
+    ],
+)
+def test_a_packages_name_in_the_plural(name: str, count: int, words: str) -> None:
+    assert needs_action.plural(name, count) == words
+
+
+def test_an_items_packages_of_several_words_are_open_packages(
+    session: Session, spools: Spools
+) -> None:
+    reported(session, spools)
+    shorter = add(
+        session,
+        ItemPackage(item_id=spools.cable.id, name="Spool 150 m", size=Decimal(150)),
+    )
+    made = open_packages.make(session, uuid.uuid4(), shorter.id, spools.store.id)
+    open_packages.report(
+        session, [made.id], spools.place.volunteer.id, datetime.now(UTC)
+    )
+    session.flush()
+
+    def line() -> needs_action.ItemWaiting:
+        [found] = [
+            each
+            for each in needs_action.by_item(session, *used_up.REPORTED)
+            if each.item_id == spools.cable.id
+        ]
+        return found
+
+    # Spools of two lengths are spools.
+    assert line().packages == "2 spools"
+    reel = add(
+        session, ItemPackage(item_id=spools.cable.id, name="Reel", size=Decimal(100))
+    )
+    made = open_packages.make(session, uuid.uuid4(), reel.id, spools.store.id)
+    open_packages.report(
+        session, [made.id], spools.place.volunteer.id, datetime.now(UTC)
+    )
+    session.flush()
+    assert (line().packages, line().below) == ("3 open packages", 0)
 
 
 def test_a_report_cleared_is_offered_again(
