@@ -17,16 +17,18 @@ import {
   type Offered,
   offered,
   offeredAt,
+  openingPackage,
+  placed,
   quantityOf,
   RETIRED,
   SIDES,
   type Side,
   sealedCounts,
-  sealedHere,
   search,
   toBatch,
   unseen,
   withLine,
+  withLineChanged,
 } from "./cart";
 import { Field } from "./Field";
 import { placeSides, readLabel, type Scanned } from "./labels";
@@ -262,26 +264,18 @@ function CartForm({
   }
 
   function set(fields: Partial<Cart>) {
-    const next = { ...cart.value, ...fields };
-    // What was taken from open packages was where it came from, as it was:
-    // another place, or another kind, leaves none of it.
-    const moved =
-      next.kind !== cart.value.kind || next.fromId !== cart.value.fromId;
-    change(
-      moved
-        ? { ...next, lines: next.lines.map(({ open: _, ...line }) => line) }
-        : next,
-    );
+    change(placed(cart.value, { ...cart.value, ...fields }, catalogue, sealed));
   }
 
-  /** Add one, and say what: opening, an item is its one package sealed
-   * where it is opened (sealedHere), as only whole packages are opened;
-   * with no such package, its line, for the volunteer to fill. */
+  /** Add one, and say what: opening, an item is the package it opens
+   * (openingPackage), as only whole packages are opened; with no such
+   * package, its line, for the volunteer to fill. A package's own label
+   * is the volunteer's choice, kept as typed. */
   function add(itemId: number, packageId?: number): string {
     const item = indexOf(catalogue).items.get(itemId);
     const opening = packageId === undefined && cart.value.kind === "open";
     const pack = opening
-      ? sealedHere(item, cart.value.fromId, sealed)
+      ? openingPackage(item, cart.value.fromId, sealed)
       : item?.packages.find((each) => each.id === packageId);
     query.value = "";
     if (opening && pack === undefined) {
@@ -291,7 +285,13 @@ function CartForm({
       change(withLine(cart.value, itemId));
       return `${item?.name}: type how many of which package to open.`;
     }
-    change(addOne(cart.value, itemId, pack?.id));
+    const next = addOne(cart.value, itemId, pack?.id);
+    // A package's own label is the volunteer's choice (Line.typed).
+    change(
+      packageId === undefined
+        ? next
+        : withLineChanged(next, itemId, (line) => ({ ...line, typed: true })),
+    );
     return `Added ${pack === undefined ? "one" : `a ${pack.name}`}: ${item?.name}.`;
   }
 
@@ -508,11 +508,12 @@ function CartForm({
                 }
                 moving={cart.value.kind === "move"}
                 onChange={(next) =>
-                  set({
-                    lines: cart.value.lines.map((each) =>
-                      each.itemId === line.itemId ? next : each,
-                    ),
-                  })
+                  set(
+                    withLineChanged(cart.value, line.itemId, () => ({
+                      ...next,
+                      typed: true,
+                    })),
+                  )
                 }
                 onRemove={() =>
                   set({

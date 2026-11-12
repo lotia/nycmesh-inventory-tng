@@ -11,6 +11,8 @@ import {
   loadCart,
   offered,
   offeredAt,
+  openingPackage,
+  placed,
   quantityOf,
   STORAGE_KEY,
   sealedCounts,
@@ -74,13 +76,15 @@ describe("storage", () => {
 describe("adding", () => {
   test("one of an item, then one more", () => {
     const twice = addOne(addOne(cart(), 100), 100);
-    expect(twice.lines).toEqual([{ itemId: 100, packages: {}, loose: "2" }]);
+    expect(twice.lines).toEqual([
+      { itemId: 100, packages: {}, loose: "2", picked: 2 },
+    ]);
   });
 
   test("a package counts whole packages", () => {
     const added = addOne(addOne(cart(), 101, 1001), 101, 1001);
     expect(added.lines).toEqual([
-      { itemId: 101, packages: { 1001: "2" }, loose: "" },
+      { itemId: 101, packages: { 1001: "2" }, loose: "", picked: 2 },
     ]);
   });
 });
@@ -88,8 +92,8 @@ describe("adding", () => {
 test("adding to one line of several leaves the others", () => {
   const two = addOne(addOne(cart(), 100), 101);
   expect(addOne(two, 101).lines).toEqual([
-    { itemId: 100, packages: {}, loose: "1" },
-    { itemId: 101, packages: {}, loose: "2" },
+    { itemId: 100, packages: {}, loose: "1", picked: 1 },
+    { itemId: 101, packages: {}, loose: "2", picked: 2 },
   ]);
 });
 
@@ -622,6 +626,72 @@ describe("turning a cart into a batch", () => {
     expect(sealedHere(undefined, 10, counts)).toBe(undefined);
   });
 
+  test("opening with no place picked opens an item's one current package", () => {
+    const [box] = radio.packages;
+    if (box === undefined) throw new Error("the radio comes in a box");
+    const counts = sealedCounts(CATALOGUE, []);
+    expect(openingPackage(radio, null, counts)).toBe(box);
+    // A retired one beside it is not counted, with no place to say.
+    const old = { ...box, id: 2, retired: true };
+    expect(
+      openingPackage({ ...radio, packages: [box, old] }, null, counts),
+    ).toBe(box);
+    const two = { ...radio, packages: [box, { ...box, id: 3 }] };
+    expect(openingPackage(two, null, counts)).toBe(undefined);
+    expect(openingPackage(undefined, null, counts)).toBe(undefined);
+    // At a place, the one sealed there.
+    expect(openingPackage(radio, 12, counts)).toBe(undefined);
+    expect(openingPackage(radio, 10, counts)).toBe(box);
+  });
+
+  test("a place picked fills the lines not typed into", () => {
+    const counts = sealedCounts(CATALOGUE, []);
+    const lines = [
+      // Picked twice with no place: two of its one package.
+      { itemId: 100, packages: { 1000: "2" }, loose: "", picked: 2 },
+      // Picked under another kind, loose, with a cut typed.
+      {
+        itemId: 101,
+        packages: {},
+        loose: "1",
+        open: { k: { amount: "2", whole: false } },
+      },
+      // Typed: kept as it is.
+      { itemId: 101, packages: { 1001: "5" }, loose: "", typed: true },
+      // Gone from the catalogue.
+      { itemId: 999, packages: { 7: "1" }, loose: "" },
+    ];
+    const opening = cart({ kind: "open", fromId: null, lines });
+    const move = (fields: Partial<Cart>, from = opening) =>
+      placed(from, { ...from, ...fields }, CATALOGUE, counts);
+    const atVan = move({ fromId: 12 });
+    expect(atVan.lines).toEqual([
+      { itemId: 100, packages: {}, loose: "", picked: 2 },
+      { itemId: 101, packages: { 1001: "1" }, loose: "" },
+      lines[2],
+      { itemId: 999, packages: {}, loose: "" },
+    ]);
+    // Through a place with none, the count picked stays.
+    expect(move({ fromId: 10 }, atVan).lines[0]).toEqual({
+      itemId: 100,
+      packages: { 1000: "2" },
+      loose: "",
+      picked: 2,
+    });
+    // Nothing moved: as it was.
+    expect(move({ volunteerId: 2 }).lines).toBe(lines);
+    // Another kind: only what was taken from open packages goes.
+    const moving = move({ kind: "move" });
+    expect(moving.lines[1]).toEqual({ itemId: 101, packages: {}, loose: "1" });
+    expect(moving.lines[0]).toEqual(lines[0]);
+    // Back to opening: lines from another kind keep what they hold.
+    expect(move({ kind: "open", fromId: 12 }, moving).lines[1]).toEqual({
+      itemId: 101,
+      packages: {},
+      loose: "1",
+    });
+  });
+
   test("sealed counts follow the batches the catalogue does not show yet", () => {
     // The catalogue: 3 spools sealed at the hub, 1 in the van.
     const batch = (draft: Partial<Draft>) =>
@@ -740,8 +810,13 @@ describe("turning a cart into a batch", () => {
   test("a line for an item is added once, with nothing in it", () => {
     const empty = cart({ lines: [] });
     const once = withLine(empty, 100);
-    expect(once.lines).toEqual([{ itemId: 100, packages: {}, loose: "" }]);
-    expect(withLine(once, 100)).toBe(once);
+    expect(once.lines).toEqual([
+      { itemId: 100, packages: {}, loose: "", picked: 1 },
+    ]);
+    // Picked again: counted, on the same line.
+    expect(withLine(once, 100).lines).toEqual([
+      { itemId: 100, packages: {}, loose: "", picked: 2 },
+    ]);
   });
 
   test("lines with nothing in them are left out", () => {

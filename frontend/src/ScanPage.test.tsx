@@ -264,6 +264,36 @@ describe("filling and saving a cart", () => {
     ).toBe("1");
   });
 
+  test("opening, a place picked fills what was added before and not typed", async () => {
+    open();
+    await ready();
+    fireEvent.click(screen.getByLabelText("Opening packages"));
+    const box = () => (screen.getByLabelText(/^Box/) as HTMLInputElement).value;
+    // No place yet: the radio's one package (inventory-tng-prp).
+    find("beam");
+    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    expect(box()).toBe("1");
+    // None sealed at the van; one at the hub.
+    pick("Where", "12");
+    expect(box()).toBe("");
+    pick("Where", "10");
+    expect(box()).toBe("1");
+    // Picked again, then through a place with none: still two.
+    find("beam");
+    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    pick("Where", "12");
+    pick("Where", "10");
+    expect(box()).toBe("2");
+    // Switched to another kind and back, the place kept: as it was.
+    fireEvent.click(screen.getByLabelText("Moving stock"));
+    fireEvent.click(screen.getByLabelText("Opening packages"));
+    expect(box()).toBe("2");
+    // Typed into: never filled again.
+    fireEvent.input(screen.getByLabelText(/^Box/), { target: { value: "3" } });
+    pick("Where", "12");
+    expect(box()).toBe("3");
+  });
+
   test("opening, an item adds its one package sealed there, retired or not", async () => {
     const withOld = {
       ...CATALOGUE,

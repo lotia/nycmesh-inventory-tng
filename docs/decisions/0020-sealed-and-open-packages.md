@@ -51,6 +51,11 @@ deployed, so the migrations may be rewritten (0016).
   outbox has opened or taken that the catalogue does not show yet, plus
   what it brought; the catalogue says which of the outbox's batches it
   shows, and is asked for again after each save (inventory-tng-jlc).
+  With no place picked yet, an item of one current package adds that
+  package; once the place is picked or changed, every opening line the
+  volunteer has not typed into is filled again by the rule above. A line
+  typed into, or added by a package's own label, is never filled again
+  (Ali, 2026-11-12, inventory-tng-prp).
   A package's own label adds that package, as ever.
 - **Cutting or taking from an open package**: scan the item's label, pick
   the open package from those at the place ("opened 3 Nov, 120 m left"),

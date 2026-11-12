@@ -141,10 +141,18 @@ test("opening, an item fills its package sealed where it is opened", async ({
   await page.goto("/scan");
   await page.getByLabel("Opening packages").check();
   const where = page.getByLabel("Where", { exact: true });
+  const box = page.getByLabel(/^Box of 305 m/);
   await where.selectOption({ label: "Van" });
   await pick(page, cable);
-  await expect(page.getByLabel(/^Box of 305 m/)).toHaveValue("");
+  await expect(box).toHaveValue("");
+  // Picking the place fills a line not typed into (inventory-tng-prp).
   await where.selectOption({ label: "Supernode 1 › Shelf A" });
+  await expect(box).toHaveValue("1");
+  // With no place, its one package, then none where none is sealed.
+  await page.getByRole("button", { name: "Remove" }).click();
+  await where.selectOption({ label: "Pick a place" });
   await pick(page, cable);
-  await expect(page.getByLabel(/^Box of 305 m/)).toHaveValue("1");
+  await expect(box).toHaveValue("1");
+  await where.selectOption({ label: "Van" });
+  await expect(box).toHaveValue("");
 });
