@@ -134,7 +134,7 @@ jobs:
       - run: npm run build
 
   # The built app in real browsers, Chromium and WebKit, at a phone's width
-  # (frontend/browser/, CONTRIBUTING.md: Running the checks).
+  # (frontend/browser-tests/, CONTRIBUTING.md: Running the checks).
   check-browser:
     runs-on: ubuntu-latest
     timeout-minutes: 15

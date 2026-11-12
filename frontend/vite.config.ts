@@ -66,7 +66,7 @@ export default defineConfig({
     strictPort: true,
   },
   test: {
-    // Unit tests only: browser/ is Playwright's (playwright.config.ts).
+    // Unit tests only: browser-tests/ is Playwright's (playwright.config.ts).
     include: ["src/**/*.test.{ts,tsx}"],
     environment: "happy-dom",
     setupFiles: ["src/test-setup.ts"],
@@ -84,7 +84,7 @@ export default defineConfig({
         "src/api/**",
         // Pages' entries: wiring that runs only in a browser.
         ...pages,
-        // The camera itself: browser/camera.spec.ts runs it, in Chromium.
+        // The camera itself: browser-tests/camera.spec.ts runs it, in Chromium.
         "src/camera.ts",
       ],
       reporter: ["text-summary", "cobertura"],

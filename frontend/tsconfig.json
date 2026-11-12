@@ -16,5 +16,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "browser", "vite.config.ts", "playwright.config.ts"]
+  "include": ["src", "browser-tests", "vite.config.ts", "playwright.config.ts"]
 }

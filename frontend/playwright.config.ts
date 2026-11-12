@@ -1,5 +1,5 @@
 /**
- * The browser tests, in browser/ (CONTRIBUTING.md, Running the checks).
+ * The browser tests, in browser-tests/ (CONTRIBUTING.md, Running the checks).
  * WebKit runs in CI, and wherever PLAYWRIGHT_WEBKIT=1: on this machine, or
  * in Playwright's container when PLAYWRIGHT_WEBKIT_SERVER names its server
  * (mise run browser-webkit).
@@ -8,7 +8,7 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig, type Project } from "@playwright/test";
-import { adminState, inRun } from "./browser/prepared";
+import { adminState, inRun } from "./browser-tests/prepared";
 
 // This run's folder (backend/tests/browser_database.py) and port, chosen
 // once, here in the main process, for the backend and the workers to inherit.
@@ -72,7 +72,7 @@ const browsers: { name: string; use: NonNullable<Project["use"]> }[] = [
 ];
 
 export default defineConfig({
-  testDir: "browser",
+  testDir: "browser-tests",
   // A database of its own, seeded, and the backend serving the build from it
   // (backend/tests/browser_database.py).
   webServer: {
@@ -97,7 +97,8 @@ export default defineConfig({
       use: { browserName: "chromium", channel: "chromium" },
     },
     // The crawl reads every row there is, so it runs in each browser before
-    // any test that changes one; those make rows of their own (browser/own.ts).
+    // any test that changes one; those make rows of their own
+    // (browser-tests/own.ts).
     ...browsers.map(({ name, use }) => ({
       name: `${name} crawl`,
       testMatch: CRAWL,

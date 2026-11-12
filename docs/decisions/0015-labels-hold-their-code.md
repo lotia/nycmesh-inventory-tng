@@ -50,4 +50,4 @@ prefilled Google Form links, which the new app cannot read.
   the bare code as a full QR code, the code in words beneath it for typing,
   and what it names.
 - Chromium's fake camera, showing a seeded label, tests scanning end to end
-  (`frontend/browser/camera.spec.ts`); iOS Safari is checked by hand.
+  (`frontend/browser-tests/camera.spec.ts`); iOS Safari is checked by hand.

@@ -1,4 +1,4 @@
-"""What the browser tests (frontend/browser/) run against. Playwright's
+"""What the browser tests (frontend/browser-tests/) run against. Playwright's
 webServer (playwright.config.ts) starts
 
     uv run python tests/browser_database.py serve
@@ -35,7 +35,7 @@ from inventory_tng.models import Admin, AdminPassword, Item, Label, Volunteer
 from databases import migrated_engine, new_database
 
 # What a run writes in its folder: these, and the signed-in session
-# sign-in.setup.ts keeps (frontend/browser/prepared.ts, adminState).
+# sign-in.setup.ts keeps (frontend/browser-tests/prepared.ts, adminState).
 # The other administrator's username.
 OTHER_ADMIN = "browser-other"
 RUN_FILES = ("prepared.json", "camera.y4m", "admin.json", "totp-keys/1")
