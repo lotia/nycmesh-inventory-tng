@@ -35,16 +35,8 @@
     {% if back_link %}<p class="back"><a href="{{ back_link[0] }}"><span aria-hidden="true">‹&nbsp;</span><span class="sr-only">Back to </span>{{ back_link[1] }}</a></p>{% endif %}
     <h1>{{ title }}</h1>
     {% if alert %}<p role="alert">{{ alert }}</p>{% endif %}
-    {#- A notice about one section is said by its heading (_notice.html). One
-    that a change can be undone from offers it: `undo`, the path to post to. #}
-    {% if notice and not notice_section %}
-    {% if undo %}
-    <div role="status" class="flex flex-wrap items-center gap-3">
-      <span>{{ notice }}</span>
-      <form method="post" action="{{ undo }}"><button>{{ undo_words | default("Bring it back") }}</button></form>
-    </div>
-    {% else %}<p role="status">{{ notice }}</p>{% endif %}
-    {% endif %}
+    {#- A notice about one section is said by its heading; any other, here. #}
+    {% with section_id=none %}{% include "_notice.html" %}{% endwith %}
     {% block main %}{% endblock %}
   </main>
 </body>

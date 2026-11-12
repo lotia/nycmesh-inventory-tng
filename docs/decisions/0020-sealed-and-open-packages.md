@@ -253,9 +253,8 @@ you" counts every report in one line, which hides what is waiting.
 - **Several open packages at a place** are a card each, most left first;
   one showing nothing or less is last, greyed, flagged "Shows nothing
   left", so the next volunteer can report it.
-- **One checkbox, one wording**: "Nothing usable left on this Spool 305
-  m" (the package's name, never a word made from it: inventory-tng-b1z),
-  whatever is typed.
+- **One checkbox, one wording**: "Nothing usable left on it", whatever is
+  typed, in the card whose legend names the package.
 - **It ticks itself** when a cut leaves a short end, uses up what the
   package shows, or passes it, and a note appears in the card saying why
   and that an administrator confirms: "Your cut uses up the Spool 305 m",
@@ -282,8 +281,9 @@ you" counts every report in one line, which hides what is waiting.
   m** (the button follows the box; "Set to it" without JavaScript)
   writes a count under the administrator's name of the difference
   between N and what the package showed then: at the volunteer's report,
-  for the volunteer's figure, else on the page. So a cut since stays as
-  saved, and Set is never refused for one (Ali, 2026-11-12,
+  for the volunteer's figure, else on the page, each with any count or
+  adjustment of it since, which put it right already. So a cut since
+  stays as saved, and Set is never refused for one (Ali, 2026-11-12,
   inventory-tng-b1z); if cuts since leave it below zero, it is asked
   about again. **Leave it** clears the check. **Closing the package**
   settles it too.

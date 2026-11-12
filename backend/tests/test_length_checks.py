@@ -8,10 +8,11 @@ from functools import partial
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, open_packages, pages
+from inventory_tng.admin import length_checks
 from inventory_tng.local_env import CLONE
 from inventory_tng.models import (
     Admin,
@@ -47,10 +48,12 @@ def seen(session: Session, made: OpenPackage) -> str:
 
 def set_form(session: Session, made: OpenPackage, left: str) -> dict[str, str]:
     """The check page's own Set form for it, as shown now."""
+    moment = session.scalar(select(func.max(LedgerTransaction.id))) or 0
     return {
         "left": left,
         "seen": seen(session, made),
         "showed": str(left_on(session, made)),
+        "as_of": str(moment),
     }
 
 
@@ -178,6 +181,8 @@ def test_needs_your_action_lists_lengths_to_check(
     assert "said 250 m is on it" in page
     # Set against what it showed.
     assert 'name="showed" value="305.000"' in page
+    moment = session.scalar(select(func.max(LedgerTransaction.id)))
+    assert f'name="as_of" value="{moment}"' in page
     assert "310 m" in page  # The recent cut.
     # No such item: all of them.
     assert "Only" not in text(admin_client.get(f"{LENGTHS}?item=999999"))
@@ -318,13 +323,10 @@ def test_a_report_since_the_page_was_shown_is_not_settled_unseen(
 ) -> None:
     made = spools.opened()
     registered_client.post(URL, json=report(spools, length(made, "250")))
-    shown, shown_at = seen(session, made), str(left_on(session, made))
+    form = set_form(session, made, "250")
     registered_client.post(URL, json=report(spools, length(made, "5")))
-    for path, form in (
-        ("leave", {"seen": shown}),
-        ("set", {"left": "250", "seen": shown, "showed": shown_at}),
-    ):
-        done = admin_client.post(f"{LENGTHS}/{made.id}/{path}", data=form)
+    for path, sent in (("leave", {"seen": form["seen"]}), ("set", form)):
+        done = admin_client.post(f"{LENGTHS}/{made.id}/{path}", data=sent)
         assert done.headers["location"] == f"{LENGTHS}?notice=length_unchanged"
     session.refresh(made)
     assert made.length_reported == 5
@@ -496,10 +498,16 @@ def test_set_moves_it_by_what_it_was_off_so_cuts_since_stay(
     registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "310")]))
     form = set_form(session, made, "3")
     registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "1")]))
-    # A form that does not say what it showed: nothing to set it against.
-    for stale in ("", "x", "NaN"):
+    # A form that does not say what it showed, or when: nothing to set it
+    # against.
+    for field, stale in (
+        ("showed", ""),
+        ("showed", "x"),
+        ("showed", "NaN"),
+        ("as_of", ""),
+    ):
         refused = admin_client.post(
-            f"{LENGTHS}/{made.id}/set", data=form | {"showed": stale}
+            f"{LENGTHS}/{made.id}/set", data=form | {field: stale}
         )
         assert refused.headers["location"] == f"{LENGTHS}?notice=length_reload"
     done = admin_client.post(f"{LENGTHS}/{made.id}/set", data=form)
@@ -597,3 +605,76 @@ def test_a_count_since_the_report_is_not_taken_off_twice(
     )
     assert done.headers["location"] == f"{LENGTHS}?notice=length_set"
     assert left_on(session, made) == 250
+
+
+def test_a_count_since_the_page_is_not_taken_off_twice(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """What is typed is what it had when the page showed it: a count of it
+    since put that right too, so it is added to what the page showed."""
+    made = spools.opened()
+    form = set_form(session, made, "200")
+    counter = add(session, Admin(username=f"counter-{tag()}"))
+    ledger.count_open_package(
+        session, uuid.uuid4(), counter.id, made, Decimal(250), Decimal(305)
+    )
+    made.below_zero_at = made.opened_at  # A check to settle.
+    session.flush()
+    form["seen"] = seen(session, made)
+    done = admin_client.post(f"{LENGTHS}/{made.id}/set", data=form)
+    assert done.headers["location"] == f"{LENGTHS}?notice=length_set"
+    # Showed 305 on the page, really had 200: 105 off, whatever the count.
+    assert left_on(session, made) == 200
+
+
+def test_a_package_moved_from_the_places_locked_is_not_set(
+    session: Session, spools: Spools
+) -> None:
+    """Its place is not locked: nothing more is locked holding it."""
+    admin = add(session, Admin(username=f"setter-{tag()}"))
+    made = spools.opened()
+    made.below_zero_at = made.opened_at
+    session.flush()
+    answer = length_checks.Answer(made.id, seen(session, made), Decimal(1), as_of=0)
+    assert length_checks._set(session, admin.id, answer, [made.location_id + 1]) == (
+        False,
+        False,
+    )
+    session.refresh(made)
+    assert made.below_zero_at is not None
+
+
+def test_ticked_boxes_that_name_no_package_are_passed_over(
+    admin_client: TestClient,
+) -> None:
+    for sent in ("07 x/", "\N{SUPERSCRIPT TWO} x", "99999999999999999999 x", "x y"):
+        done = admin_client.post(LENGTHS, data={"open_package": [sent], "do": "set"})
+        assert done.status_code == 303
+
+
+def test_recent_cuts_leave_out_a_move_of_it_whole(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    made = spools.opened()
+    registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "5")]))
+    moved = cut(made, "300") | {"whole": True}
+    registered_client.post(URL, json=spools.place.batch(lines=[moved]))
+    found = length_checks.recent_cuts(session, [made.id])[made.id]
+    assert [each.quantity for each in found] == [5]
+
+
+def test_the_volunteers_figure_typed_is_set_against_the_report(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    spools: Spools,
+) -> None:
+    """The box filled with what the volunteer said: set against what it
+    showed at the report, so a cut since stays, whatever the page showed."""
+    made = spools.opened()
+    registered_client.post(URL, json=report(spools, length(made, "250")))
+    registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "10")]))
+    form = set_form(session, made, "250") | {"showed": "", "as_of": ""}
+    done = admin_client.post(f"{LENGTHS}/{made.id}/set", data=form)
+    assert done.headers["location"] == f"{LENGTHS}?notice=length_set"
+    assert left_on(session, made) == 240

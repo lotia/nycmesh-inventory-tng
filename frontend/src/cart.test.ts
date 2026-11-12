@@ -521,6 +521,12 @@ describe("turning a cart into a batch", () => {
         "Cat6 cable: enter what is on the open package, up to 3 decimals, or leave it blank.",
       ],
     });
+    // More than the server takes: said here, not refused with the cut.
+    expect(
+      toBatch(cart({ lines: line({ now: "1000000000" }) }), CATALOGUE),
+    ).toEqual({
+      problems: ["Cat6 cable: That is more than the inventory can count."],
+    });
   });
 
   test("an open package said used up is offered no more", () => {
@@ -717,8 +723,7 @@ describe("turning a cart into a batch", () => {
     // Both sealed there, or neither: none is picked.
     expect(sealedHere(both, 10, counts)).toBe(undefined);
     expect(sealedHere(both, 11, counts)).toBe(undefined);
-    // No place yet: none is sealed "here".
-    expect(sealedHere(radio, null, counts)).toBe(undefined);
+    // No such item: none.
     expect(sealedHere(undefined, 10, counts)).toBe(undefined);
   });
 
@@ -776,16 +781,24 @@ describe("turning a cart into a batch", () => {
     });
     // Nothing moved: as it was.
     expect(move({ volunteerId: 2 }).lines).toBe(lines);
-    // Another kind: only what was taken from open packages goes.
+    // Another kind: only what was taken from open packages goes, and each
+    // line is kept as it is from then on.
     const moving = move({ kind: "move" });
-    expect(moving.lines[1]).toEqual({ itemId: 101, packages: {}, loose: "1" });
-    expect(moving.lines[0]).toEqual(lines[0]);
-    // Back to opening: lines from another kind keep what they hold.
-    expect(move({ kind: "open", fromId: 12 }, moving).lines[1]).toEqual({
+    expect(moving.lines[1]).toEqual({
       itemId: 101,
       packages: {},
       loose: "1",
+      typed: true,
     });
+    expect(moving.lines[0]).toEqual({ ...lines[0], typed: true });
+    // Back to opening: lines from another kind keep what they hold, a
+    // place picked after too, so loose picked to move never become
+    // packages to open.
+    const reopened = move({ kind: "open" }, move({ fromId: 10 }, moving));
+    expect(move({ fromId: 12 }, reopened).lines.slice(0, 2)).toEqual([
+      { ...lines[0], typed: true },
+      { itemId: 101, packages: {}, loose: "1", typed: true },
+    ]);
   });
 
   test("sealed counts follow the batches the catalogue does not show yet", () => {
@@ -878,6 +891,25 @@ describe("turning a cart into a batch", () => {
       },
     ]);
     expect(at(resized, 12)).toBe(1);
+    // As stored by another build, unreadable: skipped, never thrown.
+    const unreadable = {
+      state: "waiting" as const,
+      queuedAt: 0,
+      body: batch({
+        from_location_id: 10,
+        to_location_id: 12,
+        lines: [
+          spools(1, { quantity: "1.2345" }),
+          {
+            item_id: 101,
+            quantity: "abc",
+            open_package_key: "11111111-1111-4111-8111-111111111111",
+          },
+        ],
+      }),
+    };
+    expect(at(sealedCounts(CATALOGUE, [unreadable]), 12)).toBe(1);
+    expect(offered(CATALOGUE, [unreadable])).toEqual(offered(CATALOGUE, []));
     // The last sealed at the hub opened: the next opening there fills none.
     const opened = sealedCounts(CATALOGUE, [
       {

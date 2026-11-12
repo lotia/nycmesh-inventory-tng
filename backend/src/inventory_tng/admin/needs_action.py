@@ -4,6 +4,7 @@ open packages one line per item, linking to its page showing only that
 item. Each kind's page takes the item as `?item=` (OnlyItem)."""
 
 from collections import Counter, defaultdict
+from collections.abc import Sequence
 from decimal import Decimal
 from typing import Annotated, NamedTuple
 from urllib.parse import urlencode
@@ -15,7 +16,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import open_packages
 from inventory_tng.admin.common import row_id
 from inventory_tng.db import DbSession
-from inventory_tng.models import Item
+from inventory_tng.models import Item, OpenPackage
 
 # Between how many and a package's name, as an administrator reads it.
 TIMES = "\N{MULTIPLICATION SIGN}"
@@ -90,6 +91,13 @@ def only_item(session: DbSession, item: str = "") -> Item | None:
 
 
 OnlyItem = Annotated[Item | None, Depends(only_item)]
+
+
+def of_only(
+    where: Sequence[ColumnElement[bool]], only: Item | None
+) -> list[ColumnElement[bool]]:
+    """A kind's open packages, `where`, of only one item, if one."""
+    return [*where, OpenPackage.item_id == only.id] if only else list(where)
 
 
 def query(only: Item | None) -> dict[str, str]:

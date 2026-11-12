@@ -66,7 +66,10 @@ from helpers.stock import (
     Place,
     Spools,
     adjustment_form,
+    cut,
+    length,
     received,
+    report,
     retire,
     stocked,
     write,
@@ -589,14 +592,10 @@ def test_counts_packages_opened_by_what_they_became(
         select(OpenPackage).where(OpenPackage.item_id == spools.cable.id)
     ).one()
     client.cookies.set(devices.COOKIE, token)
-    cut = {
-        "item_id": spools.cable.id,
-        "quantity": "5",
-        "open_package_key": str(made.key),
-    }
-    whole = cut | {"quantity": "300", "whole": True}
+    five = cut(made, "5")
+    whole = five | {"quantity": "300", "whole": True}
     # The cut asked whether it is used up, and was told so.
-    used = spools.place.batch(lines=[cut], used_up=[str(made.key)])
+    used = spools.place.batch(lines=[five], used_up=[str(made.key)])
     assert client.post("/api/transactions", json=used).status_code == 201
     batch = spools.place.batch(lines=[whole])
     assert client.post("/api/transactions", json=batch).status_code == 201
@@ -861,28 +860,12 @@ def test_counts_length_checks_raised_and_settled(
     raised and settled match (inventory-tng-b1z)."""
     client, _, reader, _ = rolled_back
     spools = Spools(session)
-    reported, cut, closing = spools.opened(), spools.opened(), spools.opened()
+    reported, cut_from, closing = spools.opened(), spools.opened(), spools.opened()
     _, token = new_device(session)
     client.cookies.set(devices.COOKIE, token)
-    report = spools.place.batch(
-        kind="report",
-        to_location_id=None,
-        lines=[],
-        lengths=[
-            {"open_package_key": str(each.key), "left": "250"}
-            for each in (reported, closing)
-        ],
-    )
-    assert client.post("/api/transactions", json=report).status_code == 201
-    below = spools.place.batch(
-        lines=[
-            {
-                "item_id": spools.cable.id,
-                "quantity": "310",
-                "open_package_key": str(cut.key),
-            }
-        ]
-    )
+    said = report(spools, length(reported, "250"), length(closing, "250"))
+    assert client.post("/api/transactions", json=said).status_code == 201
+    below = spools.place.batch(lines=[cut(cut_from, "310")])
     assert client.post("/api/transactions", json=below).status_code == 201
     client.cookies.clear()
     assert counted(reader, "inventory.open_packages.length_checks.raised") == {
@@ -892,12 +875,13 @@ def test_counts_length_checks_raised_and_settled(
     _, key = new_admin(session)
     sign_in_with(client, code=code(key))
     lengths = "/admin/stock/length-checks"
-    for row in (reported, cut):
+    for row in (reported, cut_from):
         session.refresh(row)
     ticked = f"{reported.id} {open_packages.check_seen(reported)}"
     client.post(lengths, data={"open_package": [ticked], "do": "set"})
     client.post(
-        f"{lengths}/{cut.id}/leave", data={"seen": open_packages.check_seen(cut)}
+        f"{lengths}/{cut_from.id}/leave",
+        data={"seen": open_packages.check_seen(cut_from)},
     )
     client.post(f"/admin/items/{spools.cable.id}/open-packages/{closing.id}/close")
     assert counted(reader, "inventory.open_packages.length_checks.settled") == {

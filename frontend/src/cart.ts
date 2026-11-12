@@ -405,15 +405,15 @@ export function placed(
     return next;
   }
   const lines = next.lines.map(({ open: _, ...line }) => line);
-  return {
-    ...next,
-    // Only a place picked or changed while opening: lines from another
-    // kind keep what they hold.
-    lines:
-      next.kind === "open" && before.kind === "open"
-        ? refilled(lines, catalogue, next.fromId, sealed)
-        : lines,
-  };
+  // Only a place picked or changed while opening is filled again: lines
+  // from another kind keep what they hold, there and after, as typed, so
+  // loose units picked to move never become packages to open.
+  if (next.kind !== before.kind) {
+    return { ...next, lines: lines.map((line) => ({ ...line, typed: true })) };
+  }
+  return next.kind === "open"
+    ? { ...next, lines: refilled(lines, catalogue, next.fromId, sealed) }
+    : { ...next, lines };
 }
 
 /** An opening's lines the volunteer has not typed into, filled again for
@@ -446,12 +446,9 @@ function refilled(
  * are, or none. */
 export function sealedHere(
   item: Item | undefined,
-  placeId: number | null,
+  placeId: number,
   sealed: ReadonlyMap<string, number>,
 ): Item["packages"][number] | undefined {
-  if (placeId === null) {
-    return undefined;
-  }
   const here = (item?.packages ?? []).filter(
     (each) => (sealed.get(sealedKey(each.id, placeId)) ?? 0) > 0,
   );
@@ -578,17 +575,20 @@ export function toBatch(
   const lengths: NonNullable<Draft["lengths"]> = [];
   const problems: string[] = [];
   for (const line of cart.lines) {
-    const named = index.items.get(line.itemId)?.name ?? "An item";
+    const item = index.items.get(line.itemId);
+    const named = item?.name ?? "An item";
+    const each = item?.unit === "each";
     for (const [key, { now }] of Object.entries(line.open ?? {})) {
       if (now === undefined || now.trim() === "") {
         continue;
       }
       const left = thousandths(now);
-      const each = index.items.get(line.itemId)?.unit === "each";
       if (left === null || (each && left % 1000 !== 0)) {
         problems.push(
           `${named}: enter what is on the open package${each ? ", in whole units" : ", up to 3 decimals"}, or leave it blank.`,
         );
+      } else if (left >= MAX_AMOUNT) {
+        problems.push(`${named}: That is more than the inventory can count.`);
       } else {
         lengths.push({ open_package_key: key, left: decimal(left) });
       }
@@ -842,14 +842,23 @@ export function sealedCounts(
       const fromOpen = body.kind !== "open" && line.open_package_key != null;
       const size = packageId == null ? undefined : sizes.get(packageId);
       // Nor one counted in a size its package no longer has: the server
-      // refuses it (package_resized), so it moves none.
+      // refuses it (package_resized), so it moves none. Read as stored,
+      // which another build may have written: one unreadable is skipped.
       const resized =
-        line.package_size != null && sent(String(line.package_size)) !== size;
-      if (packageId == null || fromOpen || size === undefined || resized) {
+        line.package_size != null &&
+        thousandths(String(line.package_size)) !== size;
+      const quantity = thousandths(String(line.quantity));
+      if (
+        packageId == null ||
+        fromOpen ||
+        size === undefined ||
+        resized ||
+        quantity === null
+      ) {
         continue;
       }
       // Rounded up, as the catalogue counts a part of one (catalogue.py).
-      const n = Math.ceil(sent(String(line.quantity)) / size);
+      const n = Math.ceil(quantity / size);
       add(packageId, body.from_location_id, -n);
       if (body.kind !== "open") {
         add(packageId, body.to_location_id, n);
@@ -890,8 +899,10 @@ export function offered(
     }
     for (const line of draft.lines) {
       const key = line.open_package_key;
-      const amount = sent(String(line.quantity));
-      if (key == null) {
+      // As stored, which another build may have written: one unreadable is
+      // skipped, as sealedCounts does.
+      const amount = thousandths(String(line.quantity));
+      if (key == null || amount === null) {
         continue;
       }
       if (draft.kind === "open") {

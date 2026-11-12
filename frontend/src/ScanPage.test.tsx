@@ -186,7 +186,7 @@ describe("filling and saving a cart", () => {
   });
 
   const CUT = "Cut or take from the Spool opened 2026-11-03 (m)";
-  const NOTHING_LEFT = "Nothing usable left on this Spool";
+  const NOTHING_LEFT = "Nothing usable left on it";
   const ticked = () =>
     (screen.getByLabelText(NOTHING_LEFT) as HTMLInputElement).checked;
   const note = () =>
