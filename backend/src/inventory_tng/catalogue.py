@@ -33,6 +33,7 @@ from inventory_tng.models import (
     OpenPackage,
     ScanSettings,
     Volunteer,
+    fold,
 )
 from inventory_tng.open_packages import tracks_opened
 
@@ -119,6 +120,11 @@ class ItemEntry(BaseModel):
     manufacturer: str | None
     part_number: str | None
     old_code: str | None
+    # What the page finds it by (its name, maker, part number, old code and
+    # category), folded as the server's searches fold it (models.fold), so
+    # "cafe" finds "Café" with no folding on the page: only ever matched,
+    # never shown (docs/decisions/0021, 2026-11-12).
+    search_text: str
     packages: list[PackageEntry]
     # Retired, but with stock left: it may be taken, never received.
     retired: bool
@@ -205,6 +211,7 @@ def catalogue(session: Session) -> Catalogue:
             manufacturer=item.manufacturer,
             part_number=item.part_number,
             old_code=item.old_code,
+            search_text=f"{item.search_text} {fold(category)}",
             packages=packages.get(item.id, []),
             retired=item.retired_at is not None,
         )

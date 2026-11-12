@@ -29,10 +29,11 @@ export async function ownVolunteer(page: Page): Promise<string> {
 
 /**
  * A new cable, in metres, that comes in a box of 305 m whose opened ones
- * are followed (docs/decisions/0020), as the seed's is. Its name.
+ * are followed (docs/decisions/0020), as the seed's is, named `what` and
+ * something unique. Its name.
  */
-export async function ownCable(page: Page): Promise<string> {
-  const name = await named(page, "/admin/items", "Cable");
+export async function ownCable(page: Page, what = "Cable"): Promise<string> {
+  const name = await named(page, "/admin/items", what);
   await page.getByLabel("Category").selectOption({ label: "Cables" });
   await page.getByLabel(/^Unit/).selectOption("m");
   const add = page.getByRole("button", { name: "Add", exact: true });

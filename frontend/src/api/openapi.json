@@ -577,6 +577,10 @@
             ],
             "title": "Old Code"
           },
+          "search_text": {
+            "type": "string",
+            "title": "Search Text"
+          },
           "packages": {
             "items": {
               "$ref": "#/components/schemas/PackageEntry"
@@ -598,6 +602,7 @@
           "manufacturer",
           "part_number",
           "old_code",
+          "search_text",
           "packages",
           "retired"
         ],

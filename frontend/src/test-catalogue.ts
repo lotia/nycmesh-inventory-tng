@@ -9,6 +9,7 @@ export const radio: Item = {
   manufacturer: "Ubiquiti",
   part_number: "LBE-5AC-Gen2",
   old_code: "LB5",
+  search_text: "LiteBeam 5AC Ubiquiti LBE-5AC-Gen2 LB5 Radios",
   packages: [
     {
       id: 1000,
@@ -31,6 +32,7 @@ export const cable: Item = {
   manufacturer: null,
   part_number: null,
   old_code: null,
+  search_text: "Cat6 cable Cables",
   packages: [
     {
       id: 1001,
@@ -46,6 +48,16 @@ export const cable: Item = {
     },
   ],
   retired: false,
+};
+
+/** Accented, with its text folded as the server folds it (models.fold). */
+export const cafe: Item = {
+  ...cable,
+  id: 102,
+  name: "Café Łódź patch",
+  category: "Câbles",
+  search_text: "Cafe Lodz patch Cables",
+  packages: [],
 };
 
 export const CATALOGUE: Catalogue = {
@@ -67,4 +79,10 @@ export const CATALOGUE: Catalogue = {
     { code: "B3ZT9W", item_id: 100, package_id: null, location_id: null },
     { code: "S4HELF", item_id: null, package_id: null, location_id: 11 },
   ],
+};
+
+/** The catalogue, and the accented item. */
+export const WITH_CAFE: Catalogue = {
+  ...CATALOGUE,
+  items: [...CATALOGUE.items, cafe],
 };
