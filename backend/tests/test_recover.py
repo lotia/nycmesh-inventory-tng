@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import accounts, sign_in
 from inventory_tng.models import ResetLink
 from inventory_tng.resets import RECOVER
-from inventory_tng.settings import Settings, SettingsError
+from inventory_tng.settings import RateLimits, Settings, SettingsError
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.rows import history
@@ -119,9 +119,13 @@ def test_two_at_once_make_one_link(
     refuses the second, as "used", not as an error."""
     new_admin(session)
     now = datetime.now(UTC)
-    accounts.recover(session, TOKEN, TOKEN, "ada", "192.0.2.91", now, NO_MAIL)
+    accounts.recover(
+        session, TOKEN, TOKEN, "ada", "192.0.2.91", now, NO_MAIL, RateLimits()
+    )
     monkeypatch.setattr(accounts, "exists_where", lambda *_: False)
     with pytest.raises(accounts.TokenRefused) as refused:
-        accounts.recover(session, TOKEN, TOKEN, "ada", "192.0.2.91", now, NO_MAIL)
+        accounts.recover(
+            session, TOKEN, TOKEN, "ada", "192.0.2.91", now, NO_MAIL, RateLimits()
+        )
     assert refused.value.reason == "used"
     assert len(session.scalars(select(ResetLink)).all()) == 1

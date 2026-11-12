@@ -79,6 +79,7 @@ from inventory_tng.models import (
     SignInSettings,
     Volunteer,
 )
+from inventory_tng.settings import RateLimits
 
 from helpers.concurrency import Committed, Worker, delete_made, made, newest_ids
 from helpers.devices import new_device
@@ -121,6 +122,7 @@ def signing_in(
         user_agent=None,
         now=datetime.now(UTC),
         keys=TOTP_KEYS,
+        limits=RateLimits(),
     )
 
 
@@ -327,6 +329,7 @@ def test_a_code_being_confirmed_while_a_reset_is_made_does_not_deadlock(
         later,
         recovery=True,
         account_change=False,
+        limits=RateLimits(),
     )
     assert confirmed[0] == "confirmed"
     reset, worker = reset_blocked(committed, ada, ben)
@@ -388,7 +391,14 @@ def test_a_recovery_under_way_waits_for_a_retire_then_is_refused(
     worker = committed.blocked(
         recovering,
         lambda: accounts.recover(
-            recovering, token, token, "ben", "192.0.2.82", datetime.now(UTC), NO_MAIL
+            recovering,
+            token,
+            token,
+            "ben",
+            "192.0.2.82",
+            datetime.now(UTC),
+            NO_MAIL,
+            RateLimits(),
         ),
     )
     retiring.commit()
@@ -473,6 +483,7 @@ def test_a_password_confirmed_while_totp_is_set_up_is_refused(
             datetime.now(UTC),
             recovery=True,
             account_change=False,
+            limits=RateLimits(),
         )[0],
     )
     adding.commit()

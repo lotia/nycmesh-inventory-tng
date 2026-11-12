@@ -600,6 +600,9 @@ The tests run at once, in several workers, against that one database, so
 none may change rows another reads: a test that changes data first makes
 the rows it changes, such as an item to move
 (`frontend/browser-tests/own.ts`).
+Every test shares one administrator's session, signed in once, so what
+another test confirmed in it holds: a test of what a session asks for
+first takes an administrator of its own (`ownAdmin`, there too).
 The crawl of every page (`phone-width.spec.ts`), which reads them all,
 runs in each browser before any other test starts.
 

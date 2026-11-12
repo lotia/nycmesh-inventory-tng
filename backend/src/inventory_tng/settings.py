@@ -76,7 +76,9 @@ class Redaction:
         switch = environ.get(name, "").strip().lower()
         if switch not in {"", "on", "off"}:
             raise SettingsError(f"{name} must be on or off, not {environ[name]!r}")
-        hours = _whole_hours(environ.get("REDACTION_OFF_MAX_HOURS", ""))
+        hours = _whole_number(
+            environ, "REDACTION_OFF_MAX_HOURS", REDACTION_OFF_MAX_HOURS, "hours", 168
+        )
         until = environ.get(f"{name}_OFF_UNTIL", "").strip()
         return cls(
             switch=None if not switch else switch == "on",
@@ -154,6 +156,31 @@ class FrontendConfig:
         )
 
 
+@dataclass(frozen=True)
+class RateLimits:
+    """How many attempts the sign-in pages take before refusing more
+    (accounts.py). From one address, in a minute: signing in, setting up
+    the first administrator, recovery, and asking for or using a reset
+    link, each counted apart (RATE_LIMIT_PER_ADDRESS). For one
+    administrator, in 15 minutes: codes, or the password where it stands
+    in for one, at signing in and to confirm (RATE_LIMIT_PER_ACCOUNT)."""
+
+    per_address: int = 10
+    per_account: int = 10
+
+    @classmethod
+    def from_environ(cls, environ: Mapping[str, str] = os.environ) -> Self:
+        default = cls()
+        return cls(
+            per_address=_attempts(
+                environ, "RATE_LIMIT_PER_ADDRESS", default.per_address
+            ),
+            per_account=_attempts(
+                environ, "RATE_LIMIT_PER_ACCOUNT", default.per_account
+            ),
+        )
+
+
 MailSecurity = Literal["starttls", "tls", "none"]
 DEFAULT_MAIL_PORTS: dict[MailSecurity, int] = {"starttls": 587, "tls": 465, "none": 25}
 
@@ -222,6 +249,7 @@ class Settings:
     # Password resets and notices by mail; None sends none.
     mail: MailConfig | None = None
     traces: Redaction = field(default_factory=Redaction)
+    rate_limits: RateLimits = field(default_factory=RateLimits)
 
     def __post_init__(self) -> None:
         # Every Settings passes through here, however it was built.
@@ -249,6 +277,7 @@ class Settings:
             recovery_token=environ.get("RECOVERY_TOKEN", "").strip() or None,
             mail=MailConfig.from_environ(environ),
             traces=Redaction.from_environ("TRACE", environ),
+            rate_limits=RateLimits.from_environ(environ),
         )
 
 
@@ -430,15 +459,25 @@ def _flag(environ: Mapping[str, str], name: str, default: bool) -> bool:
     raise SettingsError(f"{name} must be true or false, not {environ[name]!r}")
 
 
-def _whole_hours(value: str) -> int:
-    value = value.strip()
+# The most attempts a limit may allow: enough for tests run many times over.
+MAX_ATTEMPTS = 1_000_000
+
+
+def _attempts(environ: Mapping[str, str], name: str, default: int) -> int:
+    return _whole_number(environ, name, default, "attempts", MAX_ATTEMPTS)
+
+
+def _whole_number(
+    environ: Mapping[str, str], name: str, default: int, unit: str, most: int
+) -> int:
+    value = environ.get(name, "").strip()
     if not value:
-        return REDACTION_OFF_MAX_HOURS
-    if value.isascii() and value.isdigit() and 0 < int(value) <= 168:
+        return default
+    if value.isascii() and value.isdigit() and 0 < int(value) <= most:
         return int(value)
     raise SettingsError(
-        f"REDACTION_OFF_MAX_HOURS must be a whole number of hours from 1 to 168, "
-        f"not {value!r}"
+        f"{name} must be a whole number of {unit} from 1 to {most}, "
+        f"not {environ[name]!r}"
     )
 
 

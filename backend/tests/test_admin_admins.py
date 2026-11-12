@@ -18,6 +18,7 @@ from inventory_tng import accounts, activity, sign_in
 from inventory_tng.accounts import qr_svg
 from inventory_tng.admin.admins import ADMINS
 from inventory_tng.models import ACTIVITY_KINDS, Admin, AdminSession, SignInSettings
+from inventory_tng.settings import RateLimits
 
 from helpers.mail import NO_MAIL, SentMail
 from helpers.sign_in import (
@@ -568,7 +569,14 @@ def test_the_operators_recovery_link_is_told(session: Session) -> None:
     new_admin(session)
     token = "a recovery token the operator set, long"
     accounts.recover(
-        session, token, token, "ada", "192.0.2.90", datetime.now(UTC), NO_MAIL
+        session,
+        token,
+        token,
+        "ada",
+        "192.0.2.90",
+        datetime.now(UTC),
+        NO_MAIL,
+        RateLimits(),
     )
     assert activity.recent(session)[0].words == (
         "The operator made a link for ada with the recovery token"

@@ -60,6 +60,7 @@ from inventory_tng.pages import (
     sections,
     templates,
 )
+from inventory_tng.settings import RateLimits
 from inventory_tng.totp_keys import TotpKeys
 from inventory_tng.web import rate_key, set_private_cookie
 
@@ -364,6 +365,7 @@ async def _confirmed(
             typed,
             notify,
             need,
+            request.app.state.settings.rate_limits,
         )
         if outcome != "confirmed":
             raise await run_in_threadpool(
@@ -405,6 +407,7 @@ def _confirm(
     typed: str,
     notify: Notify,
     need: Need,
+    limits: RateLimits,
 ) -> accounts.Confirmation:
     """Confirm for `need`, keep it, and tell the owner if a recovery code did
     it."""
@@ -416,6 +419,7 @@ def _confirm(
         _now(),
         recovery=need.recovery,
         account_change=need.account_change,
+        limits=limits,
     )
     if outcome == "confirmed":
         left = _codes_left(session, signed.admin, factor)
@@ -633,7 +637,13 @@ def setup(
     }
     optional = _totp_optional(session)
     try:
-        accounts.check_setup_token(session, expected, token, rate_key(request))
+        accounts.check_setup_token(
+            session,
+            expected,
+            token,
+            rate_key(request),
+            request.app.state.settings.rate_limits,
+        )
     except accounts.TokenRefused as refused:
         limited = refused.reason == "rate_limited"
         return _setup_page(
@@ -772,6 +782,7 @@ def sign_in(
             user_agent=request.headers.get("user-agent"),
             now=_now(),
             keys=keys,
+            limits=request.app.state.settings.rate_limits,
         )
     except accounts.SignInRefused as refused:
         limited = refused.reason == "rate_limited"
@@ -828,7 +839,15 @@ def confirm(
     confirm_code: Annotated[str, Form()] = "",
     next: Annotated[str, Form()] = HOME,
 ) -> Response:
-    outcome = _confirm(keys, session, signed, confirm_code, notify, SENSITIVE)
+    outcome = _confirm(
+        keys,
+        session,
+        signed,
+        confirm_code,
+        notify,
+        SENSITIVE,
+        request.app.state.settings.rate_limits,
+    )
     if outcome == "confirmed":
         return redirect(_local(next))
     return _confirm_page(
