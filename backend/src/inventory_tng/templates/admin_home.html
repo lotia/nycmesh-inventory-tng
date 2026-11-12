@@ -6,14 +6,14 @@
 {% if needs %}
 <section id="needs-action">
   <h2>Needs your action ({{ needs | sum(attribute="total") }})</h2>
-  {% for kind in needs %}
+  {% for found in needs %}{% set kind = found.kind %}
   <h3>{{ kind.title }}</h3>
   <ul>
-    {% for line in kind.items %}
+    {% for line in found.items %}
     <li><a href="{{ kind.path }}?item={{ line.item_id }}">{{ line.item }}: {{ line.packages }}</a>
       {%- if line.below %}, {{ line.below | amount }} {{ line.unit }} below zero{% endif %}</li>
     {% endfor %}
-    <li><a href="{{ kind.path }}">All {{ kind.total }}</a></li>
+    <li><a href="{{ kind.path }}">All {{ found.total }}</a></li>
   </ul>
   {% endfor %}
 </section>

@@ -955,7 +955,7 @@ export function afterCut(
   return { after, ending: short ? "short" : null };
 }
 
-type Taken = NonNullable<Line["open"]>[string];
+export type Taken = NonNullable<Line["open"]>[string];
 
 /** The cut typed on an open package, as afterCut sees it; null for none:
  * blank, nothing, not yet a number, or all of it moved whole. */
@@ -981,13 +981,13 @@ export function usedUpOf(
 /** The cart with what it takes from open packages no longer offered left
  * out: reported or closed elsewhere, or moved, since it was typed, its
  * field is gone from the page, so what was typed there goes too. */
-function withOffered(cart: Cart, keys: ReadonlyMap<string, unknown>): Cart {
+function withOffered(cart: Cart, here: ReadonlyMap<string, unknown>): Cart {
   return {
     ...cart,
     lines: cart.lines.map((line) => ({
       ...line,
       open: Object.fromEntries(
-        Object.entries(line.open ?? {}).filter(([key]) => keys.has(key)),
+        Object.entries(line.open ?? {}).filter(([key]) => here.has(key)),
       ),
     })),
   };

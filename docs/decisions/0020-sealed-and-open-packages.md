@@ -1,7 +1,8 @@
 # 0020 — Sealed and open packages: spools in stock
 
 **Status:** accepted · 2026-11-11 · amends 0003 (what a ledger line holds,
-reorder) and adds the home page's "Waiting for you" ·
+reorder) and adds the home page's "Waiting for you" (now "Needs your
+action") ·
 amended 2026-11-11 (tracking opened packages is a setting; bulk actions)
 · amended 2026-11-12 (an open package on the scan page; correcting its
 length; "Needs your action")

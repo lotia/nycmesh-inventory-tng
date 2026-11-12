@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import ledger, open_packages
 from inventory_tng.admin.common import admin_page, now
 from inventory_tng.admin.items import ITEMS
-from inventory_tng.admin.needs_action import OnlyItem, query, query_string
+from inventory_tng.admin.needs_action import Kind, OnlyItem, query, query_string
 from inventory_tng.admin.stock import STOCK
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.local_time import site_zone
@@ -56,6 +56,8 @@ REPORTED = (OpenPackage.reported_at.is_not(None), OpenPackage.closed_at.is_(None
 
 
 TITLE = "Reported used up"
+# As "Needs your action" lists it (needs_action.py).
+KIND = Kind(TITLE, USED_UP, REPORTED)
 
 
 @router.get(USED_UP)

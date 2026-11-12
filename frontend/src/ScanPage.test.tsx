@@ -287,9 +287,7 @@ describe("filling and saving a cart", () => {
       screen.getByRole("group", { name: /^Old reel open opened 2026-11-03/ }),
     ).toBeDefined();
     expect(
-      screen.getByLabelText(
-        "Cut or take from the old reel opened 2026-11-03 (m)",
-      ),
+      screen.getByLabelText("Cut or take from the old opened 2026-11-03 (m)"),
     ).toBeDefined();
   });
 
