@@ -26,9 +26,11 @@ def service(name: str) -> str:
 
 def test_the_app_takes_the_settings_env_example_names() -> None:
     named = set(SETTING.findall((CLONE / ".env.example").read_text()))
-    # INVENTORY_ settings are compose's and mise's, for the host; the
-    # container sets FRONTEND_DIST itself, to the bundle it built.
-    for_the_app = {name for name in named if not name.startswith("INVENTORY_")}
+    # INVENTORY_ and COMPOSE_ settings are compose's and mise's, for the
+    # host; the container sets FRONTEND_DIST itself, to the bundle it built.
+    for_the_app = {
+        name for name in named if not name.startswith(("INVENTORY_", "COMPOSE_"))
+    }
     assert set(LISTED.findall(service("app"))) == for_the_app | {"FRONTEND_DIST"}
 
 
@@ -38,8 +40,8 @@ def test_the_app_is_not_given_the_whole_env() -> None:
 
 def test_the_database_has_only_its_named_volume() -> None:
     """A bind mount would put the path of the checkout that made the
-    container in its hash, so every other checkout's start-database would
-    find it differs."""
+    container in its hash, so each checkout sharing the project would make
+    it again."""
     after = service("db").split("\n    volumes:\n", 1)[1]
     volumes = re.split(r"^ {4}\S", after, maxsplit=1, flags=re.MULTILINE)[0]
     assert re.findall(r"^ +- *(.*)$", volumes, re.MULTILINE) == [

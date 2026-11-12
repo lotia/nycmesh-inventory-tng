@@ -11,14 +11,15 @@ if [[ frontend/package-lock.json -nt frontend/node_modules/.package-lock.json ]]
   (cd frontend && npm ci)
 fi
 if [[ ! -f .env ]]; then
-  # A database of this checkout's own on the server every checkout shares
-  # (CONTRIBUTING.md, Local settings): named for its directory, and told
-  # apart from another of that name by where it is.
-  checkout=$(basename "$PWD" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9\n' '_')
-  where=$(printf %s "$PWD" | cksum | cut -d " " -f 1)
-  sed "s/^INVENTORY_DB_NAME=.*/INVENTORY_DB_NAME=inventory_${checkout:0:40}_$where/" \
-    .env.example >.env
-  echo "Made .env from .env.example, with a database of its own."
+  # A compose stack of this checkout's own, with its database, and ports no
+  # other stack of this repository claims and nothing listens on
+  # (CONTRIBUTING.md, Local settings). With no runtime running, it knows of
+  # no other stack.
+  projects=$("$(dirname "$0")/compose" ls --all --format json) || projects=[]
+  (cd backend && uv run --quiet --frozen python -m inventory_tng.stacks new-env) <<<"$projects" >.env.new
+  mv .env.new .env
+  echo "Made .env from .env.example, with a compose stack and database of its own:" \
+    "$(grep '^COMPOSE_PROJECT_NAME=' .env)"
 fi
 # The key development seals authenticators' TOTP keys with (DEPLOYMENT.md,
 # TOTP keys), readable by you alone. Made again if empty, as a run that

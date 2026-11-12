@@ -1,8 +1,8 @@
-"""This checkout's development database, on compose's one PostgreSQL server,
-which every checkout shares (CONTRIBUTING.md, Local settings): made if
-missing, the owner's and held to its connection limit, or dropped, named to
-confirm. Migrating it is alembic's, after (mise run dev-database,
-reset-dev-database). Only with APP_ENV=development.
+"""This checkout's development database, on its compose stack's PostgreSQL
+server (CONTRIBUTING.md, Local settings): made if missing, the owner's and
+held to its connection limit, or dropped, named to confirm. Migrating it
+is alembic's, after (mise run dev-database, reset-dev-database). Only with
+APP_ENV=development.
 
     uv run python -m inventory_tng.dev_database make
     uv run python -m inventory_tng.dev_database drop NAME
@@ -29,8 +29,8 @@ log = structlog.get_logger(__name__)
 SUPERUSER = "inventory"
 OWNER = "inventory_owner"
 # Connections a development database takes at most, as the roles log in:
-# an app's pools (db.py, 20) and a migration or seed beside it, so one
-# checkout cannot starve the others (CONTRIBUTING.md, Connections).
+# an app's pools (db.py, 20) and a migration or seed beside it, so it
+# cannot starve the tests beside it (CONTRIBUTING.md, Connections).
 CONNECTION_LIMIT = 30
 # The roles, made if missing (roles.sql says who else runs it).
 ROLES_SQL = CLONE / "backend" / "migrations" / "roles.sql"

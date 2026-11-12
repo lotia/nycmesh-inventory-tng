@@ -139,11 +139,10 @@ run = [
     "uv run alembic upgrade head",
 ]
 
-# The server every checkout shares (CONTRIBUTING.md, Local settings).
-[tasks.recreate-database-container]
-description = "Recreate the database container every checkout shares, with compose.yaml's settings"
-confirm = "Recreate the database container? It restarts the server every checkout shares, ending every checkout's connections. Its volume, with every database, is kept."
-run = "mise run compose -- up -d --wait --force-recreate db"
+# This checkout's stack (CONTRIBUTING.md, Local settings).
+[tasks.start-database]
+description = "Start this checkout's database server, making its container again (its volume kept) when compose.yaml or .env changed its settings"
+run = "mise-tasks/compose up -d --wait db"
 
 [tasks.dev-backend]
 description = "The backend, restarting when its Python changes (mise run dev runs it)"

@@ -94,35 +94,51 @@ runs Python through `uv run`.
 
 ## Local settings
 
-`.env` holds your local settings: the database's port and URLs, and any
-logging or telemetry settings you want. Git ignores it, so it never reaches a
+`.env` holds your local settings: this checkout's compose project and
+ports, its database's name and URLs, and any logging or telemetry settings
+you want. Git ignores it, so it never reaches a
 commit; change `.env.example` only to change what everyone starts from.
 Compose, the run command and migrations read `.env`, and the tests read its
 database port. A value set in your shell wins over the file.
 
-The database listens on port 5433, so it can run beside MeshDB's. If that port
-is taken, change `INVENTORY_DB_PORT` in `.env`; both URLs follow it.
+Every clone, worktree or agent's checkout has a compose stack of its own:
+its PostgreSQL server, app container and WebKit server, with their volume,
+under the project `COMPOSE_PROJECT_NAME` in `.env`. So one checkout's
+settings, rebuild or seed never touch another's. When `mise run setup`
+makes `.env`, it names the project for the checkout's directory and where
+that is, `inventory-tng-<directory>_<n>`, and the database on its server
+`inventory_<directory>_<n>` (`INVENTORY_DB_NAME`, which both URLs name).
+It gives each port compose publishes (`INVENTORY_DB_PORT`, 5433, beside
+MeshDB's 5432; `INVENTORY_APP_PORT`, 8000; and the others `.env.example`
+lists) its usual number, or, if another stack claims it or something
+listens on it, the next free one up. Never copy a `.env` from another
+checkout. If a port is taken later, change it in `.env`; the URLs follow
+it.
 
-Every clone, worktree or agent's checkout shares that one server, and has a
-database of its own on it, `INVENTORY_DB_NAME`, which both URLs name: so
-one's rebuild or seed never touches another's. `mise run setup` names it
-for the checkout's directory and where that is, `inventory_<directory>_<n>`,
-when it makes `.env`; a `.env` made before names `inventory`, so give any
-second checkout with one a name of its own in both URLs. Never copy a
-`.env` from another checkout. The server's container is every checkout's
-too, so no task makes it again: each that needs the server runs
-`mise run start-database`, which starts it as it is. When `compose.yaml`,
-or `.env`'s `INVENTORY_DB_PORT`, changes its settings, those tasks, the
-browser tests too, stop and say so rather than recreate it. Then
-`mise run recreate-database-container` recreates it: it keeps the volume,
-but restarts the server, ending every checkout's connections, so it asks
-first. Run it from a checkout with the newest `compose.yaml`, so pull
-first: from an older one it puts back the old settings. An agent asks the
-person, then runs
-`mise run --yes recreate-database-container`.
+A `.env` made before names no project, so its checkout uses the project
+`inventory-tng` (`compose.yaml`'s name), as it always did, on ports 5433,
+8000 and 3000, and a database `inventory`: nothing changes for a single
+clone. Checkouts with such a `.env` share that one stack; to give one its
+own, move its `.env` aside, run `mise run setup`, and copy back any
+setting of yours.
+
+Each task that needs the server runs `mise run start-database`, which
+starts it, and makes its container again, keeping its volume, when
+`compose.yaml` or `.env` changed its settings: that ends this stack's
+connections, and in `inventory-tng` those of every checkout sharing it.
 `mise run dev-database` starts the server, makes the database if it is
 missing, and migrates it; `mise run dev` and `mise run seed` run it first.
 It holds each to 30 connections (Connections, below).
+
+A stack stays after its checkout is deleted. `mise run list-stale-stacks`
+lists each whose `compose.yaml` is gone, and
+`mise run remove-stale-stacks` lists them, asks, then removes those it
+listed, with their volumes and every database in them. Neither touches
+`inventory-tng` or this checkout's. A checkout moved or renamed keeps its
+stack, which still names the old path, so it is listed too: check the list
+before you confirm. Compose knows a stack's checkout only from its
+containers, so a stack taken down with `down`, not `down --volumes`,
+before its checkout was deleted leaves a volume neither can find.
 
 The app logs in with `DATABASE_URL`, as `inventory_app`, which may read and
 add to the ledger but never change it. Migrations log in with
@@ -177,7 +193,8 @@ that does, your local database no longer matches its migrations: rebuild
 it, losing its data, with `mise run reset-dev-database -- <its name>`. It
 drops only this checkout's database, which you name to confirm, then makes
 and migrates it again, empty. Never rebuild with `mise run compose -- down
---volumes`: that removes every checkout's database. Once production runs,
+--volumes`: that removes the stack's volume, with every database in it,
+and in `inventory-tng` every checkout's that shares it. Once production runs,
 a migration is never edited: add a new one.
 
 Migrations run as the owner, and every table they create gives the app
@@ -402,24 +419,26 @@ command line.
 
 To see the mail the app sends, start Mailpit, which catches it all and sends
 nothing on: `mise run compose -- --profile mail up -d mail`. Set these in `.env`
-and restart, then read the mail at <http://localhost:8025>:
+and restart, then read the mail at <http://localhost:8025>, or the port
+`INVENTORY_MAILPIT_PORT` names (Local settings):
 
 ```sh
 MAIL_HOST=localhost
-MAIL_PORT=1025
+MAIL_PORT=${INVENTORY_SMTP_PORT:-1025}
 MAIL_SECURITY=none
 MAIL_FROM=inventory@localhost
 SITE_URL=http://127.0.0.1:8000
 ```
 
 `MAIL_SECURITY=none` works only with `APP_ENV=development`. For the app
-container, set `INVENTORY_APP_MAIL_HOST=mail` too.
+container, set `INVENTORY_APP_MAIL_HOST=mail` too, and `SITE_URL`'s port to
+`INVENTORY_APP_PORT`.
 
 ### Running the app in a container
 
 ```sh
 mise run dev-database
-mise run compose -- up -d --build --wait app  # http://127.0.0.1:8000/api/docs
+mise run compose -- up -d --build --wait app  # its port: INVENTORY_APP_PORT
 mise run compose -- logs -f app
 ```
 
@@ -429,8 +448,8 @@ image builds the scan page too, and serves Brotli and gzip copies of its
 files, as production will. It does not replace uv: the checks, new
 migrations and your editor still use it. The container migrates this
 checkout's database (`INVENTORY_DB_NAME`, which `mise run dev-database`
-makes) when it starts, then serves with `--reload`. There is one app
-container for every checkout: the last to start it has it.
+makes) when it starts, then serves with `--reload`. Each checkout's stack
+has its own.
 Your `backend/src` and `backend/migrations` are mounted into it, so it picks
 up your edits. Pass `--build` again after changing dependencies or
 `frontend/`.
@@ -444,14 +463,15 @@ because inside it `localhost` is the container, and its own
 `VITE_DEV_SERVER` and `FRONTEND_DIST`, so it serves the bundle it built. To
 send its telemetry to the dashboard, start the dashboard (Logging, below)
 and set `INVENTORY_APP_OTLP_ENDPOINT=http://dashboard:18890`; to send mail
-to Mailpit, `INVENTORY_APP_MAIL_HOST=mail`. It takes port 8000, as the run
-command does; `INVENTORY_APP_PORT` moves it. The client address it logs is
+to Mailpit, `INVENTORY_APP_MAIL_HOST=mail`. It takes `INVENTORY_APP_PORT`
+(Local settings), which is 8000, as the run command's port, unless setup
+chose another. The client address it logs is
 the container network's, not your browser's.
 
 ### Using compose directly
 
-Compose on its own (`mise run compose -- up -d db`) gives the PostgreSQL
-server every checkout shares. On a new volume it makes the two roles and
+Compose on its own (`mise run compose -- up -d db`) gives this checkout's
+PostgreSQL server. On a new volume it makes the two roles and
 a database, `inventory`, the owner's. It makes no other database a
 checkout's `.env` names (`INVENTORY_DB_NAME`), which the app's container
 migrates as it starts: until `mise run dev-database` makes it, the
@@ -461,11 +481,10 @@ task is the safer way:
 | Command | What it does | When |
 | --- | --- | --- |
 | `mise run dev-database` | Starts the server, makes this checkout's database if missing, migrates it | Before the app, here or in its container |
-| `mise run start-database` | Starts the server as it is; stops if `compose.yaml` changed it | Before the checks |
-| `mise run recreate-database-container` | Recreates the server's container, keeping its volume | After a change to `db` ([Local settings](#local-settings)) |
+| `mise run start-database` | Starts the server, making its container again if its settings changed | Before the checks |
 | `mise run reset-dev-database -- <name>` | Drops this checkout's database, makes it again empty and migrated | After a migration was edited ([Migrations](#migrations)) |
 | `mise run compose -- up -d --build --wait app` | The app in its container | After `mise run dev-database` ([above](#running-the-app-in-a-container)) |
-| `mise run compose -- up -d db` | Starts the server, but recreates it if `compose.yaml` changed it, ending every checkout's connections | Rarely: `mise run start-database` instead |
+| `mise run remove-stale-stacks` | Removes the stacks of checkouts that are gone, once you confirm | After deleting a checkout ([Local settings](#local-settings)) |
 
 ### Podman's exec bug
 
@@ -664,20 +683,21 @@ statements for a test of its own.
 
 ### Connections
 
-Every checkout's tests, apps and browser tests share compose's one
+Each checkout's tests, apps and browser tests use its own stack's
 PostgreSQL, which allows 400 connections (`compose.yaml`), less 3 kept for
 the superuser. A whole test run, measured over 8 processes, holds under 60
 at once, all processes together; one process held at most about 24, and
 one database under 20; a dev app
-up to 20, as does the browser tests' server. So three checkouts can run
-the checks at once, each beside its app. Each test database allows 40
+up to 20, as does the browser tests' server. So a checkout's checks and its
+app fit with room to spare, and so would three checkouts sharing
+`inventory-tng` (Local settings). Each test database allows 40
 (`tests/databases.py`), so a process that leaks connections is refused at
 its own database, not the server's limit, and a test that fails for either
 limit says which. Long before a leak reaches that limit, a test that ends
 with a connection it took from any pool and kept errors at its teardown,
 named by `keeps_its_connections` in conftest.py. Each checkout's development
 database allows 30 (`dev_database.py`): one app, and a migration or seed
-beside it.
+beside it, so it cannot starve the tests beside it.
 
 ### Measuring the catalogue
 
@@ -821,8 +841,9 @@ to keep it); in development, whole, unless `TRACE_REDACTION=on`. Secrets in
 query strings are masked either way, unless `UNMASK_SECRETS=true`. How to
 see unredacted traces in production for a while is in DEPLOYMENT.md.
 To see telemetry locally, start the dashboard, run the server with
-`OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`, and open
-<http://localhost:18888>:
+`OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:${INVENTORY_OTLP_PORT:-4318}` in
+`.env`, and open <http://localhost:18888>, or the port
+`INVENTORY_DASHBOARD_PORT` names (Local settings):
 
 ```sh
 mise run compose -- --profile telemetry up -d dashboard
