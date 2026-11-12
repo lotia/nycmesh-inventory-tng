@@ -648,8 +648,11 @@ up to 20, as does the browser tests' server. So three checkouts can run
 the checks at once, each beside its app. Each test database allows 40
 (`tests/databases.py`), so a process that leaks connections is refused at
 its own database, not the server's limit, and a test that fails for either
-limit says which. Each checkout's development database allows 30
-(`dev_database.py`): one app, and a migration or seed beside it.
+limit says which. Long before a leak reaches that limit, a test that ends
+with a connection it took from any pool and kept errors at its teardown,
+named by `keeps_its_connections` in conftest.py. Each checkout's development
+database allows 30 (`dev_database.py`): one app, and a migration or seed
+beside it.
 
 ### Measuring the catalogue
 
