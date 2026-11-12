@@ -154,6 +154,15 @@ def test_package_names_clashing_with_retired_ones_are_named_first(
         text("UPDATE item_package SET name = 'Spool 305 m' WHERE id = :i"),
         {"i": spool},
     )
+    # A too-short length of a whole one or more is named too.
+    connection.execute(
+        text("UPDATE item_package SET short_below = 305 WHERE id = :i"), {"i": spool}
+    )
+    with pytest.raises(RuntimeError, match=f"by id: {spool}\\. Lower it"):
+        command.upgrade(alembic_config, "head")
+    connection.execute(
+        text("UPDATE item_package SET short_below = 5 WHERE id = :i"), {"i": spool}
+    )
     command.upgrade(alembic_config, "head")
     command.downgrade(alembic_config, "0029")
 

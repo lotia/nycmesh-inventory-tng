@@ -81,9 +81,7 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
             <input name="package_name" value="{{ sent.get('package_name', package.name) }}" required>
             {% if sent %}{% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
-          {% if package.id in sizes_fixed %}
-          <input type="hidden" name="size" value="{{ package.size | amount }}">
-          {% else %}
+          {% if package.id not in sizes_fixed %}
           <label>Holds <span class="hint">in {{ item.unit }}; fixed once some has moved, been opened or labelled</span>
             <input name="size" inputmode="decimal" value="{{ sent.get('size', package.size | amount) }}" required>
             {% if sent %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}

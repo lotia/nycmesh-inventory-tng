@@ -49,6 +49,8 @@ NOTICES.update(
         "length_unchanged": "Nothing changed: it was checked meanwhile, or "
         "its place can't be counted. Look again.",
         "length_bad": "Type what is on it: a number, 0 or more.",
+        "length_reload": "This page is from before the last change to how "
+        "lengths are set: load it again, then set it.",
         "length_none_said": "Nobody said what is on those: type what is on "
         "each, and set it on its own.",
     }
@@ -195,35 +197,22 @@ def kind_page(
     return _checks_page(request, signed, session, only, kind.title, kind.where)
 
 
-def _places(session: Session, where: Sequence[ColumnElement[bool]]) -> set[int]:
-    """Where the open packages `where` names are."""
-    return set(
-        session.scalars(select(OpenPackage.location_id).where(*where).distinct())
-    )
-
-
 def _set(session: Session, signed: SignedIn, answer: Answer) -> tuple[bool, bool]:
     """A count of the open package by the difference between what it really
-    had and what it showed then (docs/decisions/0020, amended by
+    had and what it `showed` then (docs/decisions/0020, amended by
     inventory-tng-b1z), so a cut since stays as saved: then is the report,
-    for the figure a volunteer said, else the page. Under a key of its
+    for the figure a volunteer said, else the page (set_one). Under a key of its
     check, so sending it twice writes it once, and the check settled: both,
     if the check is still as `seen`; else neither. Whether it was set, and
     whether that left it below zero, asked about again."""
     open_id, seen, left, showed = answer
-    assert left is not None  # A Set's, never a Leave's.
+    # A Set's, never a Leave's; each says what it is against.
+    assert left is not None
+    assert showed is not None
     row = session.get_one(OpenPackage, open_id)
     key = uuid.uuid5(row.key, f"length {seen}")
-    if row.length_reported_in_id is not None and left == row.length_reported:
-        showed = ledger.left_at(session, open_id, row.length_reported_in_id)
-    if showed is None:
-        log.info(
-            "length not set: the form said not what it showed", open_package_id=open_id
-        )
-        return False, False
 
     def both() -> bool:
-        assert showed is not None  # Narrowed above, for the closure.
         if not open_packages.settle_check(session, open_id, seen):
             raise RuleBroken("length_unchanged")
         shows = ledger.count_open_package(
@@ -274,7 +263,8 @@ def _answer(
     places locked first, by id, as saves take places: only here, never as
     the page is shown."""
     named = OpenPackage.id.in_([each.open_id for each in answers])
-    for place in sorted(_places(session, [named])):
+    places = session.scalars(select(OpenPackage.location_id).where(named).distinct())
+    for place in sorted(places):
         ledger.lock_place(session, place)
     set_, left_, below = 0, 0, 0
     for each in sorted(answers):
@@ -320,8 +310,19 @@ def set_one(
     length = quantity(left, positive=False, unit=unit)
     if not isinstance(length, Decimal):
         return redirect(back, notice="length_bad", **query(only))
-    # What it showed on the page: what was typed is set against it.
-    answer = [Answer(open_id, seen, length, _showed(showed))]
+    # The volunteer's figure, as the box is filled, is set against what it
+    # showed at the report; any other, against what the page showed.
+    against = (
+        ledger.left_at(session, open_id, row.length_reported_in_id)
+        if row.length_reported_in_id is not None and length == row.length_reported
+        else _showed(showed)
+    )
+    if against is None:
+        log.info(
+            "length not set: the form said not what it showed", open_package_id=open_id
+        )
+        return redirect(back, notice="length_reload", **query(only))
+    answer = [Answer(open_id, seen, length, against)]
     return _answer(session, signed, answer, query(only), page=back)
 
 
@@ -376,8 +377,10 @@ def answer_ticked(
         if do == "leave":
             answers.append(Answer(row.id, seen))
         elif row.length_reported is not None:
-            # Against what it showed at the report (_set).
-            answers.append(Answer(row.id, seen, row.length_reported))
+            # Against what it showed at the report.
+            assert row.length_reported_in_id is not None  # Reported with it.
+            at_report = ledger.left_at(session, row.id, row.length_reported_in_id)
+            answers.append(Answer(row.id, seen, row.length_reported, at_report))
         else:
             unsaid += 1
     return _answer(session, signed, answers, query(only), unsaid=unsaid, page=back)

@@ -518,7 +518,7 @@ def test_set_moves_it_by_what_it_was_off_so_cuts_since_stay(
         refused = admin_client.post(
             f"{LENGTHS}/{made.id}/set", data=form | {"showed": stale}
         )
-        assert refused.headers["location"] == f"{LENGTHS}?notice=length_unchanged"
+        assert refused.headers["location"] == f"{LENGTHS}?notice=length_reload"
     done = admin_client.post(f"{LENGTHS}/{made.id}/set", data=form)
     assert done.headers["location"] == f"{LENGTHS}?notice=length_set"
     # Showed -5, really had 3; the cut of 1 since stays.
@@ -611,3 +611,25 @@ def test_a_set_that_leaves_it_below_zero_asks_again(
     session.refresh(made)
     assert left_on(session, made) == -50
     assert (made.length_reported, made.below_zero_at is not None) == (None, True)
+
+
+def test_a_count_since_the_report_is_not_taken_off_twice(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    spools: Spools,
+) -> None:
+    """A count since the report put it right already: the report's figure
+    is set against what it showed after that count, not before it."""
+    made = spools.opened()
+    registered_client.post(URL, json=report(spools, length(made, "250")))
+    counter = add(session, Admin(username=f"counter-{tag()}"))
+    ledger.count_open_package(
+        session, uuid.uuid4(), counter.id, made, Decimal(250), Decimal(305)
+    )
+    assert left_on(session, made) == 250
+    done = admin_client.post(
+        LENGTHS, data={"open_package": ticked(session, made), "do": "set"}
+    )
+    assert done.headers["location"] == f"{LENGTHS}?notice=length_set"
+    assert left_on(session, made) == 250

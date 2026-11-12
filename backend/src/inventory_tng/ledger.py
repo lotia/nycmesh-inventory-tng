@@ -41,6 +41,7 @@ from sqlalchemy import (
     Select,
     Subquery,
     any_,
+    case,
     func,
     insert,
     or_,
@@ -515,19 +516,32 @@ def moment(session: Session, location_id: int) -> int:
 
 def left_at(session: Session, open_id: int, as_of: int) -> Decimal:
     """What an open package showed just after the ledger transaction
-    `as_of`, wherever it was: all that went into it less all that left it,
-    to then. A save holds the open packages it names before it draws its
-    id (_hold_forms), so none naming it commits later with a lower one."""
-    into = select(func.coalesce(func.sum(Movement.quantity), 0)).where(
-        Movement.to_open_package_id == open_id, Movement.transaction_id <= as_of
+    `as_of`, wherever it was, carried forward by the counts and adjustments
+    of it since, which put right what it showed: all that went into it less
+    all that left it. A save holds the open packages it names before it
+    draws its id (_hold_forms), so none naming it commits later with a
+    lower one."""
+    then = or_(
+        LedgerTransaction.id <= as_of,
+        LedgerTransaction.kind.in_(("count", "adjustment")),
     )
-    out = select(func.coalesce(func.sum(Movement.quantity), 0)).where(
-        Movement.from_open_package_id == open_id, Movement.transaction_id <= as_of
+    # A whole move names it on both sides: in and out, nothing changed.
+    signed = case(
+        (Movement.to_open_package_id == open_id, Movement.quantity), else_=0
+    ) - case((Movement.from_open_package_id == open_id, Movement.quantity), else_=0)
+    total = session.scalar(
+        select(func.coalesce(func.sum(signed), 0))
+        .select_from(Movement)
+        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .where(
+            or_(
+                Movement.to_open_package_id == open_id,
+                Movement.from_open_package_id == open_id,
+            ),
+            then,
+        )
     )
-    came, went = session.execute(
-        select(into.scalar_subquery(), out.scalar_subquery())
-    ).one()
-    return Decimal(came) - Decimal(went)
+    return Decimal(total or 0)
 
 
 def _at_place(location_id: int) -> ColumnElement[bool]:
