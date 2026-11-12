@@ -603,7 +603,13 @@ def save_package(
         return not_found()
     found = session.get_one(Item, item_id)
     name = package_name.strip()
-    parsed, problems = _package_fields(session, found, name, size)
+    # A size fixed is not on the form: as it is, whatever its item's unit
+    # has become since.
+    parsed, problems = _package_fields(
+        session, found, name, size if size.strip() else "1"
+    )
+    if not size.strip():
+        parsed = package.size
     if parsed is not None and not problems:
         _, broken = refusal(
             session,
@@ -681,7 +687,10 @@ def retire_package(
     session.commit()
     log.info("package retired", item_package_id=package_id)
     return redirect(
-        f"{ITEMS}/{item_id}", notice="package_retired", undo=str(package_id)
+        f"{ITEMS}/{item_id}",
+        notice="package_retired",
+        section="packages",
+        undo=str(package_id),
     )
 
 
@@ -752,9 +761,19 @@ def package_settings(
         RETIRED,
         SHORT_UNDER_SIZE,
     )
+    if broken == RETIRED:
+        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
     if broken:
-        # Resized meanwhile to no more than it, said above the page.
-        return _item_page(request, session, signed, found, alert=RULES[broken])
+        # Resized meanwhile to no more than it: said beside it, as above.
+        values = {
+            "package_id": str(package_id),
+            "short_below": short_below,
+            "minimum_sealed": minimum_sealed,
+        }
+        problems = {"short_below": "Shorter than a whole one, or blank."}
+        return _item_page(
+            request, session, signed, found, problems=problems, values=values
+        )
     session.commit()
     log.info(
         "package settings saved",

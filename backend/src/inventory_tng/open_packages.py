@@ -39,12 +39,6 @@ closed = meter.create_counter(
 )
 
 
-def measure_closed(how: Literal["confirmed", "direct", "count"], count: int) -> None:
-    """Measured once committed."""
-    if count:
-        closed.add(count, {"how": how})
-
-
 # How a check of what an open package has was raised: a volunteer's
 # report, or a save that took it below zero (docs/decisions/0020,
 # 2026-11-12); and how an administrator settled it.
@@ -319,7 +313,8 @@ def measure_closing(
     """Packages closed and the checks that settled, measured once committed:
     a check closed with its package counts as settled."""
     closed_now = [each for each in done if each is not None]
-    measure_closed(how, len(closed_now))
+    if closed_now:
+        closed.add(len(closed_now), {"how": how})
     measure_checks_settled("closed", sum(each.check_settled for each in closed_now))
 
 

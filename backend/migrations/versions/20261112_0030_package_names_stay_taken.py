@@ -46,6 +46,19 @@ def upgrade() -> None:
             f"punctuation, retired ones included, by id: {groups}. Rename all "
             "but one in each, then upgrade again."
         )
+    too_short = (
+        op.get_bind()
+        .execute(
+            sa.text("SELECT id FROM item_package WHERE short_below >= size ORDER BY id")
+        )
+        .scalars()
+        .all()
+    )
+    if too_short:
+        raise RuntimeError(
+            "Packages whose too-short length is a whole one or more, by id: "
+            f"{', '.join(map(str, too_short))}. Lower it, then upgrade again."
+        )
     op.drop_index("uq_item_package_name", table_name="item_package")
     op.create_index(
         "uq_item_package_name",

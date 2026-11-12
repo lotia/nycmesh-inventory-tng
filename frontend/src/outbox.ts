@@ -42,10 +42,10 @@ export const REPORT_AFTER = 5;
  * it (forgetShown), as the scan page counts it until then (cart.ts,
  * unseen). */
 const SAVED_KEPT = 10;
-/** Batch keys a catalogue is asked about (catalogue.py, MOST_KEYS; cart.ts,
- * keysToAsk), and so the saved batches kept at most, shown or not, so
- * storage never fills when no catalogue is read. */
-export const SAVED_MOST = 100;
+/** Saved batches kept at most, shown by a catalogue or not, so storage
+ * never fills when no catalogue is read: half the keys a catalogue is
+ * asked about (cart.ts, MAX_KEYS_ASKED), leaving room for those waiting. */
+export const SAVED_MOST = 50;
 
 /** On the list: all but the saved batches dismissed. */
 const onList = (entry: Entry) => entry.dismissed !== true;

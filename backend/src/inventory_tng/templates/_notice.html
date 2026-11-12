@@ -1,4 +1,11 @@
 {#- The notice, if it is about the section with id `section_id` (pages.SECTION).
     Included just after that section's heading, which has that id:
     {% with section_id="retired" %}{% include "_notice.html" %}{% endwith %} -#}
-{% if notice and notice_section == section_id %}<p role="status">{{ notice }}</p>{% endif %}
+{% if notice and notice_section == section_id %}
+{%- if undo %}
+<div role="status" class="flex flex-wrap items-center gap-3">
+  <span>{{ notice }}</span>
+  <form method="post" action="{{ undo }}"><button>{{ undo_words | default("Bring it back") }}</button></form>
+</div>
+{%- else %}<p role="status">{{ notice }}</p>{% endif %}
+{%- endif %}

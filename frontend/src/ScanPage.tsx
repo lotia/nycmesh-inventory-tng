@@ -62,7 +62,6 @@ async function loadCatalogue(api: Api, outbox: Outbox): Promise<Loaded> {
   );
   switch (reply.status) {
     case 200:
-      outbox.forgetShown(reply.body.saved);
       return { state: "ready", catalogue: reply.body };
     case 403:
       return { state: "unregistered", reason: reply.body.reason };
@@ -87,12 +86,24 @@ export function ScanPage({
   // One refresh at a time; one asked for meanwhile follows it.
   const asking = useRef<"no" | "yes" | "again">("no");
 
+  // The newest load asked for: an older one's answer, which may not show
+  // a batch a newer one let the outbox forget, is never shown after it.
+  const newest = useRef(0);
+
   /** Load it; again, keeping the one it has if that fails. */
   async function fetch(again: boolean) {
+    const order = ++newest.current;
     const result = await loadCatalogue(api, outbox);
+    if (order !== newest.current) {
+      return;
+    }
     if (!again || result.state === "ready") {
       loaded.value = result;
       loadedAt.current = Date.now();
+    }
+    if (result.state === "ready") {
+      // Shown now: what it shows need not be kept (outbox.ts).
+      outbox.forgetShown(result.catalogue.saved);
     }
   }
 

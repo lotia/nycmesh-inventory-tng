@@ -15,7 +15,7 @@ from inventory_tng import items, open_packages
 from inventory_tng.admin.common import quantity
 from inventory_tng.admin.items import ITEMS
 from inventory_tng.admin.listing import PER_PAGE
-from inventory_tng.db import attempt
+from inventory_tng.db import RuleBroken, attempt
 from inventory_tng.local_time import DEFAULT_ZONE
 from inventory_tng.models import (
     Category,
@@ -880,3 +880,45 @@ def test_a_package_shows_its_own_setting_only_where_it_differs(
     session.flush()
     path = f"{page}/packages/{spool.id}/tracking"
     assert admin_client.post(path, data={"track": "off"}).status_code == 404
+
+
+def test_a_package_of_a_fixed_size_is_renamed_whatever_its_unit_became(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Its size is not on the form once fixed: kept as it is, though its
+    item is counted each now and the size is a part of one."""
+    item = new_item(session, radios)
+    item.unit = "m"
+    box = add(session, ItemPackage(item_id=item.id, name="Coil", size=Decimal("2.5")))
+    add(session, Label(item_id=item.id, package_id=box.id))
+    item.unit = "each"
+    session.flush()
+    page = admin_client.get(f"{ITEMS}/{item.id}").text
+    assert f'action="{ITEMS}/{item.id}/packages/{box.id}"' in page
+    done = admin_client.post(
+        f"{ITEMS}/{item.id}/packages/{box.id}",
+        data={"package_name": "Reel", "package_version": shown(box)},
+    )
+    assert done.status_code == 303
+    assert (box.name, box.size) == ("Reel", Decimal("2.5"))
+
+
+def test_a_too_short_length_refused_as_resized_meanwhile_says_so_beside_it(
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    item = new_item(session, radios)
+    box = add(session, ItemPackage(item_id=item.id, name="Box", size=Decimal(10)))
+
+    def resized_meanwhile(*_: object) -> None:
+        raise RuleBroken("ck_item_package_short_below_under_size")
+
+    monkeypatch.setattr(items, "package_settings", resized_meanwhile)
+    refused = admin_client.post(
+        f"{ITEMS}/{item.id}/packages/{box.id}/settings",
+        data={"short_below": "5", "minimum_sealed": ""},
+    )
+    assert refused.status_code == 400
+    assert "Shorter than a whole one, or blank." in text(refused)

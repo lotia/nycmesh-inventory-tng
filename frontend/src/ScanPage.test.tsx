@@ -91,6 +91,25 @@ describe("loading", () => {
     ]);
   });
 
+  test("an older load answering after a newer one is not shown", async () => {
+    const older = deferred();
+    const first = answering(() => older.promise).api;
+    const outbox = new Outbox(first);
+    const { rerender } = render(<ScanPage api={first} outbox={outbox} />);
+    const newer = {
+      ...CATALOGUE,
+      volunteers: [{ id: 3, name: "Hedy" }],
+    };
+    const second = answering((request) =>
+      isCatalogue(request) ? json(newer, 200) : saved(),
+    ).api;
+    rerender(<ScanPage api={second} outbox={outbox} />);
+    await screen.findByRole("option", { name: "Hedy" });
+    older.resolve(json(CATALOGUE, 200));
+    await new Promise((done) => setTimeout(done, 0));
+    expect(screen.queryByRole("option", { name: "Ada" })).toBeNull();
+  });
+
   test("an unregistered browser is sent to register", async () => {
     const { api } = answering(() => json({ reason: "unregistered" }, 403));
     open(api);
