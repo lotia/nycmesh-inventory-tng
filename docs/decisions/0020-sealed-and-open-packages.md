@@ -3,6 +3,8 @@
 **Status:** accepted · 2026-11-11 · amends 0003 (what a ledger line holds,
 reorder) and adds the home page's "Waiting for you" ·
 amended 2026-11-11 (tracking opened packages is a setting; bulk actions)
+· amended 2026-11-12 (an open package on the scan page; correcting its
+length; "Needs your action")
 
 ## Context
 
@@ -209,3 +211,93 @@ wants this to be easy for administrators.
 We rejected the setting per package alone (each size decided separately,
 though spools or boxes of one item behave alike) and per category alone
 (a category can mix spools with things sold each).
+
+## Amendment: an open package on the scan page, and correcting its length (2026-11-12)
+
+Ali reviewed mockups of cutting from an open spool (inventory-tng-ck0).
+On the page as built, an open package is one more grey box among the
+sealed and loose ones and easy to miss; the used-up question changes its
+wording silently as the volunteer types; and what an open package shows
+is its size minus the cuts typed, which drifts from the real spool. A
+cut can pass what it shows (a typo, cuts rounded up, a cut recorded
+against the wrong spool, a spool longer than its label). "Waiting for
+you" counts every report in one line, which hides what is waiting.
+
+### On the scan page
+
+- **Each open package is a card of its own**, above the item's sealed
+  and loose boxes: its package, an "open" badge, when it was opened, and
+  two figures side by side, **Now** and **After this cut** (blank until a
+  cut is typed; below zero, "N m over"). The second is a preview: nothing
+  changes until the save, and offline it counts only this phone's cuts.
+- **Several open packages at a place** are a card each, most left first;
+  one showing nothing or less is last, greyed, flagged "Shows nothing
+  left", so the next volunteer can report it.
+- **One checkbox, one wording**: "Nothing usable left on this spool" (the
+  package's word), whatever is typed.
+- **It ticks itself** when a cut leaves a short end, uses up what the
+  package shows, or passes it, and a note appears in the card saying why
+  and that an administrator confirms: "Your cut uses up the spool", "This
+  spool will be unusable after this cut" (a short end), or that the cut
+  is more than the spool shows and an administrator will check it. The
+  volunteer unticks it when cable is left, a short end kept for patch
+  leads included. The note is a polite live region, and the cut's box is
+  described by both figures; nothing else is announced as one types.
+- **A cut past what a package shows is warned of and saved as typed**,
+  never refused: the cable is already cut, a phone offline cannot know
+  other phones' cuts, and negative balances are allowed (0003).
+
+### Correcting what a package shows
+
+- **A volunteer may report what is on it now**: an optional field when a
+  cut passes what it shows, and a "Shows the wrong length?" link on any
+  open package. It is a report, not an adjustment (0003), and waits for
+  an administrator (Ali: it saves administrators a recount).
+- **The app raises the same check by itself** when an open package goes
+  below zero, reported or not (Ali): its record was wrong, which is
+  worth a look even when the spool is finished.
+- **The check page** shows the item, package and place, what it shows,
+  the volunteer's figure, who and when, and the recent cuts. **Set to N**
+  writes an adjustment under the administrator's name, as a count does;
+  **Leave it** clears the check.
+- **Items measured in length** (metres, feet) get a hint on the count
+  page and on the reporting field: read the length printed on the cable,
+  and if the marks count up from its start, what is left is the
+  package's size less the mark (Ali). Items counted each get none, nor do
+  items not tracked, which have no open packages.
+
+### "Needs your action" on the home page
+
+- **"Waiting for you" becomes "Needs your action (N)"**, N being what is
+  to do, gone when nothing is (Ali: the name must say work is waiting).
+- **Under each kind**, reported used up, shows the wrong length, and went
+  below zero, **one line per item** names how many of its packages wait,
+  in the package's word ("Cat6 cable: 3 spools", "RJ45 plugs: 2 bags"),
+  and links to that kind's page showing only that item; "all N" links to
+  the whole list and its bulk buttons. A reported package below zero
+  shows its shortfall there, so none is confirmed unseen.
+
+### Rejected in this amendment
+
+- **Closing an open package by itself at zero**: zero is only what was
+  typed, so it could write off cable still there, and it would skip the
+  administrator's confirmation.
+- **Refusing a cut past what a package shows**: the volunteer would
+  record nothing, or record it elsewhere, and the error would spread.
+- **Asking at every cut that reaches zero, with no answer assumed**: a
+  tap more on a frequent action, for what the self-ticking box and its
+  note already ask.
+- **One count for every report on the home page**: it hides what is
+  waiting and where.
+- **A setting for items with a printed length**: one more thing for
+  administrators to set; the unit is enough.
+
+### What follows
+
+- Volunteers report more, and administrators confirm more, but each is a
+  tap rather than a recount; the next count still corrects anything left.
+- Metrics, besides those above: checks of a package's length raised, by
+  how (`volunteer`, `below_zero`), and settled, by how (`set`, `left`).
+- Built by inventory-tng-ck0 (the card and its box), inventory-tng-pll
+  ("Needs your action"), inventory-tng-wy7 (reporting and checking a
+  length) and inventory-tng-pg7 (the hint).
