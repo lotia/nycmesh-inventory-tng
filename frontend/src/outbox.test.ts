@@ -445,6 +445,24 @@ describe("storage", () => {
     expect(stored(BEFORE)).toEqual([older]);
   });
 
+  test("a batch copied here stays here if the list of those copied can't be kept", () => {
+    const older = entry();
+    storeAt(BEFORE, older);
+    const noList = {
+      getItem: (key: string) => localStorage.getItem(key),
+      setItem: (key: string, value: string) => {
+        if (key.endsWith(".copied")) {
+          throw new DOMException("full", "QuotaExceededError");
+        }
+        localStorage.setItem(key, value);
+      },
+    } as unknown as Storage;
+    const outbox = new Outbox(answering(() => saved()).api, noList);
+    outbox.queue(draft(), "mine", 30);
+    expect(stored().map((e: Entry) => e.body.key)).toContain(older.body.key);
+    expect(outbox.entries.value).toHaveLength(2);
+  });
+
   test("a batch copied here and forgotten is not copied again", () => {
     const older = entry({ state: "saved", transactionId: 1 });
     storeAt(BEFORE, older);
@@ -453,6 +471,13 @@ describe("storage", () => {
     outbox.forgetShown([older.body.key]);
     expect(outbox.entries.value).toEqual([]);
     expect(new Outbox(answering(() => saved()).api).entries.value).toEqual([]);
+    // This build's key unreadable: what the build before holds is copied
+    // again, not left out as copied once.
+    localStorage.setItem(STORAGE_KEY, "not json");
+    storeAt(BEFORE, older);
+    expect(new Outbox(answering(() => saved()).api).entries.value).toEqual([
+      older,
+    ]);
   });
 
   test("the first build's batches are read only while the second's key is absent", () => {
@@ -508,11 +533,11 @@ describe("storage", () => {
   });
 
   test("what a batch holds is as its key says: a new field takes a new key", () => {
-    // Every field path of a stored batch. Changed once a build with this
-    // key is deployed, it needs a new STORAGE_KEY: a tab of the build
-    // before would drop the new field from what it writes back
-    // (CONTRIBUTING.md, The scan page).
-    // And every value a field allows, which it would drop an entry for.
+    // Every field path of a stored batch, and every value a field allows.
+    // Changed once a build with this key is deployed, it needs a new
+    // STORAGE_KEY: a tab of the build before would drop a field it does not
+    // know from what it writes back, and an entry with a value it does not
+    // allow (CONTRIBUTING.md, The scan page).
     const paths = (schema: unknown, at: string[] = []): string[] => {
       const s = schema as {
         entries?: Record<string, unknown>;

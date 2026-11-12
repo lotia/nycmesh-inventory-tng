@@ -531,6 +531,38 @@ def test_a_line_sent_in_a_size_its_package_no_longer_has_is_refused(
             (["lines", 0, "package_size"], "package_resized")
         ]
     assert (spools.van.id, box.id, None) not in forms(session, spools.cable)
+    # Its rules read in the size it was counted in: a part of a unit is
+    # still said, and an opening is not too many packages in the new size.
+    radios = add(
+        session, ItemPackage(item_id=spools.place.item.id, name="Pack", size=4)
+    )
+    halves = {
+        "item_id": spools.place.item.id,
+        "quantity": "2.5",
+        "package_id": radios.id,
+    }
+    many = sealed_line(spools, "610") | {"package_size": "305"}
+    spools.spool.size = Decimal(1)
+    session.flush()
+    for batch, problems in (
+        (
+            spools.place.batch(lines=[halves | {"package_size": "0.5"}]),
+            [
+                (["lines", 0, "package_size"], "package_resized"),
+                (["lines", 0, "quantity"], "not_whole"),
+            ],
+        ),
+        (
+            spools.place.batch(
+                kind="open", to_location_id=spools.store.id, lines=[many]
+            ),
+            [(["lines", 0, "package_size"], "package_resized")],
+        ),
+    ):
+        response = registered_client.post(URL, json=batch)
+        assert [
+            (p["loc"][1:], p["type"]) for p in response.json()["detail"]
+        ] == problems
     # In the size it has: saved.
     now = spools.place.batch(lines=[line | {"package_size": "25.000"}])
     assert registered_client.post(URL, json=now).status_code == 201

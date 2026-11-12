@@ -40,7 +40,7 @@ export const BEFORE = "inventory.outbox.v2";
 const LONG_BEFORE = "inventory.outbox.v1";
 /** The keys of the batches in BEFORE already copied here, so one this
  * build has since forgotten is not copied again. */
-const COPIED = "inventory.outbox.v3.copied";
+const COPIED = `${STORAGE_KEY}.copied`;
 /** How long to wait before trying again after no answer. */
 export const RETRY_MS = 30_000;
 /** Unexpected answers to one batch before its note asks for a report. */
@@ -197,9 +197,11 @@ export class Outbox {
     return this.readAll().entries;
   }
 
-  /** And `toCopy`: the keys COPIED is to hold, if it does not yet. */
+  /** What read() returns, and `toCopy`: the keys COPIED is to hold, if it
+   * does not hold them yet. */
   private readAll(): { entries: Entry[]; toCopy?: string[] } {
-    const here = parsed(readStored(this.storage, STORAGE_KEY));
+    const kept = readStored(this.storage, STORAGE_KEY);
+    const here = parsed(kept);
     // LONG_BEFORE only while BEFORE was never written: the build before
     // copied its batches.
     const before = readStored(this.storage, BEFORE);
@@ -208,8 +210,10 @@ export class Outbox {
         ? before
         : readStored(this.storage, LONG_BEFORE),
     );
-    const stored = readStored(this.storage, COPIED);
-    const copied = new Set(Array.isArray(stored) ? stored : []);
+    // Trusted only beside what it says was copied: here unreadable, its
+    // copies are gone too, so they are copied again.
+    const listed = Array.isArray(kept) ? readStored(this.storage, COPIED) : [];
+    const copied = new Set(Array.isArray(listed) ? listed : []);
     const keys = new Set(here.map((entry) => entry.body.key));
     const copies = older.filter(
       (entry) => !keys.has(entry.body.key) && !copied.has(entry.body.key),
@@ -229,10 +233,13 @@ export class Outbox {
   private update(change: (entries: Entry[]) => Entry[]): boolean {
     const { entries, toCopy } = this.readAll();
     const next = change(entries);
-    // Copied first: kept here without it, one forgotten would come back.
-    const kept =
-      (toCopy === undefined || writeStored(this.storage, COPIED, toCopy)) &&
-      writeStored(this.storage, STORAGE_KEY, next);
+    const kept = writeStored(this.storage, STORAGE_KEY, next);
+    // Once kept here: listed copied first, a batch would be in neither.
+    // Not listed, one forgotten here is copied again, which only shows it
+    // until a catalogue does once more.
+    if (kept && toCopy !== undefined) {
+      writeStored(this.storage, COPIED, toCopy);
+    }
     // Shown as stored, so the page never shows what was not kept.
     this.show(kept ? next : this.read());
     return kept;

@@ -840,13 +840,14 @@ export function sealedCounts(
       // package the catalogue has no more counted.
       const packageId = line.package_id;
       const fromOpen = body.kind !== "open" && line.open_package_key != null;
-      const known = packageId == null ? undefined : sizes.get(packageId);
-      if (packageId == null || fromOpen || known === undefined) {
+      const size = packageId == null ? undefined : sizes.get(packageId);
+      // Nor one counted in a size its package no longer has: the server
+      // refuses it (package_resized), so it moves none.
+      const resized =
+        line.package_size != null && sent(String(line.package_size)) !== size;
+      if (packageId == null || fromOpen || size === undefined || resized) {
         continue;
       }
-      // In the size it was counted in: one resized since is refused.
-      const size =
-        line.package_size != null ? sent(String(line.package_size)) : known;
       // Rounded up, as the catalogue counts a part of one (catalogue.py).
       const n = Math.ceil(sent(String(line.quantity)) / size);
       add(packageId, body.from_location_id, -n);

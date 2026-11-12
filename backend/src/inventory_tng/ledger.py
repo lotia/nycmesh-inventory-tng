@@ -1427,9 +1427,10 @@ LINE_PROBLEMS: dict[str, tuple[str, ProblemKind]] = {
 
 
 def _packages_opened(batch: Batch, packages: Mapping[int, PackageFacts]) -> int:
-    """How many open packages an opening would make (_opening)."""
+    """How many open packages an opening would make (_opening), in the
+    size each line was counted in, if it says."""
     return sum(
-        _packages_in(line, package.size)
+        _packages_in(line, line.package_size or package.size)
         for line in batch.lines
         if (package := packages.get(line.package_id or 0)) is not None
         and package.tracked
@@ -1467,30 +1468,31 @@ def _problems(
         if broken is None:
             problems.append((("lines", number, "item_id"), "not_found"))
             continue
+        # Resized since the page read its catalogue: refused, and its rules
+        # read in the size it was counted in, which no quantity in the new
+        # one says.
+        facts = packages
+        package = packages.get(sent.package_id or 0)
+        if (
+            sent.package_size is not None
+            and package is not None
+            and package.item_id == sent.item_id
+            and package.size != sent.package_size
+        ):
+            problems.append((("lines", number, "package_size"), "package_resized"))
+            size = package._replace(size=sent.package_size)
+            facts = {**packages, sent.package_id or 0: size}
         broken += _line_form_breaks(
             batch.kind,
             lines[number],
             places,
-            packages,
+            facts,
             opens,
             keyed=sent.open_package_key is not None,
         )
-        # Resized since the page read its catalogue: its count of packages
-        # is of the old size, which no quantity in the new one says, so
-        # what the new size makes of its quantity is not said.
-        package = packages.get(sent.package_id or 0)
-        resized = (
-            sent.package_size is not None
-            and package is not None
-            and "movement_package_of_item" not in broken
-            and package.size != sent.package_size
-        )
-        if resized:
-            problems.append((("lines", number, "package_size"), "package_resized"))
         for rule in dict.fromkeys(broken):
             field, kind = LINE_PROBLEMS[rule]
-            if not (resized and field == "quantity"):
-                problems.append((("lines", number, field), kind))
+            problems.append((("lines", number, field), kind))
     # Never more open packages than a page could have sent a line each for.
     if batch.kind == "open" and _packages_opened(batch, packages) > MAX_LINES:
         problems += [
