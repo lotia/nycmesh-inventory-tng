@@ -99,17 +99,24 @@ def shown(text: str) -> str:
     return kept + "\\x20" * (len(escaped) - len(kept))
 
 
+def folded(text: str) -> str:
+    """What `text` folds to, as a field: ∅ for nothing, which fold, all
+    ASCII, never gives, so no line ends in a tab an editor might trim."""
+    return shown(fold(text)) or "∅"
+
+
 def reference() -> str:
-    """The file, as fold folds now."""
+    """The file, as fold folds now. Its first line names anyascii's version
+    and Python's Unicode's, which says what characters there are."""
     lines = [
-        f"# models.fold, with {FOLDED_WITH}: each input, its code point, "
-        + f"what it folds to. Written by {COMMANDS}."
+        f"# models.fold, with {FOLDED_WITH}, Unicode "
+        + f"{unicodedata.unidata_version}: each input, its code point, what it "
+        + f"folds to (∅: nothing). Written by {COMMANDS}."
     ]
     lines += [
-        f"{shown(each)}\tU+{ord(each):04X}\t{shown(fold(each))}"
-        for each in characters()
+        f"{shown(each)}\tU+{ord(each):04X}\t{folded(each)}" for each in characters()
     ]
-    lines += [f"{shown(each)}\tstring\t{shown(fold(each))}" for each in STRINGS]
+    lines += [f"{shown(each)}\tstring\t{folded(each)}" for each in STRINGS]
     return "\n".join(lines) + "\n"
 
 

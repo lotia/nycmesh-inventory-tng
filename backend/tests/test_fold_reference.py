@@ -19,7 +19,8 @@ def test_fold_spells_the_sample_as_the_reference_does() -> None:
     found = difference()
     assert found == "", (
         f"fold() no longer gives {REFERENCE.name}. If more than its first line "
-        "(the version) changed, decide whether to take it; then write it again "
+        "(the versions of anyascii and of Python's Unicode) changed, decide "
+        "whether to take it; then write it again "
         f"({COMMANDS}), and if spellings changed, fold again in a migration the "
         f"rows whose folded_with is not {FOLDED_WITH!r}:\n{found}"
     )

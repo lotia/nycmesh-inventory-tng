@@ -202,8 +202,8 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
         )
 
 
-# Whether a test's own body failed, for its fixtures' teardown.
-CALL_FAILED = pytest.StashKey[bool]()
+# Whether a test's setup or body failed, for its fixtures' teardown.
+FAILED = pytest.StashKey[bool]()
 
 
 @pytest.hookimpl(wrapper=True)
@@ -214,8 +214,8 @@ def pytest_runtest_makereport(
     says which limit, and where the budget is: from its whole report, so a
     refusal inside a group of errors, or as another's cause, is found too."""
     report = yield
-    if report.when == "call":
-        item.stash[CALL_FAILED] = report.failed
+    if report.when in {"setup", "call"} and report.failed:
+        item.stash[FAILED] = True
     if report.failed and (said := refused_connection(report.longreprtext)):
         report.sections.append(("Connection refused", said))
     return report
@@ -243,11 +243,11 @@ def keeps_its_connections(request: pytest.FixtureRequest) -> Iterator[None]:
     in the test that leaks, not in whichever later one meets the database's
     connection limit. Broader fixtures a test asks for are set up before
     this one, so what they hold is not its; one it asks for by name as it
-    runs (getfixturevalue) would be. Not after its body failed, whose
-    traceback keeps what it held."""
+    runs (getfixturevalue) would be. Not after its setup or body failed,
+    whose traceback keeps what it held."""
     before = set(checked_out)
     yield
-    if request.node.stash.get(CALL_FAILED, False):
+    if request.node.stash.get(FAILED, False):
         return
     leaked = len(checked_out - before)
     assert leaked == 0, (

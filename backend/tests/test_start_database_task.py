@@ -105,15 +105,19 @@ def test_settings_are_hashed_as_if_from_the_checkout_that_made_it(
     run: Run, calls: Path, tmp_path: Path
 ) -> None:
     """A bind mount's path is in the hash, so another checkout's would differ
-    for that alone. This checkout's .env, or none, never that one's."""
+    for that alone. This checkout's .env, or none, never that one's; its
+    compose.override.yaml too, which compose merges as it makes one."""
     run(made=f"{RUNNING}|/made in/there")
     (tmp_path / ".env").touch()
+    (tmp_path / "compose.override.yaml").touch()
     run(made=f"{RUNNING}|/made in/there")
     hashes = [
         line for line in calls.read_text().splitlines() if "config --hash" in line
     ]
-    files = f"--file {tmp_path}/compose.yaml --project-directory /made in/there"
+    file = f"--file {tmp_path}/compose.yaml"
+    override = f"--file {tmp_path}/compose.override.yaml"
+    made_in = "--project-directory /made in/there"
     assert hashes == [
-        f"{files} --env-file /dev/null config --hash db",
-        f"{files} --env-file {tmp_path}/.env config --hash db",
+        f"{file} {made_in} --env-file /dev/null config --hash db",
+        f"{file} {override} {made_in} --env-file {tmp_path}/.env config --hash db",
     ]

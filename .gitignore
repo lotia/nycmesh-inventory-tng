@@ -23,6 +23,7 @@ __pycache__/
 
 # Coverage, written by mise run check
 .coverage
+.coverage.*
 coverage.xml
 frontend/coverage/
 
@@ -35,3 +36,6 @@ frontend/playwright-report/
 
 # Local settings
 .env
+
+# bv (b9s) local config and caches
+.bv/
