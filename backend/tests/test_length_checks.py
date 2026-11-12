@@ -8,7 +8,7 @@ from functools import partial
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, open_packages, pages
@@ -54,6 +54,24 @@ def seen(session: Session, made: OpenPackage) -> str:
     """What the check page shows of its check."""
     session.refresh(made)
     return open_packages.check_seen(made)
+
+
+def showed(session: Session, made: OpenPackage) -> str:
+    """Where it is and what it shows, as the check page sends them back."""
+    session.refresh(made)
+    return f"{made.location_id} {left_on(session, made)}"
+
+
+def set_form(
+    session: Session, made: OpenPackage, left: str, as_of: str
+) -> dict[str, str]:
+    """The check page's own Set form for it, as shown now."""
+    return {
+        "left": left,
+        "as_of": as_of,
+        "seen": seen(session, made),
+        "showed": showed(session, made),
+    }
 
 
 def ticked(session: Session, *made: OpenPackage) -> list[str]:
@@ -192,7 +210,7 @@ def test_set_counts_it_at_what_it_really_has(
     made = spools.opened()
     registered_client.post(URL, json=report(spools, length(made, "250")))
     as_of = str(ledger.moment(session, spools.store.id))
-    form = {"left": "260", "as_of": as_of, "seen": seen(session, made)}
+    form = set_form(session, made, "260", as_of)
     done = admin_client.post(f"{LENGTHS}/{made.id}/set", data=form)
     assert done.headers["location"] == f"{LENGTHS}?notice=length_set"
     session.refresh(made)
@@ -220,7 +238,7 @@ def test_set_finds_what_was_more_than_it_showed(
     made = spools.opened()
     registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "310")]))
     as_of = str(ledger.moment(session, spools.store.id))
-    form = {"left": "3", "as_of": as_of, "seen": seen(session, made)}
+    form = set_form(session, made, "3", as_of)
     admin_client.post(f"{LENGTHS}/{made.id}/set", data=form)
     assert left_on(session, made) == 3
 
@@ -319,12 +337,12 @@ def test_a_report_since_the_page_was_shown_is_not_settled_unseen(
 ) -> None:
     made = spools.opened()
     registered_client.post(URL, json=report(spools, length(made, "250")))
-    shown = seen(session, made)
+    shown, shown_at = seen(session, made), showed(session, made)
     registered_client.post(URL, json=report(spools, length(made, "5")))
     as_of = str(ledger.moment(session, spools.store.id))
     for path, form in (
         ("leave", {"seen": shown}),
-        ("set", {"left": "250", "as_of": as_of, "seen": shown}),
+        ("set", {"left": "250", "as_of": as_of, "seen": shown, "showed": shown_at}),
     ):
         done = admin_client.post(f"{LENGTHS}/{made.id}/{path}", data=form)
         assert done.headers["location"] == f"{LENGTHS}?notice=length_unchanged"
@@ -422,7 +440,7 @@ def test_a_length_of_an_item_counted_each_is_whole(
     registered_client.post(URL, json=report(spools, length(made, "250")))
     spools.cable.unit = "each"
     session.flush()
-    form = {"left": "2.5", "as_of": "1", "seen": seen(session, made)}
+    form = set_form(session, made, "2.5", "1")
     done = admin_client.post(f"{LENGTHS}/{made.id}/set", data=form)
     assert done.headers["location"] == f"{LENGTHS}?notice=length_bad"
 
@@ -466,3 +484,78 @@ def test_the_count_page_hints_at_the_printed_length_of_items_in_length(
 def test_the_scan_page_hints_in_the_same_words() -> None:
     card = (CLONE / "frontend" / "src" / "OpenPackageCard.tsx").read_text()
     assert f'"{pages.PRINTED_LENGTH}"' in card
+
+
+def test_set_refuses_what_changed_since_the_page_showed_it(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    spools: Spools,
+) -> None:
+    """The page reads its moment unlocked (ledger.latest_at): a save under
+    way then may commit with a lower id, so what the package showed is
+    checked too (inventory-tng-a34)."""
+    made = spools.opened()
+    registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "310")]))
+    as_of = str(ledger.latest_at(session, [spools.store.id])[spools.store.id])
+    store = spools.store.id
+    form = {"left": "3", "as_of": as_of, "seen": seen(session, made)}
+    # Shown before the cut, elsewhere, or by a form from before it said.
+    for stale in (f"{store} 305", f"{spools.van.id} -5", "", "x -5", f"{store} NaN"):
+        refused = admin_client.post(
+            f"{LENGTHS}/{made.id}/set", data=form | {"showed": stale}
+        )
+        assert refused.headers["location"] == f"{LENGTHS}?notice=length_unchanged"
+    assert left_on(session, made) == -5
+    done = admin_client.post(
+        f"{LENGTHS}/{made.id}/set", data=form | {"showed": f"{store} -5.000"}
+    )
+    assert done.headers["location"] == f"{LENGTHS}?notice=length_set"
+    assert left_on(session, made) == 3
+
+
+def test_a_place_with_no_saves_is_at_nothing(session: Session, spools: Spools) -> None:
+    assert ledger.latest_at(session, [spools.van.id]) == {spools.van.id: 0}
+
+
+def test_the_page_reads_alike_for_one_package_or_ten_and_locks_nothing(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    spools: Spools,
+) -> None:
+    """One query of recent cuts for all, and each place's latest
+    transaction read, not locked (inventory-tng-a34)."""
+
+    def statements() -> list[str]:
+        sent: list[str] = []
+
+        def keep(_c: object, _cur: object, statement: str, *_: object) -> None:
+            sent.append(statement)
+
+        connection = session.connection()
+        event.listen(connection, "before_cursor_execute", keep)
+        assert admin_client.get(LENGTHS).status_code == 200
+        event.remove(connection, "before_cursor_execute", keep)
+        return sent
+
+    def check(count: int) -> None:
+        for _ in range(count):
+            made = spools.opened()
+            registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "1")]))
+            registered_client.post(URL, json=report(spools, length(made, "250")))
+            # Half of them moved whole to the van: a place more to read.
+            if count > 1 and made.id % 2:
+                registered_client.post(
+                    URL,
+                    json=spools.place.batch(lines=[cut(made, "304") | {"whole": True}]),
+                )
+
+    check(1)
+    one = statements()
+    check(9)
+    at_van = select(OpenPackage).where(OpenPackage.location_id == spools.van.id)
+    assert session.scalars(at_van).first() is not None
+    ten = statements()
+    assert len(ten) == len(one)
+    assert not [each for each in ten if " FOR " in each]

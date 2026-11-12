@@ -29,6 +29,7 @@ really has, as a count does, or leave it as it shows.</p>
       <form method="post" action="{{ here }}/{{ row.id }}/set{{ query }}" class="actions">
         <input type="hidden" name="as_of" value="{{ each.as_of }}">
         <input type="hidden" name="seen" value="{{ each.seen }}">
+        <input type="hidden" name="showed" value="{{ row.location_id }} {{ shown.left }}">
         <input type="hidden" name="page" value="{{ all_path }}">
         {% set hint = shown.unit | printed_length %}
         <label>Really on it ({{ shown.unit }})

@@ -505,12 +505,34 @@ def moment(session: Session, location_id: int) -> int:
     with a lower id. The lock is held only for the read."""
     with session.begin_nested() as reading:
         lock_place(session, location_id)
-        latest = session.scalar(
-            select(func.max(LedgerTransaction.id)).where(_at_place(location_id))
-        )
+        latest = latest_at(session, [location_id])[location_id]
         # Rolling back to the savepoint releases the lock.
         reading.rollback()
-    return latest or 0
+    return latest
+
+
+def latest_at(session: Session, location_ids: Collection[int]) -> dict[int, int]:
+    """Each place's latest ledger transaction, or 0: read, not locked, so a
+    save under way there may still commit with a lower id. What counts as
+    of it must also check what it counts is as it was read
+    (count_open_package's `showed`)."""
+    ids = list(location_ids)
+    if not ids:
+        return {}
+    sides = union_all(
+        select(
+            LedgerTransaction.to_location_id.label("place"), LedgerTransaction.id
+        ).where(LedgerTransaction.to_location_id.in_(ids)),
+        select(LedgerTransaction.from_location_id, LedgerTransaction.id).where(
+            LedgerTransaction.from_location_id.in_(ids)
+        ),
+    ).subquery()
+    latest = dict.fromkeys(ids, 0)
+    for place, newest in session.execute(
+        select(sides.c.place, func.max(sides.c.id)).group_by(sides.c.place)
+    ):
+        latest[place] = newest
+    return latest
 
 
 def _at_place(location_id: int) -> ColumnElement[bool]:
@@ -1695,11 +1717,15 @@ def count_open_package(
     row: OpenPackage,
     left: Decimal,
     as_of: int,
+    *,
+    showed: tuple[int, Decimal] | None = None,
 ) -> bool:
     """Put an open package right at what it really has (docs/decisions/0020,
     2026-11-12), as a count of it at its place does (count_corrections), as
     it stood at `as_of` (a transaction id). False if it was cut from or
-    moved since, so a later cut is never undone; a count of only this
+    moved since, so a later cut is never undone, or if it is no longer
+    where and at what it `showed` (place, left) when `as_of` was read,
+    unlocked (latest_at): a save under way then may commit with a lower id; a count of only this
     package, so another's cut does not stop it, as it would a count of the
     place. Sent again under its key, written once. RuleBroken
     (location_countable), as record_count."""
@@ -1720,12 +1746,17 @@ def count_open_package(
             ),
         )
     )
-    if since:
+    now = left_on(session, [row])[row.id]
+    if since or (showed is not None and showed != (row.location_id, now)):
+        log.info(
+            "open package not counted: changed since shown",
+            open_package_id=row.id,
+            moved_since=bool(since),
+        )
         return False
     form = Form(open_package_id=row.id)
     found, lost = count_corrections(
-        [(row.item_id, form, left)],
-        {(row.item_id, form): left_on(session, [row])[row.id]},
+        [(row.item_id, form, left)], {(row.item_id, form): now}
     )
     if found:
         _correct(
