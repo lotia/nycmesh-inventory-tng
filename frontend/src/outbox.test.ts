@@ -1,8 +1,9 @@
 import { v4 as uuid } from "uuid";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
+  BEFORE,
   type Draft,
-  type Entry,
+  Entry,
   newEntry,
   Outbox,
   REPORT_AFTER,
@@ -29,9 +30,11 @@ function entry(fields: Partial<Entry> = {}): Entry {
   return { ...newEntry({ ...draft(), key: uuid() }, "a", 1), ...fields };
 }
 
-function store(...entries: unknown[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+function storeAt(key: string, ...entries: unknown[]) {
+  localStorage.setItem(key, JSON.stringify(entries));
 }
+
+const store = (...entries: unknown[]) => storeAt(STORAGE_KEY, ...entries);
 
 /** Storage that reads but refuses every write. */
 const full = {
@@ -47,7 +50,8 @@ function replies(...queued: (() => Response | Promise<Response>)[]) {
 }
 
 const states = (outbox: Outbox) => outbox.entries.value.map((e) => e.state);
-const stored = () => JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
+const stored = (key = STORAGE_KEY) =>
+  JSON.parse(localStorage.getItem(key) ?? "null");
 const bodies = (sent: Request[]) =>
   Promise.all(sent.map((request) => request.clone().json()));
 
@@ -425,18 +429,145 @@ describe("storage", () => {
     expect((await bodies(sent))[0].lines).toEqual(lines);
   });
 
-  test("an older build's batches are read, and left for its tabs", async () => {
-    const waiting = entry();
-    localStorage.setItem("inventory.outbox.v1", JSON.stringify([waiting]));
-    const outbox = new Outbox(answering(() => saved()).api);
-    expect(outbox.entries.value).toEqual([waiting]);
+  test("an older build's batches are sent, and copied here, left there for its tabs", async () => {
+    const mine = entry({ queuedAt: 2 });
+    const older = entry({ queuedAt: 1 });
+    store(mine);
+    storeAt(BEFORE, older);
+    const { api, sent } = answering(() => saved());
+    const outbox = new Outbox(api);
+    expect(outbox.entries.value).toEqual([older, mine]);
     await outbox.send();
-    expect(states(outbox)).toEqual(["saved"]);
-    // Written to this build's key only: an older tab's reader would drop a
-    // package from a line it wrote back.
+    expect(sent).toHaveLength(2);
+    expect(stored().map((e: Entry) => e.state)).toEqual(["saved", "saved"]);
+    // An older tab still sends, settles and counts its own: the server
+    // saves it once, by its key.
+    expect(stored(BEFORE)).toEqual([older]);
+  });
+
+  test("a batch copied here and forgotten is not copied again", () => {
+    const older = entry({ state: "saved", transactionId: 1 });
+    storeAt(BEFORE, older);
+    const outbox = new Outbox(answering(() => saved()).api);
+    outbox.dismiss(older.body.key);
+    outbox.forgetShown([older.body.key]);
+    expect(outbox.entries.value).toEqual([]);
+    expect(new Outbox(answering(() => saved()).api).entries.value).toEqual([]);
+  });
+
+  test("the first build's batches are read only while the second's key is absent", () => {
+    const waiting = entry();
+    storeAt("inventory.outbox.v1", waiting);
+    expect(new Outbox(answering(() => saved()).api).entries.value).toEqual([
+      waiting,
+    ]);
+    // Unreadable is not absent: the build before copied the first's.
+    localStorage.setItem(BEFORE, "not json");
+    expect(new Outbox(answering(() => saved()).api).entries.value).toEqual([]);
+    // Nor is a key the browser will not read.
+    localStorage.removeItem(BEFORE);
+    const refusing = {
+      getItem: (key: string) => {
+        if (key === BEFORE) {
+          throw new DOMException("denied", "SecurityError");
+        }
+        return localStorage.getItem(key);
+      },
+    } as unknown as Storage;
     expect(
-      JSON.parse(localStorage.getItem("inventory.outbox.v1") ?? ""),
-    ).toEqual([waiting]);
+      new Outbox(answering(() => saved()).api, refusing).entries.value,
+    ).toEqual([]);
+  });
+
+  test("an older tab's rewrite drops nothing here: not dismissed, not a saved batch", () => {
+    const saves = Array.from({ length: 12 }, (_, n) =>
+      entry({ state: "saved", transactionId: n + 1, queuedAt: n }),
+    );
+    store(...saves);
+    const outbox = new Outbox(answering(() => saved()).api);
+    outbox.dismiss(saves[0]?.body.key ?? "");
+    // A tab of the build before keeps 10 saved batches and drops fields it
+    // cannot read from what it rewrites: only its own key.
+    const theirs = entry({ queuedAt: 20 });
+    storeAt(BEFORE, theirs);
+    outbox.queue(draft(), "mine", 30);
+    expect(stored()).toHaveLength(14);
+    expect(stored()[0]).toEqual({ ...saves[0], dismissed: true });
+    expect(outbox.shown().map((e) => e.body.key)).not.toContain(
+      saves[0]?.body.key,
+    );
+  });
+
+  test("a batch both here and in an older key is this build's", () => {
+    const here = entry({ state: "saved", transactionId: 4 });
+    store(here);
+    storeAt(BEFORE, { ...here, state: "waiting", transactionId: null });
+    expect(new Outbox(answering(() => saved()).api).entries.value).toEqual([
+      here,
+    ]);
+  });
+
+  test("what a batch holds is as its key says: a new field takes a new key", () => {
+    // Every field path of a stored batch. Changed, it needs a new
+    // STORAGE_KEY: a tab of the build before would drop the new field from
+    // what it writes back (CONTRIBUTING.md, The scan page).
+    // And every value a field allows, which it would drop an entry for.
+    const paths = (schema: unknown, at: string[] = []): string[] => {
+      const s = schema as {
+        entries?: Record<string, unknown>;
+        item?: unknown;
+        wrapped?: unknown;
+        options?: unknown[];
+        literal?: unknown;
+      };
+      if (s.entries !== undefined) {
+        return Object.entries(s.entries).flatMap(([name, field]) => [
+          [...at, name].join("."),
+          ...paths(field, [...at, name]),
+        ]);
+      }
+      if (s.literal !== undefined) {
+        return [`${at.join(".")} = ${String(s.literal)}`];
+      }
+      if (s.options?.every((each) => typeof each === "string")) {
+        return [`${at.join(".")} = ${s.options.join(" | ")}`];
+      }
+      const inner = s.options ?? [s.item ?? s.wrapped].filter(Boolean);
+      return inner.flatMap((each) => paths(each, at));
+    };
+    expect({ [STORAGE_KEY]: paths(Entry).sort() }).toEqual({
+      "inventory.outbox.v3": [
+        "body",
+        "body.from_location_id",
+        "body.install_number",
+        "body.key",
+        "body.kind",
+        "body.kind = move | receipt | install | open | report",
+        "body.lengths",
+        "body.lengths.left",
+        "body.lengths.open_package_key",
+        "body.lines",
+        "body.lines.item_id",
+        "body.lines.open_package_key",
+        "body.lines.package_id",
+        "body.lines.quantity",
+        "body.lines.whole",
+        "body.to_location_id",
+        "body.used_up",
+        "body.volunteer_id",
+        "dismissed",
+        "dismissed = true",
+        "failures",
+        "note",
+        "queuedAt",
+        "state",
+        "state = waiting | saved | refused",
+        "transactionId",
+        "waitingFor",
+        "waitingFor = network | registration",
+        "what",
+      ],
+    });
   });
 
   test("an unreadable entry is dropped, and only that one", () => {
@@ -558,6 +689,16 @@ describe("listening", () => {
     store(other);
     window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
     expect(outbox.entries.value).toEqual([other]);
+    stop();
+  });
+
+  test("an older build's tab's batch shows here", () => {
+    const outbox = new Outbox(answering(() => saved()).api);
+    const stop = outbox.listen();
+    const theirs = entry();
+    storeAt(BEFORE, theirs);
+    window.dispatchEvent(new StorageEvent("storage", { key: BEFORE }));
+    expect(outbox.entries.value).toEqual([theirs]);
     stop();
   });
 

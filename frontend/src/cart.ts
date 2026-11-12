@@ -204,7 +204,7 @@ export class CartStore {
 
   /** Follow other tabs' changes. Returns what stops it. */
   listen(): () => void {
-    return onStoredChange(STORAGE_KEY, () => {
+    return onStoredChange([STORAGE_KEY], () => {
       this.cart.value = this.stored();
     });
   }

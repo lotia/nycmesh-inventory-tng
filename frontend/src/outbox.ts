@@ -24,15 +24,23 @@ import {
   ValidationFailed,
 } from "./api/replies";
 import { NOT_REGISTERED } from "./registration";
-import { onStoredChange, readStored, writeStored } from "./stored";
+import { hasStored, onStoredChange, readStored, writeStored } from "./stored";
 import { telemetry } from "./telemetry";
 
-/** Versioned: a later build that changes the shape reads the one before.
- * v2's lines may name a package (docs/decisions/0020), which v1's reader
- * would drop if it wrote them back, so a tab of an older build keeps to
- * v1's. */
-export const STORAGE_KEY = "inventory.outbox.v2";
-const BEFORE = "inventory.outbox.v1";
+/** Versioned: a build that changes the shape keeps to a key of its own, as
+ * a tab of an older build, open during a deploy, would drop what it cannot
+ * read from what it writes back: v3's batches may report what is on an
+ * open package (`lengths`), and its saved batches may be dismissed. */
+export const STORAGE_KEY = "inventory.outbox.v3";
+/** The key of the build before, or, absent, of the one before that. Their
+ * batches are copied here, never written there, so an older tab, open
+ * during a deploy, keeps sending, settling and counting its own, and this
+ * build sends them too: the server saves a batch once, by its key. */
+export const BEFORE = "inventory.outbox.v2";
+const LONG_BEFORE = "inventory.outbox.v1";
+/** The keys of the batches in BEFORE already copied here, so one this
+ * build has since forgotten is not copied again. */
+const COPIED = "inventory.outbox.v3.copied";
 /** How long to wait before trying again after no answer. */
 export const RETRY_MS = 30_000;
 /** Unexpected answers to one batch before its note asks for a report. */
@@ -94,7 +102,8 @@ export type Body = Schemas["Batch"];
 /** A batch before the outbox gives it its key. */
 export type Draft = Omit<Body, "key">;
 
-const Entry = v.object({
+/** A batch as kept: a field added here takes a new STORAGE_KEY. */
+export const Entry = v.object({
   body: BatchBody,
   /** What is in it, in words, so two batches can be told apart. */
   what: v.string(),
@@ -171,32 +180,51 @@ export class Outbox {
     const elsewhere = [...this.forgottenElsewhere.values()].filter(
       (entry) => !here.has(entry.body.key),
     );
-    this.entries.value =
-      elsewhere.length === 0
-        ? stored
-        : [...elsewhere, ...stored].sort((a, b) => a.queuedAt - b.queuedAt);
+    this.entries.value = oldestFirst(elsewhere, stored);
   }
 
-  /** What storage holds, minus any entry that cannot be read: one bad entry
-   * loses one batch, not every batch on the device. */
+  /** What storage holds: this build's, and an older build's not yet
+   * copied here, oldest first. */
   private read(): Entry[] {
-    // Until this build first writes, what an older one kept, to send.
-    const stored =
-      readStored(this.storage, STORAGE_KEY) ?? readStored(this.storage, BEFORE);
-    if (!Array.isArray(stored)) {
-      return [];
-    }
-    return stored.flatMap((entry) => {
-      const parsed = v.safeParse(Entry, entry);
-      return parsed.success ? [parsed.output] : [];
-    });
+    return this.readAll().entries;
+  }
+
+  /** And `toCopy`: the keys COPIED is to hold, if it does not yet. */
+  private readAll(): { entries: Entry[]; toCopy?: string[] } {
+    const here = parsed(readStored(this.storage, STORAGE_KEY));
+    // LONG_BEFORE only while BEFORE was never written: the build before
+    // copied its batches.
+    const before = readStored(this.storage, BEFORE);
+    const older = parsed(
+      before !== undefined || hasStored(this.storage, BEFORE)
+        ? before
+        : readStored(this.storage, LONG_BEFORE),
+    );
+    const stored = readStored(this.storage, COPIED);
+    const copied = new Set(Array.isArray(stored) ? stored : []);
+    const keys = new Set(here.map((entry) => entry.body.key));
+    const copies = older.filter(
+      (entry) => !keys.has(entry.body.key) && !copied.has(entry.body.key),
+    );
+    // Only those older still holds, so COPIED never outgrows it.
+    const toCopy = older.map((entry) => entry.body.key);
+    const same =
+      toCopy.length === copied.size && toCopy.every((key) => copied.has(key));
+    return {
+      entries: oldestFirst(copies, here),
+      ...(same ? {} : { toCopy }),
+    };
   }
 
   /** Change what is kept, from what storage holds now. False if the browser
    * would not store it (full, or storage forbidden). */
   private update(change: (entries: Entry[]) => Entry[]): boolean {
-    const next = change(this.read());
-    const kept = writeStored(this.storage, STORAGE_KEY, next);
+    const { entries, toCopy } = this.readAll();
+    const next = change(entries);
+    // Copied first: kept here without it, one forgotten would come back.
+    const kept =
+      (toCopy === undefined || writeStored(this.storage, COPIED, toCopy)) &&
+      writeStored(this.storage, STORAGE_KEY, next);
     // Shown as stored, so the page never shows what was not kept.
     this.show(kept ? next : this.read());
     return kept;
@@ -433,7 +461,7 @@ export class Outbox {
         send();
       }
     };
-    const stopFollowing = onStoredChange(STORAGE_KEY, () => {
+    const follow = () => {
       const stored = this.read();
       const here = new Set(stored.map((entry) => entry.body.key));
       for (const entry of this.entries.value) {
@@ -442,7 +470,9 @@ export class Outbox {
         }
       }
       this.show(stored);
-    });
+    };
+    // An older build's tab too, open during a deploy: its batches show here.
+    const stopFollowing = onStoredChange([STORAGE_KEY, BEFORE], follow);
     target.addEventListener("online", send);
     target.document.addEventListener("visibilitychange", visible);
     return () => {
@@ -452,6 +482,25 @@ export class Outbox {
       clearTimeout(this.retry);
     };
   }
+}
+
+/** Both, oldest first; `rest` alone, as it is, if `extra` is empty. */
+function oldestFirst(extra: Entry[], rest: Entry[]): Entry[] {
+  return extra.length === 0
+    ? rest
+    : [...extra, ...rest].sort((a, b) => a.queuedAt - b.queuedAt);
+}
+
+/** Stored entries, minus any that cannot be read: one bad entry loses one
+ * batch, not every batch on the device. */
+function parsed(stored: unknown): Entry[] {
+  if (!Array.isArray(stored)) {
+    return [];
+  }
+  return stored.flatMap((entry) => {
+    const result = v.safeParse(Entry, entry);
+    return result.success ? [result.output] : [];
+  });
 }
 
 /** The open packages an opening makes, by the keys the page gave them. */
