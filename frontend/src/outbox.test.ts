@@ -7,6 +7,7 @@ import {
   Outbox,
   REPORT_AFTER,
   RETRY_MS,
+  SAVED_MOST,
   STORAGE_KEY,
 } from "./outbox";
 import { telemetry } from "./telemetry";
@@ -456,7 +457,7 @@ describe("storage", () => {
     },
   );
 
-  test("only the ten newest saved batches are kept", async () => {
+  test("saved batches are kept until a catalogue shows them, then the ten newest", async () => {
     let id = 0;
     const { api } = answering(() => saved(++id));
     const outbox = new Outbox(api);
@@ -464,9 +465,46 @@ describe("storage", () => {
       outbox.queue(draft(), `batch ${n}`);
       await vi.waitFor(() => expect(states(outbox).at(-1)).toBe("saved"));
     }
+    expect(outbox.entries.value).toHaveLength(12);
+    const keys = outbox.entries.value.map((e) => e.body.key);
+    // A catalogue showing only the oldest: the second, unshown, stays.
+    outbox.forgetShown([keys[0] ?? ""]);
+    expect(outbox.entries.value.map((e) => e.what)).toEqual(
+      Array.from({ length: 11 }, (_, n) => `batch ${n + 1}`),
+    );
+    outbox.forgetShown(keys);
     expect(outbox.entries.value.map((e) => e.what)).toEqual(
       Array.from({ length: 10 }, (_, n) => `batch ${n + 2}`),
     );
+  });
+
+  test("at most SAVED_MOST saved batches are kept, shown or not", async () => {
+    store(
+      ...Array.from({ length: SAVED_MOST }, (_, n) =>
+        entry({ state: "saved", transactionId: n + 1, what: `batch ${n}` }),
+      ),
+    );
+    const outbox = new Outbox(answering(() => saved()).api);
+    outbox.queue(draft(), "newest");
+    await vi.waitFor(() => expect(states(outbox).at(-1)).toBe("saved"));
+    const kept = outbox.entries.value.map((e) => e.what);
+    expect(kept).toHaveLength(SAVED_MOST);
+    expect(kept[0]).toBe("batch 1");
+    expect(kept.at(-1)).toBe("newest");
+  });
+
+  test("a saved batch dismissed leaves the list, and is forgotten once a catalogue shows it", () => {
+    const first = entry({ state: "saved", transactionId: 1 });
+    const second = entry({ state: "saved", transactionId: 2 });
+    store(first, second);
+    const outbox = new Outbox(answering(() => saved()).api);
+    outbox.dismiss(first.body.key);
+    expect(outbox.shown()).toEqual([second]);
+    expect(stored()).toEqual([{ ...first, dismissed: true }, second]);
+    outbox.forgetShown([second.body.key]);
+    expect(outbox.entries.value).toHaveLength(2);
+    outbox.forgetShown([first.body.key, second.body.key]);
+    expect(outbox.entries.value).toEqual([second]);
   });
 
   test("another tab's batch is not lost when this tab writes", async () => {
@@ -494,6 +532,22 @@ describe("listening", () => {
     window.dispatchEvent(new Event("online"));
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
     expect(sent).toHaveLength(2);
+    stop();
+  });
+
+  test("a saved batch another tab forgets stays here, off the list, until this tab's catalogue shows it", () => {
+    const old = entry({ state: "saved", transactionId: 1, queuedAt: 1 });
+    const kept = entry({ state: "saved", transactionId: 2, queuedAt: 2 });
+    const waiting = entry({ queuedAt: 3 });
+    store(old, kept, waiting);
+    const outbox = new Outbox(answering(() => saved()).api);
+    const stop = outbox.listen();
+    store(kept, waiting);
+    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    expect(outbox.entries.value).toEqual([old, kept, waiting]);
+    expect(outbox.shown()).toEqual([kept, waiting]);
+    outbox.forgetShown([old.body.key]);
+    expect(outbox.entries.value).toEqual([kept, waiting]);
     stop();
   });
 

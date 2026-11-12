@@ -62,6 +62,7 @@ async function loadCatalogue(api: Api, outbox: Outbox): Promise<Loaded> {
   );
   switch (reply.status) {
     case 200:
+      outbox.forgetShown(reply.body.saved);
       return { state: "ready", catalogue: reply.body };
     case 403:
       return { state: "unregistered", reason: reply.body.reason };
@@ -811,7 +812,7 @@ function Finder({
 }
 
 function OutboxList({ outbox }: { outbox: Outbox }) {
-  const entries = [...outbox.entries.value].reverse();
+  const entries = outbox.shown().reverse();
   if (entries.length === 0) {
     return null;
   }

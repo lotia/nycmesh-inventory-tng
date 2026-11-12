@@ -37,8 +37,18 @@ const BEFORE = "inventory.outbox.v1";
 export const RETRY_MS = 30_000;
 /** Unexpected answers to one batch before its note asks for a report. */
 export const REPORT_AFTER = 5;
-/** Saved batches kept on show, newest first, so a volunteer can check. */
+/** Saved batches kept on show, newest first, so a volunteer can check.
+ * An older one, or one dismissed, is forgotten only once a catalogue shows
+ * it (forgetShown), as the scan page counts it until then (cart.ts,
+ * unseen). */
 const SAVED_KEPT = 10;
+/** Batch keys a catalogue is asked about (catalogue.py, MOST_KEYS; cart.ts,
+ * keysToAsk), and so the saved batches kept at most, shown or not, so
+ * storage never fills when no catalogue is read. */
+export const SAVED_MOST = 100;
+
+/** On the list: all but the saved batches dismissed. */
+const onList = (entry: Entry) => entry.dismissed !== true;
 
 const nullableId = v.exactOptional(v.nullable(id));
 
@@ -97,6 +107,8 @@ const Entry = v.object({
   transactionId: v.nullable(id),
   /** Unexpected answers to this batch in a row. */
   failures: v.pipe(v.number(), v.integer()),
+  /** Saved, and dismissed: off the list, kept until a catalogue shows it. */
+  dismissed: v.exactOptional(v.literal(true)),
 });
 
 export type Entry = v.InferOutput<typeof Entry>;
@@ -141,12 +153,28 @@ export class Outbox {
   readonly entries = signal<Entry[]>([]);
   private sending = false;
   private retry: ReturnType<typeof setTimeout> | undefined;
+  /** Saved batches another tab let storage forget, as its catalogue showed
+   * them: kept in `entries` until this tab's shows them too (forgetShown),
+   * as its page counts them until then. Off the list. */
+  private readonly forgottenElsewhere = new Map<string, Entry>();
 
   constructor(
     private readonly api: Api,
     private readonly storage: Storage = localStorage,
   ) {
-    this.entries.value = this.read();
+    this.show(this.read());
+  }
+
+  /** `stored`, and the batches forgotten elsewhere, oldest first. */
+  private show(stored: Entry[]): void {
+    const here = new Set(stored.map((entry) => entry.body.key));
+    const elsewhere = [...this.forgottenElsewhere.values()].filter(
+      (entry) => !here.has(entry.body.key),
+    );
+    this.entries.value =
+      elsewhere.length === 0
+        ? stored
+        : [...elsewhere, ...stored].sort((a, b) => a.queuedAt - b.queuedAt);
   }
 
   /** What storage holds, minus any entry that cannot be read: one bad entry
@@ -170,7 +198,7 @@ export class Outbox {
     const next = change(this.read());
     const kept = writeStored(this.storage, STORAGE_KEY, next);
     // Shown as stored, so the page never shows what was not kept.
-    this.entries.value = kept ? next : this.read();
+    this.show(kept ? next : this.read());
     return kept;
   }
 
@@ -180,9 +208,53 @@ export class Outbox {
         entry.body.key === key ? { ...entry, ...changes } : entry,
       );
       const saved = next.filter((entry) => entry.state === "saved");
-      const dropped = new Set(saved.slice(0, -SAVED_KEPT));
+      const dropped = new Set(saved.slice(0, -SAVED_MOST));
       return next.filter((entry) => !dropped.has(entry));
     });
+  }
+
+  /** What the list shows: all but the saved batches dismissed. */
+  shown(): Entry[] {
+    return this.entries.value.filter(
+      (entry) => onList(entry) && !this.forgottenElsewhere.has(entry.body.key),
+    );
+  }
+
+  /**
+   * Forget the saved batches a catalogue shows (`saved`, its keys) that are
+   * dismissed or older than the newest SAVED_KEPT on show. Until then the
+   * scan page still counts them (cart.ts, unseen), so an opening or a cut
+   * saved while the catalogue could not be read again is never lost.
+   */
+  forgetShown(saved: readonly string[]): void {
+    const inCatalogue = new Set(saved);
+    const before = this.forgottenElsewhere.size;
+    for (const key of inCatalogue) {
+      this.forgottenElsewhere.delete(key);
+    }
+    if (this.forgottenElsewhere.size !== before) {
+      this.show(this.read());
+    }
+    const forgotten = (entries: Entry[]) => {
+      const onShow = entries.filter(
+        (entry) => entry.state === "saved" && onList(entry),
+      );
+      const kept = new Set(onShow.slice(-SAVED_KEPT));
+      return entries.filter(
+        (entry) =>
+          entry.state === "saved" &&
+          inCatalogue.has(entry.body.key) &&
+          !kept.has(entry),
+      );
+    };
+    // Checked on what is shown, so a load that forgets nothing writes
+    // nothing.
+    if (forgotten(this.entries.value).length > 0) {
+      this.update((entries) => {
+        const gone = new Set(forgotten(entries));
+        return entries.filter((entry) => !gone.has(entry));
+      });
+    }
   }
 
   /**
@@ -200,12 +272,18 @@ export class Outbox {
     return kept;
   }
 
-  /** Forget a settled batch. */
+  /** Take a settled batch off the list: a refused one is forgotten, a
+   * saved one once a catalogue shows it (forgetShown). */
   dismiss(key: string): void {
     this.update((entries) =>
-      entries.filter(
-        (entry) => entry.body.key !== key || entry.state === "waiting",
-      ),
+      entries.flatMap((entry) => {
+        if (entry.body.key !== key || entry.state === "waiting") {
+          return [entry];
+        }
+        return entry.state === "saved"
+          ? [{ ...entry, dismissed: true as const }]
+          : [];
+      }),
     );
   }
 
@@ -356,7 +434,14 @@ export class Outbox {
       }
     };
     const stopFollowing = onStoredChange(STORAGE_KEY, () => {
-      this.entries.value = this.read();
+      const stored = this.read();
+      const here = new Set(stored.map((entry) => entry.body.key));
+      for (const entry of this.entries.value) {
+        if (entry.state === "saved" && !here.has(entry.body.key)) {
+          this.forgottenElsewhere.set(entry.body.key, entry);
+        }
+      }
+      this.show(stored);
     });
     target.addEventListener("online", send);
     target.document.addEventListener("visibilitychange", visible);
