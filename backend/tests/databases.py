@@ -114,7 +114,7 @@ def as_role(url: str, role: str) -> str:
 def create_database(template: str | None = None) -> str:
     """A database of its own, and the URL the app logs in to it with: empty,
     with no schema, or a copy of the database `template`. The roles are made
-    first, if missing: compose's volume may predate them."""
+    first, if missing (dev_database.ROLES_SQL)."""
     name = database_name(int(time.time()))
     try:
         with as_superuser(SERVER_URL) as connection:

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 #MISE description="Serve the app over https through a tunnel, and show a QR code that registers a phone"
+#MISE depends=["dev-database"]
 # CONTRIBUTING.md, On a phone.
 set -euo pipefail
 
@@ -8,11 +9,11 @@ set -euo pipefail
 compose=$(dirname "$0")/compose
 compose() { "$compose" "$@"; }
 
-# The database first; then never its dependencies, which compose would
-# recreate if made from another checkout (start-database says why).
-"$(dirname "$0")/start-database"
-compose up -d --build --wait --no-deps app
-# A new container, so its log holds only this tunnel's address.
+# This checkout's database is made and migrated first (dev-database), as
+# the server's container makes no role.
+compose up -d --build --wait app
+# A new container, so its log holds only this tunnel's address; --no-deps
+# leaves the app as it is.
 compose --profile phone up -d --force-recreate --no-deps tunnel
 url=$(timeout 60 "$compose" logs -f tunnel 2>&1 |
   grep -v '//api\.' |

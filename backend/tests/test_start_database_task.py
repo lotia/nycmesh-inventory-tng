@@ -14,6 +14,8 @@ from inventory_tng.local_env import CLONE
 
 SCRIPT = CLONE / "mise-tasks" / "start-database"
 RUNNING = "a1b2"
+# What `ps` prints of a container labelled with RUNNING.
+LABELLED = f"c0ffee|{RUNNING}"
 
 pytestmark = pytest.mark.clone
 
@@ -28,8 +30,8 @@ def calls(tmp_path: Path) -> Path:
 @pytest.fixture
 def run(tmp_path: Path, calls: Path) -> Run:
     """Runs the script in a clone root of its own (tmp_path), with compose a
-    stand-in: `ps` prints `made`, the running container's hash and, after a
-    `|`, where it was made; `config --hash db` prints `wanted`."""
+    stand-in: `ps` prints `made`, the running container's id and, after a
+    `|`, its hash; `config --hash db` prints `wanted`."""
     tools = tmp_path / "bin"
     tools.mkdir()
     # bash for the compose task's script, which this one runs.
@@ -77,13 +79,13 @@ def test_with_no_container_it_starts_one(run: Run, calls: Path) -> None:
 
 
 def test_the_same_settings_start_it_as_it_is(run: Run, calls: Path) -> None:
-    done = run(made=f"{RUNNING}|/made in/here")
+    done = run(made=LABELLED)
     assert (done.returncode, done.stderr) == (0, "")
     assert calls.read_text().splitlines()[-1] == "up -d --wait --no-recreate db"
 
 
 def test_settings_that_differ_stop_it(run: Run, calls: Path) -> None:
-    done = run(made=f"{RUNNING}|/made/here", wanted="c3d4")
+    done = run(made=LABELLED, wanted="c3d4")
     assert done.returncode == 1
     assert done.stderr == (
         "The database container's settings differ from this checkout's "
@@ -95,29 +97,26 @@ def test_settings_that_differ_stop_it(run: Run, calls: Path) -> None:
 
 def test_a_container_compose_did_not_label_stops_it(run: Run, calls: Path) -> None:
     """With no hash to compare, it is never taken as the same."""
-    done = run(made="|/made/here")
+    done = run(made="c0ffee|")
     assert done.returncode == 1
     assert "recreate-database-container" in done.stderr
-    assert "--project-directory /made/here " in calls.read_text()
 
 
-def test_settings_are_hashed_as_if_from_the_checkout_that_made_it(
+def test_this_checkouts_settings_are_hashed(
     run: Run, calls: Path, tmp_path: Path
 ) -> None:
-    """A bind mount's path is in the hash, so another checkout's would differ
-    for that alone. This checkout's .env, or none, never that one's; its
-    compose.override.yaml too, which compose merges as it makes one."""
-    run(made=f"{RUNNING}|/made in/there")
+    """This checkout's .env, or none, and its compose.override.yaml too,
+    which compose merges as it makes one."""
+    run(made=LABELLED)
     (tmp_path / ".env").touch()
     (tmp_path / "compose.override.yaml").touch()
-    run(made=f"{RUNNING}|/made in/there")
+    run(made=LABELLED)
     hashes = [
         line for line in calls.read_text().splitlines() if "config --hash" in line
     ]
     file = f"--file {tmp_path}/compose.yaml"
     override = f"--file {tmp_path}/compose.override.yaml"
-    made_in = "--project-directory /made in/there"
     assert hashes == [
-        f"{file} {made_in} --env-file /dev/null config --hash db",
-        f"{file} {override} {made_in} --env-file {tmp_path}/.env config --hash db",
+        f"{file} --env-file /dev/null config --hash db",
+        f"{file} {override} --env-file {tmp_path}/.env config --hash db",
     ]

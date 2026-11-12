@@ -1,5 +1,6 @@
 """compose.yaml's app container takes the settings .env.example names, and
-only those, listed one by one (inventory-tng-zr5), never the whole .env."""
+only those, listed one by one (inventory-tng-zr5), never the whole .env; and
+its database mounts nothing from a checkout (inventory-tng-0c2)."""
 
 import re
 
@@ -15,9 +16,9 @@ SETTING = re.compile(r"^#? ?([A-Z][A-Z0-9_]*)=", re.MULTILINE)
 LISTED = re.compile(r"^ {6}([A-Z][A-Z0-9_]*):", re.MULTILINE)
 
 
-def app_service() -> str:
-    """The app service, up to the next line as little indented."""
-    after = (CLONE / "compose.yaml").read_text().split("\n  app:\n", 1)[1]
+def service(name: str) -> str:
+    """The service `name`, up to the next line as little indented."""
+    after = (CLONE / "compose.yaml").read_text().split(f"\n  {name}:\n", 1)[1]
     return re.split(r"^ {0,2}\S", after, maxsplit=1, flags=re.MULTILINE)[0]
 
 
@@ -26,8 +27,19 @@ def test_the_app_takes_the_settings_env_example_names() -> None:
     # INVENTORY_ settings are compose's and mise's, for the host; the
     # container sets FRONTEND_DIST itself, to the bundle it built.
     for_the_app = {name for name in named if not name.startswith("INVENTORY_")}
-    assert set(LISTED.findall(app_service())) == for_the_app | {"FRONTEND_DIST"}
+    assert set(LISTED.findall(service("app"))) == for_the_app | {"FRONTEND_DIST"}
 
 
 def test_the_app_is_not_given_the_whole_env() -> None:
-    assert not re.search(r"^ {4}env_file:", app_service(), re.MULTILINE)
+    assert not re.search(r"^ {4}env_file:", service("app"), re.MULTILINE)
+
+
+def test_the_database_mounts_nothing_from_a_checkout() -> None:
+    """A bind mount would put the path of the checkout that made the
+    container in its hash, so every other checkout's start-database would
+    find it differs."""
+    after = service("db").split("\n    volumes:\n", 1)[1]
+    volumes = re.split(r"^ {4}\S", after, maxsplit=1, flags=re.MULTILINE)[0]
+    assert re.findall(r"^ +- *(.*)$", volumes, re.MULTILINE) == [
+        "db:/var/lib/postgresql"
+    ]

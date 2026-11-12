@@ -18,7 +18,7 @@ services:
     # checkout's connections.
     command: ["postgres", "-c", "max_connections=400"]
     environment:
-      # The superuser, which only makes the roles below, the tests'
+      # The superuser, which only makes the owner and app roles, the tests'
       # databases and each checkout's (dev_database.py): the app and
       # migrations never log in as it.
       POSTGRES_DB: inventory
@@ -28,10 +28,10 @@ services:
       # Why 5433, and how to change it: CONTRIBUTING.md.
       - "127.0.0.1:${INVENTORY_DB_PORT:-5433}:5432"
     volumes:
+      # Only the named volume: a bind mount would put this checkout's path in
+      # the settings start-database compares, so another checkout's would
+      # differ. So the roles come from dev_database.py, not an init script.
       - db:/var/lib/postgresql
-      # On a new volume only: the owner and app roles, and the database made
-      # the owner's (DEPLOYMENT.md, Database roles).
-      - ./backend/migrations/initdb:/docker-entrypoint-initdb.d:ro,z
     healthcheck:
       # -h, so it asks over TCP: on first start the image runs a setup server
       # on the socket only, and that one must not count. -U and -d only stop

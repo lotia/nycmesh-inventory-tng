@@ -1,9 +1,8 @@
 -- The two login roles (DEPLOYMENT.md, Database roles), with development's
--- passwords, each its own name. Compose runs this on a new database volume;
--- the tests run it on their server before each run, and mise run
--- dev-database before making a checkout's database (dev_database.py). Roles belong to the
--- whole server, so it makes them only if missing, and two runs at once may
--- both try.
+-- passwords, each its own name. Run before making any database, a test
+-- run's or a checkout's (dev_database.create), so a new volume gets them
+-- then. Roles belong to the whole server, so it makes them only if missing,
+-- and two runs at once may both try.
 DO $$
 DECLARE
     role text;

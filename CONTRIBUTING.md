@@ -127,8 +127,10 @@ It holds each to 30 connections (Connections, below).
 The app logs in with `DATABASE_URL`, as `inventory_app`, which may read and
 add to the ledger but never change it. Migrations log in with
 `MIGRATION_DATABASE_URL`, as `inventory_owner`, which owns the schema
-(DEPLOYMENT.md, Database roles). Both roles have their names as passwords;
-`mise run dev-database` makes them if they are missing.
+(DEPLOYMENT.md, Database roles). Both roles have their names as passwords.
+The server's container makes neither: `mise run dev-database`, a seed or
+a test run makes them (`backend/migrations/roles.sql`) if missing, so on a
+new volume run one of those before anything that logs in as them.
 
 ## Running the app
 
@@ -315,10 +317,12 @@ something new to report starts there.
 mise run phone
 ```
 
-This runs the app in its container (below) behind a Cloudflare quick
-tunnel, which gives it a public `https://….trycloudflare.com` address with a
-real certificate, and prints a one-use registration code for it, with a QR
-code. Scan that with the phone to register it, then go on to the scan page.
+This makes and migrates this checkout's database (`mise run
+dev-database`), then runs the app in its container (below) behind a
+Cloudflare quick tunnel, which gives it a public
+`https://….trycloudflare.com` address with a real certificate, and
+prints a one-use registration code for it, with a QR code. Scan that
+with the phone to register it, then go on to the scan page.
 Pages come from the container's build, not Vite's dev server. The address
 changes each time the tunnel starts, and anyone who has it reaches your app
 while it runs, so stop it when you are done.
@@ -344,7 +348,7 @@ builds (docs/decisions/0014). Under `mise run dev` it comes from Vite's dev
 server and reloads on save; otherwise from the build. Without a build, pages
 are plain HTML. The app container builds it into its image, so a class new
 to a template shows there only after
-`mise run compose -- up -d --build --no-deps app`.
+`mise run compose -- up -d --build app`.
 Administrator pages put their content in `<main class="admin page-width">`;
 the scan and registration pages in `<main class="volunteer page-width">`,
 with a label above its text box or list as `Field`
@@ -414,8 +418,8 @@ container, set `INVENTORY_APP_MAIL_HOST=mail` too.
 ### Running the app in a container
 
 ```sh
-mise run start-database
-mise run compose -- up -d --build --wait --no-deps app  # http://127.0.0.1:8000/api/docs
+mise run dev-database
+mise run compose -- up -d --build --wait app  # http://127.0.0.1:8000/api/docs
 mise run compose -- logs -f app
 ```
 
