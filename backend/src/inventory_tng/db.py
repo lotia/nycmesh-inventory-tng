@@ -19,6 +19,7 @@ from sqlalchemy import (
     URL,
     Column,
     ColumnElement,
+    Connection,
     Engine,
     MetaData,
     Select,
@@ -159,6 +160,27 @@ def make_engine(url: str) -> Engine:
     """One pool, for what serves no requests: migrations and the tests'
     own set-up."""
     return _engine(url, POOL, OVERFLOW)
+
+
+# Printed in place of PostgreSQL's message, which a log must not hold
+# (CONTRIBUTING.md, Logging).
+CANNOT_CONNECT_TO_MIGRATE = (
+    "Cannot connect to this checkout's database as its owner. If the server "
+    "is down, or the role or the database is missing, run "
+    "`mise run dev-database`."
+)
+
+
+def connect_to_migrate(engine: Engine, *, development: bool) -> Connection:
+    """A connection for alembic's command line (migrations/env.py). In
+    development, one refused exits, printing CANNOT_CONNECT_TO_MIGRATE."""
+    try:
+        return engine.connect()
+    except exc.OperationalError as error:
+        if not development:
+            raise
+        log.error("cannot connect to migrate", **describe_error(error))
+        raise SystemExit(CANNOT_CONNECT_TO_MIGRATE) from None
 
 
 def _engine(

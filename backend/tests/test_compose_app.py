@@ -1,11 +1,13 @@
 """compose.yaml's app container takes the settings .env.example names, and
 only those, listed one by one (inventory-tng-zr5), never the whole .env; and
-its database mounts nothing from a checkout (inventory-tng-0c2)."""
+its database's settings name no checkout's path, its init scripts coming
+from configs (inventory-tng-0c2)."""
 
 import re
 
 import pytest
 
+from inventory_tng.dev_database import OWNER, ROLES_SQL
 from inventory_tng.local_env import CLONE
 
 pytestmark = pytest.mark.clone
@@ -34,7 +36,7 @@ def test_the_app_is_not_given_the_whole_env() -> None:
     assert not re.search(r"^ {4}env_file:", service("app"), re.MULTILINE)
 
 
-def test_the_database_mounts_nothing_from_a_checkout() -> None:
+def test_the_database_has_only_its_named_volume() -> None:
     """A bind mount would put the path of the checkout that made the
     container in its hash, so every other checkout's start-database would
     find it differs."""
@@ -43,3 +45,22 @@ def test_the_database_mounts_nothing_from_a_checkout() -> None:
     assert re.findall(r"^ +- *(.*)$", volumes, re.MULTILINE) == [
         "db:/var/lib/postgresql"
     ]
+
+
+def test_the_database_init_scripts_are_the_roles_file_and_the_owners() -> None:
+    """The roles first, from the one file dev_database runs too, then the
+    database the server makes, made the owner's."""
+    text = (CLONE / "compose.yaml").read_text()
+    db = service("db")
+    owners = ROLES_SQL.with_name("database-owner.sql")
+    for name, script, file in (
+        ("roles", "1-roles.sql", ROLES_SQL),
+        ("database-owner", "2-database-owner.sql", owners),
+    ):
+        assert (
+            f"- source: {name}\n        target: /docker-entrypoint-initdb.d/{script}\n"
+            in db
+        )
+        assert f"\n  {name}:\n    file: ./{file.relative_to(CLONE)}\n" in text
+    (made,) = re.findall(r"^ +POSTGRES_DB: (\S+)$", db, re.MULTILINE)
+    assert f"ALTER DATABASE {made} OWNER TO {OWNER};" in owners.read_text()

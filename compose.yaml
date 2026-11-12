@@ -1,5 +1,15 @@
 # Development only; production runs on Kubernetes with Helm.
 # Run it with `mise run compose -- <arguments>`, which picks Podman or Docker.
+#
+# `up db` gives one PostgreSQL server, which every checkout shares. On a new
+# volume it makes the owner and app roles and a database, `inventory`, the
+# owner's, but no other that a checkout's .env names (INVENTORY_DB_NAME).
+# For each job, a mise task (CONTRIBUTING.md, Using compose directly):
+#   mise run dev-database                 this checkout's database, migrated
+#   mise run start-database               start the server, never recreated
+#   mise run recreate-database-container  take up a change to db below
+#   mise run reset-dev-database -- NAME   this checkout's database, made anew
+# The app in a container: `mise run dev-database`, then `up -d --build app`.
 name: inventory-tng
 
 services:
@@ -30,8 +40,16 @@ services:
     volumes:
       # Only the named volume: a bind mount would put this checkout's path in
       # the settings start-database compares, so another checkout's would
-      # differ. So the roles come from dev_database.py, not an init script.
+      # differ. A config's file is not in them, though the container mounts
+      # it from the checkout that made it.
       - db:/var/lib/postgresql
+    # On a new volume only: the owner and app roles, and the inventory
+    # database made the owner's (DEPLOYMENT.md, Database roles).
+    configs:
+      - source: roles
+        target: /docker-entrypoint-initdb.d/1-roles.sql
+      - source: database-owner
+        target: /docker-entrypoint-initdb.d/2-database-owner.sql
     healthcheck:
       # -h, so it asks over TCP: on first start the image runs a setup server
       # on the socket only, and that one must not count. -U and -d only stop
@@ -201,3 +219,9 @@ services:
 
 volumes:
   db:
+
+configs:
+  roles:
+    file: ./backend/migrations/roles.sql
+  database-owner:
+    file: ./backend/migrations/database-owner.sql

@@ -8,7 +8,7 @@ from sqlalchemy import Connection
 
 # Imported for its mapped classes, so autogenerate sees every table.
 from inventory_tng import models  # noqa: F401
-from inventory_tng.db import Base, make_engine
+from inventory_tng.db import Base, connect_to_migrate, make_engine
 from inventory_tng.local_env import load_local_env
 from inventory_tng.logs import configure_logging
 from inventory_tng.settings import migration_settings
@@ -33,7 +33,7 @@ else:
     configure_logging(settings)
     engine = make_engine(settings.database_url)
     try:
-        with engine.connect() as connection:
+        with connect_to_migrate(engine, development=settings.development) as connection:
             run(connection)
     finally:
         engine.dispose()

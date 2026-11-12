@@ -10,9 +10,15 @@ from collections.abc import Iterator
 
 import pytest
 from sqlalchemy import make_url, text
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import OperationalError, ProgrammingError
+from structlog.testing import capture_logs
 
 from inventory_tng import dev_database
+from inventory_tng.db import (
+    CANNOT_CONNECT_TO_MIGRATE,
+    connect_to_migrate,
+    make_engine,
+)
 from inventory_tng.dev_database import CONNECTION_LIMIT, OWNER
 
 from databases import APP, as_role, database_name, superuser_url
@@ -98,3 +104,34 @@ def test_only_in_development_and_on_one_database(
     with pytest.raises(SystemExit, match="must name one database"):
         dev_database.main(["make"])
     assert facts(url) is None
+
+
+def test_a_migration_that_cannot_connect_says_how_to_mend_it(url: str) -> None:
+    """In development, the fix, and the error's class but never its text,
+    which names the role and the database; elsewhere, the error itself.
+    `url`'s database is not made."""
+    engine = make_engine(as_role(url, OWNER))
+    try:
+        with capture_logs() as logs, pytest.raises(SystemExit) as exiting:
+            connect_to_migrate(engine, development=True)
+        assert exiting.value.code == CANNOT_CONNECT_TO_MIGRATE
+        assert logs == [
+            {
+                "event": "cannot connect to migrate",
+                "error": "OperationalError",
+                "log_level": "error",
+            }
+        ]
+        with pytest.raises(OperationalError):
+            connect_to_migrate(engine, development=False)
+    finally:
+        engine.dispose()
+
+
+def test_a_migration_that_can_connect_does(database_url: str) -> None:
+    engine = make_engine(as_role(database_url, OWNER))
+    try:
+        with connect_to_migrate(engine, development=True) as connection:
+            assert connection.scalar(text("SELECT current_user")) == OWNER
+    finally:
+        engine.dispose()
