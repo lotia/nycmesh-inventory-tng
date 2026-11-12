@@ -56,7 +56,11 @@ SEARCHED = Searched(
     LABELS,
     Label,
     func.concat_ws(
-        " ", Item.search_text, ItemPackage.name, Location.name, _parent.name
+        " ",
+        Item.search_text,
+        ItemPackage.search_text,
+        Location.search_text,
+        _parent.search_text,
     ),
     func.coalesce(Location.name, Item.name),
     query=select(Label)

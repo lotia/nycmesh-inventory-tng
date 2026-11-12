@@ -31,13 +31,13 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from ipaddress import IPv4Address, IPv6Address
-from typing import Annotated, Any, Literal, get_args
+from typing import Annotated, Any, ClassVar, Literal, get_args
 
+from anyascii import anyascii
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
     ColumnElement,
-    Computed,
     DateTime,
     ForeignKey,
     Identity,
@@ -48,14 +48,16 @@ from sqlalchemy import (
     SQLColumnExpression,
     Text,
     Uuid,
+    event,
     func,
+    inspect,
     literal,
     literal_column,
     or_,
     text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB
-from sqlalchemy.orm import Mapped, MappedColumn, mapped_column, validates
+from sqlalchemy.orm import Mapped, MappedColumn, Session, mapped_column, validates
 
 # Imported for its flush listeners: whatever can write these tables records
 # their history.
@@ -193,6 +195,44 @@ def holds(column: SQLColumnExpression[str], search: str) -> ColumnElement[bool]:
     return column.ilike(f"%{escaped}%", escape="\\")
 
 
+def fold(text: str) -> str:
+    """`text` as searches compare it: in ASCII, as anyascii spells it, so
+    "cafe" finds "Café" and "lodz" "Łódź" (docs/decisions/0021, 2026-11-12).
+    What is searched is kept folded (Searchable); what is typed is folded
+    before it is compared."""
+    return anyascii(text)
+
+
+class Searchable:
+    """A row a search finds: `search_text`, what it is found by (SEARCHED,
+    its name unless a model says more), spaced and folded. Kept by the app
+    as each row is added or changed (_refold), never by PostgreSQL
+    (docs/decisions/0016); migration 0032 filled the rows there were."""
+
+    SEARCHED: ClassVar[tuple[str, ...]] = ("name",)
+    search_text: Mapped[str] = mapped_column(Text)
+
+    def refold(self) -> None:
+        held = (getattr(self, field) or "" for field in self.SEARCHED)
+        self.search_text = fold(" ".join(held))
+
+
+# First, so the lock guard and the history see the folded columns too. A
+# row changed in nothing searched is left alone, loading nothing, so a
+# change such as a receipt's to on_order stays only that (db.flush_writes).
+@event.listens_for(Session, "before_flush", insert=True)
+def _refold(session: Session, _context: object, _instances: object) -> None:
+    for row in (*session.new, *session.dirty):
+        if isinstance(row, Searchable) and (
+            row in session.new
+            or any(
+                inspect(row).attrs[field].history.has_changes()
+                for field in row.SEARCHED
+            )
+        ):
+            row.refold()
+
+
 def fuzzy(column: SQLColumnExpression[str], search: str) -> ColumnElement[bool]:
     """Whether `column` matches what was typed, forgiving typos: it holds it
     as typed, or pg_trgm finds it close, as a whole (`%`) or as a word in it
@@ -273,7 +313,7 @@ class Category(Versioned, Base):
     retired_at: Mapped[RetiredAt]
 
 
-class Item(Versioned, Base):
+class Item(Searchable, Versioned, Base):
     """A catalogue entry, never the stock: stock comes from the ledger, and is
     always counted in `unit`."""
 
@@ -334,20 +374,20 @@ class Item(Versioned, Base):
     track_opened: Mapped[bool] = mapped_column(server_default=text("false"))
     retired_at: Mapped[RetiredAt]
 
-    # Everything a volunteer might type to find an item, as one string, kept
-    # by PostgreSQL. ix_item_search makes fuzzy() on it fast, as the items
-    # list searches it (admin/items.py).
-    search_text: Mapped[str] = mapped_column(
-        Text,
-        Computed(
-            "name || ' ' || coalesce(manufacturer, '') || ' ' || "
-            "coalesce(part_number, '') || ' ' || coalesce(old_code, '')",
-            persisted=True,
-        ),
-    )
+    # Everything a volunteer might type to find an item, as one string,
+    # folded (Searchable), and its name alone so, for close names
+    # (items.similar), kept alike. ix_item_search makes
+    # fuzzy() on search_text fast, as the items list searches it
+    # (admin/items.py).
+    SEARCHED = ("name", "manufacturer", "part_number", "old_code")
+    name_folded: Mapped[str] = mapped_column(Text)
+
+    def refold(self) -> None:
+        super().refold()
+        self.name_folded = fold(self.name or "")
 
 
-class ItemPackage(Versioned, Base):
+class ItemPackage(Searchable, Versioned, Base):
     """A size an item comes in: "100-pack" = 100, "reel" = 305 (m)."""
 
     __tablename__ = "item_package"
@@ -491,7 +531,7 @@ class VendorPrice(Base):
     )
 
 
-class Volunteer(Versioned, Base):
+class Volunteer(Searchable, Versioned, Base):
     """A name to pick, not a login (docs/decisions/0004)."""
 
     __tablename__ = "volunteer"
@@ -508,6 +548,12 @@ class Volunteer(Versioned, Base):
         CheckConstraint(
             "merged_into_id IS NULL OR retired_at IS NOT NULL", name="merged_is_retired"
         ),
+        Index(
+            "ix_volunteer_search",
+            "search_text",
+            postgresql_using="gin",
+            postgresql_ops={"search_text": "gin_trgm_ops"},
+        ),
         protection(owner="volunteers.py", lock="catalogue", history=True),
     )
 
@@ -521,7 +567,7 @@ class Volunteer(Versioned, Base):
     retired_at: Mapped[RetiredAt]
 
 
-class Location(Versioned, Base):
+class Location(Searchable, Versioned, Base):
     """Where stock is (docs/decisions/0003). Areas nest under a store or
     another area; a volunteer holding stock is a custody location."""
 

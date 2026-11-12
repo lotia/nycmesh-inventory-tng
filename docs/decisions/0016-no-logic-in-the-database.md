@@ -57,8 +57,8 @@ privilege, so neither binds it.
   for the catalogue (`db.locked_row`), once for the ledger (`ledger.py`) and
   once for administrators (`accounts.lock_admins`).
 - PostgreSQL features still in use, and what another database would need:
-  - fuzzy search: `pg_trgm` and a GIN index on `item.search_text`, a computed
-    column (the largest cost);
+  - fuzzy search: `pg_trgm` and GIN indexes on `item.search_text` and
+    `volunteer.search_text`, which the app keeps (0021; the largest cost);
   - JSONB history rows, INET addresses, partial and `lower()` indexes, regular
     expressions and `num_nulls()` in CHECKs, identity columns;
   - an index on an expression with `regexp_replace` and POSIX character

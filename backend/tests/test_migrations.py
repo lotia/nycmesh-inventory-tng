@@ -172,6 +172,8 @@ def test_going_back_before_decimal_points_names_what_would_clash(
 ) -> None:
     """Migration 0031: back to a key that drops a decimal point, items and
     packages named so are named by id to rename; nothing is renamed."""
+    # Before 0032, whose folded columns these rows do not fill.
+    command.downgrade(alembic_config, "0031")
     connection = alembic_config.attributes["connection"]
     category_id = connection.scalar(
         text("INSERT INTO category (name) VALUES ('Cables') RETURNING id")
@@ -214,6 +216,8 @@ def test_going_back_before_package_forms_names_what_it_cannot_hold(
 ) -> None:
     """Migration 0024's downgrade: before it, an item was on one line of a
     transaction, so one on two, in different forms, is named by id."""
+    # Before 0032, whose folded columns these rows do not fill.
+    command.downgrade(alembic_config, "0031")
     connection = alembic_config.attributes["connection"]
     category_id = connection.scalar(
         text("INSERT INTO category (name) VALUES ('Cables') RETURNING id")

@@ -342,8 +342,8 @@ def as_to_jsonb(session: Session, table: str, row_id: int) -> object:
 
 
 def test_rows_are_recorded_as_to_jsonb_would(session: Session, item: Item) -> None:
-    """Numbers, times, the column PostgreSQL computes (search_text), bytes
-    and an address: as the database's own to_jsonb() writes the row now."""
+    """Numbers, times, bytes and an address: as the database's own
+    to_jsonb() writes the row now."""
     code, phrase = devices.create_code(session, max_uses=1, lifetime=timedelta(days=1))
     device, _ = devices.register(session, phrase, "2001:db8::1")
     session.flush()
