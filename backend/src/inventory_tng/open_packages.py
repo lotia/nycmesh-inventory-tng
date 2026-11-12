@@ -49,7 +49,7 @@ def measure_closed(how: Literal["confirmed", "direct", "count"], count: int) -> 
 # report, or a save that took it below zero (docs/decisions/0020,
 # 2026-11-12); and how an administrator settled it.
 CheckRaised = Literal["volunteer", "below_zero"]
-CheckSettled = Literal["set", "left"]
+CheckSettled = Literal["set", "left", "closed"]
 
 checks_raised = meter.create_counter(
     "inventory.open_packages.length_checks.raised",
@@ -61,7 +61,8 @@ checks_settled = meter.create_counter(
     "inventory.open_packages.length_checks.settled",
     unit="{check}",
     description="Checks of what an open package really has that an "
-    "administrator settled, by how: set to a length, or left as it is",
+    "administrator settled, by how: set to a length, left as it is, or the "
+    "package closed",
 )
 
 
@@ -209,12 +210,27 @@ def went_below_zero(
     return True
 
 
-def _clear_check(row: OpenPackage) -> None:
+def left_below_zero(row: OpenPackage, left: Decimal, at: datetime) -> bool:
+    """Ask again about an open package an administrator's Set left below
+    zero, as cuts since took more than it had: its records are wrong still.
+    Whether it asked. Call it holding the row, its check just settled, as
+    went_below_zero."""
+    if left >= 0:
+        return False
+    row.below_zero_at = at
+    log.info("open package left below zero by a set", open_package_id=row.id)
+    return True
+
+
+def _clear_check(row: OpenPackage) -> bool:
+    """Whether there was a check to clear."""
+    checked = row.length_reported_at is not None or row.below_zero_at is not None
     row.length_reported_at = None
     row.length_reported_by_volunteer_id = None
     row.length_reported = None
     row.length_reported_in_id = None
     row.below_zero_at = None
+    return checked
 
 
 def check_seen(row: OpenPackage) -> str:
@@ -239,6 +255,13 @@ def settle_check(session: Session, open_id: int, seen: str) -> bool:
     return True
 
 
+class Closed(NamedTuple):
+    """An open package closed, and whether that settled a check of what it
+    had (docs/decisions/0020; inventory-tng-b1z)."""
+
+    check_settled: bool
+
+
 def close(
     session: Session,
     open_id: int,
@@ -247,11 +270,11 @@ def close(
     *,
     reported: bool = False,
     reason: str = adjustment_reasons.USED_UP,
-) -> bool:
+) -> Closed | None:
     """Close an open package as used up (docs/decisions/0020): an
     adjustment, under the administrator's name, for whatever it still
     showed, with the reason Used up, so it shows nothing; then closed.
-    Whether it closed it: not if there is no such package, it is closed
+    None if it did not close it: if there is no such package, it is closed
     already, it moved since it was read, or, with `reported`, it is no
     longer reported (a report cleared meanwhile). A count closes one not
     there with the reason Lost or stolen (`reason`). Its place is locked
@@ -259,7 +282,7 @@ def close(
     ledger.record_adjustment refuses."""
     found = session.get(OpenPackage, open_id)
     if found is None:
-        return False
+        return None
     place = found.location_id
     # In the ledger's order: its place, its item, then it.
     ledger.lock_place(session, place)
@@ -267,9 +290,9 @@ def close(
     row = get_locked(session, OpenPackage, open_id, key_share=True)
     assert row is not None  # Read just now; open packages are never deleted.
     if row.closed_at is not None or row.location_id != place:
-        return False
+        return None
     if reported and row.reported_at is None:
-        return False
+        return None
     left = ledger.left_on(session, [row])[row.id]
     if left != 0:
         ledger.record_adjustment(
@@ -284,10 +307,20 @@ def close(
             form=ledger.Form(open_package_id=row.id),
         )
     row.closed_at, row.closed_by_admin_id = at, admin_id
-    # Nobody checks what a closed package has: its check goes with it.
-    _clear_check(row)
+    # Nobody checks what a closed package has: closing settles its check.
+    settled = _clear_check(row)
     log.info("open package closed", open_package_id=row.id, admin_id=admin_id)
-    return True
+    return Closed(check_settled=settled)
+
+
+def measure_closing(
+    how: Literal["confirmed", "direct", "count"], done: Iterable[Closed | None]
+) -> None:
+    """Packages closed and the checks that settled, measured once committed:
+    a check closed with its package counts as settled."""
+    closed_now = [each for each in done if each is not None]
+    measure_closed(how, len(closed_now))
+    measure_checks_settled("closed", sum(each.check_settled for each in closed_now))
 
 
 def clear(session: Session, open_id: int) -> bool:

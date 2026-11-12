@@ -601,7 +601,7 @@ def count(
             alert=TWICE if repeats else problems.get(CLOSED_MEANWHILE),
             items=sent_items,
         )
-    closed: list[bool] = []
+    closed: list[open_packages.Closed | None] = []
 
     # An item counted by its total holds loose units alone (_forms): with
     # an open package of it found, its total is its loose units.
@@ -675,7 +675,7 @@ def count(
     assert result is not None
     session.commit()
     corrected(signed.admin.id, place.id, result.written, result.withheld)
-    open_packages.measure_closed("count", sum(closed))
+    open_packages.measure_closing("count", closed)
     if not result.moved:
         return redirect(
             COUNTS,

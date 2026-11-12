@@ -283,6 +283,17 @@ def counted(reader: InMemoryMetricReader, name: str) -> dict[tuple[object, ...],
     }
 
 
+def added(
+    reader: InMemoryMetricReader, name: str, before: dict[tuple[object, ...], int]
+) -> dict[tuple[object, ...], int]:
+    """A counter's totals since `before` (counted): the reader keeps them for
+    the module, and more than one test may add to a counter."""
+    now = counted(reader, name)
+    return {
+        key: n - before.get(key, 0) for key, n in now.items() if n != before.get(key, 0)
+    }
+
+
 def test_counts_registrations_and_refusals(
     rolled_back: Recorded, session: Session
 ) -> None:
@@ -800,6 +811,8 @@ def test_counts_open_packages_closed_and_cleared(
     rolled_back: Recorded, session: Session
 ) -> None:
     client, _, reader, _ = rolled_back
+    closed = "inventory.open_packages.closed"
+    before = counted(reader, closed)
     _, key = new_admin(session)
     sign_in_with(client, code=code(key))
     spools = Spools(session)
@@ -820,7 +833,7 @@ def test_counts_open_packages_closed_and_cleared(
         f"state_{four.id}": "missing",
     }
     client.post(f"/admin/counts/{store}", data=count)
-    assert counted(reader, "inventory.open_packages.closed") == {
+    assert added(reader, closed, before) == {
         (("how", "confirmed"),): 1,
         (("how", "direct"),): 1,
         (("how", "count"),): 1,
@@ -832,17 +845,21 @@ def test_counts_length_checks_raised_and_settled(
     rolled_back: Recorded, session: Session
 ) -> None:
     """Raised by a volunteer's report or a cut below zero; settled by
-    setting or leaving (inventory-tng-wy7)."""
+    setting or leaving (inventory-tng-wy7), or by closing the package, so
+    raised and settled match (inventory-tng-b1z)."""
     client, _, reader, _ = rolled_back
     spools = Spools(session)
-    reported, cut = spools.opened(), spools.opened()
+    reported, cut, closing = spools.opened(), spools.opened(), spools.opened()
     _, token = new_device(session)
     client.cookies.set(devices.COOKIE, token)
     report = spools.place.batch(
         kind="report",
         to_location_id=None,
         lines=[],
-        lengths=[{"open_package_key": str(reported.key), "left": "250"}],
+        lengths=[
+            {"open_package_key": str(each.key), "left": "250"}
+            for each in (reported, closing)
+        ],
     )
     assert client.post("/api/transactions", json=report).status_code == 201
     below = spools.place.batch(
@@ -857,7 +874,7 @@ def test_counts_length_checks_raised_and_settled(
     assert client.post("/api/transactions", json=below).status_code == 201
     client.cookies.clear()
     assert counted(reader, "inventory.open_packages.length_checks.raised") == {
-        (("how", "volunteer"),): 1,
+        (("how", "volunteer"),): 2,
         (("how", "below_zero"),): 1,
     }
     _, key = new_admin(session)
@@ -870,7 +887,9 @@ def test_counts_length_checks_raised_and_settled(
     client.post(
         f"{lengths}/{cut.id}/leave", data={"seen": open_packages.check_seen(cut)}
     )
+    client.post(f"/admin/items/{spools.cable.id}/open-packages/{closing.id}/close")
     assert counted(reader, "inventory.open_packages.length_checks.settled") == {
         (("how", "set"),): 1,
         (("how", "left"),): 1,
+        (("how", "closed"),): 1,
     }

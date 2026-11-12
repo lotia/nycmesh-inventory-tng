@@ -26,27 +26,16 @@ export const PRINTED_LENGTH =
 /** Nothing taken yet. */
 export const NOTHING_TAKEN: Taken = { amount: "", whole: false };
 
-/** The open package's word, for "this spool": the first of its package's
- * name ("Spool 305 m" is a spool), its first letter small unless it is a
- * name of its own, such as "UniFi" or "RJ45"; as "Needs your action" says
- * it (needs_action.py, by_item and plural). */
-export function packageWord(open: Pick<Offered, "package_name">): string {
-  const [word = ""] = open.package_name.split(" ");
-  return word.slice(1) === word.slice(1).toLowerCase()
-    ? word.charAt(0).toLowerCase() + word.slice(1)
-    : word;
-}
-
 /** The note when the box follows the cut (Ali, 2026-11-12). */
-export function endingNote(ending: Ending, word: string, unit: string): string {
+export function endingNote(ending: Ending, name: string, unit: string): string {
   const left = unit === "each" ? "any is left" : "cable is left";
   switch (ending) {
     case "used":
-      return `Your cut uses up the ${word}, so it's ticked. Untick it if ${left}. An administrator confirms.`;
+      return `Your cut uses up the ${name}, so it's ticked. Untick it if ${left}. An administrator confirms.`;
     case "short":
-      return `This ${word} will be unusable after this cut, so it's ticked. Untick it if you'll keep the short end.`;
+      return `This ${name} will be unusable after this cut, so it's ticked. Untick it if you'll keep the short end.`;
     case "over":
-      return `Your cut is more than the ${word} shows, so it's ticked. It's saved as you typed it, and an administrator will check the ${word}.`;
+      return `Your cut is more than the ${name} shows, so it's ticked. It's saved as you typed it, and an administrator will check the ${name}.`;
   }
 }
 
@@ -79,13 +68,15 @@ export function OpenPackageCard({
   const hintId = useId();
   const unit = item.unit;
   const printed = unit !== "each";
-  const word = packageWord(open);
+  // Its package as named, never a word made from the name
+  // (inventory-tng-b1z): "the Spool 305 m".
+  const name = open.package_name;
   const cut = cutOf(open, taken);
   const usedUp = usedUpOf(open, taken);
   const empty = open.left <= 0;
   const opened = open.opened_at.slice(0, 10);
   const note =
-    cut?.ending != null && usedUp ? endingNote(cut.ending, word, unit) : "";
+    cut?.ending != null && usedUp ? endingNote(cut.ending, name, unit) : "";
   // What is really on it: asked when the cut passes what it shows, or
   // when the volunteer says it shows the wrong length.
   const asking = taken.now !== undefined || cut?.ending === "over";
@@ -117,7 +108,7 @@ export function OpenPackageCard({
       </div>
       <Field
         quiet
-        label={`Cut or take from the ${word} opened ${opened} (${unit})`}
+        label={`Cut or take from the ${name} opened ${opened} (${unit})`}
       >
         {(id) => (
           <input
@@ -158,7 +149,7 @@ export function OpenPackageCard({
       {asking ? (
         <Field
           quiet
-          label={`What's on the ${word} ${cut === null ? "now" : "after this cut"} (${unit}), if you can tell`}
+          label={`What's on the ${name} ${cut === null ? "now" : "after this cut"} (${unit}), if you can tell`}
         >
           {(id) => (
             <>
@@ -199,7 +190,7 @@ export function OpenPackageCard({
                 onTake({ ...taken, usedUp: event.currentTarget.checked })
               }
             />
-            Nothing usable left on this {word}
+            Nothing usable left on this {name}
           </label>
         )}
         <p aria-live="polite" class={note === "" ? "" : "warning mt-2"}>

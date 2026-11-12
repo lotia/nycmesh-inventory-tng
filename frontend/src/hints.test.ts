@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from "vitest";
-import { followPicks } from "./hints";
+import { followPicks, followTyped } from "./hints";
 
 beforeEach(() => {
   document.body.innerHTML = `
@@ -58,4 +58,33 @@ test("a select with nothing to pick hides it", () => {
     <p id="hint" data-hint-for="pick">Hint</p>`;
   followPicks(document);
   expect((document.getElementById("hint") as HTMLElement).hidden).toBe(true);
+});
+
+test("a button says what is typed, and 'it' while nothing is", () => {
+  document.body.innerHTML = `
+    <input id="left-7" value="250">
+    <button>Set to <span data-follows="left-7" data-unit="m">it</span></button>
+    <span data-follows="nowhere">it</span>`;
+  followTyped(document);
+  const button = document.querySelector("button") as HTMLButtonElement;
+  expect(button.textContent).toBe("Set to 250 m");
+  const field = document.getElementById("left-7") as HTMLInputElement;
+  field.value = " 40 ";
+  field.dispatchEvent(new Event("input"));
+  expect(button.textContent).toBe("Set to 40 m");
+  for (const typed of ["", "abc", "4 0"]) {
+    field.value = typed;
+    field.dispatchEvent(new Event("input"));
+    expect(button.textContent).toBe("Set to it");
+  }
+});
+
+test("with no unit, the number alone", () => {
+  document.body.innerHTML = `
+    <input id="n" value="3">
+    <button>Set to <span data-follows="n">it</span></button>`;
+  followTyped(document);
+  expect((document.querySelector("button") as HTMLElement).textContent).toBe(
+    "Set to 3",
+  );
 });

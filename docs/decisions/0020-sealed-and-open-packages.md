@@ -246,13 +246,14 @@ you" counts every report in one line, which hides what is waiting.
 - **Several open packages at a place** are a card each, most left first;
   one showing nothing or less is last, greyed, flagged "Shows nothing
   left", so the next volunteer can report it.
-- **One checkbox, one wording**: "Nothing usable left on this spool" (the
-  package's word), whatever is typed.
+- **One checkbox, one wording**: "Nothing usable left on this Spool 305
+  m" (the package's name, never a word made from it: inventory-tng-b1z),
+  whatever is typed.
 - **It ticks itself** when a cut leaves a short end, uses up what the
   package shows, or passes it, and a note appears in the card saying why
-  and that an administrator confirms: "Your cut uses up the spool", "This
-  spool will be unusable after this cut" (a short end), or that the cut
-  is more than the spool shows and an administrator will check it. The
+  and that an administrator confirms: "Your cut uses up the Spool 305 m",
+  "This Spool 305 m will be unusable after this cut" (a short end), or
+  that the cut is more than it shows and an administrator will check it. The
   volunteer unticks it when cable is left, a short end kept for patch
   leads included. The note is a polite live region, and the cut's box is
   described by both figures; nothing else is announced as one types.
@@ -270,9 +271,15 @@ you" counts every report in one line, which hides what is waiting.
   below zero, reported or not (Ali): its record was wrong, which is
   worth a look even when the spool is finished.
 - **The check page** shows the item, package and place, what it shows,
-  the volunteer's figure, who and when, and the recent cuts. **Set to N**
-  writes an adjustment under the administrator's name, as a count does;
-  **Leave it** clears the check.
+  the volunteer's figure, who and when, and the recent cuts. **Set to N
+  m** (the button follows the box; "Set to it" without JavaScript)
+  writes a count under the administrator's name of the difference
+  between N and what the package showed then: at the volunteer's report,
+  for the volunteer's figure, else on the page. So a cut since stays as
+  saved, and Set is never refused for one (Ali, 2026-11-12,
+  inventory-tng-b1z); if cuts since leave it below zero, it is asked
+  about again. **Leave it** clears the check. **Closing the package**
+  settles it too.
 - **Items measured in length** (metres, feet) get a hint on the count
   page and on the reporting field: read the length printed on the cable,
   and if the marks count up from its start, what is left is the
@@ -284,10 +291,11 @@ you" counts every report in one line, which hides what is waiting.
 - **"Waiting for you" becomes "Needs your action (N)"**, N being what is
   to do, gone when nothing is (Ali: the name must say work is waiting).
 - **Under each kind**, reported used up, shows the wrong length, and went
-  below zero, **one line per item** names how many of its packages wait,
-  in the package's word ("Cat6 cable: 3 spools", "RJ45 plugs: 2 bags"),
-  and links to that kind's page showing only that item; "all N" links to
-  the whole list and its bulk buttons. A reported package below zero
+  below zero, **one line per item** names how many of each of its
+  packages wait, by the package's name ("Cat6 cable: 3 × Spool 305 m",
+  "RJ45 plugs: 2 × Bag of 100": inventory-tng-b1z), and links to that
+  kind's page showing only that item; "all N" links to the whole list
+  and its bulk buttons. A reported package below zero
   shows its shortfall there, so none is confirmed unseen.
 
 ### Rejected in this amendment
@@ -310,7 +318,8 @@ you" counts every report in one line, which hides what is waiting.
 - Volunteers report more, and administrators confirm more, but each is a
   tap rather than a recount; the next count still corrects anything left.
 - Metrics, besides those above: checks of a package's length raised, by
-  how (`volunteer`, `below_zero`), and settled, by how (`set`, `left`).
+  how (`volunteer`, `below_zero`), and settled, by how (`set`, `left`,
+  `closed`).
 - Built by inventory-tng-ck0 (the card and its box), inventory-tng-pll
   ("Needs your action"), inventory-tng-wy7 (reporting and checking a
   length) and inventory-tng-pg7 (the hint).

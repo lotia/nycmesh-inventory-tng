@@ -3,7 +3,8 @@
 {% block main %}
 <p class="hint">What these open packages show may be wrong: a volunteer said
 what is really on one, or a save took one below zero. Set it to what it
-really has, as a count does, or leave it as it shows.</p>
+really had when it showed that, or leave it as it shows. A cut saved since
+stays.</p>
 {% if only %}
 <p>Only {{ only.name }}. <a href="{{ all_path }}">Show all</a></p>
 {% endif %}
@@ -27,15 +28,16 @@ really has, as a count does, or leave it as it shows.</p>
     <td>{% for cut in each.cuts %}{{ cut.quantity | amount }} {{ shown.unit }}, {{ cut.volunteer or cut.kind }}, {{ cut.at | when(zone) }}{% if not loop.last %}<br>{% endif %}{% else %}None{% endfor %}</td>
     <td>
       <form method="post" action="{{ here }}/{{ row.id }}/set{{ query }}" class="actions">
-        <input type="hidden" name="as_of" value="{{ each.as_of }}">
         <input type="hidden" name="seen" value="{{ each.seen }}">
-        <input type="hidden" name="showed" value="{{ row.location_id }} {{ shown.left }}">
+        <input type="hidden" name="showed" value="{{ shown.left }}">
         <input type="hidden" name="page" value="{{ all_path }}">
         {% set hint = shown.unit | printed_length %}
         <label>Really on it ({{ shown.unit }})
-          <input name="left" inputmode="decimal" value="{{ row.length_reported | amount if row.length_reported is not none else '' }}"{% if hint %} aria-describedby="hint-{{ row.id }}"{% endif %}></label>
+          <input name="left" id="left-{{ row.id }}" inputmode="decimal" value="{{ row.length_reported | amount if row.length_reported is not none else '' }}"{% if hint %} aria-describedby="hint-{{ row.id }}"{% endif %}></label>
         {% if hint %}<p class="hint" id="hint-{{ row.id }}">{{ hint }}</p>{% endif %}
-        <button>Set to it<span class="sr-only"> {{ shown.item }} at {{ shown.place }}</span></button>
+        {#- "Set to 40 m", following the box in the browser (frontend/src/hints.ts);
+        "Set to it" without, as the box may be changed. #}
+        <button>Set to <span data-follows="left-{{ row.id }}" data-unit="{{ shown.unit }}">it</span><span class="sr-only"> {{ shown.item }} at {{ shown.place }}</span></button>
         <button formaction="{{ here }}/{{ row.id }}/leave{{ query }}">Leave it<span class="sr-only"> {{ shown.item }} at {{ shown.place }}</span></button>
       </form>
     </td>

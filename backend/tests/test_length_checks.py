@@ -62,21 +62,12 @@ def seen(session: Session, made: OpenPackage) -> str:
     return open_packages.check_seen(made)
 
 
-def showed(session: Session, made: OpenPackage) -> str:
-    """Where it is and what it shows, as the check page sends them back."""
-    session.refresh(made)
-    return f"{made.location_id} {left_on(session, made)}"
-
-
-def set_form(
-    session: Session, made: OpenPackage, left: str, as_of: str
-) -> dict[str, str]:
+def set_form(session: Session, made: OpenPackage, left: str) -> dict[str, str]:
     """The check page's own Set form for it, as shown now."""
     return {
         "left": left,
-        "as_of": as_of,
         "seen": seen(session, made),
-        "showed": showed(session, made),
+        "showed": str(left_on(session, made)),
     }
 
 
@@ -195,13 +186,15 @@ def test_needs_your_action_lists_lengths_to_check(
     assert "Needs your action (2)" in home
     assert "Shows the wrong length" in home
     assert "Went below zero" in home
-    assert f"{spools.cable.name}: 1 spool</a>, 5 m below zero" in home
+    assert (
+        f"{spools.cable.name}: 1 \N{MULTIPLICATION SIGN} Spool</a>, 5 m below zero"
+        in home
+    )
     page = text(admin_client.get(f"{LENGTHS}?item={spools.cable.id}"))
     assert f"Only {spools.cable.name}." in page
     assert "said 250 m is on it" in page
-    # Set to what was said is as of the report.
-    session.refresh(reported)
-    assert f'name="as_of" value="{reported.length_reported_in_id}"' in page
+    # Set against what it showed.
+    assert 'name="showed" value="305.000"' in page
     assert "310 m" in page  # The recent cut.
     # No such item: all of them.
     assert "Only" not in text(admin_client.get(f"{LENGTHS}?item=999999"))
@@ -215,8 +208,7 @@ def test_set_counts_it_at_what_it_really_has(
 ) -> None:
     made = spools.opened()
     registered_client.post(URL, json=report(spools, length(made, "250")))
-    as_of = str(ledger.moment(session, spools.store.id))
-    form = set_form(session, made, "260", as_of)
+    form = set_form(session, made, "260")
     done = admin_client.post(f"{LENGTHS}/{made.id}/set", data=form)
     assert done.headers["location"] == f"{LENGTHS}?notice=length_set"
     session.refresh(made)
@@ -243,19 +235,19 @@ def test_set_finds_what_was_more_than_it_showed(
 ) -> None:
     made = spools.opened()
     registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "310")]))
-    as_of = str(ledger.moment(session, spools.store.id))
-    form = set_form(session, made, "3", as_of)
+    form = set_form(session, made, "3")
     admin_client.post(f"{LENGTHS}/{made.id}/set", data=form)
     assert left_on(session, made) == 3
 
 
-def test_set_after_a_cut_since_changes_nothing(
+def test_set_keeps_a_cut_since_the_report(
     admin_client: TestClient,
     registered_client: TestClient,
     session: Session,
     spools: Spools,
 ) -> None:
-    """The reported figure is as of the report: a cut since is never lost."""
+    """The reported figure is set against what it showed at the report, so
+    a cut since stays (inventory-tng-b1z)."""
     made, other = spools.opened(), spools.opened()
     registered_client.post(URL, json=report(spools, length(made, "250")))
     registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "10")]))
@@ -267,10 +259,11 @@ def test_set_after_a_cut_since_changes_nothing(
     assert done.headers["location"] == f"{LENGTHS}?notice=length_set"
     session.refresh(made)
     session.refresh(other)
-    assert made.length_reported == 250
+    assert made.length_reported is None
     assert other.length_reported is None
     assert left_on(session, other) == 100
-    assert left_on(session, made) == 295
+    # Showed 305 at the report, really 250; cut 10 since.
+    assert left_on(session, made) == 240
 
 
 def test_leave_it_and_what_is_refused(
@@ -282,7 +275,7 @@ def test_leave_it_and_what_is_refused(
     made = spools.opened()
     registered_client.post(URL, json=report(spools, length(made, "250")))
     only = f"?item={spools.cable.id}"
-    for bad in ({"left": "x", "as_of": "1"}, {"left": "1", "as_of": ""}):
+    for bad in ({"left": "x"}, {"left": ""}):
         refused = admin_client.post(f"{LENGTHS}/{made.id}/set{only}", data=bad)
         assert refused.headers["location"] == (f"{LENGTHS}{only}&notice=length_bad")
     none = admin_client.post(f"{LENGTHS}{only}", data={"do": "leave"})
@@ -321,15 +314,14 @@ def test_counting_an_open_package_twice_under_its_key_writes_once(
 ) -> None:
     made = spools.opened()
     counter = add(session, Admin(username=f"counter-{tag()}"))
-    as_of = ledger.moment(session, spools.store.id)
     key = uuid.uuid4()
     count = partial(ledger.count_open_package, session, key, counter.id, made)
     # What it shows already: nothing differs, nothing is written.
-    assert count(Decimal(305), as_of)
+    assert count(Decimal(305), Decimal(305)) == 305
     assert left_on(session, made) == 305
-    assert count(Decimal(300), as_of)
+    assert count(Decimal(300), Decimal(305)) == 300
     # Sent again under its key: written once.
-    assert count(Decimal(290), as_of)
+    assert count(Decimal(290), Decimal(305)) is None
     assert left_on(session, made) == 300
     # Nothing to settle: said so.
     assert open_packages.settle_check(session, made.id, "/") is False
@@ -343,12 +335,11 @@ def test_a_report_since_the_page_was_shown_is_not_settled_unseen(
 ) -> None:
     made = spools.opened()
     registered_client.post(URL, json=report(spools, length(made, "250")))
-    shown, shown_at = seen(session, made), showed(session, made)
+    shown, shown_at = seen(session, made), str(left_on(session, made))
     registered_client.post(URL, json=report(spools, length(made, "5")))
-    as_of = str(ledger.moment(session, spools.store.id))
     for path, form in (
         ("leave", {"seen": shown}),
-        ("set", {"left": "250", "as_of": as_of, "seen": shown, "showed": shown_at}),
+        ("set", {"left": "250", "seen": shown, "showed": shown_at}),
     ):
         done = admin_client.post(f"{LENGTHS}/{made.id}/{path}", data=form)
         assert done.headers["location"] == f"{LENGTHS}?notice=length_unchanged"
@@ -446,7 +437,7 @@ def test_a_length_of_an_item_counted_each_is_whole(
     registered_client.post(URL, json=report(spools, length(made, "250")))
     spools.cable.unit = "each"
     session.flush()
-    form = set_form(session, made, "2.5", "1")
+    form = set_form(session, made, "2.5")
     done = admin_client.post(f"{LENGTHS}/{made.id}/set", data=form)
     assert done.headers["location"] == f"{LENGTHS}?notice=length_bad"
 
@@ -509,36 +500,33 @@ def test_the_scan_page_hints_in_the_same_words() -> None:
     assert f'"{pages.PRINTED_LENGTH}"' in card
 
 
-def test_set_refuses_what_changed_since_the_page_showed_it(
+def test_set_moves_it_by_what_it_was_off_so_cuts_since_stay(
     admin_client: TestClient,
     registered_client: TestClient,
     session: Session,
     spools: Spools,
 ) -> None:
-    """The page reads its moment unlocked (ledger.latest_at): a save under
-    way then may commit with a lower id, so what the package showed is
-    checked too (inventory-tng-a34)."""
+    """What is typed is what it had when the page showed it: a cut since,
+    or one under way as the page was read, stays as saved
+    (inventory-tng-b1z)."""
     made = spools.opened()
     registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "310")]))
-    as_of = str(ledger.latest_at(session, [spools.store.id])[spools.store.id])
-    store = spools.store.id
-    form = {"left": "3", "as_of": as_of, "seen": seen(session, made)}
-    # Shown before the cut, elsewhere, or by a form from before it said.
-    for stale in (f"{store} 305", f"{spools.van.id} -5", "", "x -5", f"{store} NaN"):
+    form = set_form(session, made, "3")
+    registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "1")]))
+    # A form that does not say what it showed: nothing to set it against.
+    for stale in ("", "x", "NaN"):
         refused = admin_client.post(
             f"{LENGTHS}/{made.id}/set", data=form | {"showed": stale}
         )
         assert refused.headers["location"] == f"{LENGTHS}?notice=length_unchanged"
-    assert left_on(session, made) == -5
-    done = admin_client.post(
-        f"{LENGTHS}/{made.id}/set", data=form | {"showed": f"{store} -5.000"}
-    )
+    done = admin_client.post(f"{LENGTHS}/{made.id}/set", data=form)
     assert done.headers["location"] == f"{LENGTHS}?notice=length_set"
-    assert left_on(session, made) == 3
+    # Showed -5, really had 3; the cut of 1 since stays.
+    assert left_on(session, made) == 2
 
 
 def test_a_place_with_no_saves_is_at_nothing(session: Session, spools: Spools) -> None:
-    assert ledger.latest_at(session, [spools.van.id]) == {spools.van.id: 0}
+    assert ledger.moment(session, spools.van.id) == 0
 
 
 def test_the_page_reads_alike_for_one_package_or_ten_and_locks_nothing(
@@ -582,3 +570,44 @@ def test_the_page_reads_alike_for_one_package_or_ten_and_locks_nothing(
     ten = statements()
     assert len(ten) == len(one)
     assert not [each for each in ten if " FOR " in each]
+
+
+def test_with_nothing_to_check_the_page_says_so(admin_client: TestClient) -> None:
+    page = text(admin_client.get(f"{LENGTHS}/below-zero?item=999999"))
+    assert "Nothing to check." in page
+
+
+def test_a_figure_other_than_the_volunteers_is_set_against_the_page(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    spools: Spools,
+) -> None:
+    """The volunteer's figure is set against what it showed at the report;
+    one the administrator measured, against what the page showed."""
+    made = spools.opened()
+    registered_client.post(URL, json=report(spools, length(made, "250")))
+    registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "10")]))
+    form = set_form(session, made, "240")
+    done = admin_client.post(f"{LENGTHS}/{made.id}/set", data=form)
+    assert done.headers["location"] == f"{LENGTHS}?notice=length_set"
+    assert left_on(session, made) == 240
+
+
+def test_a_set_that_leaves_it_below_zero_asks_again(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    spools: Spools,
+) -> None:
+    """Cuts since took more than it really had: still wrong, asked about."""
+    made = spools.opened()
+    registered_client.post(URL, json=report(spools, length(made, "250")))
+    registered_client.post(URL, json=spools.place.batch(lines=[cut(made, "300")]))
+    done = admin_client.post(
+        LENGTHS, data={"open_package": ticked(session, made), "do": "set"}
+    )
+    assert done.headers["location"] == f"{LENGTHS}?notice=length_set"
+    session.refresh(made)
+    assert left_on(session, made) == -50
+    assert (made.length_reported, made.below_zero_at is not None) == (None, True)
