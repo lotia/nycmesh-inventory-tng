@@ -32,8 +32,8 @@ OWNER = "inventory_owner"
 # an app's pools (db.py, 20) and a migration or seed beside it, so one
 # checkout cannot starve the others (CONTRIBUTING.md, Connections).
 CONNECTION_LIMIT = 30
-# The roles, made if missing, as compose makes them on a new volume.
-ROLES_SQL = CLONE / "backend" / "migrations" / "initdb" / "1-roles.sql"
+# The roles, made if missing: compose's server makes none itself.
+ROLES_SQL = CLONE / "backend" / "migrations" / "roles.sql"
 
 
 def server_url(url: str, database: str = "postgres") -> str:
@@ -82,8 +82,8 @@ def create(
     connection: Connection, name: str, *, limit: int, template: str | None = None
 ) -> None:
     """Make the roles if missing, then the database `name`, the owner's, as
-    compose's first one is, held to `limit` connections: empty, or a copy of
-    `template`. The tests make theirs with it too."""
+    a CloudNativePG cluster's is, held to `limit` connections: empty, or a
+    copy of `template`. The tests make theirs with it too."""
     connection.exec_driver_sql(ROLES_SQL.read_text())
     quote = connection.dialect.identifier_preparer.quote
     copy = f" TEMPLATE {quote(template)}" if template else ""
