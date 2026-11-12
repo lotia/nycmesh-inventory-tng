@@ -54,14 +54,14 @@ run = [
 [tasks.browser-webkit]
 description = "The browser tests in WebKit, in Playwright's container, for systems its WebKit does not run on"
 dir = "frontend"
-depends = ["start-database"]
+depends = ["start-database", "ports-free INVENTORY_WEBKIT_PORT"]
 run = [
     "mise run compose -- --profile webkit up -d --wait webkit",
     "npm run build",
     # The server's port as compose publishes it: the shell's, else .env's.
     """
-    port=$(cd ../backend && uv run python -m inventory_tng.local_env INVENTORY_WEBKIT_PORT)
-    PLAYWRIGHT_WEBKIT=1 PLAYWRIGHT_WEBKIT_SERVER="ws://127.0.0.1:${port:-3000}/" \
+    port=$(cd ../backend && uv run --quiet --frozen python -m inventory_tng.stacks port INVENTORY_WEBKIT_PORT)
+    PLAYWRIGHT_WEBKIT=1 PLAYWRIGHT_WEBKIT_SERVER="ws://127.0.0.1:${port}/" \
       npx playwright test --project=webkit
     """,
 ]
@@ -142,16 +142,29 @@ run = [
 # This checkout's stack (CONTRIBUTING.md, Local settings).
 [tasks.start-database]
 description = "Start this checkout's database server, making its container again (its volume kept) when compose.yaml or .env changed its settings"
+depends = ["ports-free INVENTORY_DB_PORT"]
 run = "mise-tasks/compose up -d --wait db"
 
-[tasks.dev-backend]
-description = "The backend, restarting when its Python changes (mise run dev runs it)"
+# Each task that starts something runs it first, naming the settings of the
+# ports it needs (CONTRIBUTING.md, Local settings).
+[tasks.ports-free]
+description = "Stop, saying what holds it and what to do, unless each port named (-- [--here] INVENTORY_DB_PORT ...) is free or this checkout's stack's"
 dir = "backend"
+run = "uv run --quiet --frozen python -m inventory_tng.stacks ports-free"
+
+[tasks.dev-backend]
+description = "The backend on INVENTORY_APP_PORT, restarting when its Python changes (mise run dev runs it)"
+dir = "backend"
+depends = ["ports-free --here INVENTORY_APP_PORT"]
 # VITE_DEV_SERVER works only in development.
 env = { APP_ENV = "development" }
-run = "uv run python -m inventory_tng --reload"
+run = """
+uv run python -m inventory_tng --reload \
+  --port "$(uv run --quiet --frozen python -m inventory_tng.stacks port INVENTORY_APP_PORT)"
+"""
 
 [tasks.dev-vite]
-description = "Vite's dev server, for the frontend (mise run dev runs it)"
+description = "Vite's dev server, for the frontend, on INVENTORY_VITE_PORT (mise run dev runs it)"
 dir = "frontend"
+depends = ["ports-free --here INVENTORY_VITE_PORT"]
 run = "npm run dev"

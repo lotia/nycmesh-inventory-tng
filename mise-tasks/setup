@@ -1,8 +1,19 @@
 #!/usr/bin/env bash
-#MISE description="Set up a clone: every tool, the dependencies, and a .env to start from"
+#MISE description="Set up a clone: every tool, the dependencies, and a .env to start from; -- --new-ports gives an existing .env free ports"
 # CONTRIBUTING.md, Requirements. Safe to run again, as after a pull.
 set -euo pipefail
 cd "${MISE_PROJECT_ROOT:-$(dirname "$0")/..}"
+
+new_ports=false
+for argument in "$@"; do
+  case $argument in
+    --new-ports) new_ports=true ;;
+    *)
+      echo "Unknown argument $argument: only --new-ports" >&2
+      exit 2
+      ;;
+  esac
+done
 
 # mise installs the tools in mise.toml before it runs this.
 (cd backend && uv sync)
@@ -13,13 +24,15 @@ fi
 if [[ ! -f .env ]]; then
   # A compose stack of this checkout's own, with its database, and ports no
   # other stack of this repository claims and nothing listens on
-  # (CONTRIBUTING.md, Local settings). With no runtime running, it knows of
-  # no other stack.
-  projects=$("$(dirname "$0")/compose" ls --all --format json) || projects=[]
-  (cd backend && uv run --quiet --frozen python -m inventory_tng.stacks new-env) <<<"$projects" >.env.new
+  # (CONTRIBUTING.md, Local settings).
+  (cd backend && uv run --quiet --frozen python -m inventory_tng.stacks new-env) >.env.new
   mv .env.new .env
   echo "Made .env from .env.example, with a compose stack and database of its own:" \
     "$(grep '^COMPOSE_PROJECT_NAME=' .env)"
+elif $new_ports; then
+  # Only its port settings, each free or this checkout's stack's
+  # (CONTRIBUTING.md, Local settings); every other line stays.
+  (cd backend && uv run --quiet --frozen python -m inventory_tng.stacks new-ports)
 fi
 # The key development seals authenticators' TOTP keys with (DEPLOYMENT.md,
 # TOTP keys), readable by you alone. Made again if empty, as a run that

@@ -5,13 +5,20 @@
 set -euo pipefail
 
 clone=$(dirname "$0")/..
+backend() { uv run --quiet --frozen --project "$clone/backend" python -m "$@"; }
 
+# Before starting anything: the two servers' ports, from .env, which setup
+# may just have made (CONTRIBUTING.md, Local settings).
+mise run ports-free -- --here INVENTORY_APP_PORT INVENTORY_VITE_PORT
+
+read -r app_port vite_port < <(
+  backend inventory_tng.stacks port INVENTORY_APP_PORT INVENTORY_VITE_PORT
+)
 # Vite's address, read as the backend reads it (the shell, then .env), else
-# the same default as DEFAULT_ORIGIN in frontend/vite.config.ts. Both servers
-# get it from here, so they agree.
-VITE_DEV_SERVER=$(uv run --quiet --frozen --project "$clone/backend" \
-  python -m inventory_tng.local_env VITE_DEV_SERVER)
-export VITE_DEV_SERVER=${VITE_DEV_SERVER:-http://localhost:5173}
+# INVENTORY_VITE_PORT's, as in frontend/vite.config.ts. Both servers get it
+# from here, so they agree.
+VITE_DEV_SERVER=$(backend inventory_tng.local_env VITE_DEV_SERVER)
+export VITE_DEV_SERVER=${VITE_DEV_SERVER:-http://localhost:$vite_port}
 # Output goes through mise, not a terminal: Vite keeps its colour with this.
 export FORCE_COLOR=1
 
@@ -19,5 +26,5 @@ mise run dev-database
 
 # Both at once, each line marked with its task. If either fails, mise stops
 # the other; Ctrl-C stops both.
-echo "The app: http://127.0.0.1:8000, its scripts from $VITE_DEV_SERVER"
+echo "The app: http://127.0.0.1:$app_port, its scripts from $VITE_DEV_SERVER"
 exec mise run --jobs 2 --output prefix dev-backend ::: dev-vite
