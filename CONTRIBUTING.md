@@ -128,9 +128,9 @@ The app logs in with `DATABASE_URL`, as `inventory_app`, which may read and
 add to the ledger but never change it. Migrations log in with
 `MIGRATION_DATABASE_URL`, as `inventory_owner`, which owns the schema
 (DEPLOYMENT.md, Database roles). Both roles have their names as passwords.
-The server's container makes neither: `mise run dev-database`, a seed or
-a test run makes them (`backend/migrations/roles.sql`) if missing, so on a
-new volume run one of those before anything that logs in as them.
+The server's container makes them on a new volume, and
+`mise run dev-database` and the tests make them if they are missing
+(`backend/migrations/roles.sql`).
 
 ## Running the app
 
@@ -447,6 +447,25 @@ and set `INVENTORY_APP_OTLP_ENDPOINT=http://dashboard:18890`; to send mail
 to Mailpit, `INVENTORY_APP_MAIL_HOST=mail`. It takes port 8000, as the run
 command does; `INVENTORY_APP_PORT` moves it. The client address it logs is
 the container network's, not your browser's.
+
+### Using compose directly
+
+Compose on its own (`mise run compose -- up -d db`) gives the PostgreSQL
+server every checkout shares. On a new volume it makes the two roles and
+a database, `inventory`, the owner's. It makes no other database a
+checkout's `.env` names (`INVENTORY_DB_NAME`), which the app's container
+migrates as it starts: until `mise run dev-database` makes it, the
+container stops, and in development says to run that. For most jobs a
+task is the safer way:
+
+| Command | What it does | When |
+| --- | --- | --- |
+| `mise run dev-database` | Starts the server, makes this checkout's database if missing, migrates it | Before the app, here or in its container |
+| `mise run start-database` | Starts the server as it is; stops if `compose.yaml` changed it | Before the checks |
+| `mise run recreate-database-container` | Recreates the server's container, keeping its volume | After a change to `db` ([Local settings](#local-settings)) |
+| `mise run reset-dev-database -- <name>` | Drops this checkout's database, makes it again empty and migrated | After a migration was edited ([Migrations](#migrations)) |
+| `mise run compose -- up -d --build --wait app` | The app in its container | After `mise run dev-database` ([above](#running-the-app-in-a-container)) |
+| `mise run compose -- up -d db` | Starts the server, but recreates it if `compose.yaml` changed it, ending every checkout's connections | Rarely: `mise run start-database` instead |
 
 ### Podman's exec bug
 

@@ -32,7 +32,7 @@ OWNER = "inventory_owner"
 # an app's pools (db.py, 20) and a migration or seed beside it, so one
 # checkout cannot starve the others (CONTRIBUTING.md, Connections).
 CONNECTION_LIMIT = 30
-# The roles, made if missing: compose's server makes none itself.
+# The roles, made if missing (roles.sql says who else runs it).
 ROLES_SQL = CLONE / "backend" / "migrations" / "roles.sql"
 
 

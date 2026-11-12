@@ -9,8 +9,8 @@ set -euo pipefail
 compose=$(dirname "$0")/compose
 compose() { "$compose" "$@"; }
 
-# This checkout's database is made and migrated first (dev-database), as
-# the server's container makes no role.
+# dev-database first (depends): the server's container makes only
+# `inventory`, not this checkout's database.
 compose up -d --build --wait app
 # A new container, so its log holds only this tunnel's address; --no-deps
 # leaves the app as it is.
