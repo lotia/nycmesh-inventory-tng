@@ -800,7 +800,8 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
     changed since, and the volunteer must not be asked to fix what is saved."""
     if (written := _replay(session, batch)) is not None:
         return Recorded(written, False)
-    header = {"device_id": device_id, **_header(batch)}
+    used_up = batch.used_up or []
+    header = {"device_id": device_id, **_header(batch), "used_up": used_up}
     # An opening's are made later (_opening); another's are taken from.
     taken = {} if batch.kind == "open" else _open_packages_named(session, batch)
     lines = [
@@ -808,7 +809,7 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
         for number, line in enumerate(batch.lines)
     ]
     held = hold(session, header, [line.item_id for line in lines])
-    reports = _keyed(session, batch.used_up or [])
+    reports = _keyed(session, used_up)
     # Those reported too, with the lines', in one order (ledger.py's).
     packages, opens, _ = _hold_forms(session, lines, also=reports.values())
     # Its open packages' locks waited for any request writing it, which a
@@ -828,8 +829,9 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
         problems += [
             (("lines", number, "open_package_key"), "repeated") for number in twice
         ]
+    problems += [(("used_up", number), "repeated") for number in repeated(used_up)]
     whole = {line.open_package_key for line in batch.lines if line.whole}
-    for number, key in enumerate(batch.used_up or []):
+    for number, key in enumerate(used_up):
         opened = opens.get(reports.get(key, 0))
         if opened is None:
             problems.append((("used_up", number), "not_found"))
@@ -1629,7 +1631,8 @@ def record_adjustment(
 
 
 def _header(batch: Batch) -> dict[str, object]:
-    """The batch's own columns: everything but its key, lines and reports."""
+    """The batch's own columns: everything but its key, lines and reports,
+    which are compared apart (_replay)."""
     return batch.model_dump(exclude={"key", "lines", "used_up"})
 
 
@@ -1660,8 +1663,15 @@ def _replay(session: Session, batch: Batch) -> LedgerTransaction | None:
         for item_id, quantity, from_package, from_open, to_package, to_open in rows
     )
     sent = Counter(_written_as(session, batch))
-    same = written == sent and all(
-        getattr(transaction, field) == value for field, value in _header(batch).items()
+    # Its reports as sent, whatever their order: what became of the open
+    # packages since, as cleared by an administrator, does not count.
+    same = (
+        written == sent
+        and Counter(transaction.used_up) == Counter(batch.used_up or [])
+        and all(
+            getattr(transaction, field) == value
+            for field, value in _header(batch).items()
+        )
     )
     if not same:
         refused.add(1, {"reason": "key_reused"})

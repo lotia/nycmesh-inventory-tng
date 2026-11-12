@@ -56,6 +56,7 @@ from inventory_tng.ledger import (
     Batch,
     Entry,
     Form,
+    KeyReused,
     Recorded,
     insert_transaction,
     record,
@@ -1149,6 +1150,41 @@ def test_a_whole_move_sent_twice_at_once_is_written_once(
     assert finished.error is None, finished.error
     second, wrote_again, *_ = cast(Recorded, finished.result)
     assert (wrote, wrote_again, second.id) == (True, False, first.id)
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize("same", [True, False])
+def test_a_report_sent_twice_at_once_is_compared_with_the_first(
+    own_committed: Committed, same: bool
+) -> None:
+    """The second waits, on the open package's lock for the same report or
+    on the first's key for another, then finds the first written and
+    compares the reports each sent (inventory-tng-ckl): the same are
+    replayed, others refused as the key reused."""
+    setup = own_committed.session()
+    spools = Spools(setup)
+    one, two = spools.opened(), spools.opened()
+    setup.commit()
+    batch = Batch.model_validate(
+        spools.place.batch(
+            kind="report", to_location_id=None, lines=[], used_up=[str(one.key)]
+        )
+    )
+    other = batch if same else batch.model_copy(update={"used_up": [two.key]})
+    first_session, second_session = own_committed.session(), own_committed.session()
+    first, *_ = record(first_session, batch, device_id=None)
+    worker = own_committed.blocked(
+        second_session, lambda: record(second_session, other, device_id=None)
+    )
+    first_session.commit()
+    finished = worker.finished()
+    second_session.rollback()
+    if same:
+        assert finished.error is None, finished.error
+        second, wrote_again, *_ = cast(Recorded, finished.result)
+        assert (wrote_again, second.id) == (False, first.id)
+    else:
+        assert isinstance(finished.error, KeyReused)
 
 
 @pytest.mark.concurrency

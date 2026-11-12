@@ -47,6 +47,7 @@ from sqlalchemy import (
     SmallInteger,
     SQLColumnExpression,
     Text,
+    Uuid,
     func,
     literal,
     literal_column,
@@ -739,6 +740,11 @@ class LedgerTransaction(Base):
     # or arrived for a receipt (local_time.zone_at). Kept, so a zone set
     # later does not change the clock it happened at.
     time_zone: Mapped[str] = mapped_column(Text)
+    # The keys of the open packages its batch said were used up, as sent
+    # (docs/decisions/0020): a batch sent again is compared with them.
+    used_up: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(Uuid), server_default=text("'{}'")
+    )
 
 
 class Movement(Base):

@@ -161,6 +161,10 @@ deployed, so the migrations may be rewritten (0016).
 - A volunteer's report of open packages used up, alone, is a transaction
   of its own kind too, `report`, at the place, with no lines: it moves
   nothing, and the open packages say who reported them and when.
+- A batch's reports are kept on its transaction, as sent (`used_up`): one
+  sent again under its key is compared with them, so other reports are
+  refused as the key reused, whatever became of the packages since
+  (inventory-tng-ckl).
 - Metrics: packages opened; reported used up, by how (`cut`, `button`);
   closed, by how (`confirmed`, `direct`, `count`); and reports cleared as
   not used up.
