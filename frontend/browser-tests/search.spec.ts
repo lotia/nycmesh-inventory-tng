@@ -1,8 +1,10 @@
 /**
  * A long list's search box suggests as one types, and picking one narrows
- * the list to it (docs/decisions/0019).
+ * the list to it (docs/decisions/0019). Searches ignore accents, the scan
+ * page's too (docs/decisions/0021).
  */
 import { expect, test } from "@playwright/test";
+import { ownCable } from "./own";
 
 test("a suggestion picked with the keyboard narrows the list", async ({
   page,
@@ -45,4 +47,16 @@ test("Escape closes the suggestions, and Enter lists every match", async ({
   await expect(box).toHaveAttribute("aria-expanded", "false");
   await box.press("Enter");
   await expect(page).toHaveURL(/q=a/);
+});
+
+test("the scan page finds an item without its accents, and shows them", async ({
+  page,
+}) => {
+  // A word only the server's folded text spells as typed.
+  const name = await ownCable(page, "Caféclip");
+  await page.goto("/scan");
+  await page
+    .getByLabel(/Find an item/)
+    .fill(name.replace("Caféclip", "cafeclip"));
+  await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
 });

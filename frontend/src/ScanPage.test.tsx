@@ -7,7 +7,7 @@ import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "./outbox";
 import { ScanPage } from "./ScanPage";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
 import { fakeCamera } from "./test-camera";
-import { CATALOGUE } from "./test-catalogue";
+import { CATALOGUE, WITH_CAFE } from "./test-catalogue";
 import { answering, deferred, json, saved } from "./test-fetch";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
@@ -463,6 +463,14 @@ describe("filling and saving a cart", () => {
     find("litebeam");
     fireEvent.keyDown(screen.getByLabelText(/Find an item/), { key: "Enter" });
     expect(screen.getByText("1 each in all")).toBeDefined();
+  });
+
+  test("an item is found without its accents, and shown with them", async () => {
+    open(answering(() => json(WITH_CAFE, 200)).api);
+    await ready();
+    find("cafe lodz");
+    screen.getByRole("button", { name: "Café Łódź patch" });
+    expect(document.body.textContent).not.toContain("Cafe Lodz");
   });
 
   test("another key, or Enter with more than one match, adds nothing", async () => {

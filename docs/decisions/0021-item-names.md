@@ -94,6 +94,16 @@ compared. Items' and volunteers' are indexed with `pg_trgm`. A release of
 anyascii that spells a character otherwise needs a migration to fold the
 rows again.
 
+The scan page has no anyascii, which would weigh more than the rest of its
+scripts (Ali, 2026-11-12). The catalogue sends each item's details as
+spelt and its folded text, with its category's (`search_text`). The page
+looks for each word typed, ignoring case, as typed and without what the
+browser's own decomposing (`normalize("NFD")`) takes off, in both, so
+`cafe`, `Café` and `cafè` all find `Café`. It shows only the details as
+spelt, never the folded text. Accepted gap: a typed letter decomposing
+leaves alone (`ø`, `ł`, `æ`, `ß`) finds nothing unless the whole word is
+typed as the name spells it.
+
 Rejected: `unaccent()` at search time, which no index serves without a
 function of our own wrapping it (0016), so each search reads the whole
 table; and decomposing alone, for what it misses.

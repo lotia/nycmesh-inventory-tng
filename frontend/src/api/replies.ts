@@ -87,6 +87,8 @@ export const ItemEntry = v.object({
   manufacturer: v.nullable(v.string()),
   part_number: v.nullable(v.string()),
   old_code: v.nullable(v.string()),
+  // What it is found by, folded by the server: matched, never shown.
+  search_text: v.string(),
   packages: v.array(PackageEntry),
   // Retired, with stock left: it may be taken, never received.
   retired: v.boolean(),

@@ -211,6 +211,8 @@ export interface components {
       part_number: string | null;
       /** Old Code */
       old_code: string | null;
+      /** Search Text */
+      search_text: string;
       /** Packages */
       packages: components["schemas"]["PackageEntry"][];
       /** Retired */

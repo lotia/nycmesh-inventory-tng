@@ -35,7 +35,7 @@ function keyed(draft: Draft): Body {
 }
 const SHOWN = "99999999-9999-4999-8999-999999999999";
 
-import { CATALOGUE, cable, radio } from "./test-catalogue";
+import { CATALOGUE, cable, radio, WITH_CAFE } from "./test-catalogue";
 
 function cart(fields: Partial<Cart> = {}): Cart {
   return { ...freshCart(), volunteerId: 1, fromId: 10, toId: 12, ...fields };
@@ -1068,6 +1068,35 @@ describe("finding", () => {
     expect(search(CATALOGUE, "gen2").map((i) => i.id)).toEqual([100]);
     expect(search(CATALOGUE, "")).toEqual([]);
     expect(search(CATALOGUE, "radio cable")).toEqual([]);
+  });
+
+  test("search ignores accents, but shows the name as spelt", () => {
+    const found = (text: string) =>
+      search(WITH_CAFE, text).map((item) => item.name);
+    for (const typed of [
+      "cafe",
+      "Café",
+      "cafè",
+      "CAFÉ",
+      "cafe\u0301", // as typed decomposed
+      "câbles patch", // the category
+      "lodz", // the server's folding spells "ł" too
+      "łódź", // as spelt
+      "Łódź patch",
+    ]) {
+      expect(found(typed), typed).toEqual(["Café Łódź patch"]);
+    }
+    // What decomposing cannot take off, spelt otherwise: the accepted gap.
+    expect(found("łodz")).toEqual([]);
+    // Each word on its own: one as spelt, one folded.
+    expect(found("Câbles Cafe")).toEqual(["Café Łódź patch"]);
+    // The category folded by the server, as another is spelt.
+    expect(found("cables")).toEqual(["Cat6 cable", "Café Łódź patch"]);
+  });
+
+  test("a lone accent searches for nothing", () => {
+    expect(search(CATALOGUE, "\u0301")).toEqual([]);
+    expect(search(CATALOGUE, "beam \u0301").map((i) => i.id)).toEqual([100]);
   });
 
   test("a place is named with the places it sits in", () => {

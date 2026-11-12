@@ -135,6 +135,7 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
     items = by_id(reply["items"])
     assert rows.retired_item.id not in items
     cable = items[rows.cable.id]
+    mark = rows.cable.name.removeprefix("Cable ")
     # Sizes are decimal strings; compared as numbers, however they are spelt.
     packages = [p | {"size": Decimal(p["size"])} for p in cable.pop("packages")]
     # Smallest first; the retired reel is left out.
@@ -162,10 +163,11 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
         "id": rows.cable.id,
         "name": rows.cable.name,
         "unit": "m",
-        "category": f"Cables {rows.cable.name.removeprefix('Cable ')}",
+        "category": f"Cables {mark}",
         "manufacturer": "Ubiquiti",
         "part_number": rows.cable.part_number,
         "old_code": rows.cable.old_code,
+        "search_text": f"{rows.cable.search_text} Cables {mark}",
         "retired": False,
     }
 
@@ -180,6 +182,31 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
     assert rows.revoked.code not in labels
     for label in rows.on_retired:
         assert label.code not in labels
+
+
+def test_an_item_is_found_by_its_folded_text_but_shown_by_its_name(
+    registered_client: TestClient, session: Session
+) -> None:
+    # The page matches what is typed against search_text too, folding
+    # nothing itself (docs/decisions/0021, 2026-11-12).
+    mark = tag()
+    category = add(session, Category(name=f"Câbles {mark}"))
+    item = add(
+        session,
+        Item(
+            name=f"Café {mark}",
+            category_id=category.id,
+            manufacturer="Łódź",
+            part_number=f"Ø-{mark}",
+        ),
+    )
+    entry = by_id(registered_client.get(URL).json()["items"])[item.id]
+    assert (entry["name"], entry["category"], entry["manufacturer"]) == (
+        f"Café {mark}",
+        f"Câbles {mark}",
+        "Łódź",
+    )
+    assert entry["search_text"] == f"Cafe {mark} Lodz O-{mark}  Cables {mark}"
 
 
 def test_holds_the_scan_settings(registered_client: TestClient) -> None:
