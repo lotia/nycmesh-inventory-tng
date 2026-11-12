@@ -423,6 +423,7 @@ describe("turning a cart into a batch", () => {
           item_id: 101,
           quantity: "305",
           package_id: 1009,
+          package_size: "305",
           open_package_key: "33333333-3333-4333-8333-333333333333",
         },
       ],
@@ -431,6 +432,16 @@ describe("turning a cart into a batch", () => {
       { state: "waiting" as const, body: keyed(opening), queuedAt: 0 },
     ]);
     expect(made?.package_name).toBe("package");
+    // Kept by an older build, in no size: refused, so offered nowhere.
+    const sizeless = {
+      ...opening,
+      lines: opening.lines.map(({ package_size: _, ...line }) => line),
+    };
+    expect(
+      offered(CATALOGUE, [
+        { state: "waiting" as const, body: keyed(sizeless), queuedAt: 0 },
+      ]),
+    ).toEqual([]);
   });
 
   test("open packages said used up go with a cut, or alone as a report", () => {

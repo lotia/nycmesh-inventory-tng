@@ -129,7 +129,7 @@ run = "uv run python -m inventory_tng.seed"
 description = "This checkout's development database: the server started, the database made if missing, and migrated"
 dir = "backend"
 run = [
-    "../mise-tasks/compose up -d --wait db",
+    "../mise-tasks/compose up -d --wait --no-recreate db",
     "uv run python -m inventory_tng.dev_database make",
     "uv run alembic upgrade head",
 ]

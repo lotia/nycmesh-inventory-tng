@@ -10,16 +10,16 @@ from sqlalchemy import make_url, text
 from sqlalchemy.exc import OperationalError
 
 from inventory_tng.db import make_engine
+from inventory_tng.dev_database import as_superuser
 
 from databases import (
-    CONNECTION_LIMIT,
     NO_DATABASE,
     SERVER_URL,
+    TEST_CONNECTION_LIMIT,
     database_name,
     drop_left_behind,
     new_database,
     refused_connection,
-    superuser,
 )
 
 
@@ -65,22 +65,18 @@ def test_databases_left_behind_are_dropped_and_no_others(database_url: str) -> N
 def test_a_database_past_its_connection_limit_says_which_limit(
     database_url: str,
 ) -> None:
-    """Each test database takes CONNECTION_LIMIT connections; past it, the
+    """Each test database takes TEST_CONNECTION_LIMIT connections; past it, the
     test fails saying so (conftest.py's pytest_runtest_makereport)."""
     del database_url  # Only for the server, as the run's database needs it.
     with new_database() as url:
         name = make_url(url).database
-        admin = superuser()
-        try:
-            with admin.connect() as connection:
-                limit = connection.scalar(
-                    text("SELECT datconnlimit FROM pg_database WHERE datname = :n"),
-                    {"n": name},
-                )
-                connection.execute(text(f'ALTER DATABASE "{name}" CONNECTION LIMIT 1'))
-        finally:
-            admin.dispose()
-        assert limit == CONNECTION_LIMIT
+        with as_superuser(url) as connection:
+            limit = connection.scalar(
+                text("SELECT datconnlimit FROM pg_database WHERE datname = :n"),
+                {"n": name},
+            )
+            connection.execute(text(f'ALTER DATABASE "{name}" CONNECTION LIMIT 1'))
+        assert limit == TEST_CONNECTION_LIMIT
         engine = make_engine(url)
         try:
             with engine.connect(), pytest.raises(OperationalError) as refused:
@@ -89,7 +85,7 @@ def test_a_database_past_its_connection_limit_says_which_limit(
             engine.dispose()
     said = refused_connection(str(refused.value))
     assert said is not None
-    assert f"CONNECTION LIMIT, {CONNECTION_LIMIT}" in said
+    assert f"CONNECTION LIMIT, {TEST_CONNECTION_LIMIT}" in said
     for full in (
         "FATAL:  sorry, too many clients already",
         "FATAL:  remaining connection slots are reserved for roles with SUPERUSER",
