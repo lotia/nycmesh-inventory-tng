@@ -410,6 +410,38 @@ to Mailpit, `INVENTORY_APP_MAIL_HOST=mail`. It takes port 8000, as the run
 command does; `INVENTORY_APP_PORT` moves it. The client address it logs is
 the container network's, not your browser's.
 
+### Podman's exec bug
+
+Rootless Podman raises an `oom_score_adj` asked for below its own to its own
+as a container starts, as a process without privileges may not lower it
+far. Compose asks for 0. Podman's exec, which runs health checks too, still
+asks for the lower one, and crun 1.31 and later apply it, so every exec fails
+with
+``write to `/proc/self/oom_score_adj`: Permission denied``. A health check
+then never passes, and `compose up --wait` fails. So each service in
+`compose.yaml` with a health check sets `oom_score_adj: 200`, the value
+systemd gives a user's services, and a test checks that each does.
+Podman's issue:
+<https://github.com/podman-container-tools/podman/issues/30245>. Under
+Docker it changes nothing that matters for development.
+
+```sh
+mise run reproduce-podman-exec-oom-bug            # present, fixed, or neither
+mise run podman-exec-oom-workaround-still-needed  # fails once Podman fixes it
+```
+
+The first asks exec in two containers of its own, then removes them: one
+asked for 0, as compose asks, and one for -1000, below the lowest value a
+process without privileges may go back down to (the kernel's
+`oom_score_adj_min`, which systemd's defaults set to 100). Present, if
+both fail; present but not affecting compose here, if only -1000 fails;
+fixed, if neither does. The second
+fails when Podman has fixed the bug and `compose.yaml` still works around
+it: then remove `oom_score_adj` from `compose.yaml`, both tasks, the test
+and this section (inventory-tng-46w). Run the second after upgrading
+Podman or crun. Neither is one of the checks, and both say "not applicable"
+in CI, whose Docker runs as root, where the bug never shows.
+
 ## Running the checks
 
 ```sh
