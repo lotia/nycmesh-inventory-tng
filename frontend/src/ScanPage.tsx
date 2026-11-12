@@ -662,13 +662,12 @@ function CartLine({
         const take = (next: typeof taken) =>
           onChange({ ...line, open: { ...line.open, [open.key]: next } });
         const left = decimal(open.left);
-        const pack = item.packages.find((each) => each.id === open.package_id);
         const since = `, opened ${open.opened_at.slice(0, 10)}`;
         return (
           <div key={open.key} class="flex flex-col gap-1">
             <Field
               quiet
-              label={`From the open ${pack?.name ?? "package"}: ${left} ${item.unit} left${since}`}
+              label={`From the open ${open.package_name}: ${left} ${item.unit} left${since}`}
             >
               {(id) => (
                 <input

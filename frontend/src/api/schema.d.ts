@@ -277,6 +277,8 @@ export interface components {
       item_id: number;
       /** Package Id */
       package_id: number;
+      /** Package Name */
+      package_name: string;
       /** Location Id */
       location_id: number;
       /**

@@ -644,6 +644,7 @@ export function offered(
     ]),
   );
   const known = new Set(byKey.keys());
+  const { items } = indexOf(catalogue);
   for (const { state, body: draft, queuedAt } of outbox) {
     if (state !== "waiting") {
       continue;
@@ -660,11 +661,17 @@ export function offered(
       }
       if (draft.kind === "open") {
         if (!known.has(key)) {
+          // A retired package is missing once the catalogue says none is
+          // sealed: named once saved, from the catalogue's open package.
+          const pack = items
+            .get(line.item_id)
+            ?.packages.find((each) => each.id === line.package_id);
           byKey.set(key, {
             id: 0,
             key,
             item_id: line.item_id,
             package_id: line.package_id ?? 0,
+            package_name: pack?.name ?? "package",
             location_id: draft.from_location_id ?? 0,
             opened_at: new Date(queuedAt).toISOString(),
             left: amount,

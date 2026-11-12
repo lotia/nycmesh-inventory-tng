@@ -588,6 +588,7 @@ def test_a_package_opened_and_followed_is_made_once(
             "key": str(made.key),
             "item_id": spools.cable.id,
             "package_id": spool,
+            "package_name": spools.spool.name,
             "location_id": store,
             "opened_at": mine[0]["opened_at"],
             "left": "305.000",

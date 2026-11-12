@@ -721,6 +721,10 @@
             "type": "integer",
             "title": "Package Id"
           },
+          "package_name": {
+            "type": "string",
+            "title": "Package Name"
+          },
           "location_id": {
             "type": "integer",
             "title": "Location Id"
@@ -745,6 +749,7 @@
           "key",
           "item_id",
           "package_id",
+          "package_name",
           "location_id",
           "opened_at",
           "left",

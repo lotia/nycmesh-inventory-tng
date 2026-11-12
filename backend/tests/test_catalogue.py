@@ -270,5 +270,8 @@ def test_a_retired_package_stays_while_some_are_sealed(
         Entry(spools.cable.id, Decimal(305), spools.sealed, LOOSE),
     )
     assert spools.spool.id not in sent()
+    # Its open one is still sent, with its package's name, which the page
+    # no longer has (inventory-tng-4w4).
     reply = registered_client.get(URL).json()
-    assert opened.id in {each["id"] for each in reply["open_packages"]}
+    [entry] = [each for each in reply["open_packages"] if each["id"] == opened.id]
+    assert entry["package_name"] == spools.spool.name
