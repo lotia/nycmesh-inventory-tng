@@ -345,14 +345,23 @@ class Item(Versioned, Base):
     )
 
 
-class ItemPackage(Base):
+class ItemPackage(Versioned, Base):
     """A size an item comes in: "100-pack" = 100, "reel" = 305 (m)."""
 
     __tablename__ = "item_package"
     __table_args__ = (
-        _unique_current_name("item_package", "item_id"),
+        # Among all of its item's, retired ones too, so one can always be
+        # brought back, compared as items' names are (docs/decisions/0021).
+        Index(
+            "uq_item_package_name",
+            literal_column("item_id"),
+            name_key(literal_column("name")),
+            unique=True,
+        ),
         CheckConstraint("size > 0", name="size"),
         CheckConstraint("short_below > 0", name="short_below"),
+        # A whole one is never a short end.
+        CheckConstraint("short_below < size", name="short_below_under_size"),
         CheckConstraint("minimum_sealed >= 0", name="minimum_sealed"),
         protection(owner="items.py", lock="catalogue", history=True),
     )

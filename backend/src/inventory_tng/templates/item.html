@@ -69,8 +69,29 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
     {% for package in packages %}
     {% set own = package.track_opened is not none %}
     {% set followed = package.track_opened if own else item.track_opened %}
+    {#- What was sent, and its problems, beside the package it was for. #}
+    {% set sent = values if values.get('package_id') == package.id | string else {} %}
+    {% set short = package.short_below | amount if package.short_below is not none else '' %}
+    {% set keep = package.minimum_sealed if package.minimum_sealed is not none else '' %}
     <tr>
-      <td>{{ package.name }}
+      <td>{% if not package.retired_at and not retired %}
+        <form method="post" action="{{ here }}/packages/{{ package.id }}" class="actions">
+          <input type="hidden" name="package_version" value="{{ sent.get('package_version', package.edit_version) }}">
+          <label>Name
+            <input name="package_name" value="{{ sent.get('package_name', package.name) }}" required>
+            {% if sent %}{% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
+          </label>
+          {% if package.id in sizes_fixed %}
+          <input type="hidden" name="size" value="{{ package.size | amount }}">
+          {% else %}
+          <label>Holds <span class="hint">in {{ item.unit }}; fixed once some has moved, been opened or labelled</span>
+            <input name="size" inputmode="decimal" value="{{ sent.get('size', package.size | amount) }}" required>
+            {% if sent %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
+          </label>
+          {% endif %}
+          <button>Save<span class="sr-only"> {{ "the name of" if package.id in sizes_fixed else "the name and size of" }} {{ package.name }}</span></button>
+        </form>
+      {% else %}{{ package.name }}{% endif %}
         <span class="hint block">{{ "Opened ones followed" if followed else "Opened ones loose" }}
         ({{ "set on this package" if own and followed != item.track_opened else "as the item" }})</span></td>
       <td>{{ package.size | amount }} {{ item.unit }}</td>
@@ -87,21 +108,20 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
         </form>
       {% endif %}</td>
       <td>{% if not package.retired_at and not retired %}
-        {#- What was sent, and its problems, beside the package it was for. #}
-        {% set mine = values.get('package_id') == package.id | string %}
         <form method="post" action="{{ here }}/packages/{{ package.id }}/settings" class="actions">
           <label>Too short to use <span class="hint">below, in {{ item.unit }}; blank: none</span>
-            <input name="short_below" inputmode="decimal" value="{{ values.get('short_below') if mine else (package.short_below | amount if package.short_below is not none else '') }}">
-            {% if mine %}{% with name = "short_below" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
+            <input name="short_below" inputmode="decimal" value="{{ sent.get('short_below', short) }}">
+            {% if sent %}{% with name = "short_below" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           <label>Keep sealed <span class="hint">in the stores; blank: no minimum</span>
-            <input name="minimum_sealed" inputmode="numeric" value="{{ values.get('minimum_sealed') if mine else (package.minimum_sealed if package.minimum_sealed is not none else '') }}">
-            {% if mine %}{% with name = "minimum_sealed" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
+            <input name="minimum_sealed" inputmode="numeric" value="{{ sent.get('minimum_sealed', keep) }}">
+            {% if sent %}{% with name = "minimum_sealed" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           <button>Save<span class="sr-only"> {{ package.name }}</span></button>
         </form>
       {% endif %}</td>
       <td>{% if package.retired_at %}<span class="tag">Retired</span>
+        {% if not retired %}<form method="post" action="{{ here }}/packages/{{ package.id }}/restore"><button>Bring it back<span class="sr-only"> {{ package.name }}</span></button></form>{% endif %}
       {% elif not retired %}
         <form method="post" action="{{ here }}/packages/{{ package.id }}/retire"><button>Retire<span class="sr-only"> {{ package.name }}</span></button></form>
       {% endif %}</td>
@@ -111,12 +131,15 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
     {% endfor %}
   {% endcall %}
   {% if not retired %}
+  {#- A package's own form sent back names it: its problems are beside it. #}
+  {% set adding = 'package_id' not in values %}
+  {% set new = values if adding else {} %}
   <form method="post" action="{{ here }}/packages" class="actions">
-    <label>Package <input name="package_name" value="{{ values.get('package_name', '') }}" placeholder="Box" required>
-      {% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}
+    <label>Package <input name="package_name" value="{{ new.get('package_name', '') }}" placeholder="Box" required>
+      {% if adding %}{% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>
-    <label>Holds <input name="size" value="{{ values.get('size', '') }}" inputmode="decimal" required>
-      {% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}
+    <label>Holds <input name="size" value="{{ new.get('size', '') }}" inputmode="decimal" required>
+      {% if adding %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>
     <button class="primary">Add package</button>
   </form>

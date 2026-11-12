@@ -155,6 +155,7 @@ VERSIONED = (
     "adjustment_reason",
     "category",
     "item",
+    "item_package",
     "location",
     "scan_settings",
     "sign_in_settings",

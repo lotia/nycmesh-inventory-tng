@@ -151,6 +151,8 @@ NOTICES.update(
     {
         "package_added": "Package added.",
         "package_retired": "Package retired.",
+        "package_saved": "Package saved.",
+        "package_restored": "Package brought back.",
         "package_tracking": "Saved: how its opened packages are followed.",
         "package_settings": "Saved: when an open one is a short end, and how "
         "many sealed to keep.",
@@ -258,6 +260,7 @@ def _item_page(
     values: Mapping[str, str] | None = None,
     alert: str | None = None,
     similar: Sequence[Item] = (),
+    undo: str | None = None,
 ) -> HTMLResponse:
     packages = session.scalars(
         select(ItemPackage)
@@ -275,6 +278,11 @@ def _item_page(
             "item": item,
             **retirement(session, item),
             "packages": packages,
+            # Only a current one's size can change.
+            "sizes_fixed": items.sizes_fixed(
+                session, [each.id for each in packages if each.retired_at is None]
+            ),
+            "undo": undo,
             "categories": [c for c in _categories(session) if c.retired_at is None],
             "units": UNITS,
             "unit_fixed": _moved(session, item.id),
@@ -298,17 +306,25 @@ def _confirmed(form: Mapping[str, str], fields: items.Fields) -> bool:
     return form.get(DIFFERENT, "").strip() == fields.name
 
 
+def _key_name_problem(session: Session, name: str) -> str | None:
+    """What is wrong with a name compared as items' are (models.name_key),
+    an item's or a package's."""
+    if problem := name_problem(name):
+        return problem
+    # A letter is never punctuation: only a name without one asks.
+    if not any(c.isalpha() for c in name) and items.nameless(session, name):
+        return NO_LETTERS
+    return None
+
+
 def _fields(
     session: Session, form: Mapping[str, str]
 ) -> tuple[items.Fields | None, dict[str, str]]:
     """What to set, unless something is wrong, and what is."""
     name = form.get("name", "").strip()
     problems: dict[str, str] = {}
-    if problem := name_problem(name):
+    if problem := _key_name_problem(session, name):
         problems["name"] = problem
-    # A letter is never punctuation: only a name without one asks.
-    elif not any(c.isalpha() for c in name) and items.nameless(session, name):
-        problems["name"] = NO_LETTERS
     category = chosen(session, Category, form.get("category_id", ""))
     if category is None:
         problems["category_id"] = "Pick a category."
@@ -413,12 +429,18 @@ def track_items(
 
 @router.get(f"{ITEMS}/{{item_id}}")
 def item(
-    request: Request, signed: AdminSignedIn, session: DbSession, item_id: int
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    item_id: int,
+    undo: str = "",
 ) -> Response:
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
-    return _item_page(request, session, signed, found)
+    # A package just retired, offered back.
+    back = undo_retire(session, ItemPackage, undo, f"{ITEMS}/{item_id}/packages")
+    return _item_page(request, session, signed, found, undo=back)
 
 
 @router.post(f"{ITEMS}/{{item_id}}")
@@ -498,6 +520,38 @@ def restore_item(
     return redirect(f"{ITEMS}/{item_id}", notice="restored")
 
 
+def _package(session: Session, item_id: int, package_id: int) -> ItemPackage | None:
+    """The package a path names, if it is of the item it names."""
+    package = session.get(ItemPackage, package_id)
+    return package if package is not None and package.item_id == item_id else None
+
+
+# A package refused as another of its item's, retired ones too, has its name.
+PACKAGE_TAKEN = "It already has a package by that name."
+# A size at or below its too-short length (models.ItemPackage).
+SHORT_UNDER_SIZE = "ck_item_package_short_below_under_size"
+
+
+def _package_fields(
+    session: Session, item: Item, name: str, size: str
+) -> tuple[Decimal | None, dict[str, str]]:
+    """A package's size as typed, and what is wrong with its name or size:
+    its name compared as items' are, so it needs more than spaces and
+    punctuation; its size whole, for an item counted each."""
+    problems: dict[str, str] = {}
+    if problem := _key_name_problem(session, name):
+        problems["package_name"] = problem
+    parsed = quantity(
+        size,
+        positive=True,
+        unit=item.unit,
+        required="How many of the item's unit it holds.",
+    )
+    if isinstance(parsed, str):
+        problems["size"] = parsed
+    return (parsed if isinstance(parsed, Decimal) else None), problems
+
+
 @router.post(f"{ITEMS}/{{item_id}}/packages")
 def add_package(
     request: Request,
@@ -511,16 +565,8 @@ def add_package(
     if found is None:
         return not_found()
     name = package_name.strip()
-    problems: dict[str, str] = {}
-    if problem := name_problem(name):
-        problems["package_name"] = problem
-    parsed = quantity(
-        size, positive=True, required="How many of the item's unit it holds."
-    )
-    if isinstance(parsed, str):
-        problems["size"] = parsed
-    if not problems:
-        assert isinstance(parsed, Decimal)  # Checked above; narrows the type.
+    parsed, problems = _package_fields(session, found, name, size)
+    if parsed is not None and not problems:
         package, broken = refusal(
             session,
             lambda: items.add_package(session, found, name, parsed),
@@ -535,9 +581,84 @@ def add_package(
             return redirect(
                 f"{ITEMS}/{item_id}", notice="package_added", section="packages"
             )
-        problems["package_name"] = "It already has a package by that name."
+        problems["package_name"] = PACKAGE_TAKEN
     values = {"package_name": name, "size": size}
     return _item_page(request, session, signed, found, problems=problems, values=values)
+
+
+@router.post(f"{ITEMS}/{{item_id}}/packages/{{package_id}}")
+def save_package(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    item_id: int,
+    package_id: int,
+    package_name: Annotated[str, Form()] = "",
+    size: Annotated[str, Form()] = "",
+    package_version: Annotated[str, Form()] = "",
+) -> Response:
+    """A package renamed, or resized while none of it has moved."""
+    package = _package(session, item_id, package_id)
+    if package is None:
+        return not_found()
+    found = session.get_one(Item, item_id)
+    name = package_name.strip()
+    parsed, problems = _package_fields(session, found, name, size)
+    if parsed is not None and not problems:
+        _, broken = refusal(
+            session,
+            lambda: items.save_package(
+                session, package, name, parsed, seen=form_version(package_version)
+            ),
+            "unique",
+            "package_size_fixed",
+            SHORT_UNDER_SIZE,
+            *ALERTS,
+        )
+        # Its size field is gone once fixed: said above the page, as for a
+        # form that went stale.
+        if broken in {*ALERTS, "package_size_fixed"}:
+            return _item_page(request, session, signed, found, alert=RULES[broken])
+        if broken is None:
+            session.commit()
+            log.info("package saved", item_package_id=package_id)
+            return redirect(
+                f"{ITEMS}/{item_id}", notice="package_saved", section="packages"
+            )
+        if broken == "unique":
+            problems["package_name"] = PACKAGE_TAKEN
+        else:  # SHORT_UNDER_SIZE, the one other refusal it expects.
+            problems["size"] = RULES[broken]
+    # Beside the fields of the package it was sent for.
+    values = {
+        "package_id": str(package_id),
+        "package_name": name,
+        "size": size,
+        "package_version": package_version,
+    }
+    return _item_page(request, session, signed, found, problems=problems, values=values)
+
+
+@router.post(f"{ITEMS}/{{item_id}}/packages/{{package_id}}/restore")
+def restore_package(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    item_id: int,
+    package_id: int,
+) -> Response:
+    package = _package(session, item_id, package_id)
+    if package is None:
+        return not_found()
+    _, broken = refusal(
+        session, lambda: items.restore_package(session, package), RETIRED
+    )
+    if broken:
+        found = session.get_one(Item, item_id)
+        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
+    session.commit()
+    log.info("package restored", item_package_id=package_id)
+    return redirect(f"{ITEMS}/{item_id}", notice="package_restored", section="packages")
 
 
 @router.post(f"{ITEMS}/{{item_id}}/packages/{{package_id}}/retire")
@@ -548,8 +669,8 @@ def retire_package(
     item_id: int,
     package_id: int,
 ) -> Response:
-    package = session.get(ItemPackage, package_id)
-    if package is None or package.item_id != item_id:
+    package = _package(session, item_id, package_id)
+    if package is None:
         return not_found()
     _, broken = refusal(
         session, lambda: items.retire_package(session, package, now()), RETIRED
@@ -559,7 +680,9 @@ def retire_package(
         return _item_page(request, session, signed, found, alert=RULES[RETIRED])
     session.commit()
     log.info("package retired", item_package_id=package_id)
-    return redirect(f"{ITEMS}/{item_id}", notice="package_retired", section="packages")
+    return redirect(
+        f"{ITEMS}/{item_id}", notice="package_retired", undo=str(package_id)
+    )
 
 
 @router.post(f"{ITEMS}/{{item_id}}/packages/{{package_id}}/tracking")
@@ -572,8 +695,8 @@ def track_package(
     track: Annotated[str, Form()] = "",
 ) -> Response:
     """A package's own "track each opened package", or as its item says."""
-    package = session.get(ItemPackage, package_id)
-    if package is None or package.item_id != item_id or track not in TRACKING:
+    package = _package(session, item_id, package_id)
+    if package is None or track not in TRACKING:
         return not_found()
     before = package.track_opened
     _, broken = refusal(
@@ -600,8 +723,8 @@ def package_settings(
 ) -> Response:
     """A package's too-short-to-use length and minimum sealed, each blank
     for none."""
-    package = session.get(ItemPackage, package_id)
-    if package is None or package.item_id != item_id:
+    package = _package(session, item_id, package_id)
+    if package is None:
         return not_found()
     found = session.get_one(Item, item_id)
     short = quantity(short_below, positive=True, unit=found.unit)
@@ -627,9 +750,11 @@ def package_settings(
         session,
         lambda: items.package_settings(session, package, short, minimum),
         RETIRED,
+        SHORT_UNDER_SIZE,
     )
     if broken:
-        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
+        # Resized meanwhile to no more than it, said above the page.
+        return _item_page(request, session, signed, found, alert=RULES[broken])
     session.commit()
     log.info(
         "package settings saved",

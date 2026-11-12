@@ -113,6 +113,51 @@ def test_item_names_differing_only_by_punctuation_are_named_first(
     command.upgrade(alembic_config, "head")
 
 
+def test_package_names_clashing_with_retired_ones_are_named_first(
+    alembic_config: Config,
+) -> None:
+    """Migration 0030: a package's name is its own among its item's,
+    retired ones too, compared as items' are, so packages it would refuse
+    are named by id to rename; nothing is renamed for them."""
+    command.downgrade(alembic_config, "0029")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Cables') RETURNING id")
+    )
+    item_id = connection.scalar(
+        text("INSERT INTO item (name, category_id) VALUES ('Cat6', :c) RETURNING id"),
+        {"c": category_id},
+    )
+    old, spool, _ = (
+        connection.scalar(
+            text(
+                "INSERT INTO item_package (item_id, name, size, retired_at)"
+                " VALUES (:i, :n, 305, :r) RETURNING id"
+            ),
+            {"i": item_id, "n": name, "r": retired},
+        )
+        for name, retired in (
+            ("Spool", "2026-11-01T00:00:00Z"),
+            ("spool!", None),
+            ("Box", None),
+        )
+    )
+    with pytest.raises(RuntimeError, match=f"by id: {old}, {spool}\\. Rename"):
+        command.upgrade(alembic_config, "head")
+    assert (
+        connection.scalar(
+            text("SELECT name FROM item_package WHERE id = :i"), {"i": spool}
+        )
+        == "spool!"
+    )
+    connection.execute(
+        text("UPDATE item_package SET name = 'Spool 305 m' WHERE id = :i"),
+        {"i": spool},
+    )
+    command.upgrade(alembic_config, "head")
+    command.downgrade(alembic_config, "0029")
+
+
 def test_going_back_before_package_forms_names_what_it_cannot_hold(
     alembic_config: Config,
 ) -> None:
