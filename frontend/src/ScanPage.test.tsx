@@ -251,7 +251,9 @@ describe("filling and saving a cart", () => {
     fireEvent.click(screen.getByLabelText("Opening packages"));
     expect(screen.getByLabelText("Where")).toBeDefined();
     expect(screen.queryByLabelText("To")).toBeNull();
-    // Only whole packages are opened: the radio's one box, not a radio.
+    // Only whole packages are opened: the radio's box sealed here, not a
+    // radio.
+    pick("Where", "10");
     find("beam");
     fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     expect(
@@ -259,7 +261,7 @@ describe("filling and saving a cart", () => {
     ).toBe("1");
   });
 
-  test("opening, an item adds its one current package, beside a retired one", async () => {
+  test("opening, an item adds its one package sealed there, retired or not", async () => {
     const withOld = {
       ...CATALOGUE,
       items: CATALOGUE.items.map((item) =>
@@ -274,6 +276,7 @@ describe("filling and saving a cart", () => {
                   size: "8",
                   track_opened: false,
                   retired: true,
+                  sealed_at: [10, 12],
                 },
               ],
             }
@@ -284,11 +287,26 @@ describe("filling and saving a cart", () => {
     open(api);
     await ready();
     fireEvent.click(screen.getByLabelText("Opening packages"));
+    const field = (name: RegExp) =>
+      (screen.getByLabelText(name) as HTMLInputElement).value;
+    // At the van only the old crate is sealed (inventory-tng-f9h).
+    pick("Where", "12");
     find("beam");
     fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
-    expect(
-      (screen.getByLabelText("Box (4 each)") as HTMLInputElement).value,
-    ).toBe("1");
+    expect([field(/^Box/), field(/^Old crate/)]).toEqual(["", "1"]);
+    // At the hub both are: neither is picked for the volunteer.
+    pick("Where", "10");
+    fireEvent.input(screen.getByLabelText(/^Old crate/), {
+      target: { value: "" },
+    });
+    find("beam");
+    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    // Nor a loose one: only whole packages are opened.
+    expect([field(/^Box/), field(/^Old crate/), field(/^Loose/)]).toEqual([
+      "",
+      "",
+      "",
+    ]);
   });
 
   test("a move is saved, sent, and a new cart keeps the choices", async () => {
@@ -656,8 +674,8 @@ describe("scanning labels with the camera", () => {
     camera.state.inView = codes;
   }
 
-  async function opened() {
-    open();
+  async function opened(api = server().api) {
+    open(api);
     await ready();
     camera.state.inView = [];
     fireEvent.click(
@@ -676,6 +694,32 @@ describe("scanning labels with the camera", () => {
     scan("K7QX2M");
     await screen.findByText("Added a Spool: Cat6 cable.");
     expect(screen.queryByText("Nothing in the cart yet.")).toBeNull();
+  });
+
+  test("opening, an item's label asks which package if none is sealed there", async () => {
+    await opened();
+    fireEvent.click(screen.getByLabelText("Opening packages"));
+    // The radio's box is sealed at the hub, not the van.
+    pick("Where", "12");
+    scan("B3ZT9W");
+    await screen.findByText(
+      "LiteBeam 5AC: type how many of which package to open.",
+    );
+  });
+
+  test("opening, an item of no package is not added", async () => {
+    const loose = {
+      ...CATALOGUE,
+      items: CATALOGUE.items.map((item) =>
+        item.id === 100 ? { ...item, packages: [] } : item,
+      ),
+    };
+    await opened(answering(() => json(loose, 200)).api);
+    fireEvent.click(screen.getByLabelText("Opening packages"));
+    pick("Where", "10");
+    scan("B3ZT9W");
+    await screen.findByText("LiteBeam 5AC comes in no package to open.");
+    expect(screen.getByText("Nothing in the cart yet.")).toBeDefined();
   });
 
   test("a place's label asks from or to, the empty side first", async () => {

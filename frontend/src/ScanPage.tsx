@@ -16,13 +16,14 @@ import {
   type Offered,
   offered,
   offeredAt,
-  onlyPackage,
   quantityOf,
   RETIRED,
   SIDES,
   type Side,
+  sealedHere,
   search,
   toBatch,
+  withLine,
 } from "./cart";
 import { Field } from "./Field";
 import { placeSides, readLabel, type Scanned } from "./labels";
@@ -214,16 +215,24 @@ function CartForm({
     );
   }
 
-  /** Add one, and say what: opening, an item of one package is one of
-   * those, as only whole packages are opened. */
+  /** Add one, and say what: opening, an item is its one package sealed
+   * where it is opened (sealedHere), as only whole packages are opened;
+   * with no such package, its line, for the volunteer to fill. */
   function add(itemId: number, packageId?: number): string {
     const item = indexOf(catalogue).items.get(itemId);
-    const pack =
-      packageId === undefined && cart.value.kind === "open"
-        ? onlyPackage(item)
-        : item?.packages.find((each) => each.id === packageId);
-    change(addOne(cart.value, itemId, pack?.id));
+    const opening = packageId === undefined && cart.value.kind === "open";
+    const pack = opening
+      ? sealedHere(item, cart.value.fromId)
+      : item?.packages.find((each) => each.id === packageId);
     query.value = "";
+    if (opening && pack === undefined) {
+      if (item?.packages.length === 0) {
+        return `${item.name} comes in no package to open.`;
+      }
+      change(withLine(cart.value, itemId));
+      return `${item?.name}: type how many of which package to open.`;
+    }
+    change(addOne(cart.value, itemId, pack?.id));
     return `Added ${pack === undefined ? "one" : `a ${pack.name}`}: ${item?.name}.`;
   }
 

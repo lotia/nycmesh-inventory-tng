@@ -68,6 +68,9 @@ class PackageEntry(Entry):
     # Retired, but with sealed packages left: they may be taken, never
     # received.
     retired: bool
+    # The current places with some sealed: opening its item at one of them
+    # opens this package, if it is the item's only one sealed there.
+    sealed_at: list[int]
 
 
 class OpenPackageEntry(Entry):
@@ -137,6 +140,7 @@ def catalogue(session: Session) -> Catalogue:
     locations = session.scalars(
         select(Location).where(Location.retired_at.is_(None)).order_by(Location.name)
     )
+    sealed = ledger.sealed_places(session)
     packages: dict[int, list[PackageEntry]] = {}
     for package, item_tracks in session.execute(
         select(ItemPackage, Item.track_opened)
@@ -151,6 +155,7 @@ def catalogue(session: Session) -> Catalogue:
                 size=package.size,
                 track_opened=tracks_opened(item_tracks, package.track_opened),
                 retired=package.retired_at is not None,
+                sealed_at=sealed.get(package.id, []),
             )
         )
     # A retired item stays while it has stock, so what is left can be taken.

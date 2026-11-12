@@ -114,3 +114,37 @@ test("a package opened on the scan page is saved as an opening", async ({
     used_up: [key],
   });
 });
+
+test("opening, an item fills its package sealed where it is opened", async ({
+  page,
+}) => {
+  const cable = await ownCable(page);
+  // A box received at the shelf, so one is sealed there.
+  await page.goto("/scan");
+  await page.getByLabel("Your name").selectOption({ label: "Sam Example" });
+  await page.getByLabel("Receiving stock").check();
+  await page
+    .getByLabel("To", { exact: true })
+    .selectOption({ label: "Supernode 1 › Shelf A" });
+  await pick(page, cable);
+  await page.getByLabel(/^Box of 305 m/).fill("1");
+  await page.getByLabel(/^Loose/).fill("");
+  const receiving = page.waitForResponse(
+    (each) =>
+      each.url().endsWith("/api/transactions") &&
+      each.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Save" }).click();
+  expect((await receiving).status()).toBe(201);
+  // Loaded again, the page knows it is sealed there, and nowhere else
+  // (inventory-tng-f9h).
+  await page.goto("/scan");
+  await page.getByLabel("Opening packages").check();
+  const where = page.getByLabel("Where", { exact: true });
+  await where.selectOption({ label: "Van" });
+  await pick(page, cable);
+  await expect(page.getByLabel(/^Box of 305 m/)).toHaveValue("");
+  await where.selectOption({ label: "Supernode 1 › Shelf A" });
+  await pick(page, cable);
+  await expect(page.getByLabel(/^Box of 305 m/)).toHaveValue("1");
+});

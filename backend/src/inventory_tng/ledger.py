@@ -189,14 +189,16 @@ def _retired_left(
     """The ids, in `summed`'s `column`, of `model`'s retired rows with some
     left at a current place."""
     return (
-        select(summed.c[column])
-        .join(Location, Location.id == summed.c.location_id)
-        .where(
-            Location.retired_at.is_(None),
-            summed.c.quantity > 0,
-            summed.c[column] == any_(_retired(model)),
-        )
+        _left_at_current(select(summed.c[column]), summed)
+        .where(summed.c[column] == any_(_retired(model)))
         .distinct()
+    )
+
+
+def _left_at_current[*T](query: Select[*T], summed: Subquery) -> Select[*T]:
+    """`query` of `summed`'s rows with some left at a current place."""
+    return query.join(Location, Location.id == summed.c.location_id).where(
+        Location.retired_at.is_(None), summed.c.quantity > 0
     )
 
 
@@ -210,6 +212,20 @@ def retired_packages_in_stock() -> Select[tuple[int]]:
     """The ids of retired packages with some sealed at a current place:
     what volunteers may still take, as retired_in_stock's items."""
     return _retired_left(by_form, "package_id", ItemPackage)
+
+
+def sealed_places(session: Session) -> dict[int, list[int]]:
+    """The current places with some of each package sealed, by package:
+    where opening its item opens that package (docs/decisions/0020)."""
+    found: dict[int, list[int]] = {}
+    for package_id, location_id in session.execute(
+        _left_at_current(select(by_form.c.package_id, by_form.c.location_id), by_form)
+        .where(by_form.c.package_id.is_not(None))
+        # So a reply for the same stock is the same.
+        .order_by(by_form.c.location_id)
+    ):
+        found.setdefault(package_id, []).append(location_id)
+    return found
 
 
 def retired_holding_stock() -> Select[int]:
