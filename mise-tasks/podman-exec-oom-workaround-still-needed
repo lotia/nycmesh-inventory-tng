@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+#MISE description="Fail once Podman's exec oom_score_adj bug is fixed while compose.yaml still works around it"
+# CONTRIBUTING.md, Podman's exec bug. Not one of the checks: CI's Docker
+# runs as root, where the bug never shows.
+set -euo pipefail
+here=$(dirname "$0")
+root=${MISE_PROJECT_ROOT:-$here/..}
+
+result=$("$here/reproduce-podman-exec-oom-bug")
+echo "$result"
+if [[ $result == *": fixed" ]] && grep -q '^    oom_score_adj:' "$root/compose.yaml"; then
+  echo "Podman fixed it (https://github.com/podman-container-tools/podman/issues/30245): remove oom_score_adj from compose.yaml," \
+    "this task and reproduce-podman-exec-oom-bug (CONTRIBUTING.md, Podman's exec bug)" >&2
+  exit 1
+fi

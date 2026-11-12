@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+#MISE description="Reproduce Podman's exec oom_score_adj bug, which compose.yaml works around: present, and whether it affects compose here; fixed; or not applicable"
+# CONTRIBUTING.md, Podman's exec bug. In two throwaway containers of its
+# own, never compose's or the database's.
+set -euo pipefail
+
+say() { echo "podman exec oom_score_adj bug: $*"; }
+
+if [[ -n ${CI:-} ]]; then
+  say "not applicable: in CI, which runs Docker as root, and must never fail on this"
+  exit 0
+fi
+if ! command -v podman >/dev/null; then
+  say "not applicable: no Podman here"
+  exit 0
+fi
+if [[ $(podman info --format '{{.Host.Security.Rootless}}') != true ]]; then
+  say "not applicable: Podman runs as root, which may lower oom_score_adj"
+  exit 0
+fi
+if [[ ! -r /proc/self/oom_score_adj ]]; then
+  say "not applicable: no /proc here, so Podman runs in a VM (podman machine)"
+  exit 0
+fi
+current=$(</proc/self/oom_score_adj)
+if ((current <= -1000)); then
+  say "not applicable: oom_score_adj is already the lowest, -1000"
+  exit 0
+fi
+
+# compose.yaml's database image, so most likely pulled already.
+image=docker.io/library/postgres:18
+# Named here, not in probe: it runs in a subshell, so the trap would not
+# see a name it made.
+probe_name=inventory-tng-oom-probe-$$
+trap 'podman rm --force --time 0 "$probe_name-0" "$probe_name--1000" >/dev/null 2>&1 || true' EXIT
+
+# Whether exec works in a container asked to have this oom_score_adj: Podman
+# raises it to this shell's as the container starts, and the bug is that
+# exec still asks for the one asked for. "works" or "fails"; anything but
+# the bug stops the task.
+probe() {
+  local name=$probe_name-$1 started error
+  if ! started=$(podman run --quiet --detach --rm --name "$name" \
+    --oom-score-adj "$1" "$image" sleep 300 2>&1); then
+    echo "podman run failed: $started" >&2
+    exit 2
+  fi
+  if error=$(podman exec "$name" true 2>&1); then
+    echo works
+  elif [[ $error == *oom_score_adj* ]]; then
+    echo fails
+  else
+    echo "podman exec failed, but not on oom_score_adj: $error" >&2
+    exit 2
+  fi
+}
+
+# 0: what compose asks for without the workaround. -1000: below any floor
+# a process without privileges may go back down to (the kernel's
+# oom_score_adj_min), as Podman's own test asks for, so it fails wherever
+# the bug is, whatever this machine's floor.
+compose=$(probe 0)
+lowest=$(probe -1000)
+# Only fails/fails has been run for real (rootless Podman 6.2.0, crun 1.31,
+# systemd's defaults). works/fails needs a machine whose floor is 0 or
+# lower, and works/works a Podman with the bug fixed: check them when one
+# turns up.
+case $compose/$lowest in
+  fails/fails) say "present: compose's 0 fails here (this shell's oom_score_adj is $current)" ;;
+  works/fails) say "present, not affecting compose here: 0 works, -1000 fails" ;;
+  works/works) say "fixed" ;;
+  *)
+    echo "0 fails but -1000 works, which the bug can't explain: look into it" >&2
+    exit 2
+    ;;
+esac

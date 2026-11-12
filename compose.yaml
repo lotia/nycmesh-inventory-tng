@@ -5,6 +5,10 @@ name: inventory-tng
 services:
   db:
     image: docker.io/library/postgres:18
+    # Podman's exec bug: without this, rootless Podman's health checks and
+    # exec fail under crun 1.31 and later (CONTRIBUTING.md, Podman's exec bug;
+    # https://github.com/podman-container-tools/podman/issues/30245).
+    oom_score_adj: 200
     # Room for the tests across processes (CONTRIBUTING.md, Running the
     # checks) beside a running app; 100 is the default.
     command: ["postgres", "-c", "max_connections=200"]
@@ -37,6 +41,10 @@ services:
       # The root, so the image can build frontend/ as well.
       context: .
       dockerfile: backend/Containerfile
+    # Podman's exec bug: without this, rootless Podman's health checks and
+    # exec fail under crun 1.31 and later (CONTRIBUTING.md, Podman's exec bug;
+    # https://github.com/podman-container-tools/podman/issues/30245).
+    oom_score_adj: 200
     # Migrate, then serve with reload. A reload does not migrate again.
     command:
       - sh
@@ -141,6 +149,10 @@ services:
   webkit:
     image: mcr.microsoft.com/playwright:v1.64.1-noble
     profiles: [webkit]
+    # Podman's exec bug: without this, rootless Podman's health checks and
+    # exec fail under crun 1.31 and later (CONTRIBUTING.md, Podman's exec bug;
+    # https://github.com/podman-container-tools/podman/issues/30245).
+    oom_score_adj: 200
     command: [npx, -y, playwright@1.64.1, run-server, --port, "3000", --host, "0.0.0.0"]
     init: true
     ipc: host
