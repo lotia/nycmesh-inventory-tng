@@ -10,7 +10,7 @@ from fastapi.responses import Response
 from sqlalchemy import func, select
 
 from inventory_tng import accounts, activity
-from inventory_tng.admin import used_up
+from inventory_tng.admin import needs_action
 from inventory_tng.admin.common import ADMINS, admin_page
 from inventory_tng.admin.counts import COUNTS
 from inventory_tng.db import DbSession
@@ -81,8 +81,7 @@ def home(request: Request, signed: AdminSignedIn, session: DbSession) -> Respons
             # What waits for an administrator's decision, until it is made
             # (docs/decisions/0020): unlike changes, shown however often
             # one signs in, and never mailed.
-            "waiting": used_up.waiting(session),
-            "used_up_path": used_up.USED_UP,
+            "needs": needs_action.needs_action(session),
             "admins_path": ADMINS,
             "zone": site_zone(session),
         },

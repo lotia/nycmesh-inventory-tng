@@ -77,7 +77,8 @@ deployed, so the migrations may be rewritten (0016).
 
 ### What administrators confirm
 
-- **"Waiting for you" on the home page** lists what needs an
+- **"Waiting for you" on the home page** (now "Needs your action", by
+  item: the 2026-11-12 amendment) lists what needs an
   administrator's decision, for example "2 spools reported used up:
   Confirm". It stays until each is dealt with, however often anyone signs
   in, like the home page's other warnings, and unlike "Since you last

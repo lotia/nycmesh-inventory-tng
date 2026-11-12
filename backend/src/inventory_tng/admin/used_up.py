@@ -1,8 +1,8 @@
 """Open packages volunteers said are used up, for an administrator to
-confirm or clear (docs/decisions/0020): "Waiting for you" on the home page
-leads here, one at a time or ticked together; and closing one directly,
-from its item's page. Closing writes off what it still showed, with the
-reason Used up (open_packages.close)."""
+confirm or clear (docs/decisions/0020): "Needs your action" on the home
+page leads here, for one item or all, one at a time or ticked together;
+and closing one directly, from its item's page. Closing writes off what
+it still showed, with the reason Used up (open_packages.close)."""
 
 from collections.abc import Sequence
 from typing import Annotated, Literal
@@ -11,12 +11,13 @@ import structlog
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import Response
 from opentelemetry import metrics
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, open_packages
 from inventory_tng.admin.common import admin_page, now
 from inventory_tng.admin.items import ITEMS
+from inventory_tng.admin.needs_action import OnlyItem, query, query_string
 from inventory_tng.admin.stock import STOCK
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.local_time import site_zone
@@ -50,29 +51,31 @@ cleared = meter.create_counter(
 )
 
 
-def waiting(session: Session) -> int:
-    """How many open packages wait for an administrator: reported used up,
-    not yet closed."""
-    return session.scalar(select(func.count()).where(*REPORTED)) or 0
-
-
 # Reported used up, and waiting.
 REPORTED = (OpenPackage.reported_at.is_not(None), OpenPackage.closed_at.is_(None))
 
 
+TITLE = "Reported used up"
+
+
 @router.get(USED_UP)
 def used_up_page(
-    request: Request, signed: AdminSignedIn, session: DbSession
+    request: Request, signed: AdminSignedIn, session: DbSession, only: OnlyItem
 ) -> Response:
+    """All those reported, or only one item's."""
+    where = [*REPORTED, OpenPackage.item_id == only.id] if only else REPORTED
     return admin_page(
         request,
         signed,
         "used_up.html",
         {
-            "title": "Reported used up",
+            "title": TITLE,
             "here": USED_UP,
             "back_link": (STOCK, "Stock"),
-            "reported": open_packages.shown(session, *REPORTED),
+            "only": only,
+            # Answered, the page shows the same item again.
+            "query": query_string(only),
+            "reported": open_packages.shown(session, *where),
             "zone": site_zone(session),
         },
     )
@@ -83,7 +86,11 @@ DONE: dict[Doing, str] = {"confirm": "used_up_confirmed", "clear": "used_up_clea
 
 
 def _answer(
-    session: Session, signed: SignedIn, ids: Sequence[int], do: str
+    session: Session,
+    signed: SignedIn,
+    ids: Sequence[int],
+    do: str,
+    back: dict[str, str],
 ) -> Response:
     """Confirm, or clear, each of `ids` still reported, and say so. Their
     places locked first, by id, as saves take places, so none waits on
@@ -119,30 +126,39 @@ def _answer(
         changed=changed,
         admin_id=signed.admin.id,
     )
-    return redirect(USED_UP, notice=DONE[answer] if changed else "used_up_unchanged")
+    return redirect(
+        USED_UP,
+        notice=DONE[answer] if changed else "used_up_unchanged",
+        **back,
+    )
 
 
 @router.post(USED_UP)
 def answer_ticked(
     signed: AdminSignedIn,
     session: DbSession,
+    only: OnlyItem,
     open_package: Annotated[list[int], Form()] = [],  # noqa: B006  FastAPI copies it.
     do: Annotated[str, Form()] = "",
 ) -> Response:
     """Confirm, or clear, the open packages ticked."""
     if do in DONE and not open_package:
-        return redirect(USED_UP, notice="used_up_none")
-    return _answer(session, signed, open_package, do)
+        return redirect(USED_UP, notice="used_up_none", **query(only))
+    return _answer(session, signed, open_package, do, query(only))
 
 
 @router.post(f"{USED_UP}/{{open_id}}/{{do}}")
 def answer_one(
-    signed: AdminSignedIn, session: DbSession, open_id: int, do: str
+    signed: AdminSignedIn,
+    session: DbSession,
+    open_id: int,
+    do: str,
+    only: OnlyItem,
 ) -> Response:
     """Confirm, or clear, one."""
     if session.get(OpenPackage, open_id) is None:
         return not_found()
-    return _answer(session, signed, [open_id], do)
+    return _answer(session, signed, [open_id], do, query(only))
 
 
 CLOSE = f"{ITEMS}/{{item_id}}/open-packages/{{open_id}}/close"

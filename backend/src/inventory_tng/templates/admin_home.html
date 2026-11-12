@@ -3,13 +3,19 @@
 {% for warning in warnings %}
 <p class="warning">{{ warning.words }} <a href="{{ warning.path }}">{{ warning.action }}</a>.</p>
 {% endfor %}
-{% if waiting %}
-<section id="waiting">
-  <h2>Waiting for you</h2>
+{% if needs %}
+<section id="needs-action">
+  <h2>Needs your action ({{ needs | sum(attribute="total") }})</h2>
+  {% for kind in needs %}
+  <h3>{{ kind.title }}</h3>
   <ul>
-    <li>{{ waiting }} open package{{ "s" if waiting != 1 else "" }} reported used up:
-      <a href="{{ used_up_path }}">Confirm</a></li>
+    {% for line in kind.items %}
+    <li><a href="{{ kind.path }}?item={{ line.item_id }}">{{ line.item }}: {{ line.packages }}</a>
+      {%- if line.below %}, {{ line.below | amount }} {{ line.unit }} below zero{% endif %}</li>
+    {% endfor %}
+    <li><a href="{{ kind.path }}">All {{ kind.total }}</a></li>
   </ul>
+  {% endfor %}
 </section>
 {% endif %}
 {% if changes %}
