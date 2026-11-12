@@ -14,25 +14,25 @@ import preact from "@preact/preset-vite";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vitest/config";
 
-const DEFAULT_ORIGIN = "http://localhost:5173";
-
 // Each page's entry: what the build bundles. admin.ts is the server-rendered
 // pages' script (backend bundle.py).
 const pages = ["src/scan.tsx", "src/register.tsx", "src/admin.ts"];
 /**
- * VITE_DEV_SERVER as the backend reads it: from the shell, else from the
+ * A setting as the backend reads it: from the shell, else from the
  * repository's .env and no other file, wherever Vite is started from.
  */
-function devServer(): string {
-  if (process.env.VITE_DEV_SERVER !== undefined) {
-    return process.env.VITE_DEV_SERVER.trim();
-  }
+function setting(key: string): string {
+  const value = process.env[key];
+  if (value !== undefined) return value.trim();
   const file = new URL("../.env", import.meta.url);
   if (!existsSync(file)) return "";
-  return (parseEnv(readFileSync(file, "utf8")).VITE_DEV_SERVER ?? "").trim();
+  return (parseEnv(readFileSync(file, "utf8"))[key] ?? "").trim();
 }
 
-const url = new URL(devServer() || DEFAULT_ORIGIN);
+// This checkout's port for Vite, which mise run setup chooses (CONTRIBUTING.md,
+// Local settings), else 5173, its default in backend stacks.py.
+const DEFAULT_ORIGIN = `http://localhost:${setting("INVENTORY_VITE_PORT") || "5173"}`;
+const url = new URL(setting("VITE_DEV_SERVER") || DEFAULT_ORIGIN);
 // Only the origin, as the backend keeps it.
 const { origin, hostname, port } = url;
 if (!port || port === "0") {

@@ -110,10 +110,21 @@ that is, `inventory-tng-<directory>_<n>`, and the database on its server
 `inventory_<directory>_<n>` (`INVENTORY_DB_NAME`, which both URLs name).
 It gives each port compose publishes (`INVENTORY_DB_PORT`, 5433, beside
 MeshDB's 5432; `INVENTORY_APP_PORT`, 8000; and the others `.env.example`
-lists) its usual number, or, if another stack claims it or something
-listens on it, the next free one up. Never copy a `.env` from another
-checkout. If a port is taken later, change it in `.env`; the URLs follow
-it.
+lists), and Vite's (`INVENTORY_VITE_PORT`, 5173), its usual number, or, if
+another stack claims it or something listens on it, the next free one up.
+Never copy a `.env` from another checkout.
+
+A port can still be taken later, as by a checkout set up at the same time
+whose stack was not yet started. So each task that starts something
+(`mise run start-database`, and so every task that needs the server,
+`mise run dev`, `mise run phone`, `mise run browser-webkit`) first runs
+`mise run ports-free` for the ports it needs. It stops, before starting
+what needs it, when one is in use and not by this checkout's stack, saying
+which port and setting, what holds it (another checkout, or something else)
+and what to do: `mise run setup -- --new-ports` gives `.env` free ports again,
+changing only its port settings, and only those another stack claims or
+something else holds. The URLs follow them. Without `--new-ports`, setup
+never changes an existing `.env`.
 
 A `.env` made before names no project, so its checkout uses the project
 `inventory-tng` (`compose.yaml`'s name), as it always did, on ports 5433,
@@ -154,11 +165,16 @@ The server's container makes them on a new volume, and
 mise run dev             # http://127.0.0.1:8000, Ctrl-C stops it
 ```
 
+Its port is `INVENTORY_APP_PORT` and Vite's `INVENTORY_VITE_PORT`, from
+`.env` (Local settings), so checkouts can each run one at once; it prints
+the address.
+
 It runs, in order:
 
 1. `mise run setup`, which installs what a pull changed;
-2. `mise run dev-database`: the database, and its migrations;
-3. two servers side by side, each line of output marked with which:
+2. `mise run ports-free` for the two servers' ports (Local settings);
+3. `mise run dev-database`: the database, and its migrations;
+4. two servers side by side, each line of output marked with which:
    `dev-backend`, which renders every page and restarts when you save its
    Python, and `dev-vite`, Vite's dev server for the frontend (The scan
    page, below). If either fails, the other stops too.
@@ -294,9 +310,10 @@ The scan page and the registration page are TypeScript, in `frontend/`
 and answers 503 until they are built, unless Vite's dev server serves them.
 
 Under `mise run dev` their scripts come from Vite's dev server, at
-`VITE_DEV_SERVER` (from your shell or `.env`, else `http://localhost:5173`;
-the port is required), so edits show as you save. A backend you run on its
-own does the same only if `VITE_DEV_SERVER` is set. The page still comes from
+`VITE_DEV_SERVER` (from your shell or `.env`, else `http://localhost:`
+and `INVENTORY_VITE_PORT`; the port is required), so edits show as you
+save. A backend you run on its own does the same only if
+`VITE_DEV_SERVER` is set. The page still comes from
 the backend, so the device cookie and the API work as in production.
 
 Without the dev server, the backend serves a build instead:
@@ -437,6 +454,7 @@ container, set `INVENTORY_APP_MAIL_HOST=mail` too, and `SITE_URL`'s port to
 ### Running the app in a container
 
 ```sh
+mise run ports-free -- INVENTORY_APP_PORT
 mise run dev-database
 mise run compose -- up -d --build --wait app  # its port: INVENTORY_APP_PORT
 mise run compose -- logs -f app
@@ -475,8 +493,10 @@ PostgreSQL server. On a new volume it makes the two roles and
 a database, `inventory`, the owner's. It makes no other database a
 checkout's `.env` names (`INVENTORY_DB_NAME`), which the app's container
 migrates as it starts: until `mise run dev-database` makes it, the
-container stops, and in development says to run that. For most jobs a
-task is the safer way:
+container stops, and in development says to run that. Nor does it check
+the ports first, as the tasks do (Local settings): if one is taken, it
+fails with the runtime's own message. For most jobs a task is the safer
+way:
 
 | Command | What it does | When |
 | --- | --- | --- |
