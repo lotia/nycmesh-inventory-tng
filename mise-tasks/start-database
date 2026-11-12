@@ -20,7 +20,9 @@ if [[ -n $made ]]; then
   IFS='|' read -r running made_in <<<"$made"
   env_file=$root/.env
   [[ -f $env_file ]] || env_file=/dev/null
-  wanted=$(compose --file "$root/compose.yaml" --project-directory "${made_in:-$root}" \
+  files=(--file "$root/compose.yaml")
+  [[ -f $root/compose.override.yaml ]] && files+=(--file "$root/compose.override.yaml")
+  wanted=$(compose "${files[@]}" --project-directory "${made_in:-$root}" \
     --env-file "$env_file" config --hash db)
   if [[ ${wanted#db } != "$running" ]]; then
     echo "The database container's settings differ from this checkout's compose.yaml." \

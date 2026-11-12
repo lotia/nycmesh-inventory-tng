@@ -10,8 +10,7 @@ whether a thing is a link or a button, where the account links go, how
 records are retired and listed. Each page had decided for itself. Research
 into established design systems (GOV.UK, USWDS, Primer, Polaris, Atlassian,
 Material) and WCAG 2.2 AA, with options drawn in the app's own colours, was
-reviewed with Ali on 2026-11-10 (inventory-tng-8i4.60.12; the mock-ups are
-at <https://claude.ai/artifact/Ju4jnjECT3qHVEqUWwTj2D>). The rules below
+reviewed with Ali on 2026-11-10 (inventory-tng-8i4.60.12). The rules below
 apply to the administrator pages and, where they have the same parts, to
 the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
 

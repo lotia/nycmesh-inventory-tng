@@ -142,12 +142,16 @@ const REPORTS: Record<string, string> = {
 /** A line's package_size refused as a page's bug, as a build from before
  * sizes were sent kept its lines (inventory-tng-1p8), by the server's type:
  * its words are for whoever writes a client, these for the volunteer. */
-const SIZE_REFUSED: Record<string, string> = {
-  package_size_required:
+const SIZE_REFUSED = new Map([
+  [
+    "package_size_required",
     "A line of a package says the size it was counted in: load the page again, and count it again",
-  package_size_without_package:
+  ],
+  [
+    "package_size_without_package",
     "A loose line says a package's size: load the page again, and count it again",
-};
+  ],
+]);
 
 /** A 422's problems, in words a volunteer can act on. A line of the cart
  * may be sent as several, one for each package and one loose (cart.ts,
@@ -161,7 +165,7 @@ function problems(
     .map(({ loc, msg, type }) => {
       const line = loc[0] === "body" && loc[1] === "lines" ? loc[2] : undefined;
       const words =
-        (loc[3] === "package_size" ? SIZE_REFUSED[type] : undefined) ??
+        (loc[3] === "package_size" ? SIZE_REFUSED.get(type) : undefined) ??
         (typeof msg === "string" ? msg : "Not accepted");
       // A report's, by its place in the batch's list of them.
       const report = REPORTS[String(loc[1])];

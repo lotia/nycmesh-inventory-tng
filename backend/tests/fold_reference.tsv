@@ -1,4 +1,4 @@
-# models.fold, with anyascii 0.3.3: each input, its code point, what it folds to. Written by mise run regenerate-fold-reference, or from backend/: uv run python -m tests.helpers.fold_reference.
+# models.fold, with anyascii 0.3.3, Unicode 17.0.0: each input, its code point, what it folds to (∅: nothing). Written by mise run regenerate-fold-reference, or from backend/: uv run python -m tests.helpers.fold_reference.
 \xa0	U+00A0	\x20
 ¡	U+00A1	!
 ¢	U+00A2	c
@@ -12,7 +12,7 @@
 ª	U+00AA	a
 «	U+00AB	<<
 ¬	U+00AC	!
-\xad	U+00AD	
+\xad	U+00AD	∅
 ®	U+00AE	(R)
 ¯	U+00AF	-
 °	U+00B0	deg
@@ -698,9 +698,9 @@
 ҁ	U+0481	q
 ҂	U+0482	1000
 ҃	U+0483	.
-҄	U+0484	
-҅	U+0485	
-҆	U+0486	
+҄	U+0484	∅
+҅	U+0485	∅
+҆	U+0486	∅
 ҇	U+0487	.
 ҈	U+0488	100000
 ҉	U+0489	1000000
@@ -833,11 +833,11 @@
 \u2008	U+2008	\x20
 \u2009	U+2009	\x20
 \u200a	U+200A	\x20
-\u200b	U+200B	
-\u200c	U+200C	
-\u200d	U+200D	
-\u200e	U+200E	
-\u200f	U+200F	
+\u200b	U+200B	∅
+\u200c	U+200C	∅
+\u200d	U+200D	∅
+\u200e	U+200E	∅
+\u200f	U+200F	∅
 ‐	U+2010	-
 ‑	U+2011	-
 ‒	U+2012	-
@@ -864,11 +864,11 @@
 ‧	U+2027	-
 \u2028	U+2028	\x20
 \u2029	U+2029	\x20
-\u202a	U+202A	
-\u202b	U+202B	
-\u202c	U+202C	
-\u202d	U+202D	
-\u202e	U+202E	
+\u202a	U+202A	∅
+\u202b	U+202B	∅
+\u202c	U+202C	∅
+\u202d	U+202D	∅
+\u202e	U+202E	∅
 \u202f	U+202F	\x20
 ‰	U+2030	%0
 ‱	U+2031	%00
@@ -918,21 +918,21 @@
 ⁝	U+205D	:
 ⁞	U+205E	:
 \u205f	U+205F	\x20
-\u2060	U+2060	
-\u2061	U+2061	
-\u2062	U+2062	
-\u2063	U+2063	
-\u2064	U+2064	
-\u2066	U+2066	
-\u2067	U+2067	
-\u2068	U+2068	
-\u2069	U+2069	
-\u206a	U+206A	
-\u206b	U+206B	
-\u206c	U+206C	
-\u206d	U+206D	
-\u206e	U+206E	
-\u206f	U+206F	
+\u2060	U+2060	∅
+\u2061	U+2061	∅
+\u2062	U+2062	∅
+\u2063	U+2063	∅
+\u2064	U+2064	∅
+\u2066	U+2066	∅
+\u2067	U+2067	∅
+\u2068	U+2068	∅
+\u2069	U+2069	∅
+\u206a	U+206A	∅
+\u206b	U+206B	∅
+\u206c	U+206C	∅
+\u206d	U+206D	∅
+\u206e	U+206E	∅
+\u206f	U+206F	∅
 ₠	U+20A0	CE
 ₡	U+20A1	C
 ₢	U+20A2	Cr
@@ -966,7 +966,7 @@
 ₾	U+20BE	Lari
 ₿	U+20BF	BTC
 ⃀	U+20C0	Som
-⃁	U+20C1	
+⃁	U+20C1	∅
 ℀	U+2100	a/c
 ℁	U+2101	a/s
 ℂ	U+2102	C
@@ -1056,7 +1056,7 @@ Søren Ødegård	string	Soren Odegard
 café	string	cafe
 Café Lódź	string	Cafe Lodz
 è́̂	string	e
-́	string	
+́	string	∅
 ﬁber ﬂoor ﬀ ﬃ ﬄ	string	fiber floor ff ffi ffl
 ｃａｆｅ ＡＢ１２	string	cafe AB12
 １０ｍ ＲＪ４５	string	10m RJ45

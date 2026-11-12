@@ -116,7 +116,9 @@ or `.env`'s `INVENTORY_DB_PORT`, changes its settings, those tasks, the
 browser tests too, stop and say so rather than recreate it. Then
 `mise run recreate-database-container` recreates it: it keeps the volume,
 but restarts the server, ending every checkout's connections, so it asks
-first. An agent asks the person, then runs
+first. Run it from a checkout with the newest `compose.yaml`, so pull
+first: from an older one it puts back the old settings. An agent asks the
+person, then runs
 `mise run --yes recreate-database-container`.
 `mise run dev-database` starts the server, makes the database if it is
 missing, and migrates it; `mise run dev` and `mise run seed` run it first.
@@ -704,8 +706,9 @@ after it.
   `0.0.z` package keeps its patch, there being no minor to name, and a series
   released only as betas, such as OpenTelemetry's instrumentation, floors at
   the minor's first beta (`>=0.66b0`).
-  A new anyascii fails `tests/test_fold_reference.py`, with the difference:
-  the file's first line names the version. If you take it, run
+  A new anyascii, or a Python with a newer Unicode, fails
+  `tests/test_fold_reference.py`, with the difference: the file's first
+  line names both versions. If you take it, run
   `mise run regenerate-fold-reference` (from `backend/`:
   `uv run python -m tests.helpers.fold_reference`, and `--check` only
   compares). If a spelling changed, also add a migration that folds again

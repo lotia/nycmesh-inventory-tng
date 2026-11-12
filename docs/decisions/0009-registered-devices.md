@@ -65,3 +65,7 @@ fingerprinting (unreliable, and hostile to privacy).
   shared by every instance (0012, Amendment): each counts before it is
   checked and a good one is taken back, so a room of phones can register.
   At about 64 bits per phrase that is far more than enough.
+- A registered device sees every current volunteer's name, and nothing else
+  of them (`catalogue.py`, `VolunteerEntry`), and the names of their custody
+  locations, made in their names (`locations.add_custody`). An unregistered
+  device is refused the catalogue, so sees none of it.
