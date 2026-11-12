@@ -865,7 +865,7 @@ describe("turning a cart into a batch", () => {
     ]);
     expect(at(counts, 10)).toBe(3 - 2 + 1 - 1);
     expect(at(counts, 12)).toBe(1 - 1 + 2);
-    // Counted in a size the spool had before a resize: as many as counted.
+    // Counted in a size the spool had before a resize: refused, so none.
     const resized = sealedCounts(CATALOGUE, [
       {
         state: "waiting" as const,
@@ -877,7 +877,7 @@ describe("turning a cart into a batch", () => {
         }),
       },
     ]);
-    expect(at(resized, 12)).toBe(1 + 1);
+    expect(at(resized, 12)).toBe(1);
     // The last sealed at the hub opened: the next opening there fills none.
     const opened = sealedCounts(CATALOGUE, [
       {

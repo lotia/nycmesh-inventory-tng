@@ -1,11 +1,11 @@
 """No page reads row by row (inventory-tng-du6): CONTRIBUTING.md, Running
 the checks, says what this measures and what a new page needs here."""
 
-import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import timedelta
 from decimal import Decimal
+from functools import cached_property
 
 import pytest
 from fastapi import FastAPI
@@ -40,26 +40,32 @@ class World:
     registration code, once a device is registered with it."""
 
     session: Session
-    spools: Spools = field(init=False)
     labels: list[int] = field(default_factory=list)
     code_id: int = 0
     phrase: str = ""
 
-    def __post_init__(self) -> None:
-        self.spools = Spools(self.session)
+    @cached_property
+    def spools(self) -> Spools:
+        return Spools(self.session)
 
 
 def everything(world: World) -> None:
     """One more of all that the list pages show: a category, items, places,
     a volunteer, sealed spools, an item to reorder, one short at a place,
     an open package cut below zero, one said to show the wrong length, one
-    said used up, and labels for a package and a place."""
+    said used up, one moved whole and checked there, and labels for a package and a place."""
     session = world.session
     spools = Spools(session)
     spools.cable.minimum = Decimal(10_000)
     spools.spool.minimum_sealed = 99
     write(session, spools.place, lines=[cut(spools.opened(), "400")])
     write(session, spools.place, **report(spools, length(spools.opened(), "250")))
+    # Moved whole to the van, then said to show the wrong length there: a
+    # place more for the length checks to read.
+    van = spools.opened()
+    write(session, spools.place, lines=[cut(van, "305") | {"whole": True}])
+    at_van = report(spools, length(van, "250")) | {"from_location_id": spools.van.id}
+    write(session, spools.place, **at_van)
     # Radios the store never had moved out: less than none there.
     write(session, spools.place)
     used_up = report(spools) | {"lengths": None, "used_up": [str(spools.opened().key)]}
@@ -134,7 +140,7 @@ def device_of_code(world: World) -> None:
 
 
 def admin(world: World) -> None:
-    new_admin(world.session, f"admin-{uuid.uuid4().hex[:8]}", totp=False)
+    new_admin(world.session, f"admin-{tag()}", totp=False)
 
 
 def authenticator(world: World) -> None:
