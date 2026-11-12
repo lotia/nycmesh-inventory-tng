@@ -841,18 +841,14 @@ export function sealedCounts(
       const packageId = line.package_id;
       const fromOpen = body.kind !== "open" && line.open_package_key != null;
       const size = packageId == null ? undefined : sizes.get(packageId);
-      // Nor one counted in a size its package no longer has: the server
-      // refuses it (package_resized), so it moves none. Read as stored,
-      // which another build may have written: one unreadable is skipped.
-      const resized =
-        line.package_size != null &&
-        thousandths(String(line.package_size)) !== size;
+      // Read as stored, which another build may have written: one
+      // unreadable is skipped.
       const quantity = thousandths(String(line.quantity));
       if (
         packageId == null ||
         fromOpen ||
         size === undefined ||
-        resized ||
+        refusedAsCounted(line, size) ||
         quantity === null
       ) {
         continue;
@@ -866,6 +862,16 @@ export function sealedCounts(
     }
   }
   return counts;
+}
+
+/** Whether the server refuses a line of a package of `size` (thousandths)
+ * as counted, so it moves none: counted in a size its package no longer
+ * has (package_resized), or in none, as an older build's stored line may
+ * be (inventory-tng-1p8). */
+function refusedAsCounted(line: Draft["lines"][number], size: number): boolean {
+  return (
+    line.package_size == null || thousandths(String(line.package_size)) !== size
+  );
 }
 
 export type OpenPackage = Catalogue["open_packages"][number];
@@ -906,12 +912,16 @@ export function offered(
         continue;
       }
       if (draft.kind === "open") {
-        if (!known.has(key)) {
-          // A retired package is missing once the catalogue says none is
-          // sealed: named once saved, from the catalogue's open package.
-          const pack = items
-            .get(line.item_id)
-            ?.packages.find((each) => each.id === line.package_id);
+        if (known.has(key)) {
+          continue;
+        }
+        // A retired package is missing once the catalogue says none is
+        // sealed: named once saved, from the catalogue's open package.
+        const pack = items
+          .get(line.item_id)
+          ?.packages.find((each) => each.id === line.package_id);
+        // One the server refuses opens none, so is never offered.
+        if (pack === undefined || !refusedAsCounted(line, sent(pack.size))) {
           byKey.set(key, {
             id: 0,
             key,

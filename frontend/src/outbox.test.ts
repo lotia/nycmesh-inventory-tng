@@ -277,7 +277,7 @@ describe("refusals", () => {
   test("a 422 says which line of the cart, in the server's words", async () => {
     // The cart's first line went as two, a box and loose units.
     const lines = [
-      { item_id: 5, quantity: "4", package_id: 9 },
+      { item_id: 5, quantity: "4", package_id: 9, package_size: "4" },
       { item_id: 5, quantity: "1" },
       { item_id: 6, quantity: "2" },
     ];
@@ -320,9 +320,15 @@ describe("refusals", () => {
       kind: "open",
       to_location_id: 1,
       lines: [
-        { item_id: 5, quantity: "305", package_id: 9, open_package_key: key },
+        {
+          item_id: 5,
+          quantity: "305",
+          package_id: 9,
+          package_size: "305",
+          open_package_key: key,
+        },
         // A box its item does not follow: no key.
-        { item_id: 6, quantity: "100", package_id: 8 },
+        { item_id: 6, quantity: "100", package_id: 8, package_size: "100" },
       ],
     });
     const cut = draft({
@@ -373,7 +379,13 @@ describe("refusals", () => {
       kind: "open",
       to_location_id: 1,
       lines: [
-        { item_id: 5, quantity: "305", package_id: 9, open_package_key: key },
+        {
+          item_id: 5,
+          quantity: "305",
+          package_id: 9,
+          package_size: "305",
+          open_package_key: key,
+        },
       ],
     });
     const report = draft({
@@ -414,10 +426,10 @@ describe("storage", () => {
     expect(states(outbox)).toEqual(["saved"]);
   });
 
-  test("a batch's sealed packages are kept and sent; an older page's lines too", async () => {
+  test("a batch's sealed packages are kept and sent with their size; an older page's lines too", async () => {
     // An older page's lines have no package_id: the server takes them loose.
     const lines = [
-      { item_id: 5, quantity: "305", package_id: 9 },
+      { item_id: 5, quantity: "305", package_id: 9, package_size: "305" },
       { item_id: 6, quantity: "3" },
     ];
     const waiting = entry({ body: { ...entry().body, lines } });
@@ -427,6 +439,29 @@ describe("storage", () => {
     expect(outbox.entries.value).toEqual([waiting]);
     await outbox.send();
     expect((await bodies(sent))[0].lines).toEqual(lines);
+  });
+
+  test("a stored line of a package without its size is read, sent, and refused naming its line", async () => {
+    // Kept by a build from before sizes were sent (inventory-tng-1p8): the
+    // server refuses it, and the volunteer is told which line, not left
+    // with a batch dropped unseen.
+    const lines = [{ item_id: 5, quantity: "305", package_id: 9 }];
+    store(entry({ body: { ...entry().body, lines } }));
+    const detail = [
+      {
+        type: "value_error",
+        loc: ["body", "lines", 0],
+        msg: "Value error, A line of a package says the size it was counted in: load the page again, and count it again",
+      },
+    ];
+    const { api, sent } = answering(() => json({ detail }, 422));
+    const outbox = new Outbox(api);
+    await outbox.send();
+    expect((await bodies(sent))[0].lines).toEqual(lines);
+    expect(states(outbox)).toEqual(["refused"]);
+    expect(outbox.entries.value[0]?.note).toBe(
+      "Not saved. Line 1: Value error, A line of a package says the size it was counted in: load the page again, and count it again",
+    );
   });
 
   test("an older build's batches are sent, and copied here, left there for its tabs", async () => {

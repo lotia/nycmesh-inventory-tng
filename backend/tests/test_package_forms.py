@@ -468,6 +468,7 @@ def sealed_line(spools: Spools, quantity: str) -> dict[str, object]:
         "item_id": spools.cable.id,
         "quantity": quantity,
         "package_id": spools.spool.id,
+        "package_size": "305",
     }
 
 
@@ -572,7 +573,9 @@ def test_a_size_is_said_only_of_a_package_of_the_lines_item(
     registered_client: TestClient, spools: Spools
 ) -> None:
     """Another item's package is not found, whatever size it is said to be;
-    a size said of no package is a page's bug."""
+    a size said of no package, or a package without one (an outbox's batch
+    from before inventory-tng-5f7, on a dev phone: inventory-tng-1p8), is
+    refused as a page's bug, naming the line."""
     other = sealed_line(spools, "300") | {
         "item_id": spools.place.item.id,
         "package_size": "1",
@@ -582,8 +585,12 @@ def test_a_size_is_said_only_of_a_package_of_the_lines_item(
         (["lines", 0, "package_id"], "not_found")
     ]
     loose = {"item_id": spools.cable.id, "quantity": "5", "package_size": "5"}
-    response = registered_client.post(URL, json=spools.place.batch(lines=[loose]))
-    assert response.status_code == 422
+    unsized = sealed_line(spools, "305") | {"package_size": None}
+    for line in (loose, unsized):
+        response = registered_client.post(URL, json=spools.place.batch(lines=[line]))
+        assert response.status_code == 422
+        assert [p["loc"][1:] for p in response.json()["detail"]] == [["lines", 0]]
+    assert "count it again" in response.json()["detail"][0]["msg"]
 
 
 def test_a_refusal_names_each_bad_package_line(
@@ -594,7 +601,12 @@ def test_a_refusal_names_each_bad_package_line(
     )
     lines = [
         sealed_line(spools, "300"),
-        {"item_id": spools.cable.id, "quantity": "10", "package_id": other.id},
+        {
+            "item_id": spools.cable.id,
+            "quantity": "10",
+            "package_id": other.id,
+            "package_size": "10",
+        },
         sealed_line(spools, "305"),
         {"item_id": spools.cable.id, "quantity": "1"},
     ]
@@ -917,7 +929,9 @@ def test_a_line_taken_from_an_open_package_that_cannot_be_is_refused(
     made = spools.opened()
     store = spools.store.id
     for batch in (
-        spools.place.batch(lines=[taken(made, "1", package_id=spools.spool.id)]),
+        spools.place.batch(
+            lines=[taken(made, "1", package_id=spools.spool.id, package_size="305")]
+        ),
         spools.place.batch(
             kind="receipt",
             from_location_id=None,
