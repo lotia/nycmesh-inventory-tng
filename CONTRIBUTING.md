@@ -555,6 +555,18 @@ app's requests on them meet the lock guard (`db.protection`) as in
 production: a route that changes a row it did not lock fails its test
 (`tests/helpers/apps.py`).
 
+### Measuring the catalogue
+
+```sh
+mise run measure-catalogue   # MEASURE_YEARS=10 MEASURE_PER_DAY=80 for more
+```
+
+It fills a database of its own with years of saves, sealed and open (five
+years of 40 a day unless told otherwise), prints the plan of each ledger
+query the scan page's catalogue makes, as run (`EXPLAIN (ANALYZE,
+BUFFERS)`), and times `GET /api/catalogue`. It is not one of the checks:
+run it after changing those queries (inventory-tng-kcz).
+
 ### Coverage
 
 `mise run check` and CI measure which code the tests run, and fail when:

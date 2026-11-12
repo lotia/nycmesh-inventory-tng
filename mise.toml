@@ -75,6 +75,14 @@ uv run --project backend diff-cover -c backend/pyproject.toml \
   --include-untracked
 """
 
+[tasks.measure-catalogue]
+description = "Time the scan page's catalogue against years of saves, with its ledger queries' plans"
+dir = "backend"
+run = [
+    "mise run compose -- up -d --wait db",
+    "uv run pytest tests/measure_catalogue.py -p no:randomly -p no:cacheprovider -q -s",
+]
+
 [tasks.check-markdown]
 description = "Lint every Markdown file the project writes (AGENTS.md rule 9)"
 run = "markdownlint-cli2"
