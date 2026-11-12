@@ -111,12 +111,15 @@ rows again.
 The scan page has no anyascii, which would weigh more than the rest of its
 scripts (Ali, 2026-11-12). The catalogue sends each item's details as
 spelt and its folded text, with its category's (`search_text`). The page
-looks for each word typed, ignoring case, as typed and without what the
-browser's own decomposing (`normalize("NFD")`) takes off, in both, so
-`cafe`, `Café` and `cafè` all find `Café`. It shows only the details as
-spelt, never the folded text. Accepted gap: a typed letter decomposing
-leaves alone (`ø`, `ł`, `æ`, `ß`) finds nothing unless the whole word is
-typed as the name spells it.
+strips both, once per catalogue, and each word typed alike: in lower case,
+without what the browser's own compatibility decomposing
+(`normalize("NFKD")`) takes off (Ali, 2026-11-12, inventory-tng-ffn). So
+`cafe`, `Café` and `cafè` all find `Café`, `łodz` finds `Łódź`, and so do
+a fullwidth `ｃａｆｅ`, the ligature `ﬁ` and the micro sign in `µF`, as an
+IME or a paste may give them. It shows only the details as spelt, never
+the folded or stripped text. Accepted gap: a word typed half as spelt
+and half as the server folds it finds nothing, such as `lø` or `ło` for
+`Łø`, as `ø` and `ł` do not decompose.
 
 Rejected: `unaccent()` at search time, which no index serves without a
 function of our own wrapping it (0016), so each search reads the whole

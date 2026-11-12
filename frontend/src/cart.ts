@@ -219,8 +219,8 @@ type Index = {
   places: Map<number, string>;
   /** Every place, sorted by that name. */
   placeList: { id: number; name: string }[];
-  /** What search looks through, per item, in lower case: its details as
-   * spelt, then the server's folded text. */
+  /** What search looks through, per item, bare: its details as spelt, then
+   * the server's folded text. */
   haystacks: Map<number, string>;
   /** Label codes and items' old codes, upper case, to what they name. */
   codes: Map<string, Named>;
@@ -290,17 +290,18 @@ export function indexOf(catalogue: Catalogue): Index {
     haystacks: new Map(
       catalogue.items.map((item) => [
         item.id,
-        [
-          item.name,
-          item.manufacturer,
-          item.part_number,
-          item.old_code,
-          item.category,
-          item.search_text,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase(),
+        bare(
+          [
+            item.name,
+            item.manufacturer,
+            item.part_number,
+            item.old_code,
+            item.category,
+            item.search_text,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        ),
       ]),
     ),
     codes,
@@ -1046,16 +1047,13 @@ function withOffered(cart: Cart, here: ReadonlyMap<string, unknown>): Cart {
 }
 
 /** Items whose name, maker, part number, code or category holds every word,
- * as typed or unaccented, ignoring case: in the details as spelt or the
- * server's folded text (docs/decisions/0021, 2026-11-12). */
+ * both bare (`bare`): in the details as spelt or the server's folded text
+ * (docs/decisions/0021, 2026-11-12). */
 export function search(catalogue: Catalogue, text: string, limit = 20): Item[] {
-  const words = text
-    .trim()
-    .toLowerCase()
+  const words = bare(text)
     .split(/\s+/)
-    .map((word) => [word, unaccented(word)] as const)
     // A lone accent is no word: not a search matching everything.
-    .filter(([, bare]) => bare !== "");
+    .filter((word) => word !== "");
   if (words.length === 0) {
     return [];
   }
@@ -1063,15 +1061,14 @@ export function search(catalogue: Catalogue, text: string, limit = 20): Item[] {
   return catalogue.items
     .filter((item) => {
       const haystack = haystacks.get(item.id) ?? "";
-      return words.every(
-        ([word, bare]) => haystack.includes(word) || haystack.includes(bare),
-      );
+      return words.every((word) => haystack.includes(word));
     })
     .slice(0, limit);
 }
 
-/** `word` decomposed, without its combining marks: "é" is "e", but "ł",
- * "ø", "æ" and "ß", which do not decompose, stay as they are. */
-function unaccented(word: string): string {
-  return word.normalize("NFD").replace(/\p{M}/gu, "");
+/** `text` in lower case, decomposed by compatibility, without its combining
+ * marks: "é" is "e", fullwidth "ｃａｆｅ" is "cafe", "ﬁ" is "fi" and "µ" is
+ * "μ"; "ł", "ø", "æ" and "ß", which do not decompose, stay as they are. */
+function bare(text: string): string {
+  return text.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
 }
