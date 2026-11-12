@@ -674,6 +674,7 @@ export function toBatch(
           item_id: item.id,
           quantity: decimal(count * size),
           package_id: packageId,
+          package_size: decimal(size),
         });
       }
       if (quantity.loose > 0) {
@@ -761,7 +762,12 @@ function openings(item: Item, sealed: Map<number, Packs>): Draft["lines"] {
     item.packages.filter((pack) => pack.track_opened).map((pack) => pack.id),
   );
   return [...sealed].flatMap(([packageId, { count, size }]) => {
-    const each = { item_id: item.id, package_id: packageId };
+    // The size counted in: one resized since is refused, not recounted.
+    const each = {
+      item_id: item.id,
+      package_id: packageId,
+      package_size: decimal(size),
+    };
     return followed.has(packageId)
       ? Array.from({ length: count }, () => ({
           ...each,
@@ -834,10 +840,13 @@ export function sealedCounts(
       // package the catalogue has no more counted.
       const packageId = line.package_id;
       const fromOpen = body.kind !== "open" && line.open_package_key != null;
-      const size = packageId == null ? undefined : sizes.get(packageId);
-      if (packageId == null || fromOpen || size === undefined) {
+      const known = packageId == null ? undefined : sizes.get(packageId);
+      if (packageId == null || fromOpen || known === undefined) {
         continue;
       }
+      // In the size it was counted in: one resized since is refused.
+      const size =
+        line.package_size != null ? sent(String(line.package_size)) : known;
       // Rounded up, as the catalogue counts a part of one (catalogue.py).
       const n = Math.ceil(sent(String(line.quantity)) / size);
       add(packageId, body.from_location_id, -n);

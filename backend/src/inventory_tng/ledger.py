@@ -650,18 +650,20 @@ refused = meter.create_counter(
     unit="{transaction}",
     # FastAPI's own 422s, for a batch that cannot be at all, are a client's
     # bug and are not counted here.
-    description="Batches refused for naming rows that do not exist, or for "
-    "reusing a key, by reason",
+    description="Batches refused for naming rows that do not exist, for "
+    "a package resized since the page read it, or for reusing a key, by reason",
 )
 
 # An id or install number: positive, and fits PostgreSQL's integer.
 Number = Annotated[int, Field(gt=0, le=INTEGER_MAX)]
+# An amount in an item's unit, as the ledger's quantities are kept.
+Amount = Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=3)]
 
 
 class Line(BaseModel):
     item_id: Number
     # In the item's unit: the scan page turns packages into units first.
-    quantity: Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=3)]
+    quantity: Amount
     package_id: Annotated[
         Number | None,
         Field(
@@ -669,6 +671,15 @@ class Line(BaseModel):
             "kept sealed (docs/decisions/0020): `quantity` is a whole "
             "number of them, in units. None: loose units. An opening's "
             "lines name the package opened."
+        ),
+    ] = None
+    package_size: Annotated[
+        Amount | None,
+        Field(
+            description="The size the page took `package_id` to be, from its "
+            "catalogue. A line of a package resized since is refused "
+            "(package_resized), never counted in the new size. None: an "
+            "older page's, not checked.",
         ),
     ] = None
     open_package_key: Annotated[
@@ -787,6 +798,8 @@ class Batch(BaseModel):
                 raise ValueError("a line is taken from an open package, or not")
             if line.whole and not (taken and self.kind == "move"):
                 raise ValueError("only a move's open package moves whole")
+            if line.package_size is not None and line.package_id is None:
+                raise ValueError("only a line of a package says its size")
         if self.install_number is not None and self.kind != "install":
             raise ValueError("only an install has an install number")
         return self
@@ -802,6 +815,7 @@ ProblemKind = Literal[
     "open_package_elsewhere",
     "open_package_whole",
     "moved_whole",
+    "package_resized",
     "refused",
     "retired",
     "retired_package",
@@ -815,6 +829,8 @@ MESSAGES = {
     "open_package_whole": "Moving an open package whole takes all that is "
     "left on it, which changed: load the page again",
     "moved_whole": "That open package moves whole, still open: it is not used up",
+    "package_resized": "This package's size changed since the page loaded: "
+    "load the page again, and count it again",
     "refused": "The inventory's rules refuse this as sent: it changed since "
     "the page loaded. Load the page again, and do it again",
     "not_found": "There is no such row",
@@ -934,8 +950,11 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
         elif opened.location_id != batch.from_location_id:
             problems.append((at, "open_package_elsewhere"))
     if problems:
-        refused.add(1, {"reason": "invalid"})
-        log.info("batch refused", problems=sorted({kind for _, kind in problems}))
+        kinds = {kind for _, kind in problems}
+        # Counted apart: how often a page's catalogue is only a resize behind.
+        reason = "package_resized" if kinds == {"package_resized"} else "invalid"
+        refused.add(1, {"reason": reason})
+        log.info("batch refused", problems=sorted(kinds))
         raise BatchRefused(problems)
     try:
         lines, opened = _opening(session, batch, packages, lines)
@@ -1442,6 +1461,7 @@ def _problems(
     )
     places = (batch.from_location_id, batch.to_location_id)
     for number, broken in enumerate(lines_break(batch.kind, held.items, lines)):
+        sent = batch.lines[number]
         if number in twice:
             problems.append((("lines", number, "item_id"), "repeated"))
         if broken is None:
@@ -1453,11 +1473,24 @@ def _problems(
             places,
             packages,
             opens,
-            keyed=batch.lines[number].open_package_key is not None,
+            keyed=sent.open_package_key is not None,
         )
+        # Resized since the page read its catalogue: its count of packages
+        # is of the old size, which no quantity in the new one says, so
+        # what the new size makes of its quantity is not said.
+        package = packages.get(sent.package_id or 0)
+        resized = (
+            sent.package_size is not None
+            and package is not None
+            and "movement_package_of_item" not in broken
+            and package.size != sent.package_size
+        )
+        if resized:
+            problems.append((("lines", number, "package_size"), "package_resized"))
         for rule in dict.fromkeys(broken):
             field, kind = LINE_PROBLEMS[rule]
-            problems.append((("lines", number, field), kind))
+            if not (resized and field == "quantity"):
+                problems.append((("lines", number, field), kind))
     # Never more open packages than a page could have sent a line each for.
     if batch.kind == "open" and _packages_opened(batch, packages) > MAX_LINES:
         problems += [

@@ -167,7 +167,12 @@ describe("turning a cart into a batch", () => {
         from_location_id: 10,
         to_location_id: 12,
         lines: [
-          { item_id: 100, quantity: "4", package_id: 1000 },
+          {
+            item_id: 100,
+            quantity: "4",
+            package_id: 1000,
+            package_size: "4",
+          },
           { item_id: 100, quantity: "2" },
           { item_id: 101, quantity: "0.25" },
         ],
@@ -222,17 +227,19 @@ describe("turning a cart into a batch", () => {
       {
         item_id: 101,
         package_id: 1001,
+        package_size: "305",
         quantity: "305",
         open_package_key: expect.any(String),
       },
       {
         item_id: 101,
         package_id: 1001,
+        package_size: "305",
         quantity: "305",
         open_package_key: expect.any(String),
       },
       // The box is not: its radios become loose units.
-      { item_id: 100, package_id: 1000, quantity: "12" },
+      { item_id: 100, package_id: 1000, package_size: "4", quantity: "12" },
     ]);
     expect(sent[0]?.open_package_key).not.toBe(sent[1]?.open_package_key);
   });
@@ -858,6 +865,19 @@ describe("turning a cart into a batch", () => {
     ]);
     expect(at(counts, 10)).toBe(3 - 2 + 1 - 1);
     expect(at(counts, 12)).toBe(1 - 1 + 2);
+    // Counted in a size the spool had before a resize: as many as counted.
+    const resized = sealedCounts(CATALOGUE, [
+      {
+        state: "waiting" as const,
+        queuedAt: 0,
+        body: batch({
+          kind: "receipt",
+          to_location_id: 12,
+          lines: [spools(2, { package_size: "610" })],
+        }),
+      },
+    ]);
+    expect(at(resized, 12)).toBe(1 + 1);
     // The last sealed at the hub opened: the next opening there fills none.
     const opened = sealedCounts(CATALOGUE, [
       {

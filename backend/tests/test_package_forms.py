@@ -507,6 +507,53 @@ def test_a_batch_saved_before_packages_were_kept_sealed_saves_loose(
     assert forms(session, spools.cable)[(spools.van.id, None, None)] == 305
 
 
+def test_a_line_sent_in_a_size_its_package_no_longer_has_is_refused(
+    registered_client: TestClient, session: Session, spools: Spools
+) -> None:
+    """A batch built before its package was resized, waiting in an outbox
+    (inventory-tng-5f7): its count of boxes is of the old size, so it is
+    refused, not saved as another number of them; an opening's too."""
+    box = add(session, ItemPackage(item_id=spools.cable.id, name=f"B {tag()}", size=50))
+    line = {"item_id": spools.cable.id, "quantity": "50", "package_id": box.id}
+    built = spools.place.batch(lines=[line | {"package_size": "50"}])
+    opening = spools.place.batch(
+        kind="open",
+        to_location_id=spools.store.id,
+        lines=[sealed_line(spools, "305") | {"package_size": "305"}],
+    )
+    box.size = Decimal(25)
+    spools.spool.size = Decimal(300)
+    session.flush()
+    for batch in (built, opening):
+        response = registered_client.post(URL, json=batch)
+        assert response.status_code == 422
+        assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
+            (["lines", 0, "package_size"], "package_resized")
+        ]
+    assert (spools.van.id, box.id, None) not in forms(session, spools.cable)
+    # In the size it has: saved.
+    now = spools.place.batch(lines=[line | {"package_size": "25.000"}])
+    assert registered_client.post(URL, json=now).status_code == 201
+
+
+def test_a_size_is_said_only_of_a_package_of_the_lines_item(
+    registered_client: TestClient, spools: Spools
+) -> None:
+    """Another item's package is not found, whatever size it is said to be;
+    a size said of no package is a page's bug."""
+    other = sealed_line(spools, "300") | {
+        "item_id": spools.place.item.id,
+        "package_size": "1",
+    }
+    response = registered_client.post(URL, json=spools.place.batch(lines=[other]))
+    assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
+        (["lines", 0, "package_id"], "not_found")
+    ]
+    loose = {"item_id": spools.cable.id, "quantity": "5", "package_size": "5"}
+    response = registered_client.post(URL, json=spools.place.batch(lines=[loose]))
+    assert response.status_code == 422
+
+
 def test_a_refusal_names_each_bad_package_line(
     registered_client: TestClient, session: Session, spools: Spools
 ) -> None:

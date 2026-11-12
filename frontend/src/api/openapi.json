@@ -719,6 +719,22 @@
             "title": "Package Id",
             "description": "Sealed packages of this package of the item, kept sealed (docs/decisions/0020): `quantity` is a whole number of them, in units. None: loose units. An opening's lines name the package opened."
           },
+          "package_size": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Size",
+            "description": "The size the page took `package_id` to be, from its catalogue. A line of a package resized since is refused (package_resized), never counted in the new size. None: an older page's, not checked."
+          },
           "open_package_key": {
             "anyOf": [
               {

@@ -264,6 +264,11 @@ export interface components {
        */
       package_id?: number | null;
       /**
+       * Package Size
+       * @description The size the page took `package_id` to be, from its catalogue. A line of a package resized since is refused (package_resized), never counted in the new size. None: an older page's, not checked.
+       */
+      package_size?: number | string | null;
+      /**
        * Open Package Key
        * @description An opening's: the key of the open package made, if its item tracks opened packages, made by the page so a later line can name it. One package a line, then. Any other line's: the open package it is taken from, cut loose, or moved whole.
        */
