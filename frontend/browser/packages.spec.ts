@@ -38,6 +38,7 @@ test("a package counted on the scan page is saved sealed", async ({ page }) => {
       item_id: expect.any(Number),
       quantity: "305",
       package_id: expect.any(Number),
+      package_size: "305",
     },
   ]);
 });

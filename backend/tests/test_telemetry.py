@@ -39,7 +39,13 @@ from inventory_tng.app import create_app
 from inventory_tng.db import NoSession, RuleBroken
 from inventory_tng.devices import RegisteredDevice
 from inventory_tng.masking import MASK, Masker
-from inventory_tng.models import Category, Device, LedgerTransaction, OpenPackage
+from inventory_tng.models import (
+    Category,
+    Device,
+    ItemPackage,
+    LedgerTransaction,
+    OpenPackage,
+)
 from inventory_tng.settings import Settings
 from inventory_tng.telemetry import Telemetry, enabled
 
@@ -535,6 +541,10 @@ def test_counts_batches_written_replayed_and_refused(
     assert client.post("/api/transactions", json=batch).status_code == 200
     unknown = place.batch(lines=[{"item_id": 999999, "quantity": "1"}])
     assert client.post("/api/transactions", json=unknown).status_code == 422
+    box = add(session, ItemPackage(item_id=place.cable.id, name="Box", size=25))
+    resized = {"item_id": place.cable.id, "quantity": "50", "package_id": box.id}
+    stale = place.batch(lines=[resized | {"package_size": "50"}])
+    assert client.post("/api/transactions", json=stale).status_code == 422
     client.cookies.clear()
 
     kind = (("kind", "move"),)
@@ -543,6 +553,8 @@ def test_counts_batches_written_replayed_and_refused(
     assert (
         counted(reader, "inventory.transactions.refused")[(("reason", "invalid"),)] >= 1
     )
+    resized_reason = (("reason", "package_resized"),)
+    assert counted(reader, "inventory.transactions.refused")[resized_reason] >= 1
     assert "inventory.transaction.lines" in metric_names(reader)
 
 

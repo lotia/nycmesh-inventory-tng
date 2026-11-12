@@ -60,6 +60,10 @@ const onList = (entry: Entry) => entry.dismissed !== true;
 
 const nullableId = v.exactOptional(v.nullable(id));
 
+/** An amount in an item's unit: a decimal, as sent, or an older page's
+ * number. */
+const amount = v.union([v.number(), v.string()]);
+
 /** A batch as POST /api/transactions takes it. */
 export const BatchBody = v.object({
   key: v.pipe(v.string(), v.uuid()),
@@ -71,9 +75,12 @@ export const BatchBody = v.object({
   lines: v.array(
     v.object({
       item_id: id,
-      quantity: v.union([v.number(), v.string()]),
+      quantity: amount,
       /** Sealed packages of it, kept sealed; absent (an older page's): loose. */
       package_id: nullableId,
+      /** The size the page took that package to be: refused if resized
+       * since. Absent (an older page's): not checked. */
+      package_size: v.exactOptional(v.nullable(amount)),
       /** A move's taken from an open package: all of it, moved whole. */
       whole: v.exactOptional(v.nullable(v.boolean())),
       /** An opening's: the key of the open package it makes, followed;
@@ -91,7 +98,7 @@ export const BatchBody = v.object({
       v.array(
         v.object({
           open_package_key: v.pipe(v.string(), v.uuid()),
-          left: v.union([v.number(), v.string()]),
+          left: amount,
         }),
       ),
     ),
@@ -102,7 +109,8 @@ export type Body = Schemas["Batch"];
 /** A batch before the outbox gives it its key. */
 export type Draft = Omit<Body, "key">;
 
-/** A batch as kept: a field added here takes a new STORAGE_KEY. */
+/** A batch as kept: once a build keeping it under STORAGE_KEY is deployed,
+ * a field added here takes a new key. */
 export const Entry = v.object({
   body: BatchBody,
   /** What is in it, in words, so two batches can be told apart. */

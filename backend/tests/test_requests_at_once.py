@@ -57,6 +57,7 @@ from inventory_tng.db import (
 )
 from inventory_tng.ledger import (
     Batch,
+    BatchRefused,
     Entry,
     Form,
     KeyReused,
@@ -1116,6 +1117,50 @@ def test_a_package_resized_while_it_moves_waits_then_is_refused(
         lambda s, p: items.save_package(s, p, p.name, Decimal(25), seen=None),
     )
     assert at_once(own_committed, receipt, resize) == "package_size_fixed"
+
+
+@pytest.mark.concurrency
+def test_a_batch_of_a_package_resized_meanwhile_waits_then_is_refused(
+    own_committed: Committed,
+) -> None:
+    """The outbox's race (inventory-tng-5f7): a batch built from a catalogue
+    before a package nobody had used was resized, saved as the resize
+    commits. It waits for the package's lock (ledger._hold_forms), then
+    finds the size it was sent with gone and is refused, rather than saved
+    as twice as many boxes. On a database of its own, as it may write the
+    ledger."""
+    setup = own_committed.session()
+    place = Place(setup)
+    box = ItemPackage(item_id=place.cable.id, name="Box", size=Decimal(50))
+    setup.add(box)
+    setup.commit()
+    line = {
+        "item_id": place.cable.id,
+        "quantity": "50",
+        "package_id": box.id,
+        "package_size": "50",
+    }
+    batch = Batch.model_validate(
+        place.batch(
+            kind="receipt",
+            from_location_id=None,
+            to_location_id=place.store.id,
+            lines=[line],
+        )
+    )
+    one, two = own_committed.session(), own_committed.session()
+    doing(
+        ItemPackage,
+        box.id,
+        lambda s, p: items.save_package(s, p, p.name, Decimal(25), seen=None),
+    )(one)
+    one.flush()
+    worker = own_committed.blocked(two, lambda: record(two, batch, device_id=None))
+    one.commit()
+    error = worker.finished().error
+    two.rollback()
+    assert isinstance(error, BatchRefused), error
+    assert error.problems == [(("lines", 0, "package_size"), "package_resized")]
 
 
 @pytest.mark.concurrency

@@ -508,9 +508,10 @@ describe("storage", () => {
   });
 
   test("what a batch holds is as its key says: a new field takes a new key", () => {
-    // Every field path of a stored batch. Changed, it needs a new
-    // STORAGE_KEY: a tab of the build before would drop the new field from
-    // what it writes back (CONTRIBUTING.md, The scan page).
+    // Every field path of a stored batch. Changed once a build with this
+    // key is deployed, it needs a new STORAGE_KEY: a tab of the build
+    // before would drop the new field from what it writes back
+    // (CONTRIBUTING.md, The scan page).
     // And every value a field allows, which it would drop an entry for.
     const paths = (schema: unknown, at: string[] = []): string[] => {
       const s = schema as {
@@ -550,6 +551,7 @@ describe("storage", () => {
         "body.lines.item_id",
         "body.lines.open_package_key",
         "body.lines.package_id",
+        "body.lines.package_size",
         "body.lines.quantity",
         "body.lines.whole",
         "body.to_location_id",
@@ -663,6 +665,26 @@ describe("listening", () => {
     window.dispatchEvent(new Event("online"));
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
     expect(sent).toHaveLength(2);
+    stop();
+  });
+
+  test("the page shown again sends what waits; hidden, nothing", async () => {
+    const { api, sent } = answering(() => saved());
+    store(entry());
+    const outbox = new Outbox(api);
+    const stop = outbox.listen();
+    const shown = (state: DocumentVisibilityState) => {
+      Object.defineProperty(document, "visibilityState", {
+        value: state,
+        configurable: true,
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    };
+    shown("hidden");
+    expect(sent).toHaveLength(0);
+    shown("visible");
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
+    Reflect.deleteProperty(document, "visibilityState");
     stop();
   });
 
