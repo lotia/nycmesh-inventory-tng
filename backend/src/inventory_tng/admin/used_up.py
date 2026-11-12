@@ -17,7 +17,13 @@ from sqlalchemy.orm import Session
 from inventory_tng import ledger, open_packages
 from inventory_tng.admin.common import admin_page, now
 from inventory_tng.admin.items import ITEMS
-from inventory_tng.admin.needs_action import Kind, OnlyItem, query, query_string
+from inventory_tng.admin.needs_action import (
+    Kind,
+    OnlyItem,
+    of_only,
+    query,
+    query_string,
+)
 from inventory_tng.admin.stock import STOCK
 from inventory_tng.db import DbSession, attempt
 from inventory_tng.local_time import site_zone
@@ -65,7 +71,6 @@ def used_up_page(
     request: Request, signed: AdminSignedIn, session: DbSession, only: OnlyItem
 ) -> Response:
     """All those reported, or only one item's."""
-    where = [*REPORTED, OpenPackage.item_id == only.id] if only else REPORTED
     return admin_page(
         request,
         signed,
@@ -77,7 +82,7 @@ def used_up_page(
             "only": only,
             # Answered, the page shows the same item again.
             "query": query_string(only),
-            "reported": open_packages.shown(session, *where),
+            "reported": open_packages.shown(session, *of_only(REPORTED, only)),
             "zone": site_zone(session),
         },
     )
@@ -103,8 +108,7 @@ def _answer(
     rows = session.scalars(
         select(OpenPackage).where(OpenPackage.id.in_(list(ids)), *REPORTED)
     ).all()
-    for place in sorted({row.location_id for row in rows}):
-        ledger.lock_place(session, place)
+    ledger.lock_places(session, (row.location_id for row in rows))
     changed = 0
     closed: list[open_packages.Closed | None] = []
     for row in sorted(rows, key=lambda each: each.id):

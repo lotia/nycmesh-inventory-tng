@@ -533,14 +533,18 @@ SHORT_UNDER_SIZE = "ck_item_package_short_below_under_size"
 
 
 def _package_fields(
-    session: Session, item: Item, name: str, size: str
+    session: Session, item: Item, name: str, size: str, *, kept: Decimal | None = None
 ) -> tuple[Decimal | None, dict[str, str]]:
     """A package's size as typed, and what is wrong with its name or size:
     its name compared as items' are, so it needs more than spaces and
-    punctuation; its size whole, for an item counted each."""
+    punctuation; its size whole, for an item counted each. A blank size is
+    `kept`, if given: a size fixed is not on the form, and stays as it is,
+    whatever its item's unit has become since."""
     problems: dict[str, str] = {}
     if problem := _key_name_problem(session, name):
         problems["package_name"] = problem
+    if kept is not None and not size.strip():
+        return kept, problems
     parsed = quantity(
         size,
         positive=True,
@@ -603,13 +607,7 @@ def save_package(
         return not_found()
     found = session.get_one(Item, item_id)
     name = package_name.strip()
-    # A size fixed is not on the form: as it is, whatever its item's unit
-    # has become since.
-    parsed, problems = _package_fields(
-        session, found, name, size if size.strip() else "1"
-    )
-    if not size.strip():
-        parsed = package.size
+    parsed, problems = _package_fields(session, found, name, size, kept=package.size)
     if parsed is not None and not problems:
         _, broken = refusal(
             session,

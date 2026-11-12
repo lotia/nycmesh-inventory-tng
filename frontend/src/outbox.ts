@@ -38,8 +38,9 @@ export const STORAGE_KEY = "inventory.outbox.v3";
  * build sends them too: the server saves a batch once, by its key. */
 export const BEFORE = "inventory.outbox.v2";
 const LONG_BEFORE = "inventory.outbox.v1";
-/** The keys of the batches in BEFORE already copied here, so one this
- * build has since forgotten is not copied again. */
+/** The keys of the batches under the older build's key (BEFORE, or
+ * LONG_BEFORE) already copied here, so one this build has since forgotten
+ * is not copied again. */
 const COPIED = `${STORAGE_KEY}.copied`;
 /** How long to wait before trying again after no answer. */
 export const RETRY_MS = 30_000;
@@ -204,10 +205,9 @@ export class Outbox {
     const here = parsed(kept);
     // LONG_BEFORE only while BEFORE was never written: the build before
     // copied its batches.
-    const before = readStored(this.storage, BEFORE);
     const older = parsed(
-      before !== undefined || hasStored(this.storage, BEFORE)
-        ? before
+      hasStored(this.storage, BEFORE)
+        ? readStored(this.storage, BEFORE)
         : readStored(this.storage, LONG_BEFORE),
     );
     // Trusted only beside what it says was copied: here unreadable, its

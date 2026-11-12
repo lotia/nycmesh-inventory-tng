@@ -30,6 +30,7 @@ stays.</p>
       <form method="post" action="{{ here }}/{{ row.id }}/set{{ query }}" class="actions">
         <input type="hidden" name="seen" value="{{ each.seen }}">
         <input type="hidden" name="showed" value="{{ shown.left }}">
+        <input type="hidden" name="as_of" value="{{ moment }}">
         <input type="hidden" name="page" value="{{ all_path }}">
         {% set hint = shown.unit | printed_length %}
         <label>Really on it ({{ shown.unit }})

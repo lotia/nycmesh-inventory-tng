@@ -500,6 +500,13 @@ def lock_place(session: Session, location_id: int) -> None:
     get_locked(session, Location, location_id)
 
 
+def lock_places(session: Session, location_ids: Iterable[int]) -> None:
+    """lock_place for each of these places, by id, as saves take places, so
+    none waits on another the wrong way round."""
+    for location_id in sorted(set(location_ids)):
+        lock_place(session, location_id)
+
+
 def moment(session: Session, location_id: int) -> int:
     """Now, at a place, as a count form shows it: its latest ledger
     transaction, with no save there under way, so none can commit later
@@ -514,6 +521,10 @@ def moment(session: Session, location_id: int) -> int:
     return latest or 0
 
 
+# A ledger transaction that puts right what the records show.
+_CORRECTS = LedgerTransaction.kind.in_(("count", "adjustment"))
+
+
 def left_at(session: Session, open_id: int, as_of: int) -> Decimal:
     """What an open package showed just after the ledger transaction
     `as_of`, wherever it was, carried forward by the counts and adjustments
@@ -521,10 +532,18 @@ def left_at(session: Session, open_id: int, as_of: int) -> Decimal:
     all that left it. A save holds the open packages it names before it
     draws its id (_hold_forms), so none naming it commits later with a
     lower one."""
-    then = or_(
-        LedgerTransaction.id <= as_of,
-        LedgerTransaction.kind.in_(("count", "adjustment")),
-    )
+    return _into_open(session, open_id, or_(LedgerTransaction.id <= as_of, _CORRECTS))
+
+
+def corrected_since(session: Session, open_id: int, after: int) -> Decimal:
+    """What the counts and adjustments of an open package after the ledger
+    transaction `after` put right of what it showed."""
+    return _into_open(session, open_id, LedgerTransaction.id > after, _CORRECTS)
+
+
+def _into_open(session: Session, open_id: int, *where: ColumnElement[bool]) -> Decimal:
+    """All that went into an open package less all that left it, in the
+    ledger transactions `where` picks."""
     # A whole move names it on both sides: in and out, nothing changed.
     signed = case(
         (Movement.to_open_package_id == open_id, Movement.quantity), else_=0
@@ -538,7 +557,7 @@ def left_at(session: Session, open_id: int, as_of: int) -> Decimal:
                 Movement.to_open_package_id == open_id,
                 Movement.from_open_package_id == open_id,
             ),
-            then,
+            *where,
         )
     )
     return Decimal(total or 0)
@@ -656,8 +675,10 @@ refused = meter.create_counter(
 
 # An id or install number: positive, and fits PostgreSQL's integer.
 Number = Annotated[int, Field(gt=0, le=INTEGER_MAX)]
-# An amount in an item's unit, as the ledger's quantities are kept.
+# An amount in an item's unit, as the ledger's quantities are kept; one
+# left on something may be none.
 Amount = Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=3)]
+Remaining = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=3)]
 
 
 class Line(BaseModel):
@@ -728,7 +749,7 @@ class LengthReport(BaseModel):
 
     open_package_key: uuid.UUID
     # In the item's unit.
-    left: Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=3)]
+    left: Remaining
 
 
 class Batch(BaseModel):
@@ -905,9 +926,11 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
         for number, line in enumerate(batch.lines)
     ]
     held = hold(session, header, [line.item_id for line in lines])
-    reports = _keyed(session, used_up)
     length_keys = [each.open_package_key for each in lengths]
-    measured = _keyed(session, length_keys)
+    # Read together: the open packages said used up, and those measured.
+    keyed = _keyed(session, {*used_up, *length_keys})
+    reports = {key: keyed[key] for key in used_up if key in keyed}
+    measured = {key: keyed[key] for key in length_keys if key in keyed}
     # Those reported too, with the lines', in one order (ledger.py's).
     packages, opens, rows = _hold_forms(
         session, lines, also={*reports.values(), *measured.values()}
@@ -1426,14 +1449,25 @@ LINE_PROBLEMS: dict[str, tuple[str, ProblemKind]] = {
 }
 
 
+def _as_counted(
+    line: Line, packages: Mapping[int, PackageFacts]
+) -> PackageFacts | None:
+    """The package a line names, in the size it was counted in, if it says
+    and the package is of its item: no quantity in another size says what
+    the volunteer meant (package_resized)."""
+    package = packages.get(line.package_id or 0)
+    if package is None or line.package_size is None or package.item_id != line.item_id:
+        return package
+    return package._replace(size=line.package_size)
+
+
 def _packages_opened(batch: Batch, packages: Mapping[int, PackageFacts]) -> int:
     """How many open packages an opening would make (_opening), in the
-    size each line was counted in, if it says."""
+    size each line was counted in (_as_counted)."""
     return sum(
-        _packages_in(line, line.package_size or package.size)
+        _packages_in(line, package.size)
         for line in batch.lines
-        if (package := packages.get(line.package_id or 0)) is not None
-        and package.tracked
+        if (package := _as_counted(line, packages)) is not None and package.tracked
     )
 
 
@@ -1469,19 +1503,12 @@ def _problems(
             problems.append((("lines", number, "item_id"), "not_found"))
             continue
         # Resized since the page read its catalogue: refused, and its rules
-        # read in the size it was counted in, which no quantity in the new
-        # one says.
+        # read in the size it was counted in.
         facts = packages
-        package = packages.get(sent.package_id or 0)
-        if (
-            sent.package_size is not None
-            and package is not None
-            and package.item_id == sent.item_id
-            and package.size != sent.package_size
-        ):
+        counted = _as_counted(sent, packages)
+        if counted is not None and counted != packages[sent.package_id or 0]:
             problems.append((("lines", number, "package_size"), "package_resized"))
-            size = package._replace(size=sent.package_size)
-            facts = {**packages, sent.package_id or 0: size}
+            facts = {**packages, sent.package_id or 0: counted}
         broken += _line_form_breaks(
             batch.kind,
             lines[number],
@@ -1782,13 +1809,8 @@ def count_open_package(
         [(row.item_id, form, now)], {(row.item_id, form): shows}
     )
     if found:
-        _correct(
-            session,
-            key,
-            "count",
-            {"admin_id": admin_id, "to_location_id": place},
-            found,
-        )
+        header = {"admin_id": admin_id, "to_location_id": place}
+        _correct(session, key, "count", header, found)
     if lost:
         header = {"admin_id": admin_id, "from_location_id": place}
         _correct(session, lost_key, "count", header, lost)

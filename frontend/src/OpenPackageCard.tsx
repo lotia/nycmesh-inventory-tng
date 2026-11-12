@@ -77,6 +77,12 @@ export function OpenPackageCard({
   const opened = open.opened_at.slice(0, 10);
   const note =
     cut?.ending != null && usedUp ? endingNote(cut.ending, name, unit) : "";
+  /** `next` taken, keeping what is on it as typed only while the box asks
+   * the same: what is on it now, or after the cut. */
+  const take = (next: Taken) => {
+    const same = (cut === null) === (cutOf(open, next) === null);
+    onTake(same || !next.now ? next : { ...next, now: "" });
+  };
   // What is really on it: asked when the cut passes what it shows, or
   // when the volunteer says it shows the wrong length.
   const asking = taken.now !== undefined || cut?.ending === "over";
@@ -120,7 +126,7 @@ export function OpenPackageCard({
             onInput={(event) => {
               // A new cut: the box follows it again.
               const { usedUp: _, ...rest } = taken;
-              onTake({
+              take({
                 ...rest,
                 amount: event.currentTarget.value,
                 whole: false,
@@ -136,11 +142,13 @@ export function OpenPackageCard({
             type="checkbox"
             checked={taken.whole}
             onChange={(event) =>
-              onTake(
-                event.currentTarget.checked
+              take({
+                // Moved whole, it is not used up.
+                ...(taken.now === undefined ? {} : { now: taken.now }),
+                ...(event.currentTarget.checked
                   ? { amount: decimal(open.left), whole: true }
-                  : NOTHING_TAKEN,
-              )
+                  : NOTHING_TAKEN),
+              })
             }
           />
           All of it, moved still open
@@ -190,7 +198,7 @@ export function OpenPackageCard({
                 onTake({ ...taken, usedUp: event.currentTarget.checked })
               }
             />
-            Nothing usable left on this {name}
+            Nothing usable left on it
           </label>
         )}
         <p aria-live="polite" class={note === "" ? "" : "warning mt-2"}>

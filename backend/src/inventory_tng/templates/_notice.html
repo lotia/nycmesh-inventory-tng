@@ -1,6 +1,9 @@
 {#- The notice, if it is about the section with id `section_id` (pages.SECTION).
     Included just after that section's heading, which has that id:
-    {% with section_id="retired" %}{% include "_notice.html" %}{% endwith %} -#}
+    {% with section_id="retired" %}{% include "_notice.html" %}{% endwith %}
+    With `none`, a notice about no section, under the page's title
+    (admin_base.html). One that a change can be undone from offers it:
+    `undo`, the path to post to. -#}
 {% if notice and notice_section == section_id %}
 {%- if undo %}
 <div role="status" class="flex flex-wrap items-center gap-3">

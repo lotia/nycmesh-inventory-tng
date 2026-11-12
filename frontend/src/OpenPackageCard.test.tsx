@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/preact";
-import { describe, expect, test } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/preact";
+import { describe, expect, test, vi } from "vitest";
 import { afterCut, cutOf, usedUpOf } from "./cart";
 import { endingNote, OpenPackageCard, PRINTED_LENGTH } from "./OpenPackageCard";
 import { cable, radio } from "./test-catalogue";
@@ -43,7 +43,7 @@ describe("an open package's card", () => {
 function card(
   item: typeof cable,
   taken: { amount: string; whole: boolean; now?: string },
-  { left = 4000, moving = false } = {},
+  { left = 4000, moving = false, onTake = () => {} } = {},
 ) {
   const open = {
     id: 1,
@@ -62,7 +62,7 @@ function card(
       item={item}
       taken={taken}
       moving={moving}
-      onTake={() => {}}
+      onTake={onTake}
     />,
   );
 }
@@ -93,4 +93,37 @@ test("moved whole, then shown at nothing, its box stays to untick", () => {
 test("showing nothing, nothing is offered to move whole", () => {
   card(cable, { amount: "", whole: false }, { left: 0, moving: true });
   expect(screen.queryByLabelText("All of it, moved still open")).toBeNull();
+});
+
+test("what is on it, typed, is asked again once the box asks otherwise", () => {
+  const onTake = vi.fn();
+  const cutBox = () => screen.getByLabelText(/^Cut or take from the Spool/);
+  // Typed as it is now: a cut typed since makes it "after this cut".
+  const now = card(cable, { amount: "", whole: false, now: "3" }, { onTake });
+  fireEvent.input(cutBox(), { target: { value: "1" } });
+  expect(onTake).toHaveBeenLastCalledWith({
+    amount: "1",
+    whole: false,
+    now: "",
+  });
+  now.unmount();
+  // After a cut, another cut: still after this cut, kept.
+  card(cable, { amount: "1", whole: false, now: "2" }, { onTake });
+  fireEvent.input(cutBox(), { target: { value: "1.5" } });
+  expect(onTake).toHaveBeenLastCalledWith({
+    amount: "1.5",
+    whole: false,
+    now: "2",
+  });
+});
+
+test("moved whole, what is on it as typed now is said still", () => {
+  const onTake = vi.fn();
+  card(cable, { amount: "", whole: false, now: "3" }, { moving: true, onTake });
+  fireEvent.click(screen.getByLabelText("All of it, moved still open"));
+  expect(onTake).toHaveBeenLastCalledWith({
+    amount: "4",
+    whole: true,
+    now: "3",
+  });
 });
