@@ -11,7 +11,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import ledger, open_packages
+from inventory_tng import ledger, open_packages, pages
+from inventory_tng.local_env import CLONE
 from inventory_tng.models import Admin, LedgerTransaction, OpenPackage
 
 from helpers.rows import add, tag
@@ -58,6 +59,18 @@ def seen(session: Session, made: OpenPackage) -> str:
 def ticked(session: Session, *made: OpenPackage) -> list[str]:
     """Boxes ticked on the check page."""
     return [f"{each.id} {seen(session, each)}" for each in made]
+
+
+def test_the_check_page_hints_at_the_printed_length(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    spools: Spools,
+) -> None:
+    made = spools.opened()
+    registered_client.post(URL, json=report(spools, length(made, "250")))
+    page = text(admin_client.get(LENGTHS))
+    assert pages.PRINTED_LENGTH in page
+    assert f'aria-describedby="hint-{made.id}"' in page
 
 
 def test_a_volunteer_reports_what_is_on_it_and_nothing_moves(
@@ -428,3 +441,28 @@ def test_a_report_of_one_closed_is_not_kept(
     )
     session.refresh(made)
     assert made.length_reported is None
+
+
+# The hint to read the printed length (inventory-tng-pg7).
+
+
+def test_the_count_page_hints_at_the_printed_length_of_items_in_length(
+    admin_client: TestClient, session: Session, spools: Spools
+) -> None:
+    store = spools.store.id
+    spools.opened()
+    made = spools.opened()
+    page = text(admin_client.get(f"/admin/counts/{store}"))
+    assert page.count(pages.PRINTED_LENGTH) == 2
+    assert f'aria-describedby="hint-opened_{made.id}"' in page
+    # Counted each, as a box of plugs: none.
+    spools.cable.unit = "each"
+    session.flush()
+    page = text(admin_client.get(f"/admin/counts/{store}"))
+    assert pages.PRINTED_LENGTH not in page
+
+
+@pytest.mark.clone
+def test_the_scan_page_hints_in_the_same_words() -> None:
+    card = (CLONE / "frontend" / "src" / "OpenPackageCard.tsx").read_text()
+    assert f'"{pages.PRINTED_LENGTH}"' in card

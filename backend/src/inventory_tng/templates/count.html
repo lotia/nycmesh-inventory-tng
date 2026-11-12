@@ -30,7 +30,8 @@ if you didn't count it. Anything else here, add below.</p>
       <td>{{ row.words }}</td>
       <td>{{ row.amount | amount }}{% if not row.field.startswith("sealed_") %} {{ item.unit }}{% endif %}</td>
       {% if recount %}<td></td>{% endif %}
-      <td><input name="{{ row.field }}" inputmode="decimal" value="{{ values.get(row.field, row.amount | amount if row.amount > 0 else '0') }}" aria-label="{{ item.name }}, {{ row.words }}">
+      {%- set hint = item.unit | printed_length if row.open_id else "" %}
+      <td><input name="{{ row.field }}" inputmode="decimal" value="{{ values.get(row.field, row.amount | amount if row.amount > 0 else '0') }}" aria-label="{{ item.name }}, {{ row.words }}"{% if hint %} aria-describedby="hint-{{ row.field }}"{% endif %}>
         {% if row.open_id %}
         <select name="state_{{ row.open_id }}" aria-label="{{ item.name }}, {{ row.words }}: is it here?">
           {% set state = values.get("state_" ~ row.open_id, "here") %}
@@ -39,7 +40,8 @@ if you didn't count it. Anything else here, add below.</p>
           <option value="missing" {% if state == "missing" %}selected{% endif %}>Not here: close it, lost</option>
         </select>
         {% endif %}
-        {% with name = row.field %}{% include "_field_problem.html" %}{% endwith %}</td>
+        {% with name = row.field %}{% include "_field_problem.html" %}{% endwith %}
+        {% if hint %}<p class="hint" id="hint-{{ row.field }}">{{ hint }}</p>{% endif %}</td>
     </tr>
     {% endfor %}
     {% else %}
