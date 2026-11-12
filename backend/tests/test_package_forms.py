@@ -575,7 +575,8 @@ def test_a_size_is_said_only_of_a_package_of_the_lines_item(
     """Another item's package is not found, whatever size it is said to be;
     a size said of no package, or a package without one (an outbox's batch
     from before inventory-tng-5f7, on a dev phone: inventory-tng-1p8), is
-    refused as a page's bug, naming the line."""
+    refused as a page's bug, on the line's package_size; a package_id
+    refused already, on that alone."""
     other = sealed_line(spools, "300") | {
         "item_id": spools.place.item.id,
         "package_size": "1",
@@ -584,13 +585,41 @@ def test_a_size_is_said_only_of_a_package_of_the_lines_item(
     assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
         (["lines", 0, "package_id"], "not_found")
     ]
-    loose = {"item_id": spools.cable.id, "quantity": "5", "package_size": "5"}
-    unsized = sealed_line(spools, "305") | {"package_size": None}
-    for line in (loose, unsized):
+    # On package_size itself, in words naming both fields, for whoever
+    # writes a client; the scan page says it in its own (outbox.ts).
+    missing = (
+        "package_size_required",
+        (
+            "package_size is required when package_id is given: the size, in "
+            "the item's unit, the package was counted in, from the catalogue"
+        ),
+    )
+    unsized = {
+        k: v for k, v in sealed_line(spools, "305").items() if k != "package_size"
+    }
+    cases = [
+        (unsized, missing),
+        (unsized | {"package_size": None}, missing),
+        (
+            {"item_id": spools.cable.id, "quantity": "5", "package_size": "5"},
+            (
+                "package_size_without_package",
+                "package_size is only allowed with package_id",
+            ),
+        ),
+    ]
+    for line, (kind, words) in cases:
         response = registered_client.post(URL, json=spools.place.batch(lines=[line]))
         assert response.status_code == 422
-        assert [p["loc"][1:] for p in response.json()["detail"]] == [["lines", 0]]
-    assert "count it again" in response.json()["detail"][0]["msg"]
+        assert [
+            (p["loc"][1:], p["type"], p["msg"]) for p in response.json()["detail"]
+        ] == [(["lines", 0, "package_size"], kind, words)]
+    bad = sealed_line(spools, "305") | {"package_id": 0}
+    response = registered_client.post(URL, json=spools.place.batch(lines=[bad]))
+    assert response.status_code == 422
+    assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
+        (["lines", 0, "package_id"], "greater_than")
+    ]
 
 
 def test_a_refusal_names_each_bad_package_line(

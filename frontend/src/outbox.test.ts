@@ -449,9 +449,9 @@ describe("storage", () => {
     store(entry({ body: { ...entry().body, lines } }));
     const detail = [
       {
-        type: "value_error",
-        loc: ["body", "lines", 0],
-        msg: "Value error, A line of a package says the size it was counted in: load the page again, and count it again",
+        type: "package_size_required",
+        loc: ["body", "lines", 0, "package_size"],
+        msg: "package_size is required when package_id is given: the size, in the item's unit, the package was counted in, from the catalogue",
       },
     ];
     const { api, sent } = answering(() => json({ detail }, 422));
@@ -460,8 +460,40 @@ describe("storage", () => {
     expect((await bodies(sent))[0].lines).toEqual(lines);
     expect(states(outbox)).toEqual(["refused"]);
     expect(outbox.entries.value[0]?.note).toBe(
-      "Not saved. Line 1: Value error, A line of a package says the size it was counted in: load the page again, and count it again",
+      "Not saved. Line 1: A line of a package says the size it was counted in: load the page again, and count it again",
     );
+  });
+
+  test("a loose line's size, refused, is told in the page's words", async () => {
+    const detail = [
+      {
+        type: "package_size_without_package",
+        loc: ["body", "lines", 0, "package_size"],
+        msg: "package_size is only allowed with package_id",
+      },
+    ];
+    store(entry());
+    const outbox = new Outbox(answering(() => json({ detail }, 422)).api);
+    await outbox.send();
+    expect(outbox.entries.value[0]?.note).toBe(
+      "Not saved. Line 1: A loose line says a package's size: load the page again, and count it again",
+    );
+  });
+
+  test("another refusal of a line's package_size keeps the server's words", async () => {
+    const msg =
+      "This package's size changed since the page loaded: load the page again, and count it again";
+    const detail = [
+      {
+        type: "package_resized",
+        loc: ["body", "lines", 0, "package_size"],
+        msg,
+      },
+    ];
+    store(entry());
+    const outbox = new Outbox(answering(() => json({ detail }, 422)).api);
+    await outbox.send();
+    expect(outbox.entries.value[0]?.note).toBe(`Not saved. Line 1: ${msg}`);
   });
 
   test("an older build's batches are sent, and copied here, left there for its tabs", async () => {
