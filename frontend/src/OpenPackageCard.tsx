@@ -79,6 +79,9 @@ export function OpenPackageCard({
   const opened = open.opened_at.slice(0, 10);
   const note =
     cut?.ending != null && usedUp ? endingNote(cut.ending, word, unit) : "";
+  // What is really on it: asked when the cut passes what it shows, or
+  // when the volunteer says it shows the wrong length.
+  const asking = taken.now !== undefined || cut?.ending === "over";
   return (
     <fieldset
       class={`flex flex-col gap-2 border-2 border-line p-3 ${empty ? "bg-band" : ""}`}
@@ -144,6 +147,31 @@ export function OpenPackageCard({
           />
           All of it, moved still open
         </label>
+      )}
+      {asking ? (
+        <Field
+          quiet
+          label={`What's on the ${word} ${cut === null ? "now" : "after this cut"} (${unit}), if you can tell`}
+        >
+          {(id) => (
+            <input
+              id={id}
+              inputMode="decimal"
+              value={taken.now ?? ""}
+              onInput={(event) =>
+                onTake({ ...taken, now: event.currentTarget.value })
+              }
+            />
+          )}
+        </Field>
+      ) : (
+        <button
+          type="button"
+          class="self-start"
+          onClick={() => onTake({ ...taken, now: "" })}
+        >
+          Shows the wrong length?
+        </button>
       )}
       {/* The note is always there, so it is read out as it changes. */}
       <div>

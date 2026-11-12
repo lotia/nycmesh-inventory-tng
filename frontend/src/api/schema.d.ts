@@ -144,6 +144,11 @@ export interface components {
        * @description Keys of open packages the volunteer says are used up, for an administrator to confirm (docs/decisions/0020): with a cut that took all they showed, or alone, in a report.
        */
       used_up?: string[] | null;
+      /**
+       * Lengths
+       * @description What the volunteer says is really on open packages, by key, for an administrator to check (docs/decisions/0020): with a cut, or alone, in a report. Never an adjustment.
+       */
+      lengths?: components["schemas"]["LengthReport"][] | null;
     };
     /** Catalogue */
     Catalogue: {
@@ -232,6 +237,20 @@ export interface components {
       package_id: number | null;
       /** Location Id */
       location_id: number | null;
+    };
+    /**
+     * LengthReport
+     * @description What a volunteer says is really on an open package, for an
+     *     administrator to check (docs/decisions/0020, 2026-11-12).
+     */
+    LengthReport: {
+      /**
+       * Open Package Key
+       * Format: uuid
+       */
+      open_package_key: string;
+      /** Left */
+      left: number | string;
     };
     /** Line */
     Line: {

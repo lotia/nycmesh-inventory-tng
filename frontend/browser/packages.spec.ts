@@ -167,3 +167,51 @@ test("opening, an item fills its package sealed where it is opened", async ({
   await where.selectOption({ label: "Van" });
   await expect(box).toHaveValue("");
 });
+
+test("what is on an open package, said, is set by an administrator", async ({
+  page,
+}) => {
+  const cable = await ownCable(page);
+  const saving = () =>
+    page.waitForResponse(
+      (each) =>
+        each.url().endsWith("/api/transactions") &&
+        each.request().method() === "POST",
+    );
+  await page.goto("/scan");
+  await page.getByLabel("Your name").selectOption({ label: "Sam Example" });
+  await page.getByLabel("Opening packages").check();
+  await page
+    .getByLabel("Where", { exact: true })
+    .selectOption({ label: "Supernode 1 › Shelf A" });
+  await pick(page, cable);
+  await page.getByLabel(/^Box of 305 m/).fill("1");
+  let saved = saving();
+  await page.getByRole("button", { name: "Save" }).click();
+  expect((await saved).status()).toBe(201);
+  // Said to show the wrong length (inventory-tng-wy7).
+  await page.goto("/scan");
+  await page.getByLabel("Moving stock").check();
+  await pick(page, cable);
+  await page.getByLabel(/^Box of 305 m/).fill("");
+  await page.getByLabel(/^Loose/).fill("");
+  await page.getByRole("button", { name: "Shows the wrong length?" }).click();
+  await page
+    .getByLabel("What's on the box of 305 m now (m), if you can tell")
+    .fill("250");
+  saved = saving();
+  await page.getByRole("button", { name: "Save" }).click();
+  const report = await saved;
+  expect(report.status()).toBe(201);
+  expect(report.request().postDataJSON()).toMatchObject({
+    kind: "report",
+    lengths: [{ left: "250" }],
+  });
+  await page.goto("/admin");
+  await page.getByRole("link", { name: `${cable}: 1 box` }).click();
+  await expect(page.getByText("said 250 m is on it")).toBeVisible();
+  await page.getByRole("button", { name: `Set to it ${cable}` }).click();
+  await expect(
+    page.getByText("Set: a count of each writes what it really has."),
+  ).toBeVisible();
+});

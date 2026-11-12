@@ -456,6 +456,66 @@ describe("turning a cart into a batch", () => {
     });
   });
 
+  test("what is on an open package now goes with a cut, or alone", () => {
+    const key = "11111111-1111-4111-8111-111111111111";
+    const line = (taken: Record<string, unknown>) => [
+      {
+        itemId: 101,
+        packages: {},
+        loose: "",
+        open: { [key]: { amount: "", whole: false, ...taken } },
+      },
+    ];
+    expect(
+      toBatch(cart({ lines: line({ amount: "20", now: "250" }) }), CATALOGUE),
+    ).toMatchObject({
+      draft: {
+        kind: "move",
+        lengths: [{ open_package_key: key, left: "250" }],
+      },
+      what: "Move: 1 item from Hub to Van (what is on 1 open package said)",
+    });
+    expect(toBatch(cart({ lines: line({ now: "12.5" }) }), CATALOGUE)).toEqual({
+      draft: {
+        kind: "report",
+        volunteer_id: 1,
+        from_location_id: 10,
+        lines: [],
+        lengths: [{ open_package_key: key, left: "12.5" }],
+      },
+      what: "What's on it: 1 open package at Hub",
+    });
+    // With used up too, and the words say both.
+    expect(
+      toBatch(cart({ lines: line({ now: "0", usedUp: true }) }), CATALOGUE),
+    ).toMatchObject({
+      what: "Used up: 1 open package at Hub (what is on 1 open package said)",
+    });
+    // Blank is no report; not a number is a problem.
+    expect(toBatch(cart({ lines: line({ now: " " }) }), CATALOGUE)).toEqual({
+      problems: ["Add something to the cart."],
+    });
+    // Counted each: whole units only.
+    const radioLine = [
+      {
+        itemId: 100,
+        packages: {},
+        loose: "",
+        open: { [key]: { amount: "", whole: false, now: "2.5" } },
+      },
+    ];
+    expect(toBatch(cart({ lines: radioLine }), CATALOGUE)).toEqual({
+      problems: [
+        "LiteBeam 5AC: enter what is on the open package, in whole units, or leave it blank.",
+      ],
+    });
+    expect(toBatch(cart({ lines: line({ now: "lots" }) }), CATALOGUE)).toEqual({
+      problems: [
+        "Cat6 cable: enter what is on the open package, up to 3 decimals, or leave it blank.",
+      ],
+    });
+  });
+
   test("an open package said used up is offered no more", () => {
     const key = "11111111-1111-4111-8111-111111111111";
     const known = {

@@ -114,7 +114,14 @@ def query_string(only: Item | None) -> str:
 def needs_action(session: Session) -> list[Kind]:
     """What waits for an administrator's decision, by kind, those with
     something waiting: shown on the home page until each is made."""
-    from inventory_tng.admin import used_up
+    # They import this.
+    from inventory_tng.admin import length_checks, used_up
 
-    kinds = [kind(session, used_up.TITLE, used_up.USED_UP, *used_up.REPORTED)]
+    kinds = [
+        kind(session, used_up.TITLE, used_up.USED_UP, *used_up.REPORTED),
+        *(
+            kind(session, each.title, each.path, *each.where)
+            for each in length_checks.KINDS
+        ),
+    ]
     return [each for each in kinds if each.items]

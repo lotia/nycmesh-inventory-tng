@@ -224,6 +224,26 @@ describe("filling and saving a cart", () => {
     expect((screen.getByLabelText(CUT) as HTMLInputElement).value).toBe("");
   });
 
+  test("what is on it now: asked for when a cut passes it, or by a button", async () => {
+    await cableWith(spool());
+    const now = "What's on the spool now (m), if you can tell";
+    expect(screen.queryByLabelText(now)).toBeNull();
+    fireEvent.input(screen.getByLabelText(CUT), { target: { value: "150" } });
+    expect(
+      screen.getByLabelText(
+        "What's on the spool after this cut (m), if you can tell",
+      ),
+    ).toBeDefined();
+    fireEvent.input(screen.getByLabelText(CUT), { target: { value: "" } });
+    expect(screen.queryByLabelText(now)).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Shows the wrong length?" }),
+    );
+    const field = screen.getByLabelText(now) as HTMLInputElement;
+    fireEvent.input(field, { target: { value: "90" } });
+    expect(field.value).toBe("90");
+  });
+
   test("a cut leaving less than the package's short length ticks the box", async () => {
     await cableWith(spool({ short_below: "15.000" }));
     fireEvent.input(screen.getByLabelText(CUT), { target: { value: "110" } });

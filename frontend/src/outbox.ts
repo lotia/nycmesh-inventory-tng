@@ -67,6 +67,17 @@ export const BatchBody = v.object({
   ),
   /** Open packages said to be used up, by key (docs/decisions/0020). */
   used_up: v.exactOptional(v.nullable(v.array(v.pipe(v.string(), v.uuid())))),
+  /** What is really on open packages, said, by key. */
+  lengths: v.exactOptional(
+    v.nullable(
+      v.array(
+        v.object({
+          open_package_key: v.pipe(v.string(), v.uuid()),
+          left: v.union([v.number(), v.string()]),
+        }),
+      ),
+    ),
+  ),
 });
 
 export type Body = Schemas["Batch"];
@@ -90,6 +101,12 @@ const Entry = v.object({
 
 export type Entry = v.InferOutput<typeof Entry>;
 
+/** A batch's reports, as a 422 names them. */
+const REPORTS: Record<string, string> = {
+  used_up: "Open package said used up",
+  lengths: "What is on an open package",
+};
+
 /** A 422's problems, in words a volunteer can act on. A line of the cart
  * may be sent as several, one for each package and one loose (cart.ts,
  * toBatch), so a line is named as the cart's: by its item's place in it. */
@@ -102,10 +119,14 @@ function problems(
     .map(({ loc, msg }) => {
       const line = loc[0] === "body" && loc[1] === "lines" ? loc[2] : undefined;
       const words = typeof msg === "string" ? msg : "Not accepted";
-      const usedUp =
-        loc[0] === "body" && loc[1] === "used_up" ? loc[2] : undefined;
-      if (typeof usedUp === "number") {
-        return `Open package said used up, ${usedUp + 1}: ${words}`;
+      // A report's, by its place in the batch's list of them.
+      const report = REPORTS[String(loc[1])];
+      if (
+        loc[0] === "body" &&
+        report !== undefined &&
+        typeof loc[2] === "number"
+      ) {
+        return `${report}, ${loc[2] + 1}: ${words}`;
       }
       const sent = typeof line === "number" ? body.lines[line] : undefined;
       return sent === undefined
@@ -362,6 +383,7 @@ function keysNamed(body: Body): string[] {
     : [
         ...body.lines.flatMap((line) => line.open_package_key ?? []),
         ...(body.used_up ?? []),
+        ...(body.lengths ?? []).map((each) => each.open_package_key),
       ];
 }
 

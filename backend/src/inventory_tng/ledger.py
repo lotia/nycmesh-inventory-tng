@@ -25,7 +25,7 @@ Two choices that keep a volunteer's work from being lost:
 """
 
 import uuid
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from decimal import Decimal
 from types import MappingProxyType
@@ -680,6 +680,15 @@ class Line(BaseModel):
         )
 
 
+class LengthReport(BaseModel):
+    """What a volunteer says is really on an open package, for an
+    administrator to check (docs/decisions/0020, 2026-11-12)."""
+
+    open_package_key: uuid.UUID
+    # In the item's unit.
+    left: Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=3)]
+
+
 class Batch(BaseModel):
     key: uuid.UUID
     kind: VolunteerKind
@@ -705,15 +714,27 @@ class Batch(BaseModel):
             "that took all they showed, or alone, in a report.",
         ),
     ] = None
+    lengths: Annotated[
+        list[LengthReport] | None,
+        Field(
+            max_length=MAX_LINES,
+            description="What the volunteer says is really on open packages, "
+            "by key, for an administrator to check (docs/decisions/0020): "
+            "with a cut, or alone, in a report. Never an adjustment.",
+        ),
+    ] = None
 
     @model_validator(mode="after")
     def _sides(self) -> Batch:
         if (self.kind == "report") != (not self.lines):
             raise ValueError("a report has no lines; every other batch has some")
-        if self.kind == "report" and not self.used_up:
-            raise ValueError("a report names the open packages used up")
-        if self.used_up and self.kind not in ("move", "install", "report"):
-            raise ValueError("only a batch taking from where it is reports used up")
+        reports = bool(self.used_up or self.lengths)
+        if self.kind == "report" and not reports:
+            raise ValueError(
+                "a report names the open packages used up, or what is on them"
+            )
+        if reports and self.kind not in ("move", "install", "report"):
+            raise ValueError("only a batch taking from where it is reports")
         has_from, has_to = SIDES[self.kind]
         if (self.from_location_id is not None) != has_from or (
             self.to_location_id is not None
@@ -810,6 +831,8 @@ class Recorded(NamedTuple):
     opened: Mapping[Into, int] = MappingProxyType({})
     # How many open packages it reported used up, by how.
     reported: Mapping[Reported, int] = MappingProxyType({})
+    # How many checks of what an open package has it raised, by how.
+    checks: Mapping[open_packages.CheckRaised, int] = MappingProxyType({})
 
 
 def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded:
@@ -821,7 +844,13 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
     if (written := _replay(session, batch)) is not None:
         return Recorded(written, False)
     used_up = batch.used_up or []
-    header = {"device_id": device_id, **_header(batch), "used_up": used_up}
+    lengths = batch.lengths or []
+    header = {
+        "device_id": device_id,
+        **_header(batch),
+        "used_up": used_up,
+        "lengths": _lengths_as_kept(lengths),
+    }
     # An opening's are made later (_opening); another's are taken from.
     taken = {} if batch.kind == "open" else _open_packages_named(session, batch)
     lines = [
@@ -830,8 +859,12 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
     ]
     held = hold(session, header, [line.item_id for line in lines])
     reports = _keyed(session, used_up)
+    length_keys = [each.open_package_key for each in lengths]
+    measured = _keyed(session, length_keys)
     # Those reported too, with the lines', in one order (ledger.py's).
-    packages, opens, _ = _hold_forms(session, lines, also=reports.values())
+    packages, opens, rows = _hold_forms(
+        session, lines, also={*reports.values(), *measured.values()}
+    )
     # Its open packages' locks waited for any request writing it, which a
     # form rule would refuse, as it changed them: found as written instead.
     if opens and (written := _replay(session, batch)) is not None:
@@ -859,6 +892,16 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
             problems.append((("used_up", number), "open_package_elsewhere"))
         elif key in whole:
             problems.append((("used_up", number), "moved_whole"))
+    twice = repeated(length_keys)
+    for number, key in enumerate(length_keys):
+        at: tuple[str | int, ...] = ("lengths", number, "open_package_key")
+        opened = opens.get(measured.get(key, 0))
+        if number in twice:
+            problems.append((at, "repeated"))
+        elif opened is None:
+            problems.append((at, "not_found"))
+        elif opened.location_id != batch.from_location_id:
+            problems.append((at, "open_package_elsewhere"))
     if problems:
         refused.add(1, {"reason": "invalid"})
         log.info("batch refused", problems=sorted({kind for _, kind in problems}))
@@ -881,6 +924,28 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
     reported = open_packages.report(
         session, reports.values(), batch.volunteer_id, transaction.created_at
     )
+    # Each open package cut from: what it showed before, and after.
+    cuts: defaultdict[int, Decimal] = defaultdict(Decimal)
+    for number, open_id in taken.items():
+        if not batch.lines[number].whole:
+            cuts[open_id] += batch.lines[number].quantity
+    checks: dict[open_packages.CheckRaised, int] = {
+        "volunteer": sum(
+            open_packages.report_length(
+                rows[measured[each.open_package_key]],
+                each.left,
+                batch.volunteer_id,
+                transaction,
+            )
+            for each in lengths
+        ),
+        "below_zero": sum(
+            open_packages.went_below_zero(
+                rows[open_id], opens[open_id].left, cut, transaction.created_at
+            )
+            for open_id, cut in cuts.items()
+        ),
+    }
     # Asked as a cut took all it showed, or by its button, taking nothing.
     cut = {line.open_package_key for line in batch.lines}
     how: dict[Reported, int] = {}
@@ -888,7 +953,7 @@ def record(session: Session, batch: Batch, *, device_id: int | None) -> Recorded
         if open_id in reported:
             way: Reported = "cut" if key in cut else "button"
             how[way] = how.get(way, 0) + 1
-    return Recorded(transaction, True, retired, opened, how)
+    return Recorded(transaction, True, retired, opened, how, checks)
 
 
 # What an opened package became: an open package, followed, or loose units.
@@ -1623,6 +1688,59 @@ def record_count(
     return Counted(bool(into or out), moved, written, len(moved) if sent is None else 0)
 
 
+def count_open_package(
+    session: Session,
+    key: uuid.UUID,
+    admin_id: int,
+    row: OpenPackage,
+    left: Decimal,
+    as_of: int,
+) -> bool:
+    """Put an open package right at what it really has (docs/decisions/0020,
+    2026-11-12), as a count of it at its place does (count_corrections), as
+    it stood at `as_of` (a transaction id). False if it was cut from or
+    moved since, so a later cut is never undone; a count of only this
+    package, so another's cut does not stop it, as it would a count of the
+    place. Sent again under its key, written once. RuleBroken
+    (location_countable), as record_count."""
+    place = row.location_id
+    lock_place(session, place)
+    lost_key = uuid.uuid5(key, "lost")
+    if _first_sent(session, place, key, lost_key) is not None:
+        return True
+    _require_countable(session, place)
+    since = session.scalar(
+        select(func.count())
+        .select_from(Movement)
+        .where(
+            Movement.transaction_id > as_of,
+            or_(
+                Movement.from_open_package_id == row.id,
+                Movement.to_open_package_id == row.id,
+            ),
+        )
+    )
+    if since:
+        return False
+    form = Form(open_package_id=row.id)
+    found, lost = count_corrections(
+        [(row.item_id, form, left)],
+        {(row.item_id, form): left_on(session, [row])[row.id]},
+    )
+    if found:
+        _correct(
+            session,
+            key,
+            "count",
+            {"admin_id": admin_id, "to_location_id": place},
+            found,
+        )
+    if lost:
+        header = {"admin_id": admin_id, "from_location_id": place}
+        _correct(session, lost_key, "count", header, lost)
+    return True
+
+
 def record_adjustment(
     session: Session,
     key: uuid.UUID,
@@ -1653,7 +1771,21 @@ def record_adjustment(
 def _header(batch: Batch) -> dict[str, object]:
     """The batch's own columns: everything but its key, lines and reports,
     which are compared apart (_replay)."""
-    return batch.model_dump(exclude={"key", "lines", "used_up"})
+    return batch.model_dump(exclude={"key", "lines", "used_up", "lengths"})
+
+
+def _lengths_as_kept(lengths: Sequence[LengthReport]) -> list[dict[str, str]]:
+    """A batch's reports of what is on open packages, as its transaction
+    keeps them."""
+    return [
+        {"open_package_key": str(each.open_package_key), "left": str(each.left)}
+        for each in lengths
+    ]
+
+
+def _kept_as_sent(kept: Mapping[str, str]) -> tuple[uuid.UUID, Decimal]:
+    """One of those, as sent, compared whatever its decimal places."""
+    return uuid.UUID(kept["open_package_key"]), Decimal(kept["left"])
 
 
 def _replay(session: Session, batch: Batch) -> LedgerTransaction | None:
@@ -1688,6 +1820,8 @@ def _replay(session: Session, batch: Batch) -> LedgerTransaction | None:
     same = (
         written == sent
         and Counter(transaction.used_up) == Counter(batch.used_up or [])
+        and Counter(map(_kept_as_sent, transaction.lengths))
+        == Counter((each.open_package_key, each.left) for each in batch.lengths or [])
         and all(
             getattr(transaction, field) == value
             for field, value in _header(batch).items()
@@ -1805,7 +1939,7 @@ def save_batch(
     package it is in, sealed, and one loose (docs/decisions/0020)."""
     # So the history of anything the batch changes, such as on_order, says who.
     set_actor(session, f"volunteer:{batch.volunteer_id}")
-    transaction, written, retired, opened, reported = record(
+    transaction, written, retired, opened, reported, checks = record(
         session, batch, device_id=device.id
     )
     # Read before the commit, which expires it.
@@ -1826,6 +1960,8 @@ def save_batch(
                 taken_from.add(1, {"how": "whole" if line.whole else "cut"})
     for how, packages in reported.items():
         packages_reported.add(packages, {"how": how})
+    for how, raised in checks.items():
+        open_packages.measure_checks_raised(how, raised)
     log.info(
         "transaction recorded",
         transaction_id=transaction_id,
