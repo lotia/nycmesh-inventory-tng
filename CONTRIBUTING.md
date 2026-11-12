@@ -488,8 +488,9 @@ npm run coverage                 # Vitest, with coverage (npm test: without)
 ```
 
 Those are unit tests: Vitest runs the frontend's in a page it simulates
-(happy-dom), with no layout. The browser tests, in `frontend/browser/`, are
-another kind: Playwright drives a real browser engine against the whole app,
+(happy-dom), with no layout. The browser tests, in
+`frontend/browser-tests/`, are another kind: Playwright drives a real
+browser engine against the whole app,
 built frontend and all, from a database of their own
 (`backend/tests/browser_database.py`), at a phone's width, with a fake
 camera in Chromium that shows a seeded label. They check what
@@ -501,7 +502,8 @@ mise run check-browser           # builds, starts the app, runs them
 
 The tests run at once, in several workers, against that one database, so
 none may change rows another reads: a test that changes data first makes
-the rows it changes, such as an item to move (`frontend/browser/own.ts`).
+the rows it changes, such as an item to move
+(`frontend/browser-tests/own.ts`).
 The crawl of every page (`phone-width.spec.ts`), which reads them all,
 runs in each browser before any other test starts.
 

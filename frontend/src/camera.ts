@@ -1,6 +1,6 @@
 /**
  * The camera, for scanning labels (Scanner.tsx), with a QR decoder
- * (decoder.ts). Needs a real camera, so browser/camera.spec.ts tests it,
+ * (decoder.ts). Needs a real camera, so browser-tests/camera.spec.ts tests it,
  * not Vitest.
  */
 import { qrDetector } from "./decoder";
