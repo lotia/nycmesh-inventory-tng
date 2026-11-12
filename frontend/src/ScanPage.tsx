@@ -1,4 +1,4 @@
-import { type Signal, useSignal } from "@preact/signals";
+import { type Signal, signal, useSignal } from "@preact/signals";
 import type { TargetedSubmitEvent } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { type Api, check, makeApi } from "./api/client";
@@ -6,13 +6,16 @@ import { Catalogue as CatalogueReply, DeviceRefusedReply } from "./api/replies";
 import {
   addOne,
   askWho,
+  STORAGE_KEY as CART_KEY,
   type Cart,
   CartStore,
   type Catalogue,
+  cartInOlderKeys,
   freshCart,
   indexOf,
   keysToAsk,
   type Line,
+  loadCart,
   type Offered,
   offered,
   offeredAt,
@@ -32,10 +35,17 @@ import {
 import { Field } from "./Field";
 import { placeSides, readLabel, type Scanned } from "./labels";
 import { NOTHING_TAKEN, OpenPackageCard } from "./OpenPackageCard";
-import { type Entry, type Outbox, sharedOutbox } from "./outbox";
+import {
+  type Entry,
+  STORAGE_KEY as OUTBOX_KEY,
+  type Outbox,
+  sharedOutbox,
+  waitingInOlderKeys,
+} from "./outbox";
 import { decimal, thousandths } from "./quantity";
 import { NOT_REGISTERED } from "./registration";
 import { Scanner } from "./Scanner";
+import { onStoredChange } from "./stored";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
 
 const API = makeApi();
@@ -77,11 +87,30 @@ const RULED_LIST = "list-none p-0 *:border-t *:border-line *:py-3";
 export function ScanPage({
   api = API,
   outbox = sharedOutbox(),
+  reload,
 }: {
   api?: Api;
   outbox?: Outbox;
+  /** Load the page again: a newer build's (scan.tsx). */
+  reload: () => void;
 }) {
   const loaded = useSignal<Loaded>({ state: "loading" });
+  // Whether the cart holds no lines: until it does, a newer build is not
+  // loaded, as it would not read this build's cart (build.ts).
+  const cartEmpty = useMemo(() => signal(storedCartEmpty()), []);
+  // What older builds left, which this one keeps but never reads.
+  const older = useMemo(
+    () => ({ saves: waitingInOlderKeys(), cart: cartInOlderKeys() }),
+    [],
+  );
+  useEffect(() => {
+    if (older.saves > 0) {
+      telemetry.record({ kind: "older_storage", held: "saves" });
+    }
+    if (older.cart) {
+      telemetry.record({ kind: "older_storage", held: "cart" });
+    }
+  }, []);
   const loadedAt = useRef(0);
   // One refresh at a time; one asked for meanwhile follows it.
   const asking = useRef<"no" | "yes" | "again">("no");
@@ -171,14 +200,27 @@ export function ScanPage({
 
   useEffect(() => {
     const stop = outbox.listen();
+    const stopBuilds = outbox.builds.listen([OUTBOX_KEY, CART_KEY]);
+    // Another tab's cart, while no CartForm keeps cartEmpty.
+    const stopCart = onStoredChange([CART_KEY], () => {
+      if (loaded.value.state !== "ready") {
+        cartEmpty.value = storedCartEmpty();
+      }
+    });
     void outbox.send();
-    return stop;
+    return () => {
+      stop();
+      stopBuilds();
+      stopCart();
+    };
   }, [outbox]);
 
   const current = loaded.value;
   return (
     <main class="volunteer page-width">
       <h1>Scan</h1>
+      <NewerBuild outbox={outbox} cartEmpty={cartEmpty.value} reload={reload} />
+      <LeftByOlder saves={older.saves} cart={older.cart} />
       {current.state === "loading" && <p>Loading the catalogue…</p>}
       {current.state === "unregistered" && (
         <p role="alert">
@@ -199,6 +241,7 @@ export function ScanPage({
           catalogue={current.catalogue}
           pending={pending}
           outbox={outbox}
+          cartEmpty={cartEmpty}
         />
       )}
       <OutboxList outbox={outbox} />
@@ -206,15 +249,101 @@ export function ScanPage({
   );
 }
 
+/** Asks for a reload once a newer build is out, when this tab has sent
+ * what waits and the cart is saved or emptied, as the newer build reads
+ * neither (build.ts). */
+function NewerBuild({
+  outbox,
+  cartEmpty,
+  reload,
+}: {
+  outbox: Outbox;
+  cartEmpty: boolean;
+  reload: () => void;
+}) {
+  const learned = outbox.builds.newer.value;
+  if (learned === null) {
+    return null;
+  }
+  const waiting = outbox.entries.value.filter(
+    (entry) => entry.state === "waiting",
+  ).length;
+  let words: string;
+  if (learned === "too_old") {
+    words =
+      "This page is out of date, and the inventory no longer takes its saves.";
+    if (waiting > 0) {
+      words += ` The ${savesCount(waiting)} waiting will be kept on this phone, not sent: tell an administrator.`;
+    }
+  } else if (waiting > 0) {
+    words = `A newer version of this page is out. ${savesCount(waiting)} waiting to send: stay on this page until they have gone.`;
+  } else if (!cartEmpty) {
+    words =
+      "A newer version of this page is out. Save the cart, or empty it, then load the page again.";
+  } else {
+    words = "A newer version of this page is out.";
+  }
+  const offered = learned === "too_old" || (waiting === 0 && cartEmpty);
+  return (
+    <div
+      role="alert"
+      class="flex flex-col items-start gap-3 border-2 border-caution p-3"
+    >
+      <div>{words}</div>
+      {offered && (
+        <button type="button" class="primary" onClick={reload}>
+          Load the page again
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** "1 save", or "N saves". */
+function savesCount(n: number): string {
+  return n === 1 ? "1 save" : `${n} saves`;
+}
+
+/** Whether the stored cart holds no lines. */
+function storedCartEmpty(): boolean {
+  return loadCart().lines.length === 0;
+}
+
+/** Says what older builds left on this browser: kept, never read here. */
+function LeftByOlder({ saves, cart }: { saves: number; cart: boolean }) {
+  if (saves === 0 && !cart) {
+    return null;
+  }
+  return (
+    <div role="status" class="border-2 border-caution p-3">
+      {saves > 0 && (
+        <p>
+          This phone holds {savesCount(saves)} an older version of this page did
+          not send. They are kept here, not sent: tell an administrator.
+        </p>
+      )}
+      {cart && (
+        <p>
+          A cart filled on an older version of this page is kept on this phone,
+          not shown here. Fill it again if it was not saved.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function CartForm({
   catalogue,
   pending,
   outbox,
+  cartEmpty,
 }: {
   catalogue: Catalogue;
   /** The outbox's batches it does not show (cart.ts, unseen). */
   pending: readonly Entry[];
   outbox: Outbox;
+  /** Kept as the cart changes, here or in another tab (NewerBuild). */
+  cartEmpty: Signal<boolean>;
 }) {
   const store = useMemo(() => new CartStore(catalogue), []);
   // The open packages to take from, and how many are sealed where, as the
@@ -238,6 +367,10 @@ function CartForm({
   // Tabs share one cart; a refreshed catalogue clears what it no longer has.
   useEffect(() => store.listen(), [store]);
   useEffect(() => store.useCatalogue(catalogue), [catalogue]);
+  const empty = cart.value.lines.length === 0;
+  useEffect(() => {
+    cartEmpty.value = empty;
+  }, [empty]);
 
   // Asked when the page is shown again, and checked each minute, so a hub
   // tablet left on asks too. Never, when administrators set 0.

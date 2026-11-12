@@ -8,6 +8,7 @@ VITE_DEV_SERVER set, they point at Vite's dev server instead.
 """
 
 import json
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,6 +31,11 @@ STATIC = "/static/"
 ASSETS = STATIC + "assets/"
 # Where Vite's manifest is, inside dist.
 MANIFEST = Path(".vite") / "manifest.json"
+# Beside it, which build this is (frontend/vite.config.ts, BUILD): when it
+# was made, in UTC, to the millisecond, so a later build sorts after an
+# earlier one as text (page_builds.py).
+BUILD_FILE = Path(".vite") / "build.json"
+BUILD_ID = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z")
 # Each page and the entry in frontend/vite.config.ts that it loads.
 SCAN = "/scan"
 PAGES = {
@@ -61,6 +67,8 @@ class Bundle:
         self.config = config
         self.development = development
         self.built: dict[str, Tags] | None = None
+        # The build's id (BUILD_FILE), read with it; None without one.
+        self.build: str | None = None
         # The manifest's modification time and size when self.built was read.
         self.read_at: tuple[int, int] | None = None
         if config.dev_server is None:
@@ -76,6 +84,15 @@ class Bundle:
             self.reread()
         return None if self.built is None else self.built[entry]
 
+    def build_id(self) -> str | None:
+        """The id of the build the pages come from; None from the dev
+        server, or without a usable build."""
+        if self.config.dev_server is not None:
+            return None
+        if self.development:
+            self.reread()
+        return None if self.built is None else self.build
+
     def reread(self) -> None:
         """Read the manifest again if it changed since it was last read."""
         try:
@@ -86,7 +103,9 @@ class Bundle:
         if changed_at != self.read_at:
             # The build first: another request that sees read_at changed
             # must find the build that goes with it.
-            self.built = None if changed_at is None else self.read()
+            built = None if changed_at is None else self.read()
+            self.build = None if built is None else self.read_build()
+            self.built = built
             self.read_at = changed_at
 
     def read(self) -> dict[str, Tags] | None:
@@ -103,6 +122,15 @@ class Bundle:
             # Vite's: the pages answer as if unbuilt.
             log.warning("frontend manifest unusable", error=type(error).__name__)
             return None
+
+    def read_build(self) -> str | None:
+        """The build's id, from BUILD_FILE; None if it has none, as a build
+        from before builds had ids would not."""
+        try:
+            build = json.loads((self.config.dist / BUILD_FILE).read_text())["build"]
+        except OSError, ValueError, KeyError, TypeError:
+            return None
+        return build if isinstance(build, str) and BUILD_ID.fullmatch(build) else None
 
 
 def _from_manifest(manifest: dict[str, dict], entry: str) -> Tags:
@@ -188,7 +216,8 @@ def install(app: FastAPI, settings: Settings) -> None:
     if config.dev_server is not None:
         log.info("frontend", source="dev_server", at=config.dev_server)
         return
-    log.info("frontend", source="build", at=str(config.dist))
+    # The build's id is what page_builds.OLDEST_BUILD names.
+    log.info("frontend", source="build", at=str(config.dist), build=bundle.build)
     # An unusable manifest has already said so.
     if bundle.built is None and not (config.dist / MANIFEST).exists():
         log.warning("frontend not built", dist=str(config.dist))

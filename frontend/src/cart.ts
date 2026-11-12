@@ -11,11 +11,19 @@ import { v4 as uuid } from "uuid";
 import * as v from "valibot";
 import type { Schemas } from "./api/client";
 import { id } from "./api/replies";
+import { BUILD } from "./build";
 import type { Draft, Entry } from "./outbox";
 import { count, decimal, sent, thousandths } from "./quantity";
-import { onStoredChange, readStored, writeStored } from "./stored";
+import {
+  olderVersions,
+  onStoredChange,
+  readStored,
+  writeStored,
+} from "./stored";
 
-export const STORAGE_KEY = "inventory.cart.v1";
+/** Versioned as the outbox's is (outbox.ts): each build reads its own.
+ * v2's is stamped with the build that wrote it. */
+export const STORAGE_KEY = "inventory.cart.v2";
 /** The server's limits (ledger.py), checked here too, so a batch it would
  * refuse is never queued and the cart is kept to fix it. */
 const MAX_ID = 2 ** 31 - 1;
@@ -133,12 +141,26 @@ export function loadCart(storage: Storage = localStorage): Cart {
   return parsed.success ? parsed.output : freshCart();
 }
 
-/** False if the browser would not keep it. */
+/** False if the browser would not keep it. Stamped with this build, so a
+ * tab of an older one learns a newer one is out (build.ts). */
 export function storeCart(
   cart: Cart,
   storage: Storage = localStorage,
 ): boolean {
-  return writeStored(storage, STORAGE_KEY, cart);
+  return writeStored(storage, STORAGE_KEY, { ...cart, build: BUILD });
+}
+
+/** A stored cart with lines, of any version. */
+const Filled = v.object({
+  lines: v.pipe(v.array(v.unknown()), v.minLength(1)),
+});
+
+/** Whether an older build left a cart with lines under its key, which this
+ * build never reads: kept, and reported (ScanPage). */
+export function cartInOlderKeys(storage: Storage = localStorage): boolean {
+  return olderVersions(storage, STORAGE_KEY).some((stored) =>
+    v.is(Filled, stored),
+  );
 }
 
 /**

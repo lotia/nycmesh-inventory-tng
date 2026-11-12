@@ -327,19 +327,31 @@ A new build is picked up without restarting the backend when
 `APP_ENV=development`. Each backend says where its pages' scripts come from
 in its `frontend` log line at startup: `source=build` or `source=dev_server`.
 
-The scan page's outbox keeps its batches in `localStorage`, under a key
-with a version (`frontend/src/outbox.ts`). A change to what a stored batch
-holds, or a value a field may take, takes a new key, as a tab of the build
-before, open during a deploy, drops what it cannot read from what it writes
-back; `outbox.test.ts` lists both for the key. The new build copies the key
-before's batches into its own and sends them too, and never writes that
-key, so an older tab keeps sending and counting its own.
+The scan page's outbox and cart are kept in `localStorage`, each under a
+key with a version (`frontend/src/outbox.ts`, `cart.ts`), stamped with the
+build that wrote them. A change to what is kept, or to a value a field may
+take, takes a new key, as a tab of the build before, open during a deploy,
+drops what it cannot read from what it writes back; `outbox.test.ts` lists
+both for the outbox's key. A build reads and writes only its own keys: a
+tab of an older build sends its own batches, then asks for a reload, and a
+newer build reports what an older one left, never reading or removing it
+(`frontend/src/build.ts`, docs/decisions/0010).
+
+So the server keeps taking what the build before sends. Expand, then
+contract: a field the batch endpoint will require is added as optional,
+and made required only in a later deploy, after the one whose page sends
+it. That later change also sets `OLDEST_BUILD` in
+`backend/src/inventory_tng/page_builds.py` to the id of the build the
+earlier deploy served, from its `frontend` log line at startup
+(`build=`). A batch from a build before that is then answered 409
+`build_too_old` and kept on the phone, where a 422 would have it refused.
 
 The scan page needs a registered device, and some catalogue rows to choose
 from. The camera works only over HTTPS or on `localhost`.
 
-Both pages report their errors, three Web Vitals, the outbox's retries and
-how long a batch took from its first line to saving, through
+Both pages report their errors, three Web Vitals, the outbox's retries,
+how long a batch took from its first line to saving, a tab learning that a
+newer build is out, and what an older build left in storage, through
 `frontend/src/telemetry.ts`, to `POST /api/telemetry`, which turns them into
 `inventory.*` metrics (docs/decisions/0006). Its schema, in
 `backend/src/inventory_tng/page_telemetry.py`, lists all a page may send:

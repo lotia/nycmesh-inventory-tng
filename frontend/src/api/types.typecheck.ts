@@ -50,6 +50,7 @@ export async function saving(): Promise<void> {
     error.reason satisfies
       | Schemas["DeviceRefusedReply"]["reason"]
       | Schemas["KeyReusedReply"]["reason"]
+      | Schemas["BuildTooOldReply"]["reason"]
       | Schemas["UnavailableReply"]["reason"];
   }
   // @ts-expect-error not a kind the ledger has
@@ -79,10 +80,11 @@ export const replies: [
     Schemas["DeviceRefusedReply"]
   >,
   Same<Checked<typeof replies_.KeyReusedReply>, Schemas["KeyReusedReply"]>,
+  Same<Checked<typeof replies_.BuildTooOldReply>, Schemas["BuildTooOldReply"]>,
   Same<Checked<typeof replies_.Saved>, Schemas["Saved"]>,
   Same<Checked<typeof replies_.Catalogue>, Schemas["Catalogue"]>,
   // What the outbox keeps is exactly what the endpoint takes.
   Same<Checked<typeof BatchBody>, Schemas["Batch"]>,
-] = [true, true, true, true, true, true, true, true];
+] = [true, true, true, true, true, true, true, true, true];
 // @ts-expect-error a schema missing a field is caught
 export const caught: Same<{ id: number }, Schemas["VolunteerEntry"]> = true;

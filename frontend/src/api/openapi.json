@@ -106,17 +106,42 @@
     "/api/transactions": {
       "post": {
         "summary": "Save Batch",
-        "description": "Write a whole batch, or none of it. A 422 names each bad line, as\nFastAPI's own do: an item, package, location or volunteer that does not\nexist, a fraction of an item counted in each or of a package, a retired\nitem or package received, or an item another line names in the same\npackage, or loose, too (repeated): send each item on one line for each\npackage it is in, sealed, and one loose (docs/decisions/0020).",
+        "description": "Write a whole batch, or none of it. A 422 names each bad line, as\nFastAPI's own do: an item, package, location or volunteer that does not\nexist, a fraction of an item counted in each or of a package, a retired\nitem or package received, or an item another line names in the same\npackage, or loose, too (repeated): send each item on one line for each\npackage it is in, sealed, and one loose (docs/decisions/0020). The\nreply's X-Inventory-Build header names the build of the pages this\nserver serves, when it has one (page_builds.py).",
         "operationId": "save_batch_api_transactions_post",
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Inventory-Build",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The id of the scan page's build that sent it: a build older than the server takes is answered 409 build_too_old, before the batch is checked",
+              "title": "X-Inventory-Build"
+            },
+            "description": "The id of the scan page's build that sent it: a build older than the server takes is answered 409 build_too_old, before the batch is checked"
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/Batch"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -160,11 +185,19 @@
             }
           },
           "409": {
-            "description": "The key was used for another batch",
+            "description": "The key was used for another batch (key_reused), or the page's build is too old for this server (build_too_old): keep the batch, and load the page again",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/KeyReusedReply"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/KeyReusedReply"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BuildTooOldReply"
+                    }
+                  ],
+                  "title": "Response 409 Save Batch Api Transactions Post"
                 }
               }
             }
@@ -179,12 +212,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "device": []
-          }
-        ]
+        }
       }
     },
     "/api/catalogue": {
@@ -416,6 +444,18 @@
         "type": "object",
         "required": ["key", "kind", "volunteer_id", "lines"],
         "title": "Batch"
+      },
+      "BuildTooOldReply": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "const": "build_too_old",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": ["reason"],
+        "title": "BuildTooOldReply"
       },
       "Catalogue": {
         "properties": {
@@ -800,6 +840,25 @@
         "required": ["id", "name", "kind", "parent_id"],
         "title": "LocationEntry"
       },
+      "OlderStorage": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "older_storage",
+            "title": "Kind"
+          },
+          "held": {
+            "type": "string",
+            "enum": ["saves", "cart"],
+            "title": "Held"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind", "held"],
+        "title": "OlderStorage",
+        "description": "A scan page found what an older build left under its own key, which\nit keeps but does not read: saves not sent, or a cart with lines."
+      },
       "OpenPackageEntry": {
         "properties": {
           "id": {
@@ -862,6 +921,25 @@
         ],
         "title": "OpenPackageEntry",
         "description": "A package opened and followed, not reported used up: one a cart can\ntake from where it is."
+      },
+      "OutOfDate": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "out_of_date",
+            "title": "Kind"
+          },
+          "learned": {
+            "type": "string",
+            "enum": ["other_tab", "server", "too_old"],
+            "title": "Learned"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind", "learned"],
+        "title": "OutOfDate",
+        "description": "A scan page's tab learned that a newer build is out (page_builds.py),\nonce a tab."
       },
       "OutboxRetry": {
         "properties": {
@@ -1007,12 +1085,20 @@
                 },
                 {
                   "$ref": "#/components/schemas/ScanToSave"
+                },
+                {
+                  "$ref": "#/components/schemas/OutOfDate"
+                },
+                {
+                  "$ref": "#/components/schemas/OlderStorage"
                 }
               ],
               "discriminator": {
                 "propertyName": "kind",
                 "mapping": {
                   "error": "#/components/schemas/PageError",
+                  "older_storage": "#/components/schemas/OlderStorage",
+                  "out_of_date": "#/components/schemas/OutOfDate",
                   "outbox_retry": "#/components/schemas/OutboxRetry",
                   "scan_to_save": "#/components/schemas/ScanToSave",
                   "web_vital": "#/components/schemas/WebVital"

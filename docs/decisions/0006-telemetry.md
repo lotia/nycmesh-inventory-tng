@@ -29,8 +29,9 @@ judged too heavy, especially in the browser: about 1,000 lines and 9 packages.
 - **The app knows no vendor.** It sends to an endpoint: the Datadog Agent's
   OTLP receiver, or an OpenTelemetry Collector.
 - **The scan page uses no OpenTelemetry.** It sends errors, Web Vitals,
-  outbox retries and scan-to-save time to `/api/telemetry`, which records
-  them. Its schema limits what may be sent.
+  outbox retries, scan-to-save time, a tab learning that a newer build is
+  out, and what an older build left in storage to `/api/telemetry`, which
+  records them. Its schema limits what may be sent.
 
 We rejected always-on tracing and OpenTelemetry in the browser: neither
 earns its cost here.

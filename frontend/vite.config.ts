@@ -17,6 +17,10 @@ import { defineConfig } from "vitest/config";
 // Each page's entry: what the build bundles. admin.ts is the server-rendered
 // pages' script (backend bundle.py).
 const pages = ["src/scan.tsx", "src/register.tsx", "src/admin.ts"];
+// This build's id: when it was made, in UTC, so a later build's sorts after
+// (backend bundle.BUILD_ID). The pages stamp it on what they keep and send
+// it with each batch (src/build.ts); the backend reads it from dist.
+const BUILD = new Date().toISOString();
 /**
  * A setting as the backend reads it: from the shell, else from the
  * repository's .env and no other file, wherever Vite is started from.
@@ -44,7 +48,23 @@ if (!port || port === "0") {
 }
 
 export default defineConfig({
-  plugins: [preact(), tailwindcss()],
+  plugins: [
+    preact(),
+    tailwindcss(),
+    {
+      name: "build-id",
+      apply: "build",
+      // Beside the manifest, which only the backend reads (bundle.py).
+      generateBundle() {
+        this.emitFile({
+          type: "asset",
+          fileName: ".vite/build.json",
+          source: JSON.stringify({ build: BUILD }),
+        });
+      },
+    },
+  ],
+  define: { __BUILD__: JSON.stringify(BUILD) },
   base: "/static/",
   // No public/ directory: the backend serves only the hashed files Vite
   // writes to assets/, so a file copied as it is would be found by the dev

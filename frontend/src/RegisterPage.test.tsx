@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { expect, test, vi } from "vitest";
-import { Outbox } from "./outbox";
+import { BUILD } from "./build";
+import { Outbox, STORAGE_KEY } from "./outbox";
 import { RegisterPage } from "./RegisterPage";
 import { REFUSALS } from "./registration";
 import { answering, deferred, json } from "./test-fetch";
@@ -146,7 +147,10 @@ test("registering sends the batches that waited for it", async () => {
     transactionId: null,
     failures: 0,
   };
-  localStorage.setItem("inventory.outbox.v1", JSON.stringify([waiting]));
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ build: BUILD, entries: [waiting] }),
+  );
   const outbox = new Outbox(api);
   openAt("/register?code=a-b-c-d-e");
   render(<RegisterPage api={api} outbox={outbox} />);

@@ -69,7 +69,25 @@ class ScanToSave(Strict):
     seconds: Annotated[float, Field(ge=0, le=86_400)]
 
 
-AnyEvent = WebVital | PageError | OutboxRetry | ScanToSave
+class OutOfDate(Strict):
+    """A scan page's tab learned that a newer build is out (page_builds.py),
+    once a tab."""
+
+    kind: Literal["out_of_date"]
+    # From another tab's, the server's reply, or a batch held back as from
+    # a build too old.
+    learned: Literal["other_tab", "server", "too_old"]
+
+
+class OlderStorage(Strict):
+    """A scan page found what an older build left under its own key, which
+    it keeps but does not read: saves not sent, or a cart with lines."""
+
+    kind: Literal["older_storage"]
+    held: Literal["saves", "cart"]
+
+
+AnyEvent = WebVital | PageError | OutboxRetry | ScanToSave | OutOfDate | OlderStorage
 Event = Annotated[AnyEvent, Field(discriminator="kind")]
 
 
@@ -104,6 +122,17 @@ outbox_retries = meter.create_counter(
     unit="{attempt}",
     description="Batches the scan page will send again, by why",
 )
+out_of_date = meter.create_counter(
+    "inventory.page.out_of_date",
+    unit="{tab}",
+    description="Scan page tabs that learned a newer build is out, by how",
+)
+older_storage = meter.create_counter(
+    "inventory.page.older_storage",
+    unit="{load}",
+    description="Scan page loads that found saves not sent, or a cart, left "
+    "by an older build, by which",
+)
 scan_to_save = meter.create_histogram(
     "inventory.scan.to_save.duration",
     unit="s",
@@ -131,6 +160,10 @@ def record(event: AnyEvent) -> None:
             page_errors.add(1, {"page": event.page, "source": event.source})
         case OutboxRetry():
             outbox_retries.add(1, {"reason": event.reason})
+        case OutOfDate():
+            out_of_date.add(1, {"learned": event.learned})
+        case OlderStorage():
+            older_storage.add(1, {"held": event.held})
         case _:  # ScanToSave, the last kind left.
             scan_to_save.record(event.seconds)
 
