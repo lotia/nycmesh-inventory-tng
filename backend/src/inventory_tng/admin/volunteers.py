@@ -52,7 +52,7 @@ NOTICES.update(
 
 
 # How the volunteers list finds one: by name.
-SEARCHED = Searched(VOLUNTEERS, Volunteer, Volunteer.name, Volunteer.name)
+SEARCHED = Searched(VOLUNTEERS, Volunteer, Volunteer.search_text, Volunteer.name)
 
 
 def _list_page(

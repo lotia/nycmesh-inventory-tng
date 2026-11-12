@@ -105,7 +105,7 @@ def change(table: Table, old: Row | None, new: Row | None) -> Change | None:
 # The flush (imperative shell). Each row it touches is read from the
 # database before the flush and after it, rather than taken from the
 # objects, which may not hold every column (one expired, or set by the
-# database such as created_at and item.search_text), and may hold a value
+# database such as created_at), and may hold a value
 # other than the one stored (5.0004 in a numeric(12,3)). What is read before
 # is not locked: where two requests may change a row at once, the app locks
 # it first, and the flush refuses a change to a row of a table that names a

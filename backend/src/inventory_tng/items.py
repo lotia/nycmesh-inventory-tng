@@ -36,6 +36,7 @@ from inventory_tng.models import (
     Label,
     Movement,
     OpenPackage,
+    fold,
     fuzzy,
     name_key,
 )
@@ -133,11 +134,12 @@ def similar(session: Session, name: str, item_id: int) -> list[Item]:
     """Items other than `item_id`, the one named `name` now, whose names are
     close to it, closest first, retired ones too: as search finds them
     (models.fuzzy), or with a name found in `name`, as "mast" is in "Mast,
-    telescopic"."""
-    within = Item.name.op("<%", is_comparison=True)(literal(name))
-    close = or_(fuzzy(Item.name, name), within)
+    telescopic"; accents aside, as search's (models.fold)."""
+    folded = fold(name)
+    within = Item.name_folded.op("<%", is_comparison=True)(literal(folded))
+    close = or_(fuzzy(Item.name_folded, folded), within)
     query = select(Item).where(close, Item.id != item_id)
-    closest = func.similarity(Item.name, name).desc(), func.lower(Item.name)
+    closest = func.similarity(Item.name_folded, folded).desc(), func.lower(Item.name)
     return list(session.scalars(query.order_by(*closest).limit(SIMILAR)))
 
 

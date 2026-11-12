@@ -27,7 +27,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import INTEGER_MAX, fuzzy, holds, whole
+from inventory_tng.models import INTEGER_MAX, fold, fuzzy, holds, whole
 
 log = structlog.get_logger(__name__)
 
@@ -39,6 +39,12 @@ PER_PAGE = 50
 SUGGESTED = 8
 # The longest search read: enough for any name, and no more work than that.
 SEARCH_MAX = 200
+
+
+def folded(search: str) -> str:
+    """What was typed as what is searched is kept (models.fold), no longer
+    than SEARCH_MAX, as folding may lengthen it."""
+    return fold(search)[:SEARCH_MAX]
 
 
 def closeness(column: SQLColumnExpression[str], search: str) -> ColumnElement[float]:
@@ -53,7 +59,8 @@ def closeness(column: SQLColumnExpression[str], search: str) -> ColumnElement[fl
 @dataclass(frozen=True)
 class Searched[T]:
     """How a list page, at `here`, finds its kind of record: the model, the
-    text a search reads (such as an item's search_text) and its name, by
+    text a search reads, folded (models.fold), such as an item's
+    search_text, and its name, by
     which the list is sorted. Optionally: the select of the model it reads,
     if joined to more; a column a search matches only whole, held in
     capitals, such as a label's code, put first; which are current, if not
@@ -82,9 +89,11 @@ class Searched[T]:
             self.lapsed: self.lapsed,
             "all": "all",
         }
+        search = " ".join(q.split())[:SEARCH_MAX]
         return Listing(
             self,
-            search=" ".join(q.split())[:SEARCH_MAX],
+            # Nothing once folded, such as a lone accent: no search.
+            search=search if folded(search).strip() else "",
             show=shows.get(show, "current"),
             page=whole(page, 1, INTEGER_MAX) or 1,
             pick=whole(pick, 1, INTEGER_MAX),
@@ -99,14 +108,14 @@ class Searched[T]:
         return query.where(current if show == "current" else not_(current))
 
     def matching(self, search: str) -> ColumnElement[bool]:
-        found = fuzzy(self.text, search)
+        found = fuzzy(self.text, folded(search))
         if self.whole is None:
             return found
         return or_(found, self.whole == search.upper())
 
     def closeness(self, search: str) -> ColumnElement[float]:
         """As closeness(), and the whole column matched before anything."""
-        near = closeness(self.text, search)
+        near = closeness(self.text, folded(search))
         if self.whole is None:
             return near
         return case((self.whole == search.upper(), 3.0), else_=0.0) + near

@@ -78,3 +78,22 @@ left to the question about close names. A point or comma anywhere else is
 punctuation as before: `1. 5`, `.5` and `v.2` lose it. `models.name_key`
 and migration 0031, which makes the indexes again, say so in one
 expression, and a test checks they agree.
+
+## Amendment: searches ignore accents (2026-11-12)
+
+Uniqueness still keeps accented letters apart, but searches do not (Ali,
+2026-11-12, inventory-tng-8i4.135): many keyboards make accents hard to
+type, so `cafe` finds `Café` and `lodz` finds `Łódź`, and the reverse.
+Each searchable table keeps what is searched folded to ASCII, by the
+anyascii library (`models.fold`), which also spells `ø`, `ł`, `æ` and `ß`,
+as decomposing alone would not: items' `search_text` and `name_folded`,
+and volunteers', places' and packages' `search_text`. The app writes them
+as each row is added or changed (`models.Searchable`, before each flush),
+never PostgreSQL (0016), and what is typed is folded alike before it is
+compared. Items' and volunteers' are indexed with `pg_trgm`. A release of
+anyascii that spells a character otherwise needs a migration to fold the
+rows again.
+
+Rejected: `unaccent()` at search time, which no index serves without a
+function of our own wrapping it (0016), so each search reads the whole
+table; and decomposing alone, for what it misses.
