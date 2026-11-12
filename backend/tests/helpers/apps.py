@@ -11,8 +11,10 @@ from inventory_tng.app import create_app
 from inventory_tng.db import (
     LOCKS_INFO,
     UNGUARDED_INFO,
+    DbSession,
     get_session,
     get_session_factory,
+    get_snapshot,
     release_hold,
 )
 from inventory_tng.settings import LogConfig, Settings
@@ -59,12 +61,20 @@ def sessions_of(session: Session) -> Callable[[], Iterator[Session]]:
     return request_session
 
 
+def _same(session: DbSession) -> Session:
+    """get_snapshot's override: the request's session, as it is."""
+    return session
+
+
 def on_session(session: Session) -> dict[Callable[..., Any], Callable[..., Any]]:
     """An app's dependency overrides that put its requests, and the work
     after each reply, on the test's session, so they roll back with it,
-    guarded as the app's own sessions are (as_the_app)."""
+    guarded as the app's own sessions are (as_the_app). A route reading one
+    snapshot (db.get_snapshot) reads the test's transaction, whose isolation
+    is set: a test of the snapshot itself takes sessions that commit."""
     return {
         get_session: sessions_of(session),
+        get_snapshot: _same,
         get_session_factory: lambda: lambda: as_the_app(session),
     }
 

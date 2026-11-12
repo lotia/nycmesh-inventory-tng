@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng import labels, ledger
-from inventory_tng.db import DbSession
+from inventory_tng.db import SnapshotSession
 from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
 from inventory_tng.ledger import takeable, takeable_package
 from inventory_tng.models import (
@@ -232,27 +232,13 @@ def catalogue(session: Session) -> Catalogue:
     )
 
 
-# Reads of the catalogue before answering one whose batches changed as it
-# was read.
-TRIES = 3
-
-
 def with_saved(session: Session, keys: Sequence[uuid.UUID]) -> Catalogue:
     """The catalogue, and which of `keys` are saved batches, so that a batch
-    is in `saved` exactly when the stock shows it. Each read sees what was
-    committed as it began, so the keys are read before and after: a batch
-    saved before is in every read, one saved after in none. One saved
-    meanwhile, as the page's own outbox sends, is read again. Should that
-    keep happening, the keys read before are answered: the page takes off
-    such a batch twice until it asks again, which it does after a save."""
-    for _ in range(TRIES):
-        # Read again, rows too: not as the identity map kept them.
-        session.expire_all()
-        before = saved_of(session, keys)
-        reply = catalogue(session)
-        if saved_of(session, keys) == before:
-            break
-    reply.saved = sorted(before)
+    is in `saved` exactly when the stock shows it. On a session reading one
+    snapshot (db.SnapshotSession): a batch committed as it is read is in
+    neither (inventory-tng-19c)."""
+    reply = catalogue(session)
+    reply.saved = sorted(saved_of(session, keys))
     return reply
 
 
@@ -310,8 +296,9 @@ def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]
     },
 )
 def get_catalogue(
+    # The device first: one without a cookie is refused with no read.
     device: RegisteredDevice,
-    session: DbSession,
+    session: SnapshotSession,
     key: Annotated[list[uuid.UUID], Query(max_length=MOST_KEYS)] = [],  # noqa: B006  FastAPI copies it.
 ) -> Catalogue:
     """Everything current that a cart can hold, and who can fill one; and

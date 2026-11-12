@@ -229,6 +229,15 @@ an attempt counted against a rate limit the limits pool (`db.Database`). Take
 a connection only from a pool after the ones you hold: every test checks it,
 and one that breaks the order on purpose is marked `breaks_pool_order`.
 
+### Reads that must agree
+
+A route that only reads, and whose reads must agree with one another, as
+the catalogue's stock and the batches it says it shows must, takes
+`db.SnapshotSession`: the request's session, reading one snapshot
+(REPEATABLE READ, read only). A test's session cannot change its
+isolation, so a test of the snapshot takes sessions that commit
+(`own_committed`, or `make_client(own_sessions=True)`).
+
 ### The scan page
 
 The scan page and the registration page are TypeScript, in `frontend/`

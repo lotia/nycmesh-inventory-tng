@@ -294,6 +294,30 @@ def get_session(
 
 DbSession = Annotated[Session, Depends(get_session, scope="function")]
 
+
+def get_snapshot(session: DbSession) -> Session:
+    """The request's session, reading from here on one snapshot of the
+    database: what was committed as its first read began, and nothing
+    committed after, however many statements a reply takes. Read only, so
+    a write fails at once rather than as a serialization failure. A
+    transaction's isolation is set as it begins, so one begun already, as
+    by reading the request's device, is let go first: it must have changed
+    nothing."""
+    if session.new or session.dirty or session.deleted:
+        raise RuntimeError("a snapshot asked for after a change")
+    if session.in_transaction():
+        session.rollback()
+    session.connection(
+        execution_options={
+            "isolation_level": "REPEATABLE READ",
+            "postgresql_readonly": True,
+        }
+    )
+    return session
+
+
+SnapshotSession = Annotated[Session, Depends(get_snapshot)]
+
 # Opens a session of its own: for work after the reply, when the request's
 # has closed.
 SessionFactory = Callable[[], AbstractContextManager[Session]]

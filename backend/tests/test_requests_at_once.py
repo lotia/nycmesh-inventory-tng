@@ -34,6 +34,7 @@ from inventory_tng import (
     accounts,
     adjustment_reasons,
     categories,
+    devices,
     items,
     locations,
     mail,
@@ -41,12 +42,14 @@ from inventory_tng import (
     sign_in,
     volunteers,
 )
+from inventory_tng import catalogue as scan_catalogue
 from inventory_tng.admin.admins import ADMINS
 from inventory_tng.admin.volunteers import VOLUNTEERS
 from inventory_tng.db import (
     Base,
     DbSession,
     RuleBroken,
+    get_snapshot,
     hold_until_commit,
     locked,
     locked_row,
@@ -76,6 +79,7 @@ from inventory_tng.models import (
 )
 
 from helpers.concurrency import Committed, Worker, delete_made, made, newest_ids
+from helpers.devices import new_device
 from helpers.mail import NO_MAIL, SentMail
 from helpers.rows import item_fields, tag
 from helpers.sign_in import (
@@ -1354,3 +1358,74 @@ def test_a_form_sent_twice_at_once_waits_then_makes_nothing(
         committed.session().scalar(select(Admin.id).where(Admin.username == "grace"))
         is None
     )
+
+
+@pytest.mark.concurrency
+def test_the_catalogue_reads_one_snapshot(
+    own_committed: Committed, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A batch committed while the catalogue is read is in neither its
+    stock nor `saved`; one committed before is in both (inventory-tng-19c).
+    Under READ COMMITTED, the receipt saved between the stock's read and the
+    keys' would be said saved and not counted, and the page would never
+    take it off. On a database of its own, as it writes the ledger."""
+    setup = own_committed.session()
+    spools = Spools(setup)
+    before, during = uuid.uuid4(), uuid.uuid4()
+    spools.receive(before)
+    setup.commit()
+    reader = own_committed.session()
+    # The device's read, as the route's request makes it first.
+    reader.scalar(select(Location.id).limit(1))
+    get_snapshot(reader)
+    to_take = scan_catalogue.open_to_take
+
+    def saving_meanwhile(session: Session, item_ids: set[int]) -> object:
+        spools.receive(during)
+        setup.commit()
+        return to_take(session, item_ids)
+
+    monkeypatch.setattr(scan_catalogue, "open_to_take", saving_meanwhile)
+    reply = scan_catalogue.with_saved(reader, [before, during])
+    reader.rollback()
+    assert reply.saved == [before]
+    [cable] = [each for each in reply.items if each.id == spools.cable.id]
+    # Two received with the place, and `before`'s.
+    assert [(s.location_id, s.count) for s in cable.packages[0].sealed] == [
+        (spools.store.id, 3)
+    ]
+    # One that has read nothing yet begins its snapshot as is.
+    fresh = get_snapshot(own_committed.session())
+    assert fresh.scalar(text("SHOW transaction_isolation")) == "repeatable read"
+    fresh.rollback()
+
+
+@pytest.mark.end_to_end
+def test_the_catalogue_route_reads_one_snapshot(
+    committed: Committed,
+    make_client: Callable[..., TestClient],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """On a session of its own, as in production: REPEATABLE READ, from
+    after its device was read."""
+    setup = committed.session()
+    _, token = new_device(setup)
+    setup.commit()
+    seen: list[tuple[str | None, str | None]] = []
+    answer = scan_catalogue.with_saved
+
+    def isolation(session: Session, keys: list[uuid.UUID]) -> scan_catalogue.Catalogue:
+        shown = session.execute(
+            text(
+                "SELECT current_setting('transaction_isolation'),"
+                " current_setting('transaction_read_only')"
+            )
+        ).one()
+        seen.append(tuple(shown))
+        return answer(session, keys)
+
+    monkeypatch.setattr(scan_catalogue, "with_saved", isolation)
+    client = make_client(own_sessions=True)
+    client.cookies.set(devices.COOKIE, token)
+    assert client.get("/api/catalogue").status_code == 200
+    assert seen == [("repeatable read", "on")]
