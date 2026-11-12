@@ -34,7 +34,7 @@ from inventory_tng.models import (
     ScanSettings,
     Volunteer,
 )
-from inventory_tng.open_packages import is_short_end, tracks_opened
+from inventory_tng.open_packages import tracks_opened
 
 log = structlog.get_logger(__name__)
 
@@ -81,6 +81,9 @@ class PackageEntry(Entry):
     # Retired, but with sealed packages left: they may be taken, never
     # received.
     retired: bool
+    # Too short to use, in the item's unit, if set: for an open package
+    # the page makes before the server has seen it (OpenPackageEntry).
+    short_below: Decimal | None
     # The current places with some sealed, and how many: opening its item
     # at one of them opens this package, if it is the item's only one
     # sealed there (the page takes off what its outbox has moved since).
@@ -102,9 +105,10 @@ class OpenPackageEntry(Entry):
     opened_at: datetime
     # What is left on it, in the item's unit, as the records say.
     left: Decimal
-    # Less left than its package's too-short-to-use length, retired
-    # package or not: asked about as a short end on the next cut.
-    short: bool
+    # Its package's too-short-to-use length, in the item's unit, if set,
+    # retired package or not: a cut leaving less than it ticks "nothing
+    # usable left" (docs/decisions/0020).
+    short_below: Decimal | None
 
 
 class ItemEntry(BaseModel):
@@ -173,6 +177,7 @@ def catalogue(session: Session) -> Catalogue:
                 size=package.size,
                 track_opened=tracks_opened(item_tracks, package.track_opened),
                 retired=package.retired_at is not None,
+                short_below=package.short_below,
                 sealed=[
                     # A part of one, as a count may leave, is one to open.
                     SealedAt(
@@ -289,7 +294,7 @@ def open_to_take(session: Session, item_ids: set[int]) -> list[OpenPackageEntry]
             location_id=row.location_id,
             opened_at=row.opened_at,
             left=left[row.id],
-            short=is_short_end(left[row.id], short_below),
+            short_below=short_below,
         )
         for row, name, short_below in found
     ]

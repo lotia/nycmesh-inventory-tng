@@ -79,7 +79,18 @@ test("a package opened on the scan page is saved as an opening", async ({
   await pick(page, cable);
   await page.getByLabel(/^Box of 305 m/).fill("");
   await page.getByLabel(/^Loose/).fill("");
-  await page.getByLabel(/^From the open Box of 305 m: 305 m left/).fill("20");
+  // A cut of all it shows ticks the box, and says why (inventory-tng-ck0).
+  const cutBox = page.getByLabel(/^Cut or take from the box of 305 m opened/);
+  const nothingLeft = page.getByLabel(
+    "Nothing usable left on this box of 305 m",
+  );
+  await cutBox.fill("305");
+  await expect(nothingLeft).toBeChecked();
+  await expect(
+    page.getByText("Your cut uses up the box of 305 m"),
+  ).toBeVisible();
+  await cutBox.fill("20");
+  await expect(nothingLeft).not.toBeChecked();
   const cutting = page.waitForResponse(
     (each) =>
       each.url().endsWith("/api/transactions") &&
@@ -99,7 +110,7 @@ test("a package opened on the scan page is saved as an opening", async ({
   await pick(page, cable);
   await page.getByLabel(/^Box of 305 m/).fill("");
   await page.getByLabel(/^Loose/).fill("");
-  await page.getByLabel("Used up: what is left is no use").check();
+  await page.getByLabel("Nothing usable left on this box of 305 m").check();
   const reporting = page.waitForResponse(
     (each) =>
       each.url().endsWith("/api/transactions") &&

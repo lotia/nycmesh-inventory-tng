@@ -265,7 +265,8 @@ class Forms:
 def is_short_end(left: Decimal, short_below: Decimal | None) -> bool:
     """Whether an open package with `left` on it is a short end: some
     left, but less than its package's too-short-to-use length. Less than
-    nothing is the records', not a short end."""
+    nothing is the records', not a short end. The scan page judges a cut
+    by the same length (frontend/src/cart.ts, afterCut)."""
     return short_below is not None and 0 < left < short_below
 
 

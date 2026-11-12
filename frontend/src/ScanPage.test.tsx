@@ -138,21 +138,11 @@ describe("loading", () => {
 });
 
 describe("filling and saving a cart", () => {
-  test("an open package where it comes from can be cut, or taken whole", async () => {
-    const opened = {
-      id: 5,
-      key: "11111111-1111-4111-8111-111111111111",
-      item_id: 101,
-      package_id: 1001,
-      package_name: "Spool",
-      location_id: 10,
-      opened_at: "2026-11-03T10:00:00Z",
-      left: "120.000",
-      short: false,
-    };
+  /** The cable at the hub, with these open packages there. */
+  async function cableWith(...opens: Record<string, unknown>[]) {
     const { api } = answering((request) =>
-      new URL(request.url).pathname === "/api/catalogue"
-        ? json({ ...CATALOGUE, open_packages: [opened] }, 200)
+      isCatalogue(request)
+        ? json({ ...CATALOGUE, open_packages: opens }, 200)
         : saved(),
     );
     open(api);
@@ -160,90 +150,119 @@ describe("filling and saving a cart", () => {
     pick("From", "10");
     find("cat6");
     fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
-    const label = "From the open Spool: 120 m left, opened 2026-11-03";
-    const field = screen.getByLabelText(label) as HTMLInputElement;
+  }
+
+  const spool = (fields: Record<string, unknown> = {}) => ({
+    id: 5,
+    key: "11111111-1111-4111-8111-111111111111",
+    item_id: 101,
+    package_id: 1001,
+    package_name: "Spool",
+    location_id: 10,
+    opened_at: "2026-11-03T10:00:00Z",
+    left: "120.000",
+    short_below: null,
+    ...fields,
+  });
+
+  const CUT = "Cut or take from the spool opened 2026-11-03 (m)";
+  const NOTHING_LEFT = "Nothing usable left on this spool";
+  const ticked = () =>
+    (screen.getByLabelText(NOTHING_LEFT) as HTMLInputElement).checked;
+  const note = () =>
+    screen.getByText(
+      (_, element) => element?.getAttribute("aria-live") === "polite",
+    ).textContent;
+
+  test("an open package is a card: now, after this cut, and a box that ticks itself", async () => {
+    await cableWith(spool());
+    const card = screen.getByRole("group", {
+      name: /^Spool open opened 2026-11-03/,
+    });
+    expect(within(card).getByText("120 m")).toBeDefined();
+    const field = screen.getByLabelText(CUT) as HTMLInputElement;
+    // The cut's box is described by both figures.
+    const described = (field.getAttribute("aria-describedby") ?? "").split(" ");
+    expect(
+      described.map((id) => document.getElementById(id)?.textContent),
+    ).toEqual(["Now: 120 m", "After this cut: "]);
     fireEvent.input(field, { target: { value: "20" } });
-    expect(field.value).toBe("20");
+    expect(within(card).getByText("100 m")).toBeDefined();
+    expect(ticked()).toBe(false);
+    expect(note()).toBe("");
+    // All it shows: ticked, and why.
+    fireEvent.input(field, { target: { value: "120" } });
+    expect(ticked()).toBe(true);
+    expect(note()).toBe(
+      "Your cut uses up the spool, so it's ticked. Untick it if cable is left. An administrator confirms.",
+    );
+    // Unticked by the volunteer: no note.
+    fireEvent.click(screen.getByLabelText(NOTHING_LEFT));
+    expect(ticked()).toBe(false);
+    expect(note()).toBe("");
+    // Another cut: the box follows it again.
+    fireEvent.input(field, { target: { value: "150" } });
+    expect(within(card).getByText("30 m over")).toBeDefined();
+    expect(ticked()).toBe(true);
+    expect(note()).toBe(
+      "Your cut is more than the spool shows, so it's ticked. It's saved as you typed it, and an administrator will check the spool.",
+    );
+    // Back to a cut that leaves some: unticked again.
+    fireEvent.input(field, { target: { value: "20" } });
+    expect(ticked()).toBe(false);
+    // Moved whole: no cut, no box.
     fireEvent.click(screen.getByLabelText("All of it, moved still open"));
     expect(field.value).toBe("120");
     expect(field.disabled).toBe(true);
+    expect(screen.queryByLabelText(NOTHING_LEFT)).toBeNull();
     fireEvent.click(screen.getByLabelText("All of it, moved still open"));
     expect(field.value).toBe("");
-    fireEvent.input(field, { target: { value: "20" } });
-    // All of it typed: asked whether it is used up.
-    fireEvent.input(field, { target: { value: "120" } });
-    fireEvent.click(
-      screen.getByLabelText("That takes all it shows: is it used up?"),
-    );
-    fireEvent.input(field, { target: { value: "20" } });
-    expect(
-      (
-        screen.getByLabelText(
-          "Used up: what is left is no use",
-        ) as HTMLInputElement
-      ).checked,
-    ).toBe(true);
-    // 120 m left is no short end: the question is the button's own.
-    fireEvent.input(field, { target: { value: "" } });
-    expect(screen.queryByLabelText("A short end: is it used up?")).toBeNull();
     // Another place: what was taken from this one's packages goes.
+    fireEvent.input(field, { target: { value: "20" } });
     pick("From", "12");
     pick("From", "10");
-    expect((screen.getByLabelText(label) as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText(CUT) as HTMLInputElement).value).toBe("");
   });
 
-  test("an open package below its package's short length is a short end", async () => {
-    const opened = {
-      id: 6,
-      key: "22222222-2222-4222-8222-222222222222",
-      item_id: 101,
-      package_id: 1001,
-      package_name: "Spool",
-      location_id: 10,
-      opened_at: "2026-11-03T10:00:00Z",
-      left: "12.000",
-      short: true,
-    };
-    const { api } = answering((request) =>
-      new URL(request.url).pathname === "/api/catalogue"
-        ? json({ ...CATALOGUE, open_packages: [opened] }, 200)
-        : saved(),
+  test("a cut leaving less than the package's short length ticks the box", async () => {
+    await cableWith(spool({ short_below: "15.000" }));
+    fireEvent.input(screen.getByLabelText(CUT), { target: { value: "110" } });
+    expect(ticked()).toBe(true);
+    expect(note()).toBe(
+      "This spool will be unusable after this cut, so it's ticked. Untick it if you'll keep the short end.",
     );
-    open(api);
-    await ready();
-    pick("From", "10");
-    find("cat6");
-    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
-    expect(screen.getByLabelText("A short end: is it used up?")).toBeDefined();
+  });
+
+  test("several open packages: most left first, one showing nothing last", async () => {
+    await cableWith(
+      spool({ key: "22222222-2222-4222-8222-222222222222", left: "-4.000" }),
+      spool({ key: "33333333-3333-4333-8333-333333333333", left: "40.000" }),
+      spool(),
+    );
+    const cards = screen.getAllByRole("group", { name: /^Spool open/ });
+    expect(
+      cards.map((card) => within(card).getAllByText(/ m$/)[0]?.textContent),
+    ).toEqual(["Now: 120 m", "Now: 40 m", "Now: -4 m"]);
+    expect(
+      within(cards[2] as HTMLElement).getByText("Shows nothing left"),
+    ).toBeDefined();
+    expect(
+      within(cards[0] as HTMLElement).queryByText("Shows nothing left"),
+    ).toBeNull();
   });
 
   test("an open package is named by its package, though the catalogue has it no more", async () => {
     // A retired spool with none sealed left is not among the cable's
     // packages, but its open one is still taken from (inventory-tng-4w4).
-    const opened = {
-      id: 7,
-      key: "55555555-5555-4555-8555-555555555555",
-      item_id: 101,
-      package_id: 1009,
-      package_name: "Old reel",
-      location_id: 10,
-      opened_at: "2026-11-03T10:00:00Z",
-      left: "40.000",
-      short: false,
-    };
-    const { api } = answering((request) =>
-      new URL(request.url).pathname === "/api/catalogue"
-        ? json({ ...CATALOGUE, open_packages: [opened] }, 200)
-        : saved(),
+    await cableWith(
+      spool({ package_id: 1009, package_name: "Old reel", left: "40.000" }),
     );
-    open(api);
-    await ready();
-    pick("From", "10");
-    find("cat6");
-    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    expect(
+      screen.getByRole("group", { name: /^Old reel open opened 2026-11-03/ }),
+    ).toBeDefined();
     expect(
       screen.getByLabelText(
-        "From the open Old reel: 40 m left, opened 2026-11-03",
+        "Cut or take from the old reel opened 2026-11-03 (m)",
       ),
     ).toBeDefined();
   });
@@ -309,6 +328,7 @@ describe("filling and saving a cart", () => {
                   size: "8",
                   track_opened: false,
                   retired: true,
+                  short_below: null,
                   sealed: [
                     { location_id: 10, count: 1 },
                     { location_id: 12, count: 1 },

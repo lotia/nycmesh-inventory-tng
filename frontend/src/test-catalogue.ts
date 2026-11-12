@@ -16,6 +16,7 @@ export const radio: Item = {
       size: "4.000",
       track_opened: false,
       retired: false,
+      short_below: null,
       sealed: [{ location_id: 10, count: 2 }],
     },
   ],
@@ -37,6 +38,7 @@ export const cable: Item = {
       size: "305.000",
       track_opened: true,
       retired: false,
+      short_below: null,
       sealed: [
         { location_id: 10, count: 3 },
         { location_id: 12, count: 1 },

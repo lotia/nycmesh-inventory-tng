@@ -43,7 +43,8 @@ const LineSchema = v.object({
       v.object({
         amount: v.string(),
         whole: v.boolean(),
-        /** Said to be used up, for an administrator to confirm. */
+        /** Said to be used up, or not, by the volunteer, for an
+         * administrator to confirm; unsaid, as the cut says (usedUpOf). */
         usedUp: v.exactOptional(v.boolean()),
       }),
     ),
@@ -550,16 +551,25 @@ export const RETIRED = "retired: taking only";
 export function toBatch(
   filled: Cart,
   catalogue: Catalogue,
-  offeredKeys?: ReadonlySet<string>,
+  all?: readonly Offered[],
 ): { draft: Draft; what: string } | { problems: string[] } {
-  const cart = withOffered(reconcile(filled, catalogue), offeredKeys);
+  const reconciled = reconcile(filled, catalogue);
+  // Only what the page offers to take from, where it comes from.
+  const here = new Map(
+    (all ?? [])
+      .filter((each) => each.location_id === reconciled.fromId)
+      .map((each) => [each.key, each]),
+  );
+  const cart = all === undefined ? reconciled : withOffered(reconciled, here);
   const index = indexOf(catalogue);
   // Open packages said to be used up: with what is taken, or alone, when
   // nothing else is in the cart: a report, at the From place.
   const usedUp = cart.lines.flatMap((line) =>
-    Object.entries(line.open ?? {}).flatMap(([key, taken]) =>
-      taken.usedUp ? [key] : [],
-    ),
+    Object.entries(line.open ?? {}).flatMap(([key, taken]) => {
+      const open = here.get(key);
+      const said = open === undefined ? taken.usedUp : usedUpOf(open, taken);
+      return said ? [key] : [];
+    }),
   );
   const reporting =
     usedUp.length > 0 &&
@@ -855,7 +865,7 @@ export function offered(
             location_id: draft.from_location_id ?? 0,
             opened_at: new Date(queuedAt).toISOString(),
             left: amount,
-            short: false,
+            short_below: pack?.short_below ?? null,
           });
         }
         continue;
@@ -875,34 +885,68 @@ export function offered(
   return [...byKey.values()];
 }
 
-/** The keys of offered's open packages at a place, of any item. */
-export function keysAt(
-  all: readonly Offered[],
-  placeId: number | null,
-): Set<string> {
-  return new Set(
-    all.filter((each) => each.location_id === placeId).map((each) => each.key),
-  );
-}
-
-/** offered's open packages of an item at a place. */
+/** offered's open packages of an item at a place, most left first, so
+ * those showing nothing, or less, come last (docs/decisions/0020). */
 export function offeredAt(
   all: readonly Offered[],
   itemId: number,
   placeId: number | null,
 ): Offered[] {
-  return all.filter(
-    (each) => each.item_id === itemId && each.location_id === placeId,
-  );
+  return all
+    .filter((each) => each.item_id === itemId && each.location_id === placeId)
+    .sort((a, b) => b.left - a.left);
+}
+
+/** Why a cut leaves nothing usable on an open package. */
+export type Ending = "short" | "used" | "over";
+
+/** What a cut of `amount` (thousandths) leaves on an open package, and
+ * why nothing usable would be left then, if so: less than nothing, none,
+ * or less than its too-short-to-use length (open_packages.is_short_end). */
+export function afterCut(
+  open: Pick<Offered, "left" | "short_below">,
+  amount: number,
+): { after: number; ending: Ending | null } {
+  const after = open.left - amount;
+  if (after < 0) {
+    return { after, ending: "over" };
+  }
+  if (after === 0) {
+    return { after, ending: "used" };
+  }
+  const shortBelow =
+    open.short_below === null ? null : thousandths(open.short_below);
+  const short = shortBelow !== null && after < shortBelow;
+  return { after, ending: short ? "short" : null };
+}
+
+type Taken = NonNullable<Line["open"]>[string];
+
+/** The cut typed on an open package, as afterCut sees it; null for none:
+ * blank, nothing, not yet a number, or all of it moved whole. */
+export function cutOf(
+  open: Pick<Offered, "left" | "short_below">,
+  taken: Taken,
+): ReturnType<typeof afterCut> | null {
+  const typed = thousandths(taken.amount);
+  return taken.whole || typed === null || typed === 0
+    ? null
+    : afterCut(open, typed);
+}
+
+/** Whether an open package is said to be used up: as the volunteer said,
+ * else when the cut leaves nothing usable on it (Ali, 2026-11-12). */
+export function usedUpOf(
+  open: Pick<Offered, "left" | "short_below">,
+  taken: Taken,
+): boolean {
+  return taken.usedUp ?? cutOf(open, taken)?.ending != null;
 }
 
 /** The cart with what it takes from open packages no longer offered left
  * out: reported or closed elsewhere, or moved, since it was typed, its
  * field is gone from the page, so what was typed there goes too. */
-function withOffered(cart: Cart, keys?: ReadonlySet<string>): Cart {
-  if (keys === undefined) {
-    return cart;
-  }
+function withOffered(cart: Cart, keys: ReadonlyMap<string, unknown>): Cart {
   return {
     ...cart,
     lines: cart.lines.map((line) => ({

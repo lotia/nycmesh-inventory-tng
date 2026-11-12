@@ -11,7 +11,6 @@ import {
   type Catalogue,
   freshCart,
   indexOf,
-  keysAt,
   keysToAsk,
   type Line,
   type Offered,
@@ -32,6 +31,7 @@ import {
 } from "./cart";
 import { Field } from "./Field";
 import { placeSides, readLabel, type Scanned } from "./labels";
+import { NOTHING_TAKEN, OpenPackageCard } from "./OpenPackageCard";
 import { type Entry, type Outbox, sharedOutbox } from "./outbox";
 import { decimal, thousandths } from "./quantity";
 import { NOT_REGISTERED } from "./registration";
@@ -341,9 +341,7 @@ function CartForm({
       ];
       return;
     }
-    // Only what the page offers to take from, where it comes from.
-    const offeredKeys = keysAt(opens, current.fromId);
-    const batch = toBatch(current, catalogue, offeredKeys);
+    const batch = toBatch(current, catalogue, opens);
     if ("problems" in batch) {
       problems.value = batch.problems;
       return;
@@ -672,6 +670,18 @@ function CartLine({
         <strong>{item.name}</strong>
         {item.retired && <small> {RETIRED}</small>}
       </div>
+      {opens.map((open) => (
+        <OpenPackageCard
+          key={open.key}
+          open={open}
+          item={item}
+          moving={moving}
+          taken={line.open?.[open.key] ?? NOTHING_TAKEN}
+          onTake={(next) =>
+            onChange({ ...line, open: { ...line.open, [open.key]: next } })
+          }
+        />
+      ))}
       {item.packages.map((pack) => (
         <Field
           key={pack.id}
@@ -717,74 +727,6 @@ function CartLine({
           />
         )}
       </Field>
-      {opens.map((open) => {
-        const taken: NonNullable<Line["open"]>[string] = line.open?.[
-          open.key
-        ] ?? {
-          amount: "",
-          whole: false,
-        };
-        const take = (next: typeof taken) =>
-          onChange({ ...line, open: { ...line.open, [open.key]: next } });
-        const left = decimal(open.left);
-        const since = `, opened ${open.opened_at.slice(0, 10)}`;
-        return (
-          <div key={open.key} class="flex flex-col gap-1">
-            <Field
-              quiet
-              label={`From the open ${open.package_name}: ${left} ${item.unit} left${since}`}
-            >
-              {(id) => (
-                <input
-                  id={id}
-                  inputMode="decimal"
-                  value={taken.amount}
-                  disabled={taken.whole}
-                  onInput={(event) =>
-                    take({
-                      ...taken,
-                      amount: event.currentTarget.value,
-                      whole: false,
-                    })
-                  }
-                />
-              )}
-            </Field>
-            {moving && (
-              <label class="flex items-center gap-2 font-normal">
-                <input
-                  type="checkbox"
-                  checked={taken.whole}
-                  onChange={(event) =>
-                    take(
-                      event.currentTarget.checked
-                        ? { amount: left, whole: true }
-                        : { amount: "", whole: false },
-                    )
-                  }
-                />
-                All of it, moved still open
-              </label>
-            )}
-            {!taken.whole && (
-              <label class="flex items-center gap-2 font-normal">
-                <input
-                  type="checkbox"
-                  checked={taken.usedUp === true}
-                  onChange={(event) =>
-                    take({ ...taken, usedUp: event.currentTarget.checked })
-                  }
-                />
-                {(thousandths(taken.amount) ?? 0) >= open.left
-                  ? "That takes all it shows: is it used up?"
-                  : open.short
-                    ? "A short end: is it used up?"
-                    : "Used up: what is left is no use"}
-              </label>
-            )}
-          </div>
-        );
-      })}
       <div>
         {"problem" in quantity
           ? quantity.problem
