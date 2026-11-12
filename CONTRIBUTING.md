@@ -462,8 +462,8 @@ uv run pytest --cov              # tests, against the database started above
 `mise run check-backend` and CI run the tests across processes, one per
 core and at most 8: `uv run pytest -n auto --maxprocesses=8 --cov`. Each
 process makes databases of its own, which takes a moment, so past 8 a run
-is slower, and running a few tests is quicker without `-n`. Each process
-holds up to about 22 connections, so compose's PostgreSQL allows 200.
+is slower, and running a few tests is quicker without `-n`.
+Connections, below, says how many runs fit at once.
 
 For the frontend:
 
@@ -602,6 +602,18 @@ route under `/admin` fails there until it has an entry in `PAGES`, saying
 how to add one more of what it lists, or in `EXEMPT`, saying why it lists
 nothing that grows. `tests/helpers/queries.py` counts a request's
 statements for a test of its own.
+
+### Connections
+
+Every checkout's tests, apps and browser tests share compose's one
+PostgreSQL, which allows 400 connections (`compose.yaml`), less 3 kept for
+the superuser. A whole test run, measured over 8 processes, holds under 60
+at once, about 24 in one process and under 20 on one database; a dev app
+up to 20, as does the browser tests' server. So three checkouts can run
+the checks at once, each beside its app. Each test database allows 40
+(`tests/databases.py`), so a process that leaks connections is refused at
+its own database, not the server's limit, and a test that fails for either
+limit says which.
 
 ### Measuring the catalogue
 

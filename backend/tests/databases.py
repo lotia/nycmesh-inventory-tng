@@ -44,10 +44,33 @@ OWNER = "inventory_owner"
 APP = "inventory_app"
 
 TEST_DATABASE = re.compile(r"test_(\d+)_[0-9a-f]{8}")
+# Connections each test database takes at most, as the roles log in (a
+# superuser's are not counted): twice the most measured on one, and how it
+# fits the server's, in CONTRIBUTING.md, Connections. It bounds each
+# database, not a run: a process that leaks connections is refused at its
+# own database's limit, with a clear message (refused_connection), long
+# before it could fill the server.
+CONNECTION_LIMIT = 40
+# The server's max_connections, as a role or the superuser finds it full.
+FULL = (
+    "the server's max_connections (compose.yaml). Are too many runs, or apps,"
+    " using the server at once?"
+)
+# What PostgreSQL says, by the limit it hit, and the likely cause.
+REFUSALS = {
+    "too many connections for database": (
+        f"its database's CONNECTION LIMIT, {CONNECTION_LIMIT} (tests/databases.py)."
+        " Is a test in this process, perhaps an earlier one, holding"
+        " connections it no longer needs?"
+    ),
+    "remaining connection slots are reserved": FULL,
+    "too many clients already": FULL,
+}
 LEFT_BEHIND = timedelta(hours=1)
 
 
-def _server() -> Engine:
+def superuser() -> Engine:
+    """Compose's superuser on the server, outside any transaction."""
     return make_engine(SERVER_URL).execution_options(isolation_level="AUTOCOMMIT")
 
 
@@ -59,7 +82,7 @@ def drop_left_behind(now: float | None = None) -> list[str]:
     """Test databases made over an hour ago that nothing is connected to:
     never one still in use."""
     now = time.time() if now is None else now
-    server = _server()
+    server = superuser()
     with server.connect() as connection:
         idle = connection.scalars(
             text(
@@ -100,18 +123,24 @@ def create_database(template: str | None = None) -> str:
     with no schema, or a copy of the database `template`. The roles are made
     first, if missing: compose's volume may predate them."""
     name = database_name(int(time.time()))
-    server = _server()
+    server = superuser()
     try:
         copy = f' TEMPLATE "{template}"' if template else ""
         with server.connect() as connection:
             connection.exec_driver_sql(ROLES_SQL.read_text())
-            connection.execute(text(f'CREATE DATABASE "{name}" OWNER {OWNER}{copy}'))
+            connection.execute(
+                text(
+                    f'CREATE DATABASE "{name}" OWNER {OWNER}{copy}'
+                    f" CONNECTION LIMIT {CONNECTION_LIMIT}"
+                )
+            )
     except OperationalError as error:
-        raise Unreachable(
+        advice = refused_connection(str(error)) or (
             f"Cannot reach PostgreSQL at {SERVER}. Start it with "
             f"`mise run compose -- up -d --wait db`, or run only the tests "
-            f"that need none: `uv run pytest -m 'not database'`.\n{error}"
-        ) from error
+            f"that need none: `uv run pytest -m 'not database'`."
+        )
+        raise Unreachable(f"{advice}\n{error}") from error
     finally:
         server.dispose()
     log.info("created test database", database=name)
@@ -122,7 +151,7 @@ def create_database(template: str | None = None) -> str:
 
 def drop_database(url: str) -> None:
     name = make_url(url).database
-    server = _server()
+    server = superuser()
     with server.connect() as connection:
         connection.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
     server.dispose()
@@ -175,3 +204,15 @@ def alembic_config_for(connection: Connection) -> Config:
 # database out of reach wherever a test wants one: nothing listens on port
 # 1, so connecting fails at once.
 NO_DATABASE = "postgresql+psycopg://nobody@127.0.0.1:1/use_the_database_url_fixture"
+
+
+def refused_connection(error: str) -> str | None:
+    """What to do about `error`, if it is PostgreSQL refusing a connection
+    for a limit; else None."""
+    for said, limit in REFUSALS.items():
+        if said in error:
+            return (
+                f"PostgreSQL refused a connection: the test reached {limit} "
+                "CONTRIBUTING.md, Connections, gives the budget."
+            )
+    return None
