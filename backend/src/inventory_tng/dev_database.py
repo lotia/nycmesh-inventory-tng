@@ -65,7 +65,7 @@ def checkout_database(app_url: str, migration_url: str) -> URL:
 
 
 @contextlib.contextmanager
-def _as_superuser(url: str) -> Generator[Connection]:
+def as_superuser(url: str) -> Generator[Connection]:
     """A connection as the superuser to the server `url` names, outside
     any transaction."""
     server = make_engine(server_url(url)).execution_options(
@@ -78,32 +78,48 @@ def _as_superuser(url: str) -> Generator[Connection]:
         server.dispose()
 
 
+def create(
+    connection: Connection, name: str, *, limit: int, template: str | None = None
+) -> None:
+    """Make the roles if missing, then the database `name`, the owner's, as
+    compose's first one is, held to `limit` connections: empty, or a copy of
+    `template`. The tests make theirs with it too."""
+    connection.exec_driver_sql(ROLES_SQL.read_text())
+    quote = connection.dialect.identifier_preparer.quote
+    copy = f" TEMPLATE {quote(template)}" if template else ""
+    connection.execute(
+        text(
+            f"CREATE DATABASE {quote(name)} OWNER {OWNER}{copy}"
+            f" CONNECTION LIMIT {limit}"
+        )
+    )
+
+
 def make(url: str) -> bool:
-    """Make the database `url` names if missing, with the roles; make it
-    the owner's, as compose's first one is, and hold it to its connection
-    limit either way: whether it was made."""
+    """Make the database `url` names if missing; one there already, made by
+    hand or before the roles, is made the owner's and held to its limit
+    too: whether it was made."""
     name = make_url(url).database or ""
-    with _as_superuser(url) as connection:
-        connection.exec_driver_sql(ROLES_SQL.read_text())
-        quoted = connection.dialect.identifier_preparer.quote(name)
-        made = True
+    with as_superuser(url) as connection:
         try:
-            connection.execute(text(f"CREATE DATABASE {quoted}"))
+            create(connection, name, limit=CONNECTION_LIMIT)
         except ProgrammingError as error:
             # Made already, or by another task at once.
             if getattr(error.orig, "sqlstate", None) != "42P04":
                 raise
-            made = False
+        else:
+            return True
+        quoted = connection.dialect.identifier_preparer.quote(name)
         connection.execute(text(f"ALTER DATABASE {quoted} OWNER TO {OWNER}"))
         connection.execute(
             text(f"ALTER DATABASE {quoted} CONNECTION LIMIT {CONNECTION_LIMIT}")
         )
-    return made
+    return False
 
 
 def drop(url: str) -> None:
     """Drop the database `url` names, ending its connections."""
-    with _as_superuser(url) as connection:
+    with as_superuser(url) as connection:
         quoted = connection.dialect.identifier_preparer.quote(
             make_url(url).database or ""
         )

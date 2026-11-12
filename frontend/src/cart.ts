@@ -920,8 +920,13 @@ export function offered(
         const pack = items
           .get(line.item_id)
           ?.packages.find((each) => each.id === line.package_id);
-        // One the server refuses opens none, so is never offered.
-        if (pack === undefined || !refusedAsCounted(line, sent(pack.size))) {
+        // One the server refuses opens none, so is never offered: one in no
+        // size whatever the catalogue holds.
+        const refused =
+          pack === undefined
+            ? line.package_size == null
+            : refusedAsCounted(line, sent(pack.size));
+        if (!refused) {
           byKey.set(key, {
             id: 0,
             key,

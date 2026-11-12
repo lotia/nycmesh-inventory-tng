@@ -15,7 +15,7 @@ from sqlalchemy.exc import ProgrammingError
 from inventory_tng import dev_database
 from inventory_tng.dev_database import CONNECTION_LIMIT, OWNER
 
-from databases import APP, as_role, database_name, superuser, superuser_url
+from databases import APP, as_role, database_name, superuser_url
 
 
 @pytest.fixture
@@ -34,28 +34,15 @@ def url(database_url: str, monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
 def facts(url: str) -> tuple[int, str, int] | None:
     """Which database it is, its owner and its connection limit, if it
     exists."""
-    server = superuser()
-    try:
-        with server.connect() as connection:
-            row = connection.execute(
-                text(
-                    "SELECT oid, pg_get_userbyid(datdba), datconnlimit"
-                    " FROM pg_database WHERE datname = :n"
-                ),
-                {"n": make_url(url).database},
-            ).one_or_none()
-    finally:
-        server.dispose()
+    with dev_database.as_superuser(url) as connection:
+        row = connection.execute(
+            text(
+                "SELECT oid, pg_get_userbyid(datdba), datconnlimit"
+                " FROM pg_database WHERE datname = :n"
+            ),
+            {"n": make_url(url).database},
+        ).one_or_none()
     return None if row is None else tuple(row)
-
-
-def superuser_says(statement: str) -> None:
-    server = superuser()
-    try:
-        with server.connect() as connection:
-            connection.execute(text(statement))
-    finally:
-        server.dispose()
 
 
 def test_made_once_the_owners_and_held_to_its_limit(url: str) -> None:
@@ -65,8 +52,9 @@ def test_made_once_the_owners_and_held_to_its_limit(url: str) -> None:
     assert made[1:] == (OWNER, CONNECTION_LIMIT)
     # Made already, as by hand or before the roles: kept, and put right.
     name = make_url(url).database or ""
-    superuser_says(f'ALTER DATABASE "{name}" OWNER TO inventory')
-    superuser_says(f'ALTER DATABASE "{name}" CONNECTION LIMIT -1')
+    with dev_database.as_superuser(url) as connection:
+        connection.execute(text(f'ALTER DATABASE "{name}" OWNER TO inventory'))
+        connection.execute(text(f'ALTER DATABASE "{name}" CONNECTION LIMIT -1'))
     assert not dev_database.make(url)
     assert facts(url) == made
     # Any other refusal is not swallowed.

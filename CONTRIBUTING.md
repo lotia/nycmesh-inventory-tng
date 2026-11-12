@@ -107,8 +107,12 @@ Every clone, worktree or agent's checkout shares that one server, and has a
 database of its own on it, `INVENTORY_DB_NAME`, which both URLs name: so
 one's rebuild or seed never touches another's. `mise run setup` names it
 for the checkout's directory and where that is, `inventory_<directory>_<n>`,
-when it makes `.env`; a `.env` made before names `inventory`. So never copy
-a `.env` from another checkout.
+when it makes `.env`; a `.env` made before names `inventory`, so give any
+second checkout with one a name of its own in both URLs. Never copy a
+`.env` from another checkout. The server's container is every checkout's
+too: a change to it in `compose.yaml` takes effect with
+`mise run compose -- up -d --force-recreate db`, which ends every
+checkout's connections.
 `mise run dev-database` starts the server, makes the database if it is
 missing, and migrates it; `mise run dev` and `mise run seed` run it first.
 It holds each to 30 connections (Connections, below).
@@ -404,7 +408,8 @@ image builds the scan page too, and serves Brotli and gzip copies of its
 files, as production will. It does not replace uv: the checks, new
 migrations and your editor still use it. The container migrates this
 checkout's database (`INVENTORY_DB_NAME`, which `mise run dev-database`
-makes) when it starts, then serves with `--reload`.
+makes) when it starts, then serves with `--reload`. There is one app
+container for every checkout: the last to start it has it.
 Your `backend/src` and `backend/migrations` are mounted into it, so it picks
 up your edits. Pass `--build` again after changing dependencies or
 `frontend/`.
@@ -622,7 +627,8 @@ statements for a test of its own.
 Every checkout's tests, apps and browser tests share compose's one
 PostgreSQL, which allows 400 connections (`compose.yaml`), less 3 kept for
 the superuser. A whole test run, measured over 8 processes, holds under 60
-at once, about 24 in one process and under 20 on one database; a dev app
+at once, all processes together; one process held at most about 24, and
+one database under 20; a dev app
 up to 20, as does the browser tests' server. So three checkouts can run
 the checks at once, each beside its app. Each test database allows 40
 (`tests/databases.py`), so a process that leaks connections is refused at

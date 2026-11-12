@@ -20,7 +20,7 @@ from sqlalchemy.exc import OperationalError
 
 from inventory_tng import dev_database
 from inventory_tng.db import make_engine
-from inventory_tng.dev_database import OWNER, ROLES_SQL, server_url
+from inventory_tng.dev_database import OWNER, as_superuser, create, server_url
 from inventory_tng.local_env import setting
 
 log = structlog.get_logger(__name__)
@@ -31,12 +31,11 @@ PYPROJECT = Path(__file__).parents[1] / "pyproject.toml"
 # from the shell, else the repository's .env (CONTRIBUTING.md, Local
 # settings), else compose's default.
 PORT = setting("INVENTORY_DB_PORT") or "5433"
-SERVER = make_url(server_url(f"postgresql://localhost:{PORT}"))
 
 
 def superuser_url(database: str) -> str:
     """Compose's superuser's URL for `database`."""
-    return SERVER.set(database=database).render_as_string(hide_password=False)
+    return server_url(f"postgresql://localhost:{PORT}", database)
 
 
 # The server's own database, which no checkout's reset can drop.
@@ -51,7 +50,7 @@ TEST_DATABASE = re.compile(r"test_(\d+)_[0-9a-f]{8}")
 # database, not a run: a process that leaks connections is refused at its
 # own database's limit, with a clear message (refused_connection), long
 # before it could fill the server.
-CONNECTION_LIMIT = 40
+TEST_CONNECTION_LIMIT = 40
 # The server's max_connections, as a role or the superuser finds it full.
 FULL = (
     "the server's max_connections (compose.yaml). Are too many runs, or apps,"
@@ -60,7 +59,7 @@ FULL = (
 # What PostgreSQL says, by the limit it hit, and the likely cause.
 REFUSALS = {
     "too many connections for database": (
-        f"its database's CONNECTION LIMIT, {CONNECTION_LIMIT} (tests/databases.py)."
+        f"its database's CONNECTION LIMIT, {TEST_CONNECTION_LIMIT} (tests/databases.py)."
         " Is a test in this process, perhaps an earlier one, holding"
         " connections it no longer needs?"
     ),
@@ -68,11 +67,6 @@ REFUSALS = {
     "too many clients already": FULL,
 }
 LEFT_BEHIND = timedelta(hours=1)
-
-
-def superuser() -> Engine:
-    """Compose's superuser on the server, outside any transaction."""
-    return make_engine(SERVER_URL).execution_options(isolation_level="AUTOCOMMIT")
 
 
 class Unreachable(Exception):
@@ -83,8 +77,7 @@ def drop_left_behind(now: float | None = None) -> list[str]:
     """Test databases made over an hour ago that nothing is connected to:
     never one still in use."""
     now = time.time() if now is None else now
-    server = superuser()
-    with server.connect() as connection:
+    with as_superuser(SERVER_URL) as connection:
         idle = connection.scalars(
             text(
                 "SELECT datname FROM pg_database WHERE datname LIKE 'test\\_%' "
@@ -98,7 +91,6 @@ def drop_left_behind(now: float | None = None) -> list[str]:
             if match and now - int(match.group(1)) > LEFT_BEHIND.total_seconds():
                 connection.execute(text(f'DROP DATABASE IF EXISTS "{name}"'))
                 dropped.append(name)
-    server.dispose()
     if dropped:
         log.info("dropped test databases left behind", databases=dropped)
     return dropped
@@ -124,26 +116,16 @@ def create_database(template: str | None = None) -> str:
     with no schema, or a copy of the database `template`. The roles are made
     first, if missing: compose's volume may predate them."""
     name = database_name(int(time.time()))
-    server = superuser()
     try:
-        copy = f' TEMPLATE "{template}"' if template else ""
-        with server.connect() as connection:
-            connection.exec_driver_sql(ROLES_SQL.read_text())
-            connection.execute(
-                text(
-                    f'CREATE DATABASE "{name}" OWNER {OWNER}{copy}'
-                    f" CONNECTION LIMIT {CONNECTION_LIMIT}"
-                )
-            )
+        with as_superuser(SERVER_URL) as connection:
+            create(connection, name, limit=TEST_CONNECTION_LIMIT, template=template)
     except OperationalError as error:
         advice = refused_connection(str(error)) or (
-            f"Cannot reach PostgreSQL at {SERVER}. Start it with "
+            f"Cannot reach PostgreSQL at {make_url(SERVER_URL)}. Start it with "
             f"`mise run compose -- up -d --wait db`, or run only the tests "
             f"that need none: `uv run pytest -m 'not database'`."
         )
         raise Unreachable(f"{advice}\n{error}") from error
-    finally:
-        server.dispose()
     log.info("created test database", database=name)
     # Reachable now: sweep up after earlier runs. This one is too new to go.
     drop_left_behind()
