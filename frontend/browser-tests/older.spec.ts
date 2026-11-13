@@ -131,7 +131,7 @@ test("a save an older build left goes back in the cart, whole without a tap, and
   ).toBeNull();
 });
 
-test("a save holding an item retired since, with none left, names it, and can only be discarded", async ({
+test("saves holding an item retired since, with none left, name it, and go by its line's Discard or their own", async ({
   page,
 }) => {
   const cable = await ownCable(page, "Retired cable");
@@ -139,20 +139,38 @@ test("a save holding an item retired since, with none left, names it, and can on
   await page.getByRole("button", { name: "Retire", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Retired.");
   await page.goto("/scan");
-  await leave(page, [{ item_id: itemId, quantity: "2" }]);
+  await leave(
+    page,
+    [{ item_id: itemId, quantity: "2" }],
+    [{ item_id: itemId, quantity: "3" }],
+  );
   await page.reload();
 
   const listing = listingOf(page);
-  await expect(listing.getByText("Item retired")).toBeVisible();
+  await expect(listing.getByText("Item retired")).toHaveCount(2);
   await expect(listing.getByText(`${cable}: 2 m`)).toBeVisible();
   await expect(
-    listing.getByRole("button", { name: "Cannot Add to Cart" }),
+    listing.getByRole("button", { name: "Cannot Add to Cart" }).first(),
   ).toBeDisabled();
   await expect(page.getByText(PUT_BACK)).toHaveCount(0);
-  await listing.getByRole("button", { name: "Discard" }).click();
+  // The line's own Discard, without asking: the save goes with its only
+  // line.
+  await listing
+    .getByRole("listitem")
+    .filter({ hasText: `${cable}: 2 m` })
+    .last()
+    .getByRole("button", { name: "Discard" })
+    .click();
+  await expect(listing.getByText(`${cable}: 2 m`)).toHaveCount(0);
+  await expect(listing.getByText(`${cable}: 3 m`)).toBeVisible();
+  // The save's own asks first.
+  await listing.getByRole("button", { name: "Discard" }).last().click();
   await expect(listing.getByText("Confirm discard")).toBeVisible();
-  await listing.getByRole("button", { name: "Discard" }).click();
+  await listing.getByRole("button", { name: "Discard" }).last().click();
   await expect(listing).toHaveCount(0);
+  expect(
+    await page.evaluate(() => localStorage.getItem("inventory.outbox.v3")),
+  ).toBeNull();
 });
 
 test("a save an older build's tab saved meanwhile is saved once, under its key; changed after it went back, it is not saved, and says so", async ({

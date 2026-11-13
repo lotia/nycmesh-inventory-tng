@@ -1371,8 +1371,8 @@ describe("a newer build", () => {
 describe("what an older build left", () => {
   const HEADING = "Checked out items. Add to cart or discard before sending";
   const ADDED_BACK = "Added back to cart. Review before Save.";
-  const PACKAGE_RETIRED =
-    "Sorry. The package has been retired since this item was added. Discard and re-add the item.";
+  const RETIRED = "Sorry. This item has been retired.";
+  const RESCAN = "Sorry. Can't add these items. Please rescan.";
   const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
   const AT = 1_700_000_000_000;
   const OLDER = "2026-11-12T09:00:00.000Z";
@@ -1429,6 +1429,13 @@ describe("what an older build left", () => {
       .getByRole("heading", { name: HEADING })
       .closest("section") as HTMLElement;
 
+  /** The Discard of a whole entry, `in` the listing's first by default,
+   * after any of its lines' own; once tapped, the one confirming it. */
+  const lastDiscard = (entry: HTMLElement = listing()) =>
+    within(entry)
+      .getAllByRole("button", { name: "Discard" })
+      .at(-1) as HTMLElement;
+
   test("each is listed in words, and counted once as found", async () => {
     const record = vi.spyOn(telemetry, "record");
     leaveSave();
@@ -1441,9 +1448,23 @@ describe("what an older build left", () => {
       `Saved on this device ${at}, not sent.`,
     );
     within(save as HTMLElement).getByText("LiteBeam 5AC: 2 × Box");
-    within(save as HTMLElement).getByText(
-      "Sorry. Could not read 1 open item, scan it in again.",
-    );
+    // What cannot go back says why under it, the opening words in bold,
+    // in the alert's style, and has its own Discard.
+    const taken = within(save as HTMLElement)
+      .getByText("Cat6 cable: 3 m from an open package")
+      .closest("li") as HTMLElement;
+    const why = within(taken).getByText(RESCAN);
+    expect(why.tagName).toBe("STRONG");
+    expect(why.parentElement?.className).toBe("alert");
+    within(taken).getByRole("button", { name: "Discard" });
+    // What goes back has none.
+    expect(
+      within(
+        within(save as HTMLElement)
+          .getByText("LiteBeam 5AC: 2 × Box")
+          .closest("li") as HTMLElement,
+      ).queryByRole("button"),
+    ).toBeNull();
     expect(cart?.textContent).toContain(
       "A cart: taking it to an install from Van for install 456, by Grace",
     );
@@ -1575,12 +1596,8 @@ describe("what an older build left", () => {
       throw new DOMException("full", "QuotaExceededError");
     });
     const [save] = within(listing()).getAllByRole("listitem");
-    fireEvent.click(
-      within(save as HTMLElement).getByRole("button", { name: "Discard" }),
-    );
-    fireEvent.click(
-      within(save as HTMLElement).getByRole("button", { name: "Discard" }),
-    );
+    fireEvent.click(lastDiscard(save as HTMLElement));
+    fireEvent.click(lastDiscard(save as HTMLElement));
     setItem.mockRestore();
     within(listing()).getByText(
       "Sorry. Unable to discard. Clear your site data to remove.",
@@ -1630,8 +1647,8 @@ describe("what an older build left", () => {
     leaveCart();
     open();
     await ready();
-    fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
-    fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
+    fireEvent.click(lastDiscard());
+    fireEvent.click(lastDiscard());
     expect(localStorage.getItem("inventory.cart.v1")).toBeNull();
     expect(record).toHaveBeenCalledWith({
       kind: "older_storage",
@@ -1645,10 +1662,10 @@ describe("what an older build left", () => {
     leaveSave();
     open();
     await ready();
-    fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
+    fireEvent.click(lastDiscard());
     // Sent by an older tab, the storage event not yet heard.
     localStorage.removeItem("inventory.outbox.v3");
-    fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
+    fireEvent.click(lastDiscard());
     expect(screen.queryByText(HEADING)).toBeNull();
   });
 
@@ -1732,7 +1749,7 @@ describe("what an older build left", () => {
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
     screen.getByText(ADDED_BACK);
-    screen.getByText("Sorry. Could not read 1 open item, scan it in again.");
+    screen.getByText(RESCAN);
     expect(selected("Your name")).toBe("1");
     expect(selected("From")).toBe("10");
     expect(selected("To")).toBe("12");
@@ -1745,9 +1762,9 @@ describe("what an older build left", () => {
       action: "put_in_cart",
     });
     record.mockRestore();
-    // The cable taken from an open package is left out: removed, it saves.
-    const cable = screen.getByText("Cat6 cable").closest("li") as HTMLElement;
-    fireEvent.click(within(cable).getByRole("button", { name: "Remove" }));
+    // The cable taken from an open package is left out, not put back as
+    // its item's empty line.
+    expect(screen.queryByText("Cat6 cable")).toBeNull();
     save();
     await screen.findByText(/^Saved: /);
     await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
@@ -1762,7 +1779,8 @@ describe("what an older build left", () => {
     expect(outbox.entries.value[0]?.putBack).toBe(true);
   });
 
-  test("one that only took from an open package goes back as its item's line, empty, which saves nothing", async () => {
+  test("one that only took from an open package has nothing to put back: its line, discarded, takes it", async () => {
+    const record = vi.spyOn(telemetry, "record");
     leaveSave({
       body: {
         key: KEY,
@@ -1773,26 +1791,95 @@ describe("what an older build left", () => {
         lines: [{ item_id: 101, quantity: "3", open_package_key: KEY }],
       },
     });
-    const { api, sent } = server();
-    open(api);
+    open();
     await ready();
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: "Add to cart" }),
+    within(listing()).getByText(RESCAN);
+    expect(
+      within(listing()).queryByRole("button", { name: "Add to cart" }),
+    ).toBeNull();
+    const [line, entry] = within(listing()).getAllByRole("button", {
+      name: "Discard",
+    });
+    expect(line?.getAttribute("aria-describedby")).toBe("older-0-0");
+    expect(screen.getByText("Cat6 cable: 3 m from an open package").id).toBe(
+      "older-0-0",
     );
+    expect(entry?.getAttribute("aria-describedby")).toBe("older-0");
+    // Without asking: one line goes.
+    fireEvent.click(line as HTMLElement);
+    expect(screen.queryByText(HEADING)).toBeNull();
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
-    screen.getByText("Sorry. Could not read 1 open item, scan it in again.");
-    // Its line, to take it again on; the places kept.
-    const cable = screen.getByText("Cat6 cable").closest("li") as HTMLElement;
-    within(cable).getByRole("button", { name: "Remove" });
-    expect(selected("From")).toBe("10");
-    expect(selected("To")).toBe("12");
-    // Nothing in it yet, so nothing is sent.
-    save();
-    await screen.findByText("Add something to the cart.");
-    expect(saves(sent)).toHaveLength(0);
+    expect(record).toHaveBeenLastCalledWith({
+      kind: "older_storage",
+      held: "saves",
+      action: "line_discarded",
+    });
+    record.mockRestore();
   });
 
-  test("its item's empty line left in, the rest saves", async () => {
+  test("a line discarded goes alone, and the rest, whole, goes in the empty cart, under its key", async () => {
+    leaveSave();
+    const { api, sent } = server();
+    const outbox = open(api);
+    await ready();
+    const taken = within(listing())
+      .getByText("Cat6 cable: 3 m from an open package")
+      .closest("li") as HTMLElement;
+    fireEvent.click(within(taken).getByRole("button", { name: "Discard" }));
+    // What is left goes back whole, so in the empty cart without a tap,
+    // with nothing left out to say.
+    await screen.findByText(ADDED_BACK);
+    expect(screen.queryByText(HEADING)).toBeNull();
+    expect(boxes()).toBe("2");
+    expect(screen.queryByText(RESCAN)).toBeNull();
+    save();
+    await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
+    expect(outbox.entries.value[0]?.body.key).toBe(KEY);
+  });
+
+  test("a line the browser will not let go of says so, and stays", async () => {
+    leaveSave();
+    open();
+    await ready();
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+    const taken = within(listing())
+      .getByText("Cat6 cable: 3 m from an open package")
+      .closest("li") as HTMLElement;
+    fireEvent.click(within(taken).getByRole("button", { name: "Discard" }));
+    setItem.mockRestore();
+    within(listing()).getByText(
+      "Sorry. Unable to discard. Clear your site data to remove.",
+    );
+    within(listing()).getByText(RESCAN);
+  });
+
+  test("a line of one changed meanwhile, by an older tab, is not discarded, and the list shows it as it is", async () => {
+    leaveSave();
+    open();
+    await ready();
+    const [first] = JSON.parse(
+      localStorage.getItem("inventory.outbox.v3") ?? "",
+    );
+    localStorage.setItem(
+      "inventory.outbox.v3",
+      JSON.stringify([{ ...first, state: "refused", note: "No." }]),
+    );
+    const taken = within(listing())
+      .getByText("Cat6 cable: 3 m from an open package")
+      .closest("li") as HTMLElement;
+    fireEvent.click(within(taken).getByRole("button", { name: "Discard" }));
+    expect(
+      within(listing()).queryByText(
+        "Sorry. Unable to discard. Clear your site data to remove.",
+      ),
+    ).toBeNull();
+    within(listing()).getByText("No. Add it to the cart, fix that, then save.");
+    within(listing()).getByText(RESCAN);
+  });
+
+  test("what cannot go back left out, the rest saves as it is", async () => {
     leaveSave();
     const { api, sent } = server();
     const outbox = open(api);
@@ -1848,12 +1935,12 @@ describe("what an older build left", () => {
     leaveSave();
     open();
     await ready();
-    fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
+    fireEvent.click(lastDiscard());
     within(listing()).getByText("Confirm discard");
     fireEvent.click(within(listing()).getByRole("button", { name: "Keep it" }));
     expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
-    fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
-    fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
+    fireEvent.click(lastDiscard());
+    fireEvent.click(lastDiscard());
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(confirm).not.toHaveBeenCalled();
@@ -1951,12 +2038,12 @@ describe("what an older build left", () => {
     const { api, sent } = server();
     const outbox = open(api);
     await ready();
-    within(listing()).getByText(PACKAGE_RETIRED);
+    within(listing()).getByText(RETIRED);
     within(listing()).getByText("LiteBeam 5AC: 1 × Box");
     fireEvent.click(
       within(listing()).getByRole("button", { name: "Add to cart" }),
     );
-    screen.getByText(PACKAGE_RETIRED);
+    screen.getByText(RETIRED);
     expect(boxes()).toBe("1");
     save();
     await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
@@ -1980,11 +2067,11 @@ describe("what an older build left", () => {
     );
     open();
     await ready();
-    within(listing()).getByText(PACKAGE_RETIRED);
+    within(listing()).getByText(RETIRED);
     fireEvent.click(
       within(listing()).getByRole("button", { name: "Add to cart" }),
     );
-    screen.getByText(PACKAGE_RETIRED);
+    screen.getByText(RETIRED);
     expect(boxes()).toBe("1");
   });
 
@@ -2105,8 +2192,6 @@ describe("what an older build left", () => {
     fireEvent.click(
       within(listing()).getByRole("button", { name: "Add to cart" }),
     );
-    const cable = screen.getByText("Cat6 cable").closest("li") as HTMLElement;
-    fireEvent.click(within(cable).getByRole("button", { name: "Remove" }));
     save();
     await screen.findByText("In the inventory (transaction 2).");
     expect(outbox.entries.value[0]?.body.key).not.toBe(KEY);
@@ -2142,7 +2227,7 @@ describe("what an older build left", () => {
     within(listing()).getByRole("button", { name: "Add to cart" });
   });
 
-  test("an item retired since, with none left, is named, and the save can only be discarded", async () => {
+  test("an item retired since, with none left, is named, and the rest goes in the cart only once that line is discarded", async () => {
     leaveMoves([
       KEY,
       AT,
@@ -2150,22 +2235,37 @@ describe("what an older build left", () => {
     ]);
     open();
     await ready();
-    const [retired, radio] = within(listing())
-      .getAllByRole("listitem")
-      .filter(
-        (each) =>
-          each.textContent?.endsWith(" × Pair") ||
-          each.textContent?.endsWith(" × Box"),
-      );
-    expect(retired?.textContent).toBe("Item retiredNanoStation M5: 2 × Pair");
-    expect(radio?.textContent).toBe("LiteBeam 5AC: 1 × Box");
+    const retired = within(listing())
+      .getByText(/NanoStation M5: 2 × Pair/)
+      .closest("li") as HTMLElement;
+    expect(retired.textContent).toBe(
+      "Item retiredNanoStation M5: 2 × PairDiscard",
+    );
+    const radio = within(listing())
+      .getByText("LiteBeam 5AC: 1 × Box")
+      .closest("li") as HTMLElement;
+    expect(within(radio).queryByRole("button")).toBeNull();
     const add = within(listing()).getByRole("button", {
       name: "Cannot Add to Cart",
     }) as HTMLButtonElement;
     expect(add.disabled).toBe(true);
     expect(screen.queryByText(ADDED_BACK)).toBeNull();
-    fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
-    fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
+    fireEvent.click(within(retired).getByRole("button", { name: "Discard" }));
+    // The rest, whole now, goes in the empty cart without a tap.
+    await screen.findByText(ADDED_BACK);
+    expect(boxes()).toBe("1");
+  });
+
+  test("an item retired since, the whole save discarded, goes", async () => {
+    leaveMoves([
+      KEY,
+      AT,
+      [{ item_id: 103, quantity: "4", package_id: 1003 }, radios(1)],
+    ]);
+    open();
+    await ready();
+    fireEvent.click(lastDiscard());
+    fireEvent.click(lastDiscard());
     expect(screen.queryByText(HEADING)).toBeNull();
   });
 });

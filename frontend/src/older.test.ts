@@ -1,13 +1,13 @@
 import { describe, expect, test } from "vitest";
 import { freshCart, type Item } from "./cart";
 import {
+  dropPart,
   goesBackWhole,
   isListed,
   nextWhole,
   type Older,
   OlderStore,
   olderId,
-  PACKAGE_RETIRED,
   readOlder,
   removeOlder,
   tidyOlder,
@@ -17,6 +17,10 @@ import {
 import { KEY_REUSED, SAVED_BEFORE_CHANGES } from "./outbox";
 import { CATALOGUE } from "./test-catalogue";
 import { refusing } from "./test-storage";
+
+/** In Ali's words (inventory-tng-0su). */
+const RETIRED = "Sorry. This item has been retired.";
+const RESCAN = "Sorry. Can't add these items. Please rescan.";
 
 const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
 const OTHER = "6f1e2d3c-4b5a-4968-8776-5a4b3c2d1e0f";
@@ -137,7 +141,7 @@ describe("reading what older builds left", () => {
           },
         ],
         linesLost: false,
-        reports: 1,
+        reports: { usedUp: 1, lengths: 0 },
       },
     ]);
   });
@@ -461,13 +465,12 @@ describe("as a cart", () => {
       ),
       CATALOGUE,
     );
-    expect(cart.lines).toEqual([
-      { itemId: 101, packages: {}, loose: "", typed: true },
-    ]);
-    // Each once for the save: the take and the report are two open items.
+    // The take is not put back as its item's empty line.
+    expect(cart.lines).toEqual([]);
+    // Each once for the save, the take and the report together.
     expect(gaps).toEqual([
       "Sorry. Could not read 1 previously added item, scan it again.",
-      "Sorry. Could not read 2 open items, scan them in again.",
+      RESCAN,
     ]);
   });
 
@@ -487,10 +490,11 @@ describe("as a cart", () => {
       ),
       CATALOGUE,
     );
-    expect(cart.lines.map((line) => line.itemId)).toEqual([101, 999]);
+    // An unread line's item goes back, to count again; a take does not.
+    expect(cart.lines.map((line) => line.itemId)).toEqual([101]);
     expect(gaps).toEqual([
       "Sorry. Could not read 2 previously added items, scan them again.",
-      "Sorry. Could not read 1 open item, scan it in again.",
+      RESCAN,
     ]);
   });
 
@@ -527,7 +531,7 @@ describe("as a cart", () => {
     ]);
     expect(gaps).toEqual([
       "Sorry. The package size has changed since this item was added. Discard and re-add the new package size.",
-      "Sorry. The package has been retired since this item was added. Discard and re-add the item.",
+      RETIRED,
     ]);
   });
 
@@ -549,13 +553,13 @@ describe("as a cart", () => {
       { itemId: 100, packages: { 1000: "1" }, loose: "1", typed: true },
       { itemId: 999, packages: { 9999: "1" }, loose: "", typed: true },
     ]);
-    expect(gaps).toEqual([PACKAGE_RETIRED]);
+    expect(gaps).toEqual([RETIRED]);
     // None of one held, nothing is told; one unreadable is, as the cart
     // reads it as some.
     const told = (packages: Record<string, string>) =>
       toCart(cartHolding(packages), CATALOGUE).gaps;
     expect(told({ 1000: "1", 1004: "" })).toEqual([]);
-    expect(told({ 1000: "1", 1004: "lots" })).toEqual([PACKAGE_RETIRED]);
+    expect(told({ 1000: "1", 1004: "lots" })).toEqual([RETIRED]);
   });
 
   test("a package retired with some left is still offered: counted, not told", () => {
@@ -708,7 +712,7 @@ describe("as a cart", () => {
     });
     expect(gaps).toEqual([
       "Sorry. Could not read 1 previously added item, scan it again.",
-      "Sorry. Could not read 1 open item, scan it in again.",
+      RESCAN,
     ]);
   });
 
@@ -725,11 +729,295 @@ describe("as a cart", () => {
           { itemId: 101, packages: {}, loose: "", open: { [KEY]: said } },
         ],
       });
-      expect(toCart(readOlder()[0] as Older, CATALOGUE).gaps).toEqual([
-        "Sorry. Could not read 1 open item, scan it in again.",
-      ]);
+      const { cart, gaps } = toCart(readOlder()[0] as Older, CATALOGUE);
+      expect(gaps).toEqual([RESCAN]);
+      // All it held left out, so not put back as an empty line.
+      expect(cart.lines).toEqual([]);
     },
   );
+});
+
+describe("line by line", () => {
+  const only = (body = {}, fields = {}) => {
+    keep("inventory.outbox.v3", [saveOf(fields, body)]);
+    return readOlder()[0] as Older;
+  };
+  const stored = (key = "inventory.outbox.v3") =>
+    JSON.parse(localStorage.getItem(key) ?? "null");
+
+  /** A save of a box retired with none left, cable taken from an open
+   * package, a box resized since, two boxes still offered, and a report. */
+  const mixed = () =>
+    only({
+      lines: [
+        { item_id: 100, quantity: "4", package_id: 1004 },
+        { item_id: 101, quantity: "12", open_package_key: OTHER },
+        { item_id: 100, quantity: "4", package_id: 1000, package_size: 2 },
+        { item_id: 100, quantity: "8", package_id: 1000 },
+      ],
+      used_up: [OTHER],
+    });
+
+  test("each line is listed in the order kept, what cannot go back with why", () => {
+    const { parts, lost } = toCart(mixed(), CATALOGUE);
+    expect(lost).toBeNull();
+    expect(
+      parts.map(({ words, note }) => [
+        words,
+        note === null ? null : note.join(""),
+      ]),
+    ).toEqual([
+      ["LiteBeam 5AC: 4", RETIRED],
+      ["Cat6 cable: 12 m from an open package", RESCAN],
+      [
+        "LiteBeam 5AC: 4",
+        "Sorry. The package size has changed since this item was added. Discard and re-add the new package size.",
+      ],
+      ["LiteBeam 5AC: 2 × Box", null],
+      ["Open package said used up", RESCAN],
+    ]);
+    // Opening words in bold.
+    expect(parts[2]?.note).toEqual([
+      "Sorry. The package size has changed",
+      " since this item was added. Discard and re-add the new package size.",
+    ]);
+  });
+
+  test("an older cart's line is listed in its parts: what goes back, a package gone, and each open package", () => {
+    keep("inventory.cart.v1", {
+      ...freshCart(),
+      lines: [
+        {
+          itemId: 100,
+          packages: { 1000: "1", 1004: "2" },
+          loose: "",
+          open: { [KEY]: { usedUp: true } },
+        },
+        {
+          itemId: 101,
+          packages: {},
+          loose: "",
+          open: { [KEY]: { amount: "3" } },
+        },
+        {
+          itemId: 101,
+          packages: {},
+          loose: "",
+          open: { [OTHER]: { now: "9" } },
+        },
+      ],
+    });
+    const { cart, parts } = toCart(readOlder()[0] as Older, CATALOGUE);
+    expect(parts.map(({ words, note }) => [words, note?.join("")])).toEqual([
+      ["LiteBeam 5AC: 1 × Box", undefined],
+      ["LiteBeam 5AC: 2 × a package no longer in the catalogue", RETIRED],
+      ["LiteBeam 5AC: Open package said used up", RESCAN],
+      ["Cat6 cable: 3 m from an open package", RESCAN],
+      ["Cat6 cable: What is on an open package", RESCAN],
+    ]);
+    expect(cart.lines.map((line) => line.itemId)).toEqual([100]);
+  });
+
+  test.each([
+    ["a package no longer offered", { package_id: 1004 }],
+    ["a package resized since", { package_id: 1000, package_size: 2 }],
+    ["a take from an open package", { open_package_key: OTHER }],
+  ])("one holding only %s has nothing to put back", (_name, line) => {
+    const { cart, parts } = toCart(
+      only({ lines: [{ item_id: 100, quantity: "4", ...line }] }),
+      CATALOGUE,
+    );
+    expect(cart.lines).toEqual([]);
+    expect(parts).toHaveLength(1);
+  });
+
+  test("a line discarded goes alone, the save keeping its key and the rest as they were", () => {
+    const older = mixed();
+    const { parts } = toCart(older, CATALOGUE);
+    const before = stored();
+    expect(dropPart(older, parts[0]?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(stored()).toEqual([
+      {
+        ...before[0],
+        body: { ...before[0].body, lines: before[0].body.lines.slice(1) },
+      },
+    ]);
+    // The report too, by its place.
+    const again = readOlder()[0] as Older;
+    const report = toCart(again, CATALOGUE).parts.at(-1);
+    expect(dropPart(again, report?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(stored()[0].body.used_up).toEqual([]);
+    expect(stored()[0].body.key).toBe(KEY);
+  });
+
+  test("among others, kept as v4 keeps them, only its line goes; and a report of a save whose lines are lost", () => {
+    const build = "2026-11-12T10:00:00.000Z";
+    const other = saveOf({ build }, { key: OTHER });
+    keep("inventory.outbox.v3", {
+      build,
+      entries: [
+        other,
+        saveOf(
+          {},
+          {
+            lines: [
+              { item_id: 100, quantity: "4", package_id: 1004 },
+              { item_id: 101, quantity: "2" },
+            ],
+          },
+        ),
+      ],
+    });
+    const older = readOlder()[1] as Older;
+    const [gone] = toCart(older, CATALOGUE).parts;
+    expect(dropPart(older, gone?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(stored()).toEqual({
+      build,
+      entries: [
+        other,
+        saveOf({}, { lines: [{ item_id: 101, quantity: "2" }] }),
+      ],
+    });
+    keep("inventory.outbox.v3", [
+      saveOf({}, { lines: "many", used_up: [KEY, OTHER] }),
+    ]);
+    const lost = readOlder()[0] as Older;
+    const [report] = toCart(lost, CATALOGUE).parts;
+    expect(dropPart(lost, report?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(stored()[0].body).toMatchObject({ lines: "many", used_up: [OTHER] });
+  });
+
+  test("of an older cart's line, what it said of one open package goes, the rest kept", () => {
+    const line = {
+      itemId: 101,
+      packages: { 1001: "1" },
+      loose: "",
+      open: { [KEY]: { amount: "3" }, [OTHER]: { usedUp: true } },
+    };
+    keep("inventory.cart.v1", { ...freshCart(), lines: [line] });
+    const older = readOlder()[0] as Older;
+    const taken = toCart(older, CATALOGUE).parts.find(
+      (part) => part.words === "Cat6 cable: 3 m from an open package",
+    );
+    expect(dropPart(older, taken?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(stored("inventory.cart.v1").lines).toEqual([
+      { ...line, open: { [OTHER]: { usedUp: true } } },
+    ]);
+  });
+
+  test("an item's lines that go back are discarded together", () => {
+    const older = only({
+      lines: [
+        { item_id: 100, quantity: "4", package_id: 1000 },
+        { item_id: 101, quantity: "2" },
+        { item_id: 100, quantity: "1" },
+      ],
+    });
+    const { parts } = toCart(older, CATALOGUE);
+    expect(parts.map((part) => part.words)).toEqual([
+      "LiteBeam 5AC: 1 × Box, 1 loose",
+      "Cat6 cable: 2 m",
+    ]);
+    expect(dropPart(older, parts[0]?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(stored()[0].body.lines).toEqual([{ item_id: 101, quantity: "2" }]);
+  });
+
+  test("of an older cart's line, only that part goes, and the line once it holds nothing", () => {
+    const line = {
+      itemId: 100,
+      packages: { 1000: "1", 1004: "2" },
+      loose: "3",
+      picked: 4,
+    };
+    keep("inventory.cart.v1", { ...freshCart(), lines: [line] });
+    const listedCart = readOlder()[0] as Older;
+    const [back, gone] = toCart(listedCart, CATALOGUE).parts;
+    expect(gone?.note).toEqual(["Sorry. This item has been retired.", ""]);
+    expect(dropPart(listedCart, gone?.drop ?? [], CATALOGUE)).toBe(true);
+    // No field added that it never had: an older build still reads it.
+    expect(stored("inventory.cart.v1").lines).toEqual([
+      { ...line, packages: { 1000: "1" } },
+    ]);
+    keep("inventory.cart.v1", {
+      ...freshCart(),
+      lines: [line, { itemId: 101, packages: {}, loose: "1" }],
+    });
+    const two = readOlder()[0] as Older;
+    const parts = toCart(two, CATALOGUE).parts;
+    expect(back?.words).toBe("LiteBeam 5AC: 1 × Box, 3 loose");
+    expect(dropPart(two, parts[0]?.drop ?? [], CATALOGUE)).toBe(true);
+    // What it held besides was the package gone, still to discard.
+    expect(stored("inventory.cart.v1").lines).toEqual([
+      { ...line, packages: { 1004: "2" }, loose: "" },
+      { itemId: 101, packages: {}, loose: "1" },
+    ]);
+    const left = readOlder()[0] as Older;
+    expect(
+      dropPart(left, toCart(left, CATALOGUE).parts[0]?.drop ?? [], CATALOGUE),
+    ).toBe(true);
+    expect(stored("inventory.cart.v1").lines).toEqual([
+      { itemId: 101, packages: {}, loose: "1" },
+    ]);
+  });
+
+  test("the last line listed discarded takes the save, or the cart, with it", () => {
+    const older = only({
+      lines: [
+        { item_id: 100, quantity: "4", package_id: 1004 },
+        // Unread: never listed, so not left on its own.
+        { item_id: 100, quantity: "lots" },
+      ],
+    });
+    const { parts } = toCart(older, CATALOGUE);
+    expect(parts).toHaveLength(1);
+    expect(dropPart(older, parts[0]?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
+    keep("inventory.cart.v1", {
+      ...freshCart(),
+      lines: [{ itemId: 100, packages: { 1004: "2" }, loose: "" }],
+    });
+    const cart = readOlder()[0] as Older;
+    expect(
+      dropPart(cart, toCart(cart, CATALOGUE).parts[0]?.drop ?? [], CATALOGUE),
+    ).toBe(true);
+    expect(localStorage.getItem("inventory.cart.v1")).toBeNull();
+  });
+
+  test("an item retired since is listed as named, and goes back once discarded", () => {
+    const older = only({
+      lines: [
+        { item_id: 103, quantity: "4", package_id: 1003 },
+        { item_id: 100, quantity: "4", package_id: 1000 },
+      ],
+    });
+    const named = withRetired(CATALOGUE);
+    const [retired] = toCart(older, named).parts;
+    expect(retired?.words).toBe("NanoStation M5: 2 × Pair");
+    expect(dropPart(older, retired?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(goesBackWhole(readOlder()[0] as Older, CATALOGUE)).toBe(true);
+  });
+
+  test("one changed meanwhile, or a browser that will not keep the change, keeps it", () => {
+    const older = mixed();
+    const { parts } = toCart(older, CATALOGUE);
+    const drop = parts[0]?.drop ?? [];
+    expect(dropPart(older, drop, CATALOGUE, refusing("setItem"))).toBe(false);
+    keep("inventory.outbox.v3", [saveOf({ state: "refused", note: "No." })]);
+    const before = stored();
+    expect(dropPart(older, drop, CATALOGUE)).toBe(false);
+    expect(stored()).toEqual(before);
+  });
+
+  test("the store lists again after a line goes", () => {
+    mixed();
+    const store = new OlderStore();
+    const [older] = store.listed.value;
+    const { parts } = toCart(older as Older, CATALOGUE);
+    expect(
+      store.dropPart(older as Older, parts[0]?.drop ?? [], CATALOGUE),
+    ).toBe(true);
+    expect(store.listed.value[0]?.lines).toHaveLength(3);
+  });
 });
 
 describe("put back without a tap", () => {

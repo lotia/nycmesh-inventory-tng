@@ -8,8 +8,8 @@
  * and how much of each, and when. The scan page puts one that goes back
  * whole (goesBackWhole) in an empty cart itself; the volunteer adds each
  * other to the cart, to check, fill in what this build needs and save
- * again, or discards it. Nothing else is removed, but keys with nothing to
- * lose (tidyOlder).
+ * again, or discards it, or a line of it that cannot go back (dropPart).
+ * Nothing else is removed, but keys with nothing to lose (tidyOlder).
  *
  * Each version's shape is in the history of outbox.ts and cart.ts. Every
  * batch kept its key, kind, volunteer_id, places, install_number and lines
@@ -39,9 +39,10 @@ import {
   BatchKey,
   KEY_REUSED,
   STORAGE_KEY as OUTBOX_KEY,
+  REPORTS,
   SAVED_BEFORE_CHANGES,
 } from "./outbox";
-import { decimal, thousandths } from "./quantity";
+import { count, decimal, thousandths } from "./quantity";
 import {
   hasStored,
   olderKeys,
@@ -134,8 +135,9 @@ export type Older = {
   /** Whether it held lines that could not be read even as a list, so how
    * many is unknown. */
   linesLost: boolean;
-  /** Open packages it said were used up, or what was on them. */
-  reports: number;
+  /** How many open packages it said were used up, and of how many it
+   * said what was on them. */
+  reports: { usedUp: number; lengths: number };
 };
 
 type OldBatchLine = v.InferOutput<typeof OldLine>;
@@ -194,7 +196,10 @@ function savesIn(key: string, stored: unknown): Older[] {
         refused: state === "refused" ? (note ?? "") : null,
         lines: linesOf(body.lines ?? [], OldLine),
         linesLost: body.lines === null,
-        reports: (body.used_up?.length ?? 0) + (body.lengths?.length ?? 0),
+        reports: {
+          usedUp: body.used_up?.length ?? 0,
+          lengths: body.lengths?.length ?? 0,
+        },
       },
     ];
   });
@@ -220,7 +225,7 @@ function cartIn(key: string, stored: unknown): Older[] {
       refused: null,
       lines: linesOf(cart.lines, OldCartLine),
       linesLost: false,
-      reports: 0,
+      reports: { usedUp: 0, lengths: 0 },
     },
   ];
 }
@@ -333,6 +338,139 @@ export function removeOlder(
   return writeStored(storage, older.key, next);
 }
 
+/**
+ * Discard a part of `older` (Part.drop): what is left is kept as it was,
+ * under its key, so a save keeps its batch key, as one put back in the
+ * cart and changed there does (Older.batchKey); one left with nothing to
+ * list in `catalogue` goes whole (removeOlder). False if the browser would
+ * not keep the change, or `older` has changed meanwhile.
+ */
+export function dropPart(
+  older: Older,
+  drop: readonly Cut[],
+  catalogue: Catalogue,
+  storage: Storage = localStorage,
+): boolean {
+  if (!isUnchanged(older, storage)) {
+    return false;
+  }
+  const stored = readStored(storage, older.key);
+  let next: unknown;
+  if (older.batch === null) {
+    const cart = stored as { lines: unknown[] };
+    next = { ...cart, lines: cut(cart.lines, drop) };
+  } else {
+    const entries = entriesOf(stored).map((entry) => {
+      const read = v.safeParse(OldEntry, entry);
+      if (!read.success || read.output.body.key !== older.batch) {
+        return entry;
+      }
+      const { body } = entry as { body: Record<string, unknown> };
+      const cutReports = (kind: "used_up" | "lengths") =>
+        Array.isArray(body[kind])
+          ? {
+              [kind]: body[kind].filter(
+                (_, at) =>
+                  !drop.some(
+                    (each) =>
+                      "report" in each &&
+                      each.report === kind &&
+                      each.at === at,
+                  ),
+              ),
+            }
+          : {};
+      return {
+        ...(entry as object),
+        body: {
+          ...body,
+          // Lines not even a list are lost already: none is listed.
+          ...(Array.isArray(body.lines)
+            ? { lines: cut(body.lines, drop) }
+            : {}),
+          ...cutReports("used_up"),
+          ...cutReports("lengths"),
+        },
+      };
+    });
+    next = Array.isArray(stored) ? entries : { ...(stored as object), entries };
+  }
+  const after = (older.batch === null ? cartIn : savesIn)(older.key, next).find(
+    (each) => each.batch === older.batch,
+  );
+  if (
+    after === undefined ||
+    toCart(after, withRetired(catalogue)).parts.length === 0
+  ) {
+    return removeOlder(older, storage);
+  }
+  return writeStored(storage, older.key, next);
+}
+
+/** `lines` as kept, less what `drop` cuts from them: a line whole, or of a
+ * cart's line some counts, its loose or what it said of open packages,
+ * the line going too once it holds nothing. Fields it never had are not
+ * added, so an older build still reads it. */
+function cut(lines: unknown[], drop: readonly Cut[]): unknown[] {
+  return lines.flatMap((line, at) => {
+    const cuts = drop.filter((each) => !("report" in each) && each.at === at);
+    if (cuts.length === 0) {
+      return [line];
+    }
+    const parts = cuts as {
+      packages?: string[];
+      loose?: true;
+      open?: string[];
+    }[];
+    if (
+      parts.some(
+        (each) =>
+          each.packages === undefined &&
+          each.loose === undefined &&
+          each.open === undefined,
+      )
+    ) {
+      return [];
+    }
+    const kept = { ...(line as Record<string, unknown>) };
+    const without = (field: "packages" | "open", keys: string[]) => {
+      if (typeof kept[field] === "object" && kept[field] !== null) {
+        kept[field] = Object.fromEntries(
+          Object.entries(kept[field]).filter(([key]) => !keys.includes(key)),
+        );
+      }
+    };
+    without(
+      "packages",
+      parts.flatMap((each) => each.packages ?? []),
+    );
+    without(
+      "open",
+      parts.flatMap((each) => each.open ?? []),
+    );
+    if (parts.some((each) => each.loose) && "loose" in kept) {
+      kept.loose = "";
+    }
+    const read = v.safeParse(OldCartLine, kept);
+    const holds =
+      read.success &&
+      (Object.values(read.output.packages).some(holdsSome) ||
+        read.output.loose.trim() !== "" ||
+        Object.values(read.output.open).some(saidOfOpen));
+    return holds ? [kept] : [];
+  });
+}
+
+/** Whether `older` is still listed, every part of it as it was read. */
+export function isUnchanged(
+  older: Older,
+  storage: Storage = localStorage,
+): boolean {
+  return readOlder(storage).some(
+    (each) => JSON.stringify(each) === JSON.stringify(older),
+  );
+}
+
 /** Whether `older` is still listed as it was read. */
 export function isListed(
   older: Older,
@@ -350,50 +488,85 @@ export function isListed(
  * said once for the whole save, not for each line. */
 export type Gaps = string[];
 
-/** In Ali's words (inventory-tng-3c0), each said once for a save. */
-export const LINES_LOST =
-  "Sorry. Could not read previously added items, scan them again.";
-export const RESIZED =
-  "Sorry. The package size has changed since this item was added. Discard and re-add the new package size.";
-/** Of a package no longer offered: retired, with none sealed left
- * (inventory-tng-adb). */
-export const PACKAGE_RETIRED =
-  "Sorry. The package has been retired since this item was added. Discard and re-add the item.";
+/** A note on what cannot go back: its opening words, shown in bold, then
+ * the rest. */
+export type Note = readonly [opening: string, rest: string];
+
+/** A note in words. */
+export const said = (note: Note): string => note.join("");
+
+/** In Ali's words (inventory-tng-3c0, inventory-tng-0su). Atop the save. */
+export const LINES_LOST: Note = [
+  "Sorry. Could not read previously added items",
+  ", scan them again.",
+];
+/** Under a save's line of a package resized since. */
+export const RESIZED: Note = [
+  "Sorry. The package size has changed",
+  " since this item was added. Discard and re-add the new package size.",
+];
+/** Under a sealed count of a package no longer offered: retired, with none
+ * sealed left. */
+export const RETIRED: Note = ["Sorry. This item has been retired.", ""];
+/** Under what was taken from, or said of, an open package. */
+export const RESCAN: Note = [
+  "Sorry. Can't add these items. Please rescan.",
+  "",
+];
 
 /** Lines that could not be read, counted. */
-export function unreadWords(n: number): string {
+export function unreadWords(n: number): Note {
   return n === 1
-    ? "Sorry. Could not read 1 previously added item, scan it again."
-    : `Sorry. Could not read ${n} previously added items, scan them again.`;
+    ? ["Sorry. Could not read 1 previously added item", ", scan it again."]
+    : [
+        `Sorry. Could not read ${n} previously added items`,
+        ", scan them again.",
+      ];
 }
 
-/** What was taken from, or said of, open packages, counted. */
-export function openWords(n: number): string {
-  return n === 1
-    ? "Sorry. Could not read 1 open item, scan it in again."
-    : `Sorry. Could not read ${n} open items, scan them in again.`;
-}
+/** What discarding a part drops from what is kept, by where in what was
+ * read: a line whole, or of a cart's line the counts of some packages, its
+ * loose and what it said of some open packages; or a save's report. */
+export type Cut =
+  | { at: number; packages?: string[]; loose?: true; open?: string[] }
+  | { report: "used_up" | "lengths"; at: number };
+
+/** One line of what an older build left, as listed: an item's lines that
+ * go back, or one that cannot, with why. */
+export type Part = {
+  /** Its item; null for a report, which names none. */
+  itemId: number | null;
+  words: string;
+  /** Why it cannot go back; null if it does. */
+  note: Note | null;
+  drop: Cut[];
+};
 
 /**
  * `older` as a cart to check and save, keeping `last`'s choices where it
- * has none; and what of it the cart cannot hold, in words. A batch's
- * package line goes back as packages, if the item still has the package
- * and the amount is whole ones of it; else as loose, for the cart to say
- * what is wrong; one of a package resized since it was saved, or of one
- * the catalogue no longer offers, is left to do again, as is an older
- * cart's count of one no longer offered, unless blank or none. What was
- * taken from an open package, and what was said of one, are left to do
- * again too, as the open packages may have changed.
- * The cart keeps the batch key it is to be sent under (Older.batchKey).
+ * has none; what of it the cart cannot hold, in words; and it as listed,
+ * line by line, each named from `catalogue`. A batch's package line goes
+ * back as packages, if the item still has the package and the amount is
+ * whole ones of it; else as loose, for the cart to say what is wrong; one
+ * of a package resized since it was saved, or of one the catalogue no
+ * longer offers, is left to do again, as is an older cart's count of one
+ * no longer offered, unless blank or none. What was taken from an open
+ * package, and what was said of one, are left to do again too, as the
+ * open packages may have changed. A line left out is not put back as its
+ * item's empty line (Ali, inventory-tng-0su), but one that could not be
+ * read is, as before. The cart keeps the batch key it is to be sent under
+ * (Older.batchKey).
  */
 export function toCart(
   older: Older,
   catalogue: Catalogue,
   last: Cart = freshCart(),
-): { cart: Cart; gaps: Gaps } {
+): { cart: Cart; gaps: Gaps; lost: Note | null; parts: Part[] } {
   const { items } = indexOf(catalogue);
   const lines = new Map<number, Line>();
-  const lineOf = (itemId: number): Line => {
+  // What each item's line goes back from, to discard it.
+  const from = new Map<number, Cut[]>();
+  const lineOf = (itemId: number, cut: Cut): Line => {
     const made = lines.get(itemId) ?? {
       itemId,
       packages: {},
@@ -401,43 +574,70 @@ export function toCart(
       typed: true,
     };
     lines.set(itemId, made);
+    from.set(itemId, [...(from.get(itemId) ?? []), cut]);
     return made;
   };
+  const left: Part[] = [];
   let unread = 0;
-  let open = older.reports;
-  let resized = false;
-  let retired = false;
-  for (const line of older.lines) {
+  older.lines.forEach((line, at) => {
     if (line === null) {
       unread += 1;
     } else if ("itemId" in line) {
       const item = items.get(line.itemId);
-      const made = lineOf(line.itemId);
-      made.packages = {};
+      const before = left.length;
+      const leave = (words: string, note: Note, cut: Cut) =>
+        left.push({ itemId: line.itemId, words, note, drop: [cut] });
+      const kept: Record<string, string> = {};
       for (const [packageId, n] of Object.entries(line.packages)) {
         if (
           item === undefined ||
           item.packages.some((pack) => String(pack.id) === packageId)
         ) {
-          made.packages[packageId] = n;
+          kept[packageId] = n;
         } else if (holdsSome(n)) {
           // Neither shown nor saved by the cart, so said, not kept.
-          retired = true;
+          leave(`${nameOf(item)}: ${n} × ${GONE_PACKAGE}`, RETIRED, {
+            at,
+            packages: [packageId],
+          });
         }
       }
-      made.loose = line.loose;
-      open += Object.values(line.open).filter(saidOfOpen).length;
+      for (const [key, each] of Object.entries(line.open)) {
+        if (saidOfOpen(each)) {
+          leave(openWords(item, each), RESCAN, { at, open: [key] });
+        }
+      }
+      const holds =
+        Object.values(kept).some(holdsSome) || line.loose.trim() !== "";
+      // All it held left out, it is not put back empty.
+      if (holds || left.length === before) {
+        const made = lineOf(line.itemId, {
+          at,
+          packages: Object.keys(kept),
+          loose: true,
+        });
+        made.packages = kept;
+        made.loose = line.loose;
+      }
     } else {
       const item = items.get(line.item_id);
       const amount = thousandths(String(line.quantity));
-      const made = lineOf(line.item_id);
       if (amount === null) {
         unread += 1;
-        continue;
+        // Its item's line, as before, to count again.
+        lineOf(line.item_id, { at });
+        return;
       }
+      const leave = (note: Note, after = "") =>
+        left.push({
+          itemId: line.item_id,
+          words: `${nameOf(item)}: ${decimal(amount)}${unitOf(item)}${after}`,
+          note,
+          drop: [{ at }],
+        });
       if (line.open_package_key !== null && older.kind !== "open") {
-        open += 1;
-        continue;
+        leave(RESCAN, FROM_OPEN);
+        return;
       }
       const pack = item?.packages.find((each) => each.id === line.package_id);
       if (
@@ -447,8 +647,8 @@ export function toCart(
       ) {
         // No longer offered: loose would not say what was moved, sealed,
         // so it is done again. An item gone is named as it is (withRetired).
-        retired = true;
-        continue;
+        leave(RETIRED);
+        return;
       }
       const size = pack === undefined ? null : thousandths(pack.size);
       if (
@@ -458,9 +658,10 @@ export function toCart(
       ) {
         // Resized since: neither its count of packages nor loose would say
         // what was moved, so it is done again, as the server would ask.
-        resized = true;
-        continue;
+        leave(RESIZED);
+        return;
       }
+      const made = lineOf(line.item_id, { at });
       if (
         pack !== undefined &&
         size !== null &&
@@ -479,41 +680,97 @@ export function toCart(
         made.loose = decimal((thousandths(made.loose) ?? 0) + amount);
       }
     }
-  }
-  const gaps: Gaps = [];
-  if (older.linesLost) {
-    gaps.push(LINES_LOST);
-  } else if (unread > 0) {
-    gaps.push(unreadWords(unread));
-  }
-  if (open > 0) {
-    gaps.push(openWords(open));
-  }
-  if (resized) {
-    gaps.push(RESIZED);
-  }
-  if (retired) {
-    gaps.push(PACKAGE_RETIRED);
-  }
+  });
+  const report = (kind: "used_up" | "lengths", n: number) =>
+    Array.from({ length: n }, (_, at) => ({
+      itemId: null,
+      words: REPORTS[kind],
+      note: RESCAN,
+      drop: [{ report: kind, at }],
+    }));
+  left.push(
+    ...report("used_up", older.reports.usedUp),
+    ...report("lengths", older.reports.lengths),
+  );
+  const lost = older.linesLost
+    ? LINES_LOST
+    : unread > 0
+      ? unreadWords(unread)
+      : null;
+  const gaps: Gaps = [
+    ...(lost === null ? [] : [lost]),
+    ...[RESCAN, RESIZED, RETIRED].filter((note) =>
+      left.some((part) => part.note === note),
+    ),
+  ].map(said);
   const kind: Kind =
     older.kind === null || older.kind === "report" ? last.kind : older.kind;
-  return {
-    // Choices the catalogue no longer has are cleared, for the cart to ask.
-    cart: reconcile(
-      {
-        ...freshCart(last),
-        kind,
-        volunteerId: older.volunteerId ?? last.volunteerId,
-        fromId: older.fromId,
-        toId: older.toId,
-        installNumber: older.installNumber,
-        lines: [...lines.values()],
-        ...(v.is(BatchKey, older.batchKey) ? { batchKey: older.batchKey } : {}),
-      },
-      catalogue,
-    ),
-    gaps,
-  };
+  // Choices the catalogue no longer has are cleared, for the cart to ask.
+  const cart = reconcile(
+    {
+      ...freshCart(last),
+      kind,
+      volunteerId: older.volunteerId ?? last.volunteerId,
+      fromId: older.fromId,
+      toId: older.toId,
+      installNumber: older.installNumber,
+      lines: [...lines.values()],
+      ...(v.is(BatchKey, older.batchKey) ? { batchKey: older.batchKey } : {}),
+    },
+    catalogue,
+  );
+  const back = cart.lines.flatMap((line) => {
+    const words = lineWords(line, items.get(line.itemId));
+    return words === null
+      ? []
+      : [
+          {
+            itemId: line.itemId,
+            words,
+            note: null,
+            drop: from.get(line.itemId) ?? [],
+          },
+        ];
+  });
+  // In the order they were kept, the reports last.
+  const first = (part: Part) =>
+    part.drop.find((cut) => !("report" in cut))?.at ?? Infinity;
+  const parts = [...back, ...left].sort((a, b) => first(a) - first(b));
+  return { cart, gaps, lost, parts };
+}
+
+/** A package no longer offered, which the catalogue cannot name. */
+const GONE_PACKAGE = "a package no longer in the catalogue";
+/** After an amount taken from an open package. */
+const FROM_OPEN = " from an open package";
+
+/** What an older cart's line said of an open package, in words. */
+function openWords(item: Item | undefined, said: unknown): string {
+  const { amount, usedUp } = said as Record<string, unknown>;
+  const taken = typeof amount === "string" ? (thousandths(amount) ?? 0) : 0;
+  const what =
+    taken > 0
+      ? `${decimal(taken)}${unitOf(item)}${FROM_OPEN}`
+      : REPORTS[usedUp === true ? "used_up" : "lengths"];
+  return `${nameOf(item)}: ${what}`;
+}
+
+/** A cart's line in words: its item, then how many of each package, and
+ * how much loose; null if it holds none. */
+export function lineWords(line: Line, item: Item | undefined): string | null {
+  if (item === undefined) {
+    return nameOf(item);
+  }
+  const parts = item.packages.flatMap((pack) => {
+    const packs = count(line.packages[pack.id] ?? "") ?? 0;
+    return packs > 0 ? [`${packs} × ${pack.name}`] : [];
+  });
+  const loose = thousandths(line.loose) ?? 0;
+  if (loose > 0) {
+    const after = parts.length > 0 ? " loose" : "";
+    parts.push(`${decimal(loose)}${unitOf(item)}${after}`);
+  }
+  return parts.length === 0 ? null : `${item.name}: ${parts.join(", ")}`;
 }
 
 /**
@@ -649,6 +906,18 @@ export class OlderStore {
     const removed = removeOlder(older, this.storage);
     this.refresh();
     return removed;
+  }
+
+  /** Whether `older` is still listed, every part as it was read. */
+  isUnchanged(older: Older): boolean {
+    return isUnchanged(older, this.storage);
+  }
+
+  /** Discard a part of `older`, and list again. False as dropPart says. */
+  dropPart(older: Older, drop: readonly Cut[], catalogue: Catalogue): boolean {
+    const dropped = dropPart(older, drop, catalogue, this.storage);
+    this.refresh();
+    return dropped;
   }
 
   /** Follow other tabs' changes to the older keys: an older build's tab

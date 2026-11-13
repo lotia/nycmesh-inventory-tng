@@ -82,14 +82,18 @@ class OutOfDate(Strict):
 class OlderStorage(Strict):
     """What an older build left under its own key, saves not sent or a cart
     with lines: a scan page found it as it loaded, a volunteer put one back
-    in the cart or discarded it, or the page put one back in an empty cart
-    itself (frontend/src/older.ts)."""
+    in the cart, discarded it or discarded one line of it, or the page put
+    one back in an empty cart itself (frontend/src/older.ts)."""
 
     kind: Literal["older_storage"]
     held: Literal["saves", "cart"]
     # Found, unless it says: a page sending none means that.
     action: Literal[
-        "found", "put_in_cart", "put_in_cart_automatically", "discarded"
+        "found",
+        "put_in_cart",
+        "put_in_cart_automatically",
+        "discarded",
+        "line_discarded",
     ] = "found"
 
 
@@ -143,8 +147,8 @@ older_acted_on = meter.create_counter(
     "inventory.page.older_acted_on",
     unit="{entry}",
     description="Saves not sent, or carts, left by an older build that a "
-    "volunteer put back in the cart or discarded, or the page put back in an "
-    "empty cart itself, by which and how",
+    "volunteer put back in the cart, discarded or discarded a line of, or the "
+    "page put back in an empty cart itself, by which and how",
 )
 scan_to_save = meter.create_histogram(
     "inventory.scan.to_save.duration",

@@ -166,10 +166,10 @@ export const SAVED_BEFORE_CHANGES =
   "Not saved: another tab saved it first, as it was before your changes. Check what was saved, then save your changes again.";
 
 /** A batch's reports, as a 422 names them. */
-const REPORTS: Record<string, string> = {
+export const REPORTS = {
   used_up: "Open package said used up",
   lengths: "What is on an open package",
-};
+} as const;
 
 /** A line's package_size refused as a page's bug, as a build from before
  * sizes were sent kept its lines (inventory-tng-1p8), by the server's type:
@@ -200,7 +200,9 @@ function problems(
         (loc[3] === "package_size" ? SIZE_REFUSED.get(type) : undefined) ??
         (typeof msg === "string" ? msg : "Not accepted");
       // A report's, by its place in the batch's list of them.
-      const report = REPORTS[String(loc[1])];
+      const report = Object.entries(REPORTS).find(
+        ([field]) => field === loc[1],
+      )?.[1];
       if (
         loc[0] === "body" &&
         report !== undefined &&

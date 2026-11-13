@@ -332,8 +332,8 @@ export interface components {
      * OlderStorage
      * @description What an older build left under its own key, saves not sent or a cart
      *     with lines: a scan page found it as it loaded, a volunteer put one back
-     *     in the cart or discarded it, or the page put one back in an empty cart
-     *     itself (frontend/src/older.ts).
+     *     in the cart, discarded it or discarded one line of it, or the page put
+     *     one back in an empty cart itself (frontend/src/older.ts).
      */
     OlderStorage: {
       /**
@@ -355,7 +355,8 @@ export interface components {
         | "found"
         | "put_in_cart"
         | "put_in_cart_automatically"
-        | "discarded";
+        | "discarded"
+        | "line_discarded";
     };
     /**
      * OpenPackageEntry

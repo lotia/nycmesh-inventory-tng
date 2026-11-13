@@ -164,6 +164,15 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   what goes back and said, as a resized one is (inventory-tng-adb). We
   rejected putting it back loose, which says loose units moved where
   sealed packages did.
+  Each line that cannot go back says why under it, and has a Discard of
+  its own that drops that line from what the older build kept (Ali,
+  2026-11-13, inventory-tng-0su); an entry with nothing to put back
+  offers only Discard. A save keeps its batch key while its lines go, as
+  one put back and changed in the cart does: an older tab may have sent
+  it as it was, and the key then has the server take it once. We
+  rejected one note for the whole entry, which left the volunteer to
+  work out which line it meant, and dropping the key with a line, which
+  could record the save twice.
 - Compression behaves the same in compose and in Kubernetes, because the
   app serves the compressed files itself. The image holds three copies of
   each file; the bundle is small, so that costs little.

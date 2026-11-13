@@ -342,10 +342,15 @@ every version kept. Into an empty cart it puts, without a tap, the oldest
 one that goes back whole (nothing unread, nothing of an open package, no
 package resized, no item or package retired or gone, no refusal); it lists
 the rest for the volunteer to add to the cart or discard, naming an item
-retired since from the catalogue's `retired_items`. Put back, a count of a
-package no longer offered, or a save's of one resized, is left out and
-said, never kept loose or unseen. A save put back keeps its batch key, as
-does a cart it filled when a newer build reads it, and
+retired since from the catalogue's `retired_items`. A count of a package
+no longer offered, a save's of one resized, and what was taken from or
+said of an open package are listed each on its own line, saying why it
+cannot go back, and are left out when put back, never kept loose, unseen
+or as an empty line. Each of those lines, and one of an item retired
+since, has a Discard of its own, which drops that line alone from what
+the older build kept; the entry goes with its last listed line. A save
+keeps its batch key while its lines go (`dropPart`), and one put back
+keeps it, as does a cart it filled when a newer build reads it, and
 the cart is saved under it until emptied, as an older tab may be sending
 it still: the server then takes it once, or, changed since, refuses it
 (409 `key_reused`), which the page says. A save refused for its key goes
