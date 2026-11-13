@@ -11,6 +11,12 @@ import { ownCable } from "./own";
 const HEADING = "Checked out items. Add to cart or discard before sending";
 const PUT_BACK = "Added back to cart. Review before Save.";
 
+/** What older builds left, as the page lists it. */
+const listingOf = (page: Page) =>
+  page.locator("section", {
+    has: page.getByRole("heading", { name: HEADING }),
+  });
+
 /** The scan page's ids for a name and two places, by what it offers. */
 async function choices(page: Page) {
   const value = async (label: string, option: string) =>
@@ -88,9 +94,7 @@ test("a save an older build left goes back in the cart, whole without a tap, and
   await expect(page.getByLabel("To", { exact: true })).toHaveValue(
     String(toId),
   );
-  const listing = page.locator("section", {
-    has: page.getByRole("heading", { name: HEADING }),
-  });
+  const listing = listingOf(page);
   await expect(listing).toContainText(
     "Moving stock from Supernode 1 › Shelf A to Van, by Sam Example",
   );
@@ -138,9 +142,7 @@ test("a save holding an item retired since, with none left, names it, and can on
   await leave(page, [{ item_id: itemId, quantity: "2" }]);
   await page.reload();
 
-  const listing = page.locator("section", {
-    has: page.getByRole("heading", { name: HEADING }),
-  });
+  const listing = listingOf(page);
   await expect(listing.getByText("Item retired")).toBeVisible();
   await expect(listing.getByText(`${cable}: 2 m`)).toBeVisible();
   await expect(

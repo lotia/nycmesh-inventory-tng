@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { freshCart } from "./cart";
+import { freshCart, type Item } from "./cart";
 import {
   goesBackWhole,
   isListed,
@@ -611,8 +611,8 @@ describe("as a cart", () => {
 });
 
 describe("put back without a tap", () => {
-  const only = (body = {}) => {
-    keep("inventory.outbox.v3", [saveOf({}, body)]);
+  const only = (body = {}, fields = {}) => {
+    keep("inventory.outbox.v3", [saveOf(fields, body)]);
     return readOlder()[0] as Older;
   };
 
@@ -647,10 +647,11 @@ describe("put back without a tap", () => {
   });
 
   test("one the inventory refused does not, as its reason is said only while it is listed", () => {
-    keep("inventory.outbox.v3", [
-      saveOf({ state: "refused", note: "Not saved. Line 1: too many." }),
-    ]);
-    expect(goesBackWhole(readOlder()[0] as Older, CATALOGUE)).toBe(false);
+    const refused = only(
+      {},
+      { state: "refused", note: "Not saved. Line 1: too many." },
+    );
+    expect(goesBackWhole(refused, CATALOGUE)).toBe(false);
   });
 
   test("an older cart holding some of a package gone does not; none of one, or a count unread, it does", () => {
@@ -665,19 +666,6 @@ describe("put back without a tap", () => {
     expect(
       goesBackWhole(cartWith({ 1000: "1", 1003: "", 1004: "lots" }), CATALOGUE),
     ).toBe(true);
-  });
-
-  test("one with a package retired, some left, does not", () => {
-    const retired = {
-      ...CATALOGUE,
-      items: CATALOGUE.items.map((item) => ({
-        ...item,
-        packages: item.packages.map((pack) => ({ ...pack, retired: true })),
-      })),
-    };
-    const body = { lines: [{ item_id: 100, quantity: "4", package_id: 1000 }] };
-    expect(goesBackWhole(only(body), CATALOGUE)).toBe(true);
-    expect(goesBackWhole(only(body), retired)).toBe(false);
   });
 
   test("the oldest that goes back whole is next, one of no known time last, and those tried are skipped", () => {
@@ -698,14 +686,23 @@ describe("put back without a tap", () => {
     ).toBeUndefined();
   });
 
-  test("one with an item retired, some left, does not", () => {
-    const retired = {
-      ...CATALOGUE,
-      items: CATALOGUE.items.map((item) =>
-        item.id === 101 ? { ...item, retired: true } : item,
-      ),
-    };
-    expect(goesBackWhole(only(), retired)).toBe(false);
+  test.each([
+    [
+      "a package retired, some left",
+      (item: Item) => ({
+        ...item,
+        packages: item.packages.map((pack) => ({ ...pack, retired: true })),
+      }),
+    ],
+    [
+      "an item retired, some left",
+      (item: Item) => ({ ...item, retired: true }),
+    ],
+  ])("one with %s does not", (_name, retire) => {
+    const retired = { ...CATALOGUE, items: CATALOGUE.items.map(retire) };
+    const body = { lines: [{ item_id: 100, quantity: "4", package_id: 1000 }] };
+    expect(goesBackWhole(only(body), CATALOGUE)).toBe(true);
+    expect(goesBackWhole(only(body), retired)).toBe(false);
   });
 });
 

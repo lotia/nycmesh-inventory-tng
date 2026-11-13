@@ -101,10 +101,10 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   build never copies an older one's batches, so a change to what is kept
   needs no copying code, and Valibot's objects stay strict. Instead, a tab
   of an older build sends its own batches and lets the volunteer save the
-  cart, then asks for a reload. It learns that a newer build is out from another
-  tab's stamp in storage (each build stamps its id, the time it was made,
-  on what it keeps) or from the server, whose reply to a batch names its
-  build. What an older build left under its keys is listed to the
+  cart, then asks for a reload. It learns that a newer build is out from
+  another tab's stamp in storage (each build stamps its id, the time it
+  was made, on what it keeps) or from the server, whose reply to a batch
+  names its build. What an older build left under its keys is listed to the
   volunteer (Ali, 2026-11-12, inventory-tng-kk1), read only in the parts
   every version kept (the kind, who, the places, items and how much, and
   when), for them to put each back in the cart, to check and save again,
