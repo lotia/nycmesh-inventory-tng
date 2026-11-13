@@ -96,6 +96,7 @@ describe("reading what older builds left", () => {
             item_id: 100,
             quantity: 3,
             package_id: null,
+            package_size: null,
             open_package_key: null,
           },
           null,
@@ -103,6 +104,7 @@ describe("reading what older builds left", () => {
             item_id: 101,
             quantity: "1.5",
             package_id: null,
+            package_size: null,
             open_package_key: null,
           },
         ],
@@ -274,6 +276,46 @@ describe("removing one", () => {
   });
 });
 
+describe("a browser that will not let it at storage", () => {
+  const refusing = (refused: "getItem" | "removeItem") =>
+    ({
+      getItem: (key: string) => localStorage.getItem(key),
+      setItem: (key: string, value: string) => localStorage.setItem(key, value),
+      removeItem: (key: string) => localStorage.removeItem(key),
+      [refused]: () => {
+        throw new DOMException("refused", "SecurityError");
+      },
+    }) as unknown as Storage;
+
+  test("one that will not read lists nothing, and the page still loads", () => {
+    keep("inventory.outbox.v1", [saveOf()]);
+    keep("inventory.outbox.v3", [saveOf()]);
+    const older = new OlderStore(refusing("getItem"));
+    expect(older.listed.value).toEqual([]);
+    expect(localStorage.getItem("inventory.outbox.v1")).not.toBeNull();
+  });
+
+  test("one that will not forget keeps each, and says so", () => {
+    // v1's one save is in v3 too, so v1 would go on load.
+    keep("inventory.outbox.v1", [saveOf()]);
+    keep("inventory.outbox.v3", [
+      saveOf({ state: "saved" }),
+      saveOf({}, { key: OTHER }),
+    ]);
+    keep("inventory.cart.v1", {
+      ...freshCart(),
+      lines: [{ itemId: 100, packages: {}, loose: "1" }],
+    });
+    const storage = refusing("removeItem");
+    const older = new OlderStore(storage);
+    expect(localStorage.getItem("inventory.outbox.v1")).not.toBeNull();
+    for (const each of older.listed.value) {
+      expect(removeOlder(each, storage)).toBe(false);
+    }
+    expect(older.listed.value).toHaveLength(2);
+  });
+});
+
 describe("as a cart", () => {
   const only = (save: unknown) => {
     keep("inventory.outbox.v3", [save]);
@@ -358,6 +400,42 @@ describe("as a cart", () => {
     expect(gaps).toEqual([
       "An item no longer in the catalogue: 2 was taken from an open package. Take it again.",
       "2 lines could not be read: add them again if they are missing.",
+    ]);
+  });
+
+  test("a package resized since is not counted again in today's size", () => {
+    const { cart, gaps } = toCart(
+      only(
+        saveOf(
+          {},
+          {
+            lines: [
+              // Two boxes of 2, which hold 4 now: neither one box nor 4
+              // loose is what was moved.
+              {
+                item_id: 100,
+                quantity: "4",
+                package_id: 1000,
+                package_size: "2",
+              },
+              // The size it was saved in is the size now.
+              {
+                item_id: 100,
+                quantity: "8",
+                package_id: 1000,
+                package_size: 4,
+              },
+            ],
+          },
+        ),
+      ),
+      CATALOGUE,
+    );
+    expect(cart.lines).toEqual([
+      { itemId: 100, packages: { 1000: "2" }, loose: "", typed: true },
+    ]);
+    expect(gaps).toEqual([
+      "A line could not be read: add it again if it is missing.",
     ]);
   });
 

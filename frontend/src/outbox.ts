@@ -375,7 +375,8 @@ export class Outbox {
       params: { header: { [HEADER]: this.builds.build } },
       body: entry.body,
     });
-    // Whatever the answer, it names the server's build: a newer one is out.
+    // A save, and a 409 build_too_old, name the server's build
+    // (page_builds.py), which may be newer; its other answers name none.
     call.then(
       ({ response }) =>
         this.builds.heard(response.headers.get(HEADER), "server"),

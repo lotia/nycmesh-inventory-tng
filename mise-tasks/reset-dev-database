@@ -5,6 +5,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/../backend"
 
-../mise-tasks/compose up -d --wait db
+# Its ports checked first, as every task that needs the server does
+# (CONTRIBUTING.md, Local settings).
+mise run start-database
 uv run python -m inventory_tng.dev_database drop "$@"
 mise run dev-database

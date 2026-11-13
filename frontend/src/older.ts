@@ -30,7 +30,14 @@ import {
 } from "./cart";
 import { STORAGE_KEY as OUTBOX_KEY } from "./outbox";
 import { decimal, thousandths } from "./quantity";
-import { olderKeys, onStoredChange, readStored, writeStored } from "./stored";
+import {
+  hasStored,
+  olderKeys,
+  onStoredChange,
+  readStored,
+  removeStored,
+  writeStored,
+} from "./stored";
 
 /** The builds up to the one keeping v3 each took over the batches under
  * the key before theirs, and sent them, but left them there as they were:
@@ -63,6 +70,9 @@ const OldLine = v.object({
   item_id: id,
   quantity: v.union([v.number(), v.string()]),
   package_id: maybe(id),
+  /** The size the page took that package to be, kept since inventory-tng-1p8
+   * (during v3). */
+  package_size: maybe(v.union([v.number(), v.string()])),
   open_package_key: maybe(v.string()),
 });
 
@@ -186,7 +196,7 @@ function outboxKeys(storage: Storage): {
   const keys = olderKeys(OUTBOX_KEY);
   const newest = keys
     .slice(0, TOOK_OVER)
-    .findLastIndex((key) => storage.getItem(key) !== null);
+    .findLastIndex((key) => hasStored(storage, key));
   const from = Math.max(newest, 0);
   return { read: keys.slice(from), superseded: keys.slice(0, from) };
 }
@@ -233,7 +243,7 @@ export function tidyOlder(storage: Storage = localStorage): void {
       stored !== undefined &&
       list(key, stored).every((each) => newer.has(each.batch))
     ) {
-      storage.removeItem(key);
+      removeStored(storage, key);
     }
   };
   const { read, superseded } = outboxKeys(storage);
@@ -265,8 +275,7 @@ export function removeOlder(
     return false;
   }
   if (older.batch === null) {
-    storage.removeItem(older.key);
-    return true;
+    return removeStored(storage, older.key);
   }
   const stored = readStored(storage, older.key);
   const left = entriesOf(stored).filter((entry) => {
@@ -277,8 +286,7 @@ export function removeOlder(
     ? left
     : { ...(stored as object), entries: left };
   if (savesIn(older.key, next).length === 0) {
-    storage.removeItem(older.key);
-    return true;
+    return removeStored(storage, older.key);
   }
   return writeStored(storage, older.key, next);
 }
@@ -304,8 +312,9 @@ export type Gaps = string[];
  * has none; and what of it the cart cannot hold, in words. A batch's
  * package line goes back as packages, if the item still has the package
  * and the amount is whole ones of it; else as loose, for the cart to say
- * what is wrong. What was taken from an open package, and what was said
- * of one, are left to do again, as the open packages may have changed.
+ * what is wrong; one of a package resized since it was saved is left to
+ * do again. What was taken from an open package, and what was said of
+ * one, are left to do again too, as the open packages may have changed.
  */
 export function toCart(
   older: Older,
@@ -354,6 +363,16 @@ export function toCart(
       }
       const pack = item?.packages.find((each) => each.id === line.package_id);
       const size = pack === undefined ? null : thousandths(pack.size);
+      if (
+        line.package_size !== null &&
+        size !== null &&
+        thousandths(String(line.package_size)) !== size
+      ) {
+        // Resized since: neither its count of packages nor loose would say
+        // what was moved, so it is done again, as the server would ask.
+        unread += 1;
+        continue;
+      }
       if (
         pack !== undefined &&
         size !== null &&

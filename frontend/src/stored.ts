@@ -28,6 +28,26 @@ export function writeStored(
   }
 }
 
+/** Whether anything is stored under `key`, readable or not; false if the
+ * browser will not say. */
+export function hasStored(storage: Storage, key: string): boolean {
+  try {
+    return storage.getItem(key) !== null;
+  } catch {
+    return false;
+  }
+}
+
+/** False if the browser would not forget it. */
+export function removeStored(storage: Storage, key: string): boolean {
+  try {
+    storage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** `key`'s older versions, oldest first: a key ending in `.v3` has `.v1`
  * and `.v2`; one with no version has none. Where older builds kept what
  * this build lists to put back or discard (older.ts). */
