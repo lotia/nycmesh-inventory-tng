@@ -762,15 +762,16 @@ describe("other tabs and a changing catalogue", () => {
       target: { value: "2" },
     });
     expect(screen.getByText("9 each in all")).toBeDefined();
-    // An administrator makes the box, never used, a box of 8.
-    const [radio, ...rest] = CATALOGUE.items;
-    const [box] = radio?.packages ?? [];
     catalogue = {
       ...CATALOGUE,
-      items: [
-        { ...radio, packages: [{ ...box, size: "8.000" }] },
-        ...rest,
-      ] as typeof CATALOGUE.items,
+      items: CATALOGUE.items.map((item) =>
+        item.id === 100
+          ? {
+              ...item,
+              packages: item.packages.map((box) => ({ ...box, size: "8.000" })),
+            }
+          : item,
+      ),
     };
     await vi.advanceTimersByTimeAsync(11 * 60_000);
     const count = (await screen.findByLabelText(

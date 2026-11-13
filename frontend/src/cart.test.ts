@@ -1330,6 +1330,17 @@ describe("a package resized while the cart counts it (inventory-tng-0qi)", () =>
     ).not.toHaveProperty("sizes");
   });
 
+  test("a count of an item the catalogue no longer has keeps its size, and a new one has none", () => {
+    const gone = { ...CATALOGUE, items: [] };
+    const counted = boxes("2", { 1000: "4.000" });
+    expect(sized(counted, counted, gone).lines[0]?.sizes).toEqual({
+      1000: "4.000",
+    });
+    expect(sized(counted, boxes("3"), gone).lines[0]).not.toHaveProperty(
+      "sizes",
+    );
+  });
+
   test("a count kept before sizes were is taken as counted at the size shown", () => {
     const before = boxes("2");
     expect(sized(before, before, CATALOGUE).lines[0]?.sizes).toEqual({
@@ -1387,17 +1398,9 @@ describe("a package resized while the cart counts it (inventory-tng-0qi)", () =>
       problems: [`${radio.name}: enter the count`],
     });
     // Counted again, at the size shown, it is saved.
-    const again = cart({
-      lines: [
-        {
-          itemId: 100,
-          packages: { 1000: "1" },
-          loose: "",
-          sizes: { 1000: "8.000" },
-        },
-      ],
-    });
-    expect(toBatch(again, boxOf("8.000"))).toMatchObject({
+    expect(
+      toBatch(boxes("1", { 1000: "8.000" }), boxOf("8.000")),
+    ).toMatchObject({
       draft: {
         lines: [
           { item_id: 100, quantity: "8", package_id: 1000, package_size: "8" },
