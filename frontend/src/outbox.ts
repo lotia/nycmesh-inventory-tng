@@ -17,8 +17,8 @@
  * discard (older.ts). Builds that keep the same shape share a key, so each
  * batch names the build that queued it, and is sent as that build's: one
  * the server holds back as from a build too old (409 build_too_old) is
- * listed with what older builds left, unless it is this tab's own, when
- * the tab is too old.
+ * listed with what older builds left, unless it is this tab's own, or a
+ * newer build's, when the tab is too old.
  */
 import { signal } from "@preact/signals";
 import { v4 as uuid } from "uuid";
@@ -244,10 +244,16 @@ export class Outbox {
     return kept;
   }
 
+  /** An answer to the batch `key`, applied to it while it still waits, or
+   * a save whatever became of it: another tab may have sent it meanwhile,
+   * and one saved is never refused or listed to save again. */
   private settle(key: string, changes: Partial<Entry>): void {
     this.update((entries) => {
       const next = entries.map((entry) =>
-        entry.body.key === key ? { ...entry, ...changes } : entry,
+        entry.body.key === key &&
+        (entry.state === "waiting" || changes.state === "saved")
+          ? { ...entry, ...changes }
+          : entry,
       );
       const saved = next.filter((entry) => entry.state === "saved");
       const dropped = new Set(saved.slice(0, -SAVED_MOST));

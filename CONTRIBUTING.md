@@ -354,10 +354,10 @@ change also sets `OLDEST_BUILD` in
 earlier deploy served (DEPLOYMENT.md, Tightening what a batch accepts). A
 batch whose `X-Inventory-Build` header names a build before that is then
 answered 409 `build_too_old` and kept on the phone, where a 422 would have
-it refused: queued by the tab sending it, it waits there while that tab
-asks for a reload; queued by an older build, it is listed with what older
-builds left, to put back in the cart. One naming no build, from another
-client of the API, gets the 422.
+it refused: queued by the sending tab's build, or a newer one, it waits
+there while that tab asks for a reload; queued by an older build, it is
+listed with what older builds left, to put back in the cart. One naming
+no build, from another client of the API, gets the 422.
 
 `backend/tests/batch_schema.json` keeps what the endpoint's schema
 accepts, and `backend/tests/test_batch_schema.py` fails on a change that

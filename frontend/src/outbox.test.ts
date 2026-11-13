@@ -431,7 +431,7 @@ describe("builds", () => {
   const OLDER = "2026-11-12T09:00:00.000Z";
 
   /** An outbox of the build MINE, whose server answers with `reply`. */
-  function of(reply: (request: Request) => Response) {
+  function of(reply: (request: Request) => Response | Promise<Response>) {
     const { api, sent } = answering(reply);
     return { outbox: new Outbox(api, localStorage, new Builds(MINE)), sent };
   }
@@ -546,6 +546,41 @@ describe("builds", () => {
     await outbox.send();
     expect(sent).toHaveLength(2);
     expect(stored()[0].state).toBe("too_old");
+  });
+
+  test.each([
+    ["held back as too old", () => json(TOO_OLD, 409)],
+    ["refused", () => json({ detail: [] }, 422)],
+    [
+      "not answered",
+      (): Promise<Response> => Promise.reject(new TypeError("Failed to fetch")),
+    ],
+  ])(
+    "a batch another tab saved meanwhile stays saved, here %s",
+    async (_name, reply) => {
+      const theirs = entry({ build: OLDER });
+      store(theirs);
+      const { outbox } = of(() => {
+        // Saved from another tab while this one's request was out.
+        store({ ...theirs, state: "saved", transactionId: 7 });
+        return reply();
+      });
+      await outbox.send();
+      expect(stored()).toEqual([
+        { ...theirs, state: "saved", transactionId: 7 },
+      ]);
+    },
+  );
+
+  test("a save another tab held back meanwhile is saved here", async () => {
+    const theirs = entry({ build: OLDER });
+    store(theirs);
+    const { outbox } = of(() => {
+      store({ ...theirs, state: "too_old" });
+      return saved(8);
+    });
+    await outbox.send();
+    expect(stored()[0]).toMatchObject({ state: "saved", transactionId: 8 });
   });
 
   test("a newer build's batch held back as too old says this tab is too", async () => {
