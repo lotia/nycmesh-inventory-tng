@@ -1,5 +1,5 @@
 import { type Signal, signal, useSignal } from "@preact/signals";
-import type { TargetedSubmitEvent } from "preact";
+import { Fragment, type TargetedSubmitEvent } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { type Api, check, makeApi } from "./api/client";
 import { Catalogue as CatalogueReply, DeviceRefusedReply } from "./api/replies";
@@ -25,6 +25,7 @@ import {
   placed,
   quantityOf,
   RETIRED,
+  resized,
   SIDES,
   type Side,
   sealedCounts,
@@ -1118,30 +1119,40 @@ function CartLine({
           }
         />
       ))}
-      {item.packages.map((pack) => (
-        <Field
-          key={pack.id}
-          quiet
-          label={`${pack.name} (${decimal(thousandths(pack.size) ?? 0)} ${item.unit})${pack.retired ? `, ${RETIRED}` : ""}`}
-        >
-          {(id) => (
-            <input
-              id={id}
-              inputMode="numeric"
-              value={line.packages[pack.id] ?? ""}
-              onInput={(event) =>
-                onChange({
-                  ...line,
-                  packages: {
-                    ...line.packages,
-                    [pack.id]: event.currentTarget.value,
-                  },
-                })
-              }
-            />
-          )}
-        </Field>
-      ))}
+      {item.packages.map((pack) => {
+        const size = decimal(thousandths(pack.size) ?? 0);
+        return (
+          <Fragment key={pack.id}>
+            {resized(line, pack) && (
+              <p role="alert">
+                <strong>Sorry. The package size has changed to {size}</strong>{" "}
+                since this item was added. Enter the count again.
+              </p>
+            )}
+            <Field
+              quiet
+              label={`${pack.name} (${size} ${item.unit})${pack.retired ? `, ${RETIRED}` : ""}`}
+            >
+              {(id) => (
+                <input
+                  id={id}
+                  inputMode="numeric"
+                  value={line.packages[pack.id] ?? ""}
+                  onInput={(event) =>
+                    onChange({
+                      ...line,
+                      packages: {
+                        ...line.packages,
+                        [pack.id]: event.currentTarget.value,
+                      },
+                    })
+                  }
+                />
+              )}
+            </Field>
+          </Fragment>
+        );
+      })}
       <Field
         quiet
         label={

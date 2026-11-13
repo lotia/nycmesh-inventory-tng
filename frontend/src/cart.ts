@@ -19,8 +19,8 @@ import { count, decimal, sent, thousandths } from "./quantity";
 import { onStoredChange, readStored, writeStored } from "./stored";
 
 /** Versioned as the outbox's is (outbox.ts): each build reads its own.
- * v2's is stamped with the build that wrote it, and may keep a batch key
- * (batchKey). */
+ * v2's is stamped with the build that wrote it, may keep a batch key
+ * (batchKey), and keeps the size each package was counted at (sizes). */
 export const STORAGE_KEY = "inventory.cart.v2";
 /** The server's limits (ledger.py), checked here too, so a batch it would
  * refuse is never queued and the cart is kept to fix it. */
@@ -39,6 +39,11 @@ const LineSchema = v.object({
   itemId: id,
   /** Whole packages, by package id, as typed. */
   packages: v.record(v.string(), v.string()),
+  /** The size each package was counted at, by package id, as the
+   * catalogue gave it then (sized): what is saved. One the catalogue now
+   * gives another size has its count cleared (reconcile) and is said
+   * (resized) until a count is typed again. */
+  sizes: v.exactOptional(v.record(v.string(), v.string())),
   /** Loose units, in the item's unit, as typed. */
   loose: v.string(),
   /** Taken from open packages, by key: how much, as typed, and whether
@@ -184,11 +189,12 @@ export class CartStore {
     return this.kept;
   }
 
-  /** Change what the cart holds. False if the browser would not keep it. */
+  /** Change what the cart holds, each count typed at the size this tab's
+   * catalogue shows (sized). False if the browser would not keep it. */
   change(next: Cart, now = Date.now()): boolean {
     const empty = next.lines.length === 0;
     // Emptied, it is no longer that save: what fills it next is new.
-    const { batchKey, ...rest } = next;
+    const { batchKey, ...rest } = sized(this.cart.value, next, this.catalogue);
     return this.write({
       ...rest,
       ...(empty || batchKey === undefined ? {} : { batchKey }),
@@ -332,9 +338,12 @@ export function indexOf(catalogue: Catalogue): Index {
  * The cart with choices the catalogue no longer has (retired since it was
  * filled) cleared, so what the lists show and what is saved agree. Lines
  * stay: a line whose item has gone says so, for the volunteer to remove.
+ * A count of a package the catalogue now gives another size than it was
+ * counted at is cleared, keeping that size, so the line says so (resized)
+ * until a count is typed again (inventory-tng-0qi).
  */
 export function reconcile(cart: Cart, catalogue: Catalogue): Cart {
-  const { volunteers, places } = indexOf(catalogue);
+  const { volunteers, places, items } = indexOf(catalogue);
   const place = (placeId: number | null) =>
     placeId !== null && places.has(placeId) ? placeId : null;
   const volunteerId =
@@ -343,11 +352,74 @@ export function reconcile(cart: Cart, catalogue: Catalogue): Cart {
       : null;
   const fromId = place(cart.fromId);
   const toId = place(cart.toId);
+  const lines = cart.lines.map((line) =>
+    recounted(line, items.get(line.itemId)),
+  );
   return volunteerId === cart.volunteerId &&
     fromId === cart.fromId &&
-    toId === cart.toId
+    toId === cart.toId &&
+    lines.every((line, at) => line === cart.lines[at])
     ? cart
-    : { ...cart, volunteerId, fromId, toId };
+    : { ...cart, volunteerId, fromId, toId, lines };
+}
+
+type Package = Item["packages"][number];
+
+/** Whether the catalogue gives this package another size than the line's
+ * count of it was made at: its count is to be typed again. */
+export function resized(line: Line, pack: Package): boolean {
+  const counted = line.sizes?.[pack.id];
+  return (
+    counted !== undefined && thousandths(counted) !== thousandths(pack.size)
+  );
+}
+
+/** The line with its counts of packages resized since cleared. */
+function recounted(line: Line, item: Item | undefined): Line {
+  const clear = (item?.packages ?? []).filter(
+    (pack) => (line.packages[pack.id] ?? "") !== "" && resized(line, pack),
+  );
+  if (clear.length === 0) {
+    return line;
+  }
+  const packages = { ...line.packages };
+  for (const pack of clear) {
+    packages[pack.id] = "";
+  }
+  return { ...line, packages };
+}
+
+/**
+ * `next`, changed from `before`, with the size each package was counted
+ * at: a count typed or added now, at the size the catalogue shows; one
+ * unchanged, at the size it had. One kept before sizes were (a cart an
+ * older build left, put back) is taken as counted at the size shown now,
+ * as it was read before; a count blank has none, but one cleared as
+ * resized keeps its size until typed again (reconcile).
+ */
+export function sized(before: Cart, next: Cart, catalogue: Catalogue): Cart {
+  const { items } = indexOf(catalogue);
+  const was = new Map(before.lines.map((line) => [line.itemId, line]));
+  return {
+    ...next,
+    lines: next.lines.map(({ sizes: kept, ...line }) => {
+      const packs = items.get(line.itemId)?.packages ?? [];
+      const sizes: Record<string, string> = {};
+      for (const [packageId, typed] of Object.entries(line.packages)) {
+        const counted = kept?.[packageId];
+        const pack = packs.find((each) => String(each.id) === packageId);
+        if (
+          counted !== undefined &&
+          was.get(line.itemId)?.packages[packageId] === typed
+        ) {
+          sizes[packageId] = counted;
+        } else if (typed !== "" && pack !== undefined) {
+          sizes[packageId] = pack.size;
+        }
+      }
+      return Object.keys(sizes).length === 0 ? line : { ...line, sizes };
+    }),
+  };
 }
 
 /** Add one of this item, or of this package of it, to the cart. */
@@ -517,7 +589,8 @@ export function quantityOf(
   const sealed = new Map<number, Packs>();
   for (const pack of item.packages) {
     const packs = count(line.packages[pack.id] ?? "");
-    const size = thousandths(pack.size);
+    // As counted: one resized since is refused when saved, not recounted.
+    const size = thousandths(line.sizes?.[pack.id] ?? pack.size);
     if (packs === null || size === null) {
       return { problem: `Count whole packages: ${pack.name}.` };
     }
