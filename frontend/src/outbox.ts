@@ -18,7 +18,9 @@
  * batch names the build that queued it, and is sent as that build's: one
  * the server holds back as from a build too old (409 build_too_old) is
  * listed with what older builds left, unless it is this tab's own, or a
- * newer build's, when the tab is too old.
+ * newer build's, when the tab is too old. A cart filled from a save an
+ * older build left is sent under that save's key (cart.ts, batchKey): if
+ * that build's tab saved it first, the server takes it once.
  */
 import { signal } from "@preact/signals";
 import { v4 as uuid } from "uuid";
@@ -40,8 +42,9 @@ import { telemetry } from "./telemetry";
 /** Versioned: a build that changes what is kept takes a new key, as a tab
  * of an older build, open during a deploy, would drop what it cannot read
  * from what it writes back. v4's is stamped with the build that wrote it;
- * v5's entries each with the build that queued them too. */
-export const STORAGE_KEY = "inventory.outbox.v5";
+ * v5's entries each with the build that queued them too; v6's say which
+ * were sent under an older save's key (putBack). */
+export const STORAGE_KEY = "inventory.outbox.v6";
 /** How long to wait before trying again after no answer. */
 export const RETRY_MS = 30_000;
 /** Unexpected answers to one batch before its note asks for a report. */
@@ -63,13 +66,16 @@ const onList = (entry: Entry) =>
 
 const nullableId = v.exactOptional(v.nullable(id));
 
+/** A batch's idempotency key. */
+export const BatchKey = v.pipe(v.string(), v.uuid());
+
 /** An amount in an item's unit: a decimal, as sent, or an older page's
  * number. */
 const amount = v.union([v.number(), v.string()]);
 
 /** A batch as POST /api/transactions takes it. */
 export const BatchBody = v.object({
-  key: v.pipe(v.string(), v.uuid()),
+  key: BatchKey,
   kind: v.picklist(["move", "receipt", "install", "open", "report"]),
   volunteer_id: id,
   from_location_id: nullableId,
@@ -135,6 +141,9 @@ export const Entry = v.object({
   failures: v.pipe(v.number(), v.integer()),
   /** Saved, and dismissed: off the list, kept until a catalogue shows it. */
   dismissed: v.exactOptional(v.literal(true)),
+  /** Sent under the key of a save an older build left, put back in the
+   * cart (older.ts): that build's tab may have saved it first. */
+  putBack: v.exactOptional(v.literal(true)),
 });
 
 export type Entry = v.InferOutput<typeof Entry>;
@@ -145,6 +154,11 @@ export const Kept = v.object({
   build: v.string(),
   entries: v.array(v.unknown()),
 });
+
+/** A save put back in the cart, then changed, whose older build's tab
+ * saved it first, as it was (409 key_reused). */
+export const SAVED_BEFORE_CHANGES =
+  "Not saved: another tab saved it first, as it was before your changes. Check what was saved, then save your changes again.";
 
 /** A batch's reports, as a 422 names them. */
 const REPORTS: Record<string, string> = {
@@ -308,16 +322,20 @@ export class Outbox {
   /**
    * Give this batch its key, keep it, and start sending it. The key is made
    * here, before anything is sent, and kept with the batch for every
-   * attempt. False means the browser would not store it: nothing was sent,
-   * and the caller still holds the batch.
+   * attempt; or it is `putBack`, the key of a save an older build left
+   * that filled the cart, so the server takes that save once, whichever
+   * tab sends it first. False means the browser would not store it:
+   * nothing was sent, and the caller still holds the batch.
    */
-  queue(draft: Draft, what: string, now = Date.now()): boolean {
+  queue(draft: Draft, what: string, putBack?: string): boolean {
     const entry = newEntry(
-      { ...draft, key: uuid() },
+      { ...draft, key: putBack ?? uuid() },
       what,
       this.builds.build,
-      now,
     );
+    if (putBack !== undefined) {
+      entry.putBack = true;
+    }
     const kept = this.update((entries) => [...entries, entry]);
     if (kept) {
       void this.send();
@@ -464,10 +482,14 @@ export class Outbox {
           });
           return "stop";
         }
+        // A save put back: an older build's tab saved it first, as it
+        // was. This, changed since, is not saved, and says so.
         this.settle(key, {
           state: "refused",
           waitingFor: null,
-          note: "Not saved: its key was already used for a different batch. Please report this.",
+          note: entry.putBack
+            ? SAVED_BEFORE_CHANGES
+            : "Not saved: its key was already used for a different batch. Please report this.",
         });
         return "next";
       case 422:

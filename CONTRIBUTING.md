@@ -342,7 +342,10 @@ every version kept. Into an empty cart it puts, without a tap, the oldest
 one that goes back whole (nothing unread, nothing of an open package, no
 package resized, no item or package retired or gone, no refusal); it lists
 the rest for the volunteer to add to the cart or discard, naming an item
-retired since from the catalogue's `retired_items`. It removes an older
+retired since from the catalogue's `retired_items`. A save put back keeps
+its batch key, and the cart is saved under it until emptied, as an older
+tab may be sending it still: the server then takes it once, or, changed
+since, refuses it (409 `key_reused`), which the page says. It removes an older
 key once nothing in it is left to list (`frontend/src/older.ts`). Builds
 that keep the same shape share a key, so each batch is kept with the build
 that queued it, and is sent as that build's, whichever tab sends it.

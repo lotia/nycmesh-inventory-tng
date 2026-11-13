@@ -142,7 +142,7 @@ describe("reading what older builds left", () => {
       build,
       entries: [saveOf({ state: "too_old", build })],
     });
-    keep("inventory.outbox.v5", {
+    keep("inventory.outbox.v6", {
       build,
       entries: [
         saveOf({ state: "too_old", build }, { key: OTHER }),
@@ -153,7 +153,7 @@ describe("reading what older builds left", () => {
     });
     expect(listed()).toEqual([
       { key: "inventory.outbox.v4", batch: KEY, refused: null },
-      { key: "inventory.outbox.v5", batch: OTHER, refused: null },
+      { key: "inventory.outbox.v6", batch: OTHER, refused: null },
     ]);
   });
 
@@ -173,11 +173,11 @@ describe("reading what older builds left", () => {
   });
 
   test("this build's own keys are not older", () => {
-    keep("inventory.outbox.v5", {
+    keep("inventory.outbox.v6", {
       build: "x",
       entries: [saveOf({ build: "x" })],
     });
-    keep("inventory.cart.v2", {
+    keep("inventory.cart.v3", {
       ...freshCart(),
       lines: [{ itemId: 100, packages: {}, loose: "1" }],
     });
@@ -233,9 +233,9 @@ describe("tidying on load", () => {
       build: "x",
       entries: [saveOf({ state: "saved", build: "x" })],
     });
-    localStorage.setItem("inventory.outbox.v5", kept);
+    localStorage.setItem("inventory.outbox.v6", kept);
     tidyOlder();
-    expect(localStorage.getItem("inventory.outbox.v5")).toBe(kept);
+    expect(localStorage.getItem("inventory.outbox.v6")).toBe(kept);
   });
 
   test("text no build wrote is left alone", () => {
@@ -283,7 +283,7 @@ describe("removing one", () => {
   test("one held back under this build's key goes from it, which stays with the rest", () => {
     const build = "2026-11-12T10:00:00.000Z";
     const waiting = saveOf({ build }, { key: OTHER });
-    keep("inventory.outbox.v5", {
+    keep("inventory.outbox.v6", {
       build,
       entries: [saveOf({ state: "too_old", build }), waiting],
     });
@@ -291,16 +291,16 @@ describe("removing one", () => {
     expect(removeOlder(save as Older)).toBe(true);
     expect(readOlder()).toEqual([]);
     expect(
-      JSON.parse(localStorage.getItem("inventory.outbox.v5") ?? ""),
+      JSON.parse(localStorage.getItem("inventory.outbox.v6") ?? ""),
     ).toEqual({ build, entries: [waiting] });
     // Its last: the key is still the outbox's.
-    keep("inventory.outbox.v5", {
+    keep("inventory.outbox.v6", {
       build,
       entries: [saveOf({ state: "too_old", build })],
     });
     expect(removeOlder(readOlder()[0] as Older)).toBe(true);
     expect(
-      JSON.parse(localStorage.getItem("inventory.outbox.v5") ?? ""),
+      JSON.parse(localStorage.getItem("inventory.outbox.v6") ?? ""),
     ).toEqual({ build, entries: [] });
   });
 
@@ -401,6 +401,20 @@ describe("as a cart", () => {
       ],
     });
     expect(gaps).toEqual([]);
+  });
+
+  test("a save's cart keeps its batch key, to be sent under; a cart's has none", () => {
+    expect(toCart(only(saveOf()), CATALOGUE).cart.batchKey).toBe(KEY);
+    // A key no build made is not sent: the outbox gives a new one.
+    expect(
+      toCart(only(saveOf({}, { key: "c" })), CATALOGUE).cart,
+    ).not.toHaveProperty("batchKey");
+    keep("inventory.cart.v1", {
+      ...freshCart(),
+      lines: [{ itemId: 100, packages: {}, loose: "1" }],
+    });
+    const cart = readOlder().find((each) => each.batch === null) as Older;
+    expect(toCart(cart, CATALOGUE).cart).not.toHaveProperty("batchKey");
   });
 
   test("what the cart cannot hold is told, to do again", () => {

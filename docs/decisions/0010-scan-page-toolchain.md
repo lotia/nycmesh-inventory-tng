@@ -154,6 +154,12 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   rejected asking only for a tap on each, which Ali found needless where
   nothing needs the volunteer, and naming such an item only by its
   absence, which left the volunteer unable to tell what the save held.
+  A save put back keeps its batch key, and the cart it fills is saved
+  under it (Ali, 2026-11-13, inventory-tng-co9): an older tab open beside
+  may be sending it as the page loads, and the server's idempotent key
+  then takes it once, or refuses it changed, which the page says. We
+  rejected putting back only saves the server says it does not hold,
+  which still leaves the window between asking and saving.
 - Compression behaves the same in compose and in Kubernetes, because the
   app serves the compressed files itself. The image holds three copies of
   each file; the bundle is small, so that costs little.

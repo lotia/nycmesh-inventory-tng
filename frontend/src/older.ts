@@ -32,7 +32,7 @@ import {
   type Line,
   reconcile,
 } from "./cart";
-import { STORAGE_KEY as OUTBOX_KEY } from "./outbox";
+import { BatchKey, STORAGE_KEY as OUTBOX_KEY } from "./outbox";
 import { count, decimal, thousandths } from "./quantity";
 import {
   hasStored,
@@ -355,6 +355,8 @@ export function openWords(n: number): string {
  * what is wrong; one of a package resized since it was saved is left to
  * do again. What was taken from an open package, and what was said of
  * one, are left to do again too, as the open packages may have changed.
+ * A save's cart keeps its batch key, to be sent under (cart.ts, batchKey):
+ * an older build's tab may be sending it still.
  */
 export function toCart(
   older: Older,
@@ -452,6 +454,7 @@ export function toCart(
         toId: older.toId,
         installNumber: older.installNumber,
         lines: [...lines.values()],
+        ...(v.is(BatchKey, older.batch) ? { batchKey: older.batch } : {}),
       },
       catalogue,
     ),

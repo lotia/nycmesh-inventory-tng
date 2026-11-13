@@ -486,7 +486,8 @@ function CartForm({
       problems.value = batch.problems;
       return;
     }
-    if (!outbox.queue(batch.draft, batch.what)) {
+    // A save an older build left, put back: sent under its key.
+    if (!outbox.queue(batch.draft, batch.what, current.batchKey)) {
       // Nothing was sent, and the cart stays to try again.
       problems.value = [
         "This browser wouldn't keep the batch, so it isn't saved. Free some space or leave private browsing, then try again.",
