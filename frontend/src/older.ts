@@ -470,11 +470,11 @@ export function toCart(
 export function goesBackWhole(older: Older, catalogue: Catalogue): boolean {
   const { cart, gaps } = toCart(older, catalogue);
   const { items } = indexOf(catalogue);
-  const current = (itemId: number, packageId: number | string) =>
+  const current = ([itemId, packageId]: [number, string]) =>
     items
       .get(itemId)
       ?.packages.some(
-        (pack) => String(pack.id) === String(packageId) && !pack.retired,
+        (pack) => String(pack.id) === packageId && !pack.retired,
       ) === true;
   return (
     older.refused === null &&
@@ -482,22 +482,22 @@ export function goesBackWhole(older: Older, catalogue: Catalogue): boolean {
     cart.lines.length > 0 &&
     cart.lines.every((line) => items.get(line.itemId)?.retired === false) &&
     // An unread line is a gap already.
-    older.lines.every((line) => line === null || packagesCurrent(line, current))
+    older.lines.every(
+      (line) => line === null || packagesHeld(line).every(current),
+    )
   );
 }
 
-/** Whether every package `line` holds some of is current: offered, and
- * not retired. */
-function packagesCurrent(
-  line: OldBatchLine | OldCartLine,
-  current: (itemId: number, packageId: number | string) => boolean,
-): boolean {
+/** The packages `line` holds some of, as [item id, package id]. */
+function packagesHeld(line: OldBatchLine | OldCartLine): [number, string][] {
   if ("itemId" in line) {
-    return Object.entries(line.packages).every(
-      ([id, n]) => (count(n) ?? 0) === 0 || current(line.itemId, id),
-    );
+    return Object.entries(line.packages)
+      .filter(([, n]) => (count(n) ?? 0) !== 0)
+      .map(([id]) => [line.itemId, id]);
   }
-  return line.package_id === null || current(line.item_id, line.package_id);
+  return line.package_id === null
+    ? []
+    : [[line.item_id, String(line.package_id)]];
 }
 
 /** Of `listed`, the oldest that goes back whole and `skip` does not hold,
