@@ -638,8 +638,46 @@ describe("put back without a tap", () => {
       },
     ],
     ["an item retired, none left", { lines: [{ item_id: 103, quantity: 1 }] }],
+    [
+      "a package gone, which would go back loose",
+      { lines: [{ item_id: 100, quantity: "4", package_id: 1003 }] },
+    ],
   ])("one with %s does not", (_name, body) => {
     expect(goesBackWhole(only(body), CATALOGUE)).toBe(false);
+  });
+
+  test("one the inventory refused does not, as its reason is said only while it is listed", () => {
+    keep("inventory.outbox.v3", [
+      saveOf({ state: "refused", note: "Not saved. Line 1: too many." }),
+    ]);
+    expect(goesBackWhole(readOlder()[0] as Older, CATALOGUE)).toBe(false);
+  });
+
+  test("an older cart holding some of a package gone does not; none of one, or a count unread, it does", () => {
+    const cartWith = (packages: Record<string, string>) => {
+      keep("inventory.cart.v1", {
+        ...freshCart(),
+        lines: [{ itemId: 100, packages, loose: "", open: {} }],
+      });
+      return readOlder()[0] as Older;
+    };
+    expect(goesBackWhole(cartWith({ 1003: "2" }), CATALOGUE)).toBe(false);
+    expect(
+      goesBackWhole(cartWith({ 1000: "1", 1003: "", 1004: "lots" }), CATALOGUE),
+    ).toBe(true);
+  });
+
+  test("one with a package retired, some left, does not", () => {
+    const retired = {
+      ...CATALOGUE,
+      items: CATALOGUE.items.map((item) => ({
+        ...item,
+        packages: item.packages.map((pack) => ({ ...pack, retired: true })),
+      })),
+    };
+    const body = { lines: [{ item_id: 100, quantity: "4", package_id: 1000 }] };
+    expect(goesBackWhole(only(body), CATALOGUE)).toBe(true);
+    expect(goesBackWhole(only(body), retired)).toBe(false);
   });
 
   test("the oldest that goes back whole is next, one of no known time last, and those tried are skipped", () => {

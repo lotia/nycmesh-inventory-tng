@@ -340,12 +340,12 @@ it asks at once (`frontend/src/build.ts`, docs/decisions/0010). A newer
 build reads the saves and the cart an older one left only in the parts
 every version kept. Into an empty cart it puts, without a tap, the oldest
 one that goes back whole (nothing unread, nothing of an open package, no
-package resized, no item retired); it lists the rest for the volunteer to
-add to the cart or discard, naming an item retired since from the
-catalogue's `retired_items`. It removes an older key once nothing in it
-is left to list (`frontend/src/older.ts`). Builds that keep the same
-shape share a key, so each batch is kept with the build that queued it,
-and is sent as that build's, whichever tab sends it.
+package resized, no item or package retired or gone, no refusal); it lists
+the rest for the volunteer to add to the cart or discard, naming an item
+retired since from the catalogue's `retired_items`. It removes an older
+key once nothing in it is left to list (`frontend/src/older.ts`). Builds
+that keep the same shape share a key, so each batch is kept with the build
+that queued it, and is sent as that build's, whichever tab sends it.
 
 So the server keeps taking what the build before sends. Expand, then
 contract: a field the batch endpoint will require is added as optional,

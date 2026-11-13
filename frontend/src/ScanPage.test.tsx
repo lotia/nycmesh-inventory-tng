@@ -1862,6 +1862,8 @@ describe("what an older build left", () => {
     save();
     await vi.waitFor(() => expect(boxes()).toBe("3"));
     screen.getByText("Added back to cart. Review before Save.");
+    // The save just made is still said.
+    screen.getByText(/^Saved: /);
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
   });

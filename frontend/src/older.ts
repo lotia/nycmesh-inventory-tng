@@ -33,7 +33,7 @@ import {
   reconcile,
 } from "./cart";
 import { STORAGE_KEY as OUTBOX_KEY } from "./outbox";
-import { decimal, thousandths } from "./quantity";
+import { count, decimal, thousandths } from "./quantity";
 import {
   hasStored,
   olderKeys,
@@ -462,17 +462,42 @@ export function toCart(
 /**
  * Whether `older` goes back in the cart whole, for the page to put it
  * there without a tap: something to put back, nothing left out (no line
- * unread, nothing of an open package, no package resized) and no item
- * retired, gone or not, as each needs the volunteer.
+ * unread, nothing of an open package, no package resized), no item or
+ * package retired, gone or not, and no refusal, as each needs the
+ * volunteer: a refusal's reason is said only while it is listed, and a
+ * package gone would go back loose, or not at all.
  */
 export function goesBackWhole(older: Older, catalogue: Catalogue): boolean {
   const { cart, gaps } = toCart(older, catalogue);
   const { items } = indexOf(catalogue);
+  const current = (itemId: number, packageId: number | string) =>
+    items
+      .get(itemId)
+      ?.packages.some(
+        (pack) => String(pack.id) === String(packageId) && !pack.retired,
+      ) === true;
   return (
+    older.refused === null &&
     gaps.length === 0 &&
     cart.lines.length > 0 &&
-    cart.lines.every((line) => items.get(line.itemId)?.retired === false)
+    cart.lines.every((line) => items.get(line.itemId)?.retired === false) &&
+    // An unread line is a gap already.
+    older.lines.every((line) => line === null || packagesCurrent(line, current))
   );
+}
+
+/** Whether every package `line` holds some of is current: offered, and
+ * not retired. */
+function packagesCurrent(
+  line: OldBatchLine | OldCartLine,
+  current: (itemId: number, packageId: number | string) => boolean,
+): boolean {
+  if ("itemId" in line) {
+    return Object.entries(line.packages).every(
+      ([id, n]) => (count(n) ?? 0) === 0 || current(line.itemId, id),
+    );
+  }
+  return line.package_id === null || current(line.item_id, line.package_id);
 }
 
 /** Of `listed`, the oldest that goes back whole and `skip` does not hold,
