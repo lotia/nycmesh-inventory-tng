@@ -808,14 +808,23 @@ function OlderList({
     const offered = indexOf(catalogue).items;
     return listed.map((each) => {
       const { cart, lost, parts } = toCart(each, withRetired(catalogue));
-      const lines = parts.map((part) => ({
-        ...part,
-        // Goes back, but not as it is named (withRetired).
-        retired:
-          part.note === null &&
-          part.itemId !== null &&
-          !offered.has(part.itemId),
-      }));
+      const seen = new Map<string, number>();
+      const lines = parts.map((part) => {
+        // Keyed by what it says, not by its place, which passes to the
+        // next line once it is discarded, and its Discard, focused, with it.
+        const says = `${part.words} ${part.note?.join("") ?? ""}`;
+        const nth = (seen.get(says) ?? 0) + 1;
+        seen.set(says, nth);
+        return {
+          ...part,
+          key: `${says} ${nth}`,
+          // Goes back, but not as it is named (withRetired).
+          retired:
+            part.note === null &&
+            part.itemId !== null &&
+            !offered.has(part.itemId),
+        };
+      });
       return {
         each,
         lost,
@@ -859,7 +868,10 @@ function OlderList({
                   {lines.map((line, at) => {
                     const named = `${title}-${at}`;
                     return (
-                      <li key={at} class="flex flex-col items-start gap-1">
+                      <li
+                        key={line.key}
+                        class="flex flex-col items-start gap-1"
+                      >
                         <div id={named}>
                           {line.retired && (
                             <>

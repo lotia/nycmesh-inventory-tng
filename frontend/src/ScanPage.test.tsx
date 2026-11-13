@@ -1837,6 +1837,35 @@ describe("what an older build left", () => {
     expect(outbox.entries.value[0]?.body.key).toBe(KEY);
   });
 
+  test("a line's Discard, once it has gone, does not become the next line's", async () => {
+    leaveSave({
+      body: {
+        key: KEY,
+        kind: "move",
+        volunteer_id: 1,
+        from_location_id: 10,
+        to_location_id: 12,
+        lines: [
+          { item_id: 101, quantity: "3", open_package_key: KEY },
+          { item_id: 101, quantity: "5", open_package_key: KEY },
+        ],
+      },
+    });
+    open();
+    await ready();
+    const discardOf = (words: string) =>
+      within(
+        within(listing()).getByText(words).closest("li") as HTMLElement,
+      ).getByRole("button", { name: "Discard" });
+    const first = discardOf("Cat6 cable: 3 m from an open package");
+    first.focus();
+    fireEvent.click(first);
+    // Focus left on it, a second press would discard the next, unasked.
+    expect(document.activeElement).not.toBe(
+      discardOf("Cat6 cable: 5 m from an open package"),
+    );
+  });
+
   test("a line the browser will not let go of says so, and stays", async () => {
     leaveSave();
     open();
@@ -2171,6 +2200,26 @@ describe("what an older build left", () => {
       state: "refused",
       what: "Move: 1 item from Hub to Van",
     });
+  });
+
+  test("one with a line discarded, which an older build's tab saved first whole, is not saved again, and says so", async () => {
+    leaveSave();
+    const [first] = JSON.parse(
+      localStorage.getItem("inventory.outbox.v3") ?? "",
+    );
+    // The older tab's request, in flight as this page loaded, saved it
+    // whole, the cable taken from an open package included.
+    const written = new Map([[KEY, linesOf(first.body)]]);
+    open(ledger(written).api);
+    await ready();
+    const taken = within(listing())
+      .getByText("Cat6 cable: 3 m from an open package")
+      .closest("li") as HTMLElement;
+    fireEvent.click(within(taken).getByRole("button", { name: "Discard" }));
+    await screen.findByText(ADDED_BACK);
+    save();
+    await screen.findByText(SAVED_BEFORE_CHANGES);
+    expect(written.size).toBe(1);
   });
 
   test("emptied, a cart that went back saves what fills it next under a new key", async () => {
