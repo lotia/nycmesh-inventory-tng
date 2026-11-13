@@ -4,7 +4,9 @@
  * name, kind and places (this phone's last choices). Tabs share it.
  *
  * A cart has no idempotency key: the outbox gives the batch one when it is
- * queued, before anything is sent, so two tabs never share a key.
+ * queued, before anything is sent, so two tabs never share a key. But a
+ * cart filled from a save an older build left keeps that save's key, and
+ * is sent under it (batchKey), as that build's tab may still be sending it.
  */
 import { type Signal, signal } from "@preact/signals";
 import { v4 as uuid } from "uuid";
@@ -12,13 +14,14 @@ import * as v from "valibot";
 import type { Schemas } from "./api/client";
 import { id } from "./api/replies";
 import { BUILD } from "./build";
-import type { Draft, Entry } from "./outbox";
+import { BatchKey, type Draft, type Entry } from "./outbox";
 import { count, decimal, sent, thousandths } from "./quantity";
 import { onStoredChange, readStored, writeStored } from "./stored";
 
 /** Versioned as the outbox's is (outbox.ts): each build reads its own.
- * v2's is stamped with the build that wrote it. */
-export const STORAGE_KEY = "inventory.cart.v2";
+ * v2's is stamped with the build that wrote it; v3's may keep a batch key
+ * (batchKey). */
+export const STORAGE_KEY = "inventory.cart.v3";
 /** The server's limits (ledger.py), checked here too, so a batch it would
  * refuse is never queued and the cart is kept to fix it. */
 const MAX_ID = 2 ** 31 - 1;
@@ -81,6 +84,10 @@ const CartSchema = v.object({
   /** New with every change to what the cart holds: how a tab tells whether
    * another tab has changed it since (CartStore). */
   revision: v.optional(v.string(), ""),
+  /** The key of the save an older build left that filled it (older.ts),
+   * to be sent under: if that build's tab saved it meanwhile, the server
+   * takes it once. Gone once the cart is emptied. */
+  batchKey: v.exactOptional(BatchKey),
 });
 
 export type Line = v.InferOutput<typeof LineSchema>;
@@ -180,8 +187,16 @@ export class CartStore {
 
   /** Change what the cart holds. False if the browser would not keep it. */
   change(next: Cart, now = Date.now()): boolean {
-    const startedAt = next.lines.length === 0 ? 0 : next.startedAt || now;
-    return this.write({ ...next, revision: uuid(), usedAt: now, startedAt });
+    const empty = next.lines.length === 0;
+    // Emptied, it is no longer that save: what fills it next is new.
+    const { batchKey, ...rest } = next;
+    return this.write({
+      ...rest,
+      ...(empty || batchKey === undefined ? {} : { batchKey }),
+      revision: uuid(),
+      usedAt: now,
+      startedAt: empty ? 0 : next.startedAt || now,
+    });
   }
 
   /** Mark the cart used now, changing nothing in it. */

@@ -4,7 +4,11 @@ import { BUILD, BUILD_KEY, Builds } from "./build";
 import { openCamera } from "./camera";
 import { addOne, STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
 import { PRINTED_LENGTH } from "./OpenPackageCard";
-import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "./outbox";
+import {
+  STORAGE_KEY as OUTBOX_KEY,
+  Outbox,
+  SAVED_BEFORE_CHANGES,
+} from "./outbox";
 import { ScanPage } from "./ScanPage";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
 import { fakeCamera } from "./test-camera";
@@ -231,6 +235,28 @@ describe("filling and saving a cart", () => {
     screen.getByText(
       (_, element) => element?.getAttribute("aria-live") === "polite",
     ).textContent;
+
+  test("a batch the browser would not keep is not saved, and the cart stays", async () => {
+    const outbox = open();
+    await ready();
+    fillMove();
+    const real = localStorage.setItem.bind(localStorage);
+    const setItem = vi
+      .spyOn(localStorage, "setItem")
+      .mockImplementation((key, value) => {
+        if (key === OUTBOX_KEY) {
+          throw new DOMException("full", "QuotaExceededError");
+        }
+        real(key, value);
+      });
+    save();
+    setItem.mockRestore();
+    screen.getByText(
+      "This browser wouldn't keep the batch, so it isn't saved. Free some space or leave private browsing, then try again.",
+    );
+    screen.getByText("Cat6 cable");
+    expect(outbox.entries.value).toEqual([]);
+  });
 
   test("an open package is a card: now, after this cut, and a box that ticks itself", async () => {
     await cableWith(spool());
@@ -1648,8 +1674,9 @@ describe("what an older build left", () => {
       to_location_id: 12,
       lines: [{ item_id: 100, package_id: 1000, quantity: "8" }],
     });
-    // A fresh key: the old one is never sent.
-    expect(outbox.entries.value[0]?.body.key).not.toBe(KEY);
+    // Under its key, which an older build's tab may have saved meanwhile.
+    expect(outbox.entries.value[0]?.body.key).toBe(KEY);
+    expect(outbox.entries.value[0]?.putBack).toBe(true);
   });
 
   test("one that only took from an open package goes back as its item's line, empty, which saves nothing", async () => {
@@ -1852,6 +1879,92 @@ describe("what an older build left", () => {
     screen.getByText(/^Saved: /);
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
+  });
+
+  /** What the ledger compares of a batch sent again under its key. */
+  const linesOf = (body: { lines: object[] }) =>
+    JSON.stringify(
+      (
+        body.lines as {
+          item_id: number;
+          quantity: string;
+          package_id?: number;
+        }[]
+      ).map((line) => [
+        line.item_id,
+        Number(line.quantity),
+        line.package_id ?? null,
+      ]),
+    );
+
+  /** The batch endpoint as the ledger answers a key (ledger.py, _replay):
+   * the same lines again are the first transaction, others are refused.
+   * `written` holds the lines saved under each key, in order. */
+  function ledger(written: Map<string, string>) {
+    return answering(async (request) => {
+      if (isCatalogue(request)) {
+        return json(CATALOGUE, 200);
+      }
+      const body = await request.clone().json();
+      const first = written.get(body.key);
+      if (first === undefined) {
+        written.set(body.key, linesOf(body));
+        return saved(written.size);
+      }
+      return first === linesOf(body)
+        ? json(
+            { transaction_id: [...written.keys()].indexOf(body.key) + 1 },
+            200,
+          )
+        : json({ reason: "key_reused" }, 409);
+    });
+  }
+
+  test("one an older build's tab saved meanwhile is saved once, under its key", async () => {
+    leaveMoves([KEY, AT, [radios(1)]]);
+    // The older build's tab, its request in flight as this page loaded,
+    // saved it first.
+    const written = new Map([[KEY, linesOf({ lines: [radios(1)] })]]);
+    const outbox = open(ledger(written).api);
+    await ready();
+    await screen.findByText(ADDED_BACK);
+    save();
+    await screen.findByText("In the inventory (transaction 1).");
+    expect(written.size).toBe(1);
+    expect(outbox.entries.value[0]?.body.key).toBe(KEY);
+  });
+
+  test("one changed after it went back, which an older build's tab saved first, is not saved, and says so", async () => {
+    leaveMoves([KEY, AT, [radios(1)]]);
+    const written = new Map([[KEY, linesOf({ lines: [radios(1)] })]]);
+    const outbox = open(ledger(written).api);
+    await ready();
+    await screen.findByText(ADDED_BACK);
+    fireEvent.input(screen.getByLabelText("Box (4 each)"), {
+      target: { value: "2" },
+    });
+    save();
+    await screen.findByText(SAVED_BEFORE_CHANGES);
+    expect(written.size).toBe(1);
+    // Listed, to save the changes again.
+    expect(outbox.shown()[0]).toMatchObject({
+      state: "refused",
+      what: "Move: 1 item from Hub to Van",
+    });
+  });
+
+  test("emptied, a cart that went back saves what fills it next under a new key", async () => {
+    leaveMoves([KEY, AT, [radios(1)]]);
+    const written = new Map([[KEY, linesOf({ lines: [radios(1)] })]]);
+    const outbox = open(ledger(written).api);
+    await ready();
+    await screen.findByText(ADDED_BACK);
+    const radio = screen.getByText("LiteBeam 5AC").closest("li") as HTMLElement;
+    fireEvent.click(within(radio).getByRole("button", { name: "Remove" }));
+    fillMove();
+    save();
+    await screen.findByText("In the inventory (transaction 2).");
+    expect(outbox.entries.value[0]?.body.key).not.toBe(KEY);
   });
 
   test("a cart with lines takes none without a tap", async () => {

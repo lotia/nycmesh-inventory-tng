@@ -154,3 +154,53 @@ test("a save holding an item retired since, with none left, names it, and can on
   await listing.getByRole("button", { name: "Discard" }).click();
   await expect(listing).toHaveCount(0);
 });
+
+test("a save an older build's tab saved meanwhile is saved once, under its key; changed after it went back, it is not saved, and says so", async ({
+  page,
+}) => {
+  await ownCable(page);
+  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  await page.goto("/scan");
+  /** One left, which the older build's tab then saves, as its request in
+   * flight would. */
+  const leaveSaved = async () => {
+    await leave(page, [{ item_id: itemId, quantity: "2" }]);
+    const [left] = JSON.parse(
+      (await page.evaluate(() =>
+        localStorage.getItem("inventory.outbox.v3"),
+      )) ?? "[]",
+    );
+    const first = await page.request.post("/api/transactions", {
+      data: left.body,
+    });
+    expect(first.status()).toBe(201);
+    await page.reload();
+    await expect(page.getByText(PUT_BACK)).toBeVisible();
+    return (await first.json()).transaction_id as number;
+  };
+  const sent = (status: number) =>
+    page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/transactions") &&
+        response.status() === status,
+    );
+
+  const saved = await leaveSaved();
+  const replayed = sent(200);
+  await page.getByRole("button", { name: "Save" }).click();
+  expect(await (await replayed).json()).toEqual({ transaction_id: saved });
+  await expect(
+    page.getByText(`In the inventory (transaction ${saved}).`),
+  ).toBeVisible();
+
+  await leaveSaved();
+  await page.getByLabel(/^Loose/).fill("3");
+  const refused = sent(409);
+  await page.getByRole("button", { name: "Save" }).click();
+  await refused;
+  await expect(
+    page.getByText(
+      "Not saved: another tab saved it first, as it was before your changes. Check what was saved, then save your changes again.",
+    ),
+  ).toBeVisible();
+});

@@ -9,6 +9,7 @@ import {
   Outbox,
   REPORT_AFTER,
   RETRY_MS,
+  SAVED_BEFORE_CHANGES,
   SAVED_MOST,
   STORAGE_KEY,
 } from "./outbox";
@@ -281,6 +282,22 @@ describe("refusals", () => {
       expect(states(outbox)).toEqual(["refused", "saved"]),
     );
     expect(outbox.entries.value[0]?.note).toContain("Please report this");
+  });
+
+  test("a save put back goes under its key, and refused as reused says it was saved first, before the changes", async () => {
+    const { api, sent } = answering(
+      replies(() => json({ reason: "key_reused" }, 409)),
+    );
+    const outbox = new Outbox(api);
+    const key = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
+    outbox.queue(draft(), "first", key);
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
+    expect(outbox.entries.value[0]).toMatchObject({
+      body: { key },
+      putBack: true,
+      note: SAVED_BEFORE_CHANGES,
+    });
+    expect((await bodies(sent))[0]).toMatchObject({ key });
   });
 
   test("a 422 says which line of the cart, in the server's words", async () => {
@@ -752,7 +769,7 @@ describe("storage", () => {
     };
     expect(Object.keys(Kept.entries)).toEqual(["build", "entries"]);
     expect({ [STORAGE_KEY]: paths(Entry).sort() }).toEqual({
-      "inventory.outbox.v5": [
+      "inventory.outbox.v6": [
         "body",
         "body.from_location_id",
         "body.install_number",
@@ -777,6 +794,8 @@ describe("storage", () => {
         "dismissed = true",
         "failures",
         "note",
+        "putBack",
+        "putBack = true",
         "queuedAt",
         "state",
         "state = waiting | saved | refused | too_old",
