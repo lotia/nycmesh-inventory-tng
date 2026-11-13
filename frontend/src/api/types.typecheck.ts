@@ -70,7 +70,8 @@ type Checked<S extends v.GenericSchema> = v.InferOutput<S>;
 
 // Each reply schema says exactly what the generated type says: a field
 // added, dropped or retyped on the server fails here until replies.ts
-// follows.
+// follows. Except BuildTooOldReply, read by pages older than the server:
+// only its reason is checked, and must stay the same (replies.ts).
 export const replies: [
   Same<Checked<typeof replies_.Registered>, Schemas["Registered"]>,
   Same<Checked<typeof replies_.CodeRefusedReply>, Schemas["CodeRefusedReply"]>,
@@ -80,7 +81,10 @@ export const replies: [
     Schemas["DeviceRefusedReply"]
   >,
   Same<Checked<typeof replies_.KeyReusedReply>, Schemas["KeyReusedReply"]>,
-  Same<Checked<typeof replies_.BuildTooOldReply>, Schemas["BuildTooOldReply"]>,
+  Same<
+    Checked<typeof replies_.BuildTooOldReply>["reason"],
+    Schemas["BuildTooOldReply"]["reason"]
+  >,
   Same<Checked<typeof replies_.Saved>, Schemas["Saved"]>,
   Same<Checked<typeof replies_.Catalogue>, Schemas["Catalogue"]>,
   // What the outbox keeps is exactly what the endpoint takes.
