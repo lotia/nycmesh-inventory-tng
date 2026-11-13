@@ -5,10 +5,11 @@
  * them back as from a build too old (outbox.ts, state too_old). This build
  * never sends them as they were. It lists each for the volunteer, read only
  * in the parts every version kept: the kind, who, the places, the items
- * and how much of each, and when. The volunteer puts each back in the cart,
- * to check, fill in what this build needs and save again, or discards it.
- * Nothing is removed until they do, but keys with nothing to lose
- * (tidyOlder).
+ * and how much of each, and when. The scan page puts one that goes back
+ * whole (goesBackWhole) in an empty cart itself; the volunteer adds each
+ * other to the cart, to check, fill in what this build needs and save
+ * again, or discards it. Nothing else is removed, but keys with nothing to
+ * lose (tidyOlder).
  *
  * Each version's shape is in the history of outbox.ts and cart.ts. Every
  * batch kept its key, kind, volunteer_id, places, install_number and lines
@@ -25,6 +26,7 @@ import {
   type Cart,
   type Catalogue,
   freshCart,
+  type Item,
   indexOf,
   type Kind,
   type Line,
@@ -59,7 +61,8 @@ const OldEntry = v.object({
     from_location_id: maybe(id),
     to_location_id: maybe(id),
     install_number: maybe(id),
-    lines: v.fallback(v.array(v.unknown()), []),
+    // Null where the lines themselves cannot be read: how many is unknown.
+    lines: maybe(v.array(v.unknown())),
     used_up: maybe(v.array(v.unknown())),
     lengths: maybe(v.array(v.unknown())),
   }),
@@ -114,6 +117,9 @@ export type Older = {
   /** Its lines, as the batch or the cart kept them, each read on its own:
    * null for one that cannot be. */
   lines: (OldBatchLine | OldCartLine | null)[];
+  /** Whether it held lines that could not be read even as a list, so how
+   * many is unknown. */
+  linesLost: boolean;
   /** Open packages it said were used up, or what was on them. */
   reports: number;
 };
@@ -164,7 +170,8 @@ function savesIn(key: string, stored: unknown): Older[] {
           body.install_number === null ? "" : String(body.install_number),
         at: queuedAt,
         refused: state === "refused" ? (note ?? "") : null,
-        lines: linesOf(body.lines, OldLine),
+        lines: linesOf(body.lines ?? [], OldLine),
+        linesLost: body.lines === null,
         reports: (body.used_up?.length ?? 0) + (body.lengths?.length ?? 0),
       },
     ];
@@ -189,6 +196,7 @@ function cartIn(key: string, stored: unknown): Older[] {
       at: cart.usedAt === null || cart.usedAt <= 0 ? null : cart.usedAt,
       refused: null,
       lines: linesOf(cart.lines, OldCartLine),
+      linesLost: false,
       reports: 0,
     },
   ];
@@ -315,8 +323,29 @@ export function isListed(
   );
 }
 
-/** What putting `older` in the cart leaves to do again, in words. */
+/** What putting `older` in the cart leaves to do again, in words: each
+ * said once for the whole save, not for each line. */
 export type Gaps = string[];
+
+/** In Ali's words (inventory-tng-3c0), each said once for a save. */
+export const LINES_LOST =
+  "Sorry. Could not read previously added items, scan them again.";
+export const RESIZED =
+  "Sorry. The package size has changed since this item was added. Discard and re-add the new package size.";
+
+/** Lines that could not be read, counted. */
+export function unreadWords(n: number): string {
+  return n === 1
+    ? "Sorry. Could not read 1 previously added item, scan it again."
+    : `Sorry. Could not read ${n} previously added items, scan them again.`;
+}
+
+/** What was taken from, or said of, open packages, counted. */
+export function openWords(n: number): string {
+  return n === 1
+    ? "Sorry. Could not read 1 open item, scan it in again."
+    : `Sorry. Could not read ${n} open items, scan them in again.`;
+}
 
 /**
  * `older` as a cart to check and save, keeping `last`'s choices where it
@@ -333,7 +362,6 @@ export function toCart(
   last: Cart = freshCart(),
 ): { cart: Cart; gaps: Gaps } {
   const { items } = indexOf(catalogue);
-  const gaps: Gaps = [];
   const lines = new Map<number, Line>();
   const lineOf = (itemId: number): Line => {
     const made = lines.get(itemId) ?? {
@@ -346,6 +374,8 @@ export function toCart(
     return made;
   };
   let unread = 0;
+  let open = older.reports;
+  let resized = false;
   for (const line of older.lines) {
     if (line === null) {
       unread += 1;
@@ -353,11 +383,7 @@ export function toCart(
       const made = lineOf(line.itemId);
       made.packages = { ...line.packages };
       made.loose = line.loose;
-      if (Object.values(line.open).some(saidOfOpen)) {
-        gaps.push(
-          `${nameOf(items.get(line.itemId))}: take what was taken from an open package again.`,
-        );
-      }
+      open += Object.values(line.open).filter(saidOfOpen).length;
     } else {
       const item = items.get(line.item_id);
       const amount = thousandths(String(line.quantity));
@@ -367,9 +393,7 @@ export function toCart(
         continue;
       }
       if (line.open_package_key !== null && older.kind !== "open") {
-        gaps.push(
-          `${nameOf(item)}: ${decimal(amount)}${unitOf(item)} was taken from an open package. Take it again.`,
-        );
+        open += 1;
         continue;
       }
       const pack = item?.packages.find((each) => each.id === line.package_id);
@@ -381,7 +405,7 @@ export function toCart(
       ) {
         // Resized since: neither its count of packages nor loose would say
         // what was moved, so it is done again, as the server would ask.
-        unread += 1;
+        resized = true;
         continue;
       }
       if (
@@ -403,17 +427,17 @@ export function toCart(
       }
     }
   }
-  if (unread > 0) {
-    gaps.push(
-      unread === 1
-        ? "A line could not be read: add it again if it is missing."
-        : `${unread} lines could not be read: add them again if they are missing.`,
-    );
+  const gaps: Gaps = [];
+  if (older.linesLost) {
+    gaps.push(LINES_LOST);
+  } else if (unread > 0) {
+    gaps.push(unreadWords(unread));
   }
-  if (older.reports > 0) {
-    gaps.push(
-      "It also said an open package was used up, or what was on one: say so again on the open package.",
-    );
+  if (open > 0) {
+    gaps.push(openWords(open));
+  }
+  if (resized) {
+    gaps.push(RESIZED);
   }
   const kind: Kind =
     older.kind === null || older.kind === "report" ? last.kind : older.kind;
@@ -433,6 +457,67 @@ export function toCart(
     ),
     gaps,
   };
+}
+
+/**
+ * Whether `older` goes back in the cart whole, for the page to put it
+ * there without a tap: something to put back, nothing left out (no line
+ * unread, nothing of an open package, no package resized) and no item
+ * retired, gone or not, as each needs the volunteer.
+ */
+export function goesBackWhole(older: Older, catalogue: Catalogue): boolean {
+  const { cart, gaps } = toCart(older, catalogue);
+  const { items } = indexOf(catalogue);
+  return (
+    gaps.length === 0 &&
+    cart.lines.length > 0 &&
+    cart.lines.every((line) => items.get(line.itemId)?.retired === false)
+  );
+}
+
+/** Of `listed`, the oldest that goes back whole and `skip` does not hold,
+ * by its id (olderId); one of no known time last. */
+export function nextWhole(
+  listed: readonly Older[],
+  catalogue: Catalogue,
+  skip: ReadonlySet<string> = new Set(),
+): Older | undefined {
+  return listed
+    .filter(
+      (each) => !skip.has(olderId(each)) && goesBackWhole(each, catalogue),
+    )
+    .sort((a, b) => timeOf(a) - timeOf(b))[0];
+}
+
+/** When it was saved, or a cart last changed; one of no known time, last. */
+const timeOf = (each: Older): number => each.at ?? Infinity;
+
+/** One of what older builds left, among the rest. */
+export function olderId(each: Older): string {
+  return `${each.key} ${each.batch ?? "cart"}`;
+}
+
+/** The catalogue with its retired items no longer offered added, retired,
+ * to name them and their packages in what older builds left; never to
+ * fill a cart from. */
+export function withRetired(catalogue: Catalogue): Catalogue {
+  const named: Item[] = catalogue.retired_items.map((item) => ({
+    ...item,
+    category: "",
+    manufacturer: null,
+    part_number: null,
+    old_code: null,
+    search_text: "",
+    retired: true,
+    packages: item.packages.map((pack) => ({
+      ...pack,
+      track_opened: false,
+      retired: true,
+      short_below: null,
+      sealed: [],
+    })),
+  }));
+  return { ...catalogue, items: [...catalogue.items, ...named] };
 }
 
 /** Whether a cart's line said anything of an open package: an amount

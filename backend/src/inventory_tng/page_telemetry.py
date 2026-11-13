@@ -31,7 +31,7 @@ meter = metrics.get_meter(__name__)
 router = APIRouter()
 
 PATH = "/telemetry"
-# A page flushes at ten events and sends 54 an hour at most (telemetry.ts,
+# A page flushes at ten events and sends 56 an hour at most (telemetry.ts,
 # PER_HOUR); a few pages open at once on one network share an address.
 REPORTS = RateLimitItemPerMinute(30)
 MOST_EVENTS = 50
@@ -81,13 +81,16 @@ class OutOfDate(Strict):
 
 class OlderStorage(Strict):
     """What an older build left under its own key, saves not sent or a cart
-    with lines: a scan page found it as it loaded, or a volunteer put one
-    back in the cart or discarded it (frontend/src/older.ts)."""
+    with lines: a scan page found it as it loaded, a volunteer put one back
+    in the cart or discarded it, or the page put one back in an empty cart
+    itself (frontend/src/older.ts)."""
 
     kind: Literal["older_storage"]
     held: Literal["saves", "cart"]
     # Found, unless it says: a page sending none means that.
-    action: Literal["found", "put_in_cart", "discarded"] = "found"
+    action: Literal[
+        "found", "put_in_cart", "put_in_cart_automatically", "discarded"
+    ] = "found"
 
 
 AnyEvent = WebVital | PageError | OutboxRetry | ScanToSave | OutOfDate | OlderStorage
@@ -140,7 +143,8 @@ older_acted_on = meter.create_counter(
     "inventory.page.older_acted_on",
     unit="{entry}",
     description="Saves not sent, or carts, left by an older build that a "
-    "volunteer put back in the cart or discarded, by which and how",
+    "volunteer put back in the cart or discarded, or the page put back in an "
+    "empty cart itself, by which and how",
 )
 scan_to_save = meter.create_histogram(
     "inventory.scan.to_save.duration",

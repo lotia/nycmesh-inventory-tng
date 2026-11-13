@@ -10,8 +10,8 @@
  * A tab learns that a newer build is out from another tab's stamp in
  * storage, or from the server: its reply to a batch names the server's
  * build, and a batch of this tab's build too old is held back (409
- * build_too_old). The scan page then asks for a reload, once nothing waits
- * to send and the cart is saved.
+ * build_too_old). The scan page then asks for a reload: once nothing waits
+ * to send and the cart is saved; at once, if too old.
  */
 import { signal } from "@preact/signals";
 import { onStoredChange, parseStored, writeStored } from "./stored";
@@ -24,11 +24,13 @@ export const BUILD: string = __BUILD__;
 /** Where each tab stamps its build's id as it starts: a key no build
  * changes, so a tab hears of a newer build whatever keys that build keeps. */
 export const BUILD_KEY = "inventory.build";
-/** What a page of a build no longer current tells the volunteer, in these
- * words wherever it does: UPDATED where it asks for a refresh, SCANNER_UPDATED
- * and a full stop where it cannot yet. */
-export const SCANNER_UPDATED = "The scanner has been updated";
-export const UPDATED = `${SCANNER_UPDATED}, refresh this page.`;
+/** What a page of a build no longer current tells the volunteer, in Ali's
+ * words (inventory-tng-3c0): UPDATED once nothing is left to send or save,
+ * MUST_UPGRADE where the server takes nothing more from it but it holds
+ * something; each with the button UPGRADE, which reloads. */
+export const UPDATED = "The scanner has been updated.";
+export const MUST_UPGRADE = `${UPDATED} You must upgrade. Your data will be kept but may need some changes before sending.`;
+export const UPGRADE = "Upgrade";
 /** The header a batch names its build in, and the reply the server's. */
 export const HEADER = "X-Inventory-Build";
 /** As the backend checks one (bundle.BUILD_ID). */

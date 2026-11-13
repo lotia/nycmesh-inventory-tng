@@ -73,6 +73,15 @@ export const CATALOGUE: Catalogue = {
   ],
   items: [radio, cable],
   open_packages: [],
+  // Retired with none left: named only.
+  retired_items: [
+    {
+      id: 103,
+      name: "NanoStation M5",
+      unit: "each",
+      packages: [{ id: 1003, name: "Pair", size: "2.000" }],
+    },
+  ],
   saved: [],
   labels: [
     { code: "K7QX2M", item_id: 101, package_id: 1001, location_id: null },

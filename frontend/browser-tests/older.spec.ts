@@ -1,72 +1,63 @@
 /**
  * Saves an older build of the scan page left on a phone (frontend/src/
- * older.ts, inventory-tng-kk1): listed in words, put back in the cart and
- * saved again, on a phone's width. The cable is the test's own (own.ts).
+ * older.ts, inventory-tng-kk1, inventory-tng-3c0): one that goes back whole
+ * is put in the empty cart without a tap; the rest are listed in words, to
+ * add to the cart and save again, on a phone's width. The cable is the
+ * test's own (own.ts).
  */
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { ownCable } from "./own";
 
-test("a save an older build left is listed, put back in the cart, and saved", async ({
-  page,
-}) => {
-  const cable = await ownCable(page);
-  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
-  await page.goto("/scan");
-  const value = (label: string, option: string) =>
-    page
-      .getByLabel(label, { exact: true })
-      .locator("option", { hasText: option })
-      .first()
-      .getAttribute("value");
-  const volunteerId = Number(await value("Your name", "Sam Example"));
-  const fromId = Number(await value("From", "Supernode 1 › Shelf A"));
-  const toId = Number(await value("To", "Van"));
-  // As a build keeping the outbox under v3 left it: waiting, never sent.
+const HEADING = "Checked out items. Add to cart or discard before sending";
+const PUT_BACK = "Added back to cart. Review before Save.";
+
+/** The scan page's ids for a name and two places, by what it offers. */
+async function choices(page: Page) {
+  const value = async (label: string, option: string) =>
+    Number(
+      await page
+        .getByLabel(label, { exact: true })
+        .locator("option", { hasText: option })
+        .first()
+        .getAttribute("value"),
+    );
+  return {
+    volunteerId: await value("Your name", "Sam Example"),
+    fromId: await value("From", "Supernode 1 › Shelf A"),
+    toId: await value("To", "Van"),
+  };
+}
+
+/** Saves as a build keeping the outbox under v3 left them: waiting, never
+ * sent, each a move of `lines`, queued in this order. */
+async function leave(page: Page, ...saves: unknown[][]) {
+  const { volunteerId, fromId, toId } = await choices(page);
   await page.evaluate(
-    (save) =>
-      localStorage.setItem("inventory.outbox.v3", JSON.stringify([save])),
-    {
+    (entries) =>
+      localStorage.setItem("inventory.outbox.v3", JSON.stringify(entries)),
+    saves.map((lines, at) => ({
       body: {
         key: crypto.randomUUID(),
         kind: "move",
         volunteer_id: volunteerId,
         from_location_id: fromId,
         to_location_id: toId,
-        lines: [{ item_id: itemId, quantity: "2" }],
+        lines,
       },
       what: "Move: 1 item",
-      queuedAt: Date.now(),
+      queuedAt: Date.now() - 60_000 + at,
       state: "waiting",
       waitingFor: "network",
       note: null,
       transactionId: null,
       failures: 0,
-    },
+    })),
   );
-  await page.reload();
-  const listing = page.locator("section", {
-    has: page.getByRole("heading", {
-      name: "Left by an older version of this page",
-    }),
-  });
-  await expect(listing).toContainText(
-    "Moving stock from Supernode 1 › Shelf A to Van, by Sam Example",
-  );
-  await expect(listing.getByText(`${cable}: 2 m`)).toBeVisible();
-  // It fits a phone, buttons and all.
-  expect(
-    await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth -
-        document.documentElement.clientWidth,
-    ),
-  ).toBeLessThanOrEqual(0);
+  return { volunteerId, fromId, toId };
+}
 
-  await listing.getByRole("button", { name: "Put it in the cart" }).click();
-  await expect(listing).toHaveCount(0);
-  await expect(page.getByLabel("To", { exact: true })).toHaveValue(
-    String(toId),
-  );
+/** Saves the cart, and what it sent. */
+async function save(page: Page) {
   const saving = page.waitForResponse(
     (response) =>
       response.url().endsWith("/api/transactions") &&
@@ -75,14 +66,89 @@ test("a save an older build left is listed, put back in the cart, and saved", as
   await page.getByRole("button", { name: "Save" }).click();
   const response = await saving;
   expect(response.status()).toBe(201);
-  expect(response.request().postDataJSON()).toMatchObject({
+  return response.request().postDataJSON();
+}
+
+test("a save an older build left goes back in the cart, whole without a tap, and is saved", async ({
+  page,
+}) => {
+  const cable = await ownCable(page);
+  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  await page.goto("/scan");
+  const { volunteerId, fromId, toId } = await leave(
+    page,
+    [{ item_id: itemId, quantity: "2" }],
+    // A line no build wrote: not whole, so it waits for a tap.
+    [{ item_id: itemId, quantity: "3" }, { quantity: "1" }],
+  );
+  await page.reload();
+
+  // The first, whole, is in the cart already; the other is listed.
+  await expect(page.getByText(PUT_BACK)).toBeVisible();
+  await expect(page.getByLabel("To", { exact: true })).toHaveValue(
+    String(toId),
+  );
+  const listing = page.locator("section", {
+    has: page.getByRole("heading", { name: HEADING }),
+  });
+  await expect(listing).toContainText(
+    "Moving stock from Supernode 1 › Shelf A to Van, by Sam Example",
+  );
+  await expect(listing.getByText(`${cable}: 3 m`)).toBeVisible();
+  await expect(
+    listing.getByText(
+      "Sorry. Could not read 1 previously added item, scan it again.",
+    ),
+  ).toBeVisible();
+  // It fits a phone, buttons and all.
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(0);
+  expect(await save(page)).toMatchObject({
     kind: "move",
     volunteer_id: volunteerId,
     from_location_id: fromId,
     to_location_id: toId,
     lines: [{ item_id: itemId, quantity: "2" }],
   });
+
+  await listing.getByRole("button", { name: "Add to cart" }).click();
+  await expect(listing).toHaveCount(0);
+  await expect(page.getByText(PUT_BACK)).toBeVisible();
+  expect(await save(page)).toMatchObject({
+    lines: [{ item_id: itemId, quantity: "3" }],
+  });
   expect(
     await page.evaluate(() => localStorage.getItem("inventory.outbox.v3")),
   ).toBeNull();
+});
+
+test("a save holding an item retired since, with none left, names it, and can only be discarded", async ({
+  page,
+}) => {
+  const cable = await ownCable(page, "Retired cable");
+  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  await page.getByRole("button", { name: "Retire", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Retired.");
+  await page.goto("/scan");
+  await leave(page, [{ item_id: itemId, quantity: "2" }]);
+  await page.reload();
+
+  const listing = page.locator("section", {
+    has: page.getByRole("heading", { name: HEADING }),
+  });
+  await expect(listing.getByText("Item retired")).toBeVisible();
+  await expect(listing.getByText(`${cable}: 2 m`)).toBeVisible();
+  await expect(
+    listing.getByRole("button", { name: "Cannot Add to Cart" }),
+  ).toBeDisabled();
+  await expect(page.getByText(PUT_BACK)).toHaveCount(0);
+  await listing.getByRole("button", { name: "Discard" }).click();
+  await expect(listing.getByText("Confirm discard")).toBeVisible();
+  await listing.getByRole("button", { name: "Discard" }).click();
+  await expect(listing).toHaveCount(0);
 });

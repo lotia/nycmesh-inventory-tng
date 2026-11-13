@@ -1099,30 +1099,36 @@ describe("a newer build", () => {
     );
   }
 
-  const reloadButton = () =>
-    screen.queryByRole("button", { name: "Refresh this page" });
+  const reloadButton = () => screen.queryByRole("button", { name: "Upgrade" });
+  const UPDATED = "The scanner has been updated.";
+  const MUST_UPGRADE =
+    "The scanner has been updated. You must upgrade. Your data will be kept but may need some changes before sending.";
+  /** The banner's words, if it shows. */
+  const banner = () =>
+    screen
+      .queryAllByRole("alert")
+      .find((each) => each.textContent?.startsWith(UPDATED))
+      ?.querySelector("div")?.textContent ?? null;
 
   test("with nothing waiting and the cart empty, it offers the reload", async () => {
     const { reload } = openMine();
     await ready();
     expect(screen.queryByRole("alert")).toBeNull();
     newerTab();
-    await screen.findByText("The scanner has been updated, refresh this page.");
+    await vi.waitFor(() => expect(banner()).toBe(UPDATED));
     fireEvent.click(reloadButton() as HTMLElement);
     expect(reload).toHaveBeenCalledOnce();
   });
 
-  test("with the cart filled, it asks for it to be saved first", async () => {
+  test("with the cart filled, it says nothing until the cart is saved and sent", async () => {
     openMine();
     await ready();
     fillMove();
     newerTab();
-    await screen.findByText(
-      "The scanner has been updated, refresh this page. Save the cart, or empty it, first.",
-    );
+    await vi.waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
     expect(reloadButton()).toBeNull();
     save();
-    await screen.findByText("The scanner has been updated, refresh this page.");
+    await vi.waitFor(() => expect(banner()).toBe(UPDATED));
     expect(reloadButton()).not.toBeNull();
   });
 
@@ -1131,30 +1137,30 @@ describe("a newer build", () => {
     await ready();
     fillMove();
     newerTab();
-    await screen.findByText(
-      "The scanner has been updated, refresh this page. Save the cart, or empty it, first.",
-    );
+    expect(banner()).toBeNull();
     storeCart(freshCart());
     window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
-    await screen.findByText("The scanner has been updated, refresh this page.");
+    await vi.waitFor(() => expect(banner()).toBe(UPDATED));
     expect(reloadButton()).not.toBeNull();
   });
 
-  test("with no catalogue, a cart filled in another tab is still to be saved first", async () => {
+  test("with no catalogue, a cart filled in another tab still holds it back", async () => {
     const { api } = answering(() => json({}, 500));
-    openMine(api);
+    const { outbox } = openMine(api);
     await screen.findByText(/Couldn't load the catalogue/);
     storeCart(addOne(freshCart(), 100));
     window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
     newerTab();
-    await screen.findByText(
-      "The scanner has been updated, refresh this page. Save the cart, or empty it, first.",
-    );
+    await vi.waitFor(() => expect(outbox.builds.newer.value).toBe("other_tab"));
+    expect(banner()).toBeNull();
     expect(reloadButton()).toBeNull();
   });
 
-  test("offline, with saves waiting, it asks to stay, and offers no reload", async () => {
-    const { api } = server(() => Promise.reject(new TypeError("offline")));
+  test("offline, with saves waiting, it says nothing until they have gone", async () => {
+    let online = false;
+    const { api } = server(() =>
+      online ? saved() : Promise.reject(new TypeError("offline")),
+    );
     const { outbox } = openMine(api);
     await ready();
     fillMove();
@@ -1163,62 +1169,90 @@ describe("a newer build", () => {
       expect(outbox.entries.value[0]?.waitingFor).toBe("network"),
     );
     newerTab();
-    await screen.findByText(
-      "The scanner has been updated. 1 save waiting to send: stay on this page until they have gone.",
-    );
+    await vi.waitFor(() => expect(outbox.builds.newer.value).toBe("other_tab"));
+    expect(banner()).toBeNull();
     expect(reloadButton()).toBeNull();
+    online = true;
+    await outbox.send();
+    await vi.waitFor(() => expect(banner()).toBe(UPDATED));
   });
 
-  test("a save from a build too old is kept, not refused, and the reload offered", async () => {
+  test("a save from a build too old is kept, not refused, and the upgrade asked for", async () => {
     const { api } = server(() => json(TOO_OLD, 409));
     const { outbox, reload } = openMine(api);
     await ready();
     fillMove();
     save();
-    await screen.findByText(
-      "The scanner has been updated, refresh this page. The 1 save waiting here will then be listed, to put back in the cart and save again.",
-    );
+    await vi.waitFor(() => expect(banner()).toBe(MUST_UPGRADE));
     expect(outbox.entries.value.map((each) => each.state)).toEqual(["waiting"]);
+    // The save itself says the same, and nothing more.
+    const list = screen
+      .getByRole("heading", { name: "Saved on this browser" })
+      .closest("section") as HTMLElement;
+    within(list).getByText(MUST_UPGRADE);
     expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
     fireEvent.click(reloadButton() as HTMLElement);
     expect(reload).toHaveBeenCalledOnce();
   });
 
-  test("too old with saves waiting, it counts them", async () => {
-    const { api } = server(() => json(TOO_OLD, 409));
-    openMine(api);
-    await ready();
-    fillMove();
-    save();
-    await screen.findByText(/The 1 save waiting here/);
-    fillMove();
-    save();
-    await screen.findByText(
-      "The scanner has been updated, refresh this page. The 2 saves waiting here will then be listed, to put back in the cart and save again.",
+  test("too old, a newer build's save waiting here is not counted, as that build sends it", async () => {
+    const LATER = "2026-11-12T11:00:00.000Z";
+    localStorage.setItem(
+      OUTBOX_KEY,
+      JSON.stringify({
+        build: LATER,
+        entries: [
+          {
+            body: {
+              key: "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61",
+              kind: "move",
+              volunteer_id: 1,
+              from_location_id: 10,
+              to_location_id: 12,
+              lines: [{ item_id: 100, quantity: "8", package_id: 1000 }],
+            },
+            what: "Move: 1 item from Hub to Van",
+            queuedAt: 1,
+            build: LATER,
+            state: "waiting",
+            waitingFor: null,
+            note: null,
+            transactionId: null,
+            failures: 0,
+          },
+        ],
+      }),
     );
+    const { api } = server(() => Promise.reject(new TypeError("offline")));
+    const { outbox } = openMine(api);
+    await ready();
+    await vi.waitFor(() =>
+      expect(outbox.entries.value[0]?.waitingFor).toBe("network"),
+    );
+    outbox.builds.learn("too_old");
+    await vi.waitFor(() => expect(banner()).toBe(UPDATED));
   });
 
   test("too old with nothing waiting, it offers the reload alone", async () => {
     const { outbox } = openMine();
     await ready();
     outbox.builds.learn("too_old");
-    await screen.findByText("The scanner has been updated, refresh this page.");
+    await vi.waitFor(() => expect(banner()).toBe(UPDATED));
     expect(reloadButton()).not.toBeNull();
   });
 
-  test("too old with the cart filled, it offers the reload, and says the cart is kept", async () => {
+  test("too old with the cart filled, it asks for the upgrade, as the cart is kept", async () => {
     const { outbox } = openMine();
     await ready();
     fillMove();
     outbox.builds.learn("too_old");
-    await screen.findByText(
-      "The scanner has been updated, refresh this page. The cart is kept for after the refresh.",
-    );
+    await vi.waitFor(() => expect(banner()).toBe(MUST_UPGRADE));
     expect(reloadButton()).not.toBeNull();
   });
 });
 
 describe("what an older build left", () => {
+  const HEADING = "Checked out items. Add to cart or discard before sending";
   const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
   const AT = 1_700_000_000_000;
   const at = new Date(AT).toLocaleString([], {
@@ -1252,7 +1286,8 @@ describe("what an older build left", () => {
     );
   }
 
-  /** A cart filled for an install, under v1. */
+  /** A cart filled for an install, under v1, with a line no build wrote:
+   * not whole, so it waits for the volunteer. */
   function leaveCart() {
     localStorage.setItem(
       "inventory.cart.v1",
@@ -1262,7 +1297,7 @@ describe("what an older build left", () => {
         volunteerId: 2,
         fromId: 12,
         installNumber: "456",
-        lines: [{ itemId: 101, packages: {}, loose: "12.5" }],
+        lines: [{ itemId: 101, packages: {}, loose: "12.5" }, { loose: 1 }],
         usedAt: AT,
       }),
     );
@@ -1270,7 +1305,7 @@ describe("what an older build left", () => {
 
   const listing = () =>
     screen
-      .getByRole("heading", { name: "Left by an older version of this page" })
+      .getByRole("heading", { name: HEADING })
       .closest("section") as HTMLElement;
 
   test("each is listed in words, and counted once as found", async () => {
@@ -1282,16 +1317,16 @@ describe("what an older build left", () => {
     const [save, cart] = listing().querySelector("ul")?.children ?? [];
     expect(save?.textContent).toContain("Moving stock from Hub to Van, by Ada");
     within(save as HTMLElement).getByText(
-      `Saved on this phone ${at}, not sent.`,
+      `Saved on this device ${at}, not sent.`,
     );
     within(save as HTMLElement).getByText("LiteBeam 5AC: 2 × Box");
     within(save as HTMLElement).getByText(
-      "Cat6 cable: 3 m was taken from an open package. Take it again.",
+      "Sorry. Could not read 1 open item, scan it in again.",
     );
     expect(cart?.textContent).toContain(
       "A cart: taking it to an install from Van for install 456, by Grace",
     );
-    within(cart as HTMLElement).getByText(`Last changed ${at}, not saved.`);
+    within(cart as HTMLElement).getByText(`Added on ${at} but not sent`);
     within(cart as HTMLElement).getByText("Cat6 cable: 12.5 m");
     expect(record.mock.calls.map(([event]) => event)).toEqual([
       { kind: "older_storage", held: "saves", action: "found" },
@@ -1316,6 +1351,8 @@ describe("what an older build left", () => {
           from_location_id: 10,
           to_location_id: 10,
           lines: [{ item_id: 101, quantity: "305", package_id: 1001 }],
+          // Not whole, so listed, not put in the cart.
+          used_up: [KEY],
         }),
         save("c", {
           kind: "receipt",
@@ -1339,12 +1376,12 @@ describe("what an older build left", () => {
     const [report, opening, receipt, install] =
       listing().querySelector("ul")?.children ?? [];
     expect(report?.textContent).toContain(
-      "Saying what is on open packages at HubSaved on this phone, not sent.",
+      "Saying what is on open packages at HubSaved on this device, not sent.",
     );
     // Nothing in it can go in the cart: discarding is all there is.
     expect(
       within(report as HTMLElement).queryByRole("button", {
-        name: "Put it in the cart",
+        name: "Add to cart",
       }),
     ).toBeNull();
     within(opening as HTMLElement).getByText("Cat6 cable: 1 × Spool");
@@ -1356,7 +1393,7 @@ describe("what an older build left", () => {
       "An item no longer in the catalogue",
     );
     expect(install?.textContent).toContain(
-      "Taking it to an install for install 77Saved on this phone; the inventory did not take it.",
+      "Taking it to an install for install 77Add it to the cart, fix that, then save.",
     );
   });
 
@@ -1387,11 +1424,11 @@ describe("what an older build left", () => {
       throw new DOMException("full", "QuotaExceededError");
     });
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Put it in the cart" }),
+      within(listing()).getByRole("button", { name: "Add to cart" }),
     );
     setItem.mockRestore();
     within(listing()).getByText(
-      "This browser isn't keeping the cart, so it was not put in. Free some space or leave private browsing.",
+      "Sorry. Can't save the cart. Clear local data, reload the page and try again.",
     );
     // Not filled either: saved from here, then put back, it would go twice.
     screen.getByText("Nothing in the cart yet.");
@@ -1421,11 +1458,11 @@ describe("what an older build left", () => {
       within(save as HTMLElement).getByRole("button", { name: "Discard" }),
     );
     fireEvent.click(
-      within(save as HTMLElement).getByRole("button", { name: "Discard it" }),
+      within(save as HTMLElement).getByRole("button", { name: "Discard" }),
     );
     setItem.mockRestore();
     within(listing()).getByText(
-      "This browser would not forget it. Free some space or leave private browsing, then discard it again.",
+      "Sorry. Unable to discard. Clear your site data to remove.",
     );
     expect(
       JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? ""),
@@ -1457,12 +1494,12 @@ describe("what an older build left", () => {
       });
     fireEvent.click(
       within(listing()).getAllByRole("button", {
-        name: "Put it in the cart",
+        name: "Add to cart",
       })[0] as HTMLElement,
     );
     setItem.mockRestore();
     screen.getByText(
-      "This browser would not forget the older one, so it is still listed: discard it once this cart is saved.",
+      "Sorry. This item wasn't automatically removed. Save the cart and try to remove.",
     );
     expect(selected("From")).toBe("10");
   });
@@ -1473,9 +1510,7 @@ describe("what an older build left", () => {
     open();
     await ready();
     fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: "Discard it" }),
-    );
+    fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
     expect(localStorage.getItem("inventory.cart.v1")).toBeNull();
     expect(record).toHaveBeenCalledWith({
       kind: "older_storage",
@@ -1492,12 +1527,8 @@ describe("what an older build left", () => {
     fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
     // Sent by an older tab, the storage event not yet heard.
     localStorage.removeItem("inventory.outbox.v3");
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: "Discard it" }),
-    );
-    expect(
-      screen.queryByText("Left by an older version of this page"),
-    ).toBeNull();
+    fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
+    expect(screen.queryByText(HEADING)).toBeNull();
   });
 
   test("a cart's line with nothing readable in it is not told", async () => {
@@ -1508,6 +1539,8 @@ describe("what an older build left", () => {
         lines: [
           { itemId: 100, packages: { 1000: "some" }, loose: "lots" },
           { itemId: 101, packages: {}, loose: "2" },
+          // Not whole, so listed, not put in the cart.
+          { loose: 1 },
         ],
       }),
     );
@@ -1548,24 +1581,17 @@ describe("what an older build left", () => {
     );
   }
 
-  test("one an older build left under this build's key, held back as too old, is listed, not this tab", async () => {
+  test("one an older build left under this build's key, held back as too old, goes back in the empty cart, and this tab is not too old", async () => {
     leaveInOutbox("waiting");
     // A server whose oldest build is after OLDER.
     const { api } = server(() => json(TOO_OLD, 409));
     const outbox = open(api);
     await ready();
-    await vi.waitFor(() =>
-      within(listing()).getByText(`Saved on this phone ${at}, not sent.`),
-    );
+    await screen.findByText("Added back to cart. Review before Save.");
     expect(outbox.builds.newer.value).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByText("Saved on this browser")).toBeNull();
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: "Put it in the cart" }),
-    );
-    expect(
-      screen.queryByText("Left by an older version of this page"),
-    ).toBeNull();
+    expect(screen.queryByText(HEADING)).toBeNull();
     expect(
       (screen.getByLabelText("Box (4 each)") as HTMLInputElement).value,
     ).toBe("2");
@@ -1578,13 +1604,13 @@ describe("what an older build left", () => {
   test("one another tab held back as too old is listed here, and goes when put back there", async () => {
     open();
     await ready();
-    expect(
-      screen.queryByText("Left by an older version of this page"),
-    ).toBeNull();
+    // A cart with lines takes none without a tap.
+    fillMove();
+    expect(screen.queryByText(HEADING)).toBeNull();
     leaveInOutbox("too_old");
     window.dispatchEvent(new StorageEvent("storage", { key: OUTBOX_KEY }));
     await vi.waitFor(() =>
-      within(listing()).getByText(`Saved on this phone ${at}, not sent.`),
+      within(listing()).getByText(`Saved on this device ${at}, not sent.`),
     );
     // Put back in the cart there.
     localStorage.setItem(
@@ -1592,11 +1618,7 @@ describe("what an older build left", () => {
       JSON.stringify({ build: BUILD, entries: [] }),
     );
     window.dispatchEvent(new StorageEvent("storage", { key: OUTBOX_KEY }));
-    await vi.waitFor(() =>
-      expect(
-        screen.queryByText("Left by an older version of this page"),
-      ).toBeNull(),
-    );
+    await vi.waitFor(() => expect(screen.queryByText(HEADING)).toBeNull());
   });
 
   test("a refused one says why", async () => {
@@ -1604,7 +1626,7 @@ describe("what an older build left", () => {
     open();
     await ready();
     within(listing()).getByText(
-      `Saved on this phone ${at}; the inventory did not take it. Not saved. Line 1: no.`,
+      "Not saved. Line 1: no. Add it to the cart, fix that, then save.",
     );
   });
 
@@ -1615,18 +1637,12 @@ describe("what an older build left", () => {
     const outbox = open(api);
     await ready();
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Put it in the cart" }),
+      within(listing()).getByRole("button", { name: "Add to cart" }),
     );
-    expect(
-      screen.queryByText("Left by an older version of this page"),
-    ).toBeNull();
+    expect(screen.queryByText(HEADING)).toBeNull();
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
-    screen.getByText(
-      "Put back in the cart. Check it, fill in what it needs, then Save.",
-    );
-    screen.getByText(
-      "Cat6 cable: 3 m was taken from an open package. Take it again.",
-    );
+    screen.getByText("Added back to cart. Review before Save.");
+    screen.getByText("Sorry. Could not read 1 open item, scan it in again.");
     expect(selected("Your name")).toBe("1");
     expect(selected("From")).toBe("10");
     expect(selected("To")).toBe("12");
@@ -1670,12 +1686,10 @@ describe("what an older build left", () => {
     open(api);
     await ready();
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Put it in the cart" }),
+      within(listing()).getByRole("button", { name: "Add to cart" }),
     );
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
-    screen.getByText(
-      "Cat6 cable: 3 m was taken from an open package. Take it again.",
-    );
+    screen.getByText("Sorry. Could not read 1 open item, scan it in again.");
     // Its line, to take it again on; the places kept.
     const cable = screen.getByText("Cat6 cable").closest("li") as HTMLElement;
     within(cable).getByRole("button", { name: "Remove" });
@@ -1693,7 +1707,7 @@ describe("what an older build left", () => {
     const outbox = open(api);
     await ready();
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Put it in the cart" }),
+      within(listing()).getByRole("button", { name: "Add to cart" }),
     );
     save();
     await screen.findByText(/^Saved: /);
@@ -1708,7 +1722,7 @@ describe("what an older build left", () => {
     open();
     await ready();
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Put it in the cart" }),
+      within(listing()).getByRole("button", { name: "Add to cart" }),
     );
     expect(localStorage.getItem("inventory.cart.v1")).toBeNull();
     expect(selected("Your name")).toBe("2");
@@ -1727,9 +1741,11 @@ describe("what an older build left", () => {
     await ready();
     fillMove();
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Put it in the cart" }),
+      within(listing()).getByRole("button", { name: "Add to cart" }),
     );
-    within(listing()).getByText("Save the cart, or empty it, first.");
+    within(listing()).getByText(
+      "Save previous cart before adding additional items",
+    );
     expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
   });
 
@@ -1742,19 +1758,13 @@ describe("what an older build left", () => {
     open();
     await ready();
     fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
-    within(listing()).getByText(
-      "Discard it? It was never saved in the inventory, and can't be got back.",
-    );
+    within(listing()).getByText("Confirm discard");
     fireEvent.click(within(listing()).getByRole("button", { name: "Keep it" }));
     expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
     fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: "Discard it" }),
-    );
+    fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
-    expect(
-      screen.queryByText("Left by an older version of this page"),
-    ).toBeNull();
+    expect(screen.queryByText(HEADING)).toBeNull();
     expect(confirm).not.toHaveBeenCalled();
     expect(record).toHaveBeenCalledWith({
       kind: "older_storage",
@@ -1770,16 +1780,14 @@ describe("what an older build left", () => {
     open();
     await ready();
     const button = within(listing()).getByRole("button", {
-      name: "Put it in the cart",
+      name: "Add to cart",
     });
     // Sent, but the storage event not yet heard.
     const sent = JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? "");
     sent[0].state = "saved";
     localStorage.setItem("inventory.outbox.v3", JSON.stringify(sent));
     fireEvent.click(button);
-    expect(
-      screen.queryByText("Left by an older version of this page"),
-    ).toBeNull();
+    expect(screen.queryByText(HEADING)).toBeNull();
     expect(screen.getByText("Nothing in the cart yet.")).not.toBeNull();
   });
 
@@ -1804,11 +1812,133 @@ describe("what an older build left", () => {
     save();
     await screen.findByText(/^Saved: /);
     fireEvent.click(
-      within(listing()).getByRole("button", { name: "Put it in the cart" }),
+      within(listing()).getByRole("button", { name: "Add to cart" }),
     );
-    screen.getByText(
-      "Put back in the cart. Check it, fill in what it needs, then Save.",
-    );
+    screen.getByText("Added back to cart. Review before Save.");
     expect(screen.queryByText(/^Saved: /)).toBeNull();
+  });
+  /** Saves under v3 that go back whole: moves of `boxes` boxes of radios,
+   * each queued at its time. */
+  function leaveWhole(...saves: [key: string, at: number, boxes: number][]) {
+    localStorage.setItem(
+      "inventory.outbox.v3",
+      JSON.stringify(
+        saves.map(([key, queuedAt, boxes]) => ({
+          body: {
+            key,
+            kind: "move",
+            volunteer_id: 1,
+            from_location_id: 10,
+            to_location_id: 12,
+            lines: [
+              { item_id: 100, quantity: String(boxes * 4), package_id: 1000 },
+            ],
+          },
+          queuedAt,
+          state: "waiting",
+        })),
+      ),
+    );
+  }
+
+  const boxes = () =>
+    (screen.getByLabelText("Box (4 each)") as HTMLInputElement).value;
+
+  test("one that goes back whole goes in an empty cart without a tap, the oldest first, one at a time", async () => {
+    const record = vi.spyOn(telemetry, "record");
+    leaveWhole(["newer", AT, 3], ["older", AT - 1000, 1]);
+    open();
+    await ready();
+    await screen.findByText("Added back to cart. Review before Save.");
+    expect(boxes()).toBe("1");
+    // The newer one waits, listed, for the cart to be saved.
+    within(listing()).getByText("LiteBeam 5AC: 3 × Box");
+    expect(record).toHaveBeenCalledWith({
+      kind: "older_storage",
+      held: "saves",
+      action: "put_in_cart_automatically",
+    });
+    record.mockRestore();
+    save();
+    await vi.waitFor(() => expect(boxes()).toBe("3"));
+    screen.getByText("Added back to cart. Review before Save.");
+    expect(screen.queryByText(HEADING)).toBeNull();
+    expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
+  });
+
+  test("a cart with lines takes none without a tap", async () => {
+    storeCart(addOne(freshCart(), 101));
+    leaveWhole([KEY, AT, 1]);
+    open();
+    await ready();
+    within(listing()).getByRole("button", { name: "Add to cart" });
+    expect(
+      screen.queryByText("Added back to cart. Review before Save."),
+    ).toBeNull();
+  });
+
+  test("one the browser would not keep in the cart says so, and is not tried again", async () => {
+    leaveWhole([KEY, AT, 1]);
+    const real = localStorage.setItem.bind(localStorage);
+    const setItem = vi
+      .spyOn(localStorage, "setItem")
+      .mockImplementation((key, value) => {
+        if (key === CART_KEY) {
+          throw new DOMException("full", "QuotaExceededError");
+        }
+        real(key, value);
+      });
+    open();
+    await ready();
+    await screen.findByText(
+      "Sorry. Can't save the cart. Clear local data, reload the page and try again.",
+    );
+    setItem.mockRestore();
+    screen.getByText("Nothing in the cart yet.");
+    within(listing()).getByRole("button", { name: "Add to cart" });
+  });
+
+  test("an item retired since, with none left, is named, and the save can only be discarded", async () => {
+    localStorage.setItem(
+      "inventory.outbox.v3",
+      JSON.stringify([
+        {
+          body: {
+            key: KEY,
+            kind: "move",
+            volunteer_id: 1,
+            from_location_id: 10,
+            to_location_id: 12,
+            lines: [
+              { item_id: 103, quantity: "4", package_id: 1003 },
+              { item_id: 100, quantity: "4", package_id: 1000 },
+            ],
+          },
+          queuedAt: AT,
+          state: "waiting",
+        },
+      ]),
+    );
+    open();
+    await ready();
+    const [retired, radio] = within(listing())
+      .getAllByRole("listitem")
+      .filter(
+        (each) =>
+          each.textContent?.endsWith(" × Pair") ||
+          each.textContent?.endsWith(" × Box"),
+      );
+    expect(retired?.textContent).toBe("Item retiredNanoStation M5: 2 × Pair");
+    expect(radio?.textContent).toBe("LiteBeam 5AC: 1 × Box");
+    const add = within(listing()).getByRole("button", {
+      name: "Cannot Add to Cart",
+    }) as HTMLButtonElement;
+    expect(add.disabled).toBe(true);
+    expect(
+      screen.queryByText("Added back to cart. Review before Save."),
+    ).toBeNull();
+    fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
+    fireEvent.click(within(listing()).getByRole("button", { name: "Discard" }));
+    expect(screen.queryByText(HEADING)).toBeNull();
   });
 });

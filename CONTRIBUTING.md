@@ -333,14 +333,19 @@ build that wrote them. A change to what is kept, or to a value a field may
 take, takes a new key, as a tab of the build before, open during a deploy,
 drops what it cannot read from what it writes back; `outbox.test.ts` lists
 both for the outbox's key. A build reads and writes only its own keys: a
-tab of an older build sends its own batches, then asks for a reload
-(`frontend/src/build.ts`, docs/decisions/0010). A newer build lists the
-saves and the cart an older one left, read only in the parts every version
-kept, for the volunteer to put each back in the cart or discard it, and
-removes an older key once nothing in it is left to list
-(`frontend/src/older.ts`). Builds that keep the same shape share a key,
-so each batch is kept with the build that queued it, and is sent as that
-build's, whichever tab sends it.
+tab of an older build sends its own batches and lets the volunteer save
+the cart, saying nothing of the newer build until then, and then asks for
+an upgrade, a reload; once the server holds its batches back as too old,
+it asks at once (`frontend/src/build.ts`, docs/decisions/0010). A newer
+build reads the saves and the cart an older one left only in the parts
+every version kept. Into an empty cart it puts, without a tap, the oldest
+one that goes back whole (nothing unread, nothing of an open package, no
+package resized, no item retired); it lists the rest for the volunteer to
+add to the cart or discard, naming an item retired since from the
+catalogue's `retired_items`. It removes an older key once nothing in it
+is left to list (`frontend/src/older.ts`). Builds that keep the same
+shape share a key, so each batch is kept with the build that queued it,
+and is sent as that build's, whichever tab sends it.
 
 So the server keeps taking what the build before sends. Expand, then
 contract: a field the batch endpoint will require is added as optional,

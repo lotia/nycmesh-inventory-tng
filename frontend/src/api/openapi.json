@@ -513,6 +513,13 @@
             "type": "array",
             "title": "Open Packages"
           },
+          "retired_items": {
+            "items": {
+              "$ref": "#/components/schemas/RetiredItem"
+            },
+            "type": "array",
+            "title": "Retired Items"
+          },
           "saved": {
             "items": {
               "type": "string",
@@ -530,7 +537,8 @@
           "locations",
           "items",
           "labels",
-          "open_packages"
+          "open_packages",
+          "retired_items"
         ],
         "title": "Catalogue"
       },
@@ -882,7 +890,12 @@
           },
           "action": {
             "type": "string",
-            "enum": ["found", "put_in_cart", "discarded"],
+            "enum": [
+              "found",
+              "put_in_cart",
+              "put_in_cart_automatically",
+              "discarded"
+            ],
             "title": "Action",
             "default": "found"
           }
@@ -891,7 +904,7 @@
         "type": "object",
         "required": ["kind", "held"],
         "title": "OlderStorage",
-        "description": "What an older build left under its own key, saves not sent or a cart\nwith lines: a scan page found it as it loaded, or a volunteer put one\nback in the cart or discarded it (frontend/src/older.ts)."
+        "description": "What an older build left under its own key, saves not sent or a cart\nwith lines: a scan page found it as it loaded, a volunteer put one back\nin the cart or discarded it, or the page put one back in an empty cart\nitself (frontend/src/older.ts)."
       },
       "OpenPackageEntry": {
         "properties": {
@@ -1149,6 +1162,52 @@
         "type": "object",
         "required": ["events"],
         "title": "Report"
+      },
+      "RetiredItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "packages": {
+            "items": {
+              "$ref": "#/components/schemas/RetiredPackage"
+            },
+            "type": "array",
+            "title": "Packages"
+          }
+        },
+        "type": "object",
+        "required": ["id", "name", "unit", "packages"],
+        "title": "RetiredItem",
+        "description": "A retired item with no stock left: named, never offered."
+      },
+      "RetiredPackage": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "size": {
+            "type": "string",
+            "title": "Size"
+          }
+        },
+        "type": "object",
+        "required": ["id", "name", "size"],
+        "title": "RetiredPackage"
       },
       "Saved": {
         "properties": {

@@ -101,8 +101,7 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   build never copies an older one's batches, so a change to what is kept
   needs no copying code, and Valibot's objects stay strict. Instead, a tab
   of an older build sends its own batches and lets the volunteer save the
-  cart, then asks for a reload; offline, it says how many saves wait and
-  to stay on the page. It learns that a newer build is out from another
+  cart, then asks for a reload. It learns that a newer build is out from another
   tab's stamp in storage (each build stamps its id, the time it was made,
   on what it keeps) or from the server, whose reply to a batch names its
   build. What an older build left under its keys is listed to the
@@ -143,6 +142,18 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   old. We rejected making every change that sets `OLDEST_BUILD` take a new
   outbox key, which listed, rather than sent, the saves of the build
   before left on phones with no tab of it open, and accepting the gap.
+  Ali chose the words and the behaviour the volunteer meets (Ali,
+  2026-11-13, inventory-tng-3c0): until the cart is saved and its saves
+  sent, the tab says nothing of a newer build, then "The scanner has been
+  updated." with an Upgrade button; too old, it says at once that the
+  volunteer must upgrade and that their data is kept. The newer build puts
+  an older save that goes back whole into an empty cart without a tap,
+  and lists the rest to add to the cart or discard; one holding an item
+  retired since is named from the catalogue, which now lists retired
+  items' names apart from those offered, and can only be discarded. We
+  rejected asking only for a tap on each, which Ali found needless where
+  nothing needs the volunteer, and naming such an item only by its
+  absence, which left the volunteer unable to tell what the save held.
 - Compression behaves the same in compose and in Kubernetes, because the
   app serves the compressed files itself. The image holds three copies of
   each file; the bundle is small, so that costs little.

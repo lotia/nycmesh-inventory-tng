@@ -20,17 +20,16 @@ import type { Schemas } from "./api/client";
 
 export const PATH = "/api/telemetry";
 export const FLUSH_AT = 10;
-/** How many of each kind a page sends an hour: 54 in all, under the
+/** How many of each kind a page sends an hour: 56 in all, under the
  * server's limit (page_telemetry.REPORTS). */
 export const PER_HOUR: Record<Event["kind"], number> = {
-  // Three a load: a page loaded more than twice an hour reports some.
-  web_vital: 8,
+  web_vital: 10,
   error: 10,
   outbox_retry: 10,
   scan_to_save: 20,
   // Once a tab, or twice, then too old (build.ts); once a load for each
-  // of saves and a cart an older build left, and once for each a volunteer
-  // puts back in the cart or discards (older.ts).
+  // of saves and a cart an older build left, and once for each put back in
+  // the cart, by a tap or not, or discarded (older.ts).
   out_of_date: 2,
   older_storage: 4,
 };
