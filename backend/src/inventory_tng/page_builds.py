@@ -14,9 +14,9 @@ before it, so a batch whose header names a build before it is answered
 409 build_too_old, before its body is checked, where a 422 would have it
 refused. The page names the build that queued each batch, whichever tab
 sends it: a batch of the sending tab's build is kept while the tab asks
-for a reload, and an older build's is listed to put back in the cart. A batch with no header is
-from another client of the API, never the page, so it is checked as any
-other: a field it lacks is a 422 that names it.
+for a reload, and an older build's is listed to put back in the cart. A
+batch with no header is from another client of the API, never the page,
+so it is checked as any other: a field it lacks is a 422 that names it.
 """
 
 from typing import Annotated, Literal, cast
@@ -41,7 +41,7 @@ too_old = meter.create_counter(
     "inventory.transactions.too_old",
     unit="{transaction}",
     description="Batches held back as from a build of the scan page older "
-    "than the server takes: kept on the phone, which is asked to reload",
+    "than the server takes: kept on the phone, to put back in the cart",
 )
 
 

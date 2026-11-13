@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
-import { BUILD_KEY, Builds } from "./build";
+import { BUILD, BUILD_KEY, Builds } from "./build";
 import { openCamera } from "./camera";
 import { addOne, STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
 import { PRINTED_LENGTH } from "./OpenPackageCard";
@@ -1517,7 +1517,8 @@ describe("what an older build left", () => {
     within(listing()).getByText("Cat6 cable: 2 m");
   });
 
-  test("one an older build left under this build's key, held back as too old, is listed, not this tab", async () => {
+  /** A save an older build left under this build's outbox key. */
+  function leaveInOutbox(state: "waiting" | "too_old") {
     const OLDER = "2026-11-12T09:00:00.000Z";
     localStorage.setItem(
       OUTBOX_KEY,
@@ -1536,7 +1537,7 @@ describe("what an older build left", () => {
             what: "Move: 1 item from Hub to Van",
             queuedAt: AT,
             build: OLDER,
-            state: "waiting",
+            state,
             waitingFor: null,
             note: null,
             transactionId: null,
@@ -1545,6 +1546,10 @@ describe("what an older build left", () => {
         ],
       }),
     );
+  }
+
+  test("one an older build left under this build's key, held back as too old, is listed, not this tab", async () => {
+    leaveInOutbox("waiting");
     // A server whose oldest build is after OLDER.
     const { api } = server(() => json(TOO_OLD, 409));
     const outbox = open(api);
@@ -1567,6 +1572,30 @@ describe("what an older build left", () => {
     // Gone from the outbox, whose key stays.
     expect(JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? "").entries).toEqual(
       [],
+    );
+  });
+
+  test("one another tab held back as too old is listed here, and goes when put back there", async () => {
+    open();
+    await ready();
+    expect(
+      screen.queryByText("Left by an older version of this page"),
+    ).toBeNull();
+    leaveInOutbox("too_old");
+    window.dispatchEvent(new StorageEvent("storage", { key: OUTBOX_KEY }));
+    await vi.waitFor(() =>
+      within(listing()).getByText(`Saved on this phone ${at}, not sent.`),
+    );
+    // Put back in the cart there.
+    localStorage.setItem(
+      OUTBOX_KEY,
+      JSON.stringify({ build: BUILD, entries: [] }),
+    );
+    window.dispatchEvent(new StorageEvent("storage", { key: OUTBOX_KEY }));
+    await vi.waitFor(() =>
+      expect(
+        screen.queryByText("Left by an older version of this page"),
+      ).toBeNull(),
     );
   });
 
