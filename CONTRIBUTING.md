@@ -390,9 +390,9 @@ so the server refuses a count of a package resized since (`package_resized`)
 rather than counting it at the new size. Where the page's catalogue shows
 another size, the count is cleared and the line says so until a count of
 that package is typed or scanned again (`frontend/src/cart.ts`,
-`reconcile` and `sized`). Saved meanwhile, the rest of the cart is
-saved without it. A count kept before the cart kept sizes is taken as
-counted at the size shown.
+`reconcile` and `sized`). Until then the cart is not saved, as the
+rest without it would record less than was moved (`toBatch`). A count
+kept before the cart kept sizes is taken as counted at the size shown.
 
 The scan page needs a registered device, and some catalogue rows to choose
 from. The camera works only over HTTPS or on `localhost`.

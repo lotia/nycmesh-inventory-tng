@@ -46,10 +46,11 @@ deployed, so the migrations may be rewritten (0016).
   The cart keeps that size with each count, so a package resized while a
   cart counts it is never saved at the new size: where the page's
   catalogue shows another size, the count is cleared and the line asks
-  for it again, until it is typed (Ali, 2026-11-13, inventory-tng-0qi). We
-  rejected keeping the count and refusing the save until the volunteer
-  taps to say it was checked, which keeps the typing but adds a button and
-  a step.
+  for it again, until it is typed; until then the cart is not saved, as
+  the rest without it would record less than was moved (Ali, 2026-11-13,
+  inventory-tng-0qi). We rejected keeping the count and refusing the save
+  until the volunteer taps to say it was checked, which keeps the typing
+  but adds a button and a step.
 
 ### What volunteers do
 

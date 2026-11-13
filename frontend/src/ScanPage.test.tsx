@@ -809,19 +809,18 @@ describe("other tabs and a changing catalogue", () => {
     });
   });
 
-  test("saved while a resized count is said, the rest is saved without it", async () => {
-    const { sent } = await resizedWhileCounted();
+  test("saving while a resized count is said is refused, until it is counted again", async () => {
+    const { sent, count } = await resizedWhileCounted();
+    save();
+    // Saving the rest would record less than was moved.
+    expect(screen.getByText("LiteBeam 5AC: enter the count")).toBeDefined();
     expect(screen.getByText(/since this item was added/)).toBeDefined();
+    fireEvent.input(count, { target: { value: "1" } });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(saves(sent)).toEqual([]);
     save();
     await screen.findByText(/^In the inventory/);
-    const body = await saves(sent)[0]?.json();
-    // The rest of the cart, and the loose radio: the box, cleared, is
-    // neither saved nor kept.
-    expect(body.lines).toEqual([
-      { item_id: 101, quantity: "1" },
-      { item_id: 100, quantity: "1" },
-    ]);
-    expect(screen.getByText("Nothing in the cart yet.")).toBeDefined();
+    expect(saves(sent)).toHaveLength(1);
   });
 
   test("a retired name or place in a stored cart shows as not picked", async () => {
