@@ -80,11 +80,14 @@ class OutOfDate(Strict):
 
 
 class OlderStorage(Strict):
-    """A scan page found what an older build left under its own key, which
-    it keeps but does not read: saves not sent, or a cart with lines."""
+    """What an older build left under its own key, saves not sent or a cart
+    with lines: a scan page found it as it loaded, or a volunteer put one
+    back in the cart or discarded it (frontend/src/older.ts)."""
 
     kind: Literal["older_storage"]
     held: Literal["saves", "cart"]
+    # Found, unless it says: a page sending none means that.
+    action: Literal["found", "put_in_cart", "discarded"] = "found"
 
 
 AnyEvent = WebVital | PageError | OutboxRetry | ScanToSave | OutOfDate | OlderStorage
@@ -133,6 +136,12 @@ older_storage = meter.create_counter(
     description="Scan page loads that found saves not sent, or a cart, left "
     "by an older build, by which",
 )
+older_acted_on = meter.create_counter(
+    "inventory.page.older_acted_on",
+    unit="{entry}",
+    description="Saves not sent, or carts, left by an older build that a "
+    "volunteer put back in the cart or discarded, by which and how",
+)
 scan_to_save = meter.create_histogram(
     "inventory.scan.to_save.duration",
     unit="s",
@@ -162,8 +171,10 @@ def record(event: AnyEvent) -> None:
             outbox_retries.add(1, {"reason": event.reason})
         case OutOfDate():
             out_of_date.add(1, {"learned": event.learned})
-        case OlderStorage():
+        case OlderStorage(action="found"):
             older_storage.add(1, {"held": event.held})
+        case OlderStorage():
+            older_acted_on.add(1, {"held": event.held, "action": event.action})
         case _:  # ScanToSave, the last kind left.
             scan_to_save.record(event.seconds)
 

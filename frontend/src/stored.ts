@@ -28,15 +28,14 @@ export function writeStored(
   }
 }
 
-/** What older builds kept under `key`'s older versions, oldest first: a
- * key ending in `.v3` has `.v1` and `.v2`, at 0 and 1, each undefined if
- * nothing readable is there. Read, never written nor removed: an older
- * build's tab may still be using them, and what they hold is reported, not
- * read (build.ts). */
-export function olderVersions(storage: Storage, key: string): unknown[] {
+/** `key`'s older versions, oldest first: a key ending in `.v3` has `.v1`
+ * and `.v2`; one with no version has none. Where older builds kept what
+ * this build lists to put back or discard (older.ts). */
+export function olderKeys(key: string): string[] {
   const [, name, version] = /^(.*\.v)(\d+)$/.exec(key) ?? [];
-  return Array.from({ length: Math.max(Number(version ?? 1) - 1, 0) }, (_, n) =>
-    readStored(storage, `${name}${n + 1}`),
+  return Array.from(
+    { length: Math.max(Number(version ?? 1) - 1, 0) },
+    (_, n) => `${name}${n + 1}`,
   );
 }
 

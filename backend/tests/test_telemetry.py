@@ -771,6 +771,8 @@ def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
         {"kind": "scan_to_save", "seconds": 42.5},
         {"kind": "out_of_date", "learned": "too_old"},
         {"kind": "older_storage", "held": "cart"},
+        {"kind": "older_storage", "held": "saves", "action": "put_in_cart"},
+        {"kind": "older_storage", "held": "cart", "action": "discarded"},
     ]
     assert client.post("/api/telemetry", json={"events": events}).status_code == 204
     durations = histogram_counts(reader, "inventory.page.web_vital.duration")
@@ -793,6 +795,9 @@ def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
     out_of_date = counted(reader, "inventory.page.out_of_date")
     assert out_of_date[(("learned", "too_old"),)] >= 1
     assert counted(reader, "inventory.page.older_storage")[(("held", "cart"),)] >= 1
+    acted_on = counted(reader, "inventory.page.older_acted_on")
+    assert acted_on[(("action", "put_in_cart"), ("held", "saves"))] >= 1
+    assert acted_on[(("action", "discarded"), ("held", "cart"))] >= 1
     # Buckets that fit the values, not the SDK's own from 5 up.
     bounds = {
         name: {

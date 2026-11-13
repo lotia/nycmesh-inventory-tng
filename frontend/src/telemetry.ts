@@ -2,10 +2,11 @@
  * What the pages tell the backend about themselves (docs/decisions/0006):
  * errors, three Web Vitals, the outbox's retries, how long a batch took
  * from its first line to saving, a tab learning a newer build is out, and
- * what an older build left behind. No OpenTelemetry here: events go to
- * POST /api/telemetry on this origin, whose schema is the list of what may
- * be sent, and the backend turns them into metrics. Nothing names a
- * volunteer, an item or a place, and an error sends only that one happened.
+ * what an older build left behind and what volunteers did with it. No
+ * OpenTelemetry here: events go to POST /api/telemetry on this origin,
+ * whose schema is the list of what may be sent, and the backend turns them
+ * into metrics. Nothing names a volunteer, an item or a place, and an error
+ * sends only that one happened.
  *
  * Events wait in memory and go together: when ten are waiting, and when the
  * page is hidden or left, by sendBeacon, which outlives the page. Each kind
@@ -22,14 +23,16 @@ export const FLUSH_AT = 10;
 /** How many of each kind a page sends an hour: 54 in all, under the
  * server's limit (page_telemetry.REPORTS). */
 export const PER_HOUR: Record<Event["kind"], number> = {
-  web_vital: 10,
+  // Three a load: a page loaded more than twice an hour reports some.
+  web_vital: 8,
   error: 10,
   outbox_retry: 10,
   scan_to_save: 20,
   // Once a tab, or twice, then too old (build.ts); once a load for each
-  // of saves and a cart an older build left (ScanPage).
+  // of saves and a cart an older build left, and once for each a volunteer
+  // puts back in the cart or discards (older.ts).
   out_of_date: 2,
-  older_storage: 2,
+  older_storage: 4,
 };
 export const HOUR_MS = 3_600_000;
 /** The longest scan_to_save the backend takes (page_telemetry.ScanToSave):

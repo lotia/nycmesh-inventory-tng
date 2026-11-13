@@ -13,7 +13,7 @@
  * first, so two tabs do not drop each other's batches. Each build reads and
  * writes its own key only: a tab of an older build sends its own batches
  * before it asks for a reload (build.ts), and what an older build left is
- * reported, never read nor removed (waitingInOlderKeys).
+ * listed for the volunteer to put back in the cart or discard (older.ts).
  */
 import { signal } from "@preact/signals";
 import { v4 as uuid } from "uuid";
@@ -29,12 +29,7 @@ import {
 } from "./api/replies";
 import { Builds, HEADER, UPDATED } from "./build";
 import { NOT_REGISTERED } from "./registration";
-import {
-  olderVersions,
-  onStoredChange,
-  readStored,
-  writeStored,
-} from "./stored";
+import { onStoredChange, readStored, writeStored } from "./stored";
 import { telemetry } from "./telemetry";
 
 /** Versioned: a build that changes what is kept takes a new key, as a tab
@@ -138,30 +133,6 @@ export const Kept = v.object({
   build: v.string(),
   entries: v.array(v.unknown()),
 });
-
-/** The builds up to the one keeping v3 each took over the batches under
- * the key before theirs, and sent them, but left them there as they were:
- * of v1 to v3, only the newest held stands for what was not sent. */
-const TOOK_OVER = 3;
-/** A stored entry waiting to send, of any version. */
-const Waiting = v.object({ state: v.literal("waiting") });
-
-/** How many batches waiting to send older builds left under their keys,
- * which this build never reads: kept for their tabs, or for someone to
- * recover, and reported (ScanPage). Each was a list of entries, as v4's
- * entries are. */
-export function waitingInOlderKeys(storage: Storage = localStorage): number {
-  const older = olderVersions(storage, STORAGE_KEY);
-  const newest = older
-    .slice(0, TOOK_OVER)
-    .findLastIndex((stored) => stored !== undefined);
-  return older
-    .slice(Math.max(newest, 0))
-    .flatMap((stored) =>
-      Array.isArray(stored) ? stored : v.is(Kept, stored) ? stored.entries : [],
-    )
-    .filter((entry) => v.is(Waiting, entry)).length;
-}
 
 /** A batch's reports, as a 422 names them. */
 const REPORTS: Record<string, string> = {
@@ -446,7 +417,7 @@ export class Outbox {
         return "stop";
       case 409:
         if (reply.body.reason === "build_too_old") {
-          // Kept, waiting: a newer build of the page reports it (ScanPage).
+          // Kept, waiting: a newer build of the page lists it (older.ts).
           this.builds.learn("too_old");
           this.settle(key, {
             waitingFor: null,

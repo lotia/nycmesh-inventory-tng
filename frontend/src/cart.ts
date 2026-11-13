@@ -14,12 +14,7 @@ import { id } from "./api/replies";
 import { BUILD } from "./build";
 import type { Draft, Entry } from "./outbox";
 import { count, decimal, sent, thousandths } from "./quantity";
-import {
-  olderVersions,
-  onStoredChange,
-  readStored,
-  writeStored,
-} from "./stored";
+import { onStoredChange, readStored, writeStored } from "./stored";
 
 /** Versioned as the outbox's is (outbox.ts): each build reads its own.
  * v2's is stamped with the build that wrote it. */
@@ -148,19 +143,6 @@ export function storeCart(
   storage: Storage = localStorage,
 ): boolean {
   return writeStored(storage, STORAGE_KEY, { ...cart, build: BUILD });
-}
-
-/** A stored cart with lines, of any version. */
-const Filled = v.object({
-  lines: v.pipe(v.array(v.unknown()), v.minLength(1)),
-});
-
-/** Whether an older build left a cart with lines under its key, which this
- * build never reads: kept, and reported (ScanPage). */
-export function cartInOlderKeys(storage: Storage = localStorage): boolean {
-  return olderVersions(storage, STORAGE_KEY).some((stored) =>
-    v.is(Filled, stored),
-  );
 }
 
 /**
