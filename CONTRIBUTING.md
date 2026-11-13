@@ -343,9 +343,9 @@ one that goes back whole (nothing unread, nothing of an open package, no
 package resized, no item or package retired or gone, no refusal); it lists
 the rest for the volunteer to add to the cart or discard, naming an item
 retired since from the catalogue's `retired_items`. Put back, a count of a
-package resized or no longer offered is left out and said, never kept
-loose or unseen. A save put back keeps
-its batch key, as does a cart it filled when a newer build reads it, and
+package no longer offered, or a save's of one resized, is left out and
+said, never kept loose or unseen. A save put back keeps its batch key, as
+does a cart it filled when a newer build reads it, and
 the cart is saved under it until emptied, as an older tab may be sending
 it still: the server then takes it once, or, changed since, refuses it
 (409 `key_reused`), which the page says. A save refused for its key goes

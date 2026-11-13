@@ -484,7 +484,15 @@ describe("as a cart", () => {
               // A box retired with none sealed left: 4 loose is not what
               // was moved.
               { item_id: 100, quantity: "4", package_id: 1004 },
+              { item_id: 100, quantity: "2", package_id: 1003 },
               { item_id: 100, quantity: "8", package_id: 1000 },
+              // Resized since: said apart, each once for the save.
+              {
+                item_id: 100,
+                quantity: "4",
+                package_id: 1000,
+                package_size: 2,
+              },
               // An item gone is named apart (withRetired), as it was.
               { item_id: 999, quantity: "2", package_id: 9999 },
             ],
@@ -498,6 +506,7 @@ describe("as a cart", () => {
       { itemId: 999, packages: {}, loose: "2", typed: true },
     ]);
     expect(gaps).toEqual([
+      "Sorry. The package size has changed since this item was added. Discard and re-add the new package size.",
       "Sorry. The package has been retired since this item was added. Discard and re-add the item.",
     ]);
   });
@@ -521,12 +530,17 @@ describe("as a cart", () => {
       { itemId: 999, packages: { 9999: "1" }, loose: "", typed: true },
     ]);
     expect(gaps).toEqual([PACKAGE_RETIRED]);
-    // None of one held, nothing is told.
-    keep("inventory.cart.v1", {
-      ...freshCart(),
-      lines: [{ itemId: 100, packages: { 1000: "1", 1004: "" }, loose: "" }],
-    });
-    expect(toCart(readOlder()[0] as Older, CATALOGUE).gaps).toEqual([]);
+    // None of one held, nothing is told; one unreadable is, as the cart
+    // reads it as some.
+    const told = (packages: Record<string, string>) => {
+      keep("inventory.cart.v1", {
+        ...freshCart(),
+        lines: [{ itemId: 100, packages, loose: "" }],
+      });
+      return toCart(readOlder()[0] as Older, CATALOGUE).gaps;
+    };
+    expect(told({ 1000: "1", 1004: "" })).toEqual([]);
+    expect(told({ 1000: "1", 1004: "lots" })).toEqual([PACKAGE_RETIRED]);
   });
 
   test("a package retired with some left is still offered: counted, not told", () => {
@@ -754,7 +768,7 @@ describe("put back without a tap", () => {
     expect(goesBackWhole(refused, CATALOGUE)).toBe(false);
   });
 
-  test("an older cart holding some of a package gone does not; none of one, or a count unread, it does", () => {
+  test("an older cart holding some of a package gone, or a count unread of one, does not; none of one, it does", () => {
     const cartWith = (packages: Record<string, string>) => {
       keep("inventory.cart.v1", {
         ...freshCart(),
@@ -763,9 +777,20 @@ describe("put back without a tap", () => {
       return readOlder()[0] as Older;
     };
     expect(goesBackWhole(cartWith({ 1003: "2" }), CATALOGUE)).toBe(false);
+    expect(goesBackWhole(cartWith({ 1004: "lots" }), CATALOGUE)).toBe(false);
     expect(
-      goesBackWhole(cartWith({ 1000: "1", 1003: "", 1004: "lots" }), CATALOGUE),
+      goesBackWhole(cartWith({ 1000: "1", 1003: "", 1004: "0" }), CATALOGUE),
     ).toBe(true);
+    // Some of a package retired with some left: offered, taking only.
+    const retired = {
+      ...CATALOGUE,
+      items: CATALOGUE.items.map((item) => ({
+        ...item,
+        packages: item.packages.map((pack) => ({ ...pack, retired: true })),
+      })),
+    };
+    expect(goesBackWhole(cartWith({ 1000: "1" }), retired)).toBe(false);
+    expect(goesBackWhole(cartWith({ 1000: "lots" }), retired)).toBe(false);
   });
 
   test("the oldest that goes back whole is next, one of no known time last, and those tried are skipped", () => {
