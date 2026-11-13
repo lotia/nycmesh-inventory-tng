@@ -12,8 +12,13 @@
  * device cookie, so registering loses no work. Each change rereads storage
  * first, so two tabs do not drop each other's batches. Each build reads and
  * writes its own key only: a tab of an older build sends its own batches
- * before it asks for a reload (build.ts), and what an older build left is
- * listed for the volunteer to put back in the cart or discard (older.ts).
+ * before it asks for a reload (build.ts), and what an older build left
+ * under an older key is listed for the volunteer to put back in the cart or
+ * discard (older.ts). Builds that keep the same shape share a key, so each
+ * batch names the build that queued it, and is sent as that build's: one
+ * the server holds back as from a build too old (409 build_too_old) is
+ * listed with what older builds left, unless it is this tab's own, when
+ * the tab is too old.
  */
 import { signal } from "@preact/signals";
 import { v4 as uuid } from "uuid";
@@ -34,8 +39,9 @@ import { telemetry } from "./telemetry";
 
 /** Versioned: a build that changes what is kept takes a new key, as a tab
  * of an older build, open during a deploy, would drop what it cannot read
- * from what it writes back. v4's is stamped with the build that wrote it. */
-export const STORAGE_KEY = "inventory.outbox.v4";
+ * from what it writes back. v4's is stamped with the build that wrote it;
+ * v5's entries each with the build that queued them too. */
+export const STORAGE_KEY = "inventory.outbox.v5";
 /** How long to wait before trying again after no answer. */
 export const RETRY_MS = 30_000;
 /** Unexpected answers to one batch before its note asks for a report. */
@@ -50,8 +56,10 @@ const SAVED_KEPT = 10;
  * asked about (cart.ts, MAX_KEYS_ASKED), leaving room for those waiting. */
 export const SAVED_MOST = 50;
 
-/** On the list: all but the saved batches dismissed. */
-const onList = (entry: Entry) => entry.dismissed !== true;
+/** On the list: all but the saved batches dismissed, and those too old,
+ * which older.ts lists. */
+const onList = (entry: Entry) =>
+  entry.dismissed !== true && entry.state !== "too_old";
 
 const nullableId = v.exactOptional(v.nullable(id));
 
@@ -113,7 +121,11 @@ export const Entry = v.object({
   /** What is in it, in words, so two batches can be told apart. */
   what: v.string(),
   queuedAt: v.number(),
-  state: v.picklist(["waiting", "saved", "refused"]),
+  /** The build that queued it, named when it is sent (build.HEADER). */
+  build: v.string(),
+  /** too_old: held back by the server as from a build too old, and listed
+   * with what older builds left (older.ts), to put back in the cart. */
+  state: v.picklist(["waiting", "saved", "refused", "too_old"]),
   /** While waiting: what it waits for. */
   waitingFor: v.nullable(v.picklist(["network", "registration"])),
   /** Why it was refused, or why it waits, in words. */
@@ -294,7 +306,12 @@ export class Outbox {
    * and the caller still holds the batch.
    */
   queue(draft: Draft, what: string, now = Date.now()): boolean {
-    const entry = newEntry({ ...draft, key: uuid() }, what, now);
+    const entry = newEntry(
+      { ...draft, key: uuid() },
+      what,
+      this.builds.build,
+      now,
+    );
     const kept = this.update((entries) => [...entries, entry]);
     if (kept) {
       void this.send();
@@ -372,7 +389,8 @@ export class Outbox {
   private async sendOne(entry: Entry): Promise<"next" | "stop"> {
     const key = entry.body.key;
     const call = this.api.POST("/api/transactions", {
-      params: { header: { [HEADER]: this.builds.build } },
+      // As the build that queued it, which the server judges it by.
+      params: { header: { [HEADER]: entry.build } },
       body: entry.body,
     });
     // A save, and a 409 build_too_old, name the server's build
@@ -418,7 +436,19 @@ export class Outbox {
         return "stop";
       case 409:
         if (reply.body.reason === "build_too_old") {
-          // Kept, waiting: a newer build of the page lists it (older.ts).
+          const mine = this.builds.build;
+          if (entry.build !== mine && !this.builds.isNewer(entry.build)) {
+            // An older build's, kept under this key: too old itself, not
+            // this tab. Listed with what older builds left (older.ts).
+            this.settle(key, {
+              state: "too_old",
+              waitingFor: null,
+              note: null,
+            });
+            return "next";
+          }
+          // This tab's own, or a newer one's: this tab is too old. Kept,
+          // waiting: a newer build of the page lists it (older.ts).
           this.builds.learn("too_old");
           this.settle(key, {
             waitingFor: null,
@@ -540,12 +570,18 @@ function keysNamed(body: Body): string[] {
       ];
 }
 
-/** A batch as first kept: waiting, and not yet tried. */
-export function newEntry(body: Body, what: string, now = Date.now()): Entry {
+/** A batch as first kept by `build`: waiting, and not yet tried. */
+export function newEntry(
+  body: Body,
+  what: string,
+  build: string,
+  now = Date.now(),
+): Entry {
   return {
     body,
     what,
     queuedAt: now,
+    build,
     state: "waiting",
     waitingFor: null,
     note: null,

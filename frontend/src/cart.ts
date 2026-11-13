@@ -821,7 +821,9 @@ export function unseen<T extends Pending>(
 ): T[] {
   const shown = new Set(catalogue.saved);
   return outbox.filter(
-    (each) => each.state !== "refused" && !shown.has(each.body.key),
+    (each) =>
+      (each.state === "waiting" || each.state === "saved") &&
+      !shown.has(each.body.key),
   );
 }
 

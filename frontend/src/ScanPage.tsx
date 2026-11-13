@@ -199,6 +199,13 @@ export function ScanPage({
     () => (shown === null ? [] : unseen(entries, shown)),
     [shown, entries],
   );
+  // A save the server held back as from an older build too old, here or
+  // in another tab, is listed with what older builds left (outbox.ts).
+  const tooOld = entries
+    .filter((each) => each.state === "too_old")
+    .map((each) => each.body.key)
+    .join();
+  useEffect(() => older.refresh(), [tooOld]);
   // One saved changed stock: ask again, so what the page fills and offers
   // follows.
   const savedSince = pending

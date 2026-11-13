@@ -216,7 +216,9 @@ A build's id is when it was built, in UTC. Build the image once and
 promote it from test to production, never rebuilding it, so each deploy's
 id is later than the one before. A batch from a scan page built before
 `OLDEST_BUILD` is then answered 409 `build_too_old` and kept on the phone,
-for the volunteer to save again after a reload; what other clients of the
+for the volunteer to save again after a reload. Each batch names the build
+that queued it, so this holds whichever build's tab sends it, and whether
+or not the change also takes a new outbox key; what other clients of the
 API get is in CONTRIBUTING.md, The scan page.
 
 ## Backups

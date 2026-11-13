@@ -132,7 +132,17 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   alone (Ali, 2026-11-12, inventory-tng-op6), the one reply not held to match
   its generated type exactly, rather than freezing its other fields: only a
   page older than the server reads it, so a later server may change them
-  without that page sending the batch again for ever.
+  without that page sending the batch again for ever. Each batch names the
+  build that queued it (Ali, 2026-11-13, inventory-tng-1cj), not the build
+  of the tab that sends it: builds that keep the same shape share an outbox
+  key, so a newer tab, after a reload or open beside an older one, would
+  otherwise send an older build's batch as its own, and a limit narrowed
+  without a new key would refuse it (422) rather than hold it back. Held
+  back, an older build's batch is listed with what older builds left, and
+  only a batch of the tab's own build, or a newer one, makes the tab too
+  old. We rejected making every change that sets `OLDEST_BUILD` take a new
+  outbox key, which listed, rather than sent, the saves of the build
+  before left on phones with no tab of it open, and accepting the gap.
 - Compression behaves the same in compose and in Kubernetes, because the
   app serves the compressed files itself. The image holds three copies of
   each file; the bundle is small, so that costs little.
