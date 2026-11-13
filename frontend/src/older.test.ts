@@ -10,6 +10,7 @@ import {
   toCart,
 } from "./older";
 import { CATALOGUE } from "./test-catalogue";
+import { refusing } from "./test-storage";
 
 const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
 const OTHER = "6f1e2d3c-4b5a-4968-8776-5a4b3c2d1e0f";
@@ -265,28 +266,13 @@ describe("removing one", () => {
 
   test("a browser that will not keep the change says so", () => {
     keep("inventory.outbox.v3", [saveOf(), saveOf({}, { key: OTHER })]);
-    const full = {
-      getItem: (key: string) => localStorage.getItem(key),
-      setItem: () => {
-        throw new DOMException("full", "QuotaExceededError");
-      },
-      removeItem: (key: string) => localStorage.removeItem(key),
-    } as unknown as Storage;
-    expect(removeOlder(readOlder()[0] as Older, full)).toBe(false);
+    expect(removeOlder(readOlder()[0] as Older, refusing("setItem"))).toBe(
+      false,
+    );
   });
 });
 
 describe("a browser that will not let it at storage", () => {
-  const refusing = (refused: "getItem" | "removeItem") =>
-    ({
-      getItem: (key: string) => localStorage.getItem(key),
-      setItem: (key: string, value: string) => localStorage.setItem(key, value),
-      removeItem: (key: string) => localStorage.removeItem(key),
-      [refused]: () => {
-        throw new DOMException("refused", "SecurityError");
-      },
-    }) as unknown as Storage;
-
   test("one that will not read lists nothing, and the page still loads", () => {
     keep("inventory.outbox.v1", [saveOf()]);
     keep("inventory.outbox.v3", [saveOf()]);

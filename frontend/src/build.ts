@@ -12,7 +12,7 @@
  * nothing waits to send and the cart is saved.
  */
 import { signal } from "@preact/signals";
-import { onStoredChange, writeStored } from "./stored";
+import { onStoredChange, parseStored, writeStored } from "./stored";
 import { telemetry } from "./telemetry";
 
 declare const __BUILD__: string;
@@ -85,13 +85,7 @@ export class Builds {
   listen(keys: readonly string[]): () => void {
     writeStored(this.storage, BUILD_KEY, { build: this.build });
     return onStoredChange([BUILD_KEY, ...keys], (event) => {
-      let stored: unknown;
-      try {
-        stored = JSON.parse(event.newValue ?? "null");
-      } catch {
-        return;
-      }
-      this.heard(stampOf(stored), "other_tab");
+      this.heard(stampOf(parseStored(event.newValue)), "other_tab");
     });
   }
 }

@@ -100,9 +100,7 @@ def checked(
     ] = None,
 ) -> None:
     """Say which build this server's pages are, and refuse a batch from a
-    build too old. A dependency, so it runs before the body is checked. A
-    batch naming no build is from another client of the API: checked as
-    any other, so a field it lacks is a 422 that names it."""
+    build too old. A dependency, so it runs before the body is checked."""
     response.headers.update(own_build(request))
     if build is not None and is_too_old(build):
         raise BuildTooOld(build)

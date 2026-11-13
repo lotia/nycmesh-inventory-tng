@@ -37,7 +37,14 @@ import {
 import { Field } from "./Field";
 import { placeSides, readLabel, type Scanned } from "./labels";
 import { NOTHING_TAKEN, OpenPackageCard } from "./OpenPackageCard";
-import { type Gaps, type Older, OlderStore, toCart, unitOf } from "./older";
+import {
+  type Gaps,
+  nameOf,
+  type Older,
+  OlderStore,
+  toCart,
+  unitOf,
+} from "./older";
 import {
   type Entry,
   STORAGE_KEY as OUTBOX_KEY,
@@ -774,10 +781,21 @@ function OlderList({
   const discarding = useSignal<string | null>(null);
   const said = useSignal<{ on: string; words: string } | null>(null);
   const listed = older.listed.value;
-  if (listed.length === 0) {
+  // Each in words once, not on every change to the cart beside it.
+  const shown = useMemo(() => {
+    const { items } = indexOf(catalogue);
+    return listed.map((each) => {
+      const { cart, gaps } = toCart(each, catalogue);
+      const lines = cart.lines.flatMap((line) => {
+        const words = lineWords(line, items.get(line.itemId));
+        return words === null ? [] : [words];
+      });
+      return { each, gaps, lines, fills: cart.lines.length > 0 };
+    });
+  }, [listed, catalogue]);
+  if (shown.length === 0) {
     return null;
   }
-  const { items } = indexOf(catalogue);
   return (
     <section>
       <h2>Left by an older version of this page</h2>
@@ -786,13 +804,8 @@ function OlderList({
         save it again, or discard it.
       </p>
       <ul class={RULED_LIST}>
-        {listed.map((each, n) => {
+        {shown.map(({ each, gaps, lines, fills }, n) => {
           const on = `${each.key} ${each.batch ?? "cart"}`;
-          const { cart, gaps } = toCart(each, catalogue);
-          const lines = cart.lines.flatMap((line) => {
-            const words = lineWords(line, items.get(line.itemId));
-            return words === null ? [] : [words];
-          });
           const title = `older-${n}`;
           return (
             <li key={on} class="flex flex-col gap-2">
@@ -861,7 +874,7 @@ function OlderList({
                 </div>
               ) : (
                 <div class="actions">
-                  {cart.lines.length > 0 && (
+                  {fills && (
                     <button
                       type="button"
                       aria-describedby={title}
@@ -947,7 +960,7 @@ function olderWhen(each: Older): string {
  * how much loose; null if it holds none. */
 function lineWords(line: Line, item: Item | undefined): string | null {
   if (item === undefined) {
-    return "An item no longer in the catalogue";
+    return nameOf(item);
   }
   const parts = item.packages.flatMap((pack) => {
     const packs = count(line.packages[pack.id] ?? "") ?? 0;

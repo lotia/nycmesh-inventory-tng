@@ -7,7 +7,15 @@
 /** What is stored under `key`, parsed; undefined if nothing readable is. */
 export function readStored(storage: Storage, key: string): unknown {
   try {
-    const text = storage.getItem(key);
+    return parseStored(storage.getItem(key));
+  } catch {
+    return undefined;
+  }
+}
+
+/** Stored text, parsed; undefined if there is none, or it is not JSON. */
+export function parseStored(text: string | null): unknown {
+  try {
     return text === null ? undefined : JSON.parse(text);
   } catch {
     return undefined;

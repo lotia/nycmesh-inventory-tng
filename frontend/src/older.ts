@@ -247,15 +247,18 @@ export function tidyOlder(storage: Storage = localStorage): void {
     }
   };
   const { read, superseded } = outboxKeys(storage);
-  const outbox = [...superseded, ...read];
-  outbox.forEach((key, at) => {
-    // Only a superseded key's saves can be under a newer key too.
-    const newer =
-      at < superseded.length
-        ? outbox.slice(at + 1).flatMap((each) => batchesIn(storage, each))
-        : [];
-    tidy(key, savesIn, new Set(newer));
+  // Only a superseded key's saves can be under a newer key too.
+  superseded.forEach((key, at) => {
+    const newer = [...superseded.slice(at + 1), ...read];
+    tidy(
+      key,
+      savesIn,
+      new Set(newer.flatMap((each) => batchesIn(storage, each))),
+    );
   });
+  for (const key of read) {
+    tidy(key, savesIn);
+  }
   for (const key of olderKeys(CART_KEY)) {
     tidy(key, cartIn);
   }
@@ -436,7 +439,8 @@ function saidOfOpen(said: unknown): boolean {
   return taken || usedUp === true || told;
 }
 
-function nameOf(item: Catalogue["items"][number] | undefined): string {
+/** An item's name, or words for one gone from the catalogue. */
+export function nameOf(item: Catalogue["items"][number] | undefined): string {
   return item?.name ?? "An item no longer in the catalogue";
 }
 
