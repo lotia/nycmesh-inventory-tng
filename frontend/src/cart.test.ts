@@ -6,18 +6,23 @@ import {
   type Cart,
   CartStore,
   freshCart,
+  type Item,
   indexOf,
   keysToAsk,
+  type Line,
   loadCart,
   offered,
   offeredAt,
   openingPackage,
   placed,
   quantityOf,
+  reconcile,
+  resized,
   STORAGE_KEY,
   sealedCounts,
   sealedHere,
   search,
+  sized,
   storeCart,
   toBatch,
   unseen,
@@ -1280,5 +1285,105 @@ describe("the cart store, shared by tabs", () => {
     store.change(cart({ volunteerId: 2 }));
     store.useCatalogue({ ...CATALOGUE, volunteers: [{ id: 1, name: "Ada" }] });
     expect(store.cart.value.volunteerId).toBeNull();
+  });
+});
+
+describe("a package resized while the cart counts it (inventory-tng-0qi)", () => {
+  /** The test catalogue with the radio's box made a box of `size`. */
+  const boxOf = (size: string) => ({
+    ...CATALOGUE,
+    items: CATALOGUE.items.map((item) =>
+      item.id === radio.id
+        ? {
+            ...item,
+            packages: item.packages.map((pack) => ({ ...pack, size })),
+          }
+        : item,
+    ),
+  });
+  const box = radio.packages[0] as Item["packages"][number];
+  const first = (each: Cart) => each.lines[0] as Line;
+  const boxes = (typed: string, sizes?: Record<string, string>): Cart =>
+    cart({
+      lines: [
+        {
+          itemId: 100,
+          packages: { 1000: typed },
+          loose: "",
+          ...(sizes === undefined ? {} : { sizes }),
+        },
+      ],
+    });
+
+  test("a count typed is kept with the size shown; one unchanged keeps its size", () => {
+    const typed = sized(boxes(""), boxes("2"), CATALOGUE);
+    expect(typed.lines[0]?.sizes).toEqual({ 1000: "4.000" });
+    // Unchanged, under a catalogue that now says 8, it keeps the 4.
+    const kept = sized(typed, { ...typed, kind: "receipt" }, boxOf("8.000"));
+    expect(kept.lines[0]?.sizes).toEqual({ 1000: "4.000" });
+    // Typed again, it is at the size shown then.
+    const again = sized(kept, boxes("3", { 1000: "4.000" }), boxOf("8.000"));
+    expect(again.lines[0]?.sizes).toEqual({ 1000: "8.000" });
+    // Blank, it holds no size.
+    expect(
+      sized(again, boxes("", { 1000: "8.000" }), CATALOGUE).lines[0],
+    ).not.toHaveProperty("sizes");
+  });
+
+  test("a count kept before sizes were is taken as counted at the size shown", () => {
+    const before = boxes("2");
+    expect(sized(before, before, CATALOGUE).lines[0]?.sizes).toEqual({
+      1000: "4.000",
+    });
+  });
+
+  test("a count at another size is cleared, keeping its size, and said", () => {
+    const counted = boxes("2", { 1000: "4.000" });
+    const now = reconcile(counted, boxOf("8.000"));
+    expect(now.lines[0]).toEqual({
+      itemId: 100,
+      packages: { 1000: "" },
+      loose: "",
+      sizes: { 1000: "4.000" },
+    });
+    expect(resized(first(now), box)).toBe(false);
+    expect(resized(first(now), { ...box, size: "8.000" })).toBe(true);
+    // The same size, written otherwise, is no change.
+    expect(reconcile(counted, boxOf("4"))).toBe(counted);
+    // Cleared once, it is left as it is.
+    expect(reconcile(now, boxOf("8.000"))).toBe(now);
+  });
+
+  test("a count is saved at the size it was counted at", () => {
+    const counted = boxes("2", { 1000: "4.000" });
+    const resizedRadio = { ...radio, packages: [{ ...box, size: "8.000" }] };
+    expect(quantityOf(first(counted), resizedRadio)).toMatchObject({
+      amount: 8000,
+    });
+    const batch = toBatch(counted, CATALOGUE);
+    expect("draft" in batch && batch.draft.lines).toEqual([
+      { item_id: 100, quantity: "8", package_id: 1000, package_size: "4" },
+    ]);
+    // With a newer catalogue, nothing is left to save at either size.
+    expect(toBatch(counted, boxOf("8.000"))).toEqual({
+      problems: ["Add something to the cart."],
+    });
+  });
+
+  test("a tab with the newer catalogue clears another tab's count, until typed again", () => {
+    const there = new CartStore(CATALOGUE);
+    there.change(boxes("2"));
+    expect(loadCart().lines[0]?.sizes).toEqual({ 1000: "4.000" });
+    const here = new CartStore(boxOf("8.000"));
+    const line = () => first(here.cart.value);
+    expect(line().packages).toEqual({ 1000: "" });
+    // Another change keeps it said.
+    here.change({ ...here.cart.value, kind: "receipt" });
+    expect(line().sizes).toEqual({ 1000: "4.000" });
+    here.change(boxes("1", line().sizes));
+    expect(line()).toMatchObject({
+      packages: { 1000: "1" },
+      sizes: { 1000: "8.000" },
+    });
   });
 });

@@ -355,6 +355,13 @@ removes an older key once nothing in it is left to list
 that keep the same shape share a key, so each batch is kept with the build
 that queued it, and is sent as that build's, whichever tab sends it.
 
+The cart keeps the size each package was counted at, and saves that size,
+so the server refuses a count of a package resized since (`package_resized`)
+rather than counting it at the new size. Where the page's catalogue shows
+another size, the count is cleared and the line says so until a count is
+typed again (`frontend/src/cart.ts`, `reconcile` and `sized`). A count
+kept before the cart kept sizes is taken as counted at the size shown.
+
 So the server keeps taking what the build before sends. Expand, then
 contract: a field the batch endpoint will require is added as optional,
 and made required only in a later deploy, after the one whose page sends

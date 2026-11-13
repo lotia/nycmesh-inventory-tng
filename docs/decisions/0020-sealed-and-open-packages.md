@@ -43,6 +43,13 @@ deployed, so the migrations may be rewritten (0016).
   the server's to guess (inventory-tng-5f7). Every line of a package says
   its size: one kept in an outbox by a page from before is refused, naming
   its line, as none was ever deployed (Ali, 2026-11-12, inventory-tng-1p8).
+  The cart keeps that size with each count, so a package resized while a
+  cart counts it is never saved at the new size: where the page's
+  catalogue shows another size, the count is cleared and the line asks
+  for it again, until it is typed (Ali, 2026-11-13, inventory-tng-0qi). We
+  rejected keeping the count and refusing the save until the volunteer
+  taps to say it was checked, which keeps the typing but adds a button and
+  a step.
 
 ### What volunteers do
 

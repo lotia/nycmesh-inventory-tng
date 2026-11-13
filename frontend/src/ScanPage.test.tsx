@@ -744,6 +744,63 @@ describe("other tabs and a changing catalogue", () => {
     expect(saves(sent)).toEqual([]);
   });
 
+  test("a count of a package resized while the cart is open is cleared and said, until typed again", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let catalogue = CATALOGUE;
+    const { api, sent } = answering((request) =>
+      isCatalogue(request) ? json(catalogue, 200) : saved(),
+    );
+    open(api);
+    await ready();
+    fillMove();
+    find("beam");
+    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    fireEvent.input(screen.getByLabelText("Box (4 each)"), {
+      target: { value: "2" },
+    });
+    expect(screen.getByText("9 each in all")).toBeDefined();
+    // An administrator makes the box, never used, a box of 8.
+    const [radio, ...rest] = CATALOGUE.items;
+    const [box] = radio?.packages ?? [];
+    catalogue = {
+      ...CATALOGUE,
+      items: [
+        { ...radio, packages: [{ ...box, size: "8.000" }] },
+        ...rest,
+      ] as typeof CATALOGUE.items,
+    };
+    await vi.advanceTimersByTimeAsync(11 * 60_000);
+    const count = (await screen.findByLabelText(
+      "Box (8 each)",
+    )) as HTMLInputElement;
+    // Cleared once the page takes the catalogue, after it paints.
+    await vi.waitFor(() => expect(count.value).toBe(""));
+    const said = screen.getByText(/since this item was added/);
+    // Not 2 boxes of 8: the one loose radio the item's pick added.
+    expect(screen.getByText("1 each in all")).toBeDefined();
+    expect(said.getAttribute("role")).toBe("alert");
+    expect(said.textContent).toBe(
+      "Sorry. The package size has changed to 8 since this item was added. Enter the count again.",
+    );
+    expect(said.querySelector("strong")?.textContent).toBe(
+      "Sorry. The package size has changed to 8",
+    );
+    // It stays through other changes.
+    pick("To", "11");
+    expect(screen.getByText(/since this item was added/)).toBeDefined();
+    fireEvent.input(count, { target: { value: "1" } });
+    expect(screen.queryByText(/since this item was added/)).toBeNull();
+    save();
+    await screen.findByText(/^In the inventory/);
+    const body = await saves(sent)[0]?.json();
+    expect(body.lines).toContainEqual({
+      item_id: 100,
+      quantity: "8",
+      package_id: 1000,
+      package_size: "8",
+    });
+  });
+
   test("a retired name or place in a stored cart shows as not picked", async () => {
     storeCart({ ...freshCart(), volunteerId: 99, toId: 98 });
     open();
