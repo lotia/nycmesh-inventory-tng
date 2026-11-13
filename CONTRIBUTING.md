@@ -342,11 +342,13 @@ every version kept. Into an empty cart it puts, without a tap, the oldest
 one that goes back whole (nothing unread, nothing of an open package, no
 package resized, no item or package retired or gone, no refusal); it lists
 the rest for the volunteer to add to the cart or discard, naming an item
-retired since from the catalogue's `retired_items`. A count of a package
-no longer offered, a save's of one resized, and what was taken from or
-said of an open package are listed each on its own line, saying why it
-cannot go back, and are left out when put back, never kept loose, unseen
-or as an empty line. Each of those lines, and one of an item retired
+retired since from the catalogue's `retired_items`, and a package retired
+with none left from its item's `retired_packages`, neither ever offered.
+A count of a package no longer offered, a save's of one resized, and
+what was taken from or said of an open package are listed each on its
+own line, saying why it cannot go back, and are left out when put back,
+never kept loose, unseen or as an empty line; the status then repeats
+each note as "item: note". Each of those lines, and one of an item retired
 since, has a Discard of its own, which drops that line alone from what
 the older build kept; the entry goes with its last listed line, unless
 it says lines could not be read, when it stays, saying so, until its own
@@ -464,6 +466,10 @@ utilities. When you style a page:
 - Use the tokens in `@theme` (`bg-band`, `text-heading`, …), not colours of
   your own: the dark scheme gives each token its own value.
 - Make markup that repeats a Jinja macro or a Preact component.
+- A failure or refusal note on the scan page is in the alert's style
+  (`role="alert"`, or `class="alert"` for notes shown with a list), with
+  only the words naming the problem in bold: never "Sorry.", what to do
+  next, or a status that reports no problem.
 - Follow docs/decisions/0019 for links, buttons and lists. A button is
   secondary unless it is its form's main one, `class="primary"`, or the one
   a confirmation page asks for, `class="danger"`. A page's way back is

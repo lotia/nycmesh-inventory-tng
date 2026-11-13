@@ -1014,15 +1014,17 @@ function OlderList({
 }
 
 /**
- * Why something cannot go back, in the alert's style, its opening words in
- * bold. Not role="alert": it is there as the list is shown, and several at
- * once, read out together, would drown each other and the page.
+ * Why something cannot go back, in the alert's style, only the words
+ * naming the problem in bold. Not role="alert": it is there as the list is
+ * shown, and several at once, read out together, would drown each other
+ * and the page.
  */
-function NoteSaid({ note: [opening, rest] }: { note: Note }) {
+function NoteSaid({ note: [before, problem, after] }: { note: Note }) {
   return (
     <p class="alert">
-      <strong>{opening}</strong>
-      {rest}
+      {before}
+      <strong>{problem}</strong>
+      {after}
     </p>
   );
 }
@@ -1202,7 +1204,7 @@ function CartLine({
           <Fragment key={pack.id}>
             {resized(line, pack) && (
               <p role="alert">
-                <strong>Sorry. The package size has changed to {size}</strong>{" "}
+                Sorry. <strong>The package size has changed to {size}</strong>{" "}
                 since this item was added. Enter the count again.
               </p>
             )}

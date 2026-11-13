@@ -253,6 +253,8 @@ export interface components {
       packages: components["schemas"]["PackageEntry"][];
       /** Retired */
       retired: boolean;
+      /** Retired Packages */
+      retired_packages: components["schemas"]["RetiredPackage"][];
     };
     /** KeyReusedReply */
     KeyReusedReply: {

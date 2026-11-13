@@ -173,6 +173,51 @@ test("saves holding an item retired since, with none left, name it, and go by it
   ).toBeNull();
 });
 
+test("a save's package retired since, with none left, is named, never offered, and goes by its line's Discard", async ({
+  page,
+}) => {
+  const cable = await ownCable(page, "Boxed cable");
+  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  const box = "Box of 305 m";
+  const retire = page.getByRole("button", { name: `Retire ${box}` });
+  const packageId = Number(
+    ((await page.locator("form", { has: retire }).getAttribute("action")) ?? "")
+      .split("/")
+      .at(-2),
+  );
+  await retire.click();
+  await expect(
+    page.getByRole("button", { name: `Bring it back ${box}` }),
+  ).toBeVisible();
+  await page.goto("/scan");
+  await leave(page, [
+    { item_id: itemId, quantity: "610", package_id: packageId },
+    { item_id: itemId, quantity: "3" },
+  ]);
+  await page.reload();
+
+  // Named from the catalogue (retired_packages), only the problem in bold.
+  const listing = listingOf(page);
+  await expect(listing.getByText(`${cable}: 2 × ${box}`)).toBeVisible();
+  const note = listing.locator(".alert", {
+    hasText: "Sorry. This item has been retired.",
+  });
+  await expect(note.locator("strong")).toHaveText("retired");
+  await listing
+    .getByRole("listitem")
+    .filter({ hasText: `${cable}: 2 × ${box}` })
+    .last()
+    .getByRole("button", { name: "Discard" })
+    .click();
+  // What is left goes back whole, without a tap; the box is not offered.
+  await expect(listing).toHaveCount(0);
+  await expect(page.getByText(PUT_BACK)).toBeVisible();
+  await expect(page.getByLabel(new RegExp(`^${box}`))).toHaveCount(0);
+  expect(await save(page)).toMatchObject({
+    lines: [{ item_id: itemId, quantity: "3" }],
+  });
+});
+
 test("a save an older build's tab saved meanwhile is saved once, under its key; changed after it went back, it is not saved, and says so", async ({
   page,
 }) => {

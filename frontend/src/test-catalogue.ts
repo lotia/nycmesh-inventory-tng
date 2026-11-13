@@ -22,6 +22,7 @@ export const radio: Item = {
     },
   ],
   retired: false,
+  retired_packages: [],
 };
 
 export const cable: Item = {
@@ -48,6 +49,7 @@ export const cable: Item = {
     },
   ],
   retired: false,
+  retired_packages: [],
 };
 
 /** Accented, with its text folded as the server folds it (models.fold). */
