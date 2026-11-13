@@ -1573,6 +1573,54 @@ describe("what an older build left", () => {
     expect(outbox.entries.value[0]?.body.key).not.toBe(KEY);
   });
 
+  test("one that only took from an open package goes back as its item's line, empty, which saves nothing", async () => {
+    leaveSave({
+      body: {
+        key: KEY,
+        kind: "move",
+        volunteer_id: 1,
+        from_location_id: 10,
+        to_location_id: 12,
+        lines: [{ item_id: 101, quantity: "3", open_package_key: KEY }],
+      },
+    });
+    const { api, sent } = server();
+    open(api);
+    await ready();
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: "Put it in the cart" }),
+    );
+    expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
+    screen.getByText(
+      "Cat6 cable: 3 m was taken from an open package. Take it again.",
+    );
+    // Its line, to take it again on; the places kept.
+    const cable = screen.getByText("Cat6 cable").closest("li") as HTMLElement;
+    within(cable).getByRole("button", { name: "Remove" });
+    expect(selected("From")).toBe("10");
+    expect(selected("To")).toBe("12");
+    // Nothing in it yet, so nothing is sent.
+    save();
+    await screen.findByText("Add something to the cart.");
+    expect(saves(sent)).toHaveLength(0);
+  });
+
+  test("its item's empty line left in, the rest saves", async () => {
+    leaveSave();
+    const { api, sent } = server();
+    const outbox = open(api);
+    await ready();
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: "Put it in the cart" }),
+    );
+    save();
+    await screen.findByText(/^Saved: /);
+    await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
+    expect(outbox.entries.value[0]?.body.lines).toEqual([
+      { item_id: 100, package_id: 1000, package_size: "4", quantity: "8" },
+    ]);
+  });
+
   test("an older cart put in the cart fills it", async () => {
     leaveCart();
     open();
