@@ -16,7 +16,7 @@
  * of item_id and quantity (a number in v1, then a decimal), with what,
  * queuedAt, state and note; package_id came in v1, open packages later.
  * Every cart kept its kind, volunteerId, places, installNumber, usedAt and
- * lines of itemId, packages (counts by package id) and loose; from v3, the
+ * lines of itemId, packages (counts by package id) and loose; from v2, the
  * key of the save an older build left that filled it (batchKey).
  */
 import { type Signal, signal } from "@preact/signals";
