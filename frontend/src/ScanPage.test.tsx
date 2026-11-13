@@ -1858,6 +1858,60 @@ describe("what an older build left", () => {
   const boxes = () =>
     (screen.getByLabelText("Box (4 each)") as HTMLInputElement).value;
 
+  test("a package no longer offered is told, listed and put back, and never saved as something else", async () => {
+    const RETIRED_PACKAGE =
+      "Sorry. The package has been retired since this item was added. Discard and re-add the item.";
+    // A save of a box retired since, with none sealed left (1004), and a
+    // box still offered.
+    leaveMoves([
+      KEY,
+      AT,
+      [{ item_id: 100, quantity: "4", package_id: 1004 }, radios(1)],
+    ]);
+    const { api, sent } = server();
+    const outbox = open(api);
+    await ready();
+    within(listing()).getByText(RETIRED_PACKAGE);
+    within(listing()).getByText("LiteBeam 5AC: 1 × Box");
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: "Add to cart" }),
+    );
+    screen.getByText(RETIRED_PACKAGE);
+    expect(boxes()).toBe("1");
+    save();
+    await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
+    // Not 4 loose.
+    expect(outbox.entries.value[0]?.body.lines).toEqual([
+      { item_id: 100, package_id: 1000, package_size: "4", quantity: "4" },
+    ]);
+  });
+
+  test("an older cart's count of a package no longer offered is told when put back", async () => {
+    localStorage.setItem(
+      "inventory.cart.v1",
+      JSON.stringify({
+        ...freshCart(),
+        volunteerId: 1,
+        fromId: 10,
+        toId: 12,
+        lines: [{ itemId: 100, packages: { 1000: "1", 1004: "2" }, loose: "" }],
+        usedAt: AT,
+      }),
+    );
+    open();
+    await ready();
+    within(listing()).getByText(
+      "Sorry. The package has been retired since this item was added. Discard and re-add the item.",
+    );
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: "Add to cart" }),
+    );
+    screen.getByText(
+      "Sorry. The package has been retired since this item was added. Discard and re-add the item.",
+    );
+    expect(boxes()).toBe("1");
+  });
+
   test("one that goes back whole goes in an empty cart without a tap, the oldest first, one at a time", async () => {
     const record = vi.spyOn(telemetry, "record");
     leaveMoves(["newer", AT, [radios(3)]], ["older", AT - 1000, [radios(1)]]);

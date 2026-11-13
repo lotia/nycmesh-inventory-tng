@@ -7,6 +7,7 @@ import {
   type Older,
   OlderStore,
   olderId,
+  PACKAGE_RETIRED,
   readOlder,
   removeOlder,
   tidyOlder,
@@ -471,6 +472,84 @@ describe("as a cart", () => {
       "Sorry. Could not read 2 previously added items, scan them again.",
       "Sorry. Could not read 1 open item, scan it in again.",
     ]);
+  });
+
+  test("a package no longer offered is neither counted loose nor dropped, but told", () => {
+    const { cart, gaps } = toCart(
+      only(
+        saveOf(
+          {},
+          {
+            lines: [
+              // A box retired with none sealed left: 4 loose is not what
+              // was moved.
+              { item_id: 100, quantity: "4", package_id: 1004 },
+              { item_id: 100, quantity: "8", package_id: 1000 },
+              // An item gone is named apart (withRetired), as it was.
+              { item_id: 999, quantity: "2", package_id: 9999 },
+            ],
+          },
+        ),
+      ),
+      CATALOGUE,
+    );
+    expect(cart.lines).toEqual([
+      { itemId: 100, packages: { 1000: "2" }, loose: "", typed: true },
+      { itemId: 999, packages: {}, loose: "2", typed: true },
+    ]);
+    expect(gaps).toEqual([
+      "Sorry. The package has been retired since this item was added. Discard and re-add the item.",
+    ]);
+  });
+
+  test("an older cart's count of a package no longer offered is told, not kept unseen", () => {
+    keep("inventory.cart.v1", {
+      ...freshCart(),
+      lines: [
+        {
+          itemId: 100,
+          packages: { 1000: "1", 1004: "2", 1005: "", 1006: "0" },
+          loose: "1",
+        },
+        // An item gone keeps what it held, to be named as it is.
+        { itemId: 999, packages: { 9999: "1" }, loose: "" },
+      ],
+    });
+    const { cart, gaps } = toCart(readOlder()[0] as Older, CATALOGUE);
+    expect(cart.lines).toEqual([
+      { itemId: 100, packages: { 1000: "1" }, loose: "1", typed: true },
+      { itemId: 999, packages: { 9999: "1" }, loose: "", typed: true },
+    ]);
+    expect(gaps).toEqual([PACKAGE_RETIRED]);
+    // None of one held, nothing is told.
+    keep("inventory.cart.v1", {
+      ...freshCart(),
+      lines: [{ itemId: 100, packages: { 1000: "1", 1004: "" }, loose: "" }],
+    });
+    expect(toCart(readOlder()[0] as Older, CATALOGUE).gaps).toEqual([]);
+  });
+
+  test("a package retired with some left is still offered: counted, not told", () => {
+    const catalogue = {
+      ...CATALOGUE,
+      items: CATALOGUE.items.map((item) => ({
+        ...item,
+        packages: item.packages.map((pack) => ({ ...pack, retired: true })),
+      })),
+    };
+    const { cart, gaps } = toCart(
+      only(
+        saveOf(
+          {},
+          { lines: [{ item_id: 100, quantity: "8", package_id: 1000 }] },
+        ),
+      ),
+      catalogue,
+    );
+    expect(cart.lines).toEqual([
+      { itemId: 100, packages: { 1000: "2" }, loose: "", typed: true },
+    ]);
+    expect(gaps).toEqual([]);
   });
 
   test("lines that cannot be read even as a list are not counted", () => {
