@@ -239,11 +239,22 @@ def test_a_retired_item_stays_while_it_has_stock(
         from_location_id=None,
         to_location_id=place.store.id,
     )
+    reel = add(session, ItemPackage(item_id=place.cable.id, name="Reel", size=100))
     retire(session, place.item, place.cable)
-    items = by_id(registered_client.get(URL).json()["items"])
-    # The radio has stock left; the cable never had any.
+    reply = registered_client.get(URL).json()
+    items = by_id(reply["items"])
+    # The radio has stock left; the cable never had any, so it is only
+    # named, for what an older build left (inventory-tng-3c0).
     assert items[place.item.id]["retired"] is True
     assert place.cable.id not in items
+    gone = by_id(reply["retired_items"])
+    assert place.item.id not in gone
+    assert gone[place.cable.id] == {
+        "id": place.cable.id,
+        "name": place.cable.name,
+        "unit": "m",
+        "packages": [{"id": reel.id, "name": "Reel", "size": "100"}],
+    }
     # Once it is all taken, it is gone from the page.
     write(
         session,
@@ -252,8 +263,10 @@ def test_a_retired_item_stays_while_it_has_stock(
         from_location_id=place.store.id,
         to_location_id=None,
     )
-    items = by_id(registered_client.get(URL).json()["items"])
-    assert place.item.id not in items
+    reply = registered_client.get(URL).json()
+    assert place.item.id not in by_id(reply["items"])
+    (radio,) = [each for each in reply["retired_items"] if each["id"] == place.item.id]
+    assert radio["name"] == place.item.name
 
 
 def test_a_retired_item_counts_stock_where_there_is_some(

@@ -502,7 +502,7 @@ describe("builds", () => {
       await vi.waitFor(() => expect(outbox.builds.newer.value).toBe("too_old"));
       expect(states(outbox)).toEqual(["waiting", "waiting"]);
       expect(outbox.entries.value[0]?.note).toBe(
-        "Not sent. The scanner has been updated, refresh this page.",
+        "The scanner has been updated. You must upgrade. Your data will be kept but may need some changes before sending.",
       );
       expect(stored().map((each: Entry) => each.state)).toEqual([
         "waiting",

@@ -192,6 +192,8 @@ export interface components {
       labels: components["schemas"]["LabelEntry"][];
       /** Open Packages */
       open_packages: components["schemas"]["OpenPackageEntry"][];
+      /** Retired Items */
+      retired_items: components["schemas"]["RetiredItem"][];
       /**
        * Saved
        * @default []
@@ -329,8 +331,9 @@ export interface components {
     /**
      * OlderStorage
      * @description What an older build left under its own key, saves not sent or a cart
-     *     with lines: a scan page found it as it loaded, or a volunteer put one
-     *     back in the cart or discarded it (frontend/src/older.ts).
+     *     with lines: a scan page found it as it loaded, a volunteer put one back
+     *     in the cart or discarded it, or the page put one back in an empty cart
+     *     itself (frontend/src/older.ts).
      */
     OlderStorage: {
       /**
@@ -348,7 +351,11 @@ export interface components {
        * @default found
        * @enum {string}
        */
-      action: "found" | "put_in_cart" | "discarded";
+      action:
+        | "found"
+        | "put_in_cart"
+        | "put_in_cart_automatically"
+        | "discarded";
     };
     /**
      * OpenPackageEntry
@@ -475,6 +482,29 @@ export interface components {
         | components["schemas"]["OutOfDate"]
         | components["schemas"]["OlderStorage"]
       )[];
+    };
+    /**
+     * RetiredItem
+     * @description A retired item with no stock left: named, never offered.
+     */
+    RetiredItem: {
+      /** Id */
+      id: number;
+      /** Name */
+      name: string;
+      /** Unit */
+      unit: string;
+      /** Packages */
+      packages: components["schemas"]["RetiredPackage"][];
+    };
+    /** RetiredPackage */
+    RetiredPackage: {
+      /** Id */
+      id: number;
+      /** Name */
+      name: string;
+      /** Size */
+      size: string;
     };
     /** Saved */
     Saved: {

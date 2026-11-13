@@ -2,8 +2,10 @@
 
 One reply, loaded once per page, holding what is current: retired rows,
 merged volunteers and revoked labels are left out, but for retired items
-and packages with stock left, which may be taken. Registered devices only,
-since it names volunteers, and those names are never logged.
+and packages with stock left, which may be taken. The other retired items
+are named apart (retired_items), with their packages, only so the page can
+say what a save an older build left held. Registered devices only, since
+it names volunteers, and those names are never logged.
 """
 
 import math
@@ -129,6 +131,21 @@ class ItemEntry(BaseModel):
     retired: bool
 
 
+class RetiredPackage(Entry):
+    id: int
+    name: str
+    size: Decimal
+
+
+class RetiredItem(BaseModel):
+    """A retired item with no stock left: named, never offered."""
+
+    id: int
+    name: str
+    unit: str
+    packages: list[RetiredPackage]
+
+
 class LabelEntry(Entry):
     """A printed code, and the one thing it names."""
 
@@ -151,6 +168,7 @@ class Catalogue(BaseModel):
     items: list[ItemEntry]
     labels: list[LabelEntry]
     open_packages: list[OpenPackageEntry]
+    retired_items: list[RetiredItem]
     # Of the batch keys the page asked about, those saved: what the rest of
     # the reply shows already (with_saved), so the page takes off only what
     # the others moved (inventory-tng-jlc).
@@ -224,6 +242,17 @@ def catalogue(session: Session) -> Catalogue:
         {place.id for place in places},
     )
 
+    gone = list(session.scalars(select(Item).where(~takeable()).order_by(Item.id)))
+    gone_packages: dict[int, list[RetiredPackage]] = {}
+    for package in session.scalars(
+        select(ItemPackage)
+        .where(ItemPackage.item_id.in_([item.id for item in gone]))
+        .order_by(ItemPackage.size)
+    ):
+        gone_packages.setdefault(package.item_id, []).append(
+            RetiredPackage.model_validate(package)
+        )
+
     return Catalogue(
         settings=Settings.model_validate(session.get_one(ScanSettings, 1)),
         volunteers=[VolunteerEntry.model_validate(v) for v in volunteers],
@@ -235,6 +264,15 @@ def catalogue(session: Session) -> Catalogue:
             if labels.inactive(label, sent) is None
         ],
         open_packages=open_to_take(session, {entry.id for entry in entries}),
+        retired_items=[
+            RetiredItem(
+                id=item.id,
+                name=item.name,
+                unit=item.unit,
+                packages=gone_packages.get(item.id, []),
+            )
+            for item in gone
+        ],
     )
 
 

@@ -105,6 +105,15 @@ export const ItemEntry = v.object({
   retired: v.boolean(),
 });
 
+/** A retired item with none left: named, for what an older build left,
+ * never offered. */
+export const RetiredItem = v.object({
+  id,
+  name: v.string(),
+  unit: v.string(),
+  packages: v.array(v.object({ id, name: v.string(), size: v.string() })),
+});
+
 export const LabelEntry = v.object({
   code: v.string(),
   item_id: v.nullable(id),
@@ -119,6 +128,7 @@ export const Catalogue = v.object({
   items: v.array(ItemEntry),
   labels: v.array(LabelEntry),
   open_packages: v.array(OpenPackageEntry),
+  retired_items: v.array(RetiredItem),
   // Of the batch keys asked about, those saved, which the rest shows.
   saved: v.array(v.pipe(v.string(), v.uuid())),
 });

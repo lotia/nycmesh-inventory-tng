@@ -32,7 +32,7 @@ import {
   Saved,
   ValidationFailed,
 } from "./api/replies";
-import { Builds, HEADER, UPDATED } from "./build";
+import { Builds, HEADER, MUST_UPGRADE } from "./build";
 import { NOT_REGISTERED } from "./registration";
 import { onStoredChange, readStored, writeStored } from "./stored";
 import { telemetry } from "./telemetry";
@@ -460,7 +460,7 @@ export class Outbox {
           this.builds.learn("too_old");
           this.settle(key, {
             waitingFor: null,
-            note: `Not sent. ${UPDATED}`,
+            note: MUST_UPGRADE,
           });
           return "stop";
         }

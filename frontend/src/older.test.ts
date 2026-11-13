@@ -1,13 +1,17 @@
 import { describe, expect, test } from "vitest";
 import { freshCart } from "./cart";
 import {
+  goesBackWhole,
   isListed,
+  nextWhole,
   type Older,
   OlderStore,
+  olderId,
   readOlder,
   removeOlder,
   tidyOlder,
   toCart,
+  withRetired,
 } from "./older";
 import { CATALOGUE } from "./test-catalogue";
 import { refusing } from "./test-storage";
@@ -109,6 +113,7 @@ describe("reading what older builds left", () => {
             open_package_key: null,
           },
         ],
+        linesLost: false,
         reports: 1,
       },
     ]);
@@ -417,14 +422,14 @@ describe("as a cart", () => {
     expect(cart.lines).toEqual([
       { itemId: 101, packages: {}, loose: "", typed: true },
     ]);
+    // Each once for the save: the take and the report are two open items.
     expect(gaps).toEqual([
-      "Cat6 cable: 5 m was taken from an open package. Take it again.",
-      "A line could not be read: add it again if it is missing.",
-      "It also said an open package was used up, or what was on one: say so again on the open package.",
+      "Sorry. Could not read 1 previously added item, scan it again.",
+      "Sorry. Could not read 2 open items, scan them in again.",
     ]);
   });
 
-  test("lines that cannot be read are counted; an item gone is named so", () => {
+  test("lines that cannot be read are counted, and an item gone kept", () => {
     const { cart, gaps } = toCart(
       only(
         saveOf(
@@ -442,8 +447,19 @@ describe("as a cart", () => {
     );
     expect(cart.lines.map((line) => line.itemId)).toEqual([101, 999]);
     expect(gaps).toEqual([
-      "An item no longer in the catalogue: 2 was taken from an open package. Take it again.",
-      "2 lines could not be read: add them again if they are missing.",
+      "Sorry. Could not read 2 previously added items, scan them again.",
+      "Sorry. Could not read 1 open item, scan it in again.",
+    ]);
+  });
+
+  test("lines that cannot be read even as a list are not counted", () => {
+    const { cart, gaps } = toCart(
+      only(saveOf({}, { lines: "many" })),
+      CATALOGUE,
+    );
+    expect(cart.lines).toEqual([]);
+    expect(gaps).toEqual([
+      "Sorry. Could not read previously added items, scan them again.",
     ]);
   });
 
@@ -479,7 +495,7 @@ describe("as a cart", () => {
       { itemId: 100, packages: { 1000: "2" }, loose: "", typed: true },
     ]);
     expect(gaps).toEqual([
-      "A line could not be read: add it again if it is missing.",
+      "Sorry. The package size has changed since this item was added. Discard and re-add the new package size.",
     ]);
   });
 
@@ -569,8 +585,8 @@ describe("as a cart", () => {
       ],
     });
     expect(gaps).toEqual([
-      "Cat6 cable: take what was taken from an open package again.",
-      "A line could not be read: add it again if it is missing.",
+      "Sorry. Could not read 1 previously added item, scan it again.",
+      "Sorry. Could not read 1 open item, scan it in again.",
     ]);
   });
 
@@ -588,10 +604,85 @@ describe("as a cart", () => {
         ],
       });
       expect(toCart(readOlder()[0] as Older, CATALOGUE).gaps).toEqual([
-        "Cat6 cable: take what was taken from an open package again.",
+        "Sorry. Could not read 1 open item, scan it in again.",
       ]);
     },
   );
+});
+
+describe("put back without a tap", () => {
+  const only = (body = {}) => {
+    keep("inventory.outbox.v3", [saveOf({}, body)]);
+    return readOlder()[0] as Older;
+  };
+
+  test("one that goes back whole does", () => {
+    expect(goesBackWhole(only(), CATALOGUE)).toBe(true);
+  });
+
+  test.each([
+    ["a line unread", { lines: [{ item_id: 101, quantity: "lots" }] }],
+    ["its lines unread", { lines: "many" }],
+    ["nothing to put back", { lines: [] }],
+    ["a report", { used_up: [OTHER] }],
+    [
+      "a take from an open package",
+      { lines: [{ item_id: 101, quantity: "2", open_package_key: OTHER }] },
+    ],
+    [
+      "a package resized",
+      {
+        lines: [
+          { item_id: 100, quantity: "4", package_id: 1000, package_size: 2 },
+        ],
+      },
+    ],
+    ["an item retired, none left", { lines: [{ item_id: 103, quantity: 1 }] }],
+  ])("one with %s does not", (_name, body) => {
+    expect(goesBackWhole(only(body), CATALOGUE)).toBe(false);
+  });
+
+  test("the oldest that goes back whole is next, one of no known time last, and those tried are skipped", () => {
+    keep("inventory.outbox.v3", [
+      saveOf({ queuedAt: null }, { key: "untimed" }),
+      saveOf({ queuedAt: 3 }, { key: "newer" }),
+      saveOf({ queuedAt: 1 }, { key: "unread", lines: "many" }),
+      saveOf({ queuedAt: 2 }, { key: "older" }),
+    ]);
+    const listed = readOlder();
+    expect(nextWhole(listed, CATALOGUE)?.batch).toBe("older");
+    const tried = new Set(
+      listed.filter((each) => each.batch !== "untimed").map(olderId),
+    );
+    expect(nextWhole(listed, CATALOGUE, tried)?.batch).toBe("untimed");
+    expect(
+      nextWhole(listed, CATALOGUE, new Set(listed.map(olderId))),
+    ).toBeUndefined();
+  });
+
+  test("one with an item retired, some left, does not", () => {
+    const retired = {
+      ...CATALOGUE,
+      items: CATALOGUE.items.map((item) =>
+        item.id === 101 ? { ...item, retired: true } : item,
+      ),
+    };
+    expect(goesBackWhole(only(), retired)).toBe(false);
+  });
+});
+
+test("an item retired with none left is named, with its packages, never offered", () => {
+  keep("inventory.outbox.v3", [
+    saveOf({}, { lines: [{ item_id: 103, quantity: "4", package_id: 1003 }] }),
+  ]);
+  const older = readOlder()[0] as Older;
+  expect(toCart(older, withRetired(CATALOGUE)).cart.lines).toEqual([
+    { itemId: 103, packages: { 1003: "2" }, loose: "", typed: true },
+  ]);
+  expect(
+    withRetired(CATALOGUE).items.find((item) => item.id === 103),
+  ).toMatchObject({ name: "NanoStation M5", retired: true });
+  expect(CATALOGUE.items.some((item) => item.id === 103)).toBe(false);
 });
 
 test("the list follows another tab's changes to the older keys", () => {
