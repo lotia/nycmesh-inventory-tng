@@ -526,7 +526,10 @@ function CartForm({
       return "Sorry. Can't save the cart. Clear local data, reload the page and try again.";
     }
     kept(true);
-    saved.value = null;
+    if (!automatically) {
+      // Put in after a save, without a tap, it leaves that save said.
+      saved.value = null;
+    }
     if (!older.remove(each)) {
       problems.value = [
         "Sorry. This item wasn't automatically removed. Save the cart and try to remove.",
