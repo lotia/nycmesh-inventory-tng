@@ -338,7 +338,9 @@ tab of an older build sends its own batches, then asks for a reload
 saves and the cart an older one left, read only in the parts every version
 kept, for the volunteer to put each back in the cart or discard it, and
 removes an older key once nothing in it is left to list
-(`frontend/src/older.ts`).
+(`frontend/src/older.ts`). Builds that keep the same shape share a key,
+so each batch is kept with the build that queued it, and is sent as that
+build's, whichever tab sends it.
 
 So the server keeps taking what the build before sends. Expand, then
 contract: a field the batch endpoint will require is added as optional,
@@ -352,8 +354,10 @@ change also sets `OLDEST_BUILD` in
 earlier deploy served (DEPLOYMENT.md, Tightening what a batch accepts). A
 batch whose `X-Inventory-Build` header names a build before that is then
 answered 409 `build_too_old` and kept on the phone, where a 422 would have
-it refused; one naming none, from another client of the API, gets the
-422.
+it refused: queued by the tab sending it, it waits there while that tab
+asks for a reload; queued by an older build, it is listed with what older
+builds left, to put back in the cart. One naming no build, from another
+client of the API, gets the 422.
 
 `backend/tests/batch_schema.json` keeps what the endpoint's schema
 accepts, and `backend/tests/test_batch_schema.py` fails on a change that

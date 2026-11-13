@@ -141,6 +141,7 @@ test("registering sends the batches that waited for it", async () => {
     },
     what: "Receipt: 1 item",
     queuedAt: 1,
+    build: BUILD,
     state: "waiting",
     waitingFor: "registration",
     note: "Waiting for this browser to be registered.",

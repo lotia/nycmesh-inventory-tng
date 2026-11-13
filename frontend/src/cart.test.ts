@@ -1002,7 +1002,7 @@ describe("turning a cart into a batch", () => {
   });
 
   test("unseen: batches waiting or saved that the catalogue does not show", () => {
-    const entry = (state: "waiting" | "saved" | "refused") => ({
+    const entry = (state: "waiting" | "saved" | "refused" | "too_old") => ({
       state,
       queuedAt: 0,
       body: keyed({ kind: "move", volunteer_id: 1, lines: [] }),
@@ -1011,7 +1011,9 @@ describe("turning a cart into a batch", () => {
     const shown = entry("saved");
     const saved = entry("saved");
     const refused = entry("refused");
-    const outbox = [waiting, shown, saved, refused];
+    // Listed with what older builds left (older.ts), never sent.
+    const tooOld = entry("too_old");
+    const outbox = [waiting, shown, saved, refused, tooOld];
     const catalogue = { ...CATALOGUE, saved: [shown.body.key] };
     expect(unseen(outbox, catalogue)).toEqual([waiting, saved]);
     // Asked about: saved ones first, then those waiting.

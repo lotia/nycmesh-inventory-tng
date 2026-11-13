@@ -1517,6 +1517,59 @@ describe("what an older build left", () => {
     within(listing()).getByText("Cat6 cable: 2 m");
   });
 
+  test("one an older build left under this build's key, held back as too old, is listed, not this tab", async () => {
+    const OLDER = "2026-11-12T09:00:00.000Z";
+    localStorage.setItem(
+      OUTBOX_KEY,
+      JSON.stringify({
+        build: OLDER,
+        entries: [
+          {
+            body: {
+              key: KEY,
+              kind: "move",
+              volunteer_id: 1,
+              from_location_id: 10,
+              to_location_id: 12,
+              lines: [{ item_id: 100, quantity: "8", package_id: 1000 }],
+            },
+            what: "Move: 1 item from Hub to Van",
+            queuedAt: AT,
+            build: OLDER,
+            state: "waiting",
+            waitingFor: null,
+            note: null,
+            transactionId: null,
+            failures: 0,
+          },
+        ],
+      }),
+    );
+    // A server whose oldest build is after OLDER.
+    const { api } = server(() => json(TOO_OLD, 409));
+    const outbox = open(api);
+    await ready();
+    await vi.waitFor(() =>
+      within(listing()).getByText(`Saved on this phone ${at}, not sent.`),
+    );
+    expect(outbox.builds.newer.value).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText("Saved on this browser")).toBeNull();
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: "Put it in the cart" }),
+    );
+    expect(
+      screen.queryByText("Left by an older version of this page"),
+    ).toBeNull();
+    expect(
+      (screen.getByLabelText("Box (4 each)") as HTMLInputElement).value,
+    ).toBe("2");
+    // Gone from the outbox, whose key stays.
+    expect(JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? "").entries).toEqual(
+      [],
+    );
+  });
+
   test("a refused one says why", async () => {
     leaveSave({ state: "refused", note: "Not saved. Line 1: no." });
     open();

@@ -11,8 +11,10 @@ later deploy, as is any other way of accepting less of a batch
 (CONTRIBUTING.md, The scan page; DEPLOYMENT.md, Tightening what a batch
 accepts). That later change sets OLDEST_BUILD to the build of the deploy
 before it, so a batch whose header names a build before it is answered
-409 build_too_old, before its body is checked: its tab keeps it and asks
-for a reload, where a 422 would have it refused. A batch with no header is
+409 build_too_old, before its body is checked, where a 422 would have it
+refused. The page names the build that queued each batch, whichever tab
+sends it: a batch of the sending tab's build is kept while the tab asks
+for a reload, and an older build's is listed to put back in the cart. A batch with no header is
 from another client of the API, never the page, so it is checked as any
 other: a field it lacks is a 422 that names it.
 """

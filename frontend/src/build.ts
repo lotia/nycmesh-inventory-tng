@@ -5,11 +5,13 @@
  * A build's id is when it was made, in UTC (vite.config.ts), so a newer
  * build's sorts after. Each build keeps the outbox and the cart under keys
  * of its own and reads no other's, so a tab of an older build, open during a
- * deploy, sends what it holds itself. It learns that a newer build is out
- * from another tab's stamp in storage, or from the server: its reply to a
- * batch names the server's build, and a batch from a build too old is held
- * back (409 build_too_old). The scan page then asks for a reload, once
- * nothing waits to send and the cart is saved.
+ * deploy, sends what it holds itself. Builds that keep the same shape
+ * share a key, so each batch names the build that queued it (outbox.ts).
+ * A tab learns that a newer build is out from another tab's stamp in
+ * storage, or from the server: its reply to a batch names the server's
+ * build, and a batch of this tab's build too old is held back (409
+ * build_too_old). The scan page then asks for a reload, once nothing waits
+ * to send and the cart is saved.
  */
 import { signal } from "@preact/signals";
 import { onStoredChange, parseStored, writeStored } from "./stored";

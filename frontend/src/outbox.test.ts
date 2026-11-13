@@ -29,7 +29,10 @@ function draft(fields: Partial<Draft> = {}): Draft {
 
 /** An entry as storage might hold it. */
 function entry(fields: Partial<Entry> = {}): Entry {
-  return { ...newEntry({ ...draft(), key: uuid() }, "a", 1), ...fields };
+  return {
+    ...newEntry({ ...draft(), key: uuid() }, "a", BUILD, 1),
+    ...fields,
+  };
 }
 
 /** Kept as this build keeps them, stamped by `build`. */
@@ -425,9 +428,10 @@ describe("refusals", () => {
 describe("builds", () => {
   const MINE = "2026-11-12T10:00:00.000Z";
   const NEWER = "2026-11-12T11:00:00.000Z";
+  const OLDER = "2026-11-12T09:00:00.000Z";
 
   /** An outbox of the build MINE, whose server answers with `reply`. */
-  function of(reply: () => Response) {
+  function of(reply: (request: Request) => Response) {
     const { api, sent } = answering(reply);
     return { outbox: new Outbox(api, localStorage, new Builds(MINE)), sent };
   }
@@ -511,6 +515,46 @@ describe("builds", () => {
       expect(states(outbox)).toEqual(["waiting", "waiting"]);
     },
   );
+
+  test("each batch names the build that queued it, which may be older", async () => {
+    const { outbox, sent } = of(() => saved());
+    store(entry({ build: OLDER }));
+    outbox.queue(draft(), "mine");
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["saved", "saved"]));
+    expect(sent.map((each) => each.headers.get(HEADER))).toEqual([OLDER, MINE]);
+  });
+
+  test("an older build's batch held back as too old is too old itself, not this tab", async () => {
+    const theirs = entry({ build: OLDER });
+    store(theirs);
+    // A server whose oldest build is after OLDER.
+    const { outbox, sent } = of((request) =>
+      request.headers.get(HEADER) === OLDER ? json(TOO_OLD, 409) : saved(),
+    );
+    outbox.queue(draft(), "mine");
+    await vi.waitFor(() =>
+      expect(states(outbox)).toEqual(["too_old", "saved"]),
+    );
+    expect(outbox.builds.newer.value).toBeNull();
+    expect(outbox.entries.value[0]).toMatchObject({
+      waitingFor: null,
+      note: null,
+    });
+    // Listed with what older builds left (older.ts), not here, and never
+    // sent again.
+    expect(outbox.shown().map((each) => each.what)).toEqual(["mine"]);
+    await outbox.send();
+    expect(sent).toHaveLength(2);
+    expect(stored()[0].state).toBe("too_old");
+  });
+
+  test("a newer build's batch held back as too old says this tab is too", async () => {
+    store(entry({ build: NEWER }));
+    const { outbox } = of(() => json(TOO_OLD, 409));
+    await outbox.send();
+    expect(outbox.builds.newer.value).toBe("too_old");
+    expect(states(outbox)).toEqual(["waiting"]);
+  });
 
   // Checked by its reason alone, but by its reason: any other 409 is one
   // this build does not understand, kept and tried again.
@@ -674,7 +718,7 @@ describe("storage", () => {
     };
     expect(Object.keys(Kept.entries)).toEqual(["build", "entries"]);
     expect({ [STORAGE_KEY]: paths(Entry).sort() }).toEqual({
-      "inventory.outbox.v4": [
+      "inventory.outbox.v5": [
         "body",
         "body.from_location_id",
         "body.install_number",
@@ -694,13 +738,14 @@ describe("storage", () => {
         "body.to_location_id",
         "body.used_up",
         "body.volunteer_id",
+        "build",
         "dismissed",
         "dismissed = true",
         "failures",
         "note",
         "queuedAt",
         "state",
-        "state = waiting | saved | refused",
+        "state = waiting | saved | refused | too_old",
         "transactionId",
         "waitingFor",
         "waitingFor = network | registration",

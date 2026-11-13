@@ -1,6 +1,8 @@
 /**
  * What older builds of the scan page left on this browser, under keys of
- * their own (build.ts): saves not sent, and a cart with lines. This build
+ * their own (build.ts): saves not sent, and a cart with lines; and saves an
+ * older build left under this build's own outbox key, once the server held
+ * them back as from a build too old (outbox.ts, state too_old). This build
  * never sends them as they were. It lists each for the volunteer, read only
  * in the parts every version kept: the kind, who, the places, the items
  * and how much of each, and when. The volunteer puts each back in the cart,
@@ -61,7 +63,7 @@ const OldEntry = v.object({
     used_up: maybe(v.array(v.unknown())),
     lengths: maybe(v.array(v.unknown())),
   }),
-  state: v.picklist(["waiting", "refused"]),
+  state: v.picklist(["waiting", "refused", "too_old"]),
   queuedAt: maybe(v.number()),
   note: maybe(v.string()),
 });
@@ -145,6 +147,11 @@ function savesIn(key: string, stored: unknown): Older[] {
       return [];
     }
     const { body, state, queuedAt, note } = read.output;
+    // This build's own key: only the saves held back as too old. The rest
+    // are the outbox's.
+    if (key === OUTBOX_KEY && state !== "too_old") {
+      return [];
+    }
     return [
       {
         key,
@@ -204,7 +211,7 @@ function outboxKeys(storage: Storage): {
 /** What older builds left: the saves, then a cart. No build since v3
  * copies another's saves, so each is under one key. */
 export function readOlder(storage: Storage = localStorage): Older[] {
-  const saves = outboxKeys(storage).read.flatMap((key) =>
+  const saves = [...outboxKeys(storage).read, OUTBOX_KEY].flatMap((key) =>
     savesIn(key, readStored(storage, key)),
   );
   const carts = olderKeys(CART_KEY).flatMap((key) =>
@@ -266,7 +273,8 @@ export function tidyOlder(storage: Storage = localStorage): void {
 
 /**
  * Remove one: a save from its key, the rest kept as they were, or the
- * cart. A key left with nothing to list goes. False if the browser would
+ * cart. An older key left with nothing to list goes; this build's outbox
+ * key stays, as the outbox's. False if the browser would
  * not keep the change, or `older` has gone meanwhile (sent by an older
  * tab, or put back in another).
  */
@@ -288,7 +296,7 @@ export function removeOlder(
   const next = Array.isArray(stored)
     ? left
     : { ...(stored as object), entries: left };
-  if (savesIn(older.key, next).length === 0) {
+  if (older.key !== OUTBOX_KEY && savesIn(older.key, next).length === 0) {
     return removeStored(storage, older.key);
   }
   return writeStored(storage, older.key, next);
