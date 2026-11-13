@@ -750,6 +750,12 @@ export function toBatch(
         }
       }
     }
+    // Cleared as resized (reconcile), it is to be counted again, not
+    // left out: saving the rest would record less than was moved.
+    if (item.packages.some((pack) => resized(line, pack))) {
+      problems.push(`${item.name}: enter the count`);
+      continue;
+    }
     const quantity = quantityOf(line, item);
     if ("problem" in quantity) {
       problems.push(`${item.name}: ${quantity.problem}`);

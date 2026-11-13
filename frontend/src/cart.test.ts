@@ -1364,9 +1364,45 @@ describe("a package resized while the cart counts it (inventory-tng-0qi)", () =>
     expect("draft" in batch && batch.draft.lines).toEqual([
       { item_id: 100, quantity: "8", package_id: 1000, package_size: "4" },
     ]);
-    // With a newer catalogue, nothing is left to save at either size.
+  });
+
+  test("a cart with a count cleared as resized is not saved until counted again", () => {
+    const counted = cart({
+      lines: [
+        { itemId: 101, packages: {}, loose: "4" },
+        {
+          itemId: 100,
+          packages: { 1000: "2" },
+          loose: "1",
+          sizes: { 1000: "4.000" },
+        },
+      ],
+    });
+    // Not the rest without it: that would record less than was moved.
     expect(toBatch(counted, boxOf("8.000"))).toEqual({
-      problems: ["Add something to the cart."],
+      problems: [`${radio.name}: enter the count`],
+    });
+    // Alone in the cart, said in place of "Add something to the cart."
+    expect(toBatch(boxes("2", { 1000: "4.000" }), boxOf("8.000"))).toEqual({
+      problems: [`${radio.name}: enter the count`],
+    });
+    // Counted again, at the size shown, it is saved.
+    const again = cart({
+      lines: [
+        {
+          itemId: 100,
+          packages: { 1000: "1" },
+          loose: "",
+          sizes: { 1000: "8.000" },
+        },
+      ],
+    });
+    expect(toBatch(again, boxOf("8.000"))).toMatchObject({
+      draft: {
+        lines: [
+          { item_id: 100, quantity: "8", package_id: 1000, package_size: "8" },
+        ],
+      },
     });
   });
 
