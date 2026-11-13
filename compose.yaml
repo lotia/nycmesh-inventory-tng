@@ -6,13 +6,9 @@
 # checkouts whose .env names none share (CONTRIBUTING.md, Local settings).
 # `up db` gives its PostgreSQL server. On a new volume it makes the owner
 # and app roles and a database, `inventory`, the owner's, but no other that
-# .env names (INVENTORY_DB_NAME). For each job, a mise task (CONTRIBUTING.md,
-# Using compose directly):
-#   mise run dev-database                this checkout's database, migrated
-#   mise run start-database              start the server
-#   mise run reset-dev-database -- NAME  this checkout's database, made anew
-#   mise run remove-stale-stacks         stacks of checkouts that are gone
-# The app in a container: `mise run dev-database`, then `up -d --build app`.
+# .env names (INVENTORY_DB_NAME). For most jobs a mise task is safer: the
+# table in CONTRIBUTING.md, Using compose directly, names each, and how to
+# run the app in a container.
 name: inventory-tng
 
 services:

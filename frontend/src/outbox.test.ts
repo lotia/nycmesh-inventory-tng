@@ -14,6 +14,7 @@ import {
 } from "./outbox";
 import { telemetry } from "./telemetry";
 import { answering, json, saved, TOO_OLD } from "./test-fetch";
+import { refusing } from "./test-storage";
 
 function draft(fields: Partial<Draft> = {}): Draft {
   return {
@@ -44,12 +45,7 @@ function storeOlder(key: string, ...entries: unknown[]) {
 }
 
 /** Storage that reads but refuses every write. */
-const full = {
-  getItem: (key: string) => localStorage.getItem(key),
-  setItem: () => {
-    throw new DOMException("full", "QuotaExceededError");
-  },
-} as unknown as Storage;
+const full = refusing("setItem");
 
 /** Replies in turn, then saves for good. */
 function replies(...queued: (() => Response | Promise<Response>)[]) {

@@ -57,7 +57,8 @@ UNORDERED = {"enum", "required"}
 # to accept less, not being understood here.
 HANDLED = (
     ANNOTATIONS
-    | {"$ref", "anyOf", "oneOf", "type", "enum", "const", "default", "required"}
+    | DATA
+    | {"$ref", "anyOf", "oneOf", "type"}
     | {"properties", "additionalProperties", "items"}
     | {"minimum", "exclusiveMinimum", "maximum", "exclusiveMaximum", "multipleOf"}
     | {"minLength", "minItems", "minProperties", "uniqueItems"}
