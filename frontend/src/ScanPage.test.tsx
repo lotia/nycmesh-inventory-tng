@@ -744,7 +744,10 @@ describe("other tabs and a changing catalogue", () => {
     expect(saves(sent)).toEqual([]);
   });
 
-  test("a count of a package resized while the cart is open is cleared and said, until typed again", async () => {
+  /** A cart counting 2 boxes of 4 radios, and 1 loose, when an
+   * administrator makes the box, never used, a box of 8: the box count
+   * once the page has taken the new catalogue. */
+  async function resizedWhileCounted() {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     let catalogue = CATALOGUE;
     const { api, sent } = answering((request) =>
@@ -775,6 +778,11 @@ describe("other tabs and a changing catalogue", () => {
     )) as HTMLInputElement;
     // Cleared once the page takes the catalogue, after it paints.
     await vi.waitFor(() => expect(count.value).toBe(""));
+    return { sent, count };
+  }
+
+  test("a count of a package resized while the cart is open is cleared and said, until typed again", async () => {
+    const { sent, count } = await resizedWhileCounted();
     const said = screen.getByText(/since this item was added/);
     // Not 2 boxes of 8: the one loose radio the item's pick added.
     expect(screen.getByText("1 each in all")).toBeDefined();
@@ -799,6 +807,21 @@ describe("other tabs and a changing catalogue", () => {
       package_id: 1000,
       package_size: "8",
     });
+  });
+
+  test("saved while a resized count is said, the rest is saved without it", async () => {
+    const { sent } = await resizedWhileCounted();
+    expect(screen.getByText(/since this item was added/)).toBeDefined();
+    save();
+    await screen.findByText(/^In the inventory/);
+    const body = await saves(sent)[0]?.json();
+    // The rest of the cart, and the loose radio: the box, cleared, is
+    // neither saved nor kept.
+    expect(body.lines).toEqual([
+      { item_id: 101, quantity: "1" },
+      { item_id: 100, quantity: "1" },
+    ]);
+    expect(screen.getByText("Nothing in the cart yet.")).toBeDefined();
   });
 
   test("a retired name or place in a stored cart shows as not picked", async () => {

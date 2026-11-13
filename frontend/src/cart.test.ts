@@ -1386,4 +1386,14 @@ describe("a package resized while the cart counts it (inventory-tng-0qi)", () =>
       sizes: { 1000: "8.000" },
     });
   });
+
+  test("a package's label scanned after its count was cleared counts one at the size shown", () => {
+    storeCart(boxes("2", { 1000: "4.000" }));
+    const store = new CartStore(boxOf("8.000"));
+    store.change(addOne(store.cart.value, 100, 1000));
+    expect(first(store.cart.value)).toMatchObject({
+      packages: { 1000: "1" },
+      sizes: { 1000: "8.000" },
+    });
+  });
 });
