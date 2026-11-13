@@ -155,6 +155,11 @@ export const Kept = v.object({
   entries: v.array(v.unknown()),
 });
 
+/** A batch whose key the inventory holds for another (409 key_reused),
+ * as every build has said it. */
+export const KEY_REUSED =
+  "Not saved: its key was already used for a different batch. Please report this.";
+
 /** A save put back in the cart, then changed, whose older build's tab
  * saved it first, as it was (409 key_reused). */
 export const SAVED_BEFORE_CHANGES =
@@ -487,9 +492,7 @@ export class Outbox {
         this.settle(key, {
           state: "refused",
           waitingFor: null,
-          note: entry.putBack
-            ? SAVED_BEFORE_CHANGES
-            : "Not saved: its key was already used for a different batch. Please report this.",
+          note: entry.putBack ? SAVED_BEFORE_CHANGES : KEY_REUSED,
         });
         return "next";
       case 422:

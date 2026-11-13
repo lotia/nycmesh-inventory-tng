@@ -64,6 +64,12 @@ describe("storage", () => {
     expect(loadCart()).toEqual(kept);
   });
 
+  test("a stored cart keeps the key of the save that filled it", () => {
+    const key = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
+    storeCart({ ...addOne(cart(), 101), batchKey: key });
+    expect(loadCart().batchKey).toBe(key);
+  });
+
   test("a stored cart is stamped with the build that wrote it", () => {
     storeCart(cart());
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "")).toEqual({

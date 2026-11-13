@@ -13,6 +13,7 @@ import {
   toCart,
   withRetired,
 } from "./older";
+import { KEY_REUSED, SAVED_BEFORE_CHANGES } from "./outbox";
 import { CATALOGUE } from "./test-catalogue";
 import { refusing } from "./test-storage";
 
@@ -89,6 +90,7 @@ describe("reading what older builds left", () => {
       {
         key: "inventory.outbox.v3",
         batch: KEY,
+        batchKey: KEY,
         kind: null,
         volunteerId: null,
         fromId: 10,
@@ -416,6 +418,27 @@ describe("as a cart", () => {
     const cart = readOlder().find((each) => each.batch === null) as Older;
     expect(toCart(cart, CATALOGUE).cart).not.toHaveProperty("batchKey");
   });
+
+  test("a cart a save filled keeps that save's key, to be sent under", () => {
+    // As a cart from v3 on keeps it, once a newer build reads it.
+    keep("inventory.cart.v2", {
+      ...freshCart(),
+      lines: [{ itemId: 100, packages: {}, loose: "1" }],
+      batchKey: KEY,
+    });
+    expect(toCart(readOlder()[0] as Older, CATALOGUE).cart.batchKey).toBe(KEY);
+  });
+
+  test.each([KEY_REUSED, SAVED_BEFORE_CHANGES])(
+    "a save refused for its key (%j) goes back without it, as the inventory holds it for another",
+    (note) => {
+      const refused = only(saveOf({ state: "refused", note }));
+      expect(toCart(refused, CATALOGUE).cart).not.toHaveProperty("batchKey");
+      // Refused for anything else, the key never took it: kept.
+      const invalid = only(saveOf({ state: "refused", note: "Not saved." }));
+      expect(toCart(invalid, CATALOGUE).cart.batchKey).toBe(KEY);
+    },
+  );
 
   test("what the cart cannot hold is told, to do again", () => {
     const { cart, gaps } = toCart(
