@@ -791,8 +791,9 @@ describe("other tabs and a changing catalogue", () => {
     expect(said.textContent).toBe(
       "Sorry. The package size has changed to 8 since this item was added. Enter the count again.",
     );
+    // Only the words naming the problem in bold (Ali, inventory-tng-0su).
     expect(said.querySelector("strong")?.textContent).toBe(
-      "Sorry. The package size has changed to 8",
+      "The package size has changed to 8",
     );
     // It stays through other changes.
     pick("To", "11");
@@ -1429,6 +1430,13 @@ describe("what an older build left", () => {
       .getByRole("heading", { name: HEADING })
       .closest("section") as HTMLElement;
 
+  /** A note under a line, in the alert's style, which says `text`, its
+   * bold words among the rest. */
+  const noted =
+    (text: string) =>
+    (_: string, element: Element | null): boolean =>
+      element?.className === "alert" && element.textContent === text;
+
   /** The Discard of a whole entry, `in` the listing's first by default,
    * after any of its lines' own; once tapped, the one confirming it. */
   const lastDiscard = (entry: HTMLElement = listing()) =>
@@ -1448,14 +1456,15 @@ describe("what an older build left", () => {
       `Saved on this device ${at}, not sent.`,
     );
     within(save as HTMLElement).getByText("LiteBeam 5AC: 2 × Box");
-    // What cannot go back says why under it, the opening words in bold,
-    // in the alert's style, and has its own Discard.
+    // What cannot go back says why under it, in the alert's style, only
+    // the words naming the problem in bold, and has its own Discard.
     const taken = within(save as HTMLElement)
       .getByText("Cat6 cable: 3 m from an open package")
       .closest("li") as HTMLElement;
-    const why = within(taken).getByText(RESCAN);
-    expect(why.tagName).toBe("STRONG");
-    expect(why.parentElement?.className).toBe("alert");
+    const why = within(taken).getByText(noted(RESCAN));
+    expect(why.querySelector("strong")?.textContent).toBe(
+      "Can't add these items",
+    );
     within(taken).getByRole("button", { name: "Discard" });
     // What goes back has none.
     expect(
@@ -1749,7 +1758,8 @@ describe("what an older build left", () => {
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
     screen.getByText(ADDED_BACK);
-    screen.getByText(RESCAN);
+    // Each note left behind, naming its item (Ali, inventory-tng-0su).
+    screen.getByText(`Cat6 cable: ${RESCAN}`);
     expect(selected("Your name")).toBe("1");
     expect(selected("From")).toBe("10");
     expect(selected("To")).toBe("12");
@@ -1793,7 +1803,7 @@ describe("what an older build left", () => {
     });
     open();
     await ready();
-    within(listing()).getByText(RESCAN);
+    within(listing()).getByText(noted(RESCAN));
     expect(
       within(listing()).queryByRole("button", { name: "Add to cart" }),
     ).toBeNull();
@@ -1818,6 +1828,7 @@ describe("what an older build left", () => {
   });
 
   test("a line discarded goes alone, and the rest, whole, goes in the empty cart, under its key", async () => {
+    const record = vi.spyOn(telemetry, "record");
     leaveSave();
     const { api, sent } = server();
     const outbox = open(api);
@@ -1827,11 +1838,18 @@ describe("what an older build left", () => {
       .closest("li") as HTMLElement;
     fireEvent.click(within(taken).getByRole("button", { name: "Discard" }));
     // What is left goes back whole, so in the empty cart without a tap,
-    // with nothing left out to say.
+    // with row 16's status and nothing left out to say (Ali,
+    // inventory-tng-0su, question 10).
     await screen.findByText(ADDED_BACK);
+    expect(screen.getByRole("status").textContent).toBe(ADDED_BACK);
+    expect(record).toHaveBeenCalledWith({
+      kind: "older_storage",
+      held: "saves",
+      action: "put_in_cart_automatically",
+    });
+    record.mockRestore();
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(boxes()).toBe("2");
-    expect(screen.queryByText(RESCAN)).toBeNull();
     save();
     await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
     expect(outbox.entries.value[0]?.body.key).toBe(KEY);
@@ -1949,8 +1967,13 @@ describe("what an older build left", () => {
     });
     open();
     await ready();
-    const unread = "Sorry. Could not read 1 previously added item";
+    const unread = noted(
+      "Sorry. Could not read 1 previously added item, scan it again.",
+    );
     within(listing()).getByText(unread);
+    expect(
+      within(listing()).getByText(unread).querySelector("strong")?.textContent,
+    ).toBe("Could not read 1");
     const taken = within(listing())
       .getByText("Cat6 cable: 3 m from an open package")
       .closest("li") as HTMLElement;
@@ -1988,7 +2011,7 @@ describe("what an older build left", () => {
     within(listing()).getByText(
       "Sorry. Unable to discard. Clear your site data to remove.",
     );
-    within(listing()).getByText(RESCAN);
+    within(listing()).getByText(noted(RESCAN));
   });
 
   test("a line of one changed meanwhile, by an older tab, is not discarded, and the list shows it as it is", async () => {
@@ -2012,7 +2035,7 @@ describe("what an older build left", () => {
       ),
     ).toBeNull();
     within(listing()).getByText("No. Add it to the cart, fix that, then save.");
-    within(listing()).getByText(RESCAN);
+    within(listing()).getByText(noted(RESCAN));
   });
 
   test("what cannot go back left out, the rest saves as it is", async () => {
@@ -2174,12 +2197,12 @@ describe("what an older build left", () => {
     const { api, sent } = server();
     const outbox = open(api);
     await ready();
-    within(listing()).getByText(RETIRED);
+    within(listing()).getByText(noted(RETIRED));
     within(listing()).getByText("LiteBeam 5AC: 1 × Box");
     fireEvent.click(
       within(listing()).getByRole("button", { name: "Add to cart" }),
     );
-    screen.getByText(RETIRED);
+    screen.getByText(`LiteBeam 5AC: ${RETIRED}`);
     expect(boxes()).toBe("1");
     save();
     await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
@@ -2203,12 +2226,57 @@ describe("what an older build left", () => {
     );
     open();
     await ready();
-    within(listing()).getByText(RETIRED);
+    within(listing()).getByText(noted(RETIRED));
     fireEvent.click(
       within(listing()).getByRole("button", { name: "Add to cart" }),
     );
-    screen.getByText(RETIRED);
+    screen.getByText(`LiteBeam 5AC: ${RETIRED}`);
     expect(boxes()).toBe("1");
+  });
+
+  test("a package no longer offered is named from the catalogue, and never offered", async () => {
+    // The radio's box 1004, retired with none sealed left, as the
+    // catalogue names it (retired_packages).
+    const named = {
+      ...CATALOGUE,
+      items: CATALOGUE.items.map((item) =>
+        item.id === 100
+          ? {
+              ...item,
+              retired_packages: [{ id: 1004, name: "Old box", size: "4.000" }],
+            }
+          : item,
+      ),
+    };
+    leaveMoves([
+      KEY,
+      AT,
+      [{ item_id: 100, quantity: "8", package_id: 1004 }, radios(1)],
+    ]);
+    localStorage.setItem(
+      "inventory.cart.v1",
+      JSON.stringify({
+        ...freshCart(),
+        lines: [{ itemId: 100, packages: { 1004: "3", 1009: "1" }, loose: "" }],
+        usedAt: AT,
+      }),
+    );
+    const { api } = answering((request) =>
+      isCatalogue(request) ? json(named, 200) : saved(),
+    );
+    open(api);
+    await ready();
+    within(listing()).getByText("LiteBeam 5AC: 2 × Old box");
+    within(listing()).getByText("LiteBeam 5AC: 3 × Old box");
+    within(listing()).getByText("LiteBeam 5AC: 1 × a removed package or item");
+    fireEvent.click(
+      within(listing()).getAllByRole("button", {
+        name: "Add to cart",
+      })[0] as HTMLElement,
+    );
+    expect(boxes()).toBe("1");
+    // Named only: no count of it in the cart.
+    expect(screen.queryByLabelText(/Old box/)).toBeNull();
   });
 
   test("one that goes back whole goes in an empty cart without a tap, the oldest first, one at a time", async () => {

@@ -4,10 +4,14 @@ import {
   dropPart,
   goesBackWhole,
   isListed,
+  LINES_LOST,
   nextWhole,
   type Older,
   OlderStore,
   olderId,
+  RESCAN as RESCAN_NOTE,
+  RESIZED as RESIZED_NOTE,
+  RETIRED as RETIRED_NOTE,
   readOlder,
   removeOlder,
   tidyOlder,
@@ -22,6 +26,8 @@ import { refusing } from "./test-storage";
 /** In Ali's words (inventory-tng-0su). */
 const RETIRED = "Sorry. This item has been retired.";
 const RESCAN = "Sorry. Can't add these items. Please rescan.";
+const RESIZED =
+  "Sorry. The package size has changed since this item was added. Discard and re-add the new package size.";
 
 const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
 const OTHER = "6f1e2d3c-4b5a-4968-8776-5a4b3c2d1e0f";
@@ -468,10 +474,11 @@ describe("as a cart", () => {
     );
     // The take is not put back as its item's empty line.
     expect(cart.lines).toEqual([]);
-    // Each once for the save, the take and the report together.
+    // Each line left out, by its item; a report by what it says.
     expect(gaps).toEqual([
       "Sorry. Could not read 1 previously added item, scan it again.",
-      RESCAN,
+      `Cat6 cable: ${RESCAN}`,
+      `What is on an open package: ${RESCAN}`,
     ]);
   });
 
@@ -495,7 +502,7 @@ describe("as a cart", () => {
     expect(cart.lines.map((line) => line.itemId)).toEqual([101]);
     expect(gaps).toEqual([
       "Sorry. Could not read 2 previously added items, scan them again.",
-      RESCAN,
+      `An item no longer in the catalogue: ${RESCAN}`,
     ]);
   });
 
@@ -530,9 +537,10 @@ describe("as a cart", () => {
       { itemId: 100, packages: { 1000: "2" }, loose: "", typed: true },
       { itemId: 999, packages: {}, loose: "2", typed: true },
     ]);
+    // In the order kept, each said once for its item.
     expect(gaps).toEqual([
-      "Sorry. The package size has changed since this item was added. Discard and re-add the new package size.",
-      RETIRED,
+      `LiteBeam 5AC: ${RETIRED}`,
+      `LiteBeam 5AC: ${RESIZED}`,
     ]);
   });
 
@@ -554,13 +562,15 @@ describe("as a cart", () => {
       { itemId: 100, packages: { 1000: "1" }, loose: "1", typed: true },
       { itemId: 999, packages: { 9999: "1" }, loose: "", typed: true },
     ]);
-    expect(gaps).toEqual([RETIRED]);
+    expect(gaps).toEqual([`LiteBeam 5AC: ${RETIRED}`]);
     // None of one held, nothing is told; one unreadable is, as the cart
     // reads it as some.
     const told = (packages: Record<string, string>) =>
       toCart(cartHolding(packages), CATALOGUE).gaps;
     expect(told({ 1000: "1", 1004: "" })).toEqual([]);
-    expect(told({ 1000: "1", 1004: "lots" })).toEqual([RETIRED]);
+    expect(told({ 1000: "1", 1004: "lots" })).toEqual([
+      `LiteBeam 5AC: ${RETIRED}`,
+    ]);
   });
 
   test("a package retired with some left is still offered: counted, not told", () => {
@@ -621,9 +631,7 @@ describe("as a cart", () => {
     expect(cart.lines).toEqual([
       { itemId: 100, packages: { 1000: "2" }, loose: "", typed: true },
     ]);
-    expect(gaps).toEqual([
-      "Sorry. The package size has changed since this item was added. Discard and re-add the new package size.",
-    ]);
+    expect(gaps).toEqual([`LiteBeam 5AC: ${RESIZED}`]);
   });
 
   test("an opening's packages go back as packages to open", () => {
@@ -713,7 +721,7 @@ describe("as a cart", () => {
     });
     expect(gaps).toEqual([
       "Sorry. Could not read 1 previously added item, scan it again.",
-      RESCAN,
+      `Cat6 cable: ${RESCAN}`,
     ]);
   });
 
@@ -731,7 +739,7 @@ describe("as a cart", () => {
         ],
       });
       const { cart, gaps } = toCart(readOlder()[0] as Older, CATALOGUE);
-      expect(gaps).toEqual([RESCAN]);
+      expect(gaps).toEqual([`Cat6 cable: ${RESCAN}`]);
       // All it held left out, so not put back as an empty line.
       expect(cart.lines).toEqual([]);
     },
@@ -770,16 +778,14 @@ describe("line by line", () => {
     ).toEqual([
       ["LiteBeam 5AC: 4", RETIRED],
       ["Cat6 cable: 12 m from an open package", RESCAN],
-      [
-        "LiteBeam 5AC: 4",
-        "Sorry. The package size has changed since this item was added. Discard and re-add the new package size.",
-      ],
+      ["LiteBeam 5AC: 4", RESIZED],
       ["LiteBeam 5AC: 2 × Box", null],
       ["Open package said used up", RESCAN],
     ]);
-    // Opening words in bold.
+    // Only the words naming the problem in bold.
     expect(parts[2]?.note).toEqual([
-      "Sorry. The package size has changed",
+      "Sorry. ",
+      "The package size has changed",
       " since this item was added. Discard and re-add the new package size.",
     ]);
   });
@@ -811,12 +817,113 @@ describe("line by line", () => {
     const { cart, parts } = toCart(readOlder()[0] as Older, CATALOGUE);
     expect(parts.map(({ words, note }) => [words, note?.join("")])).toEqual([
       ["LiteBeam 5AC: 1 × Box", undefined],
-      ["LiteBeam 5AC: 2 × a package no longer in the catalogue", RETIRED],
+      ["LiteBeam 5AC: 2 × a removed package or item", RETIRED],
       ["LiteBeam 5AC: Open package said used up", RESCAN],
       ["Cat6 cable: 3 m from an open package", RESCAN],
       ["Cat6 cable: What is on an open package", RESCAN],
     ]);
     expect(cart.lines.map((line) => line.itemId)).toEqual([100]);
+  });
+
+  /** The catalogue, naming the radio's box retired with none left, 1004
+   * (Item.retired_packages). */
+  const NAMED = {
+    ...CATALOGUE,
+    items: CATALOGUE.items.map((item) =>
+      item.id === 100
+        ? {
+            ...item,
+            retired_packages: [{ id: 1004, name: "Old box", size: "2.000" }],
+          }
+        : item,
+    ),
+  };
+
+  test("a package no longer offered is named where the catalogue names it, never put back", () => {
+    const save = only({
+      lines: [
+        { item_id: 100, quantity: "4", package_id: 1004 },
+        // Counted at the size saved, not the size named now.
+        { item_id: 100, quantity: "9", package_id: 1004, package_size: 3 },
+        // Not whole ones of it: by its amount, as before.
+        { item_id: 100, quantity: "3", package_id: 1004 },
+        // Not named at all: by its amount, as before.
+        { item_id: 100, quantity: "4", package_id: 1005 },
+        { item_id: 100, quantity: "8", package_id: 1000 },
+      ],
+    });
+    const { cart, parts, gaps } = toCart(save, NAMED);
+    expect(parts.map(({ words, note }) => [words, note?.join("")])).toEqual([
+      ["LiteBeam 5AC: 2 × Old box", RETIRED],
+      ["LiteBeam 5AC: 3 × Old box", RETIRED],
+      ["LiteBeam 5AC: 3", RETIRED],
+      ["LiteBeam 5AC: 4", RETIRED],
+      ["LiteBeam 5AC: 2 × Box", undefined],
+    ]);
+    expect(gaps).toEqual([`LiteBeam 5AC: ${RETIRED}`]);
+    // Named only: never in the cart, nor offered.
+    expect(cart.lines).toEqual([
+      { itemId: 100, packages: { 1000: "2" }, loose: "", typed: true },
+    ]);
+    expect(goesBackWhole(save, NAMED)).toBe(false);
+    keep("inventory.cart.v1", {
+      ...freshCart(),
+      lines: [{ itemId: 100, packages: { 1004: "2", 1005: "1" }, loose: "" }],
+    });
+    expect(
+      toCart(readOlder()[1] as Older, NAMED).parts.map(({ words }) => words),
+    ).toEqual([
+      "LiteBeam 5AC: 2 × Old box",
+      "LiteBeam 5AC: 1 × a removed package or item",
+    ]);
+  });
+
+  test("a note left behind names its item, one named only too", () => {
+    const { gaps } = toCart(
+      only({
+        lines: [
+          { item_id: 103, quantity: "2", open_package_key: OTHER },
+          { item_id: 101, quantity: "3", open_package_key: OTHER },
+          { item_id: 101, quantity: "4", open_package_key: KEY },
+        ],
+      }),
+      CATALOGUE,
+    );
+    // Retired with none left, so not offered: named from retired_items.
+    expect(gaps).toEqual([
+      `NanoStation M5: ${RESCAN}`,
+      `Cat6 cable: ${RESCAN}`,
+    ]);
+  });
+
+  test("only the words naming the problem are bold, never 'Sorry.' or what to do", () => {
+    expect([
+      RETIRED_NOTE,
+      RESCAN_NOTE,
+      RESIZED_NOTE,
+      LINES_LOST,
+      unreadWords(1),
+      unreadWords(2),
+    ]).toEqual([
+      ["Sorry. This item has been ", "retired", "."],
+      ["Sorry. ", "Can't add these items", ". Please rescan."],
+      [
+        "Sorry. ",
+        "The package size has changed",
+        " since this item was added. Discard and re-add the new package size.",
+      ],
+      [
+        "Sorry. ",
+        "Could not read",
+        " previously added items, scan them again.",
+      ],
+      ["Sorry. ", "Could not read 1", " previously added item, scan it again."],
+      [
+        "Sorry. ",
+        "Could not read 2",
+        " previously added items, scan them again.",
+      ],
+    ]);
   });
 
   test.each([
@@ -933,7 +1040,7 @@ describe("line by line", () => {
     keep("inventory.cart.v1", { ...freshCart(), lines: [line] });
     const listedCart = readOlder()[0] as Older;
     const [back, gone] = toCart(listedCart, CATALOGUE).parts;
-    expect(gone?.note).toEqual(["Sorry. This item has been retired.", ""]);
+    expect(gone?.note).toEqual(["Sorry. This item has been ", "retired", "."]);
     expect(dropPart(listedCart, gone?.drop ?? [], CATALOGUE)).toBe(true);
     // No field added that it never had: an older build still reads it.
     expect(stored("inventory.cart.v1").lines).toEqual([

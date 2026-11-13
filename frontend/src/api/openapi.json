@@ -667,6 +667,13 @@
           "retired": {
             "type": "boolean",
             "title": "Retired"
+          },
+          "retired_packages": {
+            "items": {
+              "$ref": "#/components/schemas/RetiredPackage"
+            },
+            "type": "array",
+            "title": "Retired Packages"
           }
         },
         "type": "object",
@@ -680,7 +687,8 @@
           "old_code",
           "search_text",
           "packages",
-          "retired"
+          "retired",
+          "retired_packages"
         ],
         "title": "ItemEntry"
       },

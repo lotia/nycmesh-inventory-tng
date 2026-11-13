@@ -8,7 +8,6 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
@@ -58,7 +57,7 @@ class Rows:
         self.box = add(
             session, ItemPackage(item_id=self.cable.id, name="Box", size=Decimal(50))
         )
-        add(
+        self.reel = add(
             session,
             ItemPackage(item_id=self.cable.id, name="Reel", size=1, retired_at=NOW),
         )
@@ -83,14 +82,9 @@ class Rows:
         )
         self.shelf_label = add(session, Label(location_id=self.shelf.id))
         self.revoked = add(session, Label(item_id=self.cable.id, revoked_at=NOW))
-        reel = session.scalars(
-            select(ItemPackage).where(
-                ItemPackage.item_id == self.cable.id, ItemPackage.name == "Reel"
-            )
-        ).one()
         # Labels left on what has since been retired.
         self.on_retired = [
-            add(session, Label(item_id=self.cable.id, package_id=reel.id)),
+            add(session, Label(item_id=self.cable.id, package_id=self.reel.id)),
             add(session, Label(item_id=self.retired_item.id)),
             add(session, Label(location_id=self.closed.id)),
         ]
@@ -169,6 +163,8 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
         "old_code": rows.cable.old_code,
         "search_text": f"{rows.cable.search_text} Cables {mark}",
         "retired": False,
+        # Named only, for what an older build left (inventory-tng-0su).
+        "retired_packages": [{"id": rows.reel.id, "name": "Reel", "size": "1"}],
     }
 
     labels = {label["code"]: label for label in reply["labels"]}
@@ -308,15 +304,20 @@ def test_a_retired_package_stays_while_some_are_sealed(
         return by_id(items[spools.cable.id]["packages"])
 
     assert sent()[spools.spool.id]["retired"] is True
+    cable = by_id(registered_client.get(URL).json()["items"])[spools.cable.id]
+    assert cable["retired_packages"] == []
     # One opened: the other is still sealed, and its open one is sent too.
     opened = spools.opened()
     assert spools.spool.id in sent()
-    # The last one installed: none sealed is left, so it is gone.
+    # The last one installed: none sealed is left, so it is gone, but
+    # named, for what an older build left (inventory-tng-0su).
     spools.write(
         {"kind": "install", "from_location_id": spools.store.id},
         Entry(spools.cable.id, Decimal(305), spools.sealed, LOOSE),
     )
     assert spools.spool.id not in sent()
+    cable = by_id(registered_client.get(URL).json()["items"])[spools.cable.id]
+    assert [each["id"] for each in cable["retired_packages"]] == [spools.spool.id]
     # Its open one is still sent, with its package's name, which the page
     # no longer has (inventory-tng-4w4).
     reply = registered_client.get(URL).json()

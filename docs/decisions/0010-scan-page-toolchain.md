@@ -180,6 +180,13 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   rejected one note for the whole entry, which left the volunteer to
   work out which line it meant, and dropping the key with a line, which
   could record the save twice.
+  A line whose package was retired with none left names it, as the
+  catalogue lists such packages apart from those offered, and only one
+  the catalogue no longer has at all is "a removed package or item";
+  once added to the cart, the status names each line's item before its
+  note (Ali, 2026-11-13, inventory-tng-0su). We rejected naming the
+  package only by the amount, which left the volunteer to work out what
+  was counted.
 - Compression behaves the same in compose and in Kubernetes, because the
   app serves the compressed files itself. The image holds three copies of
   each file; the bundle is small, so that costs little.

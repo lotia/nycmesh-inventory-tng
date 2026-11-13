@@ -3,8 +3,9 @@
 One reply, loaded once per page, holding what is current: retired rows,
 merged volunteers and revoked labels are left out, but for retired items
 and packages with stock left, which may be taken. The other retired items
-are named apart (retired_items), with their packages, only so the page can
-say what a save an older build left held. Registered devices only, since
+are named apart (retired_items), with their packages, as are the other
+retired packages of an item sent (ItemEntry.retired_packages), only so
+the page can say what a save or cart an older build left held. Registered devices only, since
 it names volunteers, and those names are never logged.
 """
 
@@ -114,6 +115,12 @@ class OpenPackageEntry(Entry):
     short_below: Decimal | None
 
 
+class RetiredPackage(Entry):
+    id: int
+    name: str
+    size: Decimal
+
+
 class ItemEntry(BaseModel):
     id: int
     name: str
@@ -129,12 +136,8 @@ class ItemEntry(BaseModel):
     packages: list[PackageEntry]
     # Retired, but with stock left: it may be taken, never received.
     retired: bool
-
-
-class RetiredPackage(Entry):
-    id: int
-    name: str
-    size: Decimal
+    # Its retired packages with none sealed left: named, never offered.
+    retired_packages: list[RetiredPackage]
 
 
 class RetiredItem(BaseModel):
@@ -187,12 +190,20 @@ def catalogue(session: Session) -> Catalogue:
     )
     sealed = ledger.sealed_places(session)
     packages: dict[int, list[PackageEntry]] = {}
-    for package, item_tracks in session.execute(
-        select(ItemPackage, Item.track_opened)
+    # Every package by its item, to name: an item no longer offered has
+    # them all named; one offered, those it no longer offers.
+    named: dict[int, list[RetiredPackage]] = {}
+    not_offered: dict[int, list[RetiredPackage]] = {}
+    for package, item_tracks, offered in session.execute(
+        select(ItemPackage, Item.track_opened, takeable_package())
         .join(Item, Item.id == ItemPackage.item_id)
-        .where(takeable_package())
         .order_by(ItemPackage.size)
     ):
+        name = RetiredPackage.model_validate(package)
+        named.setdefault(package.item_id, []).append(name)
+        if not offered:
+            not_offered.setdefault(package.item_id, []).append(name)
+            continue
         packages.setdefault(package.item_id, []).append(
             PackageEntry(
                 id=package.id,
@@ -231,6 +242,7 @@ def catalogue(session: Session) -> Catalogue:
             search_text=f"{item.search_text} {fold(category)}",
             packages=packages.get(item.id, []),
             retired=item.retired_at is not None,
+            retired_packages=not_offered.get(item.id, []),
         )
         for item, category in items
     ]
@@ -243,15 +255,6 @@ def catalogue(session: Session) -> Catalogue:
     )
 
     gone = list(session.scalars(select(Item).where(~takeable()).order_by(Item.id)))
-    gone_packages: dict[int, list[RetiredPackage]] = {}
-    for package in session.scalars(
-        select(ItemPackage)
-        .where(ItemPackage.item_id.in_([item.id for item in gone]))
-        .order_by(ItemPackage.size)
-    ):
-        gone_packages.setdefault(package.item_id, []).append(
-            RetiredPackage.model_validate(package)
-        )
 
     return Catalogue(
         settings=Settings.model_validate(session.get_one(ScanSettings, 1)),
@@ -269,7 +272,7 @@ def catalogue(session: Session) -> Catalogue:
                 id=item.id,
                 name=item.name,
                 unit=item.unit,
-                packages=gone_packages.get(item.id, []),
+                packages=named.get(item.id, []),
             )
             for item in gone
         ],

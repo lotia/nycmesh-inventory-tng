@@ -90,6 +90,14 @@ export const OpenPackageEntry = v.object({
   short_below: v.nullable(v.string()),
 });
 
+/** A retired package with none sealed left: named, for what an older
+ * build left, never offered. */
+export const RetiredPackage = v.object({
+  id,
+  name: v.string(),
+  size: v.string(),
+});
+
 export const ItemEntry = v.object({
   id,
   name: v.string(),
@@ -103,6 +111,8 @@ export const ItemEntry = v.object({
   packages: v.array(PackageEntry),
   // Retired, with stock left: it may be taken, never received.
   retired: v.boolean(),
+  // Its retired packages with none sealed left: named, never offered.
+  retired_packages: v.array(RetiredPackage),
 });
 
 /** A retired item with none left: named, for what an older build left,
@@ -111,7 +121,7 @@ export const RetiredItem = v.object({
   id,
   name: v.string(),
   unit: v.string(),
-  packages: v.array(v.object({ id, name: v.string(), size: v.string() })),
+  packages: v.array(RetiredPackage),
 });
 
 export const LabelEntry = v.object({
