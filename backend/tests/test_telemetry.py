@@ -773,6 +773,7 @@ def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
         {"kind": "older_storage", "held": "cart"},
         {"kind": "older_storage", "held": "saves", "action": "put_in_cart"},
         {"kind": "older_storage", "held": "cart", "action": "discarded"},
+        {"kind": "older_storage", "held": "saves", "action": "line_discarded"},
         {
             "kind": "older_storage",
             "held": "saves",
@@ -803,6 +804,7 @@ def test_records_what_the_pages_report(rolled_back: Recorded) -> None:
     acted_on = counted(reader, "inventory.page.older_acted_on")
     assert acted_on[(("action", "put_in_cart"), ("held", "saves"))] >= 1
     assert acted_on[(("action", "discarded"), ("held", "cart"))] >= 1
+    assert acted_on[(("action", "line_discarded"), ("held", "saves"))] >= 1
     automatically = (("action", "put_in_cart_automatically"), ("held", "saves"))
     assert acted_on[automatically] >= 1
     # Buckets that fit the values, not the SDK's own from 5 up.

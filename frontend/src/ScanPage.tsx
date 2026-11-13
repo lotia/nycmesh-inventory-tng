@@ -12,7 +12,6 @@ import {
   CartStore,
   type Catalogue,
   freshCart,
-  type Item,
   indexOf,
   type Kind,
   keysToAsk,
@@ -40,13 +39,12 @@ import { placeSides, readLabel, type Scanned } from "./labels";
 import { NOTHING_TAKEN, OpenPackageCard } from "./OpenPackageCard";
 import {
   type Gaps,
-  nameOf,
+  type Note,
   nextWhole,
   type Older,
   OlderStore,
   olderId,
   toCart,
-  unitOf,
   withRetired,
 } from "./older";
 import {
@@ -55,7 +53,7 @@ import {
   type Outbox,
   sharedOutbox,
 } from "./outbox";
-import { count, decimal, thousandths } from "./quantity";
+import { decimal, thousandths } from "./quantity";
 import { NOT_REGISTERED } from "./registration";
 import { Scanner } from "./Scanner";
 import { onStoredChange } from "./stored";
@@ -786,9 +784,10 @@ function CartForm({
 /**
  * What older builds left and the page did not put back in the cart itself,
  * each in words, to add to the cart or discard (older.ts). Discarding asks
- * first, here on the page. One holding an item retired since, and out of
- * the catalogue, names it from the catalogue's retired items, and can
- * only be discarded.
+ * first, here on the page. A line that cannot go back says why under it,
+ * and can be discarded on its own, without asking. One holding an item
+ * retired since, and out of the catalogue, names it from the catalogue's
+ * retired items, and goes in the cart only once that line is discarded.
  */
 function OlderList({
   older,
@@ -807,19 +806,19 @@ function OlderList({
   // Each in words once, not on every change to the cart beside it.
   const shown = useMemo(() => {
     const offered = indexOf(catalogue).items;
-    const named = withRetired(catalogue);
-    const { items } = indexOf(named);
     return listed.map((each) => {
-      const { cart, gaps } = toCart(each, named);
-      const lines = cart.lines.flatMap((line) => {
-        const words = lineWords(line, items.get(line.itemId));
-        return words === null
-          ? []
-          : [{ words, retired: !offered.has(line.itemId) }];
-      });
+      const { cart, lost, parts } = toCart(each, withRetired(catalogue));
+      const lines = parts.map((part) => ({
+        ...part,
+        // Goes back, but not as it is named (withRetired).
+        retired:
+          part.note === null &&
+          part.itemId !== null &&
+          !offered.has(part.itemId),
+      }));
       return {
         each,
-        gaps,
+        lost,
         lines,
         fills: cart.lines.length > 0,
         retired: lines.some((line) => line.retired),
@@ -829,11 +828,22 @@ function OlderList({
   if (shown.length === 0) {
     return null;
   }
+  /** Tell the volunteer, under `each`, that it, or a line of it, was not
+   * discarded, unless it changed meanwhile (`still`), which listing it
+   * again shows. */
+  const notDiscarded = (still: boolean, on: string) => {
+    if (still) {
+      said.value = {
+        on,
+        words: "Sorry. Unable to discard. Clear your site data to remove.",
+      };
+    }
+  };
   return (
     <section>
       <h2>Checked out items. Add to cart or discard before sending</h2>
       <ul class={RULED_LIST}>
-        {shown.map(({ each, gaps, lines, fills, retired }, n) => {
+        {shown.map(({ each, lost, lines, fills, retired }, n) => {
           const on = olderId(each);
           const title = `older-${n}`;
           return (
@@ -843,26 +853,46 @@ function OlderList({
                 {olderWhere(each, catalogue)}
               </div>
               <small>{olderWhen(each)}</small>
+              {lost !== null && <NoteSaid note={lost} />}
               {lines.length > 0 && (
                 <ul class="list-none p-0">
-                  {lines.map((line, at) => (
-                    <li key={at}>
-                      {line.retired && (
-                        <>
-                          <strong>Item retired</strong>
-                          <br />
-                        </>
-                      )}
-                      {line.words}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {gaps.length > 0 && (
-                <ul class="list-none p-0">
-                  {gaps.map((gap) => (
-                    <li key={gap}>{gap}</li>
-                  ))}
+                  {lines.map((line, at) => {
+                    const named = `${title}-${at}`;
+                    return (
+                      <li key={at} class="flex flex-col items-start gap-1">
+                        <div id={named}>
+                          {line.retired && (
+                            <>
+                              <strong>Item retired</strong>
+                              <br />
+                            </>
+                          )}
+                          {line.words}
+                        </div>
+                        {line.note !== null && <NoteSaid note={line.note} />}
+                        {(line.note !== null || line.retired) && (
+                          <button
+                            type="button"
+                            aria-describedby={named}
+                            onClick={() => {
+                              said.value = null;
+                              if (older.dropPart(each, line.drop, catalogue)) {
+                                telemetry.record({
+                                  kind: "older_storage",
+                                  held: heldIn(each),
+                                  action: "line_discarded",
+                                });
+                              } else {
+                                notDiscarded(older.isUnchanged(each), on);
+                              }
+                            }}
+                          >
+                            Discard
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
               {said.value?.on === on && <p role="alert">{said.value.words}</p>}
@@ -882,12 +912,8 @@ function OlderList({
                             held: heldIn(each),
                             action: "discarded",
                           });
-                        } else if (older.isListed(each)) {
-                          said.value = {
-                            on,
-                            words:
-                              "Sorry. Unable to discard. Clear your site data to remove.",
-                          };
+                        } else {
+                          notDiscarded(older.isListed(each), on);
                         }
                       }}
                     >
@@ -935,6 +961,20 @@ function OlderList({
         })}
       </ul>
     </section>
+  );
+}
+
+/**
+ * Why something cannot go back, in the alert's style, its opening words in
+ * bold. Not role="alert": it is there as the list is shown, and several at
+ * once, read out together, would drown each other and the page.
+ */
+function NoteSaid({ note: [opening, rest] }: { note: Note }) {
+  return (
+    <p class="alert">
+      <strong>{opening}</strong>
+      {rest}
+    </p>
   );
 }
 
@@ -991,24 +1031,6 @@ function olderWhen(each: Older): string {
     return at === "" ? "Added but not sent" : `Added on${at} but not sent`;
   }
   return `Saved on this device${at}, not sent.`;
-}
-
-/** A cart's line in words: its item, then how many of each package, and
- * how much loose; null if it holds none. */
-function lineWords(line: Line, item: Item | undefined): string | null {
-  if (item === undefined) {
-    return nameOf(item);
-  }
-  const parts = item.packages.flatMap((pack) => {
-    const packs = count(line.packages[pack.id] ?? "") ?? 0;
-    return packs > 0 ? [`${packs} × ${pack.name}`] : [];
-  });
-  const loose = thousandths(line.loose) ?? 0;
-  if (loose > 0) {
-    const after = parts.length > 0 ? " loose" : "";
-    parts.push(`${decimal(loose)}${unitOf(item)}${after}`);
-  }
-  return parts.length === 0 ? null : `${item.name}: ${parts.join(", ")}`;
 }
 
 /** From or To, for a place a label named: the side still empty first. */
