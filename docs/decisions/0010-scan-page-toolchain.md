@@ -167,7 +167,14 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   Each line that cannot go back says why under it, and has a Discard of
   its own that drops that line from what the older build kept (Ali,
   2026-11-13, inventory-tng-0su); an entry with nothing to put back
-  offers only Discard. A save keeps its batch key while its lines go, as
+  offers only Discard. One that says lines could not be read stays once
+  its last listed line goes, until its own Discard, so the note is not
+  lost unseen. After a line's Discard, focus goes to the entry's heading,
+  not the page, so the volunteer keeps their place, and taps on the
+  entry's buttons are ignored for half a second, so a double tap's second
+  cannot discard the line that moves up (Ali, 2026-11-13). We rejected
+  asking before each line's Discard, which slows every one.
+  A save keeps its batch key while its lines go, as
   one put back and changed in the cart does: an older tab may have sent
   it as it was, and the key then has the server take it once. We
   rejected one note for the whole entry, which left the volunteer to

@@ -12,6 +12,7 @@ import {
   removeOlder,
   tidyOlder,
   toCart,
+  unreadWords,
   withRetired,
 } from "./older";
 import { KEY_REUSED, SAVED_BEFORE_CHANGES } from "./outbox";
@@ -962,11 +963,7 @@ describe("line by line", () => {
 
   test("the last line listed discarded takes the save, or the cart, with it", () => {
     const older = only({
-      lines: [
-        { item_id: 100, quantity: "4", package_id: 1004 },
-        // Unread: never listed, so not left on its own.
-        { item_id: 100, quantity: "lots" },
-      ],
+      lines: [{ item_id: 100, quantity: "4", package_id: 1004 }],
     });
     const { parts } = toCart(older, CATALOGUE);
     expect(parts).toHaveLength(1);
@@ -981,6 +978,36 @@ describe("line by line", () => {
       dropPart(cart, toCart(cart, CATALOGUE).parts[0]?.drop ?? [], CATALOGUE),
     ).toBe(true);
     expect(localStorage.getItem("inventory.cart.v1")).toBeNull();
+  });
+
+  test.each([
+    ["could not be read", [{ item_id: 100, quantity: "lots" }]],
+    ["could not be read at all", [{ item_id: "lots" }]],
+  ])(
+    "one with lines that %s stays, saying so, once its last line listed is discarded",
+    (_name, unread) => {
+      const older = only({
+        lines: [{ item_id: 100, quantity: "4", package_id: 1004 }, ...unread],
+      });
+      const [gone] = toCart(older, CATALOGUE).parts;
+      expect(dropPart(older, gone?.drop ?? [], CATALOGUE)).toBe(true);
+      expect(stored()[0].body.lines).toEqual(unread);
+      const left = readOlder()[0] as Older;
+      expect(toCart(left, CATALOGUE)).toMatchObject({
+        lost: unreadWords(1),
+        parts: [],
+      });
+    },
+  );
+
+  test("one whose lines are lost stays, saying so, once its last report is discarded", () => {
+    keep("inventory.outbox.v3", [
+      saveOf({}, { lines: "many", used_up: [KEY] }),
+    ]);
+    const older = readOlder()[0] as Older;
+    const [report] = toCart(older, CATALOGUE).parts;
+    expect(dropPart(older, report?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(stored()[0].body).toMatchObject({ lines: "many", used_up: [] });
   });
 
   test("an item retired since is listed as named, and goes back once discarded", () => {

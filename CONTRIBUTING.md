@@ -348,7 +348,10 @@ said of an open package are listed each on its own line, saying why it
 cannot go back, and are left out when put back, never kept loose, unseen
 or as an empty line. Each of those lines, and one of an item retired
 since, has a Discard of its own, which drops that line alone from what
-the older build kept; the entry goes with its last listed line. A save
+the older build kept; the entry goes with its last listed line, unless
+it says lines could not be read, when it stays, saying so, until its own
+Discard. Focus then goes to the entry's heading, and taps on its buttons
+are ignored for half a second, so a double tap discards one line. A save
 keeps its batch key while its lines go (`dropPart`), and one put back
 keeps it, as does a cart it filled when a newer build reads it, and
 the cart is saved under it until emptied, as an older tab may be sending
