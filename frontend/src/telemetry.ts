@@ -19,13 +19,13 @@ import type { Schemas } from "./api/client";
 
 export const PATH = "/api/telemetry";
 export const FLUSH_AT = 10;
-/** How many of each kind a page sends an hour: 50 in all, under the
+/** How many of each kind a page sends an hour: 54 in all, under the
  * server's limit (page_telemetry.REPORTS). */
 export const PER_HOUR: Record<Event["kind"], number> = {
   web_vital: 10,
   error: 10,
   outbox_retry: 10,
-  scan_to_save: 16,
+  scan_to_save: 20,
   // Once a tab, or twice, then too old (build.ts); once a load for each
   // of saves and a cart an older build left (ScanPage).
   out_of_date: 2,

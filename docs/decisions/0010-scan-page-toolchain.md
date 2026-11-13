@@ -111,10 +111,13 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   deploy that adds it. When it is, the server answers a batch from a build
   before that one 409 `build_too_old`, before checking it, and the tab
   keeps the batch and asks for a reload, where a 422 would have it
-  refused. We rejected copying between keys, which earlier builds did and
-  which every change to what is kept made harder, and reading leniently
-  (`v.looseObject`), which keeps unknown fields but still needs a new key
-  for a changed value.
+  refused. Only a batch that names its build is checked so (Ali,
+  2026-11-12, inventory-tng-omi.1): another client of the API names none,
+  and a 409 on every batch would leave it no way to save, where a 422
+  tells it which field it lacks. We rejected copying between keys, which
+  earlier builds did and which every change to what is kept made harder,
+  and reading leniently (`v.looseObject`), which keeps unknown fields but
+  still needs a new key for a changed value.
 - Compression behaves the same in compose and in Kubernetes, because the
   app serves the compressed files itself. The image holds three copies of
   each file; the bundle is small, so that costs little.

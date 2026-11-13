@@ -31,7 +31,7 @@ meter = metrics.get_meter(__name__)
 router = APIRouter()
 
 PATH = "/telemetry"
-# A page flushes at ten events and sends fifty an hour at most (telemetry.ts,
+# A page flushes at ten events and sends 54 an hour at most (telemetry.ts,
 # PER_HOUR); a few pages open at once on one network share an address.
 REPORTS = RateLimitItemPerMinute(30)
 MOST_EVENTS = 50

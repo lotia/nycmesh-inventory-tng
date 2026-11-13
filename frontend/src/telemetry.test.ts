@@ -95,6 +95,13 @@ describe("reporting", () => {
     ]);
   });
 
+  test("a page sends 54 events an hour at most, 20 of them times to save", () => {
+    // The build events (out_of_date, older_storage) were added beside
+    // scan_to_save's 20, not taken from them: a busy hub tablet saves many.
+    expect(Object.values(PER_HOUR).reduce((sum, n) => sum + n)).toBe(54);
+    expect(PER_HOUR.scan_to_save).toBe(20);
+  });
+
   test("each kind has its own share an hour, so none crowds out the rest", async () => {
     let now = 0;
     const reports: Promise<Event[]>[] = [];

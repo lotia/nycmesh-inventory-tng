@@ -27,6 +27,9 @@ export const KeyReusedReply = v.object({ reason: v.literal("key_reused") });
  * not refused (backend page_builds.py). */
 export const BuildTooOldReply = v.object({
   reason: v.literal("build_too_old"),
+  build: v.string(),
+  oldest: v.string(),
+  message: v.string(),
 });
 
 export const Saved = v.object({ transaction_id: id });

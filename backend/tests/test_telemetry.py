@@ -574,7 +574,11 @@ def test_counts_batches_from_a_build_too_old(
     monkeypatch.setattr(page_builds, "OLDEST_BUILD", "2026-11-12T10:00:00.000Z")
     _, token = new_device(session)
     client.cookies.set(devices.COOKIE, token)
-    response = client.post("/api/transactions", json=Place(session).batch())
+    response = client.post(
+        "/api/transactions",
+        json=Place(session).batch(),
+        headers={page_builds.HEADER: "2026-11-12T09:00:00.000Z"},
+    )
     client.cookies.clear()
     assert response.status_code == 409
     assert added(reader, "inventory.transactions.too_old", before) == {(): 1}

@@ -27,7 +27,7 @@ import {
   Saved,
   ValidationFailed,
 } from "./api/replies";
-import { Builds, HEADER } from "./build";
+import { Builds, HEADER, UPDATED } from "./build";
 import { NOT_REGISTERED } from "./registration";
 import {
   olderVersions,
@@ -450,7 +450,7 @@ export class Outbox {
           this.builds.learn("too_old");
           this.settle(key, {
             waitingFor: null,
-            note: "Not sent: this page is out of date. Load it again.",
+            note: `Not sent. ${UPDATED}`,
           });
           return "stop";
         }

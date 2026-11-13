@@ -127,10 +127,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The id of the scan page's build that sent it: a build older than the server takes is answered 409 build_too_old, before the batch is checked",
+              "description": "The id of the scan page's build that sent it: a build older than the server takes is answered 409 build_too_old, before the batch is checked. Only the scan page sends it; a batch without it is checked as any other",
               "title": "X-Inventory-Build"
             },
-            "description": "The id of the scan page's build that sent it: a build older than the server takes is answered 409 build_too_old, before the batch is checked"
+            "description": "The id of the scan page's build that sent it: a build older than the server takes is answered 409 build_too_old, before the batch is checked. Only the scan page sends it; a batch without it is checked as any other"
           }
         ],
         "requestBody": {
@@ -451,11 +451,27 @@
             "type": "string",
             "const": "build_too_old",
             "title": "Reason"
+          },
+          "build": {
+            "type": "string",
+            "title": "Build",
+            "description": "The build the batch named, in X-Inventory-Build"
+          },
+          "oldest": {
+            "type": "string",
+            "title": "Oldest",
+            "description": "The oldest build of the scan page whose batches this server takes"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "What to do"
           }
         },
         "type": "object",
-        "required": ["reason"],
-        "title": "BuildTooOldReply"
+        "required": ["reason", "build", "oldest", "message"],
+        "title": "BuildTooOldReply",
+        "description": "A batch from a build of the scan page older than this server takes:\nnot checked, nor saved."
       },
       "Catalogue": {
         "properties": {
@@ -560,10 +576,22 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "build": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Build",
+            "description": "The id of the build of the scan page this server serves, as its frontend log line at startup names it; null with no build, or when Vite's dev server serves the pages"
           }
         },
         "type": "object",
-        "required": ["status"],
+        "required": ["status", "build"],
         "title": "Health"
       },
       "ItemEntry": {
