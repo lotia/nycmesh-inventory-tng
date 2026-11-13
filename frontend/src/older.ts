@@ -27,6 +27,7 @@ import {
   type Cart,
   type Catalogue,
   freshCart,
+  holdsSome,
   type Item,
   indexOf,
   type Kind,
@@ -39,7 +40,7 @@ import {
   STORAGE_KEY as OUTBOX_KEY,
   SAVED_BEFORE_CHANGES,
 } from "./outbox";
-import { count, decimal, thousandths } from "./quantity";
+import { decimal, thousandths } from "./quantity";
 import {
   hasStored,
   olderKeys,
@@ -418,9 +419,8 @@ export function toCart(
           item.packages.some((pack) => String(pack.id) === packageId)
         ) {
           made.packages[packageId] = n;
-        } else if ((count(n) ?? 1) !== 0) {
-          // Neither shown nor saved by the cart, so said, not kept; one
-          // unreadable too, as the cart reads it as some (quantityOf).
+        } else if (holdsSome(n)) {
+          // Neither shown nor saved by the cart, so said, not kept.
           retired = true;
         }
       }
@@ -544,12 +544,11 @@ export function goesBackWhole(older: Older, catalogue: Catalogue): boolean {
   );
 }
 
-/** The packages `line` holds some of, as [item id, package id]: a count
- * unreadable is some, as the cart reads it (quantityOf). */
+/** The packages `line` holds some of, as [item id, package id]. */
 function packagesHeld(line: OldBatchLine | OldCartLine): [number, string][] {
   if ("itemId" in line) {
     return Object.entries(line.packages)
-      .filter(([, n]) => (count(n) ?? 1) !== 0)
+      .filter(([, n]) => holdsSome(n))
       .map(([id]) => [line.itemId, id]);
   }
   return line.package_id === null

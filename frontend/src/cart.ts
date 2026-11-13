@@ -484,8 +484,15 @@ function sealedKey(packageId: number, placeId: number): string {
  * thousandths of the item's unit. */
 type Packs = { count: number; size: number };
 
+/** Whether a typed count of packages holds some: blank is none, and one
+ * that cannot be read is some, to be questioned rather than dropped. */
+export function holdsSome(typed: string): boolean {
+  return (count(typed) ?? 1) !== 0;
+}
+
 /** A line's quantity in thousandths of the item's unit, and of it, the
  * packages counted, by package, and how much loose; or why it has none. */
+
 export function quantityOf(
   line: Line,
   item: Item,
@@ -499,7 +506,7 @@ export function quantityOf(
   | { problem: string } {
   const current = new Set(item.packages.map((pack) => String(pack.id)));
   for (const [packageId, typed] of Object.entries(line.packages)) {
-    if (!current.has(packageId) && (count(typed) ?? 1) !== 0) {
+    if (!current.has(packageId) && holdsSome(typed)) {
       return {
         problem:
           "A package counted here is no longer used. Remove the line and add it again.",
