@@ -1291,6 +1291,8 @@ describe("a newer build", () => {
 describe("what an older build left", () => {
   const HEADING = "Checked out items. Add to cart or discard before sending";
   const ADDED_BACK = "Added back to cart. Review before Save.";
+  const PACKAGE_RETIRED =
+    "Sorry. The package has been retired since this item was added. Discard and re-add the item.";
   const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
   const AT = 1_700_000_000_000;
   const OLDER = "2026-11-12T09:00:00.000Z";
@@ -1859,8 +1861,6 @@ describe("what an older build left", () => {
     (screen.getByLabelText("Box (4 each)") as HTMLInputElement).value;
 
   test("a package no longer offered is told, listed and put back, and never saved as something else", async () => {
-    const RETIRED_PACKAGE =
-      "Sorry. The package has been retired since this item was added. Discard and re-add the item.";
     // A save of a box retired since, with none sealed left (1004), and a
     // box still offered.
     leaveMoves([
@@ -1871,12 +1871,12 @@ describe("what an older build left", () => {
     const { api, sent } = server();
     const outbox = open(api);
     await ready();
-    within(listing()).getByText(RETIRED_PACKAGE);
+    within(listing()).getByText(PACKAGE_RETIRED);
     within(listing()).getByText("LiteBeam 5AC: 1 × Box");
     fireEvent.click(
       within(listing()).getByRole("button", { name: "Add to cart" }),
     );
-    screen.getByText(RETIRED_PACKAGE);
+    screen.getByText(PACKAGE_RETIRED);
     expect(boxes()).toBe("1");
     save();
     await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
@@ -1900,15 +1900,11 @@ describe("what an older build left", () => {
     );
     open();
     await ready();
-    within(listing()).getByText(
-      "Sorry. The package has been retired since this item was added. Discard and re-add the item.",
-    );
+    within(listing()).getByText(PACKAGE_RETIRED);
     fireEvent.click(
       within(listing()).getByRole("button", { name: "Add to cart" }),
     );
-    screen.getByText(
-      "Sorry. The package has been retired since this item was added. Discard and re-add the item.",
-    );
+    screen.getByText(PACKAGE_RETIRED);
     expect(boxes()).toBe("1");
   });
 

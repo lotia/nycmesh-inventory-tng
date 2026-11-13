@@ -48,6 +48,26 @@ function keep(key: string, value: unknown) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+/** An older cart of item 100 holding `packages`, as read. */
+function cartHolding(packages: Record<string, string>): Older {
+  keep("inventory.cart.v1", {
+    ...freshCart(),
+    lines: [{ itemId: 100, packages, loose: "" }],
+  });
+  return readOlder()[0] as Older;
+}
+
+const retirePackages = (item: Item): Item => ({
+  ...item,
+  packages: item.packages.map((pack) => ({ ...pack, retired: true })),
+});
+
+/** Every package retired with some left: still offered, taking only. */
+const PACKAGES_RETIRED = {
+  ...CATALOGUE,
+  items: CATALOGUE.items.map(retirePackages),
+};
+
 const listed = () =>
   readOlder().map(({ key, batch, refused }) => ({ key, batch, refused }));
 
@@ -532,25 +552,13 @@ describe("as a cart", () => {
     expect(gaps).toEqual([PACKAGE_RETIRED]);
     // None of one held, nothing is told; one unreadable is, as the cart
     // reads it as some.
-    const told = (packages: Record<string, string>) => {
-      keep("inventory.cart.v1", {
-        ...freshCart(),
-        lines: [{ itemId: 100, packages, loose: "" }],
-      });
-      return toCart(readOlder()[0] as Older, CATALOGUE).gaps;
-    };
+    const told = (packages: Record<string, string>) =>
+      toCart(cartHolding(packages), CATALOGUE).gaps;
     expect(told({ 1000: "1", 1004: "" })).toEqual([]);
     expect(told({ 1000: "1", 1004: "lots" })).toEqual([PACKAGE_RETIRED]);
   });
 
   test("a package retired with some left is still offered: counted, not told", () => {
-    const catalogue = {
-      ...CATALOGUE,
-      items: CATALOGUE.items.map((item) => ({
-        ...item,
-        packages: item.packages.map((pack) => ({ ...pack, retired: true })),
-      })),
-    };
     const { cart, gaps } = toCart(
       only(
         saveOf(
@@ -558,7 +566,7 @@ describe("as a cart", () => {
           { lines: [{ item_id: 100, quantity: "8", package_id: 1000 }] },
         ),
       ),
-      catalogue,
+      PACKAGES_RETIRED,
     );
     expect(cart.lines).toEqual([
       { itemId: 100, packages: { 1000: "2" }, loose: "", typed: true },
@@ -769,28 +777,18 @@ describe("put back without a tap", () => {
   });
 
   test("an older cart holding some of a package gone, or a count unread of one, does not; none of one, it does", () => {
-    const cartWith = (packages: Record<string, string>) => {
-      keep("inventory.cart.v1", {
-        ...freshCart(),
-        lines: [{ itemId: 100, packages, loose: "", open: {} }],
-      });
-      return readOlder()[0] as Older;
-    };
-    expect(goesBackWhole(cartWith({ 1003: "2" }), CATALOGUE)).toBe(false);
-    expect(goesBackWhole(cartWith({ 1004: "lots" }), CATALOGUE)).toBe(false);
+    expect(goesBackWhole(cartHolding({ 1003: "2" }), CATALOGUE)).toBe(false);
+    expect(goesBackWhole(cartHolding({ 1004: "lots" }), CATALOGUE)).toBe(false);
     expect(
-      goesBackWhole(cartWith({ 1000: "1", 1003: "", 1004: "0" }), CATALOGUE),
+      goesBackWhole(cartHolding({ 1000: "1", 1003: "", 1004: "0" }), CATALOGUE),
     ).toBe(true);
     // Some of a package retired with some left: offered, taking only.
-    const retired = {
-      ...CATALOGUE,
-      items: CATALOGUE.items.map((item) => ({
-        ...item,
-        packages: item.packages.map((pack) => ({ ...pack, retired: true })),
-      })),
-    };
-    expect(goesBackWhole(cartWith({ 1000: "1" }), retired)).toBe(false);
-    expect(goesBackWhole(cartWith({ 1000: "lots" }), retired)).toBe(false);
+    expect(goesBackWhole(cartHolding({ 1000: "1" }), PACKAGES_RETIRED)).toBe(
+      false,
+    );
+    expect(goesBackWhole(cartHolding({ 1000: "lots" }), PACKAGES_RETIRED)).toBe(
+      false,
+    );
   });
 
   test("the oldest that goes back whole is next, one of no known time last, and those tried are skipped", () => {
@@ -812,13 +810,7 @@ describe("put back without a tap", () => {
   });
 
   test.each([
-    [
-      "a package retired, some left",
-      (item: Item) => ({
-        ...item,
-        packages: item.packages.map((pack) => ({ ...pack, retired: true })),
-      }),
-    ],
+    ["a package retired, some left", retirePackages],
     [
       "an item retired, some left",
       (item: Item) => ({ ...item, retired: true }),
