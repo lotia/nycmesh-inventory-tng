@@ -379,8 +379,9 @@ export function openWords(n: number): string {
  * and the amount is whole ones of it; else as loose, for the cart to say
  * what is wrong; one of a package resized since it was saved, or of one
  * the catalogue no longer offers, is left to do again, as is an older
- * cart's count of one no longer offered. What was taken from an open package, and what was said of
- * one, are left to do again too, as the open packages may have changed.
+ * cart's count of one no longer offered, unless blank or none. What was
+ * taken from an open package, and what was said of one, are left to do
+ * again too, as the open packages may have changed.
  * The cart keeps the batch key it is to be sent under (Older.batchKey).
  */
 export function toCart(
@@ -417,8 +418,9 @@ export function toCart(
           item.packages.some((pack) => String(pack.id) === packageId)
         ) {
           made.packages[packageId] = n;
-        } else if ((count(n) ?? 0) !== 0) {
-          // Neither shown nor saved by the cart, so said, not kept.
+        } else if ((count(n) ?? 1) !== 0) {
+          // Neither shown nor saved by the cart, so said, not kept; one
+          // unreadable too, as the cart reads it as some (quantityOf).
           retired = true;
         }
       }
@@ -542,11 +544,12 @@ export function goesBackWhole(older: Older, catalogue: Catalogue): boolean {
   );
 }
 
-/** The packages `line` holds some of, as [item id, package id]. */
+/** The packages `line` holds some of, as [item id, package id]: a count
+ * unreadable is some, as the cart reads it (quantityOf). */
 function packagesHeld(line: OldBatchLine | OldCartLine): [number, string][] {
   if ("itemId" in line) {
     return Object.entries(line.packages)
-      .filter(([, n]) => (count(n) ?? 0) !== 0)
+      .filter(([, n]) => (count(n) ?? 1) !== 0)
       .map(([id]) => [line.itemId, id]);
   }
   return line.package_id === null
