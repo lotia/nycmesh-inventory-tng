@@ -5,7 +5,6 @@ import {
   askWho,
   type Cart,
   CartStore,
-  cartInOlderKeys,
   freshCart,
   indexOf,
   keysToAsk,
@@ -73,26 +72,12 @@ describe("storage", () => {
     });
   });
 
-  test("an older build's cart is not read, but reported while it has lines, and kept", () => {
-    const older = JSON.stringify(addOne(cart(), 100));
-    localStorage.setItem("inventory.cart.v1", older);
+  test("an older build's cart is not read", () => {
+    localStorage.setItem(
+      "inventory.cart.v1",
+      JSON.stringify(addOne(cart(), 100)),
+    );
     expect(loadCart()).toEqual(freshCart());
-    expect(cartInOlderKeys()).toBe(true);
-    storeCart(addOne(cart(), 101));
-    expect(localStorage.getItem("inventory.cart.v1")).toBe(older);
-  });
-
-  test.each([
-    ["no older cart", null],
-    ["an empty one", JSON.stringify(cart())],
-    ["one unreadable", "not json"],
-  ])("%s is not reported", (_name, value) => {
-    if (value !== null) {
-      localStorage.setItem("inventory.cart.v1", value);
-    }
-    // This build's own, however full, is not older.
-    storeCart(addOne(cart(), 100));
-    expect(cartInOlderKeys()).toBe(false);
   });
 
   test.each(["not json", '{"kind": "move"}', "null"])(

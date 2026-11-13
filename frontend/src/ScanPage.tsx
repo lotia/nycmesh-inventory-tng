@@ -11,9 +11,10 @@ import {
   type Cart,
   CartStore,
   type Catalogue,
-  cartInOlderKeys,
   freshCart,
+  type Item,
   indexOf,
+  type Kind,
   keysToAsk,
   type Line,
   loadCart,
@@ -36,14 +37,14 @@ import {
 import { Field } from "./Field";
 import { placeSides, readLabel, type Scanned } from "./labels";
 import { NOTHING_TAKEN, OpenPackageCard } from "./OpenPackageCard";
+import { type Gaps, type Older, OlderStore, toCart, unitOf } from "./older";
 import {
   type Entry,
   STORAGE_KEY as OUTBOX_KEY,
   type Outbox,
   sharedOutbox,
-  waitingInOlderKeys,
 } from "./outbox";
-import { decimal, thousandths } from "./quantity";
+import { count, decimal, thousandths } from "./quantity";
 import { NOT_REGISTERED } from "./registration";
 import { Scanner } from "./Scanner";
 import { onStoredChange } from "./stored";
@@ -81,6 +82,14 @@ async function loadCatalogue(api: Api, outbox: Outbox): Promise<Loaded> {
   }
 }
 
+/** What a cart is filled for, in the words the page asks it in. */
+const KIND_WORDS: Record<Kind, string> = {
+  move: "Moving stock",
+  receipt: "Receiving stock",
+  install: "Taking it to an install",
+  open: "Opening packages",
+};
+
 /** A list whose entries are ruled apart: the cart's lines, the outbox. */
 const RULED_LIST = "list-none p-0 *:border-t *:border-line *:py-3";
 
@@ -99,18 +108,14 @@ export function ScanPage({
   // Whether the cart holds no lines: until it does, a newer build is not
   // loaded, as it would not read this build's cart (build.ts).
   const cartEmpty = useMemo(() => signal(storedCartEmpty()), []);
-  // What older builds left, which this one keeps but never reads.
-  const older = useMemo(
-    () => ({ saves: waitingInOlderKeys(), cart: cartInOlderKeys() }),
-    [],
-  );
+  // What older builds left, listed to put back in the cart or discard.
+  const older = useMemo(() => new OlderStore(), []);
   useEffect(() => {
-    if (older.saves > 0) {
-      telemetry.record({ kind: "older_storage", held: "saves" });
+    // Once for saves, once for a cart: the saves are listed first.
+    for (const held of new Set(older.listed.value.map(heldIn))) {
+      telemetry.record({ kind: "older_storage", held, action: "found" });
     }
-    if (older.cart) {
-      telemetry.record({ kind: "older_storage", held: "cart" });
-    }
+    return older.listen();
   }, []);
   const loadedAt = useRef(0);
   // One refresh at a time; one asked for meanwhile follows it.
@@ -221,7 +226,6 @@ export function ScanPage({
     <main class="volunteer page-width">
       <h1>Scan</h1>
       <NewerBuild outbox={outbox} cartEmpty={cartEmpty.value} reload={reload} />
-      <LeftByOlder saves={older.saves} cart={older.cart} />
       {current.state === "loading" && <p>Loading the catalogue…</p>}
       {current.state === "unregistered" && (
         <p role="alert">
@@ -243,6 +247,7 @@ export function ScanPage({
           pending={pending}
           outbox={outbox}
           cartEmpty={cartEmpty}
+          older={older}
         />
       )}
       <OutboxList outbox={outbox} />
@@ -271,9 +276,14 @@ function NewerBuild({
   ).length;
   let words: string;
   if (learned === "too_old") {
+    // Nothing more is sent from here: after the refresh, the newer build
+    // lists what this one kept, to put back in the cart (older.ts).
     words = UPDATED;
     if (waiting > 0) {
-      words += ` The ${savesCount(waiting)} waiting will be kept on this phone, not sent: tell an administrator.`;
+      words += ` The ${savesCount(waiting)} waiting here will then be listed, to put back in the cart and save again.`;
+    }
+    if (!cartEmpty) {
+      words += " The cart is kept for after the refresh.";
     }
   } else if (waiting > 0) {
     words = `${SCANNER_UPDATED}. ${savesCount(waiting)} waiting to send: stay on this page until they have gone.`;
@@ -308,34 +318,12 @@ function storedCartEmpty(): boolean {
   return loadCart().lines.length === 0;
 }
 
-/** Says what older builds left on this browser: kept, never read here. */
-function LeftByOlder({ saves, cart }: { saves: number; cart: boolean }) {
-  if (saves === 0 && !cart) {
-    return null;
-  }
-  return (
-    <div role="status" class="border-2 border-caution p-3">
-      {saves > 0 && (
-        <p>
-          This phone holds {savesCount(saves)} an older version of this page did
-          not send. They are kept here, not sent: tell an administrator.
-        </p>
-      )}
-      {cart && (
-        <p>
-          A cart filled on an older version of this page is kept on this phone,
-          not shown here. Fill it again if it was not saved.
-        </p>
-      )}
-    </div>
-  );
-}
-
 function CartForm({
   catalogue,
   pending,
   outbox,
   cartEmpty,
+  older,
 }: {
   catalogue: Catalogue;
   /** The outbox's batches it does not show (cart.ts, unseen). */
@@ -343,6 +331,8 @@ function CartForm({
   outbox: Outbox;
   /** Kept as the cart changes, here or in another tab (NewerBuild). */
   cartEmpty: Signal<boolean>;
+  /** What older builds left, to put back in the cart or discard. */
+  older: OlderStore;
 }) {
   const store = useMemo(() => new CartStore(catalogue), []);
   // The open packages to take from, and how many are sealed where, as the
@@ -358,6 +348,8 @@ function CartForm({
   const query = useSignal("");
   const problems = useSignal<string[]>([]);
   const saved = useSignal<string | null>(null);
+  // An older save just put back in the cart, and what it left to do again.
+  const putBack = useSignal<Gaps | null>(null);
   // After a while unused, the phone may have changed hands: offer to
   // change the name, without stopping anyone saving.
   const checkName = useSignal(askWho(cart.value, catalogue));
@@ -404,6 +396,7 @@ function CartForm({
 
   function change(next: Cart) {
     saved.value = null;
+    putBack.value = null;
     kept(store.change(next));
   }
 
@@ -509,6 +502,41 @@ function CartForm({
     saved.value = batch.what;
   }
 
+  /** Put an older build's save, or cart, in this cart, which must be
+   * empty, and forget it there: moved, never copied, so it is saved once. */
+  function putInCart(each: Older): string | null {
+    if (cart.value.lines.length > 0) {
+      return "Save the cart, or empty it, first.";
+    }
+    const { cart: filled, gaps } = toCart(each, catalogue, cart.value);
+    // Read again first: an older tab may have sent it meanwhile.
+    if (!older.isListed(each)) {
+      older.refresh();
+      return "That one has gone: it was sent, or dealt with in another tab.";
+    }
+    const before = cart.value;
+    if (!store.change(filled)) {
+      // Not kept, a reload would empty it while the older one stays
+      // listed, to be put back and saved twice: the cart stays as it was.
+      cart.value = before;
+      return "This browser isn't keeping the cart, so it was not put in. Free some space or leave private browsing.";
+    }
+    kept(true);
+    saved.value = null;
+    if (!older.remove(each)) {
+      problems.value = [
+        "This browser would not forget the older one, so it is still listed: discard it once this cart is saved.",
+      ];
+    }
+    telemetry.record({
+      kind: "older_storage",
+      held: heldIn(each),
+      action: "put_in_cart",
+    });
+    putBack.value = gaps;
+    return null;
+  }
+
   const sides = SIDES[cart.value.kind];
   const { items, volunteers } = indexOf(catalogue);
   const name =
@@ -523,6 +551,7 @@ function CartForm({
 
   return (
     <form onSubmit={save}>
+      <OlderList older={older} catalogue={catalogue} onPutBack={putInCart} />
       {checkName.value && name !== undefined && (
         <div
           role="alert"
@@ -578,25 +607,20 @@ function CartForm({
       {/* Choices close together, each tall enough to tap. */}
       <fieldset class="gap-1">
         <legend>What is happening</legend>
-        {(
-          [
-            ["move", "Moving stock"],
-            ["receipt", "Receiving stock"],
-            ["install", "Taking it to an install"],
-            ["open", "Opening packages"],
-          ] as const
-        ).map(([kind, words]) => (
-          <label key={kind} class="flex items-center gap-2 py-1 font-normal">
-            <input
-              type="radio"
-              name="kind"
-              value={kind}
-              checked={cart.value.kind === kind}
-              onChange={() => set({ kind })}
-            />
-            {words}
-          </label>
-        ))}
+        {(Object.entries(KIND_WORDS) as [Kind, string][]).map(
+          ([kind, words]) => (
+            <label key={kind} class="flex items-center gap-2 py-1 font-normal">
+              <input
+                type="radio"
+                name="kind"
+                value={kind}
+                checked={cart.value.kind === kind}
+                onChange={() => set({ kind })}
+              />
+              {words}
+            </label>
+          ),
+        )}
       </fieldset>
 
       {sides.from && (
@@ -632,6 +656,20 @@ function CartForm({
       )}
 
       <h2>Cart</h2>
+      {putBack.value !== null && (
+        <div role="status">
+          <p>
+            Put back in the cart. Check it, fill in what it needs, then Save.
+          </p>
+          {putBack.value.length > 0 && (
+            <ul>
+              {putBack.value.map((gap) => (
+                <li key={gap}>{gap}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {cart.value.lines.length === 0 ? (
         <p>Nothing in the cart yet.</p>
       ) : (
@@ -716,6 +754,211 @@ function CartForm({
       </button>
     </form>
   );
+}
+
+/**
+ * What older builds left, each in words, to put back in the cart or
+ * discard (older.ts). Discarding asks first, here on the page.
+ */
+function OlderList({
+  older,
+  catalogue,
+  onPutBack,
+}: {
+  older: OlderStore;
+  catalogue: Catalogue;
+  /** Put one back in the cart: why not, if it was not. */
+  onPutBack: (each: Older) => string | null;
+}) {
+  // The one whose discarding is being confirmed, and what one tap said.
+  const discarding = useSignal<string | null>(null);
+  const said = useSignal<{ on: string; words: string } | null>(null);
+  const listed = older.listed.value;
+  if (listed.length === 0) {
+    return null;
+  }
+  const { items } = indexOf(catalogue);
+  return (
+    <section>
+      <h2>Left by an older version of this page</h2>
+      <p>
+        Never saved in the inventory. Put each back in the cart to check it and
+        save it again, or discard it.
+      </p>
+      <ul class={RULED_LIST}>
+        {listed.map((each, n) => {
+          const on = `${each.key} ${each.batch ?? "cart"}`;
+          const { cart, gaps } = toCart(each, catalogue);
+          const lines = cart.lines.flatMap((line) => {
+            const words = lineWords(line, items.get(line.itemId));
+            return words === null ? [] : [words];
+          });
+          const title = `older-${n}`;
+          return (
+            <li key={on} class="flex flex-col gap-2">
+              <div id={title}>
+                <strong>{olderKind(each)}</strong>
+                {olderWhere(each, catalogue)}
+              </div>
+              <small>{olderWhen(each)}</small>
+              {lines.length > 0 && (
+                <ul class="list-none p-0">
+                  {lines.map((words, at) => (
+                    <li key={at}>{words}</li>
+                  ))}
+                </ul>
+              )}
+              {gaps.length > 0 && (
+                <div>
+                  Once in the cart:
+                  <ul>
+                    {gaps.map((gap) => (
+                      <li key={gap}>{gap}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {said.value?.on === on && <p role="alert">{said.value.words}</p>}
+              {discarding.value === on ? (
+                <div class="flex flex-col items-start gap-3">
+                  <div role="alert">
+                    Discard it? It was never saved in the inventory, and can't
+                    be got back.
+                  </div>
+                  <div class="actions">
+                    <button
+                      type="button"
+                      class="danger"
+                      aria-describedby={title}
+                      onClick={() => {
+                        discarding.value = null;
+                        if (older.remove(each)) {
+                          telemetry.record({
+                            kind: "older_storage",
+                            held: heldIn(each),
+                            action: "discarded",
+                          });
+                        } else if (older.isListed(each)) {
+                          said.value = {
+                            on,
+                            words:
+                              "This browser would not forget it. Free some space or leave private browsing, then discard it again.",
+                          };
+                        }
+                      }}
+                    >
+                      Discard it
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        discarding.value = null;
+                      }}
+                    >
+                      Keep it
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div class="actions">
+                  {cart.lines.length > 0 && (
+                    <button
+                      type="button"
+                      aria-describedby={title}
+                      onClick={() => {
+                        const why = onPutBack(each);
+                        said.value = why === null ? null : { on, words: why };
+                      }}
+                    >
+                      Put it in the cart
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    aria-describedby={title}
+                    onClick={() => {
+                      said.value = null;
+                      discarding.value = on;
+                    }}
+                  >
+                    Discard
+                  </button>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/** Whether it is saves or a cart, as telemetry tells them. */
+function heldIn(each: Older): "saves" | "cart" {
+  return each.batch === null ? "cart" : "saves";
+}
+
+/** What it was for, in the words the page asks it in. */
+function olderKind(each: Older): string {
+  if (each.kind === "report") {
+    return "Saying what is on open packages";
+  }
+  const words = each.kind === null ? "Something" : KIND_WORDS[each.kind];
+  return each.batch === null ? `A cart: ${words.toLowerCase()}` : words;
+}
+
+/** Where, for which install, and by whom, as the catalogue names them. */
+function olderWhere(each: Older, catalogue: Catalogue): string {
+  const { places, volunteers } = indexOf(catalogue);
+  const place = (placeId: number) =>
+    places.get(placeId) ?? "a place no longer in the catalogue";
+  const words: string[] = [];
+  const at = each.kind === "open" || each.kind === "report";
+  if (each.fromId !== null) {
+    words.push(`${at ? "at" : "from"} ${place(each.fromId)}`);
+  }
+  if (each.toId !== null && !at) {
+    words.push(`to ${place(each.toId)}`);
+  }
+  if (each.installNumber !== "") {
+    words.push(`for install ${each.installNumber}`);
+  }
+  const who =
+    each.volunteerId === null ? undefined : volunteers.get(each.volunteerId);
+  const where = words.length > 0 ? ` ${words.join(" ")}` : "";
+  return who === undefined ? where : `${where}, by ${who}`;
+}
+
+/** When it was saved, or the cart last changed, and what became of it. */
+function olderWhen(each: Older): string {
+  const at =
+    each.at === null
+      ? ""
+      : ` ${new Date(each.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`;
+  if (each.batch === null) {
+    return `Last changed${at}, not saved.`;
+  }
+  return each.refused === null
+    ? `Saved on this phone${at}, not sent.`
+    : `Saved on this phone${at}; the inventory did not take it. ${each.refused}`.trim();
+}
+
+/** A cart's line in words: its item, then how many of each package, and
+ * how much loose; null if it holds none. */
+function lineWords(line: Line, item: Item | undefined): string | null {
+  if (item === undefined) {
+    return "An item no longer in the catalogue";
+  }
+  const parts = item.packages.flatMap((pack) => {
+    const packs = count(line.packages[pack.id] ?? "") ?? 0;
+    return packs > 0 ? [`${packs} × ${pack.name}`] : [];
+  });
+  const loose = thousandths(line.loose) ?? 0;
+  if (loose > 0) {
+    const after = parts.length > 0 ? " loose" : "";
+    parts.push(`${decimal(loose)}${unitOf(item)}${after}`);
+  }
+  return parts.length === 0 ? null : `${item.name}: ${parts.join(", ")}`;
 }
 
 /** From or To, for a place a label named: the side still empty first. */

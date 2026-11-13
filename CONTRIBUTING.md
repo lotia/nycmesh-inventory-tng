@@ -333,14 +333,18 @@ build that wrote them. A change to what is kept, or to a value a field may
 take, takes a new key, as a tab of the build before, open during a deploy,
 drops what it cannot read from what it writes back; `outbox.test.ts` lists
 both for the outbox's key. A build reads and writes only its own keys: a
-tab of an older build sends its own batches, then asks for a reload, and a
-newer build reports what an older one left, never reading or removing it
-(`frontend/src/build.ts`, docs/decisions/0010).
+tab of an older build sends its own batches, then asks for a reload
+(`frontend/src/build.ts`, docs/decisions/0010). A newer build lists the
+saves and the cart an older one left, read only in the parts every version
+kept, for the volunteer to put each back in the cart or discard it, and
+removes an older key once nothing in it is left to list
+(`frontend/src/older.ts`).
 
 So the server keeps taking what the build before sends. Expand, then
 contract: a field the batch endpoint will require is added as optional,
 and made required only in a later deploy, after the one whose page sends
-it. That later change also sets `OLDEST_BUILD` in
+it. Better still, the server works the field out itself where it can, so
+it never needs to be required. That later change also sets `OLDEST_BUILD` in
 `backend/src/inventory_tng/page_builds.py` to the id of the build the
 earlier deploy served (DEPLOYMENT.md, Making a field required). A batch
 whose `X-Inventory-Build` header names a build before that is then
@@ -354,7 +358,8 @@ from. The camera works only over HTTPS or on `localhost`.
 
 Both pages report their errors, three Web Vitals, the outbox's retries,
 how long a batch took from its first line to saving, a tab learning that a
-newer build is out, and what an older build left in storage, through
+newer build is out, and what an older build left in storage and what
+volunteers did with it, through
 `frontend/src/telemetry.ts`, to `POST /api/telemetry`, which turns them into
 `inventory.*` metrics (docs/decisions/0006). Its schema, in
 `backend/src/inventory_tng/page_telemetry.py`, lists all a page may send:

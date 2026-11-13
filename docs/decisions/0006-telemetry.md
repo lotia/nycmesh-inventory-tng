@@ -30,8 +30,9 @@ judged too heavy, especially in the browser: about 1,000 lines and 9 packages.
   OTLP receiver, or an OpenTelemetry Collector.
 - **The scan page uses no OpenTelemetry.** It sends errors, Web Vitals,
   outbox retries, scan-to-save time, a tab learning that a newer build is
-  out, and what an older build left in storage to `/api/telemetry`, which
-  records them. Its schema limits what may be sent.
+  out, and what an older build left in storage and what volunteers did with
+  it to `/api/telemetry`, which records them. Its schema limits what may
+  be sent.
 
 We rejected always-on tracing and OpenTelemetry in the browser: neither
 earns its cost here.

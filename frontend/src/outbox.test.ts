@@ -11,7 +11,6 @@ import {
   RETRY_MS,
   SAVED_MOST,
   STORAGE_KEY,
-  waitingInOlderKeys,
 } from "./outbox";
 import { telemetry } from "./telemetry";
 import { answering, json, saved, TOO_OLD } from "./test-fetch";
@@ -139,15 +138,18 @@ describe("sending again", () => {
     expect(again).toEqual(once);
   });
 
-  test("an unregistered device notes every waiting batch", async () => {
+  test("an unregistered device notes every waiting batch, and only those", async () => {
     const { api } = answering(() => json({ reason: "unregistered" }, 403));
-    store(entry(), entry());
+    const done = entry({ state: "saved", transactionId: 1 });
+    store(done, entry(), entry());
     const outbox = new Outbox(api);
     await outbox.send();
     expect(outbox.entries.value.map((e) => e.waitingFor)).toEqual([
+      done.waitingFor,
       "registration",
       "registration",
     ]);
+    expect(outbox.entries.value[0]).toEqual(done);
   });
 
   test.each([
@@ -590,45 +592,6 @@ describe("storage", () => {
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
     expect(sent).toHaveLength(1);
     expect(keys.map((key) => localStorage.getItem(key))).toEqual(before);
-  });
-
-  test("the batches waiting under older keys are counted, never removed", () => {
-    storeOlder(
-      "inventory.outbox.v3",
-      entry(),
-      entry({ state: "saved", transactionId: 1 }),
-      entry({ state: "refused" }),
-      "not a batch",
-    );
-    localStorage.setItem("inventory.outbox.v1", "not json");
-    expect(waitingInOlderKeys()).toBe(1);
-    // This build's own are not older.
-    store(entry());
-    expect(waitingInOlderKeys()).toBe(1);
-    expect(localStorage.getItem("inventory.outbox.v1")).toBe("not json");
-  });
-
-  test("of v1 to v3, only the newest held is counted, as each build up to v3 took over and sent the key's before", () => {
-    // v3 copied and sent v2's, which still says they wait.
-    const copied = [entry(), entry()];
-    storeOlder("inventory.outbox.v2", ...copied);
-    storeOlder("inventory.outbox.v1", entry());
-    expect(waitingInOlderKeys()).toBe(2);
-    storeOlder("inventory.outbox.v3", entry({ state: "saved" }));
-    expect(waitingInOlderKeys()).toBe(0);
-    expect(localStorage.getItem("inventory.outbox.v2")).toBe(
-      JSON.stringify(copied),
-    );
-  });
-
-  test("an older key kept as v4 keeps it is counted too", () => {
-    // What a later build will count, once this key is older than its own.
-    localStorage.setItem(
-      "inventory.outbox.v3",
-      JSON.stringify({ build: BUILD, entries: [entry()] }),
-    );
-    expect(waitingInOlderKeys()).toBe(1);
-    expect(waitingInOlderKeys(full)).toBe(1);
   });
 
   test("what is kept is stamped with the build that wrote it", () => {

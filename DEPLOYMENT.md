@@ -212,9 +212,10 @@ A build's id is when it was built, in UTC. Build the image once and
 promote it from test to production, never rebuilding it, so each deploy's
 id is later than the one before. A batch from a scan page built before
 `OLDEST_BUILD` is then answered 409 `build_too_old`, and the phone keeps
-it and asks for a reload. A client of the API other than the scan page
-sends no `X-Inventory-Build` header, and gets a 422 naming the field it
-lacks.
+it and asks for a reload, after which the page lists it for the volunteer
+to put back in the cart and save again. A client of the API other than
+the scan page sends no `X-Inventory-Build` header, and gets a 422 naming
+the field it lacks.
 
 ## Backups
 

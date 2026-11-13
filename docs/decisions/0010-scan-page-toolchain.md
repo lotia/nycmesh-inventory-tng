@@ -105,8 +105,14 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   to stay on the page. It learns that a newer build is out from another
   tab's stamp in storage (each build stamps its id, the time it was made,
   on what it keeps) or from the server, whose reply to a batch names its
-  build. What an older build left under its keys is reported to the
-  volunteer and counted, never read nor removed. So the server keeps
+  build. What an older build left under its keys is listed to the
+  volunteer (Ali, 2026-11-12, inventory-tng-kk1), read only in the parts
+  every version kept (the kind, who, the places, items and how much, and
+  when), for them to put each back in the cart, to check and save again,
+  or to discard. An older key is removed only once nothing in it is left
+  to list. We rejected only reporting it, which left it on the phone for
+  good with no one able to act on it, and an administrator's page, as the
+  volunteer holding the phone is the one who can. So the server keeps
   taking what older builds send: a field is never made required in the
   deploy that adds it. When it is, the server answers a batch from a build
   before that one 409 `build_too_old`, before checking it, and the tab

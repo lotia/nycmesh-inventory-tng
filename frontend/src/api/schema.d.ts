@@ -328,8 +328,9 @@ export interface components {
     };
     /**
      * OlderStorage
-     * @description A scan page found what an older build left under its own key, which
-     *     it keeps but does not read: saves not sent, or a cart with lines.
+     * @description What an older build left under its own key, saves not sent or a cart
+     *     with lines: a scan page found it as it loaded, or a volunteer put one
+     *     back in the cart or discarded it (frontend/src/older.ts).
      */
     OlderStorage: {
       /**
@@ -342,6 +343,12 @@ export interface components {
        * @enum {string}
        */
       held: "saves" | "cart";
+      /**
+       * Action
+       * @default found
+       * @enum {string}
+       */
+      action: "found" | "put_in_cart" | "discarded";
     };
     /**
      * OpenPackageEntry
