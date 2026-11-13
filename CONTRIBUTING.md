@@ -342,9 +342,12 @@ contract: a field the batch endpoint will require is added as optional,
 and made required only in a later deploy, after the one whose page sends
 it. That later change also sets `OLDEST_BUILD` in
 `backend/src/inventory_tng/page_builds.py` to the id of the build the
-earlier deploy served, from its `frontend` log line at startup
-(`build=`). A batch from a build before that is then answered 409
-`build_too_old` and kept on the phone, where a 422 would have it refused.
+earlier deploy served (DEPLOYMENT.md, Making a field required). A batch
+whose `X-Inventory-Build` header names a build before that is then
+answered 409 `build_too_old` and kept on the phone, where a 422 would have
+it refused; one naming none, from another client of the API, gets the
+422. `backend/tests/test_page_builds.py` lists the fields the endpoint
+requires, and fails when one is added.
 
 The scan page needs a registered device, and some catalogue rows to choose
 from. The camera works only over HTTPS or on `localhost`.

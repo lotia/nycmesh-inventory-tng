@@ -22,6 +22,11 @@ export const BUILD: string = __BUILD__;
 /** Where each tab stamps its build's id as it starts: a key no build
  * changes, so a tab hears of a newer build whatever keys that build keeps. */
 export const BUILD_KEY = "inventory.build";
+/** What a page of a build no longer current tells the volunteer, in these
+ * words wherever it does: UPDATED where it asks for a refresh, SCANNER_UPDATED
+ * and a full stop where it cannot yet. */
+export const SCANNER_UPDATED = "The scanner has been updated";
+export const UPDATED = `${SCANNER_UPDATED}, refresh this page.`;
 /** The header a batch names its build in, and the reply the server's. */
 export const HEADER = "X-Inventory-Build";
 /** As the backend checks one (bundle.BUILD_ID). */

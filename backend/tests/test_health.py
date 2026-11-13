@@ -1,4 +1,7 @@
+from typing import cast
+
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import exc
 from structlog.testing import capture_logs
@@ -10,9 +13,21 @@ from helpers.apps import out_of_reach
 
 
 def test_healthz_answers_once_the_database_does(client: TestClient) -> None:
+    """With no build of the pages, it names none."""
     response = client.get("/api/healthz")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {"status": "ok", "build": None}
+
+
+def test_healthz_names_the_build_the_server_serves(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """So an operator can read it for page_builds.OLDEST_BUILD without the
+    logs (DEPLOYMENT.md, Making a field required)."""
+    build = "2026-11-12T12:00:00.000Z"
+    app = cast(FastAPI, client.app)
+    monkeypatch.setattr(app.state.bundle, "build_id", lambda: build)
+    assert client.get("/api/healthz").json() == {"status": "ok", "build": build}
 
 
 def test_healthz_is_503_and_warns_when_the_database_is_unreachable() -> None:

@@ -3,6 +3,7 @@ import type { TargetedSubmitEvent } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { type Api, check, makeApi } from "./api/client";
 import { Catalogue as CatalogueReply, DeviceRefusedReply } from "./api/replies";
+import { SCANNER_UPDATED, UPDATED } from "./build";
 import {
   addOne,
   askWho,
@@ -91,7 +92,7 @@ export function ScanPage({
 }: {
   api?: Api;
   outbox?: Outbox;
-  /** Load the page again: a newer build's (scan.tsx). */
+  /** Refresh this page, to load a newer build (scan.tsx). */
   reload: () => void;
 }) {
   const loaded = useSignal<Loaded>({ state: "loading" });
@@ -270,18 +271,16 @@ function NewerBuild({
   ).length;
   let words: string;
   if (learned === "too_old") {
-    words =
-      "This page is out of date, and the inventory no longer takes its saves.";
+    words = UPDATED;
     if (waiting > 0) {
       words += ` The ${savesCount(waiting)} waiting will be kept on this phone, not sent: tell an administrator.`;
     }
   } else if (waiting > 0) {
-    words = `A newer version of this page is out. ${savesCount(waiting)} waiting to send: stay on this page until they have gone.`;
+    words = `${SCANNER_UPDATED}. ${savesCount(waiting)} waiting to send: stay on this page until they have gone.`;
   } else if (!cartEmpty) {
-    words =
-      "A newer version of this page is out. Save the cart, or empty it, then load the page again.";
+    words = `${UPDATED} Save the cart, or empty it, first.`;
   } else {
-    words = "A newer version of this page is out.";
+    words = UPDATED;
   }
   const offered = learned === "too_old" || (waiting === 0 && cartEmpty);
   return (
@@ -292,7 +291,7 @@ function NewerBuild({
       <div>{words}</div>
       {offered && (
         <button type="button" class="primary" onClick={reload}>
-          Load the page again
+          Refresh this page
         </button>
       )}
     </div>

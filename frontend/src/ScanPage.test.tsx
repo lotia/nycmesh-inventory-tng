@@ -9,7 +9,7 @@ import { ScanPage } from "./ScanPage";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
 import { fakeCamera } from "./test-camera";
 import { CATALOGUE, WITH_CAFE } from "./test-catalogue";
-import { answering, deferred, json, saved } from "./test-fetch";
+import { answering, deferred, json, saved, TOO_OLD } from "./test-fetch";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));
@@ -1100,14 +1100,14 @@ describe("a newer build", () => {
   }
 
   const reloadButton = () =>
-    screen.queryByRole("button", { name: "Load the page again" });
+    screen.queryByRole("button", { name: "Refresh this page" });
 
   test("with nothing waiting and the cart empty, it offers the reload", async () => {
     const { reload } = openMine();
     await ready();
     expect(screen.queryByRole("alert")).toBeNull();
     newerTab();
-    await screen.findByText("A newer version of this page is out.");
+    await screen.findByText("The scanner has been updated, refresh this page.");
     fireEvent.click(reloadButton() as HTMLElement);
     expect(reload).toHaveBeenCalledOnce();
   });
@@ -1118,11 +1118,11 @@ describe("a newer build", () => {
     fillMove();
     newerTab();
     await screen.findByText(
-      "A newer version of this page is out. Save the cart, or empty it, then load the page again.",
+      "The scanner has been updated, refresh this page. Save the cart, or empty it, first.",
     );
     expect(reloadButton()).toBeNull();
     save();
-    await screen.findByText("A newer version of this page is out.");
+    await screen.findByText("The scanner has been updated, refresh this page.");
     expect(reloadButton()).not.toBeNull();
   });
 
@@ -1132,11 +1132,11 @@ describe("a newer build", () => {
     fillMove();
     newerTab();
     await screen.findByText(
-      "A newer version of this page is out. Save the cart, or empty it, then load the page again.",
+      "The scanner has been updated, refresh this page. Save the cart, or empty it, first.",
     );
     storeCart(freshCart());
     window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
-    await screen.findByText("A newer version of this page is out.");
+    await screen.findByText("The scanner has been updated, refresh this page.");
     expect(reloadButton()).not.toBeNull();
   });
 
@@ -1148,7 +1148,7 @@ describe("a newer build", () => {
     window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
     newerTab();
     await screen.findByText(
-      "A newer version of this page is out. Save the cart, or empty it, then load the page again.",
+      "The scanner has been updated, refresh this page. Save the cart, or empty it, first.",
     );
     expect(reloadButton()).toBeNull();
   });
@@ -1164,19 +1164,19 @@ describe("a newer build", () => {
     );
     newerTab();
     await screen.findByText(
-      "A newer version of this page is out. 1 save waiting to send: stay on this page until they have gone.",
+      "The scanner has been updated. 1 save waiting to send: stay on this page until they have gone.",
     );
     expect(reloadButton()).toBeNull();
   });
 
   test("a save from a build too old is kept, not refused, and the reload offered", async () => {
-    const { api } = server(() => json({ reason: "build_too_old" }, 409));
+    const { api } = server(() => json(TOO_OLD, 409));
     const { outbox, reload } = openMine(api);
     await ready();
     fillMove();
     save();
     await screen.findByText(
-      "This page is out of date, and the inventory no longer takes its saves. The 1 save waiting will be kept on this phone, not sent: tell an administrator.",
+      "The scanner has been updated, refresh this page. The 1 save waiting will be kept on this phone, not sent: tell an administrator.",
     );
     expect(outbox.entries.value.map((each) => each.state)).toEqual(["waiting"]);
     expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
@@ -1188,9 +1188,7 @@ describe("a newer build", () => {
     const { outbox } = openMine();
     await ready();
     outbox.builds.learn("too_old");
-    await screen.findByText(
-      "This page is out of date, and the inventory no longer takes its saves.",
-    );
+    await screen.findByText("The scanner has been updated, refresh this page.");
     expect(reloadButton()).not.toBeNull();
   });
 

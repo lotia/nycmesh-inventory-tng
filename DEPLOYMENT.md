@@ -156,12 +156,14 @@ The app reads the scan page's build once, at startup, so it serves a new
 build only after a restart. Delete the previous version's folder once the
 restarted app is serving. Until there is a build, `/scan` and `/register`
 answer 503 and the app logs a warning. Its `frontend` log line at startup
-says which folder it serves.
+says which folder it serves, and that build's id (`build=`).
 
 `GET /api/healthz` answers 200 when the app can reach the database, and 503
 when it cannot. Use it as a readiness check, not a liveness check: a
 database outage once it runs should take the app out of rotation, not
-restart it.
+restart it. Its 200 names the scan page's build the app serves, as
+`{"status": "ok", "build": "<id>"}`; `build` is `null` until there is a
+build, and when Vite's dev server serves the pages.
 
 The limits on guessing registration phrases, passwords and codes are kept
 in the database (the `rate_limit` table), so every pod and worker counts
@@ -190,6 +192,29 @@ rather than hold up every query after it, so run it again.
 Count the total before scaling: processes × 20, plus one for a migration,
 must stay under PostgreSQL's `max_connections` (100 by default, less 3 kept
 for superusers and CloudNativePG's own).
+
+## Making a field required
+
+A phone keeps a volunteer's saves until the server takes them, so a field
+the batch endpoint (`POST /api/transactions`) comes to require is added
+as optional in one deploy, and required only in a later one
+(CONTRIBUTING.md, The scan page). For that later one:
+
+1. Confirm that the deploy that added the field is live in production,
+   and has been long enough for phones to send the saves they held.
+2. Read that deploy's build id: `build` in `GET /api/healthz`'s reply, or
+   `build=` in the app's `frontend` log line at startup.
+3. In the change that makes the field required, set `OLDEST_BUILD` in
+   `backend/src/inventory_tng/page_builds.py` to that id.
+4. Deploy that change.
+
+A build's id is when it was built, in UTC. Build the image once and
+promote it from test to production, never rebuilding it, so each deploy's
+id is later than the one before. A batch from a scan page built before
+`OLDEST_BUILD` is then answered 409 `build_too_old`, and the phone keeps
+it and asks for a reload. A client of the API other than the scan page
+sends no `X-Inventory-Build` header, and gets a 422 naming the field it
+lacks.
 
 ## Backups
 

@@ -152,13 +152,32 @@ export interface components {
        */
       lengths?: components["schemas"]["LengthReport"][] | null;
     };
-    /** BuildTooOldReply */
+    /**
+     * BuildTooOldReply
+     * @description A batch from a build of the scan page older than this server takes:
+     *     not checked, nor saved.
+     */
     BuildTooOldReply: {
       /**
        * Reason
        * @constant
        */
       reason: "build_too_old";
+      /**
+       * Build
+       * @description The build the batch named, in X-Inventory-Build
+       */
+      build: string;
+      /**
+       * Oldest
+       * @description The oldest build of the scan page whose batches this server takes
+       */
+      oldest: string;
+      /**
+       * Message
+       * @description What to do
+       */
+      message: string;
     };
     /** Catalogue */
     Catalogue: {
@@ -204,6 +223,11 @@ export interface components {
     Health: {
       /** Status */
       status: string;
+      /**
+       * Build
+       * @description The id of the build of the scan page this server serves, as its frontend log line at startup names it; null with no build, or when Vite's dev server serves the pages
+       */
+      build: string | null;
     };
     /** ItemEntry */
     ItemEntry: {
@@ -630,7 +654,7 @@ export interface operations {
     parameters: {
       query?: never;
       header?: {
-        /** @description The id of the scan page's build that sent it: a build older than the server takes is answered 409 build_too_old, before the batch is checked */
+        /** @description The id of the scan page's build that sent it: a build older than the server takes is answered 409 build_too_old, before the batch is checked. Only the scan page sends it; a batch without it is checked as any other */
         "X-Inventory-Build"?: string | null;
       };
       path?: never;

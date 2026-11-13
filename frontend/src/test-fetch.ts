@@ -9,6 +9,14 @@ export const json = (body: unknown, status: number): Response =>
 export const saved = (transactionId = 77): Response =>
   json({ transaction_id: transactionId }, 201);
 
+/** The batch endpoint's answer to a batch from a build too old. */
+export const TOO_OLD = {
+  reason: "build_too_old",
+  build: "2026-11-12T09:00:00.000Z",
+  oldest: "2026-11-12T10:00:00.000Z",
+  message: "Load the page again.",
+};
+
 /** An api whose fetch answers with `reply`, and keeps what it was sent. */
 export function answering(
   reply: (request: Request) => Response | Promise<Response>,

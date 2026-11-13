@@ -14,7 +14,7 @@ import {
   waitingInOlderKeys,
 } from "./outbox";
 import { telemetry } from "./telemetry";
-import { answering, json, saved } from "./test-fetch";
+import { answering, json, saved, TOO_OLD } from "./test-fetch";
 
 function draft(fields: Partial<Draft> = {}): Draft {
   return {
@@ -477,13 +477,13 @@ describe("builds", () => {
   });
 
   test("a batch from a build too old is kept waiting, not refused, and nothing more is sent", async () => {
-    const { outbox, sent } = of(() => json({ reason: "build_too_old" }, 409));
+    const { outbox, sent } = of(() => json(TOO_OLD, 409));
     outbox.queue(draft(), "first");
     outbox.queue(draft(), "second");
     await vi.waitFor(() => expect(outbox.builds.newer.value).toBe("too_old"));
     expect(states(outbox)).toEqual(["waiting", "waiting"]);
     expect(outbox.entries.value[0]?.note).toBe(
-      "Not sent: this page is out of date. Load it again.",
+      "Not sent. The scanner has been updated, refresh this page.",
     );
     expect(stored().map((each: Entry) => each.state)).toEqual([
       "waiting",
