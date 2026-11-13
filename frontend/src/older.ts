@@ -16,7 +16,8 @@
  * of item_id and quantity (a number in v1, then a decimal), with what,
  * queuedAt, state and note; package_id came in v1, open packages later.
  * Every cart kept its kind, volunteerId, places, installNumber, usedAt and
- * lines of itemId, packages (counts by package id) and loose.
+ * lines of itemId, packages (counts by package id) and loose; from v3, the
+ * key of the save an older build left that filled it (batchKey).
  */
 import { type Signal, signal } from "@preact/signals";
 import * as v from "valibot";
@@ -32,7 +33,12 @@ import {
   type Line,
   reconcile,
 } from "./cart";
-import { BatchKey, STORAGE_KEY as OUTBOX_KEY } from "./outbox";
+import {
+  BatchKey,
+  KEY_REUSED,
+  STORAGE_KEY as OUTBOX_KEY,
+  SAVED_BEFORE_CHANGES,
+} from "./outbox";
 import { count, decimal, thousandths } from "./quantity";
 import {
   hasStored,
@@ -90,6 +96,7 @@ const OldCart = v.object({
   installNumber: v.fallback(v.string(), ""),
   lines: v.pipe(v.array(v.unknown()), v.minLength(1)),
   usedAt: maybe(v.number()),
+  batchKey: maybe(v.string()),
 });
 
 const OldCartLine = v.object({
@@ -105,6 +112,11 @@ export type Older = {
   key: string;
   /** A save's batch key, unique among saves; a cart's, null. */
   batch: string | null;
+  /** The key to save it under again (cart.ts, batchKey), as a tab of an
+   * older build may be sending it still: a save's own, or a cart's that a
+   * save filled. None for one the inventory refused for its key, which it
+   * then holds for another batch and never takes again. */
+  batchKey: string | null;
   kind: (typeof KINDS)[number] | null;
   volunteerId: number | null;
   fromId: number | null;
@@ -146,6 +158,10 @@ function entriesOf(stored: unknown): unknown[] {
 
 const Entries = v.object({ entries: v.array(v.unknown()) });
 
+/** What every build has said of a save refused for its key (409
+ * key_reused). */
+const REFUSED_FOR_KEY = new Set([KEY_REUSED, SAVED_BEFORE_CHANGES]);
+
 function savesIn(key: string, stored: unknown): Older[] {
   return entriesOf(stored).flatMap((entry) => {
     const read = v.safeParse(OldEntry, entry);
@@ -162,6 +178,10 @@ function savesIn(key: string, stored: unknown): Older[] {
       {
         key,
         batch: body.key,
+        batchKey:
+          state === "refused" && REFUSED_FOR_KEY.has(note ?? "")
+            ? null
+            : body.key,
         kind: body.kind,
         volunteerId: body.volunteer_id,
         fromId: body.from_location_id,
@@ -188,6 +208,7 @@ function cartIn(key: string, stored: unknown): Older[] {
     {
       key,
       batch: null,
+      batchKey: cart.batchKey,
       kind: cart.kind,
       volunteerId: cart.volunteerId,
       fromId: cart.fromId,
@@ -355,8 +376,7 @@ export function openWords(n: number): string {
  * what is wrong; one of a package resized since it was saved is left to
  * do again. What was taken from an open package, and what was said of
  * one, are left to do again too, as the open packages may have changed.
- * A save's cart keeps its batch key, to be sent under (cart.ts, batchKey):
- * an older build's tab may be sending it still.
+ * The cart keeps the batch key it is to be sent under (Older.batchKey).
  */
 export function toCart(
   older: Older,
@@ -454,7 +474,7 @@ export function toCart(
         toId: older.toId,
         installNumber: older.installNumber,
         lines: [...lines.values()],
-        ...(v.is(BatchKey, older.batch) ? { batchKey: older.batch } : {}),
+        ...(v.is(BatchKey, older.batchKey) ? { batchKey: older.batchKey } : {}),
       },
       catalogue,
     ),

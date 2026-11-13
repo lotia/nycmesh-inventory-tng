@@ -5,6 +5,7 @@ import { openCamera } from "./camera";
 import { addOne, STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
 import { PRINTED_LENGTH } from "./OpenPackageCard";
 import {
+  KEY_REUSED,
   STORAGE_KEY as OUTBOX_KEY,
   Outbox,
   SAVED_BEFORE_CHANGES,
@@ -1962,6 +1963,22 @@ describe("what an older build left", () => {
     const radio = screen.getByText("LiteBeam 5AC").closest("li") as HTMLElement;
     fireEvent.click(within(radio).getByRole("button", { name: "Remove" }));
     fillMove();
+    save();
+    await screen.findByText("In the inventory (transaction 2).");
+    expect(outbox.entries.value[0]?.body.key).not.toBe(KEY);
+  });
+
+  test("one refused for its key goes back without it, and saves under a new one", async () => {
+    leaveSave({ state: "refused", note: KEY_REUSED });
+    // The ledger holds another batch under its key.
+    const written = new Map([[KEY, "another"]]);
+    const outbox = open(ledger(written).api);
+    await ready();
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: "Add to cart" }),
+    );
+    const cable = screen.getByText("Cat6 cable").closest("li") as HTMLElement;
+    fireEvent.click(within(cable).getByRole("button", { name: "Remove" }));
     save();
     await screen.findByText("In the inventory (transaction 2).");
     expect(outbox.entries.value[0]?.body.key).not.toBe(KEY);
