@@ -222,3 +222,60 @@ test("a save an older build's tab saved meanwhile is saved once, under its key; 
     ),
   ).toBeVisible();
 });
+
+test("a double tap on a line's Discard discards that line only; one that could not read a line stays, saying so, until its own Discard", async ({
+  page,
+}) => {
+  const cable = await ownCable(page);
+  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  await page.goto("/scan");
+  const open = crypto.randomUUID();
+  await leave(page, [
+    { item_id: itemId, quantity: "3", open_package_key: open },
+    { item_id: itemId, quantity: "5", open_package_key: open },
+    // A line no build wrote.
+    { quantity: "1" },
+  ]);
+  await page.reload();
+
+  const listing = listingOf(page);
+  const lineDiscard = (words: string) =>
+    listing
+      .getByRole("listitem")
+      .filter({ hasText: words })
+      .last()
+      .getByRole("button", { name: "Discard" });
+  await lineDiscard(`${cable}: 3 m from an open package`).dblclick();
+  await expect(
+    listing.getByText(`${cable}: 3 m from an open package`),
+  ).toHaveCount(0);
+  await expect(
+    listing.getByText(`${cable}: 5 m from an open package`),
+  ).toBeVisible();
+  // Focus on the entry's heading, not the line that moved up.
+  await expect(listing.locator("#older-0")).toBeFocused();
+  // Once the taps are taken again, its last line goes, and it stays.
+  await expect(async () => {
+    await lineDiscard(`${cable}: 5 m from an open package`).click();
+    await expect(listing.getByText(`${cable}: 5 m`)).toHaveCount(0, {
+      timeout: 1000,
+    });
+  }).toPass();
+  await expect(
+    listing.getByText(
+      "Sorry. Could not read 1 previously added item, scan it again.",
+    ),
+  ).toBeVisible();
+  await expect(listing.getByRole("button")).toHaveText(["Discard"]);
+  await expect(async () => {
+    await listing.getByRole("button", { name: "Discard" }).click();
+    await expect(listing.getByText("Confirm discard")).toBeVisible({
+      timeout: 1000,
+    });
+  }).toPass();
+  await listing.getByRole("button", { name: "Discard" }).click();
+  await expect(listing).toHaveCount(0);
+  expect(
+    await page.evaluate(() => localStorage.getItem("inventory.outbox.v3")),
+  ).toBeNull();
+});

@@ -785,7 +785,9 @@ function CartForm({
  * What older builds left and the page did not put back in the cart itself,
  * each in words, to add to the cart or discard (older.ts). Discarding asks
  * first, here on the page. A line that cannot go back says why under it,
- * and can be discarded on its own, without asking. One holding an item
+ * and can be discarded on its own, without asking: focus then goes to its
+ * entry's heading, and taps on the entry's buttons wait a moment
+ * (SETTLE_MS). One holding an item
  * retired since, and out of the catalogue, names it from the catalogue's
  * retired items, and goes in the cart only once that line is discarded.
  */
@@ -802,6 +804,10 @@ function OlderList({
   // The one whose discarding is being confirmed, and what one tap said.
   const discarding = useSignal<string | null>(null);
   const said = useSignal<{ on: string; words: string } | null>(null);
+  // When a line of each was last discarded, and the one whose heading is
+  // to take focus once it is listed again.
+  const lineGoneAt = useRef(new Map<string, number>());
+  const refocus = useRef<string | null>(null);
   const listed = older.listed.value;
   // Each in words once, not on every change to the cart beside it.
   const shown = useMemo(() => {
@@ -834,9 +840,24 @@ function OlderList({
       };
     });
   }, [listed, catalogue]);
+  // After a line's Discard, focus goes to its entry's heading, not to the
+  // page; if the entry went with it, where it goes after an entry's Discard.
+  useEffect(() => {
+    const on = refocus.current;
+    refocus.current = null;
+    const n = shown.findIndex(({ each }) => olderId(each) === on);
+    if (n >= 0) {
+      document.getElementById(`older-${n}`)?.focus();
+    }
+  }, [shown]);
   if (shown.length === 0) {
     return null;
   }
+  /** Whether a tap on one of `on`'s buttons is to be ignored: just after a
+   * line of it was discarded, the second tap of a double tap would land
+   * on what moved up in its place (Ali, inventory-tng-0su). */
+  const settling = (on: string) =>
+    performance.now() - (lineGoneAt.current.get(on) ?? -Infinity) < SETTLE_MS;
   /** Tell the volunteer, under `each`, that it, or a line of it, was not
    * discarded, unless it changed meanwhile (`still`), which listing it
    * again shows. */
@@ -857,7 +878,7 @@ function OlderList({
           const title = `older-${n}`;
           return (
             <li key={on} class="flex flex-col gap-2">
-              <div id={title}>
+              <div id={title} tabIndex={-1}>
                 <strong>{olderKind(each)}</strong>
                 {olderWhere(each, catalogue)}
               </div>
@@ -887,8 +908,13 @@ function OlderList({
                             type="button"
                             aria-describedby={named}
                             onClick={() => {
+                              if (settling(on)) {
+                                return;
+                              }
                               said.value = null;
                               if (older.dropPart(each, line.drop, catalogue)) {
+                                lineGoneAt.current.set(on, performance.now());
+                                refocus.current = on;
                                 telemetry.record({
                                   kind: "older_storage",
                                   held: heldIn(each),
@@ -917,6 +943,9 @@ function OlderList({
                       class="danger"
                       aria-describedby={title}
                       onClick={() => {
+                        if (settling(on)) {
+                          return;
+                        }
                         discarding.value = null;
                         if (older.remove(each)) {
                           telemetry.record({
@@ -934,7 +963,9 @@ function OlderList({
                     <button
                       type="button"
                       onClick={() => {
-                        discarding.value = null;
+                        if (!settling(on)) {
+                          discarding.value = null;
+                        }
                       }}
                     >
                       Keep it
@@ -949,6 +980,9 @@ function OlderList({
                       aria-describedby={title}
                       disabled={retired}
                       onClick={() => {
+                        if (settling(on)) {
+                          return;
+                        }
                         const why = onPutBack(each);
                         said.value = why === null ? null : { on, words: why };
                       }}
@@ -960,6 +994,9 @@ function OlderList({
                     type="button"
                     aria-describedby={title}
                     onClick={() => {
+                      if (settling(on)) {
+                        return;
+                      }
                       said.value = null;
                       discarding.value = on;
                     }}
@@ -989,6 +1026,10 @@ function NoteSaid({ note: [opening, rest] }: { note: Note }) {
     </p>
   );
 }
+
+/** How long after a line's Discard taps on its entry's buttons are
+ * ignored, in milliseconds. */
+const SETTLE_MS = 500;
 
 /** Said when one has gone meanwhile. */
 const GONE = "That one has gone: it was sent, or dealt with in another tab.";

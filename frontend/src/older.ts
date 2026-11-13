@@ -342,7 +342,8 @@ export function removeOlder(
  * Discard a part of `older` (Part.drop): what is left is kept as it was,
  * under its key, so a save keeps its batch key, as one put back in the
  * cart and changed there does (Older.batchKey); one left with nothing to
- * list in `catalogue` goes whole (removeOlder). False if the browser would
+ * list in `catalogue` goes whole (removeOlder), but one that says lines
+ * could not be read stays (nothingListed). False if the browser would
  * not keep the change, or `older` has changed meanwhile.
  */
 export function dropPart(
@@ -398,13 +399,18 @@ export function dropPart(
   const after = (older.batch === null ? cartIn : savesIn)(older.key, next).find(
     (each) => each.batch === older.batch,
   );
-  if (
-    after === undefined ||
-    toCart(after, withRetired(catalogue)).parts.length === 0
-  ) {
+  if (after === undefined || nothingListed(after, catalogue)) {
     return removeOlder(older, storage);
   }
   return writeStored(storage, older.key, next);
+}
+
+/** Whether `older` lists nothing more: no part, and no note that lines
+ * could not be read, which stays, with its own Discard, until that is
+ * tapped (Ali, inventory-tng-0su). */
+function nothingListed(older: Older, catalogue: Catalogue): boolean {
+  const { lost, parts } = toCart(older, withRetired(catalogue));
+  return parts.length === 0 && lost === null;
 }
 
 /** `lines` as kept, less what `drop` cuts from them: a line whole, or of a

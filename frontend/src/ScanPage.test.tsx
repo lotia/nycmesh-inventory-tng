@@ -1860,10 +1860,117 @@ describe("what an older build left", () => {
     const first = discardOf("Cat6 cable: 3 m from an open package");
     first.focus();
     fireEvent.click(first);
-    // Focus left on it, a second press would discard the next, unasked.
+    // Focus left on it, a second press would discard the next, unasked:
+    // it goes to the entry's heading.
+    await vi.waitFor(() => expect(document.activeElement?.id).toBe("older-0"));
     expect(document.activeElement).not.toBe(
       discardOf("Cat6 cable: 5 m from an open package"),
     );
+  });
+
+  test("just after a line's Discard, taps on its entry's buttons are ignored, so a double tap discards one line", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    leaveSave({
+      body: {
+        key: KEY,
+        kind: "move",
+        volunteer_id: 1,
+        from_location_id: 10,
+        to_location_id: 12,
+        lines: [
+          { item_id: 101, quantity: "3", open_package_key: KEY },
+          { item_id: 101, quantity: "5", open_package_key: KEY },
+          { item_id: 101, quantity: "7", open_package_key: KEY },
+          { item_id: 100, quantity: "8", package_id: 1000 },
+        ],
+      },
+    });
+    open();
+    await ready();
+    const discardOf = (words: string) =>
+      within(
+        within(listing()).getByText(words).closest("li") as HTMLElement,
+      ).getByRole("button", { name: "Discard" });
+    fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
+    // The second tap of a double tap, on what moved up in its place.
+    fireEvent.click(discardOf("Cat6 cable: 5 m from an open package"));
+    within(listing()).getByText("Cat6 cable: 5 m from an open package");
+    fireEvent.click(lastDiscard());
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: "Add to cart" }),
+    );
+    expect(within(listing()).queryByText("Confirm discard")).toBeNull();
+    expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(500);
+    fireEvent.click(lastDiscard());
+    within(listing()).getByText("Confirm discard");
+    // Asked, a line discarded meanwhile holds the answer back too.
+    fireEvent.click(discardOf("Cat6 cable: 5 m from an open package"));
+    fireEvent.click(lastDiscard());
+    fireEvent.click(within(listing()).getByRole("button", { name: "Keep it" }));
+    within(listing()).getByText("Confirm discard");
+    await vi.advanceTimersByTimeAsync(500);
+    fireEvent.click(within(listing()).getByRole("button", { name: "Keep it" }));
+    expect(within(listing()).queryByText("Confirm discard")).toBeNull();
+  });
+
+  test("a cart's line of an item no longer in the catalogue says so, and can be removed", async () => {
+    storeCart({
+      ...freshCart(),
+      volunteerId: 1,
+      lines: [{ itemId: 999, packages: {}, loose: "1", typed: true }],
+    });
+    open();
+    await ready();
+    fireEvent.click(
+      within(
+        screen
+          .getByText(/^No longer in the catalogue\./)
+          .closest("li") as HTMLElement,
+      ).getByRole("button", { name: "Remove" }),
+    );
+    expect(screen.queryByText(/^No longer in the catalogue\./)).toBeNull();
+  });
+
+  test("one that could not read some lines stays, saying so, once its last line listed is discarded, until it is discarded itself", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    leaveSave({
+      body: {
+        key: KEY,
+        kind: "move",
+        volunteer_id: 1,
+        from_location_id: 10,
+        to_location_id: 12,
+        lines: [
+          { item_id: 101, quantity: "3", open_package_key: KEY },
+          { item_id: "lots" },
+        ],
+      },
+    });
+    open();
+    await ready();
+    const unread = "Sorry. Could not read 1 previously added item";
+    within(listing()).getByText(unread);
+    const taken = within(listing())
+      .getByText("Cat6 cable: 3 m from an open package")
+      .closest("li") as HTMLElement;
+    fireEvent.click(within(taken).getByRole("button", { name: "Discard" }));
+    expect(
+      within(listing()).queryByText("Cat6 cable: 3 m from an open package"),
+    ).toBeNull();
+    within(listing()).getByText(unread);
+    await vi.waitFor(() => expect(document.activeElement?.id).toBe("older-0"));
+    // Nothing left to put back: only its own Discard.
+    expect(
+      within(listing())
+        .getAllByRole("button")
+        .map((each) => each.textContent),
+    ).toEqual(["Discard"]);
+    await vi.advanceTimersByTimeAsync(500);
+    fireEvent.click(lastDiscard());
+    fireEvent.click(lastDiscard());
+    expect(screen.queryByText(HEADING)).toBeNull();
+    expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
   });
 
   test("a line the browser will not let go of says so, and stays", async () => {
