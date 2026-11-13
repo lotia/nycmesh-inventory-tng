@@ -525,8 +525,7 @@ describe("builds", () => {
   });
 
   test("an older build's batch held back as too old is too old itself, not this tab", async () => {
-    const theirs = entry({ build: OLDER });
-    store(theirs);
+    store(entry({ build: OLDER }));
     // A server whose oldest build is after OLDER.
     const { outbox, sent } = of((request) =>
       request.headers.get(HEADER) === OLDER ? json(TOO_OLD, 409) : saved(),

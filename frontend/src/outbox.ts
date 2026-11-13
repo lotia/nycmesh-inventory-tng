@@ -442,8 +442,10 @@ export class Outbox {
         return "stop";
       case 409:
         if (reply.body.reason === "build_too_old") {
-          const mine = this.builds.build;
-          if (entry.build !== mine && !this.builds.isNewer(entry.build)) {
+          if (
+            entry.build !== this.builds.build &&
+            !this.builds.isNewer(entry.build)
+          ) {
             // An older build's, kept under this key: too old itself, not
             // this tab. Listed with what older builds left (older.ts).
             this.settle(key, {
