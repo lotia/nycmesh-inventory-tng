@@ -120,14 +120,19 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   refused. Only a batch that names its build is checked so (Ali,
   2026-11-12, inventory-tng-omi.1): another client of the API names none,
   and a 409 on every batch would leave it no way to save, where a 422
-  tells it which field it lacks. We rejected copying between keys, which
-  earlier builds did and which every change to what is kept made harder,
-  and reading leniently (`v.looseObject`), which keeps unknown fields but
-  still needs a new key for a changed value. The page checks that 409 by
-  its reason alone (Ali, 2026-11-12, inventory-tng-op6), the one reply not
-  held to match its generated type exactly, rather than freezing its other
-  fields: only a page older than the server reads it, so a later server may
-  change them without that page sending the batch again for ever.
+  tells it which field it lacks. A test holds the server to it (Ali,
+  2026-11-12, inventory-tng-iv6): it keeps what the batch endpoint's schema
+  accepts, and fails on any change that accepts less, not only a field made
+  required, and on one that accepts more until the copy is written again, so
+  it never measures against a stale one. Rules inside validators are not in
+  the schema, and are watched by hand. We rejected copying between keys, which
+  earlier builds did and which every change to what is kept made harder, and
+  reading leniently (`v.looseObject`), which keeps unknown fields but still
+  needs a new key for a changed value. The page checks that 409 by its reason
+  alone (Ali, 2026-11-12, inventory-tng-op6), the one reply not held to match
+  its generated type exactly, rather than freezing its other fields: only a
+  page older than the server reads it, so a later server may change them
+  without that page sending the batch again for ever.
 - Compression behaves the same in compose and in Kubernetes, because the
   app serves the compressed files itself. The image holds three copies of
   each file; the bundle is small, so that costs little.

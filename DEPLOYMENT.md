@@ -193,19 +193,23 @@ Count the total before scaling: processes × 20, plus one for a migration,
 must stay under PostgreSQL's `max_connections` (100 by default, less 3 kept
 for superusers and CloudNativePG's own).
 
-## Making a field required
+## Tightening what a batch accepts
 
-A phone keeps a volunteer's saves until the server takes them, so a field
-the batch endpoint (`POST /api/transactions`) comes to require is added
-as optional in one deploy, and required only in a later one
-(CONTRIBUTING.md, The scan page). For that later one:
+A phone keeps a volunteer's saves until the server takes them, so a change
+that makes the batch endpoint (`POST /api/transactions`) accept less, such
+as a field it comes to require, is made in two deploys: the first keeps
+accepting what the build before sends, and the second accepts less
+(CONTRIBUTING.md, The scan page). For the second:
 
-1. Confirm that the deploy that added the field is live in production,
-   and has been long enough for phones to send the saves they held.
+1. Confirm that the first deploy is live in production, and has been long
+   enough for phones to send the saves they held. A week is a good wait,
+   as advice, not a rule: a phone that holds saves longer still keeps
+   them, and once reloaded lists them for the volunteer to save again.
 2. Read that deploy's build id: `build` in `GET /api/healthz`'s reply, or
    `build=` in the app's `frontend` log line at startup.
-3. In the change that makes the field required, set `OLDEST_BUILD` in
-   `backend/src/inventory_tng/page_builds.py` to that id.
+3. In the change that accepts less, set `OLDEST_BUILD` in
+   `backend/src/inventory_tng/page_builds.py` to that id, then write
+   `backend/tests/batch_schema.json` again (CONTRIBUTING.md, The scan page).
 4. Deploy that change.
 
 A build's id is when it was built, in UTC. Build the image once and

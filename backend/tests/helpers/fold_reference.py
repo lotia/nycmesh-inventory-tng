@@ -13,12 +13,13 @@ only, writing nothing, and exit 1 with the difference if it is stale:
 """
 
 import argparse
-import difflib
 import sys
 import unicodedata
 from pathlib import Path
 
 from inventory_tng.models import FOLDED_WITH, fold
+
+from . import committed
 
 REFERENCE = Path(__file__).parent.parent / "fold_reference.tsv"
 COMMANDS = (
@@ -121,34 +122,14 @@ def reference() -> str:
     return "\n".join(lines) + "\n"
 
 
-def difference() -> str:
-    """How the file differs from what fold makes now: nothing if it doesn't."""
-    kept = REFERENCE.read_text(encoding="utf-8") if REFERENCE.exists() else ""
-    return "".join(
-        difflib.unified_diff(
-            kept.splitlines(keepends=True),
-            reference().splitlines(keepends=True),
-            "committed",
-            "now",
-        )
-    )
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument(
         "--check", action="store_true", help="compare only, and write nothing"
     )
     if parser.parse_args(argv).check:
-        found = difference()
-        if found:
-            print(found, end="")
-            return 1
-        print(f"{REFERENCE.name} is up to date")
-        return 0
-    REFERENCE.write_text(reference(), encoding="utf-8")
-    print(f"Wrote {REFERENCE}")
-    return 0
+        return committed.check(REFERENCE, reference())
+    return committed.write(REFERENCE, reference())
 
 
 if __name__ == "__main__":
