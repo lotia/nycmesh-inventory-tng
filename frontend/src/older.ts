@@ -353,6 +353,10 @@ export const LINES_LOST =
   "Sorry. Could not read previously added items, scan them again.";
 export const RESIZED =
   "Sorry. The package size has changed since this item was added. Discard and re-add the new package size.";
+/** Of a package no longer offered: retired, with none sealed left
+ * (inventory-tng-adb). */
+export const PACKAGE_RETIRED =
+  "Sorry. The package has been retired since this item was added. Discard and re-add the item.";
 
 /** Lines that could not be read, counted. */
 export function unreadWords(n: number): string {
@@ -373,8 +377,9 @@ export function openWords(n: number): string {
  * has none; and what of it the cart cannot hold, in words. A batch's
  * package line goes back as packages, if the item still has the package
  * and the amount is whole ones of it; else as loose, for the cart to say
- * what is wrong; one of a package resized since it was saved is left to
- * do again. What was taken from an open package, and what was said of
+ * what is wrong; one of a package resized since it was saved, or of one
+ * the catalogue no longer offers, is left to do again, as is an older
+ * cart's count of one no longer offered. What was taken from an open package, and what was said of
  * one, are left to do again too, as the open packages may have changed.
  * The cart keeps the batch key it is to be sent under (Older.batchKey).
  */
@@ -398,12 +403,25 @@ export function toCart(
   let unread = 0;
   let open = older.reports;
   let resized = false;
+  let retired = false;
   for (const line of older.lines) {
     if (line === null) {
       unread += 1;
     } else if ("itemId" in line) {
+      const item = items.get(line.itemId);
       const made = lineOf(line.itemId);
-      made.packages = { ...line.packages };
+      made.packages = {};
+      for (const [packageId, n] of Object.entries(line.packages)) {
+        if (
+          item === undefined ||
+          item.packages.some((pack) => String(pack.id) === packageId)
+        ) {
+          made.packages[packageId] = n;
+        } else if ((count(n) ?? 0) !== 0) {
+          // Neither shown nor saved by the cart, so said, not kept.
+          retired = true;
+        }
+      }
       made.loose = line.loose;
       open += Object.values(line.open).filter(saidOfOpen).length;
     } else {
@@ -419,6 +437,16 @@ export function toCart(
         continue;
       }
       const pack = item?.packages.find((each) => each.id === line.package_id);
+      if (
+        item !== undefined &&
+        line.package_id !== null &&
+        pack === undefined
+      ) {
+        // No longer offered: loose would not say what was moved, sealed,
+        // so it is done again. An item gone is named as it is (withRetired).
+        retired = true;
+        continue;
+      }
       const size = pack === undefined ? null : thousandths(pack.size);
       if (
         line.package_size !== null &&
@@ -461,6 +489,9 @@ export function toCart(
   if (resized) {
     gaps.push(RESIZED);
   }
+  if (retired) {
+    gaps.push(PACKAGE_RETIRED);
+  }
   const kind: Kind =
     older.kind === null || older.kind === "report" ? last.kind : older.kind;
   return {
@@ -485,10 +516,10 @@ export function toCart(
 /**
  * Whether `older` goes back in the cart whole, for the page to put it
  * there without a tap: something to put back, nothing left out (no line
- * unread, nothing of an open package, no package resized), no item or
- * package retired, gone or not, and no refusal, as each needs the
- * volunteer: a refusal's reason is said only while it is listed, and a
- * package gone would go back loose, or not at all.
+ * unread, nothing of an open package, no package resized or no longer
+ * offered), no item or package retired, gone or not, and no refusal, as
+ * each needs the volunteer: a refusal's reason is said only while it is
+ * listed, and one retired with some left is taking only.
  */
 export function goesBackWhole(older: Older, catalogue: Catalogue): boolean {
   const { cart, gaps } = toCart(older, catalogue);

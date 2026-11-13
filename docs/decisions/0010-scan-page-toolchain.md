@@ -160,6 +160,10 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   then takes it once, or refuses it changed, which the page says. We
   rejected putting back only saves the server says it does not hold,
   which still leaves the window between asking and saving.
+  A count of a package the catalogue no longer offers is left out of
+  what goes back and said, as a resized one is (inventory-tng-adb). We
+  rejected putting it back loose, which says loose units moved where
+  sealed packages did.
 - Compression behaves the same in compose and in Kubernetes, because the
   app serves the compressed files itself. The image holds three copies of
   each file; the bundle is small, so that costs little.
