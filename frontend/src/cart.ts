@@ -19,9 +19,9 @@ import { count, decimal, sent, thousandths } from "./quantity";
 import { onStoredChange, readStored, writeStored } from "./stored";
 
 /** Versioned as the outbox's is (outbox.ts): each build reads its own.
- * v2's is stamped with the build that wrote it; v3's may keep a batch key
+ * v2's is stamped with the build that wrote it, and may keep a batch key
  * (batchKey). */
-export const STORAGE_KEY = "inventory.cart.v3";
+export const STORAGE_KEY = "inventory.cart.v2";
 /** The server's limits (ledger.py), checked here too, so a batch it would
  * refuse is never queued and the cart is kept to fix it. */
 const MAX_ID = 2 ** 31 - 1;
@@ -85,8 +85,7 @@ const CartSchema = v.object({
    * another tab has changed it since (CartStore). */
   revision: v.optional(v.string(), ""),
   /** The key of the save an older build left that filled it (older.ts),
-   * to be sent under: if that build's tab saved it meanwhile, the server
-   * takes it once. Gone once the cart is emptied. */
+   * kept until the cart is emptied. */
   batchKey: v.exactOptional(BatchKey),
 });
 

@@ -4,6 +4,7 @@ import { BUILD, Builds, HEADER } from "./build";
 import {
   type Draft,
   Entry,
+  KEY_REUSED,
   Kept,
   newEntry,
   Outbox,
@@ -281,7 +282,7 @@ describe("refusals", () => {
     await vi.waitFor(() =>
       expect(states(outbox)).toEqual(["refused", "saved"]),
     );
-    expect(outbox.entries.value[0]?.note).toContain("Please report this");
+    expect(outbox.entries.value[0]?.note).toBe(KEY_REUSED);
   });
 
   test("a save put back goes under its key, and refused as reused says it was saved first, before the changes", async () => {
@@ -769,7 +770,7 @@ describe("storage", () => {
     };
     expect(Object.keys(Kept.entries)).toEqual(["build", "entries"]);
     expect({ [STORAGE_KEY]: paths(Entry).sort() }).toEqual({
-      "inventory.outbox.v6": [
+      "inventory.outbox.v4": [
         "body",
         "body.from_location_id",
         "body.install_number",

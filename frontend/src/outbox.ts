@@ -41,10 +41,10 @@ import { telemetry } from "./telemetry";
 
 /** Versioned: a build that changes what is kept takes a new key, as a tab
  * of an older build, open during a deploy, would drop what it cannot read
- * from what it writes back. v4's is stamped with the build that wrote it;
- * v5's entries each with the build that queued them too; v6's say which
- * were sent under an older save's key (putBack). */
-export const STORAGE_KEY = "inventory.outbox.v6";
+ * from what it writes back. v4's is stamped with the build that wrote it,
+ * its entries each with the build that queued them, and says which were
+ * sent under an older save's key (putBack). */
+export const STORAGE_KEY = "inventory.outbox.v4";
 /** How long to wait before trying again after no answer. */
 export const RETRY_MS = 30_000;
 /** Unexpected answers to one batch before its note asks for a report. */

@@ -1921,14 +1921,20 @@ describe("what an older build left", () => {
     });
   }
 
-  test("one an older build's tab saved meanwhile is saved once, under its key", async () => {
+  /** A move of one radio left, put back in the cart without a tap, which
+   * the older build's tab, its request in flight as this page loaded,
+   * saved first. */
+  async function putBackSavedFirst() {
     leaveMoves([KEY, AT, [radios(1)]]);
-    // The older build's tab, its request in flight as this page loaded,
-    // saved it first.
     const written = new Map([[KEY, linesOf({ lines: [radios(1)] })]]);
     const outbox = open(ledger(written).api);
     await ready();
     await screen.findByText(ADDED_BACK);
+    return { outbox, written };
+  }
+
+  test("one an older build's tab saved meanwhile is saved once, under its key", async () => {
+    const { outbox, written } = await putBackSavedFirst();
     save();
     await screen.findByText("In the inventory (transaction 1).");
     expect(written.size).toBe(1);
@@ -1936,11 +1942,7 @@ describe("what an older build left", () => {
   });
 
   test("one changed after it went back, which an older build's tab saved first, is not saved, and says so", async () => {
-    leaveMoves([KEY, AT, [radios(1)]]);
-    const written = new Map([[KEY, linesOf({ lines: [radios(1)] })]]);
-    const outbox = open(ledger(written).api);
-    await ready();
-    await screen.findByText(ADDED_BACK);
+    const { outbox, written } = await putBackSavedFirst();
     fireEvent.input(screen.getByLabelText("Box (4 each)"), {
       target: { value: "2" },
     });
@@ -1955,11 +1957,7 @@ describe("what an older build left", () => {
   });
 
   test("emptied, a cart that went back saves what fills it next under a new key", async () => {
-    leaveMoves([KEY, AT, [radios(1)]]);
-    const written = new Map([[KEY, linesOf({ lines: [radios(1)] })]]);
-    const outbox = open(ledger(written).api);
-    await ready();
-    await screen.findByText(ADDED_BACK);
+    const { outbox } = await putBackSavedFirst();
     const radio = screen.getByText("LiteBeam 5AC").closest("li") as HTMLElement;
     fireEvent.click(within(radio).getByRole("button", { name: "Remove" }));
     fillMove();
