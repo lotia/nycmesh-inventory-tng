@@ -10,14 +10,14 @@ import pytest
 
 from inventory_tng.models import FOLDED_WITH
 
-from helpers import fold_reference
-from helpers.fold_reference import COMMANDS, REFERENCE, characters, difference, main
+from helpers import committed, fold_reference
+from helpers.fold_reference import COMMANDS, REFERENCE, characters, main, reference
 
 pytestmark = pytest.mark.clone
 
 
 def test_fold_spells_the_sample_as_the_reference_does() -> None:
-    found = difference()
+    found = committed.difference(REFERENCE, reference())
     assert found == "", (
         f"fold() no longer gives {REFERENCE.name}. If more than its first line "
         "(the versions of anyascii and of Python's Unicode) changed, decide "

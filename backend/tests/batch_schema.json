@@ -1,0 +1,224 @@
+{
+  "about": "What /api/transactions accepts. Written by mise run regenerate-batch-schema, or from backend/: uv run python -m tests.helpers.batch_schema.",
+  "body": {
+    "$ref": "#/components/schemas/Batch"
+  },
+  "models": {
+    "Batch": {
+      "properties": {
+        "from_location_id": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "maximum": 2147483647.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "install_number": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "maximum": 2147483647.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "key": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "install",
+            "move",
+            "open",
+            "receipt",
+            "report"
+          ],
+          "type": "string"
+        },
+        "lengths": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/components/schemas/LengthReport"
+              },
+              "maxItems": 500,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lines": {
+          "items": {
+            "$ref": "#/components/schemas/Line"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "to_location_id": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "maximum": 2147483647.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "used_up": {
+          "anyOf": [
+            {
+              "items": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "maxItems": 500,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "volunteer_id": {
+          "exclusiveMinimum": 0.0,
+          "maximum": 2147483647.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "key",
+        "kind",
+        "lines",
+        "volunteer_id"
+      ],
+      "type": "object"
+    },
+    "LengthReport": {
+      "properties": {
+        "left": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "open_package_key": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "left",
+        "open_package_key"
+      ],
+      "type": "object"
+    },
+    "Line": {
+      "properties": {
+        "item_id": {
+          "exclusiveMinimum": 0.0,
+          "maximum": 2147483647.0,
+          "type": "integer"
+        },
+        "open_package_key": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "package_id": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "maximum": 2147483647.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "package_size": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "whole": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "item_id",
+        "quantity"
+      ],
+      "type": "object"
+    }
+  },
+  "oldest_build": null,
+  "parameters": [
+    {
+      "in": "header",
+      "name": "X-Inventory-Build",
+      "required": false,
+      "schema": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    }
+  ]
+}

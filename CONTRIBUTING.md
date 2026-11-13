@@ -344,14 +344,29 @@ So the server keeps taking what the build before sends. Expand, then
 contract: a field the batch endpoint will require is added as optional,
 and made required only in a later deploy, after the one whose page sends
 it. Better still, the server works the field out itself where it can, so
-it never needs to be required. That later change also sets `OLDEST_BUILD` in
+it never needs to be required. The same goes for any change that makes
+the endpoint accept less: a narrower limit, a value dropped from a kind's
+list, null no longer taken, or fields it does not name refused. That later
+change also sets `OLDEST_BUILD` in
 `backend/src/inventory_tng/page_builds.py` to the id of the build the
-earlier deploy served (DEPLOYMENT.md, Making a field required). A batch
-whose `X-Inventory-Build` header names a build before that is then
+earlier deploy served (DEPLOYMENT.md, Tightening what a batch accepts). A
+batch whose `X-Inventory-Build` header names a build before that is then
 answered 409 `build_too_old` and kept on the phone, where a 422 would have
 it refused; one naming none, from another client of the API, gets the
-422. `backend/tests/test_page_builds.py` lists the fields the endpoint
-requires, and fails when one is added.
+422.
+
+`backend/tests/batch_schema.json` keeps what the endpoint's schema
+accepts, and `backend/tests/test_batch_schema.py` fails on a change that
+accepts less, naming each way. A change that only accepts more fails too,
+until the file is written again, so the next change is measured against
+what was deployed: `mise run regenerate-batch-schema` (from `backend/`:
+`uv run python -m tests.helpers.batch_schema`, and `--check` only
+compares). Over a change that accepts less, it writes nothing until
+`OLDEST_BUILD` has moved, or `--tighten` says no older build's batch is
+refused by it. A rule inside a validator (a pydantic model's or field's,
+or the ledger's checks), a decimal's digits, and strict mode (`strict=True`,
+which refuses `"5"` for a whole number) are not in the schema, so the
+test cannot see them: tightening one takes the same care, by hand.
 
 The scan page needs a registered device, and some catalogue rows to choose
 from. The camera works only over HTTPS or on `localhost`.

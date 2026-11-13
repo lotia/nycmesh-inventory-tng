@@ -23,7 +23,7 @@ def test_healthz_names_the_build_the_server_serves(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """So an operator can read it for page_builds.OLDEST_BUILD without the
-    logs (DEPLOYMENT.md, Making a field required)."""
+    logs (DEPLOYMENT.md, Tightening what a batch accepts)."""
     build = "2026-11-12T12:00:00.000Z"
     app = cast(FastAPI, client.app)
     monkeypatch.setattr(app.state.bundle, "build_id", lambda: build)

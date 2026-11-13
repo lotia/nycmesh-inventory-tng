@@ -88,6 +88,11 @@ description = "Write tests/fold_reference.tsv again, after a release of anyascii
 dir = "backend"
 run = "uv run python -m tests.helpers.fold_reference"
 
+[tasks.regenerate-batch-schema]
+description = "Write tests/batch_schema.json again, after a change to what the batch endpoint accepts (CONTRIBUTING.md, The scan page)"
+dir = "backend"
+run = "uv run python -m tests.helpers.batch_schema"
+
 [tasks.check-markdown]
 description = "Lint every Markdown file the project writes (AGENTS.md rule 9)"
 run = "markdownlint-cli2"

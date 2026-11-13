@@ -7,9 +7,10 @@ endpoint's reply carries this server's, so a tab of an older build learns
 that a newer one is out, sends what it holds, and asks for a reload.
 
 A field the server comes to require is added first and required only in a
-later deploy (CONTRIBUTING.md, The scan page; DEPLOYMENT.md, Making a field
-required). That later change sets OLDEST_BUILD to the build of the deploy
-that added it, so a batch whose header names a build before it is answered
+later deploy, as is any other way of accepting less of a batch
+(CONTRIBUTING.md, The scan page; DEPLOYMENT.md, Tightening what a batch
+accepts). That later change sets OLDEST_BUILD to the build of the deploy
+before it, so a batch whose header names a build before it is answered
 409 build_too_old, before its body is checked: its tab keeps it and asks
 for a reload, where a 422 would have it refused. A batch with no header is
 from another client of the API, never the page, so it is checked as any
@@ -31,7 +32,7 @@ meter = metrics.get_meter(__name__)
 
 HEADER = "X-Inventory-Build"
 # The oldest build whose batches this server takes, as its id; None takes
-# every build's. Set only in the change that makes a field required.
+# every build's. Set only in a change that makes a batch accept less.
 OLDEST_BUILD: str | None = None
 
 too_old = meter.create_counter(
