@@ -2,7 +2,8 @@
  * What the API's replies must look like before the pages use them, checked
  * with Valibot (decision 0010). The generated types say what the server
  * promises; these check what arrived. types.typecheck.ts proves that each
- * matches its generated type, so the two cannot drift apart.
+ * matches its generated type exactly, so the two cannot drift apart. One
+ * exception: BuildTooOldReply.
  */
 import * as v from "valibot";
 
@@ -24,12 +25,13 @@ export const DeviceRefusedReply = v.object({
 export const KeyReusedReply = v.object({ reason: v.literal("key_reused") });
 
 /** A batch from a build of the page older than the server takes: kept,
- * not refused (backend page_builds.py). */
-export const BuildTooOldReply = v.object({
+ * not refused (backend page_builds.py). The one reply checked loosely, by
+ * its reason alone (Ali, 2026-11-12, inventory-tng-op6): only a page older
+ * than the server reads it, so a later server may add, drop or rename its
+ * other fields without that page failing to recognise it and sending the
+ * batch again for ever. */
+export const BuildTooOldReply = v.looseObject({
   reason: v.literal("build_too_old"),
-  build: v.string(),
-  oldest: v.string(),
-  message: v.string(),
 });
 
 export const Saved = v.object({ transaction_id: id });

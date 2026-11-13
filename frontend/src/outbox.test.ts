@@ -478,24 +478,56 @@ describe("builds", () => {
     expect(outbox.builds.newer.value).toBeNull();
   });
 
-  test("a batch from a build too old is kept waiting, not refused, and nothing more is sent", async () => {
-    const { outbox, sent } = of(() => json(TOO_OLD, 409));
-    outbox.queue(draft(), "first");
-    outbox.queue(draft(), "second");
-    await vi.waitFor(() => expect(outbox.builds.newer.value).toBe("too_old"));
-    expect(states(outbox)).toEqual(["waiting", "waiting"]);
-    expect(outbox.entries.value[0]?.note).toBe(
-      "Not sent. The scanner has been updated, refresh this page.",
-    );
-    expect(stored().map((each: Entry) => each.state)).toEqual([
-      "waiting",
-      "waiting",
-    ]);
-    // Neither a dismissal nor another round sends or drops it.
-    outbox.dismiss(outbox.entries.value[0]?.body.key ?? "");
-    await outbox.send();
-    expect(sent).toHaveLength(1);
-    expect(states(outbox)).toEqual(["waiting", "waiting"]);
+  // Only a page older than the server reads this reply, so a later server
+  // may change all of it but the reason (replies.BuildTooOldReply).
+  test.each([
+    ["as this build's server sends it", TOO_OLD],
+    ["with only its reason", { reason: "build_too_old" }],
+    [
+      "with its other fields renamed, and one added",
+      {
+        reason: "build_too_old",
+        sent_build: TOO_OLD.build,
+        oldest_build: 20261112,
+        what_to_do: null,
+        added: { anything: [1] },
+      },
+    ],
+  ])(
+    "a batch from a build too old, %s, is kept waiting, not refused, and nothing more is sent",
+    async (_name, body) => {
+      const { outbox, sent } = of(() => json(body, 409));
+      outbox.queue(draft(), "first");
+      outbox.queue(draft(), "second");
+      await vi.waitFor(() => expect(outbox.builds.newer.value).toBe("too_old"));
+      expect(states(outbox)).toEqual(["waiting", "waiting"]);
+      expect(outbox.entries.value[0]?.note).toBe(
+        "Not sent. The scanner has been updated, refresh this page.",
+      );
+      expect(stored().map((each: Entry) => each.state)).toEqual([
+        "waiting",
+        "waiting",
+      ]);
+      // Neither a dismissal nor another round sends or drops it.
+      outbox.dismiss(outbox.entries.value[0]?.body.key ?? "");
+      await outbox.send();
+      expect(sent).toHaveLength(1);
+      expect(states(outbox)).toEqual(["waiting", "waiting"]);
+    },
+  );
+
+  // Checked by its reason alone, but by its reason: any other 409 is one
+  // this build does not understand, kept and tried again.
+  test.each([
+    ["a reason this build does not know", { reason: "frozen", build: MINE }],
+    ["no reason", { build: MINE, oldest: NEWER, message: "Load again." }],
+  ])("a 409 with %s is unexpected, not too old", async (_name, body) => {
+    const { outbox } = of(() => json(body, 409));
+    outbox.queue(draft(), "a");
+    await vi.waitFor(() => expect(outbox.entries.value[0]?.failures).toBe(1));
+    expect(outbox.entries.value[0]?.note).toContain("answered unexpectedly");
+    expect(states(outbox)).toEqual(["waiting"]);
+    expect(outbox.builds.newer.value).toBeNull();
   });
 });
 
