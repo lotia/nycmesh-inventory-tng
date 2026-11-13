@@ -34,6 +34,7 @@ export const MAX_KEYS_ASKED = 100;
 
 export type Catalogue = Schemas["Catalogue"];
 export type Item = Schemas["ItemEntry"];
+type Package = Item["packages"][number];
 
 const LineSchema = v.object({
   itemId: id,
@@ -363,8 +364,6 @@ export function reconcile(cart: Cart, catalogue: Catalogue): Cart {
     : { ...cart, volunteerId, fromId, toId, lines };
 }
 
-type Package = Item["packages"][number];
-
 /** Whether the catalogue gives this package another size than the line's
  * count of it was made at: its count is to be typed again. */
 export function resized(line: Line, pack: Package): boolean {
@@ -474,7 +473,7 @@ export function openingPackage(
   item: Item | undefined,
   placeId: number | null,
   sealed: ReadonlyMap<string, number>,
-): Item["packages"][number] | undefined {
+): Package | undefined {
   if (placeId !== null) {
     return sealedHere(item, placeId, sealed);
   }
@@ -541,7 +540,7 @@ export function sealedHere(
   item: Item | undefined,
   placeId: number,
   sealed: ReadonlyMap<string, number>,
-): Item["packages"][number] | undefined {
+): Package | undefined {
   const here = (item?.packages ?? []).filter(
     (each) => (sealed.get(sealedKey(each.id, placeId)) ?? 0) > 0,
   );

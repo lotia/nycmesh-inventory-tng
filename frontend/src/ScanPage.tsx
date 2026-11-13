@@ -1120,6 +1120,8 @@ function CartLine({
         />
       ))}
       {item.packages.map((pack) => {
+        // The catalogue gives every size as a decimal, so never null.
+        /* v8 ignore next */
         const size = decimal(thousandths(pack.size) ?? 0);
         return (
           <Fragment key={pack.id}>
