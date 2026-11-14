@@ -49,13 +49,17 @@ import {
 } from "./older";
 import {
   type Entry,
+  NO_ANSWER,
+  OFFLINE,
   STORAGE_KEY as OUTBOX_KEY,
   type Outbox,
   RECORDED_ELSEWHERE,
   REFUSED_FOR_KEY,
   RELOAD_TO_CONTINUE,
+  recordedElsewhere,
   refusalOf,
   type Said,
+  SCAN_AGAIN_CHANGED,
   sharedOutbox,
   wordsOf,
 } from "./outbox";
@@ -342,6 +346,24 @@ function reloadWaits(outbox: Outbox, cartEmpty: boolean): boolean {
   return (
     learned !== null && learned !== "too_old" && holding(outbox, cartEmpty)
   );
+}
+
+/** Whether the browser says it is online, following it as it changes. */
+function useOnline(): boolean {
+  const online = useSignal(navigator.onLine);
+  useEffect(() => {
+    const follow = () => {
+      online.value = navigator.onLine;
+    };
+    follow();
+    window.addEventListener("online", follow);
+    window.addEventListener("offline", follow);
+    return () => {
+      window.removeEventListener("online", follow);
+      window.removeEventListener("offline", follow);
+    };
+  }, []);
+  return online.value;
 }
 
 /** Whether the stored cart holds no lines. */
@@ -917,7 +939,8 @@ function OlderList({
         each,
         lost,
         lines,
-        fills: cart.lines.length > 0,
+        // Recorded elsewhere, it never goes in a cart again.
+        fills: cart.lines.length > 0 && !recordedElsewhere(each.refused),
         retired: lines.some((line) => line.retired),
       };
     });
@@ -966,6 +989,8 @@ function OlderList({
               </div>
               {each.refused === null ? (
                 <small>{olderWhen(each)}</small>
+              ) : recordedElsewhere(each.refused) ? (
+                <NoteSaid note={SCAN_AGAIN_CHANGED} />
               ) : (
                 <p class="alert">
                   {each.refused !== "" && (
@@ -1171,6 +1196,8 @@ const NOT_KEPT =
 /** One went in the cart, but stays listed (row 22). */
 const NOT_REMOVED =
   "This item wasn't automatically removed. Record the cart and try to remove.";
+/** Before WAIT_THEN_RELOAD while the browser says it is offline. */
+const OFFLINE_NOW = "This device is offline.";
 /** Instead of RELOAD_TO_CONTINUE while the reload waits for the cart. */
 const RECORD_THEN_RELOAD = "Record or discard your cart, then reload the page.";
 /** Instead of RELOAD_TO_CONTINUE while it waits for batches to be sent:
@@ -1521,18 +1548,22 @@ function OutboxList({
       ),
     [],
   );
+  const online = useOnline();
   const entries = outbox.shown().reverse();
   if (entries.length === 0) {
     return null;
   }
   const waits = reloadWaits(outbox, cartEmpty);
   // What to do before a reload, said after RECORDED_ELSEWHERE: held back,
-  // what it waits for (Ali, inventory-tng-wyq, 'Held-back Reload note').
+  // what it waits for (Ali, inventory-tng-wyq, 'Held-back Reload note'
+  // and 'Offline').
   const reloadWords = !waits
     ? RELOAD_TO_CONTINUE
-    : cartEmpty
-      ? WAIT_THEN_RELOAD
-      : RECORD_THEN_RELOAD;
+    : !cartEmpty
+      ? RECORD_THEN_RELOAD
+      : online
+        ? WAIT_THEN_RELOAD
+        : `${OFFLINE_NOW} ${WAIT_THEN_RELOAD}`;
   const needsRegistering = entries.some((e) => e.waitingFor === "registration");
   return (
     <section>
@@ -1554,15 +1585,15 @@ function OutboxList({
             REFUSED_FOR_KEY.has(entry.note ?? "") &&
             !refusedBefore.has(key);
           // Kept without the reload's words, which only the page says
-          // (inventory-tng-93z's build kept them: dropped once reloaded).
-          const elsewhere =
-            entry.note === RECORDED_ELSEWHERE ||
-            entry.note === `${RECORDED_ELSEWHERE} ${RELOAD_TO_CONTINUE}`;
-          const note = !elsewhere
-            ? entry.note
-            : toReload
+          // (inventory-tng-93z's build kept them); reloaded, what is left
+          // to do, as the older list says it.
+          const note = recordedElsewhere(entry.note)
+            ? toReload
               ? `${RECORDED_ELSEWHERE} ${reloadWords}`
-              : RECORDED_ELSEWHERE;
+              : SCAN_AGAIN_CHANGED
+            : entry.note === NO_ANSWER && !online
+              ? OFFLINE
+              : entry.note;
           const lines =
             refused && catalogue !== null ? linesSaid(entry, catalogue) : [];
           return (

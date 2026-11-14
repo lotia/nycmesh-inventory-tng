@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -12,10 +13,13 @@ import { addOne, STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
 import { PRINTED_LENGTH } from "./OpenPackageCard";
 import {
   KEY_REUSED,
+  NO_ANSWER,
+  OFFLINE,
   STORAGE_KEY as OUTBOX_KEY,
   Outbox,
   RECORDED_ELSEWHERE,
   RELOAD_TO_CONTINUE,
+  SCAN_AGAIN_CHANGED,
 } from "./outbox";
 import { ScanPage } from "./ScanPage";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
@@ -876,6 +880,37 @@ describe("filling and saving a cart", () => {
       state: "waiting",
       what: "Receipt: 1 item to Hub › Shelf A",
     });
+  });
+
+  test("while the browser is offline, a batch waiting for an answer says so, and online again, as before", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    const { api } = server(() =>
+      Promise.reject(new TypeError("Failed to fetch")),
+    );
+    open(api);
+    await ready();
+    fillMove();
+    fireEvent.input(screen.getByLabelText(/^Loose/), {
+      target: { value: "3" },
+    });
+    save();
+    // Bold whole, in the alert's style (Ali, inventory-tng-wyq, 'Offline').
+    const note = await screen.findByText(OFFLINE);
+    expect(note.tagName).toBe("STRONG");
+    expect(screen.queryByText(NO_ANSWER)).toBeNull();
+    onLine.mockReturnValue(true);
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+    await screen.findByText(NO_ANSWER);
+    expect(screen.queryByText(OFFLINE)).toBeNull();
+    onLine.mockReturnValue(false);
+    act(() => {
+      window.dispatchEvent(new Event("offline"));
+    });
+    await screen.findByText(OFFLINE);
+    onLine.mockRestore();
   });
 });
 
@@ -2614,7 +2649,9 @@ describe("what an older build left", () => {
       open(api);
       await ready();
       expect(screen.queryByText(BEFORE_RELOAD)).toBeNull();
-      const again = (await screen.findByText(RECORDED_ELSEWHERE)).closest(
+      // What is left to do, as the older list says it (Ali,
+      // inventory-tng-wyq, question c).
+      const again = (await screen.findByText(SCAN_AGAIN_CHANGED)).closest(
         "li",
       ) as HTMLElement;
       within(again).getByText("1. LiteBeam 5AC: 2 × Box");
@@ -2622,7 +2659,7 @@ describe("what an older build left", () => {
         within(again).queryByRole("button", { name: "Reload" }),
       ).toBeNull();
       fireEvent.click(within(again).getByRole("button", { name: "Dismiss" }));
-      expect(screen.queryByText(RECORDED_ELSEWHERE)).toBeNull();
+      expect(screen.queryByText(SCAN_AGAIN_CHANGED)).toBeNull();
     },
   );
 
@@ -2655,6 +2692,15 @@ describe("what an older build left", () => {
       `${RECORDED_ELSEWHERE} Wait until sending finishes, then reload the page.`,
     );
     expect(within(entry).queryByRole("button")).toBeNull();
+    // Offline, it says so (Ali, inventory-tng-wyq, 'Offline').
+    const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    act(() => {
+      window.dispatchEvent(new Event("offline"));
+    });
+    await within(entry).findByText(
+      `${RECORDED_ELSEWHERE} This device is offline. Wait until sending finishes, then reload the page.`,
+    );
+    onLine.mockRestore();
     hold.until = null;
     answer.resolve(new Response());
     await vi.waitFor(() =>
@@ -2703,6 +2749,30 @@ describe("what an older build left", () => {
     await screen.findByText("Recorded (transaction 2).");
     expect(outbox.entries.value[0]?.body.key).not.toBe(KEY);
   });
+
+  test.each([
+    RECORDED_ELSEWHERE,
+    BEFORE_RELOAD,
+    "Not saved: another tab saved it first, as it was before your changes. Check what was saved, then save your changes again.",
+  ])(
+    "one put back and refused as another tab recorded it first (%s) goes in no cart again, only Discard",
+    async (note) => {
+      leaveSave({ state: "refused", note, putBack: true });
+      open();
+      await ready();
+      // What it held is recorded: once more would record it twice (Ali,
+      // inventory-tng-wyq, question c).
+      const why = within(listing()).getByText(noted(SCAN_AGAIN_CHANGED));
+      expect(why.firstElementChild?.tagName).toBe("STRONG");
+      expect(
+        within(listing()).queryByRole("button", { name: "Add to cart" }),
+      ).toBeNull();
+      fireEvent.click(lastDiscard());
+      fireEvent.click(lastDiscard());
+      expect(screen.queryByText(HEADING)).toBeNull();
+      expect(screen.getByText("Nothing in the cart yet.")).toBeDefined();
+    },
+  );
 
   test("one refused for its key goes back without it, and saves under a new one", async () => {
     leaveSave({ state: "refused", note: KEY_REUSED });
