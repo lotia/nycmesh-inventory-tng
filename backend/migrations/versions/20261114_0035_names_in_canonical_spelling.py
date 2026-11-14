@@ -58,13 +58,14 @@ def upgrade() -> None:
     clashes: list[str] = []
     for table, uniques in UNIQUE.items():
         rows = bind.execute(sa.text(f"SELECT id, name FROM {table}")).all()
-        renamed[table] = [
-            {"id": id_, "name": _canonical(name)}
+        changed = [
+            {"id": id_, "name": new}
             for id_, name in rows
-            if _canonical(name) != name
+            if (new := _canonical(name)) != name
         ]
-        if renamed[table]:
-            clashes += _clashes(table, uniques, renamed[table])
+        if changed:
+            renamed[table] = changed
+            clashes += _clashes(bind, table, uniques, changed)
     if clashes:
         raise RuntimeError(
             "Names that would be one name once in canonical spelling (such as "
@@ -72,14 +73,14 @@ def upgrade() -> None:
             "in each, then upgrade again."
         )
     for table, rows in renamed.items():
-        if rows:
-            bind.execute(
-                sa.text(f"UPDATE {table} SET name = :name WHERE id = :id"), rows
-            )
+        bind.execute(sa.text(f"UPDATE {table} SET name = :name WHERE id = :id"), rows)
 
 
 def _clashes(
-    table: str, uniques: tuple[tuple[str, str, str], ...], rows: list[dict[str, object]]
+    bind: sa.Connection,
+    table: str,
+    uniques: tuple[tuple[str, str, str], ...],
+    rows: list[dict[str, object]],
 ) -> list[str]:
     """Each group of `table`'s rows whose names would clash with `rows`'
     names in place of theirs, as "table ids"."""
@@ -97,7 +98,7 @@ def _clashes(
             f"SELECT array_agg(id ORDER BY id) FROM ({renamed}) AS t"
             f" WHERE {where} GROUP BY {group} HAVING count(*) > 1"
         )
-        groups = op.get_bind().execute(sa.text(query), new).scalars()
+        groups = bind.execute(sa.text(query), new).scalars()
         found += [f"{table} {', '.join(map(str, ids))}" for ids in groups]
     return found
 

@@ -1,7 +1,7 @@
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
 from helpers.sign_in import TOTP_KEYS
 
@@ -255,6 +255,17 @@ def test_going_back_before_package_forms_names_what_it_cannot_hold(
         command.downgrade(alembic_config, "0023")
 
 
+def _item(connection: Connection, category_id: int, name: str) -> int:
+    """An item as 0034 holds one, its search text 'kept'."""
+    return connection.scalar(
+        text(
+            "INSERT INTO item (name, category_id, search_text, name_folded,"
+            " folded_with) VALUES (:n, :c, 'kept', 'kept', 'x') RETURNING id"
+        ),
+        {"n": name, "c": category_id},
+    )
+
+
 def test_names_are_rewritten_in_canonical_spelling(alembic_config: Config) -> None:
     """Migration 0035: names in canonical spelling, in place; m² and ﬁ, which
     NFKC would change, and case, kept; what searches compare unchanged."""
@@ -264,17 +275,12 @@ def test_names_are_rewritten_in_canonical_spelling(alembic_config: Config) -> No
         text("INSERT INTO category (name) VALUES ('Sensors 85℃') RETURNING id")
     )
 
-    def item(name: str) -> int:
-        return connection.scalar(
-            text(
-                "INSERT INTO item (name, category_id, search_text, name_folded,"
-                " folded_with) VALUES (:n, :c, 'kept', 'kept', 'x') RETURNING id"
-            ),
-            {"n": name, "c": category_id},
-        )
-
     # The Ohm sign, a decomposed é, the micro sign, ℉.
-    ohm, cafe, ligature = item("50Ω load"), item("Café µF"), item("ﬁber 1 m² 72℉")
+    ohm, cafe, ligature = (
+        _item(connection, category_id, "50Ω load"),
+        _item(connection, category_id, "Café µF"),
+        _item(connection, category_id, "ﬁber 1 m² 72℉"),
+    )
     command.upgrade(alembic_config, "head")
     names = dict(connection.execute(text("SELECT id, name FROM item")).all())
     assert names == {
@@ -297,14 +303,7 @@ def test_names_clashing_once_canonical_are_named_first(alembic_config: Config) -
         text("INSERT INTO category (name) VALUES ('Capacitors') RETURNING id")
     )
     micro, greek = (
-        connection.scalar(
-            text(
-                "INSERT INTO item (name, category_id, search_text, name_folded,"
-                " folded_with) VALUES (:n, :c, '', '', '') RETURNING id"
-            ),
-            {"n": name, "c": category_id},
-        )
-        for name in ("Cap 10µF", "cap 10 μf")
+        _item(connection, category_id, name) for name in ("Cap 10µF", "cap 10 μf")
     )
     store, shelf = (
         connection.scalar(

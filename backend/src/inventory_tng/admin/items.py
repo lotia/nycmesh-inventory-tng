@@ -301,10 +301,16 @@ def _item_page(
     )
 
 
+def _typed_name(typed: str) -> str:
+    """An item's or a package's name as it will be stored
+    (models.CanonicalName), so it is checked and compared so."""
+    return canonical(typed.strip())
+
+
 def _confirmed(form: Mapping[str, str], fields: items.Fields) -> bool:
     """Whether the name was sent before and asked about, then sent again
     unchanged: a different item's, whatever is close."""
-    return canonical(form.get(DIFFERENT, "").strip()) == fields.name
+    return _typed_name(form.get(DIFFERENT, "")) == fields.name
 
 
 def _key_name_problem(session: Session, name: str) -> str | None:
@@ -322,8 +328,7 @@ def _fields(
     session: Session, form: Mapping[str, str]
 ) -> tuple[items.Fields | None, dict[str, str]]:
     """What to set, unless something is wrong, and what is."""
-    # As it will be stored (models.CanonicalName), so it is compared so.
-    name = canonical(form.get("name", "").strip())
+    name = _typed_name(form.get("name", ""))
     problems: dict[str, str] = {}
     if problem := _key_name_problem(session, name):
         problems["name"] = problem
@@ -570,7 +575,7 @@ def add_package(
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
-    name = canonical(package_name.strip())
+    name = _typed_name(package_name)
     parsed, problems = _package_fields(session, found, name, size)
     if parsed is not None and not problems:
         package, broken = refusal(
@@ -608,7 +613,7 @@ def save_package(
     if package is None:
         return not_found()
     found = session.get_one(Item, item_id)
-    name = canonical(package_name.strip())
+    name = _typed_name(package_name)
     parsed, problems = _package_fields(session, found, name, size, kept=package.size)
     if parsed is not None and not problems:
         _, broken = refusal(
