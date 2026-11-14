@@ -48,6 +48,15 @@ def test_a_file_gone_before_it_is_read_is_skipped(
     assert text_files() == {tmp_path / "kept.md": "text"}
 
 
+def test_other_checkouts_are_not_walked(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Such as one an agent works apart in, which may hold anything."""
+    folders = ["worktrees", "skills"]
+    walked = [(str(CLONE / ".claude"), folders, [])]
+    monkeypatch.setattr(os, "walk", lambda _: iter(walked))
+    text_files()
+    assert folders == ["skills"]
+
+
 def test_every_mise_task_is_in_contributing() -> None:
     text = (CLONE / "CONTRIBUTING.md").read_text()
     missing = {

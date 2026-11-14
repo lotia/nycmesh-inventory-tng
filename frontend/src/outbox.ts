@@ -326,6 +326,18 @@ export const Entry = v.object({
 
 export type Entry = v.InferOutput<typeof Entry>;
 
+/** Whether the server may hold this batch's key: it may be sent, it was
+ * saved, or it was refused for its key. Refused for what it held (422), or
+ * held back as from a build too old, it holds none. */
+function holdsKey(entry: Entry): boolean {
+  return (
+    entry.state === "waiting" ||
+    entry.state === "saved" ||
+    entry.reason?.code === "key_reused" ||
+    entry.reason?.code === "recorded_elsewhere"
+  );
+}
+
 /** What STORAGE_KEY holds: the batches, and the build that last wrote them.
  * Each entry is read on its own (parsed). */
 export const Kept = v.object({
@@ -423,17 +435,18 @@ export class Outbox {
     return kept;
   }
 
-  /** An answer to the batch `key`, applied to it while it still waits, or
+  /** An answer to the batch `body`, applied to it while it still waits, or
    * a save whatever became of it: another tab may have sent it meanwhile,
-   * and one saved is never refused or listed to save again. But not to one
-   * recorded elsewhere: another batch under that key, never this one. */
-  private settle(key: string, changes: Partial<Entry>): void {
+   * and one saved is never refused or listed to save again. Not to another
+   * batch under its key, as a tab of a build before inventory-tng-e2d may
+   * queue for a cart it had not heard was recorded: that one is sent, and
+   * answered, itself. */
+  private settle(body: Entry["body"], changes: Partial<Entry>): void {
+    const sent = JSON.stringify(body);
     this.update((entries) => {
       const next = entries.map((entry) =>
-        entry.body.key === key &&
-        (entry.state === "waiting" ||
-          (changes.state === "saved" &&
-            entry.reason?.code !== "recorded_elsewhere"))
+        JSON.stringify(entry.body) === sent &&
+        (entry.state === "waiting" || changes.state === "saved")
           ? { ...entry, ...changes }
           : entry,
       );
@@ -496,10 +509,14 @@ export class Outbox {
    * was sent, and the caller still holds the batch.
    *
    * A key already queued here is that cart again, emptied by Record but
-   * not kept so, or filled again by a tab that had not heard: the same
-   * again is not queued twice, and changed it is not recorded, as the
-   * server would refuse it (409 key_reused), and it is never answered as
-   * the batch already under that key.
+   * not kept so, or filled again by a tab that had not heard. The same
+   * again, waiting or saved, is not queued twice. Another batch, while
+   * the server may hold that key (one under it waits, was saved, or was
+   * refused for it), is not recorded, as the server would refuse it (409
+   * key_reused): it is listed so, under a key of its own, never sent, so
+   * one key names one batch and no answer to the first settles it. One
+   * refused for what it held (422) holds no key: it takes a key of its
+   * own, and this batch goes under the cart's.
    */
   queue(draft: Draft, what: string, key?: string): boolean {
     const entry = newEntry(
@@ -514,25 +531,34 @@ export class Outbox {
     let added = false;
     const kept = this.update((entries) => {
       const before = entries.filter((each) => each.body.key === key);
-      if (before.length === 0) {
-        added = true;
-        return [...entries, entry];
-      }
       if (
         before.some(
           (each) =>
-            each.state !== "refused" && JSON.stringify(each.body) === body,
+            (each.state === "waiting" || each.state === "saved") &&
+            JSON.stringify(each.body) === body,
         )
       ) {
         return entries;
       }
+      if (before.some(holdsKey)) {
+        return [
+          ...entries,
+          {
+            ...entry,
+            body: { ...entry.body, key: uuid() },
+            state: "refused",
+            reason: { code: "recorded_elsewhere" },
+          },
+        ];
+      }
+      added = true;
       return [
-        ...entries,
-        {
-          ...entry,
-          state: "refused",
-          reason: { code: "recorded_elsewhere" },
-        },
+        ...entries.map((each) =>
+          before.includes(each) && each.reason?.code === "refused"
+            ? { ...each, body: { ...each.body, key: uuid() } }
+            : each,
+        ),
+        entry,
       ];
     });
     if (kept && added) {
@@ -583,7 +609,8 @@ export class Outbox {
         const entry = waiting.find((each) => {
           const named = keysNamed(each.body);
           const ready =
-            !tried.has(each.body.key) && !named.some((key) => before.has(key));
+            !tried.has(JSON.stringify(each.body)) &&
+            !named.some((key) => before.has(key));
           for (const key of [...keysMade(each.body), ...named]) {
             before.add(key);
           }
@@ -592,7 +619,7 @@ export class Outbox {
         if (entry === undefined) {
           return;
         }
-        tried.add(entry.body.key);
+        tried.add(JSON.stringify(entry.body));
         if ((await this.sendOne(entry)) === "stop") {
           return;
         }
@@ -609,7 +636,6 @@ export class Outbox {
 
   /** Whether the round goes on to the next batch. */
   private async sendOne(entry: Entry): Promise<"next" | "stop"> {
-    const key = entry.body.key;
     const call = this.api.POST("/api/transactions", {
       // As the build that queued it, which the server judges it by.
       params: { header: { [HEADER]: entry.build } },
@@ -632,7 +658,7 @@ export class Outbox {
     switch (reply.status) {
       case 200:
       case 201:
-        this.settle(key, {
+        this.settle(entry.body, {
           state: "saved",
           waitingFor: null,
           reason: null,
@@ -664,7 +690,7 @@ export class Outbox {
           ) {
             // An older build's, kept under this key: too old itself, not
             // this tab. Listed with what older builds left (older.ts).
-            this.settle(key, {
+            this.settle(entry.body, {
               state: "too_old",
               waitingFor: null,
               reason: null,
@@ -674,7 +700,7 @@ export class Outbox {
           // This tab's own, or a newer one's: this tab is too old. Kept,
           // waiting: a newer build of the page lists it (older.ts).
           this.builds.learn("too_old");
-          this.settle(key, {
+          this.settle(entry.body, {
             waitingFor: null,
             reason: { code: "must_upgrade" },
           });
@@ -682,7 +708,7 @@ export class Outbox {
         }
         // A save put back: an older build's tab saved it first, as it
         // was. This, changed since, is not recorded, and says so.
-        this.settle(key, {
+        this.settle(entry.body, {
           state: "refused",
           waitingFor: null,
           reason: {
@@ -691,7 +717,7 @@ export class Outbox {
         });
         return "next";
       case 422:
-        this.settle(key, {
+        this.settle(entry.body, {
           state: "refused",
           waitingFor: null,
           reason: {
@@ -705,7 +731,7 @@ export class Outbox {
         // dropped; tried again each round.
         const failures = entry.failures + 1;
         telemetry.record({ kind: "outbox_retry", reason: "unexpected" });
-        this.settle(key, {
+        this.settle(entry.body, {
           waitingFor: "network",
           failures,
           reason: { code: "unexpected", status: reply.code, tries: failures },
@@ -718,7 +744,7 @@ export class Outbox {
           kind: "outbox_retry",
           reason: reply.status === "unavailable" ? "unavailable" : "no_answer",
         });
-        this.settle(key, {
+        this.settle(entry.body, {
           waitingFor: "network",
           reason: {
             code: reply.status === "unavailable" ? "unavailable" : "no_answer",

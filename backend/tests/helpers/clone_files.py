@@ -8,6 +8,9 @@ from inventory_tng.local_env import CLONE
 
 # Folders that tools write, not the project.
 NOT_OURS = {".git", ".jj", ".beads", ".venv", "node_modules", "dist", "__pycache__"}
+# Other checkouts of the clone, which Claude Code makes for agents working
+# apart (.gitignore): what each holds is checked there, not here.
+ELSEWHERE = {CLONE / ".claude" / "worktrees"}
 
 
 def text_files() -> dict[Path, str]:
@@ -17,7 +20,11 @@ def text_files() -> dict[Path, str]:
     be read, is skipped."""
     found = {}
     for folder, folders, files in os.walk(CLONE):
-        folders[:] = [name for name in folders if name not in NOT_OURS]
+        folders[:] = [
+            name
+            for name in folders
+            if name not in NOT_OURS and Path(folder, name) not in ELSEWHERE
+        ]
         for name in files:
             path = Path(folder, name)
             try:

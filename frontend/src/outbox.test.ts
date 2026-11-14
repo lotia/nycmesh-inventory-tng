@@ -131,6 +131,60 @@ describe("queueing", () => {
     );
     expect(sent).toHaveLength(1);
     expect(outbox.entries.value[1]?.transactionId).toBeNull();
+    // Under a key of its own, so the list names each apart: dismissing it
+    // leaves the first.
+    const own = outbox.entries.value[1]?.body.key ?? "";
+    expect(own).not.toBe(key);
+    outbox.dismiss(own);
+    expect(outbox.entries.value).toMatchObject([{ what: "a", state: "saved" }]);
+    expect(outbox.entries.value[0]).not.toHaveProperty("dismissed");
+  });
+
+  test("an answer settles the batch it answers, not another a build before kept under its key (inventory-tng-e2d)", async () => {
+    // A tab of a build before, which had not heard the cart was recorded,
+    // queues it again under its key, changed: two batches under one key.
+    const key = uuid();
+    const first = entry({ body: { ...draft(), key }, putBack: true });
+    const changed = entry({
+      body: { ...draft({ lines: [{ item_id: 6, quantity: "1" }] }), key },
+      what: "b",
+      putBack: true,
+    });
+    store(first, changed);
+    const { api, sent } = answering(
+      replies(
+        () => saved(41),
+        () => json({ reason: "key_reused" }, 409),
+      ),
+    );
+    const outbox = new Outbox(api);
+    await outbox.send();
+    expect(sent).toHaveLength(2);
+    expect(outbox.entries.value).toMatchObject([
+      { state: "saved", transactionId: 41 },
+      { what: "b", state: "refused", reason: { code: "recorded_elsewhere" } },
+    ]);
+  });
+
+  test("a cart's key whose batch was refused for what it held (422) is sent with another (inventory-tng-e2d)", async () => {
+    let reply = json({ detail: [] }, 422);
+    const { api, sent } = answering(() => reply);
+    const outbox = new Outbox(api);
+    const key = uuid();
+    outbox.queue(draft(), "a", key);
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
+    // Fixed in the cart, whose emptying was not kept, and recorded again.
+    reply = saved(41);
+    outbox.queue(draft({ lines: [{ item_id: 6, quantity: "1" }] }), "b", key);
+    await vi.waitFor(() =>
+      expect(states(outbox)).toEqual(["refused", "saved"]),
+    );
+    const bodies = await Promise.all(sent.map((each) => each.clone().json()));
+    expect(bodies.map((each) => each.key)).toEqual([key, key]);
+    // The refused one, under a key of its own, is not taken as saved.
+    expect(outbox.entries.value[0]?.body.key).not.toBe(key);
+    expect(outbox.entries.value[0]?.reason?.code).toBe("refused");
+    expect(outbox.entries.value[1]?.transactionId).toBe(41);
   });
 
   test("a browser that will not store it says so, shows and sends nothing", () => {

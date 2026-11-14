@@ -416,8 +416,10 @@ would record it twice (reason `recorded_elsewhere`). Any other save refused
 for its key goes back without it, as the server holds that key for
 another batch. A key the outbox already holds, queued again (a cart
 whose emptying the browser did not keep, or one a tab that had not heard
-filled again), is not queued twice; with another batch, it is kept as
-`recorded_elsewhere` without being sent (`Outbox.queue`).
+filled again), is not queued twice. Another batch under it is kept as
+`recorded_elsewhere`, under a key of its own, without being sent, unless
+the one under it was refused for what it held (422): then it is sent
+(`Outbox.queue`).
 
 A refused save in the outbox's list lists its lines, in the words of the
 older list, each item numbered as the refusal's "Line n" names it. While
