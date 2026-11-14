@@ -274,6 +274,8 @@ export interface components {
        * @constant
        */
       reason: "key_reused";
+      /** @description The transaction recorded under the key, as a batch sends one, for the page to show what differs; none if no volunteer's batch recorded it. Only one sending the key learns of it. */
+      recorded?: components["schemas"]["RecordedBatch"] | null;
     };
     /**
      * LabelEntry
@@ -474,6 +476,66 @@ export interface components {
        * @constant
        */
       reason: "rate_limited";
+    };
+    /**
+     * RecordedBatch
+     * @description The transaction recorded under a batch's key, as a batch sends one
+     *     (Batch), with its id.
+     */
+    RecordedBatch: {
+      /** Transaction Id */
+      transaction_id: number;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "move" | "receipt" | "install" | "open" | "report";
+      /** Volunteer Id */
+      volunteer_id: number;
+      /** From Location Id */
+      from_location_id: number | null;
+      /** To Location Id */
+      to_location_id: number | null;
+      /** Install Number */
+      install_number: number | null;
+      /** Lines */
+      lines: components["schemas"]["RecordedLine"][];
+      /** Used Up */
+      used_up: string[];
+      /** Lengths */
+      lengths: components["schemas"]["RecordedLength"][];
+    };
+    /**
+     * RecordedLength
+     * @description A report of what is on an open package, as recorded (LengthReport).
+     */
+    RecordedLength: {
+      /**
+       * Open Package Key
+       * Format: uuid
+       */
+      open_package_key: string;
+      /** Left */
+      left: string;
+    };
+    /**
+     * RecordedLine
+     * @description A line of the transaction recorded under a batch's key, as a batch
+     *     sends one (Line), so the scan page compares it with what it sent.
+     */
+    RecordedLine: {
+      /** Item Id */
+      item_id: number;
+      /** Quantity */
+      quantity: string;
+      /** Package Id */
+      package_id: number | null;
+      /** Package Size */
+      package_size: string | null;
+      /** Open Package Key */
+      open_package_key: string | null;
+      /** Whole */
+      whole: boolean | null;
     };
     /** Registered */
     Registered: {

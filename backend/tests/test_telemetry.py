@@ -31,6 +31,7 @@ from inventory_tng import (
     ledger,
     mail,
     open_packages,
+    over_recorded,
     page_builds,
     page_telemetry,
 )
@@ -46,6 +47,7 @@ from inventory_tng.models import (
     ItemPackage,
     LedgerTransaction,
     OpenPackage,
+    OverRecorded,
 )
 from inventory_tng.settings import RateLimits, Settings
 from inventory_tng.telemetry import Telemetry, enabled
@@ -933,4 +935,38 @@ def test_counts_length_checks_raised_and_settled(
         (("how", "set"),): 1,
         (("how", "left"),): 1,
         (("how", "closed"),): 1,
+    }
+
+
+def test_counts_lines_recorded_more_than_moved_raised_and_settled(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """Raised as a batch changed after another tab recorded it takes some
+    off (inventory-tng-0gg), settled corrected or checked."""
+    client, _, reader, _ = rolled_back
+    place = Place(session)
+    _, token = new_device(session)
+    client.cookies.set(devices.COOKIE, token)
+    first = place.batch(
+        lines=[
+            {"item_id": place.item.id, "quantity": "3"},
+            {"item_id": place.cable.id, "quantity": "10"},
+        ]
+    )
+    assert client.post("/api/transactions", json=first).status_code == 201
+    changed = first | {"lines": [{"item_id": place.item.id, "quantity": "1"}]}
+    assert client.post("/api/transactions", json=changed).status_code == 409
+    client.cookies.clear()
+    assert counted(reader, "inventory.over_recorded.raised") == {(): 2}
+    _, key = new_admin(session)
+    sign_in_with(client, code=code(key))
+    page = "/admin/stock/recorded-more"
+    first_check, second_check = session.scalars(
+        select(OverRecorded).order_by(OverRecorded.id)
+    ).all()
+    for check, do in ((first_check, "correct"), (second_check, "checked")):
+        client.post(f"{page}/{check.id}/{do}", data={"seen": over_recorded.seen(check)})
+    assert counted(reader, "inventory.over_recorded.settled") == {
+        (("how", "corrected"),): 1,
+        (("how", "checked"),): 1,
     }

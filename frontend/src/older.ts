@@ -235,6 +235,15 @@ function saveOf(key: string, save: v.InferOutput<typeof OldEntry>): Older {
   };
 }
 
+/** A batch this build made, as listed, to put in the cart as a save put
+ * back is (toCart), under its own key (recorded.ts, differenceOf). */
+export function asSave(body: unknown): Older {
+  return saveOf(
+    "",
+    v.parse(OldEntry, { body, state: "waiting", queuedAt: null }),
+  );
+}
+
 /** What main's build (v3) kept of a batch refused for its key. */
 const KEY_REUSED_KEPT =
   "Not saved: its key was already used for a different batch. Please report this.";

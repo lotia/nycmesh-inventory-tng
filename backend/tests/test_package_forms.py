@@ -1053,7 +1053,7 @@ def test_a_batch_sent_again_with_other_reports_is_refused(
 
     assert registered_client.post(URL, json=reporting(first)).status_code == 201
     response = registered_client.post(URL, json=reporting(again))
-    assert (response.status_code, response.json()) == (409, {"reason": "key_reused"})
+    assert (response.status_code, response.json()["reason"]) == (409, "key_reused")
 
 
 def test_a_batch_sent_again_with_its_reports_in_another_order_is_replayed(

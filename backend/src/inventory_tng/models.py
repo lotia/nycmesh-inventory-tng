@@ -887,6 +887,44 @@ class Movement(Base):
     to_open_package_id: Mapped[int | None] = _reference("open_package.id")
 
 
+OVER_RECORDED_SETTLED = ("corrected", "checked")
+
+
+class OverRecorded(Base):
+    """A line recorded with more than was moved, for an administrator to
+    correct (docs/decisions/0020, inventory-tng-0gg): a batch, changed on a
+    scan page after another tab recorded it under the same key, sent less of
+    its movement than was recorded, and was refused (409 key_reused). One a
+    movement; a later such batch says how much again while it waits. Settled
+    when an administrator corrects it, with adjustments, or marks it checked
+    (over_recorded.py)."""
+
+    __tablename__ = "over_recorded"
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="quantity"),
+        CheckConstraint(_one_of("settled_how", OVER_RECORDED_SETTLED), name="how"),
+        CheckConstraint(
+            "num_nulls(settled_at, settled_by_admin_id, settled_how) IN (0, 3)",
+            name="settled",
+        ),
+        # Raised by one statement, which a check settled leaves as it is;
+        # settled holding its row (over_recorded.py).
+        protection(owner="over_recorded.py", lock=None, history=False),
+    )
+
+    id: Mapped[IntId]
+    raised_at: Mapped[CreatedAt]
+    movement_id: Mapped[int] = mapped_column(
+        ForeignKey("movement.id", ondelete="RESTRICT"), unique=True
+    )
+    # How much more was recorded than the batch refused said, in the item's
+    # unit, in the movement's forms.
+    quantity: Mapped[Decimal] = mapped_column(QUANTITY)
+    settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    settled_by_admin_id: Mapped[int | None] = _reference("admin.id")
+    settled_how: Mapped[str | None] = mapped_column(Text)
+
+
 class ScanSettings(Versioned, Base):
     """How the scan page behaves, which administrators set on the Site settings
     page (admin/settings.py, through scan_settings.py). One row, id 1, made

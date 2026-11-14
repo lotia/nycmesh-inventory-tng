@@ -121,7 +121,7 @@ def test_a_key_cannot_be_used_for_another_batch(
     assert client.post(URL, json=batch).status_code == 201
     changed = batch | {"lines": [{"item_id": place.item.id, "quantity": "4"}]}
     response = client.post(URL, json=changed)
-    assert (response.status_code, response.json()) == (409, {"reason": "key_reused"})
+    assert (response.status_code, response.json()["reason"]) == (409, "key_reused")
 
 
 def test_a_refusal_names_each_bad_line(

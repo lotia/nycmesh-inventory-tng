@@ -32,6 +32,7 @@ import {
   DeviceRefusedReply,
   id,
   KeyReusedReply,
+  type RecordedBatch,
   Saved,
   ValidationFailed,
 } from "./api/replies";
@@ -168,6 +169,19 @@ const Problem = v.object({
 
 type Problem = v.InferOutput<typeof Problem>;
 
+/** What another tab recorded under a batch's key, as the server said
+ * (409 key_reused): the transaction, as a batch sends one, under that key;
+ * and who recorded it, as far as this browser knows: one of its tabs of
+ * this build, whose outbox held a batch under the key (here), or another
+ * (elsewhere). */
+export const Recorded = v.object({
+  by: v.picklist(["here", "elsewhere"]),
+  transactionId: id,
+  batch: BatchBody,
+});
+
+export type Recorded = v.InferOutput<typeof Recorded>;
+
 /** Why a batch was refused, or why it waits, as kept: a code, and what
  * the page's words for it are made from (noteOf). */
 export const Reason = v.union([
@@ -181,10 +195,19 @@ export const Reason = v.union([
       "must_upgrade",
       // 409 key_reused: the inventory holds its key for another batch.
       "key_reused",
-      // 409 key_reused of a batch sent under its cart's key, which
-      // another tab recorded first, as it was then.
-      "recorded_elsewhere",
     ]),
+  }),
+  /** 409 key_reused of a batch sent under its cart's key, which another
+   * tab recorded first, as it was then: what it recorded, once the server
+   * has said; or, listed so without being sent, as a batch under that key
+   * was queued here first, the key to ask the server under (heldKey). A
+   * build before inventory-tng-0gg keeps the code alone. */
+  v.object({
+    code: v.literal("recorded_elsewhere"),
+    recorded: v.exactOptional(Recorded),
+    heldKey: v.exactOptional(BatchKey),
+    /** Its difference put in the cart (Add the difference to cart). */
+    added: v.exactOptional(v.literal(true)),
   }),
   /** An answer this build does not understand: its HTTP status, and how
    * many in a row. */
@@ -220,12 +243,34 @@ export function wordsOf(said: Said): string {
 export const KEY_REUSED =
   "Not recorded: its key was already used for a different batch. Please report this.";
 
-/** What the page says of a recorded_elsewhere, with Dismiss, or Discard
- * in the older list: what it held is recorded, but not the changes since,
- * so it never goes in a cart again, which would record it twice (Ali,
- * inventory-tng-wyq, question c, and inventory-tng-g0e, d). */
-export const SCAN_AGAIN_CHANGED =
-  "Not recorded: another tab recorded this cart before your changes. Scan again only what you changed.";
+/**
+ * What the page says first of a recorded_elsewhere, bold, as an alert, by
+ * who recorded it (Recorded.by; undefined while the server has not said).
+ * One wording today (Ali, inventory-tng-0gg); Ali is still choosing, and
+ * may say this browser's own tab apart ("here": it recorded the cart
+ * itself) from another: change the words here alone.
+ */
+export function recordedFirst(_by?: Recorded["by"]): string {
+  return "Not recorded: another tab recorded this cart before your changes.";
+}
+
+/**
+ * The heading over what another tab recorded (Ali, inventory-tng-0gg, 1),
+ * by who recorded it, as recordedFirst: the words for both are changed
+ * here alone.
+ */
+export function recordedHeading(recorded: Recorded): string {
+  return `Recorded by the other tab (transaction ${recorded.transactionId})`;
+}
+
+/** What the page says of a recorded_elsewhere whose recorded transaction
+ * it does not know (a server, or a build, from before inventory-tng-0gg
+ * kept none), with Dismiss, or Discard in the older list: what it held is
+ * recorded, but not the changes since, so it never goes in a cart again,
+ * which would record it twice (Ali, inventory-tng-wyq, question c, and
+ * inventory-tng-g0e, d). Knowing it, the page shows what differs instead
+ * (recorded.ts). */
+export const SCAN_AGAIN_CHANGED = `${recordedFirst()} Scan again only what you changed.`;
 
 /** A batch waiting after no_answer, while the browser is online. */
 export const NO_ANSWER = "No answer from the inventory. Trying again shortly.";
@@ -254,7 +299,17 @@ export function noteOf(reason: Reason, online = true): Note {
     case "key_reused":
       return { bold: [KEY_REUSED] };
     case "recorded_elsewhere":
-      return { bold: [SCAN_AGAIN_CHANGED] };
+      // Known, or to be asked (heldKey), what was recorded is shown
+      // instead of asking to scan again.
+      return {
+        bold: [
+          reason.recorded !== undefined
+            ? recordedFirst(reason.recorded.by)
+            : reason.heldKey !== undefined
+              ? recordedFirst("here")
+              : SCAN_AGAIN_CHANGED,
+        ],
+      };
     case "unexpected":
       return {
         bold: [
@@ -456,7 +511,9 @@ export class Outbox {
     this.update((entries) => {
       const next = entries.map((entry) =>
         sameBatch(entry.body, body) &&
-        (entry.state === "waiting" || changes.state === "saved")
+        (entry.state === "waiting" ||
+          heldKeyOf(entry) !== undefined ||
+          changes.state === "saved")
           ? { ...entry, ...changes }
           : entry,
       );
@@ -559,7 +616,13 @@ export class Outbox {
             ...entry,
             body: { ...entry.body, key: uuid() },
             state: "refused",
-            reason: { code: "recorded_elsewhere" },
+            // Asked under the cart's key once nothing under it waits
+            // (send): so the server says what it recorded, and keeps what
+            // this took off a line it recorded, for an administrator.
+            reason: {
+              code: "recorded_elsewhere",
+              ...(key === undefined ? {} : { heldKey: key }),
+            },
           },
         ];
       }
@@ -576,10 +639,24 @@ export class Outbox {
     if (!kept) {
       return "not_kept";
     }
-    if (queued === "queued") {
+    if (queued !== "already") {
+      // A batch listed refused is asked about under the key held for it.
       void this.send();
     }
     return queued;
+  }
+
+  /** Mark one recorded elsewhere as having had its difference put in the
+   * cart (Add the difference to cart), so it is offered no more. False if
+   * the browser would not keep that. */
+  differenceAdded(key: string): boolean {
+    return this.update((entries) =>
+      entries.map((entry) =>
+        entry.body.key === key && entry.reason?.code === "recorded_elsewhere"
+          ? { ...entry, reason: { ...entry.reason, added: true as const } }
+          : entry,
+      ),
+    );
   }
 
   /** Take a settled batch off the list: a refused one is forgotten, a
@@ -631,11 +708,23 @@ export class Outbox {
           }
           return ready;
         });
-        if (entry === undefined) {
+        // Then one listed recorded elsewhere without being sent, asked
+        // under the key held for it once nothing under that key waits.
+        const asked =
+          entry ??
+          this.read().find((each) => {
+            const held = heldKeyOf(each);
+            return (
+              held !== undefined &&
+              !tried.some((body) => sameBatch(body, each.body)) &&
+              !waiting.some((other) => other.body.key === held)
+            );
+          });
+        if (asked === undefined) {
           return;
         }
-        tried.push(entry.body);
-        if ((await this.sendOne(entry)) === "stop") {
+        tried.push(asked.body);
+        if ((await this.sendOne(asked)) === "stop") {
           return;
         }
       }
@@ -649,12 +738,12 @@ export class Outbox {
     this.retry = setTimeout(() => void this.send(), RETRY_MS);
   }
 
-  /** Whether the round goes on to the next batch. */
-  private async sendOne(entry: Entry): Promise<"next" | "stop"> {
+  /** POST `body` as `build`'s, hearing of a newer build from the reply. */
+  private post(body: Body, build: string) {
     const call = this.api.POST("/api/transactions", {
       // As the build that queued it, which the server judges it by.
-      params: { header: { [HEADER]: entry.build } },
-      body: entry.body,
+      params: { header: { [HEADER]: build } },
+      body,
     });
     // A save, and a 409 build_too_old, name the server's build
     // (page_builds.py), which may be newer; its other answers name none.
@@ -663,13 +752,103 @@ export class Outbox {
         this.builds.heard(response.headers.get(HEADER), "server"),
       () => {},
     );
-    const reply = await check(call, {
+    return check(call, {
       200: Saved,
       201: Saved,
       403: DeviceRefusedReply,
       409: v.variant("reason", [KeyReusedReply, BuildTooOldReply]),
       422: ValidationFailed,
     });
+  }
+
+  /**
+   * Ask the server what it recorded under the key held for one listed
+   * recorded elsewhere without being sent (heldKeyOf), by sending it under
+   * that key: so the server, refusing it (409 key_reused), says what it
+   * recorded and keeps what this took off a line it recorded, for an
+   * administrator. Recorded instead, as nothing held the key after all
+   * (the batch under it refused, 422), it is saved under it; the same as
+   * recorded, it is dropped, as the batch under the key says it; refused
+   * (422), it says why. Anything else leaves it as it is, asked again later,
+   * but a build too old to be taken, which asks no more. Whether the round
+   * goes on to the next batch.
+   */
+  private async askHeld(entry: Entry, held: string): Promise<"next" | "stop"> {
+    const sent = { ...entry.body, key: held };
+    const reply = await this.post(sent, entry.build);
+    const listed = (changes: Partial<Entry>) =>
+      this.settle(entry.body, changes);
+    switch (reply.status) {
+      case 200:
+        this.update((entries) =>
+          entries.filter((each) => !sameBatch(each.body, entry.body)),
+        );
+        return "next";
+      case 201:
+        listed({
+          state: "saved",
+          reason: null,
+          transactionId: reply.body.transaction_id,
+          body: sent,
+        });
+        return "next";
+      case 403:
+        return "stop";
+      case 409:
+        if (reply.body.reason === "key_reused") {
+          listed({
+            reason: recordedElsewhere(
+              held,
+              reply.body.recorded ?? null,
+              this.holdsSaved(held, entry.body),
+            ),
+          });
+          return "next";
+        }
+        if (
+          entry.build === this.builds.build ||
+          this.builds.isNewer(entry.build)
+        ) {
+          this.builds.learn("too_old");
+          return "stop";
+        }
+        listed({ reason: { code: "recorded_elsewhere" } });
+        return "next";
+      case 422:
+        listed({
+          reason: {
+            code: "refused",
+            problems: problems(reply.body.detail, entry.body),
+          },
+        });
+        return "next";
+      case "unexpected":
+        this.later();
+        return "next";
+      default:
+        this.later();
+        return "stop";
+    }
+  }
+
+  /** Whether this outbox holds a batch saved under `key` other than
+   * `body`: this browser recorded what is under it. */
+  private holdsSaved(key: string, body: Body): boolean {
+    return this.read().some(
+      (each) =>
+        each.state === "saved" &&
+        each.body.key === key &&
+        !sameBatch(each.body, body),
+    );
+  }
+
+  /** Whether the round goes on to the next batch. */
+  private async sendOne(entry: Entry): Promise<"next" | "stop"> {
+    const held = heldKeyOf(entry);
+    if (held !== undefined) {
+      return this.askHeld(entry, held);
+    }
+    const reply = await this.post(entry.body, entry.build);
     switch (reply.status) {
       case 200:
       case 201:
@@ -722,13 +901,18 @@ export class Outbox {
           return "stop";
         }
         // Sent under its cart's key, which another tab recorded first, as
-        // it was then: this, changed since, is not recorded, and says so.
+        // it was then: this, changed since, is not recorded, and says so,
+        // with what was recorded, if the server said.
         this.settle(entry.body, {
           state: "refused",
           waitingFor: null,
-          reason: {
-            code: entry.putBack ? "recorded_elsewhere" : "key_reused",
-          },
+          reason: entry.putBack
+            ? recordedElsewhere(
+                entry.body.key,
+                reply.body.recorded ?? null,
+                this.holdsSaved(entry.body.key, entry.body),
+              )
+            : { code: "key_reused" },
         });
         return "next";
       case 422:
@@ -799,6 +983,37 @@ export class Outbox {
       clearTimeout(this.retry);
     };
   }
+}
+
+/** The key held for an entry listed recorded elsewhere without being sent
+ * (Outbox.queue), to ask the server under; undefined for any other. */
+function heldKeyOf(entry: Entry): string | undefined {
+  return entry.state === "refused" &&
+    entry.reason?.code === "recorded_elsewhere"
+    ? entry.reason.heldKey
+    : undefined;
+}
+
+/** A 409 key_reused of a batch sent under its cart's key `key`, as kept:
+ * what the server said was recorded under it, if anything, and whether
+ * this browser's outbox holds that, saved (`here`). */
+function recordedElsewhere(
+  key: string,
+  recorded: v.InferOutput<typeof RecordedBatch> | null,
+  here: boolean,
+): Reason {
+  if (recorded === null) {
+    return { code: "recorded_elsewhere" };
+  }
+  const { transaction_id, ...batch } = recorded;
+  return {
+    code: "recorded_elsewhere",
+    recorded: {
+      by: here ? "here" : "elsewhere",
+      transactionId: transaction_id,
+      batch: { ...batch, key },
+    },
+  };
 }
 
 /** Both, oldest first; `rest` alone, as it is, if `extra` is empty. */

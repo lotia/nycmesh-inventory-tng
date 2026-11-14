@@ -22,7 +22,42 @@ export const DeviceRefusedReply = v.object({
   reason: v.picklist(["unregistered", "revoked"]),
 });
 
-export const KeyReusedReply = v.object({ reason: v.literal("key_reused") });
+/** A line of the transaction recorded under a batch's key, as a batch
+ * sends one (backend ledger.RecordedLine). */
+export const RecordedLine = v.object({
+  item_id: id,
+  quantity: v.string(),
+  package_id: v.nullable(id),
+  package_size: v.nullable(v.string()),
+  open_package_key: v.nullable(v.pipe(v.string(), v.uuid())),
+  whole: v.nullable(v.boolean()),
+});
+
+/** The transaction recorded under a batch's key, as a batch sends one,
+ * with its id (backend ledger.RecordedBatch). */
+export const RecordedBatch = v.object({
+  transaction_id: id,
+  kind: v.picklist(["move", "receipt", "install", "open", "report"]),
+  volunteer_id: id,
+  from_location_id: v.nullable(id),
+  to_location_id: v.nullable(id),
+  install_number: v.nullable(id),
+  lines: v.array(RecordedLine),
+  used_up: v.array(v.pipe(v.string(), v.uuid())),
+  lengths: v.array(
+    v.object({
+      open_package_key: v.pipe(v.string(), v.uuid()),
+      left: v.string(),
+    }),
+  ),
+});
+
+/** The key was used for another batch: which, if a volunteer's batch
+ * recorded it. A server from before inventory-tng-0gg sends none. */
+export const KeyReusedReply = v.object({
+  reason: v.literal("key_reused"),
+  recorded: v.exactOptional(v.nullable(RecordedBatch)),
+});
 
 /** A batch from a build of the page older than the server takes: kept,
  * not refused (backend page_builds.py). The one reply checked loosely, by

@@ -11,6 +11,7 @@ import {
   Outbox,
   REPORT_AFTER,
   RETRY_MS,
+  recordedFirst,
   SAVED_MOST,
   SCAN_AGAIN_CHANGED,
   STORAGE_KEY,
@@ -112,7 +113,12 @@ describe("queueing", () => {
 
   test("a cart's key queued again with another batch is not recorded, nor ever answered as the first (inventory-tng-e2d)", async () => {
     const answer = deferred();
-    const { api, sent } = answering(() => answer.promise);
+    const { api, sent } = answering(
+      replies(
+        () => answer.promise,
+        () => json({ reason: "key_reused" }, 409),
+      ),
+    );
     const outbox = new Outbox(api);
     const key = uuid();
     outbox.queue(draft(), "a", key);
@@ -129,7 +135,9 @@ describe("queueing", () => {
     await vi.waitFor(() =>
       expect(states(outbox)).toEqual(["saved", "refused"]),
     );
-    expect(sent).toHaveLength(1);
+    // Asked about under the key once the first was answered (send): the
+    // server refuses it (inventory-tng-0gg).
+    await vi.waitFor(() => expect(sent).toHaveLength(2));
     expect(outbox.entries.value[1]?.transactionId).toBeNull();
     // Under a key of its own, so the list names each apart: dismissing it
     // leaves the first.
@@ -573,6 +581,242 @@ describe("refusals", () => {
   });
 });
 
+describe("what another tab recorded (inventory-tng-0gg)", () => {
+  /** The server's 409 for a key whose transaction 41 held `lines`. */
+  const recordedReply = (lines = [{ item_id: 5, quantity: "3.000" }]) =>
+    json(
+      {
+        reason: "key_reused",
+        recorded: {
+          transaction_id: 41,
+          kind: "move",
+          volunteer_id: 1,
+          from_location_id: 1,
+          to_location_id: 2,
+          install_number: null,
+          lines: lines.map((line) => ({
+            package_id: null,
+            package_size: null,
+            open_package_key: null,
+            whole: null,
+            ...line,
+          })),
+          used_up: [],
+          lengths: [],
+        },
+      },
+      409,
+    );
+
+  const changed = () => draft({ lines: [{ item_id: 5, quantity: "4" }] });
+
+  test("a cart's batch refused for its key keeps what the server says was recorded", async () => {
+    const { api } = answering(() => recordedReply());
+    const outbox = new Outbox(api);
+    const key = uuid();
+    outbox.queue(changed(), "b", key);
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
+    expect(outbox.entries.value[0]?.reason).toEqual({
+      code: "recorded_elsewhere",
+      recorded: {
+        by: "elsewhere",
+        transactionId: 41,
+        batch: {
+          key,
+          kind: "move",
+          volunteer_id: 1,
+          from_location_id: 1,
+          to_location_id: 2,
+          install_number: null,
+          lines: [
+            {
+              item_id: 5,
+              quantity: "3.000",
+              package_id: null,
+              package_size: null,
+              open_package_key: null,
+              whole: null,
+            },
+          ],
+          used_up: [],
+          lengths: [],
+        },
+      },
+    });
+    // Then it says only that it was not recorded: the list shows the rest.
+    expect(said(outbox)).toBe(recordedFirst());
+  });
+
+  test("a keyless batch refused for its key still asks for a report", async () => {
+    const { api } = answering(() => recordedReply());
+    const outbox = new Outbox(api);
+    outbox.queue(changed(), "b");
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
+    expect(said(outbox)).toBe(KEY_REUSED);
+  });
+
+  /** A cart recorded here (41), then queued again changed, under its key:
+   * listed refused, then asked about under the key, answered `reply`. */
+  async function askedAbout(reply: () => Response | Promise<Response>) {
+    const { api, sent } = answering(replies(() => saved(41), reply));
+    const outbox = new Outbox(api);
+    const key = uuid();
+    outbox.queue(draft(), "a", key);
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
+    expect(outbox.queue(changed(), "b", key)).toBe("refused");
+    return { outbox, sent, key };
+  }
+
+  /** The changed batch, as listed. */
+  const second = (outbox: Outbox) => outbox.entries.value[1];
+
+  test("one listed recorded elsewhere unsent is asked about under the key, and shows what this browser recorded", async () => {
+    const { outbox, sent, key } = await askedAbout(() => recordedReply());
+    // Until the server says, nothing to scan again.
+    expect(noteOf(second(outbox)?.reason ?? { code: "no_answer" })).toEqual({
+      bold: [recordedFirst("here")],
+    });
+    await vi.waitFor(() =>
+      expect(second(outbox)?.reason).toHaveProperty("recorded"),
+    );
+    const asked = sent[1] as Request;
+    expect((await asked.clone().json()).key).toBe(key);
+    expect(second(outbox)).toMatchObject({
+      state: "refused",
+      transactionId: null,
+      reason: { code: "recorded_elsewhere", recorded: { by: "here" } },
+    });
+    expect(second(outbox)?.reason).not.toHaveProperty("heldKey");
+    // Under a key of its own still.
+    expect(second(outbox)?.body.key).not.toBe(key);
+    // Asked once.
+    await outbox.send();
+    expect(sent).toHaveLength(2);
+  });
+
+  test("one asked about that the server records, as nothing held the key, is saved under it", async () => {
+    const { outbox, key } = await askedAbout(() => saved(42));
+    await vi.waitFor(() => expect(second(outbox)?.state).toBe("saved"));
+    expect(second(outbox)).toMatchObject({
+      transactionId: 42,
+      reason: null,
+      body: { key },
+    });
+  });
+
+  test("one asked about that is the same as recorded is dropped", async () => {
+    const { outbox } = await askedAbout(() =>
+      json({ transaction_id: 41 }, 200),
+    );
+    await vi.waitFor(() => expect(outbox.entries.value).toHaveLength(1));
+    expect(states(outbox)).toEqual(["saved"]);
+  });
+
+  test("one asked about the server refuses for what it holds says why", async () => {
+    const { outbox } = await askedAbout(() =>
+      json(
+        { detail: [{ loc: ["body", "lines", 0], type: "x", msg: "No" }] },
+        422,
+      ),
+    );
+    await vi.waitFor(() =>
+      expect(second(outbox)?.reason?.code).toBe("refused"),
+    );
+    expect(second(outbox)?.state).toBe("refused");
+  });
+
+  test("one asked about without an answer stays as it is, and is asked again", async () => {
+    const { outbox, sent } = await askedAbout(
+      () => new Promise<Response>((_, fail) => fail(new TypeError("offline"))),
+    );
+    await vi.waitFor(() => expect(sent).toHaveLength(2));
+    await vi.waitFor(() =>
+      expect(second(outbox)?.reason).toMatchObject({
+        code: "recorded_elsewhere",
+        heldKey: expect.any(String),
+      }),
+    );
+    expect(second(outbox)?.state).toBe("refused");
+  });
+
+  test("one asked about is not answered as too old: this tab is", async () => {
+    const { outbox } = await askedAbout(() => json(TOO_OLD, 409));
+    await vi.waitFor(() => expect(outbox.builds.newer.value).toBe("too_old"));
+    expect(second(outbox)).toMatchObject({
+      state: "refused",
+      reason: { code: "recorded_elsewhere", heldKey: expect.any(String) },
+    });
+  });
+
+  test("one asked about from an older build's tab, too old, asks no more", async () => {
+    const key = uuid();
+    const held = entry({
+      body: { ...changed(), key: uuid() },
+      build: "older",
+      state: "refused",
+      reason: { code: "recorded_elsewhere", heldKey: key },
+      putBack: true,
+    });
+    store(held);
+    const { api, sent } = answering(() => json(TOO_OLD, 409));
+    const outbox = new Outbox(api, localStorage, new Builds("newer"));
+    await outbox.send();
+    expect(sent).toHaveLength(1);
+    expect(outbox.entries.value[0]?.reason).toEqual({
+      code: "recorded_elsewhere",
+    });
+    await outbox.send();
+    expect(sent).toHaveLength(1);
+  });
+
+  test("its difference put in the cart is kept so, of that one alone", async () => {
+    const { api } = answering(
+      replies(
+        () => saved(40),
+        () => recordedReply(),
+      ),
+    );
+    const outbox = new Outbox(api);
+    const key = uuid();
+    outbox.queue(draft(), "a");
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
+    outbox.queue(changed(), "b", key);
+    await vi.waitFor(() =>
+      expect(states(outbox)).toEqual(["saved", "refused"]),
+    );
+    expect(outbox.differenceAdded(key)).toBe(true);
+    expect(outbox.entries.value[1]?.reason).toMatchObject({ added: true });
+    expect(outbox.entries.value[0]?.reason).toBeNull();
+  });
+
+  test("one listed recorded elsewhere waits to be asked about while the batch under its key waits", async () => {
+    const { api, sent } = answering(() => json({}, 500));
+    const outbox = new Outbox(api);
+    const key = uuid();
+    outbox.queue(draft(), "a", key);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(outbox.queue(changed(), "b", key)).toBe("refused");
+    await outbox.send();
+    const bodies = await Promise.all(sent.map((each) => each.clone().json()));
+    expect(bodies.map((body) => body.lines[0].quantity)).toEqual(
+      bodies.map(() => "3"),
+    );
+  });
+
+  test.each([
+    ["unregistered", () => json({ reason: "unregistered" }, 403)],
+    ["failing", () => json({}, 500)],
+  ])("one asked about, the device %s, stays as it is", async (_, reply) => {
+    const { outbox, sent } = await askedAbout(reply);
+    await vi.waitFor(() => expect(sent).toHaveLength(2));
+    await outbox.send();
+    expect(second(outbox)).toMatchObject({
+      state: "refused",
+      reason: { code: "recorded_elsewhere", heldKey: expect.any(String) },
+    });
+  });
+});
+
 describe("builds", () => {
   const MINE = "2026-11-12T10:00:00.000Z";
   const NEWER = "2026-11-12T11:00:00.000Z";
@@ -898,8 +1142,47 @@ describe("storage", () => {
       const inner = s.options ?? [s.item ?? s.wrapped].filter(Boolean);
       return inner.flatMap((each) => paths(each, at));
     };
+    // Optional fields added since a build keeping v4 was deployed (Ali,
+    // inventory-tng-0gg): a tab of 42b1595b drops them from what it writes
+    // back, which leaves the entry as that build itself would have kept it
+    // (a recorded_elsewhere it says to scan again), so they need no new key.
+    // Only such a field may be added here without one.
+    const droppedAsBefore = [
+      "reason.added",
+      "reason.added = true",
+      "reason.heldKey",
+      "reason.recorded",
+      "reason.recorded.batch",
+      ...[
+        "from_location_id",
+        "install_number",
+        "key",
+        "kind",
+        "kind = move | receipt | install | open | report",
+        "lengths",
+        "lengths.left",
+        "lengths.open_package_key",
+        "lines",
+        "lines.item_id",
+        "lines.open_package_key",
+        "lines.package_id",
+        "lines.package_size",
+        "lines.quantity",
+        "lines.whole",
+        "to_location_id",
+        "used_up",
+        "volunteer_id",
+      ].map((path) => `reason.recorded.batch.${path}`),
+      "reason.recorded.by",
+      "reason.recorded.by = here | elsewhere",
+      "reason.recorded.transactionId",
+    ];
     expect(Object.keys(Kept.entries)).toEqual(["build", "entries"]);
-    expect({ [STORAGE_KEY]: paths(Entry).sort() }).toEqual({
+    expect({
+      [STORAGE_KEY]: paths(Entry)
+        .filter((path) => !droppedAsBefore.includes(path))
+        .sort(),
+    }).toEqual({
       "inventory.outbox.v4": [
         "body",
         "body.from_location_id",
@@ -932,8 +1215,11 @@ describe("storage", () => {
         "reason.code",
         "reason.code",
         "reason.code",
-        "reason.code = no_answer | unavailable | must_upgrade | key_reused | recorded_elsewhere",
+        "reason.code",
+        // The same values as shipped, recorded_elsewhere an object of its own.
+        "reason.code = no_answer | unavailable | must_upgrade | key_reused",
         "reason.code = not_registered",
+        "reason.code = recorded_elsewhere",
         "reason.code = refused",
         "reason.code = unexpected",
         "reason.problems",

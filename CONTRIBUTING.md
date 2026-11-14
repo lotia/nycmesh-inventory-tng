@@ -332,7 +332,9 @@ key with a version (`frontend/src/outbox.ts`, `cart.ts`), stamped with the
 build that wrote them. A change to what is kept, or to a value a field may
 take, takes a new key, as a tab of the build before, open during a deploy,
 drops what it cannot read from what it writes back; `outbox.test.ts` lists
-both for the outbox's key. Builds that keep the same shape share a key, so
+both for the outbox's key. The one exception is an optional field whose
+loss leaves the entry as the build before would have kept it, which that
+test lists apart. Builds that keep the same shape share a key, so
 each batch is kept with the build that queued it, and is sent as that
 build's, whichever tab sends it. Why a batch was refused, or waits, is
 kept as a code with its data (`outbox.Reason`), never in words: the page
@@ -406,23 +408,37 @@ does a cart when a newer build reads it, and one without a key, left by a
 build from before, gets one as it goes back. The cart is sent under its
 key until emptied or discarded, as an older tab may be sending it still:
 the server then takes it once, or, changed since, refuses it (409
-`key_reused`). The page then asks for the catalogue and
+`key_reused`), saying what it recorded under the key, to the request
+holding it only. The page then asks for the catalogue and
 stock at once, as its periodic refresh does, whichever tab sent it, and
 the save stays listed with Dismiss, saying "Not recorded: another tab
-recorded this cart before your changes. Scan again only what you
-changed." Such a save never goes in a cart again, here or in the older
-list, which offers only Discard: what it held is recorded, and once more
-would record it twice (reason `recorded_elsewhere`). Any other save refused
-for its key goes back without it, as the server holds that key for
-another batch. A key the outbox already holds, queued again (a cart
+recorded this cart before your changes.", then what that tab recorded,
+and what the save holds otherwise, line by line (`frontend/src/
+recorded.ts`). "Add the difference to cart" puts what it holds more of,
+or new, in an empty cart under a new key, once; never what was taken
+from or said of an open package. Under a line it holds less of, it says
+an administrator will correct it: the server, refusing it, keeps that
+difference (`over_recorded.py`), and the administrators' home page lists
+it under "Needs your action" as "Recorded more than moved" until one
+corrects it, with adjustments that undo it on each side, or marks it
+checked. From a server that says nothing of what it recorded, the note
+goes on "Scan again only what you changed." Such a save never goes in a
+cart whole again, here or in the older list, which offers only Discard:
+what it held is recorded, and once more would record it twice (reason
+`recorded_elsewhere`, which keeps what was recorded). Any other save
+refused for its key goes back without it, as the server holds that key
+for another batch. A key the outbox already holds, queued again (a cart
 whose emptying the browser did not keep, or one a tab that had not heard
 filled again), is not queued twice. Another batch under it is kept as
-`recorded_elsewhere`, under a key of its own, without being sent, unless
-the one under it was refused for what it held (422): then it is sent
-(`Outbox.queue`). Either way the page says nothing is sending and counts
-no save: the list shows what became of it. An opening's open packages
-take keys made from the cart's, so the same opening recorded again is
-the same batch (`cart.openings`).
+`recorded_elsewhere`, under a key of its own, unless the one under it
+was refused for what it held (422): then it is sent (`Outbox.queue`).
+Kept so, it is sent under the cart's key once nothing under that key
+waits, only for the server to say what it recorded and keep what it took
+off; the server takes it only if nothing holds the key after all.
+Either way the page says nothing is sending and counts no save: the list
+shows what became of it. An opening's open packages take keys made from
+the cart's, so the same opening recorded again is the same batch
+(`cart.openings`).
 
 A refused save in the outbox's list lists its lines, in the words of the
 older list, each item numbered as the refusal's "Line n" names it. While

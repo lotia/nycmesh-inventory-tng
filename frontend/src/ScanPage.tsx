@@ -50,16 +50,27 @@ import {
   withRetired,
 } from "./older";
 import {
+  type Body,
   type Entry,
   type Note,
   noteOf,
   STORAGE_KEY as OUTBOX_KEY,
   type Outbox,
+  type Recorded,
+  recordedHeading,
   type Said,
   sharedOutbox,
   wordsOf,
 } from "./outbox";
 import { decimal, thousandths } from "./quantity";
+import {
+  ADD_DIFFERENCE,
+  changesShown,
+  differenceOf,
+  differenceToCart,
+  recordedLines,
+  YOUR_CHANGES,
+} from "./recorded";
 import { NOT_REGISTERED } from "./registration";
 import { Scanner } from "./Scanner";
 import { onStoredChange } from "./stored";
@@ -141,6 +152,9 @@ export function ScanPage({
     return older.listen();
   }, []);
   const loadedAt = useRef(0);
+  // What puts a save's difference in the cart, while the cart is shown
+  // (CartForm), for the outbox's list below it.
+  const adder = useRef<AddDifference | null>(null);
   // One refresh at a time; one asked for meanwhile follows it.
   const asking = useRef<"no" | "yes" | "again">("no");
 
@@ -300,9 +314,16 @@ export function ScanPage({
           outbox={outbox}
           cartEmpty={cartEmpty}
           older={older}
+          adder={adder}
         />
       )}
-      <OutboxList outbox={outbox} catalogue={shown} />
+      <OutboxList
+        outbox={outbox}
+        catalogue={shown}
+        onAddDifference={(entry, difference) =>
+          adder.current?.(entry, difference) ?? null
+        }
+      />
     </main>
   );
 }
@@ -377,6 +398,7 @@ function CartForm({
   outbox,
   cartEmpty,
   older,
+  adder,
 }: {
   catalogue: Catalogue;
   /** The outbox's batches it does not show (cart.ts, unseen). */
@@ -386,6 +408,8 @@ function CartForm({
   cartEmpty: Signal<boolean>;
   /** What older builds left, to put back in the cart or discard. */
   older: OlderStore;
+  /** Given what puts a save's difference in this cart (addDifference). */
+  adder: { current: AddDifference | null };
 }) {
   const store = useMemo(() => new CartStore(catalogue), []);
   // The open packages to take from, and how many are sealed where, as the
@@ -594,14 +618,18 @@ function CartForm({
     telemetry.record({ kind: "cart_discarded" });
   }
 
+  /** The cart as stored, to fill if empty: another tab may have filled
+   * it, unheard yet, which filling it would write over. */
+  function storedCart(): Cart {
+    return store.forSaving() ?? cart.value;
+  }
+
   /** Put an older build's save, or cart, in this cart, which must be
    * empty, and forget it there: moved, never copied, so it is saved once.
    * Why not, if it was not and there is anything to say: of one gone
    * meanwhile, nothing, as it is no longer listed to say it under. */
   function putInCart(each: Older, automatically = false): NotPut | null {
-    // As stored: another tab may have filled it, unheard yet, which this
-    // would write over.
-    const current = store.forSaving() ?? cart.value;
+    const current = storedCart();
     if (current.lines.length > 0) {
       return "cart_not_empty";
     }
@@ -636,6 +664,34 @@ function CartForm({
     putBack.value = gaps;
     return null;
   }
+
+  /** Put what a save recorded elsewhere adds (recorded.ts, differenceOf)
+   * in this cart, which must be empty, under the difference's own key,
+   * and mark the save so, offering it no more. Why not, if it was not. */
+  function addDifference(entry: Entry, difference: Body): NotPut | null {
+    const current = storedCart();
+    if (current.lines.length > 0) {
+      return "cart_not_empty";
+    }
+    const { cart: filled, gaps } = differenceToCart(
+      difference,
+      catalogue,
+      current,
+    );
+    const before = cart.value;
+    if (!store.change(filled)) {
+      cart.value = before;
+      return "not_kept";
+    }
+    kept(true);
+    saved.value = null;
+    if (!outbox.differenceAdded(entry.body.key)) {
+      problems.value = [[NOT_REMOVED]];
+    }
+    putBack.value = gaps;
+    return null;
+  }
+  adder.current = addDifference;
 
   // An empty cart takes what an older build left that goes back whole,
   // without a tap: the oldest first, one at a time. Each is tried once a
@@ -1276,6 +1332,10 @@ const CHANGED_NOT_DISCARDED =
  * meanwhile, or the browser would not keep the cart. */
 type NotPut = "cart_not_empty" | "changed" | "not_kept";
 
+/** Puts what a save recorded elsewhere adds in the cart (CartForm,
+ * addDifference): why not, if it was not. */
+type AddDifference = (entry: Entry, difference: Body) => NotPut | null;
+
 /** What the older list says under one: why it was not put in the cart, or
  * not discarded (changed meanwhile, or not kept). */
 type OlderWhy = NotPut | "discard_changed" | "discard_not_kept";
@@ -1613,20 +1673,26 @@ function Finder({
 /**
  * What this browser sent, or is sending, and what became of each. A
  * refusal or failure says so in the alert's style, and a refused batch
- * lists its lines, to compare with what was recorded. One put back from
- * an older build and refused as another tab recorded it first says what
- * is left to do (SCAN_AGAIN_CHANGED), as the older list does, while the
- * page refreshes the stock (Ali, inventory-tng-g0e, d).
+ * lists its lines, to compare with what was recorded. One sent under its
+ * cart's key and refused as another tab recorded it first shows what that
+ * tab recorded and what differs (RecordedElsewhere), or, from a server
+ * that does not say, what is left to do (SCAN_AGAIN_CHANGED), as the older
+ * list does, while the page refreshes the stock (Ali, inventory-tng-g0e,
+ * d; inventory-tng-0gg).
  */
 function OutboxList({
   outbox,
   catalogue,
+  onAddDifference,
 }: {
   outbox: Outbox;
   /** To name the lines of one refused; null until it is loaded. */
   catalogue: Catalogue | null;
+  onAddDifference: AddDifference;
 }) {
   const online = useOnline();
+  // Under which save, why its difference did not go in the cart.
+  const notAdded = useSignal<{ on: string; why: NotPut } | null>(null);
   const stored = outbox.entries.value;
   // Of each refused, its lines, read again only as the outbox or
   // catalogue changes.
@@ -1658,7 +1724,11 @@ function OutboxList({
         {entries.map((entry) => {
           const key = entry.body.key;
           const { reason } = entry;
-          const lines = linesOf.get(key) ?? [];
+          const recorded =
+            reason?.code === "recorded_elsewhere" && catalogue !== null
+              ? reason.recorded
+              : undefined;
+          const lines = recorded === undefined ? (linesOf.get(key) ?? []) : [];
           return (
             <li key={key} class="flex flex-col items-start gap-1">
               <div>{entry.what}</div>
@@ -1678,6 +1748,25 @@ function OutboxList({
                   ))}
                 </ul>
               )}
+              {recorded !== undefined && catalogue !== null && (
+                <RecordedElsewhere
+                  entry={entry}
+                  recorded={recorded}
+                  catalogue={catalogue}
+                  added={reason?.code === "recorded_elsewhere" && reason.added}
+                  onAdd={(difference) => {
+                    const why = onAddDifference(entry, difference);
+                    notAdded.value = why === null ? null : { on: key, why };
+                  }}
+                />
+              )}
+              {notAdded.value?.on === key && (
+                <p role="alert">
+                  <AlertWords
+                    note={{ bold: [olderSaid(notAdded.value.why, true)] }}
+                  />
+                </p>
+              )}
               {entry.state !== "waiting" && (
                 <button type="button" onClick={() => outbox.dismiss(key)}>
                   Dismiss
@@ -1688,5 +1777,68 @@ function OutboxList({
         })}
       </ul>
     </section>
+  );
+}
+
+/**
+ * A save refused as another tab recorded its cart first, once the server
+ * said what it recorded (Ali, inventory-tng-0gg): that, under its heading,
+ * then what the save holds otherwise, each with why it cannot go back, if
+ * it cannot, and under one it holds less of, that an administrator will
+ * correct it; and a button that puts what it adds in the cart, until it
+ * has.
+ */
+function RecordedElsewhere({
+  entry,
+  recorded,
+  catalogue,
+  added,
+  onAdd,
+}: {
+  entry: Entry;
+  recorded: Recorded;
+  catalogue: Catalogue;
+  /** Its difference is in the cart already. */
+  added: boolean | undefined;
+  onAdd: (difference: Body) => void;
+}) {
+  const { was, changes, difference } = useMemo(
+    () => ({
+      was: recordedLines(recorded, catalogue),
+      changes: changesShown(recorded, entry.body, catalogue),
+      difference: differenceOf(recorded.batch, entry.body),
+    }),
+    [recorded, entry.body, catalogue],
+  );
+  // Keyed by what each says, two saying the same apart.
+  const wasKeys = keyedByWords(was.map(wordsOf));
+  const changeKeys = keyedByWords(changes.map(({ words }) => wordsOf(words)));
+  return (
+    <>
+      <h3>{recordedHeading(recorded)}</h3>
+      <ul class="list-none p-0">
+        {was.map((said, at) => (
+          <li key={wasKeys[at]}>
+            <Counted said={said} />
+          </li>
+        ))}
+      </ul>
+      <h3>{YOUR_CHANGES}</h3>
+      <ul class="list-none p-0">
+        {changes.map(({ words, note }, at) => (
+          <li key={changeKeys[at]} class="flex flex-col items-start gap-1">
+            <div>
+              <Counted said={words} />
+            </div>
+            {note !== null && <NoteSaid note={note} />}
+          </li>
+        ))}
+      </ul>
+      {difference !== null && added !== true && (
+        <button type="button" onClick={() => onAdd(difference)}>
+          {ADD_DIFFERENCE}
+        </button>
+      )}
+    </>
   );
 }

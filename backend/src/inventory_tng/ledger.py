@@ -29,7 +29,7 @@ from collections import Counter, defaultdict
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from decimal import Decimal
 from types import MappingProxyType
-from typing import Annotated, Literal, NamedTuple
+from typing import Annotated, Literal, NamedTuple, cast
 
 import structlog
 from fastapi import APIRouter, Depends, FastAPI, Request, Response
@@ -52,7 +52,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from inventory_tng import open_packages, page_builds
+from inventory_tng import open_packages, over_recorded, page_builds
 from inventory_tng.db import (
     DbSession,
     RuleBroken,
@@ -898,8 +898,53 @@ class BatchRefused(Exception):
         self.problems = problems
 
 
+class RecordedLine(BaseModel):
+    """A line of the transaction recorded under a batch's key, as a batch
+    sends one (Line), so the scan page compares it with what it sent."""
+
+    item_id: int
+    quantity: Decimal
+    package_id: int | None
+    # The package's size now, with package_id.
+    package_size: Decimal | None
+    open_package_key: uuid.UUID | None
+    whole: bool | None
+
+
+class RecordedLength(BaseModel):
+    """A report of what is on an open package, as recorded (LengthReport)."""
+
+    open_package_key: uuid.UUID
+    left: Decimal
+
+
+class RecordedBatch(BaseModel):
+    """The transaction recorded under a batch's key, as a batch sends one
+    (Batch), with its id."""
+
+    transaction_id: int
+    kind: VolunteerKind
+    volunteer_id: int
+    from_location_id: int | None
+    to_location_id: int | None
+    install_number: int | None
+    lines: list[RecordedLine]
+    used_up: list[uuid.UUID]
+    lengths: list[RecordedLength]
+
+
 class KeyReused(Exception):
-    """The key was already used, for a different batch."""
+    """The key was already used, for a different batch: `recorded`, the
+    transaction under it, as a batch (None if no volunteer's batch wrote
+    it); `over`, by movement, how much more of it was recorded than this
+    batch sends, for an administrator to correct (over_recorded.py)."""
+
+    def __init__(
+        self, recorded: RecordedBatch | None, over: Mapping[int, Decimal]
+    ) -> None:
+        super().__init__("key reused")
+        self.recorded = recorded
+        self.over = over
 
 
 Side = Literal["from", "to"]
@@ -1902,6 +1947,7 @@ def _replay(session: Session, batch: Batch) -> LedgerTransaction | None:
         return None
     rows = session.execute(
         select(
+            Movement.id,
             Movement.item_id,
             Movement.quantity,
             Movement.from_package_id,
@@ -1909,16 +1955,23 @@ def _replay(session: Session, batch: Batch) -> LedgerTransaction | None:
             Movement.to_package_id,
             Movement.to_open_package_id,
         ).where(Movement.transaction_id == transaction.id)
-    )
-    # As many of each line, whatever their order: an item may be on several
-    # lines, in different forms.
-    written = Counter(
-        Entry(
+    ).all()
+    # Each line as written, by its movement.
+    movements = {
+        movement_id: Entry(
             item_id, quantity, Form(from_package, from_open), Form(to_package, to_open)
         )
-        for item_id, quantity, from_package, from_open, to_package, to_open in rows
+        for movement_id, item_id, quantity, from_package, from_open, to_package, to_open in rows
+    }
+    # As many of each line, whatever their order: an item may be on several
+    # lines, in different forms.
+    written = Counter(movements.values())
+    sent_lines = _written_as(session, batch)
+    sent = Counter(sent_lines)
+    header = _header(batch)
+    same_header = all(
+        getattr(transaction, field) == value for field, value in header.items()
     )
-    sent = Counter(_written_as(session, batch))
     # Its reports as sent, whatever their order: what became of the open
     # packages since, as cleared by an administrator, does not count.
     same = (
@@ -1926,18 +1979,117 @@ def _replay(session: Session, batch: Batch) -> LedgerTransaction | None:
         and Counter(transaction.used_up) == Counter(batch.used_up or [])
         and Counter(map(_kept_as_sent, transaction.lengths))
         == Counter((each.open_package_key, each.left) for each in batch.lengths or [])
-        and all(
-            getattr(transaction, field) == value
-            for field, value in _header(batch).items()
-        )
+        and same_header
     )
     if not same:
         refused.add(1, {"reason": "key_reused"})
         log.warning("idempotency key reused", transaction_id=transaction.id)
-        raise KeyReused
+        # Stock moves by kind and places alone: who, or an install's number,
+        # changed, the lines are still compared.
+        moved_alike = all(
+            getattr(transaction, field) == header[field]
+            for field in ("kind", "from_location_id", "to_location_id")
+        )
+        raise KeyReused(
+            _as_batch(session, transaction, movements),
+            _more_written(movements, sent_lines if moved_alike else []),
+        )
     replayed.add(1, {"kind": batch.kind})
     log.info("transaction replayed", transaction_id=transaction.id)
     return transaction
+
+
+def _more_written(
+    written: Mapping[int, Entry], sent: Sequence[Entry]
+) -> dict[int, Decimal]:
+    """By movement, how much more of it was written than `sent` holds of
+    the same item in the same forms: what the volunteer took off a batch
+    already recorded."""
+    sent_by: defaultdict[tuple[int, Form, Form], Decimal] = defaultdict(Decimal)
+    for line in sent:
+        sent_by[line.item_id, line.leaves, line.arrives] += line.quantity
+    over = {}
+    for movement_id, line in written.items():
+        more = line.quantity - sent_by[line.item_id, line.leaves, line.arrives]
+        if more > 0:
+            over[movement_id] = more
+    return over
+
+
+def _as_batch(
+    session: Session, transaction: LedgerTransaction, movements: Mapping[int, Entry]
+) -> RecordedBatch | None:
+    """`transaction`, written with `movements`, as a batch would send it:
+    a sealed line by its package, at its size now; one taken from an open
+    package, or an opening's, by the open package's key. None if no
+    volunteer's batch wrote it."""
+    if transaction.kind not in SIDES or transaction.volunteer_id is None:
+        return None
+    lines = list(movements.values())
+    opened = {
+        form.open_package_id
+        for line in lines
+        for form in (line.leaves, line.arrives)
+        if form.open_package_id is not None
+    }
+    keys = dict(
+        session.execute(
+            select(OpenPackage.id, OpenPackage.key).where(OpenPackage.id.in_(opened))
+        ).all()
+        if opened
+        else []
+    )
+    packages = {
+        form.package_id
+        for line in lines
+        for form in (line.leaves, line.arrives)
+        if form.package_id is not None
+    }
+    sizes = dict(
+        session.execute(
+            select(ItemPackage.id, ItemPackage.size).where(ItemPackage.id.in_(packages))
+        ).all()
+        if packages
+        else []
+    )
+
+    def line_of(line: Entry) -> RecordedLine:
+        if transaction.kind == "open":
+            # Sealed, opened into a followed open package or loose.
+            package_id = line.leaves.package_id
+            open_id = line.arrives.open_package_id
+            whole = None
+        elif line.leaves.open_package_id is not None:
+            package_id = None
+            open_id = line.leaves.open_package_id
+            whole = True if line.arrives.open_package_id == open_id else None
+        else:
+            package_id = line.leaves.package_id or line.arrives.package_id
+            open_id = None
+            whole = None
+        return RecordedLine(
+            item_id=line.item_id,
+            quantity=line.quantity,
+            package_id=package_id,
+            package_size=sizes.get(package_id) if package_id is not None else None,
+            open_package_key=keys.get(open_id) if open_id is not None else None,
+            whole=whole,
+        )
+
+    return RecordedBatch(
+        transaction_id=transaction.id,
+        kind=cast(VolunteerKind, transaction.kind),
+        volunteer_id=transaction.volunteer_id,
+        from_location_id=transaction.from_location_id,
+        to_location_id=transaction.to_location_id,
+        install_number=transaction.install_number,
+        lines=[line_of(line) for line in lines],
+        used_up=list(transaction.used_up),
+        lengths=[
+            RecordedLength(open_package_key=key, left=left)
+            for key, left in map(_kept_as_sent, transaction.lengths)
+        ],
+    )
 
 
 def _keyed(session: Session, keys: Collection[uuid.UUID]) -> dict[uuid.UUID, int]:
@@ -2012,6 +2164,15 @@ class Saved(BaseModel):
 
 class KeyReusedReply(BaseModel):
     reason: Literal["key_reused"]
+    recorded: Annotated[
+        RecordedBatch | None,
+        Field(
+            description="The transaction recorded under the key, as a batch "
+            "sends one, for the page to show what differs; none if no "
+            "volunteer's batch recorded it. Only one sending the key learns "
+            "of it."
+        ),
+    ] = None
 
 
 PATH = "/transactions"
@@ -2048,9 +2209,20 @@ def save_batch(
     server serves, when it has one (page_builds.py)."""
     # So the history of anything the batch changes, such as on_order, says who.
     set_actor(session, f"volunteer:{batch.volunteer_id}")
-    transaction, written, retired, opened, reported, checks = record(
-        session, batch, device_id=device.id
-    )
+    try:
+        # In a savepoint, so nothing of a batch refused for its key is kept,
+        # an opening's open packages made before the key was found taken
+        # too: only what it took off a line already recorded, for an
+        # administrator to correct.
+        with session.begin_nested():
+            transaction, written, retired, opened, reported, checks = record(
+                session, batch, device_id=device.id
+            )
+    except KeyReused as reused:
+        raised = over_recorded.raise_checks(session, reused.over)
+        session.commit()
+        over_recorded.measure_raised(raised)
+        raise
     # Read before the commit, which expires it.
     transaction_id = transaction.id
     session.commit()
@@ -2105,6 +2277,6 @@ def install(app: FastAPI) -> None:
         return JSONResponse({"detail": detail}, status_code=422)
 
     @app.exception_handler(KeyReused)
-    def key_reused(_request: Request, _error: KeyReused) -> JSONResponse:
-        body = KeyReusedReply(reason="key_reused")
-        return JSONResponse(body.model_dump(), status_code=409)
+    def key_reused(_request: Request, error: KeyReused) -> JSONResponse:
+        body = KeyReusedReply(reason="key_reused", recorded=error.recorded)
+        return JSONResponse(body.model_dump(mode="json"), status_code=409)

@@ -75,6 +75,8 @@ UNLOCKED = {
     "activity",
     # Counted attempts, written by one statement that holds the key's row.
     "rate_limit",
+    # Raised or said again by one statement; settled holding its row.
+    "over_recorded",
 }
 
 

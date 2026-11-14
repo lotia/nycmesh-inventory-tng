@@ -240,6 +240,29 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   cart again, in the older list too, which offers only its Discard (Ali,
   inventory-tng-wyq): what it held is recorded, and once more would
   record it twice.
+  The server's refusal says what it recorded under the key, to the
+  request that sent it, and the save shows that under "Recorded by the
+  other tab (transaction n)", then "Your changes, not recorded", each
+  line that differs as "n more", "new" or "n fewer", in place of "Scan
+  again only what you changed.", which stays only for a server that
+  says nothing (Ali, 2026-11-14, inventory-tng-0gg). That note could
+  read as covering lines rescanned since, and so record them twice.
+  "Add the difference to cart" puts what was added or raised in an
+  empty cart under a new key; what was taken from an open package never
+  goes back so, as the package may have changed. A line taken down
+  says "Recorded 2 × Bag of 50, you changed it to 1. An administrator
+  will correct it.": the ledger never changes, and a volunteer makes no
+  adjustment (0003). The server keeps that difference itself as it
+  refuses the save, checked against the transaction it recorded, rather
+  than the page reporting it later: no request more to lose or retry,
+  and a device can flag only what it sent of a cart recorded. A save
+  another tab of this build recorded first is never sent under the key,
+  so it is sent once nothing under the key waits, only for that answer.
+  What the server recorded is kept with the refused save in the outbox
+  under its key, as optional fields: a tab of the build before drops
+  them, which leaves the save as that build shows it. We rejected a new
+  storage key, which would have listed every save waiting at a deploy
+  with what older builds left.
   The page's words drop "save" (Ali, 2026-11-13, inventory-tng-wyq): the
   cart lives in the browser, written to storage as it changes, so what
   the browser holds is "kept", and what the inventory takes is

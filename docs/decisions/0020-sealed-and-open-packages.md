@@ -5,7 +5,8 @@ reorder) and adds the home page's "Waiting for you" (now "Needs your
 action") ·
 amended 2026-11-11 (tracking opened packages is a setting; bulk actions)
 · amended 2026-11-12 (an open package on the scan page; correcting its
-length; "Needs your action")
+length; "Needs your action") · amended 2026-11-14 (recorded more than
+moved)
 
 ## Context
 
@@ -315,6 +316,23 @@ you" counts every report in one line, which hides what is waiting.
   and its bulk buttons. A reported package below zero
   shows its shortfall there, so none is confirmed unseen.
 
+### Recorded more than moved (2026-11-14)
+
+- **A line recorded with more than was moved** waits under "Needs your
+  action" as "Recorded more than moved", one line per item with each
+  amount, as a package's are ("RJ45 connectors: 1 × Bag of 50"), linking
+  to its page: the item, the amount, the places and the transaction (Ali,
+  2026-11-14, inventory-tng-0gg). It is raised when a scan page's save,
+  changed after another tab recorded its cart under the same key, is
+  refused holding less of a line than was recorded; the server compares
+  the two, so nothing else can raise one. A later such save says the
+  amount again while it waits.
+- **Correct** writes an adjustment on each side of the transaction, with
+  the reason "Recorded more than moved", in the forms it moved in: found
+  again where it left, written off where it arrived. **Mark checked**
+  settles it as it is, for one corrected another way. Either settles it
+  only as the administrator saw it.
+
 ### Rejected in this amendment
 
 - **Closing an open package by itself at zero**: zero is only what was
@@ -336,7 +354,8 @@ you" counts every report in one line, which hides what is waiting.
   tap rather than a recount; the next count still corrects anything left.
 - Metrics, besides those above: checks of a package's length raised, by
   how (`volunteer`, `below_zero`), and settled, by how (`set`, `left`,
-  `closed`).
+  `closed`); lines recorded more than moved raised, and settled, by how
+  (`corrected`, `checked`).
 - Built by inventory-tng-ck0 (the card and its box), inventory-tng-pll
   ("Needs your action"), inventory-tng-wy7 (reporting and checking a
   length) and inventory-tng-pg7 (the hint).

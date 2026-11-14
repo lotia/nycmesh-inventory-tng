@@ -712,6 +712,17 @@
             "type": "string",
             "const": "key_reused",
             "title": "Reason"
+          },
+          "recorded": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecordedBatch"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The transaction recorded under the key, as a batch sends one, for the page to show what differs; none if no volunteer's batch recorded it. Only one sending the key learns of it."
           }
         },
         "type": "object",
@@ -1116,6 +1127,177 @@
         "type": "object",
         "required": ["reason"],
         "title": "RateLimitedReply"
+      },
+      "RecordedBatch": {
+        "properties": {
+          "transaction_id": {
+            "type": "integer",
+            "title": "Transaction Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["move", "receipt", "install", "open", "report"],
+            "title": "Kind"
+          },
+          "volunteer_id": {
+            "type": "integer",
+            "title": "Volunteer Id"
+          },
+          "from_location_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Location Id"
+          },
+          "to_location_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Location Id"
+          },
+          "install_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Install Number"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/RecordedLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "used_up": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Used Up"
+          },
+          "lengths": {
+            "items": {
+              "$ref": "#/components/schemas/RecordedLength"
+            },
+            "type": "array",
+            "title": "Lengths"
+          }
+        },
+        "type": "object",
+        "required": [
+          "transaction_id",
+          "kind",
+          "volunteer_id",
+          "from_location_id",
+          "to_location_id",
+          "install_number",
+          "lines",
+          "used_up",
+          "lengths"
+        ],
+        "title": "RecordedBatch",
+        "description": "The transaction recorded under a batch's key, as a batch sends one\n(Batch), with its id."
+      },
+      "RecordedLength": {
+        "properties": {
+          "open_package_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Open Package Key"
+          },
+          "left": {
+            "type": "string",
+            "title": "Left"
+          }
+        },
+        "type": "object",
+        "required": ["open_package_key", "left"],
+        "title": "RecordedLength",
+        "description": "A report of what is on an open package, as recorded (LengthReport)."
+      },
+      "RecordedLine": {
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "quantity": {
+            "type": "string",
+            "title": "Quantity"
+          },
+          "package_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Id"
+          },
+          "package_size": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Size"
+          },
+          "open_package_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Package Key"
+          },
+          "whole": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whole"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "quantity",
+          "package_id",
+          "package_size",
+          "open_package_key",
+          "whole"
+        ],
+        "title": "RecordedLine",
+        "description": "A line of the transaction recorded under a batch's key, as a batch\nsends one (Line), so the scan page compares it with what it sent."
       },
       "Registered": {
         "properties": {

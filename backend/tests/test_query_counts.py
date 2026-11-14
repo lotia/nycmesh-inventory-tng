@@ -11,9 +11,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.routing import iter_route_contexts
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import accounts, devices
+from inventory_tng import accounts, devices, over_recorded
 from inventory_tng.admin.length_checks import KINDS
 from inventory_tng.models import (
     Authenticator,
@@ -21,6 +22,7 @@ from inventory_tng.models import (
     ItemPackage,
     Label,
     Location,
+    Movement,
     Volunteer,
 )
 
@@ -70,11 +72,22 @@ def everything(world: World) -> None:
     write(session, spools.place)
     used_up = report(spools) | {"lengths": None, "used_up": [str(spools.opened().key)]}
     write(session, spools.place, **used_up)
+    over_recorded_line(world)
     for label in (
         Label(item_id=spools.cable.id, package_id=spools.spool.id),
         Label(location_id=spools.store.id),
     ):
         world.labels.append(add(session, label).id)
+
+
+def over_recorded_line(world: World) -> None:
+    """A line more recorded with more than was moved (over_recorded.py)."""
+    transaction = write(world.session, world.spools.place)
+    movement_id = world.session.scalar(
+        select(Movement.id).where(Movement.transaction_id == transaction.id)
+    )
+    assert movement_id is not None
+    over_recorded.raise_checks(world.session, {movement_id: Decimal(1)})
 
 
 def item_parts(world: World) -> None:
@@ -194,6 +207,7 @@ PAGES: dict[str, tuple[More, *tuple[Path, ...]]] = {
     "/admin/stock/needs-counting": (everything,),
     "/admin/stock/used-up": (everything,),
     "/admin/stock/length-checks": (everything,),
+    "/admin/stock/recorded-more": (over_recorded_line,),
     "/admin/stock/length-checks/{which}": (everything, *(k.path for k in KINDS)),
     "/admin/counts": (everything,),
     "/admin/counts/{location_id:int}": (
