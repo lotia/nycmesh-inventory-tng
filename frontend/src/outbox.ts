@@ -127,6 +127,12 @@ export const REPORTS = {
   lengths: "What is on an open package",
 } as const;
 
+/** A kind of report a batch holds (REPORTS). */
+export type ReportKind = keyof typeof REPORTS;
+
+const isReport = (kind: unknown): kind is ReportKind =>
+  typeof kind === "string" && Object.hasOwn(REPORTS, kind);
+
 /** A line's package_size refused as a page's bug, as a build from before
  * sizes were sent kept its lines (inventory-tng-1p8), by the server's type:
  * its words are for whoever writes a client, these for the volunteer. */
@@ -137,14 +143,18 @@ const SIZE_REFUSED = {
     "A loose line says a package's size: load the page again, and count it again",
 } as const;
 
-const count = v.pipe(v.number(), v.integer());
+/** A whole number, as kept. */
+const whole = v.pipe(v.number(), v.integer());
 
 /** One of a 422's problems, as kept. */
 const Problem = v.object({
   /** What it names: a line, numbered as the cart's (lineNumbers), or a
    * report (REPORTS), numbered among those of its kind from 1; or neither. */
   names: v.nullable(
-    v.object({ of: v.picklist(["line", "used_up", "lengths"]), n: count }),
+    v.object({
+      of: v.picklist(["line", ...(Object.keys(REPORTS) as ReportKind[])]),
+      n: whole,
+    }),
   ),
   /** A line's package_size refused as a page's bug: said in the page's
    * words (SIZE_REFUSED), not the server's. */
@@ -177,7 +187,7 @@ export const Reason = v.union([
   }),
   /** An answer this build does not understand: its HTTP status, and how
    * many in a row. */
-  v.object({ code: v.literal("unexpected"), status: count, tries: count }),
+  v.object({ code: v.literal("unexpected"), status: whole, tries: whole }),
   /** 403: the device is not registered, and why. */
   v.object({
     code: v.literal("not_registered"),
@@ -303,7 +313,7 @@ export const Entry = v.object({
   reason: v.nullable(Reason),
   transactionId: v.nullable(id),
   /** Unexpected answers to this batch in a row. */
-  failures: v.pipe(v.number(), v.integer()),
+  failures: whole,
   /** Saved, and dismissed: off the list, kept until a catalogue shows it. */
   dismissed: v.exactOptional(v.literal(true)),
   /** Sent under the key of a save an older build left, put back in the
@@ -347,8 +357,8 @@ function problems(
     // A report's, by its place in the batch's list of them.
     if (
       loc[0] === "body" &&
-      (loc[1] === "used_up" || loc[1] === "lengths") &&
-      // Whole, as kept (count): one that is not would drop the entry.
+      isReport(loc[1]) &&
+      // Whole, as kept: one that is not would drop the entry.
       typeof loc[2] === "number" &&
       Number.isInteger(loc[2])
     ) {

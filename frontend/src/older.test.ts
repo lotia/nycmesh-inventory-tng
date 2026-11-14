@@ -529,7 +529,7 @@ describe("as a cart", () => {
     });
     expect(refusedFor({ note: null })).toEqual({
       code: "refused",
-      note: { bold: [] },
+      note: null,
     });
     // A code, in this build's words.
     expect(refusedFor({ reason: { code: "key_reused" } })).toEqual({
