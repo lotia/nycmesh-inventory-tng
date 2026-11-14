@@ -13,12 +13,18 @@ any other.
 The scan page reads the same table (frontend/src/units.json, which `uv run
 python -m inventory_tng.units` writes) the same way (frontend/src/units.ts),
 and both are tested against frontend/src/units-vectors.json.
+
+An item's or a package's name, as typed on its form, is stored with each
+unit after a number spelt by its symbol as a name shows it, joined to the
+number (spell, inventory-tng-c0c.3): case is read loosely only where one
+reading is a likely size, and the form asks where two are.
 """
 
 import json
 import re
 import sys
 import unicodedata
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -44,12 +50,15 @@ class Kind:
 
 @dataclass(frozen=True)
 class Prefix:
-    """An SI prefix: its symbol, in ASCII, its power of ten, and the other
-    spellings it is read by."""
+    """An SI prefix: its symbol, in ASCII, its power of ten, its name, the
+    other spellings it is read by, and its symbol in a name, if not
+    `symbol`."""
 
     symbol: str
     exponent: int
+    name: str
     spellings: tuple[str, ...] = ()
+    shown: str | None = None
 
 
 @dataclass(frozen=True)
@@ -98,30 +107,30 @@ KINDS: dict[str, Kind] = {
 # The SI's, largest first, as UCUM lists them; ronna, quetta, ronto and
 # quecto (2022) are newer than UCUM 2.2. Micro is spelt "u", as in UCUM.
 PREFIXES: tuple[Prefix, ...] = (
-    Prefix("Q", 30),
-    Prefix("R", 27),
-    Prefix("Y", 24),
-    Prefix("Z", 21),
-    Prefix("E", 18),
-    Prefix("P", 15),
-    Prefix("T", 12),
-    Prefix("G", 9),
-    Prefix("M", 6),
-    Prefix("k", 3),
-    Prefix("h", 2),
-    Prefix("da", 1),
-    Prefix("d", -1),
-    Prefix("c", -2),
-    Prefix("m", -3),
-    Prefix("u", -6, ("\u03bc", "\u00b5")),  # Greek mu, micro sign
-    Prefix("n", -9),
-    Prefix("p", -12),
-    Prefix("f", -15),
-    Prefix("a", -18),
-    Prefix("z", -21),
-    Prefix("y", -24),
-    Prefix("r", -27),
-    Prefix("q", -30),
+    Prefix("Q", 30, "quetta"),
+    Prefix("R", 27, "ronna"),
+    Prefix("Y", 24, "yotta"),
+    Prefix("Z", 21, "zetta"),
+    Prefix("E", 18, "exa"),
+    Prefix("P", 15, "peta"),
+    Prefix("T", 12, "tera"),
+    Prefix("G", 9, "giga"),
+    Prefix("M", 6, "mega"),
+    Prefix("k", 3, "kilo"),
+    Prefix("h", 2, "hecto"),
+    Prefix("da", 1, "deca"),
+    Prefix("d", -1, "deci"),
+    Prefix("c", -2, "centi"),
+    Prefix("m", -3, "milli"),
+    Prefix("u", -6, "micro", ("\u03bc", "\u00b5"), "\u03bc"),  # Greek mu, micro sign
+    Prefix("n", -9, "nano"),
+    Prefix("p", -12, "pico"),
+    Prefix("f", -15, "femto"),
+    Prefix("a", -18, "atto"),
+    Prefix("z", -21, "zepto"),
+    Prefix("y", -24, "yocto"),
+    Prefix("r", -27, "ronto"),
+    Prefix("q", -30, "quecto"),
 )
 
 UNITS: tuple[Unit, ...] = (
@@ -160,6 +169,37 @@ UNITS: tuple[Unit, ...] = (
     Unit("gal", "volume", False, ("[gal_us]",), (), ("gallon", "gallons"), 3.785411784),
 )
 
+# Each unit's name, its prefix's where "{}" is, and its symbol in a name
+# where that is not its symbol here: as the SI Brochure writes it, in the
+# spelling models.canonical keeps (docs/decisions/0021, 2026-11-14).
+NAMES: dict[str, str] = {
+    "m": "{}metres",
+    "in": "inches",
+    "ft": "feet",
+    "yd": "yards",
+    "mi": "miles",
+    "Hz": "{}hertz",
+    "bit/s": "{}bits per second",
+    "W": "{}watts",
+    "dBm": "decibel-milliwatts",
+    "dBi": "decibels isotropic",
+    "V": "{}volts",
+    "A": "{}amperes",
+    "degC": "degrees Celsius",
+    "degF": "degrees Fahrenheit",
+    "K": "{}kelvins",
+    "F": "{}farads",
+    "Ohm": "{}ohms",
+    "g": "{}grams",
+    "t": "tonnes",
+    "lb": "pounds",
+    "oz": "ounces",
+    "L": "{}litres",
+    "m3": "cubic {}metres",
+    "gal": "US gallons",
+}
+SHOWN: dict[str, str] = {"degC": "°C", "degF": "°F", "Ohm": "\u03a9", "m3": "m\u00b3"}
+
 
 def table() -> dict[str, Any]:
     """What reading a unit needs, as the scan page reads it (units.json):
@@ -191,6 +231,30 @@ class Reading:
 
     def __str__(self) -> str:
         return (self.prefix.symbol if self.prefix else "") + self.unit.symbol
+
+    @property
+    def shown(self) -> str:
+        """As a name spells it: `μF`, `kΩ`, `°C`."""
+        prefix = (self.prefix.shown or self.prefix.symbol) if self.prefix else ""
+        return prefix + SHOWN.get(self.unit.symbol, self.unit.symbol)
+
+    @property
+    def named(self) -> str:
+        """In words: `microfarads`, `cubic kilometres`."""
+        return NAMES[self.unit.symbol].format(self.prefix.name if self.prefix else "")
+
+    def plausible(self, number: float) -> bool:
+        """Whether `number` of it is a size this inventory may hold: in its
+        kind's plausible range, as a size in the kind's base, or for a
+        level in decibels, as typed."""
+        low, high = KINDS[self.unit.kind].plausible
+        unit = self.unit
+        if unit.factor is None:
+            return low <= number <= high
+        power = self.prefix.exponent * unit.power if self.prefix else 0
+        size = number * 10.0**power * unit.factor + unit.offset
+        # A size of a kind that cannot be negative, typed so, as its size.
+        return low <= (abs(size) if low > 0 else size) <= high
 
 
 def _first(pairs: list[tuple[str, Unit]]) -> dict[str, Unit]:
@@ -287,6 +351,116 @@ def respell(text: str) -> str:
         return match[0] if reading is None else str(reading)
 
     return ALONE.sub(alone, AFTER_A_NUMBER.sub(respelt, text))
+
+
+# How a name an administrator types spells its units (docs/decisions/0021,
+# Ali, 2026-11-12, inventory-tng-c0c.3): each unit right after a number
+# by its symbol, joined to the number, read in any case, but only as a
+# size this inventory may hold; where case leaves two such, the form asks.
+
+# The number a unit follows, ending at its last digit: a comma groups
+# thousands, a point is decimal, and a minus counts only where no letter
+# or digit is before it ("-40 dBm", not "Gen2-5 m").
+_NUMBER = re.compile(r"(?:(?<![^\W_])[-\u2212])?[0-9][0-9,]*(?:[.][0-9]+)?\Z")
+
+
+def readings(token: str) -> list[tuple[Reading, bool]]:
+    """Every unit `token` spells in any case, each once, and whether it is
+    spelt so as typed, those first: `MF` is megafarads as typed and
+    millifarads otherwise."""
+    lower = token.lower()
+    found: dict[str, tuple[Reading, bool]] = {}
+
+    def add(reading: Reading, exact: bool) -> None:
+        if exact or str(reading) not in found:
+            found[str(reading)] = (reading, exact)
+
+    for spelling, unit in [*_PREFIXED, *_ALONE]:
+        if spelling.lower() == lower:
+            add(Reading(None, unit), spelling == token)
+    for spelling, prefix in _PREFIX_SPELLINGS:
+        if lower.startswith(spelling.lower()):
+            rest = token[len(spelling) :]
+            for each, unit in _PREFIXED:
+                if each.lower() == rest.lower():
+                    exact = token.startswith(spelling) and each == rest
+                    add(Reading(prefix, unit), exact)
+    return sorted(found.values(), key=lambda pair: not pair[1])
+
+
+@dataclass(frozen=True)
+class Found:
+    """What may be a unit right after a number in a name: the number as
+    typed, the unit as typed (`token`), where the space before it, if any,
+    and it are (`start`, `end`), and the readings of it that are plausible
+    sizes (Reading.plausible), the one spelt as typed first. `settled` is
+    the reading to spell it by, if case leaves only one: the one plausible,
+    or the one plausible spelt as typed."""
+
+    number: str
+    token: str
+    start: int
+    end: int
+    plausible: tuple[Reading, ...]
+    settled: Reading | None
+
+    @property
+    def asks(self) -> bool:
+        """Whether case leaves two plausible readings, so the form asks."""
+        return self.settled is None and len(self.plausible) > 1
+
+
+def found_in(name: str) -> list[Found]:
+    """What may be units in `name`, right after a number: each token some
+    unit spells, in any case (readings), whether or not one is plausible.
+    `name` is in canonical spelling (models.canonical), so `℃` is `°C`."""
+    found = []
+    for match in AFTER_A_NUMBER.finditer(name):
+        every = readings(match[2])
+        if _marked(name, match.end()) or not every:
+            continue
+        number = _NUMBER.search(name[: match.end(1)])
+        assert number is not None  # It ends at the digit the match starts with.
+        value = float(number[0].replace(",", "").replace("\u2212", "-"))
+        plausible = [(r, exact) for r, exact in every if r.plausible(value)]
+        exact = [r for r, spelt in plausible if spelt]
+        settled = None
+        if len(plausible) == 1:
+            settled = plausible[0][0]
+        elif len(exact) == 1:
+            settled = exact[0]
+        found.append(
+            Found(
+                number[0],
+                match[2],
+                match.end(1),
+                match.end(),
+                tuple(r for r, _ in plausible),
+                settled,
+            )
+        )
+    return found
+
+
+def spell(name: str, chosen: Mapping[str, str]) -> tuple[str, list[Found]]:
+    """`name` with each unit right after a number spelt by its symbol as a
+    name shows it (Reading.shown), joined to the number: the one reading
+    case leaves, or the one `chosen` for its token (by str(Reading)), as
+    the form asked. And what is still to be asked. A token with no
+    plausible reading is left as typed: `4 K`, as -269 °C, is no unit."""
+    spelt, asked, at = [], [], 0
+    for found in found_in(name):
+        choice = next(
+            (r for r in found.plausible if str(r) == chosen.get(found.token)), None
+        )
+        reading = found.settled or choice
+        if reading is None:
+            if found.asks:
+                asked.append(found)
+            continue
+        spelt += [name[at : found.start], reading.shown]
+        at = found.end
+    return "".join([*spelt, name[at:]]), asked
 
 
 def laid_out(value: object, depth: int = 0) -> str:

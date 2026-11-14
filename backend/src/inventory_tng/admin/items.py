@@ -14,7 +14,7 @@ from opentelemetry import metrics
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import items, labels, open_packages
+from inventory_tng import items, labels, open_packages, units
 from inventory_tng.admin.categories import CATEGORIES
 from inventory_tng.admin.common import (
     ADMIN,
@@ -64,6 +64,11 @@ TAKEN = (
     "manufacturer and part number, or that old code."
 )
 NO_LETTERS = "Give it a name with more than spaces and punctuation in it."
+# A field saying which reading of a unit in a name was meant, where case
+# leaves two (units.spell): this, then the unit as typed; its value is
+# str(Reading).
+READING = "unit:"
+ASK_UNIT = "Which unit did you mean? Pick one below."
 # The form's field holding the name an administrator was shown close names
 # for, and sent again: a different item's, so not asked about again.
 DIFFERENT = "different"
@@ -201,9 +206,21 @@ def _categories(session: Session) -> list[Category]:
 SEARCHED = Searched(ITEMS, Item, Item.search_text, Item.name)
 
 
+def _units_read(typed: str) -> list[units.Found]:
+    """What may be units in a name as typed, as _units_read.html says them."""
+    return units.found_in(canonical(typed.strip()))
+
+
 def _name_field(similar: Sequence[Item]) -> dict[str, object]:
-    """What _item_name.html needs besides the form's values."""
-    return {"similar": similar, "items_path": ITEMS, "different": DIFFERENT}
+    """What _item_name.html and _units_read.html need besides the form's
+    values."""
+    return {
+        "similar": similar,
+        "items_path": ITEMS,
+        "different": DIFFERENT,
+        "units_read": _units_read,
+        "reading_field": READING,
+    }
 
 
 def _list_page(
@@ -302,16 +319,36 @@ def _item_page(
     )
 
 
-def _typed_name(typed: str) -> str:
+def _typed_name(typed: str, form: Mapping[str, str]) -> tuple[str, list[units.Found]]:
     """An item's or a package's name as it will be stored
-    (models.CanonicalName), so it is checked and compared so."""
-    return canonical(typed.strip())
+    (models.CanonicalName), each unit after a number spelt by its symbol,
+    joined to it, as read or as `form` says it was meant (units.spell), so
+    it is checked and compared so; and the units still to ask about."""
+    chosen = {
+        key.removeprefix(READING): value
+        for key, value in form.items()
+        if key.startswith(READING)
+    }
+    return units.spell(canonical(typed.strip()), chosen)
+
+
+def _name_problem(
+    name: str, asked: Sequence[units.Found], item_id: int | None
+) -> str | None:
+    """What is wrong with an item's or a package's name: one of
+    _key_name_problem's, or a unit in it to ask about."""
+    if problem := _key_name_problem(name):
+        return problem
+    if asked:
+        log.debug("unit asked about", item_id=item_id, asked=len(asked))
+        return ASK_UNIT
+    return None
 
 
 def _confirmed(form: Mapping[str, str], fields: items.Fields) -> bool:
     """Whether the name was sent before and asked about, then sent again
     unchanged: a different item's, whatever is close."""
-    return _typed_name(form.get(DIFFERENT, "")) == fields.name
+    return _typed_name(form.get(DIFFERENT, ""), form)[0] == fields.name
 
 
 def _key_name_problem(name: str) -> str | None:
@@ -325,12 +362,12 @@ def _key_name_problem(name: str) -> str | None:
 
 
 def _fields(
-    session: Session, form: Mapping[str, str]
+    session: Session, form: Mapping[str, str], item_id: int | None = None
 ) -> tuple[items.Fields | None, dict[str, str]]:
     """What to set, unless something is wrong, and what is."""
-    name = _typed_name(form.get("name", ""))
+    name, asked = _typed_name(form.get("name", ""), form)
     problems: dict[str, str] = {}
-    if problem := _key_name_problem(name):
+    if problem := _name_problem(name, asked, item_id):
         problems["name"] = problem
     category = chosen(session, Category, form.get("category_id", ""))
     if category is None:
@@ -461,7 +498,7 @@ def save_item(
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
-    fields, problems = _fields(session, form)
+    fields, problems = _fields(session, form, item_id)
     tracked = found.track_opened
     if fields is not None:
         seen = form_version(form.get("version", ""))
@@ -538,15 +575,20 @@ SHORT_UNDER_SIZE = "ck_item_package_short_below_under_size"
 
 
 def _package_fields(
-    item: Item, name: str, size: str, *, kept: Decimal | None = None
+    item: Item,
+    name: str,
+    asked: Sequence[units.Found],
+    size: str,
+    *,
+    kept: Decimal | None = None,
 ) -> tuple[Decimal | None, dict[str, str]]:
     """A package's size as typed, and what is wrong with its name or size:
-    its name compared as items' are, so it needs a letter or a digit; its
-    size whole, for an item counted each. A blank size is
-    `kept`, if given: a size fixed is not on the form, and stays as it is,
-    whatever its item's unit has become since."""
+    its name compared as items' are, so it needs a letter or a digit, with
+    no unit in it `asked` about; its size whole, for an item counted each.
+    A blank size is `kept`, if given: a size fixed is not on the form, and
+    stays as it is, whatever its item's unit has become since."""
     problems: dict[str, str] = {}
-    if problem := _key_name_problem(name):
+    if problem := _name_problem(name, asked, item.id):
         problems["package_name"] = problem
     if kept is not None and not size.strip():
         return kept, problems
@@ -567,14 +609,15 @@ def add_package(
     signed: AdminSignedIn,
     session: DbSession,
     item_id: int,
+    form: TextForm,
     package_name: Annotated[str, Form()] = "",
     size: Annotated[str, Form()] = "",
 ) -> Response:
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
-    name = _typed_name(package_name)
-    parsed, problems = _package_fields(found, name, size)
+    name, asked = _typed_name(package_name, form)
+    parsed, problems = _package_fields(found, name, asked, size)
     if parsed is not None and not problems:
         package, broken = refusal(
             session,
@@ -591,7 +634,8 @@ def add_package(
                 f"{ITEMS}/{item_id}", notice="package_added", section="packages"
             )
         problems["package_name"] = PACKAGE_TAKEN
-    values = {"package_name": name, "size": size}
+    # With the units chosen, if any: not a package's own form's (package_id).
+    values = {**form, "package_name": name, "size": size}
     return _item_page(request, session, signed, found, problems=problems, values=values)
 
 
@@ -602,6 +646,7 @@ def save_package(
     session: DbSession,
     item_id: int,
     package_id: int,
+    form: TextForm,
     package_name: Annotated[str, Form()] = "",
     size: Annotated[str, Form()] = "",
     package_version: Annotated[str, Form()] = "",
@@ -611,8 +656,8 @@ def save_package(
     if package is None:
         return not_found()
     found = session.get_one(Item, item_id)
-    name = _typed_name(package_name)
-    parsed, problems = _package_fields(found, name, size, kept=package.size)
+    name, asked = _typed_name(package_name, form)
+    parsed, problems = _package_fields(found, name, asked, size, kept=package.size)
     if parsed is not None and not problems:
         _, broken = refusal(
             session,
@@ -638,8 +683,10 @@ def save_package(
             problems["package_name"] = PACKAGE_TAKEN
         else:  # SHORT_UNDER_SIZE, the one other refusal it expects.
             problems["size"] = RULES[broken]
-    # Beside the fields of the package it was sent for.
+    # Beside the fields of the package it was sent for, with the units
+    # chosen, if any.
     values = {
+        **form,
         "package_id": str(package_id),
         "package_name": name,
         "size": size,

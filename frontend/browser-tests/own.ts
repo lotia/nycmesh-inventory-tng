@@ -7,9 +7,16 @@ import { randomUUID } from "node:crypto";
 import { test as base, expect, type Page } from "@playwright/test";
 import { prepared } from "./prepared";
 
-/** A name no other test, or run of this one, has. */
+/**
+ * A name no other test, or run of this one, has. Its end in letters only,
+ * so no part of it is read as a unit after a number ("3f" as farads),
+ * which a name would store otherwise (docs/decisions/0021).
+ */
 function unique(what: string): string {
-  return `${what} ${randomUUID().slice(0, 8)}`;
+  const id = randomUUID()
+    .slice(0, 8)
+    .replace(/[0-9]/g, (digit) => "ghijklmnop".charAt(Number(digit)));
+  return `${what} ${id}`;
 }
 
 /** Opens a list's page and fills in a new row's name, unique. The name. */
@@ -47,7 +54,7 @@ export async function ownCable(page: Page, what = "Cable"): Promise<string> {
     await add.click();
   }
   await expect(heading).toBeVisible();
-  const box = "Box of 305 m";
+  const box = "Box of 305m";
   await page.getByLabel("Package", { exact: true }).fill(box);
   await page.getByLabel("Holds").fill("305");
   await page.getByRole("button", { name: "Add package" }).click();

@@ -367,7 +367,8 @@ def test_a_package_is_renamed_and_resized_until_it_moves(
     fixed = send(spools.spool, "Spool", "300")
     assert "Its size is fixed" in text(fixed)
     assert send(spools.spool, "Spool 305 m", "305").status_code == 303
-    assert (spools.spool.name, spools.spool.size) == ("Spool 305 m", 305)
+    # Its unit joined to its number, as names are stored (units.spell).
+    assert (spools.spool.name, spools.spool.size) == ("Spool 305m", 305)
     # A form shown before another's save is refused, as it was changed.
     stale = admin_client.post(
         f"{page}/packages/{box.id}",
@@ -993,3 +994,80 @@ def test_a_too_short_length_refused_as_resized_meanwhile_says_so_beside_it(
     )
     assert refused.status_code == 400
     assert "Shorter than a whole one, or blank." in text(refused)
+
+
+def test_a_unit_in_a_name_is_stored_by_its_symbol_and_said_under_it(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Joined to its number, by its symbol, its case read loosely where one
+    reading only is a likely size (Ali, 2026-11-12, inventory-tng-c0c.3);
+    the form says how each was read, and what was not."""
+    form = {"category_id": str(radios.id), "unit": "each"}
+    done = admin_client.post(ITEMS, data=form | {"name": "Cable 305 M, 10 \u00b5F"})
+    assert done.status_code == 303
+    item = named(session, Item, "Cable 305m, 10\u03bcF")
+    page = text(admin_client.get(f"{ITEMS}/{item.id}"))
+    assert '<span class="hint block">305m: metres</span>' in page
+    assert '<span class="hint block">10\u03bcF: microfarads</span>' in page
+    hub = new_item(session, radios, "Hub 4 K")
+    page = text(admin_client.get(f"{ITEMS}/{hub.id}"))
+    assert "4 K: not read as a unit, as no size of one is likely" in page
+
+
+def test_case_asks_which_unit_when_both_are_likely(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """5 MG may be megagrams or milligrams: the form asks, saving nothing,
+    and keeps the answer through the question about close names."""
+    from structlog.testing import capture_logs
+
+    new_item(session, radios, "Weight 5mg brass")
+    form = {"name": "Weight 5 MG", "category_id": str(radios.id), "unit": "each"}
+    with capture_logs() as logs:
+        asked = admin_client.post(ITEMS, data=form)
+    assert asked.status_code == 400
+    page = text(asked)
+    assert "Which unit did you mean?" in page
+    assert "<legend>5 MG is</legend>" in page
+    assert 'name="unit:MG" value="Mg"' in page
+    assert "5Mg, megagrams" in page
+    assert "5mg, milligrams" in page
+    (line,) = [line for line in logs if line["event"] == "unit asked about"]
+    assert line == {"event": "unit asked about", "item_id": None, "asked": 1} | {
+        "log_level": "debug"
+    }
+    assert session.scalar(select(func.count()).select_from(Item)) == 1
+    answered = form | {"unit:MG": "mg"}
+    close = admin_client.post(ITEMS, data=answered)
+    assert "A different item?" in text(close)
+    assert 'name="unit:MG" value="mg" checked' in close.text
+    again = answered | {"different": "Weight 5 MG"}
+    assert admin_client.post(ITEMS, data=again).status_code == 303
+    named(session, Item, "Weight 5mg")
+
+
+def test_a_package_name_reads_units_too(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Added or renamed, as an item's name is: asked where case leaves two."""
+    item = new_item(session, radios, "Brass")
+    path = f"{ITEMS}/{item.id}/packages"
+    added = admin_client.post(path, data={"package_name": "Bag 5 MG", "size": "2"})
+    assert added.status_code == 400
+    assert 'name="unit:MG" value="mg"' in added.text
+    assert 'name="unit:MG" value="Mg" checked' not in added.text
+    chosen = {"package_name": "Bag 5 MG", "size": "2", "unit:MG": "Mg"}
+    assert admin_client.post(path, data=chosen).status_code == 303
+    package = named(session, ItemPackage, "Bag 5Mg")
+    page = text(admin_client.get(f"{ITEMS}/{item.id}"))
+    assert "5Mg: megagrams" in page
+    renamed = {"package_name": "Spool 1000 FT", "size": "2"}
+    resent = admin_client.post(
+        f"{path}/{package.id}", data=renamed | {"package_version": shown(package)}
+    )
+    assert resent.status_code == 303
+    assert package.name == "Spool 1000ft"
+    asking = {"package_name": "Bag 5 MG", "size": "2", "package_version": "1"}
+    refused = admin_client.post(f"{path}/{package.id}", data=asking)
+    assert refused.status_code == 400
+    assert "Which unit did you mean?" in text(refused)

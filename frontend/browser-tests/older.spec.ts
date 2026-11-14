@@ -179,7 +179,7 @@ test("a save's package retired since, with none left, is named, never offered, a
 }) => {
   const cable = await ownCable(page, "Boxed cable");
   const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
-  const box = "Box of 305 m";
+  const box = "Box of 305m";
   const retire = page.getByRole("button", { name: `Retire ${box}` });
   const packageId = Number(
     ((await page.locator("form", { has: retire }).getAttribute("action")) ?? "")

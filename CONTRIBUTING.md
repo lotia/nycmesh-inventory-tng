@@ -297,6 +297,14 @@ mise run regenerate-fold-reference
 `frontend/src/units-vectors.json` holds what both sides must make of some
 text; both test against it.
 
+An item's or a package's form stores each unit after a number by its
+symbol as a name shows it, joined to the number (`units.spell`: `305 m` is
+`305m`, `10 uF` is `10μF`), reading case loosely only as a size in its
+kind's plausible range (`units.KINDS`), and asks which was meant where two
+readings are likely. A new unit needs its name in words and, if a name
+spells it otherwise than its symbol, that spelling: `units.NAMES` and
+`units.SHOWN`.
+
 ### Locking a row
 
 Lock rows with `db.locked` (a select) or `db.get_locked` (`Session.get`),

@@ -239,3 +239,34 @@ dash alone is refused though its key keeps it.
 Rejected: a key in PostgreSQL's own locale, which Python cannot match, so
 the CHECK would refuse names the app keyed, and a function or trigger
 computing it (0016).
+
+## Amendment: a name spells each unit by its symbol (2026-11-14)
+
+An item's or a package's name, as an administrator types it on its form,
+is stored with each unit right after a number spelt by its symbol and
+joined to the number, whatever the spelling or spacing typed (Ali,
+2026-11-12, inventory-tng-c0c.3): `Spool 305 m` is stored `Spool 305m`,
+`10 uF` and `10 µF` as `10μF`, `4.7 kohm` as `4.7kΩ`, `85 deg C` as
+`85°C`, `2 m3` as `2m³` and `100 feet` as `100ft`. The symbol is the one
+the SI Brochure writes, in canonical spelling (`μ`, `Ω`, `°C`), not the
+ASCII one searches compare. Only units in the table are read, and only
+after a number; the rest of the name is as typed.
+
+Case is read loosely, but only as a size this inventory may hold: each
+kind's plausible range in `units.KINDS`, a level in decibels as typed. So
+`305M` is `305m`, as 305 megametres is no likely length, `10MF` is
+`10mF`, and `100 mhz` is `100MHz`. A token with no likely size is left as
+typed: `4 K` would be -269 °C. Where two readings are likely and neither
+is spelt as typed, the form asks which, with both as choices, and saves
+nothing until answered: `5 MG` may be megagrams or milligrams. Spelt as
+one of them, as `5 mg` or `10 MΩ`, it is taken as typed.
+
+Under the name, the form says how each unit was read (`305m: metres`), and
+which were not read as units, with no extra step (Ali, 2026-11-12). The
+hint is the server's, as the page is shown; the page reads nothing as one
+types, which would need the plausible sizes on the page too.
+
+Names already stored are not respelt; saving one respells it. Names a
+seed or an import writes are not read here. Settled readings kept as
+rules, so a reading such as `10G` (read as grams) can be overruled, are
+inventory-tng-c0c.4's.

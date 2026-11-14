@@ -64,11 +64,11 @@ test("the scan page finds an item without its accents, and shows them", async ({
 test("a unit after a number is found however it is spelt, on both sides", async ({
   page,
 }) => {
-  const name = await ownCable(page, "Cap 10 μF");
+  const name = await ownCable(page, "Cap 10μF");
   await page.goto("/scan");
-  await page.getByLabel(/Find an item/).fill(name.replace("10 μF", "10uf"));
+  await page.getByLabel(/Find an item/).fill(name.replace("10μF", "10uf"));
   await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
-  const typed = name.replace("10 μF", "10 µF");
+  const typed = name.replace("10μF", "10 µF");
   await page.goto(`/admin/items?q=${encodeURIComponent(typed)}`);
   await expect(
     page.getByRole("table").getByRole("link", { name, exact: true }),

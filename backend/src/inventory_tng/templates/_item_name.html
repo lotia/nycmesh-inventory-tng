@@ -5,6 +5,7 @@
   <input name="name" value="{{ values.get('name', default) }}" maxlength="{{ name_max }}" required>
   {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
 </label>
+{% with typed = values.get('name', default), sent = values %}{% include "_units_read.html" %}{% endwith %}
 {% if similar %}
 <p class="warning" role="status">Similar: {% for other in similar -%}
   <a href="{{ items_path }}/{{ other.id }}">{{ other.name }}</a>

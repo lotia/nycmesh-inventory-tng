@@ -1,0 +1,15 @@
+{#- How the units in a name are read (units.found_in, docs/decisions/0021): each said in a hint under its field, and where case leaves two plausible readings, the form asks which was meant. `typed` is the name in the field, `sent` the form sent, holding any answer. -#}
+{% set found = units_read(typed) %}
+{% for each in found if not each.asks %}
+<span class="hint block">{% if each.settled %}{{ each.number }}{{ each.settled.shown }}: {{ each.settled.named }}
+{%- else %}{{ each.number }} {{ each.token }}: not read as a unit, as no size of one is likely{% endif %}</span>
+{% endfor %}
+{% for each in found if each.asks %}
+{% set field = reading_field ~ each.token %}
+<fieldset>
+  <legend>{{ each.number }} {{ each.token }} is</legend>
+  {% for reading in each.plausible %}
+  <label><input type="radio" name="{{ field }}" value="{{ reading }}" {% if sent.get(field) == reading | string %}checked{% endif %} required> {{ each.number }}{{ reading.shown }}, {{ reading.named }}</label>
+  {% endfor %}
+</fieldset>
+{% endfor %}

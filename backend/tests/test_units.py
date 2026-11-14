@@ -229,3 +229,69 @@ def test_a_unit_ends_where_a_letter_or_digit_of_any_script_does_not_follow() -> 
         != (unicodedata.category(chr(point))[0] in "LN")
     ]
     assert differ == []
+
+
+@pytest.mark.parametrize(
+    ("typed", "stored"),
+    [
+        ("Spool 305 m", "Spool 305m"),
+        # Megametres are no likely size: case read loosely (Ali, 2026-11-12).
+        ("Spool 305M", "Spool 305m"),
+        ("Cap 10 uF", "Cap 10\u03bcF"),
+        ("Cap 10 \u039cF", "Cap 10\u03bcF"),
+        ("4.7 kohm", "4.7k\u03a9"),
+        ("Probe 85 deg C", "Probe 85\u00b0C"),
+        ("Probe 85 Cel", "Probe 85\u00b0C"),
+        ("Antenna -100 dBm", "Antenna -100dBm"),
+        ("Box 1,000 ft", "Box 1,000ft"),
+        ("Tank 2 m3", "Tank 2m\u00b3"),
+        ("Radio 100 mhz", "Radio 100MHz"),
+        ("Link 1 Gbps", "Link 1Gbit/s"),
+        # Megafarads are not likely, millifarads are.
+        ("Cap 10MF", "Cap 10mF"),
+        # Both likely, but spelt as typed, so not asked.
+        ("Pill 5 mg", "Pill 5mg"),
+        ("Resistor 10 MOhm", "Resistor 10M\u03a9"),
+        # No size of it likely (-269 °C): no unit, left as typed.
+        ("Hub 4 K", "Hub 4 K"),
+        ("LiteBeam 5AC Gen2", "LiteBeam 5AC Gen2"),
+        ("2 g\u00e2teaux", "2 g\u00e2teaux"),
+        ("Patch 2 m, 5 m", "Patch 2m, 5m"),
+    ],
+)
+def test_a_name_spells_each_unit_by_its_symbol_joined_to_its_number(
+    typed: str, stored: str
+) -> None:
+    """Ali, 2026-11-12 (inventory-tng-c0c.3): the symbol as the SI Brochure
+    writes it, joined to its number; searched alike either way."""
+    assert units.spell(typed, {}) == (stored, [])
+    assert fold(stored).lower() == fold(typed).lower()
+
+
+def test_case_asks_only_between_two_plausible_readings() -> None:
+    """5 MG may be megagrams or milligrams, both likely sizes, and neither
+    spelt as typed: asked, by the token as typed, which each such token
+    answers; an answer not among them asks again."""
+    typed = "Weights 5 MG, 10 MG"
+    spelt, asked = units.spell(typed, {})
+    assert spelt == typed
+    assert [(each.number, each.token) for each in asked] == [("5", "MG"), ("10", "MG")]
+    assert [str(r) for r in asked[0].plausible] == ["Mg", "mg"]
+    assert [r.named for r in asked[0].plausible] == ["megagrams", "milligrams"]
+    assert units.spell(typed, {"MG": "mg"}) == ("Weights 5mg, 10mg", [])
+    assert units.spell(typed, {"MG": "kg"})[1] == asked
+
+
+def test_every_reading_is_shown_and_named_and_read_back_as_itself() -> None:
+    """What a name stores is read as what it was (searches decompose it
+    first, so m\u00b3 is m3), and every unit has a name in words."""
+    assert set(units.NAMES) == {unit.symbol for unit in UNITS}
+    every = [Reading(None, unit) for unit in UNITS] + [
+        Reading(prefix, unit) for unit in UNITS if unit.prefixes for prefix in PREFIXES
+    ]
+    for reading in every:
+        assert read(unicodedata.normalize("NFKD", reading.shown)) == reading
+        assert "{" not in reading.named
+    cubic = read("km3")
+    assert cubic is not None
+    assert cubic.named == "cubic kilometres"
