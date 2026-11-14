@@ -35,7 +35,7 @@ export function endingNote(ending: Ending, name: string, unit: string): string {
     case "short":
       return `This ${name} will be unusable after this cut, so it's ticked. Untick it if you'll keep the short end.`;
     case "over":
-      return `Your cut is more than the ${name} shows, so it's ticked. It's saved as you typed it, and an administrator will check the ${name}.`;
+      return `Your cut is more than the ${name} shows, so it's ticked. It's recorded as you typed it, and an administrator will check the ${name}.`;
   }
 }
 

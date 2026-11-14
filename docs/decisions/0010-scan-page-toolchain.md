@@ -202,6 +202,18 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   it, the batch stays listed, no longer asking, until dismissed. We
   rejected leaving only Dismiss, which dropped the note before the
   volunteer had seen the stock as it is.
+  The page's words drop "save" (Ali, 2026-11-13, inventory-tng-wyq): the
+  cart lives in the browser, written to storage as it changes, so what
+  the browser holds is "kept", and what the inventory takes is
+  "recorded"; the main button is Record, an entry is "Sending…" until
+  the inventory answers, then "Recorded (transaction n)", and the list is
+  "Carts from this device". Discard cart, beside Record, empties the cart
+  after an in-page confirmation, as an older entry's Discard asks. The
+  names in code, and the metric of the time to Record, keep "save", as
+  volunteers never see them and a renamed metric loses its history. We
+  rejected keeping "Save", which says the cart is not kept until it is
+  pressed, when every change already is, and emptying a cart only by
+  removing each line.
 - Compression behaves the same in compose and in Kubernetes, because the
   app serves the compressed files itself. The image holds three copies of
   each file; the bundle is small, so that costs little.

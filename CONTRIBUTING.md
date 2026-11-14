@@ -333,7 +333,7 @@ build that wrote them. A change to what is kept, or to a value a field may
 take, takes a new key, as a tab of the build before, open during a deploy,
 drops what it cannot read from what it writes back; `outbox.test.ts` lists
 both for the outbox's key. A build reads and writes only its own keys: a
-tab of an older build sends its own batches and lets the volunteer save
+tab of an older build sends its own batches and lets the volunteer record
 the cart, saying nothing of the newer build until then, and then asks for
 an upgrade, a reload; once the server holds its batches back as too old,
 it asks at once (`frontend/src/build.ts`, docs/decisions/0010). A newer
@@ -356,7 +356,7 @@ Discard. Focus then goes to the entry's heading, and taps on its buttons
 are ignored for half a second, so a double tap discards one line. A save
 keeps its batch key while its lines go (`dropPart`), and one put back
 keeps it, as does a cart it filled when a newer build reads it, and
-the cart is saved under it until emptied, as an older tab may be sending
+the cart is sent under it until emptied or discarded, as an older tab may be sending
 it still: the server then takes it once, or, changed since, refuses it
 (409 `key_reused`), which the page says, asking for a reload in place
 of Dismiss, held back as a newer build's is; after it, the save stays
@@ -399,22 +399,29 @@ or the ledger's checks), a decimal's digits, and strict mode (`strict=True`,
 which refuses `"5"` for a whole number) are not in the schema, so the
 test cannot see them: tightening one takes the same care, by hand.
 
-The cart keeps the size each package was counted at, and saves that size,
+The cart keeps the size each package was counted at, and sends that size,
 so the server refuses a count of a package resized since (`package_resized`)
 rather than counting it at the new size. Where the page's catalogue shows
 another size, the count is cleared and the line says so until a count of
 that package is typed or scanned again (`frontend/src/cart.ts`,
-`reconcile` and `sized`). Until then the cart is not saved, as the
+`reconcile` and `sized`). Until then Record refuses the cart, as the
 rest without it would record less than was moved (`toBatch`). A count
 kept before the cart kept sizes is taken as counted at the size shown.
+
+The page's words never say "save": the inventory records what Record
+sends, and the browser keeps the cart, which every change writes to
+storage as it happens (docs/decisions/0010). Discard cart, beside Record
+while the cart has lines, asks first in the page, as an older entry's
+Discard does, then empties the cart, dropping its batch key and keeping
+who and where, as Record does.
 
 The scan page needs a registered device, and some catalogue rows to choose
 from. The camera works only over HTTPS or on `localhost`.
 
 Both pages report their errors, three Web Vitals, the outbox's retries,
-how long a batch took from its first line to saving, a tab learning that a
-newer build is out, and what an older build left in storage and what
-volunteers did with it, through
+how long a batch took from its first line to Record, a tab learning that a
+newer build is out, what an older build left in storage and what
+volunteers did with it, and a cart discarded, through
 `frontend/src/telemetry.ts`, to `POST /api/telemetry`, which turns them into
 `inventory.*` metrics (docs/decisions/0006). Its schema, in
 `backend/src/inventory_tng/page_telemetry.py`, lists all a page may send:

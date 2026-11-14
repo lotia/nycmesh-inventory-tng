@@ -88,9 +88,9 @@ export function RegisterPage({
   return (
     <Page>
       <p>
-        Registering lets this browser save to the inventory. It covers only this
-        browser, so use the same one for the scan page. If the QR code opened a
-        browser you don't usually use, open the link in yours.
+        Registering lets this browser record in the inventory. It covers only
+        this browser, so use the same one for the scan page. If the QR code
+        opened a browser you don't usually use, open the link in yours.
       </p>
       <form onSubmit={submit}>
         <Field label="Registration phrase">

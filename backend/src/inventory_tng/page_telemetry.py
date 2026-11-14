@@ -31,7 +31,7 @@ meter = metrics.get_meter(__name__)
 router = APIRouter()
 
 PATH = "/telemetry"
-# A page flushes at ten events and sends 56 an hour at most (telemetry.ts,
+# A page flushes at ten events and sends 60 an hour at most (telemetry.ts,
 # PER_HOUR); a few pages open at once on one network share an address.
 REPORTS = RateLimitItemPerMinute(30)
 MOST_EVENTS = 50
@@ -97,7 +97,21 @@ class OlderStorage(Strict):
     ] = "found"
 
 
-AnyEvent = WebVital | PageError | OutboxRetry | ScanToSave | OutOfDate | OlderStorage
+class CartDiscarded(Strict):
+    """A volunteer discarded the scan page's cart, once they confirmed it."""
+
+    kind: Literal["cart_discarded"]
+
+
+AnyEvent = (
+    WebVital
+    | PageError
+    | OutboxRetry
+    | ScanToSave
+    | OutOfDate
+    | OlderStorage
+    | CartDiscarded
+)
 Event = Annotated[AnyEvent, Field(discriminator="kind")]
 
 
@@ -150,6 +164,11 @@ older_acted_on = meter.create_counter(
     "volunteer put back in the cart, discarded or discarded a line of, or the "
     "page put back in an empty cart itself, by which and how",
 )
+cart_discards = meter.create_counter(
+    "inventory.cart.discards",
+    unit="{cart}",
+    description="Carts a volunteer discarded on the scan page",
+)
 scan_to_save = meter.create_histogram(
     "inventory.scan.to_save.duration",
     unit="s",
@@ -183,6 +202,8 @@ def record(event: AnyEvent) -> None:
             older_storage.add(1, {"held": event.held})
         case OlderStorage():
             older_acted_on.add(1, {"held": event.held, "action": event.action})
+        case CartDiscarded():
+            cart_discards.add(1)
         case _:  # ScanToSave, the last kind left.
             scan_to_save.record(event.seconds)
 

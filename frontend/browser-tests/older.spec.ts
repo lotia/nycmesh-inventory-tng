@@ -9,7 +9,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 import { ownCable } from "./own";
 
 const HEADING = "Checked out items. Add to cart or discard before sending";
-const PUT_BACK = "Added back to cart. Review before Save.";
+const PUT_BACK = "Added back to cart. Review before Record.";
 
 /** What older builds left, as the page lists it. */
 const listingOf = (page: Page) =>
@@ -77,7 +77,7 @@ async function save(page: Page) {
       response.url().endsWith("/api/transactions") &&
       response.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Record" }).click();
   const response = await saving;
   expect(response.status()).toBe(201);
   return response.request().postDataJSON();
@@ -248,16 +248,16 @@ test("a save an older build's tab saved meanwhile is saved once, under its key; 
 
   const saved = await leaveSaved();
   const replayed = sent(200);
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Record" }).click();
   expect(await (await replayed).json()).toEqual({ transaction_id: saved });
   await expect(
-    page.getByText(`In the inventory (transaction ${saved}).`),
+    page.getByText(`Recorded (transaction ${saved}).`),
   ).toBeVisible();
 
   await leaveSaved();
   await page.getByLabel(/^Loose/).fill("3");
   const refused = sent(409);
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Record" }).click();
   await refused;
   const said = "Not recorded: another tab recorded this first.";
   const reloadWords = `${said} Reload the page to continue.`;

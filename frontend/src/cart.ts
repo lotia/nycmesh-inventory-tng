@@ -14,7 +14,7 @@ import * as v from "valibot";
 import type { Schemas } from "./api/client";
 import { id } from "./api/replies";
 import { BUILD } from "./build";
-import { BatchKey, type Draft, type Entry } from "./outbox";
+import { BatchKey, type Draft, type Entry, type Said } from "./outbox";
 import { count, decimal, sent, thousandths } from "./quantity";
 import { onStoredChange, readStored, writeStored } from "./stored";
 
@@ -574,13 +574,14 @@ export function quantityOf(
       loose: number;
       taken: Map<string, { amount: number; whole: boolean }>;
     }
-  | { problem: string } {
+  | { problem: Said } {
   const current = new Set(item.packages.map((pack) => String(pack.id)));
   for (const [packageId, typed] of Object.entries(line.packages)) {
     if (!current.has(packageId) && holdsSome(typed)) {
       return {
-        problem:
+        problem: [
           "A package counted here is no longer used. Remove the line and add it again.",
+        ],
       };
     }
   }
@@ -591,7 +592,9 @@ export function quantityOf(
     // As counted: one resized since is refused when saved, not recounted.
     const size = thousandths(line.sizes?.[pack.id] ?? pack.size);
     if (packs === null || size === null) {
-      return { problem: `Count whole packages: ${pack.name}.` };
+      return {
+        problem: ["Count whole packages: ", { quoted: pack.name }, "."],
+      };
     }
     if (packs > 0) {
       sealed.set(pack.id, { count: packs, size });
@@ -601,7 +604,7 @@ export function quantityOf(
   const loose = thousandths(line.loose);
   if (loose === null) {
     return {
-      problem: `Enter the loose amount in ${item.unit}, up to 3 decimals.`,
+      problem: [`Enter the loose amount in ${item.unit}, up to 3 decimals.`],
     };
   }
   amount += loose;
@@ -612,7 +615,7 @@ export function quantityOf(
     const part = thousandths(typed);
     if (part === null) {
       return {
-        problem: `Enter how much from the open package, up to 3 decimals.`,
+        problem: ["Enter how much from the open package, up to 3 decimals."],
       };
     }
     if (part > 0) {
@@ -627,7 +630,7 @@ export function quantityOf(
     ...[...taken.values()].map((t) => t.amount),
   ];
   if (item.unit === "each" && parts.some((part) => part % 1000 !== 0)) {
-    return { problem: "Counted in whole units." };
+    return { problem: ["Counted in whole units."] };
   }
   return { amount, sealed, loose, taken };
 }
@@ -652,7 +655,7 @@ export function toBatch(
   filled: Cart,
   catalogue: Catalogue,
   all?: readonly Offered[],
-): { draft: Draft; what: string } | { problems: string[] } {
+): { draft: Draft; what: string } | { problems: Said[] } {
   const reconciled = reconcile(filled, catalogue);
   // Only what the page offers to take from, where it comes from.
   const here = new Map(
@@ -673,10 +676,12 @@ export function toBatch(
   );
   // What is really on open packages, said: with what is taken, or alone.
   const lengths: NonNullable<Draft["lengths"]> = [];
-  const problems: string[] = [];
+  // Each problem with the names in it quoted, as no number of a name is a
+  // count the page wrote (outbox.Said).
+  const problems: Said[] = [];
   for (const line of cart.lines) {
     const item = index.items.get(line.itemId);
-    const named = item?.name ?? "An item";
+    const named = item === undefined ? "An item" : { quoted: item.name };
     const each = item?.unit === "each";
     for (const [key, { now }] of Object.entries(line.open ?? {})) {
       if (now === undefined || now.trim() === "") {
@@ -684,11 +689,12 @@ export function toBatch(
       }
       const left = thousandths(now);
       if (left === null || (each && left % 1000 !== 0)) {
-        problems.push(
-          `${named}: enter what is on the open package${each ? ", in whole units" : ", up to 3 decimals"}, or leave it blank.`,
-        );
+        problems.push([
+          named,
+          `: enter what is on the open package${each ? ", in whole units" : ", up to 3 decimals"}, or leave it blank.`,
+        ]);
       } else if (left >= MAX_AMOUNT) {
-        problems.push(`${named}: That is more than the inventory can count.`);
+        problems.push([named, ": That is more than the inventory can count."]);
       } else {
         lengths.push({ open_package_key: key, left: decimal(left) });
       }
@@ -708,67 +714,69 @@ export function toBatch(
   const fromId = sides.from ? cart.fromId : null;
   const toId = sides.to ? cart.toId : null;
   if (cart.volunteerId === null) {
-    problems.push("Pick your name.");
+    problems.push(["Pick your name."]);
   }
   if (sides.from && fromId === null) {
-    problems.push("Pick where it comes from.");
+    problems.push(["Pick where it comes from."]);
   }
   if (sides.to && toId === null) {
-    problems.push("Pick where it goes.");
+    problems.push(["Pick where it goes."]);
   }
   if (fromId !== null && fromId === toId) {
-    problems.push("From and to must be different places.");
+    problems.push(["From and to must be different places."]);
   }
   const installNumber = kind === "install" ? cart.installNumber.trim() : "";
   const install = count(installNumber);
   if (install === null) {
-    problems.push("An install number is digits only.");
+    problems.push(["An install number is digits only."]);
   } else if (installNumber !== "" && (install < 1 || install > MAX_ID)) {
-    problems.push("That install number is out of range.");
+    problems.push(["That install number is out of range."]);
   }
   const lines: Draft["lines"] = [];
   let items = 0;
   for (const line of cart.lines) {
     const item = index.items.get(line.itemId);
     if (item === undefined) {
-      problems.push(
+      problems.push([
         "An item in the cart is no longer in the catalogue. Remove it.",
-      );
+      ]);
       continue;
     }
+    const name = { quoted: item.name };
     if (item.retired && cart.kind === "receipt") {
-      problems.push(`${item.name}: ${RETIRED}, so it can't be received.`);
+      problems.push([name, `: ${RETIRED}, so it can't be received.`]);
       continue;
     }
     if (cart.kind === "receipt") {
       for (const pack of item.packages) {
         if (pack.retired && (count(line.packages[pack.id] ?? "") ?? 0) > 0) {
-          problems.push(
-            `${item.name}, ${pack.name}: ${RETIRED}, so it can't be received.`,
-          );
+          problems.push([
+            name,
+            ", ",
+            { quoted: pack.name },
+            `: ${RETIRED}, so it can't be received.`,
+          ]);
         }
       }
     }
     // Cleared as resized (reconcile), it is to be counted again, not
     // left out: saving the rest would record less than was moved.
     if (item.packages.some((pack) => resized(line, pack))) {
-      problems.push(`${item.name}: enter the count`);
+      problems.push([name, ": enter the count"]);
       continue;
     }
     const quantity = quantityOf(line, item);
     if ("problem" in quantity) {
-      problems.push(`${item.name}: ${quantity.problem}`);
+      problems.push([name, ": ", ...quantity.problem]);
     } else if (quantity.amount >= MAX_AMOUNT) {
-      problems.push(`${item.name}: That is more than the inventory can count.`);
+      problems.push([name, ": That is more than the inventory can count."]);
     } else if (
       (cart.kind === "open" || cart.kind === "receipt") &&
       quantity.taken.size > 0
     ) {
-      problems.push(
-        `${item.name}: Nothing is taken from an open package here.`,
-      );
+      problems.push([name, ": Nothing is taken from an open package here."]);
     } else if (cart.kind === "open" && quantity.loose > 0) {
-      problems.push(`${item.name}: Open whole packages: leave loose empty.`);
+      problems.push([name, ": Open whole packages: leave loose empty."]);
     } else if (cart.kind === "open" && quantity.amount > 0) {
       lines.push(...openings(item, quantity.sealed));
       items += 1;
@@ -797,10 +805,12 @@ export function toBatch(
     lines.length + usedUp.length + lengths.length === 0 &&
     problems.length === 0
   ) {
-    problems.push("Add something to the cart.");
+    problems.push(["Add something to the cart."]);
   }
   if (lines.length > MAX_LINES) {
-    problems.push("That is too much for one batch: save some, then the rest.");
+    problems.push([
+      "That is too much for one batch: record some, then the rest.",
+    ]);
   }
   // The volunteer check again only narrows the type; it was reported above.
   if (problems.length > 0 || cart.volunteerId === null) {

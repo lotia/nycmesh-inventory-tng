@@ -15,7 +15,7 @@ import {
   STORAGE_KEY as OUTBOX_KEY,
   Outbox,
   RECORDED_ELSEWHERE,
-  SAVED_BEFORE_CHANGES,
+  RELOAD_TO_CONTINUE,
 } from "./outbox";
 import { ScanPage } from "./ScanPage";
 import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
@@ -27,6 +27,10 @@ import { answering, deferred, json, saved, TOO_OLD } from "./test-fetch";
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));
 const camera = fakeCamera();
 vi.mocked(openCamera).mockImplementation(camera.open);
+
+/** A put-back save refused as another tab recorded it first, until the
+ * page is reloaded: the page adds the reload's words, never kept. */
+const BEFORE_RELOAD = `${RECORDED_ELSEWHERE} ${RELOAD_TO_CONTINUE}`;
 
 /** An API with the test catalogue, saving batches as transaction 77. */
 function server(save: () => Response | Promise<Response> = () => saved()) {
@@ -101,7 +105,7 @@ function fillMove(cable = "Cat6 cable") {
 }
 
 const save = () =>
-  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  fireEvent.click(screen.getByRole("button", { name: "Record" }));
 
 /** A cart that was last used this long ago, by Ada. */
 const usedAgo = (ms: number) =>
@@ -291,7 +295,7 @@ describe("filling and saving a cart", () => {
     save();
     setItem.mockRestore();
     screen.getByText(
-      "This browser wouldn't keep the batch, so it isn't saved. Free some space or leave private browsing, then try again.",
+      "This browser wouldn't keep the cart, so it wasn't sent. Free some space or leave private browsing, then try again.",
     );
     screen.getByText("Cat6 cable");
     expect(outbox.entries.value).toEqual([]);
@@ -328,7 +332,7 @@ describe("filling and saving a cart", () => {
     expect(within(card).getByText("30 m over")).toBeDefined();
     expect(ticked()).toBe(true);
     expect(note()).toBe(
-      "Your cut is more than the Spool shows, so it's ticked. It's saved as you typed it, and an administrator will check the Spool.",
+      "Your cut is more than the Spool shows, so it's ticked. It's recorded as you typed it, and an administrator will check the Spool.",
     );
     // Back to a cut that leaves some: unticked again.
     fireEvent.input(field, { target: { value: "20" } });
@@ -513,6 +517,38 @@ describe("filling and saving a cart", () => {
     ]);
   });
 
+  test("Discard cart asks first, in the page, then empties the cart and counts it, keeping who and where", async () => {
+    const record = vi.spyOn(telemetry, "record");
+    const { api, sent } = server();
+    open(api);
+    await ready();
+    // Nothing to discard in an empty cart.
+    expect(screen.queryByRole("button", { name: "Discard cart" })).toBeNull();
+    fillMove();
+    fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
+    // Row 15's pattern (Ali, inventory-tng-wyq).
+    expect(screen.getByRole("alert").textContent).toBe("Confirm discard");
+    expect(screen.getByRole("button", { name: "Discard" }).className).toBe(
+      "danger",
+    );
+    expect(screen.queryByRole("button", { name: "Discard cart" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Keep it" }));
+    screen.getByText("Cat6 cable");
+    expect(screen.queryByText("Confirm discard")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    screen.getByText("Nothing in the cart yet.");
+    expect(screen.queryByText("Confirm discard")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Discard cart" })).toBeNull();
+    expect(JSON.parse(localStorage.getItem(CART_KEY) ?? "").lines).toEqual([]);
+    expect(selected("Your name")).toBe("1");
+    expect(selected("From")).toBe("10");
+    expect(
+      record.mock.calls.filter(([event]) => event.kind === "cart_discarded"),
+    ).toEqual([[{ kind: "cart_discarded" }]]);
+    expect(saves(sent)).toHaveLength(0);
+  });
+
   test("a move is saved, sent, and a new cart keeps the choices", async () => {
     const record = vi.spyOn(telemetry, "record");
     const { api, sent } = server();
@@ -530,9 +566,9 @@ describe("filling and saving a cart", () => {
     save();
 
     expect((await screen.findByRole("status")).textContent).toBe(
-      "Saved: Move: 1 item from Hub to Van. A new cart is ready.",
+      "Sending: Move: 1 item from Hub to Van. A new cart is ready.",
     );
-    await screen.findByText("In the inventory (transaction 77).");
+    await screen.findByText("Recorded (transaction 77).");
     const body = await saves(sent)[0]?.json();
     expect(body).toMatchObject({
       kind: "move",
@@ -744,34 +780,32 @@ describe("filling and saving a cart", () => {
     );
   });
 
-  test("a cart's problem puts in italic the counts the page wrote, no name holding a number", async () => {
-    const plain = (named: { name: string }) => ({
-      ...named,
-      name: named.name.replace(/\d/g, ""),
-    });
-    const noNumbers = {
+  test("a cart's problem puts in italic the counts the page wrote, even where a name is the same number", async () => {
+    // The cart names what it quotes (cart.ts, toBatch), so the page's "3"
+    // is not taken for the name "3" (inventory-tng-wyq).
+    const named = {
       ...CATALOGUE,
-      items: CATALOGUE.items.map((item) => ({
-        ...plain(item),
-        packages: item.packages.map(plain),
-        retired_packages: item.retired_packages.map(plain),
-      })),
+      items: CATALOGUE.items.map((item) =>
+        item.id === 101 ? { ...item, name: "3" } : item,
+      ),
     };
     const { api } = answering((request) =>
-      isCatalogue(request) ? json(noNumbers, 200) : saved(),
+      isCatalogue(request) ? json(named, 200) : saved(),
     );
     open(api);
     await ready();
-    fillMove("Cat cable");
+    pick("Your name", "1");
+    pick("From", "10");
+    pick("To", "12");
+    find("3");
+    fireEvent.click(screen.getByRole("button", { name: "3" }));
     fireEvent.input(screen.getByLabelText("Loose m"), {
       target: { value: "1.2345" },
     });
     save();
     expectBold(
-      (await screen.findByText(/^Cat cable: Enter the loose amount/)).closest(
-        "li",
-      ),
-      "Cat cable: Enter the loose amount in m, up to 3 decimals.",
+      (await screen.findByText(/^3: Enter the loose amount/)).closest("li"),
+      "3: Enter the loose amount in m, up to 3 decimals.",
       ["3"],
     );
   });
@@ -932,7 +966,7 @@ describe("other tabs and a changing catalogue", () => {
     fireEvent.input(count, { target: { value: "1" } });
     expect(screen.queryByText(/since this item was added/)).toBeNull();
     save();
-    await screen.findByText(/^In the inventory/);
+    await screen.findByText(/^Recorded \(/);
     const body = await saves(sent)[0]?.json();
     expect(body.lines).toContainEqual({
       item_id: 100,
@@ -954,7 +988,7 @@ describe("other tabs and a changing catalogue", () => {
     await vi.advanceTimersByTimeAsync(1000);
     expect(saves(sent)).toEqual([]);
     save();
-    await screen.findByText(/^In the inventory/);
+    await screen.findByText(/^Recorded \(/);
     expect(saves(sent)).toHaveLength(1);
   });
 
@@ -974,12 +1008,12 @@ describe("whose name it is", () => {
     await ready();
     fillMove();
     pick("Your name", "2");
-    expect(screen.getByText(/Saving as/).textContent).toBe(
-      "Saving as Grace. Change",
+    expect(screen.getByText(/Recording as/).textContent).toBe(
+      "Recording as Grace. Change",
     );
     expect(screen.queryByText(/Are you/)).toBeNull();
     save();
-    await screen.findByText("In the inventory (transaction 77).");
+    await screen.findByText("Recorded (transaction 77).");
     expect(saves(sent)).toHaveLength(1);
   });
 
@@ -1030,7 +1064,7 @@ describe("whose name it is", () => {
     fireEvent.click(screen.getByRole("button", { name: "Not me" }));
     expect(selected("Your name")).toBe("");
     expect(document.activeElement).toBe(screen.getByLabelText("Your name"));
-    expect(screen.queryByText(/Saving as/)).toBeNull();
+    expect(screen.queryByText(/Recording as/)).toBeNull();
   });
 
   test("coming back to the page after a while asks", async () => {
@@ -1124,7 +1158,7 @@ describe("scanning labels with the camera", () => {
     await opened(api);
     await openSpoolInVan();
     save();
-    await screen.findByText(/^Saved: Opening/);
+    await screen.findByText(/^Sending: Opening/);
     find("cable");
     fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
     expect(
@@ -1139,7 +1173,7 @@ describe("scanning labels with the camera", () => {
     expect(asked()).toBe(1);
     await openSpoolInVan();
     save();
-    await screen.findByText("In the inventory (transaction 77).");
+    await screen.findByText("Recorded (transaction 77).");
     await vi.waitFor(() => expect(asked()).toBe(2));
     // Asked whether it shows the batch saved.
     const [, again] = sent.filter(isCatalogue);
@@ -1162,14 +1196,14 @@ describe("scanning labels with the camera", () => {
     await opened(api);
     await openSpoolInVan();
     save();
-    await screen.findByText(/^Saved: Opening/);
+    await screen.findByText(/^Sending: Opening/);
     // The radio's box, sealed at the hub.
     pick("Where", "10");
     find("beam");
     fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     save();
     await vi.waitFor(() =>
-      expect(screen.getAllByText(/^In the inventory/)).toHaveLength(2),
+      expect(screen.getAllByText(/^Recorded \(/)).toHaveLength(2),
     );
     // One at a time: the second save waits for the first answer.
     expect(catalogues).toHaveLength(2);
@@ -1191,7 +1225,7 @@ describe("scanning labels with the camera", () => {
     await opened(api);
     await openSpoolInVan();
     save();
-    await screen.findByText("In the inventory (transaction 77).");
+    await screen.findByText("Recorded (transaction 77).");
     await vi.waitFor(() => expect(asked).toBe(2));
     await new Promise((done) => setTimeout(done, 0));
     expect(screen.queryByText("Couldn't load the catalogue.")).toBeNull();
@@ -1215,10 +1249,10 @@ describe("scanning labels with the camera", () => {
     const outbox = await opened(api);
     await openSpoolInVan();
     save();
-    await screen.findByText("In the inventory (transaction 77).");
+    await screen.findByText("Recorded (transaction 77).");
     await vi.waitFor(() => expect(asked).toBe(2));
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
-    expect(screen.queryByText(/^In the inventory/)).toBeNull();
+    expect(screen.queryByText(/^Recorded \(/)).toBeNull();
     const [batch] = outbox.entries.value;
     return { api, outbox, later, key: batch?.body.key ?? "" };
   }
@@ -1463,7 +1497,7 @@ describe("a newer build", () => {
     expect(outbox.entries.value.map((each) => each.state)).toEqual(["waiting"]);
     // The save itself says the same, and nothing more.
     const list = screen
-      .getByRole("heading", { name: "Saved on this browser" })
+      .getByRole("heading", { name: "Carts from this device" })
       .closest("section") as HTMLElement;
     within(list).getByText(MUST_UPGRADE);
     expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
@@ -1504,14 +1538,14 @@ describe("a newer build", () => {
 
 describe("what an older build left", () => {
   const HEADING = "Checked out items. Add to cart or discard before sending";
-  const ADDED_BACK = "Added back to cart. Review before Save.";
+  const ADDED_BACK = "Added back to cart. Review before Record.";
   const RETIRED = "This item has been retired.";
   // Failures, in bold (Ali, inventory-tng-93z).
   const NOT_KEPT =
     "This browser can't keep the cart. Clear local data, reload the page and try again.";
   const NOT_DISCARDED = "Unable to discard. Clear your site data to remove.";
   const NOT_REMOVED =
-    "This item wasn't automatically removed. Save the cart and try to remove.";
+    "This item wasn't automatically removed. Record the cart and try to remove.";
   const RESCAN = "Can't add these items. Please rescan.";
   const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
   const AT = 1_700_000_000_000;
@@ -1597,7 +1631,7 @@ describe("what an older build left", () => {
     const [save, cart] = listing().querySelector("ul")?.children ?? [];
     expect(save?.textContent).toContain("Moving stock from Hub to Van, by Ada");
     within(save as HTMLElement).getByText(
-      `Saved on this device ${at}, not sent.`,
+      `Kept on this device ${at}, not sent.`,
     );
     within(save as HTMLElement).getByText("LiteBeam 5AC: 2 × Box");
     // What cannot go back says why under it, in the alert's style, in
@@ -1668,7 +1702,7 @@ describe("what an older build left", () => {
     const [report, opening, receipt, install] =
       listing().querySelector("ul")?.children ?? [];
     expect(report?.textContent).toContain(
-      "Saying what is on open packages at HubSaved on this device, not sent.",
+      "Saying what is on open packages at HubKept on this device, not sent.",
     );
     // Nothing in it can go in the cart: discarding is all there is.
     expect(
@@ -1686,7 +1720,7 @@ describe("what an older build left", () => {
       "An item no longer in the catalogue: 1",
     );
     expect(install?.textContent).toContain(
-      "Taking it to an install for install 77Add it to the cart, fix that, then save.",
+      "Taking it to an install for install 77Add it to the cart, fix that, then record it.",
     );
   });
 
@@ -1842,7 +1876,7 @@ describe("what an older build left", () => {
     await screen.findByText(ADDED_BACK);
     expect(outbox.builds.newer.value).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.queryByText("Saved on this browser")).toBeNull();
+    expect(screen.queryByText("Carts from this device")).toBeNull();
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(
       (screen.getByLabelText("Box (4 each)") as HTMLInputElement).value,
@@ -1862,7 +1896,7 @@ describe("what an older build left", () => {
     leaveInOutbox(OLDER, "too_old", AT);
     window.dispatchEvent(new StorageEvent("storage", { key: OUTBOX_KEY }));
     await vi.waitFor(() =>
-      within(listing()).getByText(`Saved on this device ${at}, not sent.`),
+      within(listing()).getByText(`Kept on this device ${at}, not sent.`),
     );
     // Put back in the cart there.
     localStorage.setItem(
@@ -1880,9 +1914,15 @@ describe("what an older build left", () => {
     // In the alert's style: "Not saved." in bold, the rest not, its
     // numbers in italic (Ali, inventory-tng-93z).
     const why = within(listing()).getByText(
-      noted("Not saved. Line 1: no. Add it to the cart, fix that, then save."),
+      noted(
+        "Not saved. Line 1: no. Add it to the cart, fix that, then record it.",
+      ),
     );
     expectRefusal(why, "Not saved.", ["1"]);
+    // What to do, in bold as after any other refusal (row 11).
+    expect(
+      [...why.querySelectorAll("strong")].map((each) => each.textContent),
+    ).toEqual(["Not saved.", "Add it to the cart, fix that, then record it."]);
   });
 
   test("put in the cart, it fills the cart, goes from the list, and saves as any cart", async () => {
@@ -1915,7 +1955,7 @@ describe("what an older build left", () => {
     // its item's empty line.
     expect(screen.queryByText("Cat6 cable")).toBeNull();
     save();
-    await screen.findByText(/^Saved: /);
+    await screen.findByText(/^Sending: /);
     await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
     expect(outbox.entries.value[0]?.body).toMatchObject({
       kind: "move",
@@ -2142,7 +2182,9 @@ describe("what an older build left", () => {
     );
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     expect(within(listing()).queryByText(NOT_DISCARDED)).toBeNull();
-    within(listing()).getByText("No. Add it to the cart, fix that, then save.");
+    within(listing()).getByText(
+      noted("No. Add it to the cart, fix that, then record it."),
+    );
     within(listing()).getByText(noted(RESCAN));
   });
 
@@ -2155,7 +2197,7 @@ describe("what an older build left", () => {
       within(listing()).getByRole("button", { name: "Add to cart" }),
     );
     save();
-    await screen.findByText(/^Saved: /);
+    await screen.findByText(/^Sending: /);
     await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
     expect(outbox.entries.value[0]?.body.lines).toEqual([
       { item_id: 100, package_id: 1000, package_size: "4", quantity: "8" },
@@ -2190,7 +2232,7 @@ describe("what an older build left", () => {
     );
     expect(
       within(listing()).getByText(
-        "Save previous cart before adding additional items",
+        "Record or discard the current cart before adding more items",
       ).tagName,
     ).toBe("STRONG");
     expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
@@ -2247,7 +2289,7 @@ describe("what an older build left", () => {
     expect(localStorage.getItem("inventory.cart.v1")).toBeNull();
     fillMove();
     save();
-    await screen.findByText(/^Saved: /);
+    await screen.findByText(/^Sending: /);
     expect(localStorage.getItem("inventory.outbox.v3")).toBe(left);
   });
 
@@ -2257,12 +2299,12 @@ describe("what an older build left", () => {
     await ready();
     fillMove();
     save();
-    await screen.findByText(/^Saved: /);
+    await screen.findByText(/^Sending: /);
     fireEvent.click(
       within(listing()).getByRole("button", { name: "Add to cart" }),
     );
     screen.getByText(ADDED_BACK);
-    expect(screen.queryByText(/^Saved: /)).toBeNull();
+    expect(screen.queryByText(/^Sending: /)).toBeNull();
   });
 
   /** Moves from the hub to the van under v3, each queued at its time. */
@@ -2408,7 +2450,7 @@ describe("what an older build left", () => {
     await vi.waitFor(() => expect(boxes()).toBe("3"));
     screen.getByText(ADDED_BACK);
     // The save just made is still said.
-    screen.getByText(/^Saved: /);
+    screen.getByText(/^Sending: /);
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
   });
@@ -2472,13 +2514,13 @@ describe("what an older build left", () => {
       target: { value: "2" },
     });
     save();
-    return screen.findByText(SAVED_BEFORE_CHANGES);
+    return screen.findByText(BEFORE_RELOAD);
   }
 
   test("one an older build's tab saved meanwhile is saved once, under its key", async () => {
     const { outbox, written } = await putBackSavedFirst();
     save();
-    await screen.findByText("In the inventory (transaction 1).");
+    await screen.findByText("Recorded (transaction 1).");
     expect(written.size).toBe(1);
     expect(outbox.entries.value[0]?.body.key).toBe(KEY);
   });
@@ -2511,7 +2553,7 @@ describe("what an older build left", () => {
     cleanup();
     open(api);
     await ready();
-    expect(screen.queryByText(SAVED_BEFORE_CHANGES)).toBeNull();
+    expect(screen.queryByText(BEFORE_RELOAD)).toBeNull();
     const again = (await screen.findByText(RECORDED_ELSEWHERE)).closest(
       "li",
     ) as HTMLElement;
@@ -2532,7 +2574,7 @@ describe("what an older build left", () => {
     await vi.waitFor(() =>
       expect(within(entry).queryByRole("button")).toBeNull(),
     );
-    within(entry).getByText(SAVED_BEFORE_CHANGES);
+    within(entry).getByText(BEFORE_RELOAD);
     for (const line of screen.getAllByRole("button", { name: "Remove" })) {
       fireEvent.click(line);
     }
@@ -2552,8 +2594,22 @@ describe("what an older build left", () => {
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     await screen.findByText(ADDED_BACK);
     save();
-    await screen.findByText(SAVED_BEFORE_CHANGES);
+    await screen.findByText(BEFORE_RELOAD);
     expect(written.size).toBe(1);
+  });
+
+  test("discarded, a cart that went back drops its key, and what fills it next goes under a new one", async () => {
+    const { outbox } = await putBackSavedFirst();
+    expect(JSON.parse(localStorage.getItem(CART_KEY) ?? "").batchKey).toBe(KEY);
+    fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    expect(JSON.parse(localStorage.getItem(CART_KEY) ?? "")).not.toHaveProperty(
+      "batchKey",
+    );
+    fillMove();
+    save();
+    await screen.findByText("Recorded (transaction 2).");
+    expect(outbox.entries.value[0]?.body.key).not.toBe(KEY);
   });
 
   test("emptied, a cart that went back saves what fills it next under a new key", async () => {
@@ -2562,7 +2618,7 @@ describe("what an older build left", () => {
     fireEvent.click(within(radio).getByRole("button", { name: "Remove" }));
     fillMove();
     save();
-    await screen.findByText("In the inventory (transaction 2).");
+    await screen.findByText("Recorded (transaction 2).");
     expect(outbox.entries.value[0]?.body.key).not.toBe(KEY);
   });
 
@@ -2576,7 +2632,7 @@ describe("what an older build left", () => {
       within(listing()).getByRole("button", { name: "Add to cart" }),
     );
     save();
-    await screen.findByText("In the inventory (transaction 2).");
+    await screen.findByText("Recorded (transaction 2).");
     expect(outbox.entries.value[0]?.body.key).not.toBe(KEY);
   });
 

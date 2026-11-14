@@ -28,7 +28,7 @@ import {
   unseen,
   withLine,
 } from "./cart";
-import type { Body, Draft } from "./outbox";
+import type { Body, Draft, Said } from "./outbox";
 
 /** A batch with a key, as the outbox keeps it. */
 let keys = 0;
@@ -42,6 +42,21 @@ function keyed(draft: Draft): Body {
 const SHOWN = "99999999-9999-4999-8999-999999999999";
 
 import { CATALOGUE, cable, radio, WITH_CAFE } from "./test-catalogue";
+
+/** A batch's problems, or a quantity's, as text, each name the page quoted
+ * in it (outbox.Said) in [brackets]. */
+function shown<T extends object>(result: T) {
+  const text = (said: Said) =>
+    said
+      .map((part) => (typeof part === "string" ? part : `[${part.quoted}]`))
+      .join("");
+  if ("problems" in result) {
+    return { problems: (result.problems as Said[]).map(text) };
+  }
+  return "problem" in result
+    ? { problem: text(result.problem as Said) }
+    : result;
+}
 
 function cart(fields: Partial<Cart> = {}): Cart {
   return { ...freshCart(), volunteerId: 1, fromId: 10, toId: 12, ...fields };
@@ -137,14 +152,14 @@ describe("quantities", () => {
 
   test("a fraction of a package is refused", () => {
     const line = { itemId: 101, packages: { 1001: "0.5" }, loose: "" };
-    expect(quantityOf(line, cable)).toEqual({
-      problem: "Count whole packages: Spool.",
+    expect(shown(quantityOf(line, cable))).toEqual({
+      problem: "Count whole packages: [Spool].",
     });
   });
 
   test("an item counted in units takes whole numbers", () => {
     const line = { itemId: 100, packages: {}, loose: "1.5" };
-    expect(quantityOf(line, radio)).toEqual({
+    expect(shown(quantityOf(line, radio))).toEqual({
       problem: "Counted in whole units.",
     });
   });
@@ -166,14 +181,14 @@ describe("quantities", () => {
       ],
     };
     const line = { itemId: 100, packages: { 7: "1" }, loose: "0.5" };
-    expect(quantityOf(line, halves)).toEqual({
+    expect(shown(quantityOf(line, halves))).toEqual({
       problem: "Counted in whole units.",
     });
   });
 
   test("an unreadable amount says what is wanted", () => {
     const line = { itemId: 101, packages: {}, loose: "lots" };
-    expect(quantityOf(line, cable)).toEqual({
+    expect(shown(quantityOf(line, cable))).toEqual({
       problem: "Enter the loose amount in m, up to 3 decimals.",
     });
   });
@@ -224,15 +239,15 @@ describe("turning a cart into a batch", () => {
       id: 101 + number,
       name: `Cable ${number}`,
     }));
-    expect(toBatch(many, { ...CATALOGUE, items })).toEqual({
-      problems: ["That is too much for one batch: save some, then the rest."],
+    expect(shown(toBatch(many, { ...CATALOGUE, items }))).toEqual({
+      problems: ["That is too much for one batch: record some, then the rest."],
     });
   });
 
   test("a line that can't be counted is named", () => {
     const lines = [{ itemId: 100, packages: {}, loose: "1.5" }];
-    expect(toBatch(cart({ lines }), CATALOGUE)).toEqual({
-      problems: ["LiteBeam 5AC: Counted in whole units."],
+    expect(shown(toBatch(cart({ lines }), CATALOGUE))).toEqual({
+      problems: ["[LiteBeam 5AC]: Counted in whole units."],
     });
   });
 
@@ -320,8 +335,8 @@ describe("turning a cart into a batch", () => {
       open_package_key: other,
     });
     const receipt = toBatch(cart({ kind: "receipt", lines }), CATALOGUE);
-    expect(receipt).toEqual({
-      problems: ["Cat6 cable: Nothing is taken from an open package here."],
+    expect(shown(receipt)).toEqual({
+      problems: ["[Cat6 cable]: Nothing is taken from an open package here."],
     });
     const bad = [
       {
@@ -331,9 +346,9 @@ describe("turning a cart into a batch", () => {
         open: { [key]: { amount: "x", whole: false } },
       },
     ];
-    expect(toBatch(cart({ lines: bad }), CATALOGUE)).toEqual({
+    expect(shown(toBatch(cart({ lines: bad }), CATALOGUE))).toEqual({
       problems: [
-        "Cat6 cable: Enter how much from the open package, up to 3 decimals.",
+        "[Cat6 cable]: Enter how much from the open package, up to 3 decimals.",
       ],
     });
   });
@@ -560,7 +575,9 @@ describe("turning a cart into a batch", () => {
       what: "Used up: 1 open package at Hub (what is on 1 open package said)",
     });
     // Blank is no report; not a number is a problem.
-    expect(toBatch(cart({ lines: line({ now: " " }) }), CATALOGUE)).toEqual({
+    expect(
+      shown(toBatch(cart({ lines: line({ now: " " }) }), CATALOGUE)),
+    ).toEqual({
       problems: ["Add something to the cart."],
     });
     // Counted each: whole units only.
@@ -572,21 +589,23 @@ describe("turning a cart into a batch", () => {
         open: { [key]: { amount: "", whole: false, now: "2.5" } },
       },
     ];
-    expect(toBatch(cart({ lines: radioLine }), CATALOGUE)).toEqual({
+    expect(shown(toBatch(cart({ lines: radioLine }), CATALOGUE))).toEqual({
       problems: [
-        "LiteBeam 5AC: enter what is on the open package, in whole units, or leave it blank.",
+        "[LiteBeam 5AC]: enter what is on the open package, in whole units, or leave it blank.",
       ],
     });
-    expect(toBatch(cart({ lines: line({ now: "lots" }) }), CATALOGUE)).toEqual({
+    expect(
+      shown(toBatch(cart({ lines: line({ now: "lots" }) }), CATALOGUE)),
+    ).toEqual({
       problems: [
-        "Cat6 cable: enter what is on the open package, up to 3 decimals, or leave it blank.",
+        "[Cat6 cable]: enter what is on the open package, up to 3 decimals, or leave it blank.",
       ],
     });
     // More than the server takes: said here, not refused with the cut.
     expect(
-      toBatch(cart({ lines: line({ now: "1000000000" }) }), CATALOGUE),
+      shown(toBatch(cart({ lines: line({ now: "1000000000" }) }), CATALOGUE)),
     ).toEqual({
-      problems: ["Cat6 cable: That is more than the inventory can count."],
+      problems: ["[Cat6 cable]: That is more than the inventory can count."],
     });
   });
 
@@ -671,9 +690,9 @@ describe("turning a cart into a batch", () => {
   test("an opening opens whole packages only", () => {
     const lines = [{ itemId: 101, packages: { 1001: "1" }, loose: "3" }];
     expect(
-      toBatch(cart({ kind: "open", lines, fromId: 10 }), CATALOGUE),
+      shown(toBatch(cart({ kind: "open", lines, fromId: 10 }), CATALOGUE)),
     ).toEqual({
-      problems: ["Cat6 cable: Open whole packages: leave loose empty."],
+      problems: ["[Cat6 cable]: Open whole packages: leave loose empty."],
     });
   });
 
@@ -719,9 +738,9 @@ describe("turning a cart into a batch", () => {
       ),
     };
     const lines = [{ itemId: 100, packages: {}, loose: "1" }];
-    expect(toBatch(cart({ kind: "receipt", lines }), retired)).toEqual({
+    expect(shown(toBatch(cart({ kind: "receipt", lines }), retired))).toEqual({
       problems: [
-        "LiteBeam 5AC: retired: taking only, so it can't be received.",
+        "[LiteBeam 5AC]: retired: taking only, so it can't be received.",
       ],
     });
     expect(toBatch(cart({ lines }), retired)).toMatchObject({
@@ -745,22 +764,26 @@ describe("turning a cart into a batch", () => {
       ),
     };
     const boxed = [{ itemId: 100, packages: { 1000: "1" }, loose: "" }];
-    expect(toBatch(cart({ kind: "receipt", lines: boxed }), retired)).toEqual({
+    expect(
+      shown(toBatch(cart({ kind: "receipt", lines: boxed }), retired)),
+    ).toEqual({
       problems: [
-        "LiteBeam 5AC, Box: retired: taking only, so it can't be received.",
+        "[LiteBeam 5AC], [Box]: retired: taking only, so it can't be received.",
       ],
     });
     // A count that isn't one is said as such, not as retired.
     const unreadable = [{ itemId: 100, packages: { 1000: "x" }, loose: "" }];
     expect(
-      toBatch(cart({ kind: "receipt", lines: unreadable }), retired),
-    ).toEqual({ problems: ["LiteBeam 5AC: Count whole packages: Box."] });
+      shown(toBatch(cart({ kind: "receipt", lines: unreadable }), retired)),
+    ).toEqual({ problems: ["[LiteBeam 5AC]: Count whole packages: [Box]."] });
     // And what else is wrong with the line, at once.
     const typo = [{ itemId: 100, packages: { 1000: "1" }, loose: "x" }];
-    expect(toBatch(cart({ kind: "receipt", lines: typo }), retired)).toEqual({
+    expect(
+      shown(toBatch(cart({ kind: "receipt", lines: typo }), retired)),
+    ).toEqual({
       problems: [
-        "LiteBeam 5AC, Box: retired: taking only, so it can't be received.",
-        "LiteBeam 5AC: Enter the loose amount in each, up to 3 decimals.",
+        "[LiteBeam 5AC], [Box]: retired: taking only, so it can't be received.",
+        "[LiteBeam 5AC]: Enter the loose amount in each, up to 3 decimals.",
       ],
     });
     expect(toBatch(cart({ lines: boxed }), retired)).toMatchObject({
@@ -1060,21 +1083,21 @@ describe("turning a cart into a batch", () => {
 
   test("says everything still to do", () => {
     const empty = cart({ volunteerId: null, fromId: null, toId: null });
-    expect(toBatch(empty, CATALOGUE)).toEqual({
+    expect(shown(toBatch(empty, CATALOGUE))).toEqual({
       problems: [
         "Pick your name.",
         "Pick where it comes from.",
         "Pick where it goes.",
       ],
     });
-    expect(toBatch(cart(), CATALOGUE)).toEqual({
+    expect(shown(toBatch(cart(), CATALOGUE))).toEqual({
       problems: ["Add something to the cart."],
     });
     const same = cart({
       toId: 10,
       lines: [{ itemId: 100, packages: {}, loose: "1" }],
     });
-    expect(toBatch(same, CATALOGUE)).toEqual({
+    expect(shown(toBatch(same, CATALOGUE))).toEqual({
       problems: ["From and to must be different places."],
     });
     const bad = cart({
@@ -1082,7 +1105,7 @@ describe("turning a cart into a batch", () => {
       installNumber: "12a",
       lines: [{ itemId: 999, packages: {}, loose: "1" }],
     });
-    expect(toBatch(bad, CATALOGUE)).toEqual({
+    expect(shown(toBatch(bad, CATALOGUE))).toEqual({
       problems: [
         "An install number is digits only.",
         "An item in the cart is no longer in the catalogue. Remove it.",
@@ -1158,7 +1181,7 @@ describe("what has changed since the cart was filled", () => {
   test("a retired name or place counts as none picked", () => {
     const lines = [{ itemId: 100, packages: {}, loose: "1" }];
     expect(
-      toBatch(cart({ volunteerId: 99, toId: 98, lines }), CATALOGUE),
+      shown(toBatch(cart({ volunteerId: 99, toId: 98, lines }), CATALOGUE)),
     ).toEqual({
       problems: ["Pick your name.", "Pick where it goes."],
     });
@@ -1166,7 +1189,7 @@ describe("what has changed since the cart was filled", () => {
 
   test("counts for a retired package are not dropped silently", () => {
     const line = { itemId: 101, packages: { 9999: "3" }, loose: "1" };
-    expect(quantityOf(line, cable)).toEqual({
+    expect(shown(quantityOf(line, cable))).toEqual({
       problem:
         "A package counted here is no longer used. Remove the line and add it again.",
     });
@@ -1210,7 +1233,7 @@ describe("the server's limits", () => {
     "install number %s is out of range",
     (number) => {
       const install = cart({ kind: "install", installNumber: number, lines });
-      expect(toBatch(install, CATALOGUE)).toEqual({
+      expect(shown(toBatch(install, CATALOGUE))).toEqual({
         problems: ["That install number is out of range."],
       });
     },
@@ -1220,8 +1243,8 @@ describe("the server's limits", () => {
     const huge = cart({
       lines: [{ itemId: 101, packages: {}, loose: "1000000000" }],
     });
-    expect(toBatch(huge, CATALOGUE)).toEqual({
-      problems: ["Cat6 cable: That is more than the inventory can count."],
+    expect(shown(toBatch(huge, CATALOGUE))).toEqual({
+      problems: ["[Cat6 cable]: That is more than the inventory can count."],
     });
   });
 });
@@ -1390,12 +1413,14 @@ describe("a package resized while the cart counts it (inventory-tng-0qi)", () =>
       ],
     });
     // Not the rest without it: that would record less than was moved.
-    expect(toBatch(counted, boxOf("8.000"))).toEqual({
-      problems: [`${radio.name}: enter the count`],
+    expect(shown(toBatch(counted, boxOf("8.000")))).toEqual({
+      problems: [`[${radio.name}]: enter the count`],
     });
     // Alone in the cart, said in place of "Add something to the cart."
-    expect(toBatch(boxes("2", { 1000: "4.000" }), boxOf("8.000"))).toEqual({
-      problems: [`${radio.name}: enter the count`],
+    expect(
+      shown(toBatch(boxes("2", { 1000: "4.000" }), boxOf("8.000"))),
+    ).toEqual({
+      problems: [`[${radio.name}]: enter the count`],
     });
     // Counted again, at the size shown, it is saved.
     expect(
