@@ -359,7 +359,8 @@ keeps it, as does a cart it filled when a newer build reads it, and
 the cart is sent under it until emptied or discarded, as an older tab may be sending
 it still: the server then takes it once, or, changed since, refuses it
 (409 `key_reused`), which the page says, asking for a reload in place
-of Dismiss, held back as a newer build's is; after it, the save stays
+of Dismiss, held back as a newer build's is, the note then saying what
+it waits for (the cart, or batches sending); after it, the save stays
 listed, no longer asking, until dismissed. A refused save in the
 outbox's list lists its lines, in the words above, each item numbered
 as the refusal's "Line n" names it. A save
@@ -413,7 +414,8 @@ sends, and the browser keeps the cart, which every change writes to
 storage as it happens (docs/decisions/0010). Discard cart, beside Record
 while the cart has lines, asks first in the page, as an older entry's
 Discard does, then empties the cart, dropping its batch key and keeping
-who and where, as Record does.
+who and where, as Record does. If another tab changed the cart since it
+asked, it discards nothing and says so, as Record does.
 
 The scan page needs a registered device, and some catalogue rows to choose
 from. The camera works only over HTTPS or on `localhost`.

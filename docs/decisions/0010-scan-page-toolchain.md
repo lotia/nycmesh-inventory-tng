@@ -198,7 +198,8 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   problems name them, so the volunteer can compare it with what was
   recorded. One put back from an older build and refused as another tab
   recorded it first asks for a reload, in place of Dismiss, so the page
-  shows what was recorded, held back as a newer build's reload is; after
+  shows what was recorded, held back as a newer build's reload is, saying
+  meanwhile what it waits for; after
   it, the batch stays listed, no longer asking, until dismissed. We
   rejected leaving only Dismiss, which dropped the note before the
   volunteer had seen the stock as it is.
