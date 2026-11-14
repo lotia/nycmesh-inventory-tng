@@ -105,6 +105,8 @@ const OldCart = v.object({
 const OldCartLine = v.object({
   itemId: id,
   packages: v.fallback(v.record(v.string(), v.string()), {}),
+  /** The size each package was counted at, kept since v2. */
+  sizes: v.fallback(v.record(v.string(), v.string()), {}),
   loose: v.fallback(v.string(), ""),
   open: v.fallback(v.record(v.string(), v.unknown()), {}),
 });
@@ -569,7 +571,8 @@ export type Part = {
  * whole ones of it; else as loose, for the cart to say what is wrong; one
  * of a package resized since it was saved, or of one the catalogue no
  * longer offers, is left to do again, as is an older cart's count of one
- * no longer offered, unless blank or none. What was taken from an open
+ * no longer offered, unless blank or none, or of one counted at a size
+ * since changed (v2's sizes). What was taken from an open
  * package, and what was said of one, are left to do again too, as the
  * open packages may have changed. A line left out is not put back as its
  * item's empty line (Ali, inventory-tng-0su), but one that could not be
@@ -612,10 +615,31 @@ export function toCart(
         left.push({ itemId: line.itemId, words, note, drop: [cut] });
       const kept: Record<string, string> = {};
       for (const [packageId, n] of Object.entries(line.packages)) {
+        const pack = item?.packages.find(
+          (each) => String(each.id) === packageId,
+        );
+        const size = line.sizes[packageId];
+        const countedAt = size === undefined ? null : thousandths(size);
         if (
-          item === undefined ||
-          item.packages.some((pack) => String(pack.id) === packageId)
+          pack !== undefined &&
+          holdsSome(n) &&
+          countedAt !== null &&
+          countedAt !== thousandths(pack.size)
         ) {
+          // Counted at a size since changed: neither its count of today's
+          // packages nor loose says what was moved, as of a save's (row
+          // 24), so it is done again.
+          const packs = count(n);
+          leave(
+            `${nameOf(item)}: ${
+              packs === null
+                ? `${n} × ${pack.name}`
+                : `${decimal(packs * countedAt)}${unitOf(item)}`
+            }`,
+            RESIZED,
+            { at, packages: [packageId] },
+          );
+        } else if (item === undefined || pack !== undefined) {
           kept[packageId] = n;
         } else if (holdsSome(n)) {
           // Neither shown nor saved by the cart, so said, not kept: named

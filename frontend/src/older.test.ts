@@ -582,6 +582,52 @@ describe("as a cart", () => {
     ]);
   });
 
+  test("an older cart's count of a package resized since it was counted is told, not put back at today's size", () => {
+    // As a later build reads a v2 cart, which keeps the size each count
+    // was made at: 2 boxes of 2 are 4, not 2 boxes of today's 4.
+    const resized = (lines: unknown[]) => {
+      keep("inventory.cart.v1", { ...freshCart(), lines });
+      return toCart(readOlder()[0] as Older, CATALOGUE);
+    };
+    const { cart, gaps, parts } = resized([
+      {
+        itemId: 100,
+        packages: { 1000: "2" },
+        sizes: { 1000: "2" },
+        loose: "1",
+      },
+    ]);
+    expect(cart.lines).toEqual([
+      { itemId: 100, packages: {}, loose: "1", typed: true },
+    ]);
+    expect(gaps).toEqual([`LiteBeam 5AC: ${RESIZED}`]);
+    expect(parts.map(({ words, note }) => [words, note])).toEqual([
+      ["LiteBeam 5AC: 1", null],
+      ["LiteBeam 5AC: 4", RESIZED],
+    ]);
+    expect(goesBackWhole(readOlder()[0] as Older, CATALOGUE)).toBe(false);
+    // A count unread is said as typed; one at today's size, or with no
+    // size kept, goes back.
+    expect(
+      resized([
+        { itemId: 100, packages: { 1000: "lots" }, sizes: { 1000: "2" } },
+      ]).parts.map(({ words }) => words),
+    ).toEqual(["LiteBeam 5AC: lots × Box"]);
+    expect(
+      resized([
+        {
+          itemId: 100,
+          packages: { 1000: "2" },
+          sizes: { 1000: "4.000" },
+          loose: "",
+        },
+      ]),
+    ).toMatchObject({
+      cart: { lines: [{ itemId: 100, packages: { 1000: "2" } }] },
+      gaps: [],
+    });
+  });
+
   test("a package retired with some left is still offered: counted, not told", () => {
     const { cart, gaps } = toCart(
       only(

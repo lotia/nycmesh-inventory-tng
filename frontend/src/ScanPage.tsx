@@ -418,6 +418,11 @@ function CartForm({
   const empty = cart.value.lines.length === 0;
   useEffect(() => {
     cartEmpty.value = empty;
+    // Emptied, here or in another tab, nothing is left to confirm: what
+    // fills it next is asked about afresh.
+    if (empty) {
+      discarding.value = null;
+    }
   }, [empty]);
 
   // Asked when the page is shown again, and checked each minute, so a hub
@@ -587,12 +592,16 @@ function CartForm({
    * empty, and forget it there: moved, never copied, so it is saved once.
    * Why not, if it was not. */
   function putInCart(each: Older, automatically = false): string | null {
-    if (cart.value.lines.length > 0) {
+    // As stored: another tab may have filled it, unheard yet, which this
+    // would write over.
+    const current = store.forSaving() ?? cart.value;
+    if (current.lines.length > 0) {
       return CART_NOT_EMPTY;
     }
-    const { cart: filled, gaps } = toCart(each, catalogue, cart.value);
-    // Read again first: an older tab may have sent it meanwhile.
-    if (!older.isListed(each)) {
+    const { cart: filled, gaps } = toCart(each, catalogue, current);
+    // Read again first: an older tab may have sent it meanwhile, or
+    // another tab discarded a line of it, which this would put back.
+    if (!older.isUnchanged(each)) {
       older.refresh();
       return GONE;
     }
@@ -623,22 +632,29 @@ function CartForm({
   // An empty cart takes what an older build left that goes back whole,
   // without a tap: the oldest first, one at a time. Each is tried once a
   // load, so one the browser would not keep is not tried for ever.
+  // Not once a newer build is out: it puts them back itself, and a cart
+  // filled here would hold its reload back (NewerBuild).
   const triedAutomatically = useRef(new Set<string>());
   const listed = older.listed.value;
+  const newer = outbox.builds.newer.value;
   useEffect(() => {
-    if (!empty) {
+    if (!empty || newer !== null) {
       return;
     }
     const next = nextWhole(listed, catalogue, triedAutomatically.current);
     if (next === undefined) {
       return;
     }
-    triedAutomatically.current.add(olderId(next));
+    const id = olderId(next);
+    triedAutomatically.current.add(id);
     const why = putInCart(next, true);
-    if (why !== null && why !== GONE) {
+    if (why === CART_NOT_EMPTY) {
+      // Filled in another tab meanwhile: tried again once it is empty.
+      triedAutomatically.current.delete(id);
+    } else if (why !== null && why !== GONE) {
       problems.value = [[why]];
     }
-  }, [empty, listed, catalogue]);
+  }, [empty, listed, catalogue, newer]);
 
   const sides = SIDES[cart.value.kind];
   const { items, volunteers } = indexOf(catalogue);

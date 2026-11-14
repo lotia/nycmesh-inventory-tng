@@ -150,7 +150,8 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   an older save that goes back whole into an empty cart without a tap,
   and lists the rest to add to the cart or discard; one holding an item
   retired since is named from the catalogue, which now lists retired
-  items' names apart from those offered, and can only be discarded. We
+  items' names apart from those offered, and goes in the cart only once
+  that line is discarded (inventory-tng-0su). We
   rejected asking only for a tap on each, which Ali found needless where
   nothing needs the volunteer, and naming such an item only by its
   absence, which left the volunteer unable to tell what the save held.

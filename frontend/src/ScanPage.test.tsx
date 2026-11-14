@@ -320,6 +320,27 @@ describe("filling and saving a cart", () => {
     expect(outbox.entries.value).toEqual([]);
   });
 
+  test("a cart the browser would not keep says so, until it keeps it again", async () => {
+    open();
+    await ready();
+    const real = localStorage.setItem.bind(localStorage);
+    const setItem = vi
+      .spyOn(localStorage, "setItem")
+      .mockImplementation((key, value) => {
+        if (key === CART_KEY) {
+          throw new DOMException("full", "QuotaExceededError");
+        }
+        real(key, value);
+      });
+    const NOT_KEEPING =
+      "This browser isn't keeping the cart, so a reload will empty it. Free some space or leave private browsing.";
+    fillMove();
+    expectBold(screen.getByText(NOT_KEEPING).closest("li"), NOT_KEEPING);
+    setItem.mockRestore();
+    pick("To", "10");
+    expect(screen.queryByText(NOT_KEEPING)).toBeNull();
+  });
+
   test("an open package is a card: now, after this cut, and a box that ticks itself", async () => {
     await cableWith(spool());
     const card = screen.getByRole("group", {
@@ -607,6 +628,24 @@ describe("filling and saving a cart", () => {
       ).toEqual([]);
     },
   );
+
+  test("Discard cart asked, then the cart emptied and filled again in another tab, asks nothing", async () => {
+    open();
+    await ready();
+    fillMove();
+    fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
+    screen.getByText("Confirm discard");
+    const other = (lines: ReturnType<typeof freshCart>["lines"]) => {
+      storeCart({ ...freshCart(), volunteerId: 1, lines, revision: "x" });
+      window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
+    };
+    other([]);
+    await screen.findByText("Nothing in the cart yet.");
+    other([{ itemId: 101, packages: {}, loose: "4" }]);
+    await screen.findByText("4 m in all");
+    expect(screen.queryByText("Confirm discard")).toBeNull();
+    screen.getByRole("button", { name: "Discard cart" });
+  });
 
   test("a move is saved, sent, and a new cart keeps the choices", async () => {
     const record = vi.spyOn(telemetry, "record");
@@ -1602,6 +1641,35 @@ describe("a newer build", () => {
     await vi.waitFor(() => expect(banner()).toBe(UPDATED));
   });
 
+  test("once it is out, what an older build left is not put in the empty cart, which would hold the reload back", async () => {
+    localStorage.setItem(
+      "inventory.outbox.v3",
+      JSON.stringify([
+        {
+          body: {
+            key: "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61",
+            kind: "move",
+            volunteer_id: 1,
+            from_location_id: 10,
+            to_location_id: 12,
+            lines: [{ item_id: 100, quantity: "4", package_id: 1000 }],
+          },
+          queuedAt: 1_700_000_000_000,
+          state: "waiting",
+        },
+      ]),
+    );
+    openMine();
+    newerTab();
+    await ready();
+    // Once the page has done what it does as the catalogue arrives.
+    await act(() => new Promise((done) => setTimeout(done, 20)));
+    expect(banner()).toBe(UPDATED);
+    screen.getByText("Nothing in the cart yet.");
+    screen.getByRole("button", { name: "Add to cart" });
+    expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
+  });
+
   test("too old with nothing waiting, it offers the reload alone", async () => {
     const { outbox } = openMine();
     await ready();
@@ -2362,6 +2430,79 @@ describe("what an older build left", () => {
     fireEvent.click(button);
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(screen.getByText("Nothing in the cart yet.")).not.toBeNull();
+  });
+
+  test("one an older tab refused for its key meanwhile is not put in the cart under that key", async () => {
+    leaveSave();
+    open();
+    await ready();
+    const button = within(listing()).getByRole("button", {
+      name: "Add to cart",
+    });
+    // Refused for its key, which the inventory holds for another batch,
+    // but the storage event not yet heard: put back under it, it would
+    // be refused too, and never recorded.
+    const kept = JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? "");
+    kept[0] = { ...kept[0], state: "refused", note: KEY_REUSED };
+    localStorage.setItem("inventory.outbox.v3", JSON.stringify(kept));
+    fireEvent.click(button);
+    screen.getByText("Nothing in the cart yet.");
+    expect(localStorage.getItem(CART_KEY)).toBeNull();
+    // Listed as it is now, it goes back without its key.
+    within(listing()).getByText(
+      noted(`${KEY_REUSED} Add it to the cart, fix that, then record it.`),
+    );
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: "Add to cart" }),
+    );
+    expect(boxes()).toBe("2");
+    expect(storedCart()).not.toHaveProperty("batchKey");
+  });
+
+  test("a cart another tab filled meanwhile, unheard, is not written over", async () => {
+    leaveSave();
+    open();
+    await ready();
+    screen.getByText("Nothing in the cart yet.");
+    const theirs = {
+      ...freshCart(),
+      lines: [{ itemId: 101, packages: {}, loose: "4" }],
+      revision: "theirs",
+    };
+    storeCart(theirs);
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: "Add to cart" }),
+    );
+    expect(
+      within(listing()).getByText(
+        "Record or discard the current cart before adding more items",
+      ).tagName,
+    ).toBe("STRONG");
+    expect(storedCart().lines).toEqual(theirs.lines);
+    screen.getByText("4 m in all");
+    expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
+  });
+
+  test("one that goes back whole waits, unsaid, while another tab has filled the cart unheard, then goes in once it is empty", async () => {
+    open();
+    await ready();
+    storeCart({
+      ...freshCart(),
+      lines: [{ itemId: 101, packages: {}, loose: "4" }],
+      revision: "theirs",
+    });
+    leaveMoves([KEY, AT, [radios(1)]]);
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: "inventory.outbox.v3" }),
+    );
+    await screen.findByText("4 m in all");
+    expect(screen.queryByRole("alert")).toBeNull();
+    within(listing()).getByText("LiteBeam 5AC: 1 × Box");
+    // Recorded there, the cart is empty, and it goes in.
+    storeCart({ ...freshCart(), revision: "recorded" });
+    window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
+    await screen.findByText(ADDED_BACK);
+    expect(boxes()).toBe("1");
   });
 
   test("nothing is removed without the volunteer acting, but empty keys", async () => {
