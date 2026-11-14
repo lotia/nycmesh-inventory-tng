@@ -185,8 +185,13 @@ VERSIONED = (
                 "authenticator": {"last_step", "sealed_key", "key_version"},
             }
             # Each edit form's row's (models.Versioned), which moves with
-            # every change.
-            | {table: {"edit_version"} for table in VERSIONED},
+            # every change, and each searched row's folded text
+            # (models.Searchable), which moves with what is searched.
+            | {table: {"edit_version"} for table in VERSIONED}
+            | {
+                table: {"edit_version", "search_text", "folded_with"}
+                for table in ("item", "item_package", "volunteer", "location")
+            },
         ),
         ("row_lock_only", {"item": {"on_order"}}),
     ],

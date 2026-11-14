@@ -733,8 +733,9 @@ def lock_catalogue(session: Session) -> None:
 # And on a column, mapped_column(info=...), a Flag: "secret", left out of
 # history (what would let someone sign in, or copy a second factor,
 # docs/decisions/0012); "not_a_change", which changing alone is no history
-# (it moves with use); and "row_lock_only" (above), which changing alone
-# moves no edit_version (_next_version).
+# (it moves with use, or with another row, as search_text with an item's
+# aliases); and "row_lock_only" (above). Changing either alone moves no
+# edit_version (_next_version).
 #
 # A test's own session is left alone as the test writes rows to set up what
 # it tests (UNGUARDED_INFO; tests/helpers/rows.py, setting_up), but not as
@@ -961,14 +962,18 @@ def _next_version(
     """One more on the version of each row changed that has one
     (models.Versioned), in the UPDATE itself. After flush_writes has found
     what changed, so the guard and history see the version as no change of
-    their own. Not for a change only to row_lock_only columns, which no
-    edit form sets (a receipt lowering item.on_order): it undoes nothing a
-    form shows, so it refuses no form's save."""
+    their own. Not for a change only to row_lock_only or not_a_change
+    columns, which no edit form sets (a receipt lowering item.on_order, an
+    alias refolding an item's search_text): it undoes nothing a form shows,
+    so it refuses no form's save."""
     for write in flush_writes(session, context):
+        unshown = flagged(write.table, "row_lock_only") | flagged(
+            write.table, "not_a_change"
+        )
         if (
             write.action == "update"
             and "edit_version" in write.table.c
-            and write.changed - flagged(write.table, "row_lock_only")
+            and write.changed - unshown
         ):
             row: Any = write.row
             row.edit_version = write.table.c.edit_version + 1

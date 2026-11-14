@@ -290,8 +290,10 @@ class Searchable:
     migrations 0032, 0033 and 0036 filled the rows there were."""
 
     SEARCHED: ClassVar[tuple[str, ...]] = ("name",)
-    search_text: Mapped[str] = mapped_column(Text)
-    folded_with: Mapped[str] = mapped_column(Text)
+    # Not a change alone: what is searched changes with it, or another row
+    # does, as an item's aliases (Item.refold), which keep their own history.
+    search_text: Mapped[str] = mapped_column(Text, info={"not_a_change": True})
+    folded_with: Mapped[str] = mapped_column(Text, info={"not_a_change": True})
 
     def refold(self) -> None:
         # Each folded alone, so no field's number reads the next's start

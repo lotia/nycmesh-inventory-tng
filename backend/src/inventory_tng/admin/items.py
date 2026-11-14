@@ -859,7 +859,7 @@ def _alias_problem(session: Session, item: Item, name: str, broken: str | None) 
         other_item_id=other and other.id,
     )
     # Its holder changed since, as the refusal let go of the lock: rare.
-    if other is None:  # pragma: no cover
+    if other is None:
         return TAKEN
     whose = "name" if broken == items.ALIAS_IS_NAME else "alias"
     if other.id == item.id:

@@ -324,7 +324,9 @@ change takes its locks in. A row is changed or deleted only once this
 transaction has locked it.
 
 A row an edit form shows is `models.Versioned`: every update adds one to
-its `edit_version`. The form sends back the one it showed, and the domain
+its `edit_version`, but one only to columns no form shows (flagged
+`not_a_change` or `row_lock_only`, as an item's `search_text`, which its
+aliases change). The form sends back the one it showed, and the domain
 function, holding the row's lock, refuses a row changed since
 (`changed_since_shown`, `db.unchanged`), so a save never quietly undoes
 another administrator's. Its `seen` argument is required; pass `None` only

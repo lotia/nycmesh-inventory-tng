@@ -1254,6 +1254,48 @@ def test_a_clash_with_an_alias_names_the_item(
         assert f'id="{field}-problem">{said}</span>' in refused.text, said
 
 
+def test_an_alias_added_or_removed_refuses_no_save_of_the_item(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Its search text moves with its aliases, but no field its form shows:
+    a form opened before still saves, and the item's history is the
+    alias's."""
+    item = new_item(session, radios, "NanoBeam")
+    form = {
+        "name": "NanoBeam M5",
+        "category_id": str(radios.id),
+        "unit": "each",
+        "version": str(item.edit_version),
+    }
+    path = f"{ITEMS}/{item.id}/aliases"
+    assert admin_client.post(path, data={"alias_name": "NBE"}).status_code == 303
+    (alias,) = items.aliases(session, item.id)
+    assert admin_client.post(f"{path}/{alias.id}/remove").status_code == 303
+    assert admin_client.post(f"{ITEMS}/{item.id}", data=form).status_code == 303
+    session.refresh(item)
+    assert item.name == "NanoBeam M5"
+    actions = [entry.action for entry in history(session, "item", item.id)]
+    assert actions == ["insert", "update"]
+
+
+def test_an_alias_clash_gone_meanwhile_is_said_in_general(
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The holder renamed, or its alias removed, between the refusal and
+    the look for it."""
+    new_item(session, radios, "LiteBeam")
+    item = new_item(session, radios, "Rocket")
+    monkeypatch.setattr(items, "alias_taken_by", lambda *_: None)
+    path = f"{ITEMS}/{item.id}/aliases"
+    refused = admin_client.post(path, data={"alias_name": "litebeam"})
+    assert refused.status_code == 400
+    assert "Another item, perhaps a retired one, already has" in text(refused)
+    assert items.aliases(session, item.id) == []
+
+
 def test_a_retired_items_page_refuses_alias_changes(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
