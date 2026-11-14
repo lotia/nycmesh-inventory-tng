@@ -17,7 +17,6 @@ import {
   OFFLINE,
   STORAGE_KEY as OUTBOX_KEY,
   Outbox,
-  RECORDED_ELSEWHERE,
   SCAN_AGAIN_CHANGED,
 } from "./outbox";
 import { ScanPage } from "./ScanPage";
@@ -147,7 +146,7 @@ function leaveInOutbox(
           build,
           state,
           waitingFor: null,
-          note: null,
+          reason: null,
           transactionId: null,
           failures: 0,
         },
@@ -2434,14 +2433,17 @@ describe("what an older build left", () => {
     // but the storage event not yet heard: put back under it, it would
     // be refused too, and never recorded.
     const kept = JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? "");
-    kept[0] = { ...kept[0], state: "refused", note: KEY_REUSED };
+    // In main's words, as its tab keeps them, said as kept.
+    const words =
+      "Not saved: its key was already used for a different batch. Please report this.";
+    kept[0] = { ...kept[0], state: "refused", note: words };
     localStorage.setItem("inventory.outbox.v3", JSON.stringify(kept));
     fireEvent.click(button);
     screen.getByText("Nothing in the cart yet.");
     expect(localStorage.getItem(CART_KEY)).toBeNull();
     // Listed as it is now, it goes back without its key.
     within(listing()).getByText(
-      noted(`${KEY_REUSED} Add it to the cart, fix that, then record it.`),
+      noted(`${words} Add it to the cart, fix that, then record it.`),
     );
     fireEvent.click(
       within(listing()).getByRole("button", { name: "Add to cart" }),
@@ -2881,7 +2883,12 @@ describe("what an older build left", () => {
   });
 
   test("one put back and refused as another tab recorded it first goes in no cart again, only Discard", async () => {
-    leaveSave({ state: "refused", note: RECORDED_ELSEWHERE, putBack: true });
+    // As this build keeps it, once a newer build reads it.
+    leaveSave({
+      state: "refused",
+      reason: { code: "recorded_elsewhere" },
+      putBack: true,
+    });
     open();
     await ready();
     // What it held is recorded: once more would record it twice (Ali,
@@ -2898,11 +2905,16 @@ describe("what an older build left", () => {
   });
 
   test("one refused for its key goes back without it, and saves under a new one", async () => {
-    leaveSave({ state: "refused", note: KEY_REUSED });
+    // As this build keeps it, once a newer build reads it.
+    leaveSave({ state: "refused", reason: { code: "key_reused" } });
     // The ledger holds another batch under its key.
     const written = new Map([[KEY, "another"]]);
     const outbox = open(ledger(written).api);
     await ready();
+    // Said from its code, in this build's words.
+    within(listing()).getByText(
+      noted(`${KEY_REUSED} Add it to the cart, fix that, then record it.`),
+    );
     fireEvent.click(
       within(listing()).getByRole("button", { name: "Add to cart" }),
     );

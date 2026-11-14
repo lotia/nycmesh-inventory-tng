@@ -334,7 +334,11 @@ take, takes a new key, as a tab of the build before, open during a deploy,
 drops what it cannot read from what it writes back; `outbox.test.ts` lists
 both for the outbox's key. Builds that keep the same shape share a key, so
 each batch is kept with the build that queued it, and is sent as that
-build's, whichever tab sends it.
+build's, whichever tab sends it. Why a batch was refused, or waits, is
+kept as a code with its data (`outbox.Reason`), never in words: the page
+makes the words as it shows them (`noteOf`), so they can change without a
+new key. Only older keys hold words, which `older.ts` reads for their
+code and shows as kept.
 
 A build reads and writes only its own keys. A tab of an older build sends
 its own batches and lets the volunteer record the cart, saying nothing of
@@ -403,7 +407,7 @@ the save stays listed with Dismiss, saying "Not recorded: another tab
 recorded this cart before your changes. Scan again only what you
 changed." Such a save never goes in a cart again, here or in the older
 list, which offers only Discard: what it held is recorded, and once more
-would record it twice (`outbox.recordedElsewhere`). Any other save refused
+would record it twice (reason `recorded_elsewhere`). Any other save refused
 for its key goes back without it, as the server holds that key for
 another batch.
 

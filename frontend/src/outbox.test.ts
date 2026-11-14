@@ -7,12 +7,14 @@ import {
   KEY_REUSED,
   Kept,
   newEntry,
+  noteOf,
   Outbox,
-  RECORDED_ELSEWHERE,
   REPORT_AFTER,
   RETRY_MS,
   SAVED_MOST,
+  SCAN_AGAIN_CHANGED,
   STORAGE_KEY,
+  wordsOf,
 } from "./outbox";
 import { telemetry } from "./telemetry";
 import { answering, json, saved, TOO_OLD } from "./test-fetch";
@@ -58,6 +60,16 @@ function replies(...queued: (() => Response | Promise<Response>)[]) {
 }
 
 const states = (outbox: Outbox) => outbox.entries.value.map((e) => e.state);
+
+/** What the page says of the first batch's reason, as plain text. */
+function said(outbox: Outbox): string | null {
+  const reason = outbox.entries.value[0]?.reason ?? null;
+  if (reason === null) {
+    return null;
+  }
+  const { bold, plain = [] } = noteOf(reason);
+  return wordsOf([...bold, ...plain]);
+}
 const stored = () =>
   JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null")?.entries;
 const bodies = (sent: Request[]) =>
@@ -177,7 +189,7 @@ describe("sending again", () => {
     const outbox = new Outbox(api);
     outbox.queue(draft(), "a");
     await vi.waitFor(() =>
-      expect(outbox.entries.value[0]?.note).toBe(
+      expect(said(outbox)).toBe(
         "The inventory can't record this just now. Trying again shortly.",
       ),
     );
@@ -187,9 +199,7 @@ describe("sending again", () => {
     const { api } = answering(() => json({ reason: "revoked" }, 403));
     const outbox = new Outbox(api);
     outbox.queue(draft(), "a");
-    await vi.waitFor(() =>
-      expect(outbox.entries.value[0]?.note).toContain("withdrawn"),
-    );
+    await vi.waitFor(() => expect(said(outbox)).toContain("withdrawn"));
   });
 
   test("no answer holds back the batches after it", async () => {
@@ -248,13 +258,13 @@ describe("a batch the server keeps failing on", () => {
       await vi.waitFor(() =>
         expect(outbox.entries.value[0]?.failures).toBe(round),
       );
-      expect(outbox.entries.value[0]?.note).toContain("Trying again shortly");
+      expect(said(outbox)).toContain("Trying again shortly");
       await vi.advanceTimersByTimeAsync(RETRY_MS);
     }
     await vi.waitFor(() =>
       expect(outbox.entries.value[0]?.failures).toBe(REPORT_AFTER),
     );
-    expect(outbox.entries.value[0]?.note).toContain("please report this");
+    expect(said(outbox)).toContain("please report this");
     expect(states(outbox)).toEqual(["waiting"]);
   });
 
@@ -282,7 +292,7 @@ describe("refusals", () => {
     await vi.waitFor(() =>
       expect(states(outbox)).toEqual(["refused", "saved"]),
     );
-    expect(outbox.entries.value[0]?.note).toBe(KEY_REUSED);
+    expect(said(outbox)).toBe(KEY_REUSED);
   });
 
   test("a save put back goes under its key, and refused as reused keeps that another tab recorded it first, not the page's reload words", async () => {
@@ -296,10 +306,11 @@ describe("refusals", () => {
     expect(outbox.entries.value[0]).toMatchObject({
       body: { key },
       putBack: true,
-      note: RECORDED_ELSEWHERE,
+      reason: { code: "recorded_elsewhere" },
     });
-    expect(RECORDED_ELSEWHERE).toBe(
-      "Not recorded: another tab recorded this cart before your changes.",
+    expect(said(outbox)).toBe(SCAN_AGAIN_CHANGED);
+    expect(SCAN_AGAIN_CHANGED).toBe(
+      "Not recorded: another tab recorded this cart before your changes. Scan again only what you changed.",
     );
     expect((await bodies(sent))[0]).toMatchObject({ key });
   });
@@ -339,7 +350,21 @@ describe("refusals", () => {
     const outbox = new Outbox(api);
     outbox.queue(draft({ lines }), "a");
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
-    expect(outbox.entries.value[0]?.note).toBe(
+    // Kept as a code and data, the words made from them on show.
+    const row = "There is no such row";
+    expect(
+      JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "").entries[0].reason,
+    ).toEqual({
+      code: "refused",
+      problems: [
+        { names: { of: "line", n: 2 }, size: null, msg: row },
+        { names: null, size: null, msg: detail[1]?.msg },
+        { names: { of: "line", n: 1 }, size: null, msg: null },
+        { names: { of: "used_up", n: 1 }, size: null, msg: row },
+        { names: { of: "lengths", n: 1 }, size: null, msg: row },
+      ],
+    });
+    expect(said(outbox)).toBe(
       "Not recorded. Line 2: There is no such row Value error, a move has only a from and to location Line 1: Not accepted Open package said used up, 1: There is no such row What is on an open package, 1: There is no such row",
     );
   });
@@ -436,7 +461,7 @@ describe("refusals", () => {
   });
 
   test("a settled batch can be dismissed; a waiting one cannot", () => {
-    const refused = entry({ state: "refused", note: "no" });
+    const refused = entry({ state: "refused", reason: { code: "key_reused" } });
     const waiting = entry();
     store(refused, waiting);
     const outbox = new Outbox(answering(() => saved()).api);
@@ -522,7 +547,7 @@ describe("builds", () => {
       outbox.queue(draft(), "second");
       await vi.waitFor(() => expect(outbox.builds.newer.value).toBe("too_old"));
       expect(states(outbox)).toEqual(["waiting", "waiting"]);
-      expect(outbox.entries.value[0]?.note).toBe(
+      expect(said(outbox)).toBe(
         "The scanner has been updated. You must upgrade. Your data will be kept but may need some changes before sending.",
       );
       expect(stored().map((each: Entry) => each.state)).toEqual([
@@ -558,7 +583,7 @@ describe("builds", () => {
     expect(outbox.builds.newer.value).toBeNull();
     expect(outbox.entries.value[0]).toMatchObject({
       waitingFor: null,
-      note: null,
+      reason: null,
     });
     // Listed with what older builds left (older.ts), not here, and never
     // sent again.
@@ -620,7 +645,7 @@ describe("builds", () => {
     const { outbox } = of(() => json(body, 409));
     outbox.queue(draft(), "a");
     await vi.waitFor(() => expect(outbox.entries.value[0]?.failures).toBe(1));
-    expect(outbox.entries.value[0]?.note).toContain("answered unexpectedly");
+    expect(said(outbox)).toContain("answered unexpectedly");
     expect(states(outbox)).toEqual(["waiting"]);
     expect(outbox.builds.newer.value).toBeNull();
   });
@@ -669,7 +694,7 @@ describe("storage", () => {
     await outbox.send();
     expect((await bodies(sent))[0].lines).toEqual(lines);
     expect(states(outbox)).toEqual(["refused"]);
-    expect(outbox.entries.value[0]?.note).toBe(
+    expect(said(outbox)).toBe(
       "Not recorded. Line 1: A line of a package says the size it was counted in: load the page again, and count it again",
     );
   });
@@ -685,7 +710,7 @@ describe("storage", () => {
     store(entry());
     const outbox = new Outbox(answering(() => json({ detail }, 422)).api);
     await outbox.send();
-    expect(outbox.entries.value[0]?.note).toBe(
+    expect(said(outbox)).toBe(
       "Not recorded. Line 1: A loose line says a package's size: load the page again, and count it again",
     );
   });
@@ -703,7 +728,7 @@ describe("storage", () => {
     store(entry());
     const outbox = new Outbox(answering(() => json({ detail }, 422)).api);
     await outbox.send();
-    expect(outbox.entries.value[0]?.note).toBe(`Not recorded. Line 1: ${msg}`);
+    expect(said(outbox)).toBe(`Not recorded. Line 1: ${msg}`);
   });
 
   test("an older build's keys are neither read, sent, nor written", async () => {
@@ -797,10 +822,30 @@ describe("storage", () => {
         "dismissed",
         "dismissed = true",
         "failures",
-        "note",
         "putBack",
         "putBack = true",
         "queuedAt",
+        "reason",
+        "reason.code",
+        "reason.code",
+        "reason.code",
+        "reason.code",
+        "reason.code = no_answer | unavailable | must_upgrade | key_reused | recorded_elsewhere",
+        "reason.code = not_registered",
+        "reason.code = refused",
+        "reason.code = unexpected",
+        "reason.problems",
+        "reason.problems.msg",
+        "reason.problems.names",
+        "reason.problems.names.n",
+        "reason.problems.names.of",
+        "reason.problems.names.of = line | used_up | lengths",
+        "reason.problems.size",
+        "reason.problems.size = package_size_required | package_size_without_package",
+        "reason.status",
+        "reason.tries",
+        "reason.why",
+        "reason.why = unregistered | revoked",
         "state",
         "state = waiting | saved | refused | too_old",
         "transactionId",

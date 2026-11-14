@@ -42,8 +42,9 @@ import { telemetry } from "./telemetry";
 /** Versioned: a build that changes what is kept takes a new key, as a tab
  * of an older build, open during a deploy, would drop what it cannot read
  * from what it writes back. v4's is stamped with the build that wrote it,
- * its entries each with the build that queued them, and says which were
- * sent under an older save's key (putBack). */
+ * its entries each with the build that queued them, says which were
+ * sent under an older save's key (putBack), and keeps why each was
+ * refused or waits as a code (reason), not in words. */
 export const STORAGE_KEY = "inventory.outbox.v4";
 /** How long to wait before trying again after no answer. */
 export const RETRY_MS = 30_000;
@@ -120,6 +121,169 @@ export type Body = Schemas["Batch"];
 /** A batch before the outbox gives it its key. */
 export type Draft = Omit<Body, "key">;
 
+/** A batch's reports, as a 422 names them. */
+export const REPORTS = {
+  used_up: "Open package said used up",
+  lengths: "What is on an open package",
+} as const;
+
+/** A line's package_size refused as a page's bug, as a build from before
+ * sizes were sent kept its lines (inventory-tng-1p8), by the server's type:
+ * its words are for whoever writes a client, these for the volunteer. */
+const SIZE_REFUSED = {
+  package_size_required:
+    "A line of a package says the size it was counted in: load the page again, and count it again",
+  package_size_without_package:
+    "A loose line says a package's size: load the page again, and count it again",
+} as const;
+
+const count = v.pipe(v.number(), v.integer());
+
+/** One of a 422's problems, as kept. */
+const Problem = v.object({
+  /** What it names: a line, numbered as the cart's (lineNumbers), or a
+   * report (REPORTS), numbered among those of its kind from 1; or neither. */
+  names: v.nullable(
+    v.object({ of: v.picklist(["line", "used_up", "lengths"]), n: count }),
+  ),
+  /** A line's package_size refused as a page's bug: said in the page's
+   * words (SIZE_REFUSED), not the server's. */
+  size: v.nullable(
+    v.picklist(Object.keys(SIZE_REFUSED) as (keyof typeof SIZE_REFUSED)[]),
+  ),
+  /** The server's words, if it gave any. */
+  msg: v.nullable(v.string()),
+});
+
+type Problem = v.InferOutput<typeof Problem>;
+
+/** Why a batch was refused, or why it waits, as kept: a code, and what
+ * the page's words for it are made from (noteOf). */
+export const Reason = v.union([
+  v.object({
+    code: v.picklist([
+      // No answer: tried again.
+      "no_answer",
+      // The inventory cannot record just now (503): tried again.
+      "unavailable",
+      // This tab's own, or a newer build's, held back as too old.
+      "must_upgrade",
+      // 409 key_reused: the inventory holds its key for another batch.
+      "key_reused",
+      // 409 key_reused of a save put back in the cart, then changed,
+      // whose older build's tab recorded it first, as it was.
+      "recorded_elsewhere",
+    ]),
+  }),
+  /** An answer this build does not understand: its HTTP status, and how
+   * many in a row. */
+  v.object({ code: v.literal("unexpected"), status: count, tries: count }),
+  /** 403: the device is not registered, and why. */
+  v.object({
+    code: v.literal("not_registered"),
+    why: DeviceRefusedReply.entries.reason,
+  }),
+  /** 422, and its problems. */
+  v.object({ code: v.literal("refused"), problems: v.array(Problem) }),
+]);
+
+export type Reason = v.InferOutput<typeof Reason>;
+
+/** Words for an alert: a string is the page's own, its numbers counts it
+ * wrote, shown in italic; `{ quoted }` is words it did not write, such as
+ * a name or the server's, shown as they are (Ali, inventory-tng-93z). */
+export type Said = readonly (string | { quoted: string })[];
+
+/** A note on show: `bold`, then `plain`, not bold, as a refusal's
+ * problems after "Not recorded." (Ali, inventory-tng-93z). */
+export type Note = { bold: Said; plain?: Said };
+
+/** `said` as plain text, where nothing is in italic. */
+export function wordsOf(said: Said): string {
+  return said
+    .map((part) => (typeof part === "string" ? part : part.quoted))
+    .join("");
+}
+
+/** A batch refused for its key (key_reused), in words. */
+export const KEY_REUSED =
+  "Not recorded: its key was already used for a different batch. Please report this.";
+
+/** What the page says of a recorded_elsewhere, with Dismiss, or Discard
+ * in the older list: what it held is recorded, but not the changes since,
+ * so it never goes in a cart again, which would record it twice (Ali,
+ * inventory-tng-wyq, question c, and inventory-tng-g0e, d). */
+export const SCAN_AGAIN_CHANGED =
+  "Not recorded: another tab recorded this cart before your changes. Scan again only what you changed.";
+
+/** A batch waiting after no_answer, while the browser is online. */
+export const NO_ANSWER = "No answer from the inventory. Trying again shortly.";
+
+/** NO_ANSWER's words while the browser says it is offline (Ali,
+ * inventory-tng-wyq, 'Offline'). */
+export const OFFLINE = "This device is offline. Sending when it's back.";
+
+/** Before a refused batch's problems (422), in bold. */
+const NOT_RECORDED = "Not recorded.";
+
+/** What the page says of `reason`; of no_answer, as the browser is
+ * `online` or not. */
+export function noteOf(reason: Reason, online = true): Note {
+  switch (reason.code) {
+    case "no_answer":
+      return { bold: [online ? NO_ANSWER : OFFLINE] };
+    case "unavailable":
+      return {
+        bold: [
+          "The inventory can't record this just now. Trying again shortly.",
+        ],
+      };
+    case "must_upgrade":
+      return { bold: [MUST_UPGRADE] };
+    case "key_reused":
+      return { bold: [KEY_REUSED] };
+    case "recorded_elsewhere":
+      return { bold: [SCAN_AGAIN_CHANGED] };
+    case "unexpected":
+      return {
+        bold: [
+          reason.tries >= REPORT_AFTER
+            ? `The inventory keeps failing on this batch (${reason.status}, ${reason.tries} tries). It is kept and tried again; please report this.`
+            : `The inventory answered unexpectedly (${reason.status}). Trying again shortly.`,
+        ],
+      };
+    case "not_registered":
+      return {
+        bold: [`${NOT_REGISTERED[reason.why]} Register it to send this batch.`],
+      };
+    case "refused":
+      return {
+        bold: [NOT_RECORDED],
+        plain: reason.problems.flatMap(problemSaid),
+      };
+  }
+}
+
+/** One of a 422's problems, after a space: what it names in the page's
+ * words, then why, in the server's, or the page's for a size refused. */
+function problemSaid({ names, size, msg }: Problem): Said {
+  const where =
+    names === null
+      ? []
+      : [
+          names.of === "line"
+            ? `Line ${names.n}: `
+            : `${REPORTS[names.of]}, ${names.n}: `,
+        ];
+  const why =
+    size !== null
+      ? SIZE_REFUSED[size]
+      : msg === null
+        ? "Not accepted"
+        : { quoted: msg };
+  return [" ", ...where, why];
+}
+
 /** A batch as kept: once a build keeping it under STORAGE_KEY is deployed,
  * a field added here takes a new key. */
 export const Entry = v.object({
@@ -134,8 +298,9 @@ export const Entry = v.object({
   state: v.picklist(["waiting", "saved", "refused", "too_old"]),
   /** While waiting: what it waits for. */
   waitingFor: v.nullable(v.picklist(["network", "registration"])),
-  /** Why it was refused, or why it waits, in words. */
-  note: v.nullable(v.string()),
+  /** Why it was refused, or why it waits: a code, with what the page's
+   * words for it are made from (noteOf), never the words. */
+  reason: v.nullable(Reason),
   transactionId: v.nullable(id),
   /** Unexpected answers to this batch in a row. */
   failures: v.pipe(v.number(), v.integer()),
@@ -155,108 +320,6 @@ export const Kept = v.object({
   entries: v.array(v.unknown()),
 });
 
-/** A batch whose key the inventory holds for another (409 key_reused). */
-export const KEY_REUSED =
-  "Not recorded: its key was already used for a different batch. Please report this.";
-
-/** A save put back in the cart, then changed, whose older build's tab
- * recorded it first, as it was (409 key_reused), as kept; the page's note
- * for it opens with it (Ali, inventory-tng-93z and inventory-tng-wyq,
- * 'One wording for a put-back save refused for its key'). */
-export const RECORDED_ELSEWHERE =
-  "Not recorded: another tab recorded this cart before your changes.";
-
-/** Whether `note` says another tab recorded the save first: what it held
- * is recorded, but not the changes since, so it never goes in a cart
- * again, which would record it twice (Ali, inventory-tng-wyq, question c). */
-export function recordedElsewhere(note: string | null): boolean {
-  return note === RECORDED_ELSEWHERE;
-}
-
-/** What the page says of one recordedElsewhere, with Dismiss, or Discard
- * in the older list (Ali, inventory-tng-wyq, question c, and
- * inventory-tng-g0e, d): words for the page, never kept. */
-export const SCAN_AGAIN_CHANGED = `${RECORDED_ELSEWHERE} Scan again only what you changed.`;
-
-/** What every build has said of a batch refused for its key: this one,
- * then those before, whose words an older key may still hold. */
-export const REFUSED_FOR_KEY: ReadonlySet<string> = new Set([
-  KEY_REUSED,
-  RECORDED_ELSEWHERE,
-  "Not saved: its key was already used for a different batch. Please report this.",
-]);
-
-/** A batch waiting, after no answer: said as kept while the browser is
- * online. */
-export const NO_ANSWER = "No answer from the inventory. Trying again shortly.";
-
-/** NO_ANSWER's words while the browser says it is offline (Ali,
- * inventory-tng-wyq, 'Offline'): words for the page, never kept. */
-export const OFFLINE = "This device is offline. Sending when it's back.";
-
-/** Before a refused batch's problems (422), as this build says it and as
- * builds before did: shown in bold, the problems after it not. */
-const NOT_RECORDED = "Not recorded.";
-const REFUSED_LEADS = [NOT_RECORDED, "Not saved."] as const;
-
-/**
- * Words for an alert: a string is the page's own, its numbers counts it
- * wrote, shown in italic; `{ quoted }` is words it did not write, such as
- * a name or the server's, shown as they are (Ali, inventory-tng-93z).
- */
-export type Said = readonly (string | { quoted: string })[];
-
-/** `said` as plain text, where nothing is in italic. */
-export function wordsOf(said: Said): string {
-  return said
-    .map((part) => (typeof part === "string" ? part : part.quoted))
-    .join("");
-}
-
-/** A 422's note (problems, below) as its lead, of REFUSED_LEADS, and its
- * problems: where each names its line or report, the page's words; the
- * rest, the server's. Null if `note` is no such refusal. */
-export function refusalOf(
-  note: string,
-): { lead: string; problems: Said } | null {
-  const lead = REFUSED_LEADS.find((each) => note.startsWith(each));
-  if (lead === undefined) {
-    return null;
-  }
-  const problems = note
-    .slice(lead.length)
-    .split(MARKERS)
-    .flatMap((part, at) =>
-      part === "" ? [] : [at % 2 === 1 ? part : { quoted: part }],
-    );
-  return { lead, problems };
-}
-
-/** A batch's reports, as a 422 names them. */
-export const REPORTS = {
-  used_up: "Open package said used up",
-  lengths: "What is on an open package",
-} as const;
-
-/** Where a 422's problem names its line or report (refusalOf). */
-const MARKERS = new RegExp(
-  `((?:^| )(?:Line \\d+|(?:${Object.values(REPORTS).join("|")}), \\d+): )`,
-);
-
-/** A line's package_size refused as a page's bug, as a build from before
- * sizes were sent kept its lines (inventory-tng-1p8), by the server's type:
- * its words are for whoever writes a client, these for the volunteer. */
-const SIZE_REFUSED = new Map([
-  [
-    "package_size_required",
-    "A line of a package says the size it was counted in: load the page again, and count it again",
-  ],
-  [
-    "package_size_without_package",
-    "A loose line says a package's size: load the page again, and count it again",
-  ],
-]);
-
 /** The number of a batch's line naming an item, by the item's first place
  * among `itemIds`, its lines' (problems' "Line n"; older.linesSaid). */
 export function lineNumbers(
@@ -266,38 +329,36 @@ export function lineNumbers(
   return (itemId) => items.indexOf(itemId) + 1;
 }
 
-/** A 422's problems, in words a volunteer can act on. A line of the cart
- * may be sent as several, one for each package and one loose (cart.ts,
- * toBatch), so a line is named as the cart's: by its item's place in it. */
+/** A 422's problems, as kept. A line of the cart may be sent as several,
+ * one for each package and one loose (cart.ts, toBatch), so a line is
+ * named as the cart's: by its item's place in it. */
 function problems(
   detail: v.InferOutput<typeof ValidationFailed>["detail"],
   body: Body,
-) {
+): Problem[] {
   const lineOf = lineNumbers(body.lines.map((line) => line.item_id));
-  return detail
-    .map(({ loc, msg, type }) => {
-      const line = loc[0] === "body" && loc[1] === "lines" ? loc[2] : undefined;
-      const words =
-        (loc[3] === "package_size" ? SIZE_REFUSED.get(type) : undefined) ??
-        (typeof msg === "string" ? msg : "Not accepted");
-      // A report's, by its place in the batch's list of them.
-      const report =
-        typeof loc[1] === "string" && Object.hasOwn(REPORTS, loc[1])
-          ? REPORTS[loc[1] as keyof typeof REPORTS]
-          : undefined;
-      if (
-        loc[0] === "body" &&
-        report !== undefined &&
-        typeof loc[2] === "number"
-      ) {
-        return `${report}, ${loc[2] + 1}: ${words}`;
-      }
-      const sent = typeof line === "number" ? body.lines[line] : undefined;
-      return sent === undefined
-        ? words
-        : `Line ${lineOf(sent.item_id)}: ${words}`;
-    })
-    .join(" ");
+  return detail.map(({ loc, msg, type }) => {
+    const line = loc[0] === "body" && loc[1] === "lines" ? loc[2] : undefined;
+    const size =
+      loc[3] === "package_size" && Object.hasOwn(SIZE_REFUSED, type)
+        ? (type as keyof typeof SIZE_REFUSED)
+        : null;
+    const said = { size, msg: typeof msg === "string" ? msg : null };
+    // A report's, by its place in the batch's list of them.
+    if (
+      loc[0] === "body" &&
+      (loc[1] === "used_up" || loc[1] === "lengths") &&
+      typeof loc[2] === "number"
+    ) {
+      return { names: { of: loc[1], n: loc[2] + 1 }, ...said };
+    }
+    const sent = typeof line === "number" ? body.lines[line] : undefined;
+    return {
+      names:
+        sent === undefined ? null : { of: "line", n: lineOf(sent.item_id) },
+      ...said,
+    };
+  });
 }
 
 export class Outbox {
@@ -526,7 +587,7 @@ export class Outbox {
         this.settle(key, {
           state: "saved",
           waitingFor: null,
-          note: null,
+          reason: null,
           transactionId: reply.body.transaction_id,
           failures: 0,
         });
@@ -541,7 +602,7 @@ export class Outbox {
               ? {
                   ...each,
                   waitingFor: "registration",
-                  note: `${NOT_REGISTERED[reply.body.reason]} Register it to send this batch.`,
+                  reason: { code: "not_registered", why: reply.body.reason },
                 }
               : each,
           ),
@@ -558,7 +619,7 @@ export class Outbox {
             this.settle(key, {
               state: "too_old",
               waitingFor: null,
-              note: null,
+              reason: null,
             });
             return "next";
           }
@@ -567,7 +628,7 @@ export class Outbox {
           this.builds.learn("too_old");
           this.settle(key, {
             waitingFor: null,
-            note: MUST_UPGRADE,
+            reason: { code: "must_upgrade" },
           });
           return "stop";
         }
@@ -576,14 +637,19 @@ export class Outbox {
         this.settle(key, {
           state: "refused",
           waitingFor: null,
-          note: entry.putBack ? RECORDED_ELSEWHERE : KEY_REUSED,
+          reason: {
+            code: entry.putBack ? "recorded_elsewhere" : "key_reused",
+          },
         });
         return "next";
       case 422:
         this.settle(key, {
           state: "refused",
           waitingFor: null,
-          note: `${NOT_RECORDED} ${problems(reply.body.detail, entry.body)}`,
+          reason: {
+            code: "refused",
+            problems: problems(reply.body.detail, entry.body),
+          },
         });
         return "next";
       case "unexpected": {
@@ -594,10 +660,7 @@ export class Outbox {
         this.settle(key, {
           waitingFor: "network",
           failures,
-          note:
-            failures >= REPORT_AFTER
-              ? `The inventory keeps failing on this batch (${reply.code}, ${failures} tries). It is kept and tried again; please report this.`
-              : `The inventory answered unexpectedly (${reply.code}). Trying again shortly.`,
+          reason: { code: "unexpected", status: reply.code, tries: failures },
         });
         this.later();
         return "next";
@@ -609,10 +672,9 @@ export class Outbox {
         });
         this.settle(key, {
           waitingFor: "network",
-          note:
-            reply.status === "unavailable"
-              ? "The inventory can't record this just now. Trying again shortly."
-              : NO_ANSWER,
+          reason: {
+            code: reply.status === "unavailable" ? "unavailable" : "no_answer",
+          },
         });
         this.later();
         return "stop";
@@ -698,7 +760,7 @@ export function newEntry(
     build,
     state: "waiting",
     waitingFor: null,
-    note: null,
+    reason: null,
     transactionId: null,
     failures: 0,
   };
