@@ -237,10 +237,10 @@ const KEY_REUSED_KEPT =
 /** Before the problems main's build kept of a batch refused (422). */
 const NOT_SAVED = "Not saved.";
 
-/** Where a problem main's build kept names its line or report. */
-const MARKERS = new RegExp(
-  `((?:^| )(?:Line \\d+|(?:${Object.values(REPORTS).join("|")}), \\d+): )`,
-);
+/** Where a problem main's build kept names its line or report, in its
+ * words, as kept: not REPORTS, whose words may change. */
+const MARKERS =
+  /((?:^| )(?:Line \d+|(?:Open package said used up|What is on an open package), \d+): )/;
 
 /**
  * Why a save was refused: from its code, as this build keeps it; or from
