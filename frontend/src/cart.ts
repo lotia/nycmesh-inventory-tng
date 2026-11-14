@@ -346,18 +346,21 @@ export function indexOf(catalogue: Catalogue): Index {
     haystacks: new Map(
       catalogue.items.map((item) => [
         item.id,
-        bare(
-          [
+        // Each field bare alone, as the server folds each (Searchable), so
+        // no field's number reads the next's start as a unit; the server's
+        // text, folded so already, only in lower case.
+        [
+          ...[
             item.name,
             item.manufacturer,
             item.part_number,
             item.old_code,
             item.category,
-            item.search_text,
-          ]
-            .filter(Boolean)
-            .join(" "),
-        ),
+          ].map((field) => bare(field ?? "")),
+          item.search_text.toLowerCase(),
+        ]
+          .filter(Boolean)
+          .join(" "),
       ]),
     ),
     codes,

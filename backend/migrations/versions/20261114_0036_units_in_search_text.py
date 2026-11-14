@@ -26,6 +26,12 @@ down_revision: str | Sequence[str] | None = "0035"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
+# The units.VERSION this folds again for. A change to the unit table adds a
+# migration as this one, naming its own (tests/test_units.py fails until
+# the newest names units.VERSION); each folds with the app's fold and says
+# so, so a database made new folds once, with the newest.
+FOLDS_UNITS = 1
+
 # 0033's: each table's folded columns, and what each holds, in order, spaced.
 FOLDED: dict[str, dict[str, tuple[str, ...]]] = {
     "item": {

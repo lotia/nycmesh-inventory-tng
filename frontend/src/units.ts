@@ -62,16 +62,46 @@ export function read(token: string): string | undefined {
   return undefined;
 }
 
-// A digit, perhaps a space, then what may be a unit, up to the next letter
-// or digit: units.AFTER_A_NUMBER's, character for character.
-const AFTER_A_NUMBER =
-  /([0-9]) ?([Dd][Ee][Gg] [CFcf]|(?:[A-Za-z°µμΜΩω]|\[[A-Za-z_]+\])+[0-9]?(?:\/[A-Za-z]+)?)(?![\p{L}\p{N}])/gu;
+// What may be a unit, and that it ends where a letter or digit does not
+// follow: units._TOKEN and units._ENDS, character for character.
+const TOKEN = String.raw`(?:[A-Za-z°µμΜΩω]|\[[A-Za-z_]+\])+[0-9]?(?:\/[A-Za-z]+)?`;
+const ENDS = String.raw`(?![\p{L}\p{N}])`;
+// A digit, perhaps a space, then what may be a unit.
+const AFTER_A_NUMBER = new RegExp(
+  `([0-9]) ?([Dd][Ee][Gg] [CFcf]|${TOKEN})${ENDS}`,
+  "gu",
+);
+// What may be a unit with no number before it: read only if spelt with a
+// sign no word is (units.ALONE).
+const ALONE = new RegExp(String.raw`(?<![\p{L}\p{N}])(${TOKEN})${ENDS}`, "gu");
+
+/** Whether a combining mark is at any of `at` in `text` (units._marked):
+ * decomposed, a letter's accent is one, so a token beside it is part of a
+ * word, as ω in ώρα is. */
+const marked = (text: string, ...at: number[]): boolean =>
+  at.some((i) => /\p{M}/u.test(text.charAt(i)));
 
 /** `text`, decomposed (NFKD), with each unit read right after a number
- * spelt by its symbol, joined to the number. */
+ * spelt by its symbol, joined to the number, and each unit alone spelt with
+ * a sign no word is (not ASCII) by its symbol. */
 export function respell(text: string): string {
-  return text.replace(AFTER_A_NUMBER, (match, digit: string, token: string) => {
-    const unit = read(token);
-    return unit === undefined ? match : digit + unit;
-  });
+  return text
+    .replace(
+      AFTER_A_NUMBER,
+      (match, digit: string, token: string, at: number, whole: string) => {
+        if (marked(whole, at + match.length)) return match;
+        const unit = read(token);
+        return unit === undefined ? match : digit + unit;
+      },
+    )
+    .replace(ALONE, (match, token: string, at: number, whole: string) => {
+      // TOKEN's only characters not ASCII.
+      if (
+        !/[°µμΜΩω]/u.test(token) ||
+        marked(whole, at - 1, at + match.length)
+      ) {
+        return match;
+      }
+      return read(token) ?? match;
+    });
 }

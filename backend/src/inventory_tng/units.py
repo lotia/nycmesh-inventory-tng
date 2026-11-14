@@ -6,8 +6,9 @@ whether SI prefixes apply, and the spellings it is also read by, every
 UCUM code among them, so the UCUM form always works. Prefixed forms are
 derived, never rows. A unit is read only right after a number, and in any
 case (Ali, 2026-11-12): `10µF`, `10 μF` and `10uf` are all `10uF`, and
-`85 °C`, `85℃` and `85 Cel` are `85degC`. Elsewhere nothing is read, so a
-Greek word is folded as any other.
+`85 °C`, `85℃` and `85 Cel` are `85degC`. Elsewhere only a unit spelt with
+a sign no word is (`μF`, `°C`, `kΩ`) is read, so a Greek word is folded as
+any other.
 
 The scan page reads the same table (frontend/src/units.json, which `uv run
 python -m inventory_tng.units` writes) the same way (frontend/src/units.ts),
@@ -17,6 +18,7 @@ and both are tested against frontend/src/units-vectors.json.
 import json
 import re
 import sys
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -241,24 +243,50 @@ def read(token: str) -> Reading | None:
     return None
 
 
-# A digit, perhaps a space, then what may be a unit, up to the next letter
-# or digit: frontend/src/units.ts's, character for character.
-AFTER_A_NUMBER = re.compile(
-    r"([0-9]) ?([Dd][Ee][Gg] [CFcf]|(?:[A-Za-z\u00b0\u00b5\u03bc\u039c\u03a9\u03c9]|\[[A-Za-z_]+\])+[0-9]?"
-    r"(?:/[A-Za-z]+)?)(?![^\W_])"
+# What may be a unit, and that it ends where a letter or digit does not
+# follow: frontend/src/units.ts's, character for character.
+_TOKEN = (
+    r"(?:[A-Za-z\u00b0\u00b5\u03bc\u039c\u03a9\u03c9]|\[[A-Za-z_]+\])+[0-9]?"
+    r"(?:/[A-Za-z]+)?"
 )
+_ENDS = r"(?![^\W_])"
+# A digit, perhaps a space, then what may be a unit.
+AFTER_A_NUMBER = re.compile(rf"([0-9]) ?([Dd][Ee][Gg] [CFcf]|{_TOKEN}){_ENDS}")
+# What may be a unit with no number before it: read only if spelt with a
+# sign no word is (°, μ, Ω), so "μF" finds "10μF", as "Cel" or "m" alone
+# do not, which may be words (Ali, 2026-11-12).
+ALONE = re.compile(rf"(?<![^\W_])({_TOKEN}){_ENDS}")
+
+
+def _marked(text: str, *at: int) -> bool:
+    """Whether a combining mark is at any of `at` in `text`: decomposed, a
+    letter's accent is one, so a token beside it is part of a word, as ω in
+    ώρα is."""
+    return any(
+        0 <= i < len(text) and unicodedata.category(text[i])[0] == "M" for i in at
+    )
 
 
 def respell(text: str) -> str:
     """`text` with each unit read right after a number spelt by its symbol
-    (str(Reading)), joined to the number. `text` is decomposed (NFKD), as
-    both the server and the scan page fold it, so `℃` is `°C` and `µ` `μ`."""
+    (str(Reading)), joined to the number, and each unit alone spelt with a
+    sign no word is (not ASCII) by its symbol. `text` is decomposed (NFKD),
+    as both the server and the scan page fold it, so `℃` is `°C` and `µ`
+    `μ`."""
 
     def respelt(match: re.Match[str]) -> str:
+        if _marked(match.string, match.end()):
+            return match[0]
         reading = read(match[2])
         return match[0] if reading is None else f"{match[1]}{reading}"
 
-    return AFTER_A_NUMBER.sub(respelt, text)
+    def alone(match: re.Match[str]) -> str:
+        if match[1].isascii() or _marked(match.string, match.start() - 1, match.end()):
+            return match[0]
+        reading = read(match[1])
+        return match[0] if reading is None else str(reading)
+
+    return ALONE.sub(alone, AFTER_A_NUMBER.sub(respelt, text))
 
 
 def laid_out(value: object, depth: int = 0) -> str:

@@ -186,11 +186,14 @@ keeps one plausible size, for telling `305M` (metres) from megametres
 later.
 
 Only where a number comes first: alone, `Cel` finds only text holding
-`Cel`, as `Cell` and `m` would be misread. So a Greek word is folded as
+`Cel`, as `Cell` and `m` would be misread. A unit alone is read only if
+spelt with a sign no word is (`°`, `μ`, `µ`, `Ω`), so `μF`, `°C` and `kΩ`
+still find `10μF`, `85 °C` and `4.7 kΩ`, as they did before units were
+read (added in review, 2026-11-14). So a Greek word is folded as
 letters, as before, whatever its case: `μέρα` finds `ΜΕΡΑ`, and the
 server and the scan page read a capital `Μ` alike, as micro after a number
 and as a letter elsewhere (inventory-tng-5d2). The cost: a unit
-typed alone in a spelling other than its symbol, such as `Mbps` for
+typed alone in an ASCII spelling other than its symbol, such as `Mbps` for
 `100Mbit/s`, finds only what search finds close.
 
 `models.fold` reads units in the decomposed text (NFKD) before NFKC and
@@ -200,7 +203,8 @@ table (`frontend/src/units.json`, which the server writes) the same way
 (`frontend/src/units.ts`), so both spell a search alike; both are tested
 against `frontend/src/units-vectors.json`. Each folded row's
 `folded_with` names the table's version too, and migration 0036 folded
-the rows there were again.
+the rows there were again; a later table comes with its own such
+migration, which a test asks for.
 
 Rejected: storing every spelling of a unit in the search text, which
 grows it and lets a part of one spelling match the wrong unit; and a

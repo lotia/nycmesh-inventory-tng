@@ -2,6 +2,7 @@
 (inventory-tng-c0c.2, docs/decisions/0021, 2026-11-14)."""
 
 import json
+import re
 import runpy
 import sys
 import unicodedata
@@ -21,6 +22,7 @@ from helpers.sign_in import text as page_text
 
 UCUM = Path(__file__).parent / "ucum_codes.tsv"
 VECTORS = units.TABLE.with_name("units-vectors.json")
+MIGRATIONS = Path(__file__).parent.parent / "migrations" / "versions"
 # The SI's newest prefixes (2022), which UCUM 2.2 has not.
 NEWER_THAN_UCUM = {"Q", "R", "r", "q"}
 
@@ -127,6 +129,25 @@ def test_the_scan_pages_table_is_current() -> None:
     assert units.TABLE.read_text(encoding="utf-8") == units.laid_out(committed) + "\n"
 
 
+def test_the_newest_unit_table_has_a_migration_folding_again() -> None:
+    """Rows folded with an older table are folded again on deploy, by a
+    migration such as 0036 naming units.VERSION in FOLDS_UNITS."""
+    named = [
+        int(found[1])
+        for migration in MIGRATIONS.glob("*.py")
+        if (
+            found := re.search(
+                r"^FOLDS_UNITS = (\d+)$",
+                migration.read_text(encoding="utf-8"),
+                re.MULTILINE,
+            )
+        )
+    ]
+    assert max(named) == units.VERSION, (
+        "Add a migration folding again the rows folded with an older table"
+    )
+
+
 def test_writes_the_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # As the task runs it, here to another file.
     monkeypatch.setattr(sys, "argv", ["units", str(tmp_path / "units.json")])
@@ -148,15 +169,17 @@ def test_the_server_and_the_scan_page_read_units_alike(vector: dict[str, str]) -
     """units-vectors.json, which the scan page's tests read too."""
     text = vector["text"]
     assert respell(unicodedata.normalize("NFKD", text)) == vector["respelt"]
-    assert fold(text).lower() == vector["searched"]
+    if "searched" in vector:
+        assert fold(text).lower() == vector["searched"]
 
 
 def test_units_are_read_only_after_a_number_and_greek_elsewhere_is_letters() -> None:
     assert fold("10uF 10 µF 10μF 10 ΜF") == "10uF 10uF 10uF 10uF"  # noqa: RUF001  Greek capitals, on purpose.
     assert fold("85 degC 85°C 85 Cel 85℃ 85 deg C") == " ".join(["85degC"] * 5)
     assert fold("4.7 kΩ 4.7kohm") == "4.7kOhm 4.7kOhm"
-    # Alone, a unit is not read: μ is a Greek letter, and anyascii spells it.
-    assert fold("μF Ω Cel") == "mF O Cel"
+    # Alone, a unit is read only if spelt with a sign no word is: so "μF"
+    # finds "10μF", but "Cel" is not read, nor μ, a Greek letter alone.
+    assert fold("μF Ω °C ℃ Cel uF μ") == "uF Ohm degC degC Cel uF m"
     assert fold("μέρα ΜΕΡΑ ωμέγα 10 μέρα") == "mera MERA omega 10 mera"  # noqa: RUF001  Greek capitals, on purpose.
     # Neither is a word that only starts as one does.
     assert fold("10 Cell 10 mé 10 m/s") == "10 Cell 10 me 10 m/s"
@@ -173,14 +196,15 @@ def test_each_field_is_read_alone() -> None:
 def test_every_spelling_of_a_unit_finds_the_others(
     admin_client: TestClient, session: Session
 ) -> None:
-    """'10uF' finds '10μF' (inventory-tng-8g2), a capital Greek Mu is read
-    as micro after a number as the scan page reads it, and Greek words are
-    found as letters (inventory-tng-5d2)."""
+    """'10uF' finds '10μF' (inventory-tng-8g2), and so does 'μF' alone, as
+    before units were read; a capital Greek Mu is read as micro after a
+    number as the scan page reads it, and Greek words are found as letters
+    (inventory-tng-5d2)."""
     parts = add(session, Category(name=f"Parts {tag()}"))
     for name, typed in (
-        ("Cap 10μF", ("10uF", "10 µF", "10μF", "10 ΜF", "10 UF")),  # noqa: RUF001  Greek capitals, on purpose.
-        ("Sensor 85 °C", ("85 degC", "85°C", "85 Cel", "85℃", "85 deg C")),
-        ("Resistor 4.7 kΩ", ("4.7kohm", "4.7 kΩ", "4.7kOhm")),
+        ("Cap 10μF", ("10uF", "10 µF", "10μF", "10 ΜF", "10 UF", "μF", "µF")),  # noqa: RUF001  Greek capitals, on purpose.
+        ("Sensor 85 °C", ("85 degC", "85°C", "85 Cel", "85℃", "85 deg C", "°C", "℃")),
+        ("Resistor 4.7 kΩ", ("4.7kohm", "4.7 kΩ", "4.7kOhm", "kΩ")),
         ("Radio 5 GHz", ("5ghz", "5 GHz")),
         ("ΜΕΡΑ cable", ("μέρα", "mera")),  # noqa: RUF001  Greek capitals, on purpose.
     ):
@@ -192,3 +216,16 @@ def test_every_spelling_of_a_unit_finds_the_others(
         found.name.startswith("Cap 10μF")
         for found in items.similar(session, "Cap 10 uF", 0)
     )
+
+
+def test_a_unit_ends_where_a_letter_or_digit_of_any_script_does_not_follow() -> None:
+    """units._ENDS's [^\\W_] is the scan page's [\\p{L}\\p{N}]: a letter or
+    digit in Unicode's sense (category L or N), for every character."""
+    ends = re.compile(units._ENDS)
+    differ = [
+        hex(point)
+        for point in range(sys.maxunicode + 1)
+        if (ends.match(chr(point)) is None)
+        != (unicodedata.category(chr(point))[0] in "LN")
+    ]
+    assert differ == []

@@ -1,5 +1,5 @@
 {
-  "about": "What the server (models.fold, in lower case) and the scan page (cart.bare) both make of each text, as searched, and what units.respell makes of it decomposed (NFKD), on both sides: backend tests/test_units.py and frontend src/units.test.ts read it. Texts whose letters anyascii spells otherwise than decomposing, as Greek, are tested on each side alone.",
+  "about": "What the server (models.fold, in lower case) and the scan page (cart.bare) both make of each text, as searched, and what units.respell makes of it decomposed (NFKD), on both sides: backend tests/test_units.py and frontend src/units.test.ts read it. A text with letters anyascii spells otherwise than decomposing, as Greek or Cyrillic, has no 'searched': only respell is compared.",
   "vectors": [
     {
       "text": "10uF",
@@ -263,8 +263,8 @@
     },
     {
       "text": "10 ḿ",
-      "respelt": "10ḿ",
-      "searched": "10m"
+      "respelt": "10 ḿ",
+      "searched": "10 m"
     },
     {
       "text": "10 m/s",
@@ -315,6 +315,130 @@
       "text": "Cel",
       "respelt": "Cel",
       "searched": "cel"
+    },
+    {
+      "text": "μF",
+      "respelt": "uF",
+      "searched": "uf"
+    },
+    {
+      "text": "µF",
+      "respelt": "uF",
+      "searched": "uf"
+    },
+    {
+      "text": "ΜF",
+      "respelt": "uF",
+      "searched": "uf"
+    },
+    {
+      "text": "Ω",
+      "respelt": "Ohm",
+      "searched": "ohm"
+    },
+    {
+      "text": "kΩ",
+      "respelt": "kOhm",
+      "searched": "kohm"
+    },
+    {
+      "text": "°C",
+      "respelt": "degC",
+      "searched": "degc"
+    },
+    {
+      "text": "℃",
+      "respelt": "degC",
+      "searched": "degc"
+    },
+    {
+      "text": "℉ cold",
+      "respelt": "degF cold",
+      "searched": "degf cold"
+    },
+    {
+      "text": "(μF)",
+      "respelt": "(uF)",
+      "searched": "(uf)"
+    },
+    {
+      "text": "Cap μF/V",
+      "respelt": "Cap μF/V"
+    },
+    {
+      "text": "°",
+      "respelt": "°"
+    },
+    {
+      "text": "μ",
+      "respelt": "μ"
+    },
+    {
+      "text": "F",
+      "respelt": "F",
+      "searched": "f"
+    },
+    {
+      "text": "degC",
+      "respelt": "degC",
+      "searched": "degc"
+    },
+    {
+      "text": "Ohm",
+      "respelt": "Ohm",
+      "searched": "ohm"
+    },
+    {
+      "text": "10 mж",
+      "respelt": "10 mж"
+    },
+    {
+      "text": "10 m٣",
+      "respelt": "10 m٣"
+    },
+    {
+      "text": "10 m〇",
+      "respelt": "10 m〇"
+    },
+    {
+      "text": "10 m_",
+      "respelt": "10m_",
+      "searched": "10m_"
+    },
+    {
+      "text": "10 m·",
+      "respelt": "10m·"
+    },
+    {
+      "text": "жμF",
+      "respelt": "жμF"
+    },
+    {
+      "text": "٣μF",
+      "respelt": "٣μF"
+    },
+    {
+      "text": "〇μF",
+      "respelt": "〇μF"
+    },
+    {
+      "text": "_μF",
+      "respelt": "_uF",
+      "searched": "_uf"
+    },
+    {
+      "text": "x°C",
+      "respelt": "x°C"
+    },
+    {
+      "text": "2 gâteaux",
+      "respelt": "2 gâteaux",
+      "searched": "2 gateaux"
+    },
+    {
+      "text": "2 GÂTEAUX",
+      "respelt": "2 GÂTEAUX",
+      "searched": "2 gateaux"
     }
   ]
 }

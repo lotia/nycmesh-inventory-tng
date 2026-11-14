@@ -479,7 +479,7 @@
 Φ	U+03A6	F
 Χ	U+03A7	Ch
 Ψ	U+03A8	Ps
-Ω	U+03A9	O
+Ω	U+03A9	Ohm
 Ϊ	U+03AA	I
 Ϋ	U+03AB	Y
 ά	U+03AC	a
@@ -511,7 +511,7 @@
 φ	U+03C6	f
 χ	U+03C7	ch
 ψ	U+03C8	ps
-ω	U+03C9	o
+ω	U+03C9	Ohm
 ϊ	U+03CA	i
 ϋ	U+03CB	y
 ό	U+03CC	o
@@ -1005,7 +1005,7 @@
 ℣	U+2123	V
 ℤ	U+2124	Z
 ℥	U+2125	oz
-Ω	U+2126	O
+Ω	U+2126	Ohm
 ℧	U+2127	Mho
 ℨ	U+2128	Z
 ℩	U+2129	i
@@ -1062,7 +1062,7 @@ è́̂	string	e
 １０ｍ ＲＪ４５	string	10m RJ45
 10µF 10μF	string	10uF 10uF
 10 uF 4.7 kΩ 85 ℃ 85 Cel 5 GHz 1 Gbps 24 dBm 305 m	string	10uF 4.7kOhm 85degC 85degC 5GHz 1Gbit/s 24dBm 305m
-μF Ω Cel μέρα 10 Cell	string	mF O Cel mera 10 Cell
+μF Ω Cel μέρα 10 Cell	string	uF Ohm Cel mera 10 Cell
 ½ ¼ ¾ in	string	1/2 1/4 3/4in
 2×4 30° ±5%	string	2*4 30deg +-5%
 Москва кабель	string	Moskva kabel'
