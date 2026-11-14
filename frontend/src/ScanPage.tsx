@@ -591,7 +591,8 @@ function CartForm({
 
   /** Put an older build's save, or cart, in this cart, which must be
    * empty, and forget it there: moved, never copied, so it is saved once.
-   * Why not, if it was not. */
+   * Why not, if it was not and there is anything to say: of one gone
+   * meanwhile, nothing, as it is no longer listed to say it under. */
   function putInCart(each: Older, automatically = false): string | null {
     // As stored: another tab may have filled it, unheard yet, which this
     // would write over.
@@ -600,11 +601,13 @@ function CartForm({
       return CART_NOT_EMPTY;
     }
     const { cart: filled, gaps } = toCart(each, catalogue, current);
-    // Read again first: an older tab may have sent it meanwhile, or
-    // another tab discarded a line of it, which this would put back.
-    if (!older.isUnchanged(each)) {
+    // Read again first: an older tab may have sent or changed it
+    // meanwhile, or another tab discarded a line of it, which this would
+    // put back. Listed again, as it is now, to check.
+    const now = older.compared(each);
+    if (now !== "unchanged") {
       older.refresh();
-      return GONE;
+      return now === "changed" ? CHANGED_ELSEWHERE : null;
     }
     const before = cart.value;
     if (!store.change(filled)) {
@@ -618,7 +621,7 @@ function CartForm({
       // Put in after a save, without a tap, it leaves that save said.
       saved.value = null;
     }
-    if (!older.remove(each)) {
+    if (older.remove(each) !== "done") {
       problems.value = [[NOT_REMOVED]];
     }
     recordOlder(
@@ -631,7 +634,8 @@ function CartForm({
 
   // An empty cart takes what an older build left that goes back whole,
   // without a tap: the oldest first, one at a time. Each is tried once a
-  // load, so one the browser would not keep is not tried for ever.
+  // load, so one the browser would not keep is not tried for ever; one
+  // changed meanwhile, again as it is now, as listed again.
   // Not once a newer build is out: it puts them back itself, and a cart
   // filled here would hold its reload back (NewerBuild).
   const triedAutomatically = useRef(new Set<string>());
@@ -648,10 +652,11 @@ function CartForm({
     const id = olderId(next);
     triedAutomatically.current.add(id);
     const why = putInCart(next, true);
-    if (why === CART_NOT_EMPTY) {
-      // Filled in another tab meanwhile: tried again once it is empty.
+    if (why === CART_NOT_EMPTY || why === CHANGED_ELSEWHERE) {
+      // The cart filled in another tab meanwhile, tried again once it is
+      // empty; or this changed, tried again as listed now. Unsaid.
       triedAutomatically.current.delete(id);
-    } else if (why !== null && why !== GONE) {
+    } else if (why !== null) {
       problems.value = [[why]];
     }
   }, [empty, listed, catalogue, newer]);
@@ -1026,11 +1031,16 @@ function OlderList({
                             aria-describedby={named}
                             onClick={unlessSettling(on, () => {
                               said.value = null;
-                              if (older.dropPart(each, line.drop, catalogue)) {
+                              const done = older.dropPart(
+                                each,
+                                line.drop,
+                                catalogue,
+                              );
+                              if (done === "done") {
                                 lineGoneAt.current.set(on, performance.now());
                                 refocus.current = on;
                                 recordOlder(each, "line_discarded");
-                              } else if (older.isUnchanged(each)) {
+                              } else if (done === "not_kept") {
                                 // Not if it changed meanwhile, which listing
                                 // it again shows.
                                 notDiscarded(on);
@@ -1055,9 +1065,10 @@ function OlderList({
                   describedBy={title}
                   onDiscard={unlessSettling(on, () => {
                     discarding.value = null;
-                    if (older.remove(each)) {
+                    const done = older.remove(each);
+                    if (done === "done") {
                       recordOlder(each, "discarded");
-                    } else if (older.isListed(each)) {
+                    } else if (done === "not_kept") {
                       notDiscarded(on);
                     }
                   })}
@@ -1219,8 +1230,10 @@ const NOT_DISCARDED = "Unable to discard. Clear your site data to remove.";
  * ignored, in milliseconds. */
 const SETTLE_MS = 500;
 
-/** Said when one has gone meanwhile. */
-const GONE = "That one has gone: it was sent, or dealt with in another tab.";
+/** Add to cart, tapped on one changed in another tab since it was listed
+ * (Ali, inventory-tng-8gj). */
+const CHANGED_ELSEWHERE =
+  "That one was changed in another tab. Check it, then add it to the cart again.";
 
 /** Whether it is saves or a cart, as telemetry tells them. */
 function heldIn(each: Older): "saves" | "cart" {
