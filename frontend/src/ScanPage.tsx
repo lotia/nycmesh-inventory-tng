@@ -591,12 +591,12 @@ function CartForm({
    * empty, and forget it there: moved, never copied, so it is saved once.
    * Why not, if it was not and there is anything to say: of one gone
    * meanwhile, nothing, as it is no longer listed to say it under. */
-  function putInCart(each: Older, automatically = false): string | null {
+  function putInCart(each: Older, automatically = false): NotPut | null {
     // As stored: another tab may have filled it, unheard yet, which this
     // would write over.
     const current = store.forSaving() ?? cart.value;
     if (current.lines.length > 0) {
-      return CART_NOT_EMPTY;
+      return "cart_not_empty";
     }
     const { cart: filled, gaps } = toCart(each, catalogue, current);
     // Read again first: an older tab may have sent or changed it
@@ -605,14 +605,14 @@ function CartForm({
     const now = older.compared(each);
     if (now !== "unchanged") {
       older.refresh();
-      return now === "changed" ? CHANGED_ELSEWHERE : null;
+      return now === "changed" ? "changed" : null;
     }
     const before = cart.value;
     if (!store.change(filled)) {
       // Not kept, a reload would empty it while the older one stays
       // listed, to be put back and saved twice: the cart stays as it was.
       cart.value = before;
-      return NOT_KEPT;
+      return "not_kept";
     }
     kept(true);
     if (!automatically) {
@@ -650,12 +650,12 @@ function CartForm({
     const id = olderId(next);
     triedAutomatically.current.add(id);
     const why = putInCart(next, true);
-    if (why === CART_NOT_EMPTY || why === CHANGED_ELSEWHERE) {
+    if (why === "cart_not_empty" || why === "changed") {
       // The cart filled in another tab meanwhile, tried again once it is
       // empty; or this changed, tried again as listed now. Unsaid.
       triedAutomatically.current.delete(id);
     } else if (why !== null) {
-      problems.value = [[why]];
+      problems.value = [[olderSaid(why, true)]];
     }
   }, [empty, listed, catalogue, newer]);
 
@@ -854,7 +854,7 @@ function CartForm({
         <ul role="alert" class="list-none p-0">
           {problems.value.map((problem, at) => (
             <li key={problemKeys[at]}>
-              <AlertWords words={problem} />
+              <AlertWords note={{ bold: problem }} />
             </li>
           ))}
         </ul>
@@ -914,11 +914,11 @@ function OlderList({
   older: OlderStore;
   catalogue: Catalogue;
   /** Put one back in the cart: why not, if it was not. */
-  onPutBack: (each: Older) => string | null;
+  onPutBack: (each: Older) => NotPut | null;
 }) {
   // The one whose discarding is being confirmed, and what one tap said.
   const discarding = useSignal<string | null>(null);
-  const said = useSignal<{ on: string; words: string } | null>(null);
+  const said = useSignal<{ on: string; why: OlderWhy } | null>(null);
   // When a line of each was last discarded, and the one whose heading is
   // to take focus once it is listed again.
   const lineGoneAt = useRef(new Map<string, number>());
@@ -983,11 +983,14 @@ function OlderList({
    * not done: the browser did not keep it, or it changed meanwhile, as
    * listing it again shows; of one gone, nothing. */
   const discardSaid = (on: string, done: Outcome) =>
-    done === "gone"
+    done === "gone" || done === "done"
       ? null
       : {
           on,
-          words: done === "changed" ? CHANGED_NOT_DISCARDED : NOT_DISCARDED,
+          why:
+            done === "changed"
+              ? ("discard_changed" as const)
+              : ("discard_not_kept" as const),
         };
   return (
     <section>
@@ -1004,10 +1007,15 @@ function OlderList({
               </div>
               {each.refused === null ? (
                 <small>{olderWhen(each)}</small>
-              ) : each.refused.code === "recorded_elsewhere" ? (
-                <NoteSaid note={each.refused.note} />
               ) : (
-                <NoteSaid note={each.refused.note} then={FIX_THEN_RECORD} />
+                <NoteSaid
+                  note={each.refused.note}
+                  then={
+                    each.refused.code === "recorded_elsewhere"
+                      ? undefined
+                      : FIX_THEN_RECORD
+                  }
+                />
               )}
               {lost !== null && <NoteSaid note={lost} />}
               {lines.length > 0 && (
@@ -1060,14 +1068,9 @@ function OlderList({
               {said.value?.on === on && (
                 <p role="alert">
                   <AlertWords
-                    words={
-                      // Changed so it no longer goes in the cart: only to
-                      // check it (Ali, inventory-tng-8gj).
-                      said.value.words === CHANGED_ELSEWHERE &&
-                      (!fills || retired)
-                        ? CHANGED_CHECK_AGAIN
-                        : said.value.words
-                    }
+                    note={{
+                      bold: [olderSaid(said.value.why, fills && !retired)],
+                    }}
                   />
                 </p>
               )}
@@ -1096,7 +1099,7 @@ function OlderList({
                       disabled={retired}
                       onClick={unlessSettling(on, () => {
                         const why = onPutBack(each);
-                        said.value = why === null ? null : { on, words: why };
+                        said.value = why === null ? null : { on, why };
                       })}
                     >
                       {retired ? "Cannot Add to Cart" : "Add to cart"}
@@ -1127,15 +1130,22 @@ function OlderList({
  * is there as the list is shown, and several at once, read out together,
  * would drown each other and the page.
  */
-function NoteSaid({ note, then }: { note: string | Note; then?: string }) {
-  const said = typeof note === "string" ? { bold: [note] } : note;
-  const empty = said.bold.length === 0 && (said.plain ?? []).length === 0;
+function NoteSaid({
+  note,
+  then,
+}: {
+  /** Null for none: `then` alone. */
+  note: string | Note | null;
+  then?: string | undefined;
+}) {
   return (
     <p class="alert">
-      {!empty && <AlertWords words={said} />}
+      {note !== null && (
+        <AlertWords note={typeof note === "string" ? { bold: [note] } : note} />
+      )}
       {then !== undefined && (
         <>
-          {!empty && " "}
+          {note !== null && " "}
           <strong>{then}</strong>
         </>
       )}
@@ -1179,13 +1189,7 @@ function ConfirmDiscard({
  * inventory-tng-93z); of a refusal, the problems after "Not recorded."
  * (Note.plain) not in bold, the server's words in them as they are.
  */
-function AlertWords({ words }: { words: string | Said | Note }) {
-  const { bold, plain = [] }: Note =
-    typeof words === "string"
-      ? { bold: [words] }
-      : "bold" in words
-        ? words
-        : { bold: words };
+function AlertWords({ note: { bold, plain = [] } }: { note: Note }) {
   return (
     <>
       <strong>
@@ -1260,6 +1264,32 @@ const CHANGED_CHECK_AGAIN =
  * since it was listed: nothing is discarded (Ali, inventory-tng-8gj). */
 const CHANGED_NOT_DISCARDED =
   "This item was changed in another tab. Check it before discarding.";
+
+/** Why one was not put in the cart: the cart is not empty, it changed
+ * meanwhile, or the browser would not keep the cart. */
+type NotPut = "cart_not_empty" | "changed" | "not_kept";
+
+/** What the older list says under one: why it was not put in the cart, or
+ * not discarded (changed meanwhile, or not kept). */
+type OlderWhy = NotPut | "discard_changed" | "discard_not_kept";
+
+/** `why` in words; one changed, as it is now, that `offersAdd` (Add to
+ * cart, not Cannot Add to Cart) or, if not, only to check it (Ali,
+ * inventory-tng-8gj). */
+function olderSaid(why: OlderWhy, offersAdd: boolean): string {
+  switch (why) {
+    case "cart_not_empty":
+      return CART_NOT_EMPTY;
+    case "changed":
+      return offersAdd ? CHANGED_ELSEWHERE : CHANGED_CHECK_AGAIN;
+    case "not_kept":
+      return NOT_KEPT;
+    case "discard_changed":
+      return CHANGED_NOT_DISCARDED;
+    case "discard_not_kept":
+      return NOT_DISCARDED;
+  }
+}
 
 /** Whether it is saves or a cart, as telemetry tells them. */
 function heldIn(each: Older): "saves" | "cart" {
@@ -1437,7 +1467,11 @@ function CartLine({
             {resized(line, pack) && (
               <p role="alert">
                 <AlertWords
-                  words={`The package size has changed to ${size} since this item was added. Enter the count again.`}
+                  note={{
+                    bold: [
+                      `The package size has changed to ${size} since this item was added. Enter the count again.`,
+                    ],
+                  }}
                 />
               </p>
             )}

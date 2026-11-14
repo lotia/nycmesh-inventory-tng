@@ -45,6 +45,7 @@ import {
   STORAGE_KEY as OUTBOX_KEY,
   REPORTS,
   Reason,
+  type ReportKind,
   type Said,
 } from "./outbox";
 import { count, decimal, thousandths } from "./quantity";
@@ -151,8 +152,8 @@ export type Older = {
 
 /** Why the inventory refused a save, as a code (outbox.Reason), and as
  * the page says it: in this build's words from a code, or as an older
- * build kept them (refusedOf). */
-export type Refused = { code: Reason["code"]; note: Note };
+ * build kept them (refusedOf), null if it kept none. */
+export type Refused = { code: Reason["code"]; note: Note | null };
 
 type OldBatchLine = v.InferOutput<typeof OldLine>;
 type OldCartLine = v.InferOutput<typeof OldCartLine>;
@@ -258,7 +259,7 @@ function refusedOf(reason: Reason | null, note: string | null): Refused {
     return { code: "key_reused", note: { bold: [words] } };
   }
   if (!words.startsWith(NOT_SAVED)) {
-    return { code: "refused", note: { bold: words === "" ? [] : [words] } };
+    return { code: "refused", note: words === "" ? null : { bold: [words] } };
   }
   const plain: Said = words
     .slice(NOT_SAVED.length)
@@ -425,18 +426,27 @@ const kept = (done: boolean): Outcome => (done ? "done" : "not_kept");
  * Remove one: a save from its key, the rest kept as they were, or the
  * cart. An older key left with nothing to list goes; this build's outbox
  * key stays, as the outbox's. A save goes even if changed meanwhile, as
- * one put in the cart must never stay listed too; a cart changed
- * meanwhile does not, as what changed was never seen. A volunteer's
- * Discard checks first (OlderStore.discard).
+ * one put in the cart must never stay listed too, unless `unlessChanged`
+ * (a volunteer's Discard, OlderStore.discard); a cart changed meanwhile
+ * never does, as what changed was never seen.
  */
 export function removeOlder(
   older: Older,
   storage: Storage = localStorage,
+  unlessChanged = false,
 ): Outcome {
   const now = compared(older, storage);
-  if (now === "gone" || (now === "changed" && older.batch === null)) {
+  if (
+    now === "gone" ||
+    (now === "changed" && (unlessChanged || older.batch === null))
+  ) {
     return now;
   }
+  return removeRead(older, storage);
+}
+
+/** Remove `older`, as removeOlder, once compared. */
+function removeRead(older: Older, storage: Storage): Outcome {
   if (older.batch === null) {
     return kept(removeStored(storage, older.key));
   }
@@ -476,7 +486,7 @@ export function dropPart(
     next = { ...cart, lines: cut(cart.lines, drop) };
   } else {
     // A save's reports dropped, by kind, at their places.
-    const droppedOf = (kind: "used_up" | "lengths") =>
+    const droppedOf = (kind: ReportKind) =>
       new Set(
         drop.flatMap((each) =>
           "report" in each && each.report === kind ? [each.at] : [],
@@ -491,7 +501,7 @@ export function dropPart(
         return entry;
       }
       const { body } = entry as { body: Record<string, unknown> };
-      const cutReports = (kind: "used_up" | "lengths") =>
+      const cutReports = (kind: ReportKind) =>
         Array.isArray(body[kind])
           ? {
               [kind]: body[kind].filter((_, at) => !dropped[kind].has(at)),
@@ -516,7 +526,7 @@ export function dropPart(
     (each) => each.batch === older.batch,
   );
   if (after === undefined || nothingListed(after, catalogue)) {
-    return removeOlder(older, storage);
+    return removeRead(older, storage);
   }
   return kept(writeStored(storage, older.key, next));
 }
@@ -614,7 +624,7 @@ export function unreadWords(n: number): string {
  * loose and what it said of some open packages; or a save's report. */
 export type Cut =
   | { at: number; packages?: string[]; loose?: true; open?: string[] }
-  | { report: "used_up" | "lengths"; at: number };
+  | { report: ReportKind; at: number };
 
 /** One line of what an older build left, as listed: an item's lines that
  * go back, or one that cannot, with why. */
@@ -808,7 +818,7 @@ export function toCart(
       }
     }
   });
-  const report = (kind: "used_up" | "lengths", n: number) =>
+  const report = (kind: ReportKind, n: number) =>
     Array.from({ length: n }, (_, at) => ({
       itemId: null,
       words: REPORTS[kind],
@@ -1067,12 +1077,9 @@ export class OlderStore {
    * changed meanwhile, as what changed was never seen (Ali,
    * inventory-tng-8gj); otherwise as removeOlder. */
   discard(older: Older): Outcome {
-    const now = this.compared(older);
-    if (now !== "unchanged") {
-      this.refresh();
-      return now;
-    }
-    return this.remove(older);
+    const discarded = removeOlder(older, this.storage, true);
+    this.refresh();
+    return discarded;
   }
 
   /** Discard a part of `older`, and list again (dropPart). */
