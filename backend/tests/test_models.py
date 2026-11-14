@@ -8,9 +8,10 @@ import dataclasses
 from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
+from itertools import product
 
 import pytest
-from sqlalchemy import delete, exc, literal, literal_column, select, text, update
+from sqlalchemy import delete, exc, literal_column, select, text, update
 from sqlalchemy.orm import Session
 
 from inventory_tng import categories, items, labels, locations, volunteers
@@ -31,8 +32,8 @@ from inventory_tng.models import (
     fuzzy,
     mint_code,
     mint_label_code,
-    name_key,
 )
+from inventory_tng.names import name_key, name_key_sql
 
 from helpers.rows import add, breaks, item_fields, violates
 
@@ -89,9 +90,8 @@ def test_item_names_are_unique_ignoring_case_spaces_and_punctuation(
     """ToughCable and Tough cable are one name, retired ones too
     (docs/decisions/0021)."""
     tough = new_item("ToughCable")
-    assert session.scalar(select(name_key(literal("Tough-Cable, Pro!")))) == (
-        "toughcablepro"
-    )
+    assert tough.name_key == "toughcable"
+    assert name_key("Tough-Cable, Pro!") == "toughcablepro"
     for clash in ("Tough cable", "TOUGH-CABLE", "tough_cable.", " Tough  Cable "):
         with violates(session, "uq_item_name"):
             new_item(clash)
@@ -105,6 +105,10 @@ def test_item_names_are_unique_ignoring_case_spaces_and_punctuation(
     new_item("Cble")
     new_item("LiteBeam 5AC Gen1")
     new_item("LiteBeam 5AC Gen2")
+    # Only ASCII's letters are lowered, and only its spaces and punctuation
+    # ignored, whatever the database's locale (names.py).
+    new_item("CÂBLE")
+    new_item("Tough\u2013cable")
 
 
 def test_names_are_stored_in_canonical_spelling(
@@ -148,8 +152,9 @@ def test_names_are_stored_in_canonical_spelling(
     with violates(session, "uq_item_name"):
         new_item("cap 22 \u03bcf")
     # No name is refused by NOT NULL, as ever, not by the respelling.
-    with pytest.raises(exc.IntegrityError), session.begin_nested():
-        add(session, Category(name=None))
+    for nameless in (Category(name=None), Item(name=None, category_id=category.id)):
+        with pytest.raises(exc.IntegrityError), session.begin_nested():
+            add(session, nameless)
 
 
 def test_a_decimal_point_between_digits_tells_names_apart(
@@ -194,31 +199,80 @@ TRICKY_NAMES = {
     "Spool 30.5 m": "spool30.5m",
     "Tough-Cable, Pro!": "toughcablepro",
     "Câble": "câble",
+    "CÂBLE": "cÂble",
+    "Tab\tand\vfeed\x0c": "tabandfeed",
+    "\u00a0\u2013\u2019": "\u00a0\u2013\u2019",
     "...": "",
 }
 
 
-@pytest.mark.parametrize("index", ["uq_item_name", "uq_item_package_name"])
-def test_names_are_compared_alike_by_the_app_and_its_indexes(
-    session: Session, index: str
-) -> None:
-    """models.name_key, which the app asks with, and the expression each
-    migrated index keeps, written out in migration 0031, agree."""
-    indexed = session.scalar(
-        text(
-            "SELECT pg_get_expr(indexprs, indrelid) FROM pg_index"
-            " WHERE indexrelid = CAST(:index AS regclass)"
-        ),
-        {"index": index},
-    )
-    names = {"names": list(TRICKY_NAMES)}
-    each = "FROM unnest(CAST(:names AS text[])) AS name"
-    by_index = session.execute(text(f"SELECT name, {indexed} {each}"), names)
-    key = name_key(literal_column("name")).compile(
+def _sample() -> list[str]:
+    """Names to compare the app's key and the database's by: the tricky
+    ones; every character PostgreSQL can hold, in runs of 256; and every
+    name of up to five of digits, points, a comma, a space and letters, for
+    what a point between digits keeps."""
+    every = [
+        "".join(chr(c) for c in range(start, start + 256) if not 0xD800 <= c < 0xE000)
+        for start in range(0, 0x110000, 256)
+    ]
+    every[0] = every[0][1:]  # PostgreSQL's text holds no NUL.
+    near = ["".join(name) for n in range(1, 6) for name in product("1.,␣aA", repeat=n)]
+    return [*TRICKY_NAMES, *filter(None, every), *(n.replace("␣", " ") for n in near)]
+
+
+def test_names_are_keyed_alike_by_the_app_and_the_database(session: Session) -> None:
+    """names.name_key, which the app writes, and names.name_key_sql, which
+    the CHECK constraints hold it to, agree on every character, as each
+    migrated CHECK does (migration 0037 writes it out); Python has no
+    [[:punct:]], so the pattern names code points."""
+    assert {name: name_key(name) for name in TRICKY_NAMES} == TRICKY_NAMES
+    sample = _sample()
+    keys = [name_key(name) for name in sample]
+    each = "FROM unnest(CAST(:names AS text[]), CAST(:keys AS text[])) AS t(name, name_key)"
+    key = name_key_sql(literal_column("name")).compile(
         session.get_bind(), compile_kwargs={"literal_binds": True}
     )
-    by_app = session.execute(text(f"SELECT name, {key} {each}"), names)
-    assert dict(by_index.all()) == dict(by_app.all()) == TRICKY_NAMES
+    by_database = session.scalars(
+        text(f"SELECT {key} {each}"), {"names": sample, "keys": keys}
+    )
+    assert dict(zip(sample, by_database, strict=True)) == dict(
+        zip(sample, keys, strict=True)
+    )
+    for table in ("item", "item_package"):
+        check = session.scalar(
+            text(
+                "SELECT pg_get_expr(conbin, conrelid) FROM pg_constraint"
+                " WHERE conname = :name"
+            ),
+            {"name": f"ck_{table}_name_key"},
+        )
+        refused = session.scalars(
+            text(f"SELECT name {each} WHERE NOT ({check})"),
+            {"names": sample, "keys": keys},
+        )
+        assert refused.all() == [], table
+
+
+def test_a_name_key_written_wrong_is_refused(
+    new_item: Callable[..., Item], session: Session
+) -> None:
+    """The app writes each name's key as the name is set; a CHECK refuses a
+    key the name does not make, or a name written without its key, by SQL
+    or a bug, so the unique indexes on the keys always compare names."""
+    spool = new_item("Spool 30.5 m")
+    package = add(session, ItemPackage(item_id=spool.id, name="Reel 30.5 m", size=30))
+    assert (spool.name_key, package.name_key) == ("spool30.5m", "reel30.5m")
+    spool.name = "Spool, 305 M"
+    session.flush()
+    assert spool.name_key == "spool305m"
+    for row, constraint in (
+        (spool, "ck_item_name_key"),
+        (package, "ck_item_package_name_key"),
+    ):
+        with violates(session, constraint):
+            change(session, row, name_key="other")
+        with violates(session, constraint):
+            change(session, row, name="Other")
 
 
 def test_a_custody_name_is_unique_only_among_current_ones(session: Session) -> None:

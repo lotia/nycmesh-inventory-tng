@@ -373,3 +373,79 @@ def test_what_is_searched_is_folded_again_with_units(alembic_config: Config) -> 
         text("SELECT search_text, folded_with FROM location WHERE id = :i"),
         {"i": place},
     ).one() == ("Cold room 4degC", FOLDED_WITH)
+
+
+def test_name_keys_are_filled_by_the_migration(alembic_config: Config) -> None:
+    """Migration 0037: each item's and package's key, filled by its CHECK's
+    own expression."""
+    command.downgrade(alembic_config, "0036")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Cables') RETURNING id")
+    )
+    spool = _item(connection, category_id, "Spool, 30.5 M")
+    connection.execute(
+        text(
+            "INSERT INTO item_package (item_id, name, size, search_text,"
+            " folded_with) VALUES (:i, 'Câble Reel', 1, '', '')"
+        ),
+        {"i": spool},
+    )
+    command.upgrade(alembic_config, "head")
+    assert connection.execute(
+        text(
+            "SELECT i.name_key, p.name_key FROM item i"
+            " JOIN item_package p ON p.item_id = i.id"
+        )
+    ).one() == ("spool30.5m", "câblereel")
+
+
+def test_going_back_before_name_keys_names_what_would_clash(
+    alembic_config: Config,
+) -> None:
+    """Migration 0037's downgrade: names the database's locale makes one,
+    which the keys keep apart, are named by id to rename; nothing is
+    changed until none are."""
+    connection = alembic_config.attributes["connection"]
+    if connection.scalar(text("SELECT lower('Â')")) == "Â":
+        pytest.skip("Under a C locale the keys before were the same.")
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Cables') RETURNING id")
+    )
+
+    def row(table: str, name: str, key: str, **values: object) -> int:
+        columns = ", ".join(values)
+        return connection.scalar(
+            text(
+                f"INSERT INTO {table} (name, name_key, search_text, folded_with,"
+                f" {columns}) VALUES (:n, :k, '', '', :{', :'.join(values)})"
+                " RETURNING id"
+            ),
+            {"n": name, "k": key, **values},
+        )
+
+    lower, upper = (
+        row("item", name, key, category_id=category_id, name_folded="")
+        for name, key in (("Câble", "câble"), ("CÂBLE", "cÂble"))
+    )
+    reel, dashed = (
+        row("item_package", name, key, item_id=lower, size=1)
+        for name, key in (("Reel 1", "reel1"), ("Reel\u20131", "reel\u20131"))
+    )
+    with pytest.raises(
+        RuntimeError,
+        match=f"by id: item {lower}, {upper}; item_package {reel}, {dashed}\\. Rename",
+    ):
+        command.downgrade(alembic_config, "0036")
+    connection.execute(
+        text("UPDATE item SET name = 'Câble 2', name_key = 'câble2' WHERE id = :i"),
+        {"i": upper},
+    )
+    connection.execute(
+        text(
+            "UPDATE item_package SET name = 'Reel 2', name_key = 'reel2' WHERE id = :i"
+        ),
+        {"i": dashed},
+    )
+    command.downgrade(alembic_config, "0036")
+    command.upgrade(alembic_config, "head")

@@ -186,8 +186,7 @@ def test_a_name_is_checked_and_saved_in_canonical_spelling(
 def test_a_package_name_is_checked_in_canonical_spelling(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
-    """As stored: \u2103 alone is a sign, which name_key may take for
-    punctuation, but \u00b0C has a letter."""
+    """As stored: \u2103 alone is stored \u00b0C, which has a letter."""
     item = new_item(session, radios, "Probe")
     path = f"{ITEMS}/{item.id}/packages"
     added = admin_client.post(path, data={"package_name": "\u2103", "size": "1"})

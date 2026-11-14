@@ -61,9 +61,8 @@ privilege, so neither binds it.
     `volunteer.search_text`, which the app keeps (0021; the largest cost);
   - JSONB history rows, INET addresses, partial and `lower()` indexes, regular
     expressions and `num_nulls()` in CHECKs, identity columns;
-  - an index on an expression with `regexp_replace` and POSIX character
-    classes and lookaround, `item.name` with spaces and punctuation
-    removed but a decimal point between digits (0021);
+  - a CHECK with `regexp_replace`, lookaround and `COLLATE "C"`, holding
+    items' and packages' `name_key` to their names (0021, 2026-11-14);
   - advisory locks (the catalogue lock), `FOR KEY SHARE` and
     `FOR NO KEY UPDATE`, `LOCK TABLE ... SHARE ROW EXCLUSIVE`;
   - `INSERT ... ON CONFLICT DO NOTHING`, arrays in queries, and

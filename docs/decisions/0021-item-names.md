@@ -19,8 +19,9 @@ identify it. Researched with Ali on 2026-11-11 (inventory-tng-8i4.60.22).
   (Ali, 2026-11-11): `ToughCable`, `Tough cable` and `tough-cable` are one
   name. Letters and digits still tell names apart, so `LiteBeam 5AC Gen1`
   and `LiteBeam 5AC Gen2` are two. Retired items' names stay taken, so one
-  can always come back (0019). A unique index on `models.name_key(name)`
-  keeps it, and a refused form names the item it clashes with.
+  can always come back (0019). A unique index on each item's key keeps it
+  (`names.py`; Amendment, 2026-11-14), and a refused form names the item it
+  clashes with.
 - **Manufacturer and part number together, and the old code, stay unique**
   where given, and both stay optional: most of the mesh's supplies have no
   part number that means anything.
@@ -62,10 +63,10 @@ so admins would type half a name in each field.
   only.
 - An item's name needs more than spaces and punctuation, as the database
   classes them: such names alone would all be one name.
-- Which characters are spaces and punctuation, and how case folds, is the
-  database's locale's. Under a C locale, as CloudNativePG makes by default,
-  that is ASCII's: letters such as `â` are kept, but `Â` and `â` are not
-  folded together.
+- Which characters are spaces and punctuation, and how case folds, is
+  ASCII's, as a C locale has it, whatever the database's locale (Amendment,
+  2026-11-14): letters such as `â` are kept, but `Â` and `â` are not
+  folded together, and signs beyond ASCII, such as `–`, are kept.
 
 ## Amendment: a decimal point tells names apart (2026-11-12)
 
@@ -210,3 +211,28 @@ Rejected: storing every spelling of a unit in the search text, which
 grows it and lets a part of one spelling match the wrong unit; and a
 character table spelling `μ` as `u` everywhere, which misspells Greek
 words. pint, a units library, was not needed for a table this size.
+
+## Amendment: each name's key is a column the app writes (2026-11-14)
+
+An item's and a package's key, the name as uniqueness compares it, is kept
+in a column, `name_key`, which the app writes as the name is set
+(`models.KeyedName`), as it writes what searches compare (Ali, 2026-11-12,
+inventory-tng-6sb). A CHECK constraint holds it to the name, so a key
+written wrong, by SQL or a bug, is refused, and plain unique indexes on
+`name_key`, and on `item_id` and `name_key`, keep names unique. A CHECK is
+a declaration, so this is within 0016, whose exception for an index on a
+regular expression is gone. `inventory_tng/names.py` says the rule once, as
+a pattern Python and PostgreSQL read alike, and a test checks the two
+agree on every character. Migration 0037 added and filled the columns.
+
+The key is collated `"C"`, whatever the database's locale, so the app can
+write it as PostgreSQL checks it: only ASCII's spaces and punctuation are
+left out, and only its letters lowered. That is what a C locale, as
+CloudNativePG makes by default, did already. A database made with another
+locale, as the development one is, now keeps `Câble` and `CÂBLE`, or an
+en dash and a hyphen, apart, as a C locale did. Accents stay apart in
+uniqueness, as above.
+
+Rejected: a key in PostgreSQL's own locale, which Python cannot match, so
+the CHECK would refuse names the app keyed, and a function or trigger
+computing it (0016).

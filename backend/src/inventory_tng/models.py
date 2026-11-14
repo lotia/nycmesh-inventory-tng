@@ -15,8 +15,9 @@ Conventions, on every table with history:
   every foreign key is ON DELETE RESTRICT, in PostgreSQL itself.
 - Quantities are numeric(12,3); money is numeric(10,2).
 - Names are unique, ignoring case: among current rows, or all of them,
-  retired ones too, as each table says. An item's ignore spaces and
-  punctuation too, but a decimal point between digits (name_key).
+  retired ones too, as each table says. An item's and a package's are
+  compared by their key, which ignores spaces and punctuation too, but a
+  decimal point between digits (names.py, KeyedName).
 
 A rule about one row's own values is a check constraint, which raises a
 check violation (SQLSTATE 23514) named for the rule, as describe_error()
@@ -65,6 +66,7 @@ from sqlalchemy.orm import Mapped, MappedColumn, Session, mapped_column, validat
 # their history.
 from inventory_tng import (
     history,  # noqa: F401
+    names,
     units,
 )
 from inventory_tng.db import ACTOR_PATTERN, Base, enforce, protection
@@ -237,6 +239,29 @@ class CanonicalName:
         return None if value is None else canonical(value)
 
 
+class KeyedName(CanonicalName):
+    """A row whose name is compared by its key (names.name_key), kept in
+    `name_key` as the name is set and held to it by a CHECK constraint
+    (_name_key_check), so a unique index on it compares names so
+    (docs/decisions/0021)."""
+
+    name_key: Mapped[str] = mapped_column(Text)
+
+    @validates("name")
+    def _canonical(self, _key: str, value: str | None) -> str | None:
+        value = super()._canonical(_key, value)
+        if value is not None:
+            self.name_key = names.name_key(value)
+        return value
+
+
+def _name_key_check() -> CheckConstraint:
+    return CheckConstraint(
+        literal_column("name_key") == names.name_key_sql(literal_column("name")),
+        name="name_key",
+    )
+
+
 # What folds (fold), as each folded row records it (Searchable.folded_with),
 # so rows a release of anyascii, a Python with a newer Unicode, or another
 # unit table would spell otherwise can be found.
@@ -311,23 +336,6 @@ def _unique_name(
     )
 
 
-# What two item names may differ by and still be one name: case, spaces and
-# punctuation, so "ToughCable" and "Tough cable" clash (docs/decisions/0021);
-# but not a decimal point between two digits, so "305 m" and "30.5 m" do
-# not; a comma is always punctuation, so "1,000 ft" and "1000 ft" clash (US
-# number conventions: 0021, 2026-11-12). Named classes, not "all but
-# [:alnum:]": under a C locale, as CloudNativePG makes by default, [:alnum:]
-# is ASCII only, and a letter such as â would go. Migration 0031 writes it
-# out: change both.
-NAME_IGNORED = "(?!(?<=[0-9])[.][0-9])[[:space:][:punct:]]"
-
-
-def name_key(name: SQLColumnExpression[str]) -> ColumnElement[str]:
-    """`name` as item names are compared: lower case, with every space and
-    punctuation mark removed but a decimal point between two digits."""
-    return func.lower(func.regexp_replace(name, NAME_IGNORED, "", "g"))
-
-
 def _unique_current_name(table: str, *scope: str) -> Index:
     """Names unique, ignoring case, among current rows (within `scope`)."""
     return _unique_name(table, *scope, where="retired_at IS NULL")
@@ -363,14 +371,15 @@ class Category(CanonicalName, Versioned, Base):
     retired_at: Mapped[RetiredAt]
 
 
-class Item(CanonicalName, Searchable, Versioned, Base):
+class Item(KeyedName, Searchable, Versioned, Base):
     """A catalogue entry, never the stock: stock comes from the ledger, and is
     always counted in `unit`."""
 
     __tablename__ = "item"
     __table_args__ = (
         # Retired ones too, as for categories (docs/decisions/0019).
-        Index("uq_item_name", name_key(literal_column("name")), unique=True),
+        Index("uq_item_name", "name_key", unique=True),
+        _name_key_check(),
         Index(
             "uq_item_manufacturer_part_number",
             text("lower(manufacturer)"),
@@ -437,19 +446,15 @@ class Item(CanonicalName, Searchable, Versioned, Base):
         self.name_folded = fold(self.name or "")
 
 
-class ItemPackage(CanonicalName, Searchable, Versioned, Base):
+class ItemPackage(KeyedName, Searchable, Versioned, Base):
     """A size an item comes in: "100-pack" = 100, "reel" = 305 (m)."""
 
     __tablename__ = "item_package"
     __table_args__ = (
         # Among all of its item's, retired ones too, so one can always be
         # brought back, compared as items' names are (docs/decisions/0021).
-        Index(
-            "uq_item_package_name",
-            literal_column("item_id"),
-            name_key(literal_column("name")),
-            unique=True,
-        ),
+        Index("uq_item_package_name", "item_id", "name_key", unique=True),
+        _name_key_check(),
         CheckConstraint("size > 0", name="size"),
         CheckConstraint("short_below > 0", name="short_below"),
         # A whole one is never a short end.

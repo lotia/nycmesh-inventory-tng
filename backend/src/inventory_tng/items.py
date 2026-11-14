@@ -38,8 +38,8 @@ from inventory_tng.models import (
     OpenPackage,
     fold,
     fuzzy,
-    name_key,
 )
+from inventory_tng.names import name_key
 
 
 def _in_current_category(session: Session, category_id: int) -> None:
@@ -106,7 +106,7 @@ def taken_by(
     that item, as the unique indexes compare them: a unique violation says
     neither. None if none has, as when the other changed meanwhile."""
     wanted: list[tuple[str, ColumnElement[bool]]] = [
-        ("name", name_key(Item.name) == name_key(literal(fields.name)))
+        ("name", Item.name_key == name_key(fields.name))
     ]
     if fields.manufacturer is not None and fields.part_number is not None:
         both = and_(
@@ -143,16 +143,15 @@ def similar(session: Session, name: str, item_id: int) -> list[Item]:
     return list(session.scalars(query.order_by(*closest).limit(SIMILAR)))
 
 
-def nameless(session: Session, name: str) -> bool:
+def nameless(name: str) -> bool:
     """Whether `name` is spaces and punctuation alone, as name_key finds
     them: every such name would be one name."""
-    return session.scalar(select(name_key(literal(name)) == "")) is True
+    return name_key(name) == ""
 
 
-def same_name(session: Session, one: str, other: str) -> bool:
+def same_name(one: str, other: str) -> bool:
     """Whether two names are one, as items' are compared (name_key)."""
-    same = name_key(literal(one)) == name_key(literal(other))
-    return bool(session.scalar(select(same)))
+    return name_key(one) == name_key(other)
 
 
 def add(session: Session, fields: Fields) -> Item:

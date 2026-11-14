@@ -313,13 +313,12 @@ def _confirmed(form: Mapping[str, str], fields: items.Fields) -> bool:
     return _typed_name(form.get(DIFFERENT, "")) == fields.name
 
 
-def _key_name_problem(session: Session, name: str) -> str | None:
-    """What is wrong with a name compared as items' are (models.name_key),
+def _key_name_problem(name: str) -> str | None:
+    """What is wrong with a name compared as items' are (names.name_key),
     an item's or a package's."""
     if problem := name_problem(name):
         return problem
-    # A letter is never punctuation: only a name without one asks.
-    if not any(c.isalpha() for c in name) and items.nameless(session, name):
+    if items.nameless(name):
         return NO_LETTERS
     return None
 
@@ -330,7 +329,7 @@ def _fields(
     """What to set, unless something is wrong, and what is."""
     name = _typed_name(form.get("name", ""))
     problems: dict[str, str] = {}
-    if problem := _key_name_problem(session, name):
+    if problem := _key_name_problem(name):
         problems["name"] = problem
     category = chosen(session, Category, form.get("category_id", ""))
     if category is None:
@@ -467,9 +466,7 @@ def save_item(
         seen = form_version(form.get("version", ""))
         # Its own name, or a respelling of it, asks nothing: it is the same.
         same = fields.name == found.name or _confirmed(form, fields)
-        asked = (
-            None if same or items.same_name(session, fields.name, found.name) else []
-        )
+        asked = None if same or items.same_name(fields.name, found.name) else []
         _, broken = _change_or_note(
             session,
             lambda: items.save(session, found, fields, seen=seen),
@@ -548,7 +545,7 @@ def _package_fields(
     `kept`, if given: a size fixed is not on the form, and stays as it is,
     whatever its item's unit has become since."""
     problems: dict[str, str] = {}
-    if problem := _key_name_problem(session, name):
+    if problem := _key_name_problem(name):
         problems["package_name"] = problem
     if kept is not None and not size.strip():
         return kept, problems

@@ -259,13 +259,22 @@ none is blanked by being left out. The ledger takes lines, not a mapping by
 item, so none is lost: a transaction naming an item twice is refused
 (`movement_item_once`), and its movements' unique index says so too.
 
-Item and package names are unique ignoring case, spaces and punctuation
-(`models.name_key`, decision 0021). A decimal point between digits counts,
+Item and package names are unique ignoring case, spaces and punctuation,
+ASCII's only (decision 0021). A decimal point between digits counts,
 a comma never does, as US number conventions have it: `30.5 m` and
 `305 m` are two names, `1,000 ft` and `1000 ft` one. Where a comma is the
 decimal mark this is wrong (`30,5 m` clashes with `305 m`); the app is
 English-only and follows US conventions today (inventory-tng-g6u.1, under
 inventory-tng-g6u).
+
+Each such row keeps its key in `name_key`, which the app writes as the
+name is set (`models.KeyedName`), a CHECK constraint holds to the name,
+and a plain unique index compares. `backend/src/inventory_tng/names.py`
+has the rule: one pattern, read by Python (`name_key`) and PostgreSQL
+(`name_key_sql`), and a test checks both agree on every character. To
+change the rule, change `names.py` and add a migration that writes the
+CHECKs out again and refills every key, naming by id any rows that would
+then clash, as 0037 and 0031 do.
 
 Every name an administrator types is stored in canonical spelling
 (`models.canonical`, decision 0021): NFC, with `µ` as `μ` and `℃` and `℉`
