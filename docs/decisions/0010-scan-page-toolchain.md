@@ -205,7 +205,11 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   volunteer had seen the stock as it is. Such a batch never goes in a
   cart again, in the older list too, which offers only its Discard (Ali,
   inventory-tng-wyq): what it held is recorded, and once more would
-  record it twice.
+  record it twice. Each of its notes, before the reload, held back and
+  after it, opens "Not recorded: another tab recorded this cart before
+  your changes." (Ali, inventory-tng-wyq), in place of "another tab
+  recorded this first.", which earlier builds kept and the page still
+  recognises.
   The page's words drop "save" (Ali, 2026-11-13, inventory-tng-wyq): the
   cart lives in the browser, written to storage as it changes, so what
   the browser holds is "kept", and what the inventory takes is

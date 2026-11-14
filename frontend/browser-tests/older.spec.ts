@@ -259,7 +259,8 @@ test("a save an older build's tab saved meanwhile is saved once, under its key; 
   const refused = sent(409);
   await page.getByRole("button", { name: "Record" }).click();
   await refused;
-  const said = "Not recorded: another tab recorded this first.";
+  const said =
+    "Not recorded: another tab recorded this cart before your changes.";
   const reloadWords = `${said} Reload the page to continue.`;
   const entry = page.getByRole("listitem").filter({ hasText: said });
   await expect(entry.locator("strong")).toHaveText(reloadWords);

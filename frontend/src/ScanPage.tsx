@@ -51,6 +51,7 @@ import {
   type Entry,
   NO_ANSWER,
   OFFLINE,
+  OFFLINE_NOW,
   STORAGE_KEY as OUTBOX_KEY,
   type Outbox,
   RECORDED_ELSEWHERE,
@@ -650,6 +651,8 @@ function CartForm({
     checkName.value = false;
     nameList.current?.focus();
   }
+  // Keyed by what each says, two saying the same apart.
+  const problemKeys = keyedByWords(problems.value.map(wordsOf));
 
   return (
     <form onSubmit={save}>
@@ -833,8 +836,8 @@ function CartForm({
 
       {problems.value.length > 0 && (
         <ul role="alert" class="list-none p-0">
-          {problems.value.map((problem) => (
-            <li key={wordsOf(problem)}>
+          {problems.value.map((problem, at) => (
+            <li key={problemKeys[at]}>
               <AlertWords words={problem} />
             </li>
           ))}
@@ -856,22 +859,12 @@ function CartForm({
       </button>
       {!empty &&
         (discarding.value !== null ? (
-          <div class="flex flex-col items-start gap-3">
-            <div role="alert">Confirm discard</div>
-            <div class="actions">
-              <button type="button" class="danger" onClick={discard}>
-                Discard
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  discarding.value = null;
-                }}
-              >
-                Keep it
-              </button>
-            </div>
-          </div>
+          <ConfirmDiscard
+            onDiscard={discard}
+            onKeep={() => {
+              discarding.value = null;
+            }}
+          />
         ) : (
           <button
             type="button"
@@ -992,14 +985,7 @@ function OlderList({
               ) : recordedElsewhere(each.refused) ? (
                 <NoteSaid note={SCAN_AGAIN_CHANGED} />
               ) : (
-                <p class="alert">
-                  {each.refused !== "" && (
-                    <>
-                      <AlertWords words={each.refused} />{" "}
-                    </>
-                  )}
-                  <strong>{FIX_THEN_RECORD}</strong>
-                </p>
+                <NoteSaid note={each.refused} then={FIX_THEN_RECORD} />
               )}
               {lost !== null && <NoteSaid note={lost} />}
               {lines.length > 0 && (
@@ -1056,38 +1042,24 @@ function OlderList({
                 </p>
               )}
               {discarding.value === on ? (
-                <div class="flex flex-col items-start gap-3">
-                  <div role="alert">Confirm discard</div>
-                  <div class="actions">
-                    <button
-                      type="button"
-                      class="danger"
-                      aria-describedby={title}
-                      onClick={unlessSettling(on, () => {
-                        discarding.value = null;
-                        if (older.remove(each)) {
-                          telemetry.record({
-                            kind: "older_storage",
-                            held: heldIn(each),
-                            action: "discarded",
-                          });
-                        } else if (older.isListed(each)) {
-                          notDiscarded(on);
-                        }
-                      })}
-                    >
-                      Discard
-                    </button>
-                    <button
-                      type="button"
-                      onClick={unlessSettling(on, () => {
-                        discarding.value = null;
-                      })}
-                    >
-                      Keep it
-                    </button>
-                  </div>
-                </div>
+                <ConfirmDiscard
+                  describedBy={title}
+                  onDiscard={unlessSettling(on, () => {
+                    discarding.value = null;
+                    if (older.remove(each)) {
+                      telemetry.record({
+                        kind: "older_storage",
+                        held: heldIn(each),
+                        action: "discarded",
+                      });
+                    } else if (older.isListed(each)) {
+                      notDiscarded(on);
+                    }
+                  })}
+                  onKeep={unlessSettling(on, () => {
+                    discarding.value = null;
+                  })}
+                />
               ) : (
                 <div class="actions">
                   {fills && (
@@ -1128,11 +1100,47 @@ function OlderList({
  * is there as the list is shown, and several at once, read out together,
  * would drown each other and the page.
  */
-function NoteSaid({ note }: { note: string }) {
+function NoteSaid({ note, then }: { note: string; then?: string }) {
   return (
     <p class="alert">
-      <AlertWords words={note} />
+      {note !== "" && <AlertWords words={note} />}
+      {then !== undefined && (
+        <>
+          {note !== "" && " "}
+          <strong>{then}</strong>
+        </>
+      )}
     </p>
+  );
+}
+
+/** Row 15's confirmation, asked before a discard. */
+function ConfirmDiscard({
+  onDiscard,
+  onKeep,
+  describedBy,
+}: {
+  onDiscard: () => void;
+  onKeep: () => void;
+  describedBy?: string;
+}) {
+  return (
+    <div class="flex flex-col items-start gap-3">
+      <div role="alert">Confirm discard</div>
+      <div class="actions">
+        <button
+          type="button"
+          class="danger"
+          aria-describedby={describedBy}
+          onClick={onDiscard}
+        >
+          Discard
+        </button>
+        <button type="button" onClick={onKeep}>
+          Keep it
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1196,8 +1204,6 @@ const NOT_KEPT =
 /** One went in the cart, but stays listed (row 22). */
 const NOT_REMOVED =
   "This item wasn't automatically removed. Record the cart and try to remove.";
-/** Before WAIT_THEN_RELOAD while the browser says it is offline. */
-const OFFLINE_NOW = "This device is offline.";
 /** Instead of RELOAD_TO_CONTINUE while the reload waits for the cart. */
 const RECORD_THEN_RELOAD = "Record or discard your cart, then reload the page.";
 /** Instead of RELOAD_TO_CONTINUE while it waits for batches to be sent:
@@ -1579,6 +1585,8 @@ function OutboxList({
           const refused = entry.state === "refused";
           // Put back and refused for its key since the page loaded: to be
           // reloaded, once a reload no longer waits; reloaded, dismissed.
+          // Any build's words for a key refusal (REFUSED_FOR_KEY), not
+          // only recordedElsewhere's, as older builds may have kept them.
           const toReload =
             refused &&
             entry.putBack === true &&

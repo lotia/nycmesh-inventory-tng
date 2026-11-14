@@ -358,7 +358,9 @@ keeps its batch key while its lines go (`dropPart`), and one put back
 keeps it, as does a cart it filled when a newer build reads it, and
 the cart is sent under it until emptied or discarded, as an older tab may be sending
 it still: the server then takes it once, or, changed since, refuses it
-(409 `key_reused`), which the page says, asking for a reload in place
+(409 `key_reused`), which the page says, each note opening "Not
+recorded: another tab recorded this cart before your changes.", asking
+for a reload in place
 of Dismiss, held back as a newer build's is, the note then saying what
 it waits for (the cart, or batches sending, and whether the browser says
 it is offline); after it, the save stays listed, no longer asking, until

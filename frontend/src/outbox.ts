@@ -160,10 +160,12 @@ export const KEY_REUSED =
   "Not recorded: its key was already used for a different batch. Please report this.";
 
 /** A save put back in the cart, then changed, whose older build's tab
- * recorded it first, as it was (409 key_reused), as kept (Ali,
- * inventory-tng-93z and inventory-tng-wyq). */
+ * recorded it first, as it was (409 key_reused), as kept; every note the
+ * page shows for it opens with it (Ali, inventory-tng-93z and
+ * inventory-tng-wyq, 'One wording for a put-back save refused for its
+ * key'). */
 export const RECORDED_ELSEWHERE =
-  "Not recorded: another tab recorded this first.";
+  "Not recorded: another tab recorded this cart before your changes.";
 
 /** Said after RECORDED_ELSEWHERE until the page is reloaded, beside the
  * page's Reload, so what it shows follows (Ali, inventory-tng-93z,
@@ -174,8 +176,11 @@ export const RELOAD_TO_CONTINUE = "Reload the page to continue.";
  * another tab recorded it first: this one, then those before. */
 const RECORDED_ELSEWHERE_KEPT: ReadonlySet<string> = new Set([
   RECORDED_ELSEWHERE,
-  // Kept, with the reload's words, by inventory-tng-93z's build.
-  `${RECORDED_ELSEWHERE} ${RELOAD_TO_CONTINUE}`,
+  // Kept by builds before, as they were, whatever the page says now:
+  // inventory-tng-wyq's first, and inventory-tng-93z's, with the reload's
+  // words.
+  "Not recorded: another tab recorded this first.",
+  "Not recorded: another tab recorded this first. Reload the page to continue.",
   "Not saved: another tab saved it first, as it was before your changes. Check what was saved, then save your changes again.",
 ]);
 
@@ -190,8 +195,7 @@ export function recordedElsewhere(note: string | null): boolean {
 /** What the page says of one recordedElsewhere, once nothing is left to
  * do but discard it (Ali, inventory-tng-wyq, question c): words for the
  * page, never kept. */
-export const SCAN_AGAIN_CHANGED =
-  "Not recorded: another tab recorded this cart before your changes. Scan again only what you changed.";
+export const SCAN_AGAIN_CHANGED = `${RECORDED_ELSEWHERE} Scan again only what you changed.`;
 
 /** What every build has said of a batch refused for its key: this one,
  * then those before, whose words an older key may still hold. */
@@ -205,9 +209,11 @@ export const REFUSED_FOR_KEY: ReadonlySet<string> = new Set([
  * online. */
 export const NO_ANSWER = "No answer from the inventory. Trying again shortly.";
 
-/** NO_ANSWER's words while the browser says it is offline (Ali,
- * inventory-tng-wyq, 'Offline'): words for the page, never kept. */
-export const OFFLINE = "This device is offline. Sending when it's back.";
+/** That the browser says it is offline (Ali, inventory-tng-wyq,
+ * 'Offline'): words for the page, never kept. */
+export const OFFLINE_NOW = "This device is offline.";
+/** NO_ANSWER's words while the browser says it is offline. */
+export const OFFLINE = `${OFFLINE_NOW} Sending when it's back.`;
 
 /** Before a refused batch's problems (422), as this build says it and as
  * builds before did: shown in bold, the problems after it not. */
