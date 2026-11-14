@@ -39,8 +39,7 @@ import { placeSides, readLabel, type Scanned } from "./labels";
 import { NOTHING_TAKEN, OpenPackageCard } from "./OpenPackageCard";
 import {
   type Gaps,
-  said as inWords,
-  type Note,
+  linesSaid,
   nextWhole,
   type Older,
   OlderStore,
@@ -52,6 +51,8 @@ import {
   type Entry,
   STORAGE_KEY as OUTBOX_KEY,
   type Outbox,
+  REFUSED_FOR_KEY,
+  REFUSED_LEADS,
   sharedOutbox,
 } from "./outbox";
 import { decimal, thousandths } from "./quantity";
@@ -246,13 +247,15 @@ export function ScanPage({
       {current.state === "loading" && <p>Loading the catalogue…</p>}
       {current.state === "unregistered" && (
         <p role="alert">
-          {NOT_REGISTERED[current.reason]} <a href="/register">Register it</a>,
-          then come back.
+          <strong>
+            {NOT_REGISTERED[current.reason]} <a href="/register">Register it</a>
+            , then come back.
+          </strong>
         </p>
       )}
       {current.state === "unavailable" && (
         <p role="alert">
-          Couldn't load the catalogue.{" "}
+          <strong>Couldn't load the catalogue.</strong>{" "}
           <button type="button" onClick={load}>
             Try again
           </button>
@@ -267,7 +270,11 @@ export function ScanPage({
           older={older}
         />
       )}
-      <OutboxList outbox={outbox} />
+      <OutboxList
+        outbox={outbox}
+        catalogue={current.state === "ready" ? current.catalogue : null}
+        reload={reload}
+      />
     </main>
   );
 }
@@ -511,7 +518,7 @@ function CartForm({
    * Why not, if it was not. */
   function putInCart(each: Older, automatically = false): string | null {
     if (cart.value.lines.length > 0) {
-      return "Save previous cart before adding additional items";
+      return CART_NOT_EMPTY;
     }
     const { cart: filled, gaps } = toCart(each, catalogue, cart.value);
     // Read again first: an older tab may have sent it meanwhile.
@@ -524,7 +531,7 @@ function CartForm({
       // Not kept, a reload would empty it while the older one stays
       // listed, to be put back and saved twice: the cart stays as it was.
       cart.value = before;
-      return "Sorry. Can't save the cart. Clear local data, reload the page and try again.";
+      return NOT_KEPT;
     }
     kept(true);
     if (!automatically) {
@@ -532,9 +539,7 @@ function CartForm({
       saved.value = null;
     }
     if (!older.remove(each)) {
-      problems.value = [
-        "Sorry. This item wasn't automatically removed. Save the cart and try to remove.",
-      ];
+      problems.value = [NOT_REMOVED];
     }
     telemetry.record({
       kind: "older_storage",
@@ -760,7 +765,9 @@ function CartForm({
       {problems.value.length > 0 && (
         <ul role="alert" class="list-none p-0">
           {problems.value.map((problem) => (
-            <li key={problem}>{problem}</li>
+            <li key={problem}>
+              <AlertWords words={problem} />
+            </li>
           ))}
         </ul>
       )}
@@ -820,7 +827,7 @@ function OlderList({
       const lines = parts.map((part) => {
         // Keyed by what it says, not by its place, which passes to the
         // next line once it is discarded, and its Discard, focused, with it.
-        const says = `${part.words} ${part.note === null ? "" : inWords(part.note)}`;
+        const says = `${part.words} ${part.note ?? ""}`;
         const nth = (seen.get(says) ?? 0) + 1;
         seen.set(says, nth);
         return {
@@ -869,10 +876,7 @@ function OlderList({
   /** Tell the volunteer, under `on`, that it, or a line of it, was not
    * discarded. */
   const notDiscarded = (on: string) => {
-    said.value = {
-      on,
-      words: "Sorry. Unable to discard. Clear your site data to remove.",
-    };
+    said.value = { on, words: NOT_DISCARDED };
   };
   return (
     <section>
@@ -887,7 +891,11 @@ function OlderList({
                 <strong>{olderKind(each)}</strong>
                 {olderWhere(each, catalogue)}
               </div>
-              <small>{olderWhen(each)}</small>
+              {each.refused === null ? (
+                <small>{olderWhen(each)}</small>
+              ) : (
+                <NoteSaid note={refusedWords(each.refused)} />
+              )}
               {lost !== null && <NoteSaid note={lost} />}
               {lines.length > 0 && (
                 <ul class="list-none p-0">
@@ -937,7 +945,11 @@ function OlderList({
                   })}
                 </ul>
               )}
-              {said.value?.on === on && <p role="alert">{said.value.words}</p>}
+              {said.value?.on === on && (
+                <p role="alert">
+                  <AlertWords words={said.value.words} />
+                </p>
+              )}
               {discarding.value === on ? (
                 <div class="flex flex-col items-start gap-3">
                   <div role="alert">Confirm discard</div>
@@ -1007,20 +1019,59 @@ function OlderList({
 }
 
 /**
- * Why something cannot go back, in the alert's style, only the words
- * naming the problem in bold. Not role="alert": it is there as the list is
- * shown, and several at once, read out together, would drown each other
- * and the page.
+ * Why something cannot go back, in the alert's style. Not role="alert": it
+ * is there as the list is shown, and several at once, read out together,
+ * would drown each other and the page.
  */
-function NoteSaid({ note: [before, problem, after] }: { note: Note }) {
+function NoteSaid({ note }: { note: string }) {
   return (
     <p class="alert">
-      {before}
-      <strong>{problem}</strong>
-      {after}
+      <AlertWords words={note} />
     </p>
   );
 }
+
+/**
+ * A failure or refusal note's words, in bold, its numbers in bold italic
+ * (Ali, inventory-tng-93z); of a refusal, the problems after "Not
+ * recorded." not in bold, their numbers in italic.
+ */
+function AlertWords({ words }: { words: string }) {
+  const lead = REFUSED_LEADS.find((each) => words.startsWith(each));
+  return lead === undefined ? (
+    <strong>
+      <Numbered words={words} />
+    </strong>
+  ) : (
+    <>
+      <strong>{lead}</strong>
+      <Numbered words={words.slice(lead.length)} />
+    </>
+  );
+}
+
+/** `words`, each number in italic: not the digits of a name, such as
+ * LiteBeam 5AC's. */
+function Numbered({ words }: { words: string }) {
+  return (
+    <>
+      {words
+        .split(/\b(\d+(?:\.\d+)?)\b/)
+        .map((part, at) => (at % 2 === 1 ? <em key={at}>{part}</em> : part))}
+    </>
+  );
+}
+
+/** Why one cannot go in the cart: it is not empty (row 17). */
+const CART_NOT_EMPTY = "Save previous cart before adding additional items";
+/** The cart one went in was not kept (row 21). */
+const NOT_KEPT =
+  "This browser can't keep the cart. Clear local data, reload the page and try again.";
+/** One went in the cart, but stays listed (row 22). */
+const NOT_REMOVED =
+  "This item wasn't automatically removed. Save the cart and try to remove.";
+/** The browser would not keep a discard. */
+const NOT_DISCARDED = "Unable to discard. Clear your site data to remove.";
 
 /** How long after a line's Discard taps on its entry's buttons are
  * ignored, in milliseconds. */
@@ -1065,12 +1116,14 @@ function olderWhere(each: Older, catalogue: Catalogue): string {
   return who === undefined ? where : `${where}, by ${who}`;
 }
 
-/** When it was saved, or the cart last changed, and what became of it: a
- * refusal says only why and what to do, as the rest tells it apart. */
+/** Why the inventory refused one, and what to do: all a refusal says, as
+ * the rest tells it apart. */
+function refusedWords(refused: string): string {
+  return `${refused} Add it to the cart, fix that, then save.`.trim();
+}
+
+/** When it was saved, or the cart last changed. */
 function olderWhen(each: Older): string {
-  if (each.refused !== null) {
-    return `${each.refused} Add it to the cart, fix that, then save.`.trim();
-  }
   const at =
     each.at === null
       ? ""
@@ -1197,8 +1250,9 @@ function CartLine({
           <Fragment key={pack.id}>
             {resized(line, pack) && (
               <p role="alert">
-                Sorry. <strong>The package size has changed to {size}</strong>{" "}
-                since this item was added. Enter the count again.
+                <AlertWords
+                  words={`The package size has changed to ${size} since this item was added. Enter the count again.`}
+                />
               </p>
             )}
             <Field
@@ -1329,7 +1383,34 @@ function Finder({
   );
 }
 
-function OutboxList({ outbox }: { outbox: Outbox }) {
+/**
+ * What this browser sent, or is sending, and what became of each. A
+ * refusal or failure says so in the alert's style, and a refused batch
+ * lists its lines, to compare with what was recorded. One put back from
+ * an older build and refused as another tab recorded it first asks for a
+ * reload, which shows what was recorded, in place of Dismiss; after it,
+ * it offers Dismiss (Ali, inventory-tng-93z, question 4, C).
+ */
+function OutboxList({
+  outbox,
+  catalogue,
+  reload,
+}: {
+  outbox: Outbox;
+  /** To name the lines of one refused; null until it is loaded. */
+  catalogue: Catalogue | null;
+  reload: () => void;
+}) {
+  // Refused before this page loaded: reloaded since.
+  const refusedBefore = useMemo(
+    () =>
+      new Set(
+        outbox.entries.value
+          .filter((entry) => entry.state === "refused")
+          .map((entry) => entry.body.key),
+      ),
+    [],
+  );
   const entries = outbox.shown().reverse();
   if (entries.length === 0) {
     return null;
@@ -1344,28 +1425,55 @@ function OutboxList({ outbox }: { outbox: Outbox }) {
         </p>
       )}
       <ul class={RULED_LIST}>
-        {entries.map((entry) => (
-          <li key={entry.body.key}>
-            {entry.what}
-            <br />
-            <small>
-              {entry.state === "saved"
-                ? `In the inventory (transaction ${entry.transactionId}).`
-                : (entry.note ?? "Sending…")}
-            </small>
-            {entry.state !== "waiting" && (
-              <>
-                {" "}
-                <button
-                  type="button"
-                  onClick={() => outbox.dismiss(entry.body.key)}
-                >
-                  Dismiss
-                </button>
-              </>
-            )}
-          </li>
-        ))}
+        {entries.map((entry) => {
+          const key = entry.body.key;
+          const refused = entry.state === "refused";
+          const reloads =
+            refused &&
+            entry.putBack === true &&
+            REFUSED_FOR_KEY.has(entry.note ?? "") &&
+            !refusedBefore.has(key);
+          const lines =
+            refused && catalogue !== null ? linesSaid(entry, catalogue) : [];
+          return (
+            <li key={key} class="flex flex-col items-start gap-1">
+              <div>{entry.what}</div>
+              {entry.state === "saved" ? (
+                <small>
+                  In the inventory (transaction {entry.transactionId}).
+                </small>
+              ) : entry.note === null || entry.note === MUST_UPGRADE ? (
+                // Asked for, an upgrade is no failure.
+                <small>{entry.note ?? "Sending…"}</small>
+              ) : (
+                // Not role="alert": every one is there as the page loads.
+                <NoteSaid note={entry.note} />
+              )}
+              {lines.length > 0 && (
+                <ul class="list-none p-0">
+                  {lines.map((words, at) => (
+                    // Two may say the same: numbered among those.
+                    <li
+                      key={`${words} ${lines.slice(0, at).filter((each) => each === words).length}`}
+                    >
+                      {words}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {entry.state !== "waiting" &&
+                (reloads ? (
+                  <button type="button" onClick={reload}>
+                    Reload
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => outbox.dismiss(key)}>
+                    Dismiss
+                  </button>
+                ))}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

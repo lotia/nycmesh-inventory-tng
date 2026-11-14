@@ -155,15 +155,29 @@ export const Kept = v.object({
   entries: v.array(v.unknown()),
 });
 
-/** A batch whose key the inventory holds for another (409 key_reused),
- * as every build has said it. */
+/** A batch whose key the inventory holds for another (409 key_reused). */
 export const KEY_REUSED =
-  "Not saved: its key was already used for a different batch. Please report this.";
+  "Not recorded: its key was already used for a different batch. Please report this.";
 
 /** A save put back in the cart, then changed, whose older build's tab
- * saved it first, as it was (409 key_reused). */
+ * saved it first, as it was (409 key_reused): the page offers a reload,
+ * so what it shows follows (Ali, inventory-tng-93z, question 4, C). */
 export const SAVED_BEFORE_CHANGES =
-  "Not saved: another tab saved it first, as it was before your changes. Check what was saved, then save your changes again.";
+  "Not recorded: another tab recorded this first. Reload the page to continue.";
+
+/** What every build has said of a batch refused for its key: this one,
+ * then those before, whose words an older key may still hold. */
+export const REFUSED_FOR_KEY: ReadonlySet<string> = new Set([
+  KEY_REUSED,
+  SAVED_BEFORE_CHANGES,
+  "Not saved: its key was already used for a different batch. Please report this.",
+  "Not saved: another tab saved it first, as it was before your changes. Check what was saved, then save your changes again.",
+]);
+
+/** Before a refused batch's problems (422), as this build says it and as
+ * builds before did: shown in bold, the problems after it not. */
+const NOT_RECORDED = "Not recorded.";
+export const REFUSED_LEADS = [NOT_RECORDED, "Not saved."] as const;
 
 /** A batch's reports, as a 422 names them. */
 export const REPORTS = {
@@ -491,7 +505,7 @@ export class Outbox {
           return "stop";
         }
         // A save put back: an older build's tab saved it first, as it
-        // was. This, changed since, is not saved, and says so.
+        // was. This, changed since, is not recorded, and says so.
         this.settle(key, {
           state: "refused",
           waitingFor: null,
@@ -502,7 +516,7 @@ export class Outbox {
         this.settle(key, {
           state: "refused",
           waitingFor: null,
-          note: `Not saved. ${problems(reply.body.detail, entry.body)}`,
+          note: `${NOT_RECORDED} ${problems(reply.body.detail, entry.body)}`,
         });
         return "next";
       case "unexpected": {
@@ -530,7 +544,7 @@ export class Outbox {
           waitingFor: "network",
           note:
             reply.status === "unavailable"
-              ? "The inventory can't save just now. Trying again shortly."
+              ? "The inventory can't record this just now. Trying again shortly."
               : "No answer from the inventory. Trying again shortly.",
         });
         this.later();

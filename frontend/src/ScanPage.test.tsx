@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from "@testing-library/preact";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
 import { BUILD, BUILD_KEY, Builds } from "./build";
 import { openCamera } from "./camera";
@@ -30,10 +36,25 @@ function server(save: () => Response | Promise<Response> = () => saved()) {
   );
 }
 
-function open(api = server().api) {
+function open(api = server().api, reload = vi.fn()) {
   const outbox = new Outbox(api);
-  render(<ScanPage api={api} outbox={outbox} reload={vi.fn()} />);
+  render(<ScanPage api={api} outbox={outbox} reload={reload} />);
   return outbox;
+}
+
+/** That `element`, a failure or refusal note, says `text` in bold as a
+ * whole, without "Sorry.", and its numbers, `numbers`, in bold italic
+ * (Ali, inventory-tng-93z). */
+function expectBold(
+  element: Element | null,
+  text: string,
+  numbers: string[] = [],
+) {
+  const bold = element?.querySelector("strong");
+  expect(bold?.textContent).toBe(text);
+  expect(
+    [...(bold?.querySelectorAll("em") ?? [])].map((each) => each.textContent),
+  ).toEqual(numbers);
 }
 
 const IDLE = CATALOGUE.settings.name_check_minutes * 60_000;
@@ -157,7 +178,11 @@ describe("loading", () => {
     const { api } = answering(() => json({ reason: "unregistered" }, 403));
     open(api);
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toContain("isn't registered");
+    // A failure: in bold, the link too (Ali, inventory-tng-93z).
+    expectBold(
+      alert,
+      "This browser isn't registered yet. Register it, then come back.",
+    );
     expect(within(alert).getByRole("link").getAttribute("href")).toBe(
       "/register",
     );
@@ -181,7 +206,10 @@ describe("loading", () => {
       return json(CATALOGUE, 200);
     });
     open(api);
-    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    expect(
+      (await screen.findByText("Couldn't load the catalogue.")).tagName,
+    ).toBe("STRONG");
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await ready();
   });
 
@@ -648,6 +676,36 @@ describe("filling and saving a cart", () => {
     expect(screen.getByText("Cat6 cable")).toBeDefined();
   });
 
+  test("a refused batch says why in the alert's style, and lists its lines", async () => {
+    const detail = [
+      {
+        type: "value_error",
+        loc: ["body", "lines", 0, "quantity"],
+        msg: "No.",
+      },
+    ];
+    open(server(() => json({ detail }, 422)).api);
+    await ready();
+    fillMove();
+    find("LiteBeam");
+    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    save();
+    const note = await screen.findByText(
+      (_, element) =>
+        element?.className === "alert" &&
+        element.textContent === "Not recorded. Line 1: No.",
+    );
+    // Only "Not recorded." in bold; numbers in what follows in italic
+    // (Ali, inventory-tng-93z).
+    expect(note.querySelector("strong")?.textContent).toBe("Not recorded.");
+    expect(note.querySelector("em")?.textContent).toBe("1");
+    const entry = note.closest("li") as HTMLElement;
+    expect(
+      [...entry.querySelectorAll("ul li")].map((each) => each.textContent),
+    ).toEqual(["Cat6 cable: 1 m", "LiteBeam 5AC: 1"]);
+    within(entry).getByRole("button", { name: "Dismiss" });
+  });
+
   test("saved with no connection, the batch waits in the outbox", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const { api } = server(() =>
@@ -661,9 +719,13 @@ describe("filling and saving a cart", () => {
     find("cable");
     fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
     save();
-    await screen.findByText(
+    // A failure, in the alert's style, in bold, but not read out: every
+    // note in the list is there as the page loads (Ali, inventory-tng-93z).
+    const note = await screen.findByText(
       "No answer from the inventory. Trying again shortly.",
     );
+    expect(note.tagName).toBe("STRONG");
+    expect(note.parentElement?.className).toBe("alert");
     expect(outbox.entries.value[0]).toMatchObject({
       state: "waiting",
       what: "Receipt: 1 item to Hub › Shelf A",
@@ -784,16 +846,15 @@ describe("other tabs and a changing catalogue", () => {
 
   test("a count of a package resized while the cart is open is cleared and said, until typed again", async () => {
     const { sent, count } = await resizedWhileCounted();
-    const said = screen.getByText(/since this item was added/);
+    const said = screen
+      .getByText(/since this item was added/)
+      .closest('[role="alert"]');
     // Not 2 boxes of 8: the one loose radio the item's pick added.
     expect(screen.getByText("1 each in all")).toBeDefined();
-    expect(said.getAttribute("role")).toBe("alert");
-    expect(said.textContent).toBe(
-      "Sorry. The package size has changed to 8 since this item was added. Enter the count again.",
-    );
-    // Only the words naming the problem in bold (Ali, inventory-tng-0su).
-    expect(said.querySelector("strong")?.textContent).toBe(
-      "The package size has changed to 8",
+    expectBold(
+      said,
+      "The package size has changed to 8 since this item was added. Enter the count again.",
+      ["8"],
     );
     // It stays through other changes.
     pick("To", "11");
@@ -815,7 +876,9 @@ describe("other tabs and a changing catalogue", () => {
     const { sent, count } = await resizedWhileCounted();
     save();
     // Saving the rest would record less than was moved.
-    expect(screen.getByText("LiteBeam 5AC: enter the count")).toBeDefined();
+    expect(screen.getByText("LiteBeam 5AC: enter the count").tagName).toBe(
+      "STRONG",
+    );
     expect(screen.getByText(/since this item was added/)).toBeDefined();
     fireEvent.input(count, { target: { value: "1" } });
     await vi.advanceTimersByTimeAsync(1000);
@@ -1372,8 +1435,14 @@ describe("a newer build", () => {
 describe("what an older build left", () => {
   const HEADING = "Checked out items. Add to cart or discard before sending";
   const ADDED_BACK = "Added back to cart. Review before Save.";
-  const RETIRED = "Sorry. This item has been retired.";
-  const RESCAN = "Sorry. Can't add these items. Please rescan.";
+  const RETIRED = "This item has been retired.";
+  // Failures, in bold (Ali, inventory-tng-93z).
+  const NOT_KEPT =
+    "This browser can't keep the cart. Clear local data, reload the page and try again.";
+  const NOT_DISCARDED = "Unable to discard. Clear your site data to remove.";
+  const NOT_REMOVED =
+    "This item wasn't automatically removed. Save the cart and try to remove.";
+  const RESCAN = "Can't add these items. Please rescan.";
   const KEY = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
   const AT = 1_700_000_000_000;
   const OLDER = "2026-11-12T09:00:00.000Z";
@@ -1461,15 +1530,12 @@ describe("what an older build left", () => {
       `Saved on this device ${at}, not sent.`,
     );
     within(save as HTMLElement).getByText("LiteBeam 5AC: 2 × Box");
-    // What cannot go back says why under it, in the alert's style, only
-    // the words naming the problem in bold, and has its own Discard.
+    // What cannot go back says why under it, in the alert's style, in
+    // bold, and has its own Discard.
     const taken = within(save as HTMLElement)
       .getByText("Cat6 cable: 3 m from an open package")
       .closest("li") as HTMLElement;
-    const why = within(taken).getByText(noted(RESCAN));
-    expect(why.querySelector("strong")?.textContent).toBe(
-      "Can't add these items",
-    );
+    expectBold(within(taken).getByText(noted(RESCAN)), RESCAN);
     within(taken).getByRole("button", { name: "Discard" });
     // What goes back has none.
     expect(
@@ -1583,9 +1649,7 @@ describe("what an older build left", () => {
       within(listing()).getByRole("button", { name: "Add to cart" }),
     );
     setItem.mockRestore();
-    within(listing()).getByText(
-      "Sorry. Can't save the cart. Clear local data, reload the page and try again.",
-    );
+    expect(within(listing()).getByText(NOT_KEPT).tagName).toBe("STRONG");
     // Not filled either: saved from here, then put back, it would go twice.
     screen.getByText("Nothing in the cart yet.");
     expect(selected("From")).not.toBe("10");
@@ -1613,9 +1677,7 @@ describe("what an older build left", () => {
     fireEvent.click(lastDiscard(save as HTMLElement));
     fireEvent.click(lastDiscard(save as HTMLElement));
     setItem.mockRestore();
-    within(listing()).getByText(
-      "Sorry. Unable to discard. Clear your site data to remove.",
-    );
+    expect(within(listing()).getByText(NOT_DISCARDED).tagName).toBe("STRONG");
     expect(
       JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? ""),
     ).toHaveLength(2);
@@ -1650,9 +1712,7 @@ describe("what an older build left", () => {
       })[0] as HTMLElement,
     );
     setItem.mockRestore();
-    screen.getByText(
-      "Sorry. This item wasn't automatically removed. Save the cart and try to remove.",
-    );
+    expect(screen.getByText(NOT_REMOVED).tagName).toBe("STRONG");
     expect(selected("From")).toBe("10");
   });
 
@@ -1746,9 +1806,13 @@ describe("what an older build left", () => {
     leaveSave({ state: "refused", note: "Not saved. Line 1: no." });
     open();
     await ready();
-    within(listing()).getByText(
-      "Not saved. Line 1: no. Add it to the cart, fix that, then save.",
+    // In the alert's style: "Not saved." in bold, the rest not, its
+    // numbers in italic (Ali, inventory-tng-93z).
+    const why = within(listing()).getByText(
+      noted("Not saved. Line 1: no. Add it to the cart, fix that, then save."),
     );
+    expect(why.querySelector("strong")?.textContent).toBe("Not saved.");
+    expect(why.querySelector("em")?.textContent).toBe("1");
   });
 
   test("put in the cart, it fills the cart, goes from the list, and saves as any cart", async () => {
@@ -1961,18 +2025,13 @@ describe("what an older build left", () => {
     });
     open();
     await ready();
-    const unread = noted(
-      "Sorry. Could not read 1 previously added item, scan it again.",
-    );
-    within(listing()).getByText(unread);
-    expect(
-      within(listing()).getByText(unread).querySelector("strong")?.textContent,
-    ).toBe("Could not read 1");
+    const unread = "Could not read 1 previously added item, scan it again.";
+    expectBold(within(listing()).getByText(noted(unread)), unread, ["1"]);
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     expect(
       within(listing()).queryByText("Cat6 cable: 3 m from an open package"),
     ).toBeNull();
-    within(listing()).getByText(unread);
+    within(listing()).getByText(noted(unread));
     await vi.waitFor(() => expect(document.activeElement?.id).toBe("older-0"));
     // Nothing left to put back: only its own Discard.
     expect(
@@ -1996,9 +2055,7 @@ describe("what an older build left", () => {
     });
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     setItem.mockRestore();
-    within(listing()).getByText(
-      "Sorry. Unable to discard. Clear your site data to remove.",
-    );
+    within(listing()).getByText(NOT_DISCARDED);
     within(listing()).getByText(noted(RESCAN));
   });
 
@@ -2014,11 +2071,7 @@ describe("what an older build left", () => {
       JSON.stringify([{ ...first, state: "refused", note: "No." }]),
     );
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
-    expect(
-      within(listing()).queryByText(
-        "Sorry. Unable to discard. Clear your site data to remove.",
-      ),
-    ).toBeNull();
+    expect(within(listing()).queryByText(NOT_DISCARDED)).toBeNull();
     within(listing()).getByText("No. Add it to the cart, fix that, then save.");
     within(listing()).getByText(noted(RESCAN));
   });
@@ -2065,9 +2118,11 @@ describe("what an older build left", () => {
     fireEvent.click(
       within(listing()).getByRole("button", { name: "Add to cart" }),
     );
-    within(listing()).getByText(
-      "Save previous cart before adding additional items",
-    );
+    expect(
+      within(listing()).getByText(
+        "Save previous cart before adding additional items",
+      ).tagName,
+    ).toBe("STRONG");
     expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
   });
 
@@ -2362,6 +2417,40 @@ describe("what an older build left", () => {
     });
   });
 
+  test("one changed after it went back, which an older build's tab saved first, asks for a reload, then, reloaded, lists its lines until dismissed", async () => {
+    leaveMoves([KEY, AT, [radios(1)]]);
+    const written = new Map([[KEY, linesOf({ lines: [radios(1)] })]]);
+    const { api } = ledger(written);
+    const reload = vi.fn();
+    open(api, reload);
+    await ready();
+    await screen.findByText(ADDED_BACK);
+    fireEvent.input(screen.getByLabelText("Box (4 each)"), {
+      target: { value: "2" },
+    });
+    save();
+    const said = await screen.findByText(SAVED_BEFORE_CHANGES);
+    // In bold, in the alert's style (Ali, inventory-tng-93z, question 4, C).
+    expect(said.tagName).toBe("STRONG");
+    const entry = said.closest("li") as HTMLElement;
+    // Its lines, to compare with what was recorded.
+    within(entry).getByText("LiteBeam 5AC: 2 × Box");
+    expect(within(entry).queryByRole("button", { name: "Dismiss" })).toBeNull();
+    fireEvent.click(within(entry).getByRole("button", { name: "Reload" }));
+    expect(reload).toHaveBeenCalledOnce();
+    // Reloaded: still listed, with its lines, now to dismiss.
+    cleanup();
+    open(api);
+    await ready();
+    const again = (await screen.findByText(SAVED_BEFORE_CHANGES)).closest(
+      "li",
+    ) as HTMLElement;
+    within(again).getByText("LiteBeam 5AC: 2 × Box");
+    expect(within(again).queryByRole("button", { name: "Reload" })).toBeNull();
+    fireEvent.click(within(again).getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText(SAVED_BEFORE_CHANGES)).toBeNull();
+  });
+
   test("one with a line discarded, which an older build's tab saved first whole, is not saved again, and says so", async () => {
     leaveSave();
     const [first] = JSON.parse(
@@ -2425,9 +2514,7 @@ describe("what an older build left", () => {
       });
     open();
     await ready();
-    await screen.findByText(
-      "Sorry. Can't save the cart. Clear local data, reload the page and try again.",
-    );
+    await screen.findByText(NOT_KEPT);
     setItem.mockRestore();
     screen.getByText("Nothing in the cart yet.");
     within(listing()).getByRole("button", { name: "Add to cart" });
