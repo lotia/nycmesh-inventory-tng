@@ -6,10 +6,13 @@ The key was an expression in each unique index; now each row keeps it in
 name_key (models.KeyedName, names.py), filled here by the CHECK's own
 expression, so every row passes it. The key is now collated "C" whatever
 the database's locale, so the app can write it: only ASCII's spaces and
-punctuation go and only its letters are lowered (docs/decisions/0021). That
-compares names as finely as the index did, or more, so names unique by it
-are unique by this: none can clash on the way up. On the way down, names
-the database's locale makes one may, and are named by id, to rename first.
+punctuation go and only its letters are lowered (docs/decisions/0021). Under
+a C locale or glibc's, that compares names as finely as the index did, or
+more; but under another, such as an ICU locale (whose punctuation leaves
+out $ + < = > ^ ` | ~) or a Turkish one (whose I lowers to a dotless i),
+names the index kept apart may be one. So, each way, names that would
+clash are named by id, to rename first, and nothing is changed until none
+are.
 
 Revision ID: 0037
 Revises: 0036
@@ -45,6 +48,7 @@ INDEXES = {
 
 
 def upgrade() -> None:
+    _refuse_clashes(KEY, "the database's locale kept apart, such as a$b and ab")
     for table, (index, scope) in INDEXES.items():
         op.add_column(table, sa.Column("name_key", sa.Text(), nullable=True))
         op.execute(f"UPDATE {table} SET name_key = {KEY}")
@@ -59,17 +63,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    clashing = [
-        f"{table} {ids}"
-        for table, (_, scope) in INDEXES.items()
-        for ids in _clashing(table, ", ".join([*scope, BEFORE]))
-    ]
-    if clashing:
-        raise RuntimeError(
-            "Names the database's locale makes one name, such as Câble and "
-            f"CÂBLE, by id: {'; '.join(clashing)}. Rename all but one in each, "
-            "then downgrade again."
-        )
+    _refuse_clashes(BEFORE, "the keys keep apart, such as Câble and CÂBLE")
     op.execute(f"REVOKE UPDATE (name_key) ON item_package FROM {APP_ROLE}")
     for table, (index, scope) in INDEXES.items():
         op.drop_index(index, table_name=table)
@@ -81,6 +75,21 @@ def downgrade() -> None:
         )
         # Its CHECK goes with it.
         op.drop_column(table, "name_key")
+
+
+def _refuse_clashes(key: str, apart: str) -> None:
+    """RuntimeError naming by id the rows `key` would make one name, which
+    `apart` says how they differ, if any."""
+    clashing = [
+        f"{table} {ids}"
+        for table, (_, scope) in INDEXES.items()
+        for ids in _clashing(table, ", ".join([*scope, key]))
+    ]
+    if clashing:
+        raise RuntimeError(
+            f"Names {apart}, would be one name, by id: {'; '.join(clashing)}. "
+            "Rename all but one in each, then migrate again."
+        )
 
 
 def _clashing(table: str, key: str) -> list[str]:

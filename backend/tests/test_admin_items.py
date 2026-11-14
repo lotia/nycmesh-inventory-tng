@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import items, open_packages
 from inventory_tng.admin.common import quantity
-from inventory_tng.admin.items import ITEMS
+from inventory_tng.admin.items import ITEMS, NO_LETTERS
 from inventory_tng.admin.listing import PER_PAGE
 from inventory_tng.db import RuleBroken, attempt
 from inventory_tng.local_time import DEFAULT_ZONE
@@ -75,6 +75,29 @@ def test_an_item_name_needs_more_than_punctuation(
     )
     assert admin_client.post(ITEMS, data=form | {"name": "Câble ½"}).status_code == 303
     assert admin_client.post(ITEMS, data=form | {"name": "1234"}).status_code == 303
+
+
+def test_a_name_of_signs_beyond_ascii_needs_a_letter_or_digit(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """A key keeps an en dash, but a name needs a letter or a digit, an
+    item's and a package's alike."""
+    form = {"category_id": str(radios.id), "unit": "each"}
+    item = new_item(session, radios, "Probe")
+    path = f"{ITEMS}/{item.id}/packages"
+    for name in ("\u2013", "\u201c \u2014 \u201d", "\u00b1\u00b0"):
+        refused = admin_client.post(ITEMS, data=form | {"name": name})
+        assert refused.status_code == 400
+        assert NO_LETTERS in text(refused)
+        refused = admin_client.post(path, data={"package_name": name, "size": "1"})
+        assert refused.status_code == 400
+        assert NO_LETTERS in text(refused)
+    assert (
+        admin_client.post(
+            path, data={"package_name": "\u00b2", "size": "1"}
+        ).status_code
+        == 303
+    )
 
 
 def test_an_item_needs_a_name_and_a_current_category(

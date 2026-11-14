@@ -12,6 +12,7 @@ are each its own, retired items' too (models.Item); taken_by says which
 another item has. similar finds items whose names are close, to ask
 whether a new name is a different item (docs/decisions/0021)."""
 
+import unicodedata
 from collections.abc import Collection
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -144,9 +145,10 @@ def similar(session: Session, name: str, item_id: int) -> list[Item]:
 
 
 def nameless(name: str) -> bool:
-    """Whether `name` is spaces and punctuation alone, as name_key finds
-    them: every such name would be one name."""
-    return name_key(name) == ""
+    """Whether `name` has no letter or digit, Unicode's: spaces,
+    punctuation and signs alone, which tell no name from another (an en
+    dash is kept in its key, but is no name)."""
+    return not any(unicodedata.category(c)[0] in "LN" for c in name)
 
 
 def same_name(one: str, other: str) -> bool:

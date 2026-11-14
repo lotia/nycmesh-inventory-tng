@@ -61,8 +61,9 @@ so admins would type half a name in each field.
   retired ones too (0019; migration 0030 names any clashing by id).
   Categories, places and volunteers still compare names ignoring case
   only.
-- An item's name needs more than spaces and punctuation, as the database
-  classes them: such names alone would all be one name.
+- An item's or a package's name needs a letter or a digit, as Unicode
+  classes them (Amendment, 2026-11-14): spaces, punctuation and signs
+  alone, such as `- ?` or `–`, tell no name from another.
 - Which characters are spaces and punctuation, and how case folds, is
   ASCII's, as a C locale has it, whatever the database's locale (Amendment,
   2026-11-14): letters such as `â` are kept, but `Â` and `â` are not
@@ -227,11 +228,13 @@ agree on every character. Migration 0037 added and filled the columns.
 
 The key is collated `"C"`, whatever the database's locale, so the app can
 write it as PostgreSQL checks it: only ASCII's spaces and punctuation are
-left out, and only its letters lowered. That is what a C locale, as
-CloudNativePG makes by default, did already. A database made with another
-locale, as the development one is, now keeps `Câble` and `CÂBLE`, or an
-en dash and a hyphen, apart, as a C locale did. Accents stay apart in
-uniqueness, as above.
+left out, and only its letters lowered. Production, on CloudNativePG's
+default C locale, compares names as it did. The development database,
+made with `en_US.utf8`, now compares them as production does: `Câble` and
+`CÂBLE`, or an en dash and a hyphen, are two names there, where they were
+one. Accents stay apart in uniqueness, as above. A name still needs a
+letter or a digit, Unicode's, which the app checks, so a name of an en
+dash alone is refused though its key keeps it.
 
 Rejected: a key in PostgreSQL's own locale, which Python cannot match, so
 the CHECK would refuse names the app keyed, and a function or trigger

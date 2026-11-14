@@ -400,6 +400,29 @@ def test_name_keys_are_filled_by_the_migration(alembic_config: Config) -> None:
     ).one() == ("spool30.5m", "câblereel")
 
 
+def test_name_keys_name_what_would_clash_going_up(alembic_config: Config) -> None:
+    """Migration 0037's upgrade: names a database's locale kept apart but
+    the keys make one, as an ICU locale's index kept a$b and ab, are named
+    by id to rename; nothing is changed until none are. An index on the
+    name as typed stands for such a locale's."""
+    command.downgrade(alembic_config, "0036")
+    connection = alembic_config.attributes["connection"]
+    connection.execute(text("DROP INDEX uq_item_name"))
+    connection.execute(text("CREATE UNIQUE INDEX uq_item_name ON item (name)"))
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Cables') RETURNING id")
+    )
+    signed, plain = (_item(connection, category_id, name) for name in ("a$b", "ab"))
+    with pytest.raises(RuntimeError, match=f"by id: item {signed}, {plain}\\. Rename"):
+        command.upgrade(alembic_config, "head")
+    assert not connection.scalar(
+        text(
+            "SELECT count(*) FROM information_schema.columns"
+            " WHERE column_name = 'name_key'"
+        )
+    )
+
+
 def test_going_back_before_name_keys_names_what_would_clash(
     alembic_config: Config,
 ) -> None:
