@@ -170,16 +170,44 @@ export const RECORDED_ELSEWHERE =
  * question 4, C): words for the page, never kept. */
 export const RELOAD_TO_CONTINUE = "Reload the page to continue.";
 
+/** What every build has kept of a save put back, changed and refused as
+ * another tab recorded it first: this one, then those before. */
+const RECORDED_ELSEWHERE_KEPT: ReadonlySet<string> = new Set([
+  RECORDED_ELSEWHERE,
+  // Kept, with the reload's words, by inventory-tng-93z's build.
+  `${RECORDED_ELSEWHERE} ${RELOAD_TO_CONTINUE}`,
+  "Not saved: another tab saved it first, as it was before your changes. Check what was saved, then save your changes again.",
+]);
+
+/** Whether `note` says another tab recorded the save first, as any build
+ * kept it: what it held is recorded, but not the changes since, so it
+ * never goes in a cart again, which would record it twice (Ali,
+ * inventory-tng-wyq, question c). */
+export function recordedElsewhere(note: string | null): boolean {
+  return RECORDED_ELSEWHERE_KEPT.has(note ?? "");
+}
+
+/** What the page says of one recordedElsewhere, once nothing is left to
+ * do but discard it (Ali, inventory-tng-wyq, question c): words for the
+ * page, never kept. */
+export const SCAN_AGAIN_CHANGED =
+  "Not recorded: another tab recorded this cart before your changes. Scan again only what you changed.";
+
 /** What every build has said of a batch refused for its key: this one,
  * then those before, whose words an older key may still hold. */
 export const REFUSED_FOR_KEY: ReadonlySet<string> = new Set([
   KEY_REUSED,
-  RECORDED_ELSEWHERE,
-  // Kept, with the reload's words, by inventory-tng-93z's build.
-  `${RECORDED_ELSEWHERE} ${RELOAD_TO_CONTINUE}`,
+  ...RECORDED_ELSEWHERE_KEPT,
   "Not saved: its key was already used for a different batch. Please report this.",
-  "Not saved: another tab saved it first, as it was before your changes. Check what was saved, then save your changes again.",
 ]);
+
+/** A batch waiting, after no answer: said as kept while the browser is
+ * online. */
+export const NO_ANSWER = "No answer from the inventory. Trying again shortly.";
+
+/** NO_ANSWER's words while the browser says it is offline (Ali,
+ * inventory-tng-wyq, 'Offline'): words for the page, never kept. */
+export const OFFLINE = "This device is offline. Sending when it's back.";
 
 /** Before a refused batch's problems (422), as this build says it and as
  * builds before did: shown in bold, the problems after it not. */
@@ -599,7 +627,7 @@ export class Outbox {
           note:
             reply.status === "unavailable"
               ? "The inventory can't record this just now. Trying again shortly."
-              : "No answer from the inventory. Trying again shortly.",
+              : NO_ANSWER,
         });
         this.later();
         return "stop";
@@ -646,10 +674,7 @@ function oldestFirst(extra: Entry[], rest: Entry[]): Entry[] {
 
 /** Stored entries, minus any that cannot be read: one bad entry loses one
  * batch, not every batch on the device. */
-function parsed(stored: unknown): Entry[] {
-  if (!Array.isArray(stored)) {
-    return [];
-  }
+function parsed(stored: readonly unknown[]): Entry[] {
   return stored.flatMap((entry) => {
     const result = v.safeParse(Entry, entry);
     return result.success ? [result.output] : [];

@@ -270,12 +270,16 @@ test("a save an older build's tab saved meanwhile is saved once, under its key; 
   const reloaded = page.waitForEvent("load");
   await entry.getByRole("button", { name: "Reload" }).click();
   await reloaded;
-  // Reloaded, it no longer asks for a reload (Ali, inventory-tng-93z).
-  await expect(entry.locator("strong")).toHaveText(said);
-  await expect(entry.getByText(`1. ${cable}: 3 m`)).toBeVisible();
-  await expect(entry.getByRole("button", { name: "Reload" })).toHaveCount(0);
-  await entry.getByRole("button", { name: "Dismiss" }).click();
-  await expect(page.getByText(said)).toHaveCount(0);
+  // Reloaded, it no longer asks for a reload (Ali, inventory-tng-93z), and
+  // says what is left to do (Ali, inventory-tng-wyq, question c).
+  const left =
+    "Not recorded: another tab recorded this cart before your changes. Scan again only what you changed.";
+  const again = page.getByRole("listitem").filter({ hasText: left });
+  await expect(again.locator("strong")).toHaveText(left);
+  await expect(again.getByText(`1. ${cable}: 3 m`)).toBeVisible();
+  await expect(again.getByRole("button", { name: "Reload" })).toHaveCount(0);
+  await again.getByRole("button", { name: "Dismiss" }).click();
+  await expect(page.getByText(left)).toHaveCount(0);
 });
 
 test("a double tap on a line's Discard discards that line only; one that could not read a line stays, saying so, until its own Discard", async ({

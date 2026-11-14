@@ -199,10 +199,13 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   recorded. One put back from an older build and refused as another tab
   recorded it first asks for a reload, in place of Dismiss, so the page
   shows what was recorded, held back as a newer build's reload is, saying
-  meanwhile what it waits for; after
-  it, the batch stays listed, no longer asking, until dismissed. We
+  meanwhile what it waits for; after it, the batch stays listed, no longer
+  asking, until dismissed, saying to scan again only what changed. We
   rejected leaving only Dismiss, which dropped the note before the
-  volunteer had seen the stock as it is.
+  volunteer had seen the stock as it is. Such a batch never goes in a
+  cart again, in the older list too, which offers only its Discard (Ali,
+  inventory-tng-wyq): what it held is recorded, and once more would
+  record it twice.
   The page's words drop "save" (Ali, 2026-11-13, inventory-tng-wyq): the
   cart lives in the browser, written to storage as it changes, so what
   the browser holds is "kept", and what the inventory takes is

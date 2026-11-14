@@ -360,12 +360,18 @@ the cart is sent under it until emptied or discarded, as an older tab may be sen
 it still: the server then takes it once, or, changed since, refuses it
 (409 `key_reused`), which the page says, asking for a reload in place
 of Dismiss, held back as a newer build's is, the note then saying what
-it waits for (the cart, or batches sending); after it, the save stays
-listed, no longer asking, until dismissed. A refused save in the
+it waits for (the cart, or batches sending, and whether the browser says
+it is offline); after it, the save stays listed, no longer asking, until
+dismissed, saying to scan again only what changed. Such a save never goes
+in a cart again, here or in the older list, which offers only Discard: what
+it held is recorded, and once more would record it twice
+(`outbox.recordedElsewhere`). A refused save in the
 outbox's list lists its lines, in the words above, each item numbered
-as the refusal's "Line n" names it. A save
+as the refusal's "Line n" names it. Any other save
 refused for its key goes back without it, as the server holds that key
-for another batch. It removes an older key once nothing in it is left
+for another batch. While the browser says it is offline, a batch waiting
+for an answer says so, and the page follows the browser going on and off
+line. It removes an older key once nothing in it is left
 to list (`frontend/src/older.ts`). Builds that keep the same shape
 share a key, so each batch is kept with the build that queued it, and is
 sent as that build's, whichever tab sends it.
