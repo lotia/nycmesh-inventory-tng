@@ -9,8 +9,12 @@ item's, retired ones too, so one can always be brought back. A retired
 item is read only until it is brought back (docs/decisions/0019). An
 item's name, its manufacturer and part number together, and its old code
 are each its own, retired items' too (models.Item); taken_by says which
-another item has. similar finds items whose names are close, to ask
-whether a new name is a different item (docs/decisions/0021)."""
+another item has. An item's aliases (models.ItemAlias) share its names'
+keys: no name is another item's or any item's alias, nor an alias any
+item's name or another alias, checked here holding the catalogue lock, as
+every write to either takes it (docs/decisions/0021, 2026-11-14). similar
+finds items whose names are close, to ask whether a new name is a
+different item (docs/decisions/0021)."""
 
 from collections.abc import Collection
 from dataclasses import asdict, dataclass
@@ -32,6 +36,7 @@ from inventory_tng.db import (
 from inventory_tng.models import (
     Category,
     Item,
+    ItemAlias,
     ItemPackage,
     Label,
     Movement,
@@ -99,15 +104,37 @@ class Fields:
         )
 
 
+# Refused: an item's name that is an alias, its own or another item's.
+NAME_IS_ALIAS = "item_name_is_alias"
+# Refused: an alias that is an item's name, its own or another's.
+ALIAS_IS_NAME = "item_alias_is_name"
+
+
+def _alias_of(key: str) -> ColumnElement[bool]:
+    """Whether a current alias of the item has this key."""
+    return (
+        select(ItemAlias.id)
+        .where(
+            ItemAlias.item_id == Item.id,
+            ItemAlias.name_key == key,
+            ItemAlias.retired_at.is_(None),
+        )
+        .exists()
+    )
+
+
 def taken_by(
     session: Session, fields: Fields, item_id: int | None = None
 ) -> tuple[str, Item] | None:
     """The field of `fields` another item than `item_id` already has, and
-    that item, as the unique indexes compare them: a unique violation says
+    that item, as the unique indexes compare them, or "alias" and the item
+    whose alias the name is, `item_id`'s too: a unique violation says
     neither. None if none has, as when the other changed meanwhile."""
-    wanted: list[tuple[str, ColumnElement[bool]]] = [
-        ("name", Item.name_key == name_key(fields.name))
-    ]
+    key = name_key(fields.name)
+    alias = select(Item).where(_alias_of(key))
+    if (aliased := session.scalars(alias.limit(1)).first()) is not None:
+        return "alias", aliased
+    wanted: list[tuple[str, ColumnElement[bool]]] = [("name", Item.name_key == key)]
     if fields.manufacturer is not None and fields.part_number is not None:
         both = and_(
             # PostgreSQL's lower(), as the index's: Python's folds more.
@@ -143,9 +170,16 @@ def similar(session: Session, name: str, item_id: int) -> list[Item]:
     return list(session.scalars(query.order_by(*closest).limit(SIMILAR)))
 
 
+def _not_an_alias(session: Session, name: str) -> None:
+    """RuleBroken unless no current alias has `name`'s key."""
+    taken = ItemAlias.name_key == name_key(name), ItemAlias.retired_at.is_(None)
+    enforce(NAME_IS_ALIAS, when=exists_where(session, *taken))
+
+
 def add(session: Session, fields: Fields) -> Item:
     lock_catalogue(session)
     _in_current_category(session, fields.category_id)
+    _not_an_alias(session, fields.name)
     item = Item(**asdict(fields))
     session.add(item)
     session.flush()
@@ -162,8 +196,54 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> None:
         enforce("item_unit_fixed", when=moved)
     if fields.category_id != item.category_id:
         _in_current_category(session, fields.category_id)
+    _not_an_alias(session, fields.name)
     for column, value in asdict(fields).items():
         setattr(item, column, value)
+
+
+def aliases(session: Session, item_id: int) -> list[ItemAlias]:
+    """The item's current aliases, oldest first."""
+    query = select(ItemAlias).where(
+        ItemAlias.item_id == item_id, ItemAlias.retired_at.is_(None)
+    )
+    return list(session.scalars(query.order_by(ItemAlias.id)))
+
+
+def alias_taken_by(session: Session, name: str) -> Item | None:
+    """The item whose name, or one of whose current aliases, has `name`'s
+    key, retired items' too, if any."""
+    key = name_key(name)
+    query = select(Item).where(or_(Item.name_key == key, _alias_of(key)))
+    return session.scalars(query.limit(1)).first()
+
+
+def add_alias(session: Session, item: Item, name: str) -> ItemAlias:
+    """Another name `item` is found by. Refused if it is an item's name,
+    its own or another's (ALIAS_IS_NAME), or by the unique index if a
+    current alias has it; and for a retired item, read only."""
+    relock(session, item)
+    enforce("retired_read_only", when=item.retired_at is not None)
+    enforce(
+        ALIAS_IS_NAME,
+        when=exists_where(session, Item.name_key == name_key(name)),
+    )
+    alias = ItemAlias(item_id=item.id, name=name)
+    session.add(alias)
+    session.flush()
+    item.refold()
+    return alias
+
+
+def remove_alias(session: Session, alias: ItemAlias, at: datetime) -> None:
+    """A current alias retired, freeing its name, unless its item is
+    retired, read only."""
+    item = session.get_one(Item, alias.item_id)
+    relock(session, item)
+    relock(session, alias, current=True)
+    enforce("retired_read_only", when=item.retired_at is not None)
+    alias.retired_at = at
+    session.flush()
+    item.refold()
 
 
 def retire(session: Session, item: Item, at: datetime) -> None:

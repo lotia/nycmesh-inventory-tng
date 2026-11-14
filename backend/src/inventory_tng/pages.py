@@ -97,6 +97,7 @@ NOTICES: dict[str, str] = {}
 NOTICE_SECTIONS = frozenset(
     {
         "adjust",
+        "aliases",
         "authenticators",
         "count",
         "email",

@@ -62,7 +62,8 @@ privilege, so neither binds it.
   - JSONB history rows, INET addresses, partial and `lower()` indexes, regular
     expressions and `num_nulls()` in CHECKs, identity columns;
   - a CHECK with `regexp_replace`, lookaround and `COLLATE "C"`, holding
-    items' and packages' `name_key` to their names (0021, 2026-11-14);
+    items', packages' and aliases' `name_key` to their names (0021,
+    2026-11-14);
   - advisory locks (the catalogue lock), `FOR KEY SHARE` and
     `FOR NO KEY UPDATE`, `LOCK TABLE ... SHARE ROW EXCLUSIVE`;
   - `INSERT ... ON CONFLICT DO NOTHING`, arrays in queries, and

@@ -61,6 +61,33 @@ None is left, so nobody can pick it.{% endif %}{% endcall %}
   {% if not retired %}<button class="primary">Save</button>{% endif %}
 </form>
 
+<section id="aliases">
+  <h2>Aliases</h2>
+  {% with section_id="aliases" %}{% include "_notice.html" %}{% endwith %}
+  <p class="hint">Other names it is found by, such as one it was known by.
+  Each is taken, as a name is: no other item can have it.</p>
+  {% call table() %}
+    {% for alias in aliases %}
+    <tr>
+      <td>{{ alias.name }}</td>
+      <td>{% if not retired %}<form method="post" action="{{ here }}/aliases/{{ alias.id }}/remove"><button>Remove<span class="sr-only"> {{ alias.name }}</span></button></form>{% endif %}</td>
+    </tr>
+    {% else %}
+    <tr><td>None.</td></tr>
+    {% endfor %}
+  {% endcall %}
+  {% if not retired %}
+  {% set sent = values if 'alias_name' in values else {} %}
+  <form method="post" action="{{ here }}/aliases" class="actions">
+    <label>Alias <input name="alias_name" value="{{ sent.get('alias_name', '') }}" maxlength="{{ name_max }}" required>
+      {% if sent %}{% with name = "alias_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
+    </label>
+    {% with typed = sent.get('alias_name', '') %}{% include "_units_read.html" %}{% endwith %}
+    <button class="primary">Add alias</button>
+  </form>
+  {% endif %}
+</section>
+
 <section id="packages">
   <h2>Packages</h2>
   {% with section_id="packages" %}{% include "_notice.html" %}{% endwith %}

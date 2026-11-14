@@ -239,7 +239,7 @@ def test_names_are_keyed_alike_by_the_app_and_the_database(session: Session) -> 
             ),
             {"name": f"ck_{table}_name_key"},
         )
-        for table in ("item", "item_package")
+        for table in ("item", "item_package", "item_alias")
     ]
     rows = session.execute(
         text(

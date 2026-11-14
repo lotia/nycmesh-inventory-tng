@@ -57,10 +57,18 @@ from sqlalchemy import (
     literal,
     literal_column,
     or_,
+    select,
     text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB
-from sqlalchemy.orm import Mapped, MappedColumn, Session, mapped_column, validates
+from sqlalchemy.orm import (
+    Mapped,
+    MappedColumn,
+    Session,
+    mapped_column,
+    object_session,
+    validates,
+)
 
 # Imported for its flush listeners: whatever can write these tables records
 # their history.
@@ -447,6 +455,16 @@ class Item(KeyedName, Searchable, Versioned, Base):
     def refold(self) -> None:
         super().refold()
         self.name_folded = fold(self.name or "")
+        # Its current aliases too, each folded alone, as written so far:
+        # items.add_alias and remove_alias write the alias, then refold.
+        session = object_session(self)
+        if self.id is not None and session is not None:
+            aliases = session.scalars(
+                select(ItemAlias.name)
+                .where(ItemAlias.item_id == self.id, ItemAlias.retired_at.is_(None))
+                .order_by(ItemAlias.id)
+            )
+            self.search_text = " ".join([self.search_text, *map(fold, aliases)])
 
 
 class ItemPackage(KeyedName, Searchable, Versioned, Base):
@@ -481,6 +499,33 @@ class ItemPackage(KeyedName, Searchable, Versioned, Base):
     # How many sealed in the stores to keep: fewer shows on reorder. NULL:
     # no minimum.
     minimum_sealed: Mapped[int | None]
+    retired_at: Mapped[RetiredAt]
+
+
+class ItemAlias(KeyedName, Base):
+    """Another name an item is found by, such as one it was known by: kept
+    when an administrator adds it, searched as the item's own name is
+    (Item.refold), and taken as names are (docs/decisions/0021, 2026-11-14).
+    Its key is unique among current aliases here; among items' names too,
+    which items.py checks holding the catalogue lock. Removed, it is
+    retired, freeing the name; never changed otherwise (migration 0038)."""
+
+    __tablename__ = "item_alias"
+    __table_args__ = (
+        Index(
+            "uq_item_alias_name",
+            "name_key",
+            unique=True,
+            postgresql_where=text("retired_at IS NULL"),
+        ),
+        _name_key_check(),
+        protection(owner="items.py", lock="catalogue", history=True),
+    )
+
+    id: Mapped[IntId]
+    created_at: Mapped[CreatedAt]
+    item_id: Mapped[int] = _reference("item.id")
+    name: Mapped[str] = mapped_column(Text)
     retired_at: Mapped[RetiredAt]
 
 

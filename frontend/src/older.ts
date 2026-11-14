@@ -1028,6 +1028,7 @@ export function withRetired(catalogue: Catalogue): Catalogue {
     part_number: null,
     old_code: null,
     search_text: "",
+    aliases: [],
     retired: true,
     // All named in packages: none left to name apart.
     retired_packages: [],

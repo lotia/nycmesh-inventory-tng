@@ -10,6 +10,7 @@ export const radio: Item = {
   part_number: "LBE-5AC-Gen2",
   old_code: "LB5",
   search_text: "LiteBeam 5AC Ubiquiti LBE-5AC-Gen2 LB5 Radios",
+  aliases: [],
   packages: [
     {
       id: 1000,
@@ -34,6 +35,7 @@ export const cable: Item = {
   part_number: null,
   old_code: null,
   search_text: "Cat6 cable Cables",
+  aliases: [],
   packages: [
     {
       id: 1001,

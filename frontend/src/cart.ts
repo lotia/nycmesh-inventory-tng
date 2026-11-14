@@ -356,6 +356,7 @@ export function indexOf(catalogue: Catalogue): Index {
             item.part_number,
             item.old_code,
             item.category,
+            ...item.aliases,
           ].map((field) => bare(field ?? "")),
           item.search_text.toLowerCase(),
         ]

@@ -126,6 +126,7 @@ HISTORY_TABLES = {
     "category",
     "item",
     "item_package",
+    "item_alias",
     "vendor",
     "vendor_offer",
     "vendor_price",

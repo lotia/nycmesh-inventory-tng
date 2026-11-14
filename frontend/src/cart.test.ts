@@ -1188,6 +1188,28 @@ describe("finding", () => {
     }
   });
 
+  test("search finds an item by its aliases, as spelt or folded", () => {
+    // With no folded text from the server, so only its aliases find it.
+    const known = {
+      ...CATALOGUE,
+      items: [
+        {
+          ...cable,
+          id: 103,
+          search_text: "",
+          aliases: ["Tough Câble", "Ω-wire"],
+        },
+      ],
+    };
+    for (const typed of ["tough cable", "câble", "ω-wire", "Ω"]) {
+      expect(
+        search(known, typed).map((item) => item.id),
+        typed,
+      ).toEqual([103]);
+    }
+    expect(search(known, "tough fibre")).toEqual([]);
+  });
+
   test("a lone accent searches for nothing", () => {
     expect(search(CATALOGUE, "\u0301")).toEqual([]);
     expect(search(CATALOGUE, "beam \u0301").map((i) => i.id)).toEqual([100]);

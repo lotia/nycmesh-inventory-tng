@@ -687,6 +687,13 @@
             "type": "string",
             "title": "Search Text"
           },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases"
+          },
           "packages": {
             "items": {
               "$ref": "#/components/schemas/PackageEntry"
@@ -716,6 +723,7 @@
           "part_number",
           "old_code",
           "search_text",
+          "aliases",
           "packages",
           "retired",
           "retired_packages"

@@ -267,14 +267,20 @@ decimal mark this is wrong (`30,5 m` clashes with `305 m`); the app is
 English-only and follows US conventions today (inventory-tng-g6u.1, under
 inventory-tng-g6u).
 
+An item's aliases (`item_alias`) share its name's namespace: no item's
+name is an alias, nor any alias an item's name or another alias, retired
+items' too. A unique index keeps aliases apart; `items.py` checks names
+against aliases, holding the catalogue lock. A removed alias is retired,
+freeing its name.
+
 Each such row keeps its key in `name_key`, which the app writes as the
 name is set (`models.KeyedName`), a CHECK constraint holds to the name,
 and a plain unique index compares. `backend/src/inventory_tng/names.py`
 has the rule: one pattern, read by Python (`name_key`) and PostgreSQL
 (`name_key_sql`), and a test checks both agree on every character. To
 change the rule, change `names.py` and add a migration that writes the
-CHECKs out again and refills every key, naming by id any rows that would
-then clash, as 0037 and 0031 do.
+CHECKs out again (items', packages' and aliases') and refills every key,
+naming by id any rows that would then clash, as 0037 and 0031 do.
 
 Every name an administrator types is stored in canonical spelling
 (`models.canonical`, decision 0021): NFC, with `µ` as `μ` and `℃` and `℉`
@@ -287,7 +293,8 @@ unit alone spelt with `°`, `μ`, `µ` or `Ω`: `μF` is `uF`. The table is
 `backend/src/inventory_tng/units.py`. After changing it, raise its
 `VERSION`, write the scan page's copy and the fold reference again, and
 add a migration that folds again the rows whose `folded_with` names the
-old version, as 0036 does, with `FOLDS_UNITS` the new version:
+old version, as 0036 does, with `FOLDS_UNITS` the new version, folding
+an item's current aliases after its fields, as `Item.refold` does:
 
 ```sh
 mise run regenerate-units           # frontend/src/units.json

@@ -143,6 +143,8 @@ export const ItemEntry = v.object({
   old_code: v.nullable(v.string()),
   // What it is found by, folded by the server: matched, never shown.
   search_text: v.string(),
+  // Other names it is found by, as spelt: matched, never shown.
+  aliases: v.array(v.string()),
   packages: v.array(PackageEntry),
   // Retired, with stock left: it may be taken, never received.
   retired: v.boolean(),

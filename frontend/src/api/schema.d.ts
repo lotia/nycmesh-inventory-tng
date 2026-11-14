@@ -265,6 +265,8 @@ export interface components {
       old_code: string | null;
       /** Search Text */
       search_text: string;
+      /** Aliases */
+      aliases: string[];
       /** Packages */
       packages: components["schemas"]["PackageEntry"][];
       /** Retired */

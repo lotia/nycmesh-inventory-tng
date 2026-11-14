@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import catalogue
+from inventory_tng import catalogue, items
 from inventory_tng.db import get_snapshot
 from inventory_tng.ledger import LOOSE, Entry
 from inventory_tng.models import (
@@ -166,6 +166,7 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
         "part_number": rows.cable.part_number,
         "old_code": rows.cable.old_code,
         "retired": False,
+        "aliases": [],
         # Named only, for what an older build left (inventory-tng-0su).
         "retired_packages": [{"id": rows.reel.id, "name": "Reel", "size": "1"}],
     }
@@ -208,6 +209,23 @@ def test_an_item_is_found_by_its_folded_text_but_shown_by_its_name(
     # In any case, as a tag's end may be read as a unit (3f, 3F).
     expected = f"Cafe {mark} Lodz O-{mark}  Cables {mark}"
     assert entry["search_text"].lower() == expected.lower()
+
+
+def test_an_item_is_found_by_its_current_aliases(
+    registered_client: TestClient, session: Session
+) -> None:
+    """Sent as spelt, for the page to match; in its folded text too."""
+    mark = tag()
+    category = add(session, Category(name=f"Cables {mark}"))
+    item = add(session, Item(name=f"Cat6 cable {mark}", category_id=category.id))
+    for name in (f"Tough Câble {mark}", f"Gone {mark}", f"Ω-wire {mark}"):
+        items.add_alias(session, item, name)
+    (_, gone, _) = items.aliases(session, item.id)
+    items.remove_alias(session, gone, datetime.now(UTC))
+    entry = by_id(registered_client.get(URL).json()["items"])[item.id]
+    assert entry["aliases"] == [f"Tough Câble {mark}", f"Ω-wire {mark}"]
+    expected = f"Cat6 cable {mark} Tough Cable {mark} Ohm-wire {mark} Cables {mark}"
+    assert entry["search_text"].lower().split() == expected.lower().split()
 
 
 def test_holds_the_scan_settings(registered_client: TestClient) -> None:

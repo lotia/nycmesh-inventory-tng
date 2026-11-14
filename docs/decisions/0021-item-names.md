@@ -270,3 +270,34 @@ Names already stored are not respelt; saving one respells it. Names a
 seed or an import writes are not read here. Settled readings kept as
 rules, so a reading such as `10G` (read as grams) can be overruled, are
 inventory-tng-c0c.4's.
+
+## Amendment: items have aliases, taken as names are (2026-11-14)
+
+An item may have aliases: other names it is found by, such as one it was
+known by (Ali, 2026-11-12, inventory-tng-c0c, Q6-A; built in
+inventory-tng-c0c.6). An administrator adds and removes them on the item's
+page, typed and stored as a name is: in canonical spelling, each unit
+after a number spelt by its symbol, asked about where its case leaves two
+readings. Searches find an item by its aliases, as by its name: each is
+folded alone into the item's `search_text`, which the admin list and the
+scan page search, and the catalogue sends them as spelt too
+(`aliases`), so the scan page matches them as it does the name.
+
+Names and aliases are one namespace, compared by their keys
+(`names.name_key`): no item is named what another item is named or what
+any item, itself included, has as an alias; no alias is any item's name,
+retired items' too, or another current alias. Each alias is a row of
+`item_alias`, keyed and held to its name by the same CHECK as items, with
+a unique index on the keys of current aliases. That no alias is an item's
+name is the app's to check (`items.py`), holding the catalogue lock, which
+every write to either table takes (0016): one index cannot span two
+tables, and a table holding every name and alias, which items' rows would
+point to, would need a constraint checked at commit and a second row for
+every item. A refused form names the item whose name or alias it is.
+
+A removed alias is retired, so its history stays, and its name is free
+again. A retired item's aliases stay taken, as its name does (0019), and
+are read only until it is brought back.
+
+Merging two items, which would keep the merged one's name and aliases as
+the survivor's aliases, does not exist yet.

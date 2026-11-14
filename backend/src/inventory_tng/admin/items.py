@@ -40,6 +40,7 @@ from inventory_tng.models import (
     UNITS,
     Category,
     Item,
+    ItemAlias,
     ItemPackage,
     Label,
     Movement,
@@ -80,7 +81,11 @@ TAKEN_FIELDS = {
     "spaces or punctuation.",
     "part_number": "already has that manufacturer and part number.",
     "old_code": "already has that old code.",
+    "alias": "has that name, or one differing from it only in case, spaces "
+    "or punctuation, as an alias.",
 }
+# The item's own alias, asked for as its name.
+OWN_ALIAS = "It has that name as an alias: remove the alias first."
 
 
 # The rules a change to an item may break, besides "unique", and the field
@@ -97,6 +102,8 @@ def _taken(
     """The field another item already has, and words naming that item."""
     found = items.taken_by(session, fields, item_id)
     field, other = found or ("name", None)
+    # Beside the name, whose field "alias" is.
+    shown = "name" if field == "alias" else field
     log.debug(
         "item refused",
         rule="unique",
@@ -105,9 +112,11 @@ def _taken(
         other_item_id=other and other.id,
     )
     if other is None:
-        return field, TAKEN
+        return shown, TAKEN
+    if other.id == item_id:
+        return shown, OWN_ALIAS
     retired = " It is retired." if other.retired_at is not None else ""
-    return field, f"{other.name} {TAKEN_FIELDS[field]}{retired}"
+    return shown, f"{other.name} {TAKEN_FIELDS[field]}{retired}"
 
 
 class _AskFirst(Exception):
@@ -142,11 +151,13 @@ def _change_or_note[T](
         return done
 
     try:
-        done, broken = refusal(session, asking, "unique", *REFUSED_FIELDS, *ALERTS)
+        done, broken = refusal(
+            session, asking, "unique", items.NAME_IS_ALIAS, *REFUSED_FIELDS, *ALERTS
+        )
     except _AskFirst:
         log.debug("close names asked about", item_id=item_id, found=len(asked or ()))
         return None, CLOSE
-    if broken == "unique":
+    if broken in ("unique", items.NAME_IS_ALIAS):
         field, words = _taken(session, fields, item_id)
         problems[field] = words
     elif broken in REFUSED_FIELDS:
@@ -170,6 +181,8 @@ NOTICES.update(
         "tracking_none": "Tick the items to change first.",
         "tracking_same": "Nothing changed: those ticked were set so already, "
         "or are retired.",
+        "alias_added": "Alias added.",
+        "alias_removed": "Alias removed.",
     }
 )
 
@@ -297,6 +310,7 @@ def _item_page(
             "item": item,
             **retirement(session, item),
             "packages": packages,
+            "aliases": items.aliases(session, item.id),
             # Only a current one's size can change.
             "sizes_fixed": items.sizes_fixed(
                 session, [each.id for each in packages if each.retired_at is None]
@@ -832,3 +846,86 @@ def package_settings(
         minimum_sealed=minimum,
     )
     return redirect(f"{ITEMS}/{item_id}", notice="package_settings", section="packages")
+
+
+def _alias_problem(session: Session, item: Item, name: str, broken: str | None) -> str:
+    """Words for an alias refused as an item's name or another alias
+    (`broken`), naming that item, or what is wrong with the name itself."""
+    other = items.alias_taken_by(session, name)
+    log.debug(
+        "alias refused",
+        rule=broken,
+        item_id=item.id,
+        other_item_id=other and other.id,
+    )
+    # Its holder changed since, as the refusal let go of the lock: rare.
+    if other is None:  # pragma: no cover
+        return TAKEN
+    whose = "name" if broken == items.ALIAS_IS_NAME else "alias"
+    if other.id == item.id:
+        return f"That is its {whose} already."
+    retired = " It is retired." if other.retired_at is not None else ""
+    return (
+        f"{other.name} already has that {whose}, or one differing from it only "
+        f"in case, spaces or punctuation.{retired}"
+    )
+
+
+@router.post(f"{ITEMS}/{{item_id}}/aliases")
+def add_alias(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    item_id: int,
+    form: TextForm,
+    alias_name: Annotated[str, Form()] = "",
+) -> Response:
+    """Another name the item is found by, spelt as its name would be."""
+    found = session.get(Item, item_id)
+    if found is None:
+        return not_found()
+    name, asked = _typed_name(alias_name, form)
+    problem = _name_problem(name, asked, item_id)
+    if problem is None:
+        alias, broken = refusal(
+            session,
+            lambda: items.add_alias(session, found, name),
+            "unique",
+            items.ALIAS_IS_NAME,
+            RETIRED,
+        )
+        if broken == RETIRED:
+            return _item_page(request, session, signed, found, alert=RULES[RETIRED])
+        if alias is not None:
+            session.commit()
+            log.info("alias added", item_id=item_id, item_alias_id=alias.id)
+            return redirect(
+                f"{ITEMS}/{item_id}", notice="alias_added", section="aliases"
+            )
+        problem = _alias_problem(session, found, name, broken)
+    values = {**form, "alias_name": name}
+    problems = {"alias_name": problem}
+    return _item_page(request, session, signed, found, problems=problems, values=values)
+
+
+@router.post(f"{ITEMS}/{{item_id}}/aliases/{{alias_id}}/remove")
+def remove_alias(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    item_id: int,
+    alias_id: int,
+) -> Response:
+    """An alias removed: its name is free again."""
+    alias = session.get(ItemAlias, alias_id)
+    if alias is None or alias.item_id != item_id:
+        return not_found()
+    _, broken = refusal(
+        session, lambda: items.remove_alias(session, alias, now()), RETIRED
+    )
+    if broken:
+        found = session.get_one(Item, item_id)
+        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
+    session.commit()
+    log.info("alias removed", item_id=item_id, item_alias_id=alias_id)
+    return redirect(f"{ITEMS}/{item_id}", notice="alias_removed", section="aliases")

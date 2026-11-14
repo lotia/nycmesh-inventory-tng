@@ -1038,6 +1038,34 @@ def test_an_item_added_once_its_category_is_locked_does_not_deadlock(
     assert error.rule == "item_category_current"
 
 
+@pytest.mark.concurrency
+@pytest.mark.parametrize(
+    ("swapped", "refused"),
+    [(False, items.ALIAS_IS_NAME), (True, items.NAME_IS_ALIAS)],
+)
+def test_a_name_and_an_alias_the_same_not_both(
+    committed: Committed, swapped: bool, refused: str
+) -> None:
+    """An item renamed to what another is given as an alias at once: the
+    second waits for the catalogue lock, then is refused."""
+    name = tag()
+    category = Category(name=f"Radios {name}")
+    made(committed, category)
+    one, other = (Item(name=f"{n} {name}", category_id=category.id) for n in "AB")
+    made(committed, one, other)
+    wanted = f"LiteBeam {name}"
+
+    def renaming(session: Session, item: Item) -> None:
+        fields = items.Fields.new(name=wanted, category_id=category.id)
+        items.save(session, item, fields, seen=None)
+
+    def aliasing(session: Session, item: Item) -> None:
+        items.add_alias(session, item, wanted)
+
+    first, second = doing(Item, one.id, renaming), doing(Item, other.id, aliasing)
+    assert either_first(committed, first, second, swapped=swapped) == refused
+
+
 def receiving(item: Item, store: Location, amount: str) -> Write:
     """A receipt of `amount` of the item into the store, as the ledger
     writes every save, count and adjustment."""

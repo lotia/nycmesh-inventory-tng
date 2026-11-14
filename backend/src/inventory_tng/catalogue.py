@@ -29,6 +29,7 @@ from inventory_tng.ledger import takeable
 from inventory_tng.models import (
     Category,
     Item,
+    ItemAlias,
     ItemPackage,
     Label,
     LedgerTransaction,
@@ -133,6 +134,9 @@ class ItemEntry(BaseModel):
     # matched, never shown (0021). The category is folded here, as it is
     # read, on purpose: categories keep no folded column for so few names.
     search_text: str
+    # Its current aliases (models.ItemAlias), as spelt: other names it is
+    # found by, matched, never shown. Its search_text holds them folded.
+    aliases: list[str]
     packages: list[PackageEntry]
     # Retired, but with stock left: it may be taken, never received.
     retired: bool
@@ -238,6 +242,13 @@ def catalogue(session: Session) -> Catalogue:
                 ],
             )
         )
+    aliases: dict[int, list[str]] = {}
+    for item_id, alias in session.execute(
+        select(ItemAlias.item_id, ItemAlias.name)
+        .where(ItemAlias.retired_at.is_(None))
+        .order_by(ItemAlias.id)
+    ):
+        aliases.setdefault(item_id, []).append(alias)
     found = session.scalars(select(Label).where(Label.revoked_at.is_(None)))
     places = [LocationEntry.model_validate(x) for x in locations]
     entries = [
@@ -250,6 +261,7 @@ def catalogue(session: Session) -> Catalogue:
             part_number=item.part_number,
             old_code=item.old_code,
             search_text=f"{item.search_text} {fold(category)}",
+            aliases=aliases.get(item.id, []),
             packages=packages.get(item.id, []),
             retired=item.retired_at is not None,
             retired_packages=named.get(item.id, []),
