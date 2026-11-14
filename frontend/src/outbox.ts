@@ -160,17 +160,11 @@ export const KEY_REUSED =
   "Not recorded: its key was already used for a different batch. Please report this.";
 
 /** A save put back in the cart, then changed, whose older build's tab
- * recorded it first, as it was (409 key_reused), as kept; every note the
- * page shows for it opens with it (Ali, inventory-tng-93z and
- * inventory-tng-wyq, 'One wording for a put-back save refused for its
- * key'). */
+ * recorded it first, as it was (409 key_reused), as kept; the page's note
+ * for it opens with it (Ali, inventory-tng-93z and inventory-tng-wyq,
+ * 'One wording for a put-back save refused for its key'). */
 export const RECORDED_ELSEWHERE =
   "Not recorded: another tab recorded this cart before your changes.";
-
-/** Said after RECORDED_ELSEWHERE until the page is reloaded, beside the
- * page's Reload, so what it shows follows (Ali, inventory-tng-93z,
- * question 4, C): words for the page, never kept. */
-export const RELOAD_TO_CONTINUE = "Reload the page to continue.";
 
 /** What every build has kept of a save put back, changed and refused as
  * another tab recorded it first: this one, then those before. */
@@ -192,9 +186,9 @@ export function recordedElsewhere(note: string | null): boolean {
   return RECORDED_ELSEWHERE_KEPT.has(note ?? "");
 }
 
-/** What the page says of one recordedElsewhere, once nothing is left to
- * do but discard it (Ali, inventory-tng-wyq, question c): words for the
- * page, never kept. */
+/** What the page says of one recordedElsewhere, with Dismiss, or Discard
+ * in the older list (Ali, inventory-tng-wyq, question c, and
+ * inventory-tng-g0e, d): words for the page, never kept. */
 export const SCAN_AGAIN_CHANGED = `${RECORDED_ELSEWHERE} Scan again only what you changed.`;
 
 /** What every build has said of a batch refused for its key: this one,
@@ -209,11 +203,9 @@ export const REFUSED_FOR_KEY: ReadonlySet<string> = new Set([
  * online. */
 export const NO_ANSWER = "No answer from the inventory. Trying again shortly.";
 
-/** That the browser says it is offline (Ali, inventory-tng-wyq,
- * 'Offline'): words for the page, never kept. */
-export const OFFLINE_NOW = "This device is offline.";
-/** NO_ANSWER's words while the browser says it is offline. */
-export const OFFLINE = `${OFFLINE_NOW} Sending when it's back.`;
+/** NO_ANSWER's words while the browser says it is offline (Ali,
+ * inventory-tng-wyq, 'Offline'): words for the page, never kept. */
+export const OFFLINE = "This device is offline. Sending when it's back.";
 
 /** Before a refused batch's problems (422), as this build says it and as
  * builds before did: shown in bold, the problems after it not. */

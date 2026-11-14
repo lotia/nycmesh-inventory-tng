@@ -216,7 +216,7 @@ test("a save's package retired since, with none left, is named, never offered, a
   });
 });
 
-test("a save an older build's tab saved meanwhile is saved once, under its key; changed after it went back, it is not recorded, says so, and asks for a reload, after which it is listed until dismissed", async ({
+test("a save an older build's tab saved meanwhile is saved once, under its key; changed after it went back, it is not recorded, the stock is refreshed, and it says so until dismissed", async ({
   page,
 }) => {
   const cable = await ownCable(page);
@@ -257,29 +257,26 @@ test("a save an older build's tab saved meanwhile is saved once, under its key; 
   await leaveSaved();
   await page.getByLabel(/^Loose/).fill("3");
   const refused = sent(409);
+  // Then the page asks for the stock again at once, which shows what the
+  // other tab recorded (Ali, inventory-tng-g0e, d).
+  const refreshed = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/catalogue") && response.status() === 200,
+  );
   await page.getByRole("button", { name: "Record" }).click();
   await refused;
-  const said =
-    "Not recorded: another tab recorded this cart before your changes.";
-  const reloadWords = `${said} Reload the page to continue.`;
-  const entry = page.getByRole("listitem").filter({ hasText: said });
-  await expect(entry.locator("strong")).toHaveText(reloadWords);
+  await refreshed;
+  // One note, bold whole, saying what is left to do, with Dismiss at once
+  // and no Reload.
+  const left =
+    "Not recorded: another tab recorded this cart before your changes. Scan again only what you changed.";
+  const entry = page.getByRole("listitem").filter({ hasText: left });
+  await expect(entry.locator("strong")).toHaveText(left);
   // Its lines, numbered as a refusal names them, to compare with what was
   // recorded.
   await expect(entry.getByText(`1. ${cable}: 3 m`)).toBeVisible();
-  await expect(entry.getByRole("button", { name: "Dismiss" })).toHaveCount(0);
-  const reloaded = page.waitForEvent("load");
-  await entry.getByRole("button", { name: "Reload" }).click();
-  await reloaded;
-  // Reloaded, it no longer asks for a reload (Ali, inventory-tng-93z), and
-  // says what is left to do (Ali, inventory-tng-wyq, question c).
-  const left =
-    "Not recorded: another tab recorded this cart before your changes. Scan again only what you changed.";
-  const again = page.getByRole("listitem").filter({ hasText: left });
-  await expect(again.locator("strong")).toHaveText(left);
-  await expect(again.getByText(`1. ${cable}: 3 m`)).toBeVisible();
-  await expect(again.getByRole("button", { name: "Reload" })).toHaveCount(0);
-  await again.getByRole("button", { name: "Dismiss" }).click();
+  await expect(entry.getByRole("button", { name: "Reload" })).toHaveCount(0);
+  await entry.getByRole("button", { name: "Dismiss" }).click();
   await expect(page.getByText(left)).toHaveCount(0);
 });
 

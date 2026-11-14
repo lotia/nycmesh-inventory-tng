@@ -51,12 +51,8 @@ import {
   type Entry,
   NO_ANSWER,
   OFFLINE,
-  OFFLINE_NOW,
   STORAGE_KEY as OUTBOX_KEY,
   type Outbox,
-  RECORDED_ELSEWHERE,
-  REFUSED_FOR_KEY,
-  RELOAD_TO_CONTINUE,
   recordedElsewhere,
   refusalOf,
   type Said,
@@ -230,6 +226,26 @@ export function ScanPage({
       refresh();
     }
   }, [savedSince]);
+  // One put back and refused as another tab recorded it first, here or in
+  // another tab: ask again at once, so the stock shows what that tab
+  // recorded (Ali, inventory-tng-g0e, d). Once for each; the first load
+  // shows those refused before it.
+  const recordedFirst = entries
+    .filter((each) => each.state === "refused" && recordedElsewhere(each.note))
+    .map((each) => each.body.key);
+  const refreshedFor = useMemo(() => new Set(recordedFirst), []);
+  const ready = loaded.value.state === "ready";
+  useEffect(() => {
+    // Not while loading: a refresh would drop that load's answer.
+    const fresh = recordedFirst.filter((key) => !refreshedFor.has(key));
+    if (!ready || fresh.length === 0) {
+      return;
+    }
+    for (const key of fresh) {
+      refreshedFor.add(key);
+    }
+    refresh();
+  }, [recordedFirst.join(), ready]);
 
   useEffect(() => {
     const stop = outbox.listen();
@@ -282,8 +298,6 @@ export function ScanPage({
       <OutboxList
         outbox={outbox}
         catalogue={current.state === "ready" ? current.catalogue : null}
-        cartEmpty={cartEmpty.value}
-        reload={reload}
       />
     </main>
   );
@@ -309,7 +323,6 @@ function NewerBuild({
 }) {
   const learned = outbox.builds.newer.value;
   const holds = holding(outbox, cartEmpty);
-  // As reloadWaits says, without reading what it holds twice.
   if (learned === null || (learned !== "too_old" && holds)) {
     return null;
   }
@@ -337,15 +350,6 @@ function holding(outbox: Outbox, cartEmpty: boolean): boolean {
         entry.state === "waiting" &&
         (learned !== "too_old" || !outbox.builds.isNewer(entry.build)),
     )
-  );
-}
-
-/** Whether a reload waits (NewerBuild): a newer build is out, while this
- * tab can still save and holds something (Ali, inventory-tng-93z). */
-function reloadWaits(outbox: Outbox, cartEmpty: boolean): boolean {
-  const learned = outbox.builds.newer.value;
-  return (
-    learned !== null && learned !== "too_old" && holding(outbox, cartEmpty)
   );
 }
 
@@ -1220,11 +1224,6 @@ const NOT_KEPT =
 /** One went in the cart, but stays listed (row 22). */
 const NOT_REMOVED =
   "This item wasn't automatically removed. Record the cart and try to remove.";
-/** Instead of RELOAD_TO_CONTINUE while the reload waits for the cart. */
-const RECORD_THEN_RELOAD = "Record or discard your cart, then reload the page.";
-/** Instead of RELOAD_TO_CONTINUE while it waits for batches to be sent:
- * interim words, Ali's to settle. */
-const WAIT_THEN_RELOAD = "Wait until sending finishes, then reload the page.";
 /** Discard cart, confirmed after another tab changed the cart. */
 const CHANGED_BEFORE_DISCARD =
   "The cart was changed in another tab. Check it, then discard it again.";
@@ -1542,50 +1541,23 @@ function Finder({
  * What this browser sent, or is sending, and what became of each. A
  * refusal or failure says so in the alert's style, and a refused batch
  * lists its lines, to compare with what was recorded. One put back from
- * an older build and refused as another tab recorded it first asks for a
- * reload, which shows what was recorded, in place of Dismiss; after it,
- * it offers Dismiss (Ali, inventory-tng-93z, question 4, C).
+ * an older build and refused as another tab recorded it first says what
+ * is left to do (SCAN_AGAIN_CHANGED), as the older list does, while the
+ * page refreshes the stock (Ali, inventory-tng-g0e, d).
  */
 function OutboxList({
   outbox,
   catalogue,
-  cartEmpty,
-  reload,
 }: {
   outbox: Outbox;
   /** To name the lines of one refused; null until it is loaded. */
   catalogue: Catalogue | null;
-  /** Whether the cart holds no lines: until then, with a newer build
-   * out, the reload waits (reloadWaits). */
-  cartEmpty: boolean;
-  reload: () => void;
 }) {
-  // Refused before this page loaded: reloaded since.
-  const refusedBefore = useMemo(
-    () =>
-      new Set(
-        outbox.entries.value
-          .filter((entry) => entry.state === "refused")
-          .map((entry) => entry.body.key),
-      ),
-    [],
-  );
   const online = useOnline();
   const entries = outbox.shown().reverse();
   if (entries.length === 0) {
     return null;
   }
-  const waits = reloadWaits(outbox, cartEmpty);
-  // What to do before a reload, said after RECORDED_ELSEWHERE: held back,
-  // what it waits for (Ali, inventory-tng-wyq, 'Held-back Reload note'
-  // and 'Offline').
-  const reloadWords = !waits
-    ? RELOAD_TO_CONTINUE
-    : !cartEmpty
-      ? RECORD_THEN_RELOAD
-      : online
-        ? WAIT_THEN_RELOAD
-        : `${OFFLINE_NOW} ${WAIT_THEN_RELOAD}`;
   const needsRegistering = entries.some((e) => e.waitingFor === "registration");
   return (
     <section>
@@ -1599,22 +1571,10 @@ function OutboxList({
         {entries.map((entry) => {
           const key = entry.body.key;
           const refused = entry.state === "refused";
-          // Put back and refused for its key since the page loaded: to be
-          // reloaded, once a reload no longer waits; reloaded, dismissed.
-          // Any build's words for a key refusal (REFUSED_FOR_KEY), not
-          // only recordedElsewhere's, as older builds may have kept them.
-          const toReload =
-            refused &&
-            entry.putBack === true &&
-            REFUSED_FOR_KEY.has(entry.note ?? "") &&
-            !refusedBefore.has(key);
-          // Kept without the reload's words, which only the page says
-          // (inventory-tng-93z's build kept them); reloaded, what is left
-          // to do, as the older list says it.
+          // As any build kept it, what is left to do, as the older list
+          // says it.
           const note = recordedElsewhere(entry.note)
-            ? toReload
-              ? `${RECORDED_ELSEWHERE} ${reloadWords}`
-              : SCAN_AGAIN_CHANGED
+            ? SCAN_AGAIN_CHANGED
             : entry.note === NO_ANSWER && !online
               ? OFFLINE
               : entry.note;
@@ -1639,18 +1599,11 @@ function OutboxList({
                   ))}
                 </ul>
               )}
-              {entry.state !== "waiting" &&
-                (toReload ? (
-                  !waits && (
-                    <button type="button" onClick={reload}>
-                      Reload
-                    </button>
-                  )
-                ) : (
-                  <button type="button" onClick={() => outbox.dismiss(key)}>
-                    Dismiss
-                  </button>
-                ))}
+              {entry.state !== "waiting" && (
+                <button type="button" onClick={() => outbox.dismiss(key)}>
+                  Dismiss
+                </button>
+              )}
             </li>
           );
         })}

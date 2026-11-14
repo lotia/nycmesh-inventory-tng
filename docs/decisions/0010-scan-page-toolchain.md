@@ -198,19 +198,22 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   A refused batch in the outbox list lists its lines, numbered as its
   problems name them, so the volunteer can compare it with what was
   recorded. One put back from an older build and refused as another tab
-  recorded it first asks for a reload, in place of Dismiss, so the page
-  shows what was recorded, held back as a newer build's reload is, saying
-  meanwhile what it waits for; after it, the batch stays listed, no longer
-  asking, until dismissed, saying to scan again only what changed. We
-  rejected leaving only Dismiss, which dropped the note before the
+  recorded it first makes the page ask for the catalogue and stock at
+  once, as its periodic refresh does, so the stock shows what was
+  recorded, and stays listed with Dismiss, saying "Not recorded: another
+  tab recorded this cart before your changes. Scan again only what you
+  changed." (Ali, 2026-11-14, inventory-tng-g0e). It replaces a Reload
+  button in place of Dismiss (inventory-tng-93z), held back as a newer
+  build's reload is while the cart held lines or batches were sending,
+  with a note for each wait: refreshing in place gives the volunteer the
+  same stock, holds nothing back and needs one note. We rejected leaving
+  only Dismiss without a refresh, which dropped the note before the
   volunteer had seen the stock as it is. Such a batch never goes in a
   cart again, in the older list too, which offers only its Discard (Ali,
   inventory-tng-wyq): what it held is recorded, and once more would
-  record it twice. Each of its notes, before the reload, held back and
-  after it, opens "Not recorded: another tab recorded this cart before
-  your changes." (Ali, inventory-tng-wyq), in place of "another tab
-  recorded this first.", which earlier builds kept and the page still
-  recognises.
+  record it twice. The words earlier builds kept for it, such as
+  "another tab recorded this first." with or without "Reload the page to
+  continue.", are still recognised.
   The page's words drop "save" (Ali, 2026-11-13, inventory-tng-wyq): the
   cart lives in the browser, written to storage as it changes, so what
   the browser holds is "kept", and what the inventory takes is
