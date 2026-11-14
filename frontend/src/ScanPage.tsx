@@ -1050,8 +1050,8 @@ function AlertWords({ words }: { words: string }) {
   );
 }
 
-/** `words`, each number in italic: not the digits of a name, such as
- * LiteBeam 5AC's. */
+/** `words`, each number standing alone in italic, a name's too ("Bag of
+ * 50"); not digits joined to letters, such as LiteBeam 5AC's. */
 function Numbered({ words }: { words: string }) {
   return (
     <>
