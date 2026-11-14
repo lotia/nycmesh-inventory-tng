@@ -14,7 +14,9 @@
  * Each version's shape is in the history of outbox.ts and cart.ts. Every
  * batch kept its key, kind, volunteer_id, places, install_number and lines
  * of item_id and quantity (a number in v1, then a decimal), with what,
- * queuedAt, state and note; package_id came in v1, open packages later.
+ * queuedAt and state, and why it was refused: note, in words, to v3,
+ * then reason, a code (outbox.Reason); package_id came in v1, open
+ * packages later.
  * Every cart kept its kind, volunteerId, places, installNumber, usedAt and
  * lines of itemId, packages (counts by package id) and loose; from v2, the
  * key of the save an older build left that filled it (batchKey), and each
@@ -38,9 +40,12 @@ import {
 import {
   BatchKey,
   lineNumbers,
+  type Note,
+  noteOf,
   STORAGE_KEY as OUTBOX_KEY,
-  REFUSED_FOR_KEY,
   REPORTS,
+  Reason,
+  type Said,
 } from "./outbox";
 import { count, decimal, thousandths } from "./quantity";
 import {
@@ -77,7 +82,9 @@ const OldEntry = v.object({
   }),
   state: v.picklist(["waiting", "refused", "too_old"]),
   queuedAt: maybe(v.number()),
+  /** Why it was refused: in words to v3, as a code from v4. */
   note: maybe(v.string()),
+  reason: maybe(Reason),
 });
 
 const OldLine = v.object({
@@ -130,7 +137,7 @@ export type Older = {
   /** When it was saved, or a cart last changed, in milliseconds since 1970. */
   at: number | null;
   /** Why the inventory refused it; null while it waits. */
-  refused: string | null;
+  refused: Refused | null;
   /** Its lines, as the batch or the cart kept them, each read on its own:
    * null for one that cannot be. */
   lines: (OldBatchLine | OldCartLine | null)[];
@@ -141,6 +148,11 @@ export type Older = {
    * said what was on them. */
   reports: { usedUp: number; lengths: number };
 };
+
+/** Why the inventory refused a save, as a code (outbox.Reason), and as
+ * the page says it: in this build's words from a code, or as an older
+ * build kept them (refusedOf). */
+export type Refused = { code: Reason["code"]; note: Note };
 
 type OldBatchLine = v.InferOutput<typeof OldLine>;
 type OldCartLine = v.InferOutput<typeof OldCartLine>;
@@ -192,12 +204,16 @@ function savesIn(key: string, stored: unknown): Older[] {
 
 /** A save kept under `key`, as listed. */
 function saveOf(key: string, save: v.InferOutput<typeof OldEntry>): Older {
-  const { body, state, queuedAt, note } = save;
+  const { body, state, queuedAt, note, reason } = save;
+  const refused = state === "refused" ? refusedOf(reason, note) : null;
   return {
     key,
     batch: body.key,
+    // Refused for its key, the inventory holds that key for another.
     batchKey:
-      state === "refused" && REFUSED_FOR_KEY.has(note ?? "") ? null : body.key,
+      refused?.code === "key_reused" || refused?.code === "recorded_elsewhere"
+        ? null
+        : body.key,
     kind: body.kind,
     volunteerId: body.volunteer_id,
     fromId: body.from_location_id,
@@ -205,7 +221,7 @@ function saveOf(key: string, save: v.InferOutput<typeof OldEntry>): Older {
     installNumber:
       body.install_number === null ? "" : String(body.install_number),
     at: queuedAt,
-    refused: state === "refused" ? (note ?? "") : null,
+    refused,
     lines: linesOf(body.lines ?? [], OldLine),
     linesLost: body.lines === null,
     reports: {
@@ -213,6 +229,44 @@ function saveOf(key: string, save: v.InferOutput<typeof OldEntry>): Older {
       lengths: body.lengths?.length ?? 0,
     },
   };
+}
+
+/** What main's build (v3) kept of a batch refused for its key. */
+const KEY_REUSED_KEPT =
+  "Not saved: its key was already used for a different batch. Please report this.";
+/** Before the problems main's build kept of a batch refused (422). */
+const NOT_SAVED = "Not saved.";
+
+/** Where a problem main's build kept names its line or report. */
+const MARKERS = new RegExp(
+  `((?:^| )(?:Line \\d+|(?:${Object.values(REPORTS).join("|")}), \\d+): )`,
+);
+
+/**
+ * Why a save was refused: from its code, as this build keeps it; or from
+ * the words an older build kept, read for their code, and shown as kept,
+ * main's "Not saved." in bold before its problems, each naming its line
+ * or report in the page's words and why in the server's (Ali,
+ * inventory-tng-93z).
+ */
+function refusedOf(reason: Reason | null, note: string | null): Refused {
+  if (reason !== null) {
+    return { code: reason.code, note: noteOf(reason) };
+  }
+  const words = note ?? "";
+  if (words === KEY_REUSED_KEPT) {
+    return { code: "key_reused", note: { bold: [words] } };
+  }
+  if (!words.startsWith(NOT_SAVED)) {
+    return { code: "refused", note: { bold: words === "" ? [] : [words] } };
+  }
+  const plain: Said = words
+    .slice(NOT_SAVED.length)
+    .split(MARKERS)
+    .flatMap((part, at) =>
+      part === "" ? [] : [at % 2 === 1 ? part : { quoted: part }],
+    );
+  return { code: "refused", note: { bold: [NOT_SAVED], plain } };
 }
 
 /**

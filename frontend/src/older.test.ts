@@ -21,7 +21,7 @@ import {
   unreadWords,
   withRetired,
 } from "./older";
-import { REFUSED_FOR_KEY } from "./outbox";
+import { KEY_REUSED, noteOf, SCAN_AGAIN_CHANGED } from "./outbox";
 import { CATALOGUE } from "./test-catalogue";
 import { refusing } from "./test-storage";
 
@@ -100,7 +100,11 @@ describe("reading what older builds left", () => {
     ]);
     expect(listed()).toEqual([
       { key: "inventory.outbox.v3", batch: KEY, refused: null },
-      { key: "inventory.outbox.v3", batch: OTHER, refused: "Not saved." },
+      {
+        key: "inventory.outbox.v3",
+        batch: OTHER,
+        refused: { code: "refused", note: { bold: ["Not saved."], plain: [] } },
+      },
     ]);
   });
 
@@ -465,16 +469,76 @@ describe("as a cart", () => {
     expect(toCart(readOlder()[0] as Older, CATALOGUE).cart.batchKey).toBe(KEY);
   });
 
-  test.each([...REFUSED_FOR_KEY])(
-    "a save refused for its key (%j) goes back without it, as the inventory holds it for another",
-    (note) => {
-      const refused = only(saveOf({ state: "refused", note }));
+  test.each([
+    [
+      "main's words",
+      {
+        note: "Not saved: its key was already used for a different batch. Please report this.",
+      },
+    ],
+    ["this build's code", { reason: { code: "key_reused" } }],
+    [
+      "this build's code for one recorded elsewhere",
+      { reason: { code: "recorded_elsewhere" } },
+    ],
+  ])(
+    "a save refused for its key (%s) goes back without it, as the inventory holds it for another",
+    (_name, why) => {
+      const refused = only(saveOf({ state: "refused", ...why }));
       expect(toCart(refused, CATALOGUE).cart).not.toHaveProperty("batchKey");
       // Refused for anything else, the key never took it: kept.
       const invalid = only(saveOf({ state: "refused", note: "Not saved." }));
       expect(toCart(invalid, CATALOGUE).cart.batchKey).toBe(KEY);
     },
   );
+
+  test("why one was refused is read as a code, and said as kept, or from its code", () => {
+    const refusedFor = (why: object) =>
+      only(saveOf({ state: "refused", ...why })).refused;
+    // Main's words: its key's, said as kept.
+    const mainKey =
+      "Not saved: its key was already used for a different batch. Please report this.";
+    expect(refusedFor({ note: mainKey })).toEqual({
+      code: "key_reused",
+      note: { bold: [mainKey] },
+    });
+    // Main's refusal: "Not saved." in bold, each line or report it names
+    // in the page's words, why in the server's.
+    expect(
+      refusedFor({
+        note: "Not saved. Line 1: no. Open package said used up, 2: gone",
+      }),
+    ).toEqual({
+      code: "refused",
+      note: {
+        bold: ["Not saved."],
+        plain: [
+          " Line 1: ",
+          { quoted: "no." },
+          " Open package said used up, 2: ",
+          { quoted: "gone" },
+        ],
+      },
+    });
+    // Other words, bold whole; none, nothing.
+    expect(refusedFor({ note: "No." })).toEqual({
+      code: "refused",
+      note: { bold: ["No."] },
+    });
+    expect(refusedFor({ note: null })).toEqual({
+      code: "refused",
+      note: { bold: [] },
+    });
+    // A code, in this build's words.
+    expect(refusedFor({ reason: { code: "key_reused" } })).toEqual({
+      code: "key_reused",
+      note: noteOf({ code: "key_reused" }),
+    });
+    expect(noteOf({ code: "key_reused" })).toEqual({ bold: [KEY_REUSED] });
+    expect(
+      refusedFor({ reason: { code: "recorded_elsewhere" } })?.note,
+    ).toEqual({ bold: [SCAN_AGAIN_CHANGED] });
+  });
 
   test("what the cart cannot hold is told, to do again", () => {
     const { cart, gaps } = toCart(

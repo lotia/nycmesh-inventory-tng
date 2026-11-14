@@ -202,6 +202,14 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   naming the problem, which Ali found hard to spot once seen, opening
   "Sorry.", which delays the problem, and italicising the numbers of
   names and the server's words, which are no counts.
+  The outbox keeps why a batch was refused, or waits, as a code with
+  its data (the HTTP status and tries, a 422's problems by line or
+  report with the server's words), and the page makes the words as it
+  shows them (Ali, 2026-11-14, inventory-tng-7x2). We rejected keeping
+  the sentence, which tied the stored shape to the wording, so a change
+  of words took a new key, and had the page match sentences to know
+  what happened. Older keys keep main's sentences, read for their code
+  and shown as kept.
   A refused batch in the outbox list lists its lines, numbered as its
   problems name them, so the volunteer can compare it with what was
   recorded. One put back from an older build and refused as another tab

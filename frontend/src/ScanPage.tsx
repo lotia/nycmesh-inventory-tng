@@ -50,14 +50,11 @@ import {
 } from "./older";
 import {
   type Entry,
-  NO_ANSWER,
-  OFFLINE,
+  type Note,
+  noteOf,
   STORAGE_KEY as OUTBOX_KEY,
   type Outbox,
-  recordedElsewhere,
-  refusalOf,
   type Said,
-  SCAN_AGAIN_CHANGED,
   sharedOutbox,
   wordsOf,
 } from "./outbox";
@@ -240,7 +237,7 @@ export function ScanPage({
   // recorded (Ali, inventory-tng-g0e, d). Once for each; the first load
   // shows those refused before it.
   const recordedFirst = entries
-    .filter((each) => each.state === "refused" && recordedElsewhere(each.note))
+    .filter((each) => each.reason?.code === "recorded_elsewhere")
     .map((each) => each.body.key);
   const refreshedFor = useRef(new Set(recordedFirst)).current;
   const ready = shown !== null;
@@ -951,7 +948,8 @@ function OlderList({
         lost,
         lines,
         // Recorded elsewhere, it never goes in a cart again.
-        fills: cart.lines.length > 0 && !recordedElsewhere(each.refused),
+        fills:
+          cart.lines.length > 0 && each.refused?.code !== "recorded_elsewhere",
         retired: lines.some((line) => line.retired),
       };
     });
@@ -1000,10 +998,10 @@ function OlderList({
               </div>
               {each.refused === null ? (
                 <small>{olderWhen(each)}</small>
-              ) : recordedElsewhere(each.refused) ? (
-                <NoteSaid note={SCAN_AGAIN_CHANGED} />
+              ) : each.refused.code === "recorded_elsewhere" ? (
+                <NoteSaid note={each.refused.note} />
               ) : (
-                <NoteSaid note={each.refused} then={FIX_THEN_RECORD} />
+                <NoteSaid note={each.refused.note} then={FIX_THEN_RECORD} />
               )}
               {lost !== null && <NoteSaid note={lost} />}
               {lines.length > 0 && (
@@ -1116,13 +1114,15 @@ function OlderList({
  * is there as the list is shown, and several at once, read out together,
  * would drown each other and the page.
  */
-function NoteSaid({ note, then }: { note: string; then?: string }) {
+function NoteSaid({ note, then }: { note: string | Note; then?: string }) {
+  const said = typeof note === "string" ? { bold: [note] } : note;
+  const empty = said.bold.length === 0 && (said.plain ?? []).length === 0;
   return (
     <p class="alert">
-      {note !== "" && <AlertWords words={note} />}
+      {!empty && <AlertWords words={said} />}
       {then !== undefined && (
         <>
-          {note !== "" && " "}
+          {!empty && " "}
           <strong>{then}</strong>
         </>
       )}
@@ -1164,18 +1164,21 @@ function ConfirmDiscard({
  * A failure or refusal note's words, in bold, the counts the page wrote
  * in it in bold italic, never a number of a name it quotes (Ali,
  * inventory-tng-93z); of a refusal, the problems after "Not recorded."
- * not in bold, the server's words in them as they are.
+ * (Note.plain) not in bold, the server's words in them as they are.
  */
-function AlertWords({ words }: { words: string | Said }) {
-  const refusal = typeof words === "string" ? refusalOf(words) : null;
-  return refusal === null ? (
-    <strong>
-      <Counted said={typeof words === "string" ? [words] : words} />
-    </strong>
-  ) : (
+function AlertWords({ words }: { words: string | Said | Note }) {
+  const { bold, plain = [] }: Note =
+    typeof words === "string"
+      ? { bold: [words] }
+      : "bold" in words
+        ? words
+        : { bold: words };
+  return (
     <>
-      <strong>{refusal.lead}</strong>
-      <Counted said={refusal.problems} />
+      <strong>
+        <Counted said={bold} />
+      </strong>
+      {plain.length > 0 && <Counted said={plain} />}
     </>
   );
 }
@@ -1590,24 +1593,19 @@ function OutboxList({
       <ul class={RULED_LIST}>
         {entries.map((entry) => {
           const key = entry.body.key;
-          // What is left to do, as the older list says it.
-          const note = recordedElsewhere(entry.note)
-            ? SCAN_AGAIN_CHANGED
-            : entry.note === NO_ANSWER && !online
-              ? OFFLINE
-              : entry.note;
+          const { reason } = entry;
           const lines = linesOf.get(key) ?? [];
           return (
             <li key={key} class="flex flex-col items-start gap-1">
               <div>{entry.what}</div>
               {entry.state === "saved" ? (
                 <small>Recorded (transaction {entry.transactionId}).</small>
-              ) : note === null || note === MUST_UPGRADE ? (
+              ) : reason === null || reason.code === "must_upgrade" ? (
                 // Asked for, an upgrade is no failure.
-                <small>{note ?? "Sending…"}</small>
+                <small>{reason === null ? "Sending…" : MUST_UPGRADE}</small>
               ) : (
                 // Not role="alert": every one is there as the page loads.
-                <NoteSaid note={note} />
+                <NoteSaid note={noteOf(reason, online)} />
               )}
               {lines.length > 0 && (
                 <ul class="list-none p-0">
