@@ -155,6 +155,34 @@ def test_a_saved_item_is_refused_what_another_has_its_own_respelt(
     assert item.name == "Lite Beam"
 
 
+def test_a_name_is_checked_and_saved_in_canonical_spelling(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Typed with the micro sign, a name is compared and stored with μ
+    (docs/decisions/0021, 2026-11-14): another's in that spelling is taken,
+    naming it, and its own respelt so is no change asked about."""
+    form = {"category_id": str(radios.id), "unit": "each"}
+    assert (
+        admin_client.post(ITEMS, data=form | {"name": "Cap 10\u00b5F"}).status_code
+        == 303
+    )
+    item = named(session, Item, "Cap 10\u03bcF")
+    refused = admin_client.post(ITEMS, data=form | {"name": "cap 10\u00b5f"})
+    assert refused.status_code == 400
+    assert "Cap 10\u03bcF already has that name" in refused.text
+    path = f"{ITEMS}/{item.id}"
+    edit = form | {"version": str(item.edit_version)}
+    saved = admin_client.post(path, data=edit | {"name": "Cap 10\u00b5F"})
+    assert saved.status_code == 303
+    # Close names, asked about, then sent again as the form sends them.
+    add(session, Item(name="Cap 10\u03bcF 50V", category_id=radios.id))
+    asked = admin_client.post(ITEMS, data=form | {"name": "Cap 10\u00b5F 5OV"})
+    assert "A different item?" in text(asked)
+    again = {"name": "Cap 10\u00b5F 5OV", "different": "Cap 10\u00b5F 5OV"}
+    assert admin_client.post(ITEMS, data=form | again).status_code == 303
+    named(session, Item, "Cap 10\u03bcF 5OV")
+
+
 def test_a_clash_gone_meanwhile_is_said_in_general(
     admin_client: TestClient,
     session: Session,

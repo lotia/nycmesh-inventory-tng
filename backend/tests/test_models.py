@@ -18,6 +18,7 @@ from inventory_tng.db import ACTOR_INFO, Base, refusal, set_actor
 from inventory_tng.models import (
     LABEL_ALPHABET,
     LABEL_LENGTH,
+    AdjustmentReason,
     CatalogueHistory,
     Category,
     Item,
@@ -25,6 +26,8 @@ from inventory_tng.models import (
     Label,
     Location,
     Volunteer,
+    canonical,
+    fold,
     fuzzy,
     mint_code,
     mint_label_code,
@@ -102,6 +105,48 @@ def test_item_names_are_unique_ignoring_case_spaces_and_punctuation(
     new_item("Cble")
     new_item("LiteBeam 5AC Gen1")
     new_item("LiteBeam 5AC Gen2")
+
+
+def test_names_are_stored_in_canonical_spelling(
+    new_item: Callable[..., Item], session: Session, category: Category
+) -> None:
+    """NFC, with µ as μ and ℃ and ℉ as °C and °F; case, m² and ﬁ as typed,
+    which NFKC would change (docs/decisions/0021, 2026-11-14). As each is
+    set, on every model whose name an administrator types."""
+    assert canonical("10\u00b5F 50\u2126 4\u212a 85\u2103 72\u2109") == (
+        "10\u03bcF 50\u03a9 4K 85°C 72°F"
+    )
+    assert canonical("Cafe\u0301 \ufb01ber 1 m\u00b2 MHz") == (
+        "Caf\u00e9 \ufb01ber 1 m\u00b2 MHz"
+    )
+    # What searches compare is the same of either spelling.
+    for typed in ("10\u00b5F", "85\u2103", "50\u2126", "Cafe\u0301"):
+        assert fold(canonical(typed)) == fold(typed)
+    item = new_item("Cap 10\u00b5F")
+    package = add(session, ItemPackage(item_id=item.id, name="Reel 85\u2103", size=1))
+    rows = (
+        item,
+        package,
+        add(session, Location(name="Cold room 4\u2103", kind="store")),
+        add(session, Volunteer(name="Rene\u0301e")),
+        add(session, AdjustmentReason(name="Lost at 72\u2109")),
+    )
+    category.name = "Capacitors \u00b5F"
+    item.name = "Cap 22\u00b5F"
+    session.flush()
+    for row in (*rows, category):
+        session.refresh(row)
+    assert [row.name for row in (*rows, category)] == [
+        "Cap 22\u03bcF",
+        "Reel 85°C",
+        "Cold room 4°C",
+        "Ren\u00e9e",
+        "Lost at 72°F",
+        "Capacitors \u03bcF",
+    ]
+    # So a name typed in another spelling clashes with it.
+    with violates(session, "uq_item_name"):
+        new_item("cap 22 \u03bcf")
 
 
 def test_a_decimal_point_between_digits_tells_names_apart(

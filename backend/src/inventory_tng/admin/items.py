@@ -44,6 +44,7 @@ from inventory_tng.models import (
     Label,
     Movement,
     OpenPackage,
+    canonical,
     whole,
 )
 from inventory_tng.pages import NOTICES, not_found, redirect
@@ -303,7 +304,7 @@ def _item_page(
 def _confirmed(form: Mapping[str, str], fields: items.Fields) -> bool:
     """Whether the name was sent before and asked about, then sent again
     unchanged: a different item's, whatever is close."""
-    return form.get(DIFFERENT, "").strip() == fields.name
+    return canonical(form.get(DIFFERENT, "").strip()) == fields.name
 
 
 def _key_name_problem(session: Session, name: str) -> str | None:
@@ -321,7 +322,8 @@ def _fields(
     session: Session, form: Mapping[str, str]
 ) -> tuple[items.Fields | None, dict[str, str]]:
     """What to set, unless something is wrong, and what is."""
-    name = form.get("name", "").strip()
+    # As it will be stored (models.CanonicalName), so it is compared so.
+    name = canonical(form.get("name", "").strip())
     problems: dict[str, str] = {}
     if problem := _key_name_problem(session, name):
         problems["name"] = problem

@@ -267,6 +267,11 @@ decimal mark this is wrong (`30,5 m` clashes with `305 m`); the app is
 English-only and follows US conventions today (inventory-tng-g6u.1, under
 inventory-tng-g6u).
 
+Every name an administrator types is stored in canonical spelling
+(`models.canonical`, decision 0021): NFC, with `µ` as `μ` and `℃` and `℉`
+as `°C` and `°F`, case kept. A form that compares a name before saving
+compares it so.
+
 ### Locking a row
 
 Lock rows with `db.locked` (a select) or `db.get_locked` (`Session.get`),

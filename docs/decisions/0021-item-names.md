@@ -141,3 +141,24 @@ and half as the server folds it finds nothing, such as `lø` or `ło` for
 Rejected: `unaccent()` at search time, which no index serves without a
 function of our own wrapping it (0016), so each search reads the whole
 table; and decomposing alone, for what it misses.
+
+## Amendment: names are stored in canonical spelling (2026-11-14)
+
+A name is stored in one spelling of each character, whichever a keyboard
+or a paste gave (Ali, 2026-11-12, inventory-tng-c0c): Unicode's NFC, so
+the Ohm, Kelvin and Angstrom signs are `Ω`, `K` and `Å` and an accent
+typed apart is one letter with it; and the micro sign `µ` as the Greek
+`μ`, and `℃` and `℉` as `°C` and `°F`, as the SI Brochure and ISO 80000
+write them. Case and every other character stay as typed: not NFKC, which
+would also show `m²` as `m2` and `ﬁ` as `fi`. So `10µF` typed is stored
+`10μF`, and clashes with an item already so named.
+
+It holds for every name an administrator types: items', packages',
+categories', places', volunteers' and adjustment reasons'
+(`models.CanonicalName`, as each is set, whoever sets it). The item form
+compares a name in that spelling, so the clash names the other item.
+What searches compare does not change: `fold` makes the same of either
+spelling. Migration 0035 rewrote the names there were in place, and
+names by id any that would clash once rewritten, to rename first.
+
+Matching units whatever their spelling is inventory-tng-c0c's next part.

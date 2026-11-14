@@ -253,3 +253,84 @@ def test_going_back_before_package_forms_names_what_it_cannot_hold(
     )
     with pytest.raises(RuntimeError, match=f"by id: {receipt}\\. 0023"):
         command.downgrade(alembic_config, "0023")
+
+
+def test_names_are_rewritten_in_canonical_spelling(alembic_config: Config) -> None:
+    """Migration 0035: names in canonical spelling, in place; m² and ﬁ, which
+    NFKC would change, and case, kept; what searches compare unchanged."""
+    command.downgrade(alembic_config, "0034")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Sensors 85℃') RETURNING id")
+    )
+
+    def item(name: str) -> int:
+        return connection.scalar(
+            text(
+                "INSERT INTO item (name, category_id, search_text, name_folded,"
+                " folded_with) VALUES (:n, :c, 'kept', 'kept', 'x') RETURNING id"
+            ),
+            {"n": name, "c": category_id},
+        )
+
+    # The Ohm sign, a decomposed é, the micro sign, ℉.
+    ohm, cafe, ligature = item("50Ω load"), item("Café µF"), item("ﬁber 1 m² 72℉")
+    command.upgrade(alembic_config, "head")
+    names = dict(connection.execute(text("SELECT id, name FROM item")).all())
+    assert names == {
+        ohm: "50Ω load",
+        cafe: "Café μF",
+        ligature: "ﬁber 1 m² 72°F",
+    }
+    assert connection.scalar(
+        text("SELECT name FROM category WHERE id = :c"), {"c": category_id}
+    ) == ("Sensors 85°C")
+    assert set(connection.scalars(text("SELECT search_text FROM item"))) == {"kept"}
+
+
+def test_names_clashing_once_canonical_are_named_first(alembic_config: Config) -> None:
+    """Migration 0035: names that would be one once canonical are named by id
+    to rename, whichever table's; nothing is renamed until none would."""
+    command.downgrade(alembic_config, "0034")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Capacitors') RETURNING id")
+    )
+    micro, greek = (
+        connection.scalar(
+            text(
+                "INSERT INTO item (name, category_id, search_text, name_folded,"
+                " folded_with) VALUES (:n, :c, '', '', '') RETURNING id"
+            ),
+            {"n": name, "c": category_id},
+        )
+        for name in ("Cap 10µF", "cap 10 μf")
+    )
+    store, shelf = (
+        connection.scalar(
+            text(
+                "INSERT INTO location (name, kind, search_text, folded_with)"
+                " VALUES (:n, 'store', '', '') RETURNING id"
+            ),
+            {"n": name},
+        )
+        for name in ("Cold room 4℃", "cold room 4°c")
+    )
+    with pytest.raises(
+        RuntimeError,
+        match=f"by id: item {micro}, {greek}; location {store}, {shelf}\\. Rename",
+    ):
+        command.upgrade(alembic_config, "head")
+    assert connection.scalar(
+        text("SELECT name FROM item WHERE id = :i"), {"i": micro}
+    ) == ("Cap 10µF")
+    connection.execute(
+        text("UPDATE item SET name = 'Cap 10 mF' WHERE id = :i"), {"i": greek}
+    )
+    connection.execute(
+        text("UPDATE location SET name = 'Cold room 2' WHERE id = :i"), {"i": shelf}
+    )
+    command.upgrade(alembic_config, "head")
+    assert connection.scalar(
+        text("SELECT name FROM item WHERE id = :i"), {"i": micro}
+    ) == ("Cap 10μF")

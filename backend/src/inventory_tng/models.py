@@ -207,6 +207,30 @@ def fold(text: str) -> str:
     return anyascii(unicodedata.normalize("NFKC", text))
 
 
+# Signs a name is stored without, for the spelling Unicode and the SI
+# Brochure give (docs/decisions/0021, 2026-11-14): the micro sign as the
+# Greek mu, and the one-character degree signs as a degree and a letter.
+# NFKC would make them so too, but also m² into m2 and ﬁ into fi.
+CANONICAL_SIGNS = str.maketrans({"\u00b5": "\u03bc", "\u2103": "°C", "\u2109": "°F"})
+
+
+def canonical(name: str) -> str:
+    """`name` as it is stored: NFC, so the Ohm, Kelvin and Angstrom signs are
+    Ω, K and Å, and without CANONICAL_SIGNS; case and every other character
+    as typed. fold() makes the same of either spelling."""
+    return unicodedata.normalize("NFC", name.translate(CANONICAL_SIGNS))
+
+
+class CanonicalName:
+    """A row whose `name` an administrator types: kept as canonical() spells
+    it, however it is set, so `10µF` typed is `10μF` stored and clashes
+    with it (docs/decisions/0021, 2026-11-14)."""
+
+    @validates("name")
+    def _canonical(self, _key: str, value: str) -> str:
+        return canonical(value)
+
+
 # What folds (fold), as each folded row records it (Searchable.folded_with),
 # so rows a release of anyascii, or a Python with a newer Unicode, would
 # spell otherwise can be found.
@@ -316,7 +340,7 @@ class Versioned:
     )
 
 
-class Category(Versioned, Base):
+class Category(CanonicalName, Versioned, Base):
     __tablename__ = "category"
     __table_args__ = (
         # Retired ones too, so one can always be brought back
@@ -331,7 +355,7 @@ class Category(Versioned, Base):
     retired_at: Mapped[RetiredAt]
 
 
-class Item(Searchable, Versioned, Base):
+class Item(CanonicalName, Searchable, Versioned, Base):
     """A catalogue entry, never the stock: stock comes from the ledger, and is
     always counted in `unit`."""
 
@@ -405,7 +429,7 @@ class Item(Searchable, Versioned, Base):
         self.name_folded = fold(self.name or "")
 
 
-class ItemPackage(Searchable, Versioned, Base):
+class ItemPackage(CanonicalName, Searchable, Versioned, Base):
     """A size an item comes in: "100-pack" = 100, "reel" = 305 (m)."""
 
     __tablename__ = "item_package"
@@ -549,7 +573,7 @@ class VendorPrice(Base):
     )
 
 
-class Volunteer(Searchable, Versioned, Base):
+class Volunteer(CanonicalName, Searchable, Versioned, Base):
     """A name to pick, not a login (docs/decisions/0004)."""
 
     __tablename__ = "volunteer"
@@ -585,7 +609,7 @@ class Volunteer(Searchable, Versioned, Base):
     retired_at: Mapped[RetiredAt]
 
 
-class Location(Searchable, Versioned, Base):
+class Location(CanonicalName, Searchable, Versioned, Base):
     """Where stock is (docs/decisions/0003). Areas nest under a store or
     another area; a volunteer holding stock is a custody location."""
 
@@ -1194,7 +1218,7 @@ class SiteSettings(Versioned, Base):
         return value
 
 
-class AdjustmentReason(Versioned, Base):
+class AdjustmentReason(CanonicalName, Versioned, Base):
     """Why stock was written off or found outside a count. Administrators
     extend the list (adjustment_reasons.py); its first entries come with its
     migration."""
