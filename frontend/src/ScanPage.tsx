@@ -380,8 +380,8 @@ function CartForm({
   const problems = useSignal<Said[]>([]);
   // What was last sent to be recorded, in words.
   const saved = useSignal<string | null>(null);
-  // Whether Discard cart waits to be confirmed.
-  const discarding = useSignal(false);
+  // While Discard cart waits to be confirmed, the cart's revision then.
+  const discarding = useSignal<string | null>(null);
   // An older save just put back in the cart, and what it left to do again.
   const putBack = useSignal<Gaps | null>(null);
   // After a while unused, the phone may have changed hands: offer to
@@ -433,7 +433,7 @@ function CartForm({
   function change(next: Cart) {
     saved.value = null;
     putBack.value = null;
-    discarding.value = false;
+    discarding.value = null;
     kept(store.change(next));
   }
 
@@ -546,9 +546,17 @@ function CartForm({
 
   /** Drop the cart's lines, and with them its batch key, as Record does,
    * once the volunteer has confirmed it; who and where stay, as after
-   * Record. */
+   * Record. Not if another tab changed the cart since it was asked:
+   * what it added was never confirmed. */
   function discard() {
-    change(freshCart(cart.value));
+    const asked = discarding.value;
+    const current = store.forSaving();
+    if (current === null || current.revision !== asked) {
+      discarding.value = null;
+      problems.value = [[CHANGED_BEFORE_DISCARD]];
+      return;
+    }
+    change(freshCart(current));
     telemetry.record({ kind: "cart_discarded" });
   }
 
@@ -825,7 +833,7 @@ function CartForm({
         Record
       </button>
       {!empty &&
-        (discarding.value ? (
+        (discarding.value !== null ? (
           <div class="flex flex-col items-start gap-3">
             <div role="alert">Confirm discard</div>
             <div class="actions">
@@ -835,7 +843,7 @@ function CartForm({
               <button
                 type="button"
                 onClick={() => {
-                  discarding.value = false;
+                  discarding.value = null;
                 }}
               >
                 Keep it
@@ -847,7 +855,7 @@ function CartForm({
             type="button"
             class="self-start"
             onClick={() => {
-              discarding.value = true;
+              discarding.value = cart.value.revision;
             }}
           >
             Discard cart
@@ -1163,6 +1171,14 @@ const NOT_KEPT =
 /** One went in the cart, but stays listed (row 22). */
 const NOT_REMOVED =
   "This item wasn't automatically removed. Record the cart and try to remove.";
+/** Instead of RELOAD_TO_CONTINUE while the reload waits for the cart. */
+const RECORD_THEN_RELOAD = "Record or discard your cart, then reload the page.";
+/** Instead of RELOAD_TO_CONTINUE while it waits for batches to be sent:
+ * interim words, Ali's to settle. */
+const WAIT_THEN_RELOAD = "Wait until sending finishes, then reload the page.";
+/** Discard cart, confirmed after another tab changed the cart. */
+const CHANGED_BEFORE_DISCARD =
+  "The cart was changed in another tab. Check it, then discard it again.";
 /** The browser would not keep a discard. */
 const NOT_DISCARDED = "Unable to discard. Clear your site data to remove.";
 
@@ -1510,6 +1526,13 @@ function OutboxList({
     return null;
   }
   const waits = reloadWaits(outbox, cartEmpty);
+  // What to do before a reload, said after RECORDED_ELSEWHERE: held back,
+  // what it waits for (Ali, inventory-tng-wyq, 'Held-back Reload note').
+  const reloadWords = !waits
+    ? RELOAD_TO_CONTINUE
+    : cartEmpty
+      ? WAIT_THEN_RELOAD
+      : RECORD_THEN_RELOAD;
   const needsRegistering = entries.some((e) => e.waitingFor === "registration");
   return (
     <section>
@@ -1530,11 +1553,16 @@ function OutboxList({
             entry.putBack === true &&
             REFUSED_FOR_KEY.has(entry.note ?? "") &&
             !refusedBefore.has(key);
-          // Kept without the reload's words, which only the page says.
-          const note =
-            toReload && entry.note === RECORDED_ELSEWHERE
-              ? `${RECORDED_ELSEWHERE} ${RELOAD_TO_CONTINUE}`
-              : entry.note;
+          // Kept without the reload's words, which only the page says
+          // (inventory-tng-93z's build kept them: dropped once reloaded).
+          const elsewhere =
+            entry.note === RECORDED_ELSEWHERE ||
+            entry.note === `${RECORDED_ELSEWHERE} ${RELOAD_TO_CONTINUE}`;
+          const note = !elsewhere
+            ? entry.note
+            : toReload
+              ? `${RECORDED_ELSEWHERE} ${reloadWords}`
+              : RECORDED_ELSEWHERE;
           const lines =
             refused && catalogue !== null ? linesSaid(entry, catalogue) : [];
           return (

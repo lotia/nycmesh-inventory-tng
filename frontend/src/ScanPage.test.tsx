@@ -549,6 +549,48 @@ describe("filling and saving a cart", () => {
     expect(saves(sent)).toHaveLength(0);
   });
 
+  test.each([
+    ["heard", true],
+    ["not yet heard", false],
+  ])(
+    "Discard cart confirmed after another tab changed the cart, %s, discards nothing",
+    async (_, heard) => {
+      const record = vi.spyOn(telemetry, "record");
+      open();
+      await ready();
+      fillMove();
+      fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
+      // Another tab counts 4 m, which this tab's volunteer never confirmed.
+      const theirs = {
+        ...freshCart(),
+        volunteerId: 1,
+        fromId: 10,
+        toId: 12,
+        lines: [{ itemId: 101, packages: {}, loose: "4" }],
+        revision: "theirs",
+      };
+      storeCart(theirs);
+      if (heard) {
+        await vi.waitFor(() => {
+          window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
+          screen.getByText("4 m in all");
+        });
+      }
+      fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+      expect(screen.getByRole("alert").textContent).toBe(
+        "The cart was changed in another tab. Check it, then discard it again.",
+      );
+      screen.getByText("4 m in all");
+      expect(screen.queryByText("Confirm discard")).toBeNull();
+      expect(JSON.parse(localStorage.getItem(CART_KEY) ?? "").lines).toEqual(
+        theirs.lines,
+      );
+      expect(
+        record.mock.calls.filter(([event]) => event.kind === "cart_discarded"),
+      ).toEqual([]);
+    },
+  );
+
   test("a move is saved, sent, and a new cart keeps the choices", async () => {
     const record = vi.spyOn(telemetry, "record");
     const { api, sent } = server();
@@ -2473,12 +2515,17 @@ describe("what an older build left", () => {
 
   /** The batch endpoint as the ledger answers a key (ledger.py, _replay):
    * the same lines again are the first transaction, others are refused.
-   * `written` holds the lines saved under each key, in order. */
-  function ledger(written: Map<string, string>) {
+   * `written` holds the lines saved under each key, in order; while
+   * `hold.until` is set, a batch waits for it. */
+  function ledger(
+    written: Map<string, string>,
+    hold: { until: Promise<unknown> | null } = { until: null },
+  ) {
     return answering(async (request) => {
       if (isCatalogue(request)) {
         return json(CATALOGUE, 200);
       }
+      await hold.until;
       const body = await request.clone().json();
       const first = written.get(body.key);
       if (first === undefined) {
@@ -2500,11 +2547,12 @@ describe("what an older build left", () => {
   async function putBackSavedFirst(reload = vi.fn()) {
     leaveMoves([KEY, AT, [radios(1)]]);
     const written = new Map([[KEY, linesOf({ lines: [radios(1)] })]]);
-    const { api } = ledger(written);
+    const hold: { until: Promise<unknown> | null } = { until: null };
+    const { api } = ledger(written, hold);
     const outbox = open(api, reload);
     await ready();
     await screen.findByText(ADDED_BACK);
-    return { api, outbox, written };
+    return { api, outbox, written, hold };
   }
 
   /** Changed, saved, and refused as the older build's tab saved it first:
@@ -2536,49 +2584,83 @@ describe("what an older build left", () => {
     });
   });
 
-  test("one changed after it went back, which an older build's tab saved first, asks for a reload, then, reloaded, lists its lines until dismissed", async () => {
-    const reload = vi.fn();
-    const { api } = await putBackSavedFirst(reload);
-    const said = await changedRefused();
-    // In bold, in the alert's style (Ali, inventory-tng-93z, question 4, C).
-    expect(said.tagName).toBe("STRONG");
-    const entry = said.closest("li") as HTMLElement;
-    // Its lines, to compare with what was recorded.
-    within(entry).getByText("1. LiteBeam 5AC: 2 × Box");
-    expect(within(entry).queryByRole("button", { name: "Dismiss" })).toBeNull();
-    fireEvent.click(within(entry).getByRole("button", { name: "Reload" }));
-    expect(reload).toHaveBeenCalledOnce();
-    // Reloaded: still listed, with its lines, now to dismiss, no longer
-    // asking for a reload (Ali, inventory-tng-93z).
-    cleanup();
-    open(api);
-    await ready();
-    expect(screen.queryByText(BEFORE_RELOAD)).toBeNull();
-    const again = (await screen.findByText(RECORDED_ELSEWHERE)).closest(
-      "li",
-    ) as HTMLElement;
-    within(again).getByText("1. LiteBeam 5AC: 2 × Box");
-    expect(within(again).queryByRole("button", { name: "Reload" })).toBeNull();
-    fireEvent.click(within(again).getByRole("button", { name: "Dismiss" }));
-    expect(screen.queryByText(RECORDED_ELSEWHERE)).toBeNull();
-  });
+  test.each([
+    ["as this build keeps it", false],
+    ["as inventory-tng-93z's build kept it, with the reload's words", true],
+  ])(
+    "one changed after it went back, which an older build's tab saved first, asks for a reload, then, reloaded, lists its lines until dismissed, %s",
+    async (_, withReload) => {
+      const reload = vi.fn();
+      const { api } = await putBackSavedFirst(reload);
+      const said = await changedRefused();
+      // In bold, in the alert's style (Ali, inventory-tng-93z, question 4, C).
+      expect(said.tagName).toBe("STRONG");
+      const entry = said.closest("li") as HTMLElement;
+      // Its lines, to compare with what was recorded.
+      within(entry).getByText("1. LiteBeam 5AC: 2 × Box");
+      expect(
+        within(entry).queryByRole("button", { name: "Dismiss" }),
+      ).toBeNull();
+      fireEvent.click(within(entry).getByRole("button", { name: "Reload" }));
+      expect(reload).toHaveBeenCalledOnce();
+      // Reloaded: still listed, with its lines, now to dismiss, no longer
+      // asking for a reload (Ali, inventory-tng-93z).
+      cleanup();
+      if (withReload) {
+        const kept = JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? "");
+        kept.entries[0].note = BEFORE_RELOAD;
+        localStorage.setItem(OUTBOX_KEY, JSON.stringify(kept));
+      }
+      open(api);
+      await ready();
+      expect(screen.queryByText(BEFORE_RELOAD)).toBeNull();
+      const again = (await screen.findByText(RECORDED_ELSEWHERE)).closest(
+        "li",
+      ) as HTMLElement;
+      within(again).getByText("1. LiteBeam 5AC: 2 × Box");
+      expect(
+        within(again).queryByRole("button", { name: "Reload" }),
+      ).toBeNull();
+      fireEvent.click(within(again).getByRole("button", { name: "Dismiss" }));
+      expect(screen.queryByText(RECORDED_ELSEWHERE)).toBeNull();
+    },
+  );
 
-  test("its reload waits, as a newer build's does, while the cart holds lines", async () => {
-    const { outbox } = await putBackSavedFirst();
+  test("its reload waits, as a newer build's does, while the cart holds lines or a batch is sending, and says what for", async () => {
+    const { outbox, hold } = await putBackSavedFirst();
     const entry = (await changedRefused()).closest("li") as HTMLElement;
     fillMove();
     within(entry).getByRole("button", { name: "Reload" });
     outbox.builds.learn("other_tab");
     // A newer build is out, which would not read this cart: no reload,
-    // and no Dismiss, until the cart is empty (Ali, inventory-tng-93z).
+    // and no Dismiss, until the cart is empty (Ali, inventory-tng-93z),
+    // and the note says so, bold whole (Ali, inventory-tng-wyq).
     await vi.waitFor(() =>
       expect(within(entry).queryByRole("button")).toBeNull(),
     );
+    expect(
+      within(entry).getByText(
+        `${RECORDED_ELSEWHERE} Record or discard your cart, then reload the page.`,
+      ).tagName,
+    ).toBe("STRONG");
+    // Recorded, but not yet sent: the reload waits for it.
+    const answer = deferred();
+    hold.until = answer.promise;
+    fireEvent.input(screen.getByLabelText(/^Loose/), {
+      target: { value: "3" },
+    });
+    save();
+    await screen.findByText(/^Sending: /);
+    within(entry).getByText(
+      `${RECORDED_ELSEWHERE} Wait until sending finishes, then reload the page.`,
+    );
+    expect(within(entry).queryByRole("button")).toBeNull();
+    hold.until = null;
+    answer.resolve(new Response());
+    await vi.waitFor(() =>
+      within(entry).getByRole("button", { name: "Reload" }),
+    );
     within(entry).getByText(BEFORE_RELOAD);
-    for (const line of screen.getAllByRole("button", { name: "Remove" })) {
-      fireEvent.click(line);
-    }
-    within(entry).getByRole("button", { name: "Reload" });
   });
 
   test("one with a line discarded, which an older build's tab saved first whole, is not saved again, and says so", async () => {
