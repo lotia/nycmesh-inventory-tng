@@ -287,6 +287,28 @@ describe("turning a cart into a batch", () => {
     expect(sent[0]?.open_package_key).not.toBe(sent[1]?.open_package_key);
   });
 
+  test("an opening's keys are made from its cart's, so the same cart is the same batch (inventory-tng-e2d)", () => {
+    const lines = [{ itemId: 101, packages: { 1001: "2" }, loose: "" }];
+    const keysOf = (batchKey: string) => {
+      const opened = toBatch(
+        cart({ kind: "open", lines, fromId: 10, batchKey }),
+        CATALOGUE,
+      );
+      return "draft" in opened
+        ? opened.draft.lines.map((line) => line.open_package_key)
+        : [];
+    };
+    const key = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
+    const keys = keysOf(key);
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(keys[0]).not.toBe(keys[1]);
+    expect(keysOf(key)).toEqual(keys);
+    expect(keysOf("5d2e8f10-3c4b-4a5d-9e6f-7a8b9c0d1e2f")).not.toContain(
+      keys[0],
+    );
+  });
+
   test("an opening counts only the items it opens", () => {
     const lines = [
       { itemId: 101, packages: { 1001: "1" }, loose: "" },

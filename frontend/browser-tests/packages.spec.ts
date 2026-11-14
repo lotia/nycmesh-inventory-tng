@@ -43,6 +43,56 @@ test("a package counted on the scan page is saved sealed", async ({ page }) => {
   ]);
 });
 
+test("the same opening recorded twice is one transaction, said by no note (inventory-tng-e2d)", async ({
+  page,
+}) => {
+  const cable = await ownCable(page);
+  await page.goto("/scan");
+  await page.getByLabel("Your name").selectOption({ label: "Sam Example" });
+  await page.getByLabel("Opening packages").check();
+  await page
+    .getByLabel("Where", { exact: true })
+    .selectOption({ label: "Supernode 1 › Shelf A" });
+  await pick(page, cable);
+  await page.getByLabel(/^Box of 305 m/).fill("2");
+  await page.getByLabel(/^Loose/).fill("");
+  const left = await page.evaluate(
+    () => localStorage.getItem("inventory.cart.v2") ?? "",
+  );
+  const record = async () => {
+    const saving = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/transactions") &&
+        response.request().method() === "POST",
+    );
+    await page.getByRole("button", { name: "Record" }).click();
+    return saving;
+  };
+  const first = await record();
+  expect(first.status()).toBe(201);
+  const { transaction_id: recorded } = await first.json();
+  await expect(
+    page.getByText(`Recorded (transaction ${recorded}).`),
+  ).toBeVisible();
+  // The same cart again, from a tab whose outbox never held it: its
+  // emptying not kept, and its outbox lost.
+  await page.evaluate((cart) => {
+    localStorage.setItem("inventory.cart.v2", cart);
+    localStorage.removeItem("inventory.outbox.v4");
+  }, left);
+  await page.reload();
+  const again = await record();
+  expect(again.request().postDataJSON()).toEqual(
+    first.request().postDataJSON(),
+  );
+  expect(again.status()).toBe(200);
+  expect(await again.json()).toEqual({ transaction_id: recorded });
+  await expect(
+    page.getByText(`Recorded (transaction ${recorded}).`),
+  ).toBeVisible();
+  await expect(page.getByText(/Scan again/)).toHaveCount(0);
+});
+
 test("a package opened on the scan page is saved as an opening", async ({
   page,
 }) => {

@@ -326,6 +326,11 @@ export const Entry = v.object({
 
 export type Entry = v.InferOutput<typeof Entry>;
 
+/** What became of a batch queued (Outbox.queue): kept and sent; the same
+ * batch already queued, so nothing added; listed refused as recorded
+ * elsewhere, never sent; or not kept, as the browser would not store it. */
+export type Queued = "queued" | "already" | "refused" | "not_kept";
+
 /** Whether the server may hold this batch's key: it may be sent, it was
  * saved, or it was refused for its key. Refused for what it held (422), or
  * held back as from a build too old, it holds none. */
@@ -505,8 +510,9 @@ export class Outbox {
    * `key`, its cart's (cart.ts, batchKey), so the server takes the cart
    * once, whichever tab sends it first; or, for a cart an earlier build
    * kept without one, made here. Either way it is kept with the batch for
-   * every attempt. False means the browser would not store it: nothing
-   * was sent, and the caller still holds the batch.
+   * every attempt. Says what became of it (Queued); not_kept means the
+   * browser would not store it: nothing was sent, and the caller still
+   * holds the batch.
    *
    * A key already queued here is that cart again, emptied by Record but
    * not kept so, or filled again by a tab that had not heard. The same
@@ -518,7 +524,7 @@ export class Outbox {
    * refused for what it held (422) holds no key: it takes a key of its
    * own, and this batch goes under the cart's.
    */
-  queue(draft: Draft, what: string, key?: string): boolean {
+  queue(draft: Draft, what: string, key?: string): Queued {
     const entry = newEntry(
       { ...draft, key: key ?? uuid() },
       what,
@@ -528,7 +534,7 @@ export class Outbox {
       entry.putBack = true;
     }
     const body = JSON.stringify(v.parse(BatchBody, entry.body));
-    let added = false;
+    let queued = "already" as Queued;
     const kept = this.update((entries) => {
       const before = entries.filter((each) => each.body.key === key);
       if (
@@ -541,6 +547,7 @@ export class Outbox {
         return entries;
       }
       if (before.some(holdsKey)) {
+        queued = "refused";
         return [
           ...entries,
           {
@@ -551,7 +558,7 @@ export class Outbox {
           },
         ];
       }
-      added = true;
+      queued = "queued";
       return [
         ...entries.map((each) =>
           before.includes(each) && each.reason?.code === "refused"
@@ -561,10 +568,13 @@ export class Outbox {
         entry,
       ];
     });
-    if (kept && added) {
+    if (!kept) {
+      return "not_kept";
+    }
+    if (queued === "queued") {
       void this.send();
     }
-    return kept;
+    return queued;
   }
 
   /** Take a settled batch off the list: a refused one is forgotten, a

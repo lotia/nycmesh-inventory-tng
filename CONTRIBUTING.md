@@ -419,7 +419,10 @@ whose emptying the browser did not keep, or one a tab that had not heard
 filled again), is not queued twice. Another batch under it is kept as
 `recorded_elsewhere`, under a key of its own, without being sent, unless
 the one under it was refused for what it held (422): then it is sent
-(`Outbox.queue`).
+(`Outbox.queue`). Either way the page says nothing is sending and counts
+no save: the list shows what became of it. An opening's open packages
+take keys made from the cart's, so the same opening recorded again is
+the same batch (`cart.openings`).
 
 A refused save in the outbox's list lists its lines, in the words of the
 older list, each item numbered as the refusal's "Line n" names it. While

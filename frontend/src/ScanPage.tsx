@@ -550,13 +550,20 @@ function CartForm({
       return;
     }
     // Under the cart's key, which any tab that records this cart sends.
-    if (!outbox.queue(batch.draft, batch.what, current.batchKey)) {
+    const queued = outbox.queue(batch.draft, batch.what, current.batchKey);
+    if (queued === "not_kept") {
       // Nothing was sent, and the cart stays to try again.
       problems.value = [
         [
           "This browser wouldn't keep the cart, so it wasn't sent. Free some space or leave private browsing, then try again.",
         ],
       ];
+      return;
+    }
+    if (queued !== "queued") {
+      // Already queued, or listed as recorded elsewhere, saying so: no new
+      // save, so nothing is sending and no time to save is counted.
+      change(freshCart(current));
       return;
     }
     if (current.startedAt > 0) {

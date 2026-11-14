@@ -79,7 +79,7 @@ describe("queueing", () => {
   test("a batch gets a key, is kept, sent at once, and settles as saved", async () => {
     const { api, sent } = answering(() => saved(41));
     const outbox = new Outbox(api);
-    expect(outbox.queue(draft(), "Move: 1 item")).toBe(true);
+    expect(outbox.queue(draft(), "Move: 1 item")).toBe("queued");
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
     const [kept] = outbox.entries.value;
     expect(kept).toMatchObject({ transactionId: 41, what: "Move: 1 item" });
@@ -102,10 +102,10 @@ describe("queueing", () => {
     const { api, sent } = answering(() => saved(41));
     const outbox = new Outbox(api);
     const key = uuid();
-    expect(outbox.queue(draft(), "a", key)).toBe(true);
+    expect(outbox.queue(draft(), "a", key)).toBe("queued");
     await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
     // The cart, emptied by Record but not kept so, recorded again.
-    expect(outbox.queue(draft(), "a", key)).toBe(true);
+    expect(outbox.queue(draft(), "a", key)).toBe("already");
     expect(states(outbox)).toEqual(["saved"]);
     expect(sent).toHaveLength(1);
   });
@@ -119,7 +119,7 @@ describe("queueing", () => {
     // Filled again by a tab that had not heard, and changed there.
     expect(
       outbox.queue(draft({ lines: [{ item_id: 6, quantity: "1" }] }), "b", key),
-    ).toBe(true);
+    ).toBe("refused");
     expect(outbox.entries.value[1]).toMatchObject({
       what: "b",
       state: "refused",
@@ -190,7 +190,7 @@ describe("queueing", () => {
   test("a browser that will not store it says so, shows and sends nothing", () => {
     const { api, sent } = answering(() => saved());
     const outbox = new Outbox(api, full);
-    expect(outbox.queue(draft(), "a")).toBe(false);
+    expect(outbox.queue(draft(), "a")).toBe("not_kept");
     expect(outbox.entries.value).toEqual([]);
     expect(sent).toEqual([]);
   });

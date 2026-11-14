@@ -12,7 +12,7 @@
  * is another batch.
  */
 import { type Signal, signal } from "@preact/signals";
-import { v4 as uuid } from "uuid";
+import { v4 as uuid, v5 as uuidFrom } from "uuid";
 import * as v from "valibot";
 import type { Schemas } from "./api/client";
 import { id } from "./api/replies";
@@ -791,7 +791,7 @@ export function toBatch(
     } else if (cart.kind === "open" && quantity.loose > 0) {
       problems.push([name, ": Open whole packages: leave loose empty."]);
     } else if (cart.kind === "open" && quantity.amount > 0) {
-      lines.push(...openings(item, quantity.sealed));
+      lines.push(...openings(item, quantity.sealed, cart.batchKey));
       items += 1;
     } else if (quantity.amount > 0) {
       // Each package counted on a line of its own, sealed, so stock keeps
@@ -879,17 +879,27 @@ function openPackages(count: number): string {
  * An opening's lines (docs/decisions/0020): a package its item follows
  * once opened becomes an open package, one a line, under a key made here,
  * so a later batch in the outbox can name it before the server has seen
- * it; others become loose units, one line of all of them.
+ * it; others become loose units, one line of all of them. Each key is made
+ * from the cart's (`batchKey`), as the server makes those of a line sent
+ * without one (ledger._opening_keys), so the same cart recorded again, by
+ * any tab, is the same batch, which the server takes once.
  */
-function openings(item: Item, sealed: Map<number, Packs>): Draft["lines"] {
+function openings(
+  item: Item,
+  sealed: Map<number, Packs>,
+  batchKey: string | undefined,
+): Draft["lines"] {
   const followed = new Set(
     item.packages.filter((pack) => pack.track_opened).map((pack) => pack.id),
   );
   return [...sealed].flatMap(([packageId, { count, size }]) =>
     followed.has(packageId)
-      ? Array.from({ length: count }, () => ({
+      ? Array.from({ length: count }, (_, each) => ({
           ...packageLine(item.id, packageId, size, size),
-          open_package_key: uuid(),
+          open_package_key:
+            batchKey === undefined
+              ? uuid()
+              : uuidFrom(`open ${item.id} ${packageId} ${each}`, batchKey),
         }))
       : [packageLine(item.id, packageId, size, count * size)],
   );

@@ -318,6 +318,40 @@ describe("filling and saving a cart", () => {
     expect(storedCart()).not.toHaveProperty("batchKey");
   });
 
+  test("a cart recorded again under its key, as it was or changed, is not said to be sending nor counted as a save (inventory-tng-e2d)", async () => {
+    open();
+    await ready();
+    fillMove();
+    const left = localStorage.getItem(CART_KEY) ?? "";
+    save();
+    await screen.findByText("Recorded (transaction 77).");
+    const record = vi.spyOn(telemetry, "record");
+    // Only what follows: a spy another test left may hold calls already.
+    record.mockClear();
+    // Its emptying not kept: the same cart again, loaded again.
+    const again = async (cart: string) => {
+      cleanup();
+      localStorage.setItem(CART_KEY, cart);
+      const { api, sent } = server();
+      open(api);
+      await ready();
+      save();
+      expect(saves(sent)).toHaveLength(0);
+      expect(screen.queryByText(/^Sending:/)).toBeNull();
+      expect(screen.getByText("Nothing in the cart yet.")).toBeDefined();
+    };
+    await again(left);
+    expect(screen.queryByText(SCAN_AGAIN_CHANGED)).toBeNull();
+    // Changed, by a tab that had not heard: listed as recorded elsewhere.
+    const changed = JSON.parse(left);
+    changed.lines.push({ itemId: 100, packages: {}, loose: "1" });
+    await again(JSON.stringify(changed));
+    await screen.findByText(SCAN_AGAIN_CHANGED);
+    expect(record).not.toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "scan_to_save" }),
+    );
+  });
+
   test("a batch the browser would not keep is not saved, and the cart stays", async () => {
     const outbox = open();
     await ready();
