@@ -183,6 +183,27 @@ def test_a_name_is_checked_and_saved_in_canonical_spelling(
     named(session, Item, "Cap 10\u03bcF 5OV")
 
 
+def test_a_package_name_is_checked_in_canonical_spelling(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """As stored: \u2103 alone is a sign, which name_key may take for
+    punctuation, but \u00b0C has a letter."""
+    item = new_item(session, radios, "Probe")
+    path = f"{ITEMS}/{item.id}/packages"
+    added = admin_client.post(path, data={"package_name": "\u2103", "size": "1"})
+    assert added.status_code == 303
+    package = named(session, ItemPackage, "\u00b0C")
+    resent = admin_client.post(
+        f"{path}/{package.id}",
+        data={
+            "package_name": "\u2103",
+            "size": "1",
+            "package_version": shown(package),
+        },
+    )
+    assert resent.status_code == 303
+
+
 def test_a_clash_gone_meanwhile_is_said_in_general(
     admin_client: TestClient,
     session: Session,

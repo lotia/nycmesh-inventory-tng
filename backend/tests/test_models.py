@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import delete, literal, literal_column, select, text, update
+from sqlalchemy import delete, exc, literal, literal_column, select, text, update
 from sqlalchemy.orm import Session
 
 from inventory_tng import categories, items, labels, locations, volunteers
@@ -147,6 +147,9 @@ def test_names_are_stored_in_canonical_spelling(
     # So a name typed in another spelling clashes with it.
     with violates(session, "uq_item_name"):
         new_item("cap 22 \u03bcf")
+    # No name is refused by NOT NULL, as ever, not by the respelling.
+    with pytest.raises(exc.IntegrityError), session.begin_nested():
+        add(session, Category(name=None))
 
 
 def test_a_decimal_point_between_digits_tells_names_apart(

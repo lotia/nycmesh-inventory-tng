@@ -227,8 +227,9 @@ class CanonicalName:
     with it (docs/decisions/0021, 2026-11-14)."""
 
     @validates("name")
-    def _canonical(self, _key: str, value: str) -> str:
-        return canonical(value)
+    def _canonical(self, _key: str, value: str | None) -> str | None:
+        # None is left for NOT NULL to refuse, as a rule broken.
+        return None if value is None else canonical(value)
 
 
 # What folds (fold), as each folded row records it (Searchable.folded_with),

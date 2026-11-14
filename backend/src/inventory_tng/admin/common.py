@@ -24,6 +24,7 @@ from inventory_tng.models import (
     Item,
     Location,
     Volunteer,
+    canonical,
     whole,
 )
 from inventory_tng.pages import NOTICES, page, templates
@@ -214,7 +215,8 @@ def current_rows[T: Base](session: Session, model: type[T]) -> list[T]:
 
 
 def name_problem(name: str) -> str | None:
-    if not 1 <= len(name) <= NAME_MAX:
+    # As stored (models.CanonicalName): °C for ℃ is a character longer.
+    if not 1 <= len(canonical(name)) <= NAME_MAX:
         return f"Give it a name of up to {NAME_MAX} characters."
     return None
 

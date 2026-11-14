@@ -570,7 +570,7 @@ def add_package(
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
-    name = package_name.strip()
+    name = canonical(package_name.strip())
     parsed, problems = _package_fields(session, found, name, size)
     if parsed is not None and not problems:
         package, broken = refusal(
@@ -608,7 +608,7 @@ def save_package(
     if package is None:
         return not_found()
     found = session.get_one(Item, item_id)
-    name = package_name.strip()
+    name = canonical(package_name.strip())
     parsed, problems = _package_fields(session, found, name, size, kept=package.size)
     if parsed is not None and not problems:
         _, broken = refusal(

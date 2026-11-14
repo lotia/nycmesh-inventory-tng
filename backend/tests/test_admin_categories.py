@@ -42,7 +42,8 @@ def test_adding_a_category_is_recorded_as_the_admin(
     assert "Radios" in page
 
 
-@pytest.mark.parametrize("name", ["", "x" * 201])
+# The last as stored: ℃ is stored °C (models.canonical).
+@pytest.mark.parametrize("name", ["", "x" * 201, "x" * 199 + "\u2103"])
 def test_a_name_must_be_given_and_not_too_long(
     admin_client: TestClient, name: str
 ) -> None:

@@ -269,8 +269,8 @@ inventory-tng-g6u).
 
 Every name an administrator types is stored in canonical spelling
 (`models.canonical`, decision 0021): NFC, with `µ` as `μ` and `℃` and `℉`
-as `°C` and `°F`, case kept. A form that compares a name before saving
-compares it so.
+as `°C` and `°F`, case kept. A form checks and compares a name in that
+spelling.
 
 ### Locking a row
 
