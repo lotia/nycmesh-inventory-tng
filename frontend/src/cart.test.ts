@@ -1313,6 +1313,20 @@ describe("the cart store, shared by tabs", () => {
     expect(store.cart.value.batchKey).not.toBe(key);
   });
 
+  test("what a cart was put back with is kept with its key, and dropped with it (inventory-tng-0gg)", () => {
+    const key = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
+    const changedFrom = [{ item_id: 100, quantity: "1" }];
+    const store = new CartStore(CATALOGUE);
+    store.change({ ...filled(), batchKey: key, changedFrom });
+    store.change(addOne(store.cart.value, 101));
+    expect(loadCart().changedFrom).toEqual(changedFrom);
+    store.change(freshCart(store.cart.value));
+    expect(loadCart()).not.toHaveProperty("changedFrom");
+    // Without a key it is no batch put back.
+    store.change({ ...filled(), changedFrom });
+    expect(loadCart()).not.toHaveProperty("changedFrom");
+  });
+
   test("a cart filled with a key keeps that key", () => {
     const key = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
     const store = new CartStore(CATALOGUE);

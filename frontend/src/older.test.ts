@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { freshCart, type Item } from "./cart";
+import { addOne, freshCart, type Item, toBatch } from "./cart";
 import {
   compared,
   dropPart,
@@ -457,6 +457,18 @@ describe("as a cart", () => {
     });
     const cart = readOlder().find((each) => each.batch === null) as Older;
     expect(toCart(cart, CATALOGUE).cart).not.toHaveProperty("batchKey");
+  });
+
+  test("one put back under its key keeps what it went back with, sent as what it was changed from; one without a key keeps none (inventory-tng-0gg)", () => {
+    const { cart } = toCart(only(saveOf()), CATALOGUE);
+    expect(cart.changedFrom).toEqual([{ item_id: 101, quantity: "2" }]);
+    const batch = toBatch(addOne(cart, 101), CATALOGUE);
+    expect(batch).toMatchObject({
+      draft: { changed_from: [{ item_id: 101, quantity: "2" }] },
+    });
+    expect(
+      toCart(only(saveOf({}, { key: "c" })), CATALOGUE).cart,
+    ).not.toHaveProperty("changedFrom");
   });
 
   test("a cart a save filled keeps that save's key, to be sent under", () => {

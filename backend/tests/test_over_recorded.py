@@ -22,6 +22,7 @@ from inventory_tng.models import (
     LedgerTransaction,
     Location,
     Movement,
+    OpenPackage,
     OverRecorded,
     Volunteer,
 )
@@ -63,9 +64,11 @@ def checks(session: Session) -> list[OverRecorded]:
 def recorded_then_changed(
     client: TestClient, first: dict[str, Any], **changed: object
 ) -> dict[str, Any]:
-    """`first` recorded, then sent again changed under its key: the 409."""
+    """`first` recorded, then sent again changed under its key, as a page
+    sends a cart put back with `first`'s lines (changed_from, unless
+    `changed` says otherwise): the 409."""
     assert client.post(URL, json=first).status_code == 201
-    response = client.post(URL, json=first | changed)
+    response = client.post(URL, json=first | {"changed_from": first["lines"]} | changed)
     assert response.status_code == 409
     return response.json()
 
@@ -180,7 +183,9 @@ def test_said_again_while_waiting_it_says_the_newest_and_settled_stays(
 
     def less(n: str) -> None:
         lines = [{"item_id": place.item.id, "quantity": n}]
-        response = registered_client.post(URL, json=first | {"lines": lines})
+        response = registered_client.post(
+            URL, json=first | {"lines": lines, "changed_from": first["lines"]}
+        )
         assert response.status_code == 409
 
     assert registered_client.post(URL, json=first).status_code == 201
@@ -234,14 +239,21 @@ def test_an_opening_and_a_cut_are_said_by_their_open_packages(
         ],
         **opening,
     )
+    refused_key = uuid.uuid4()
     reply = recorded_then_changed(
         registered_client,
         opened,
         install_number=None,
-        lines=[opened["lines"][0] | {"open_package_key": str(uuid.uuid4())}],
+        lines=[opened["lines"][0] | {"open_package_key": str(refused_key)}],
     )
     (line,) = reply["recorded"]["lines"]
     assert (line["package_id"], line["open_package_key"]) == (spools.spool.id, key)
+    # Nothing of the refused opening is kept: no open package under its key.
+    session.expire_all()
+    assert (
+        session.scalar(select(OpenPackage.id).where(OpenPackage.key == refused_key))
+        is None
+    )
 
 
 def test_a_line_moved_whole_is_said_whole(
@@ -268,7 +280,54 @@ def test_only_the_lines_less_was_sent_of_are_over() -> None:
         Entry(1, Decimal(50), loose, loose),
         Entry(2, Decimal(4)),
     ]
-    assert _more_written(written, sent) == {1: Decimal(50), 3: Decimal(2)}
+    assert _more_written(written, sent, list(written.values())) == {
+        1: Decimal(50),
+        3: Decimal(2),
+    }
+    # Only what it took off what it started from: another tab's addition,
+    # or the line another tab added, is no check.
+    started = [Entry(1, Decimal(100), sealed, sealed), Entry(2, Decimal(1))]
+    assert _more_written(written, sent, started) == {1: Decimal(50)}
+    assert _more_written(written, sent, None) == {}
+
+
+def test_a_batch_older_than_the_one_recorded_takes_nothing_off(
+    registered_client: TestClient, session: Session, place: Place, bags: ItemPackage
+) -> None:
+    """Another tab put the cart back, changed it and recorded it first: this
+    batch, from before that change, sent after it (a tab of a build before,
+    which sends no changed_from), took nothing off. Its difference is that
+    tab's change, which moved (inventory-tng-0gg review)."""
+    original = [{"item_id": place.item.id, "quantity": "3"}, bagged(bags, 1)]
+    newer = place.batch(
+        lines=[{"item_id": place.item.id, "quantity": "5"}, bagged(bags, 2)]
+    )
+    reply = recorded_then_changed(
+        registered_client, newer, lines=original, changed_from=None
+    )
+    assert reply["recorded"] is not None
+    assert checks(session) == []
+
+
+def test_only_what_this_batch_took_off_since_it_was_put_back_waits(
+    registered_client: TestClient, session: Session, place: Place, bags: ItemPackage
+) -> None:
+    """Put back with 3 radios and 1 bag; another tab raised the bags to 2
+    and recorded that; this one took the radios down to 1: only the 2 radios
+    wait, not the bag the other tab added."""
+    put_back = [{"item_id": place.item.id, "quantity": "3"}, bagged(bags, 1)]
+    other = place.batch(lines=[put_back[0], bagged(bags, 2)])
+    recorded_then_changed(
+        registered_client,
+        other,
+        lines=[{"item_id": place.item.id, "quantity": "1"}, bagged(bags, 1)],
+        changed_from=put_back,
+    )
+    ((check, item_id),) = [
+        (each, session.get_one(Movement, each.movement_id).item_id)
+        for each in checks(session)
+    ]
+    assert (item_id, check.quantity) == (place.item.id, 2)
 
 
 def test_the_reply_to_another_client_leaves_out_nothing_it_holds(
@@ -472,3 +531,40 @@ def test_a_cut_taken_down_is_listed_from_its_open_package(
     recorded_then_changed(registered_client, first, lines=[cut(made, "15")])
     page = text(admin_client.get(PAGE))
     assert "5 m from an open package" in page
+
+
+def test_what_a_batch_was_changed_from_does_not_make_it_another(
+    registered_client: TestClient, place: Place
+) -> None:
+    """Sent again with its lines as recorded, it is the same batch, whatever
+    it says it was changed from."""
+    first = place.batch()
+    created = registered_client.post(URL, json=first)
+    assert created.status_code == 201
+    again = registered_client.post(
+        URL,
+        json=first | {"changed_from": [{"item_id": place.item.id, "quantity": "9"}]},
+    )
+    assert again.status_code == 200
+    assert again.json() == created.json()
+
+
+def test_one_moved_whole_from_an_open_package_is_only_marked_checked(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """The open package is now where it arrived, so it cannot be found again
+    where it left: Correct is not offered, which the ledger would refuse."""
+    spools = Spools(session)
+    made = spools.opened()
+    whole = cut(made, "305") | {"whole": True}
+    recorded_then_changed(
+        registered_client,
+        spools.place.batch(
+            lines=[whole, {"item_id": spools.place.item.id, "quantity": "1"}]
+        ),
+        lines=[{"item_id": spools.place.item.id, "quantity": "1"}],
+    )
+    assert len(checks(session)) == 1
+    page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
+    assert "Mark checked" in page
+    assert "/correct" not in page

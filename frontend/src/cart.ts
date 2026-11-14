@@ -17,7 +17,13 @@ import * as v from "valibot";
 import type { Schemas } from "./api/client";
 import { id } from "./api/replies";
 import { BUILD } from "./build";
-import { BatchKey, type Draft, type Entry, type Said } from "./outbox";
+import {
+  BatchKey,
+  BatchLine,
+  type Draft,
+  type Entry,
+  type Said,
+} from "./outbox";
 import { count, decimal, sent, thousandths } from "./quantity";
 import { onStoredChange, readStored, writeStored } from "./stored";
 
@@ -99,6 +105,12 @@ const CartSchema = v.object({
    * key of what an older build left that filled it (older.ts), kept until
    * the cart is emptied. */
   batchKey: v.exactOptional(BatchKey),
+  /** The lines, as a batch sends them, the cart held when put back under
+   * its key (older.ts, toCart), kept with the key: what a volunteer then
+   * takes off, and another tab recorded under the key meanwhile, is kept
+   * for an administrator (outbox.ts, changed_from; inventory-tng-0gg). A
+   * build before drops it from what it writes back: then nothing is kept. */
+  changedFrom: v.exactOptional(v.array(BatchLine)),
 });
 
 export type Line = v.InferOutput<typeof LineSchema>;
@@ -202,10 +214,21 @@ export class CartStore {
     const empty = next.lines.length === 0;
     // Its key from its first line, so whichever tab records it sends that
     // key. Emptied, it is no longer that batch: what fills it next is new.
-    const { batchKey, ...rest } = sized(this.cart.value, next, this.catalogue);
+    const { batchKey, changedFrom, ...rest } = sized(
+      this.cart.value,
+      next,
+      this.catalogue,
+    );
     return this.write({
       ...rest,
-      ...(empty ? {} : { batchKey: batchKey ?? uuid() }),
+      ...(empty
+        ? {}
+        : {
+            batchKey: batchKey ?? uuid(),
+            ...(changedFrom === undefined || batchKey === undefined
+              ? {}
+              : { changedFrom }),
+          }),
       revision: uuid(),
       usedAt: now,
       startedAt: empty ? 0 : next.startedAt || now,
@@ -838,6 +861,9 @@ export function toBatch(
   const named = lengthsOnly ? "What's on it" : KINDS[kind];
   const words = [`${named}: ${things}`];
   const draft: Draft = { kind, volunteer_id: cart.volunteerId, lines };
+  if (cart.changedFrom !== undefined) {
+    draft.changed_from = cart.changedFrom;
+  }
   if (usedUp.length > 0) {
     draft.used_up = usedUp;
   }

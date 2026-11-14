@@ -1823,17 +1823,21 @@ function RecordedElsewhere({
           </li>
         ))}
       </ul>
-      <h3>{YOUR_CHANGES}</h3>
-      <ul class="list-none p-0">
-        {changes.map(({ words, note }, at) => (
-          <li key={changeKeys[at]} class="flex flex-col items-start gap-1">
-            <div>
-              <Counted said={words} />
-            </div>
-            {note !== null && <NoteSaid note={note} />}
-          </li>
-        ))}
-      </ul>
+      {changes.length > 0 && (
+        <>
+          <h3>{YOUR_CHANGES}</h3>
+          <ul class="list-none p-0">
+            {changes.map(({ words, note }, at) => (
+              <li key={changeKeys[at]} class="flex flex-col items-start gap-1">
+                <div>
+                  <Counted said={words} />
+                </div>
+                {note !== null && <NoteSaid note={note} />}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       {difference !== null && added !== true && (
         <button type="button" onClick={() => onAdd(difference)}>
           {ADD_DIFFERENCE}

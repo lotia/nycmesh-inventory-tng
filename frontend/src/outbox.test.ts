@@ -679,8 +679,11 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     await vi.waitFor(() =>
       expect(second(outbox)?.reason).toHaveProperty("recorded"),
     );
-    const asked = sent[1] as Request;
-    expect((await asked.clone().json()).key).toBe(key);
+    const asked = await (sent[1] as Request).clone().json();
+    expect(asked.key).toBe(key);
+    // Changed from what was recorded here: what it took off is the
+    // volunteer's, for the server to keep (inventory-tng-0gg review).
+    expect(asked.changed_from).toEqual(draft().lines);
     expect(second(outbox)).toMatchObject({
       state: "refused",
       transactionId: null,
@@ -702,6 +705,44 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
       reason: null,
       body: { key },
     });
+  });
+
+  test("one asked about that the server records, after the batch under the key was refused for what it held, leaves that one under a key of its own", async () => {
+    const { api } = answering(
+      replies(
+        () =>
+          json(
+            { detail: [{ loc: ["body", "lines", 0], type: "x", msg: "No" }] },
+            422,
+          ),
+        () => saved(42),
+      ),
+    );
+    const outbox = new Outbox(api);
+    const key = uuid();
+    outbox.queue(draft(), "a", key);
+    // Queued while the first waits: listed refused, to be asked about.
+    expect(outbox.queue(changed(), "b", key)).toBe("refused");
+    await vi.waitFor(() => expect(second(outbox)?.state).toBe("saved"));
+    const [first, recorded] = outbox.entries.value;
+    expect(first?.reason?.code).toBe("refused");
+    expect(recorded?.body.key).toBe(key);
+    // One key names one batch.
+    expect(first?.body.key).not.toBe(key);
+  });
+
+  test("the same batch queued again is not queued twice, whatever it was changed from", async () => {
+    const { api, sent } = answering(() => saved(41));
+    const outbox = new Outbox(api);
+    const key = uuid();
+    outbox.queue(
+      draft({ changed_from: [{ item_id: 5, quantity: "9" }] }),
+      "a",
+      key,
+    );
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
+    expect(outbox.queue(draft(), "a", key)).toBe("already");
+    expect(sent).toHaveLength(1);
   });
 
   test("one asked about that is the same as recorded is dropped", async () => {
@@ -1146,8 +1187,23 @@ describe("storage", () => {
     // inventory-tng-0gg): a tab of 42b1595b drops them from what it writes
     // back, which leaves the entry as that build itself would have kept it
     // (a recorded_elsewhere it says to scan again), so they need no new key.
-    // Only such a field may be added here without one.
+    // Only such a field may be added here without one. What a batch was
+    // changed from, dropped so, leaves it sent as that build sends it, and
+    // the server then keeps nothing for an administrator.
+    const changedFrom = (at: string) => [
+      `${at}.changed_from`,
+      ...[
+        "item_id",
+        "open_package_key",
+        "package_id",
+        "package_size",
+        "quantity",
+        "whole",
+      ].map((field) => `${at}.changed_from.${field}`),
+    ];
     const droppedAsBefore = [
+      ...changedFrom("body"),
+      ...changedFrom("reason.recorded.batch"),
       "reason.added",
       "reason.added = true",
       "reason.heldKey",

@@ -10,7 +10,7 @@
  * (docs/decisions/0003): the server keeps that for one (over_recorded.py),
  * as it refused the save.
  */
-import { v4 as uuid } from "uuid";
+import { v5 as uuidFrom } from "uuid";
 import { type Cart, type Catalogue, type Item, indexOf } from "./cart";
 import { asSave, type Gaps, RESCAN, toCart, withRetired } from "./older";
 import {
@@ -26,13 +26,17 @@ import { decimal, thousandths } from "./quantity";
 
 type Line = Body["lines"][number];
 
-/** One line of the save that differs from what was recorded: its item,
- * in its form (a package, an open package, moved whole, or loose), and how
- * much of it each holds, in thousandths. */
+/** One line the volunteer changed, as the save holds it otherwise than
+ * was recorded: its item, in its form (a package, an open package, moved
+ * whole, or loose), of the kind of batch it is from, how much of it each
+ * holds, and by how much the volunteer changed what was recorded, in
+ * thousandths: more, or, below zero, less. */
 export type Difference = {
   line: Line;
+  kind: Body["kind"];
   recorded: number;
   mine: number;
+  changed: number;
 };
 
 /** Under a line the save holds less of than was recorded, in Ali's words
@@ -73,24 +77,55 @@ const movedBy = (body: Body) =>
   JSON.stringify([body.kind, body.from_location_id, body.to_location_id]);
 
 /**
- * Each line `mine` holds otherwise than `recorded`, by item and form: in
- * mine's order, then those only recorded. Moved by another kind, or
- * between other places, every line differs: none moved as recorded.
+ * Each line the volunteer changed in `mine` since its cart was put back
+ * (changed_from), as it differs from `recorded`, by item and form: in
+ * mine's order, then those only recorded. What differs otherwise is the
+ * other tab's change, not the volunteer's: so with nothing it was changed
+ * from (a batch from before another tab's change), none. It took off what
+ * it holds less of than both; added what it holds more of than both.
+ * Moved by another kind, or between other places, every line differs:
+ * none moved as recorded. The server keeps what was taken off so
+ * (ledger._more_written).
  */
 export function differences(recorded: Body, mine: Body): Difference[] {
+  const from = mine.changed_from;
+  if (from === undefined || from === null) {
+    return [];
+  }
   const alike = movedBy(recorded) === movedBy(mine);
-  const found = new Map<string, Difference>();
-  const tally = (body: Body, side: "recorded" | "mine") => {
-    for (const line of body.lines) {
-      const key = `${alike ? "" : side} ${formOf(line, body.kind)}`;
-      const each = found.get(key) ?? { line, recorded: 0, mine: 0 };
+  const found = new Map<
+    string,
+    Omit<Difference, "changed"> & { started: number }
+  >();
+  const tally = (
+    lines: Line[],
+    kind: Body["kind"],
+    side: "recorded" | "mine" | "started",
+  ) => {
+    for (const line of lines) {
+      const at = alike ? "" : side === "mine" ? "mine" : "recorded";
+      const key = `${at} ${formOf(line, kind)}`;
+      const each = found.get(key) ?? {
+        line,
+        kind,
+        recorded: 0,
+        mine: 0,
+        started: 0,
+      };
       each[side] += thousandths(String(line.quantity)) ?? 0;
       found.set(key, each);
     }
   };
-  tally(mine, "mine");
-  tally(recorded, "recorded");
-  return [...found.values()].filter((each) => each.recorded !== each.mine);
+  tally(mine.lines, mine.kind, "mine");
+  tally(recorded.lines, recorded.kind, "recorded");
+  // As recorded, where it moved otherwise: as the cart went back.
+  tally(from, alike ? mine.kind : recorded.kind, "started");
+  return [...found.values()].flatMap(({ started, ...each }) => {
+    const less = Math.min(each.recorded, started) - each.mine;
+    const more = each.mine - Math.max(each.recorded, started);
+    const changed = less > 0 ? -less : Math.max(more, 0);
+    return changed === 0 ? [] : [{ ...each, changed }];
+  });
 }
 
 /** The reports `mine` makes that `recorded` did not: said of an open
@@ -221,14 +256,13 @@ export function changesShown(
   catalogue: Catalogue,
 ): Shown[] {
   const named = new Namer(catalogue);
-  const kind = mine.kind;
   const rescan: Note = { bold: [RESCAN] };
   const lines = differences(recorded.batch, mine).map(
-    ({ line, recorded: was, mine: now }): Shown => {
+    ({ line, kind, recorded: was, mine: now, changed }): Shown => {
       const name = [...named.name(line), ": "];
-      if (now < was) {
+      if (changed < 0) {
         return {
-          words: [...name, ...named.amount(line, kind, was - now), " fewer"],
+          words: [...name, ...named.amount(line, kind, -changed), " fewer"],
           note: {
             bold: loweredWords(
               named.amount(line, kind, was),
@@ -238,9 +272,9 @@ export function changesShown(
         };
       }
       const words: Said =
-        was === 0
+        changed === now
           ? [...name, ...named.amount(line, kind, now), ", new"]
-          : [...name, ...named.amount(line, kind, now - was), " more"];
+          : [...name, ...named.amount(line, kind, changed), " more"];
       return { words, note: fromOpen(line, kind) ? rescan : null };
     },
   );
@@ -253,19 +287,21 @@ export function changesShown(
 }
 
 /**
- * What `mine` adds to what was recorded, as a batch: each line it holds
- * more of, or new, by as much, of the same kind, between the same places,
- * by the same volunteer, under a new key; none taken from an open package,
- * nor any report. Null if it adds nothing that can go back.
+ * What `mine` adds to what was recorded, as a batch: each line the
+ * volunteer added, or holds more of (differences), by as much, of the same
+ * kind, between the same places, by the same volunteer, under a key of its
+ * own made from mine's, so put in the cart and recorded again it is the
+ * same batch, taken once; none taken from an open package, nor any report.
+ * Null if it adds nothing that can go back.
  */
 export function differenceOf(recorded: Body, mine: Body): Body | null {
   const lines = differences(recorded, mine).flatMap(
-    ({ line, recorded: was, mine: now }) =>
-      now > was && !fromOpen(line, mine.kind)
+    ({ line, kind, changed }) =>
+      changed > 0 && !fromOpen(line, kind)
         ? [
             {
               item_id: line.item_id,
-              quantity: decimal(now - was),
+              quantity: decimal(changed),
               package_id: line.package_id ?? null,
               package_size: line.package_size ?? null,
             },
@@ -275,8 +311,12 @@ export function differenceOf(recorded: Body, mine: Body): Body | null {
   if (lines.length === 0) {
     return null;
   }
-  const { used_up: _, lengths: __, key: ___, ...header } = mine;
-  return { ...header, key: uuid(), lines } satisfies Draft & { key: string };
+  const { used_up: _, lengths: __, key, changed_from: ___, ...header } = mine;
+  return {
+    ...header,
+    key: uuidFrom("difference", key),
+    lines,
+  } satisfies Draft & { key: string };
 }
 
 /** `difference` (differenceOf) as a cart to check and record, keeping

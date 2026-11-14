@@ -151,6 +151,11 @@ export interface components {
        * @description What the volunteer says is really on open packages, by key, for an administrator to check (docs/decisions/0020): with a cut, or alone, in a report. Never an adjustment.
        */
       lengths?: components["schemas"]["LengthReport"][] | null;
+      /**
+       * Changed From
+       * @description The lines this batch held when its cart was put back under its key, before the volunteer changed it: what it holds less of than these, and than another batch recorded under the key, the volunteer took off, kept for an administrator when this batch is refused (409 key_reused). Compared with nothing else: a batch sent again with other lines here is the same batch.
+       */
+      changed_from?: components["schemas"]["Line"][] | null;
     };
     /**
      * BuildTooOldReply

@@ -3182,6 +3182,43 @@ describe("what an older build left", () => {
     ).toBeNull();
   });
 
+  test("a cart not put back, refused as a tab of a newer build recorded it changed, lists no changes of its own (inventory-tng-0gg review)", async () => {
+    // That tab took the cart over and changed it: what differs is its
+    // change, not this cart's, which nothing here could add back.
+    const { api } = answering(async (request) => {
+      if (isCatalogue(request)) {
+        return json(CATALOGUE, 200);
+      }
+      const recorded = {
+        transaction_id: 1,
+        kind: "move",
+        volunteer_id: 1,
+        from_location_id: 10,
+        to_location_id: 12,
+        install_number: null,
+        lines: [],
+        used_up: [],
+        lengths: [],
+      };
+      return json({ reason: "key_reused", recorded }, 409);
+    });
+    open(api);
+    await ready();
+    fillMove();
+    fireEvent.input(screen.getByLabelText(/^Loose/), {
+      target: { value: "3" },
+    });
+    save();
+    const heading = await screen.findByText(
+      "Recorded by the other tab (transaction 1)",
+    );
+    const entry = heading.closest("li") as HTMLElement;
+    expect(within(entry).queryByText(YOUR_CHANGES)).toBeNull();
+    expect(
+      within(entry).queryByRole("button", { name: ADD_DIFFERENCE }),
+    ).toBeNull();
+  });
+
   test("one with a line discarded, which an older build's tab saved first whole, is not saved again, and says so", async () => {
     leaveSave();
     const [first] = JSON.parse(

@@ -6,6 +6,20 @@
   "models": {
     "Batch": {
       "properties": {
+        "changed_from": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/components/schemas/Line"
+              },
+              "maxItems": 500,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "from_location_id": {
           "anyOf": [
             {

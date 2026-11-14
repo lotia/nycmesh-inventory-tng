@@ -815,6 +815,18 @@ class Batch(BaseModel):
             "with a cut, or alone, in a report. Never an adjustment.",
         ),
     ] = None
+    changed_from: Annotated[
+        list[Line] | None,
+        Field(
+            max_length=MAX_LINES,
+            description="The lines this batch held when its cart was put back "
+            "under its key, before the volunteer changed it: what it holds "
+            "less of than these, and than another batch recorded under the "
+            "key, the volunteer took off, kept for an administrator when "
+            "this batch is refused (409 key_reused). Compared with nothing "
+            "else: a batch sent again with other lines here is the same batch.",
+        ),
+    ] = None
 
     @model_validator(mode="after")
     def _sides(self) -> Batch:
@@ -937,7 +949,8 @@ class KeyReused(Exception):
     """The key was already used, for a different batch: `recorded`, the
     transaction under it, as a batch (None if no volunteer's batch wrote
     it); `over`, by movement, how much more of it was recorded than this
-    batch sends, for an administrator to correct (over_recorded.py)."""
+    batch sends, of what it took off since it was put back (_more_written),
+    for an administrator to correct (over_recorded.py)."""
 
     def __init__(
         self, recorded: RecordedBatch | None, over: Mapping[int, Decimal]
@@ -1919,8 +1932,10 @@ def record_adjustment(
 
 def _header(batch: Batch) -> dict[str, object]:
     """The batch's own columns: everything but its key, lines and reports,
-    which are compared apart (_replay)."""
-    return batch.model_dump(exclude={"key", "lines", "used_up", "lengths"})
+    which are compared apart (_replay), and what it was changed from."""
+    return batch.model_dump(
+        exclude={"key", "lines", "used_up", "lengths", "changed_from"}
+    )
 
 
 def _lengths_as_kept(lengths: Sequence[LengthReport]) -> list[dict[str, str]]:
@@ -1990,9 +2005,19 @@ def _replay(session: Session, batch: Batch) -> LedgerTransaction | None:
             getattr(transaction, field) == header[field]
             for field in ("kind", "from_location_id", "to_location_id")
         )
+        # Only what this batch says it took off since it was put back
+        # (changed_from) is the volunteer's: a batch from before another
+        # tab's change, sent after it, takes off nothing.
+        started = (
+            None
+            if batch.changed_from is None
+            else _written_as(
+                session, batch.model_copy(update={"lines": batch.changed_from})
+            )
+        )
         raise KeyReused(
             _as_batch(session, transaction, movements),
-            _more_written(movements, sent_lines if moved_alike else []),
+            _more_written(movements, sent_lines if moved_alike else [], started),
         )
     replayed.add(1, {"kind": batch.kind})
     log.info("transaction replayed", transaction_id=transaction.id)
@@ -2000,17 +2025,29 @@ def _replay(session: Session, batch: Batch) -> LedgerTransaction | None:
 
 
 def _more_written(
-    written: Mapping[int, Entry], sent: Sequence[Entry]
+    written: Mapping[int, Entry],
+    sent: Sequence[Entry],
+    started: Sequence[Entry] | None,
 ) -> dict[int, Decimal]:
     """By movement, how much more of it was written than `sent` holds of
-    the same item in the same forms: what the volunteer took off a batch
-    already recorded."""
-    sent_by: defaultdict[tuple[int, Form, Form], Decimal] = defaultdict(Decimal)
-    for line in sent:
-        sent_by[line.item_id, line.leaves, line.arrives] += line.quantity
+    the same item in the same forms, but no more than `sent` took off what
+    it `started` from: what the volunteer took off a batch already
+    recorded. Nothing without `started`, as then what differs may be
+    another tab's change, not this batch's."""
+    if started is None:
+        return {}
+
+    def tally(lines: Sequence[Entry]) -> defaultdict[tuple[int, Form, Form], Decimal]:
+        by: defaultdict[tuple[int, Form, Form], Decimal] = defaultdict(Decimal)
+        for line in lines:
+            by[line.item_id, line.leaves, line.arrives] += line.quantity
+        return by
+
+    sent_by, started_by = tally(sent), tally(started)
     over = {}
     for movement_id, line in written.items():
-        more = line.quantity - sent_by[line.item_id, line.leaves, line.arrives]
+        form = line.item_id, line.leaves, line.arrives
+        more = min(line.quantity, started_by[form]) - sent_by[form]
         if more > 0:
             over[movement_id] = more
     return over

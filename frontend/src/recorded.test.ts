@@ -43,9 +43,16 @@ const recorded = (batch: Body): Recorded => ({
   batch,
 });
 
+/** `mine`, as a cart put back with what `was` holds, then changed, sends
+ * it, unless it says what it was changed from. */
+const putBack = (was: Body, mine: Body): Body => ({
+  changed_from: was.lines,
+  ...mine,
+});
+
 /** What changesShown says, as plain text, each note after its line. */
 function shown(was: Body, mine: Body): string[] {
-  return changesShown(recorded(was), mine, CATALOGUE).map(
+  return changesShown(recorded(was), putBack(was, mine), CATALOGUE).map(
     ({ words, note }) =>
       wordsOf(words) + (note === null ? "" : ` / ${wordsOf(note.bold)}`),
   );
@@ -69,21 +76,26 @@ describe("what differs", () => {
   });
 
   test("the same lines, in any order or way of writing them, differ in nothing", () => {
+    const was = move([boxes(1), metres(5)]);
     expect(
       differences(
-        move([boxes(1), metres(5)]),
-        move([
-          { ...metres(5), quantity: 5 },
-          { ...boxes(1), quantity: "4" },
-        ]),
+        was,
+        putBack(
+          was,
+          move([
+            { ...metres(5), quantity: 5 },
+            { ...boxes(1), quantity: "4" },
+          ]),
+        ),
       ),
     ).toEqual([]);
   });
 
   test("moved between other places, every line differs", () => {
+    const was = move([metres(5)]);
     const changed = differences(
-      move([metres(5)]),
-      move([metres(5)], { to_location_id: 11 }),
+      was,
+      putBack(was, move([metres(5)], { to_location_id: 11 })),
     );
     expect(changed.map(({ recorded, mine }) => [recorded, mine])).toEqual([
       [0, 5000],
@@ -92,8 +104,9 @@ describe("what differs", () => {
   });
 
   test("another volunteer alone moves nothing otherwise", () => {
+    const was = move([metres(5)]);
     expect(
-      differences(move([metres(5)]), move([metres(5)], { volunteer_id: 2 })),
+      differences(was, putBack(was, move([metres(5)], { volunteer_id: 2 }))),
     ).toEqual([]);
   });
 
@@ -119,14 +132,55 @@ describe("what differs", () => {
     expect(recordedLines(recorded(said), CATALOGUE).map(wordsOf)).toEqual([
       "What is on an open package",
     ]);
+    const was = move([metres(5)]);
     expect(
       differences(
-        move([metres(5)]),
-        move([{ ...metres(5), quantity: "5.5555" }]),
+        was,
+        putBack(was, move([{ ...metres(5), quantity: "5.5555" }])),
       ),
     ).toEqual([
-      { line: { ...metres(5), quantity: "5.5555" }, recorded: 5000, mine: 0 },
+      {
+        line: { ...metres(5), quantity: "5.5555" },
+        kind: "move",
+        recorded: 5000,
+        mine: 0,
+        changed: -5000,
+      },
     ]);
+  });
+
+  test("a batch from before another tab's change, which says nothing it was changed from, changed nothing: that tab did", () => {
+    const newer = move([boxes(2), metres(9)]);
+    const older = move([boxes(1), metres(5)]);
+    expect(differences(newer, older)).toEqual([]);
+    expect(changesShown(recorded(newer), older, CATALOGUE)).toEqual([]);
+    expect(differenceOf(older, newer)).toBeNull();
+  });
+
+  test("only what the volunteer changed since it went back: not what the other tab changed", () => {
+    const back = move([boxes(1), metres(5)]);
+    // The other tab added a box and took off 3 m, then recorded first.
+    const other = move([boxes(2), metres(2)]);
+    // This one took off 4 m, and kept the box as it went back.
+    const mine = putBack(back, move([boxes(1), metres(1)]));
+    expect(shown(other, mine)).toEqual([
+      "Cat6 cable: 1 m fewer / Recorded 2 m, you changed it to 1 m. An administrator will correct it.",
+    ]);
+    // Kept as it went back while the other tab took off: nothing to add.
+    const kept = putBack(back, move([boxes(1), metres(5)]));
+    expect(shown(other, kept)).toEqual([]);
+    expect(differenceOf(other, kept)).toBeNull();
+  });
+
+  test("an opening recorded, and a move sent, each line said of its own batch", () => {
+    const opened = {
+      ...boxes(1),
+      open_package_key: OPEN,
+    };
+    const opening = move([opened], { kind: "open", to_location_id: 10 });
+    expect(
+      shown(opening, move([metres(1)])).map((said) => said.split(" / ")[0]),
+    ).toEqual(["Cat6 cable: 1 m, new", "LiteBeam 5AC: 1 × Box fewer"]);
   });
 
   test("what was recorded, line by line, then its reports", () => {
@@ -155,7 +209,8 @@ describe("the difference", () => {
       used_up: [OPEN],
       volunteer_id: 2,
     });
-    const difference = differenceOf(move([boxes(1), metres(12)]), mine);
+    const was = move([boxes(1), metres(12)]);
+    const difference = differenceOf(was, putBack(was, mine));
     expect(difference).toMatchObject({
       kind: "move",
       volunteer_id: 2,
@@ -167,17 +222,21 @@ describe("the difference", () => {
     });
     expect(difference).not.toHaveProperty("used_up");
     expect(difference?.key).not.toBe(KEY);
+    // Made from the save's key: added again, it is the same batch.
+    expect(differenceOf(was, putBack(was, mine))?.key).toBe(difference?.key);
   });
 
   test("none when it adds nothing that can go back", () => {
+    const was = move([metres(5)]);
     expect(
-      differenceOf(move([metres(5)]), move([metres(5), cut(1)])),
+      differenceOf(was, putBack(was, move([metres(5), cut(1)]))),
     ).toBeNull();
-    expect(differenceOf(move([metres(5)]), move([metres(2)]))).toBeNull();
+    expect(differenceOf(was, putBack(was, move([metres(2)])))).toBeNull();
   });
 
   test("goes in a cart as a save put back does, under its key", () => {
-    const difference = differenceOf(move([boxes(1)]), move([boxes(3)]));
+    const was = move([boxes(1)]);
+    const difference = differenceOf(was, putBack(was, move([boxes(3)])));
     expect(difference).not.toBeNull();
     const { cart, gaps } = differenceToCart(
       difference as Body,

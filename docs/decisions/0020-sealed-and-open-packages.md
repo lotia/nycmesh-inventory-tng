@@ -324,14 +324,17 @@ you" counts every report in one line, which hides what is waiting.
   to its page: the item, the amount, the places and the transaction (Ali,
   2026-11-14, inventory-tng-0gg). It is raised when a scan page's save,
   changed after another tab recorded its cart under the same key, is
-  refused holding less of a line than was recorded; the server compares
-  the two, so nothing else can raise one. A later such save says the
-  amount again while it waits.
+  refused holding less of a line than was recorded and than its cart held
+  when put back, which it sends (0010); the server compares them, so
+  nothing else can raise one. A later such save says the amount again
+  while it waits.
 - **Correct** writes an adjustment on each side of the transaction, with
   the reason "Recorded more than moved", in the forms it moved in: found
   again where it left, written off where it arrived. **Mark checked**
-  settles it as it is, for one corrected another way. Either settles it
-  only as the administrator saw it.
+  settles it as it is, for one corrected another way, and is all that is
+  offered for an open package moved whole, which is now where it arrived
+  and so cannot be found again where it left. Either settles it only as
+  the administrator saw it.
 
 ### Rejected in this amendment
 

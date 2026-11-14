@@ -37,6 +37,7 @@ import {
   type Kind,
   type Line,
   reconcile,
+  toBatch,
 } from "./cart";
 import {
   BatchKey,
@@ -849,7 +850,7 @@ export function toCart(
   const kind: Kind =
     older.kind === null || older.kind === "report" ? last.kind : older.kind;
   // Choices the catalogue no longer has are cleared, for the cart to ask.
-  const cart = reconcile(
+  const filled = reconcile(
     {
       ...freshCart(last),
       kind,
@@ -862,6 +863,15 @@ export function toCart(
     },
     catalogue,
   );
+  // Under its key, it keeps what it held as it went back: what the
+  // volunteer takes off that, once another tab recorded it under the key,
+  // is kept for an administrator (inventory-tng-0gg).
+  const batch =
+    filled.batchKey === undefined ? null : toBatch(filled, catalogue);
+  const cart =
+    batch === null || "problems" in batch
+      ? filled
+      : { ...filled, changedFrom: batch.draft.lines };
   const back = cart.lines.flatMap((line) => {
     const words = lineWords(line, items.get(line.itemId));
     return words === null

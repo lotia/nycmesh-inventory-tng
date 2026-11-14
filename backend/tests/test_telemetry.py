@@ -954,7 +954,11 @@ def test_counts_lines_recorded_more_than_moved_raised_and_settled(
         ]
     )
     assert client.post("/api/transactions", json=first).status_code == 201
-    changed = first | {"lines": [{"item_id": place.item.id, "quantity": "1"}]}
+    # As a page sends a cart put back with first's lines, changed.
+    changed = first | {
+        "lines": [{"item_id": place.item.id, "quantity": "1"}],
+        "changed_from": first["lines"],
+    }
     assert client.post("/api/transactions", json=changed).status_code == 409
     client.cookies.clear()
     assert counted(reader, "inventory.over_recorded.raised") == {(): 2}

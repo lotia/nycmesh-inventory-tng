@@ -243,7 +243,8 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   The server's refusal says what it recorded under the key, to the
   request that sent it, and the save shows that under "Recorded by the
   other tab (transaction n)", then "Your changes, not recorded", each
-  line that differs as "n more", "new" or "n fewer", in place of "Scan
+  line the volunteer changed since the cart went back as "n more", "new"
+  or "n fewer", in place of "Scan
   again only what you changed.", which stays only for a server that
   says nothing (Ali, 2026-11-14, inventory-tng-0gg). That note could
   read as covering lines rescanned since, and so record them twice.
@@ -255,7 +256,15 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   adjustment (0003). The server keeps that difference itself as it
   refuses the save, checked against the transaction it recorded, rather
   than the page reporting it later: no request more to lose or retry,
-  and a device can flag only what it sent of a cart recorded. A save
+  and a device can flag only what it sent of a cart recorded. Neither
+  side alone says which batch is the newer: a tab of the build before,
+  sending the cart as it was after a newer tab changed and recorded it,
+  would otherwise flag that tab's additions. So a cart put back under its
+  key keeps the lines it went back with, and sends them (`changed_from`):
+  the volunteer changed only what differs from those, and took off only
+  what it holds less of than both those and what was recorded (review,
+  2026-11-14). A batch without them, from the build before or a cart
+  never put back, changed nothing of its own, and flags nothing. A save
   another tab of this build recorded first is never sent under the key,
   so it is sent once nothing under the key waits, only for that answer.
   What the server recorded is kept with the refused save in the outbox

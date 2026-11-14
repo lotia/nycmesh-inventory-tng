@@ -413,12 +413,17 @@ holding it only. The page then asks for the catalogue and
 stock at once, as its periodic refresh does, whichever tab sent it, and
 the save stays listed with Dismiss, saying "Not recorded: another tab
 recorded this cart before your changes.", then what that tab recorded,
-and what the save holds otherwise, line by line (`frontend/src/
-recorded.ts`). "Add the difference to cart" puts what it holds more of,
-or new, in an empty cart under a new key, once; never what was taken
-from or said of an open package. Under a line it holds less of, it says
-an administrator will correct it: the server, refusing it, keeps that
-difference (`over_recorded.py`), and the administrators' home page lists
+and what the volunteer changed since the cart went back, line by line
+(`frontend/src/recorded.ts`): a cart put back under its key keeps the
+lines it went back with (`changedFrom`), and Record sends them
+(`changed_from`), which the server compares with nothing else. Without
+them, as from a build before or a cart never put back, it changed
+nothing: what differs is the other tab's change. "Add the difference to
+cart" puts what it holds more of, or new, in an empty cart under a key
+made from the save's, so added twice it is recorded once; never what was
+taken from or said of an open package. Under a line it holds less of, it
+says an administrator will correct it: the server, refusing it, keeps
+that difference (`over_recorded.py`), and the administrators' home page lists
 it under "Needs your action" as "Recorded more than moved" until one
 corrects it, with adjustments that undo it on each side, or marks it
 checked. From a server that says nothing of what it recorded, the note
@@ -432,9 +437,11 @@ whose emptying the browser did not keep, or one a tab that had not heard
 filled again), is not queued twice. Another batch under it is kept as
 `recorded_elsewhere`, under a key of its own, unless the one under it
 was refused for what it held (422): then it is sent (`Outbox.queue`).
-Kept so, it is sent under the cart's key once nothing under that key
-waits, only for the server to say what it recorded and keep what it took
-off; the server takes it only if nothing holds the key after all.
+Kept so, changed from the batch queued here first under that key, it is
+sent under the cart's key once nothing under that key waits, only for the
+server to say what it recorded and keep what it took off; the server
+takes it only if nothing holds the key after all, and the one refused
+(422) under the key then takes a key of its own.
 Either way the page says nothing is sending and counts no save: the list
 shows what became of it. An opening's open packages take keys made from
 the cart's, so the same opening recorded again is the same batch

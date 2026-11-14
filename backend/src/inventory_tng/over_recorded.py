@@ -114,6 +114,9 @@ class Shown(NamedTuple):
     recorded_at: datetime
     from_place: str | None
     to_place: str | None
+    # Whether Correct can undo it: not a move of an open package whole,
+    # which is now where it arrived, so cannot be found again where it left.
+    correctable: bool
 
 
 def amount_words(
@@ -140,6 +143,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
             ItemPackage.name,
             ItemPackage.size,
             Movement.from_open_package_id,
+            Movement.to_open_package_id,
             LedgerTransaction.id,
             LedgerTransaction.kind,
             LedgerTransaction.created_at,
@@ -164,6 +168,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         package,
         size,
         from_open,
+        to_open,
         transaction_id,
         kind,
         at,
@@ -185,6 +190,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
                 at,
                 from_place,
                 to_place if kind != "open" else None,
+                from_open is None or from_open != to_open,
             )
         )
     return lines

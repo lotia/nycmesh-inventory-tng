@@ -19,10 +19,12 @@ Mark checked if you corrected it another way.</p>
     <td>{% if each.from_place %}from {{ each.from_place }}{% endif %}{% if each.from_place and each.to_place %} {% endif %}{% if each.to_place %}to {{ each.to_place }}{% endif %}</td>
     <td>{{ each.transaction_id }}, {{ each.recorded_at | when(zone) }}</td>
     <td>
-      <form method="post" action="{{ here }}/{{ row.id }}/correct{{ query }}" class="actions">
+      <form method="post" action="{{ here }}/{{ row.id }}/checked{{ query }}" class="actions">
         <input type="hidden" name="seen" value="{{ seen(row) }}">
-        <button>Correct<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
-        <button formaction="{{ here }}/{{ row.id }}/checked{{ query }}">Mark checked<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
+        {% if each.correctable %}
+        <button formaction="{{ here }}/{{ row.id }}/correct{{ query }}">Correct<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
+        {% endif %}
+        <button>Mark checked<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
       </form>
     </td>
   </tr>

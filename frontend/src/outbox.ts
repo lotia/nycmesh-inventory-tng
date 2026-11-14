@@ -76,6 +76,24 @@ export const BatchKey = v.pipe(v.string(), v.uuid());
  * number. */
 const amount = v.union([v.number(), v.string()]);
 
+/** A line of a batch as POST /api/transactions takes it. */
+export const BatchLine = v.object({
+  item_id: id,
+  quantity: amount,
+  /** Sealed packages of it, kept sealed; absent (an older page's): loose. */
+  package_id: nullableId,
+  /** The size the page took that package to be: refused if resized
+   * since. The server requires it with package_id, but a build from
+   * before it was sent kept lines without: read, so the server's
+   * refusal names the line, never dropped unseen (inventory-tng-1p8). */
+  package_size: v.exactOptional(v.nullable(amount)),
+  /** A move's taken from an open package: all of it, moved whole. */
+  whole: v.exactOptional(v.nullable(v.boolean())),
+  /** An opening's: the key of the open package it makes, followed;
+   * another's, the open package it is taken from. */
+  open_package_key: v.exactOptional(v.nullable(v.pipe(v.string(), v.uuid()))),
+});
+
 /** A batch as POST /api/transactions takes it. */
 export const BatchBody = v.object({
   key: BatchKey,
@@ -84,26 +102,7 @@ export const BatchBody = v.object({
   from_location_id: nullableId,
   to_location_id: nullableId,
   install_number: nullableId,
-  lines: v.array(
-    v.object({
-      item_id: id,
-      quantity: amount,
-      /** Sealed packages of it, kept sealed; absent (an older page's): loose. */
-      package_id: nullableId,
-      /** The size the page took that package to be: refused if resized
-       * since. The server requires it with package_id, but a build from
-       * before it was sent kept lines without: read, so the server's
-       * refusal names the line, never dropped unseen (inventory-tng-1p8). */
-      package_size: v.exactOptional(v.nullable(amount)),
-      /** A move's taken from an open package: all of it, moved whole. */
-      whole: v.exactOptional(v.nullable(v.boolean())),
-      /** An opening's: the key of the open package it makes, followed;
-       * another's, the open package it is taken from. */
-      open_package_key: v.exactOptional(
-        v.nullable(v.pipe(v.string(), v.uuid())),
-      ),
-    }),
-  ),
+  lines: v.array(BatchLine),
   /** Open packages said to be used up, by key (docs/decisions/0020). */
   used_up: v.exactOptional(v.nullable(v.array(v.pipe(v.string(), v.uuid())))),
   /** What is really on open packages, said, by key. */
@@ -117,6 +116,14 @@ export const BatchBody = v.object({
       ),
     ),
   ),
+  /** The lines its cart held when put back under its key, before the
+   * volunteer changed it (cart.ts, changedFrom), or those of the batch
+   * queued here first under it (Outbox.queue): what it holds less of than
+   * these, and than was recorded under the key, the volunteer took off,
+   * which the server keeps for an administrator as it refuses it
+   * (inventory-tng-0gg). Never part of what the batch is (sameBatch). A
+   * build before keeps none: the server then keeps nothing. */
+  changed_from: v.exactOptional(v.nullable(v.array(BatchLine))),
 });
 
 export type Body = Schemas["Batch"];
@@ -401,7 +408,10 @@ function holdsKey(entry: Entry): boolean {
 /** Whether two batches, each as storage reads it (parsed, so its fields
  * in one order), are the same: one key may name two (Outbox.queue). */
 function sameBatch(a: Entry["body"], b: Entry["body"]): boolean {
-  return a.key === b.key && JSON.stringify(a) === JSON.stringify(b);
+  // What it was changed from is not what it is, as the server compares.
+  const what = (body: Entry["body"]) =>
+    JSON.stringify({ ...body, changed_from: undefined });
+  return a.key === b.key && what(a) === what(b);
 }
 
 /** What STORAGE_KEY holds: the batches, and the build that last wrote them.
@@ -610,11 +620,22 @@ export class Outbox {
       }
       if (before.some(holdsKey)) {
         queued = "refused";
+        // Changed from what was queued here first under the key, saved or
+        // waiting: what it took off that is the volunteer's.
+        const first =
+          before.find((each) => each.state === "saved") ??
+          before.find((each) => each.state === "waiting");
         return [
           ...entries,
           {
             ...entry,
-            body: { ...entry.body, key: uuid() },
+            body: {
+              ...entry.body,
+              key: uuid(),
+              ...(first === undefined
+                ? {}
+                : { changed_from: first.body.lines }),
+            },
             state: "refused",
             // Asked under the cart's key once nothing under it waits
             // (send): so the server says what it recorded, and keeps what
@@ -785,6 +806,16 @@ export class Outbox {
         );
         return "next";
       case 201:
+        // What else is under the key was refused for what it held (422),
+        // so the server held none: it takes a key of its own, as in
+        // queue, so one key names one batch.
+        this.update((entries) =>
+          entries.map((each) =>
+            each.body.key === held && each.reason?.code === "refused"
+              ? { ...each, body: { ...each.body, key: uuid() } }
+              : each,
+          ),
+        );
         listed({
           state: "saved",
           reason: null,
