@@ -228,29 +228,34 @@ def test_names_are_keyed_alike_by_the_app_and_the_database(session: Session) -> 
     assert {name: name_key(name) for name in TRICKY_NAMES} == TRICKY_NAMES
     sample = _sample()
     keys = [name_key(name) for name in sample]
-    each = "FROM unnest(CAST(:names AS text[]), CAST(:keys AS text[])) AS t(name, name_key)"
     key = name_key_sql(literal_column("name")).compile(
         session.get_bind(), compile_kwargs={"literal_binds": True}
     )
-    by_database = session.scalars(
-        text(f"SELECT {key} {each}"), {"names": sample, "keys": keys}
-    )
-    assert dict(zip(sample, by_database, strict=True)) == dict(
-        zip(sample, keys, strict=True)
-    )
-    for table in ("item", "item_package"):
-        check = session.scalar(
+    checks = [
+        session.scalar(
             text(
                 "SELECT pg_get_expr(conbin, conrelid) FROM pg_constraint"
                 " WHERE conname = :name"
             ),
             {"name": f"ck_{table}_name_key"},
         )
-        refused = session.scalars(
-            text(f"SELECT name {each} WHERE NOT ({check})"),
-            {"names": sample, "keys": keys},
-        )
-        assert refused.all() == [], table
+        for table in ("item", "item_package")
+    ]
+    rows = session.execute(
+        text(
+            f"SELECT {key}, {', '.join(f'({check})' for check in checks)}"
+            " FROM unnest(CAST(:names AS text[]), CAST(:keys AS text[]))"
+            " AS t(name, name_key)"
+        ),
+        {"names": sample, "keys": keys},
+    ).all()
+    assert {name: row[0] for name, row in zip(sample, rows, strict=True)} == dict(
+        zip(sample, keys, strict=True)
+    )
+    # Each migrated CHECK accepts every key the app writes.
+    assert [
+        name for name, row in zip(sample, rows, strict=True) if not all(row[1:])
+    ] == []
 
 
 def test_a_name_key_written_wrong_is_refused(

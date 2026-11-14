@@ -236,7 +236,14 @@ class CanonicalName:
     @validates("name")
     def _canonical(self, _key: str, value: str | None) -> str | None:
         # None is left for NOT NULL to refuse, as a rule broken.
-        return None if value is None else canonical(value)
+        if value is None:
+            return None
+        value = canonical(value)
+        self._named(value)
+        return value
+
+    def _named(self, name: str) -> None:
+        """What else follows from `name`, as it is set: nothing, here."""
 
 
 class KeyedName(CanonicalName):
@@ -247,12 +254,8 @@ class KeyedName(CanonicalName):
 
     name_key: Mapped[str] = mapped_column(Text)
 
-    @validates("name")
-    def _canonical(self, _key: str, value: str | None) -> str | None:
-        value = super()._canonical(_key, value)
-        if value is not None:
-            self.name_key = names.name_key(value)
-        return value
+    def _named(self, name: str) -> None:
+        self.name_key = names.name_key(name)
 
 
 def _name_key_check() -> CheckConstraint:

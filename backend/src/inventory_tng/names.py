@@ -18,10 +18,13 @@ Only ASCII's spaces and punctuation are ignored, and only ASCII's letters
 lowered, whatever the database's locale: as a C locale has it, which
 CloudNativePG makes by default, so letters such as `â` and `Â` are kept
 apart, and so are signs beyond ASCII, such as an en dash or a curly quote.
+So a name needs a letter or a digit too (nameless), Unicode's, which no
+key drops.
 """
 
 import re
 import string
+import unicodedata
 
 from sqlalchemy import ColumnElement, SQLColumnExpression, collate, func
 
@@ -45,3 +48,10 @@ def name_key_sql(name: SQLColumnExpression[str]) -> ColumnElement[str]:
     so lower() lowers ASCII's letters only, as name_key does, whatever the
     database's locale."""
     return func.lower(func.regexp_replace(collate(name, "C"), IGNORED, "", "g"))
+
+
+def nameless(name: str) -> bool:
+    """Whether `name` has no letter or digit, Unicode's: spaces,
+    punctuation and signs alone, which tell no name from another (an en
+    dash is kept in its key, but is no name)."""
+    return not any(unicodedata.category(c)[0] in "LN" for c in name)

@@ -47,6 +47,7 @@ from inventory_tng.models import (
     canonical,
     whole,
 )
+from inventory_tng.names import name_key, nameless
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
@@ -318,7 +319,7 @@ def _key_name_problem(name: str) -> str | None:
     an item's or a package's."""
     if problem := name_problem(name):
         return problem
-    if items.nameless(name):
+    if nameless(name):
         return NO_LETTERS
     return None
 
@@ -465,8 +466,8 @@ def save_item(
     if fields is not None:
         seen = form_version(form.get("version", ""))
         # Its own name, or a respelling of it, asks nothing: it is the same.
-        same = fields.name == found.name or _confirmed(form, fields)
-        asked = None if same or items.same_name(fields.name, found.name) else []
+        same = name_key(fields.name) == found.name_key or _confirmed(form, fields)
+        asked = None if same else []
         _, broken = _change_or_note(
             session,
             lambda: items.save(session, found, fields, seen=seen),

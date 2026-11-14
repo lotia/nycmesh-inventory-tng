@@ -12,7 +12,6 @@ are each its own, retired items' too (models.Item); taken_by says which
 another item has. similar finds items whose names are close, to ask
 whether a new name is a different item (docs/decisions/0021)."""
 
-import unicodedata
 from collections.abc import Collection
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -142,18 +141,6 @@ def similar(session: Session, name: str, item_id: int) -> list[Item]:
     query = select(Item).where(close, Item.id != item_id)
     closest = func.similarity(Item.name_folded, folded).desc(), func.lower(Item.name)
     return list(session.scalars(query.order_by(*closest).limit(SIMILAR)))
-
-
-def nameless(name: str) -> bool:
-    """Whether `name` has no letter or digit, Unicode's: spaces,
-    punctuation and signs alone, which tell no name from another (an en
-    dash is kept in its key, but is no name)."""
-    return not any(unicodedata.category(c)[0] in "LN" for c in name)
-
-
-def same_name(one: str, other: str) -> bool:
-    """Whether two names are one, as items' are compared (name_key)."""
-    return name_key(one) == name_key(other)
 
 
 def add(session: Session, fields: Fields) -> Item:
