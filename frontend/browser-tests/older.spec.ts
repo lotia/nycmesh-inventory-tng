@@ -259,17 +259,20 @@ test("a save an older build's tab saved meanwhile is saved once, under its key; 
   const refused = sent(409);
   await page.getByRole("button", { name: "Save" }).click();
   await refused;
-  const said =
-    "Not recorded: another tab recorded this first. Reload the page to continue.";
+  const said = "Not recorded: another tab recorded this first.";
+  const reloadWords = `${said} Reload the page to continue.`;
   const entry = page.getByRole("listitem").filter({ hasText: said });
-  await expect(entry.locator("strong")).toHaveText(said);
-  // Its lines, to compare with what was recorded.
-  await expect(entry.getByText(`${cable}: 3 m`)).toBeVisible();
+  await expect(entry.locator("strong")).toHaveText(reloadWords);
+  // Its lines, numbered as a refusal names them, to compare with what was
+  // recorded.
+  await expect(entry.getByText(`1. ${cable}: 3 m`)).toBeVisible();
   await expect(entry.getByRole("button", { name: "Dismiss" })).toHaveCount(0);
   const reloaded = page.waitForEvent("load");
   await entry.getByRole("button", { name: "Reload" }).click();
   await reloaded;
-  await expect(entry.getByText(`${cable}: 3 m`)).toBeVisible();
+  // Reloaded, it no longer asks for a reload (Ali, inventory-tng-93z).
+  await expect(entry.locator("strong")).toHaveText(said);
+  await expect(entry.getByText(`1. ${cable}: 3 m`)).toBeVisible();
   await expect(entry.getByRole("button", { name: "Reload" })).toHaveCount(0);
   await entry.getByRole("button", { name: "Dismiss" }).click();
   await expect(page.getByText(said)).toHaveCount(0);

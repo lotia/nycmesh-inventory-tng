@@ -51,8 +51,12 @@ import {
   type Entry,
   STORAGE_KEY as OUTBOX_KEY,
   type Outbox,
+  RECORDED_ELSEWHERE,
   REFUSED_FOR_KEY,
   REFUSED_LEADS,
+  refusalSaid,
+  SAVED_BEFORE_CHANGES,
+  type Said,
   sharedOutbox,
 } from "./outbox";
 import { decimal, thousandths } from "./quantity";
@@ -273,6 +277,7 @@ export function ScanPage({
       <OutboxList
         outbox={outbox}
         catalogue={current.state === "ready" ? current.catalogue : null}
+        cartEmpty={cartEmpty.value}
         reload={reload}
       />
     </main>
@@ -298,18 +303,10 @@ function NewerBuild({
   reload: () => void;
 }) {
   const learned = outbox.builds.newer.value;
-  if (learned === null) {
+  if (learned === null || reloadWaits(outbox, cartEmpty)) {
     return null;
   }
-  const waiting = outbox.entries.value.filter(
-    (entry) =>
-      entry.state === "waiting" &&
-      (learned !== "too_old" || !outbox.builds.isNewer(entry.build)),
-  );
-  const holds = waiting.length > 0 || !cartEmpty;
-  if (learned !== "too_old" && holds) {
-    return null;
-  }
+  const holds = holding(outbox, cartEmpty);
   return (
     <div
       role="alert"
@@ -320,6 +317,29 @@ function NewerBuild({
         {UPGRADE}
       </button>
     </div>
+  );
+}
+
+/** Whether this tab holds what a newer build reads not as this build's:
+ * a cart, or a batch waiting; too old, a newer build's own not counted. */
+function holding(outbox: Outbox, cartEmpty: boolean): boolean {
+  const learned = outbox.builds.newer.value;
+  return (
+    !cartEmpty ||
+    outbox.entries.value.some(
+      (entry) =>
+        entry.state === "waiting" &&
+        (learned !== "too_old" || !outbox.builds.isNewer(entry.build)),
+    )
+  );
+}
+
+/** Whether a reload waits (NewerBuild): a newer build is out, while this
+ * tab can still save and holds something (Ali, inventory-tng-93z). */
+function reloadWaits(outbox: Outbox, cartEmpty: boolean): boolean {
+  const learned = outbox.builds.newer.value;
+  return (
+    learned !== null && learned !== "too_old" && holding(outbox, cartEmpty)
   );
 }
 
@@ -572,6 +592,7 @@ function CartForm({
 
   const sides = SIDES[cart.value.kind];
   const { items, volunteers } = indexOf(catalogue);
+  const names = useMemo(() => namesWithNumbers(catalogue), [catalogue]);
   const name =
     cart.value.volunteerId === null
       ? undefined
@@ -766,7 +787,7 @@ function CartForm({
         <ul role="alert" class="list-none p-0">
           {problems.value.map((problem) => (
             <li key={problem}>
-              <AlertWords words={problem} />
+              <AlertWords words={problem} names={names} />
             </li>
           ))}
         </ul>
@@ -1032,34 +1053,76 @@ function NoteSaid({ note }: { note: string }) {
 }
 
 /**
- * A failure or refusal note's words, in bold, its numbers in bold italic
- * (Ali, inventory-tng-93z); of a refusal, the problems after "Not
- * recorded." not in bold, their numbers in italic.
+ * A failure or refusal note's words, in bold, the counts the page wrote
+ * in it in bold italic, never a number of `names` (Ali, inventory-tng-93z);
+ * of a refusal, the problems after "Not recorded." not in bold, the
+ * server's words in them as they are.
  */
-function AlertWords({ words }: { words: string }) {
+function AlertWords({
+  words,
+  names = [],
+}: {
+  words: string;
+  /** Names in it, whose numbers are no counts (namesWithNumbers). */
+  names?: readonly string[];
+}) {
   const lead = REFUSED_LEADS.find((each) => words.startsWith(each));
   return lead === undefined ? (
     <strong>
-      <Numbered words={words} />
+      <Counted said={quoting(words, names)} />
     </strong>
   ) : (
     <>
       <strong>{lead}</strong>
-      <Numbered words={words.slice(lead.length)} />
+      <Counted said={refusalSaid(words.slice(lead.length))} />
     </>
   );
 }
 
-/** `words`, each number standing alone in italic, a name's too ("Bag of
- * 50"); not digits joined to letters, such as LiteBeam 5AC's. */
-function Numbered({ words }: { words: string }) {
+/** `said`, each number standing alone in the page's own words in italic;
+ * not digits joined to letters, such as LiteBeam 5AC's. */
+function Counted({ said }: { said: Said }) {
   return (
     <>
-      {words
-        .split(/\b(\d+(?:\.\d+)?)\b/)
-        .map((part, at) => (at % 2 === 1 ? <em key={at}>{part}</em> : part))}
+      {said.map((part, at) => (
+        <Fragment key={at}>
+          {typeof part === "string"
+            ? part
+                .split(/\b(\d+(?:\.\d+)?)\b/)
+                .map((bit, nth) =>
+                  nth % 2 === 1 ? <em key={nth}>{bit}</em> : bit,
+                )
+            : part.quoted}
+        </Fragment>
+      ))}
     </>
   );
+}
+
+/** `words`, each of `names` in it quoted. */
+function quoting(words: string, names: readonly string[]): Said {
+  if (names.length === 0) {
+    return [words];
+  }
+  const any = names
+    .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  return words
+    .split(new RegExp(`(${any})`))
+    .map((part, at) => (at % 2 === 1 ? { quoted: part } : part));
+}
+
+/** The catalogue's item and package names with a digit, longest first, so
+ * one inside another is quoted whole. */
+function namesWithNumbers(catalogue: Catalogue): string[] {
+  const names = catalogue.items.flatMap((item) => [
+    item.name,
+    ...item.packages.map((pack) => pack.name),
+    ...item.retired_packages.map((pack) => pack.name),
+  ]);
+  return [...new Set(names)]
+    .filter((name) => /\d/.test(name))
+    .sort((a, b) => b.length - a.length);
 }
 
 /** Why one cannot go in the cart: it is not empty (row 17). */
@@ -1394,11 +1457,15 @@ function Finder({
 function OutboxList({
   outbox,
   catalogue,
+  cartEmpty,
   reload,
 }: {
   outbox: Outbox;
   /** To name the lines of one refused; null until it is loaded. */
   catalogue: Catalogue | null;
+  /** Whether the cart holds no lines: until then, with a newer build
+   * out, the reload waits (reloadWaits). */
+  cartEmpty: boolean;
   reload: () => void;
 }) {
   // Refused before this page loaded: reloaded since.
@@ -1428,11 +1495,17 @@ function OutboxList({
         {entries.map((entry) => {
           const key = entry.body.key;
           const refused = entry.state === "refused";
-          const reloads =
+          // Put back and refused for its key since the page loaded: to be
+          // reloaded, once a reload no longer waits; reloaded, dismissed.
+          const toReload =
             refused &&
             entry.putBack === true &&
             REFUSED_FOR_KEY.has(entry.note ?? "") &&
             !refusedBefore.has(key);
+          const note =
+            !toReload && entry.note === SAVED_BEFORE_CHANGES
+              ? RECORDED_ELSEWHERE
+              : entry.note;
           const lines =
             refused && catalogue !== null ? linesSaid(entry, catalogue) : [];
           return (
@@ -1442,12 +1515,12 @@ function OutboxList({
                 <small>
                   In the inventory (transaction {entry.transactionId}).
                 </small>
-              ) : entry.note === null || entry.note === MUST_UPGRADE ? (
+              ) : note === null || note === MUST_UPGRADE ? (
                 // Asked for, an upgrade is no failure.
-                <small>{entry.note ?? "Sending…"}</small>
+                <small>{note ?? "Sending…"}</small>
               ) : (
                 // Not role="alert": every one is there as the page loads.
-                <NoteSaid note={entry.note} />
+                <NoteSaid note={note} />
               )}
               {lines.length > 0 && (
                 <ul class="list-none p-0">
@@ -1462,10 +1535,12 @@ function OutboxList({
                 </ul>
               )}
               {entry.state !== "waiting" &&
-                (reloads ? (
-                  <button type="button" onClick={reload}>
-                    Reload
-                  </button>
+                (toReload ? (
+                  !reloadWaits(outbox, cartEmpty) && (
+                    <button type="button" onClick={reload}>
+                      Reload
+                    </button>
+                  )
                 ) : (
                   <button type="button" onClick={() => outbox.dismiss(key)}>
                     Dismiss

@@ -359,8 +359,10 @@ keeps it, as does a cart it filled when a newer build reads it, and
 the cart is saved under it until emptied, as an older tab may be sending
 it still: the server then takes it once, or, changed since, refuses it
 (409 `key_reused`), which the page says, asking for a reload in place
-of Dismiss; after it, the save stays listed until dismissed. A refused
-save in the outbox's list lists its lines, in the words above. A save
+of Dismiss, held back as a newer build's is; after it, the save stays
+listed, no longer asking, until dismissed. A refused save in the
+outbox's list lists its lines, in the words above, each item numbered
+as the refusal's "Line n" names it. A save
 refused for its key goes back without it, as the server holds that key
 for another batch. It removes an older key once nothing in it is left
 to list (`frontend/src/older.ts`). Builds that keep the same shape
@@ -470,7 +472,8 @@ utilities. When you style a page:
 - Make markup that repeats a Jinja macro or a Preact component.
 - A failure or refusal note on the scan page is in the alert's style
   (`role="alert"`, or `class="alert"` for notes shown with a list), in
-  bold as a whole, with no "Sorry.", and its numbers in bold italic
+  bold as a whole, with no "Sorry.", and the counts the page wrote in it
+  in bold italic, never the numbers of a name or of the server's words
   (`AlertWords` in `ScanPage.tsx`). A refusal's problems, after "Not
   recorded.", are not bold. A status that reports no problem is plain.
 - Follow docs/decisions/0019 for links, buttons and lists. A button is

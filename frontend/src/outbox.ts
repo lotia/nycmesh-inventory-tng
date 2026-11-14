@@ -160,10 +160,14 @@ export const KEY_REUSED =
   "Not recorded: its key was already used for a different batch. Please report this.";
 
 /** A save put back in the cart, then changed, whose older build's tab
- * saved it first, as it was (409 key_reused): the page offers a reload,
- * so what it shows follows (Ali, inventory-tng-93z, question 4, C). */
-export const SAVED_BEFORE_CHANGES =
-  "Not recorded: another tab recorded this first. Reload the page to continue.";
+ * saved it first, as it was (409 key_reused), once the page has been
+ * reloaded (Ali, inventory-tng-93z). */
+export const RECORDED_ELSEWHERE =
+  "Not recorded: another tab recorded this first.";
+
+/** The same, as kept: the page offers a reload, so what it shows follows
+ * (Ali, inventory-tng-93z, question 4, C). */
+export const SAVED_BEFORE_CHANGES = `${RECORDED_ELSEWHERE} Reload the page to continue.`;
 
 /** What every build has said of a batch refused for its key: this one,
  * then those before, whose words an older key may still hold. */
@@ -178,6 +182,24 @@ export const REFUSED_FOR_KEY: ReadonlySet<string> = new Set([
  * builds before did: shown in bold, the problems after it not. */
 const NOT_RECORDED = "Not recorded.";
 export const REFUSED_LEADS = [NOT_RECORDED, "Not saved."] as const;
+
+/**
+ * Words for an alert: a string is the page's own, its numbers counts it
+ * wrote, shown in italic; `{ quoted }` is words it did not write, such as
+ * a name or the server's, shown as they are (Ali, inventory-tng-93z).
+ */
+export type Said = readonly (string | { quoted: string })[];
+
+/** A 422's problems as said after REFUSED_LEADS (problems, below): where
+ * each names its line or report, the page's; the rest, the server's. */
+export function refusalSaid(problems: string): Said {
+  const reports = Object.values(REPORTS).join("|");
+  return problems
+    .split(new RegExp(`((?:^| )(?:Line \\d+|(?:${reports}), \\d+): )`))
+    .flatMap((part, at) =>
+      part === "" ? [] : [at % 2 === 1 ? part : { quoted: part }],
+    );
+}
 
 /** A batch's reports, as a 422 names them. */
 export const REPORTS = {

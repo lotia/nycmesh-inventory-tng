@@ -216,15 +216,26 @@ function saveOf(key: string, save: v.InferOutput<typeof OldEntry>): Older {
  * A batch of the outbox (outbox.Entry) the inventory refused, line by
  * line in the words this list uses (toCart's parts), named from
  * `catalogue`, retired items too: for the volunteer to compare with what
- * was recorded (Ali, inventory-tng-93z).
+ * was recorded. Each item's numbered by its place in the batch, as a
+ * 422's "Line n" names it (outbox.ts, problems); a report is not (Ali,
+ * inventory-tng-93z).
  */
 export function linesSaid(entry: unknown, catalogue: Catalogue): string[] {
   const read = v.safeParse(OldEntry, entry);
-  return read.success
-    ? toCart(saveOf("", read.output), withRetired(catalogue)).parts.map(
-        (part) => part.words,
-      )
-    : [];
+  if (!read.success) {
+    return [];
+  }
+  const save = saveOf("", read.output);
+  const items = [
+    ...new Set(
+      save.lines.flatMap((line) =>
+        line !== null && "item_id" in line ? [line.item_id] : [],
+      ),
+    ),
+  ];
+  return toCart(save, withRetired(catalogue)).parts.map(({ itemId, words }) =>
+    itemId === null ? words : `${items.indexOf(itemId) + 1}. ${words}`,
+  );
 }
 
 function cartIn(key: string, stored: unknown): Older[] {
@@ -798,10 +809,11 @@ function openWords(item: Item | undefined, said: unknown): string {
 /** A cart's line in words: its item, then how many of each package, and
  * how much loose; null if it holds none. */
 export function lineWords(line: Line, item: Item | undefined): string | null {
-  if (item === undefined) {
-    return nameOf(item);
-  }
-  const parts = item.packages.flatMap((pack) => {
+  // An item gone: its packages too (Ali, inventory-tng-93z).
+  const packages =
+    item?.packages ??
+    Object.keys(line.packages).map((id) => ({ id, name: GONE }));
+  const parts = packages.flatMap((pack) => {
     const packs = count(line.packages[pack.id] ?? "") ?? 0;
     return packs > 0 ? [`${packs} × ${pack.name}`] : [];
   });
@@ -810,7 +822,11 @@ export function lineWords(line: Line, item: Item | undefined): string | null {
     const after = parts.length > 0 ? " loose" : "";
     parts.push(`${decimal(loose)}${unitOf(item)}${after}`);
   }
-  return parts.length === 0 ? null : `${item.name}: ${parts.join(", ")}`;
+  if (parts.length === 0) {
+    // An item gone is said, as the cart shows it, even holding none.
+    return item === undefined ? nameOf(item) : null;
+  }
+  return `${nameOf(item)}: ${parts.join(", ")}`;
 }
 
 /**
