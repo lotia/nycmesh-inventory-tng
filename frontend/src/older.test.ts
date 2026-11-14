@@ -6,6 +6,7 @@ import {
   isListed,
   LINES_LOST,
   linesSaid,
+  lineWords,
   nextWhole,
   type Older,
   OlderStore,
@@ -783,6 +784,20 @@ describe("line by line", () => {
     ]);
   });
 
+  test("an older cart's line of an item gone says how much it held", () => {
+    expect(
+      lineWords(
+        { itemId: 999, packages: { 5: "2", 6: "0" }, loose: "1.5" },
+        undefined,
+      ),
+    ).toBe(
+      "An item no longer in the catalogue: 2 × a removed package or item, 1.5 loose",
+    );
+    expect(lineWords({ itemId: 999, packages: {}, loose: "" }, undefined)).toBe(
+      "An item no longer in the catalogue",
+    );
+  });
+
   test("a batch the inventory refused is said line by line in the same words, and one not read, as none", () => {
     const refused = saveOf(
       { state: "refused", note: "Not recorded. Line 1: no." },
@@ -791,14 +806,19 @@ describe("line by line", () => {
           { item_id: 100, quantity: "4", package_id: 1004 },
           { item_id: 101, quantity: "12", open_package_key: OTHER },
           { item_id: 100, quantity: "8", package_id: 1000, package_size: 4 },
+          { item_id: 999, quantity: "5" },
+          { item_id: "unreadable" },
         ],
         used_up: [OTHER],
       },
     );
+    // Numbered by item, as a 422 names its lines; one gone, with how much
+    // (Ali, inventory-tng-93z).
     expect(linesSaid(refused, CATALOGUE)).toEqual([
-      "LiteBeam 5AC: 4",
-      "Cat6 cable: 12 m from an open package",
-      "LiteBeam 5AC: 2 × Box",
+      "1. LiteBeam 5AC: 4",
+      "2. Cat6 cable: 12 m from an open package",
+      "1. LiteBeam 5AC: 2 × Box",
+      "3. An item no longer in the catalogue: 5",
       "Open package said used up",
     ]);
     expect(linesSaid({ body: "lost" }, CATALOGUE)).toEqual([]);

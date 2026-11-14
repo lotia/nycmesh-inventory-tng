@@ -188,16 +188,20 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   package only by the amount, which left the volunteer to work out what
   was counted.
   A failure or refusal note on the scan page drops "Sorry." and is bold
-  as a whole, its numbers in bold italic; a refusal's problems, listed
-  after "Not recorded.", are not bold (Ali, 2026-11-13, inventory-tng-93z).
-  We rejected bolding only the words naming the problem, which Ali found
-  hard to spot once seen, and opening "Sorry.", which delays the problem.
-  A refused batch in the outbox list lists its lines, so the volunteer
-  can compare it with what was recorded. One put back from an older
-  build and refused as another tab recorded it first asks for a reload,
-  in place of Dismiss, so the page shows what was recorded; after it, the
-  batch stays listed until dismissed. We rejected leaving only Dismiss,
-  which dropped the note before the volunteer had seen the stock as it is.
+  as a whole, the counts the page wrote in it in bold italic; a
+  refusal's problems, listed after "Not recorded.", are not bold (Ali,
+  2026-11-13, inventory-tng-93z). We rejected bolding only the words
+  naming the problem, which Ali found hard to spot once seen, opening
+  "Sorry.", which delays the problem, and italicising the numbers of
+  names and the server's words, which are no counts.
+  A refused batch in the outbox list lists its lines, numbered as its
+  problems name them, so the volunteer can compare it with what was
+  recorded. One put back from an older build and refused as another tab
+  recorded it first asks for a reload, in place of Dismiss, so the page
+  shows what was recorded, held back as a newer build's reload is; after
+  it, the batch stays listed, no longer asking, until dismissed. We
+  rejected leaving only Dismiss, which dropped the note before the
+  volunteer had seen the stock as it is.
 - Compression behaves the same in compose and in Kubernetes, because the
   app serves the compressed files itself. The image holds three copies of
   each file; the bundle is small, so that costs little.

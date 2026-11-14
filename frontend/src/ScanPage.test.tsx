@@ -14,6 +14,7 @@ import {
   KEY_REUSED,
   STORAGE_KEY as OUTBOX_KEY,
   Outbox,
+  RECORDED_ELSEWHERE,
   SAVED_BEFORE_CHANGES,
 } from "./outbox";
 import { ScanPage } from "./ScanPage";
@@ -88,6 +89,15 @@ function fillMove() {
   pick("To", "12");
   find("cable");
   fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+}
+
+/** fillMove, the cable named "Cat 6 cable". */
+function fillMove6() {
+  pick("Your name", "1");
+  pick("From", "10");
+  pick("To", "12");
+  find("cable");
+  fireEvent.click(screen.getByRole("button", { name: "Cat 6 cable" }));
 }
 
 const save = () =>
@@ -680,8 +690,8 @@ describe("filling and saving a cart", () => {
     const detail = [
       {
         type: "value_error",
-        loc: ["body", "lines", 0, "quantity"],
-        msg: "No.",
+        loc: ["body", "lines", 1, "quantity"],
+        msg: "No more than 0.5 left.",
       },
     ];
     open(server(() => json({ detail }, 422)).api);
@@ -693,17 +703,48 @@ describe("filling and saving a cart", () => {
     const note = await screen.findByText(
       (_, element) =>
         element?.className === "alert" &&
-        element.textContent === "Not recorded. Line 1: No.",
+        element.textContent === "Not recorded. Line 2: No more than 0.5 left.",
     );
-    // Only "Not recorded." in bold; numbers in what follows in italic
-    // (Ali, inventory-tng-93z).
+    // Only "Not recorded." in bold; in what follows, the line's number
+    // the page wrote in italic, the server's words as they are (Ali,
+    // inventory-tng-93z).
     expect(note.querySelector("strong")?.textContent).toBe("Not recorded.");
-    expect(note.querySelector("em")?.textContent).toBe("1");
+    expect(
+      [...note.querySelectorAll("em")].map((em) => em.textContent),
+    ).toEqual(["2"]);
     const entry = note.closest("li") as HTMLElement;
+    // Numbered as the problems name them.
     expect(
       [...entry.querySelectorAll("ul li")].map((each) => each.textContent),
-    ).toEqual(["Cat6 cable: 1 m", "LiteBeam 5AC: 1"]);
+    ).toEqual(["1. Cat6 cable: 1 m", "2. LiteBeam 5AC: 1"]);
     within(entry).getByRole("button", { name: "Dismiss" });
+  });
+
+  test("a cart's problem puts in italic the counts the page wrote, not a name's numbers", async () => {
+    const named = {
+      ...CATALOGUE,
+      items: CATALOGUE.items.map((item) =>
+        item.id === 101 ? { ...item, name: "Cat 6 cable" } : item,
+      ),
+    };
+    const { api } = answering((request) =>
+      isCatalogue(request) ? json(named, 200) : saved(),
+    );
+    open(api);
+    await ready();
+    fillMove6();
+    fireEvent.input(screen.getByLabelText("Loose m"), {
+      target: { value: "1.2345" },
+    });
+    save();
+    // Ali, inventory-tng-93z.
+    expectBold(
+      (await screen.findByText(/^Cat 6 cable: Enter the loose amount/)).closest(
+        "li",
+      ),
+      "Cat 6 cable: Enter the loose amount in m, up to 3 decimals.",
+      ["3"],
+    );
   });
 
   test("saved with no connection, the batch waits in the outbox", async () => {
@@ -1611,8 +1652,9 @@ describe("what an older build left", () => {
       "Receiving stock to a place no longer in the catalogue",
     );
     within(receipt as HTMLElement).getByText("LiteBeam 5AC: 1 × Box, 3 loose");
+    // Gone, it says how much (Ali, inventory-tng-93z).
     within(receipt as HTMLElement).getByText(
-      "An item no longer in the catalogue",
+      "An item no longer in the catalogue: 1",
     );
     expect(install?.textContent).toContain(
       "Taking it to an install for install 77Add it to the cart, fix that, then save.",
@@ -2434,21 +2476,51 @@ describe("what an older build left", () => {
     expect(said.tagName).toBe("STRONG");
     const entry = said.closest("li") as HTMLElement;
     // Its lines, to compare with what was recorded.
-    within(entry).getByText("LiteBeam 5AC: 2 × Box");
+    within(entry).getByText("1. LiteBeam 5AC: 2 × Box");
     expect(within(entry).queryByRole("button", { name: "Dismiss" })).toBeNull();
     fireEvent.click(within(entry).getByRole("button", { name: "Reload" }));
     expect(reload).toHaveBeenCalledOnce();
-    // Reloaded: still listed, with its lines, now to dismiss.
+    // Reloaded: still listed, with its lines, now to dismiss, no longer
+    // asking for a reload (Ali, inventory-tng-93z).
     cleanup();
     open(api);
     await ready();
-    const again = (await screen.findByText(SAVED_BEFORE_CHANGES)).closest(
+    expect(screen.queryByText(SAVED_BEFORE_CHANGES)).toBeNull();
+    const again = (await screen.findByText(RECORDED_ELSEWHERE)).closest(
       "li",
     ) as HTMLElement;
-    within(again).getByText("LiteBeam 5AC: 2 × Box");
+    within(again).getByText("1. LiteBeam 5AC: 2 × Box");
     expect(within(again).queryByRole("button", { name: "Reload" })).toBeNull();
     fireEvent.click(within(again).getByRole("button", { name: "Dismiss" }));
-    expect(screen.queryByText(SAVED_BEFORE_CHANGES)).toBeNull();
+    expect(screen.queryByText(RECORDED_ELSEWHERE)).toBeNull();
+  });
+
+  test("its reload waits, as a newer build's does, while the cart holds lines", async () => {
+    leaveMoves([KEY, AT, [radios(1)]]);
+    const written = new Map([[KEY, linesOf({ lines: [radios(1)] })]]);
+    const outbox = open(ledger(written).api);
+    await ready();
+    await screen.findByText(ADDED_BACK);
+    fireEvent.input(screen.getByLabelText("Box (4 each)"), {
+      target: { value: "2" },
+    });
+    save();
+    const entry = (await screen.findByText(SAVED_BEFORE_CHANGES)).closest(
+      "li",
+    ) as HTMLElement;
+    fillMove();
+    within(entry).getByRole("button", { name: "Reload" });
+    outbox.builds.learn("other_tab");
+    // A newer build is out, which would not read this cart: no reload,
+    // and no Dismiss, until the cart is empty (Ali, inventory-tng-93z).
+    await vi.waitFor(() =>
+      expect(within(entry).queryByRole("button")).toBeNull(),
+    );
+    within(entry).getByText(SAVED_BEFORE_CHANGES);
+    for (const line of screen.getAllByRole("button", { name: "Remove" })) {
+      fireEvent.click(line);
+    }
+    within(entry).getByRole("button", { name: "Reload" });
   });
 
   test("one with a line discarded, which an older build's tab saved first whole, is not saved again, and says so", async () => {
