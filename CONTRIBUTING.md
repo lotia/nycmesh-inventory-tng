@@ -359,13 +359,11 @@ keeps its batch key while its lines go (`dropPart`), and one put back
 keeps it, as does a cart it filled when a newer build reads it, and
 the cart is sent under it until emptied or discarded, as an older tab may be sending
 it still: the server then takes it once, or, changed since, refuses it
-(409 `key_reused`), which the page says, each note opening "Not
-recorded: another tab recorded this cart before your changes.", asking
-for a reload in place
-of Dismiss, held back as a newer build's is, the note then saying what
-it waits for (the cart, or batches sending, and whether the browser says
-it is offline); after it, the save stays listed, no longer asking, until
-dismissed, saying to scan again only what changed. Such a save never goes
+(409 `key_reused`). The page then asks for the catalogue and stock at
+once, as its periodic refresh does, whichever tab sent it, and the save
+stays listed with Dismiss, saying "Not recorded: another tab recorded
+this cart before your changes. Scan again only what you changed."
+Such a save never goes
 in a cart again, here or in the older list, which offers only Discard: what
 it held is recorded, and once more would record it twice
 (`outbox.recordedElsewhere`). A refused save in the

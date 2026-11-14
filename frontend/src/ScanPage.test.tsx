@@ -18,7 +18,6 @@ import {
   STORAGE_KEY as OUTBOX_KEY,
   Outbox,
   RECORDED_ELSEWHERE,
-  RELOAD_TO_CONTINUE,
   SCAN_AGAIN_CHANGED,
 } from "./outbox";
 import { ScanPage } from "./ScanPage";
@@ -32,11 +31,9 @@ vi.mock("./camera", () => ({ openCamera: vi.fn() }));
 const camera = fakeCamera();
 vi.mocked(openCamera).mockImplementation(camera.open);
 
-/** A put-back save refused as another tab recorded it first, until the
- * page is reloaded: the page adds the reload's words, never kept. */
-const BEFORE_RELOAD = `${RECORDED_ELSEWHERE} ${RELOAD_TO_CONTINUE}`;
-/** What builds before kept of one: inventory-tng-wyq's first, then
- * inventory-tng-93z's, with the reload's words. */
+/** What builds before kept of a put-back save refused as another tab
+ * recorded it first: inventory-tng-wyq's first, then inventory-tng-93z's,
+ * with the reload's words. */
 const RECORDED_FIRST = "Not recorded: another tab recorded this first.";
 const RECORDED_FIRST_93Z = `${RECORDED_FIRST} Reload the page to continue.`;
 
@@ -2698,17 +2695,12 @@ describe("what an older build left", () => {
 
   /** The batch endpoint as the ledger answers a key (ledger.py, _replay):
    * the same lines again are the first transaction, others are refused.
-   * `written` holds the lines saved under each key, in order; while
-   * `hold.until` is set, a batch waits for it. */
-  function ledger(
-    written: Map<string, string>,
-    hold: { until: Promise<unknown> | null } = { until: null },
-  ) {
+   * `written` holds the lines saved under each key, in order. */
+  function ledger(written: Map<string, string>) {
     return answering(async (request) => {
       if (isCatalogue(request)) {
         return json(CATALOGUE, 200);
       }
-      await hold.until;
       const body = await request.clone().json();
       const first = written.get(body.key);
       if (first === undefined) {
@@ -2727,15 +2719,16 @@ describe("what an older build left", () => {
   /** A move of one radio left, put back in the cart without a tap, which
    * the older build's tab, its request in flight as this page loaded,
    * saved first. */
-  async function putBackSavedFirst(reload = vi.fn()) {
+  async function putBackSavedFirst() {
     leaveMoves([KEY, AT, [radios(1)]]);
     const written = new Map([[KEY, linesOf({ lines: [radios(1)] })]]);
-    const hold: { until: Promise<unknown> | null } = { until: null };
-    const { api } = ledger(written, hold);
-    const outbox = open(api, reload);
+    const { api, sent } = ledger(written);
+    const outbox = open(api);
     await ready();
     await screen.findByText(ADDED_BACK);
-    return { api, outbox, written, hold };
+    /** How many times the page has asked for the catalogue. */
+    const catalogues = () => sent.filter(isCatalogue).length;
+    return { api, outbox, written, catalogues };
   }
 
   /** Changed, saved, and refused as the older build's tab saved it first:
@@ -2745,7 +2738,7 @@ describe("what an older build left", () => {
       target: { value: "2" },
     });
     save();
-    return screen.findByText(BEFORE_RELOAD);
+    return screen.findByText(SCAN_AGAIN_CHANGED);
   }
 
   test("one an older build's tab saved meanwhile is saved once, under its key", async () => {
@@ -2767,97 +2760,89 @@ describe("what an older build left", () => {
     });
   });
 
+  test("one changed after it went back, which an older build's tab saved first, says what is left to do, bold whole, with Dismiss at once, and refreshes the stock once", async () => {
+    const { catalogues } = await putBackSavedFirst();
+    const before = catalogues();
+    const said = await changedRefused();
+    // In bold, in the alert's style, one note, and no reload (Ali,
+    // inventory-tng-g0e, d).
+    expect(said.tagName).toBe("STRONG");
+    const entry = said.closest("li") as HTMLElement;
+    // Its lines, to compare with what was recorded.
+    within(entry).getByText("1. LiteBeam 5AC: 2 × Box");
+    expect(within(entry).queryByRole("button", { name: "Reload" })).toBeNull();
+    // The stock, asked for again at once, shows what the other tab
+    // recorded; once, not again.
+    await vi.waitFor(() => expect(catalogues()).toBe(before + 1));
+    await new Promise((settled) => setTimeout(settled, 50));
+    expect(catalogues()).toBe(before + 1);
+    fireEvent.click(within(entry).getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText(SCAN_AGAIN_CHANGED)).toBeNull();
+    expect(catalogues()).toBe(before + 1);
+  });
+
+  test("one another tab's send refused as recorded first is heard, and refreshes the stock once; refused before the page loaded, its first load shows it", async () => {
+    await putBackSavedFirst();
+    await changedRefused();
+    const refused = localStorage.getItem(OUTBOX_KEY) ?? "";
+    cleanup();
+    // This tab, opened before the other tab's send was refused.
+    const kept = JSON.parse(refused);
+    localStorage.setItem(OUTBOX_KEY, JSON.stringify({ ...kept, entries: [] }));
+    const { api, sent } = server();
+    open(api);
+    await ready();
+    const before = sent.filter(isCatalogue).length;
+    localStorage.setItem(OUTBOX_KEY, refused);
+    window.dispatchEvent(new StorageEvent("storage", { key: OUTBOX_KEY }));
+    await screen.findByText(SCAN_AGAIN_CHANGED);
+    await vi.waitFor(() =>
+      expect(sent.filter(isCatalogue).length).toBe(before + 1),
+    );
+    // Loaded again, it is already shown: no refresh beyond the load.
+    cleanup();
+    const again = server();
+    open(again.api);
+    await ready();
+    await screen.findByText(SCAN_AGAIN_CHANGED);
+    await new Promise((settled) => setTimeout(settled, 50));
+    expect(again.sent.filter(isCatalogue).length).toBe(1);
+  });
+
   test.each([
-    ["as this build keeps it", null],
-    ["as this batch's first build kept it", RECORDED_FIRST],
-    [
-      "as inventory-tng-93z's build kept it, with the reload's words",
-      RECORDED_FIRST_93Z,
-    ],
+    ["this batch's first build", RECORDED_FIRST],
+    ["inventory-tng-93z's build, with the reload's words", RECORDED_FIRST_93Z],
   ])(
-    "one changed after it went back, which an older build's tab saved first, asks for a reload, then, reloaded, lists its lines until dismissed, %s",
+    "one put back and refused as another tab recorded it first, as %s kept it, says the same, with Dismiss",
     async (_, keptAs) => {
-      const reload = vi.fn();
-      const { api } = await putBackSavedFirst(reload);
-      const said = await changedRefused();
-      // In bold, in the alert's style (Ali, inventory-tng-93z, question 4, C).
-      expect(said.tagName).toBe("STRONG");
-      const entry = said.closest("li") as HTMLElement;
-      // Its lines, to compare with what was recorded.
-      within(entry).getByText("1. LiteBeam 5AC: 2 × Box");
-      expect(
-        within(entry).queryByRole("button", { name: "Dismiss" }),
-      ).toBeNull();
-      fireEvent.click(within(entry).getByRole("button", { name: "Reload" }));
-      expect(reload).toHaveBeenCalledOnce();
-      // Reloaded: still listed, with its lines, now to dismiss, no longer
-      // asking for a reload (Ali, inventory-tng-93z).
+      await putBackSavedFirst();
+      await changedRefused();
       cleanup();
-      if (keptAs !== null) {
-        const kept = JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? "");
-        kept.entries[0].note = keptAs;
-        localStorage.setItem(OUTBOX_KEY, JSON.stringify(kept));
-      }
-      open(api);
+      const kept = JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? "");
+      kept.entries[0].note = keptAs;
+      localStorage.setItem(OUTBOX_KEY, JSON.stringify(kept));
+      open();
       await ready();
-      expect(screen.queryByText(BEFORE_RELOAD)).toBeNull();
-      expect(screen.queryByText(RECORDED_FIRST, { exact: false })).toBeNull();
-      // What is left to do, as the older list says it (Ali,
-      // inventory-tng-wyq, question c).
-      const again = (await screen.findByText(SCAN_AGAIN_CHANGED)).closest(
+      expect(screen.queryByText(keptAs)).toBeNull();
+      const entry = (await screen.findByText(SCAN_AGAIN_CHANGED)).closest(
         "li",
       ) as HTMLElement;
-      within(again).getByText("1. LiteBeam 5AC: 2 × Box");
+      within(entry).getByText("1. LiteBeam 5AC: 2 × Box");
       expect(
-        within(again).queryByRole("button", { name: "Reload" }),
+        within(entry).queryByRole("button", { name: "Reload" }),
       ).toBeNull();
-      fireEvent.click(within(again).getByRole("button", { name: "Dismiss" }));
+      fireEvent.click(within(entry).getByRole("button", { name: "Dismiss" }));
       expect(screen.queryByText(SCAN_AGAIN_CHANGED)).toBeNull();
     },
   );
 
-  test("its reload waits, as a newer build's does, while the cart holds lines or a batch is sending, and says what for", async () => {
-    const { outbox, hold } = await putBackSavedFirst();
+  test("its note and Dismiss wait for nothing: not for the cart, nor a newer build", async () => {
+    const { outbox } = await putBackSavedFirst();
     const entry = (await changedRefused()).closest("li") as HTMLElement;
     fillMove();
-    within(entry).getByRole("button", { name: "Reload" });
-    outbox.builds.learn("other_tab");
-    // A newer build is out, which would not read this cart: no reload,
-    // and no Dismiss, until the cart is empty (Ali, inventory-tng-93z),
-    // and the note says so, bold whole (Ali, inventory-tng-wyq).
-    await vi.waitFor(() =>
-      expect(within(entry).queryByRole("button")).toBeNull(),
-    );
-    expect(
-      within(entry).getByText(
-        `${RECORDED_ELSEWHERE} Record or discard your cart, then reload the page.`,
-      ).tagName,
-    ).toBe("STRONG");
-    // Recorded, but not yet sent: the reload waits for it.
-    const answer = deferred();
-    hold.until = answer.promise;
-    fireEvent.input(screen.getByLabelText(/^Loose/), {
-      target: { value: "3" },
-    });
-    save();
-    await screen.findByText(/^Sending: /);
-    within(entry).getByText(
-      `${RECORDED_ELSEWHERE} Wait until sending finishes, then reload the page.`,
-    );
-    expect(within(entry).queryByRole("button")).toBeNull();
-    // Offline, it says so (Ali, inventory-tng-wyq, 'Offline').
-    const onLine = vi.spyOn(navigator, "onLine", "get");
-    setOnline(onLine, false);
-    await within(entry).findByText(
-      `${RECORDED_ELSEWHERE} This device is offline. Wait until sending finishes, then reload the page.`,
-    );
-    onLine.mockRestore();
-    hold.until = null;
-    answer.resolve(new Response());
-    await vi.waitFor(() =>
-      within(entry).getByRole("button", { name: "Reload" }),
-    );
-    within(entry).getByText(BEFORE_RELOAD);
+    act(() => outbox.builds.learn("other_tab"));
+    within(entry).getByText(SCAN_AGAIN_CHANGED);
+    within(entry).getByRole("button", { name: "Dismiss" });
   });
 
   test("one with a line discarded, which an older build's tab saved first whole, is not saved again, and says so", async () => {
@@ -2873,7 +2858,7 @@ describe("what an older build left", () => {
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     await screen.findByText(ADDED_BACK);
     save();
-    await screen.findByText(BEFORE_RELOAD);
+    await screen.findByText(SCAN_AGAIN_CHANGED);
     expect(written.size).toBe(1);
   });
 
