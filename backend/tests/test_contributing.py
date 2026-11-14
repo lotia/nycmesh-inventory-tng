@@ -13,6 +13,8 @@ import pytest
 
 from inventory_tng.local_env import CLONE
 
+from helpers.clone_files import text_files
+
 pytestmark = pytest.mark.clone
 
 TASK_SCRIPTS = CLONE / "mise-tasks"
@@ -25,7 +27,6 @@ DIRECT = re.compile(r"(?<![=\"'])\b(?:docker|podman)(?:\s+|-)compose\b")
 # Where running compose directly is right: the task that picks the runtime,
 # and CI, which runs its own.
 ALLOWED = {TASK_SCRIPTS / "compose", WORKFLOW}
-NOT_OURS = {".git", ".jj", ".beads", ".venv", "node_modules", "dist", "__pycache__"}
 
 
 def tasks() -> set[str]:
@@ -35,23 +36,6 @@ def tasks() -> set[str]:
         for script in TASK_SCRIPTS.iterdir()
         if script.is_file() and os.access(script, os.X_OK)
     }
-
-
-def text_files() -> dict[Path, str]:
-    """Each text file in the clone, read once. What a running tool writes
-    and removes as this walks, such as each test process's coverage data,
-    is not the project's: a file gone before it is read, or one that can't
-    be read, is skipped."""
-    found = {}
-    for folder, folders, files in os.walk(CLONE):
-        folders[:] = [name for name in folders if name not in NOT_OURS]
-        for name in files:
-            path = Path(folder, name)
-            try:
-                found[path] = path.read_text()
-            except UnicodeDecodeError, OSError:
-                continue
-    return found
 
 
 def test_a_file_gone_before_it_is_read_is_skipped(

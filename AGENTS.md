@@ -53,6 +53,12 @@ is, read [README.md](README.md).
     in `mise-tasks/`, each named in CONTRIBUTING.md as `mise run <task>`.
     Compose runs through `mise run compose --`, never a runtime's own compose
     command. `backend/tests/test_contributing.py` enforces both.
+11. **Never refer to an artifact** (a claude.ai artifact link, its id, or
+    words like "the questions page") in beads, docs, decision records or
+    code comments, unless the person asks. Artifacts are tools to guide the
+    work, deleted when it is done. Write the decision itself, in words, with
+    who decided and when. `backend/tests/test_artifact_links.py` refuses
+    artifact links in the clone's files.
 
 ## More guidance
 
