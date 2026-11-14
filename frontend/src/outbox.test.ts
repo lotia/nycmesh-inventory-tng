@@ -170,7 +170,7 @@ describe("sending again", () => {
     },
   );
 
-  test("a server that can't save just now says so, not that there was no answer", async () => {
+  test("a server that can't record just now says so, not that there was no answer", async () => {
     const { api } = answering(() =>
       json({ reason: "database_unavailable" }, 503),
     );
@@ -178,7 +178,7 @@ describe("sending again", () => {
     outbox.queue(draft(), "a");
     await vi.waitFor(() =>
       expect(outbox.entries.value[0]?.note).toBe(
-        "The inventory can't save just now. Trying again shortly.",
+        "The inventory can't record this just now. Trying again shortly.",
       ),
     );
   });
@@ -337,7 +337,7 @@ describe("refusals", () => {
     outbox.queue(draft({ lines }), "a");
     await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
     expect(outbox.entries.value[0]?.note).toBe(
-      "Not saved. Line 2: There is no such row Value error, a move has only a from and to location Line 1: Not accepted Open package said used up, 1: There is no such row What is on an open package, 1: There is no such row",
+      "Not recorded. Line 2: There is no such row Value error, a move has only a from and to location Line 1: Not accepted Open package said used up, 1: There is no such row What is on an open package, 1: There is no such row",
     );
   });
 
@@ -667,7 +667,7 @@ describe("storage", () => {
     expect((await bodies(sent))[0].lines).toEqual(lines);
     expect(states(outbox)).toEqual(["refused"]);
     expect(outbox.entries.value[0]?.note).toBe(
-      "Not saved. Line 1: A line of a package says the size it was counted in: load the page again, and count it again",
+      "Not recorded. Line 1: A line of a package says the size it was counted in: load the page again, and count it again",
     );
   });
 
@@ -683,7 +683,7 @@ describe("storage", () => {
     const outbox = new Outbox(answering(() => json({ detail }, 422)).api);
     await outbox.send();
     expect(outbox.entries.value[0]?.note).toBe(
-      "Not saved. Line 1: A loose line says a package's size: load the page again, and count it again",
+      "Not recorded. Line 1: A loose line says a package's size: load the page again, and count it again",
     );
   });
 
@@ -700,7 +700,7 @@ describe("storage", () => {
     store(entry());
     const outbox = new Outbox(answering(() => json({ detail }, 422)).api);
     await outbox.send();
-    expect(outbox.entries.value[0]?.note).toBe(`Not saved. Line 1: ${msg}`);
+    expect(outbox.entries.value[0]?.note).toBe(`Not recorded. Line 1: ${msg}`);
   });
 
   test("an older build's keys are neither read, sent, nor written", async () => {

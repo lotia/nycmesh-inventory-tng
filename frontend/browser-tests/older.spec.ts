@@ -108,9 +108,7 @@ test("a save an older build left goes back in the cart, whole without a tap, and
   );
   await expect(listing.getByText(`${cable}: 3 m`)).toBeVisible();
   await expect(
-    listing.getByText(
-      "Sorry. Could not read 1 previously added item, scan it again.",
-    ),
+    listing.getByText("Could not read 1 previously added item, scan it again."),
   ).toBeVisible();
   // It fits a phone, buttons and all.
   expect(
@@ -199,13 +197,15 @@ test("a save's package retired since, with none left, is named, never offered, a
   ]);
   await page.reload();
 
-  // Named from the catalogue (retired_packages), only the problem in bold.
+  // Named from the catalogue (retired_packages), in bold, without "Sorry."
   const listing = listingOf(page);
   await expect(listing.getByText(`${cable}: 2 × ${box}`)).toBeVisible();
   const note = listing.locator(".alert", {
-    hasText: "Sorry. This item has been retired.",
+    hasText: "This item has been retired.",
   });
-  await expect(note.locator("strong")).toHaveText("retired");
+  await expect(note.locator("strong")).toHaveText(
+    "This item has been retired.",
+  );
   await lineDiscard(listing, `${cable}: 2 × ${box}`).click();
   // What is left goes back whole, without a tap; the box is not offered.
   await expect(listing).toHaveCount(0);
@@ -216,10 +216,10 @@ test("a save's package retired since, with none left, is named, never offered, a
   });
 });
 
-test("a save an older build's tab saved meanwhile is saved once, under its key; changed after it went back, it is not saved, and says so", async ({
+test("a save an older build's tab saved meanwhile is saved once, under its key; changed after it went back, it is not recorded, says so, and asks for a reload, after which it is listed until dismissed", async ({
   page,
 }) => {
-  await ownCable(page);
+  const cable = await ownCable(page);
   const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
   await page.goto("/scan");
   /** One left, which the older build's tab then saves, as its request in
@@ -259,11 +259,20 @@ test("a save an older build's tab saved meanwhile is saved once, under its key; 
   const refused = sent(409);
   await page.getByRole("button", { name: "Save" }).click();
   await refused;
-  await expect(
-    page.getByText(
-      "Not saved: another tab saved it first, as it was before your changes. Check what was saved, then save your changes again.",
-    ),
-  ).toBeVisible();
+  const said =
+    "Not recorded: another tab recorded this first. Reload the page to continue.";
+  const entry = page.getByRole("listitem").filter({ hasText: said });
+  await expect(entry.locator("strong")).toHaveText(said);
+  // Its lines, to compare with what was recorded.
+  await expect(entry.getByText(`${cable}: 3 m`)).toBeVisible();
+  await expect(entry.getByRole("button", { name: "Dismiss" })).toHaveCount(0);
+  const reloaded = page.waitForEvent("load");
+  await entry.getByRole("button", { name: "Reload" }).click();
+  await reloaded;
+  await expect(entry.getByText(`${cable}: 3 m`)).toBeVisible();
+  await expect(entry.getByRole("button", { name: "Reload" })).toHaveCount(0);
+  await entry.getByRole("button", { name: "Dismiss" }).click();
+  await expect(page.getByText(said)).toHaveCount(0);
 });
 
 test("a double tap on a line's Discard discards that line only; one that could not read a line stays, saying so, until its own Discard", async ({
@@ -299,9 +308,7 @@ test("a double tap on a line's Discard discards that line only; one that could n
     });
   }).toPass();
   await expect(
-    listing.getByText(
-      "Sorry. Could not read 1 previously added item, scan it again.",
-    ),
+    listing.getByText("Could not read 1 previously added item, scan it again."),
   ).toBeVisible();
   await expect(listing.getByRole("button")).toHaveText(["Discard"]);
   await expect(async () => {

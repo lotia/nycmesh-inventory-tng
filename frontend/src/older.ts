@@ -37,10 +37,9 @@ import {
 } from "./cart";
 import {
   BatchKey,
-  KEY_REUSED,
   STORAGE_KEY as OUTBOX_KEY,
+  REFUSED_FOR_KEY,
   REPORTS,
-  SAVED_BEFORE_CHANGES,
 } from "./outbox";
 import { count, decimal, thousandths } from "./quantity";
 import {
@@ -173,47 +172,59 @@ function isSave(entry: unknown, batch: string | null): boolean {
   return read.success && read.output.body.key === batch;
 }
 
-/** What every build has said of a save refused for its key (409
- * key_reused). */
-const REFUSED_FOR_KEY = new Set([KEY_REUSED, SAVED_BEFORE_CHANGES]);
-
 function savesIn(key: string, stored: unknown): Older[] {
   return entriesOf(stored).flatMap((entry) => {
     const read = v.safeParse(OldEntry, entry);
-    if (!read.success) {
-      return [];
-    }
-    const { body, state, queuedAt, note } = read.output;
     // This build's own key: only the saves held back as too old. The rest
     // are the outbox's.
-    if (key === OUTBOX_KEY && state !== "too_old") {
+    if (
+      !read.success ||
+      (key === OUTBOX_KEY && read.output.state !== "too_old")
+    ) {
       return [];
     }
-    return [
-      {
-        key,
-        batch: body.key,
-        batchKey:
-          state === "refused" && REFUSED_FOR_KEY.has(note ?? "")
-            ? null
-            : body.key,
-        kind: body.kind,
-        volunteerId: body.volunteer_id,
-        fromId: body.from_location_id,
-        toId: body.to_location_id,
-        installNumber:
-          body.install_number === null ? "" : String(body.install_number),
-        at: queuedAt,
-        refused: state === "refused" ? (note ?? "") : null,
-        lines: linesOf(body.lines ?? [], OldLine),
-        linesLost: body.lines === null,
-        reports: {
-          usedUp: body.used_up?.length ?? 0,
-          lengths: body.lengths?.length ?? 0,
-        },
-      },
-    ];
+    return [saveOf(key, read.output)];
   });
+}
+
+/** A save kept under `key`, as listed. */
+function saveOf(key: string, save: v.InferOutput<typeof OldEntry>): Older {
+  const { body, state, queuedAt, note } = save;
+  return {
+    key,
+    batch: body.key,
+    batchKey:
+      state === "refused" && REFUSED_FOR_KEY.has(note ?? "") ? null : body.key,
+    kind: body.kind,
+    volunteerId: body.volunteer_id,
+    fromId: body.from_location_id,
+    toId: body.to_location_id,
+    installNumber:
+      body.install_number === null ? "" : String(body.install_number),
+    at: queuedAt,
+    refused: state === "refused" ? (note ?? "") : null,
+    lines: linesOf(body.lines ?? [], OldLine),
+    linesLost: body.lines === null,
+    reports: {
+      usedUp: body.used_up?.length ?? 0,
+      lengths: body.lengths?.length ?? 0,
+    },
+  };
+}
+
+/**
+ * A batch of the outbox (outbox.Entry) the inventory refused, line by
+ * line in the words this list uses (toCart's parts), named from
+ * `catalogue`, retired items too: for the volunteer to compare with what
+ * was recorded (Ali, inventory-tng-93z).
+ */
+export function linesSaid(entry: unknown, catalogue: Catalogue): string[] {
+  const read = v.safeParse(OldEntry, entry);
+  return read.success
+    ? toCart(saveOf("", read.output), withRetired(catalogue)).parts.map(
+        (part) => part.words,
+      )
+    : [];
 }
 
 function cartIn(key: string, stored: unknown): Older[] {
@@ -500,45 +511,25 @@ export function isListed(
  * each said once. */
 export type Gaps = string[];
 
-/** A note on what cannot go back: the words naming the problem, shown in
- * bold, between those before and after them, never bold (Ali,
- * inventory-tng-0su). */
-export type Note = readonly [before: string, problem: string, after: string];
-
-/** A note in words. */
-export const said = (note: Note): string => note.join("");
-
-/** In Ali's words (inventory-tng-3c0, inventory-tng-0su). Atop the save. */
-export const LINES_LOST: Note = [
-  "Sorry. ",
-  "Could not read",
-  " previously added items, scan them again.",
-];
+/** Why something cannot go back, in Ali's words (inventory-tng-3c0,
+ * inventory-tng-0su, inventory-tng-93z), shown in the alert's style. Atop
+ * the save. */
+export const LINES_LOST =
+  "Could not read previously added items, scan them again.";
 /** Under a save's line of a package resized since. */
-export const RESIZED: Note = [
-  "Sorry. ",
-  "The package size has changed",
-  " since this item was added. Discard and re-add the new package size.",
-];
+export const RESIZED =
+  "The package size has changed since this item was added. Discard and re-add the new package size.";
 /** Under a sealed count of a package no longer offered: retired, with none
  * sealed left. */
-export const RETIRED: Note = ["Sorry. This item has been ", "retired", "."];
+export const RETIRED = "This item has been retired.";
 /** Under what was taken from, or said of, an open package. */
-export const RESCAN: Note = [
-  "Sorry. ",
-  "Can't add these items",
-  ". Please rescan.",
-];
+export const RESCAN = "Can't add these items. Please rescan.";
 
 /** Lines that could not be read, counted. */
-export function unreadWords(n: number): Note {
+export function unreadWords(n: number): string {
   return n === 1
-    ? ["Sorry. ", "Could not read 1", " previously added item, scan it again."]
-    : [
-        "Sorry. ",
-        `Could not read ${n}`,
-        " previously added items, scan them again.",
-      ];
+    ? "Could not read 1 previously added item, scan it again."
+    : `Could not read ${n} previously added items, scan them again.`;
 }
 
 /** What discarding a part drops from what is kept, by where in what was
@@ -555,7 +546,7 @@ export type Part = {
   itemId: number | null;
   words: string;
   /** Why it cannot go back; null if it does. */
-  note: Note | null;
+  note: string | null;
   drop: Cut[];
 };
 
@@ -579,7 +570,7 @@ export function toCart(
   older: Older,
   catalogue: Catalogue,
   last: Cart = freshCart(),
-): { cart: Cart; gaps: Gaps; lost: Note | null; parts: Part[] } {
+): { cart: Cart; gaps: Gaps; lost: string | null; parts: Part[] } {
   const { items } = indexOf(catalogue);
   // An item by its id, offered or named only (retired_items).
   const named = (itemId: number) =>
@@ -599,7 +590,7 @@ export function toCart(
     from.set(itemId, [...(from.get(itemId) ?? []), cut]);
     return made;
   };
-  const left: (Part & { note: Note })[] = [];
+  const left: (Part & { note: string })[] = [];
   let unread = 0;
   older.lines.forEach((line, at) => {
     if (line === null) {
@@ -607,7 +598,7 @@ export function toCart(
     } else if ("itemId" in line) {
       const item = items.get(line.itemId);
       const before = left.length;
-      const leave = (words: string, note: Note, cut: Cut) =>
+      const leave = (words: string, note: string, cut: Cut) =>
         left.push({ itemId: line.itemId, words, note, drop: [cut] });
       const kept: Record<string, string> = {};
       for (const [packageId, n] of Object.entries(line.packages)) {
@@ -653,7 +644,7 @@ export function toCart(
         return;
       }
       const by = `${decimal(amount)}${unitOf(item)}`;
-      const leave = (note: Note, what = by) =>
+      const leave = (note: string, what = by) =>
         left.push({
           itemId: line.item_id,
           words: `${nameOf(item)}: ${what}`,
@@ -770,13 +761,11 @@ export function toCart(
   // a report, which names no item, by what it says. Said once each.
   const gaps: Gaps = [
     ...new Set([
-      ...(lost === null ? [] : [said(lost)]),
+      ...(lost === null ? [] : [lost]),
       ...parts.flatMap(({ itemId, words, note }) =>
         note === null
           ? []
-          : [
-              `${itemId === null ? words : nameOf(named(itemId))}: ${said(note)}`,
-            ],
+          : [`${itemId === null ? words : nameOf(named(itemId))}: ${note}`],
       ),
     ]),
   ];

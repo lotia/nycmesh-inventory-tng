@@ -358,12 +358,14 @@ keeps its batch key while its lines go (`dropPart`), and one put back
 keeps it, as does a cart it filled when a newer build reads it, and
 the cart is saved under it until emptied, as an older tab may be sending
 it still: the server then takes it once, or, changed since, refuses it
-(409 `key_reused`), which the page says. A save refused for its key goes
-back without it, as the server holds that key for another batch. It
-removes an older key once nothing in it is left to list
-(`frontend/src/older.ts`). Builds
-that keep the same shape share a key, so each batch is kept with the build
-that queued it, and is sent as that build's, whichever tab sends it.
+(409 `key_reused`), which the page says, asking for a reload in place
+of Dismiss; after it, the save stays listed until dismissed. A refused
+save in the outbox's list lists its lines, in the words above. A save
+refused for its key goes back without it, as the server holds that key
+for another batch. It removes an older key once nothing in it is left
+to list (`frontend/src/older.ts`). Builds that keep the same shape
+share a key, so each batch is kept with the build that queued it, and is
+sent as that build's, whichever tab sends it.
 
 So the server keeps taking what the build before sends. Expand, then
 contract: a field the batch endpoint will require is added as optional,
@@ -467,9 +469,10 @@ utilities. When you style a page:
   your own: the dark scheme gives each token its own value.
 - Make markup that repeats a Jinja macro or a Preact component.
 - A failure or refusal note on the scan page is in the alert's style
-  (`role="alert"`, or `class="alert"` for notes shown with a list), with
-  only the words naming the problem in bold: never "Sorry.", what to do
-  next, or a status that reports no problem.
+  (`role="alert"`, or `class="alert"` for notes shown with a list), in
+  bold as a whole, with no "Sorry.", and its numbers in bold italic
+  (`AlertWords` in `ScanPage.tsx`). A refusal's problems, after "Not
+  recorded.", are not bold. A status that reports no problem is plain.
 - Follow docs/decisions/0019 for links, buttons and lists. A button is
   secondary unless it is its form's main one, `class="primary"`, or the one
   a confirmation page asks for, `class="danger"`. A page's way back is
