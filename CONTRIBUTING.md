@@ -332,50 +332,15 @@ key with a version (`frontend/src/outbox.ts`, `cart.ts`), stamped with the
 build that wrote them. A change to what is kept, or to a value a field may
 take, takes a new key, as a tab of the build before, open during a deploy,
 drops what it cannot read from what it writes back; `outbox.test.ts` lists
-both for the outbox's key. A build reads and writes only its own keys: a
-tab of an older build sends its own batches and lets the volunteer record
-the cart, saying nothing of the newer build until then, and then asks for
-an upgrade, a reload; once the server holds its batches back as too old,
-it asks at once (`frontend/src/build.ts`, docs/decisions/0010). A newer
-build reads the saves and the cart an older one left only in the parts
-every version kept. Into an empty cart, until it learns of a newer build,
-it puts, without a tap, the oldest one that goes back whole (nothing
-unread, nothing of an open package, no package resized, no item or
-package retired or gone, no refusal); it lists the rest for the volunteer
-to add to the cart or discard, naming an item
-retired since from the catalogue's `retired_items`, and a package retired
-with none left from its item's `retired_packages`, neither ever offered.
-A count of a package no longer offered, or of one resized since, and
-what was taken from or said of an open package are listed each on its
-own line, saying why it cannot go back, and are left out when put back,
-never kept loose, unseen or as an empty line; the status then repeats
-each note as "item: note". Each of those lines, and one of an item retired
-since, has a Discard of its own, which drops that line alone from what
-the older build kept; the entry goes with its last listed line, unless
-it says lines could not be read, when it stays, saying so, until its own
-Discard. Focus then goes to the entry's heading, and taps on its buttons
-are ignored for half a second, so a double tap discards one line. A save
-keeps its batch key while its lines go (`dropPart`), and one put back
-keeps it, as does a cart it filled when a newer build reads it, and
-the cart is sent under it until emptied or discarded, as an older tab may be sending
-it still: the server then takes it once, or, changed since, refuses it
-(409 `key_reused`). The page then asks for the catalogue and stock at
-once, as its periodic refresh does, whichever tab sent it, and the save
-stays listed with Dismiss, saying "Not recorded: another tab recorded
-this cart before your changes. Scan again only what you changed."
-Such a save never goes
-in a cart again, here or in the older list, which offers only Discard: what
-it held is recorded, and once more would record it twice
-(`outbox.recordedElsewhere`). A refused save in the
-outbox's list lists its lines, in the words above, each item numbered
-as the refusal's "Line n" names it. Any other save
-refused for its key goes back without it, as the server holds that key
-for another batch. While the browser says it is offline, a batch waiting
-for an answer says so, and the page follows the browser going on and off
-line. It removes an older key once nothing in it is left
-to list (`frontend/src/older.ts`). Builds that keep the same shape
-share a key, so each batch is kept with the build that queued it, and is
-sent as that build's, whichever tab sends it.
+both for the outbox's key. Builds that keep the same shape share a key, so
+each batch is kept with the build that queued it, and is sent as that
+build's, whichever tab sends it.
+
+A build reads and writes only its own keys. A tab of an older build sends
+its own batches and lets the volunteer record the cart, saying nothing of
+the newer build until then, and then asks for an upgrade, a reload; once
+the server holds its batches back as too old, it asks at once
+(`frontend/src/build.ts`, docs/decisions/0010).
 
 So the server keeps taking what the build before sends. Expand, then
 contract: a field the batch endpoint will require is added as optional,
@@ -407,6 +372,44 @@ or the ledger's checks), a decimal's digits, and strict mode (`strict=True`,
 which refuses `"5"` for a whole number) are not in the schema, so the
 test cannot see them: tightening one takes the same care, by hand.
 
+A newer build reads the saves and the cart an older one left only in the
+parts every version kept, and removes an older key once nothing in it is
+left to list (`frontend/src/older.ts`). Into an empty cart, until it
+learns of a newer build, it puts, without a tap, the oldest save that goes
+back whole (nothing unread, nothing of an open package, no package
+resized, no item or package retired or gone, no refusal). It lists the
+rest for the volunteer to add to the cart or discard, naming an item
+retired since from the catalogue's `retired_items`, and a package retired
+with none left from its item's `retired_packages`, neither ever offered.
+A count of a package no longer offered, or of one resized since, and
+what was taken from or said of an open package are listed each on its
+own line, saying why it cannot go back, and are left out when put back,
+never kept loose, unseen or as an empty line; the status then repeats
+each note as "item: note". Each of those lines, and one of an item retired
+since, has a Discard of its own, which drops that line alone from what
+the older build kept; the entry goes with its last listed line, unless
+it says lines could not be read, when it stays, saying so, until its own
+Discard.
+
+A save keeps its batch key while its lines go (`dropPart`). One put back
+keeps it, as does a cart it filled when a newer build reads it, and the
+cart is sent under it until emptied or discarded, as an older tab may be
+sending it still: the server then takes it once, or, changed since,
+refuses it (409 `key_reused`). The page then asks for the catalogue and
+stock at once, as its periodic refresh does, whichever tab sent it, and
+the save stays listed with Dismiss, saying "Not recorded: another tab
+recorded this cart before your changes. Scan again only what you
+changed." Such a save never goes in a cart again, here or in the older
+list, which offers only Discard: what it held is recorded, and once more
+would record it twice (`outbox.recordedElsewhere`). Any other save refused
+for its key goes back without it, as the server holds that key for
+another batch.
+
+A refused save in the outbox's list lists its lines, in the words of the
+older list, each item numbered as the refusal's "Line n" names it. While
+the browser says it is offline, a batch waiting for an answer says so,
+and the page follows the browser going on and off line.
+
 The cart keeps the size each package was counted at, and sends that size,
 so the server refuses a count of a package resized since (`package_resized`)
 rather than counting it at the new size. Where the page's catalogue shows
@@ -419,11 +422,9 @@ cart kept sizes is taken as counted at the size shown.
 
 The page's words never say "save": the inventory records what Record
 sends, and the browser keeps the cart, which every change writes to
-storage as it happens (docs/decisions/0010). Discard cart, beside Record
-while the cart has lines, asks first in the page, as an older entry's
-Discard does, then empties the cart, dropping its batch key and keeping
-who and where, as Record does. If another tab changed the cart since it
-asked, it discards nothing and says so, as Record does.
+storage as it happens (docs/decisions/0010). Discard cart asks first, then
+empties the cart as Record does, dropping its batch key and keeping who
+and where, unless another tab changed the cart meanwhile.
 
 The scan page needs a registered device, and some catalogue rows to choose
 from. The camera works only over HTTPS or on `localhost`.

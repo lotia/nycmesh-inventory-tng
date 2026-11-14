@@ -38,7 +38,7 @@ const ID = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/;
 
 /** How a tab learned that a newer build is out: from another tab's stamp,
  * from the server's reply, or from a batch held back as too old. */
-export type Learned = "other_tab" | "server" | "too_old";
+type Learned = "other_tab" | "server" | "too_old";
 
 /** The build a stored value was stamped with, if any. */
 export function stampOf(stored: unknown): unknown {

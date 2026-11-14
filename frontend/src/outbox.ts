@@ -166,24 +166,11 @@ export const KEY_REUSED =
 export const RECORDED_ELSEWHERE =
   "Not recorded: another tab recorded this cart before your changes.";
 
-/** What every build has kept of a save put back, changed and refused as
- * another tab recorded it first: this one, then those before. */
-const RECORDED_ELSEWHERE_KEPT: ReadonlySet<string> = new Set([
-  RECORDED_ELSEWHERE,
-  // Kept by builds before, as they were, whatever the page says now:
-  // inventory-tng-wyq's first, and inventory-tng-93z's, with the reload's
-  // words.
-  "Not recorded: another tab recorded this first.",
-  "Not recorded: another tab recorded this first. Reload the page to continue.",
-  "Not saved: another tab saved it first, as it was before your changes. Check what was saved, then save your changes again.",
-]);
-
-/** Whether `note` says another tab recorded the save first, as any build
- * kept it: what it held is recorded, but not the changes since, so it
- * never goes in a cart again, which would record it twice (Ali,
- * inventory-tng-wyq, question c). */
+/** Whether `note` says another tab recorded the save first: what it held
+ * is recorded, but not the changes since, so it never goes in a cart
+ * again, which would record it twice (Ali, inventory-tng-wyq, question c). */
 export function recordedElsewhere(note: string | null): boolean {
-  return RECORDED_ELSEWHERE_KEPT.has(note ?? "");
+  return note === RECORDED_ELSEWHERE;
 }
 
 /** What the page says of one recordedElsewhere, with Dismiss, or Discard
@@ -195,7 +182,7 @@ export const SCAN_AGAIN_CHANGED = `${RECORDED_ELSEWHERE} Scan again only what yo
  * then those before, whose words an older key may still hold. */
 export const REFUSED_FOR_KEY: ReadonlySet<string> = new Set([
   KEY_REUSED,
-  ...RECORDED_ELSEWHERE_KEPT,
+  RECORDED_ELSEWHERE,
   "Not saved: its key was already used for a different batch. Please report this.",
 ]);
 

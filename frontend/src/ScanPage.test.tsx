@@ -31,12 +31,6 @@ vi.mock("./camera", () => ({ openCamera: vi.fn() }));
 const camera = fakeCamera();
 vi.mocked(openCamera).mockImplementation(camera.open);
 
-/** What builds before kept of a put-back save refused as another tab
- * recorded it first: inventory-tng-wyq's first, then inventory-tng-93z's,
- * with the reload's words. */
-const RECORDED_FIRST = "Not recorded: another tab recorded this first.";
-const RECORDED_FIRST_93Z = `${RECORDED_FIRST} Reload the page to continue.`;
-
 /** An API with the test catalogue, saving batches as transaction 77. */
 function server(save: () => Response | Promise<Response> = () => saved()) {
   return answering((request) =>
@@ -2809,33 +2803,6 @@ describe("what an older build left", () => {
     expect(again.sent.filter(isCatalogue).length).toBe(1);
   });
 
-  test.each([
-    ["this batch's first build", RECORDED_FIRST],
-    ["inventory-tng-93z's build, with the reload's words", RECORDED_FIRST_93Z],
-  ])(
-    "one put back and refused as another tab recorded it first, as %s kept it, says the same, with Dismiss",
-    async (_, keptAs) => {
-      await putBackSavedFirst();
-      await changedRefused();
-      cleanup();
-      const kept = JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? "");
-      kept.entries[0].note = keptAs;
-      localStorage.setItem(OUTBOX_KEY, JSON.stringify(kept));
-      open();
-      await ready();
-      expect(screen.queryByText(keptAs)).toBeNull();
-      const entry = (await screen.findByText(SCAN_AGAIN_CHANGED)).closest(
-        "li",
-      ) as HTMLElement;
-      within(entry).getByText("1. LiteBeam 5AC: 2 × Box");
-      expect(
-        within(entry).queryByRole("button", { name: "Reload" }),
-      ).toBeNull();
-      fireEvent.click(within(entry).getByRole("button", { name: "Dismiss" }));
-      expect(screen.queryByText(SCAN_AGAIN_CHANGED)).toBeNull();
-    },
-  );
-
   test("its note and Dismiss wait for nothing: not for the cart, nor a newer build", async () => {
     const { outbox } = await putBackSavedFirst();
     const entry = (await changedRefused()).closest("li") as HTMLElement;
@@ -2884,30 +2851,22 @@ describe("what an older build left", () => {
     expect(outbox.entries.value[0]?.body.key).not.toBe(KEY);
   });
 
-  test.each([
-    RECORDED_ELSEWHERE,
-    RECORDED_FIRST,
-    RECORDED_FIRST_93Z,
-    "Not saved: another tab saved it first, as it was before your changes. Check what was saved, then save your changes again.",
-  ])(
-    "one put back and refused as another tab recorded it first (%s) goes in no cart again, only Discard",
-    async (note) => {
-      leaveSave({ state: "refused", note, putBack: true });
-      open();
-      await ready();
-      // What it held is recorded: once more would record it twice (Ali,
-      // inventory-tng-wyq, question c).
-      const why = within(listing()).getByText(noted(SCAN_AGAIN_CHANGED));
-      expect(why.firstElementChild?.tagName).toBe("STRONG");
-      expect(
-        within(listing()).queryByRole("button", { name: "Add to cart" }),
-      ).toBeNull();
-      fireEvent.click(lastDiscard());
-      fireEvent.click(lastDiscard());
-      expect(screen.queryByText(HEADING)).toBeNull();
-      expect(screen.getByText("Nothing in the cart yet.")).toBeDefined();
-    },
-  );
+  test("one put back and refused as another tab recorded it first goes in no cart again, only Discard", async () => {
+    leaveSave({ state: "refused", note: RECORDED_ELSEWHERE, putBack: true });
+    open();
+    await ready();
+    // What it held is recorded: once more would record it twice (Ali,
+    // inventory-tng-wyq, question c).
+    const why = within(listing()).getByText(noted(SCAN_AGAIN_CHANGED));
+    expect(why.firstElementChild?.tagName).toBe("STRONG");
+    expect(
+      within(listing()).queryByRole("button", { name: "Add to cart" }),
+    ).toBeNull();
+    fireEvent.click(lastDiscard());
+    fireEvent.click(lastDiscard());
+    expect(screen.queryByText(HEADING)).toBeNull();
+    expect(screen.getByText("Nothing in the cart yet.")).toBeDefined();
+  });
 
   test("one refused for its key goes back without it, and saves under a new one", async () => {
     leaveSave({ state: "refused", note: KEY_REUSED });
