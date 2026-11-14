@@ -393,9 +393,10 @@ each note as "item: note". Each of those lines, and one of an item retired
 since, has a Discard of its own, which drops that line alone from what
 the older build kept; the entry goes with its last listed line, unless
 it says lines could not be read, when it stays, saying so, until its own
-Discard. Add to cart, tapped on one another tab changed since it was listed,
-lists it again as it is now and says so (`older.compared`); one going
-back without a tap is tried again as it is now.
+Discard. Add to cart or Discard, tapped on one another tab changed since
+it was listed, does nothing, lists it again as it is now and says so
+(`older.compared`); one going back without a tap is tried again as it is
+now.
 
 A save keeps its batch key while its lines go (`dropPart`). One put back
 keeps it, as does a cart it filled when a newer build reads it, and the

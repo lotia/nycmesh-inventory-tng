@@ -2311,7 +2311,7 @@ describe("what an older build left", () => {
     within(listing()).getByText(noted(RESCAN));
   });
 
-  test("a line of one changed meanwhile, by an older tab, is not discarded, and the list shows it as it is", async () => {
+  test("a line of one changed meanwhile, by an older tab, is not discarded, says so, and the list shows it as it is", async () => {
     leaveSave();
     open();
     await ready();
@@ -2324,6 +2324,11 @@ describe("what an older build left", () => {
     );
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     expect(within(listing()).queryByText(NOT_DISCARDED)).toBeNull();
+    expect(
+      within(listing()).getByText(
+        "This item was changed in another tab. Check it before discarding.",
+      ).tagName,
+    ).toBe("STRONG");
     within(listing()).getByText(
       noted("No. Add it to the cart, fix that, then record it."),
     );
@@ -2479,6 +2484,98 @@ describe("what an older build left", () => {
       within(listing()).getByRole("button", { name: "Add to cart" }),
     );
     expect(boxes()).toBe("2");
+  });
+
+  test.each([
+    [
+      "nothing of it goes back",
+      [{ item_id: 101, quantity: "3", open_package_key: KEY }],
+      "Add to cart",
+    ],
+    [
+      "it holds an item retired since",
+      [
+        { item_id: 100, quantity: "8", package_id: 1000 },
+        { item_id: 103, quantity: "4", package_id: 1003 },
+      ],
+      "Cannot Add to Cart",
+    ],
+  ])(
+    "one changed meanwhile so that %s says only to check it, bold whole",
+    async (_, lines, gone) => {
+      leaveSave();
+      open();
+      await ready();
+      const button = within(listing()).getByRole("button", {
+        name: "Add to cart",
+      });
+      // Changed there, the storage event not yet heard.
+      const kept = JSON.parse(
+        localStorage.getItem("inventory.outbox.v3") ?? "",
+      );
+      kept[0] = { ...kept[0], body: { ...kept[0].body, lines } };
+      localStorage.setItem("inventory.outbox.v3", JSON.stringify(kept));
+      fireEvent.click(button);
+      screen.getByText("Nothing in the cart yet.");
+      expect(
+        within(listing()).getByText(
+          "That one was changed in another tab. Check it again.",
+        ).tagName,
+      ).toBe("STRONG");
+      expect(
+        within(listing()).queryByText(/add it to the cart again/),
+      ).toBeNull();
+      expect(
+        within(listing()).queryByRole("button", { name: "Add to cart" }),
+      ).toBeNull();
+      if (gone !== "Add to cart") {
+        within(listing()).getByRole("button", { name: gone });
+      }
+    },
+  );
+
+  test("an entry's Discard on one changed meanwhile discards nothing, and says so, bold whole", async () => {
+    leaveSave();
+    open();
+    await ready();
+    fireEvent.click(lastDiscard());
+    // Refused there, the storage event not yet heard.
+    const kept = JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? "");
+    kept[0] = { ...kept[0], state: "refused", note: "No." };
+    localStorage.setItem("inventory.outbox.v3", JSON.stringify(kept));
+    fireEvent.click(lastDiscard());
+    expect(
+      within(listing()).getByText(
+        "This item was changed in another tab. Check it before discarding.",
+      ).tagName,
+    ).toBe("STRONG");
+    expect(
+      JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? ""),
+    ).toEqual(kept);
+    within(listing()).getByText(
+      noted("No. Add it to the cart, fix that, then record it."),
+    );
+    // Checked, it goes.
+    fireEvent.click(lastDiscard());
+    fireEvent.click(lastDiscard());
+    expect(screen.queryByText(HEADING)).toBeNull();
+  });
+
+  test("an older cart's Discard, changed meanwhile, discards nothing, and says so", async () => {
+    leaveCart();
+    open();
+    await ready();
+    fireEvent.click(lastDiscard());
+    const kept = JSON.parse(localStorage.getItem("inventory.cart.v1") ?? "");
+    const changed = { ...kept, installNumber: "789" };
+    localStorage.setItem("inventory.cart.v1", JSON.stringify(changed));
+    fireEvent.click(lastDiscard());
+    within(listing()).getByText(
+      "This item was changed in another tab. Check it before discarding.",
+    );
+    expect(JSON.parse(localStorage.getItem("inventory.cart.v1") ?? "")).toEqual(
+      changed,
+    );
   });
 
   test("a cart another tab filled meanwhile, unheard, is not written over", async () => {

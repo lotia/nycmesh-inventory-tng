@@ -164,7 +164,11 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   Add to cart on one another tab changed since it was listed puts
   nothing in the cart: the page lists it again as it is now and says,
   bold as a whole, "That one was changed in another tab. Check it, then
-  add it to the cart again." (Ali, 2026-11-14, inventory-tng-8gj). One
+  add it to the cart again." (Ali, 2026-11-14, inventory-tng-8gj), or,
+  if as it is now it offers no Add to cart, "That one was changed in
+  another tab. Check it again." An entry's Discard, or a line's, on one
+  changed meanwhile discards nothing and says, bold as a whole, "This
+  item was changed in another tab. Check it before discarding." One
   the page was putting back without a tap is tried again as it is now.
   One gone meanwhile leaves the list, and nothing is said. We rejected
   saying it had gone, which under an entry still listed was untrue.

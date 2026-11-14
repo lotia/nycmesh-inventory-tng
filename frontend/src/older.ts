@@ -425,8 +425,9 @@ const kept = (done: boolean): Outcome => (done ? "done" : "not_kept");
  * Remove one: a save from its key, the rest kept as they were, or the
  * cart. An older key left with nothing to list goes; this build's outbox
  * key stays, as the outbox's. A save goes even if changed meanwhile, as
- * it is still the one discarded; a cart changed meanwhile does not, as
- * what changed was never seen.
+ * one put in the cart must never stay listed too; a cart changed
+ * meanwhile does not, as what changed was never seen. A volunteer's
+ * Discard checks first (OlderStore.discard).
  */
 export function removeOlder(
   older: Older,
@@ -1060,6 +1061,18 @@ export class OlderStore {
     const removed = removeOlder(older, this.storage);
     this.refresh();
     return removed;
+  }
+
+  /** Discard `older` as it was read, and list again: nothing if it has
+   * changed meanwhile, as what changed was never seen (Ali,
+   * inventory-tng-8gj); otherwise as removeOlder. */
+  discard(older: Older): Outcome {
+    const now = this.compared(older);
+    if (now !== "unchanged") {
+      this.refresh();
+      return now;
+    }
+    return this.remove(older);
   }
 
   /** Discard a part of `older`, and list again (dropPart). */
