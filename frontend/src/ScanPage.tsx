@@ -44,6 +44,7 @@ import {
   nextWhole,
   type Older,
   OlderStore,
+  type Outcome,
   olderId,
   toCart,
   withRetired,
@@ -978,11 +979,16 @@ function OlderList({
       tap();
     }
   };
-  /** Tell the volunteer, under `on`, that it, or a line of it, was not
-   * discarded. */
-  const notDiscarded = (on: string) => {
-    said.value = { on, words: NOT_DISCARDED };
-  };
+  /** What to tell the volunteer, under `on`, of its Discard, or a line's,
+   * not done: the browser did not keep it, or it changed meanwhile, as
+   * listing it again shows; of one gone, nothing. */
+  const discardSaid = (on: string, done: Outcome) =>
+    done === "gone"
+      ? null
+      : {
+          on,
+          words: done === "changed" ? CHANGED_NOT_DISCARDED : NOT_DISCARDED,
+        };
   return (
     <section>
       <h2>Checked out items. Add to cart or discard before sending</h2>
@@ -1038,10 +1044,8 @@ function OlderList({
                                 lineGoneAt.current.set(on, performance.now());
                                 refocus.current = on;
                                 recordOlder(each, "line_discarded");
-                              } else if (done === "not_kept") {
-                                // Not if it changed meanwhile, which listing
-                                // it again shows.
-                                notDiscarded(on);
+                              } else {
+                                said.value = discardSaid(on, done);
                               }
                             })}
                           >
@@ -1055,7 +1059,16 @@ function OlderList({
               )}
               {said.value?.on === on && (
                 <p role="alert">
-                  <AlertWords words={said.value.words} />
+                  <AlertWords
+                    words={
+                      // Changed so it no longer goes in the cart: only to
+                      // check it (Ali, inventory-tng-8gj).
+                      said.value.words === CHANGED_ELSEWHERE &&
+                      (!fills || retired)
+                        ? CHANGED_CHECK_AGAIN
+                        : said.value.words
+                    }
+                  />
                 </p>
               )}
               {discarding.value === on ? (
@@ -1063,11 +1076,11 @@ function OlderList({
                   describedBy={title}
                   onDiscard={unlessSettling(on, () => {
                     discarding.value = null;
-                    const done = older.remove(each);
+                    const done = older.discard(each);
                     if (done === "done") {
                       recordOlder(each, "discarded");
-                    } else if (done === "not_kept") {
-                      notDiscarded(on);
+                    } else {
+                      said.value = discardSaid(on, done);
                     }
                   })}
                   onKeep={unlessSettling(on, () => {
@@ -1237,6 +1250,16 @@ const SETTLE_MS = 500;
  * (Ali, inventory-tng-8gj). */
 const CHANGED_ELSEWHERE =
   "That one was changed in another tab. Check it, then add it to the cart again.";
+
+/** CHANGED_ELSEWHERE's words once, as it is now, it offers no Add to cart
+ * (Ali, inventory-tng-8gj). */
+const CHANGED_CHECK_AGAIN =
+  "That one was changed in another tab. Check it again.";
+
+/** An entry's Discard, or a line's, tapped on one changed in another tab
+ * since it was listed: nothing is discarded (Ali, inventory-tng-8gj). */
+const CHANGED_NOT_DISCARDED =
+  "This item was changed in another tab. Check it before discarding.";
 
 /** Whether it is saves or a cart, as telemetry tells them. */
 function heldIn(each: Older): "saves" | "cart" {
