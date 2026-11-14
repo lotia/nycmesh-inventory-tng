@@ -161,6 +161,13 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   then takes it once, or refuses it changed, which the page says. We
   rejected putting back only saves the server says it does not hold,
   which still leaves the window between asking and saving.
+  Add to cart on one another tab changed since it was listed puts
+  nothing in the cart: the page lists it again as it is now and says,
+  bold as a whole, "That one was changed in another tab. Check it, then
+  add it to the cart again." (Ali, 2026-11-14, inventory-tng-8gj). One
+  the page was putting back without a tap is tried again as it is now.
+  One gone meanwhile leaves the list, and nothing is said. We rejected
+  saying it had gone, which under an entry still listed was untrue.
   A count of a package the catalogue no longer offers is left out of
   what goes back and said, as a resized one is (inventory-tng-adb). We
   rejected putting it back loose, which says loose units moved where

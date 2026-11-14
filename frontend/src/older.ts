@@ -341,22 +341,49 @@ export function tidyOlder(storage: Storage = localStorage): void {
   }
 }
 
+/** What became of one read earlier: listed as it was; listed still, by
+ * its olderId, but changed (an older tab refused it or changed its cart,
+ * or another tab discarded a line of it); or gone (sent by an older tab,
+ * or put back or discarded in another). */
+export type Now = "unchanged" | "changed" | "gone";
+
+/** What became of a change to one: done; not done, as it had changed or
+ * gone meanwhile (Now); or not kept by the browser. */
+export type Outcome = "done" | Exclude<Now, "unchanged"> | "not_kept";
+
+/** What became of `older`, read earlier, as storage holds it now. */
+export function compared(older: Older, storage: Storage = localStorage): Now {
+  const id = olderId(older);
+  const was = JSON.stringify(older);
+  const now = readOlder(storage).filter((each) => olderId(each) === id);
+  if (now.length === 0) {
+    return "gone";
+  }
+  return now.some((each) => JSON.stringify(each) === was)
+    ? "unchanged"
+    : "changed";
+}
+
+/** Whether the browser kept a change. */
+const kept = (done: boolean): Outcome => (done ? "done" : "not_kept");
+
 /**
  * Remove one: a save from its key, the rest kept as they were, or the
  * cart. An older key left with nothing to list goes; this build's outbox
- * key stays, as the outbox's. False if the browser would
- * not keep the change, or `older` has gone meanwhile (sent by an older
- * tab, or put back in another).
+ * key stays, as the outbox's. A save goes even if changed meanwhile, as
+ * it is still the one discarded; a cart changed meanwhile does not, as
+ * what changed was never seen.
  */
 export function removeOlder(
   older: Older,
   storage: Storage = localStorage,
-): boolean {
-  if (!isListed(older, storage)) {
-    return false;
+): Outcome {
+  const now = compared(older, storage);
+  if (now === "gone" || (now === "changed" && older.batch === null)) {
+    return now;
   }
   if (older.batch === null) {
-    return removeStored(storage, older.key);
+    return kept(removeStored(storage, older.key));
   }
   const stored = readStored(storage, older.key);
   const next = withEntries(
@@ -364,9 +391,9 @@ export function removeOlder(
     entriesOf(stored).filter((entry) => !isSave(entry, older.batch)),
   );
   if (older.key !== OUTBOX_KEY && savesIn(older.key, next).length === 0) {
-    return removeStored(storage, older.key);
+    return kept(removeStored(storage, older.key));
   }
-  return writeStored(storage, older.key, next);
+  return kept(writeStored(storage, older.key, next));
 }
 
 /**
@@ -374,17 +401,18 @@ export function removeOlder(
  * under its key, so a save keeps its batch key, as one put back in the
  * cart and changed there does (Older.batchKey); one left with nothing to
  * list in `catalogue` goes whole (removeOlder), but one that says lines
- * could not be read stays (nothingListed). False if the browser would
- * not keep the change, or `older` has changed meanwhile.
+ * could not be read stays (nothingListed). Only if `older` is unchanged
+ * meanwhile, as the parts were read from it.
  */
 export function dropPart(
   older: Older,
   drop: readonly Cut[],
   catalogue: Catalogue,
   storage: Storage = localStorage,
-): boolean {
-  if (!isUnchanged(older, storage)) {
-    return false;
+): Outcome {
+  const now = compared(older, storage);
+  if (now !== "unchanged") {
+    return now;
   }
   const stored = readStored(storage, older.key);
   let next: unknown;
@@ -435,7 +463,7 @@ export function dropPart(
   if (after === undefined || nothingListed(after, catalogue)) {
     return removeOlder(older, storage);
   }
-  return writeStored(storage, older.key, next);
+  return kept(writeStored(storage, older.key, next));
 }
 
 /** Whether `older` lists nothing more: no part, and no note that lines
@@ -498,28 +526,6 @@ function cut(lines: unknown[], drop: readonly Cut[]): unknown[] {
         Object.values(read.output.open).some(saidOfOpen));
     return holds ? [kept] : [];
   });
-}
-
-/** Whether `older` is still listed, every part of it as it was read. */
-export function isUnchanged(
-  older: Older,
-  storage: Storage = localStorage,
-): boolean {
-  const was = JSON.stringify(older);
-  return readOlder(storage).some((each) => JSON.stringify(each) === was);
-}
-
-/** Whether `older` is still listed as it was read. */
-export function isListed(
-  older: Older,
-  storage: Storage = localStorage,
-): boolean {
-  return readOlder(storage).some(
-    (each) =>
-      each.key === older.key &&
-      each.batch === older.batch &&
-      (older.batch !== null || JSON.stringify(each) === JSON.stringify(older)),
-  );
 }
 
 /** What putting `older` in the cart leaves to do again, in words: that
@@ -990,25 +996,20 @@ export class OlderStore {
     this.listed.value = readOlder(this.storage);
   }
 
-  /** Whether `older` is still listed as it was read. */
-  isListed(older: Older): boolean {
-    return isListed(older, this.storage);
+  /** What became of `older`, read earlier (compared). */
+  compared(older: Older): Now {
+    return compared(older, this.storage);
   }
 
-  /** Remove `older`, and list again. False as removeOlder says. */
-  remove(older: Older): boolean {
+  /** Remove `older`, and list again (removeOlder). */
+  remove(older: Older): Outcome {
     const removed = removeOlder(older, this.storage);
     this.refresh();
     return removed;
   }
 
-  /** Whether `older` is still listed, every part as it was read. */
-  isUnchanged(older: Older): boolean {
-    return isUnchanged(older, this.storage);
-  }
-
-  /** Discard a part of `older`, and list again. False as dropPart says. */
-  dropPart(older: Older, drop: readonly Cut[], catalogue: Catalogue): boolean {
+  /** Discard a part of `older`, and list again (dropPart). */
+  dropPart(older: Older, drop: readonly Cut[], catalogue: Catalogue): Outcome {
     const dropped = dropPart(older, drop, catalogue, this.storage);
     this.refresh();
     return dropped;

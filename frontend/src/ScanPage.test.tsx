@@ -2450,6 +2450,35 @@ describe("what an older build left", () => {
     expect(storedCart()).not.toHaveProperty("batchKey");
   });
 
+  test("one an older tab changed meanwhile is not put in the cart, and says so, bold whole, under it as it is now", async () => {
+    leaveSave();
+    open();
+    await ready();
+    const button = within(listing()).getByRole("button", {
+      name: "Add to cart",
+    });
+    // Refused there, but the storage event not yet heard.
+    const kept = JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? "");
+    kept[0] = { ...kept[0], state: "refused", note: "No." };
+    localStorage.setItem("inventory.outbox.v3", JSON.stringify(kept));
+    fireEvent.click(button);
+    screen.getByText("Nothing in the cart yet.");
+    expect(
+      within(listing()).getByText(
+        "That one was changed in another tab. Check it, then add it to the cart again.",
+      ).tagName,
+    ).toBe("STRONG");
+    expect(within(listing()).queryByText(/has gone/)).toBeNull();
+    within(listing()).getByText(
+      noted("No. Add it to the cart, fix that, then record it."),
+    );
+    // Checked, it goes in.
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: "Add to cart" }),
+    );
+    expect(boxes()).toBe("2");
+  });
+
   test("a cart another tab filled meanwhile, unheard, is not written over", async () => {
     leaveSave();
     open();
@@ -2889,6 +2918,23 @@ describe("what an older build left", () => {
     await ready();
     within(listing()).getByRole("button", { name: "Add to cart" });
     expect(screen.queryByText(ADDED_BACK)).toBeNull();
+  });
+
+  test("one changed meanwhile, unheard, goes in without a tap as it is now, once the cart is empty", async () => {
+    storeCart(addOne(freshCart(), 101));
+    leaveMoves([KEY, AT, [radios(1)]]);
+    open();
+    await ready();
+    // Changed by an older tab, unheard; then the cart recorded there.
+    leaveMoves([KEY, AT, [radios(2)]]);
+    storeCart({ ...freshCart(), revision: "recorded" });
+    // Effects attach after the page paints, so send until it is heard.
+    await vi.waitFor(() => {
+      window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
+      screen.getByText(ADDED_BACK);
+    });
+    expect(boxes()).toBe("2");
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   test("one the browser would not keep in the cart says so, and is not tried again", async () => {

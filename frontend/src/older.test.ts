@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { freshCart, type Item } from "./cart";
 import {
+  compared,
   dropPart,
   goesBackWhole,
-  isListed,
   LINES_LOST,
   linesSaid,
   lineWords,
@@ -289,7 +289,7 @@ describe("removing one", () => {
     };
     keep("inventory.outbox.v3", kept);
     const [first] = readOlder();
-    expect(removeOlder(first as Older)).toBe(true);
+    expect(removeOlder(first as Older)).toBe("done");
     expect(
       JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? ""),
     ).toEqual({
@@ -303,7 +303,7 @@ describe("removing one", () => {
       saveOf(),
       saveOf({ state: "saved" }, { key: "c" }),
     ]);
-    expect(removeOlder(readOlder()[0] as Older)).toBe(true);
+    expect(removeOlder(readOlder()[0] as Older)).toBe("done");
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
   });
 
@@ -315,7 +315,7 @@ describe("removing one", () => {
       entries: [saveOf({ state: "too_old", build }), waiting],
     });
     const [save] = readOlder();
-    expect(removeOlder(save as Older)).toBe(true);
+    expect(removeOlder(save as Older)).toBe("done");
     expect(readOlder()).toEqual([]);
     expect(
       JSON.parse(localStorage.getItem("inventory.outbox.v4") ?? ""),
@@ -325,7 +325,7 @@ describe("removing one", () => {
       build,
       entries: [saveOf({ state: "too_old", build })],
     });
-    expect(removeOlder(readOlder()[0] as Older)).toBe(true);
+    expect(removeOlder(readOlder()[0] as Older)).toBe("done");
     expect(
       JSON.parse(localStorage.getItem("inventory.outbox.v4") ?? ""),
     ).toEqual({ build, entries: [] });
@@ -335,9 +335,18 @@ describe("removing one", () => {
     keep("inventory.outbox.v3", [saveOf()]);
     const [save] = readOlder();
     keep("inventory.outbox.v3", [saveOf({ state: "saved" })]);
-    expect(isListed(save as Older)).toBe(false);
-    expect(removeOlder(save as Older)).toBe(false);
+    expect(compared(save as Older)).toBe("gone");
+    expect(removeOlder(save as Older)).toBe("gone");
     expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
+  });
+
+  test("a save changed meanwhile, by an older tab, is still the one discarded, and goes", () => {
+    keep("inventory.outbox.v3", [saveOf()]);
+    const [save] = readOlder();
+    keep("inventory.outbox.v3", [saveOf({ state: "refused", note: "No." })]);
+    expect(compared(save as Older)).toBe("changed");
+    expect(removeOlder(save as Older)).toBe("done");
+    expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
   });
 
   test("a cart changed meanwhile, by an older tab, is not removed", () => {
@@ -348,16 +357,18 @@ describe("removing one", () => {
     keep("inventory.cart.v1", cart);
     const [listedCart] = readOlder();
     keep("inventory.cart.v1", { ...cart, toId: 12 });
-    expect(removeOlder(listedCart as Older)).toBe(false);
+    expect(compared(listedCart as Older)).toBe("changed");
+    expect(removeOlder(listedCart as Older)).toBe("changed");
     keep("inventory.cart.v1", cart);
-    expect(removeOlder(listedCart as Older)).toBe(true);
+    expect(compared(listedCart as Older)).toBe("unchanged");
+    expect(removeOlder(listedCart as Older)).toBe("done");
     expect(localStorage.getItem("inventory.cart.v1")).toBeNull();
   });
 
   test("a browser that will not keep the change says so", () => {
     keep("inventory.outbox.v3", [saveOf(), saveOf({}, { key: OTHER })]);
     expect(removeOlder(readOlder()[0] as Older, refusing("setItem"))).toBe(
-      false,
+      "not_kept",
     );
   });
 });
@@ -386,7 +397,7 @@ describe("a browser that will not let it at storage", () => {
     const older = new OlderStore(storage);
     expect(localStorage.getItem("inventory.outbox.v1")).not.toBeNull();
     for (const each of older.listed.value) {
-      expect(removeOlder(each, storage)).toBe(false);
+      expect(removeOlder(each, storage)).toBe("not_kept");
     }
     expect(older.listed.value).toHaveLength(2);
   });
@@ -1011,7 +1022,7 @@ describe("line by line", () => {
     const older = mixed();
     const { parts } = toCart(older, CATALOGUE);
     const before = stored();
-    expect(dropPart(older, parts[0]?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(dropPart(older, parts[0]?.drop ?? [], CATALOGUE)).toBe("done");
     expect(stored()).toEqual([
       {
         ...before[0],
@@ -1021,7 +1032,7 @@ describe("line by line", () => {
     // The report too, by its place.
     const again = readOlder()[0] as Older;
     const report = toCart(again, CATALOGUE).parts.at(-1);
-    expect(dropPart(again, report?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(dropPart(again, report?.drop ?? [], CATALOGUE)).toBe("done");
     expect(stored()[0].body.used_up).toEqual([]);
     expect(stored()[0].body.key).toBe(KEY);
   });
@@ -1046,7 +1057,7 @@ describe("line by line", () => {
     });
     const older = readOlder()[1] as Older;
     const [gone] = toCart(older, CATALOGUE).parts;
-    expect(dropPart(older, gone?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(dropPart(older, gone?.drop ?? [], CATALOGUE)).toBe("done");
     expect(stored()).toEqual({
       build,
       entries: [
@@ -1059,7 +1070,7 @@ describe("line by line", () => {
     ]);
     const lost = readOlder()[0] as Older;
     const [report] = toCart(lost, CATALOGUE).parts;
-    expect(dropPart(lost, report?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(dropPart(lost, report?.drop ?? [], CATALOGUE)).toBe("done");
     expect(stored()[0].body).toMatchObject({ lines: "many", used_up: [OTHER] });
   });
 
@@ -1075,7 +1086,7 @@ describe("line by line", () => {
     const taken = toCart(older, CATALOGUE).parts.find(
       (part) => part.words === "Cat6 cable: 3 m from an open package",
     );
-    expect(dropPart(older, taken?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(dropPart(older, taken?.drop ?? [], CATALOGUE)).toBe("done");
     expect(stored("inventory.cart.v1").lines).toEqual([
       { ...line, open: { [OTHER]: { usedUp: true } } },
     ]);
@@ -1094,7 +1105,7 @@ describe("line by line", () => {
       "LiteBeam 5AC: 1 × Box, 1 loose",
       "Cat6 cable: 2 m",
     ]);
-    expect(dropPart(older, parts[0]?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(dropPart(older, parts[0]?.drop ?? [], CATALOGUE)).toBe("done");
     expect(stored()[0].body.lines).toEqual([{ item_id: 101, quantity: "2" }]);
   });
 
@@ -1109,7 +1120,7 @@ describe("line by line", () => {
     const listedCart = readOlder()[0] as Older;
     const [back, gone] = toCart(listedCart, CATALOGUE).parts;
     expect(gone?.note).toBe(ITEM_RETIRED);
-    expect(dropPart(listedCart, gone?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(dropPart(listedCart, gone?.drop ?? [], CATALOGUE)).toBe("done");
     // No field added that it never had: an older build still reads it.
     expect(stored("inventory.cart.v1").lines).toEqual([
       { ...line, packages: { 1000: "1" } },
@@ -1121,7 +1132,7 @@ describe("line by line", () => {
     const two = readOlder()[0] as Older;
     const parts = toCart(two, CATALOGUE).parts;
     expect(back?.words).toBe("LiteBeam 5AC: 1 × Box, 3 loose");
-    expect(dropPart(two, parts[0]?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(dropPart(two, parts[0]?.drop ?? [], CATALOGUE)).toBe("done");
     // What it held besides was the package gone, still to discard.
     expect(stored("inventory.cart.v1").lines).toEqual([
       { ...line, packages: { 1004: "2" }, loose: "" },
@@ -1130,7 +1141,7 @@ describe("line by line", () => {
     const left = readOlder()[0] as Older;
     expect(
       dropPart(left, toCart(left, CATALOGUE).parts[0]?.drop ?? [], CATALOGUE),
-    ).toBe(true);
+    ).toBe("done");
     expect(stored("inventory.cart.v1").lines).toEqual([
       { itemId: 101, packages: {}, loose: "1" },
     ]);
@@ -1142,7 +1153,7 @@ describe("line by line", () => {
     });
     const { parts } = toCart(older, CATALOGUE);
     expect(parts).toHaveLength(1);
-    expect(dropPart(older, parts[0]?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(dropPart(older, parts[0]?.drop ?? [], CATALOGUE)).toBe("done");
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
     keep("inventory.cart.v1", {
       ...freshCart(),
@@ -1151,7 +1162,7 @@ describe("line by line", () => {
     const cart = readOlder()[0] as Older;
     expect(
       dropPart(cart, toCart(cart, CATALOGUE).parts[0]?.drop ?? [], CATALOGUE),
-    ).toBe(true);
+    ).toBe("done");
     expect(localStorage.getItem("inventory.cart.v1")).toBeNull();
   });
 
@@ -1165,7 +1176,7 @@ describe("line by line", () => {
         lines: [{ item_id: 100, quantity: "4", package_id: 1004 }, ...unread],
       });
       const [gone] = toCart(older, CATALOGUE).parts;
-      expect(dropPart(older, gone?.drop ?? [], CATALOGUE)).toBe(true);
+      expect(dropPart(older, gone?.drop ?? [], CATALOGUE)).toBe("done");
       expect(stored()[0].body.lines).toEqual(unread);
       const left = readOlder()[0] as Older;
       expect(toCart(left, CATALOGUE)).toMatchObject({
@@ -1181,7 +1192,7 @@ describe("line by line", () => {
     ]);
     const older = readOlder()[0] as Older;
     const [report] = toCart(older, CATALOGUE).parts;
-    expect(dropPart(older, report?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(dropPart(older, report?.drop ?? [], CATALOGUE)).toBe("done");
     expect(stored()[0].body).toMatchObject({ lines: "many", used_up: [] });
   });
 
@@ -1195,7 +1206,7 @@ describe("line by line", () => {
     const named = withRetired(CATALOGUE);
     const [retired] = toCart(older, named).parts;
     expect(retired?.words).toBe("NanoStation M5: 2 × Pair");
-    expect(dropPart(older, retired?.drop ?? [], CATALOGUE)).toBe(true);
+    expect(dropPart(older, retired?.drop ?? [], CATALOGUE)).toBe("done");
     expect(goesBackWhole(readOlder()[0] as Older, CATALOGUE)).toBe(true);
   });
 
@@ -1203,10 +1214,13 @@ describe("line by line", () => {
     const older = mixed();
     const { parts } = toCart(older, CATALOGUE);
     const drop = parts[0]?.drop ?? [];
-    expect(dropPart(older, drop, CATALOGUE, refusing("setItem"))).toBe(false);
+    expect(dropPart(older, drop, CATALOGUE, refusing("setItem"))).toBe(
+      "not_kept",
+    );
     keep("inventory.outbox.v3", [saveOf({ state: "refused", note: "No." })]);
     const before = stored();
-    expect(dropPart(older, drop, CATALOGUE)).toBe(false);
+    expect(compared(older)).toBe("changed");
+    expect(dropPart(older, drop, CATALOGUE)).toBe("changed");
     expect(stored()).toEqual(before);
   });
 
@@ -1217,7 +1231,7 @@ describe("line by line", () => {
     const { parts } = toCart(older as Older, CATALOGUE);
     expect(
       store.dropPart(older as Older, parts[0]?.drop ?? [], CATALOGUE),
-    ).toBe(true);
+    ).toBe("done");
     expect(store.listed.value[0]?.lines).toHaveLength(3);
   });
 });
