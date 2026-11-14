@@ -1,7 +1,7 @@
 /**
  * A long list's search box suggests as one types, and picking one narrows
  * the list to it (docs/decisions/0019). Searches ignore accents, the scan
- * page's too (docs/decisions/0021).
+ * page's too (docs/decisions/0021), and read units after a number alike.
  */
 import { expect, test } from "@playwright/test";
 import { ownCable } from "./own";
@@ -59,4 +59,18 @@ test("the scan page finds an item without its accents, and shows them", async ({
     .getByLabel(/Find an item/)
     .fill(name.replace("Caféclip", "cafeclip"));
   await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+});
+
+test("a unit after a number is found however it is spelt, on both sides", async ({
+  page,
+}) => {
+  const name = await ownCable(page, "Cap 10 μF");
+  await page.goto("/scan");
+  await page.getByLabel(/Find an item/).fill(name.replace("10 μF", "10uf"));
+  await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+  const typed = name.replace("10 μF", "10 µF");
+  await page.goto(`/admin/items?q=${encodeURIComponent(typed)}`);
+  await expect(
+    page.getByRole("table").getByRole("link", { name, exact: true }),
+  ).toBeVisible();
 });

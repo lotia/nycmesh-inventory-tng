@@ -88,6 +88,11 @@ description = "Write tests/fold_reference.tsv again, after a release of anyascii
 dir = "backend"
 run = "uv run python -m tests.helpers.fold_reference"
 
+[tasks.regenerate-units]
+description = "Write frontend/src/units.json, the scan page's unit table, again after a change to backend units.py (CONTRIBUTING.md)"
+dir = "backend"
+run = "uv run python -m inventory_tng.units"
+
 [tasks.regenerate-batch-schema]
 description = "Write tests/batch_schema.json again, after a change to what the batch endpoint accepts (CONTRIBUTING.md, The scan page)"
 dir = "backend"

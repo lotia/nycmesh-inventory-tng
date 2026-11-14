@@ -1,0 +1,320 @@
+{
+  "about": "What the server (models.fold, in lower case) and the scan page (cart.bare) both make of each text, as searched, and what units.respell makes of it decomposed (NFKD), on both sides: backend tests/test_units.py and frontend src/units.test.ts read it. Texts whose letters anyascii spells otherwise than decomposing, as Greek, are tested on each side alone.",
+  "vectors": [
+    {
+      "text": "10uF",
+      "respelt": "10uF",
+      "searched": "10uf"
+    },
+    {
+      "text": "10 µF",
+      "respelt": "10uF",
+      "searched": "10uf"
+    },
+    {
+      "text": "10μF",
+      "respelt": "10uF",
+      "searched": "10uf"
+    },
+    {
+      "text": "10 ΜF",
+      "respelt": "10uF",
+      "searched": "10uf"
+    },
+    {
+      "text": "Capacitor 10 UF",
+      "respelt": "Capacitor 10uF",
+      "searched": "capacitor 10uf"
+    },
+    {
+      "text": "85 degC",
+      "respelt": "85degC",
+      "searched": "85degc"
+    },
+    {
+      "text": "85°C",
+      "respelt": "85degC",
+      "searched": "85degc"
+    },
+    {
+      "text": "85 °C",
+      "respelt": "85degC",
+      "searched": "85degc"
+    },
+    {
+      "text": "85℃",
+      "respelt": "85degC",
+      "searched": "85degc"
+    },
+    {
+      "text": "85 Cel",
+      "respelt": "85degC",
+      "searched": "85degc"
+    },
+    {
+      "text": "85 deg C",
+      "respelt": "85degC",
+      "searched": "85degc"
+    },
+    {
+      "text": "85 DEG c",
+      "respelt": "85degC",
+      "searched": "85degc"
+    },
+    {
+      "text": "-40 °F",
+      "respelt": "-40degF",
+      "searched": "-40degf"
+    },
+    {
+      "text": "300 K",
+      "respelt": "300K",
+      "searched": "300k"
+    },
+    {
+      "text": "4.7 kΩ",
+      "respelt": "4.7kOhm",
+      "searched": "4.7kohm"
+    },
+    {
+      "text": "4.7kohm",
+      "respelt": "4.7kOhm",
+      "searched": "4.7kohm"
+    },
+    {
+      "text": "4.7 KOHMS",
+      "respelt": "4.7kOhm",
+      "searched": "4.7kohm"
+    },
+    {
+      "text": "50Ω",
+      "respelt": "50Ohm",
+      "searched": "50ohm"
+    },
+    {
+      "text": "50 Ω",
+      "respelt": "50Ohm",
+      "searched": "50ohm"
+    },
+    {
+      "text": "1 MΩ",
+      "respelt": "1MOhm",
+      "searched": "1mohm"
+    },
+    {
+      "text": "5 MHz",
+      "respelt": "5MHz",
+      "searched": "5mhz"
+    },
+    {
+      "text": "5.8 GHz",
+      "respelt": "5.8GHz",
+      "searched": "5.8ghz"
+    },
+    {
+      "text": "2.4 ghz",
+      "respelt": "2.4GHz",
+      "searched": "2.4ghz"
+    },
+    {
+      "text": "1 Gbps",
+      "respelt": "1Gbit/s",
+      "searched": "1gbit/s"
+    },
+    {
+      "text": "100 Kbps",
+      "respelt": "100kbit/s",
+      "searched": "100kbit/s"
+    },
+    {
+      "text": "10 Mb/s",
+      "respelt": "10Mbit/s",
+      "searched": "10mbit/s"
+    },
+    {
+      "text": "1 Gbit/s",
+      "respelt": "1Gbit/s",
+      "searched": "1gbit/s"
+    },
+    {
+      "text": "24 dBm",
+      "respelt": "24dBm",
+      "searched": "24dbm"
+    },
+    {
+      "text": "23 dBi",
+      "respelt": "23dBi",
+      "searched": "23dbi"
+    },
+    {
+      "text": "12 V/2 A",
+      "respelt": "12V/2A",
+      "searched": "12v/2a"
+    },
+    {
+      "text": "48 V",
+      "respelt": "48V",
+      "searched": "48v"
+    },
+    {
+      "text": "0.5 A",
+      "respelt": "0.5A",
+      "searched": "0.5a"
+    },
+    {
+      "text": "30 mW",
+      "respelt": "30mW",
+      "searched": "30mw"
+    },
+    {
+      "text": "10 W",
+      "respelt": "10W",
+      "searched": "10w"
+    },
+    {
+      "text": "Spool 305 m",
+      "respelt": "Spool 305m",
+      "searched": "spool 305m"
+    },
+    {
+      "text": "Spool 305m",
+      "respelt": "Spool 305m",
+      "searched": "spool 305m"
+    },
+    {
+      "text": "Spool 30.5 m",
+      "respelt": "Spool 30.5m",
+      "searched": "spool 30.5m"
+    },
+    {
+      "text": "1,000 ft",
+      "respelt": "1,000ft",
+      "searched": "1,000ft"
+    },
+    {
+      "text": "100 feet",
+      "respelt": "100ft",
+      "searched": "100ft"
+    },
+    {
+      "text": "6 in",
+      "respelt": "6in",
+      "searched": "6in"
+    },
+    {
+      "text": "10 [in_i]",
+      "respelt": "10in",
+      "searched": "10in"
+    },
+    {
+      "text": "5 kg",
+      "respelt": "5kg",
+      "searched": "5kg"
+    },
+    {
+      "text": "1 lb",
+      "respelt": "1lb",
+      "searched": "1lb"
+    },
+    {
+      "text": "2 L",
+      "respelt": "2L",
+      "searched": "2l"
+    },
+    {
+      "text": "500 mL",
+      "respelt": "500mL",
+      "searched": "500ml"
+    },
+    {
+      "text": "1 m3",
+      "respelt": "1m3",
+      "searched": "1m3"
+    },
+    {
+      "text": "5 gal",
+      "respelt": "5gal",
+      "searched": "5gal"
+    },
+    {
+      "text": "LiteBeam 5AC Gen2",
+      "respelt": "LiteBeam 5AC Gen2",
+      "searched": "litebeam 5ac gen2"
+    },
+    {
+      "text": "Cat 6A",
+      "respelt": "Cat 6A",
+      "searched": "cat 6a"
+    },
+    {
+      "text": "RJ45 coupler",
+      "respelt": "RJ45 coupler",
+      "searched": "rj45 coupler"
+    },
+    {
+      "text": "10 Cell",
+      "respelt": "10 Cell",
+      "searched": "10 cell"
+    },
+    {
+      "text": "10 mé",
+      "respelt": "10 mé",
+      "searched": "10 me"
+    },
+    {
+      "text": "10 ḿ",
+      "respelt": "10ḿ",
+      "searched": "10m"
+    },
+    {
+      "text": "10 m/s",
+      "respelt": "10 m/s",
+      "searched": "10 m/s"
+    },
+    {
+      "text": "(10 m)",
+      "respelt": "(10m)",
+      "searched": "(10m)"
+    },
+    {
+      "text": "2 in 1",
+      "respelt": "2in 1",
+      "searched": "2in 1"
+    },
+    {
+      "text": "Café 10 µF",
+      "respelt": "Café 10uF",
+      "searched": "cafe 10uf"
+    },
+    {
+      "text": "fullwidth １０ｍ",
+      "respelt": "fullwidth 10m",
+      "searched": "fullwidth 10m"
+    },
+    {
+      "text": "10 m",
+      "respelt": "10m",
+      "searched": "10m"
+    },
+    {
+      "text": "10 kΩ",
+      "respelt": "10kOhm",
+      "searched": "10kohm"
+    },
+    {
+      "text": "Mbps",
+      "respelt": "Mbps",
+      "searched": "mbps"
+    },
+    {
+      "text": "uF",
+      "respelt": "uF",
+      "searched": "uf"
+    },
+    {
+      "text": "Cel",
+      "respelt": "Cel",
+      "searched": "cel"
+    }
+  ]
+}

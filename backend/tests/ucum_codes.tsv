@@ -1,0 +1,45 @@
+# UCUM's codes (case sensitive) for the prefixes and units inventory_tng.units uses: kind, code, name, and a prefix's power of ten or whether a unit is metric (takes prefixes).
+# From ucum-essence.xml, UCUM version 2.2, revision date 2024-06-17 (https://github.com/ucum-org/ucum, https://ucum.org/ucum). Written by hand from it: add a row when the table uses another code.
+prefix	Y	yotta	24
+prefix	Z	zetta	21
+prefix	E	exa	18
+prefix	P	peta	15
+prefix	T	tera	12
+prefix	G	giga	9
+prefix	M	mega	6
+prefix	k	kilo	3
+prefix	h	hecto	2
+prefix	da	deka	1
+prefix	d	deci	-1
+prefix	c	centi	-2
+prefix	m	milli	-3
+prefix	u	micro	-6
+prefix	n	nano	-9
+prefix	p	pico	-12
+prefix	f	femto	-15
+prefix	a	atto	-18
+prefix	z	zepto	-21
+prefix	y	yocto	-24
+unit	m	meter	yes
+unit	s	second	yes
+unit	g	gram	yes
+unit	K	kelvin	yes
+unit	Hz	hertz	yes
+unit	W	watt	yes
+unit	A	ampère	yes
+unit	V	volt	yes
+unit	F	farad	yes
+unit	Ohm	ohm	yes
+unit	Cel	degree Celsius	yes
+unit	l	liter	yes
+unit	L	liter	yes
+unit	t	tonne	yes
+unit	[in_i]	inch	no
+unit	[ft_i]	foot	no
+unit	[yd_i]	yard	no
+unit	[mi_i]	mile	no
+unit	[gal_us]	Queen Anne's wine gallon	no
+unit	[lb_av]	pound	no
+unit	[oz_av]	ounce	no
+unit	[degF]	degree Fahrenheit	no
+unit	bit	bit	yes

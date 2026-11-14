@@ -162,3 +162,47 @@ spelling. Migration 0035 rewrote the names there were in place, and
 names by id any that would clash once rewritten, to rename first.
 
 Matching units whatever their spelling is inventory-tng-c0c's next part.
+
+## Amendment: searches read units after a number (2026-11-14)
+
+A unit right after a number, with or without a space, is searched in one
+spelling, whichever was typed (Ali, 2026-11-12 and 2026-11-14,
+inventory-tng-c0c): its symbol in ASCII, joined to the number. So `10uF`,
+`10 µF`, `10μF` and `10 ΜF` are all searched as `10uF` and find each
+other (inventory-tng-8g2); `85 degC`, `85°C`, `85℃`, `85 Cel` and
+`85 deg C` as `85degC`; `4.7 kΩ` and `4.7kohm` as `4.7kOhm`. Case does
+not matter, as in every search, so `mF` and `MF` are one, as before.
+
+`inventory_tng/units.py` holds the table: one row per unit this
+inventory's names use, of its kinds of quantity (length, frequency, data
+rate, power, power as a level in dBm, antenna gain in dBi, voltage,
+current, temperature, capacitance, resistance, mass, volume), with its
+symbol, its kind, whether SI prefixes go on it, and the spellings it is
+also read by. Every UCUM code of a unit is one, so the UCUM form always
+works; a test checks them against UCUM 2.2's (`tests/ucum_codes.tsv`).
+Prefixed forms are derived from the prefixes, all the SI's, micro also
+`μ` and `µ`, never rows. Celsius is `degC` (Ali: the convention). Each kind
+keeps one plausible size, for telling `305M` (metres) from megametres
+later.
+
+Only where a number comes first: alone, `Cel` finds only text holding
+`Cel`, as `Cell` and `m` would be misread. So a Greek word is folded as
+letters, as before, whatever its case: `μέρα` finds `ΜΕΡΑ`, and the
+server and the scan page read a capital `Μ` alike, as micro after a number
+and as a letter elsewhere (inventory-tng-5d2). The cost: a unit
+typed alone in a spelling other than its symbol, such as `Mbps` for
+`100Mbit/s`, finds only what search finds close.
+
+`models.fold` reads units in the decomposed text (NFKD) before NFKC and
+anyascii, and folds each searched field alone, so a field's number never
+reads the next field as a unit. The scan page reads them in the same
+table (`frontend/src/units.json`, which the server writes) the same way
+(`frontend/src/units.ts`), so both spell a search alike; both are tested
+against `frontend/src/units-vectors.json`. Each folded row's
+`folded_with` names the table's version too, and migration 0036 folded
+the rows there were again.
+
+Rejected: storing every spelling of a unit in the search text, which
+grows it and lets a part of one spelling match the wrong unit; and a
+character table spelling `μ` as `u` everywhere, which misspells Greek
+words. pint, a units library, was not needed for a table this size.

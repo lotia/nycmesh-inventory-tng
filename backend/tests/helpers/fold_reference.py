@@ -54,6 +54,8 @@ STRINGS = (
     "ｃａｆｅ ＡＢ１２",  # noqa: RUF001  Look-alikes, sampled.
     "１０ｍ ＲＪ４５",  # noqa: RUF001  Look-alikes, sampled.
     "10µF 10μF",
+    "10 uF 4.7 kΩ 85 ℃ 85 Cel 5 GHz 1 Gbps 24 dBm 305 m",
+    "μF Ω Cel μέρα 10 Cell",
     "½ ¼ ¾ in",
     "2×4 30° ±5%",  # noqa: RUF001  Look-alikes, sampled.
     "Москва кабель",

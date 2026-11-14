@@ -1,0 +1,151 @@
+{
+  "version": 1,
+  "prefixes": [
+    ["Q"],
+    ["R"],
+    ["Y"],
+    ["Z"],
+    ["E"],
+    ["P"],
+    ["T"],
+    ["G"],
+    ["M"],
+    ["k"],
+    ["h"],
+    ["da"],
+    ["d"],
+    ["c"],
+    ["m"],
+    ["u", "μ", "µ"],
+    ["n"],
+    ["p"],
+    ["f"],
+    ["a"],
+    ["z"],
+    ["y"],
+    ["r"],
+    ["q"]
+  ],
+  "units": [
+    {
+      "symbol": "m",
+      "prefixed": ["m"],
+      "alone": ["meter", "meters", "metre", "metres"]
+    },
+    {
+      "symbol": "in",
+      "prefixed": [],
+      "alone": ["in", "[in_i]", "inch", "inches"]
+    },
+    {
+      "symbol": "ft",
+      "prefixed": [],
+      "alone": ["ft", "[ft_i]", "foot", "feet"]
+    },
+    {
+      "symbol": "yd",
+      "prefixed": [],
+      "alone": ["yd", "[yd_i]", "yard", "yards"]
+    },
+    {
+      "symbol": "mi",
+      "prefixed": [],
+      "alone": ["mi", "[mi_i]", "mile", "miles"]
+    },
+    {
+      "symbol": "Hz",
+      "prefixed": ["Hz"],
+      "alone": ["hertz"]
+    },
+    {
+      "symbol": "bit/s",
+      "prefixed": ["bit/s", "bps", "b/s"],
+      "alone": []
+    },
+    {
+      "symbol": "W",
+      "prefixed": ["W"],
+      "alone": ["watt", "watts"]
+    },
+    {
+      "symbol": "dBm",
+      "prefixed": [],
+      "alone": ["dBm"]
+    },
+    {
+      "symbol": "dBi",
+      "prefixed": [],
+      "alone": ["dBi"]
+    },
+    {
+      "symbol": "V",
+      "prefixed": ["V"],
+      "alone": ["volt", "volts"]
+    },
+    {
+      "symbol": "A",
+      "prefixed": ["A"],
+      "alone": ["amp", "amps", "ampere", "amperes"]
+    },
+    {
+      "symbol": "degC",
+      "prefixed": [],
+      "alone": ["degC", "Cel", "°C", "deg C"]
+    },
+    {
+      "symbol": "degF",
+      "prefixed": [],
+      "alone": ["degF", "[degF]", "°F", "deg F"]
+    },
+    {
+      "symbol": "K",
+      "prefixed": ["K"],
+      "alone": ["kelvin"]
+    },
+    {
+      "symbol": "F",
+      "prefixed": ["F"],
+      "alone": ["farad", "farads"]
+    },
+    {
+      "symbol": "Ohm",
+      "prefixed": ["Ohm", "Ω", "ohm", "ohms"],
+      "alone": []
+    },
+    {
+      "symbol": "g",
+      "prefixed": ["g"],
+      "alone": ["gram", "grams"]
+    },
+    {
+      "symbol": "t",
+      "prefixed": [],
+      "alone": ["t", "tonne", "tonnes"]
+    },
+    {
+      "symbol": "lb",
+      "prefixed": [],
+      "alone": ["lb", "[lb_av]", "lbs", "pound", "pounds"]
+    },
+    {
+      "symbol": "oz",
+      "prefixed": [],
+      "alone": ["oz", "[oz_av]", "ounce", "ounces"]
+    },
+    {
+      "symbol": "L",
+      "prefixed": ["L", "l"],
+      "alone": ["liter", "liters", "litre", "litres"]
+    },
+    {
+      "symbol": "m3",
+      "prefixed": ["m3"],
+      "alone": []
+    },
+    {
+      "symbol": "gal",
+      "prefixed": [],
+      "alone": ["gal", "[gal_us]", "gallon", "gallons"]
+    }
+  ]
+}

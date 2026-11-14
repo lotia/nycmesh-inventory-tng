@@ -3,6 +3,8 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import Connection, text
 
+from inventory_tng.models import FOLDED_WITH
+
 from helpers.sign_in import TOTP_KEYS
 
 
@@ -281,7 +283,8 @@ def test_names_are_rewritten_in_canonical_spelling(alembic_config: Config) -> No
         _item(connection, category_id, "Café µF"),
         _item(connection, category_id, "ﬁber 1 m² 72℉"),
     )
-    command.upgrade(alembic_config, "head")
+    # Not 0036, which folds what is searched again.
+    command.upgrade(alembic_config, "0035")
     names = dict(connection.execute(text("SELECT id, name FROM item")).all())
     assert names == {
         ohm: "50Ω load",
@@ -333,3 +336,40 @@ def test_names_clashing_once_canonical_are_named_first(alembic_config: Config) -
     assert connection.scalar(
         text("SELECT name FROM item WHERE id = :i"), {"i": micro}
     ) == ("Cap 10μF")
+
+
+def test_what_is_searched_is_folded_again_with_units(alembic_config: Config) -> None:
+    """Migration 0036: rows folded before units were read are folded again,
+    as the app folds them, each field alone; rows folded so are left."""
+    command.downgrade(alembic_config, "0035")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Capacitors') RETURNING id")
+    )
+    stale = _item(connection, category_id, "Cap 10 μF")
+    connection.execute(
+        text("UPDATE item SET manufacturer = 'M Corp' WHERE id = :i"), {"i": stale}
+    )
+    current = _item(connection, category_id, "Cap 4.7 kΩ")
+    connection.execute(
+        text("UPDATE item SET folded_with = :f WHERE id = :i"),
+        {"f": FOLDED_WITH, "i": current},
+    )
+    place = connection.scalar(
+        text(
+            "INSERT INTO location (name, kind, search_text, folded_with)"
+            " VALUES ('Cold room 4 °C', 'store', 'kept', 'x') RETURNING id"
+        )
+    )
+    command.upgrade(alembic_config, "head")
+    rows = connection.execute(
+        text("SELECT id, search_text, name_folded, folded_with FROM item")
+    ).all()
+    assert {row[0]: tuple(row[1:]) for row in rows} == {
+        stale: ("Cap 10uF M Corp  ", "Cap 10uF", FOLDED_WITH),
+        current: ("kept", "kept", FOLDED_WITH),
+    }
+    assert connection.execute(
+        text("SELECT search_text, folded_with FROM location WHERE id = :i"),
+        {"i": place},
+    ).one() == ("Cold room 4degC", FOLDED_WITH)

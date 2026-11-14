@@ -63,7 +63,10 @@ from sqlalchemy.orm import Mapped, MappedColumn, Session, mapped_column, validat
 
 # Imported for its flush listeners: whatever can write these tables records
 # their history.
-from inventory_tng import history  # noqa: F401
+from inventory_tng import (
+    history,  # noqa: F401
+    units,
+)
 from inventory_tng.db import ACTOR_PATTERN, Base, enforce, protection
 from inventory_tng.time_zones import is_time_zone
 
@@ -201,10 +204,12 @@ def fold(text: str) -> str:
     """`text` as searches compare it: in ASCII, as anyascii spells it, so
     "cafe" finds "Café" and "lodz" "Łódź" (docs/decisions/0021, 2026-11-12),
     after compatibility characters are made their canonical ones (NFKC), so
-    the micro sign in "µF" is spelt as the Greek "μF" is. What is searched
-    is kept folded (Searchable); what is typed is folded before it is
-    compared."""
-    return anyascii(unicodedata.normalize("NFKC", text))
+    "ﬁ" is "fi", and each unit right after a number is spelt by its symbol
+    (units.respell, 2026-11-14), so "10 µF", "10μF" and "10uf" are all
+    "10uF". What is searched is kept folded (Searchable); what is typed is
+    folded before it is compared."""
+    decomposed = unicodedata.normalize("NFKD", text)
+    return anyascii(unicodedata.normalize("NFKC", units.respell(decomposed)))
 
 
 # Signs a name is stored without, for the spelling Unicode and the SI
@@ -233,11 +238,11 @@ class CanonicalName:
 
 
 # What folds (fold), as each folded row records it (Searchable.folded_with),
-# so rows a release of anyascii, or a Python with a newer Unicode, would
-# spell otherwise can be found.
+# so rows a release of anyascii, a Python with a newer Unicode, or another
+# unit table would spell otherwise can be found.
 FOLDED_WITH = (
     f"anyascii {importlib.metadata.version('anyascii')}, "
-    f"Unicode {unicodedata.unidata_version}"
+    f"Unicode {unicodedata.unidata_version}, units {units.VERSION}"
 )
 
 
@@ -246,15 +251,17 @@ class Searchable:
     its name unless a model says more), spaced and folded, and
     `folded_with`, what folded it (FOLDED_WITH). Kept by the app as each row
     is added or changed (_refold), never by PostgreSQL (docs/decisions/0016);
-    migrations 0032 and 0033 filled the rows there were."""
+    migrations 0032, 0033 and 0036 filled the rows there were."""
 
     SEARCHED: ClassVar[tuple[str, ...]] = ("name",)
     search_text: Mapped[str] = mapped_column(Text)
     folded_with: Mapped[str] = mapped_column(Text)
 
     def refold(self) -> None:
-        held = (getattr(self, field) or "" for field in self.SEARCHED)
-        self.search_text = fold(" ".join(held))
+        # Each folded alone, so no field's number reads the next's start
+        # as a unit.
+        held = (fold(getattr(self, field) or "") for field in self.SEARCHED)
+        self.search_text = " ".join(held)
         self.folded_with = FOLDED_WITH
 
 

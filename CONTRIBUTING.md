@@ -272,6 +272,21 @@ Every name an administrator types is stored in canonical spelling
 as `°C` and `°F`, case kept. A form checks and compares a name in that
 spelling.
 
+Searches read a unit right after a number in one spelling, on the server
+and the scan page alike (decision 0021): `10 µF` is `10uF`. The table is
+`backend/src/inventory_tng/units.py`. After changing it, raise its
+`VERSION`, write the scan page's copy and the fold reference again, and
+add a migration that folds again the rows whose `folded_with` names the
+old version, as 0036 does:
+
+```sh
+mise run regenerate-units           # frontend/src/units.json
+mise run regenerate-fold-reference
+```
+
+`frontend/src/units-vectors.json` holds what both sides must make of some
+text; both test against it.
+
 ### Locking a row
 
 Lock rows with `db.locked` (a select) or `db.get_locked` (`Session.get`),

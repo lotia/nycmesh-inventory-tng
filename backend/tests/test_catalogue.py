@@ -153,6 +153,10 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
             "short_below": None,
         },
     ]
+    # In any case: a tag ending as a number and a unit does (3f), is
+    # searched as that unit (3F).
+    searched = cable.pop("search_text")
+    assert searched.lower() == f"{rows.cable.search_text} Cables {mark}".lower()
     assert cable == {
         "id": rows.cable.id,
         "name": rows.cable.name,
@@ -161,7 +165,6 @@ def test_holds_whats_current(registered_client: TestClient, rows: Rows) -> None:
         "manufacturer": "Ubiquiti",
         "part_number": rows.cable.part_number,
         "old_code": rows.cable.old_code,
-        "search_text": f"{rows.cable.search_text} Cables {mark}",
         "retired": False,
         # Named only, for what an older build left (inventory-tng-0su).
         "retired_packages": [{"id": rows.reel.id, "name": "Reel", "size": "1"}],
@@ -202,7 +205,9 @@ def test_an_item_is_found_by_its_folded_text_but_shown_by_its_name(
         f"Câbles {mark}",
         "Łódź",
     )
-    assert entry["search_text"] == f"Cafe {mark} Lodz O-{mark}  Cables {mark}"
+    # In any case, as a tag's end may be read as a unit (3f, 3F).
+    expected = f"Cafe {mark} Lodz O-{mark}  Cables {mark}"
+    assert entry["search_text"].lower() == expected.lower()
 
 
 def test_holds_the_scan_settings(registered_client: TestClient) -> None:

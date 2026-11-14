@@ -26,6 +26,7 @@ import {
 } from "./outbox";
 import { count, decimal, sent, thousandths } from "./quantity";
 import { onStoredChange, readStored, writeStored } from "./stored";
+import { respell } from "./units";
 
 /** Versioned as the outbox's is (outbox.ts): each build reads its own.
  * v2's is stamped with the build that wrote it, may keep a batch key
@@ -1230,9 +1231,11 @@ export function search(catalogue: Catalogue, text: string, limit = 20): Item[] {
     .slice(0, limit);
 }
 
-/** `text` in lower case, decomposed by compatibility, without its combining
- * marks: "é" is "e", fullwidth "ｃａｆｅ" is "cafe", "ﬁ" is "fi" and "µ" is
- * "μ"; "ł", "ø", "æ" and "ß", which do not decompose, stay as they are. */
-function bare(text: string): string {
-  return text.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
+/** `text` in lower case, decomposed by compatibility, each unit right after
+ * a number spelt as the server spells it (`respell`), and without its
+ * combining marks: "é" is "e", fullwidth "ｃａｆｅ" is "cafe", "ﬁ" is "fi"
+ * and "10 µF" is "10uf"; "ł", "ø", "æ" and "ß", which do not decompose,
+ * stay as they are, and so do Greek letters, but in units. */
+export function bare(text: string): string {
+  return respell(text.normalize("NFKD")).replace(/\p{M}/gu, "").toLowerCase();
 }
