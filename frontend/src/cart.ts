@@ -364,12 +364,18 @@ export function reconcile(cart: Cart, catalogue: Catalogue): Cart {
     : { ...cart, volunteerId, fromId, toId, lines };
 }
 
-/** Whether the catalogue gives this package another size than the line's
- * count of it was made at: its count is to be typed again. */
+/** Whether the line's count of this package is to be typed again: the
+ * catalogue gives it another size than the count was made at, or the
+ * count was cleared so (recounted), whatever size it gives now, as one
+ * resized back would otherwise leave it blank unsaid. None of it counted,
+ * there is nothing to count again. */
 export function resized(line: Line, pack: Package): boolean {
   const counted = line.sizes?.[pack.id];
+  const typed = line.packages[pack.id] ?? "";
   return (
-    counted !== undefined && thousandths(counted) !== thousandths(pack.size)
+    counted !== undefined &&
+    (typed === "" ||
+      (holdsSome(typed) && thousandths(counted) !== thousandths(pack.size)))
   );
 }
 

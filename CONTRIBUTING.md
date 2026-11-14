@@ -338,13 +338,14 @@ the cart, saying nothing of the newer build until then, and then asks for
 an upgrade, a reload; once the server holds its batches back as too old,
 it asks at once (`frontend/src/build.ts`, docs/decisions/0010). A newer
 build reads the saves and the cart an older one left only in the parts
-every version kept. Into an empty cart it puts, without a tap, the oldest
-one that goes back whole (nothing unread, nothing of an open package, no
-package resized, no item or package retired or gone, no refusal); it lists
-the rest for the volunteer to add to the cart or discard, naming an item
+every version kept. Into an empty cart, until it learns of a newer build,
+it puts, without a tap, the oldest one that goes back whole (nothing
+unread, nothing of an open package, no package resized, no item or
+package retired or gone, no refusal); it lists the rest for the volunteer
+to add to the cart or discard, naming an item
 retired since from the catalogue's `retired_items`, and a package retired
 with none left from its item's `retired_packages`, neither ever offered.
-A count of a package no longer offered, a save's of one resized, and
+A count of a package no longer offered, or of one resized since, and
 what was taken from or said of an open package are listed each on its
 own line, saying why it cannot go back, and are left out when put back,
 never kept loose, unseen or as an empty line; the status then repeats
@@ -412,10 +413,11 @@ The cart keeps the size each package was counted at, and sends that size,
 so the server refuses a count of a package resized since (`package_resized`)
 rather than counting it at the new size. Where the page's catalogue shows
 another size, the count is cleared and the line says so until a count of
-that package is typed or scanned again (`frontend/src/cart.ts`,
-`reconcile` and `sized`). Until then Record refuses the cart, as the
-rest without it would record less than was moved (`toBatch`). A count
-kept before the cart kept sizes is taken as counted at the size shown.
+that package is typed or scanned again, even if its size changes back
+(`frontend/src/cart.ts`, `reconcile` and `sized`); a count of none of it
+is left as it is. Until then Record refuses the cart, as the rest without
+it would record less than was moved (`toBatch`). A count kept before the
+cart kept sizes is taken as counted at the size shown.
 
 The page's words never say "save": the inventory records what Record
 sends, and the browser keeps the cart, which every change writes to

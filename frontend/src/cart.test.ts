@@ -1380,12 +1380,36 @@ describe("a package resized while the cart counts it (inventory-tng-0qi)", () =>
       loose: "",
       sizes: { 1000: "4.000" },
     });
-    expect(resized(first(now), box)).toBe(false);
     expect(resized(first(now), { ...box, size: "8.000" })).toBe(true);
+    // Resized back, the count cleared is still to be typed again: blank,
+    // it would record less than was moved.
+    expect(resized(first(now), box)).toBe(true);
+    expect(reconcile(now, CATALOGUE)).toBe(now);
+    expect(shown(toBatch(now, CATALOGUE))).toEqual({
+      problems: [`[${radio.name}]: enter the count`],
+    });
+    expect(resized(first(counted), box)).toBe(false);
     // The same size, written otherwise, is no change.
     expect(reconcile(counted, boxOf("4"))).toBe(counted);
     // Cleared once, it is left as it is.
     expect(reconcile(now, boxOf("8.000"))).toBe(now);
+  });
+
+  test("a count of none of a package resized is neither cleared nor asked for", () => {
+    const none = cart({
+      lines: [
+        {
+          itemId: 100,
+          packages: { 1000: "0" },
+          loose: "1",
+          sizes: { 1000: "4.000" },
+        },
+      ],
+    });
+    expect(reconcile(none, boxOf("8.000"))).toBe(none);
+    expect(toBatch(none, boxOf("8.000"))).toMatchObject({
+      draft: { lines: [{ item_id: 100, quantity: "1" }] },
+    });
   });
 
   test("a count is saved at the size it was counted at", () => {
