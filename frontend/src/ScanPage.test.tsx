@@ -9,7 +9,13 @@ import {
 import { describe, expect, type MockInstance, test, vi } from "vitest";
 import { BUILD, BUILD_KEY, Builds } from "./build";
 import { openCamera } from "./camera";
-import { addOne, STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
+import {
+  addOne,
+  STORAGE_KEY as CART_KEY,
+  CartStore,
+  freshCart,
+  storeCart,
+} from "./cart";
 import { PRINTED_LENGTH } from "./OpenPackageCard";
 import {
   KEY_REUSED,
@@ -107,6 +113,9 @@ const save = () =>
 
 /** The cart as stored. */
 const storedCart = () => JSON.parse(localStorage.getItem(CART_KEY) ?? "");
+
+/** A batch key, as the page makes them. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /** The browser says it is `online`, or not, and tells the page so. */
 function setOnline(onLine: MockInstance<() => boolean>, online: boolean) {
@@ -287,6 +296,27 @@ describe("filling and saving a cart", () => {
     screen.getByText(
       (_, element) => element?.getAttribute("aria-live") === "polite",
     ).textContent;
+
+  test("a cart gets its key with its first line, and Record sends it under that key, then drops it (inventory-tng-e2d)", async () => {
+    const { api, sent } = server();
+    const outbox = open(api);
+    await ready();
+    pick("Your name", "1");
+    expect(storedCart()).not.toHaveProperty("batchKey");
+    fillMove();
+    const key = storedCart().batchKey;
+    expect(key).toMatch(UUID);
+    find("litebeam");
+    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    expect(storedCart().batchKey).toBe(key);
+    save();
+    await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
+    expect(outbox.entries.value[0]?.body.key).toBe(key);
+    // Another tab sending it too would send this key: refused changed,
+    // it was recorded there first.
+    expect(outbox.entries.value[0]?.putBack).toBe(true);
+    expect(storedCart()).not.toHaveProperty("batchKey");
+  });
 
   test("a batch the browser would not keep is not saved, and the cart stays", async () => {
     const outbox = open();
@@ -2454,7 +2484,9 @@ describe("what an older build left", () => {
       within(listing()).getByRole("button", { name: "Add to cart" }),
     );
     expect(boxes()).toBe("2");
-    expect(storedCart()).not.toHaveProperty("batchKey");
+    // Under a key of its own, made as it went in.
+    expect(storedCart().batchKey).toMatch(UUID);
+    expect(storedCart().batchKey).not.toBe(KEY);
   });
 
   test("one an older tab changed meanwhile is not put in the cart, and says so, bold whole, under it as it is now", async () => {
@@ -2977,6 +3009,49 @@ describe("what an older build left", () => {
     save();
     await screen.findByText("Recorded (transaction 2).");
     expect(outbox.entries.value[0]?.body.key).not.toBe(KEY);
+  });
+
+  test("a cart an older build's tab recorded as this tab took it over is recorded once, under the cart's key (inventory-tng-e2d)", async () => {
+    // A cart of one box of radios, filled as this build fills it, then
+    // left under an older key, as a newer build reads it once out.
+    const store = new CartStore(CATALOGUE);
+    store.change({
+      ...freshCart(),
+      volunteerId: 1,
+      fromId: 10,
+      toId: 12,
+      lines: [{ itemId: 100, packages: { 1000: "1" }, loose: "" }],
+    });
+    const left = localStorage.getItem(CART_KEY) ?? "";
+    localStorage.removeItem(CART_KEY);
+    localStorage.setItem("inventory.cart.v1", left);
+    const key = JSON.parse(left).batchKey;
+    // The older build's tab recorded it under its key, its request in
+    // flight as this page loaded and took the cart over.
+    const written = new Map([[key, linesOf({ lines: [radios(1)] })]]);
+    const outbox = open(ledger(written).api);
+    await ready();
+    await screen.findByText(ADDED_BACK);
+    expect(localStorage.getItem("inventory.cart.v1")).toBeNull();
+    save();
+    await screen.findByText("Recorded (transaction 1).");
+    expect(written.size).toBe(1);
+    expect(outbox.entries.value[0]?.body.key).toBe(key);
+  });
+
+  test("a cart an older build left without a key gets one as it goes back, and is recorded under it", async () => {
+    leaveCart();
+    const { api, sent } = server();
+    const outbox = open(api);
+    await ready();
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: "Add to cart" }),
+    );
+    const key = storedCart().batchKey;
+    expect(key).toMatch(UUID);
+    save();
+    await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
+    expect(outbox.entries.value[0]?.body.key).toBe(key);
   });
 
   test("one put back and refused as another tab recorded it first goes in no cart again, only Discard", async () => {

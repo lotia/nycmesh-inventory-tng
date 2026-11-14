@@ -3,10 +3,13 @@
  * or a closed tab loses nothing, and so the next batch starts with the same
  * name, kind and places (this phone's last choices). Tabs share it.
  *
- * A cart has no idempotency key: the outbox gives the batch one when it is
- * queued, before anything is sent, so two tabs never share a key. But a
- * cart filled from a save an older build left keeps that save's key, and
- * is sent under it (batchKey), as that build's tab may still be sending it.
+ * A cart gets its idempotency key with its first line (batchKey), and Record
+ * sends it under that key, so a tab of another build that took the cart
+ * over, or a tab that had not heard it was recorded, sends it under the
+ * same one, and the server takes it once. A cart filled from a save an
+ * older build left keeps that save's key, as that build's tab may still be
+ * sending it. Emptied or discarded, it drops its key: what fills it next
+ * is another batch.
  */
 import { type Signal, signal } from "@preact/signals";
 import { v4 as uuid } from "uuid";
@@ -20,7 +23,9 @@ import { onStoredChange, readStored, writeStored } from "./stored";
 
 /** Versioned as the outbox's is (outbox.ts): each build reads its own.
  * v2's is stamped with the build that wrote it, may keep a batch key
- * (batchKey), and keeps the size each package was counted at (sizes). */
+ * (batchKey: made with its first line since inventory-tng-e2d; a build
+ * before kept one only from a save put back), and keeps the size each
+ * package was counted at (sizes). */
 export const STORAGE_KEY = "inventory.cart.v2";
 /** The server's limits (ledger.py), checked here too, so a batch it would
  * refuse is never queued and the cart is kept to fix it. */
@@ -90,8 +95,9 @@ const CartSchema = v.object({
   /** New with every change to what the cart holds: how a tab tells whether
    * another tab has changed it since (CartStore). */
   revision: v.optional(v.string(), ""),
-  /** The key of the save an older build left that filled it (older.ts),
-   * kept until the cart is emptied. */
+  /** The key it is to be recorded under: made with its first line, or the
+   * key of what an older build left that filled it (older.ts), kept until
+   * the cart is emptied. */
   batchKey: v.exactOptional(BatchKey),
 });
 
@@ -194,11 +200,12 @@ export class CartStore {
    * catalogue shows (sized). False if the browser would not keep it. */
   change(next: Cart, now = Date.now()): boolean {
     const empty = next.lines.length === 0;
-    // Emptied, it is no longer that save: what fills it next is new.
+    // Its key from its first line, so whichever tab records it sends that
+    // key. Emptied, it is no longer that batch: what fills it next is new.
     const { batchKey, ...rest } = sized(this.cart.value, next, this.catalogue);
     return this.write({
       ...rest,
-      ...(empty || batchKey === undefined ? {} : { batchKey }),
+      ...(empty ? {} : { batchKey: batchKey ?? uuid() }),
       revision: uuid(),
       usedAt: now,
       startedAt: empty ? 0 : next.startedAt || now,

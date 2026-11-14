@@ -280,6 +280,57 @@ test("a save an older build's tab saved meanwhile is saved once, under its key; 
   await expect(page.getByText(left)).toHaveCount(0);
 });
 
+test("a cart this build filled, which its tab recorded as a newer build took it over, is recorded once, under the cart's key (inventory-tng-e2d)", async ({
+  page,
+}) => {
+  const cable = await ownCable(page);
+  const itemId = Number(new URL(page.url()).pathname.split("/").at(-1));
+  await page.goto("/scan");
+  const { volunteerId, fromId, toId } = await choices(page);
+  await page.getByLabel("Your name").selectOption(String(volunteerId));
+  await page.getByLabel("From", { exact: true }).selectOption(String(fromId));
+  await page.getByLabel("To", { exact: true }).selectOption(String(toId));
+  await page.getByLabel(/Find an item/).fill(cable);
+  await page.getByRole("button", { name: cable, exact: true }).click();
+  await page.getByLabel(/^Loose/).fill("2");
+  // Left under an older key, as a newer build finds it once out.
+  const key = await page.evaluate(() => {
+    const kept = localStorage.getItem("inventory.cart.v2") ?? "";
+    localStorage.removeItem("inventory.cart.v2");
+    localStorage.setItem("inventory.cart.v1", kept);
+    return JSON.parse(kept).batchKey as string;
+  });
+  expect(key).toEqual(expect.any(String));
+  // Its tab records it, its request in flight as the newer page loads.
+  const first = await page.request.post("/api/transactions", {
+    data: {
+      key,
+      kind: "move",
+      volunteer_id: volunteerId,
+      from_location_id: fromId,
+      to_location_id: toId,
+      lines: [{ item_id: itemId, quantity: "2" }],
+    },
+  });
+  expect(first.status()).toBe(201);
+  const recorded = (await first.json()).transaction_id as number;
+  await page.reload();
+  await expect(page.getByText(PUT_BACK)).toBeVisible();
+  const replayed = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/transactions") &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Record" }).click();
+  const response = await replayed;
+  expect(response.request().postDataJSON().key).toBe(key);
+  expect(response.status()).toBe(200);
+  expect(await response.json()).toEqual({ transaction_id: recorded });
+  await expect(
+    page.getByText(`Recorded (transaction ${recorded}).`),
+  ).toBeVisible();
+});
+
 test("a double tap on a line's Discard discards that line only; one that could not read a line stays, saying so, until its own Discard", async ({
   page,
 }) => {

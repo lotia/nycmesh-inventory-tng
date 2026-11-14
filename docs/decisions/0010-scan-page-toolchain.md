@@ -161,6 +161,15 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   then takes it once, or refuses it changed, which the page says. We
   rejected putting back only saves the server says it does not hold,
   which still leaves the window between asking and saving.
+  A cart gets its batch key when its first line is added, not at Record,
+  and drops it when emptied or discarded (Ali, 2026-11-13,
+  inventory-tng-e2d): a newer build takes a cart over from an older one's
+  storage, and an older tab recording it meanwhile then sends the same
+  key, so the server takes it once. A cart a build from before filled
+  has no key until a tab of this one changes it, or puts it back, and
+  until then the race remains. We rejected keeping keys only for carts
+  filled from a save, which left the race at every change of the cart's
+  storage key.
   Add to cart on one another tab changed since it was listed puts
   nothing in the cart: the page lists it again as it is now and says,
   bold as a whole, "That one was changed in another tab. Check it, then

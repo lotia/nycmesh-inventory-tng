@@ -549,7 +549,7 @@ function CartForm({
       problems.value = batch.problems;
       return;
     }
-    // A save an older build left, put back: sent under its key.
+    // Under the cart's key, which any tab that records this cart sends.
     if (!outbox.queue(batch.draft, batch.what, current.batchKey)) {
       // Nothing was sent, and the cart stays to try again.
       problems.value = [

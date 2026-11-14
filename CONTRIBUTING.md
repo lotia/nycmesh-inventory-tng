@@ -398,11 +398,15 @@ it was listed, does nothing, lists it again as it is now and says so
 (`older.compared`); one going back without a tap is tried again as it is
 now.
 
-A save keeps its batch key while its lines go (`dropPart`). One put back
-keeps it, as does a cart it filled when a newer build reads it, and the
-cart is sent under it until emptied or discarded, as an older tab may be
-sending it still: the server then takes it once, or, changed since,
-refuses it (409 `key_reused`). The page then asks for the catalogue and
+A cart gets its batch key with its first line, and Record sends it under
+that key (`CartStore.change`), so every tab that records it, one of a
+newer build that took it over included, sends the same key. A save keeps
+its batch key while its lines go (`dropPart`). One put back keeps it, as
+does a cart when a newer build reads it, and one without a key, left by a
+build from before, gets one as it goes back. The cart is sent under its
+key until emptied or discarded, as an older tab may be sending it still:
+the server then takes it once, or, changed since, refuses it (409
+`key_reused`). The page then asks for the catalogue and
 stock at once, as its periodic refresh does, whichever tab sent it, and
 the save stays listed with Dismiss, saying "Not recorded: another tab
 recorded this cart before your changes. Scan again only what you
@@ -410,7 +414,10 @@ changed." Such a save never goes in a cart again, here or in the older
 list, which offers only Discard: what it held is recorded, and once more
 would record it twice (reason `recorded_elsewhere`). Any other save refused
 for its key goes back without it, as the server holds that key for
-another batch.
+another batch. A key the outbox already holds, queued again (a cart
+whose emptying the browser did not keep, or one a tab that had not heard
+filled again), is not queued twice; with another batch, it is kept as
+`recorded_elsewhere` without being sent (`Outbox.queue`).
 
 A refused save in the outbox's list lists its lines, in the words of the
 older list, each item numbered as the refusal's "Line n" names it. While

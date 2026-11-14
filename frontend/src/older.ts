@@ -19,8 +19,9 @@
  * packages later.
  * Every cart kept its kind, volunteerId, places, installNumber, usedAt and
  * lines of itemId, packages (counts by package id) and loose; from v2, the
- * key of the save an older build left that filled it (batchKey), and each
- * line's sizes, the size each package was counted at.
+ * key it is to be recorded under (batchKey), of a save an older build left
+ * that filled it, or, since inventory-tng-e2d, made with its first line;
+ * and each line's sizes, the size each package was counted at.
  */
 import { type Signal, signal } from "@preact/signals";
 import * as v from "valibot";
@@ -126,9 +127,11 @@ export type Older = {
   /** A save's batch key, unique among saves; a cart's, null. */
   batch: string | null;
   /** The key to save it under again (cart.ts, batchKey), as a tab of an
-   * older build may be sending it still: a save's own, or a cart's that a
-   * save filled. None for one the inventory refused for its key, which it
-   * then holds for another batch and never takes again. */
+   * older build may be sending it still: a save's own, or a cart's, made
+   * with its first line or a save's that filled it. None for one the
+   * inventory refused for its key, which it then holds for another batch
+   * and never takes again; nor for a cart a build before inventory-tng-e2d
+   * filled itself, which gets one in the cart (CartStore.change). */
   batchKey: string | null;
   kind: (typeof KINDS)[number] | null;
   volunteerId: number | null;

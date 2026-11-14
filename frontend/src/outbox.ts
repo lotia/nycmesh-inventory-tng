@@ -18,9 +18,10 @@
  * batch names the build that queued it, and is sent as that build's: one
  * the server holds back as from a build too old (409 build_too_old) is
  * listed with what older builds left, unless it is this tab's own, or a
- * newer build's, when the tab is too old. A cart filled from a save an
- * older build left is sent under that save's key (cart.ts, batchKey): if
- * that build's tab saved it first, the server takes it once.
+ * newer build's, when the tab is too old. A cart is sent under its own key
+ * (cart.ts, batchKey), made with its first line, or that of a save an older
+ * build left that filled it: if another tab recorded it first, a tab that
+ * took it over or one that had not heard, the server takes it once.
  */
 import { signal } from "@preact/signals";
 import { v4 as uuid } from "uuid";
@@ -43,7 +44,7 @@ import { telemetry } from "./telemetry";
  * of an older build, open during a deploy, would drop what it cannot read
  * from what it writes back. v4's is stamped with the build that wrote it,
  * its entries each with the build that queued them, says which were
- * sent under an older save's key (putBack), and keeps why each was
+ * sent under a cart's key (putBack), and keeps why each was
  * refused or waits as a code (reason), not in words. */
 export const STORAGE_KEY = "inventory.outbox.v4";
 /** How long to wait before trying again after no answer. */
@@ -180,8 +181,8 @@ export const Reason = v.union([
       "must_upgrade",
       // 409 key_reused: the inventory holds its key for another batch.
       "key_reused",
-      // 409 key_reused of a save put back in the cart, then changed,
-      // whose older build's tab recorded it first, as it was.
+      // 409 key_reused of a batch sent under its cart's key, which
+      // another tab recorded first, as it was then.
       "recorded_elsewhere",
     ]),
   }),
@@ -316,8 +317,10 @@ export const Entry = v.object({
   failures: whole,
   /** Saved, and dismissed: off the list, kept until a catalogue shows it. */
   dismissed: v.exactOptional(v.literal(true)),
-  /** Sent under the key of a save an older build left, put back in the
-   * cart (older.ts): that build's tab may have saved it first. */
+  /** Sent under its cart's key (cart.ts, batchKey), which another tab may
+   * have recorded first: a tab of an older build, whose save or cart this
+   * took over (older.ts), or one that had not heard it was recorded. Named
+   * for the save put back, which first had one, as v4 keeps it. */
   putBack: v.exactOptional(v.literal(true)),
 });
 
@@ -422,12 +425,15 @@ export class Outbox {
 
   /** An answer to the batch `key`, applied to it while it still waits, or
    * a save whatever became of it: another tab may have sent it meanwhile,
-   * and one saved is never refused or listed to save again. */
+   * and one saved is never refused or listed to save again. But not to one
+   * recorded elsewhere: another batch under that key, never this one. */
   private settle(key: string, changes: Partial<Entry>): void {
     this.update((entries) => {
       const next = entries.map((entry) =>
         entry.body.key === key &&
-        (entry.state === "waiting" || changes.state === "saved")
+        (entry.state === "waiting" ||
+          (changes.state === "saved" &&
+            entry.reason?.code !== "recorded_elsewhere"))
           ? { ...entry, ...changes }
           : entry,
       );
@@ -482,24 +488,54 @@ export class Outbox {
   }
 
   /**
-   * Give this batch its key, keep it, and start sending it. The key is made
-   * here, before anything is sent, and kept with the batch for every
-   * attempt; or it is `putBack`, the key of a save an older build left
-   * that filled the cart, so the server takes that save once, whichever
-   * tab sends it first. False means the browser would not store it:
-   * nothing was sent, and the caller still holds the batch.
+   * Give this batch its key, keep it, and start sending it. The key is
+   * `key`, its cart's (cart.ts, batchKey), so the server takes the cart
+   * once, whichever tab sends it first; or, for a cart an earlier build
+   * kept without one, made here. Either way it is kept with the batch for
+   * every attempt. False means the browser would not store it: nothing
+   * was sent, and the caller still holds the batch.
+   *
+   * A key already queued here is that cart again, emptied by Record but
+   * not kept so, or filled again by a tab that had not heard: the same
+   * again is not queued twice, and changed it is not recorded, as the
+   * server would refuse it (409 key_reused), and it is never answered as
+   * the batch already under that key.
    */
-  queue(draft: Draft, what: string, putBack?: string): boolean {
+  queue(draft: Draft, what: string, key?: string): boolean {
     const entry = newEntry(
-      { ...draft, key: putBack ?? uuid() },
+      { ...draft, key: key ?? uuid() },
       what,
       this.builds.build,
     );
-    if (putBack !== undefined) {
+    if (key !== undefined) {
       entry.putBack = true;
     }
-    const kept = this.update((entries) => [...entries, entry]);
-    if (kept) {
+    const body = JSON.stringify(v.parse(BatchBody, entry.body));
+    let added = false;
+    const kept = this.update((entries) => {
+      const before = entries.filter((each) => each.body.key === key);
+      if (before.length === 0) {
+        added = true;
+        return [...entries, entry];
+      }
+      if (
+        before.some(
+          (each) =>
+            each.state !== "refused" && JSON.stringify(each.body) === body,
+        )
+      ) {
+        return entries;
+      }
+      return [
+        ...entries,
+        {
+          ...entry,
+          state: "refused",
+          reason: { code: "recorded_elsewhere" },
+        },
+      ];
+    });
+    if (kept && added) {
       void this.send();
     }
     return kept;

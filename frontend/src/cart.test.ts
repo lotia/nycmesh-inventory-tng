@@ -1272,6 +1272,32 @@ describe("the cart store, shared by tabs", () => {
     expect(store.cart.value.startedAt).toBe(0);
   });
 
+  test("a cart gets its batch key with its first line, keeps it while it holds lines, and drops it once empty (inventory-tng-e2d)", () => {
+    const store = new CartStore(CATALOGUE);
+    // Who and where alone are no batch yet.
+    store.change(cart());
+    expect(store.cart.value).not.toHaveProperty("batchKey");
+    store.change(filled());
+    const key = store.cart.value.batchKey;
+    expect(key).toMatch(/^[0-9a-f-]{36}$/);
+    expect(loadCart().batchKey).toBe(key);
+    store.change(addOne(store.cart.value, 101));
+    expect(store.cart.value.batchKey).toBe(key);
+    store.change(freshCart(store.cart.value));
+    expect(store.cart.value).not.toHaveProperty("batchKey");
+    expect(loadCart()).not.toHaveProperty("batchKey");
+    store.change(addOne(store.cart.value, 100));
+    expect(store.cart.value.batchKey).toMatch(/^[0-9a-f-]{36}$/);
+    expect(store.cart.value.batchKey).not.toBe(key);
+  });
+
+  test("a cart filled with a key keeps that key", () => {
+    const key = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
+    const store = new CartStore(CATALOGUE);
+    store.change({ ...filled(), batchKey: key });
+    expect(loadCart().batchKey).toBe(key);
+  });
+
   test("a cart another tab changed is not saved here, and is shown instead", () => {
     const here = new CartStore(CATALOGUE);
     const there = new CartStore(CATALOGUE);

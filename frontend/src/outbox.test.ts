@@ -17,7 +17,7 @@ import {
   wordsOf,
 } from "./outbox";
 import { telemetry } from "./telemetry";
-import { answering, json, saved, TOO_OLD } from "./test-fetch";
+import { answering, deferred, json, saved, TOO_OLD } from "./test-fetch";
 import { refusing } from "./test-storage";
 
 function draft(fields: Partial<Draft> = {}): Draft {
@@ -96,6 +96,41 @@ describe("queueing", () => {
     outbox.queue(draft(), "b");
     const [first, second] = outbox.entries.value.map((e) => e.body.key);
     expect(first).not.toBe(second);
+  });
+
+  test("a cart's key queued again with the same batch is not queued twice (inventory-tng-e2d)", async () => {
+    const { api, sent } = answering(() => saved(41));
+    const outbox = new Outbox(api);
+    const key = uuid();
+    expect(outbox.queue(draft(), "a", key)).toBe(true);
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["saved"]));
+    // The cart, emptied by Record but not kept so, recorded again.
+    expect(outbox.queue(draft(), "a", key)).toBe(true);
+    expect(states(outbox)).toEqual(["saved"]);
+    expect(sent).toHaveLength(1);
+  });
+
+  test("a cart's key queued again with another batch is not recorded, nor ever answered as the first (inventory-tng-e2d)", async () => {
+    const answer = deferred();
+    const { api, sent } = answering(() => answer.promise);
+    const outbox = new Outbox(api);
+    const key = uuid();
+    outbox.queue(draft(), "a", key);
+    // Filled again by a tab that had not heard, and changed there.
+    expect(
+      outbox.queue(draft({ lines: [{ item_id: 6, quantity: "1" }] }), "b", key),
+    ).toBe(true);
+    expect(outbox.entries.value[1]).toMatchObject({
+      what: "b",
+      state: "refused",
+      reason: { code: "recorded_elsewhere" },
+    });
+    answer.resolve(saved(41));
+    await vi.waitFor(() =>
+      expect(states(outbox)).toEqual(["saved", "refused"]),
+    );
+    expect(sent).toHaveLength(1);
+    expect(outbox.entries.value[1]?.transactionId).toBeNull();
   });
 
   test("a browser that will not store it says so, shows and sends nothing", () => {
