@@ -160,20 +160,23 @@ export const KEY_REUSED =
   "Not recorded: its key was already used for a different batch. Please report this.";
 
 /** A save put back in the cart, then changed, whose older build's tab
- * saved it first, as it was (409 key_reused), once the page has been
- * reloaded (Ali, inventory-tng-93z). */
+ * recorded it first, as it was (409 key_reused), as kept (Ali,
+ * inventory-tng-93z and inventory-tng-wyq). */
 export const RECORDED_ELSEWHERE =
   "Not recorded: another tab recorded this first.";
 
-/** The same, as kept: the page offers a reload, so what it shows follows
- * (Ali, inventory-tng-93z, question 4, C). */
-export const SAVED_BEFORE_CHANGES = `${RECORDED_ELSEWHERE} Reload the page to continue.`;
+/** Said after RECORDED_ELSEWHERE until the page is reloaded, beside the
+ * page's Reload, so what it shows follows (Ali, inventory-tng-93z,
+ * question 4, C): words for the page, never kept. */
+export const RELOAD_TO_CONTINUE = "Reload the page to continue.";
 
 /** What every build has said of a batch refused for its key: this one,
  * then those before, whose words an older key may still hold. */
 export const REFUSED_FOR_KEY: ReadonlySet<string> = new Set([
   KEY_REUSED,
-  SAVED_BEFORE_CHANGES,
+  RECORDED_ELSEWHERE,
+  // Kept, with the reload's words, by inventory-tng-93z's build.
+  `${RECORDED_ELSEWHERE} ${RELOAD_TO_CONTINUE}`,
   "Not saved: its key was already used for a different batch. Please report this.",
   "Not saved: another tab saved it first, as it was before your changes. Check what was saved, then save your changes again.",
 ]);
@@ -189,6 +192,13 @@ const REFUSED_LEADS = [NOT_RECORDED, "Not saved."] as const;
  * a name or the server's, shown as they are (Ali, inventory-tng-93z).
  */
 export type Said = readonly (string | { quoted: string })[];
+
+/** `said` as plain text, where nothing is in italic. */
+export function wordsOf(said: Said): string {
+  return said
+    .map((part) => (typeof part === "string" ? part : part.quoted))
+    .join("");
+}
 
 /** A 422's note (problems, below) as its lead, of REFUSED_LEADS, and its
  * problems: where each names its line or report, the page's words; the
@@ -553,7 +563,7 @@ export class Outbox {
         this.settle(key, {
           state: "refused",
           waitingFor: null,
-          note: entry.putBack ? SAVED_BEFORE_CHANGES : KEY_REUSED,
+          note: entry.putBack ? RECORDED_ELSEWHERE : KEY_REUSED,
         });
         return "next";
       case 422:

@@ -179,6 +179,17 @@ export interface components {
        */
       message: string;
     };
+    /**
+     * CartDiscarded
+     * @description A volunteer discarded the scan page's cart, once they confirmed it.
+     */
+    CartDiscarded: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "cart_discarded";
+    };
     /** Catalogue */
     Catalogue: {
       settings: components["schemas"]["Settings"];
@@ -484,6 +495,7 @@ export interface components {
         | components["schemas"]["ScanToSave"]
         | components["schemas"]["OutOfDate"]
         | components["schemas"]["OlderStorage"]
+        | components["schemas"]["CartDiscarded"]
       )[];
     };
     /**

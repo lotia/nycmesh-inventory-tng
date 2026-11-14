@@ -30,7 +30,7 @@ test("a package counted on the scan page is saved sealed", async ({ page }) => {
       response.url().endsWith("/api/transactions") &&
       response.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Record" }).click();
   const response = await saving;
   expect(response.status()).toBe(201);
   expect(response.request().postDataJSON().lines).toEqual([
@@ -61,7 +61,7 @@ test("a package opened on the scan page is saved as an opening", async ({
       response.url().endsWith("/api/transactions") &&
       response.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Record" }).click();
   const response = await saving;
   expect(response.status()).toBe(201);
   const body = response.request().postDataJSON();
@@ -95,7 +95,7 @@ test("a package opened on the scan page is saved as an opening", async ({
       each.url().endsWith("/api/transactions") &&
       each.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Record" }).click();
   const cut = await cutting;
   expect(cut.status()).toBe(201);
   expect(cut.request().postDataJSON().lines).toEqual([
@@ -115,7 +115,7 @@ test("a package opened on the scan page is saved as an opening", async ({
       each.url().endsWith("/api/transactions") &&
       each.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Record" }).click();
   const report = await reporting;
   expect(report.status()).toBe(201);
   expect(report.request().postDataJSON()).toMatchObject({
@@ -144,7 +144,7 @@ test("opening, an item fills its package sealed where it is opened", async ({
       each.url().endsWith("/api/transactions") &&
       each.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Record" }).click();
   expect((await receiving).status()).toBe(201);
   // Loaded again, the page knows it is sealed there, and nowhere else
   // (inventory-tng-f9h).
@@ -186,7 +186,7 @@ test("what is on an open package, said, is set by an administrator", async ({
   await pick(page, cable);
   await page.getByLabel(/^Box of 305 m/).fill("1");
   let saved = saving();
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Record" }).click();
   expect((await saved).status()).toBe(201);
   // Said to show the wrong length (inventory-tng-wy7).
   await page.goto("/scan");
@@ -199,7 +199,7 @@ test("what is on an open package, said, is set by an administrator", async ({
     .getByLabel("What's on the Box of 305 m now (m), if you can tell")
     .fill("250");
   saved = saving();
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Record" }).click();
   const report = await saved;
   expect(report.status()).toBe(201);
   expect(report.request().postDataJSON()).toMatchObject({

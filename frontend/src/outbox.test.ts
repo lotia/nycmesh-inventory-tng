@@ -8,9 +8,9 @@ import {
   Kept,
   newEntry,
   Outbox,
+  RECORDED_ELSEWHERE,
   REPORT_AFTER,
   RETRY_MS,
-  SAVED_BEFORE_CHANGES,
   SAVED_MOST,
   STORAGE_KEY,
 } from "./outbox";
@@ -285,7 +285,7 @@ describe("refusals", () => {
     expect(outbox.entries.value[0]?.note).toBe(KEY_REUSED);
   });
 
-  test("a save put back goes under its key, and refused as reused says it was saved first, before the changes", async () => {
+  test("a save put back goes under its key, and refused as reused keeps that another tab recorded it first, not the page's reload words", async () => {
     const { api, sent } = answering(
       replies(() => json({ reason: "key_reused" }, 409)),
     );
@@ -296,8 +296,11 @@ describe("refusals", () => {
     expect(outbox.entries.value[0]).toMatchObject({
       body: { key },
       putBack: true,
-      note: SAVED_BEFORE_CHANGES,
+      note: RECORDED_ELSEWHERE,
     });
+    expect(RECORDED_ELSEWHERE).toBe(
+      "Not recorded: another tab recorded this first.",
+    );
     expect((await bodies(sent))[0]).toMatchObject({ key });
   });
 

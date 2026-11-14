@@ -53,10 +53,11 @@ import {
   type Outbox,
   RECORDED_ELSEWHERE,
   REFUSED_FOR_KEY,
+  RELOAD_TO_CONTINUE,
   refusalOf,
-  SAVED_BEFORE_CHANGES,
   type Said,
   sharedOutbox,
+  wordsOf,
 } from "./outbox";
 import { decimal, thousandths } from "./quantity";
 import { NOT_REGISTERED } from "./registration";
@@ -107,7 +108,7 @@ const KIND_WORDS: Record<Kind, string> = {
 /** A list whose entries are ruled apart: the cart's lines, the outbox. */
 const RULED_LIST = "list-none p-0 *:border-t *:border-line *:py-3";
 
-/** The volunteer's page: fill a cart, then Save it to the outbox. */
+/** The volunteer's page: fill a cart, then Record it, through the outbox. */
 export function ScanPage({
   api = API,
   outbox = sharedOutbox(),
@@ -376,8 +377,11 @@ function CartForm({
   );
   const cart = store.cart;
   const query = useSignal("");
-  const problems = useSignal<string[]>([]);
+  const problems = useSignal<Said[]>([]);
+  // What was last sent to be recorded, in words.
   const saved = useSignal<string | null>(null);
+  // Whether Discard cart waits to be confirmed.
+  const discarding = useSignal(false);
   // An older save just put back in the cart, and what it left to do again.
   const putBack = useSignal<Gaps | null>(null);
   // After a while unused, the phone may have changed hands: offer to
@@ -420,13 +424,16 @@ function CartForm({
     problems.value = stored
       ? []
       : [
-          "This browser isn't keeping the cart, so a reload will empty it. Free some space or leave private browsing.",
+          [
+            "This browser isn't keeping the cart, so a reload will empty it. Free some space or leave private browsing.",
+          ],
         ];
   }
 
   function change(next: Cart) {
     saved.value = null;
     putBack.value = null;
+    discarding.value = false;
     kept(store.change(next));
   }
 
@@ -504,7 +511,9 @@ function CartForm({
     const current = store.forSaving();
     if (current === null) {
       problems.value = [
-        "The cart was changed in another tab. Check it, then save again.",
+        [
+          "The cart was changed in another tab. Check it, then record it again.",
+        ],
       ];
       return;
     }
@@ -517,7 +526,9 @@ function CartForm({
     if (!outbox.queue(batch.draft, batch.what, current.batchKey)) {
       // Nothing was sent, and the cart stays to try again.
       problems.value = [
-        "This browser wouldn't keep the batch, so it isn't saved. Free some space or leave private browsing, then try again.",
+        [
+          "This browser wouldn't keep the cart, so it wasn't sent. Free some space or leave private browsing, then try again.",
+        ],
       ];
       return;
     }
@@ -531,6 +542,14 @@ function CartForm({
     }
     change(freshCart(current));
     saved.value = batch.what;
+  }
+
+  /** Drop the cart's lines, and with them its batch key, as Record does,
+   * once the volunteer has confirmed it; who and where stay, as after
+   * Record. */
+  function discard() {
+    change(freshCart(cart.value));
+    telemetry.record({ kind: "cart_discarded" });
   }
 
   /** Put an older build's save, or cart, in this cart, which must be
@@ -559,7 +578,7 @@ function CartForm({
       saved.value = null;
     }
     if (!older.remove(each)) {
-      problems.value = [NOT_REMOVED];
+      problems.value = [[NOT_REMOVED]];
     }
     telemetry.record({
       kind: "older_storage",
@@ -586,13 +605,12 @@ function CartForm({
     triedAutomatically.current.add(olderId(next));
     const why = putInCart(next, true);
     if (why !== null && why !== GONE) {
-      problems.value = [why];
+      problems.value = [[why]];
     }
   }, [empty, listed, catalogue]);
 
   const sides = SIDES[cart.value.kind];
   const { items, volunteers } = indexOf(catalogue);
-  const names = useMemo(() => namesWithNumbers(catalogue), [catalogue]);
   const name =
     cart.value.volunteerId === null
       ? undefined
@@ -620,7 +638,7 @@ function CartForm({
               type="button"
               onClick={() => {
                 checkName.value = false;
-                // Only the time changes, so "Saved" stays on show.
+                // Only the time changes, so "Sending" stays on show.
                 kept(store.touch());
               }}
             >
@@ -712,7 +730,7 @@ function CartForm({
       <h2>Cart</h2>
       {putBack.value !== null && (
         <div role="status">
-          <p>Added back to cart. Review before Save.</p>
+          <p>Added back to cart. Review before Record.</p>
           {putBack.value.length > 0 && (
             <ul>
               {putBack.value.map((gap) => (
@@ -786,26 +804,55 @@ function CartForm({
       {problems.value.length > 0 && (
         <ul role="alert" class="list-none p-0">
           {problems.value.map((problem) => (
-            <li key={problem}>
-              <AlertWords words={problem} names={names} />
+            <li key={wordsOf(problem)}>
+              <AlertWords words={problem} />
             </li>
           ))}
         </ul>
       )}
       {saved.value !== null && (
-        <p role="status">Saved: {saved.value}. A new cart is ready.</p>
+        <p role="status">Sending: {saved.value}. A new cart is ready.</p>
       )}
       {name !== undefined && (
         <p>
-          Saving as <strong>{name}</strong>.{" "}
+          Recording as <strong>{name}</strong>.{" "}
           <button type="button" onClick={changeName}>
             Change
           </button>
         </p>
       )}
       <button type="submit" class="primary w-full text-xl">
-        Save
+        Record
       </button>
+      {!empty &&
+        (discarding.value ? (
+          <div class="flex flex-col items-start gap-3">
+            <div role="alert">Confirm discard</div>
+            <div class="actions">
+              <button type="button" class="danger" onClick={discard}>
+                Discard
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  discarding.value = false;
+                }}
+              >
+                Keep it
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            class="self-start"
+            onClick={() => {
+              discarding.value = true;
+            }}
+          >
+            Discard cart
+          </button>
+        ))}
     </form>
   );
 }
@@ -912,7 +959,14 @@ function OlderList({
               {each.refused === null ? (
                 <small>{olderWhen(each)}</small>
               ) : (
-                <NoteSaid note={refusedWords(each.refused)} />
+                <p class="alert">
+                  {each.refused !== "" && (
+                    <>
+                      <AlertWords words={each.refused} />{" "}
+                    </>
+                  )}
+                  <strong>{FIX_THEN_RECORD}</strong>
+                </p>
               )}
               {lost !== null && <NoteSaid note={lost} />}
               {lines.length > 0 && (
@@ -1051,22 +1105,15 @@ function NoteSaid({ note }: { note: string }) {
 
 /**
  * A failure or refusal note's words, in bold, the counts the page wrote
- * in it in bold italic, never a number of `names` (Ali, inventory-tng-93z);
- * of a refusal, the problems after "Not recorded." not in bold, the
- * server's words in them as they are.
+ * in it in bold italic, never a number of a name it quotes (Ali,
+ * inventory-tng-93z); of a refusal, the problems after "Not recorded."
+ * not in bold, the server's words in them as they are.
  */
-function AlertWords({
-  words,
-  names = null,
-}: {
-  words: string;
-  /** Names in it, whose numbers are no counts (namesWithNumbers). */
-  names?: RegExp | null;
-}) {
-  const refusal = refusalOf(words);
+function AlertWords({ words }: { words: string | Said }) {
+  const refusal = typeof words === "string" ? refusalOf(words) : null;
   return refusal === null ? (
     <strong>
-      <Counted said={quoting(words, names)} />
+      <Counted said={typeof words === "string" ? [words] : words} />
     </strong>
   ) : (
     <>
@@ -1096,31 +1143,6 @@ function Counted({ said }: { said: Said }) {
   );
 }
 
-/** `words`, each of `names` in it quoted. */
-function quoting(words: string, names: RegExp | null): Said {
-  return names === null
-    ? [words]
-    : words
-        .split(names)
-        .map((part, at) => (at % 2 === 1 ? { quoted: part } : part));
-}
-
-/** The catalogue's item and package names with a digit, as one pattern
- * capturing any, longest first, so one inside another is quoted whole;
- * null if none has one. */
-function namesWithNumbers(catalogue: Catalogue): RegExp | null {
-  const names = catalogue.items.flatMap((item) => [
-    item.name,
-    ...item.packages.map((pack) => pack.name),
-    ...item.retired_packages.map((pack) => pack.name),
-  ]);
-  const any = [...new Set(names)]
-    .filter((name) => /\d/.test(name))
-    .sort((a, b) => b.length - a.length)
-    .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  return any.length === 0 ? null : new RegExp(`(${any.join("|")})`);
-}
-
 /** A key for each of `says` by what it says, numbered among those saying
  * the same, so that it stays with its words, not its place. */
 function keyedByWords(says: readonly string[]): string[] {
@@ -1133,13 +1155,14 @@ function keyedByWords(says: readonly string[]): string[] {
 }
 
 /** Why one cannot go in the cart: it is not empty (row 17). */
-const CART_NOT_EMPTY = "Save previous cart before adding additional items";
+const CART_NOT_EMPTY =
+  "Record or discard the current cart before adding more items";
 /** The cart one went in was not kept (row 21). */
 const NOT_KEPT =
   "This browser can't keep the cart. Clear local data, reload the page and try again.";
 /** One went in the cart, but stays listed (row 22). */
 const NOT_REMOVED =
-  "This item wasn't automatically removed. Save the cart and try to remove.";
+  "This item wasn't automatically removed. Record the cart and try to remove.";
 /** The browser would not keep a discard. */
 const NOT_DISCARDED = "Unable to discard. Clear your site data to remove.";
 
@@ -1186,13 +1209,10 @@ function olderWhere(each: Older, catalogue: Catalogue): string {
   return who === undefined ? where : `${where}, by ${who}`;
 }
 
-/** Why the inventory refused one, and what to do: all a refusal says, as
- * the rest tells it apart. */
-function refusedWords(refused: string): string {
-  return `${refused} Add it to the cart, fix that, then save.`.trim();
-}
+/** What to do with one the inventory refused, after why (row 11). */
+const FIX_THEN_RECORD = "Add it to the cart, fix that, then record it.";
 
-/** When it was saved, or the cart last changed. */
+/** When it was kept, or the cart last changed. */
 function olderWhen(each: Older): string {
   const at =
     each.at === null
@@ -1201,7 +1221,7 @@ function olderWhen(each: Older): string {
   if (each.batch === null) {
     return at === "" ? "Added but not sent" : `Added on${at} but not sent`;
   }
-  return `Saved on this device${at}, not sent.`;
+  return `Kept on this device${at}, not sent.`;
 }
 
 /** From or To, for a place a label named: the side still empty first. */
@@ -1372,7 +1392,7 @@ function CartLine({
       </Field>
       <div>
         {"problem" in quantity
-          ? quantity.problem
+          ? wordsOf(quantity.problem)
           : `${decimal(quantity.amount)} ${item.unit} in all`}
       </div>
       <button type="button" class="self-start" onClick={onRemove}>
@@ -1493,7 +1513,7 @@ function OutboxList({
   const needsRegistering = entries.some((e) => e.waitingFor === "registration");
   return (
     <section>
-      <h2>Saved on this browser</h2>
+      <h2>Carts from this device</h2>
       {needsRegistering && (
         <p>
           <a href="/register">Register this browser</a> to send what is waiting.
@@ -1510,9 +1530,10 @@ function OutboxList({
             entry.putBack === true &&
             REFUSED_FOR_KEY.has(entry.note ?? "") &&
             !refusedBefore.has(key);
+          // Kept without the reload's words, which only the page says.
           const note =
-            !toReload && entry.note === SAVED_BEFORE_CHANGES
-              ? RECORDED_ELSEWHERE
+            toReload && entry.note === RECORDED_ELSEWHERE
+              ? `${RECORDED_ELSEWHERE} ${RELOAD_TO_CONTINUE}`
               : entry.note;
           const lines =
             refused && catalogue !== null ? linesSaid(entry, catalogue) : [];
@@ -1520,9 +1541,7 @@ function OutboxList({
             <li key={key} class="flex flex-col items-start gap-1">
               <div>{entry.what}</div>
               {entry.state === "saved" ? (
-                <small>
-                  In the inventory (transaction {entry.transactionId}).
-                </small>
+                <small>Recorded (transaction {entry.transactionId}).</small>
               ) : note === null || note === MUST_UPGRADE ? (
                 // Asked for, an upgrade is no failure.
                 <small>{note ?? "Sending…"}</small>

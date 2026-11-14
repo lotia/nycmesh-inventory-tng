@@ -473,6 +473,20 @@
         "title": "BuildTooOldReply",
         "description": "A batch from a build of the scan page older than this server takes:\nnot checked, nor saved."
       },
+      "CartDiscarded": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "cart_discarded",
+            "title": "Kind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind"],
+        "title": "CartDiscarded",
+        "description": "A volunteer discarded the scan page's cart, once they confirmed it."
+      },
       "Catalogue": {
         "properties": {
           "settings": {
@@ -1147,11 +1161,15 @@
                 },
                 {
                   "$ref": "#/components/schemas/OlderStorage"
+                },
+                {
+                  "$ref": "#/components/schemas/CartDiscarded"
                 }
               ],
               "discriminator": {
                 "propertyName": "kind",
                 "mapping": {
+                  "cart_discarded": "#/components/schemas/CartDiscarded",
                   "error": "#/components/schemas/PageError",
                   "older_storage": "#/components/schemas/OlderStorage",
                   "out_of_date": "#/components/schemas/OutOfDate",

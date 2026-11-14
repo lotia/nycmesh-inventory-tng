@@ -21,6 +21,9 @@ test("the QR code's link fills in the phrase, and nothing is sent until asked", 
   render(<RegisterPage api={api} />);
   expect(phrase().value).toBe("retry-ebay-zookeeper-demotion-comprised");
   expect(sent).toEqual([]);
+  // The inventory records; "save" is not the scan page's word (Ali,
+  // inventory-tng-wyq).
+  screen.getByText(/^Registering lets this browser record in the inventory\./);
 });
 
 test("registering says so, links to the scan page and drops the phrase", async () => {

@@ -1,8 +1,9 @@
 /**
  * What the pages tell the backend about themselves (docs/decisions/0006):
  * errors, three Web Vitals, the outbox's retries, how long a batch took
- * from its first line to saving, a tab learning a newer build is out, and
- * what an older build left behind and what volunteers did with it. No
+ * from its first line to saving, a tab learning a newer build is out,
+ * what an older build left behind and what volunteers did with it, and a
+ * cart discarded. No
  * OpenTelemetry here: events go to POST /api/telemetry on this origin,
  * whose schema is the list of what may be sent, and the backend turns them
  * into metrics. Nothing names a volunteer, an item or a place, and an error
@@ -20,7 +21,7 @@ import type { Schemas } from "./api/client";
 
 export const PATH = "/api/telemetry";
 export const FLUSH_AT = 10;
-/** How many of each kind a page sends an hour: 56 in all, under the
+/** How many of each kind a page sends an hour: 60 in all, under the
  * server's limit (page_telemetry.REPORTS). */
 export const PER_HOUR: Record<Event["kind"], number> = {
   web_vital: 10,
@@ -33,6 +34,8 @@ export const PER_HOUR: Record<Event["kind"], number> = {
   // (older.ts): past four, the hour's rest are not counted.
   out_of_date: 2,
   older_storage: 4,
+  // A volunteer starting again; more than four an hour is no new news.
+  cart_discarded: 4,
 };
 export const HOUR_MS = 3_600_000;
 /** The longest scan_to_save the backend takes (page_telemetry.ScanToSave):
