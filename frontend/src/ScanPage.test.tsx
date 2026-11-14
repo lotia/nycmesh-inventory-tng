@@ -6,7 +6,7 @@ import {
   screen,
   within,
 } from "@testing-library/preact";
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, type MockInstance, test, vi } from "vitest";
 import { BUILD, BUILD_KEY, Builds } from "./build";
 import { openCamera } from "./camera";
 import { addOne, STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
@@ -35,6 +35,10 @@ vi.mocked(openCamera).mockImplementation(camera.open);
 /** A put-back save refused as another tab recorded it first, until the
  * page is reloaded: the page adds the reload's words, never kept. */
 const BEFORE_RELOAD = `${RECORDED_ELSEWHERE} ${RELOAD_TO_CONTINUE}`;
+/** What builds before kept of one: inventory-tng-wyq's first, then
+ * inventory-tng-93z's, with the reload's words. */
+const RECORDED_FIRST = "Not recorded: another tab recorded this first.";
+const RECORDED_FIRST_93Z = `${RECORDED_FIRST} Reload the page to continue.`;
 
 /** An API with the test catalogue, saving batches as transaction 77. */
 function server(save: () => Response | Promise<Response> = () => saved()) {
@@ -110,6 +114,17 @@ function fillMove(cable = "Cat6 cable") {
 
 const save = () =>
   fireEvent.click(screen.getByRole("button", { name: "Record" }));
+
+/** The cart as stored. */
+const storedCart = () => JSON.parse(localStorage.getItem(CART_KEY) ?? "");
+
+/** The browser says it is `online`, or not, and tells the page so. */
+function setOnline(onLine: MockInstance<() => boolean>, online: boolean) {
+  onLine.mockReturnValue(online);
+  act(() => {
+    window.dispatchEvent(new Event(online ? "online" : "offline"));
+  });
+}
 
 /** A cart that was last used this long ago, by Ada. */
 const usedAgo = (ms: number) =>
@@ -544,7 +559,7 @@ describe("filling and saving a cart", () => {
     screen.getByText("Nothing in the cart yet.");
     expect(screen.queryByText("Confirm discard")).toBeNull();
     expect(screen.queryByRole("button", { name: "Discard cart" })).toBeNull();
-    expect(JSON.parse(localStorage.getItem(CART_KEY) ?? "").lines).toEqual([]);
+    expect(storedCart().lines).toEqual([]);
     expect(selected("Your name")).toBe("1");
     expect(selected("From")).toBe("10");
     expect(
@@ -586,9 +601,7 @@ describe("filling and saving a cart", () => {
       );
       screen.getByText("4 m in all");
       expect(screen.queryByText("Confirm discard")).toBeNull();
-      expect(JSON.parse(localStorage.getItem(CART_KEY) ?? "").lines).toEqual(
-        theirs.lines,
-      );
+      expect(storedCart().lines).toEqual(theirs.lines);
       expect(
         record.mock.calls.filter(([event]) => event.kind === "cart_discarded"),
       ).toEqual([]);
@@ -899,16 +912,10 @@ describe("filling and saving a cart", () => {
     const note = await screen.findByText(OFFLINE);
     expect(note.tagName).toBe("STRONG");
     expect(screen.queryByText(NO_ANSWER)).toBeNull();
-    onLine.mockReturnValue(true);
-    act(() => {
-      window.dispatchEvent(new Event("online"));
-    });
+    setOnline(onLine, true);
     await screen.findByText(NO_ANSWER);
     expect(screen.queryByText(OFFLINE)).toBeNull();
-    onLine.mockReturnValue(false);
-    act(() => {
-      window.dispatchEvent(new Event("offline"));
-    });
+    setOnline(onLine, false);
     await screen.findByText(OFFLINE);
     onLine.mockRestore();
   });
@@ -2620,11 +2627,15 @@ describe("what an older build left", () => {
   });
 
   test.each([
-    ["as this build keeps it", false],
-    ["as inventory-tng-93z's build kept it, with the reload's words", true],
+    ["as this build keeps it", null],
+    ["as this batch's first build kept it", RECORDED_FIRST],
+    [
+      "as inventory-tng-93z's build kept it, with the reload's words",
+      RECORDED_FIRST_93Z,
+    ],
   ])(
     "one changed after it went back, which an older build's tab saved first, asks for a reload, then, reloaded, lists its lines until dismissed, %s",
-    async (_, withReload) => {
+    async (_, keptAs) => {
       const reload = vi.fn();
       const { api } = await putBackSavedFirst(reload);
       const said = await changedRefused();
@@ -2641,14 +2652,15 @@ describe("what an older build left", () => {
       // Reloaded: still listed, with its lines, now to dismiss, no longer
       // asking for a reload (Ali, inventory-tng-93z).
       cleanup();
-      if (withReload) {
+      if (keptAs !== null) {
         const kept = JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? "");
-        kept.entries[0].note = BEFORE_RELOAD;
+        kept.entries[0].note = keptAs;
         localStorage.setItem(OUTBOX_KEY, JSON.stringify(kept));
       }
       open(api);
       await ready();
       expect(screen.queryByText(BEFORE_RELOAD)).toBeNull();
+      expect(screen.queryByText(RECORDED_FIRST, { exact: false })).toBeNull();
       // What is left to do, as the older list says it (Ali,
       // inventory-tng-wyq, question c).
       const again = (await screen.findByText(SCAN_AGAIN_CHANGED)).closest(
@@ -2693,10 +2705,8 @@ describe("what an older build left", () => {
     );
     expect(within(entry).queryByRole("button")).toBeNull();
     // Offline, it says so (Ali, inventory-tng-wyq, 'Offline').
-    const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
-    act(() => {
-      window.dispatchEvent(new Event("offline"));
-    });
+    const onLine = vi.spyOn(navigator, "onLine", "get");
+    setOnline(onLine, false);
     await within(entry).findByText(
       `${RECORDED_ELSEWHERE} This device is offline. Wait until sending finishes, then reload the page.`,
     );
@@ -2728,12 +2738,10 @@ describe("what an older build left", () => {
 
   test("discarded, a cart that went back drops its key, and what fills it next goes under a new one", async () => {
     const { outbox } = await putBackSavedFirst();
-    expect(JSON.parse(localStorage.getItem(CART_KEY) ?? "").batchKey).toBe(KEY);
+    expect(storedCart().batchKey).toBe(KEY);
     fireEvent.click(screen.getByRole("button", { name: "Discard cart" }));
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
-    expect(JSON.parse(localStorage.getItem(CART_KEY) ?? "")).not.toHaveProperty(
-      "batchKey",
-    );
+    expect(storedCart()).not.toHaveProperty("batchKey");
     fillMove();
     save();
     await screen.findByText("Recorded (transaction 2).");
@@ -2752,7 +2760,8 @@ describe("what an older build left", () => {
 
   test.each([
     RECORDED_ELSEWHERE,
-    BEFORE_RELOAD,
+    RECORDED_FIRST,
+    RECORDED_FIRST_93Z,
     "Not saved: another tab saved it first, as it was before your changes. Check what was saved, then save your changes again.",
   ])(
     "one put back and refused as another tab recorded it first (%s) goes in no cart again, only Discard",

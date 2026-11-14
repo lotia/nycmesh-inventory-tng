@@ -299,7 +299,7 @@ describe("refusals", () => {
       note: RECORDED_ELSEWHERE,
     });
     expect(RECORDED_ELSEWHERE).toBe(
-      "Not recorded: another tab recorded this first.",
+      "Not recorded: another tab recorded this cart before your changes.",
     );
     expect((await bodies(sent))[0]).toMatchObject({ key });
   });
