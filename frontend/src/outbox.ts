@@ -343,6 +343,12 @@ function holdsKey(entry: Entry): boolean {
   );
 }
 
+/** Whether two batches, each as storage reads it (parsed, so its fields
+ * in one order), are the same: one key may name two (Outbox.queue). */
+function sameBatch(a: Entry["body"], b: Entry["body"]): boolean {
+  return a.key === b.key && JSON.stringify(a) === JSON.stringify(b);
+}
+
 /** What STORAGE_KEY holds: the batches, and the build that last wrote them.
  * Each entry is read on its own (parsed). */
 export const Kept = v.object({
@@ -447,10 +453,9 @@ export class Outbox {
    * queue for a cart it had not heard was recorded: that one is sent, and
    * answered, itself. */
   private settle(body: Entry["body"], changes: Partial<Entry>): void {
-    const sent = JSON.stringify(body);
     this.update((entries) => {
       const next = entries.map((entry) =>
-        JSON.stringify(entry.body) === sent &&
+        sameBatch(entry.body, body) &&
         (entry.state === "waiting" || changes.state === "saved")
           ? { ...entry, ...changes }
           : entry,
@@ -533,7 +538,7 @@ export class Outbox {
     if (key !== undefined) {
       entry.putBack = true;
     }
-    const body = JSON.stringify(v.parse(BatchBody, entry.body));
+    const body = v.parse(BatchBody, entry.body);
     let queued = "already" as Queued;
     const kept = this.update((entries) => {
       const before = entries.filter((each) => each.body.key === key);
@@ -541,7 +546,7 @@ export class Outbox {
         before.some(
           (each) =>
             (each.state === "waiting" || each.state === "saved") &&
-            JSON.stringify(each.body) === body,
+            sameBatch(each.body, body),
         )
       ) {
         return entries;
@@ -607,7 +612,7 @@ export class Outbox {
     }
     this.sending = true;
     clearTimeout(this.retry);
-    const tried = new Set<string>();
+    const tried: Entry["body"][] = [];
     try {
       for (;;) {
         const waiting = this.read().filter((each) => each.state === "waiting");
@@ -619,7 +624,7 @@ export class Outbox {
         const entry = waiting.find((each) => {
           const named = keysNamed(each.body);
           const ready =
-            !tried.has(JSON.stringify(each.body)) &&
+            !tried.some((body) => sameBatch(body, each.body)) &&
             !named.some((key) => before.has(key));
           for (const key of [...keysMade(each.body), ...named]) {
             before.add(key);
@@ -629,7 +634,7 @@ export class Outbox {
         if (entry === undefined) {
           return;
         }
-        tried.add(JSON.stringify(entry.body));
+        tried.push(entry.body);
         if ((await this.sendOne(entry)) === "stop") {
           return;
         }
@@ -716,8 +721,8 @@ export class Outbox {
           });
           return "stop";
         }
-        // A save put back: an older build's tab saved it first, as it
-        // was. This, changed since, is not recorded, and says so.
+        // Sent under its cart's key, which another tab recorded first, as
+        // it was then: this, changed since, is not recorded, and says so.
         this.settle(entry.body, {
           state: "refused",
           waitingFor: null,
