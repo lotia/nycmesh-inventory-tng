@@ -369,6 +369,19 @@ describe("refusals", () => {
     );
   });
 
+  test("a 422 naming a report by no whole number is kept all the same", async () => {
+    // Kept with a number that is not whole, the entry would no longer
+    // read as one, and the next write would drop the batch.
+    const detail = [{ type: "not_found", loc: ["body", "used_up", 0.5] }];
+    const outbox = new Outbox(answering(() => json({ detail }, 422)).api);
+    outbox.queue(draft(), "a");
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
+    expect(
+      new Outbox(answering(() => json({}, 500)).api).entries.value,
+    ).toEqual(outbox.entries.value);
+    expect(said(outbox)).toBe("Not recorded. Not accepted");
+  });
+
   test("a batch taking from an opening not yet saved waits for it", async () => {
     const key = "33333333-3333-4333-8333-333333333333";
     const opening = draft({

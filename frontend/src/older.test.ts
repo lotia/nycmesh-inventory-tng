@@ -506,7 +506,7 @@ describe("as a cart", () => {
     // in the page's words, why in the server's.
     expect(
       refusedFor({
-        note: "Not saved. Line 1: no. Open package said used up, 2: gone",
+        note: "Not saved. Line 1: no. Open package said used up, 2: gone What is on an open package, 1: x",
       }),
     ).toEqual({
       code: "refused",
@@ -517,6 +517,8 @@ describe("as a cart", () => {
           { quoted: "no." },
           " Open package said used up, 2: ",
           { quoted: "gone" },
+          " What is on an open package, 1: ",
+          { quoted: "x" },
         ],
       },
     });

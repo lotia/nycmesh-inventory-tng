@@ -348,7 +348,9 @@ function problems(
     if (
       loc[0] === "body" &&
       (loc[1] === "used_up" || loc[1] === "lengths") &&
-      typeof loc[2] === "number"
+      // Whole, as kept (count): one that is not would drop the entry.
+      typeof loc[2] === "number" &&
+      Number.isInteger(loc[2])
     ) {
       return { names: { of: loc[1], n: loc[2] + 1 }, ...said };
     }
