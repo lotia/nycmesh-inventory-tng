@@ -200,9 +200,10 @@ function problems(
         (loc[3] === "package_size" ? SIZE_REFUSED.get(type) : undefined) ??
         (typeof msg === "string" ? msg : "Not accepted");
       // A report's, by its place in the batch's list of them.
-      const report = Object.entries(REPORTS).find(
-        ([field]) => field === loc[1],
-      )?.[1];
+      const report =
+        typeof loc[1] === "string" && Object.hasOwn(REPORTS, loc[1])
+          ? REPORTS[loc[1] as keyof typeof REPORTS]
+          : undefined;
       if (
         loc[0] === "body" &&
         report !== undefined &&

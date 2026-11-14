@@ -14,6 +14,7 @@ import {
   RETIRED as RETIRED_NOTE,
   readOlder,
   removeOlder,
+  said,
   tidyOlder,
   toCart,
   unreadWords,
@@ -57,6 +58,13 @@ function saveOf(fields: Record<string, unknown> = {}, body = {}) {
 
 function keep(key: string, value: unknown) {
   localStorage.setItem(key, JSON.stringify(value));
+}
+
+/** The only save kept, a move of cable but for `body` and `fields`, as
+ * read. */
+function only(body = {}, fields = {}): Older {
+  keep("inventory.outbox.v3", [saveOf(fields, body)]);
+  return readOlder()[0] as Older;
 }
 
 /** An older cart of item 100 holding `packages`, as read. */
@@ -747,10 +755,6 @@ describe("as a cart", () => {
 });
 
 describe("line by line", () => {
-  const only = (body = {}, fields = {}) => {
-    keep("inventory.outbox.v3", [saveOf(fields, body)]);
-    return readOlder()[0] as Older;
-  };
   const stored = (key = "inventory.outbox.v3") =>
     JSON.parse(localStorage.getItem(key) ?? "null");
 
@@ -773,7 +777,7 @@ describe("line by line", () => {
     expect(
       parts.map(({ words, note }) => [
         words,
-        note === null ? null : note.join(""),
+        note === null ? null : said(note),
       ]),
     ).toEqual([
       ["LiteBeam 5AC: 4", RETIRED],
@@ -815,7 +819,12 @@ describe("line by line", () => {
       ],
     });
     const { cart, parts } = toCart(readOlder()[0] as Older, CATALOGUE);
-    expect(parts.map(({ words, note }) => [words, note?.join("")])).toEqual([
+    expect(
+      parts.map(({ words, note }) => [
+        words,
+        note === null ? undefined : said(note),
+      ]),
+    ).toEqual([
       ["LiteBeam 5AC: 1 × Box", undefined],
       ["LiteBeam 5AC: 2 × a removed package or item", RETIRED],
       ["LiteBeam 5AC: Open package said used up", RESCAN],
@@ -853,7 +862,12 @@ describe("line by line", () => {
       ],
     });
     const { cart, parts, gaps } = toCart(save, NAMED);
-    expect(parts.map(({ words, note }) => [words, note?.join("")])).toEqual([
+    expect(
+      parts.map(({ words, note }) => [
+        words,
+        note === null ? undefined : said(note),
+      ]),
+    ).toEqual([
       ["LiteBeam 5AC: 2 × Old box", RETIRED],
       ["LiteBeam 5AC: 3 × Old box", RETIRED],
       ["LiteBeam 5AC: 3", RETIRED],
@@ -1155,11 +1169,6 @@ describe("line by line", () => {
 });
 
 describe("put back without a tap", () => {
-  const only = (body = {}, fields = {}) => {
-    keep("inventory.outbox.v3", [saveOf(fields, body)]);
-    return readOlder()[0] as Older;
-  };
-
   test("one that goes back whole does", () => {
     expect(goesBackWhole(only(), CATALOGUE)).toBe(true);
   });

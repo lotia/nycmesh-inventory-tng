@@ -5,8 +5,8 @@ merged volunteers and revoked labels are left out, but for retired items
 and packages with stock left, which may be taken. The other retired items
 are named apart (retired_items), with their packages, as are the other
 retired packages of an item sent (ItemEntry.retired_packages), only so
-the page can say what a save or cart an older build left held. Registered devices only, since
-it names volunteers, and those names are never logged.
+the page can say what a save or cart an older build left held. Registered
+devices only, since it names volunteers, and those names are never logged.
 """
 
 import math
@@ -189,9 +189,11 @@ def catalogue(session: Session) -> Catalogue:
         select(Location).where(Location.retired_at.is_(None)).order_by(Location.name)
     )
     sealed = ledger.sealed_places(session)
+    gone = list(session.scalars(select(Item).where(~takeable()).order_by(Item.id)))
+    gone_ids = {item.id for item in gone}
     packages: dict[int, list[PackageEntry]] = {}
-    # Every package by its item, to name: an item no longer offered has
-    # them all named; one offered, those it no longer offers.
+    # Packages by their item, to name: an item no longer offered has them
+    # all named; one offered, those it no longer offers.
     named: dict[int, list[RetiredPackage]] = {}
     not_offered: dict[int, list[RetiredPackage]] = {}
     for package, item_tracks, offered in session.execute(
@@ -199,11 +201,12 @@ def catalogue(session: Session) -> Catalogue:
         .join(Item, Item.id == ItemPackage.item_id)
         .order_by(ItemPackage.size)
     ):
-        name = RetiredPackage.model_validate(package)
-        named.setdefault(package.item_id, []).append(name)
-        if not offered:
-            not_offered.setdefault(package.item_id, []).append(name)
-            continue
+        if package.item_id in gone_ids or not offered:
+            name = RetiredPackage.model_validate(package)
+            named.setdefault(package.item_id, []).append(name)
+            if not offered:
+                not_offered.setdefault(package.item_id, []).append(name)
+                continue
         packages.setdefault(package.item_id, []).append(
             PackageEntry(
                 id=package.id,
@@ -253,8 +256,6 @@ def catalogue(session: Session) -> Catalogue:
         {pack.id for entry in entries for pack in entry.packages},
         {place.id for place in places},
     )
-
-    gone = list(session.scalars(select(Item).where(~takeable()).order_by(Item.id)))
 
     return Catalogue(
         settings=Settings.model_validate(session.get_one(ScanSettings, 1)),

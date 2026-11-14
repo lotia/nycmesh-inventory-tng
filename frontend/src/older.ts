@@ -162,6 +162,17 @@ function entriesOf(stored: unknown): unknown[] {
 
 const Entries = v.object({ entries: v.array(v.unknown()) });
 
+/** `stored` holding `entries` in its place, as entriesOf reads them. */
+function withEntries(stored: unknown, entries: unknown[]): unknown {
+  return Array.isArray(stored) ? entries : { ...(stored as object), entries };
+}
+
+/** Whether `entry` is the save of batch key `batch`. */
+function isSave(entry: unknown, batch: string | null): boolean {
+  const read = v.safeParse(OldEntry, entry);
+  return read.success && read.output.body.key === batch;
+}
+
 /** What every build has said of a save refused for its key (409
  * key_reused). */
 const REFUSED_FOR_KEY = new Set([KEY_REUSED, SAVED_BEFORE_CHANGES]);
@@ -325,13 +336,10 @@ export function removeOlder(
     return removeStored(storage, older.key);
   }
   const stored = readStored(storage, older.key);
-  const left = entriesOf(stored).filter((entry) => {
-    const read = v.safeParse(OldEntry, entry);
-    return !read.success || read.output.body.key !== older.batch;
-  });
-  const next = Array.isArray(stored)
-    ? left
-    : { ...(stored as object), entries: left };
+  const next = withEntries(
+    stored,
+    entriesOf(stored).filter((entry) => !isSave(entry, older.batch)),
+  );
   if (older.key !== OUTBOX_KEY && savesIn(older.key, next).length === 0) {
     return removeStored(storage, older.key);
   }
@@ -361,24 +369,22 @@ export function dropPart(
     const cart = stored as { lines: unknown[] };
     next = { ...cart, lines: cut(cart.lines, drop) };
   } else {
+    // A save's reports dropped, by kind, at their places.
+    const dropped = (kind: "used_up" | "lengths") =>
+      new Set(
+        drop.flatMap((each) =>
+          "report" in each && each.report === kind ? [each.at] : [],
+        ),
+      );
     const entries = entriesOf(stored).map((entry) => {
-      const read = v.safeParse(OldEntry, entry);
-      if (!read.success || read.output.body.key !== older.batch) {
+      if (!isSave(entry, older.batch)) {
         return entry;
       }
       const { body } = entry as { body: Record<string, unknown> };
       const cutReports = (kind: "used_up" | "lengths") =>
         Array.isArray(body[kind])
           ? {
-              [kind]: body[kind].filter(
-                (_, at) =>
-                  !drop.some(
-                    (each) =>
-                      "report" in each &&
-                      each.report === kind &&
-                      each.at === at,
-                  ),
-              ),
+              [kind]: body[kind].filter((_, at) => !dropped(kind).has(at)),
             }
           : {};
       return {
@@ -394,7 +400,7 @@ export function dropPart(
         },
       };
     });
-    next = Array.isArray(stored) ? entries : { ...(stored as object), entries };
+    next = withEntries(stored, entries);
   }
   const after = (older.batch === null ? cartIn : savesIn)(older.key, next).find(
     (each) => each.batch === older.batch,
@@ -472,9 +478,8 @@ export function isUnchanged(
   older: Older,
   storage: Storage = localStorage,
 ): boolean {
-  return readOlder(storage).some(
-    (each) => JSON.stringify(each) === JSON.stringify(older),
-  );
+  const was = JSON.stringify(older);
+  return readOlder(storage).some((each) => JSON.stringify(each) === was);
 }
 
 /** Whether `older` is still listed as it was read. */
@@ -614,9 +619,7 @@ export function toCart(
         } else if (holdsSome(n)) {
           // Neither shown nor saved by the cart, so said, not kept: named
           // if the catalogue still names it (Item.retired_packages).
-          const gone = item.retired_packages.find(
-            (pack) => String(pack.id) === packageId,
-          );
+          const gone = retiredPackage(item, packageId);
           leave(`${item.name}: ${n} × ${gone?.name ?? GONE}`, RETIRED, {
             at,
             packages: [packageId],
@@ -670,16 +673,14 @@ export function toCart(
         // No longer offered: loose would not say what was moved, sealed,
         // so it is done again. An item gone is named as it is (withRetired);
         // its package, counted as saved, if the catalogue still names it.
-        const gone = item.retired_packages.find(
-          (each) => each.id === line.package_id,
-        );
+        const gone = retiredPackage(item, String(line.package_id));
         const size =
           gone === undefined
-            ? null
-            : thousandths(String(line.package_size ?? gone.size));
+            ? 0
+            : (thousandths(String(line.package_size ?? gone.size)) ?? 0);
         leave(
           RETIRED,
-          gone !== undefined && size !== null && size > 0 && amount % size === 0
+          gone !== undefined && size > 0 && amount % size === 0
             ? `${amount / size} × ${gone.name}`
             : by,
         );
@@ -732,21 +733,6 @@ export function toCart(
     : unread > 0
       ? unreadWords(unread)
       : null;
-  // In the order they were kept, the reports last.
-  const first = (part: Part) =>
-    part.drop.find((cut) => !("report" in cut))?.at ?? Infinity;
-  left.sort((a, b) => first(a) - first(b));
-  // Each note left behind, as "item: problem" (Ali, inventory-tng-0su);
-  // a report, which names no item, by what it says. Said once each.
-  const gaps: Gaps = [
-    ...new Set([
-      ...(lost === null ? [] : [said(lost)]),
-      ...left.map(
-        ({ itemId, words, note }) =>
-          `${itemId === null ? words : nameOf(named(itemId))}: ${said(note)}`,
-      ),
-    ]),
-  ];
   const kind: Kind =
     older.kind === null || older.kind === "report" ? last.kind : older.kind;
   // Choices the catalogue no longer has are cleared, for the cart to ask.
@@ -776,7 +762,24 @@ export function toCart(
           },
         ];
   });
+  // In the order they were kept, the reports last.
+  const first = (part: Part) =>
+    part.drop.find((cut) => !("report" in cut))?.at ?? Infinity;
   const parts = [...back, ...left].sort((a, b) => first(a) - first(b));
+  // Each note left behind, as "item: problem" (Ali, inventory-tng-0su);
+  // a report, which names no item, by what it says. Said once each.
+  const gaps: Gaps = [
+    ...new Set([
+      ...(lost === null ? [] : [said(lost)]),
+      ...parts.flatMap(({ itemId, words, note }) =>
+        note === null
+          ? []
+          : [
+              `${itemId === null ? words : nameOf(named(itemId))}: ${said(note)}`,
+            ],
+      ),
+    ]),
+  ];
   return { cart, gaps, lost, parts };
 }
 
@@ -785,6 +788,12 @@ export function toCart(
 const GONE = "a removed package or item";
 /** After an amount taken from an open package. */
 const FROM_OPEN = " from an open package";
+
+/** `item`'s package `packageId` no longer offered, if the catalogue still
+ * names it (Item.retired_packages). */
+function retiredPackage(item: Item | undefined, packageId: string) {
+  return item?.retired_packages.find((pack) => String(pack.id) === packageId);
+}
 
 /** What an older cart's line said of an open package, in words. */
 function openWords(item: Item | undefined, said: unknown): string {
@@ -880,8 +889,13 @@ export function olderId(each: Older): string {
 
 /** The catalogue with its retired items no longer offered added, retired,
  * to name them and their packages in what older builds left; never to
- * fill a cart from. */
+ * fill a cart from. Made once per catalogue, so its index (indexOf) is
+ * too. */
 export function withRetired(catalogue: Catalogue): Catalogue {
+  const made = alsoRetired.get(catalogue);
+  if (made !== undefined) {
+    return made;
+  }
   const named: Item[] = catalogue.retired_items.map((item) => ({
     ...item,
     category: "",
@@ -900,8 +914,12 @@ export function withRetired(catalogue: Catalogue): Catalogue {
       sealed: [],
     })),
   }));
-  return { ...catalogue, items: [...catalogue.items, ...named] };
+  const all = { ...catalogue, items: [...catalogue.items, ...named] };
+  alsoRetired.set(catalogue, all);
+  return all;
 }
+
+const alsoRetired = new WeakMap<Catalogue, Catalogue>();
 
 /** Whether a cart's line said anything of an open package: an amount
  * taken, used up, or what is on it. */

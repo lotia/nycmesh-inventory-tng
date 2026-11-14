@@ -39,6 +39,7 @@ import { placeSides, readLabel, type Scanned } from "./labels";
 import { NOTHING_TAKEN, OpenPackageCard } from "./OpenPackageCard";
 import {
   type Gaps,
+  said as inWords,
   type Note,
   nextWhole,
   type Older,
@@ -812,13 +813,14 @@ function OlderList({
   // Each in words once, not on every change to the cart beside it.
   const shown = useMemo(() => {
     const offered = indexOf(catalogue).items;
+    const named = withRetired(catalogue);
     return listed.map((each) => {
-      const { cart, lost, parts } = toCart(each, withRetired(catalogue));
+      const { cart, lost, parts } = toCart(each, named);
       const seen = new Map<string, number>();
       const lines = parts.map((part) => {
         // Keyed by what it says, not by its place, which passes to the
         // next line once it is discarded, and its Discard, focused, with it.
-        const says = `${part.words} ${part.note?.join("") ?? ""}`;
+        const says = `${part.words} ${part.note === null ? "" : inWords(part.note)}`;
         const nth = (seen.get(says) ?? 0) + 1;
         seen.set(says, nth);
         return {
@@ -853,21 +855,24 @@ function OlderList({
   if (shown.length === 0) {
     return null;
   }
-  /** Whether a tap on one of `on`'s buttons is to be ignored: just after a
-   * line of it was discarded, the second tap of a double tap would land
-   * on what moved up in its place (Ali, inventory-tng-0su). */
-  const settling = (on: string) =>
-    performance.now() - (lineGoneAt.current.get(on) ?? -Infinity) < SETTLE_MS;
-  /** Tell the volunteer, under `each`, that it, or a line of it, was not
-   * discarded, unless it changed meanwhile (`still`), which listing it
-   * again shows. */
-  const notDiscarded = (still: boolean, on: string) => {
-    if (still) {
-      said.value = {
-        on,
-        words: "Sorry. Unable to discard. Clear your site data to remove.",
-      };
+  /** A tap on one of `on`'s buttons, ignored just after a line of it was
+   * discarded: the second tap of a double tap would land on what moved up
+   * in its place (Ali, inventory-tng-0su). */
+  const unlessSettling = (on: string, tap: () => void) => () => {
+    if (
+      performance.now() - (lineGoneAt.current.get(on) ?? -Infinity) >=
+      SETTLE_MS
+    ) {
+      tap();
     }
+  };
+  /** Tell the volunteer, under `on`, that it, or a line of it, was not
+   * discarded. */
+  const notDiscarded = (on: string) => {
+    said.value = {
+      on,
+      words: "Sorry. Unable to discard. Clear your site data to remove.",
+    };
   };
   return (
     <section>
@@ -907,10 +912,7 @@ function OlderList({
                           <button
                             type="button"
                             aria-describedby={named}
-                            onClick={() => {
-                              if (settling(on)) {
-                                return;
-                              }
+                            onClick={unlessSettling(on, () => {
                               said.value = null;
                               if (older.dropPart(each, line.drop, catalogue)) {
                                 lineGoneAt.current.set(on, performance.now());
@@ -920,10 +922,12 @@ function OlderList({
                                   held: heldIn(each),
                                   action: "line_discarded",
                                 });
-                              } else {
-                                notDiscarded(older.isUnchanged(each), on);
+                              } else if (older.isUnchanged(each)) {
+                                // Not if it changed meanwhile, which listing
+                                // it again shows.
+                                notDiscarded(on);
                               }
-                            }}
+                            })}
                           >
                             Discard
                           </button>
@@ -942,10 +946,7 @@ function OlderList({
                       type="button"
                       class="danger"
                       aria-describedby={title}
-                      onClick={() => {
-                        if (settling(on)) {
-                          return;
-                        }
+                      onClick={unlessSettling(on, () => {
                         discarding.value = null;
                         if (older.remove(each)) {
                           telemetry.record({
@@ -953,20 +954,18 @@ function OlderList({
                             held: heldIn(each),
                             action: "discarded",
                           });
-                        } else {
-                          notDiscarded(older.isListed(each), on);
+                        } else if (older.isListed(each)) {
+                          notDiscarded(on);
                         }
-                      }}
+                      })}
                     >
                       Discard
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!settling(on)) {
-                          discarding.value = null;
-                        }
-                      }}
+                      onClick={unlessSettling(on, () => {
+                        discarding.value = null;
+                      })}
                     >
                       Keep it
                     </button>
@@ -979,13 +978,10 @@ function OlderList({
                       type="button"
                       aria-describedby={title}
                       disabled={retired}
-                      onClick={() => {
-                        if (settling(on)) {
-                          return;
-                        }
+                      onClick={unlessSettling(on, () => {
                         const why = onPutBack(each);
                         said.value = why === null ? null : { on, words: why };
-                      }}
+                      })}
                     >
                       {retired ? "Cannot Add to Cart" : "Add to cart"}
                     </button>
@@ -993,13 +989,10 @@ function OlderList({
                   <button
                     type="button"
                     aria-describedby={title}
-                    onClick={() => {
-                      if (settling(on)) {
-                        return;
-                      }
+                    onClick={unlessSettling(on, () => {
                       said.value = null;
                       discarding.value = on;
-                    }}
+                    })}
                   >
                     Discard
                   </button>

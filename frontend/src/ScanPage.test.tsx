@@ -1443,6 +1443,11 @@ describe("what an older build left", () => {
     within(entry)
       .getAllByRole("button", { name: "Discard" })
       .at(-1) as HTMLElement;
+  /** The Discard of the listed line that says `words`. */
+  const discardOf = (words: string) =>
+    within(
+      within(listing()).getByText(words).closest("li") as HTMLElement,
+    ).getByRole("button", { name: "Discard" });
 
   test("each is listed in words, and counted once as found", async () => {
     const record = vi.spyOn(telemetry, "record");
@@ -1833,10 +1838,7 @@ describe("what an older build left", () => {
     const { api, sent } = server();
     const outbox = open(api);
     await ready();
-    const taken = within(listing())
-      .getByText("Cat6 cable: 3 m from an open package")
-      .closest("li") as HTMLElement;
-    fireEvent.click(within(taken).getByRole("button", { name: "Discard" }));
+    fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     // What is left goes back whole, so in the empty cart without a tap,
     // with row 16's status and nothing left out to say (Ali,
     // inventory-tng-0su, question 10).
@@ -1871,10 +1873,6 @@ describe("what an older build left", () => {
     });
     open();
     await ready();
-    const discardOf = (words: string) =>
-      within(
-        within(listing()).getByText(words).closest("li") as HTMLElement,
-      ).getByRole("button", { name: "Discard" });
     const first = discardOf("Cat6 cable: 3 m from an open package");
     first.focus();
     fireEvent.click(first);
@@ -1905,10 +1903,6 @@ describe("what an older build left", () => {
     });
     open();
     await ready();
-    const discardOf = (words: string) =>
-      within(
-        within(listing()).getByText(words).closest("li") as HTMLElement,
-      ).getByRole("button", { name: "Discard" });
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     // The second tap of a double tap, on what moved up in its place.
     fireEvent.click(discardOf("Cat6 cable: 5 m from an open package"));
@@ -1974,10 +1968,7 @@ describe("what an older build left", () => {
     expect(
       within(listing()).getByText(unread).querySelector("strong")?.textContent,
     ).toBe("Could not read 1");
-    const taken = within(listing())
-      .getByText("Cat6 cable: 3 m from an open package")
-      .closest("li") as HTMLElement;
-    fireEvent.click(within(taken).getByRole("button", { name: "Discard" }));
+    fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     expect(
       within(listing()).queryByText("Cat6 cable: 3 m from an open package"),
     ).toBeNull();
@@ -2003,10 +1994,7 @@ describe("what an older build left", () => {
     const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
       throw new DOMException("full", "QuotaExceededError");
     });
-    const taken = within(listing())
-      .getByText("Cat6 cable: 3 m from an open package")
-      .closest("li") as HTMLElement;
-    fireEvent.click(within(taken).getByRole("button", { name: "Discard" }));
+    fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     setItem.mockRestore();
     within(listing()).getByText(
       "Sorry. Unable to discard. Clear your site data to remove.",
@@ -2025,10 +2013,7 @@ describe("what an older build left", () => {
       "inventory.outbox.v3",
       JSON.stringify([{ ...first, state: "refused", note: "No." }]),
     );
-    const taken = within(listing())
-      .getByText("Cat6 cable: 3 m from an open package")
-      .closest("li") as HTMLElement;
-    fireEvent.click(within(taken).getByRole("button", { name: "Discard" }));
+    fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     expect(
       within(listing()).queryByText(
         "Sorry. Unable to discard. Clear your site data to remove.",
@@ -2387,10 +2372,7 @@ describe("what an older build left", () => {
     const written = new Map([[KEY, linesOf(first.body)]]);
     open(ledger(written).api);
     await ready();
-    const taken = within(listing())
-      .getByText("Cat6 cable: 3 m from an open package")
-      .closest("li") as HTMLElement;
-    fireEvent.click(within(taken).getByRole("button", { name: "Discard" }));
+    fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     await screen.findByText(ADDED_BACK);
     save();
     await screen.findByText(SAVED_BEFORE_CHANGES);
