@@ -5,7 +5,7 @@
  * add to the cart and save again, on a phone's width. The cable is the
  * test's own (own.ts).
  */
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { ownCable } from "./own";
 
 const HEADING = "Checked out items. Add to cart or discard before sending";
@@ -18,6 +18,14 @@ const listingOf = (page: Page) =>
   });
 
 /** The scan page's ids for a name and two places, by what it offers. */
+/** The Discard of the listed line that says `words`. */
+const lineDiscard = (listing: Locator, words: string) =>
+  listing
+    .getByRole("listitem")
+    .filter({ hasText: words })
+    .last()
+    .getByRole("button", { name: "Discard" });
+
 async function choices(page: Page) {
   const value = async (label: string, option: string) =>
     Number(
@@ -155,12 +163,7 @@ test("saves holding an item retired since, with none left, name it, and go by it
   await expect(page.getByText(PUT_BACK)).toHaveCount(0);
   // The line's own Discard, without asking: the save goes with its only
   // line.
-  await listing
-    .getByRole("listitem")
-    .filter({ hasText: `${cable}: 2 m` })
-    .last()
-    .getByRole("button", { name: "Discard" })
-    .click();
+  await lineDiscard(listing, `${cable}: 2 m`).click();
   await expect(listing.getByText(`${cable}: 2 m`)).toHaveCount(0);
   await expect(listing.getByText(`${cable}: 3 m`)).toBeVisible();
   // The save's own asks first.
@@ -203,12 +206,7 @@ test("a save's package retired since, with none left, is named, never offered, a
     hasText: "Sorry. This item has been retired.",
   });
   await expect(note.locator("strong")).toHaveText("retired");
-  await listing
-    .getByRole("listitem")
-    .filter({ hasText: `${cable}: 2 × ${box}` })
-    .last()
-    .getByRole("button", { name: "Discard" })
-    .click();
+  await lineDiscard(listing, `${cable}: 2 × ${box}`).click();
   // What is left goes back whole, without a tap; the box is not offered.
   await expect(listing).toHaveCount(0);
   await expect(page.getByText(PUT_BACK)).toBeVisible();
@@ -284,13 +282,7 @@ test("a double tap on a line's Discard discards that line only; one that could n
   await page.reload();
 
   const listing = listingOf(page);
-  const lineDiscard = (words: string) =>
-    listing
-      .getByRole("listitem")
-      .filter({ hasText: words })
-      .last()
-      .getByRole("button", { name: "Discard" });
-  await lineDiscard(`${cable}: 3 m from an open package`).dblclick();
+  await lineDiscard(listing, `${cable}: 3 m from an open package`).dblclick();
   await expect(
     listing.getByText(`${cable}: 3 m from an open package`),
   ).toHaveCount(0);
@@ -301,7 +293,7 @@ test("a double tap on a line's Discard discards that line only; one that could n
   await expect(listing.locator("#older-0")).toBeFocused();
   // Once the taps are taken again, its last line goes, and it stays.
   await expect(async () => {
-    await lineDiscard(`${cable}: 5 m from an open package`).click();
+    await lineDiscard(listing, `${cable}: 5 m from an open package`).click();
     await expect(listing.getByText(`${cable}: 5 m`)).toHaveCount(0, {
       timeout: 1000,
     });
