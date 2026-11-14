@@ -58,6 +58,15 @@ function expectBold(
   ).toEqual(numbers);
 }
 
+/** A refusal's note: only its lead in bold, and in italic only the
+ * `numbers` the page wrote after it. */
+function expectRefusal(element: Element, lead: string, numbers: string[]) {
+  expect(element.querySelector("strong")?.textContent).toBe(lead);
+  expect(
+    [...element.querySelectorAll("em")].map((each) => each.textContent),
+  ).toEqual(numbers);
+}
+
 const IDLE = CATALOGUE.settings.name_check_minutes * 60_000;
 
 const pick = (label: string, value: string) =>
@@ -83,21 +92,12 @@ function find(text: string) {
 }
 
 /** A move from the hub to the van, of one cable, by Ada. */
-function fillMove() {
+function fillMove(cable = "Cat6 cable") {
   pick("Your name", "1");
   pick("From", "10");
   pick("To", "12");
   find("cable");
-  fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
-}
-
-/** fillMove, the cable named "Cat 6 cable". */
-function fillMove6() {
-  pick("Your name", "1");
-  pick("From", "10");
-  pick("To", "12");
-  find("cable");
-  fireEvent.click(screen.getByRole("button", { name: "Cat 6 cable" }));
+  fireEvent.click(screen.getByRole("button", { name: cable }));
 }
 
 const save = () =>
@@ -708,10 +708,7 @@ describe("filling and saving a cart", () => {
     // Only "Not recorded." in bold; in what follows, the line's number
     // the page wrote in italic, the server's words as they are (Ali,
     // inventory-tng-93z).
-    expect(note.querySelector("strong")?.textContent).toBe("Not recorded.");
-    expect(
-      [...note.querySelectorAll("em")].map((em) => em.textContent),
-    ).toEqual(["2"]);
+    expectRefusal(note, "Not recorded.", ["2"]);
     const entry = note.closest("li") as HTMLElement;
     // Numbered as the problems name them.
     expect(
@@ -732,7 +729,7 @@ describe("filling and saving a cart", () => {
     );
     open(api);
     await ready();
-    fillMove6();
+    fillMove("Cat 6 cable");
     fireEvent.input(screen.getByLabelText("Loose m"), {
       target: { value: "1.2345" },
     });
@@ -743,6 +740,38 @@ describe("filling and saving a cart", () => {
         "li",
       ),
       "Cat 6 cable: Enter the loose amount in m, up to 3 decimals.",
+      ["3"],
+    );
+  });
+
+  test("a cart's problem puts in italic the counts the page wrote, no name holding a number", async () => {
+    const plain = (named: { name: string }) => ({
+      ...named,
+      name: named.name.replace(/\d/g, ""),
+    });
+    const noNumbers = {
+      ...CATALOGUE,
+      items: CATALOGUE.items.map((item) => ({
+        ...plain(item),
+        packages: item.packages.map(plain),
+        retired_packages: item.retired_packages.map(plain),
+      })),
+    };
+    const { api } = answering((request) =>
+      isCatalogue(request) ? json(noNumbers, 200) : saved(),
+    );
+    open(api);
+    await ready();
+    fillMove("Cat cable");
+    fireEvent.input(screen.getByLabelText("Loose m"), {
+      target: { value: "1.2345" },
+    });
+    save();
+    expectBold(
+      (await screen.findByText(/^Cat cable: Enter the loose amount/)).closest(
+        "li",
+      ),
+      "Cat cable: Enter the loose amount in m, up to 3 decimals.",
       ["3"],
     );
   });
@@ -1853,8 +1882,7 @@ describe("what an older build left", () => {
     const why = within(listing()).getByText(
       noted("Not saved. Line 1: no. Add it to the cart, fix that, then save."),
     );
-    expect(why.querySelector("strong")?.textContent).toBe("Not saved.");
-    expect(why.querySelector("em")?.textContent).toBe("1");
+    expectRefusal(why, "Not saved.", ["1"]);
   });
 
   test("put in the cart, it fills the cart, goes from the list, and saves as any cart", async () => {
@@ -2427,13 +2455,24 @@ describe("what an older build left", () => {
   /** A move of one radio left, put back in the cart without a tap, which
    * the older build's tab, its request in flight as this page loaded,
    * saved first. */
-  async function putBackSavedFirst() {
+  async function putBackSavedFirst(reload = vi.fn()) {
     leaveMoves([KEY, AT, [radios(1)]]);
     const written = new Map([[KEY, linesOf({ lines: [radios(1)] })]]);
-    const outbox = open(ledger(written).api);
+    const { api } = ledger(written);
+    const outbox = open(api, reload);
     await ready();
     await screen.findByText(ADDED_BACK);
-    return { outbox, written };
+    return { api, outbox, written };
+  }
+
+  /** Changed, saved, and refused as the older build's tab saved it first:
+   * the refusal's note. */
+  async function changedRefused() {
+    fireEvent.input(screen.getByLabelText("Box (4 each)"), {
+      target: { value: "2" },
+    });
+    save();
+    return screen.findByText(SAVED_BEFORE_CHANGES);
   }
 
   test("one an older build's tab saved meanwhile is saved once, under its key", async () => {
@@ -2446,11 +2485,7 @@ describe("what an older build left", () => {
 
   test("one changed after it went back, which an older build's tab saved first, is not saved, and says so", async () => {
     const { outbox, written } = await putBackSavedFirst();
-    fireEvent.input(screen.getByLabelText("Box (4 each)"), {
-      target: { value: "2" },
-    });
-    save();
-    await screen.findByText(SAVED_BEFORE_CHANGES);
+    await changedRefused();
     expect(written.size).toBe(1);
     // Listed, to save the changes again.
     expect(outbox.shown()[0]).toMatchObject({
@@ -2460,18 +2495,9 @@ describe("what an older build left", () => {
   });
 
   test("one changed after it went back, which an older build's tab saved first, asks for a reload, then, reloaded, lists its lines until dismissed", async () => {
-    leaveMoves([KEY, AT, [radios(1)]]);
-    const written = new Map([[KEY, linesOf({ lines: [radios(1)] })]]);
-    const { api } = ledger(written);
     const reload = vi.fn();
-    open(api, reload);
-    await ready();
-    await screen.findByText(ADDED_BACK);
-    fireEvent.input(screen.getByLabelText("Box (4 each)"), {
-      target: { value: "2" },
-    });
-    save();
-    const said = await screen.findByText(SAVED_BEFORE_CHANGES);
+    const { api } = await putBackSavedFirst(reload);
+    const said = await changedRefused();
     // In bold, in the alert's style (Ali, inventory-tng-93z, question 4, C).
     expect(said.tagName).toBe("STRONG");
     const entry = said.closest("li") as HTMLElement;
@@ -2496,18 +2522,8 @@ describe("what an older build left", () => {
   });
 
   test("its reload waits, as a newer build's does, while the cart holds lines", async () => {
-    leaveMoves([KEY, AT, [radios(1)]]);
-    const written = new Map([[KEY, linesOf({ lines: [radios(1)] })]]);
-    const outbox = open(ledger(written).api);
-    await ready();
-    await screen.findByText(ADDED_BACK);
-    fireEvent.input(screen.getByLabelText("Box (4 each)"), {
-      target: { value: "2" },
-    });
-    save();
-    const entry = (await screen.findByText(SAVED_BEFORE_CHANGES)).closest(
-      "li",
-    ) as HTMLElement;
+    const { outbox } = await putBackSavedFirst();
+    const entry = (await changedRefused()).closest("li") as HTMLElement;
     fillMove();
     within(entry).getByRole("button", { name: "Reload" });
     outbox.builds.learn("other_tab");

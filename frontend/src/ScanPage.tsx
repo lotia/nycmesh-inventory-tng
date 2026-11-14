@@ -53,8 +53,7 @@ import {
   type Outbox,
   RECORDED_ELSEWHERE,
   REFUSED_FOR_KEY,
-  REFUSED_LEADS,
-  refusalSaid,
+  refusalOf,
   SAVED_BEFORE_CHANGES,
   type Said,
   sharedOutbox,
@@ -303,10 +302,11 @@ function NewerBuild({
   reload: () => void;
 }) {
   const learned = outbox.builds.newer.value;
-  if (learned === null || reloadWaits(outbox, cartEmpty)) {
+  const holds = holding(outbox, cartEmpty);
+  // As reloadWaits says, without reading what it holds twice.
+  if (learned === null || (learned !== "too_old" && holds)) {
     return null;
   }
-  const holds = holding(outbox, cartEmpty);
   return (
     <div
       role="alert"
@@ -844,23 +844,20 @@ function OlderList({
     const named = withRetired(catalogue);
     return listed.map((each) => {
       const { cart, lost, parts } = toCart(each, named);
-      const seen = new Map<string, number>();
-      const lines = parts.map((part) => {
-        // Keyed by what it says, not by its place, which passes to the
-        // next line once it is discarded, and its Discard, focused, with it.
-        const says = `${part.words} ${part.note ?? ""}`;
-        const nth = (seen.get(says) ?? 0) + 1;
-        seen.set(says, nth);
-        return {
-          ...part,
-          key: `${says} ${nth}`,
-          // Goes back, but not as it is named (withRetired).
-          retired:
-            part.note === null &&
-            part.itemId !== null &&
-            !offered.has(part.itemId),
-        };
-      });
+      // Keyed by what it says, not by its place, which passes to the next
+      // line once it is discarded, and its Discard, focused, with it.
+      const keys = keyedByWords(
+        parts.map((part) => `${part.words} ${part.note ?? ""}`),
+      );
+      const lines = parts.map((part, at) => ({
+        ...part,
+        key: keys[at],
+        // Goes back, but not as it is named (withRetired).
+        retired:
+          part.note === null &&
+          part.itemId !== null &&
+          !offered.has(part.itemId),
+      }));
       return {
         each,
         lost,
@@ -1060,21 +1057,21 @@ function NoteSaid({ note }: { note: string }) {
  */
 function AlertWords({
   words,
-  names = [],
+  names = null,
 }: {
   words: string;
   /** Names in it, whose numbers are no counts (namesWithNumbers). */
-  names?: readonly string[];
+  names?: RegExp | null;
 }) {
-  const lead = REFUSED_LEADS.find((each) => words.startsWith(each));
-  return lead === undefined ? (
+  const refusal = refusalOf(words);
+  return refusal === null ? (
     <strong>
       <Counted said={quoting(words, names)} />
     </strong>
   ) : (
     <>
-      <strong>{lead}</strong>
-      <Counted said={refusalSaid(words.slice(lead.length))} />
+      <strong>{refusal.lead}</strong>
+      <Counted said={refusal.problems} />
     </>
   );
 }
@@ -1100,29 +1097,39 @@ function Counted({ said }: { said: Said }) {
 }
 
 /** `words`, each of `names` in it quoted. */
-function quoting(words: string, names: readonly string[]): Said {
-  if (names.length === 0) {
-    return [words];
-  }
-  const any = names
-    .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-    .join("|");
-  return words
-    .split(new RegExp(`(${any})`))
-    .map((part, at) => (at % 2 === 1 ? { quoted: part } : part));
+function quoting(words: string, names: RegExp | null): Said {
+  return names === null
+    ? [words]
+    : words
+        .split(names)
+        .map((part, at) => (at % 2 === 1 ? { quoted: part } : part));
 }
 
-/** The catalogue's item and package names with a digit, longest first, so
- * one inside another is quoted whole. */
-function namesWithNumbers(catalogue: Catalogue): string[] {
+/** The catalogue's item and package names with a digit, as one pattern
+ * capturing any, longest first, so one inside another is quoted whole;
+ * null if none has one. */
+function namesWithNumbers(catalogue: Catalogue): RegExp | null {
   const names = catalogue.items.flatMap((item) => [
     item.name,
     ...item.packages.map((pack) => pack.name),
     ...item.retired_packages.map((pack) => pack.name),
   ]);
-  return [...new Set(names)]
+  const any = [...new Set(names)]
     .filter((name) => /\d/.test(name))
-    .sort((a, b) => b.length - a.length);
+    .sort((a, b) => b.length - a.length)
+    .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return any.length === 0 ? null : new RegExp(`(${any.join("|")})`);
+}
+
+/** A key for each of `says` by what it says, numbered among those saying
+ * the same, so that it stays with its words, not its place. */
+function keyedByWords(says: readonly string[]): string[] {
+  const seen = new Map<string, number>();
+  return says.map((words) => {
+    const nth = (seen.get(words) ?? 0) + 1;
+    seen.set(words, nth);
+    return `${words} ${nth}`;
+  });
 }
 
 /** Why one cannot go in the cart: it is not empty (row 17). */
@@ -1482,6 +1489,7 @@ function OutboxList({
   if (entries.length === 0) {
     return null;
   }
+  const waits = reloadWaits(outbox, cartEmpty);
   const needsRegistering = entries.some((e) => e.waitingFor === "registration");
   return (
     <section>
@@ -1524,19 +1532,14 @@ function OutboxList({
               )}
               {lines.length > 0 && (
                 <ul class="list-none p-0">
-                  {lines.map((words, at) => (
-                    // Two may say the same: numbered among those.
-                    <li
-                      key={`${words} ${lines.slice(0, at).filter((each) => each === words).length}`}
-                    >
-                      {words}
-                    </li>
+                  {keyedByWords(lines).map((key, at) => (
+                    <li key={key}>{lines[at]}</li>
                   ))}
                 </ul>
               )}
               {entry.state !== "waiting" &&
                 (toReload ? (
-                  !reloadWaits(outbox, cartEmpty) && (
+                  !waits && (
                     <button type="button" onClick={reload}>
                       Reload
                     </button>

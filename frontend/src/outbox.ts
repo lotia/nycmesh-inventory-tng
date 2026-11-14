@@ -181,7 +181,7 @@ export const REFUSED_FOR_KEY: ReadonlySet<string> = new Set([
 /** Before a refused batch's problems (422), as this build says it and as
  * builds before did: shown in bold, the problems after it not. */
 const NOT_RECORDED = "Not recorded.";
-export const REFUSED_LEADS = [NOT_RECORDED, "Not saved."] as const;
+const REFUSED_LEADS = [NOT_RECORDED, "Not saved."] as const;
 
 /**
  * Words for an alert: a string is the page's own, its numbers counts it
@@ -190,15 +190,23 @@ export const REFUSED_LEADS = [NOT_RECORDED, "Not saved."] as const;
  */
 export type Said = readonly (string | { quoted: string })[];
 
-/** A 422's problems as said after REFUSED_LEADS (problems, below): where
- * each names its line or report, the page's; the rest, the server's. */
-export function refusalSaid(problems: string): Said {
-  const reports = Object.values(REPORTS).join("|");
-  return problems
-    .split(new RegExp(`((?:^| )(?:Line \\d+|(?:${reports}), \\d+): )`))
+/** A 422's note (problems, below) as its lead, of REFUSED_LEADS, and its
+ * problems: where each names its line or report, the page's words; the
+ * rest, the server's. Null if `note` is no such refusal. */
+export function refusalOf(
+  note: string,
+): { lead: string; problems: Said } | null {
+  const lead = REFUSED_LEADS.find((each) => note.startsWith(each));
+  if (lead === undefined) {
+    return null;
+  }
+  const problems = note
+    .slice(lead.length)
+    .split(MARKERS)
     .flatMap((part, at) =>
       part === "" ? [] : [at % 2 === 1 ? part : { quoted: part }],
     );
+  return { lead, problems };
 }
 
 /** A batch's reports, as a 422 names them. */
@@ -206,6 +214,11 @@ export const REPORTS = {
   used_up: "Open package said used up",
   lengths: "What is on an open package",
 } as const;
+
+/** Where a 422's problem names its line or report (refusalOf). */
+const MARKERS = new RegExp(
+  `((?:^| )(?:Line \\d+|(?:${Object.values(REPORTS).join("|")}), \\d+): )`,
+);
 
 /** A line's package_size refused as a page's bug, as a build from before
  * sizes were sent kept its lines (inventory-tng-1p8), by the server's type:
@@ -221,6 +234,15 @@ const SIZE_REFUSED = new Map([
   ],
 ]);
 
+/** The number of a batch's line naming an item, by the item's first place
+ * among `itemIds`, its lines' (problems' "Line n"; older.linesSaid). */
+export function lineNumbers(
+  itemIds: readonly number[],
+): (itemId: number) => number {
+  const items = [...new Set(itemIds)];
+  return (itemId) => items.indexOf(itemId) + 1;
+}
+
 /** A 422's problems, in words a volunteer can act on. A line of the cart
  * may be sent as several, one for each package and one loose (cart.ts,
  * toBatch), so a line is named as the cart's: by its item's place in it. */
@@ -228,7 +250,7 @@ function problems(
   detail: v.InferOutput<typeof ValidationFailed>["detail"],
   body: Body,
 ) {
-  const items = [...new Set(body.lines.map((line) => line.item_id))];
+  const lineOf = lineNumbers(body.lines.map((line) => line.item_id));
   return detail
     .map(({ loc, msg, type }) => {
       const line = loc[0] === "body" && loc[1] === "lines" ? loc[2] : undefined;
@@ -250,7 +272,7 @@ function problems(
       const sent = typeof line === "number" ? body.lines[line] : undefined;
       return sent === undefined
         ? words
-        : `Line ${items.indexOf(sent.item_id) + 1}: ${words}`;
+        : `Line ${lineOf(sent.item_id)}: ${words}`;
     })
     .join(" ");
 }

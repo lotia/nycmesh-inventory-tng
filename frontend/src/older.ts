@@ -37,6 +37,7 @@ import {
 } from "./cart";
 import {
   BatchKey,
+  lineNumbers,
   STORAGE_KEY as OUTBOX_KEY,
   REFUSED_FOR_KEY,
   REPORTS,
@@ -226,15 +227,13 @@ export function linesSaid(entry: unknown, catalogue: Catalogue): string[] {
     return [];
   }
   const save = saveOf("", read.output);
-  const items = [
-    ...new Set(
-      save.lines.flatMap((line) =>
-        line !== null && "item_id" in line ? [line.item_id] : [],
-      ),
+  const lineOf = lineNumbers(
+    save.lines.flatMap((line) =>
+      line !== null && "item_id" in line ? [line.item_id] : [],
     ),
-  ];
+  );
   return toCart(save, withRetired(catalogue)).parts.map(({ itemId, words }) =>
-    itemId === null ? words : `${items.indexOf(itemId) + 1}. ${words}`,
+    itemId === null ? words : `${lineOf(itemId)}. ${words}`,
   );
 }
 
