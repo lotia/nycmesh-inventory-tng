@@ -12,6 +12,7 @@ import {
   CartStore,
   type Catalogue,
   freshCart,
+  type Item,
   indexOf,
   type Kind,
   keysToAsk,
@@ -64,7 +65,11 @@ import { decimal, thousandths } from "./quantity";
 import { NOT_REGISTERED } from "./registration";
 import { Scanner } from "./Scanner";
 import { onStoredChange } from "./stored";
-import { MOST_SECONDS_TO_SAVE, telemetry } from "./telemetry";
+import {
+  MOST_SECONDS_TO_SAVE,
+  type Event as Reported,
+  telemetry,
+} from "./telemetry";
 
 const API = makeApi();
 /** How often an open page checks whether to ask whose name it is, and
@@ -108,6 +113,10 @@ const KIND_WORDS: Record<Kind, string> = {
 
 /** A list whose entries are ruled apart: the cart's lines, the outbox. */
 const RULED_LIST = "list-none p-0 *:border-t *:border-line *:py-3";
+
+/** A box that asks the volunteer to act: the upgrade, the name check. */
+const CAUTION_BOX =
+  "flex flex-col items-start gap-3 border-2 border-caution p-3";
 
 /** The volunteer's page: fill a cart, then Record it, through the outbox. */
 export function ScanPage({
@@ -233,8 +242,8 @@ export function ScanPage({
   const recordedFirst = entries
     .filter((each) => each.state === "refused" && recordedElsewhere(each.note))
     .map((each) => each.body.key);
-  const refreshedFor = useMemo(() => new Set(recordedFirst), []);
-  const ready = loaded.value.state === "ready";
+  const refreshedFor = useRef(new Set(recordedFirst)).current;
+  const ready = shown !== null;
   useEffect(() => {
     // Not while loading: a refresh would drop that load's answer.
     const fresh = recordedFirst.filter((key) => !refreshedFor.has(key));
@@ -295,10 +304,7 @@ export function ScanPage({
           older={older}
         />
       )}
-      <OutboxList
-        outbox={outbox}
-        catalogue={current.state === "ready" ? current.catalogue : null}
-      />
+      <OutboxList outbox={outbox} catalogue={shown} />
     </main>
   );
 }
@@ -322,34 +328,25 @@ function NewerBuild({
   reload: () => void;
 }) {
   const learned = outbox.builds.newer.value;
-  const holds = holding(outbox, cartEmpty);
-  if (learned === null || (learned !== "too_old" && holds)) {
-    return null;
-  }
-  return (
-    <div
-      role="alert"
-      class="flex flex-col items-start gap-3 border-2 border-caution p-3"
-    >
-      <div>{holds ? MUST_UPGRADE : UPDATED}</div>
-      <button type="button" class="primary" onClick={reload}>
-        {UPGRADE}
-      </button>
-    </div>
-  );
-}
-
-/** Whether this tab holds what a newer build reads not as this build's:
- * a cart, or a batch waiting; too old, a newer build's own not counted. */
-function holding(outbox: Outbox, cartEmpty: boolean): boolean {
-  const learned = outbox.builds.newer.value;
-  return (
+  // Whether this tab holds what a newer build reads not as this build's:
+  // a cart, or a batch waiting; too old, a newer build's own not counted.
+  const holds =
     !cartEmpty ||
     outbox.entries.value.some(
       (entry) =>
         entry.state === "waiting" &&
         (learned !== "too_old" || !outbox.builds.isNewer(entry.build)),
-    )
+    );
+  if (learned === null || (learned !== "too_old" && holds)) {
+    return null;
+  }
+  return (
+    <div role="alert" class={CAUTION_BOX}>
+      <div>{holds ? MUST_UPGRADE : UPDATED}</div>
+      <button type="button" class="primary" onClick={reload}>
+        {UPGRADE}
+      </button>
+    </div>
   );
 }
 
@@ -624,11 +621,10 @@ function CartForm({
     if (!older.remove(each)) {
       problems.value = [[NOT_REMOVED]];
     }
-    telemetry.record({
-      kind: "older_storage",
-      held: heldIn(each),
-      action: automatically ? "put_in_cart_automatically" : "put_in_cart",
-    });
+    recordOlder(
+      each,
+      automatically ? "put_in_cart_automatically" : "put_in_cart",
+    );
     putBack.value = gaps;
     return null;
   }
@@ -678,10 +674,7 @@ function CartForm({
     <form onSubmit={save}>
       <OlderList older={older} catalogue={catalogue} onPutBack={putInCart} />
       {checkName.value && name !== undefined && (
-        <div
-          role="alert"
-          class="flex flex-col items-start gap-3 border-2 border-caution p-3"
-        >
+        <div role="alert" class={CAUTION_BOX}>
           <div>
             Are you <strong>{name}</strong>? This phone hasn't been used for a
             while.
@@ -1036,11 +1029,7 @@ function OlderList({
                               if (older.dropPart(each, line.drop, catalogue)) {
                                 lineGoneAt.current.set(on, performance.now());
                                 refocus.current = on;
-                                telemetry.record({
-                                  kind: "older_storage",
-                                  held: heldIn(each),
-                                  action: "line_discarded",
-                                });
+                                recordOlder(each, "line_discarded");
                               } else if (older.isUnchanged(each)) {
                                 // Not if it changed meanwhile, which listing
                                 // it again shows.
@@ -1067,11 +1056,7 @@ function OlderList({
                   onDiscard={unlessSettling(on, () => {
                     discarding.value = null;
                     if (older.remove(each)) {
-                      telemetry.record({
-                        kind: "older_storage",
-                        held: heldIn(each),
-                        action: "discarded",
-                      });
+                      recordOlder(each, "discarded");
                     } else if (older.isListed(each)) {
                       notDiscarded(on);
                     }
@@ -1242,6 +1227,14 @@ function heldIn(each: Older): "saves" | "cart" {
   return each.batch === null ? "cart" : "saves";
 }
 
+/** Tells telemetry what the volunteer did with `each`. */
+function recordOlder(
+  each: Older,
+  action: Extract<Reported, { kind: "older_storage" }>["action"],
+) {
+  telemetry.record({ kind: "older_storage", held: heldIn(each), action });
+}
+
 /** What it was for, in the words the page asks it in. */
 function olderKind(each: Older): string {
   if (each.kind === "report") {
@@ -1359,7 +1352,7 @@ function CartLine({
   onRemove,
 }: {
   line: Line;
-  item: Catalogue["items"][number] | undefined;
+  item: Item | undefined;
   /** Its open packages where it comes from, to take from. */
   opens: Offered[];
   /** Whether an open package can move whole. */
@@ -1554,6 +1547,20 @@ function OutboxList({
   catalogue: Catalogue | null;
 }) {
   const online = useOnline();
+  const stored = outbox.entries.value;
+  // Of each refused, its lines, read again only as the outbox or
+  // catalogue changes.
+  const linesOf = useMemo(
+    () =>
+      new Map(
+        catalogue === null
+          ? []
+          : stored
+              .filter((entry) => entry.state === "refused")
+              .map((entry) => [entry.body.key, linesSaid(entry, catalogue)]),
+      ),
+    [stored, catalogue],
+  );
   const entries = outbox.shown().reverse();
   if (entries.length === 0) {
     return null;
@@ -1570,16 +1577,13 @@ function OutboxList({
       <ul class={RULED_LIST}>
         {entries.map((entry) => {
           const key = entry.body.key;
-          const refused = entry.state === "refused";
-          // As any build kept it, what is left to do, as the older list
-          // says it.
+          // What is left to do, as the older list says it.
           const note = recordedElsewhere(entry.note)
             ? SCAN_AGAIN_CHANGED
             : entry.note === NO_ANSWER && !online
               ? OFFLINE
               : entry.note;
-          const lines =
-            refused && catalogue !== null ? linesSaid(entry, catalogue) : [];
+          const lines = linesOf.get(key) ?? [];
           return (
             <li key={key} class="flex flex-col items-start gap-1">
               <div>{entry.what}</div>

@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import labels, ledger
 from inventory_tng.db import SnapshotSession
 from inventory_tng.devices import DeviceRefusedReply, RegisteredDevice
-from inventory_tng.ledger import takeable, takeable_package
+from inventory_tng.ledger import takeable
 from inventory_tng.models import (
     Category,
     Item,
@@ -189,24 +189,38 @@ def catalogue(session: Session) -> Catalogue:
         select(Location).where(Location.retired_at.is_(None)).order_by(Location.name)
     )
     sealed = ledger.sealed_places(session)
-    gone = list(session.scalars(select(Item).where(~takeable()).order_by(Item.id)))
+    # A retired item stays while it has stock, so what is left can be taken;
+    # the rest are gone, named only.
+    items: list[tuple[Item, str]] = []
+    gone: list[Item] = []
+    for item, category, offered in session.execute(
+        select(Item, Category.name, takeable())
+        .join(Category, Category.id == Item.category_id)
+        .order_by(Item.name, Item.id)
+    ):
+        if offered:
+            items.append((item, category))
+        else:
+            gone.append(item)
+    gone.sort(key=lambda item: item.id)
     gone_ids = {item.id for item in gone}
     packages: dict[int, list[PackageEntry]] = {}
     # Packages by their item, to name: an item no longer offered has them
     # all named; one offered, those it no longer offers.
     named: dict[int, list[RetiredPackage]] = {}
-    not_offered: dict[int, list[RetiredPackage]] = {}
-    for package, item_tracks, offered in session.execute(
-        select(ItemPackage, Item.track_opened, takeable_package())
+    for package, item_tracks in session.execute(
+        select(ItemPackage, Item.track_opened)
         .join(Item, Item.id == ItemPackage.item_id)
         .order_by(ItemPackage.size)
     ):
+        # Retired, one with some sealed left may still be taken
+        # (takeable_package).
+        offered = package.retired_at is None or package.id in sealed
         if package.item_id in gone_ids or not offered:
-            name = RetiredPackage.model_validate(package)
-            named.setdefault(package.item_id, []).append(name)
-            if not offered:
-                not_offered.setdefault(package.item_id, []).append(name)
-                continue
+            named.setdefault(package.item_id, []).append(
+                RetiredPackage.model_validate(package)
+            )
+            continue
         packages.setdefault(package.item_id, []).append(
             PackageEntry(
                 id=package.id,
@@ -224,13 +238,6 @@ def catalogue(session: Session) -> Catalogue:
                 ],
             )
         )
-    # A retired item stays while it has stock, so what is left can be taken.
-    items = session.execute(
-        select(Item, Category.name)
-        .join(Category, Category.id == Item.category_id)
-        .where(takeable())
-        .order_by(Item.name)
-    )
     found = session.scalars(select(Label).where(Label.revoked_at.is_(None)))
     places = [LocationEntry.model_validate(x) for x in locations]
     entries = [
@@ -245,7 +252,7 @@ def catalogue(session: Session) -> Catalogue:
             search_text=f"{item.search_text} {fold(category)}",
             packages=packages.get(item.id, []),
             retired=item.retired_at is not None,
-            retired_packages=not_offered.get(item.id, []),
+            retired_packages=named.get(item.id, []),
         )
         for item, category in items
     ]

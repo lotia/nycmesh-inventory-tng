@@ -13,7 +13,7 @@ import {
   olderId,
   RESCAN as RESCAN_NOTE,
   RESIZED as RESIZED_NOTE,
-  RETIRED as RETIRED_NOTE,
+  ITEM_RETIRED as RETIRED_NOTE,
   readOlder,
   removeOlder,
   tidyOlder,
@@ -26,7 +26,7 @@ import { CATALOGUE } from "./test-catalogue";
 import { refusing } from "./test-storage";
 
 /** In Ali's words (inventory-tng-0su), without "Sorry." (inventory-tng-93z). */
-const RETIRED = "This item has been retired.";
+const ITEM_RETIRED = "This item has been retired.";
 const RESCAN = "Can't add these items. Please rescan.";
 const RESIZED =
   "The package size has changed since this item was added. Discard and re-add the new package size.";
@@ -548,7 +548,7 @@ describe("as a cart", () => {
     ]);
     // In the order kept, each said once for its item.
     expect(gaps).toEqual([
-      `LiteBeam 5AC: ${RETIRED}`,
+      `LiteBeam 5AC: ${ITEM_RETIRED}`,
       `LiteBeam 5AC: ${RESIZED}`,
     ]);
   });
@@ -571,14 +571,14 @@ describe("as a cart", () => {
       { itemId: 100, packages: { 1000: "1" }, loose: "1", typed: true },
       { itemId: 999, packages: { 9999: "1" }, loose: "", typed: true },
     ]);
-    expect(gaps).toEqual([`LiteBeam 5AC: ${RETIRED}`]);
+    expect(gaps).toEqual([`LiteBeam 5AC: ${ITEM_RETIRED}`]);
     // None of one held, nothing is told; one unreadable is, as the cart
     // reads it as some.
     const told = (packages: Record<string, string>) =>
       toCart(cartHolding(packages), CATALOGUE).gaps;
     expect(told({ 1000: "1", 1004: "" })).toEqual([]);
     expect(told({ 1000: "1", 1004: "lots" })).toEqual([
-      `LiteBeam 5AC: ${RETIRED}`,
+      `LiteBeam 5AC: ${ITEM_RETIRED}`,
     ]);
   });
 
@@ -822,7 +822,7 @@ describe("line by line", () => {
     const { parts, lost } = toCart(mixed(), CATALOGUE);
     expect(lost).toBeNull();
     expect(parts.map(({ words, note }) => [words, note])).toEqual([
-      ["LiteBeam 5AC: 4", RETIRED],
+      ["LiteBeam 5AC: 4", ITEM_RETIRED],
       ["Cat6 cable: 12 m from an open package", RESCAN],
       ["LiteBeam 5AC: 4", RESIZED],
       ["LiteBeam 5AC: 2 × Box", null],
@@ -897,7 +897,7 @@ describe("line by line", () => {
     const { cart, parts } = toCart(readOlder()[0] as Older, CATALOGUE);
     expect(parts.map(({ words, note }) => [words, note ?? undefined])).toEqual([
       ["LiteBeam 5AC: 1 × Box", undefined],
-      ["LiteBeam 5AC: 2 × a removed package or item", RETIRED],
+      ["LiteBeam 5AC: 2 × a removed package or item", ITEM_RETIRED],
       ["LiteBeam 5AC: Open package said used up", RESCAN],
       ["Cat6 cable: 3 m from an open package", RESCAN],
       ["Cat6 cable: What is on an open package", RESCAN],
@@ -934,13 +934,13 @@ describe("line by line", () => {
     });
     const { cart, parts, gaps } = toCart(save, NAMED);
     expect(parts.map(({ words, note }) => [words, note ?? undefined])).toEqual([
-      ["LiteBeam 5AC: 2 × Old box", RETIRED],
-      ["LiteBeam 5AC: 3 × Old box", RETIRED],
-      ["LiteBeam 5AC: 3", RETIRED],
-      ["LiteBeam 5AC: 4", RETIRED],
+      ["LiteBeam 5AC: 2 × Old box", ITEM_RETIRED],
+      ["LiteBeam 5AC: 3 × Old box", ITEM_RETIRED],
+      ["LiteBeam 5AC: 3", ITEM_RETIRED],
+      ["LiteBeam 5AC: 4", ITEM_RETIRED],
       ["LiteBeam 5AC: 2 × Box", undefined],
     ]);
-    expect(gaps).toEqual([`LiteBeam 5AC: ${RETIRED}`]);
+    expect(gaps).toEqual([`LiteBeam 5AC: ${ITEM_RETIRED}`]);
     // Named only: never in the cart, nor offered.
     expect(cart.lines).toEqual([
       { itemId: 100, packages: { 1000: "2" }, loose: "", typed: true },
@@ -985,7 +985,7 @@ describe("line by line", () => {
       unreadWords(1),
       unreadWords(2),
     ]).toEqual([
-      RETIRED,
+      ITEM_RETIRED,
       RESCAN,
       RESIZED,
       "Could not read previously added items, scan them again.",
@@ -1108,7 +1108,7 @@ describe("line by line", () => {
     keep("inventory.cart.v1", { ...freshCart(), lines: [line] });
     const listedCart = readOlder()[0] as Older;
     const [back, gone] = toCart(listedCart, CATALOGUE).parts;
-    expect(gone?.note).toBe(RETIRED);
+    expect(gone?.note).toBe(ITEM_RETIRED);
     expect(dropPart(listedCart, gone?.drop ?? [], CATALOGUE)).toBe(true);
     // No field added that it never had: an older build still reads it.
     expect(stored("inventory.cart.v1").lines).toEqual([

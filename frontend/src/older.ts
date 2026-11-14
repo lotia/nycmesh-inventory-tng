@@ -393,12 +393,16 @@ export function dropPart(
     next = { ...cart, lines: cut(cart.lines, drop) };
   } else {
     // A save's reports dropped, by kind, at their places.
-    const dropped = (kind: "used_up" | "lengths") =>
+    const droppedOf = (kind: "used_up" | "lengths") =>
       new Set(
         drop.flatMap((each) =>
           "report" in each && each.report === kind ? [each.at] : [],
         ),
       );
+    const dropped = {
+      used_up: droppedOf("used_up"),
+      lengths: droppedOf("lengths"),
+    };
     const entries = entriesOf(stored).map((entry) => {
       if (!isSave(entry, older.batch)) {
         return entry;
@@ -407,7 +411,7 @@ export function dropPart(
       const cutReports = (kind: "used_up" | "lengths") =>
         Array.isArray(body[kind])
           ? {
-              [kind]: body[kind].filter((_, at) => !dropped(kind).has(at)),
+              [kind]: body[kind].filter((_, at) => !dropped[kind].has(at)),
             }
           : {};
       return {
@@ -533,7 +537,7 @@ export const RESIZED =
   "The package size has changed since this item was added. Discard and re-add the new package size.";
 /** Under a sealed count of a package no longer offered: retired, with none
  * sealed left. */
-export const RETIRED = "This item has been retired.";
+export const ITEM_RETIRED = "This item has been retired.";
 /** Under what was taken from, or said of, an open package. */
 export const RESCAN = "Can't add these items. Please rescan.";
 
@@ -553,7 +557,7 @@ export type Cut =
 
 /** One line of what an older build left, as listed: an item's lines that
  * go back, or one that cannot, with why. */
-export type Part = {
+type Part = {
   /** Its item; null for a report, which names none. */
   itemId: number | null;
   words: string;
@@ -585,10 +589,11 @@ export function toCart(
   last: Cart = freshCart(),
 ): { cart: Cart; gaps: Gaps; lost: string | null; parts: Part[] } {
   const { items } = indexOf(catalogue);
+  const retired = new Map(
+    catalogue.retired_items.map((each) => [each.id, each]),
+  );
   // An item by its id, offered or named only (retired_items).
-  const named = (itemId: number) =>
-    items.get(itemId) ??
-    catalogue.retired_items.find((each) => each.id === itemId);
+  const named = (itemId: number) => items.get(itemId) ?? retired.get(itemId);
   const lines = new Map<number, Line>();
   // What each item's line goes back from, to discard it.
   const from = new Map<number, Cut[]>();
@@ -645,7 +650,7 @@ export function toCart(
           // Neither shown nor saved by the cart, so said, not kept: named
           // if the catalogue still names it (Item.retired_packages).
           const gone = retiredPackage(item, packageId);
-          leave(`${item.name}: ${n} × ${gone?.name ?? GONE}`, RETIRED, {
+          leave(`${item.name}: ${n} × ${gone?.name ?? GONE}`, ITEM_RETIRED, {
             at,
             packages: [packageId],
           });
@@ -704,7 +709,7 @@ export function toCart(
             ? 0
             : (thousandths(String(line.package_size ?? gone.size)) ?? 0);
         leave(
-          RETIRED,
+          ITEM_RETIRED,
           gone !== undefined && size > 0 && amount % size === 0
             ? `${amount / size} × ${gone.name}`
             : by,
@@ -900,11 +905,10 @@ export function nextWhole(
   catalogue: Catalogue,
   skip: ReadonlySet<string> = new Set(),
 ): Older | undefined {
-  return listed
-    .filter(
-      (each) => !skip.has(olderId(each)) && goesBackWhole(each, catalogue),
-    )
-    .sort((a, b) => timeOf(a) - timeOf(b))[0];
+  // Sorted first, so only those before the first that goes are read.
+  return [...listed]
+    .sort((a, b) => timeOf(a) - timeOf(b))
+    .find((each) => !skip.has(olderId(each)) && goesBackWhole(each, catalogue));
 }
 
 /** When it was saved, or a cart last changed; one of no known time, last. */
@@ -962,12 +966,12 @@ function saidOfOpen(said: unknown): boolean {
 }
 
 /** An item's name, or words for one gone from the catalogue. */
-export function nameOf(item: { name: string } | undefined): string {
+function nameOf(item: { name: string } | undefined): string {
   return item?.name ?? "An item no longer in the catalogue";
 }
 
 /** An item's unit after an amount: none for things counted. */
-export function unitOf(item: Catalogue["items"][number] | undefined): string {
+function unitOf(item: Item | undefined): string {
   return item === undefined || item.unit === "each" ? "" : ` ${item.unit}`;
 }
 
