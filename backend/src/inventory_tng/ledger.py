@@ -268,12 +268,22 @@ def countable() -> ColumnElement[bool]:
     return or_(Location.retired_at.is_(None), Location.id.in_(retired_holding_stock()))
 
 
+class NotCountable(RuleBroken):
+    """location_countable, with the place that refused it, so a page names
+    that one, not one it reads again after the place may have changed."""
+
+    def __init__(self, location_id: int) -> None:
+        super().__init__("location_countable")
+        self.location_id = location_id
+
+
 def _require_countable(session: Session, location_id: int) -> None:
-    """RuleBroken unless the place may be counted or adjusted, read with
+    """NotCountable unless the place may be counted or adjusted, read with
     it locked (lock_place): a retire waits for that lock, and it for a
     retire, so a place retired since the page checked is refused."""
-    allowed = exists_where(session, Location.id == location_id, countable())
-    enforce("location_countable", when=not allowed)
+    if not exists_where(session, Location.id == location_id, countable()):
+        log.debug("rule broken", rule="location_countable", location_id=location_id)
+        raise NotCountable(location_id)
 
 
 def holds_stock(session: Session, location_id: int) -> bool:
@@ -1807,7 +1817,7 @@ def record_count(
     form: sealed packages of each, each open package, loose; and withheld,
     as moved, if anything of them moved there, an opening too.
 
-    RuleBroken (location_countable) at a place that may not be counted,
+    NotCountable (location_countable) at a place that may not be counted,
     unless the form was sent there before, so it gets its first answer;
     RuleBroken (movement_item_once) for an item counted on two lines, or
     both by total and by form."""
@@ -1917,7 +1927,7 @@ def record_adjustment(
 ) -> list[Written]:
     """Stock found at a place, or written off from it, for a reason, in
     `form` there (docs/decisions/0020). What it wrote: nothing if its key
-    was written already. RuleBroken (location_countable), as record_count."""
+    was written already. NotCountable (location_countable), as record_count."""
     lock_place(session, location_id)
     if _first_sent(session, location_id, key) is not None:
         return []

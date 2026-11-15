@@ -4,6 +4,7 @@ a line already recorded waits for an administrator to correct it, or mark
 it checked, under "Needs your action"."""
 
 import uuid
+from collections.abc import Callable
 from decimal import Decimal
 from typing import Any
 
@@ -15,6 +16,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import adjustment_reasons, ledger, locations, over_recorded
+from inventory_tng.admin import over_recorded as over_recorded_page
 from inventory_tng.admin.common import RULES
 from inventory_tng.db import RuleBroken
 from inventory_tng.ledger import Entry, Form, _more_written
@@ -861,6 +863,61 @@ def test_a_count_refused_where_it_arrived_names_that_place(
     # Mark checked is offered there too, and what was typed is kept.
     assert f'action="{PAGE}/{check.id}/checked"' in response.text
     assert 'value="180"' in response.text
+
+
+def refused_then(
+    monkeypatch: pytest.MonkeyPatch, meanwhile: Callable[[], None]
+) -> None:
+    """`meanwhile` done by another administrator once a correction or count
+    is refused, before the page says why (inventory-tng-k4l)."""
+    attempt = over_recorded_page.attempt
+
+    def then[T](at: Session, change: Callable[[], T]) -> tuple[T | None, str | None]:
+        done = attempt(at, change)
+        meanwhile()
+        return done
+
+    monkeypatch.setattr(over_recorded_page, "attempt", then)
+
+
+def test_refused_at_a_place_brought_back_meanwhile_it_names_that_place(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The place as it refused, not as it is when the page is drawn."""
+    place = from_emptied_store(registered_client, session)
+
+    refused_then(monkeypatch, lambda: locations.restore(session, place.store))
+    response = correct(admin_client, session)
+    assert response.status_code == 409
+    page = " ".join(text(response).split())
+    assert (
+        f"Not changed: {place.store.name} is retired and holds nothing, so the 2 "
+        "can't be found there again." in page
+    )
+    assert f"Bring back {place.store.name}" in page
+
+
+def test_refused_then_settled_meanwhile_it_says_so(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from_emptied_store(registered_client, session)
+    (check,) = checks(session)
+    seen = over_recorded.seen(check)
+    admin_id = session.scalar(select(Admin.id))
+    assert admin_id is not None
+    refused_then(
+        monkeypatch,
+        lambda: over_recorded.mark_checked(session, check.id, seen, admin_id),
+    )
+    response = correct(admin_client, session)
+    assert response.status_code == 303
+    assert "over_recorded_unchanged" in response.headers["location"]
 
 
 def test_refused_by_another_rule_it_says_that_rule(

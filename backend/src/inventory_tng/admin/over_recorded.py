@@ -140,31 +140,34 @@ def _page(
 
 
 def _refusal(
-    session: Session, check_id: int, do: str, broken: str
+    session: Session, check_id: int, do: str, broken: str, at: int | None
 ) -> dict[str, Any] | None:
     """What the page says of a correction or count refused by a rule, and
     offers under it: Mark checked, and, refused at a retired place that
-    holds nothing (location_countable), Bring back that place, which the
-    places page would (not a volunteer's custody, which comes back with
-    them). Where it left first, as correct() adjusts there first; a count
-    adjusts only where it arrived. None if it is settled meanwhile."""
+    holds nothing (ledger.NotCountable, `at`), Bring back that place, which
+    the places page would (not a volunteer's custody, which comes back with
+    them). The place as refused, whatever has changed since. None if it is
+    settled meanwhile."""
     found = over_recorded.shown(session, OverRecorded.id == check_id)
     if not found:
         return None
     (each,) = found
-    words, place = f"Not changed: {rule_words(broken)}", None
-    if broken == "location_countable":
-        left, arrived = over_recorded.not_countable(session, check_id)
-        if do == "correct" and left is not None:
-            place, so = left, f"the {each.amount} can't be found there again"
-        elif do == "correct":
-            place, so = arrived, f"the {each.amount} can't be written off there"
-        else:
-            place, so = arrived, "its count can't be corrected there"
-        if place is not None:
-            words = f"Not changed: {place.name} is retired and holds nothing, so {so}."
-    offered = place if place is not None and place.kind != "custody" else None
-    return {"shown": each, "words": words, "place": offered}
+    if at is None:
+        words = f"Not changed: {rule_words(broken)}"
+        return {"shown": each, "words": words, "place": None}
+    place = session.get_one(Location, at)
+    # correct() adjusts where it left first, so refused there if it is that.
+    if do != "correct":
+        so = "its count can't be corrected there"
+    elif at == over_recorded.ends(session, check_id)[0]:
+        so = f"the {each.amount} can't be found there again"
+    else:
+        so = f"the {each.amount} can't be written off there"
+    return {
+        "shown": each,
+        "words": f"Not changed: {place.name} is retired and holds nothing, so {so}.",
+        "place": place if place.kind != "custody" else None,
+    }
 
 
 @router.post(f"{OVER_RECORDED}/{{check_id}}/bring-back")
@@ -266,14 +269,24 @@ def answer(
             )
     ledger.lock_places(session, over_recorded.places_of(session, check_id))
     admin_id = signed.admin.id
+    # The place that refused it (ledger.NotCountable), as it was then.
+    refused_at: int | None = None
 
     def settle() -> tuple[over_recorded.Settled, list[ledger.Written]]:
-        if do == "correct":
-            return "corrected", over_recorded.correct(session, check_id, seen, admin_id)
-        if count is not None:
-            return over_recorded.confirm_count(session, check_id, seen, admin_id, count)
-        over_recorded.mark_checked(session, check_id, seen, admin_id)
-        return "checked", []
+        nonlocal refused_at
+        try:
+            if do == "correct":
+                done = over_recorded.correct(session, check_id, seen, admin_id)
+                return "corrected", done
+            if count is not None:
+                return over_recorded.confirm_count(
+                    session, check_id, seen, admin_id, count
+                )
+            over_recorded.mark_checked(session, check_id, seen, admin_id)
+            return "checked", []
+        except ledger.NotCountable as broken:
+            refused_at = broken.location_id
+            raise
 
     settled, broken = attempt(session, settle)
     session.commit()
@@ -281,7 +294,7 @@ def answer(
         log.info("over recorded not settled", over_recorded_id=check_id, rule=broken)
         refused = None
         if broken is not None and broken not in MEANWHILE:
-            refused = _refusal(session, check_id, do, broken)
+            refused = _refusal(session, check_id, do, broken, refused_at)
         if refused is None:
             return redirect(
                 OVER_RECORDED, notice="over_recorded_unchanged", **query(only)

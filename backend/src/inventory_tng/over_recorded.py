@@ -244,7 +244,7 @@ def waiting(session: Session, check_id: int, seen_as: str) -> OverRecorded:
     return row
 
 
-def _ends(session: Session, check_id: int) -> tuple[int | None, int | None]:
+def ends(session: Session, check_id: int) -> tuple[int | None, int | None]:
     """Where a check's transaction moved stock from, and to."""
     found = session.execute(
         select(LedgerTransaction.from_location_id, LedgerTransaction.to_location_id)
@@ -258,23 +258,7 @@ def _ends(session: Session, check_id: int) -> tuple[int | None, int | None]:
 def places_of(session: Session, check_id: int) -> list[int]:
     """The places a check's transaction moved stock between, to lock first,
     as saves take places (ledger.lock_places)."""
-    return [place for place in _ends(session, check_id) if place is not None]
-
-
-def not_countable(
-    session: Session, check_id: int
-) -> tuple[Location | None, Location | None]:
-    """Where a check's transaction left, and where it arrived, each only if
-    it may not be adjusted there (ledger.countable): a retired place that
-    holds nothing, which refuses its correction (location_countable)."""
-    left, arrived = _ends(session, check_id)
-    refused = session.scalars(
-        select(Location).where(Location.id.in_([left, arrived]), ~ledger.countable())
-    ).all()
-    return (
-        next((each for each in refused if each.id == left), None),
-        next((each for each in refused if each.id == arrived), None),
-    )
+    return [place for place in ends(session, check_id) if place is not None]
 
 
 def mark_checked(session: Session, check_id: int, seen_as: str, admin_id: int) -> None:
