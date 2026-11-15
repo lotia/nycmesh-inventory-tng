@@ -630,7 +630,14 @@ def reread(session: Session, tokens: Iterable[str]) -> None:
     rows = _with_units(session, tokens, lock=True)
     enforce(READ_ALIKE, when=bool(_read_alike(session, rows, rules)))
     items_, packages, aliases = rows
-    for row in (*items_, *packages, *aliases):
-        row.unit_key = unit_key(row.name, rules)
+    keys = {row: unit_key(row.name, rules) for row in (*items_, *packages, *aliases)}
+    changing = {row: key for row, key in keys.items() if key != row.unit_key}
+    # Set apart first, as migration 0043 does: unique indexes check row by
+    # row, so two names trading keys would clash halfway.
+    for row in changing:
+        row.unit_key = f"#{row.id}"
+    session.flush()
+    for row, key in changing.items():
+        row.unit_key = key
     for searched in (*items_, *packages):
         searched.refold(rules)

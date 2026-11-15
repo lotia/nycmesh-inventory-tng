@@ -17,6 +17,7 @@ from inventory_tng.admin.items import ITEMS, SEARCHED
 from inventory_tng.admin.listing import folded
 from inventory_tng.admin.reading_rules import READINGS, SEED
 from inventory_tng.catalogue import catalogue
+from inventory_tng.db import lock_catalogue
 from inventory_tng.models import (
     Category,
     Item,
@@ -27,6 +28,7 @@ from inventory_tng.models import (
 )
 from inventory_tng.models import reading_rules as reading_rules_held
 
+from helpers.concurrency import Committed
 from helpers.rows import (
     add,
     breaks,
@@ -65,6 +67,25 @@ def test_the_rules_are_read_once_until_written_or_rolled_back(
     assert reading_rules_held(session) == {}
     reading_rules.decide(session, {"g": GBPS}, None)
     assert reading_rules_held(session) == {"g": GBPS}
+
+
+def test_the_rules_are_read_again_once_the_catalogue_is_locked(
+    committed: Committed,
+) -> None:
+    """Read before the catalogue lock, as a form's answers are, the rules
+    are read again under it: a rule another administrator wrote meanwhile
+    reads the name being saved (inventory-tng-3x2 review)."""
+    form, other = committed.session(), committed.session()
+    assert reading_rules_held(form) == {}
+    reading_rules.decide(other, {"g": GBPS}, None)
+    other.commit()
+    lock_catalogue(form)
+    assert reading_rules_held(form) == {"g": GBPS}
+    # Taken again, what it read under the lock is kept.
+    held = reading_rules_held(form)
+    lock_catalogue(form)
+    assert reading_rules_held(form) is held
+    form.rollback()
 
 
 def test_a_rule_reads_a_unit_before_the_table() -> None:
@@ -207,6 +228,22 @@ def test_a_rule_reads_every_name_with_it_again(
     session.flush()
     assert link.unit_key == "thing10g"
     assert "Gbit/s" not in link.search_text
+
+
+def test_rules_changed_together_may_trade_two_names_keys(
+    session: Session, radios: Category
+) -> None:
+    """Two names whose keys the rules trade are read again, though each
+    takes the other's key as it was: unique indexes check row by row
+    (inventory-tng-3x2 review)."""
+    grams = units.Rule("g")
+    reading_rules.decide(session, {"g": grams}, None)
+    light = new_item(session, radios, "Link 10g")
+    fast = new_item(session, radios, "Link 10Gbit/s")
+    assert (light.unit_key, fast.unit_key) == ("link10g", "link10gbits")
+    reading_rules.decide(session, {"g": GBPS, "Gbit/s": grams}, None)
+    session.flush()
+    assert (light.unit_key, fast.unit_key) == ("link10gbits", "link10g")
 
 
 def test_a_rule_reading_names_alike_is_refused(

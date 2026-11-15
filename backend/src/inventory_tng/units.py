@@ -14,10 +14,10 @@ The scan page reads the same table (frontend/src/units.json, which `uv run
 python -m inventory_tng.units` writes) the same way (frontend/src/units.ts),
 and both are tested against frontend/src/units-vectors.json.
 
-An item's or a package's name, as typed on its form, is stored with each
-unit after a number spelt by its symbol as a name shows it, joined to the
-number (spell, inventory-tng-c0c.3): case is read loosely only where one
-reading is a likely size, and the form asks where two are.
+An item's or a package's name is stored as typed on its form, its units
+respelt by their symbols only where a reading rule says so (spell, Ali,
+2026-11-15): case is read loosely only where one reading is a likely
+size, and the form asks where two are.
 
 A reading rule (models.ReadingRule, inventory-tng-c0c.4) settles how a
 unit as typed after a number (`M`, `G`) is read, or that it is no unit:

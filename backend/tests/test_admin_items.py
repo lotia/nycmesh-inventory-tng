@@ -1261,6 +1261,20 @@ def test_a_read_alike_refusal_with_none_left_to_name_says_so(
     )
 
 
+def test_an_alias_answer_refused_is_not_the_items_name_answer(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Sent back after an alias is refused, its answer is checked under the
+    alias only: under the item's name it would be sent as a correction with
+    the next save (inventory-tng-3x2 review)."""
+    box = new_item(session, radios, "Box 10g")
+    new_item(session, radios, "Box 10 Gbps")
+    form = {"alias_name": "Extra 10g", "unit:g": "Gbit/s"}
+    refused = admin_client.post(f"{ITEMS}/{box.id}/aliases", data=form)
+    assert refused.status_code == 400
+    assert refused.text.count('name="unit:g" value="Gbit/s" checked') == 1
+
+
 def test_a_package_name_reads_units_too(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:

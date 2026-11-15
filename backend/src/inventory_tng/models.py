@@ -79,7 +79,13 @@ from inventory_tng import (
     names,
     units,
 )
-from inventory_tng.db import ACTOR_PATTERN, Base, enforce, protection
+from inventory_tng.db import (
+    ACTOR_PATTERN,
+    READ_AGAIN_ONCE_LOCKED,
+    Base,
+    enforce,
+    protection,
+)
 from inventory_tng.time_zones import is_time_zone
 
 QUANTITY = Numeric(12, 3)
@@ -669,6 +675,9 @@ class ReadingRule(Versioned, Base):
 # The reading rules a transaction has read (reading_rules), kept until one
 # is written or a savepoint rolled back, so a request reads them once.
 RULES_INFO = "inventory.reading_rules"
+# Read before the catalogue lock, as a form's answers are, they are read
+# again under it: a rule changed meanwhile reads names otherwise.
+READ_AGAIN_ONCE_LOCKED.add(RULES_INFO)
 
 
 def reading_rules(session: Session) -> units.Rules:

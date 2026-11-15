@@ -709,11 +709,21 @@ def install(app: FastAPI) -> None:
 CATALOGUE_LOCK = 0x696E76656E746F72  # Any fixed key; "inventor" in ASCII.
 
 
+# What a session keeps in session.info of the catalogue, read as it was
+# then (models.reading_rules): forgotten as the catalogue lock is taken, so
+# what is read under it is what any write before it committed.
+READ_AGAIN_ONCE_LOCKED: set[str] = set()
+
+
 def lock_catalogue(session: Session) -> None:
     """Take the catalogue lock: wait for any catalogue write under way to
     end. Taking it again in the same transaction is free."""
+    held = CATALOGUE in session.info.get(LOCKS_INFO, {})
     session.execute(select(func.pg_advisory_xact_lock(CATALOGUE_LOCK)))
     _hold(session, CATALOGUE)
+    if not held:
+        for key in READ_AGAIN_ONCE_LOCKED:
+            session.info.pop(key, None)
 
 
 # Each table's protection, declared once on its model (protection()) and

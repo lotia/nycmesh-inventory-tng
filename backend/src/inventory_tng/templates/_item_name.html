@@ -5,7 +5,8 @@
   <input name="name" value="{{ values.get('name', default) }}" maxlength="{{ name_max }}" required>
   {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
 </label>
-{% with typed = values.get('name', default), sent = values %}{% include "_units_read.html" %}{% endwith %}
+{#- Only the name's own form's answers: another form sent back holds its own. #}
+{% with typed = values.get('name', default), sent = values if 'name' in values else {} %}{% include "_units_read.html" %}{% endwith %}
 {% if similar %}
 <p class="warning" role="status">Similar: {% for close in similar -%}
   {% set other = close.item -%}
