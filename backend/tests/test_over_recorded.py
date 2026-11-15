@@ -2691,3 +2691,55 @@ def test_a_correct_waits_for_a_close_of_its_open_package_then_skips_it(
     second.commit()
     (line,) = reason_adjustments(first, over_recorded.REASON)
     assert (line.to_package_id, line.to_open_package_id) == (spools.spool.id, None)
+
+
+@pytest.mark.parametrize("close", [closed_by_confirm, closed_from_its_item])
+def test_its_open_package_closed_then_its_sealed_spool_counted_closes_it(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    close: Callable[[TestClient, Spools, int], None],
+) -> None:
+    """Closed outside a count, the row offers 'Count <place>'; that count
+    of the sealed spool puts the other end right, so it closes as counted:
+    no Correct is left that would write nothing."""
+    spools = Spools(session)
+    check = opening_raised(registered_client, spools)
+    open_id = opened_into(session, check).open_package_id
+    assert open_id is not None
+    close(admin_client, spools, open_id)
+    link = f"{COUNTS}/{spools.store.id}?item={spools.cable.id}"
+    assert (
+        f'<a href="{link}">' in admin_client.get(f"{PAGE}?item={spools.cable.id}").text
+    )
+    form = count_form_at(admin_client, spools.store.id)
+    with capture_logs() as logs:
+        done = admin_client.post(link, data=form | {sealed_field(spools): "1"})
+    assert done.status_code == 303
+    (counted_at,) = count_ids(session)
+    (check,) = checks(session)
+    assert (check.settled_how, check.left_count_id, check.arrived_count_id) == (
+        "counted",
+        counted_at,
+        None,
+    )
+    assert any(each["event"] == "over recorded counted" for each in logs)
+    assert reason_adjustments(session, over_recorded.REASON) == []
+
+
+def test_a_moves_open_package_closed_then_its_place_counted_puts_nothing_right(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """Moves unchanged: only an opening's open package closed puts its end
+    right."""
+    spools = Spools(session)
+    made = moved_whole(registered_client, spools)
+    closed_from_its_item(admin_client, spools, made.id)
+    done = count_at(admin_client, spools.van.id, {f"loose_{spools.cable.id}": "0"})
+    assert done.status_code == 303
+    assert count_ids(session) != []
+    (check,) = checks(session)
+    assert check.settled_at is None
+    assert " closed " not in text_of(
+        admin_client.get(f"{PAGE}?item={spools.cable.id}").text
+    )

@@ -18,7 +18,7 @@ from typing import Literal, NamedTuple
 
 import structlog
 from opentelemetry import metrics
-from sqlalchemy import ColumnElement, func, or_, select
+from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, aliased
 
@@ -130,6 +130,12 @@ def seen(row: OverRecorded) -> str:
 # right.
 FROM, TO = aliased(Location), aliased(Location)
 LEFT_COUNT, ARRIVED_COUNT = aliased(LedgerTransaction), aliased(LedgerTransaction)
+# The open package an opening arrived in, outer-joined to say if it closed
+# since: closing it, however, wrote off what it showed, so put that end
+# right (Ali, 2026-11-15, inventory-tng-nyl). A move's is never joined.
+OPENED_INTO = and_(
+    LedgerTransaction.kind == "open", OpenPackage.id == Movement.to_open_package_id
+)
 
 
 def within(name: str) -> str:
@@ -242,17 +248,17 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         .outerjoin(TO, TO.id == LedgerTransaction.to_location_id)
         .outerjoin(LEFT_COUNT, LEFT_COUNT.id == OverRecorded.left_count_id)
         .outerjoin(ARRIVED_COUNT, ARRIVED_COUNT.id == OverRecorded.arrived_count_id)
-        .outerjoin(OpenPackage, OpenPackage.id == Movement.to_open_package_id)
+        .outerjoin(OpenPackage, OPENED_INTO)
         .where(WAITING, *where)
         .order_by(func.lower(Item.name), Item.id, OverRecorded.id)
     ).all()
     # Only a place that may be counted is offered for counting: the end
-    # still to put right of one with one end counted. An opening's ends are
-    # both at one place, so one closed needs no telling apart here.
+    # still to put right of one with one end counted, or an opening's open
+    # package closed.
     still = {
         to_id if left_on else from_id
-        for *_, from_id, to_id, left_on, arrived_on, _closed in found
-        if (left_on is None) != (arrived_on is None)
+        for *_, from_id, to_id, left_on, arrived_on, closed_on in found
+        if (left_on is None) != (arrived_on is None and closed_on is None)
     }
     countable = (
         set(
@@ -292,7 +298,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         # An opening's open package closed since: Correct skips that end
         # (correct()), so the row says it is closed.
         arrived_how: Literal["counted", "closed"] = "counted"
-        if kind == "open" and arrived_on is None and closed_on is not None:
+        if arrived_on is None and closed_on is not None:
             arrived_on, arrived_how = closed_on, "closed"
         one = None
         # Moved whole, it has one end only: where it arrived.
@@ -582,8 +588,9 @@ def counted(
     (`emptied`: used up, or not there) puts right an opening's end that
     arrived in it, as a count of it at 0 would, so Correct writes only the
     sealed end (Ali, 2026-11-15, inventory-tng-he9); a move's it does not.
-    One with every end it has put right closes as counted, by the count's
-    administrator, then. How many closed.
+    One closed before, however, put that end right already, though no count
+    did (OPENED_INTO). One with every end it has put right closes as
+    counted, by the count's administrator, then. How many closed.
 
     Call it in the count's transaction, holding the place (ledger.lock_place):
     it holds the rows it reads, by id, as Correct and Mark checked take a
@@ -601,9 +608,11 @@ def counted(
             LedgerTransaction.kind,
             LedgerTransaction.from_location_id,
             LedgerTransaction.to_location_id,
+            OpenPackage.closed_at,
         )
         .join(Movement, Movement.id == OverRecorded.movement_id)
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .outerjoin(OpenPackage, OPENED_INTO)
         .where(
             WAITING,
             Movement.item_id.in_({item_id for item_id, _ in [*put_right, *emptied]}),
@@ -617,7 +626,7 @@ def counted(
     )
     found = session.execute(locked(query, of=OverRecorded)).all()
     closed = 0
-    for row, movement, kind, left_at, arrived_at in found:
+    for row, movement, kind, left_at, arrived_at, closed_on in found:
         whole = (
             movement.from_open_package_id is not None
             and movement.from_open_package_id == movement.to_open_package_id
@@ -645,9 +654,11 @@ def counted(
         ):
             row.arrived_count_id = count_id
             _end_counted(row.id, "arrived", count_id, admin_id)
-        # Every end it has put right: one it has not is no end to put right.
+        # Every end it has put right: one it has not is no end to put right,
+        # and an opening's open package closed since put its end right
+        # (inventory-tng-nyl).
         if (left_at is None or whole or row.left_count_id) and (
-            arrived_at is None or row.arrived_count_id
+            arrived_at is None or row.arrived_count_id or closed_on is not None
         ):
             row.settled_at = func.now()
             row.settled_by_admin_id = admin_id
