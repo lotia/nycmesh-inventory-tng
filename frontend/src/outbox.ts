@@ -1006,15 +1006,13 @@ export class Outbox {
       }
     };
     const follow = () => {
-      const stored = this.read();
-      const here = new Set(stored.map((entry) => batchId(entry.body)));
+      // Each saved one, less those storage still holds (show).
       for (const entry of this.entries.value) {
-        const id = batchId(entry.body);
-        if (entry.state === "saved" && !here.has(id)) {
-          this.forgottenElsewhere.set(id, entry);
+        if (entry.state === "saved") {
+          this.forgottenElsewhere.set(batchId(entry.body), entry);
         }
       }
-      this.show(stored);
+      this.show(this.read());
     };
     const stopFollowing = onStoredChange([STORAGE_KEY], follow);
     target.addEventListener("online", send);
