@@ -12,7 +12,7 @@
  */
 import { v5 as uuidFrom } from "uuid";
 import { type Catalogue, type Item, indexOf } from "./cart";
-import { FROM_OPEN, nameOf, RESCAN, unitOf, withRetired } from "./older";
+import { FROM_OPEN, inUnit, nameOf, RESCAN, withRetired } from "./older";
 import {
   type Body,
   type Draft,
@@ -201,7 +201,7 @@ class Namer {
   }
 
   private inUnit(line: Line, amount: number): string {
-    return `${decimal(amount)}${unitOf(this.items.get(line.item_id))}`;
+    return inUnit(amount, this.items.get(line.item_id));
   }
 }
 

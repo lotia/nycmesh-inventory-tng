@@ -723,7 +723,7 @@ export function toCart(
             `${nameOf(item)}: ${
               packs === null
                 ? `${n} × ${pack.name}`
-                : `${decimal(packs * countedAt)}${unitOf(item)}`
+                : inUnit(packs * countedAt, item)
             }`,
             RESIZED,
             { at, packages: [packageId] },
@@ -766,7 +766,7 @@ export function toCart(
         lineOf(line.item_id, { at });
         return;
       }
-      const by = `${decimal(amount)}${unitOf(item)}`;
+      const by = inUnit(amount, item);
       const leave = (note: string, what = by) =>
         left.push({
           itemId: line.item_id,
@@ -922,7 +922,7 @@ function openWords(item: Item | undefined, said: unknown): string {
   const taken = typeof amount === "string" ? (thousandths(amount) ?? 0) : 0;
   const what =
     taken > 0
-      ? `${decimal(taken)}${unitOf(item)}${FROM_OPEN}`
+      ? `${inUnit(taken, item)}${FROM_OPEN}`
       : REPORTS[usedUp === true ? "used_up" : "lengths"];
   return `${nameOf(item)}: ${what}`;
 }
@@ -941,7 +941,7 @@ export function lineWords(line: Line, item: Item | undefined): string | null {
   const loose = thousandths(line.loose) ?? 0;
   if (loose > 0) {
     const after = parts.length > 0 ? " loose" : "";
-    parts.push(`${decimal(loose)}${unitOf(item)}${after}`);
+    parts.push(`${inUnit(loose, item)}${after}`);
   }
   if (parts.length === 0) {
     // An item gone is said, as the cart shows it, even holding none.
@@ -1064,9 +1064,12 @@ export function nameOf(item: { name: string } | undefined): string {
   return item?.name ?? "An item no longer in the catalogue";
 }
 
-/** An item's unit after an amount: none for things counted. */
-export function unitOf(item: Item | undefined): string {
-  return item === undefined || item.unit === "each" ? "" : ` ${item.unit}`;
+/** `amount`, in thousandths, of `item` in its unit: "20 m", or "2" for
+ * things counted. */
+export function inUnit(amount: number, item: Item | undefined): string {
+  const unit =
+    item === undefined || item.unit === "each" ? "" : ` ${item.unit}`;
+  return `${decimal(amount)}${unit}`;
 }
 
 /** What older builds left, as listed now, kept as other tabs change it. */
