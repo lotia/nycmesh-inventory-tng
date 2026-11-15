@@ -70,16 +70,16 @@ with an adjustment. Mark checked if you already fixed it.</p>
       {#- A count put one end right: the other end's next step. #}
       {% set one = each.one_counted %}
       {% if one %}
-      <p>{{ one.place }} counted {{ one.on | day(zone) }}. {{ one.still }} still to put right.</p>
+      <p>{{ one.counted }} counted {{ one.on | day(zone) }}. {{ one.still }} still to put right.</p>
       {% endif %}
       {#- Forms of their own, so Enter in the words marks it checked. #}
       <div class="actions">
         <form method="post" action="{{ here }}/{{ row.id }}/correct{{ query }}">
           <input type="hidden" name="seen" value="{{ seen(row) }}">
-          <button>Correct{% if one %} {{ one.still }}{% endif %}<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
+          <button>Correct{% if one %} {{ one.correct }}{% endif %}<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
         </form>
         {% if one and one.countable %}
-        <a href="{{ counts_path }}/{{ one.still_id }}?item={{ each.item_id }}">Count {{ one.still }}<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></a>
+        <a href="{{ counts_path }}/{{ one.place_id }}?item={{ each.item_id }}">Count {{ one.place }}<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></a>
         {% endif %}
         <form method="post" action="{{ here }}/{{ row.id }}/checked{{ query }}">
           <input type="hidden" name="seen" value="{{ seen(row) }}">

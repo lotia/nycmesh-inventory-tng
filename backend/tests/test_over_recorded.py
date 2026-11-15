@@ -1795,6 +1795,170 @@ def test_the_database_keeps_counted_ends_only_as_counts_give_them(
     assert done == (None, None if broken is None else f"ck_over_recorded_{broken}")
 
 
+# An opening's ends are both at one place: a count puts each right only
+# by its form (Ali, 2026-11-15, inventory-tng-r5z).
+
+
+def opening_raised(client: TestClient, spools: Spools) -> OverRecorded:
+    """Both sealed spools in the store recorded opened, then one: one
+    waits, sealed where it left, open (tracked) or loose where it
+    arrived."""
+    line = {
+        "item_id": spools.cable.id,
+        "quantity": "305",
+        "package_id": spools.spool.id,
+        "package_size": "305",
+    }
+    # A page sends a line for each tracked one opened, under its own key;
+    # one line of them all for loose units.
+    lines = (
+        [line | {"open_package_key": str(uuid.uuid4())} for _ in range(2)]
+        if spools.cable.track_opened
+        else [line | {"quantity": "610"}]
+    )
+    opening = spools.place.batch(
+        kind="open",
+        from_location_id=spools.store.id,
+        to_location_id=spools.store.id,
+        lines=lines,
+    )
+    recorded_then_changed(client, opening, lines=[lines[0] | {"quantity": "305"}])
+    (check,) = checks(spools.session)
+    return check
+
+
+def opened_into(session: Session, check: OverRecorded) -> Form:
+    """The form its movement arrived in: the open package, or loose."""
+    movement = session.get_one(Movement, check.movement_id)
+    return Form(movement.to_package_id, movement.to_open_package_id)
+
+
+def arrived_field(spools: Spools, into: Form) -> str:
+    """The count form's field of the form an opening arrived in."""
+    if into.open_package_id is not None:
+        return f"opened_{into.open_package_id}"
+    return f"loose_{spools.cable.id}"
+
+
+def test_a_total_count_of_an_opening_puts_nothing_right(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """Screws in boxes of 100, not tracked opened, two in the van recorded
+    opened though one was: 0 sealed and 200 loose, really 1 and 100. The
+    van holds loose ones alone, so its count asks their total, 200, which
+    cannot show the split: the row waits."""
+    spools = Spools(session, tracked=False)
+    opening_raised(registered_client, spools)
+    page = admin_client.get(f"{COUNTS}/{spools.store.id}").text
+    assert f'name="counted_{spools.cable.id}"' in page
+    done = count_at(
+        admin_client, spools.store.id, {f"counted_{spools.cable.id}": "610"}
+    )
+    assert done.status_code == 303
+    (check,) = checks(session)
+    assert (check.left_count_id, check.arrived_count_id) == (None, None)
+    assert check.settled_at is None
+
+
+@pytest.mark.parametrize("tracked", [True, False])
+def test_an_openings_sealed_count_puts_its_end_right_and_names_its_forms(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    tracked: bool,
+) -> None:
+    spools = Spools(session, tracked=tracked)
+    spools.receive(uuid.uuid4())
+    check = opening_raised(registered_client, spools)
+    into = opened_into(session, check)
+    assert (into.open_package_id is not None) == tracked
+    sealed = f"sealed_{spools.cable.id}_{spools.spool.id}"
+    count_at(admin_client, spools.store.id, {sealed: "1"})
+    (counted,) = count_ids(session)
+    (check,) = checks(session)
+    assert (check.left_count_id, check.arrived_count_id) == (counted, None)
+    assert check.settled_at is None
+    on = session.get_one(LedgerTransaction, counted).created_at
+    day = show_day(on, site_zone(session))
+    still = "Open Spool" if tracked else f"Loose {spools.cable.name}"
+    page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
+    assert f"Sealed Spool counted {day}. {still} still to put right." in text_of(page)
+    correct = "open Spool" if tracked else f"loose {spools.cable.name}"
+    assert f"Correct {correct}<span" in page
+    link = f"{COUNTS}/{spools.store.id}?item={spools.cable.id}"
+    assert f'<a href="{link}">Count {spools.store.name}<span' in page
+
+
+@pytest.mark.parametrize("tracked", [True, False])
+def test_an_openings_open_count_puts_the_other_end_right_and_both_close_it(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    tracked: bool,
+) -> None:
+    spools = Spools(session, tracked=tracked)
+    spools.receive(uuid.uuid4())
+    check = opening_raised(registered_client, spools)
+    arrived = arrived_field(spools, opened_into(session, check))
+    count_at(admin_client, spools.store.id, {arrived: "305"})
+    (at_open,) = count_ids(session)
+    (check,) = checks(session)
+    assert (check.left_count_id, check.arrived_count_id) == (None, at_open)
+    still = "Open Spool counted" if tracked else f"Loose {spools.cable.name} counted"
+    page = text_of(admin_client.get(f"{PAGE}?item={spools.cable.id}").text)
+    assert still in page
+    assert "Sealed Spool still to put right." in page
+    sealed = f"sealed_{spools.cable.id}_{spools.spool.id}"
+    count_at(admin_client, spools.store.id, {sealed: "1"})
+    _, at_sealed = count_ids(session)
+    (check,) = checks(session)
+    assert (check.settled_how, check.left_count_id, check.arrived_count_id) == (
+        "counted",
+        at_sealed,
+        at_open,
+    )
+
+
+@pytest.mark.parametrize("tracked", [True, False])
+def test_an_opening_with_one_end_counted_corrects_the_other_only(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    tracked: bool,
+) -> None:
+    """The sealed spool counted, Correct writes off what it became alone:
+    the sealed one is not found again twice."""
+    spools = Spools(session, tracked=tracked)
+    spools.receive(uuid.uuid4())
+    check = opening_raised(registered_client, spools)
+    into = opened_into(session, check)
+    count_at(
+        admin_client,
+        spools.store.id,
+        {f"sealed_{spools.cable.id}_{spools.spool.id}": "1"},
+    )
+    (check,) = checks(session)
+    done = admin_client.post(
+        f"{PAGE}/{check.id}/correct", data={"seen": over_recorded.seen(check)}
+    )
+    assert "over_recorded_corrected" in done.headers["location"]
+    (adjusted,) = session.scalars(
+        select(LedgerTransaction).where(LedgerTransaction.kind == "adjustment")
+    )
+    assert (adjusted.from_location_id, adjusted.to_location_id) == (
+        spools.store.id,
+        None,
+    )
+    (line,) = session.scalars(
+        select(Movement).where(Movement.transaction_id == adjusted.id)
+    )
+    assert (line.quantity, line.from_package_id, line.from_open_package_id) == (
+        305,
+        None,
+        into.open_package_id,
+    )
+
+
 def committed_check(
     own_committed: Committed,
 ) -> tuple[Place, OverRecorded, int, LedgerTransaction]:

@@ -383,14 +383,27 @@ you" counts every report in one line, which hides what is waiting.
   transaction for each end (`left_count_id`, `arrived_count_id`),
   written in the count's own transaction under the place's lock, the
   rows held by id after it, as Correct and Mark checked take them.
+- **An opening's ends** (Ali, 2026-11-15, inventory-tng-r5z) are both at
+  one place: sealed packages of the package opened where it left, and
+  where it arrived the open package it became (its item tracked opened)
+  or loose units. Only a count by form puts one right: a count of those
+  sealed packages the one, a count of that open package, or of loose
+  units, the other. A count by total puts neither right, as an opening
+  never changes the total and a total cannot show the sealed and open
+  split, so the row waits for Correct (both adjustments at the place,
+  the total unchanged) or Mark checked.
 - **One end put right**, the row says "Shelf B3 counted 14 Nov. Rack A
   still to put right." (the day in the site's zone) and offers "Correct
   Rack A", one adjustment at that end only, under a key of its own;
   "Count Rack A", the place's count page showing that item only (0003),
   if it may be counted; and Mark
-  checked. A Correct sent as seen before the count is refused as changed
-  meanwhile. A retired place that holds nothing cannot be counted, so
-  Bring back stays the way to put it right there.
+  checked. An opening's row names its forms, not the place twice:
+  "Sealed Spool counted 14 Nov. Open Spool still to put right.", or
+  "Loose Screws" for loose units, the package's and item's names as
+  given, with "Correct open Spool" and "Count Van". A Correct sent as
+  seen before the count is refused as changed meanwhile. A retired place
+  that holds nothing cannot be counted, so Bring back stays the way to
+  put it right there.
 - **Every end put right**, the row closes as `counted`, by the
   administrator of the count that closed it, then, and leaves "Needs your
   action". A CHECK allows one end counted at most while it waits, and
