@@ -29,6 +29,7 @@ from inventory_tng.models import (
 from inventory_tng.models import reading_rules as reading_rules_held
 
 from helpers.concurrency import Committed
+from helpers.queries import counting
 from helpers.rows import (
     add,
     breaks,
@@ -228,6 +229,25 @@ def test_a_rule_reads_every_name_with_it_again(
     session.flush()
     assert link.unit_key == "thing10g"
     assert "Gbit/s" not in link.search_text
+
+
+def test_a_rule_reads_aliases_alike_for_one_item_or_many(
+    session: Session, radios: Category
+) -> None:
+    """The aliases of the items a rule reads again are read at once, not
+    item by item, as it holds the catalogue lock (inventory-tng-3x2)."""
+
+    def alias_reads(token: str, count: int) -> int:
+        for n in range(count):
+            item = new_item(session, radios, f"Thing {token} {n} 10{token}")
+            items.add_alias(session, item, f"Other {token} {n}")
+        session.flush()
+        with counting(session) as sent:
+            reading_rules.decide(session, {token: GBPS}, None)
+            session.flush()
+        return sum("FROM item_alias" in statement for statement in sent)
+
+    assert alias_reads("q", 1) == alias_reads("r", 4)
 
 
 def test_rules_changed_together_may_trade_two_names_keys(

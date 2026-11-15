@@ -639,5 +639,13 @@ def reread(session: Session, tokens: Iterable[str]) -> None:
     session.flush()
     for row, key in changing.items():
         row.unit_key = key
-    for searched in (*items_, *packages):
-        searched.refold(rules)
+    # The items' current aliases in one read, not one read an item.
+    written: dict[int, list[ItemAlias]] = {item.id: [] for item in items_}
+    if written:
+        query = select(ItemAlias).where(ItemAlias.item_id.in_(written), CURRENT_ALIAS)
+        for alias in session.scalars(query.order_by(ItemAlias.id)):
+            written[alias.item_id].append(alias)
+    for item in items_:
+        item.refold(rules, written[item.id])
+    for package in packages:
+        package.refold(rules)

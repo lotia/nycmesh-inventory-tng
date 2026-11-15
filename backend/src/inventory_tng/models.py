@@ -527,15 +527,22 @@ class Item(KeyedName, Searchable, Versioned, Base):
     READS_RULES = True
     name_folded: Mapped[str] = mapped_column(Text)
 
-    def refold(self, rules: units.Rules | None = None) -> None:
+    def refold(
+        self,
+        rules: units.Rules | None = None,
+        written: list[ItemAlias] | None = None,
+    ) -> None:
         # Its current aliases too, each folded alone, as the session holds
         # them: refolded as a flush begins (_refold), one added or retired
         # is not yet written, and a new one's id will put it last. Read
         # first: the read may flush, refolding it, which this then replaces.
+        # `written`, if given, are its current aliases as written, read for
+        # many items at once (items.reread).
         session = object_session(self)
         names = []
         if self.id is not None and session is not None:
-            written = session.scalars(current_aliases(self.id)).all()
+            if written is None:
+                written = list(session.scalars(current_aliases(self.id)))
             adding = (
                 row
                 for row in session.new
