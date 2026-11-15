@@ -15,7 +15,7 @@ from structlog.testing import capture_logs
 from inventory_tng import items, names, reading_rules, sign_in, units
 from inventory_tng.admin.items import ITEMS, SEARCHED
 from inventory_tng.admin.listing import folded
-from inventory_tng.admin.reading_rules import READINGS, SEED, offered
+from inventory_tng.admin.reading_rules import READINGS, SEED
 from inventory_tng.catalogue import catalogue
 from inventory_tng.models import (
     Category,
@@ -229,12 +229,12 @@ def test_a_rule_may_read_what_the_table_finds_unlikely() -> None:
     rules = {"G": units.Rule("Mbit/s")}
     (found,) = units.found_in("Box 10G", rules)
     assert [str(r) for r in found.offered] == ["Gbit/s", "g", "Mbit/s"]
-    assert [str(r) for r in offered("G", units.Rule("Mbit/s"))] == [
+    assert [str(r) for r in reading_rules.offered("G", units.Rule("Mbit/s"))] == [
         "Gbit/s",
         "g",
         "Mbit/s",
     ]
-    assert offered("P", units.Rule(None)) == ()
+    assert reading_rules.offered("P", units.Rule(None)) == ()
 
 
 def test_a_rule_reads_only_known_readings(session: Session) -> None:

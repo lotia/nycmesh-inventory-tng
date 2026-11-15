@@ -287,6 +287,8 @@ They are:
 - sealing every authenticator with a new TOTP key, or retiring them when a
   key is lost or leaked (TOTP keys, below);
 - locking every administrator out, and letting one back in (Break-glass,
+  below);
+- loading how units in the imported names are read (Unit readings,
   below).
 
 What a command makes, such as a code, and its log lines are printed to
@@ -463,3 +465,32 @@ can, the operator can (Operator commands, above):
 kubectl exec deploy/inventory -- python -m inventory_tng.scan_settings \
   set --name-check-minutes 20
 ```
+
+## Unit readings
+
+Before the first import into a new database, settle how each unit typed
+after a number in the imported names is read (`3M`: meters, a data rate,
+or no unit; docs/decisions/0021). A dry run, in a checkout, writes a
+readings file from the names, one a line, with a proposed reading for
+each unit and the evidence for it:
+
+```sh
+uv run python -m inventory_tng.unit_readings propose names.txt --file readings.tsv
+```
+
+Correct it once: in each row, leave `correction` empty to take `proposed`,
+or write one of `offered`, by its symbol, or `none` for no unit. A unit
+proposed nothing must be given one. Keep the file: a later dry run keeps
+its corrections and adds new units. Then load it, before the import
+writes any name:
+
+```sh
+kubectl exec -i deploy/inventory -- python -m inventory_tng.unit_readings \
+  load - < readings.tsv
+```
+
+It writes a rule for each unit, by no administrator, and says what it did.
+A rule an administrator has set otherwise is kept, and said. A file with a
+unit left unread, or that would make two saved names read alike, loads
+nothing. After the import, administrators review what is left on the Unit
+readings page, under Propose.

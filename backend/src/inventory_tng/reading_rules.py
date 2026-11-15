@@ -4,10 +4,11 @@ every write to the reading_rule table. Each change reads every name with
 that unit after a number again (items.reread), and is refused if two names
 would then read alike (items.READ_ALIKE), holding the catalogue lock, as
 every name's write does. The seeding page proposes rules from every name
-there is (propose), by the words near each unit (units.CLUES)."""
+there is (propose), by the words near each unit (units.CLUES), as the
+import's readings file does from the names it brings (unit_readings)."""
 
 from collections import Counter
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -26,6 +27,10 @@ from inventory_tng.models import (
 
 # Refused: a reading no unit has, or a rule respelling no unit.
 NOT_A_READING = "reading_rule_reading"
+# What a form, or the import's readings file, says for "not a unit".
+NOT_A_UNIT = "none"
+# What each table's names are called, naming names that would read alike.
+TABLES = {"item": "item", "item_package": "package", "item_alias": "alias"}
 
 
 def _check(rule: units.Rule) -> None:
@@ -185,3 +190,21 @@ def names(session: Session) -> list[str]:
             )
         )
     )
+
+
+def offered(token: str, rule: units.Rule) -> tuple[units.Reading, ...]:
+    """The readings a rule's unit may be given: every one it spells
+    (units.readings), whatever the number, and the rule's."""
+    every = [reading for reading, _ in units.readings(token)]
+    ruled = units.reading_of(rule.reading) if rule.reading else None
+    if ruled is not None and ruled not in every:
+        every.append(ruled)
+    return tuple(every)
+
+
+def read_alike_words(groups: Sequence[Sequence[items.Named]]) -> list[str]:
+    """Each group of names that would read alike, in words, by id."""
+    return [
+        " and ".join(f"{TABLES[each.table]} {each.id} ({each.name})" for each in group)
+        for group in groups
+    ]

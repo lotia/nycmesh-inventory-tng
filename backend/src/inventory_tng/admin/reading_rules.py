@@ -28,6 +28,7 @@ from inventory_tng.db import DbSession, refusal
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import INTEGER_MAX, Admin, ReadingRule, whole
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.reading_rules import NOT_A_UNIT, offered, read_alike_words
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
 log = structlog.get_logger(__name__)
@@ -40,9 +41,6 @@ SEED = f"{READINGS}/seed"
 PROPOSED = "reading:"
 CHOOSE = "Choose how to read each one marked “Choose…” first."
 CHOOSE_ONE = "Choose one of the readings offered."
-# What a form sends for "not a unit".
-NOT_A_UNIT = "none"
-TABLES = {"item": "item", "item_package": "package", "item_alias": "alias"}
 
 NOTICES.update(
     {
@@ -64,24 +62,6 @@ def chosen_rule(
     if value in {str(reading) for reading in offered}:
         return units.Rule(value, respell)
     return None
-
-
-def offered(token: str, rule: units.Rule) -> tuple[units.Reading, ...]:
-    """The readings a rule's unit may be given: every one it spells
-    (units.readings), whatever the number, and the rule's."""
-    every = [reading for reading, _ in units.readings(token)]
-    ruled = units.reading_of(rule.reading) if rule.reading else None
-    if ruled is not None and ruled not in every:
-        every.append(ruled)
-    return tuple(every)
-
-
-def read_alike_words(groups: Sequence[Sequence[items.Named]]) -> list[str]:
-    """Each group of names that would read alike, in words, by id."""
-    return [
-        " and ".join(f"{TABLES[each.table]} {each.id} ({each.name})" for each in group)
-        for group in groups
-    ]
 
 
 def _list_page(request: Request, session: Session, signed: SignedIn) -> HTMLResponse:

@@ -490,3 +490,29 @@ Words the app shows for units are in US spelling, as the app follows US
 conventions (inventory-tng-g6u): `meters`, `liters`, `cubic meters`,
 `metric tons` (Ali, 2026-11-15). Both spellings are still read, in a
 search and as words near a unit (`metre`, `fibre`).
+
+## Amendment: the import's readings file (2026-11-14)
+
+An import starts with no reading rules, and its readings are settled
+before it writes a name (Ali, 2026-11-12, Q5-A, inventory-tng-c0c.5). An
+operator command, `unit_readings`, writes the dry run's readings to a
+file: one row per unit as typed after a number that the seeding page
+would propose, with the same proposal and evidence (the reading proposed
+and why, the readings offered, how many names need it, the words near it
+where they settle it, a few names), and an empty `correction` column. It
+is tab-separated UTF-8, sorted by unit, with comment lines saying what
+each column holds, so a correction is a one-line diff. The operator
+corrects it once and keeps it: a later dry run keeps every correction and
+row and adds what is new.
+
+Loading it is the first source of rules: each unit read by its correction,
+else its proposal, written with no administrator (`decided_by_admin_id`
+NULL) and the command line as the history's actor. A rule an
+administrator set otherwise is never overwritten: it is kept, and the
+command says so with what the file says. A unit with no reading, a
+reading not offered for it, or rules that would make two saved names read
+alike load nothing. The seeding page then proposes what is left.
+
+The sheet import (inventory-tng-8i4.17), not yet written, calls these for
+its dry run and before it writes; until then the command reads names from
+a text file, one a line.
