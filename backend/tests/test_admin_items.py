@@ -1390,7 +1390,10 @@ def test_a_rename_keeps_the_old_name_as_an_alias(
         "insert"
     ]
     page = text(admin_client.get(done.headers["location"]))
-    assert "Its old name is an alias now" in page
+    assert (
+        "Renamed. The old name is kept as an alias so searches still find it;"
+        " remove it below if it shouldn't be." in page
+    )
     session.refresh(item)
     assert item.name == "LiteBeam 5AC Gen1"
     found = items_named(text(admin_client.get(ITEMS, params={"q": "litebeam 5ac"})))

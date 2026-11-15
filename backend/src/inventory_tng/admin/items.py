@@ -180,8 +180,8 @@ NOTICES.update(
         "tracking_same": "Nothing changed: those ticked were set so already, "
         "or are retired.",
         "alias_added": "Alias added.",
-        "renamed": "Saved. Its old name is an alias now, so a search for it "
-        "still finds the item: remove it if it should not.",
+        "renamed": "Renamed. The old name is kept as an alias so searches "
+        "still find it; remove it below if it shouldn't be.",
         "alias_removed": "Alias removed.",
     }
 )
