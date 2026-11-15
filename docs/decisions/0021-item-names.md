@@ -372,3 +372,41 @@ name folded (`name_folded`, migration 0041), as an item does.
 
 Merging items is its own decision (inventory-tng-2f1), the merged item's
 name then moving to the survivor as an alias (Q18).
+
+## Amendment: reading rules, and names that read alike are one (2026-11-15)
+
+An administrator settles how a number and its unit, as typed, are read
+(Ali, 2026-11-12, inventory-tng-c0c.4): a reading rule, one row of
+`reading_rule` per token as typed (`305M`, `10G`, `16P`), reads it as a
+unit (`305M` as metres, `10G` as gigabits a second) or as no unit (`16P`),
+with who settled it and when. A rule is looked up before the unit table
+wherever a unit after a number is read: search, on the server and on the
+scan page, which the catalogue sends the rules to (`reading_rules`); the
+items list's search; and the item forms. The answer to the forms' question
+about a unit is kept as a rule, so it is asked once. The Unit readings page
+lists the rules, and changes or deletes one; a deleted rule's token is read
+by the table again. A token is kept with its number, so `305M` and `100M`
+are settled apart, and its case as typed.
+
+Names that read alike once their units are read are one name (Ali,
+2026-11-15): `10 uF`, `10 µF` and `10μF`, or `1 Gbps` and `1Gbit/s`, whose
+keys differ. Each item, package and alias keeps a second key, `unit_key`:
+the key of its name with each unit after a number that is read, by its
+rule or the table, spelt by its symbol (`models.unit_key`), unique as
+`name_key` is, items' and current aliases' one namespace, which `items.py`
+checks, and among an item's packages. A form refuses a name taken so,
+naming the item that has it. The app writes the column as the session
+flushes, as it writes what searches compare: a CHECK cannot hold it to the
+name, as the unit table and the rules are the app's, not PostgreSQL's
+(0016). Migration 0042 filled it, naming by id first any names it would
+make one. `Spool 305 m` and `Spool 305m` were one name already, by
+`name_key`.
+
+A rule changed, added or deleted reads every name with its number again,
+its unit key and what search keeps of it (`items.reread`), holding the
+catalogue lock; a change that would make two names one is refused, and the
+page names them by id, to rename one first.
+
+Rejected: a key in the database from a table of rules, which would need a
+function reading the unit table (0016), and keying rules by the unit alone
+(`M`), which would read `305M` and `100M` alike.

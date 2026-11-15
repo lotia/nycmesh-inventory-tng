@@ -211,6 +211,11 @@ export interface components {
       /** Retired Items */
       retired_items: components["schemas"]["RetiredItem"][];
       /**
+       * Reading Rules
+       * @default []
+       */
+      reading_rules: components["schemas"]["ReadingRuleEntry"][];
+      /**
        * Saved
        * @default []
        */
@@ -501,6 +506,19 @@ export interface components {
        * @constant
        */
       reason: "rate_limited";
+    };
+    /**
+     * ReadingRuleEntry
+     * @description A reading rule (models.ReadingRule): a number and its unit as typed
+     *     (units.rule_key), and what it reads as, by its symbol as searches spell
+     *     it (str(units.Reading)), or null: no unit. The page reads units by them
+     *     before its table, as the server does (units.respell).
+     */
+    ReadingRuleEntry: {
+      /** Token */
+      token: string;
+      /** Reading */
+      reading: string | null;
     };
     /**
      * RecordedBatch

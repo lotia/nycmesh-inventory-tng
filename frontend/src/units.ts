@@ -3,7 +3,9 @@
  * (backend/src/inventory_tng/units.py, docs/decisions/0021, 2026-11-14):
  * the same table, which the server writes to units.json, read the same
  * way, so a search spells "10 µF", "10μF" and "10uf" all "10uF" here as
- * there. units-vectors.json holds what both must make of some text.
+ * there, and the reading rules the catalogue sends first (units.Rule),
+ * as the server does. units-vectors.json holds what both must make of
+ * some text.
  */
 import table from "./units.json";
 
@@ -72,15 +74,33 @@ const ALONE = new RegExp(String.raw`(?<![\p{L}\p{N}])(${TOKEN})${ENDS}`, "gu");
 const marked = (text: string, ...at: number[]): boolean =>
   at.some((i) => /\p{M}/u.test(text.charAt(i)));
 
+/** Reading rules, by a number and its unit as typed (units.rule_key):
+ * the unit each reads as, by its symbol, or null, no unit. */
+export type Rules = ReadonlyMap<string, string | null>;
+
+// The number a unit follows, ending at its last digit (units._NUMBER).
+const NUMBER = /(?:(?<![\p{L}\p{N}])[-\u2212])?[0-9][0-9,]*(?:[.][0-9]+)?$/u;
+
 /** `text`, decomposed (NFKD), with each unit read right after a number
- * spelt by its symbol, joined to the number, and each unit alone spelt with
- * a sign no word is (not ASCII) by its symbol. */
-export function respell(text: string): string {
+ * spelt by its symbol, joined to the number, as its reading rule says if it
+ * has one (`rules`), and each unit alone spelt with a sign no word is (not
+ * ASCII) by its symbol. */
+export function respell(text: string, rules?: Rules): string {
   return text
     .replace(
       AFTER_A_NUMBER,
       (match, digit: string, token: string, at: number, whole: string) => {
         if (marked(whole, at + match.length)) return match;
+        if (rules !== undefined && rules.size > 0) {
+          // It ends at the digit the match starts with, so it is found.
+          const [number] = NUMBER.exec(
+            whole.slice(0, at + 1),
+          ) as RegExpExecArray;
+          const ruled = rules.get((number + token).normalize("NFC"));
+          if (ruled !== undefined) {
+            return ruled === null ? match : digit + ruled;
+          }
+        }
         const unit = read(token);
         return unit === undefined ? match : digit + unit;
       },

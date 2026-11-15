@@ -277,7 +277,10 @@ renaming it to one of its own aliases swaps the two (`items.save`).
 
 Each such row keeps its key in `name_key`, which the app writes as the
 name is set (`models.KeyedName`), a CHECK constraint holds to the name,
-and a plain unique index compares. `backend/src/inventory_tng/names.py`
+and a plain unique index compares. Names that read alike once their units
+are read are one too (`10 uF` and `10μF`): each row keeps `unit_key`,
+which the app writes as the session flushes (`models.unit_key`), unique
+as `name_key` is, with no CHECK, as the units are the app's. `backend/src/inventory_tng/names.py`
 has the rule: one pattern and one table of look-alikes
 (`LOOK_ALIKES`), read by Python (`name_key`) and PostgreSQL
 (`name_key_sql`), and a test checks both agree on every character. To
@@ -310,6 +313,13 @@ mise run regenerate-fold-reference
 
 `frontend/src/units-vectors.json` holds what both sides must make of some
 text; both test against it.
+
+A reading rule (`models.ReadingRule`, written only by `reading_rules.py`)
+settles how a number and its unit as typed are read, or that they are no
+unit, before the table, on both sides: the catalogue sends the rules. Each
+change to one reads every name with its number again (`items.reread`),
+refused where two names would then read alike. Administrators see and
+correct them on the Unit readings page, linked from Items.
 
 An item's or a package's form stores each unit after a number by its
 symbol as a name shows it, joined to the number (`units.spell`: `305 m` is

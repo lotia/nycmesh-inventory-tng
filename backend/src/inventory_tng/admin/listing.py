@@ -27,7 +27,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 
-from inventory_tng.models import INTEGER_MAX, folds, fuzzy, holds, whole
+from inventory_tng import units
+from inventory_tng.models import INTEGER_MAX, folds, fuzzy, holds, reading_rules, whole
 
 log = structlog.get_logger(__name__)
 
@@ -41,11 +42,11 @@ SUGGESTED = 8
 SEARCH_MAX = 200
 
 
-def folded(search: str) -> tuple[str, ...]:
+def folded(search: str, rules: units.Rules | None = None) -> tuple[str, ...]:
     """What was typed as what is searched is kept (models.folds): as typed,
-    and with its units respelt if that differs, each no longer than
-    SEARCH_MAX, as folding may lengthen it."""
-    return tuple(form[:SEARCH_MAX] for form in folds(search))
+    and with its units respelt if that differs, by `rules` first, each no
+    longer than SEARCH_MAX, as folding may lengthen it."""
+    return tuple(form[:SEARCH_MAX] for form in folds(search, rules))
 
 
 def closeness(column: SQLColumnExpression[str], search: str) -> ColumnElement[float]:
@@ -66,8 +67,9 @@ class Searched[T]:
     if joined to more; a column a search matches only whole, held in
     capitals, such as a label's code, put first; which are current, if not
     those with no retired_at; what the filter between Current and All calls
-    the rest; and each row as the page shows it, with a `name`, if not the
-    row itself."""
+    the rest; each row as the page shows it, with a `name`, if not the
+    row itself; and whether reading rules read its units (items', as
+    models.Searchable.READS_RULES)."""
 
     here: str
     model: type[T]
@@ -78,6 +80,7 @@ class Searched[T]:
     current: ColumnElement[bool] | None = None
     lapsed: Lapsed = "retired"
     shown: Callable[[Session, Sequence[T]], Sequence[Any]] | None = None
+    reads_rules: bool = False
 
     def read(
         self, q: str = "", show: str = "", page: str = "", pick: str = ""
@@ -108,15 +111,23 @@ class Searched[T]:
         current = self.is_current()
         return query.where(current if show == "current" else not_(current))
 
-    def matching(self, search: str) -> ColumnElement[bool]:
-        found = or_(*(fuzzy(self.text, form) for form in folded(search)))
+    def rules(self, session: Session) -> units.Rules | None:
+        return reading_rules(session) if self.reads_rules else None
+
+    def matching(
+        self, search: str, rules: units.Rules | None = None
+    ) -> ColumnElement[bool]:
+        found = or_(*(fuzzy(self.text, form) for form in folded(search, rules)))
         if self.whole is None:
             return found
         return or_(found, self.whole == search.upper())
 
-    def closeness(self, search: str) -> ColumnElement[float]:
+    def closeness(
+        self, search: str, rules: units.Rules | None = None
+    ) -> ColumnElement[float]:
         """As closeness(), and the whole column matched before anything."""
-        near = func.greatest(*(closeness(self.text, f) for f in folded(search)))
+        forms = folded(search, rules)
+        near = func.greatest(*(closeness(self.text, f) for f in forms))
         if self.whole is None:
             return near
         return case((self.whole == search.upper(), 3.0), else_=0.0) + near
@@ -214,8 +225,9 @@ class Listing[T]:
                 picked=shown[0].name if shown else None,
             )
         if self.search:
-            query = query.where(searched.matching(self.search)).order_by(
-                searched.closeness(self.search).desc()
+            rules = searched.rules(session)
+            query = query.where(searched.matching(self.search, rules)).order_by(
+                searched.closeness(self.search, rules).desc()
             )
         found = _count(session, query) if self.search else total
         page = min(self.page, max(1, ceil(found / PER_PAGE)))
@@ -239,11 +251,12 @@ class Listing[T]:
         if not self.search:
             return []
         searched = self.searched
+        rules = searched.rules(session)
         rows = session.scalars(
             searched.base(self.show)
-            .where(searched.matching(self.search))
+            .where(searched.matching(self.search, rules))
             .order_by(
-                searched.closeness(self.search).desc(),
+                searched.closeness(self.search, rules).desc(),
                 func.lower(searched.name),
             )
             .limit(SUGGESTED)

@@ -7,6 +7,7 @@ import runpy
 import sys
 import unicodedata
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -157,11 +158,13 @@ def test_writes_the_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     else [],
     ids=lambda vector: vector["text"],
 )
-def test_the_server_and_the_scan_page_read_units_alike(vector: dict[str, str]) -> None:
-    """units-vectors.json, which the scan page's tests read too."""
+def test_the_server_and_the_scan_page_read_units_alike(vector: dict[str, Any]) -> None:
+    """units-vectors.json, which the scan page's tests read too, its
+    reading rules first where it has them."""
     text = vector["text"]
-    assert respell(unicodedata.normalize("NFKD", text)) == vector["respelt"]
-    forms = [form.lower() for form in folds(text)]
+    rules = {k: units.Rule(v) for k, v in vector.get("rules", {}).items()}
+    assert respell(unicodedata.normalize("NFKD", text), rules) == vector["respelt"]
+    forms = [form.lower() for form in folds(text, rules)]
     if "searched" in vector:
         assert forms[-1] == vector["searched"]
     if "typed" in vector:
@@ -312,7 +315,7 @@ def test_a_name_spells_each_unit_by_its_symbol_joined_to_its_number(
 
 def test_case_asks_only_between_two_plausible_readings() -> None:
     """5 MG may be megagrams or milligrams, both likely sizes, and neither
-    spelt as typed: asked, by the token as typed, which each such token
+    spelt as typed: asked, by the number and token as typed, which each
     answers; an answer not among them asks again."""
     typed = "Weights 5 MG, 10 MG"
     spelt, asked = units.spell(typed, {})
@@ -320,8 +323,9 @@ def test_case_asks_only_between_two_plausible_readings() -> None:
     assert [(each.number, each.token) for each in asked] == [("5", "MG"), ("10", "MG")]
     assert [str(r) for r in asked[0].plausible] == ["Mg", "mg"]
     assert [r.named for r in asked[0].plausible] == ["megagrams", "milligrams"]
-    assert units.spell(typed, {"MG": "mg"}) == ("Weights 5mg, 10mg", [])
-    assert units.spell(typed, {"MG": "kg"})[1] == asked
+    answers = {"5MG": "mg", "10MG": "mg"}
+    assert units.spell(typed, answers) == ("Weights 5mg, 10mg", [])
+    assert units.spell(typed, {"5MG": "kg", "10MG": "kg"})[1] == asked
 
 
 def test_every_reading_is_shown_and_named_and_read_back_as_itself() -> None:

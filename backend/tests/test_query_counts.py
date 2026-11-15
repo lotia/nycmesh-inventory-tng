@@ -11,18 +11,20 @@ import pytest
 from fastapi import FastAPI
 from fastapi.routing import iter_route_contexts
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng import accounts, devices, over_recorded
 from inventory_tng.admin.length_checks import KINDS
 from inventory_tng.models import (
+    Admin,
     Authenticator,
     Item,
     ItemPackage,
     Label,
     Location,
     Movement,
+    ReadingRule,
     Volunteer,
 )
 
@@ -78,6 +80,15 @@ def everything(world: World) -> None:
         Label(location_id=spools.store.id),
     ):
         world.labels.append(add(session, label).id)
+
+
+def reading_rule(world: World) -> None:
+    """A reading rule more, settled by an administrator."""
+    session = world.session
+    settled = session.scalar(select(func.count()).select_from(ReadingRule))
+    admin_id = session.scalars(select(Admin.id)).first()
+    rule = ReadingRule(token=f"{settled}P", decided_by_admin_id=admin_id)
+    add(session, rule)
 
 
 def over_recorded_line(world: World) -> None:
@@ -210,6 +221,7 @@ PAGES: dict[str, tuple[More, *tuple[Path, ...]]] = {
     "/admin/stock/recorded-more": (over_recorded_line,),
     "/admin/stock/length-checks/{which}": (everything, *(k.path for k in KINDS)),
     "/admin/counts": (everything,),
+    "/admin/unit-readings": (reading_rule,),
     "/admin/counts/{location_id:int}": (
         item_in_store,
         lambda w: f"/admin/counts/{w.spools.store.id}",
@@ -241,6 +253,7 @@ EXEMPT = {
     "/admin/devices/{device_id:int}": "one device",
     "/admin/devices/{device_id:int}/revoke": "a confirmation of one row",
     "/admin/admins/{admin_id}": "one administrator",
+    "/admin/unit-readings/{rule_id}": "one reading rule",
     "/admin/admins/{admin_id}/reset": "a confirmation of one row",
 }
 

@@ -8,15 +8,17 @@ describe("units, as the server reads them", () => {
   test.each(
     shared.vectors as {
       text: string;
+      rules?: Record<string, string | null>;
       respelt: string;
       searched?: string;
       typed?: string;
     }[],
-  )("$text", ({ text, respelt, searched, typed }) => {
-    expect(respell(text.normalize("NFKD"))).toBe(respelt);
-    if (searched !== undefined) expect(bare(text)).toBe(searched);
+  )("$text", ({ text, rules: given, respelt, searched, typed }) => {
+    const rules = new Map(Object.entries(given ?? {}));
+    expect(respell(text.normalize("NFKD"), rules)).toBe(respelt);
+    if (searched !== undefined) expect(bare(text, rules)).toBe(searched);
     if (typed !== undefined) {
-      expect(bares(text)).toEqual(
+      expect(bares(text, rules)).toEqual(
         typed === searched ? [typed] : [typed, searched],
       );
     }
@@ -64,6 +66,22 @@ describe("units, as the server reads them", () => {
     }
     expect(finds("Resistor 4.7kΩ", "Ω")).toEqual(["Resistor 4.7kΩ"]);
     expect(finds("Sensor 85 °C", "Cel")).toEqual([]);
+  });
+
+  test("the catalogue's reading rules read a unit before the table", () => {
+    const ruled = (reading: string | null) => ({
+      ...CATALOGUE,
+      items: [{ ...cable, id: 104, name: "SFP+ 10G", search_text: "" }],
+      reading_rules: [{ token: "10G", reading }],
+    });
+    const finds = (reading: string | null, typed: string) =>
+      search(ruled(reading), typed).map((item) => item.id);
+    // Read as gigabits a second, not grams, as the server reads it.
+    expect(finds("Gbit/s", "10 Gbps")).toEqual([104]);
+    expect(finds("Gbit/s", "10G")).toEqual([104]);
+    // No unit: found only as typed.
+    expect(finds(null, "10 Gbps")).toEqual([]);
+    expect(finds(null, "10G")).toEqual([104]);
   });
 
   test("what was found before units were read still is (Ali, 2026-11-15)", () => {

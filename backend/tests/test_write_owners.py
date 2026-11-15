@@ -57,10 +57,13 @@ OWNERS: dict[str, str | None] = {t.name: t.info["owner"] for t in TABLES.values(
 # The functions that may write any table: one deletes an administrator's
 # password, as it is reset or retired; one is the ledger's one writer, which also
 # says where an open package moved whole is now; and the seed
-# makes its administrator, in a development database only.
+# makes its administrator, in a development database only. And a reading
+# rule is deleted, as an administrator undoes it, the unit table reading
+# its token again (docs/decisions/0021, 2026-11-15).
 ALLOWED = {
     SOURCE / "accounts.py": ("_remove_sign_in",),
     SOURCE / "ledger.py": ("insert_transaction",),
+    SOURCE / "reading_rules.py": ("delete",),
     SOURCE / "seed.py": ("run",),
 }
 # The tables a write needs no lock for, written out, so none loses its

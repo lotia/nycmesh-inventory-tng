@@ -16,9 +16,16 @@ every write to either takes it (docs/decisions/0021, 2026-11-14). A
 rename keeps the old name as an alias, and renaming an item to its own
 alias swaps the two (2026-11-15). similar finds items whose names or
 aliases are close, to ask whether a new name is a different item
-(docs/decisions/0021)."""
+(docs/decisions/0021).
 
-from collections.abc import Collection
+Names, packages' and aliases' too, are compared by their unit keys as
+well (models.unit_key), so names that read alike once their units are
+read are one: `10 uF` and `10μF`. A reading rule changed reads every name
+with it again (reread), refused if two would then read alike
+(2026-11-15)."""
+
+import re
+from collections.abc import Collection, Iterable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -39,6 +46,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
+from inventory_tng import units
 from inventory_tng.db import (
     Seen,
     enforce,
@@ -60,6 +68,9 @@ from inventory_tng.models import (
     current_aliases,
     fold,
     fuzzy,
+    holds,
+    reading_rules,
+    unit_key,
 )
 from inventory_tng.names import name_key
 
@@ -127,15 +138,32 @@ NAME_IS_ALIAS = "item_name_is_alias"
 ALIAS_IS_NAME = "item_alias_is_name"
 
 
-def _current_alias(key: str) -> tuple[ColumnElement[bool], ...]:
-    """Whether an alias is current and has this key."""
-    return ItemAlias.name_key == key, CURRENT_ALIAS
+@dataclass(frozen=True)
+class Keys:
+    """A name's keys: its name_key, and its unit_key as the reading rules
+    read it, which are both compared."""
+
+    name: str
+    units: str
+
+    @classmethod
+    def of(cls, session: Session, name: str) -> Keys:
+        return cls(name_key(name), unit_key(name, reading_rules(session)))
+
+    def match(self, model: type[Item | ItemAlias]) -> ColumnElement[bool]:
+        """Whether a row of `model` has either key."""
+        return or_(model.name_key == self.name, model.unit_key == self.units)
 
 
-def _alias_of(key: str) -> ColumnElement[bool]:
-    """Whether a current alias of the item has this key."""
+def _current_alias(keys: Keys) -> tuple[ColumnElement[bool], ...]:
+    """Whether an alias is current and has either key."""
+    return keys.match(ItemAlias), CURRENT_ALIAS
+
+
+def _alias_of(keys: Keys) -> ColumnElement[bool]:
+    """Whether a current alias of the item has either key."""
     of_item = ItemAlias.item_id == Item.id
-    return select(ItemAlias.id).where(of_item, *_current_alias(key)).exists()
+    return select(ItemAlias.id).where(of_item, *_current_alias(keys)).exists()
 
 
 def _held_by(
@@ -161,10 +189,10 @@ def taken_by(
     that item, as the unique indexes compare them, or "alias" and the other
     item whose alias the name is: a unique violation says neither. None if
     none has, as when the other changed meanwhile."""
-    key = name_key(fields.name)
+    keys = Keys.of(session, fields.name)
     wanted: list[tuple[str, ColumnElement[bool]]] = [
-        ("alias", _alias_of(key)),
-        ("name", Item.name_key == key),
+        ("alias", _alias_of(keys)),
+        ("name", keys.match(Item)),
     ]
     if fields.manufacturer is not None and fields.part_number is not None:
         both = and_(
@@ -234,8 +262,8 @@ def similar(session: Session, name: str, item_id: int) -> list[Close]:
 
 
 def _not_an_alias(session: Session, name: str) -> None:
-    """RuleBroken unless no current alias has `name`'s key."""
-    taken = _current_alias(name_key(name))
+    """RuleBroken unless no current alias has `name`'s keys."""
+    taken = _current_alias(Keys.of(session, name))
     enforce(NAME_IS_ALIAS, when=exists_where(session, *taken))
 
 
@@ -272,8 +300,11 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> Renamed
         enforce("item_unit_fixed", when=moved)
     if fields.category_id != item.category_id:
         _in_current_category(session, fields.category_id)
-    old, renamed = item.name, name_key(fields.name) != item.name_key
-    swapped = _own_alias(session, item.id, fields.name) if renamed else None
+    keys = Keys.of(session, fields.name)
+    # Only respelt, its units too, it is the same name.
+    renamed = keys.name != item.name_key and keys.units != item.unit_key
+    old = item.name
+    swapped = _own_alias(session, item.id, keys) if renamed else None
     if swapped is None:
         _not_an_alias(session, fields.name)
     for column, value in asdict(fields).items():
@@ -285,9 +316,9 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> Renamed
     return Renamed(_aliased(session, item, old), swapped)
 
 
-def _own_alias(session: Session, item_id: int, name: str) -> ItemAlias | None:
-    """The item's current alias with `name`'s key, if it has one."""
-    query = current_aliases(item_id).where(ItemAlias.name_key == name_key(name))
+def _own_alias(session: Session, item_id: int, keys: Keys) -> ItemAlias | None:
+    """The item's current alias with either key, if it has one."""
+    query = current_aliases(item_id).where(keys.match(ItemAlias))
     return session.scalars(query).first()
 
 
@@ -311,12 +342,10 @@ def aliases(session: Session, item_id: int) -> list[ItemAlias]:
 
 
 def alias_taken_by(session: Session, name: str) -> tuple[str, Item] | None:
-    """ "name" and the item whose name has `name`'s key, retired items' too,
-    or "alias" and the item one of whose current aliases has; if any."""
-    key = name_key(name)
-    return _held_by(
-        session, [("name", Item.name_key == key), ("alias", _alias_of(key))]
-    )
+    """ "name" and the item whose name has `name`'s keys, retired items'
+    too, or "alias" and the item one of whose current aliases has; if any."""
+    keys = Keys.of(session, name)
+    return _held_by(session, [("name", keys.match(Item)), ("alias", _alias_of(keys))])
 
 
 def add_alias(session: Session, item: Item, name: str) -> ItemAlias:
@@ -325,10 +354,8 @@ def add_alias(session: Session, item: Item, name: str) -> ItemAlias:
     current alias has it; and for a retired item, read only."""
     relock(session, item)
     enforce("retired_read_only", when=item.retired_at is not None)
-    enforce(
-        ALIAS_IS_NAME,
-        when=exists_where(session, Item.name_key == name_key(name)),
-    )
+    keys = Keys.of(session, name)
+    enforce(ALIAS_IS_NAME, when=exists_where(session, keys.match(Item)))
     return _aliased(session, item, name)
 
 
@@ -457,3 +484,120 @@ def track_items(session: Session, item_ids: Collection[int], track: bool) -> lis
     for item in changing:
         item.track_opened = track
     return [item.id for item in changing]
+
+
+# Refused: a reading rule changed that would make names read alike.
+READ_ALIKE = "names_read_alike"
+
+
+@dataclass(frozen=True)
+class Named:
+    """A row whose name a reading rule reads: its table, id and name, and
+    its item's id (a package's or an alias's; an item's own)."""
+
+    table: str
+    id: int
+    name: str
+    item_id: int
+
+
+# The number a reading rule's token starts with, without its sign.
+_DIGITS = re.compile(r"[-\u2212]?([0-9][0-9,]*(?:[.][0-9]+)?)")
+
+type Rows = tuple[list[Item], list[ItemPackage], list[ItemAlias]]
+
+
+def _with_numbers(session: Session, tokens: Iterable[str], *, lock: bool) -> Rows:
+    """Items, packages and current aliases with any token's number in what
+    is searched of them (an item's search_text holds its aliases), by id,
+    locked if `lock`: every one a rule for those tokens may read otherwise."""
+    numbers = {m[1] for t in tokens if (m := _DIGITS.match(t)) is not None}
+    if not numbers:
+        return [], [], []
+
+    def read[M: (Item, ItemPackage, ItemAlias)](
+        model: type[M], text: SQLColumnExpression[str], *where: ColumnElement[bool]
+    ) -> list[M]:
+        query = select(model).where(or_(*(holds(text, n) for n in numbers)), *where)
+        query = query.order_by(model.id)
+        return list(session.scalars(locked(query) if lock else query))
+
+    return (
+        read(Item, Item.search_text),
+        read(ItemPackage, ItemPackage.search_text),
+        read(ItemAlias, ItemAlias.name, CURRENT_ALIAS),
+    )
+
+
+def _read_alike(session: Session, rows: Rows, rules: units.Rules) -> list[list[Named]]:
+    """Names that would read alike, by `rules`, of which one at least is
+    in `rows`, read again: each group, by table and id. Items' names and
+    current aliases are one namespace; an item's packages another."""
+    items_, packages, aliases = rows
+    new = {
+        (row.__tablename__, row.id): unit_key(row.name, rules)
+        for row in (*items_, *packages, *aliases)
+    }
+    keys = set(new.values())
+
+    def others[M: (Item, ItemPackage, ItemAlias)](
+        model: type[M], mine: list[M], *where: ColumnElement[bool]
+    ) -> list[tuple[M, str]]:
+        ids = [row.id for row in mine]
+        query = select(model).where(
+            model.unit_key.in_(keys), model.id.not_in(ids), *where
+        )
+        return [(row, row.unit_key) for row in session.scalars(query)]
+
+    def named(row: Item | ItemPackage | ItemAlias) -> Named:
+        of = row.id if isinstance(row, Item) else row.item_id
+        return Named(row.__tablename__, row.id, row.name, of)
+
+    groups: dict[tuple[object, ...], list[Named]] = {}
+    every = [
+        *(
+            (row, new[row.__tablename__, row.id])
+            for row in (*items_, *packages, *aliases)
+        ),
+        *others(Item, items_),
+        *others(ItemPackage, packages),
+        *others(ItemAlias, aliases, CURRENT_ALIAS),
+    ]
+    for row, key in every:
+        scope = (row.item_id,) if isinstance(row, ItemPackage) else ()
+        groups.setdefault((*scope, key), []).append(named(row))
+    changed = {
+        (row.__tablename__, row.id)
+        for row in (*items_, *packages, *aliases)
+        if new[row.__tablename__, row.id] != row.unit_key
+    }
+    return [
+        group
+        for group in groups.values()
+        if len(group) > 1 and any((each.table, each.id) in changed for each in group)
+    ]
+
+
+def read_alike(
+    session: Session, tokens: Iterable[str], rules: units.Rules
+) -> list[list[Named]]:
+    """Names that would read alike by `rules`, of those with these tokens'
+    numbers: what reread refuses, said after its savepoint is undone."""
+    return _read_alike(session, _with_numbers(session, tokens, lock=False), rules)
+
+
+def reread(session: Session, tokens: Iterable[str]) -> None:
+    """Every name, package and alias with these tokens' numbers read again
+    by the reading rules as the session holds them: their unit keys and
+    what is searched of them. Refused (READ_ALIKE) if two names would then
+    read alike, naming nothing: read_alike says which. The rules are
+    written first (reading_rules.py), holding the catalogue lock."""
+    lock_catalogue(session)
+    rules = reading_rules(session)
+    rows = _with_numbers(session, list(tokens), lock=True)
+    enforce(READ_ALIKE, when=bool(_read_alike(session, rows, rules)))
+    items_, packages, aliases = rows
+    for row in (*items_, *packages, *aliases):
+        row.unit_key = unit_key(row.name, rules)
+    for searched in (*items_, *packages):
+        searched.refold(rules)

@@ -178,4 +178,9 @@ export const Catalogue = v.object({
   retired_items: v.array(RetiredItem),
   // Of the batch keys asked about, those saved, which the rest shows.
   saved: v.array(v.pipe(v.string(), v.uuid())),
+  // How a number and its unit as typed read (units.Rules): its symbol, or
+  // null, no unit.
+  reading_rules: v.array(
+    v.object({ token: v.string(), reading: v.nullable(v.string()) }),
+  ),
 });

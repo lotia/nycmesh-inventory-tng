@@ -1,0 +1,29 @@
+{% extends "admin_base.html" %}
+{#- One reading rule: what it reads its token as, changed or deleted; each
+reads every name with it again, refused where two would read alike. -#}
+{% block main %}
+{% if read_alike %}
+<div role="alert">
+  <p>Not saved: these names would read as one. Rename one of each first.</p>
+  <ul>{% for words in read_alike %}<li>{{ words }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+<form method="post" action="{{ here }}" class="actions">
+  <input type="hidden" name="version" value="{{ rule.edit_version }}">
+  <fieldset>
+    <legend>“{{ rule.token }}” is</legend>
+    {% for reading in offered %}
+    <label><input type="radio" name="reading" value="{{ reading }}" {% if rule.reading == reading | string %}checked{% endif %} required> {{ reading.shown }} · {{ reading.unit.kind }}</label>
+    {% endfor %}
+    <label><input type="radio" name="reading" value="{{ not_a_unit }}" {% if rule.reading is none %}checked{% endif %} required> Not a unit</label>
+  </fieldset>
+  <button class="primary">Save</button>
+</form>
+
+<section>
+  <h2>Delete</h2>
+  <p>Names with “{{ rule.token }}” are read by the unit table again, and an
+    item's form asks about it where that leaves two readings.</p>
+  <form method="post" action="{{ here }}/delete"><button>Delete</button></form>
+</section>
+{% endblock %}

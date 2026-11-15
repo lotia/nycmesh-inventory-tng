@@ -87,6 +87,7 @@ export const CATALOGUE: Catalogue = {
     },
   ],
   saved: [],
+  reading_rules: [],
   labels: [
     { code: "K7QX2M", item_id: 101, package_id: 1001, location_id: null },
     { code: "B3ZT9W", item_id: 100, package_id: null, location_id: null },

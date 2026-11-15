@@ -7,7 +7,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import Connection, text
 
-from inventory_tng.models import FOLDED_WITH, fold
+from inventory_tng.models import FOLDED_WITH, fold, unit_key
 from inventory_tng.names import IGNORED, name_key
 
 from helpers.sign_in import TOTP_KEYS
@@ -631,3 +631,67 @@ def test_going_back_before_name_keys_names_what_would_clash(
     )
     command.downgrade(alembic_config, "0036")
     command.upgrade(alembic_config, "head")
+
+
+def test_unit_keys_are_filled_by_the_migration(alembic_config: Config) -> None:
+    """Migration 0042: each item's, package's and alias's unit key, as the
+    app reads names with no rule settled yet; and gone again, going back."""
+    command.downgrade(alembic_config, "0041")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Parts') RETURNING id")
+    )
+    cap = _keyed(
+        connection, "item", "Cap 10 uF", category_id=category_id, name_folded=""
+    )
+    _keyed(connection, "item_package", "Reel 305 M", item_id=cap, size=305)
+    _keyed(connection, "item_alias", "Link 1 Gbps", item_id=cap, name_folded="")
+    command.upgrade(alembic_config, "head")
+    assert connection.execute(
+        text(
+            "SELECT unit_key FROM item UNION ALL SELECT unit_key FROM item_package"
+            " UNION ALL SELECT unit_key FROM item_alias"
+        )
+    ).scalars().all() == ["cap10uf", "reel305m", "link1gbits"]
+    assert unit_key("Reel 305 M") == "reel305m"
+    command.downgrade(alembic_config, "0041")
+    assert not connection.scalar(
+        text(
+            "SELECT count(*) FROM information_schema.columns"
+            " WHERE column_name = 'unit_key'"
+        )
+    )
+
+
+def test_unit_keys_name_what_would_clash(alembic_config: Config) -> None:
+    """Migration 0042's upgrade: names that would read alike once units are
+    read, among items, an item's packages, current aliases, or an alias and
+    an item's name, are named by id to rename. A retired alias clashes with
+    nothing."""
+    command.downgrade(alembic_config, "0041")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Parts') RETURNING id")
+    )
+    item = partial(_keyed, connection, "item", category_id=category_id, name_folded="")
+    cap, micro = item("Cap 10 uF"), item("Cap 10μF")
+    link = item("Link 1Gbit/s")
+    bag, bagged = (
+        _keyed(connection, "item_package", name, item_id=cap, size=1)
+        for name in ("Bag 2 uF", "Bag 2μF")
+    )
+    alias = partial(_keyed, connection, "item_alias", item_id=cap, name_folded="")
+    probe, degrees, gbps = (
+        alias("Probe 85 Cel"),
+        alias("Probe 85°C"),
+        alias("Link 1 Gbps"),
+    )
+    alias("Probe 85 degC", retired_at=datetime.now(UTC))
+    with pytest.raises(RuntimeError) as refused:
+        command.upgrade(alembic_config, "head")
+    assert str(refused.value) == (
+        "Names differing only in how their units are spelt would be one name, by"
+        f" id: item {cap}, {micro}; item_package {bag}, {bagged}; item_alias"
+        f" {probe}, {degrees}; item_alias {gbps} and item {link}. Rename all but"
+        " one in each, then migrate again."
+    )

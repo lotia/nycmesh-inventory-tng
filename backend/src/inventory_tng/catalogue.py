@@ -39,6 +39,7 @@ from inventory_tng.models import (
     ScanSettings,
     Volunteer,
     held,
+    reading_rules,
 )
 from inventory_tng.open_packages import tracks_opened
 
@@ -169,6 +170,16 @@ class Settings(Entry):
     name_check_minutes: int
 
 
+class ReadingRuleEntry(BaseModel):
+    """A reading rule (models.ReadingRule): a number and its unit as typed
+    (units.rule_key), and what it reads as, by its symbol as searches spell
+    it (str(units.Reading)), or null: no unit. The page reads units by them
+    before its table, as the server does (units.respell)."""
+
+    token: str
+    reading: str | None
+
+
 class Catalogue(BaseModel):
     settings: Settings
     volunteers: list[VolunteerEntry]
@@ -177,6 +188,8 @@ class Catalogue(BaseModel):
     labels: list[LabelEntry]
     open_packages: list[OpenPackageEntry]
     retired_items: list[RetiredItem]
+    # Optional, so a page of the build before reads the reply as it did.
+    reading_rules: list[ReadingRuleEntry] = []
     # Of the batch keys the page asked about, those saved: what the rest of
     # the reply shows already (with_saved), so the page takes off only what
     # the others moved (inventory-tng-jlc).
@@ -296,6 +309,10 @@ def catalogue(session: Session) -> Catalogue:
                 packages=named.get(item.id, []),
             )
             for item in gone
+        ],
+        reading_rules=[
+            ReadingRuleEntry(token=token, reading=rule.reading)
+            for token, rule in sorted(reading_rules(session).items())
         ],
     )
 

@@ -5,7 +5,7 @@
 {%- else %}{{ each.number }} {{ each.token }}: not read as a unit, as no size of one is likely{% endif %}</span>
 {% endfor %}
 {% for each in found if each.asks %}
-{% set field = reading_field ~ each.token %}
+{% set field = reading_field ~ each.key %}
 <fieldset>
   <legend>{{ each.number }} {{ each.token }} is</legend>
   {% for reading in each.plausible %}

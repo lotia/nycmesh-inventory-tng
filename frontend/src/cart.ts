@@ -26,7 +26,7 @@ import {
 } from "./outbox";
 import { count, decimal, sent, thousandths } from "./quantity";
 import { onStoredChange, readStored, writeStored } from "./stored";
-import { respell } from "./units";
+import { type Rules, respell } from "./units";
 
 /** Versioned as the outbox's is (outbox.ts): each build reads its own.
  * v2's is stamped with the build that wrote it, may keep a batch key
@@ -278,6 +278,8 @@ type Index = {
   /** What search looks through, per item, bare: its details as spelt, then
    * the server's folded text. */
   haystacks: Map<number, string>;
+  /** The reading rules, by a number and its unit as typed (units.Rules). */
+  rules: Rules;
   /** Label codes and items' old codes, upper case, to what they name. */
   codes: Map<string, Named>;
 };
@@ -310,6 +312,9 @@ export function indexOf(catalogue: Catalogue): Index {
     }
     places.set(location.id, names.join(" › "));
   }
+  const rules: Rules = new Map(
+    catalogue.reading_rules.map((rule) => [rule.token, rule.reading]),
+  );
   // Labels after old codes, so a label wins if the two ever clash.
   const codes: Index["codes"] = new Map();
   for (const item of catalogue.items) {
@@ -357,7 +362,7 @@ export function indexOf(catalogue: Catalogue): Index {
             item.old_code,
             item.category,
             ...item.aliases,
-          ].flatMap((field) => bares(field ?? "")),
+          ].flatMap((field) => bares(field ?? "", rules)),
           item.search_text.toLowerCase(),
         ]
           .filter(Boolean)
@@ -365,6 +370,7 @@ export function indexOf(catalogue: Catalogue): Index {
       ]),
     ),
     codes,
+    rules,
   };
   indexes.set(catalogue, index);
   return index;
@@ -1220,7 +1226,8 @@ function withOffered(cart: Cart, here: ReadonlyMap<string, unknown>): Cart {
  * or the server's folded text (docs/decisions/0021, 2026-11-12, and Ali,
  * 2026-11-15). */
 export function search(catalogue: Catalogue, text: string, limit = 20): Item[] {
-  const forms = bares(text)
+  const { haystacks, rules } = indexOf(catalogue);
+  const forms = bares(text, rules)
     .map((form) =>
       // A lone accent is no word: not a search matching everything.
       form.split(/\s+/).filter((word) => word !== ""),
@@ -1229,7 +1236,6 @@ export function search(catalogue: Catalogue, text: string, limit = 20): Item[] {
   if (forms.length === 0) {
     return [];
   }
-  const { haystacks } = indexOf(catalogue);
   return catalogue.items
     .filter((item) => {
       const haystack = haystacks.get(item.id) ?? "";
@@ -1245,18 +1251,18 @@ export function search(catalogue: Catalogue, text: string, limit = 20): Item[] {
  * combining marks: "é" is "e", fullwidth "ｃａｆｅ" is "cafe", "ﬁ" is "fi"
  * and "10 µF" is "10uf"; "ł", "ø", "æ" and "ß", which do not decompose,
  * stay as they are, and so do Greek letters, but in units. */
-export function bare(text: string): string {
-  return unmarked(respell(text.normalize("NFKD")));
+export function bare(text: string, rules?: Rules): string {
+  return unmarked(respell(text.normalize("NFKD"), rules));
 }
 
 /** `text` bare as typed, its units as they are, then `bare` if that
  * differs, as the server keeps and matches it (models.folds): so "feet",
  * "48 v" in "48 vdc" and a half-typed "10 μ" find what they did before
- * units were read. */
-export function bares(text: string): string[] {
+ * units were read; `rules`, the reading rules, read first. */
+export function bares(text: string, rules?: Rules): string[] {
   const decomposed = text.normalize("NFKD");
   const typed = unmarked(decomposed);
-  const respelling = respell(decomposed);
+  const respelling = respell(decomposed, rules);
   if (respelling === decomposed) return [typed];
   const respelt = unmarked(respelling);
   return respelt === typed ? [typed] : [typed, respelt];

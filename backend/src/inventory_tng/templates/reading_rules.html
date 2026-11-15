@@ -1,0 +1,26 @@
+{% extends "admin_base.html" %}
+{% from "_table.html" import table %}
+{#- The reading rules: how a number and its unit, as typed, are read
+(models.ReadingRule, docs/decisions/0021), each changed or deleted on its
+own page. -#}
+{% block main %}
+<p>How a number and its unit, as typed in a name, are read: by searches,
+  here and on the scan page, and by the item forms, before the unit table.
+  Settled as an item's form asks, or corrected here.</p>
+<section>
+  {% call table() %}
+    <tr><th>Typed</th><th>Read as</th><th>Settled by</th><th>When</th></tr>
+    {% for rule, username in rows %}
+    {% set reading = reading_of(rule.reading) if rule.reading else none %}
+    <tr>
+      <td><a href="{{ here }}/{{ rule.id }}">{{ rule.token }}</a></td>
+      <td>{% if reading %}{{ reading.shown }} · {{ reading.unit.kind }}{% else %}Not a unit{% endif %}</td>
+      <td>{{ username or "The import" }}</td>
+      <td>{{ rule.decided_at | when(zone) }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4">None yet.</td></tr>
+    {% endfor %}
+  {% endcall %}
+</section>
+{% endblock %}

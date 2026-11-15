@@ -550,6 +550,14 @@
             "type": "array",
             "title": "Retired Items"
           },
+          "reading_rules": {
+            "items": {
+              "$ref": "#/components/schemas/ReadingRuleEntry"
+            },
+            "type": "array",
+            "title": "Reading Rules",
+            "default": []
+          },
           "saved": {
             "items": {
               "type": "string",
@@ -1170,6 +1178,29 @@
         "type": "object",
         "required": ["reason"],
         "title": "RateLimitedReply"
+      },
+      "ReadingRuleEntry": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "reading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reading"
+          }
+        },
+        "type": "object",
+        "required": ["token", "reading"],
+        "title": "ReadingRuleEntry",
+        "description": "A reading rule (models.ReadingRule): a number and its unit as typed\n(units.rule_key), and what it reads as, by its symbol as searches spell\nit (str(units.Reading)), or null: no unit. The page reads units by them\nbefore its table, as the server does (units.respell)."
       },
       "RecordedBatch": {
         "properties": {

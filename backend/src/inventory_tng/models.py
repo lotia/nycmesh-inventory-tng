@@ -211,19 +211,19 @@ def holds(column: SQLColumnExpression[str], search: str) -> ColumnElement[bool]:
     return column.ilike(f"%{escaped}%", escape="\\")
 
 
-def fold(text: str) -> str:
+def fold(text: str, rules: units.Rules | None = None) -> str:
     """`text` as searches compare it: in ASCII, as anyascii spells it, so
     "cafe" finds "Café" and "lodz" "Łódź" (docs/decisions/0021, 2026-11-12),
     after compatibility characters are made their canonical ones (NFKC), so
     "ﬁ" is "fi", and each unit right after a number is spelt by its symbol
     (units.respell, 2026-11-14), so "10 µF", "10μF" and "10uf" are all
-    "10uF". What is searched is kept so and as typed (held); what is typed
-    is matched so and as typed (folds)."""
+    "10uF", as `rules` read it first. What is searched is kept so and as
+    typed (held); what is typed is matched so and as typed (folds)."""
     decomposed = unicodedata.normalize("NFKD", text)
-    return anyascii(unicodedata.normalize("NFKC", units.respell(decomposed)))
+    return anyascii(unicodedata.normalize("NFKC", units.respell(decomposed, rules)))
 
 
-def folds(text: str) -> tuple[str, ...]:
+def folds(text: str, rules: units.Rules | None = None) -> tuple[str, ...]:
     """`text` folded as typed, units as they are, then by fold() if that
     differs: searches match either (Ali, 2026-11-15, inventory-tng-c0c.2),
     so a unit's word alone ("feet"), a unit typed shorter than a token not
@@ -231,7 +231,7 @@ def folds(text: str) -> tuple[str, ...]:
     found before units were read, and "10 µF" finds "10uf" too."""
     typed = anyascii(unicodedata.normalize("NFKC", text))
     decomposed = unicodedata.normalize("NFKD", text)
-    respelling = units.respell(decomposed)
+    respelling = units.respell(decomposed, rules)
     if respelling == decomposed:
         return (typed,)
     respelt = anyascii(unicodedata.normalize("NFKC", respelling))
@@ -239,9 +239,9 @@ def folds(text: str) -> tuple[str, ...]:
     return (typed,) if respelt.lower() == typed.lower() else (typed, respelt)
 
 
-def held(text: str) -> str:
+def held(text: str, rules: units.Rules | None = None) -> str:
     """What search_text keeps of `text`: each of its folds, spaced."""
-    return " ".join(folds(text))
+    return " ".join(folds(text, rules))
 
 
 # Signs a name is stored without, for the spelling Unicode and the SI
@@ -280,12 +280,24 @@ class KeyedName(CanonicalName):
     """A row whose name is compared by its key (names.name_key), kept in
     `name_key` as the name is set and held to it by a CHECK constraint
     (_name_key_check), so a unique index on it compares names so
-    (docs/decisions/0021)."""
+    (docs/decisions/0021). And by `unit_key`, the key of the name with its
+    units read (unit_key), so names that differ only in how a unit is
+    spelt are one: written as the session flushes, as reading rules are
+    in the database, and again when a rule changes (items.reread); no
+    CHECK can hold it, the unit table being the app's (2026-11-15)."""
 
     name_key: Mapped[str] = mapped_column(Text)
+    unit_key: Mapped[str] = mapped_column(Text, info={"not_a_change": True})
 
     def _named(self, name: str) -> None:
         self.name_key = names.name_key(name)
+
+
+def unit_key(name: str, rules: units.Rules | None = None) -> str:
+    """The key of `name` with each unit after a number spelt by what it
+    reads as, its rule first (units.read_as): `10 µF`, `10 uF` and `10μF`
+    alike, and `305M` as `305m` where a rule reads it so."""
+    return names.name_key(units.read_as(name, rules))
 
 
 def _name_key_check() -> CheckConstraint:
@@ -313,15 +325,19 @@ class Searchable:
     migrations 0032, 0033, 0036 and 0039 filled the rows there were."""
 
     SEARCHED: ClassVar[tuple[str, ...]] = ("name",)
+    # Whether reading rules read its units (an item's, a package's), as
+    # items.reread folds it again when one changes.
+    READS_RULES: ClassVar[bool] = False
     # Not a change alone: what is searched changes with it, or another row
     # does, as an item's aliases (Item.refold), which keep their own history.
     search_text: Mapped[str] = mapped_column(Text, info={"not_a_change": True})
     folded_with: Mapped[str] = mapped_column(Text, info={"not_a_change": True})
 
-    def refold(self) -> None:
+    def refold(self, rules: units.Rules | None = None) -> None:
         # Each folded alone, so no field's number reads the next's start
         # as a unit.
-        fields = (held(getattr(self, field) or "") for field in self.SEARCHED)
+        rules = rules if self.READS_RULES else None
+        fields = (held(getattr(self, field) or "", rules) for field in self.SEARCHED)
         self.search_text = " ".join(fields)
         self.folded_with = FOLDED_WITH
 
@@ -350,8 +366,19 @@ def _refold(session: Session, _context: object, _instances: object) -> None:
         for row in changed
         if isinstance(row, ItemAlias)
     ]
+    keyed = [
+        row
+        for row in changed
+        if isinstance(row, KeyedName)
+        and (row in session.new or inspect(row).attrs["name"].history.has_changes())
+    ]
+    rules = None
+    if keyed or any(row.READS_RULES for row in rows):
+        rules = reading_rules(session)
     for row in dict.fromkeys(rows):
-        row.refold()
+        row.refold(rules)
+    for row in keyed:
+        row.unit_key = unit_key(row.name or "", rules)
 
 
 def fuzzy(column: SQLColumnExpression[str], search: str) -> ColumnElement[bool]:
@@ -427,6 +454,7 @@ class Item(KeyedName, Searchable, Versioned, Base):
     __table_args__ = (
         # Retired ones too, as for categories (docs/decisions/0019).
         Index("uq_item_name", "name_key", unique=True),
+        Index("uq_item_unit_key", "unit_key", unique=True),
         _name_key_check(),
         Index(
             "uq_item_manufacturer_part_number",
@@ -487,10 +515,11 @@ class Item(KeyedName, Searchable, Versioned, Base):
     # fuzzy() on search_text fast, as the items list searches it
     # (admin/items.py).
     SEARCHED = ("name", "manufacturer", "part_number", "old_code")
+    READS_RULES = True
     name_folded: Mapped[str] = mapped_column(Text)
 
-    def refold(self) -> None:
-        super().refold()
+    def refold(self, rules: units.Rules | None = None) -> None:
+        super().refold(rules)
         self.name_folded = fold(self.name or "")
         # Its current aliases too, each folded alone, as the session holds
         # them: refolded as a flush begins (_refold), one added or retired
@@ -504,7 +533,7 @@ class Item(KeyedName, Searchable, Versioned, Base):
                 if isinstance(row, ItemAlias) and row.item_id == self.id
             )
             names = [
-                held(alias.name)
+                held(alias.name, rules)
                 for alias in (*written, *adding)
                 if alias.retired_at is None
             ]
@@ -514,11 +543,13 @@ class Item(KeyedName, Searchable, Versioned, Base):
 class ItemPackage(KeyedName, Searchable, Versioned, Base):
     """A size an item comes in: "100-pack" = 100, "reel" = 305 (m)."""
 
+    READS_RULES = True
     __tablename__ = "item_package"
     __table_args__ = (
         # Among all of its item's, retired ones too, so one can always be
         # brought back, compared as items' names are (docs/decisions/0021).
         Index("uq_item_package_name", "item_id", "name_key", unique=True),
+        Index("uq_item_package_unit_key", "item_id", "unit_key", unique=True),
         _name_key_check(),
         CheckConstraint("size > 0", name="size"),
         CheckConstraint("short_below > 0", name="short_below"),
@@ -563,6 +594,12 @@ class ItemAlias(KeyedName, Base):
             unique=True,
             postgresql_where=text("retired_at IS NULL"),
         ),
+        Index(
+            "uq_item_alias_unit_key",
+            "unit_key",
+            unique=True,
+            postgresql_where=text("retired_at IS NULL"),
+        ),
         _name_key_check(),
         protection(owner="items.py", lock="catalogue", history=True),
     )
@@ -590,6 +627,46 @@ def current_aliases(item_id: int) -> Select[ItemAlias]:
     them."""
     query = select(ItemAlias).where(ItemAlias.item_id == item_id, CURRENT_ALIAS)
     return query.order_by(ItemAlias.id)
+
+
+class ReadingRule(Versioned, Base):
+    """How a number and its unit, as typed, are read, settled by an
+    administrator (units.Rule, docs/decisions/0021, 2026-11-15): `token`,
+    such as `305M`, read as `reading`, a unit as str(units.Reading) spells
+    it, or as no unit (NULL); and whether a name typed with it spells it by
+    its symbol (`respell`). Looked up before the unit table wherever a unit
+    is read. Changed or deleted by an administrator, when every name with
+    it is read again (items.reread), so it is the catalogue's to lock."""
+
+    __tablename__ = "reading_rule"
+    __table_args__ = (
+        Index("uq_reading_rule_token", "token", unique=True),
+        CheckConstraint("reading IS NOT NULL OR NOT respell", name="respell_a_unit"),
+        protection(owner="reading_rules.py", lock="catalogue", history=True),
+    )
+
+    id: Mapped[IntId]
+    created_at: Mapped[CreatedAt]
+    token: Mapped[str] = mapped_column(Text)
+    reading: Mapped[str | None] = mapped_column(Text)
+    respell: Mapped[bool] = mapped_column(server_default=text("false"))
+    # Who settled it last, and when; no one, if the import did.
+    decided_by_admin_id: Mapped[int | None] = _reference("admin.id")
+    decided_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    @property
+    def rule(self) -> units.Rule:
+        return units.Rule(self.reading, self.respell)
+
+
+def reading_rules(session: Session) -> dict[str, units.Rule]:
+    """Every reading rule, by its token."""
+    rows = session.execute(
+        select(ReadingRule.token, ReadingRule.reading, ReadingRule.respell)
+    )
+    return {token: units.Rule(reading, respell) for token, reading, respell in rows}
 
 
 class OpenPackage(Base):

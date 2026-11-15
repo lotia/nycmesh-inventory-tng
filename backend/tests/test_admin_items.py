@@ -137,7 +137,7 @@ def test_names_and_part_numbers_are_unique_naming_the_other(
             "name",
             (
                 "Lite-Beam 5AC already has that name, or one differing from it "
-                "only in case, spaces or punctuation."
+                "only in case, spaces, punctuation or how its units are spelt."
             ),
         ),
         (
@@ -170,7 +170,8 @@ def test_a_name_pasted_with_look_alikes_clashes_naming_the_other(
         assert refused.status_code == 400
         assert (
             f'id="name-problem">{escape(kept)} already has that name, or one '
-            "differing from it only in case, spaces or punctuation.</span>"
+            "differing from it only in case, spaces, punctuation or how its "
+            "units are spelt.</span>"
         ) in refused.text
     assert named(session, Item, "Patch\u2014cord").name_key == "patchcord"
 
@@ -1057,7 +1058,7 @@ def test_case_asks_which_unit_when_both_are_likely(
     page = text(asked)
     assert "Which unit did you mean?" in page
     assert "<legend>5 MG is</legend>" in page
-    assert 'name="unit:MG" value="Mg"' in page
+    assert 'name="unit:5MG" value="Mg"' in page
     assert "5Mg, megagrams" in page
     assert "5mg, milligrams" in page
     (line,) = [line for line in logs if line["event"] == "unit asked about"]
@@ -1065,10 +1066,10 @@ def test_case_asks_which_unit_when_both_are_likely(
         "log_level": "debug"
     }
     assert session.scalar(select(func.count()).select_from(Item)) == 1
-    answered = form | {"unit:MG": "mg"}
+    answered = form | {"unit:5MG": "mg"}
     close = admin_client.post(ITEMS, data=answered)
     assert "A different item?" in text(close)
-    assert 'name="unit:MG" value="mg" checked' in close.text
+    assert 'name="unit:5MG" value="mg" checked' in close.text
     again = answered | {"different": "Weight 5 MG"}
     assert admin_client.post(ITEMS, data=again).status_code == 303
     named(session, Item, "Weight 5mg")
@@ -1082,9 +1083,9 @@ def test_a_package_name_reads_units_too(
     path = f"{ITEMS}/{item.id}/packages"
     added = admin_client.post(path, data={"package_name": "Bag 5 MG", "size": "2"})
     assert added.status_code == 400
-    assert 'name="unit:MG" value="mg"' in added.text
-    assert 'name="unit:MG" value="Mg" checked' not in added.text
-    chosen = {"package_name": "Bag 5 MG", "size": "2", "unit:MG": "Mg"}
+    assert 'name="unit:5MG" value="mg"' in added.text
+    assert 'name="unit:5MG" value="Mg" checked' not in added.text
+    chosen = {"package_name": "Bag 5 MG", "size": "2", "unit:5MG": "Mg"}
     assert admin_client.post(path, data=chosen).status_code == 303
     package = named(session, ItemPackage, "Bag 5Mg")
     page = text(admin_client.get(f"{ITEMS}/{item.id}"))
@@ -1095,7 +1096,8 @@ def test_a_package_name_reads_units_too(
     )
     assert resent.status_code == 303
     assert package.name == "Spool 1000ft"
-    asking = {"package_name": "Bag 5 MG", "size": "2", "package_version": "1"}
+    # 5 MG is settled now, by the answer kept as a reading rule.
+    asking = {"package_name": "Bag 7 MG", "size": "2", "package_version": "1"}
     refused = admin_client.post(f"{path}/{package.id}", data=asking)
     assert refused.status_code == 400
     assert "Which unit did you mean?" in text(refused)
@@ -1238,7 +1240,10 @@ def test_a_clash_with_an_alias_names_the_item(
     beam = new_item(session, radios, "LiteBeam 5AC Gen2")
     aliased(session, beam, "LBE Gen2")
     rocket = new_item(session, radios, "Rocket")
-    words = "LiteBeam 5AC Gen2 already has that {}, or one differing from it only in case, spaces or punctuation."
+    words = (
+        "LiteBeam 5AC Gen2 already has that {}, or one differing from it only in"
+        " case, spaces, punctuation or how its units are spelt."
+    )
     for target, form, field, said in (
         (
             f"{ITEMS}/{rocket.id}/aliases",
@@ -1270,7 +1275,8 @@ def test_a_clash_with_an_alias_names_the_item(
             "name",
             (
                 "LiteBeam 5AC Gen2 has that name, or one differing from it only "
-                "in case, spaces or punctuation, as an alias."
+                "in case, spaces, punctuation or how its units are spelt, as an "
+                "alias."
             ),
         ),
         (
@@ -1284,7 +1290,8 @@ def test_a_clash_with_an_alias_names_the_item(
             "name",
             (
                 "LiteBeam 5AC Gen2 has that name, or one differing from it only "
-                "in case, spaces or punctuation, as an alias."
+                "in case, spaces, punctuation or how its units are spelt, as an "
+                "alias."
             ),
         ),
     ):

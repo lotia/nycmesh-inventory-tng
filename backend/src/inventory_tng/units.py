@@ -18,6 +18,11 @@ An item's or a package's name, as typed on its form, is stored with each
 unit after a number spelt by its symbol as a name shows it, joined to the
 number (spell, inventory-tng-c0c.3): case is read loosely only where one
 reading is a likely size, and the form asks where two are.
+
+A reading rule (models.ReadingRule, inventory-tng-c0c.4) settles how a
+number and its unit, as typed (`305M`, `10G`), are read, or that they are
+no unit (`16P`): looked up before the table, wherever a unit after a
+number is read, by search here and on the scan page, and by the forms.
 """
 
 import json
@@ -311,6 +316,38 @@ def read(token: str) -> Reading | None:
     return None
 
 
+@dataclass(frozen=True)
+class Rule:
+    """A reading rule's verdict (models.ReadingRule): the reading, as
+    str(Reading), or None, no unit; and whether a name typed with it spells
+    it by its symbol."""
+
+    reading: str | None
+    respell: bool = False
+
+
+# Reading rules by what each is kept by (rule_key).
+type Rules = Mapping[str, Rule]
+
+
+def rule_key(number: str, token: str) -> str:
+    """What a reading rule is kept by: a number and its unit as typed,
+    joined, in canonical spelling (NFC), so `305 M` and `305M` are one."""
+    return unicodedata.normalize("NFC", number + token)
+
+
+def _number(text: str, end: int) -> str:
+    """The number ending at `end` in `text`, as typed."""
+    number = _NUMBER.search(text[:end])
+    assert number is not None  # It ends at a digit AFTER_A_NUMBER found.
+    return number[0]
+
+
+def _key_of(match: re.Match[str]) -> str:
+    """The rule_key of a unit AFTER_A_NUMBER found."""
+    return rule_key(_number(match.string, match.end(1)), match[2])
+
+
 # What may be a unit, and that it ends where a letter or digit does not
 # follow: frontend/src/units.ts's, character for character.
 _TOKEN = (
@@ -335,16 +372,18 @@ def _marked(text: str, *at: int) -> bool:
     )
 
 
-def respell(text: str) -> str:
+def respell(text: str, rules: Rules | None = None) -> str:
     """`text` with each unit read right after a number spelt by its symbol
-    (str(Reading)), joined to the number, and each unit alone spelt with a
-    sign no word is (not ASCII) by its symbol. `text` is decomposed (NFKD),
-    as both the server and the scan page fold it, so `℃` is `°C` and `µ`
-    `μ`."""
+    (str(Reading)), joined to the number, as its reading rule says if it has
+    one (`rules`), and each unit alone spelt with a sign no word is (not
+    ASCII) by its symbol. `text` is decomposed (NFKD), as both the server and
+    the scan page fold it, so `℃` is `°C` and `µ` `μ`."""
 
     def respelt(match: re.Match[str]) -> str:
         if _marked(match.string, match.end()):
             return match[0]
+        if rules and (rule := rules.get(_key_of(match))) is not None:
+            return match[0] if rule.reading is None else f"{match[1]}{rule.reading}"
         reading = read(match[2])
         return match[0] if reading is None else f"{match[1]}{reading}"
 
@@ -366,6 +405,12 @@ def respell(text: str) -> str:
 # thousands, a point is decimal, and a minus counts only where no letter
 # or digit is before it ("-40 dBm", not "Gen2-5 m").
 _NUMBER = re.compile(r"(?:(?<![^\W_])[-\u2212])?[0-9][0-9,]*(?:[.][0-9]+)?\Z")
+
+
+def reading_of(symbol: str) -> Reading | None:
+    """The reading spelt `symbol` (str(Reading)), if one is."""
+    reading = read(symbol)
+    return reading if reading is not None and str(reading) == symbol else None
 
 
 def readings(token: str) -> list[tuple[Reading, bool]]:
@@ -402,57 +447,86 @@ class Found:
     end: int
     plausible: tuple[Reading, ...]
     settled: Reading | None
+    # Its reading rule, if it has one, which settled it.
+    rule: Rule | None = None
+
+    @property
+    def key(self) -> str:
+        """What its reading rule is kept by (rule_key)."""
+        return rule_key(self.number, self.token)
 
     @property
     def asks(self) -> bool:
-        """Whether case leaves two plausible readings, so the form asks."""
-        return self.settled is None and len(self.plausible) > 1
+        """Whether case leaves two plausible readings and no rule settles
+        it, so the form asks."""
+        return self.rule is None and self.settled is None and len(self.plausible) > 1
 
 
-def found_in(name: str) -> list[Found]:
+def found_in(name: str, rules: Rules | None = None) -> list[Found]:
     """What may be units in `name`, right after a number: each token some
-    unit spells, in any case (readings), whether or not one is plausible.
+    unit spells, in any case (readings), whether or not one is plausible,
+    and each a reading rule names. Its rule, if any, settles it.
     `name` is in canonical spelling (models.canonical), so `℃` is `°C`."""
     found = []
     for match in AFTER_A_NUMBER.finditer(name):
-        every = readings(match[2])
-        if _marked(name, match.end()) or not every:
+        if _marked(name, match.end()):
             continue
-        number = _NUMBER.search(name[: match.end(1)])
-        assert number is not None  # It ends at the digit the match starts with.
-        value = float(number[0].replace(",", "").replace("\u2212", "-"))
+        number = _number(name, match.end(1))
+        rule = (rules or {}).get(rule_key(number, match[2]))
+        every = readings(match[2])
+        if not every and rule is None:
+            continue
+        value = float(number.replace(",", "").replace("\u2212", "-"))
         plausible = [(r, exact) for r, exact in every if r.plausible(value)]
         exact = [r for r, spelt in plausible if spelt]
         settled = None
-        if len(plausible) == 1:
+        if rule is not None:
+            settled = None if rule.reading is None else reading_of(rule.reading)
+        elif len(plausible) == 1:
             settled = plausible[0][0]
         elif len(exact) == 1:
             settled = exact[0]
         found.append(
             Found(
-                number[0],
+                number,
                 match[2],
                 match.end(1),
                 match.end(),
                 tuple(r for r, _ in plausible),
                 settled,
+                rule,
             )
         )
     return found
 
 
-def spell(name: str, chosen: Mapping[str, str]) -> tuple[str, list[Found]]:
+def read_as(name: str, rules: Rules | None = None) -> str:
+    """`name` with each unit after a number that is read, by its rule or
+    the table (found_in), spelt by its symbol (str(Reading)) joined to its
+    number, the rest as it is: so names that read alike are spelt alike,
+    `10 µF`, `10 uF` and `10μF` all `10uF` (models.KeyedName.unit_key)."""
+    spelt, at = [], 0
+    for found in found_in(name, rules):
+        if found.settled is not None:
+            spelt += [name[at : found.start], str(found.settled)]
+            at = found.end
+    return "".join([*spelt, name[at:]])
+
+
+def spell(
+    name: str, chosen: Mapping[str, str], rules: Rules | None = None
+) -> tuple[str, list[Found]]:
     """`name` with each unit right after a number spelt by its symbol as a
     name shows it (Reading.shown), joined to the number: the one reading
     case leaves, or the one `chosen` for its token (by str(Reading)), as
     the form asked. And what is still to be asked. A token with no
     plausible reading is left as typed: `4 K`, as -269 °C, is no unit."""
     spelt, asked, at = [], [], 0
-    for found in found_in(name):
+    for found in found_in(name, rules):
         choice = next(
-            (r for r in found.plausible if str(r) == chosen.get(found.token)), None
+            (r for r in found.plausible if str(r) == chosen.get(found.key)), None
         )
-        reading = found.settled or choice
+        reading = found.settled if found.rule is not None else found.settled or choice
         if reading is None:
             if found.asks:
                 asked.append(found)

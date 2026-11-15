@@ -1,5 +1,5 @@
 {
-  "about": "What the server (models.folds, in lower case) and the scan page (cart.bares) both make of each text, as searched: 'typed', folded as typed, units as they are, and 'searched', with its units respelt, the second form only where it differs; and what units.respell makes of it decomposed (NFKD), on both sides: backend tests/test_units.py and frontend src/units.test.ts read it. A text with letters anyascii spells otherwise than decomposing, as Greek or Cyrillic, or signs, as °, has no 'typed', and no 'searched' where its respelt form has such: only what does is compared.",
+  "about": "What the server (models.folds, in lower case) and the scan page (cart.bares) both make of each text, as searched: 'typed', folded as typed, units as they are, and 'searched', with its units respelt, the second form only where it differs; and what units.respell makes of it decomposed (NFKD), on both sides, reading its 'rules' first where it has them (reading rules, by a number and its unit as typed: the unit's symbol, or null, no unit): backend tests/test_units.py and frontend src/units.test.ts read it. A text with letters anyascii spells otherwise than decomposing, as Greek or Cyrillic, or signs, as °, has no 'typed', and no 'searched' where its respelt form has such: only what does is compared.",
   "vectors": [
     {
       "text": "10uF",
@@ -543,6 +543,60 @@
       "respelt": "6[in_i]",
       "searched": "6[in_i]",
       "typed": "6 inch"
+    },
+    {
+      "text": "SFP+ 10G",
+      "rules": {
+        "10G": "Gbit/s"
+      },
+      "respelt": "SFP+ 10Gbit/s",
+      "searched": "sfp+ 10gbit/s",
+      "typed": "sfp+ 10g"
+    },
+    {
+      "text": "Uplink 10 G, 10G",
+      "rules": {
+        "10G": "Gbit/s"
+      },
+      "respelt": "Uplink 10Gbit/s, 10Gbit/s",
+      "searched": "uplink 10gbit/s, 10gbit/s",
+      "typed": "uplink 10 g, 10g"
+    },
+    {
+      "text": "Spool 305 M",
+      "rules": {
+        "305M": "m"
+      },
+      "respelt": "Spool 305m",
+      "searched": "spool 305m",
+      "typed": "spool 305 m"
+    },
+    {
+      "text": "Tape 3M 25 m",
+      "rules": {
+        "3M": null
+      },
+      "respelt": "Tape 3M 25m",
+      "searched": "tape 3m 25m",
+      "typed": "tape 3m 25 m"
+    },
+    {
+      "text": "Cable 1,000 FT",
+      "rules": {
+        "1,000FT": "ft"
+      },
+      "respelt": "Cable 1,000ft",
+      "searched": "cable 1,000ft",
+      "typed": "cable 1,000 ft"
+    },
+    {
+      "text": "Pad 16P",
+      "rules": {
+        "16P": null
+      },
+      "respelt": "Pad 16P",
+      "searched": "pad 16p",
+      "typed": "pad 16p"
     }
   ]
 }
