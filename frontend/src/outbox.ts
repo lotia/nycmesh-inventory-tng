@@ -630,12 +630,12 @@ export class Outbox {
     const kept = this.update((entries) => {
       const before = entries.filter((each) => each.body.key === key);
       if (
-        before.some(
+        entries.some(
           (each) =>
-            (each.state === "waiting" || each.state === "saved") &&
-            sameBatch(each.body, body),
-        ) ||
-        entries.some((each) => listedElsewhereAs(each, body))
+            ((each.state === "waiting" || each.state === "saved") &&
+              sameBatch(each.body, body)) ||
+            listedElsewhereAs(each, body),
+        )
       ) {
         return entries;
       }
