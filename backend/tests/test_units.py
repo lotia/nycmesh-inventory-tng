@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import items, units
 from inventory_tng.admin.items import ITEMS
-from inventory_tng.models import Category, Item, fold, folds
+from inventory_tng.models import Category, Item, fold, folds, held
 from inventory_tng.units import KINDS, PREFIXES, UNITS, Reading, read, respell
 
 from helpers.rows import add, tag
@@ -207,6 +207,18 @@ def test_search_reads_vdc_and_thousands_but_never_in_a_name() -> None:
     rules = {"ft": units.Rule("ft", respell=True)}
     assert units.spell("Spool 1,000 ft", units.found_in("Spool 1,000 ft", rules)) == (
         "Spool 1,000ft"
+    )
+
+
+def test_numbers_spaced_as_thousands_are_one_but_each_still_found() -> None:
+    """docs/decisions/0021, accepted misreading: `2 100 ft` is searched as
+    `2100ft` too, kept as typed beside it, so `100 ft` and `100 feet` still
+    find it."""
+    kept = held("Pack 2 100 ft")
+    assert kept == "Pack 2 100 ft Pack 2100ft"
+    assert all(
+        any(form.lower() in kept.lower() for form in folds(search))
+        for search in ("100 ft", "100 feet", "100ft", "2 100 ft")
     )
 
 

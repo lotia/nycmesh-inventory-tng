@@ -417,12 +417,14 @@ def _marked(text: str, *at: int) -> bool:
 
 
 # A number grouped in thousands by commas or by spaces, a thin one
-# decomposed being one, ending at its last digit: `1,000`, `1 000`. Search
-# keeps it, before a unit it reads, without them (Ali, 2026-11-15,
-# inventory-tng-ist.1): frontend/src/units.ts's, character for character.
+# decomposed being one, ending at its last digit: `1,000`, `1 000`, not
+# starting within another so grouped (`345 678` in `12 345 678`), and by
+# commas after a number and a space (`6 1,000`). Search keeps it, before a
+# unit it reads, without them (Ali, 2026-11-15, inventory-tng-ist.1):
+# frontend/src/units.ts's, character for character.
 _GROUPED = re.compile(
-    r"(?<![^\W_])(?<![0-9][., ])[0-9]{1,3}([, ])[0-9]{3}(?:\1[0-9]{3})*"
-    r"(?:[.][0-9]+)?\Z"
+    r"(?<![^\W_])(?:(?<![0-9][.,])[0-9]{1,3}(?:,[0-9]{3})+"
+    r"|(?<![0-9][., ])[0-9]{1,3}(?: [0-9]{3})+)(?:[.][0-9]+)?\Z"
 )
 
 # Where respell changes a text, and what to: a start, an end and the spelling.
@@ -435,10 +437,13 @@ def _edits(text: str, rules: Rules | None) -> list[Edit]:
     is."""
     edits: list[Edit] = []
     for match in AFTER_A_NUMBER.finditer(text):
-        if _marked(text, match.end()) or _product(text, match):
+        if _marked(text, match.end()) or _product(text, match.end(1) - 1):
             continue
         grouped = _GROUPED.search(text, 0, match.end(1))
-        number = grouped[0].replace(grouped[1], "") if grouped else None
+        if grouped and _product(text, grouped.start()):
+            # `Cat 6 305 m`: a product's number, then another, not thousands.
+            grouped = None
+        number = re.sub("[, ]", "", grouped[0]) if grouped else None
         found = _found(text, match, rules, number)
         if found is not None and (found.read or found.rule):
             # Read, or no unit by its rule.
@@ -482,17 +487,23 @@ def respell(text: str, rules: Rules | None = None) -> str:
     return _applied(text, _edits(text, rules))
 
 
+# A word of a search, between spaces, control characters and U+FEFF,
+# which Python's and JavaScript's \s each take for a space or not
+# differently: frontend/src/units.ts's SEARCH_WORD.
+_SEARCH_WORD = re.compile(r"[^\s\x00-\x1f\x7f-\x9f\ufeff]+")
+
+
 def groups(text: str, rules: Rules | None = None) -> list[tuple[str, str]]:
     """What a search for `text` is matched by group by group (Ali,
     2026-11-15, inventory-tng-ist.1): each number with the unit respell
     reads right after it, its space kept, and every other word alone, each
     as typed and respelt, cut from respelling the whole of `text`, so rules,
     products and the words near a unit read as they do there (`spool 305M`
-    is `305m`). None if there are more than GROUPS_MAX. `text` is
+    is `305m`). Empty if there are more than GROUPS_MAX. `text` is
     decomposed (NFKD), as respell's."""
     edits = _edits(text, rules)
     spans: list[list[int]] = []
-    for word in re.finditer(r"\S+", text):
+    for word in _SEARCH_WORD.finditer(text):
         # Joined to the word before where respell reads across the space.
         if spans and any(s < spans[-1][1] and word.start() < e for s, e, _ in edits):
             spans[-1][1] = word.end()
@@ -677,12 +688,12 @@ def _rank(reading: Reading) -> int:
     return PROFILE.index(reading.unit.kind)
 
 
-def _product(name: str, match: re.Match[str]) -> bool:
-    """Whether the word the number and unit AFTER_A_NUMBER found are in, or
-    its part between hyphens, alone or joined to the word or part before
-    it, is a product's (PRODUCTS): `Cat6a`, `Cat 6a`, `Cat-6a`,
-    `Cat6a-patch`, `5AC`."""
-    at = match.end(1) - 1
+def _product(name: str, at: int) -> bool:
+    """Whether the word the digit at `at` is in (the last of a number
+    AFTER_A_NUMBER found, or the first of one grouped in thousands), or its
+    part between hyphens, alone or joined to the word or part before it, is
+    a product's (PRODUCTS): `Cat6a`, `Cat 6a`, `Cat-6a`, `Cat6a-patch`,
+    `5AC`."""
     word = next(w for w in _WORD.finditer(name) if w.start() <= at < w.end())
     part = next(p for p in _PART.finditer(name) if p.start() <= at < p.end())
     said = [
@@ -750,7 +761,7 @@ def found_in(name: str, rules: Rules | None = None) -> list[Found]:
     return [
         found
         for match in AFTER_A_NUMBER.finditer(name)
-        if not _marked(name, match.end()) and not _product(name, match)
+        if not _marked(name, match.end()) and not _product(name, match.end(1) - 1)
         if (found := _found(name, match, rules)) is not None
     ]
 

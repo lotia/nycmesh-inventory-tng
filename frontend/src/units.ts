@@ -242,7 +242,7 @@ function settled(
 // last digit, as search keeps it, before a unit it reads, without them
 // (units._GROUPED).
 const GROUPED =
-  /(?<![\p{L}\p{N}])(?<![0-9][., ])[0-9]{1,3}([, ])[0-9]{3}(?:\1[0-9]{3})*(?:[.][0-9]+)?$/u;
+  /(?<![\p{L}\p{N}])(?:(?<![0-9][.,])[0-9]{1,3}(?:,[0-9]{3})+|(?<![0-9][., ])[0-9]{1,3}(?: [0-9]{3})+)(?:[.][0-9]+)?$/u;
 
 /** Where respell changes a text, and what to (units.Edit). */
 type Edit = [start: number, end: number, spelling: string];
@@ -256,10 +256,12 @@ function edits(text: string, rules: Rules | undefined): Edit[] {
     const end = at + whole.length;
     if (marked(text, end) || product(text, at)) continue;
     const before = text.slice(0, at + 1);
-    const grouped = GROUPED.exec(before);
+    let grouped = GROUPED.exec(before);
+    // `Cat 6 305 m`: a product's number, then another, not thousands.
+    if (grouped && product(text, grouped.index)) grouped = null;
     // It ends at the digit the match starts with, so it is found.
     const number = grouped
-      ? grouped[0].replaceAll(grouped[1] as string, "")
+      ? grouped[0].replaceAll(/[, ]/g, "")
       : (NUMBER.exec(before) as RegExpExecArray)[0];
     const reading = settled(text, number, token, rules);
     // Null: no unit by its rule.
@@ -311,6 +313,10 @@ export function respell(text: string, rules?: Rules): string {
   return applied(text, edits(text, rules));
 }
 
+/** A word of a search, between spaces, control characters and U+FEFF
+ * (units._SEARCH_WORD). */
+const SEARCH_WORD = /[^\s\p{Cc}\ufeff]+/gu;
+
 /** What a search for `text`, decomposed (NFKD), is matched by group by
  * group: each number with the unit respell reads after it, its space kept,
  * and every other word alone, each as typed and respelt, cut from
@@ -321,7 +327,7 @@ export function groups(
 ): [typed: string, respelt: string][] {
   const made = edits(text, rules);
   const spans: [number, number][] = [];
-  for (const word of text.matchAll(/\S+/gu)) {
+  for (const word of text.matchAll(SEARCH_WORD)) {
     const start = word.index;
     const end = start + word[0].length;
     const last = spans.at(-1);

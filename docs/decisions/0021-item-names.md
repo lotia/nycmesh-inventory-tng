@@ -519,6 +519,14 @@ and a number before a unit it reads without its thousands separators, so
 (Q2 C). Both are search's only: no name is respelt by them, nor its key
 read so. Units version 4; migration 0046 folded every row again.
 
+Accepted misreading (review, 2026-11-15): as a plain space groups
+thousands (`1 000 ft`), two numbers spaced so are read as one, `Pack 2 100
+ft` as `2100ft`. Kept: Ali's example is spaced plainly, a thin space is a
+plain one once decomposed, and what was typed is kept beside it, so `100
+ft` and `100 feet` still find it. A product's number is never the first
+of such a group, so `Cat 6 305 m` is `Cat 6 305m`, and after a number and
+a space only commas group, so `Cat 6 1,000 ft` is `Cat 6 1000ft`.
+
 ## Amendment: the import's readings file (2026-11-14)
 
 An import starts with no reading rules, and its readings are settled

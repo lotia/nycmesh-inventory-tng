@@ -823,6 +823,23 @@
       ]
     },
     {
+      "text": "Cat 6 305 m",
+      "groups": [["Cat", "Cat"], ["6", "6"], ["305 m", "305m"]]
+    },
+    {
+      "text": "Cat 6 1,000 ft",
+      "groups": [["Cat", "Cat"], ["6", "6"], ["1,000 ft", "1000ft"]]
+    },
+    {
+      "text": "PoE\ufeff48 V\u001c100 ft\u0085SFP",
+      "groups": [
+        ["PoE", "PoE"],
+        ["48 V", "48V"],
+        ["100 ft", "100ft"],
+        ["SFP", "SFP"]
+      ]
+    },
+    {
       "text": "a b c d e f g h i",
       "groups": []
     }
