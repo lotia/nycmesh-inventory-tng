@@ -248,11 +248,13 @@ def _set(
         counted = ledger.count_open_package(session, key, admin_id, row, left, then)
         if counted is None:
             return False, 0
+        # A report is as of its own batch, which may be the one that
+        # recorded the move: only a move before that batch came before it.
         closed = over_recorded.counted(
             session,
             admin_id,
             row.location_id,
-            as_of,
+            as_of if showed is not None else as_of - 1,
             counted.written,
             [(row.item_id, ledger.Form(open_package_id=open_id))],
         )

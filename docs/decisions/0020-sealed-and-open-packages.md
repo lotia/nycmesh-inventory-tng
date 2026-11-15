@@ -374,7 +374,8 @@ you" counts every report in one line, which hides what is waiting.
   count sent again. An open package moved whole has the arrival end
   only, put right by a count of that open package there, on the count
   form or by Set on its length check (one that writes nothing, as it
-  showed that already, puts nothing right). The row keeps the count's
+  showed that already, puts nothing right, nor one set to a report sent
+  in the batch that recorded the move). The row keeps the count's
   transaction for each end (`left_count_id`, `arrived_count_id`),
   written in the count's own transaction under the place's lock, the
   rows held by id after it, as Correct and Mark checked take them.

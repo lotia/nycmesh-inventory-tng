@@ -47,7 +47,7 @@ from inventory_tng.models import (
 from helpers.concurrency import Committed
 from helpers.rows import add, tag
 from helpers.sign_in import new_admin, text
-from helpers.stock import Place, Spools, cut, received, retire, write
+from helpers.stock import Place, Spools, cut, length, received, report, retire, write
 
 URL = "/api/transactions"
 PAGE = "/admin/stock/recorded-more"
@@ -1622,6 +1622,53 @@ def test_one_moved_whole_is_closed_by_setting_its_length_where_it_arrived(
     assert moment is not None
     answer = length_checks.Answer(
         made.id, open_packages.check_seen(made), Decimal(300), Decimal(305), moment
+    )
+    assert length_checks._set(session, admin_id(session), answer, [spools.van.id]) == (
+        True,
+        False,
+        1,
+    )
+    (check,) = checks(session)
+    assert check.settled_how == "counted"
+
+
+def test_only_a_report_after_the_batch_that_moved_it_whole_puts_it_right(
+    registered_client: TestClient, session: Session
+) -> None:
+    """Set to what the batch that recorded the move reported: no count
+    after the move, so it still waits. Set to a later report, it closes."""
+    spools = Spools(session)
+    made = spools.opened()
+    whole = cut(made, "305") | {"whole": True}
+    loose = {"item_id": spools.place.item.id, "quantity": "1"}
+    first = spools.place.batch(lines=[whole, loose], lengths=[length(made, "290")])
+    recorded_then_changed(registered_client, first, lines=[loose], lengths=[])
+    session.refresh(made)
+    (check,) = checks(session)
+    moved = session.get_one(Movement, check.movement_id).transaction_id
+    assert made.length_reported_in_id == moved
+    answer = length_checks.Answer(
+        made.id, open_packages.check_seen(made), made.length_reported, as_of=moved
+    )
+    assert length_checks._set(session, admin_id(session), answer, [spools.van.id]) == (
+        True,
+        False,
+        0,
+    )
+    (check,) = checks(session)
+    assert check.settled_at is None
+    assert check.arrived_count_id is None
+    # Reported again at the van, after the move: that report puts it right.
+    later = report(spools, length(made, "280")) | {"from_location_id": spools.van.id}
+    assert registered_client.post(URL, json=later).status_code == 201
+    session.refresh(made)
+    assert made.length_reported_in_id is not None
+    assert made.length_reported_in_id > moved
+    answer = length_checks.Answer(
+        made.id,
+        open_packages.check_seen(made),
+        made.length_reported,
+        as_of=made.length_reported_in_id,
     )
     assert length_checks._set(session, admin_id(session), answer, [spools.van.id]) == (
         True,
