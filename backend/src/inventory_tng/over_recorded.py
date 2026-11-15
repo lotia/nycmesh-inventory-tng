@@ -326,7 +326,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
                 if left_on is not None
                 else (arrived, arrived_how, arrived_on, left, from_id, from_place)
             )
-            correct = other[0].lower() + other[1:] if kind == "open" else other
+            correct = within(other) if kind == "open" else other
             one = OneCounted(
                 counted_end,
                 how,
