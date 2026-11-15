@@ -35,7 +35,7 @@ from inventory_tng.models import (
     folds,
     fuzzy,
     holds,
-    in_ascii,
+    in_ascii_once,
     reading_rules,
     whole,
 )
@@ -66,17 +66,12 @@ def folded(search: str, rules: units.Rules | None = None) -> tuple[str, ...]:
 
 def grouped(search: str, rules: units.Rules | None = None) -> list[tuple[str, ...]]:
     """What was typed in groups (units.groups), each folded as typed and
-    respelt, as folds() folds them, each once, case aside, and no longer
+    respelt, as folds() folds them (models.in_ascii_once), and no longer
     than SEARCH_MAX; a group folding to nothing left out."""
     found = []
     for group in units.groups(normalize("NFKD", search), rules):
-        forms = {
-            form.lower(): form
-            for each in group
-            if (form := in_ascii(each)[:SEARCH_MAX]).strip()
-        }
-        if forms:
-            found.append(tuple(forms.values()))
+        if forms := tuple(f[:SEARCH_MAX] for f in in_ascii_once(*group) if f.strip()):
+            found.append(forms)
     return found
 
 
@@ -173,19 +168,34 @@ class Searched[T]:
     def matching(
         self, search: str, rules: units.Rules | None = None
     ) -> ColumnElement[bool]:
-        found = or_(*(fuzzy(self.text, form) for form in folded(search, rules)))
-        if (every := every_group(self.text, search, rules)) is not None:
+        forms, every = folded(search, rules), every_group(self.text, search, rules)
+        return self._matching(search, forms, every)
+
+    def searching(
+        self, query: Select, search: str, rules: units.Rules | None = None
+    ) -> Select:
+        """`query` narrowed to the records matching `search`, closest
+        first: what was typed read once for both."""
+        forms, every = folded(search, rules), every_group(self.text, search, rules)
+        return query.where(self._matching(search, forms, every)).order_by(
+            self._closeness(search, forms, every).desc()
+        )
+
+    def _matching(
+        self, search: str, forms: Sequence[str], every: ColumnElement[bool] | None
+    ) -> ColumnElement[bool]:
+        found = or_(*(fuzzy(self.text, form) for form in forms))
+        if every is not None:
             found = or_(found, every)
         if self.whole is None:
             return found
         return or_(found, self.whole == search.upper())
 
-    def closeness(
-        self, search: str, rules: units.Rules | None = None
+    def _closeness(
+        self, search: str, forms: Sequence[str], every: ColumnElement[bool] | None
     ) -> ColumnElement[float]:
         """As closeness(), and the whole column matched before anything."""
-        every = every_group(self.text, search, rules)
-        near = closeness(self.text, folded(search, rules), every)
+        near = closeness(self.text, forms, every)
         if self.whole is None:
             return near
         return case((self.whole == search.upper(), 3.0), else_=0.0) + near
@@ -284,9 +294,7 @@ class Listing[T]:
             )
         if self.search:
             rules = searched.rules(session)
-            query = query.where(searched.matching(self.search, rules)).order_by(
-                searched.closeness(self.search, rules).desc()
-            )
+            query = searched.searching(query, self.search, rules)
         found = _count(session, query) if self.search else total
         page = min(self.page, last_page(found))
         rows = session.scalars(
@@ -311,12 +319,8 @@ class Listing[T]:
         searched = self.searched
         rules = searched.rules(session)
         rows = session.scalars(
-            searched.base(self.show)
-            .where(searched.matching(self.search, rules))
-            .order_by(
-                searched.closeness(self.search, rules).desc(),
-                func.lower(searched.name),
-            )
+            searched.searching(searched.base(self.show), self.search, rules)
+            .order_by(func.lower(searched.name))
             .limit(SUGGESTED)
         ).all()
         log.debug("suggested", found=len(rows))

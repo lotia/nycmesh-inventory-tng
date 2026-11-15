@@ -243,14 +243,16 @@ def folds(text: str, rules: units.Rules | None = None) -> tuple[str, ...]:
     so a unit's word alone ("feet"), a unit typed shorter than a token not
     one ("48 V" in "48 VDC") and a unit half typed ("10 μ") find what they
     found before units were read, and "10 µF" finds "10uf" too."""
-    typed = in_ascii(text)
     decomposed = unicodedata.normalize("NFKD", text)
-    respelling = units.respell(decomposed, rules)
-    if respelling == decomposed:
-        return (typed,)
-    respelt = in_ascii(respelling)
-    # Case aside: search ignores it.
-    return (typed,) if respelt.lower() == typed.lower() else (typed, respelt)
+    return in_ascii_once(decomposed, units.respell(decomposed, rules))
+
+
+def in_ascii_once(typed: str, respelt: str) -> tuple[str, ...]:
+    """`typed` in ASCII (in_ascii), then `respelt` so if that differs, case
+    aside, as search ignores it: the forms folds() keeps, and a search
+    group (units.groups) is matched by."""
+    forms = in_ascii(typed), in_ascii(respelt)
+    return forms[:1] if forms[1].lower() == forms[0].lower() else forms
 
 
 def held(text: str, rules: units.Rules | None = None) -> str:
