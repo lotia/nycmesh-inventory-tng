@@ -14,12 +14,20 @@ import uuid
 from collections.abc import Collection, Mapping, Sequence
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal, NamedTuple
+from typing import Any, Literal, NamedTuple
 from zoneinfo import ZoneInfo
 
 import structlog
 from opentelemetry import metrics
-from sqlalchemy import ColumnElement, and_, func, or_, select
+from sqlalchemy import (
+    ColumnElement,
+    Select,
+    SQLColumnExpression,
+    and_,
+    func,
+    or_,
+    select,
+)
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, aliased
 
@@ -291,11 +299,13 @@ def _end_names(
     return f"Sealed {within(package or '')}", arrived
 
 
-def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
-    """The checks waiting that `where` picks, by item name, oldest first:
-    one query, however many."""
+def _checks(*columns: SQLColumnExpression[Any]) -> Select:
+    """A check with its movement's item, form and transaction kind, then
+    `columns`, of its places (FROM, TO), the counts that put each end right
+    (LEFT_COUNT, ARRIVED_COUNT) and an opening's open package (OPENED_INTO),
+    as shown() and settled() read them."""
     package_id = func.coalesce(Movement.from_package_id, Movement.to_package_id)
-    found = session.execute(
+    return (
         select(
             OverRecorded,
             Item.id,
@@ -306,16 +316,8 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
             Movement.from_open_package_id,
             Movement.to_open_package_id,
             Movement.quantity,
-            LedgerTransaction.id,
             LedgerTransaction.kind,
-            LedgerTransaction.created_at,
-            FROM.name,
-            TO.name,
-            LedgerTransaction.from_location_id,
-            LedgerTransaction.to_location_id,
-            LEFT_COUNT.created_at,
-            ARRIVED_COUNT.created_at,
-            OpenPackage.closed_at,
+            *columns,
         )
         .join(Movement, Movement.id == OverRecorded.movement_id)
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
@@ -326,25 +328,50 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         .outerjoin(LEFT_COUNT, LEFT_COUNT.id == OverRecorded.left_count_id)
         .outerjoin(ARRIVED_COUNT, ARRIVED_COUNT.id == OverRecorded.arrived_count_id)
         .outerjoin(OpenPackage, OPENED_INTO)
+    )
+
+
+def _countable(session: Session, place_ids: Collection[int | None]) -> set[int]:
+    """Which of these places may be counted (ledger.countable): one query,
+    however many, or none for none."""
+    ids = {each for each in place_ids if each is not None}
+    if not ids:
+        return set()
+    return set(
+        session.scalars(
+            select(Location.id).where(Location.id.in_(ids), ledger.countable())
+        )
+    )
+
+
+def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
+    """The checks waiting that `where` picks, by item name, oldest first:
+    one query, however many."""
+    found = session.execute(
+        _checks(
+            LedgerTransaction.id,
+            LedgerTransaction.created_at,
+            FROM.name,
+            TO.name,
+            LedgerTransaction.from_location_id,
+            LedgerTransaction.to_location_id,
+            LEFT_COUNT.created_at,
+            ARRIVED_COUNT.created_at,
+            OpenPackage.closed_at,
+        )
         .where(WAITING, *where)
         .order_by(func.lower(Item.name), Item.id, OverRecorded.id)
     ).all()
     # Only a place that may be counted is offered for counting: the end
     # still to put right of one with one end counted, or an opening's open
     # package closed.
-    still = {
-        to_id if left_on else from_id
-        for *_, from_id, to_id, left_on, arrived_on, closed_on in found
-        if (left_on is None) != (arrived_on is None and closed_on is None)
-    }
-    countable = (
-        set(
-            session.scalars(
-                select(Location.id).where(Location.id.in_(still), ledger.countable())
-            )
-        )
-        if still
-        else set()
+    countable = _countable(
+        session,
+        {
+            to_id if left_on else from_id
+            for *_, from_id, to_id, left_on, arrived_on, closed_on in found
+            if (left_on is None) != (arrived_on is None and closed_on is None)
+        },
     )
     lines = []
     for (
@@ -357,8 +384,8 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         from_open,
         to_open,
         held,
-        transaction_id,
         kind,
+        transaction_id,
         at,
         from_place,
         to_place,
@@ -466,14 +493,11 @@ SETTLED_HOW = {
 SETTLED = OverRecorded.settled_at.is_not(None)
 
 
-def _spot(place_id: int | None, name: str | None, countable: bool) -> Spot | None:
-    return None if place_id is None else Spot(place_id, name or "", countable)
-
-
-def _countable(place: type[Location]) -> ColumnElement[bool]:
-    """Whether a place, aliased, may be counted (ledger.countable)."""
+def _spot(
+    place_id: int | None, name: str | None, countable: Collection[int]
+) -> Spot | None:
     return (
-        select(Location.id).where(Location.id == place.id, ledger.countable()).exists()
+        None if place_id is None else Spot(place_id, name or "", place_id in countable)
     )
 
 
@@ -498,43 +522,21 @@ def settled(
     limit: int,
     offset: int = 0,
 ) -> list[WasSettled]:
-    """Those settled that `where` picks (of Movement), newest first: one
-    query, however many. Days in `zone`."""
-    package_id = func.coalesce(Movement.from_package_id, Movement.to_package_id)
+    """Those settled that `where` picks (of Movement), newest first: the
+    same few queries, however many. Days in `zone`."""
     found = session.execute(
-        select(
-            OverRecorded,
-            Item.id,
-            Item.name_shown,
-            Item.unit,
-            ItemPackage.name_shown,
-            ItemPackage.size,
-            Movement.from_open_package_id,
-            Movement.to_open_package_id,
-            Movement.quantity,
+        _checks(
             LedgerTransaction.idempotency_key,
-            LedgerTransaction.kind,
             LedgerTransaction.from_location_id,
             FROM.name,
-            _countable(FROM),
             LedgerTransaction.to_location_id,
             TO.name,
-            _countable(TO),
             LEFT_COUNT.created_at,
             ARRIVED_COUNT.created_at,
             OpenPackage.closed_at,
             Admin.username,
         )
-        .join(Movement, Movement.id == OverRecorded.movement_id)
-        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
-        .join(Item, Item.id == Movement.item_id)
         .join(Admin, Admin.id == OverRecorded.settled_by_admin_id)
-        .outerjoin(ItemPackage, ItemPackage.id == package_id)
-        .outerjoin(FROM, FROM.id == LedgerTransaction.from_location_id)
-        .outerjoin(TO, TO.id == LedgerTransaction.to_location_id)
-        .outerjoin(LEFT_COUNT, LEFT_COUNT.id == OverRecorded.left_count_id)
-        .outerjoin(ARRIVED_COUNT, ARRIVED_COUNT.id == OverRecorded.arrived_count_id)
-        .outerjoin(OpenPackage, OPENED_INTO)
         .where(SETTLED, *where)
         .order_by(OverRecorded.settled_at.desc(), OverRecorded.id.desc())
         .limit(limit)
@@ -564,6 +566,15 @@ def settled(
         if off
         else set()
     )
+    # Each place a link to count its item there, if it may be counted.
+    countable = _countable(
+        session,
+        {
+            place
+            for each in found
+            for place in (each.from_location_id, each.to_location_id)
+        },
+    )
     lines = []
     for (
         row,
@@ -575,14 +586,12 @@ def settled(
         from_open,
         to_open,
         held,
-        _,
         kind,
+        _,
         from_id,
         from_place,
-        from_countable,
         to_id,
         to_place,
-        to_countable,
         left_on,
         arrived_on,
         closed_on,
@@ -648,8 +657,8 @@ def settled(
                 item,
                 _amount(row.quantity, unit, package, size, from_open, kind),
                 kind == "open",
-                _spot(from_id, from_place, from_countable),
-                _spot(to_id, to_place, to_countable),
+                _spot(from_id, from_place, countable),
+                _spot(to_id, to_place, countable),
                 SETTLED_HOW[how],
                 why,
                 by,
