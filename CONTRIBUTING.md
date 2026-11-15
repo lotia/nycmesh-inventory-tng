@@ -324,9 +324,10 @@ from Items.
 
 Search, the forms and the scan page read a unit after a number alike
 (`units.found_in`, `units.respell`, `units.ts`): never in a product's
-name (`units.PRODUCTS`); where several readings are plausible sizes
-(`units.KINDS`), by the words near it in the name (`units.CLUES`) if they
-say one kind; else by its rule; else by the one plausible reading, the
+name (`units.PRODUCTS`); by its rule, which always wins; else, where
+several readings are plausible sizes (`units.KINDS`), by the words near it
+in the name (`units.CLUES`) if they say one kind; else by the one
+plausible reading, the
 one of a kind the profile ranks likely (`units.LIKELY`: a bare `G` or `K`
 is a data rate, `units.BARE_RATES`), or, none being likely, the one spelt
 as typed. A `g`, and a unit both of whose readings are likely, as `M`,

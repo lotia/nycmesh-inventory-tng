@@ -458,16 +458,19 @@ and unit (`305M`) and search not reading the profile.
    `G`, `g`), so one answer reads `10G`, `1G` and `40 G` ("Remembered for
    "M" after a number when the name has no other clue"). `G` never
    settles `g`.
-2. Where a unit may be several kinds, the words near it in the name
-   decide first (`units.CLUES`: `spool`, `cable`, `Cat6` a length;
-   `switch`, `port`, `uplink`, `SFP` a data rate; `paste`, `grease`,
-   `weight` grams), then its rule, then the profile. So a rule reads only
-   names with no other clue, and "Not right?" is not offered for a
-   reading the words settle.
+2. A rule is looked up first and always wins. Where none is and a unit
+   may be several kinds, the words near it in the name decide
+   (`units.CLUES`: `spool`, `cable`, `Cat6` a length; `switch`, `port`,
+   `uplink`, `SFP` a data rate; `paste`, `grease`, `weight` grams), then
+   the profile. Every reading can be corrected under "Not right?", one
+   the words decided too (the hint says them: `by "spool"`), and the
+   correction, kept as the rule, then wins over those words in every
+   name (Ali, 2026-11-15, answering the review's questions).
 3. The profile settles silently where its ranking decides: `G` and `K`
    after a number are Gbps and kbps without asking, grams and kelvins
    ranking below (`Hub 4 K` is 4 kbps). `M`, a data rate or a length, both
-   ranked high, is asked where no word near it says.
+   ranked high, is asked where no word near it says. `300 K` is 300
+   kbps too, though kelvins are plausible (Ali, 2026-11-15).
 4. A `g` after a number is a data rate or grams: never silently grams,
    asked where no word near it says (Ali, the seventh).
 5. The hint names the kind (`Read as 10Gbps · data rate. Saved as

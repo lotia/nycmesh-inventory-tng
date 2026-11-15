@@ -521,14 +521,14 @@ class Item(KeyedName, Searchable, Versioned, Base):
     name_folded: Mapped[str] = mapped_column(Text)
 
     def refold(self, rules: units.Rules | None = None) -> None:
-        super().refold(rules)
-        self.name_folded = fold(self.name or "")
         # Its current aliases too, each folded alone, as the session holds
         # them: refolded as a flush begins (_refold), one added or retired
-        # is not yet written, and a new one's id will put it last.
+        # is not yet written, and a new one's id will put it last. Read
+        # first: the read may flush, refolding it, which this then replaces.
         session = object_session(self)
+        names = []
         if self.id is not None and session is not None:
-            written = session.scalars(current_aliases(self.id))
+            written = session.scalars(current_aliases(self.id)).all()
             adding = (
                 row
                 for row in session.new
@@ -539,7 +539,9 @@ class Item(KeyedName, Searchable, Versioned, Base):
                 for alias in (*written, *adding)
                 if alias.retired_at is None
             ]
-            self.search_text = " ".join([self.search_text, *names])
+        super().refold(rules)
+        self.name_folded = fold(self.name or "")
+        self.search_text = " ".join([self.search_text, *names])
 
 
 class ItemPackage(KeyedName, Searchable, Versioned, Base):

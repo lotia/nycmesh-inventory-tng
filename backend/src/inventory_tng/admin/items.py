@@ -398,8 +398,7 @@ def _typed_name(session: Session, typed: str, form: Mapping[str, str]) -> Typed:
     answered = {}
     for found in units.found_in(name, rules):
         rule = chosen_rule(form.get(READING + found.key, ""), found.offered)
-        # The words near it settle it, whatever a rule says: none is asked.
-        if rule is None or found.clue:
+        if rule is None:
             continue
         current = None if found.read is None else str(found.read)
         if found.asks or rule.reading != current:

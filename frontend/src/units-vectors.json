@@ -636,8 +636,8 @@
       "rules": {
         "M": "Mbit/s"
       },
-      "respelt": "Cable 3m",
-      "searched": "cable 3m",
+      "respelt": "Cable 3Mbit/s",
+      "searched": "cable 3mbit/s",
       "typed": "cable 3m"
     },
     {
@@ -714,8 +714,8 @@
       "rules": {
         "G": null
       },
-      "respelt": "Switch 10Gbit/s",
-      "searched": "switch 10gbit/s",
+      "respelt": "Switch 10G",
+      "searched": "switch 10g",
       "typed": "switch 10g"
     }
   ]

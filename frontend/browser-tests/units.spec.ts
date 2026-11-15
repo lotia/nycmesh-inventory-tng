@@ -5,7 +5,9 @@
  * how each is read, with "Not right?" to correct it; and the seeding page,
  * which proposes rules from every name. Rules are kept by the unit as typed
  * after a number, for every test at once, so each browser's tests read a
- * unit of their own (UNITS), which no other test's name has.
+ * unit of their own (UNITS), which no other test's name has; each starts by
+ * deleting its unit's rule, if a run before left one (forget), and accepts
+ * only its own proposal, so none settles another's.
  */
 import { expect, type Page, type TestInfo, test } from "@playwright/test";
 import { unique } from "./own";
@@ -28,6 +30,17 @@ const UNITS: Record<string, Units> = {
   webkit: { asked: ["M", "Mbps"], loose: ["MV", "mV · voltage"] },
 };
 const unitsOf = (info: TestInfo): Units => UNITS[info.project.name] ?? CHROMIUM;
+
+/** Its unit's reading rule deleted, if there is one. */
+async function forget(page: Page, unit: string): Promise<void> {
+  await page.goto("/admin/unit-readings");
+  const rule = page.getByRole("link", { name: unit, exact: true });
+  if ((await rule.count()) > 0) {
+    await rule.click();
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("Deleted.");
+  }
+}
 
 /** Fills in a new item named `name`, in Cables, counted each. */
 async function newItem(page: Page, name: string): Promise<void> {
@@ -53,6 +66,7 @@ test("a unit nothing settles is asked once, then said under the name", async ({
   page,
 }, info) => {
   const [unit, rate] = unitsOf(info).asked;
+  await forget(page, unit);
   const n = number();
   const name = unique(`Box ${n}${unit}`);
   await newItem(page, name);
@@ -88,6 +102,7 @@ test("the seeding page proposes readings, each accepted as a rule", async ({
 }, info) => {
   // Read loosely by the table: proposed so, to confirm.
   const [unit, reading] = unitsOf(info).loose;
+  await forget(page, unit);
   const n = number();
   const name = unique(`Cap ${n}${unit}`);
   await newItem(page, name);
@@ -98,20 +113,19 @@ test("the seeding page proposes readings, each accepted as a rule", async ({
   await page
     .getByRole("link", { name: "Propose readings from every name" })
     .click();
+  await expect(page.getByLabel(`Read “${unit}” as`)).toHaveValue(
+    reading.split(" ")[0] ?? "",
+  );
+  // One by one, to its own, so it accepts no other test's.
+  await page.getByRole("link", { name: "Review one by one" }).click();
   const read = page.getByLabel(`Read “${unit}” as`);
-  await expect(read).toHaveValue(reading.split(" ")[0] ?? "");
-  await expect(
-    page.getByRole("link", { name: "Review one by one" }),
-  ).toBeVisible();
-  // Change it, and choose for any other test's that nothing settles.
-  await read.selectOption({ label: "Not a unit" });
-  for (const choose of await page.getByRole("combobox").all()) {
-    if ((await choose.inputValue()) === "") {
-      await choose.selectOption({ label: "Not a unit" });
-    }
+  while ((await read.count()) === 0) {
+    await page.getByRole("link", { name: "Skip", exact: true }).click();
   }
-  await page.getByRole("button", { name: "Accept all" }).click();
+  await read.selectOption({ label: "Not a unit" });
+  await page.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Accepted.");
+  await page.goto("/admin/unit-readings/seed");
   await expect(page.getByLabel(`Read “${unit}” as`)).toHaveCount(0);
   await page.goto("/admin/unit-readings");
   await expect(

@@ -234,18 +234,18 @@ function settled(
   const value = Number(number.replaceAll(",", "").replace("−", "-"));
   const found = readings(token).filter(([each]) => plausible(each, value));
   const readable = found.map(([each]) => each);
-  const clued = readable.length > 1 ? clue(text, readable) : undefined;
-  if (clued !== undefined) return clued.symbol;
   // A rule's reading the table no longer reads is none (units.reading_of).
   if (rule !== undefined)
     return rule !== null && read(rule) === rule ? rule : null;
+  const clued = readable.length > 1 ? clue(text, readable) : undefined;
+  if (clued !== undefined) return clued.symbol;
   if (table.asked.includes(token) && found.length > 1) return undefined;
   return likeliest(found)?.symbol;
 }
 
 /** `text`, decomposed (NFKD), with each unit read right after a number
- * spelt by its symbol, joined to the number, as the forms read it (the
- * words near it, its reading rule in `rules`, the profile), else as the
+ * spelt by its symbol, joined to the number, as the forms read it (its
+ * reading rule in `rules`, the words near it, the profile), else as the
  * table reads it; a product's name as it is; and each unit alone spelt
  * with a sign no word is (not ASCII) by its symbol (units.respell). */
 export function respell(text: string, rules?: Rules): string {

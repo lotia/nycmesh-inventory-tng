@@ -60,24 +60,29 @@ def test_a_rule_reads_a_unit_before_the_table() -> None:
     assert (found.read, found.asks) == (None, True)
 
 
-def test_the_words_near_a_unit_decide_before_its_rule() -> None:
-    """Remembered for "M" after a number when the name has no other clue
-    (Ali, 2026-11-15, option D): the words near it decide first, the rule
-    where they do not, on the forms and in search alike."""
+def test_a_rule_wins_over_the_words_near_a_unit() -> None:
+    """A rule is looked up first and always wins (Ali, 2026-11-15); the
+    words near a unit decide where no rule does, on the forms and in
+    search alike."""
     rules = {"M": units.Rule("Mbit/s"), "G": units.Rule(None)}
-    for name, read, clue in [
-        ("Spool 305M", "m", ("spool",)),
-        ("Cat6 patch 3M", "m", ("cat6", "patch")),
-        ("Tape 3M", "Mbit/s", ()),
-        ("SFP+ 10G", "Gbit/s", ("sfp+",)),
-        ("Box 10G", None, ()),
+    for name, read, clue, ruled in [
+        ("Spool 305M", "m", ("spool",), "Mbit/s"),
+        ("Cat6 patch 3M", "m", ("cat6", "patch"), "Mbit/s"),
+        ("Tape 3M", None, (), "Mbit/s"),
+        ("SFP+ 10G", "Gbit/s", ("sfp+",), None),
+        ("Box 10G", "Gbit/s", (), None),
     ]:
-        (found,) = units.found_in(name, rules)
+        (found,) = units.found_in(name)
         assert (str(found.read) if found.read else None, found.clue) == (
             read,
             clue,
         ), name
-        assert units.respell(name, rules).endswith(str(found.read or "")), name
+        (found,) = units.found_in(name, rules)
+        assert (str(found.read) if found.read else None, found.clue) == (
+            ruled,
+            (),
+        ), name
+        assert units.respell(name, rules).endswith(ruled or name[-1]), name
 
 
 def test_names_that_read_alike_are_one(session: Session, radios: Category) -> None:
@@ -140,16 +145,11 @@ def test_a_name_reading_as_another_is_refused_naming_it(
     assert "It already has a package by that name." in text(again)
 
 
-def test_a_rule_the_words_near_it_agree_with_still_respells() -> None:
-    """A rule reading G as Gbps and respelling it respells a switch's 10G,
-    which the word switch reads so too; one reading G otherwise is not its
-    rule there."""
+def test_a_respelling_rule_respells_whatever_the_words_near_it() -> None:
     respelling = {"G": units.Rule("Gbit/s", respell=True)}
     for typed in ("Switch 10G", "Nano 10G"):
         found = units.found_in(typed, respelling)
         assert units.spell(typed, found) == typed.replace("10G", "10Gbps")
-    (found,) = units.found_in("Switch 10G", {"G": units.Rule(None)})
-    assert (str(found.read), found.rule) == ("Gbit/s", None)
 
 
 def test_a_rule_reads_every_name_with_it_again(
@@ -177,6 +177,8 @@ def test_a_rule_reads_every_name_with_it_again(
     assert "10Gbit/s" in link.search_text
     assert "40Gbit/s" in box.search_text
     assert "Other 1Gbit/s" in spare.search_text
+    # Its alias once, though rereading it flushed the alias first.
+    assert spare.search_text.count("Other 1") == 2
     # The same again changes nothing.
     assert reading_rules.decide(session, {"g": GBPS}, None) == []
     reading_rules.delete(session, rule, seen=None)
@@ -423,8 +425,9 @@ def test_the_seeding_page_proposes_and_accepts_readings(
     assert len(line["reading_rule_ids"]) == 2
     assert "Nothing to settle" in text(admin_client.get(SEED))
     assert "Gbit/s" not in box.search_text
-    # The words near it read the item's G still.
-    assert "10Gbit/s" in link.search_text
+    # The rule wins over the words near it: the item's G is grams too.
+    assert "Gbit/s" not in link.search_text
+    assert link.search_text.count("Tape 3M") == 1
     # Accepted twice, as a page sent again: nothing more is written.
     with capture_logs() as logs:
         again = admin_client.post(SEED, data=form | {"reading:M": "none"})

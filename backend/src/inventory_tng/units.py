@@ -22,10 +22,10 @@ reading is a likely size, and the form asks where two are.
 A reading rule (models.ReadingRule, inventory-tng-c0c.4) settles how a
 unit as typed after a number (`M`, `G`) is read, or that it is no unit:
 looked up before the table, wherever a unit after a number is read, by
-search here and on the scan page, and by the forms. Where a unit may be
-several kinds, the words near it in a name decide first (CLUES), then its
-rule, then the profile (PROFILE, LIKELY), on both sides alike (Ali,
-2026-11-15, option D).
+search here and on the scan page, and by the forms, always first. Where
+none is and a unit may be several kinds, the words near it in a name
+decide (CLUES), then the profile (PROFILE, LIKELY), on both sides alike
+(Ali, 2026-11-15, option D).
 """
 
 import json
@@ -410,8 +410,8 @@ def _marked(text: str, *at: int) -> bool:
 
 def respell(text: str, rules: Rules | None = None) -> str:
     """`text` with each unit read right after a number spelt by its symbol
-    (str(Reading)), joined to the number, as the forms read it (_found: the
-    words near it, its reading rule in `rules`, the profile), else as the
+    (str(Reading)), joined to the number, as the forms read it (_found: its
+    reading rule in `rules`, the words near it, the profile), else as the
     table reads it, case first, and each unit alone spelt with a sign no
     word is (not ASCII) by its symbol; a product's name (PRODUCTS) as it
     is. `text` is decomposed (NFKD), as both the server and the scan page
@@ -470,15 +470,15 @@ BARE_RATES = {"G": "G", "M": "M", "K": "k", "g": "G"}
 # Units the profile never settles alone where several readings are
 # plausible: a g after a number is grams as spelt and a data rate as often
 # in this inventory's names, so never silently grams (Ali, 2026-11-15).
-# The words near it decide, else its rule, else the form asks.
+# Its rule decides, else the words near it, else the form asks.
 ASKED = frozenset(("g",))
 # The kinds a network inventory names most (Ali, 2026-11-15): one of them
 # among a unit's plausible readings is taken, as 10G is 10 Gbps, not 10
-# grams, and 4 K 4 kbps; two, as 3M may be 3 Mbps or 3 m, are left to the
-# words near it, its rule or the administrator.
+# grams, and 4 K 4 kbps; two, as 3M may be 3 Mbps or 3 m, are left to its
+# rule, the words near it or the administrator.
 LIKELY = frozenset(PROFILE[:2])
 # Words that, in a name, say what kind a unit after a number is, where it
-# may be several (Ali, 2026-11-15): "3M" near "cable" or "Cat6" is a
+# may be several and no rule says (Ali, 2026-11-15): "3M" near "cable" or "Cat6" is a
 # length, near "switch" or "SFP" a data rate. Compared in lower case.
 CLUES: dict[str, frozenset[str]] = {
     "data rate": frozenset(
@@ -633,9 +633,9 @@ class Found:
     typed, the unit as typed (`token`), where the space before it, if any,
     and it are (`start`, `end`), and the readings of it that are plausible
     sizes (Reading.plausible), the one spelt as typed first, then by
-    PROFILE. `read` is what it reads as (_found): by the words near it
-    (`clue`, those words), else its rule's reading (None: no unit), else
-    the one likely; `rule` its rule, if one read it."""
+    PROFILE. `read` is what it reads as (_found): by its rule (`rule`;
+    None: no unit), else by the words near it (`clue`, those words), else
+    the one likely."""
 
     number: str
     token: str
@@ -691,11 +691,11 @@ def found_in(name: str, rules: Rules | None = None) -> list[Found]:
 
 def _found(text: str, match: re.Match[str], rules: Rules | None) -> Found | None:
     """The unit AFTER_A_NUMBER found in `text`, as read (Ali, 2026-11-15,
-    option D): where several readings are plausible, by the words near it
-    (CLUES), if they say one kind; else by its reading rule; else by the
-    one plausible reading, the one of a LIKELY kind, or the one spelt as
-    typed where none is likely. None if it is no unit's spelling and no
-    rule's."""
+    option D): by its reading rule, which always wins; else, where several
+    readings are plausible, by the words near it (CLUES), if they say one
+    kind; else by the one plausible reading, the one of a LIKELY kind, or
+    the one spelt as typed where none is likely. None if it is no unit's
+    spelling and no rule's."""
     number, token = _number(text, match.end(1)), match[2]
     rule = (rules or {}).get(rule_key(token))
     every = readings(token)
@@ -704,19 +704,15 @@ def _found(text: str, match: re.Match[str], rules: Rules | None) -> Found | None
     value = float(number.replace(",", "").replace("\u2212", "-"))
     plausible = [(r, exact) for r, exact in every if r.plausible(value)]
     readable = tuple(r for r, _ in plausible)
-    clue = _clue(text, readable) if len(readable) > 1 else None
-    if clue is not None:
-        settled, words = clue
-        # Its rule, if it reads so too, goes on respelling it.
-        if rule is not None and rule.reading != str(settled):
-            rule = None
+    clue = None
+    if rule is not None:
+        settled = None if rule.reading is None else reading_of(rule.reading)
+    elif len(readable) > 1 and (clue := _clue(text, readable)) is not None:
+        settled = clue[0]
     else:
-        words = ()
-        if rule is not None:
-            settled = None if rule.reading is None else reading_of(rule.reading)
-        else:
-            asked = token in ASKED and len(plausible) > 1
-            settled = None if asked else _likeliest(plausible)
+        asked = token in ASKED and len(plausible) > 1
+        settled = None if asked else _likeliest(plausible)
+    words = clue[1] if clue else ()
     return Found(
         number, token, match.end(1), match.end(), readable, settled, rule, words
     )

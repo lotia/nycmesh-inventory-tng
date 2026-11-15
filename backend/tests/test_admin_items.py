@@ -1063,9 +1063,7 @@ def test_a_spelling_nothing_settles_is_asked_once(
     assert "10Gbps · data rate" in page
     assert "10g · grams" in page
     assert "Not a unit: keep “10g”" in page
-    assert "Remembered for “g” after a number when the name has no other clue." in (
-        page
-    )
+    assert "Remembered for “g” after a number in every name." in page
     (line,) = [line for line in logs if line["event"] == "unit asked about"]
     assert line == {"event": "unit asked about", "item_id": None, "asked": 1} | {
         "log_level": "debug"
@@ -1130,6 +1128,32 @@ def test_not_right_corrects_a_reading_for_every_name(
     renamed = form | {"name": "Tape 25 m!", "unit:m": "none"}
     assert admin_client.post(f"{ITEMS}/{item.id}", data=renamed).status_code == 303
     assert (rule.reading, rule.respell) == (None, False)
+
+
+def test_not_right_is_offered_where_words_decide_and_its_rule_wins(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Ali, 2026-11-15: every reading may be corrected, a spool's M too,
+    which the word spool reads as meters; the correction, kept as the
+    rule, wins over the words near it, in every name."""
+    item = new_item(session, radios, "Spool 305M")
+    other = new_item(session, radios, "Cable reel 100M")
+    page = text(admin_client.get(f"{ITEMS}/{item.id}"))
+    assert "Read as 305m · length, by “spool”." in page
+    assert 'name="unit:M" value="Mbit/s"' in page
+    form = {
+        "name": "Spool 305M",
+        "category_id": str(radios.id),
+        "unit": "each",
+        "version": shown(item),
+        "unit:M": "Mbit/s",
+    }
+    assert admin_client.post(f"{ITEMS}/{item.id}", data=form).status_code == 303
+    rule = session.scalars(select(ReadingRule)).one()
+    assert (rule.token, rule.reading) == ("M", "Mbit/s")
+    assert other.unit_key == "cablereel100mbits"
+    page = text(admin_client.get(f"{ITEMS}/{item.id}"))
+    assert "Read as 305Mbps · data rate." in page
 
 
 def test_a_correction_reading_names_alike_is_refused_naming_them(
