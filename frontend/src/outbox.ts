@@ -506,8 +506,9 @@ export class Outbox {
       build: this.builds.build,
       entries: next,
     } satisfies v.InferOutput<typeof Kept>);
-    // Shown as stored, so the page never shows what was not kept.
-    this.show(kept ? next : this.read());
+    // Shown as stored, and as storage reads it back (parsed, batchId), so
+    // the page never shows what was not kept.
+    this.show(kept ? parsed(next) : this.read());
     return kept;
   }
 

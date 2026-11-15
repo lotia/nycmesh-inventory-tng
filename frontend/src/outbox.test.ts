@@ -2,6 +2,7 @@ import { v4 as uuid } from "uuid";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { BUILD, Builds, HEADER } from "./build";
 import {
+  batchId,
   type Draft,
   Entry,
   KEY_REUSED,
@@ -146,6 +147,20 @@ describe("queueing", () => {
     outbox.dismiss(outbox.entries.value[1] as Entry);
     expect(outbox.entries.value).toMatchObject([{ what: "a", state: "saved" }]);
     expect(outbox.entries.value[0]).not.toHaveProperty("dismissed");
+  });
+
+  test("a batch just queued is named as storage reads it back, whatever its fields' order (inventory-tng-suo)", () => {
+    const { api } = answering(() => new Promise<Response>(() => {}));
+    const outbox = new Outbox(api);
+    const key = uuid();
+    outbox.queue(draft(), "a", key);
+    // Refused at once, listed under a key of its own, never read back yet.
+    outbox.queue(draft({ lines: [{ item_id: 6, quantity: "1" }] }), "b", key);
+    const shown = outbox.entries.value.map((each) => batchId(each.body));
+    const readBack = new Outbox(api).entries.value.map((each) =>
+      batchId(each.body),
+    );
+    expect(shown).toEqual(readBack);
   });
 
   test("an answer settles the batch it answers, not another a build before kept under its key (inventory-tng-e2d)", async () => {
