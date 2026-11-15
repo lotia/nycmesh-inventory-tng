@@ -132,6 +132,7 @@ def _page(
     as it would be with a reason."""
     where = [Movement.item_id == only.id] if only else []
     waiting = over_recorded.shown(session, *where)
+    asking = None
     if checking is not None:
         found = next((each for each in waiting if each.row.id == checking), None)
         if found is None:
@@ -139,7 +140,7 @@ def _page(
                 OVER_RECORDED, notice="over_recorded_unchanged", **query(only)
             )
         if found.moved_whole:
-            refused = {"shown": found, "words": None, "place": None}
+            asking = found
     return admin_page(
         request,
         signed,
@@ -159,9 +160,10 @@ def _page(
             "values": values,
             "alert": alert,
             "refused": refused,
+            "asking": asking,
             "notice": notice,
         },
-        409 if refused and refused["words"] else None,
+        409 if refused else None,
     )
 
 

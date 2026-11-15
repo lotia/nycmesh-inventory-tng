@@ -1225,13 +1225,10 @@ class OverRecorded(Base):
     settled_by_admin_id: Mapped[int | None] = _reference("admin.id")
     settled_how: Mapped[str | None] = mapped_column(Text)
     # Why one marked checked is right as it is (OVER_RECORDED_REASONS), and
-    # for another way, how, as typed, in canonical spelling. Never logged.
+    # for another way, how, as typed, in canonical spelling (canonical(), by
+    # admin/over_recorded.py, which checks their length so). Never logged.
     checked_reason: Mapped[str | None] = mapped_column(Text)
     checked_words: Mapped[str | None] = mapped_column(Text)
-
-    @validates("checked_words")
-    def _canonical(self, _key: str, value: str | None) -> str | None:
-        return None if value is None else canonical(value)
 
 
 class ScanSettings(Versioned, Base):
