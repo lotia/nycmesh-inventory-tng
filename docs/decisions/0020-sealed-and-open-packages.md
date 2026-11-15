@@ -350,6 +350,19 @@ you" counts every report in one line, which hides what is waiting.
   you already fixed it."; notices "Corrected.", "Marked checked." and, for
   one answered or changed meanwhile, "Not changed: someone answered or
   changed it meanwhile. Reload to see it as it is."
+- **Refused by a rule** (Ali, 2026-11-15, inventory-tng-axb), Correct or
+  Confirm count says why above the list, with two buttons under it. At a
+  retired place that holds nothing, which cannot be adjusted or counted:
+  "Not changed: Shelf B3 is retired and holds nothing, so the 2 can't be
+  found there again." (where it arrived: "can't be written off there"; a
+  count: "so its count can't be corrected there"), then "Bring back Shelf
+  B3" and "Mark checked". Bring back makes the place current as the places
+  page does, recorded as any place change, and returns with "Shelf B3
+  brought back. Correct it now."; holding the stock then, it cannot be
+  retired again until that is moved or counted elsewhere. A volunteer's
+  custody comes back with them, so only Mark checked is offered. Any other
+  rule: "Not changed: " and its words. One not an open package moved whole
+  any more is said as one changed meanwhile.
 
 ### Rejected in this amendment
 
@@ -373,7 +386,7 @@ you" counts every report in one line, which hides what is waiting.
 - Metrics, besides those above: checks of a package's length raised, by
   how (`volunteer`, `below_zero`), and settled, by how (`set`, `left`,
   `closed`); lines recorded more than moved raised, and settled, by how
-  (`corrected`, `checked`).
+  (`corrected`, `checked`); places brought back to correct one.
 - Built by inventory-tng-ck0 (the card and its box), inventory-tng-pll
   ("Needs your action"), inventory-tng-wy7 (reporting and checking a
   length) and inventory-tng-pg7 (the hint).

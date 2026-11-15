@@ -8,7 +8,7 @@ the count it held then, as it was, or corrected there by an adjustment
 (Ali, 2026-11-15)."""
 
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Any
 
 import structlog
 from fastapi import APIRouter, Form, Request
@@ -16,8 +16,9 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng import ledger, over_recorded
-from inventory_tng.admin.common import admin_page, quantity
+from inventory_tng import ledger, locations, over_recorded
+from inventory_tng.admin.common import admin_page, quantity, row_id, rule_words
+from inventory_tng.admin.locations import TAKEN
 from inventory_tng.admin.needs_action import (
     ItemWaiting,
     Kind,
@@ -26,9 +27,9 @@ from inventory_tng.admin.needs_action import (
     query_string,
 )
 from inventory_tng.admin.stock import STOCK
-from inventory_tng.db import DbSession, attempt
+from inventory_tng.db import DbSession, Gone, attempt
 from inventory_tng.local_time import site_zone
-from inventory_tng.models import Item, Movement, OverRecorded
+from inventory_tng.models import Item, Location, Movement, OverRecorded
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn
 
@@ -53,8 +54,14 @@ NOTICES.update(
         "over_recorded_count_corrected": "Count corrected.",
         "over_recorded_unchanged": "Not changed: someone answered or changed "
         "it meanwhile. Reload to see it as it is.",
+        # The page names the place brought back (?brought=) when it can.
+        "over_recorded_brought_back": "Brought back. Correct it now.",
     }
 )
+# Refusals said as one answered or changed meanwhile: settled or said again
+# (_settle), not an open package moved whole any more, or its adjustment's
+# key written by another (unique).
+MEANWHILE = frozenset({"over_recorded_unchanged", "over_recorded_not_whole", "unique"})
 
 
 def by_item(session: Session) -> list[ItemWaiting]:
@@ -78,10 +85,20 @@ def by_item(session: Session) -> list[ItemWaiting]:
 
 @router.get(OVER_RECORDED)
 def over_recorded_page(
-    request: Request, signed: AdminSignedIn, session: DbSession, only: OnlyItem
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    only: OnlyItem,
+    notice: str = "",
+    brought: str = "",
 ) -> Response:
-    """All those waiting, or only one item's."""
-    return _page(request, signed, session, only)
+    """All those waiting, or only one item's; after a place is brought
+    back, its name in the notice."""
+    place = None
+    if notice == "over_recorded_brought_back" and (ident := row_id(brought)):
+        place = session.get(Location, ident)
+    said = f"{place.name} brought back. Correct it now." if place else None
+    return _page(request, signed, session, only, notice=said)
 
 
 def _page(
@@ -91,8 +108,13 @@ def _page(
     only: OnlyItem,
     problems: dict[str, str] | None = None,
     values: dict[str, str] | None = None,
+    *,
+    alert: str | None = None,
+    refused: dict[str, Any] | None = None,
+    notice: str | None = None,
 ) -> Response:
-    """The page, with the problems of a count sent, and what was typed."""
+    """The page, with the problems of a count sent, and what was typed; a
+    refusal's alert; or a notice in words of its own."""
     where = [Movement.item_id == only.id] if only else []
     return admin_page(
         request,
@@ -109,7 +131,107 @@ def _page(
             "zone": site_zone(session),
             "problems": problems,
             "values": values,
+            "alert": alert,
+            "refused": refused,
+            "notice": notice,
         },
+        409 if refused else None,
+    )
+
+
+def _refusal(
+    session: Session, check_id: int, do: str, broken: str
+) -> dict[str, Any] | None:
+    """What the page says of a correction or count refused by a rule, and
+    offers under it: Mark checked, and, refused at a retired place that
+    holds nothing (location_countable), Bring back that place, which the
+    places page would (not a volunteer's custody, which comes back with
+    them). Where it left first, as correct() adjusts there first; a count
+    adjusts only where it arrived. None if it is settled meanwhile."""
+    found = over_recorded.shown(session, OverRecorded.id == check_id)
+    if not found:
+        return None
+    (each,) = found
+    words, place = f"Not changed: {rule_words(broken, TAKEN)}", None
+    if broken == "location_countable":
+        left, arrived = over_recorded.not_countable(session, check_id)
+        if do == "correct" and left is not None:
+            place, so = left, f"the {each.amount} can't be found there again"
+        elif do == "correct":
+            place, so = arrived, f"the {each.amount} can't be written off there"
+        else:
+            place, so = arrived, "its count can't be corrected there"
+        if place is not None:
+            words = f"Not changed: {place.name} is retired and holds nothing, so {so}."
+    offered = place if place is not None and place.kind != "custody" else None
+    return {"shown": each, "words": words, "place": offered}
+
+
+@router.post(f"{OVER_RECORDED}/{{check_id}}/bring-back")
+def bring_back(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    check_id: int,
+    only: OnlyItem,
+    seen: Annotated[str, Form()] = "",
+    place: Annotated[str, Form()] = "",
+) -> Response:
+    """Bring back a retired place one's correction was refused at, as the
+    places page does (locations.restore, under the same locks), so it can
+    be corrected there: one of its transaction's places, not a volunteer's
+    custody, while it waits as seen. Brought back already, as after a
+    second tap, it says so the same way. Before answer(), whose path
+    would take it."""
+    check = session.get(OverRecorded, check_id)
+    ident = row_id(place)
+    location = session.get(Location, ident) if ident else None
+    if (
+        check is None
+        or location is None
+        or location.kind == "custody"
+        or location.id not in over_recorded.places_of(session, check_id)
+    ):
+        return not_found()
+    if check.settled_at is not None or over_recorded.seen(check) != seen:
+        log.info(
+            "over recorded place not brought back",
+            over_recorded_id=check_id,
+            location_id=location.id,
+        )
+        return redirect(OVER_RECORDED, notice="over_recorded_unchanged", **query(only))
+
+    def restore() -> bool:
+        try:
+            locations.restore(session, location)
+        except Gone:  # Current already.
+            return False
+        return True
+
+    brought, broken = attempt(session, restore)
+    session.commit()
+    if broken is not None:
+        log.info(
+            "over recorded place not brought back",
+            over_recorded_id=check_id,
+            location_id=location.id,
+            rule=broken,
+        )
+        alert = f"Not changed: {rule_words(broken, TAKEN)}"
+        return _page(request, signed, session, only, alert=alert)
+    if brought:
+        over_recorded.measure_brought_back()
+        log.info(
+            "over recorded place brought back",
+            over_recorded_id=check_id,
+            location_id=location.id,
+            admin_id=signed.admin.id,
+        )
+    return redirect(
+        OVER_RECORDED,
+        notice="over_recorded_brought_back",
+        brought=str(location.id),
+        **query(only),
     )
 
 
@@ -159,7 +281,15 @@ def answer(
     session.commit()
     if settled is None:
         log.info("over recorded not settled", over_recorded_id=check_id, rule=broken)
-        return redirect(OVER_RECORDED, notice="over_recorded_unchanged", **query(only))
+        refused = None
+        if broken is not None and broken not in MEANWHILE:
+            refused = _refusal(session, check_id, do, broken)
+        if refused is None:
+            return redirect(
+                OVER_RECORDED, notice="over_recorded_unchanged", **query(only)
+            )
+        values = {f"count-{check_id}": typed} if count is not None else None
+        return _page(request, signed, session, only, values=values, refused=refused)
     how, written = settled
     ledger.corrected(admin_id, 0, written)
     over_recorded.measure_settled(how)

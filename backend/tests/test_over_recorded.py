@@ -9,15 +9,18 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import adjustment_reasons, ledger, over_recorded
+from inventory_tng.admin.common import RULES
 from inventory_tng.db import RuleBroken
 from inventory_tng.ledger import Entry, Form, _more_written
 from inventory_tng.models import (
     AdjustmentReason,
+    CatalogueHistory,
     ItemPackage,
     LedgerTransaction,
     Location,
@@ -30,7 +33,7 @@ from inventory_tng.models import (
 from helpers.concurrency import Committed
 from helpers.rows import add, tag
 from helpers.sign_in import new_admin, text
-from helpers.stock import Place, Spools, cut, write
+from helpers.stock import Place, Spools, cut, received, retire, write
 
 URL = "/api/transactions"
 PAGE = "/admin/stock/recorded-more"
@@ -750,3 +753,237 @@ def test_the_page_says_what_it_is_for(admin_client: TestClient) -> None:
         "inventory shows more moved than was. Correct moves the extra back with "
         "an adjustment. Mark checked if you already fixed it." in page
     )
+
+
+# Refused by a rule (inventory-tng-axb).
+
+
+def from_emptied_store(client: TestClient, session: Session) -> Place:
+    """Three radios received into the store and moved to the van, then sent
+    again as one: two wait, and the store holds nothing, retired."""
+    place = Place(session)
+    received(session, place)
+    recorded_then_changed(
+        client, place.batch(), lines=[{"item_id": place.item.id, "quantity": "1"}]
+    )
+    retire(session, place.store)
+    return place
+
+
+def correct(client: TestClient, session: Session) -> Response:
+    (check,) = checks(session)
+    return client.post(
+        f"{PAGE}/{check.id}/correct", data={"seen": over_recorded.seen(check)}
+    )
+
+
+def bring_back(
+    client: TestClient, session: Session, location: Location, **form: str
+) -> Response:
+    (check,) = checks(session)
+    data = {"seen": over_recorded.seen(check), "place": str(location.id)} | form
+    return client.post(f"{PAGE}/{check.id}/bring-back", data=data)
+
+
+def test_refused_at_a_retired_place_it_says_why_and_offers_a_fix(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    place = from_emptied_store(registered_client, session)
+    response = correct(admin_client, session)
+    assert response.status_code == 409
+    page = " ".join(text(response).split())
+    assert (
+        f"Not changed: {place.store.name} is retired and holds nothing, so the 2 "
+        "can't be found there again." in page
+    )
+    assert f"Bring back {place.store.name}" in page
+    (check,) = checks(session)
+    assert f'formaction="{PAGE}/{check.id}/bring-back"' in response.text
+    assert f'name="place" value="{place.store.id}"' in response.text
+    assert "someone answered or changed it meanwhile" not in page
+    assert check.settled_at is None
+    assert adjustments(session) == []
+
+
+def test_refused_where_it_arrived_it_names_that_place(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """The store current, the van retired after all it got left it: the
+    write-off there is what is refused."""
+    place = Place(session)
+    received(session, place)
+    recorded_then_changed(
+        registered_client,
+        place.batch(),
+        lines=[{"item_id": place.item.id, "quantity": "1"}],
+    )
+    write(
+        session,
+        place,
+        from_location_id=place.van.id,
+        to_location_id=place.store.id,
+    )
+    retire(session, place.van)
+    page = " ".join(text(correct(admin_client, session)).split())
+    assert (
+        f"Not changed: {place.van.name} is retired and holds nothing, so the 2 "
+        "can't be written off there." in page
+    )
+    assert f"Bring back {place.van.name}" in page
+
+
+def test_a_count_refused_where_it_arrived_names_that_place(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    spools = Spools(session)
+    made = moved_whole(registered_client, spools)
+    whole = Form(open_package_id=made.id)
+    spools.write(
+        {
+            "kind": "move",
+            "volunteer_id": spools.place.volunteer.id,
+            "from_location_id": spools.van.id,
+            "to_location_id": spools.store.id,
+        },
+        Entry(spools.cable.id, Decimal(305), whole, whole),
+        Entry(spools.place.item.id, Decimal(1)),
+    )
+    retire(session, spools.van)
+    check, response = counted(admin_client, session, "180")
+    assert response.status_code == 409
+    page = " ".join(text(response).split())
+    assert (
+        f"Not changed: {spools.van.name} is retired and holds nothing, so its "
+        "count can't be corrected there." in page
+    )
+    assert f"Bring back {spools.van.name}" in page
+    # Mark checked is offered there too, and what was typed is kept.
+    assert f'action="{PAGE}/{check.id}/checked"' in response.text
+    assert 'value="180"' in response.text
+
+
+def test_refused_by_another_rule_it_says_that_rule(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    place = Place(session)
+    recorded_then_changed(
+        registered_client,
+        place.batch(),
+        lines=[{"item_id": place.item.id, "quantity": "1"}],
+    )
+
+    def refused(*_: object) -> None:
+        raise RuleBroken("movement_whole_units")
+
+    monkeypatch.setattr(over_recorded, "correct", refused)
+    response = correct(admin_client, session)
+    assert response.status_code == 409
+    page = " ".join(text(response).split())
+    assert "Not changed: This item is counted in whole units." in page
+    assert "Bring back" not in page
+    assert "Mark checked" in page
+
+
+def test_bringing_the_place_back_lets_it_be_corrected(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    place = from_emptied_store(registered_client, session)
+    with capture_logs() as logs:
+        response = bring_back(admin_client, session, place.store)
+    assert response.status_code == 303
+    location = response.headers["location"]
+    assert "over_recorded_brought_back" in location
+    assert f"{place.store.name} brought back. Correct it now." in text(
+        admin_client.get(location)
+    )
+    session.expire_all()
+    assert place.store.retired_at is None
+    # Recorded as any place change is: who, and when.
+    actor = session.scalar(
+        select(CatalogueHistory.actor)
+        .where(
+            CatalogueHistory.table_name == "location",
+            CatalogueHistory.row_id == place.store.id,
+            CatalogueHistory.new_row["retired_at"].astext.is_(None),
+        )
+        .order_by(CatalogueHistory.id.desc())
+    )
+    assert actor is not None
+    assert actor.startswith("admin:")
+    (event,) = [
+        line for line in logs if line["event"] == "over recorded place brought back"
+    ]
+    assert event["location_id"] == place.store.id
+    assert correct(admin_client, session).status_code == 303
+    assert checks(session)[0].settled_how == "corrected"
+
+
+def test_brought_back_twice_it_is_brought_back_once(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """A second tap, or another administrator first: said the same way."""
+    place = from_emptied_store(registered_client, session)
+    with capture_logs() as logs:
+        first = bring_back(admin_client, session, place.store)
+        again = bring_back(admin_client, session, place.store)
+    assert first.headers["location"] == again.headers["location"]
+    brought = [
+        line for line in logs if line["event"] == "over recorded place brought back"
+    ]
+    assert len(brought) == 1
+
+
+def test_a_place_is_not_brought_back_for_one_settled_meanwhile(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    place = from_emptied_store(registered_client, session)
+    response = bring_back(admin_client, session, place.store, seen="9")
+    assert "over_recorded_unchanged" in response.headers["location"]
+    session.expire_all()
+    assert place.store.retired_at is not None
+
+
+def test_only_its_own_places_are_brought_back(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    place = from_emptied_store(registered_client, session)
+    other = add(session, Location(name=f"Shelf {tag()}", kind="store"))
+    retire(session, other)
+    assert bring_back(admin_client, session, other).status_code == 404
+    assert bring_back(admin_client, session, place.store, place="x").status_code == 404
+    session.expire_all()
+    assert other.retired_at is not None
+
+
+def test_a_place_whose_own_place_is_retired_says_so(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """An area inside a retired store comes back only after it, as on the
+    places page."""
+    place = Place(session)
+    shelf = add(
+        session, Location(name=f"Shelf {tag()}", kind="area", parent_id=place.store.id)
+    )
+    received(session, place)
+    write(
+        session,
+        place,
+        kind="receipt",
+        from_location_id=None,
+        to_location_id=shelf.id,
+    )
+    recorded_then_changed(
+        registered_client,
+        place.batch(from_location_id=shelf.id),
+        lines=[{"item_id": place.item.id, "quantity": "1"}],
+    )
+    retire(session, shelf, place.store)
+    response = bring_back(admin_client, session, shelf)
+    assert response.status_code == 409
+    page = " ".join(text(response).split())
+    assert f"Not changed: {RULES['location_parent_current']}" in page
+    session.expire_all()
+    assert shelf.retired_at is not None

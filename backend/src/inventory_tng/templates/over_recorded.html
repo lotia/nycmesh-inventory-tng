@@ -1,6 +1,18 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% block main %}
+{% if refused %}
+{#- A correction or count a rule refused: why, and what puts it right. #}
+{% set each = refused.shown %}
+<p role="alert">{{ refused.words }}</p>
+<form method="post" action="{{ here }}/{{ each.row.id }}/checked{{ query }}" class="actions">
+  <input type="hidden" name="seen" value="{{ seen(each.row) }}">
+  {% if refused.place %}
+  <button class="primary" formaction="{{ here }}/{{ each.row.id }}/bring-back{{ query }}" name="place" value="{{ refused.place.id }}">Bring back {{ refused.place.name }}</button>
+  {% endif %}
+  <button>Mark checked<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
+</form>
+{% endif %}
 <p class="hint">Another tab recorded these before a volunteer changed them,
 so the inventory shows more moved than was. Correct moves the extra back
 with an adjustment. Mark checked if you already fixed it.</p>

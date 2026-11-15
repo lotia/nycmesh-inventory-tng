@@ -52,6 +52,12 @@ settled_counter = meter.create_counter(
     description="Lines recorded with more than was moved that an administrator "
     "settled, by how: corrected with adjustments, or marked checked",
 )
+brought_back_counter = meter.create_counter(
+    "inventory.over_recorded.places_brought_back",
+    unit="{location}",
+    description="Retired places an administrator brought back from Recorded "
+    "more than moved, to correct a line there",
+)
 
 WAITING = OverRecorded.settled_at.is_(None)
 
@@ -88,6 +94,11 @@ def measure_raised(count: int) -> None:
 def measure_settled(how: Settled) -> None:
     """One settled, measured once committed."""
     settled_counter.add(1, {"how": how})
+
+
+def measure_brought_back() -> None:
+    """A place brought back to correct one there, measured once committed."""
+    brought_back_counter.add(1)
 
 
 def seen(row: OverRecorded) -> str:
@@ -225,16 +236,39 @@ def _settle(
     return row
 
 
-def places_of(session: Session, check_id: int) -> list[int]:
-    """The places a check's transaction moved stock between, to lock first,
-    as saves take places (ledger.lock_places)."""
+def _ends(session: Session, check_id: int) -> tuple[int | None, int | None]:
+    """Where a check's transaction moved stock from, and to."""
     found = session.execute(
         select(LedgerTransaction.from_location_id, LedgerTransaction.to_location_id)
         .join(Movement, Movement.transaction_id == LedgerTransaction.id)
         .join(OverRecorded, OverRecorded.movement_id == Movement.id)
         .where(OverRecorded.id == check_id)
     ).first()
-    return [] if found is None else [place for place in found if place is not None]
+    return (None, None) if found is None else (found[0], found[1])
+
+
+def places_of(session: Session, check_id: int) -> list[int]:
+    """The places a check's transaction moved stock between, to lock first,
+    as saves take places (ledger.lock_places)."""
+    return [place for place in _ends(session, check_id) if place is not None]
+
+
+def not_countable(
+    session: Session, check_id: int
+) -> tuple[Location | None, Location | None]:
+    """Where a check's transaction left, and where it arrived, each only if
+    it may not be adjusted there (ledger.countable): a retired place that
+    holds nothing, which refuses its correction (location_countable)."""
+    left, arrived = _ends(session, check_id)
+    refused = {
+        each.id: each
+        for each in session.scalars(
+            select(Location).where(
+                Location.id.in_([left, arrived]), ~ledger.countable()
+            )
+        )
+    }
+    return refused.get(left or 0), refused.get(arrived or 0)
 
 
 def mark_checked(session: Session, check_id: int, seen_as: str, admin_id: int) -> None:

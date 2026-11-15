@@ -979,3 +979,33 @@ def test_counts_lines_recorded_more_than_moved_raised_and_settled(
         (("how", "corrected"),): 1,
         (("how", "checked"),): 1,
     }
+
+
+def test_counts_places_brought_back_to_correct_one(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """Brought back from Recorded more than moved, once however often it is
+    sent (inventory-tng-axb)."""
+    client, _, reader, _ = rolled_back
+    place = Place(session)
+    received(session, place)
+    _, token = new_device(session)
+    client.cookies.set(devices.COOKIE, token)
+    first = place.batch()
+    assert client.post("/api/transactions", json=first).status_code == 201
+    changed = first | {
+        "lines": [{"item_id": place.item.id, "quantity": "1"}],
+        "changed_from": first["lines"],
+    }
+    assert client.post("/api/transactions", json=changed).status_code == 409
+    client.cookies.clear()
+    retire(session, place.store)
+    _, key = new_admin(session)
+    sign_in_with(client, code=code(key))
+    check = session.scalars(select(OverRecorded)).one()
+    form = {"seen": over_recorded.seen(check), "place": str(place.store.id)}
+    name = "inventory.over_recorded.places_brought_back"
+    before = counted(reader, name)
+    for _ in range(2):
+        client.post(f"/admin/stock/recorded-more/{check.id}/bring-back", data=form)
+    assert added(reader, name, before) == {(): 1}
