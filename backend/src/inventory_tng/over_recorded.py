@@ -268,15 +268,13 @@ def not_countable(
     it may not be adjusted there (ledger.countable): a retired place that
     holds nothing, which refuses its correction (location_countable)."""
     left, arrived = _ends(session, check_id)
-    refused = {
-        each.id: each
-        for each in session.scalars(
-            select(Location).where(
-                Location.id.in_([left, arrived]), ~ledger.countable()
-            )
-        )
-    }
-    return refused.get(left or 0), refused.get(arrived or 0)
+    refused = session.scalars(
+        select(Location).where(Location.id.in_([left, arrived]), ~ledger.countable())
+    ).all()
+    return (
+        next((each for each in refused if each.id == left), None),
+        next((each for each in refused if each.id == arrived), None),
+    )
 
 
 def mark_checked(session: Session, check_id: int, seen_as: str, admin_id: int) -> None:

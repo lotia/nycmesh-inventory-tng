@@ -204,9 +204,9 @@ def location(
     return _location_page(request, session, signed, found)
 
 
-def _changeable(session: Session, location_id: int) -> Location | None:
-    """A location this page changes: not a volunteer's custody, whose kind
-    never changes."""
+def changeable(session: Session, location_id: int) -> Location | None:
+    """A location this page changes, or Recorded more than moved brings
+    back: not a volunteer's custody, whose kind never changes."""
     found = session.get(Location, location_id)
     return None if found is None or found.kind == "custody" else found
 
@@ -222,7 +222,7 @@ def save_location(
     time_zone: Annotated[str, Form()] = "",
     version: Annotated[str, Form()] = "",
 ) -> Response:
-    found = _changeable(session, location_id)
+    found = changeable(session, location_id)
     if found is None:
         return not_found()
     name = name.strip()
@@ -265,7 +265,7 @@ def save_location(
 def retire_location(
     request: Request, signed: AdminSignedIn, session: DbSession, location_id: int
 ) -> Response:
-    found = _changeable(session, location_id)
+    found = changeable(session, location_id)
     if found is None:
         return not_found()
     _, broken = attempt(session, lambda: locations.retire(session, found, now()))
@@ -281,7 +281,7 @@ def retire_location(
 def restore_location(
     request: Request, signed: AdminSignedIn, session: DbSession, location_id: int
 ) -> Response:
-    found = _changeable(session, location_id)
+    found = changeable(session, location_id)
     if found is None:
         return not_found()
     _, broken = attempt(session, lambda: locations.restore(session, found))

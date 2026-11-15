@@ -91,8 +91,10 @@ RETIRED = "retired_read_only"
 ALERTS = frozenset({CHANGED, RETIRED})
 
 
-def rule_words(broken: str, unique: str) -> str:
-    if broken == "unique":
+def rule_words(broken: str, unique: str | None = None) -> str:
+    """RULES' words for a rule broken; `unique`'s for a unique index, where
+    a page can say which."""
+    if broken == "unique" and unique is not None:
         return unique
     return RULES.get(broken, "That breaks one of the inventory's rules.")
 

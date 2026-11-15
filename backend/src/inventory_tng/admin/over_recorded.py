@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng import ledger, locations, over_recorded
 from inventory_tng.admin.common import admin_page, quantity, row_id, rule_words
-from inventory_tng.admin.locations import TAKEN
+from inventory_tng.admin.locations import changeable
 from inventory_tng.admin.needs_action import (
     ItemWaiting,
     Kind,
@@ -152,7 +152,7 @@ def _refusal(
     if not found:
         return None
     (each,) = found
-    words, place = f"Not changed: {rule_words(broken, TAKEN)}", None
+    words, place = f"Not changed: {rule_words(broken)}", None
     if broken == "location_countable":
         left, arrived = over_recorded.not_countable(session, check_id)
         if do == "correct" and left is not None:
@@ -183,14 +183,11 @@ def bring_back(
     custody, while it waits as seen. Brought back already, as after a
     second tap, it says so the same way. Before answer(), whose path
     would take it."""
-    check = session.get(OverRecorded, check_id)
     ident = row_id(place)
-    location = session.get(Location, ident) if ident else None
-    if (
-        check is None
-        or location is None
-        or location.kind == "custody"
-        or location.id not in over_recorded.places_of(session, check_id)
+    location = changeable(session, ident) if ident else None
+    # A check that isn't there has no places.
+    if location is None or location.id not in over_recorded.places_of(
+        session, check_id
     ):
         return not_found()
 
@@ -218,7 +215,7 @@ def bring_back(
             return redirect(
                 OVER_RECORDED, notice="over_recorded_unchanged", **query(only)
             )
-        alert = f"Not changed: {rule_words(broken, TAKEN)}"
+        alert = f"Not changed: {rule_words(broken)}"
         return _page(request, signed, session, only, alert=alert)
     if brought:
         over_recorded.measure_brought_back()
