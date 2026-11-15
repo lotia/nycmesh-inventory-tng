@@ -413,12 +413,15 @@ you" counts every report in one line, which hides what is waiting.
   "Count Rack A", the place's count page showing that item only (0003),
   if it may be counted; and Mark
   checked. An opening's row names its forms, not the place twice:
-  "Sealed Spool counted 14 Nov. Open Spool still to put right.", or
-  "Loose Screws" for loose units, the package's and item's names as
-  given, with "Correct open Spool" and "Count Van". A Correct sent as
-  seen before the count is refused as changed meanwhile. A retired place
-  that holds nothing cannot be counted, so Bring back stays the way to
-  put it right there.
+  "Sealed spool counted 14 Nov. Open spool still to put right.", or
+  "Loose cat6 cable" for loose units, with "Correct open spool" and
+  "Count Van". The package's and item's names are shown with their
+  first letter lower case when the rest of their first word is ("Spool",
+  "Cat6 cable"), else as given ("PoE injector", "UPS"), and never
+  pluralised; what is stored is unchanged (Ali, 2026-11-15). A Correct
+  sent as seen before the count is refused as changed meanwhile. A retired
+  place that holds nothing cannot be counted, so Bring back stays the
+  way to put it right there.
 - **Every end put right**, the row closes as `counted`, by the
   administrator of the count that closed it, then, and leaves "Needs your
   action". A CHECK allows one end counted at most while it waits, and

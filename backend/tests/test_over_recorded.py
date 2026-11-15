@@ -1859,6 +1859,52 @@ def test_a_total_count_of_an_opening_puts_nothing_right(
     assert check.settled_at is None
 
 
+@pytest.mark.parametrize(
+    ("name", "shown"),
+    [
+        ("Spool", "spool"),
+        ("Box", "box"),
+        ("Cat6 cable", "cat6 cable"),
+        ("PoE injector", "PoE injector"),
+        ("SFP+ module", "SFP+ module"),
+        ("UPS", "UPS"),
+        ("X", "X"),
+        ("", ""),
+        ("A frame", "A frame"),
+        ("X-ray film", "x-ray film"),
+        ("Écrou", "écrou"),
+        ("E\N{COMBINING ACUTE ACCENT}crou", "e\N{COMBINING ACUTE ACCENT}crou"),
+        ("A\N{COMBINING RING ABOVE}SA", "A\N{COMBINING RING ABOVE}SA"),
+        ("Σωλήνας", "σωλήνας"),
+    ],
+)
+def test_a_name_within_a_sentence_lowers_its_first_letter_before_lower_case(
+    name: str, shown: str
+) -> None:
+    """Only where the rest of its first word is lower case already, so an
+    acronym or a word cased within stays; a combining mark changes
+    nothing (Ali, 2026-11-15, inventory-tng-r5z)."""
+    assert over_recorded.within(name) == shown
+
+
+def test_an_openings_one_end_wording_keeps_a_name_cased_within(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    spools = Spools(session)
+    spools.spool.name = "SFP+ module"
+    session.flush()
+    spools.receive(uuid.uuid4())
+    opening_raised(registered_client, spools)
+    count_at(
+        admin_client,
+        spools.store.id,
+        {f"sealed_{spools.cable.id}_{spools.spool.id}": "1"},
+    )
+    page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
+    assert "Open SFP+ module still to put right." in text_of(page)
+    assert "Correct open SFP+ module<span" in page
+
+
 @pytest.mark.parametrize("tracked", [True, False])
 def test_an_openings_sealed_count_puts_its_end_right_and_names_its_forms(
     admin_client: TestClient,
@@ -1879,10 +1925,12 @@ def test_an_openings_sealed_count_puts_its_end_right_and_names_its_forms(
     assert check.settled_at is None
     on = session.get_one(LedgerTransaction, counted).created_at
     day = show_day(on, site_zone(session))
-    still = "Open Spool" if tracked else f"Loose {spools.cable.name}"
+    # within(): "Cable <mark>" reads "cable <mark>".
+    cable = "c" + spools.cable.name[1:]
+    still = "Open spool" if tracked else f"Loose {cable}"
     page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
-    assert f"Sealed Spool counted {day}. {still} still to put right." in text_of(page)
-    correct = "open Spool" if tracked else f"loose {spools.cable.name}"
+    assert f"Sealed spool counted {day}. {still} still to put right." in text_of(page)
+    correct = "open spool" if tracked else f"loose {cable}"
     assert f"Correct {correct}<span" in page
     link = f"{COUNTS}/{spools.store.id}?item={spools.cable.id}"
     assert f'<a href="{link}">Count {spools.store.name}<span' in page
@@ -1903,10 +1951,11 @@ def test_an_openings_open_count_puts_the_other_end_right_and_both_close_it(
     (at_open,) = count_ids(session)
     (check,) = checks(session)
     assert (check.left_count_id, check.arrived_count_id) == (None, at_open)
-    still = "Open Spool counted" if tracked else f"Loose {spools.cable.name} counted"
+    cable = "c" + spools.cable.name[1:]
+    still = "Open spool counted" if tracked else f"Loose {cable} counted"
     page = text_of(admin_client.get(f"{PAGE}?item={spools.cable.id}").text)
     assert still in page
-    assert "Sealed Spool still to put right." in page
+    assert "Sealed spool still to put right." in page
     sealed = f"sealed_{spools.cable.id}_{spools.spool.id}"
     count_at(admin_client, spools.store.id, {sealed: "1"})
     _, at_sealed = count_ids(session)

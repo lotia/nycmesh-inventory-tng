@@ -131,14 +131,25 @@ FROM, TO = aliased(Location), aliased(Location)
 LEFT_COUNT, ARRIVED_COUNT = aliased(LedgerTransaction), aliased(LedgerTransaction)
 
 
+def within(name: str) -> str:
+    """`name` as it reads after a sentence's first word: its first letter
+    lower-cased when the rest of its first word is lower case already
+    (str.islower: every cased letter lower, one at least), so "Spool"
+    reads "spool" and "Cat6 cable" "cat6 cable", but "PoE injector",
+    "SFP+ module", "UPS" and a one-letter word stay as given (Ali,
+    2026-11-15, inventory-tng-r5z). A combining mark is not cased, so it
+    changes nothing. Only shown, never stored."""
+    return name[:1].lower() + name[1:] if name.partition(" ")[0][1:].islower() else name
+
+
 class OneCounted(NamedTuple):
     """A check one of whose two ends a count put right: the end counted
     and when, the end still to put right, as a sentence starts with each,
     and as its Correct button names it; and the place to count, by id and
     name, and whether it may be counted (ledger.countable). A move's ends
     are its places; an opening's, both at one place, its forms: "Sealed
-    Spool" where it left, "Open Spool" or "Loose Screws" where it arrived,
-    the names as the administrators gave them (Ali, 2026-11-15,
+    spool" where it left, "Open spool" or "Loose cat6 cable" where it
+    arrived, the names as within() shows them (Ali, 2026-11-15,
     inventory-tng-r5z)."""
 
     counted: str
@@ -282,12 +293,16 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
             if kind == "open":
                 # An opening leaves sealed, and arrives open if its item
                 # tracks opened, else loose (ledger._opening_breaks).
-                left = f"Sealed {package}"
-                arrived = f"Open {package}" if to_open is not None else f"Loose {item}"
+                left = f"Sealed {within(package)}"
+                arrived = (
+                    f"Open {within(package)}"
+                    if to_open is not None
+                    else f"Loose {within(item)}"
+                )
             else:
                 left, arrived = from_place or "", to_place or ""
             # The other end's words, and the button's: a form's in the
-            # sentence's middle ("Correct open Spool"), a place's as named.
+            # sentence's middle ("Correct open spool"), a place's as named.
             counted_end, on, other, still_id, still_place = (
                 (left, left_on, arrived, to_id, to_place)
                 if left_on is not None
