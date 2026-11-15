@@ -202,9 +202,25 @@ def offered(token: str, rule: units.Rule) -> tuple[units.Reading, ...]:
     return tuple(every)
 
 
-def read_alike_words(groups: Sequence[Sequence[items.Named]]) -> list[str]:
-    """Each group of names that would read alike, in words, by id."""
+def chosen_rule(
+    value: str, offered: Sequence[units.Reading], *, respell: bool = False
+) -> units.Rule | None:
+    """The rule a choice of reading (a form's, or the import's readings
+    file's) says, if it is one offered: a reading by str(Reading), respelt
+    in names if `respell`, or NOT_A_UNIT."""
+    if value == NOT_A_UNIT:
+        return units.Rule(None)
+    if value in {str(reading) for reading in offered}:
+        return units.Rule(value, respell)
+    return None
+
+
+def read_alike_words(
+    session: Session, tokens: Iterable[str], rules: units.Rules
+) -> list[str]:
+    """Each group of names that would read alike by `rules`, of those with
+    these units after a number (items.read_alike), in words, by id."""
     return [
         " and ".join(f"{TABLES[each.table]} {each.id} ({each.name})" for each in group)
-        for group in groups
+        for group in items.read_alike(session, tokens, rules)
     ]

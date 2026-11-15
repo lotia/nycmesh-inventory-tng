@@ -16,7 +16,7 @@ from structlog.testing import capture_logs
 from inventory_tng import models, reading_rules, unit_readings, units
 from inventory_tng.models import Category, Item, ReadingRule, unit_key
 
-from helpers.rows import add, history
+from helpers.rows import add, history, rule_of
 from helpers.sign_in import new_admin
 
 NAMES = [
@@ -49,10 +49,6 @@ def run_load(session: Session, path: Path) -> int:
     return unit_readings.run_load(session, unit_readings.parse(["load", str(path)]))
 
 
-def rule_of(session: Session, token: str) -> ReadingRule:
-    return session.scalars(select(ReadingRule).where(ReadingRule.token == token)).one()
-
-
 def test_a_dry_run_proposes_as_the_seeding_page_does(tmp_path: Path) -> None:
     """A row per unit the seeding page would propose, from the same
     function, with its evidence; none for a unit nothing reads (16P)."""
@@ -63,9 +59,8 @@ def test_a_dry_run_proposes_as_the_seeding_page_does(tmp_path: Path) -> None:
         rows=2, corrected=0, to_choose=1, not_proposed=0
     )
     proposals = reading_rules.propose(NAMES, {})
-    keys = ["M", "g"]
-    assert sorted(rows_of(path)) == sorted(p.found.key for p in proposals) == keys
     rows = rows_of(path)
+    assert sorted(rows) == sorted(p.found.key for p in proposals) == ["M", "g"]
     assert rows["M"] == {
         "unit": "M",
         "proposed": "m",

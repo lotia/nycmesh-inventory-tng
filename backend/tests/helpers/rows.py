@@ -19,7 +19,7 @@ from inventory_tng.db import (
     describe_error,
     flagged,
 )
-from inventory_tng.models import CatalogueHistory, Item
+from inventory_tng.models import CatalogueHistory, Item, ReadingRule
 
 
 @contextmanager
@@ -114,3 +114,8 @@ def shown(row: Base) -> str:
     """The version of a row its edit form shows and sends back
     (models.Versioned): the row as it is now."""
     return str(getattr(row, "edit_version"))  # noqa: B009
+
+
+def rule_of(session: Session, token: str) -> ReadingRule:
+    """The reading rule held for `token`."""
+    return session.scalars(select(ReadingRule).where(ReadingRule.token == token)).one()

@@ -28,7 +28,12 @@ from inventory_tng.db import DbSession, refusal
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import INTEGER_MAX, Admin, ReadingRule, whole
 from inventory_tng.pages import NOTICES, not_found, redirect
-from inventory_tng.reading_rules import NOT_A_UNIT, offered, read_alike_words
+from inventory_tng.reading_rules import (
+    NOT_A_UNIT,
+    chosen_rule,
+    offered,
+    read_alike_words,
+)
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
 log = structlog.get_logger(__name__)
@@ -49,19 +54,6 @@ NOTICES.update(
         "readings_accepted": "Accepted. Every name with them is read so now.",
     }
 )
-
-
-def chosen_rule(
-    value: str, offered: Sequence[units.Reading], *, respell: bool = False
-) -> units.Rule | None:
-    """The rule a form's choice of reading sends, if it is one offered:
-    a reading by str(Reading), respelt in names if `respell`, or
-    NOT_A_UNIT."""
-    if value == NOT_A_UNIT:
-        return units.Rule(None)
-    if value in {str(reading) for reading in offered}:
-        return units.Rule(value, respell)
-    return None
 
 
 def _list_page(request: Request, session: Session, signed: SignedIn) -> HTMLResponse:
@@ -148,9 +140,8 @@ def _refused(
         rules.pop(rule.token, None)
     else:
         rules[rule.token] = change
-    groups = items.read_alike(session, [rule.token], rules)
-    log.debug("reading refused", reading_rule_id=rule.id, read_alike=len(groups))
-    words = read_alike_words(groups)
+    words = read_alike_words(session, [rule.token], rules)
+    log.debug("reading refused", reading_rule_id=rule.id, read_alike=len(words))
     return _rule_page(request, session, signed, rule, read_alike=words)
 
 
@@ -312,9 +303,8 @@ def accept(
         items.READ_ALIKE,
     )
     if broken is not None:
-        groups = items.read_alike(session, chosen, {**rules, **chosen})
-        log.debug("readings refused", read_alike=len(groups))
-        words = read_alike_words(groups)
+        words = read_alike_words(session, chosen, {**rules, **chosen})
+        log.debug("readings refused", read_alike=len(words))
         return _seed_page(
             request,
             session,

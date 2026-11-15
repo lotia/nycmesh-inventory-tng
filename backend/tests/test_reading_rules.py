@@ -27,7 +27,16 @@ from inventory_tng.models import (
 )
 from inventory_tng.models import reading_rules as reading_rules_held
 
-from helpers.rows import add, breaks, history, item_fields, named, shown, violates
+from helpers.rows import (
+    add,
+    breaks,
+    history,
+    item_fields,
+    named,
+    rule_of,
+    shown,
+    violates,
+)
 from helpers.sign_in import text
 
 GBPS = units.Rule("Gbit/s")
@@ -40,10 +49,6 @@ def radios(session: Session) -> Category:
 
 def new_item(session: Session, category: Category, name: str) -> Item:
     return add(session, Item(name=name, category_id=category.id))
-
-
-def rule_of(session: Session, token: str) -> ReadingRule:
-    return session.scalars(select(ReadingRule).where(ReadingRule.token == token)).one()
 
 
 def test_the_rules_are_read_once_until_written_or_rolled_back(

@@ -148,9 +148,8 @@ def propose(names: Iterable[str], path: Path) -> Proposed:
     }
     for proposal in reading_rules.propose(canonical, {}):
         row = _row(proposal)
-        if (earlier := kept.get(row["unit"])) is not None:
-            row["correction"] = earlier["correction"]
-            row["respell"] = earlier["respell"]
+        if (old := kept.get(row["unit"])) is not None:
+            row["correction"], row["respell"] = old["correction"], old["respell"]
         rows[row["unit"]] = row
     with path.open("w", encoding="utf-8", newline="") as text:
         write(text, rows.values())
@@ -179,7 +178,6 @@ def chosen(rows: Sequence[dict[str, str]]) -> tuple[dict[str, units.Rule], list[
         unit = units.rule_key(row["unit"].strip())
         reading = row["correction"].strip() or row["proposed"].strip()
         respell = row["respell"].strip().lower()
-        allowed = {str(r) for r in reading_rules.offered(unit, units.Rule(None))}
         if not unit:
             problems.append("a row has no unit")
         elif unit in rules:
@@ -188,20 +186,19 @@ def chosen(rows: Sequence[dict[str, str]]) -> tuple[dict[str, units.Rule], list[
             problems.append(f"{unit}: no reading; write one in its correction")
         elif respell not in {"", YES}:
             problems.append(f"{unit}: respell is {YES} or empty, not {row['respell']}")
-        elif reading == reading_rules.NOT_A_UNIT:
-            if respell:
-                problems.append(
-                    f"{unit}: {reading} is never respelt; empty its respell"
-                )
-            else:
-                rules[unit] = units.Rule(None)
-        elif reading in allowed:
-            rules[unit] = units.Rule(reading, respell == YES)
+        elif reading == reading_rules.NOT_A_UNIT and respell:
+            problems.append(f"{unit}: {reading} is never respelt; empty its respell")
         else:
-            problems.append(
-                f"{unit}: {reading} is not one of its readings: "
-                + " ".join([*sorted(allowed), reading_rules.NOT_A_UNIT])
-            )
+            offers = reading_rules.offered(unit, units.Rule(None))
+            rule = reading_rules.chosen_rule(reading, offers, respell=respell == YES)
+            if rule is not None:
+                rules[unit] = rule
+            else:
+                allowed = sorted({str(each) for each in offers})
+                problems.append(
+                    f"{unit}: {reading} is not one of its readings: "
+                    + " ".join([*allowed, reading_rules.NOT_A_UNIT])
+                )
     return rules, problems
 
 
@@ -231,27 +228,26 @@ def load(session: Session, rules: dict[str, units.Rule]) -> Loaded | list[str]:
             select(ReadingRule).where(ReadingRule.token.in_(list(rules)))
         )
     }
-    kept = [
-        (row, rule)
-        for token, rule in rules.items()
-        if (row := held.get(token)) is not None
-        and row.decided_by_admin_id is not None
-        and row.rule != rule
-    ]
+    kept: list[tuple[ReadingRule, units.Rule]] = []
+    loading: dict[str, units.Rule] = {}
+    for token, rule in rules.items():
+        row = held.get(token)
+        if row is not None and row.decided_by_admin_id is not None and row.rule != rule:
+            kept.append((row, rule))
+        else:
+            loading[token] = rule
     was = {token: row.rule for token, row in held.items()}
-    left = {row.token for row, _ in kept}
-    loading = {token: rule for token, rule in rules.items() if token not in left}
-    written, broken = refusal(
+    written, _ = refusal(
         session,
         lambda: reading_rules.decide(session, loading, None),
         items.READ_ALIKE,
     )
-    if broken is not None or written is None:
-        groups = items.read_alike(
+    if written is None:
+        words = reading_rules.read_alike_words(
             session, loading, {**models.reading_rules(session), **loading}
         )
-        log.info("unit readings refused", read_alike=len(groups))
-        return reading_rules.read_alike_words(groups)
+        log.info("unit readings refused", read_alike=len(words))
+        return words
     log.info(
         "unit readings loaded",
         reading_rule_ids=[row.id for row in written],
@@ -314,7 +310,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 def run_propose(args: argparse.Namespace) -> int:
     try:
         with _text(args.names) as text:
-            names = [line.strip() for line in text if line.strip()]
+            names = [name for line in text if (name := line.strip())]
     except ValueError as error:
         print(f"{args.names}: {error}", file=sys.stderr)
         return 1

@@ -33,12 +33,7 @@ from inventory_tng.admin.common import (
     undo_retire,
 )
 from inventory_tng.admin.listing import Listing, Searched
-from inventory_tng.admin.reading_rules import (
-    NOT_A_UNIT,
-    READINGS,
-    chosen_rule,
-    read_alike_words,
-)
+from inventory_tng.admin.reading_rules import READINGS
 from inventory_tng.db import DbSession, exists_where, refusal
 from inventory_tng.ledger import balance
 from inventory_tng.local_time import site_zone
@@ -58,6 +53,7 @@ from inventory_tng.models import (
 from inventory_tng.models import reading_rules as rules_held
 from inventory_tng.names import nameless
 from inventory_tng.pages import NOTICES, not_found, redirect
+from inventory_tng.reading_rules import NOT_A_UNIT, chosen_rule, read_alike_words
 from inventory_tng.sign_in import AdminSignedIn, SignedIn
 
 log = structlog.get_logger(__name__)
@@ -186,13 +182,13 @@ def _change_or_note[T](
 def _read_alike(session: Session, typed: Typed) -> str:
     """Words for answers refused as they would read names alike, naming
     them by id, the savepoint undone (items.read_alike)."""
-    groups = items.read_alike(session, typed.answered, typed.rules)
-    log.debug("unit answer refused", read_alike=len(groups))
-    if not groups:  # Renamed meanwhile: none to name now.
+    words = read_alike_words(session, typed.answered, typed.rules)
+    log.debug("unit answer refused", read_alike=len(words))
+    if not words:  # Renamed meanwhile: none to name now.
         return "Read so, names would read as one. Try again, or answer otherwise."
     return (
         "Read so, these names would read as one: "
-        + "; ".join(read_alike_words(groups))
+        + "; ".join(words)
         + ". Rename one of each, or answer otherwise."
     )
 
