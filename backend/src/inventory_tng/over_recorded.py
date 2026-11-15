@@ -512,8 +512,8 @@ def settled(
     off = {
         _correction_key(each.idempotency_key, check, found=False): check.id
         for each in found
+        # closed_at: an opening's only (OPENED_INTO).
         if (check := each.OverRecorded).settled_how == "corrected"
-        and each.kind == "open"
         and check.arrived_count_id is None
         and each.closed_at is not None
     }

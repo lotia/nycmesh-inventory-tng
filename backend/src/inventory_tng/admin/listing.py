@@ -42,6 +42,11 @@ SUGGESTED = 8
 SEARCH_MAX = 200
 
 
+def last_page(found: int) -> int:
+    """How many pages of PER_PAGE `found` records fill: one at least."""
+    return max(1, ceil(found / PER_PAGE))
+
+
 def folded(search: str, rules: units.Rules | None = None) -> tuple[str, ...]:
     """What was typed as what is searched is kept (models.folds): as typed,
     and with its units respelt if that differs, by `rules` first, each no
@@ -169,7 +174,7 @@ class Listing[T]:
 
     @property
     def pages(self) -> int:
-        return max(1, ceil(self.found / PER_PAGE))
+        return last_page(self.found)
 
     @property
     def narrowed(self) -> bool:
@@ -230,7 +235,7 @@ class Listing[T]:
                 searched.closeness(self.search, rules).desc()
             )
         found = _count(session, query) if self.search else total
-        page = min(self.page, max(1, ceil(found / PER_PAGE)))
+        page = min(self.page, last_page(found))
         rows = session.scalars(
             query.order_by(func.lower(searched.name), table.id)
             .limit(PER_PAGE)
@@ -294,11 +299,11 @@ class Pages:
     ) -> Pages:
         asked = whole(page, 1, INTEGER_MAX) or 1
         kept = tuple((query or {}).items())
-        return cls(here, found, min(asked, max(1, ceil(found / PER_PAGE))), kept)
+        return cls(here, found, min(asked, last_page(found)), kept)
 
     @property
     def pages(self) -> int:
-        return max(1, ceil(self.found / PER_PAGE))
+        return last_page(self.found)
 
     @property
     def offset(self) -> int:

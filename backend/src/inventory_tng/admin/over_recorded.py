@@ -30,7 +30,9 @@ from inventory_tng.admin.needs_action import (
     query,
     query_string,
 )
-from inventory_tng.admin.stock import RECORDED_MORE, RECORDED_MORE_SETTLED, STOCK
+from inventory_tng.admin.stock import RECORDED_MORE as OVER_RECORDED
+from inventory_tng.admin.stock import RECORDED_MORE_SETTLED as SETTLED
+from inventory_tng.admin.stock import STOCK
 from inventory_tng.db import DbSession, Gone, attempt, exists_where
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import (
@@ -47,9 +49,6 @@ from inventory_tng.sign_in import AdminSignedIn
 log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
-
-OVER_RECORDED = RECORDED_MORE
-SETTLED = RECORDED_MORE_SETTLED
 
 TITLE = "Recorded more than moved"
 SETTLED_TITLE = "Recorded more than moved, settled"
