@@ -73,16 +73,19 @@ with an adjustment. Mark checked if you already fixed it.</p>
       </form>
       {% else %}
       {#- A count put one end right, or an opening's open package closed: the
-      other end's next step. #}
+      other end's next step. Both: nothing left to write, so Close it. #}
       {% set one = each.one_counted %}
+      {% set both = each.both_right %}
       {% if one %}
       <p>{{ one.counted }} {{ one.how }} {{ one.on | day(zone) }}. {{ one.still }} still to put right.</p>
+      {% elif both %}
+      <p>Both ends are right: {{ both.left }} counted {{ both.left_on | day(zone) }}, {{ both.arrived }} {{ both.arrived_how }} {{ both.arrived_on | day(zone) }}.</p>
       {% endif %}
       {#- Forms of their own, so Enter in the words marks it checked. #}
       <div class="actions">
-        <form method="post" action="{{ here }}/{{ row.id }}/correct{{ query }}">
+        <form method="post" action="{{ here }}/{{ row.id }}/{{ 'close' if both else 'correct' }}{{ query }}">
           <input type="hidden" name="seen" value="{{ seen(row) }}">
-          <button>Correct{% if one %} {{ one.correct }}{% endif %}<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
+          <button>{% if both %}Close it{% else %}Correct{% if one %} {{ one.correct }}{% endif %}{% endif %}<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
         </form>
         {% if one and one.countable %}
         <a href="{{ counts_path }}/{{ one.place_id }}?item={{ each.item_id }}">Count {{ one.place }}<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></a>

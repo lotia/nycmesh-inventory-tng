@@ -7,7 +7,9 @@ why it is right as it is (Ali, 2026-11-15, inventory-tng-zgy). An open
 package moved whole is now where it arrived: Confirm count settles it with
 the count it held then, as it was, or corrected there by an adjustment
 (Ali, 2026-11-15). One a count put right at one end says so, and offers
-Correct, Count or Mark checked for the other (inventory-tng-qs8)."""
+Correct, Count or Mark checked for the other (inventory-tng-qs8); one
+with both ends right says so, and offers Close it, which settles it as
+counted (Ali, 2026-11-15, inventory-tng-dro)."""
 
 from decimal import Decimal
 from typing import Annotated, Any
@@ -70,6 +72,7 @@ NOTICES.update(
     {
         "over_recorded_corrected": "Corrected.",
         "over_recorded_checked": "Marked checked.",
+        "over_recorded_counted": "Closed.",
         "over_recorded_confirmed": "Confirmed.",
         "over_recorded_count_corrected": "Count corrected.",
         "over_recorded_unchanged": "Not changed: someone answered or changed "
@@ -366,11 +369,11 @@ def answer(
     typed_words: Annotated[str, Form(alias="words")] = "",
     marker: Annotated[str, Form(alias="refused")] = "",
 ) -> Response:
-    """Correct one, mark it checked, saying why, or confirm the count of an
-    open package moved whole, if still as seen. Its places locked first, by
-    id, as saves take places."""
+    """Correct one, close one with both ends right, mark it checked, saying
+    why, or confirm the count of an open package moved whole, if still as
+    seen. Its places locked first, by id, as saves take places."""
     check = session.get(OverRecorded, check_id)
-    if do not in ("correct", "checked", "count") or check is None:
+    if do not in ("correct", "close", "checked", "count") or check is None:
         return not_found()
     count = None
     if do == "count":
@@ -415,8 +418,10 @@ def answer(
         nonlocal refused_at
         try:
             if do == "correct":
-                done = over_recorded.correct(session, check_id, seen, admin_id)
-                return "corrected", done
+                return over_recorded.correct(session, check_id, seen, admin_id)
+            if do == "close":
+                over_recorded.close(session, check_id, seen, admin_id)
+                return "counted", []
             if count is not None:
                 return over_recorded.confirm_count(
                     session, check_id, seen, admin_id, count

@@ -440,6 +440,18 @@ you" counts every report in one line, which hides what is waiting.
   holds one holds its place first, which the close holds too unless the
   open package moved whole since. A row whose sealed end is not counted
   still waits, for Correct of the sealed end alone.
+- **Both ends right, still waiting**, as when that close skipped a row a
+  count at the opening's place held, the open package having moved whole
+  (Ali, 2026-11-15, inventory-tng-dro): the row says "Both ends are
+  right: sealed spool counted 14 Nov, open spool closed 15 Nov." (each end
+  named as one end put right names it, the days in the site's zone) and
+  offers "Close it" in place of Correct, and Mark checked. Close it
+  settles it as `counted` by the administrator, then, writing nothing,
+  under the same locks as Correct and refused as changed meanwhile if not
+  as seen; Correct sent in that state does the same, so neither settles
+  it as `corrected` with nothing written. Measured `how=counted`; listed
+  settled as "Counted" with the count's day and the close's. Locking is
+  unchanged.
 - **One end put right**, the row says "Shelf B3 counted 14 Nov. Rack A
   still to put right." (the day in the site's zone) and offers "Correct
   Rack A", one adjustment at that end only, under a key of its own;
@@ -485,7 +497,8 @@ you" counts every report in one line, which hides what is waiting.
 - **The page's words** (Ali, 2026-11-15): "Another tab recorded these
   before a volunteer changed them, so the inventory shows more moved than
   was. Correct moves the extra back with an adjustment. Mark checked if
-  you already fixed it."; notices "Corrected.", "Marked checked." and, for
+  you already fixed it."; notices "Corrected.", "Marked checked.",
+  "Closed." for Close it, and, for
   one answered or changed meanwhile, "Not changed: someone answered or
   changed it meanwhile. Reload to see it as it is."
 - **Refused by a rule** (Ali, 2026-11-15, inventory-tng-axb), Correct or

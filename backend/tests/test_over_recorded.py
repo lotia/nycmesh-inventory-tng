@@ -2868,10 +2868,11 @@ def test_a_cut_counted_where_it_left_then_its_open_package_closed_still_waits(
 
 
 def sealed_counted_check(
-    own_committed: Committed,
+    own_committed: Committed, *, whole: bool = False
 ) -> tuple[OverRecorded, OpenPackage, int]:
     """One sealed spool of the store's two opened, recorded with 305 more,
-    its sealed end counted, committed: the check, its open package and an
+    its sealed end counted, then its open package moved whole to the van if
+    `whole`, committed: the check, its open package and an
     administrator."""
     setup = own_committed.session()
     spools = Spools(setup)
@@ -2896,6 +2897,9 @@ def sealed_counted_check(
     over_recorded.counted(
         setup, admin, spools.store.id, as_of, count.written, count.put_right
     )
+    if whole:
+        held = Form(open_package_id=made.id)
+        spools.move(Entry(spools.cable.id, Decimal(305), held, held))
     setup.commit()
     (check,) = checks(setup)
     assert (check.left_count_id is not None, check.settled_at) == (True, None)
@@ -2947,3 +2951,206 @@ def test_a_close_waits_for_a_correct_then_closes_only_its_package(
     assert check.settled_how == "corrected"
     (line,) = reason_adjustments(first, over_recorded.REASON)
     assert line.from_open_package_id == made.id
+
+
+# Both ends right while it waits: an opening's sealed end counted, then its
+# open package, moved whole, closed where it went while a count held the
+# row, so the close skipped it (open_package_closed). The row says so and
+# offers Close it, which settles it as counted, writing nothing; Correct
+# does the same (Ali, 2026-11-15, inventory-tng-dro).
+
+
+@pytest.mark.concurrency
+def test_a_close_skips_one_a_count_holds_and_correct_then_closes_it_as_counted(
+    own_committed: Committed,
+) -> None:
+    """The open package moved whole to the van: a count at the store holds
+    the check (counted() locks those of the items it counts), so a close at
+    the van leaves it out rather than wait (inventory-tng-die's residual).
+    Both commit with both ends right; Correct writes nothing and settles it
+    as counted."""
+    check, made, admin = sealed_counted_check(own_committed, whole=True)
+    first, second = own_committed.session(), own_committed.session()
+    movement = first.get_one(Movement, check.movement_id)
+    place = first.get_one(LedgerTransaction, movement.transaction_id).from_location_id
+    assert place is not None
+    sealed = Form(package_id=movement.from_package_id)
+    as_of = ledger.moment(first, place)
+    count = ledger.record_count(
+        first,
+        uuid.uuid4(),
+        admin,
+        place,
+        [],
+        as_of,
+        by_form=[(made.item_id, sealed, Decimal(305))],
+    )
+    assert count.written
+    assert (
+        over_recorded.counted(
+            first, admin, place, as_of, count.written, count.put_right
+        )
+        == 0
+    )
+    closed = open_packages.close(second, made.id, admin, datetime.now(UTC))
+    assert closed == open_packages.Closed(False, 0)
+    second.commit()
+    first.commit()
+    (waits,) = checks(first)
+    assert waits.settled_at is None
+    third = own_committed.session()
+    ledger.lock_places(third, over_recorded.places_of(third, check.id))
+    assert over_recorded.correct(third, check.id, over_recorded.seen(waits), admin) == (
+        "counted",
+        [],
+    )
+    third.commit()
+    (check,) = checks(first)
+    assert (check.settled_how, check.settled_by_admin_id) == ("counted", admin)
+    assert (check.left_count_id, check.arrived_count_id) == (waits.left_count_id, None)
+    assert reason_adjustments(first, over_recorded.REASON) == []
+
+
+def ada_id(session: Session) -> int:
+    """The id of admin_client's administrator."""
+    return session.scalars(select(Admin.id).where(Admin.username == "ada")).one()
+
+
+def both_right(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[Spools, OverRecorded, str]:
+    """An opening's sealed spool counted, then its open package moved whole
+    to the van and closed there, the close skipping the check as if a count
+    at the store held it: the spools, the check, and the page's words of
+    it."""
+    spools = Spools(session)
+    check = opening_raised(registered_client, spools)
+    open_id = opened_into(session, check).open_package_id
+    assert open_id is not None
+    count_at(admin_client, spools.store.id, {sealed_field(spools): "1"})
+    (counted_at,) = count_ids(session)
+    made = session.get_one(OpenPackage, open_id)
+    whole = cut(made, "305") | {"whole": True}
+    moved = registered_client.post(URL, json=spools.place.batch(lines=[whole]))
+    assert moved.status_code == 201
+    with monkeypatch.context() as patched:
+        patched.setattr(over_recorded, "open_package_closed", lambda *_: 0)
+        closed_from_its_item(admin_client, spools, open_id)
+    session.expire_all()
+    (check,) = checks(session)
+    assert (check.settled_at, check.left_count_id) == (None, counted_at)
+    zone = site_zone(session)
+    sealed = show_day(session.get_one(LedgerTransaction, counted_at).created_at, zone)
+    on = session.get_one(OpenPackage, open_id).closed_at
+    assert on is not None
+    words = (
+        f"Both ends are right: sealed spool counted {sealed}, "
+        f"open spool closed {show_day(on, zone)}."
+    )
+    return spools, check, words
+
+
+def test_both_ends_right_it_says_so_and_offers_close_it(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spools, check, words = both_right(
+        admin_client, registered_client, session, monkeypatch
+    )
+    page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
+    assert words in text_of(page)
+    assert f'action="{PAGE}/{check.id}/close?item={spools.cable.id}"' in page
+    assert "Close it<span" in page
+    assert f"{PAGE}/{check.id}/correct" not in page
+    assert "still to put right" not in page
+
+
+@pytest.mark.parametrize("do", ["close", "correct"])
+def test_both_ends_right_close_it_or_correct_settles_it_as_counted(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    do: str,
+) -> None:
+    """Nothing left to write: settled as counted by the administrator, now,
+    writing nothing, whether Close it or a Correct shown before."""
+    _, check, _ = both_right(admin_client, registered_client, session, monkeypatch)
+    ends = (check.left_count_id, check.arrived_count_id)
+    written = session.scalar(select(func.count()).select_from(LedgerTransaction))
+    began = session.scalar(select(func.now()))
+    with capture_logs() as logs:
+        done = admin_client.post(
+            f"{PAGE}/{check.id}/{do}", data={"seen": over_recorded.seen(check)}
+        )
+    assert "over_recorded_counted" in done.headers["location"]
+    session.expire_all()
+    (check,) = checks(session)
+    assert (check.settled_how, check.settled_by_admin_id) == (
+        "counted",
+        ada_id(session),
+    )
+    assert check.settled_at == began
+    assert (check.left_count_id, check.arrived_count_id) == ends
+    assert (
+        session.scalar(select(func.count()).select_from(LedgerTransaction)) == written
+    )
+    assert {
+        "event": "over recorded closed as right",
+        "log_level": "info",
+        "over_recorded_id": check.id,
+        "admin_id": ada_id(session),
+    } in logs
+    page = admin_client.get(f"{PAGE}?notice=over_recorded_counted").text
+    assert "Closed." in page
+    # Sent again: settled, so refused.
+    again = admin_client.post(
+        f"{PAGE}/{check.id}/{do}", data={"seen": over_recorded.seen(check)}
+    )
+    assert "over_recorded_unchanged" in again.headers["location"]
+
+
+def test_close_it_from_a_page_shown_before_is_refused(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Shown before a batch said another amount: changed meanwhile."""
+    _, check, _ = both_right(admin_client, registered_client, session, monkeypatch)
+    seen = over_recorded.seen(check)
+    over_recorded.raise_checks(session, {check.movement_id: Decimal(300)})
+    session.commit()
+    done = admin_client.post(f"{PAGE}/{check.id}/close", data={"seen": seen})
+    assert "over_recorded_unchanged" in done.headers["location"]
+    (check,) = checks(session)
+    assert check.settled_at is None
+
+
+def test_close_it_with_an_end_still_to_put_right_is_refused(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+) -> None:
+    """Only its sealed end counted: Close it would leave the open end
+    wrong, so nothing is settled; Correct still writes that end."""
+    spools = Spools(session)
+    opening_raised(registered_client, spools)
+    count_at(admin_client, spools.store.id, {sealed_field(spools): "1"})
+    (check,) = checks(session)
+    page = admin_client.get(PAGE).text
+    assert f"{PAGE}/{check.id}/close" not in page
+    done = admin_client.post(
+        f"{PAGE}/{check.id}/close", data={"seen": over_recorded.seen(check)}
+    )
+    assert "over_recorded_unchanged" in done.headers["location"]
+    (check,) = checks(session)
+    assert check.settled_at is None
+    assert (
+        "over_recorded_corrected" in correct(admin_client, session).headers["location"]
+    )

@@ -1061,6 +1061,49 @@ def test_counts_lines_recorded_more_than_moved_closed_with_their_open_package(
     }
 
 
+def test_counts_lines_recorded_more_than_moved_closed_with_both_ends_right(
+    rolled_back: Recorded, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An opening's sealed end counted and its open package closed by a
+    close that skipped it: Close it settles it as counted, once however
+    often it is sent (inventory-tng-dro)."""
+    client, _, reader, _ = rolled_back
+    admin, key = new_admin(session)
+    sign_in_with(client, code=code(key))
+    spools = Spools(session)
+    made = spools.opened()
+    movement_id = session.scalar(
+        select(Movement.id).where(Movement.to_open_package_id == made.id)
+    )
+    assert movement_id is not None
+    over_recorded.raise_checks(session, {movement_id: Decimal(305)})
+    store = spools.store.id
+    as_of = ledger.moment(session, store)
+    count = ledger.record_count(
+        session,
+        uuid.uuid4(),
+        admin.id,
+        store,
+        [],
+        as_of,
+        by_form=[(spools.cable.id, spools.sealed, Decimal(305))],
+    )
+    over_recorded.counted(
+        session, admin.id, store, as_of, count.written, count.put_right
+    )
+    monkeypatch.setattr(over_recorded, "open_package_closed", lambda *_: 0)
+    assert open_packages.close(session, made.id, admin.id, datetime.now(UTC))
+    session.flush()
+    check = session.scalars(select(OverRecorded)).one()
+    form = {"seen": over_recorded.seen(check)}
+    settled = counted(reader, "inventory.over_recorded.settled")
+    for _ in range(2):
+        client.post(f"/admin/stock/recorded-more/{check.id}/close", data=form)
+    assert added(reader, "inventory.over_recorded.settled", settled) == {
+        (("how", "counted"),): 1
+    }
+
+
 def test_counts_places_brought_back_to_correct_one(
     rolled_back: Recorded, session: Session
 ) -> None:

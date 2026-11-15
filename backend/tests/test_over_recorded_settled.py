@@ -462,6 +462,44 @@ def test_an_openings_sealed_end_counted_then_closed_says_so(
     )
 
 
+def test_both_ends_right_then_closed_names_the_count_and_the_close(
+    admin_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Its sealed end counted, its open package closed by a close that
+    skipped the check (a count held it), then Close it: counted, by the
+    count and the close (inventory-tng-dro)."""
+    spools, check = opening(session)
+    movement = session.get_one(Movement, check.movement_id)
+    assert movement.to_open_package_id is not None
+    count_at(
+        admin_client,
+        spools.store.id,
+        {f"sealed_{spools.cable.id}_{spools.spool.id}": "1"},
+    )
+    at = datetime(2026, 11, 20, 15, tzinfo=UTC)
+    with monkeypatch.context() as patched:
+        patched.setattr(over_recorded, "open_package_closed", lambda *_: 0)
+        closed = open_packages.close(
+            session, movement.to_open_package_id, ada(session), at
+        )
+    assert closed == open_packages.Closed(False, 0)
+    session.flush()
+    session.expire_all()
+    check = session.get_one(OverRecorded, check.id)
+    over_recorded.close(session, check.id, seen(check), ada(session))
+    session.flush()
+    assert check.left_count_id is not None
+    counted_on = session.get_one(LedgerTransaction, check.left_count_id).created_at
+    zone = site_zone(session)
+    sealed, opened = show_day(counted_on, zone), show_day(at, zone)
+    ((*_, how, why, by),) = settled_rows(admin_client)
+    assert (how, why, by) == (
+        "Counted",
+        f"Sealed spool {sealed}, open spool closed {opened}",
+        "ada",
+    )
+
+
 def test_one_end_only_counted_names_that_end(
     admin_client: TestClient, session: Session
 ) -> None:
