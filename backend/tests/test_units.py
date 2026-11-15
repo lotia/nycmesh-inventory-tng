@@ -255,7 +255,7 @@ def test_every_spelling_of_a_unit_finds_the_others(
             listed = page_text(admin_client.get(ITEMS, params={"q": each}))
             assert item.name in listed, each
     assert any(
-        found.name.startswith("Cap 10μF")
+        found.item.name.startswith("Cap 10μF")
         for found in items.similar(session, "Cap 10 uF", 0)
     )
 

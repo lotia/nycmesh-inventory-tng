@@ -12,16 +12,29 @@ are each its own, retired items' too (models.Item); taken_by says which
 another item has. An item's aliases (models.ItemAlias) share its names'
 keys: no name is another item's or any item's alias, nor an alias any
 item's name or another alias, checked here holding the catalogue lock, as
-every write to either takes it (docs/decisions/0021, 2026-11-14). similar
-finds items whose names are close, to ask whether a new name is a
-different item (docs/decisions/0021)."""
+every write to either takes it (docs/decisions/0021, 2026-11-14). A
+rename keeps the old name as an alias, and renaming an item to its own
+alias swaps the two (2026-11-15). similar finds items whose names or
+aliases are close, to ask whether a new name is a different item
+(docs/decisions/0021)."""
 
 from collections.abc import Collection
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import ColumnElement, and_, func, literal, or_, select
+from sqlalchemy import (
+    ColumnElement,
+    SQLColumnExpression,
+    and_,
+    func,
+    literal,
+    null,
+    or_,
+    select,
+    union_all,
+)
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
 from inventory_tng.db import (
@@ -127,14 +140,14 @@ def taken_by(
     session: Session, fields: Fields, item_id: int | None = None
 ) -> tuple[str, Item] | None:
     """The field of `fields` another item than `item_id` already has, and
-    that item, as the unique indexes compare them, or "alias" and the item
-    whose alias the name is, `item_id`'s too: a unique violation says
-    neither. None if none has, as when the other changed meanwhile."""
+    that item, as the unique indexes compare them, or "alias" and the other
+    item whose alias the name is: a unique violation says neither. None if
+    none has, as when the other changed meanwhile."""
     key = name_key(fields.name)
-    alias = select(Item).where(_alias_of(key))
-    if (aliased := session.scalars(alias.limit(1)).first()) is not None:
-        return "alias", aliased
-    wanted: list[tuple[str, ColumnElement[bool]]] = [("name", Item.name_key == key)]
+    wanted: list[tuple[str, ColumnElement[bool]]] = [
+        ("alias", _alias_of(key)),
+        ("name", Item.name_key == key),
+    ]
     if fields.manufacturer is not None and fields.part_number is not None:
         both = and_(
             # PostgreSQL's lower(), as the index's: Python's folds more.
@@ -157,17 +170,57 @@ def taken_by(
 SIMILAR = 5
 
 
-def similar(session: Session, name: str, item_id: int) -> list[Item]:
-    """Items other than `item_id`, the one named `name` now, whose names are
-    close to it, closest first, retired ones too: as search finds them
-    (models.fuzzy), or with a name found in `name`, as "mast" is in "Mast,
-    telescopic"; accents aside, as search's (models.fold)."""
+@dataclass(frozen=True)
+class Close:
+    """An item whose name is close to another, or one of whose current
+    aliases is: that alias, then, as spelt."""
+
+    item: Item
+    alias: str | None = None
+
+
+def similar(session: Session, name: str, item_id: int) -> list[Close]:
+    """Items other than `item_id`, the one named `name` now, whose names or
+    current aliases are close to it, closest first, retired ones too, each
+    once, by its name where that is as close as its closest alias: as
+    search finds them (models.fuzzy), or with a name found in `name`, as
+    "mast" is in "Mast, telescopic"; accents aside, as search's
+    (models.fold)."""
     folded = fold(name)
-    within = Item.name_folded.op("<%", is_comparison=True)(literal(folded))
-    close = or_(fuzzy(Item.name_folded, folded), within)
-    query = select(Item).where(close, Item.id != item_id)
-    closest = func.similarity(Item.name_folded, folded).desc(), func.lower(Item.name)
-    return list(session.scalars(query.order_by(*closest).limit(SIMILAR)))
+
+    def close(column: SQLColumnExpression[str]) -> ColumnElement[bool]:
+        within = column.op("<%", is_comparison=True)(literal(folded))
+        return or_(fuzzy(column, folded), within)
+
+    found = union_all(
+        select(
+            Item.id.label("item_id"),
+            null().label("alias"),
+            func.similarity(Item.name_folded, folded).label("score"),
+        ).where(close(Item.name_folded), Item.id != item_id),
+        select(
+            ItemAlias.item_id,
+            ItemAlias.name,
+            func.similarity(ItemAlias.name_folded, folded),
+        ).where(
+            close(ItemAlias.name_folded),
+            ItemAlias.retired_at.is_(None),
+            ItemAlias.item_id != item_id,
+        ),
+    ).subquery()
+    best = (
+        select(found)
+        .ext(distinct_on(found.c.item_id))
+        .order_by(found.c.item_id, found.c.score.desc(), found.c.alias.nulls_first())
+        .subquery()
+    )
+    query = (
+        select(Item, best.c.alias)
+        .join(best, best.c.item_id == Item.id)
+        .order_by(best.c.score.desc(), func.lower(Item.name))
+        .limit(SIMILAR)
+    )
+    return [Close(item, alias) for item, alias in session.execute(query)]
 
 
 def _not_an_alias(session: Session, name: str) -> None:
@@ -186,8 +239,21 @@ def add(session: Session, fields: Fields) -> Item:
     return item
 
 
-def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> None:
-    """Every one of `fields` set."""
+@dataclass(frozen=True)
+class Renamed:
+    """What renaming an item did to its aliases: its old name kept as one,
+    and, if it was renamed to one of its own, that alias removed."""
+
+    kept: ItemAlias
+    swapped: ItemAlias | None
+
+
+def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> Renamed | None:
+    """Every one of `fields` set; and, if its name's key changes, its old
+    name kept as an alias, in place of the alias it is renamed to if it is
+    one of its own (Ali, 2026-11-15): what that did. The old name was the
+    item's, so no other item's name nor any current alias, and so is free
+    as an alias."""
     # FOR UPDATE waits for any movement of it being written.
     relock(session, item, seen=seen)
     enforce("retired_read_only", when=item.retired_at is not None)
@@ -196,9 +262,38 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> None:
         enforce("item_unit_fixed", when=moved)
     if fields.category_id != item.category_id:
         _in_current_category(session, fields.category_id)
-    _not_an_alias(session, fields.name)
+    old, renamed = item.name, name_key(fields.name) != item.name_key
+    swapped = own_alias(session, item.id, fields.name) if renamed else None
+    if swapped is None:
+        _not_an_alias(session, fields.name)
     for column, value in asdict(fields).items():
         setattr(item, column, value)
+    if not renamed:
+        return None
+    if swapped is not None:
+        relock(session, swapped, current=True)
+        swapped.retired_at = datetime.now(UTC)
+    return Renamed(_aliased(session, item, old), swapped)
+
+
+def own_alias(session: Session, item_id: int, name: str) -> ItemAlias | None:
+    """The item's current alias with `name`'s key, if it has one."""
+    query = select(ItemAlias).where(
+        ItemAlias.item_id == item_id,
+        ItemAlias.name_key == name_key(name),
+        ItemAlias.retired_at.is_(None),
+    )
+    return session.scalars(query).first()
+
+
+def _aliased(session: Session, item: Item, name: str) -> ItemAlias:
+    """`name` written as the item's alias, and the item refolded to find it
+    by it: refold reads the aliases written."""
+    alias = ItemAlias(item_id=item.id, name=name)
+    session.add(alias)
+    session.flush()
+    item.refold()
+    return alias
 
 
 def aliases(session: Session, item_id: int) -> list[ItemAlias]:
@@ -227,11 +322,7 @@ def add_alias(session: Session, item: Item, name: str) -> ItemAlias:
         ALIAS_IS_NAME,
         when=exists_where(session, Item.name_key == name_key(name)),
     )
-    alias = ItemAlias(item_id=item.id, name=name)
-    session.add(alias)
-    session.flush()
-    item.refold()
-    return alias
+    return _aliased(session, item, name)
 
 
 def remove_alias(session: Session, alias: ItemAlias, at: datetime) -> None:

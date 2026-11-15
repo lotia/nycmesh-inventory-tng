@@ -528,8 +528,9 @@ class ItemPackage(KeyedName, Searchable, Versioned, Base):
 
 class ItemAlias(KeyedName, Base):
     """Another name an item is found by, such as one it was known by: kept
-    when an administrator adds it, searched as the item's own name is
-    (Item.refold), and taken as names are (docs/decisions/0021, 2026-11-14).
+    when an administrator adds it or renames the item, searched as the
+    item's own name is (Item.refold), and taken as names are
+    (docs/decisions/0021, 2026-11-14 and 2026-11-15).
     Its key is unique among current aliases here; among items' names too,
     which items.py checks holding the catalogue lock. Removed, it is
     retired, freeing the name; never changed otherwise (migration 0038)."""
@@ -551,6 +552,13 @@ class ItemAlias(KeyedName, Base):
     item_id: Mapped[int] = _reference("item.id")
     name: Mapped[str] = mapped_column(Text)
     retired_at: Mapped[RetiredAt]
+    # Its name folded, as an item's name_folded, for close names
+    # (items.similar), set as the name is: an alias's never changes.
+    name_folded: Mapped[str] = mapped_column(Text)
+
+    def _named(self, name: str) -> None:
+        super()._named(name)
+        self.name_folded = fold(name)
 
 
 class OpenPackage(Base):

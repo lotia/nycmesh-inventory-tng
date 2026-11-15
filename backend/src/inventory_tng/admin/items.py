@@ -84,8 +84,6 @@ TAKEN_FIELDS = {
     "alias": "has that name, or one differing from it only in case, spaces "
     "or punctuation, as an alias.",
 }
-# The item's own alias, asked for as its name.
-OWN_ALIAS = "It has that name as an alias: remove the alias first."
 
 
 # The rules a change to an item may break, besides "unique", and the field
@@ -113,8 +111,6 @@ def _taken(
     )
     if other is None:
         return shown, TAKEN
-    if other.id == item_id:
-        return shown, OWN_ALIAS
     retired = " It is retired." if other.retired_at is not None else ""
     return shown, f"{other.name} {TAKEN_FIELDS[field]}{retired}"
 
@@ -130,14 +126,14 @@ def _change_or_note[T](
     fields: items.Fields,
     item_id: int | None = None,
     *,
-    asked: list[Item] | None = None,
+    asked: list[items.Close] | None = None,
 ) -> tuple[T | None, str | None]:
     """Makes the change to `fields`: what it did, and None; or, if it
     breaks a unique index or one of REFUSED_FIELDS' rules, None, and the
     rule, which `problems` then says beside its field; or one of ALERTS;
     or, given `asked` and every rule allowing it, CLOSE when other items'
-    names are close to its (docs/decisions/0021), those items put in
-    `asked`, and nothing of it kept."""
+    names or aliases are close to its (docs/decisions/0021), those items
+    put in `asked`, and nothing of it kept."""
 
     def asking() -> T:
         done = change()
@@ -182,6 +178,8 @@ NOTICES.update(
         "tracking_same": "Nothing changed: those ticked were set so already, "
         "or are retired.",
         "alias_added": "Alias added.",
+        "renamed": "Saved. Its old name is an alias now, so a search for it "
+        "still finds the item: remove it if it should not.",
         "alias_removed": "Alias removed.",
     }
 )
@@ -224,7 +222,7 @@ def _units_read(typed: str) -> list[units.Found]:
     return units.found_in(canonical(typed.strip()))
 
 
-def _name_field(similar: Sequence[Item]) -> dict[str, object]:
+def _name_field(similar: Sequence[items.Close]) -> dict[str, object]:
     """What _item_name.html and _units_read.html need besides the form's
     values."""
     return {
@@ -245,7 +243,7 @@ def _list_page(
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
     undo: str | None = None,
-    similar: Sequence[Item] = (),
+    similar: Sequence[items.Close] = (),
 ) -> HTMLResponse:
     listing = (listing or SEARCHED.read()).find(session)
     categories = _categories(session)
@@ -291,7 +289,7 @@ def _item_page(
     problems: Mapping[str, str] | None = None,
     values: Mapping[str, str] | None = None,
     alert: str | None = None,
-    similar: Sequence[Item] = (),
+    similar: Sequence[items.Close] = (),
     undo: str | None = None,
 ) -> HTMLResponse:
     packages = session.scalars(
@@ -513,13 +511,18 @@ def save_item(
     if found is None:
         return not_found()
     fields, problems = _fields(session, form, item_id)
-    tracked = found.track_opened
+    tracked, renamed = found.track_opened, None
     if fields is not None:
         seen = form_version(form.get("version", ""))
-        # Its own name, or a respelling of it, asks nothing: it is the same.
-        same = name_key(fields.name) == found.name_key or _confirmed(form, fields)
+        # Its own name, or a respelling of it, asks nothing: it is the same;
+        # nor one of its aliases, which it was found by already.
+        same = (
+            name_key(fields.name) == found.name_key
+            or items.own_alias(session, item_id, fields.name) is not None
+            or _confirmed(form, fields)
+        )
         asked = None if same else []
-        _, broken = _change_or_note(
+        renamed, broken = _change_or_note(
             session,
             lambda: items.save(session, found, fields, seen=seen),
             problems,
@@ -542,7 +545,14 @@ def save_item(
     log.info("item saved", item_id=item_id)
     if fields is not None and fields.track_opened != tracked:
         _tracking_changed("item", 1, fields.track_opened, item_id=item_id)
-    return redirect(f"{ITEMS}/{item_id}", notice="saved")
+    if renamed is None:
+        return redirect(f"{ITEMS}/{item_id}", notice="saved")
+    how = "rename" if renamed.swapped is None else "swap"
+    log.info("alias added", item_id=item_id, item_alias_id=renamed.kept.id, by=how)
+    if renamed.swapped is not None:
+        swapped = renamed.swapped.id
+        log.info("alias removed", item_id=item_id, item_alias_id=swapped, by=how)
+    return redirect(f"{ITEMS}/{item_id}", notice="renamed", section="aliases")
 
 
 @router.post(f"{ITEMS}/{{item_id}}/retire")

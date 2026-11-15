@@ -352,3 +352,23 @@ name included.
 
 A name with no letter or number is refused with "A name needs at least one
 letter or number." (Q16 A).
+
+## Amendment: a rename keeps the old name as an alias (2026-11-15)
+
+Renaming an item keeps its old name as an alias, so a search for it still
+finds the item; the administrator may remove it (Ali, 2026-11-15,
+inventory-tng-c0c.6, Q17 A). Renaming an item to one of its own aliases
+swaps the two: the alias is removed and the old name becomes one, where
+before the rename was refused. A name only respelt, its key the same,
+keeps nothing. Both are part of the save, so a save refused for any field
+keeps neither. The old name is always free as an alias: it was the item's
+name, so no other item's name and no current alias. Changing aliases
+still changes nothing the item's form shows, so it moves no version.
+
+The question whether a new name is a different item also lists items
+whose current aliases are close, saying which alias (`items.similar`):
+each item once, by its name where that is as close. Each alias keeps its
+name folded (`name_folded`, migration 0041), as an item does.
+
+Merging items is its own decision (inventory-tng-2f1), the merged item's
+name then moving to the survivor as an alias (Q18).

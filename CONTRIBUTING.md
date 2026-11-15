@@ -272,7 +272,8 @@ An item's aliases (`item_alias`) share its name's namespace: no item's
 name is an alias, nor any alias an item's name or another alias, retired
 items' too. A unique index keeps aliases apart; `items.py` checks names
 against aliases, holding the catalogue lock. A removed alias is retired,
-freeing its name.
+freeing its name. Renaming an item keeps its old name as an alias, and
+renaming it to one of its own aliases swaps the two (`items.save`).
 
 Each such row keeps its key in `name_key`, which the app writes as the
 name is set (`models.KeyedName`), a CHECK constraint holds to the name,
@@ -299,7 +300,8 @@ scan page), so `feet` still finds `100 feet`. The table is
 keeps, raise its `VERSION`, write the scan page's copy and the fold
 reference again, and add a migration that folds every row again with
 `models.held`, as 0039 does, with `FOLDS_UNITS` the new version, folding
-an item's current aliases after its fields, as `Item.refold` does:
+an item's current aliases after its fields, as `Item.refold` does, and
+`name_folded` of items and aliases with `models.fold`:
 
 ```sh
 mise run regenerate-units           # frontend/src/units.json

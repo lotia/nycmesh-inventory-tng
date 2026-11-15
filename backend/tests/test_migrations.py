@@ -7,7 +7,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import Connection, text
 
-from inventory_tng.models import FOLDED_WITH
+from inventory_tng.models import FOLDED_WITH, fold
 from inventory_tng.names import IGNORED, name_key
 
 from helpers.sign_in import TOTP_KEYS
@@ -520,6 +520,23 @@ def test_name_keys_read_look_alikes_as_ascii(alembic_config: Config) -> None:
     command.downgrade(alembic_config, "0039")
     assert connection.execute(query).one() == before
     command.upgrade(alembic_config, "head")
+
+
+def test_aliases_names_are_folded(alembic_config: Config) -> None:
+    """Migration 0041: each alias's name folded, as the app folds it,
+    retired ones too."""
+    command.downgrade(alembic_config, "0040")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Cables') RETURNING id")
+    )
+    cable = _keyed(connection, "item", "Cable", category_id=category_id, name_folded="")
+    for name, retired in (("Câble 10 μF", None), ("Pätch", datetime.now(UTC))):
+        _keyed(connection, "item_alias", name, item_id=cable, retired_at=retired)
+    command.upgrade(alembic_config, "head")
+    assert connection.execute(
+        text("SELECT name_folded FROM item_alias ORDER BY id")
+    ).scalars().all() == [fold("Câble 10 μF"), "Patch"]
 
 
 def test_look_alike_name_keys_name_what_would_clash(alembic_config: Config) -> None:

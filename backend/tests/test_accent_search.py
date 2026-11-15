@@ -129,9 +129,9 @@ def test_compatibility_characters_find_their_canonical_ones(
 def test_close_names_are_found_whatever_their_accents(session: Session) -> None:
     cables = add(session, Category(name=f"Cables {tag()}"))
     accented = add(session, Item(name="Câble plat", category_id=cables.id))
-    assert accented in items.similar(session, "Cable plat", 0)
+    assert items.Close(accented) in items.similar(session, "Cable plat", 0)
     plain = add(session, Item(name="Patch lead", category_id=cables.id))
-    assert plain in items.similar(session, "Pätch lead", 0)
+    assert items.Close(plain) in items.similar(session, "Pätch lead", 0)
 
 
 def test_rows_there_are_are_folded_by_the_migration(alembic_config: Config) -> None:

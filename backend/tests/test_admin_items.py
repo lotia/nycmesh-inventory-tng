@@ -292,7 +292,10 @@ def test_editing_every_field(
         "version": shown(item),
     }
     done = admin_client.post(f"{ITEMS}/{item.id}", data=form)
-    assert done.headers["location"] == f"{ITEMS}/{item.id}?notice=saved"
+    # Renamed: its old name kept as an alias.
+    assert done.headers["location"] == (
+        f"{ITEMS}/{item.id}?notice=renamed&section=aliases#aliases"
+    )
     assert (item.name, item.category_id, item.unit) == ("Cat6 cable", cables.id, "m")
     assert (item.old_code, item.minimum, item.manufacturer) == (
         "NYCM-0042",
@@ -1140,9 +1143,9 @@ def test_an_alias_is_searched_and_its_removal_frees_it(
 def test_names_and_aliases_are_one_namespace(
     session: Session, radios: Category
 ) -> None:
-    """No item's name is an alias, its own or another's; no alias is an
-    item's name, retired items' too, or another current alias, as names
-    are compared (names.name_key)."""
+    """No item's name is another's alias (its own swaps them: below); no
+    alias is an item's name, retired items' too, or another current alias,
+    as names are compared (names.name_key)."""
     beam = new_item(session, radios, "LiteBeam 5AC Gen2")
     old = new_item(session, radios, "NanoBeam")
     retire(session, old)
@@ -1154,11 +1157,9 @@ def test_names_and_aliases_are_one_namespace(
 
     new = items.Fields.new(name="lbe-gen2", category_id=radios.id)
     assert broken(lambda: items.add(session, new)) == items.NAME_IS_ALIAS
-    # Another's alias, or its own.
-    for item in (other, beam):
-        renamed = item_fields(item, name="LBE gen 2")
-        save = partial(items.save, session, item, renamed, seen=None)
-        assert broken(save) == items.NAME_IS_ALIAS
+    renamed = item_fields(other, name="LBE gen 2")
+    save = partial(items.save, session, other, renamed, seen=None)
+    assert broken(save) == items.NAME_IS_ALIAS
     for name, rule in (
         ("Nano beam", items.ALIAS_IS_NAME),  # A retired item's name.
         ("litebeam 5ac gen2", items.ALIAS_IS_NAME),  # Its own.
@@ -1263,15 +1264,18 @@ def test_a_clash_with_an_alias_names_the_item(
             ),
         ),
         (
-            f"{ITEMS}/{beam.id}",
+            f"{ITEMS}/{rocket.id}",
             {
                 "name": "LBE gen2",
                 "category_id": str(radios.id),
                 "unit": "each",
-                "version": str(beam.edit_version),
+                "version": str(rocket.edit_version),
             },
             "name",
-            "It has that name as an alias: remove the alias first.",
+            (
+                "LiteBeam 5AC Gen2 has that name, or one differing from it only "
+                "in case, spaces or punctuation, as an alias."
+            ),
         ),
     ):
         refused = admin_client.post(target, data=form)
@@ -1339,3 +1343,191 @@ def test_a_retired_items_page_refuses_alias_changes(
     assert [each.name for each in items.aliases(session, item.id)] == ["NBE"]
     missing = admin_client.post(f"{ITEMS}/0/aliases", data={"alias_name": "X"})
     assert missing.status_code == 404
+
+
+def current_aliases(session: Session, item: Item) -> list[str]:
+    return [each.name for each in items.aliases(session, item.id)]
+
+
+def test_a_rename_keeps_the_old_name_as_an_alias(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """So a search for the old name still finds it (Ali, 2026-11-15), said
+    by the aliases, where it can be removed; logged by ids. A respelling,
+    the same name, keeps nothing."""
+    from structlog.testing import capture_logs
+
+    item = new_item(session, radios, "LiteBeam 5AC")
+    form = {"category_id": str(radios.id), "unit": "each"}
+
+    def save(name: str) -> Response:
+        session.refresh(item)
+        sent = form | {"name": name, "version": str(item.edit_version)}
+        return admin_client.post(f"{ITEMS}/{item.id}", data=sent)
+
+    with capture_logs() as logs:
+        done = save("LiteBeam 5AC Gen1")
+    assert done.headers["location"] == (
+        f"{ITEMS}/{item.id}?notice=renamed&section=aliases#aliases"
+    )
+    (alias,) = items.aliases(session, item.id)
+    assert alias.name == "LiteBeam 5AC"
+    (line,) = [line for line in logs if line["event"] == "alias added"]
+    assert line == {
+        "event": "alias added",
+        "log_level": "info",
+        "item_id": item.id,
+        "item_alias_id": alias.id,
+        "by": "rename",
+    }
+    assert [entry.action for entry in history(session, "item_alias", alias.id)] == [
+        "insert"
+    ]
+    page = text(admin_client.get(done.headers["location"]))
+    assert "Its old name is an alias now" in page
+    session.refresh(item)
+    assert item.name == "LiteBeam 5AC Gen1"
+    found = items_named(text(admin_client.get(ITEMS, params={"q": "litebeam 5ac"})))
+    assert found == ["LiteBeam 5AC Gen1"]
+    # Respelt only: the same name, so no alias.
+    assert save("litebeam 5ac gen1").headers["location"] == (
+        f"{ITEMS}/{item.id}?notice=saved"
+    )
+    assert current_aliases(session, item) == ["LiteBeam 5AC"]
+    # The administrator may remove it.
+    path = f"{ITEMS}/{item.id}/aliases/{alias.id}/remove"
+    assert admin_client.post(path).status_code == 303
+    assert current_aliases(session, item) == []
+
+
+def test_renaming_to_its_own_alias_swaps_them(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """The alias, as spelt now, becomes its name and its old name an alias,
+    in one save; not asked about close names, as it was found by it
+    already; both logged by ids."""
+    from structlog.testing import capture_logs
+
+    item = new_item(session, radios, "ToughCable")
+    (pro,) = aliased(session, item, "Tough Cable Pro")
+    # Close to the alias: would be asked about, for a new name.
+    new_item(session, radios, "Tough Cable Pro 2")
+    form = {
+        "name": "tough cable PRO",
+        "category_id": str(radios.id),
+        "unit": "each",
+        "version": str(item.edit_version),
+    }
+    with capture_logs() as logs:
+        done = admin_client.post(f"{ITEMS}/{item.id}", data=form)
+    assert done.status_code == 303
+    session.refresh(item)
+    session.refresh(pro)
+    assert item.name == "tough cable PRO"
+    assert pro.retired_at is not None
+    (kept,) = items.aliases(session, item.id)
+    assert kept.name == "ToughCable"
+    said = {line["event"]: line for line in logs if "alias" in line["event"]}
+    assert said["alias added"]["item_alias_id"] == kept.id
+    assert said["alias removed"]["item_alias_id"] == pro.id
+    assert {line["by"] for line in said.values()} == {"swap"}
+    assert "Tough" not in str(said)
+    # And back: a swap again.
+    assert items.save(
+        session, item, item_fields(item, name="Tough-Cable"), seen=None
+    ) == items.Renamed(kept=items.aliases(session, item.id)[0], swapped=kept)
+    assert item.name == "Tough-Cable"
+    assert current_aliases(session, item) == ["tough cable PRO"]
+    assert item.search_text.split() == ["Tough-Cable", "tough", "cable", "PRO"]
+
+
+def test_a_rename_refused_keeps_its_aliases(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Swap and kept alias go with the rename: refused for another field,
+    nothing of either is kept, and the field is named, not the alias."""
+    item = new_item(session, radios, "ToughCable")
+    (pro,) = aliased(session, item, "Tough Cable Pro")
+    add(session, Item(name="Rocket", category_id=radios.id, old_code="NYCM-9"))
+    for name in ("Tough Cable Pro", "Tough Cable Max"):
+        form = {
+            "name": name,
+            "category_id": str(radios.id),
+            "unit": "each",
+            "old_code": "NYCM-9",
+            "different": name,
+            "version": str(item.edit_version),
+        }
+        refused = admin_client.post(f"{ITEMS}/{item.id}", data=form)
+        assert refused.status_code == 400, name
+        assert 'id="old_code-problem">Rocket already has that old code.' in (
+            refused.text
+        )
+        session.refresh(item)
+        session.refresh(pro)
+        assert (item.name, pro.retired_at) == ("ToughCable", None)
+        assert current_aliases(session, item) == ["Tough Cable Pro"]
+
+
+def test_an_old_name_is_always_free_as_an_alias(
+    session: Session, radios: Category
+) -> None:
+    """It was the item's name, so no other item's and no current alias's
+    (one namespace): renamed back and forth, past other items' removed
+    aliases and retired items, each rename keeps it, and the namespace
+    holds."""
+    item = new_item(session, radios, "NanoBeam")
+    other = new_item(session, radios, "Rocket")
+    # Another item's alias once, removed: free again.
+    (gone,) = aliased(session, other, "NanoBeam M5")
+    items.remove_alias(session, gone, NOW)
+    retire(session, new_item(session, radios, "Old NanoBeam"))
+    for name in ("NanoBeam M5", "NanoBeam", "NanoBeam M5", "NBE", "NanoBeam"):
+        done, broken = attempt(
+            session,
+            lambda name=name: items.save(
+                session, item, item_fields(item, name=name), seen=None
+            ),
+        )
+        assert broken is None, name
+        assert done is not None
+        assert done.kept.item_id == item.id
+    assert current_aliases(session, item) == ["NanoBeam M5", "NBE"]
+    names = set(session.scalars(select(Item.name_key)))
+    keys = [
+        alias.name_key
+        for alias in session.scalars(
+            select(ItemAlias).where(ItemAlias.retired_at.is_(None))
+        )
+    ]
+    assert len(keys) == len(set(keys))
+    assert not names & set(keys)
+
+
+def test_close_names_include_close_aliases(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Saying which alias is close; each item once, by its name where that
+    is as close; an item's own aliases and removed ones not."""
+    tough = new_item(session, radios, "ToughCable")
+    aliased(session, tough, "Tuff cable outdoor")
+    beam = new_item(session, radios, "LiteBeam 5AC")
+    aliased(session, beam, "LiteBeam 5AC Gen1")
+    (gone,) = aliased(session, new_item(session, radios, "Rocket"), "Patch lead")
+    items.remove_alias(session, gone, NOW)
+    assert items.similar(session, "Tuff cable outdoors", 0) == [
+        items.Close(tough, "Tuff cable outdoor")
+    ]
+    assert items.similar(session, "LiteBeam 5AC", 0) == [items.Close(beam)]
+    assert items.similar(session, "Tuff cable outdoors", tough.id) == []
+    assert items.similar(session, "Patch leads", 0) == []
+    form = {
+        "name": "Tuff cable outdoors",
+        "category_id": str(radios.id),
+        "unit": "each",
+    }
+    asked = text(admin_client.post(ITEMS, data=form))
+    assert (
+        f'<a href="{ITEMS}/{tough.id}">ToughCable</a> (alias Tuff cable outdoor).'
+        in asked
+    )

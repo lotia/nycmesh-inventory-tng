@@ -138,7 +138,7 @@ def test_the_app_may_not_delete_a_settings_row(session: Session, table: str) -> 
 FIXED = {
     "label": {"id", "created_at", "code", "item_id", "package_id", "location_id"},
     "item_package": {"id", "created_at", "item_id"},
-    "item_alias": {"id", "created_at", "item_id", "name", "name_key"},
+    "item_alias": {"id", "created_at", "item_id", "name", "name_key", "name_folded"},
     "location": {"id", "created_at", "kind", "volunteer_id"},
     "open_package": {"id", "key", "opened_at", "item_id", "package_id"},
 }
