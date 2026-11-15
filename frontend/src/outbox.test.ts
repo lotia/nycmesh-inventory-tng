@@ -754,6 +754,34 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     expect(sent).toHaveLength(2);
   });
 
+  test.each([
+    ["before it is asked about", () => json({}, 500)],
+    ["once the server said what it recorded", () => recordedReply()],
+  ])(
+    "the same cart recorded again, listed recorded elsewhere %s, is listed once (inventory-tng-3iy review)",
+    async (_, reply) => {
+      const { outbox, sent, key } = await askedAbout(reply);
+      await vi.waitFor(() => expect(sent).toHaveLength(2));
+      // Its cart not emptied, as the browser would not keep that, and
+      // recorded again: two listed would put their difference in the cart
+      // twice, each under a key of its own, to be recorded twice.
+      expect(outbox.queue(changed(), "b", key)).toBe("already");
+      expect(states(outbox)).toEqual(["saved", "refused"]);
+    },
+  );
+
+  test("the same cart recorded again, sent under its key and refused as recorded elsewhere, is listed once (inventory-tng-3iy review)", async () => {
+    const { api } = answering(() => json({ reason: "key_reused" }, 409));
+    const outbox = new Outbox(api);
+    const key = uuid();
+    outbox.queue(draft(), "a", key);
+    await vi.waitFor(() => expect(states(outbox)).toEqual(["refused"]));
+    // Another cart under a key of its own is no such one.
+    expect(outbox.queue(draft(), "b", uuid())).toBe("queued");
+    expect(outbox.queue(draft(), "a", key)).toBe("already");
+    expect(outbox.entries.value).toHaveLength(2);
+  });
+
   test("one asked about that the server records, as nothing held the key, is saved under it", async () => {
     const { outbox, key } = await askedAbout(() => saved(42));
     await vi.waitFor(() => expect(second(outbox)?.state).toBe("saved"));

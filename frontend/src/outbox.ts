@@ -606,7 +606,9 @@ export class Outbox {
    *
    * A key already queued here is that cart again, emptied by Record but
    * not kept so, or filled again by a tab that had not heard. The same
-   * again, waiting or saved, is not queued twice. Another batch, while
+   * again, waiting or saved, or listed recorded elsewhere under that key,
+   * is not queued twice: listed twice, its difference would go in the
+   * cart twice, under two keys (recorded.ts). Another batch, while
    * the server may hold that key (one under it waits, was saved, or was
    * refused for it), is not recorded, as the server would refuse it (409
    * key_reused): it is listed so, under a key of its own, never sent, so
@@ -632,7 +634,8 @@ export class Outbox {
           (each) =>
             (each.state === "waiting" || each.state === "saved") &&
             sameBatch(each.body, body),
-        )
+        ) ||
+        entries.some((each) => listedElsewhereAs(each, body))
       ) {
         return entries;
       }
@@ -1033,6 +1036,21 @@ function heldKeyOf(entry: Entry): string | undefined {
     entry.reason?.code === "recorded_elsewhere"
     ? entry.reason.heldKey
     : undefined;
+}
+
+/** Whether `entry` is listed recorded elsewhere as `body`, under `body`'s
+ * key, its cart's: sent under it, held for it, or, asked, recorded under
+ * it. Under a key of its own (queue), its key is not compared. */
+function listedElsewhereAs(entry: Entry, body: Body): boolean {
+  if (
+    entry.state !== "refused" ||
+    entry.reason?.code !== "recorded_elsewhere"
+  ) {
+    return false;
+  }
+  const { heldKey, recorded } = entry.reason;
+  const key = heldKey ?? recorded?.batch.key ?? entry.body.key;
+  return key === body.key && sameBatch({ ...entry.body, key: body.key }, body);
 }
 
 /** A 409 key_reused of a batch sent under its cart's key `key`, as kept:
