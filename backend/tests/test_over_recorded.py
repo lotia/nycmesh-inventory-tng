@@ -2763,8 +2763,20 @@ def closed_ticked(admin_client: TestClient, spools: Spools, open_id: int) -> Non
     assert "used_up_confirmed" in done.headers["location"]
 
 
+def closed_on_a_count(admin_client: TestClient, spools: Spools, open_id: int) -> None:
+    """Said used up on a later count of its place: the close settles it
+    before the count's own rows (over_recorded.counted), which then leave
+    it be."""
+    done = count_at(
+        admin_client,
+        spools.store.id,
+        {f"opened_{open_id}": "", f"state_{open_id}": "used_up"},
+    )
+    assert done.status_code == 303
+
+
 @pytest.mark.parametrize(
-    "close", [closed_by_confirm, closed_ticked, closed_from_its_item]
+    "close", [closed_by_confirm, closed_ticked, closed_from_its_item, closed_on_a_count]
 )
 def test_its_sealed_spool_counted_then_its_open_package_closed_closes_it(
     admin_client: TestClient,
@@ -2801,6 +2813,28 @@ def test_its_sealed_spool_counted_then_its_open_package_closed_closes_it(
     assert reason_adjustments(session, over_recorded.REASON) == []
     page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
     assert f"{PAGE}/{check.id}/" not in page
+
+
+def test_its_sealed_spool_counted_then_its_open_package_moved_whole_and_closed(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """Closed where it went, not where it was opened: the close holds that
+    place, not the opening's, and closes it all the same."""
+    spools = Spools(session)
+    check = opening_raised(registered_client, spools)
+    open_id = opened_into(session, check).open_package_id
+    assert open_id is not None
+    count_at(admin_client, spools.store.id, {sealed_field(spools): "1"})
+    made = session.get_one(OpenPackage, open_id)
+    whole = cut(made, "305") | {"whole": True}
+    moved = registered_client.post(URL, json=spools.place.batch(lines=[whole]))
+    assert moved.status_code == 201
+    session.expire_all()
+    assert session.get_one(OpenPackage, open_id).location_id != spools.store.id
+    closed_from_its_item(admin_client, spools, open_id)
+    (check,) = checks(session)
+    assert (check.settled_how, check.arrived_count_id) == ("counted", None)
+    assert reason_adjustments(session, over_recorded.REASON) == []
 
 
 def test_its_open_package_closed_with_neither_end_counted_leaves_it_waiting(
