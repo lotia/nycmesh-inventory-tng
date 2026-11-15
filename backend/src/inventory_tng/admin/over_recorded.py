@@ -33,8 +33,7 @@ from inventory_tng.admin.needs_action import (
     query_string,
 )
 from inventory_tng.admin.stock import RECORDED_MORE as OVER_RECORDED
-from inventory_tng.admin.stock import RECORDED_MORE_SETTLED as SETTLED
-from inventory_tng.admin.stock import STOCK
+from inventory_tng.admin.stock import RECORDED_MORE_SETTLED, STOCK
 from inventory_tng.db import DbSession, Gone, attempt, exists_where
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import (
@@ -130,11 +129,11 @@ def _views(waiting: int, only: Item | None) -> list[tuple[str, str, str]]:
     kept = query_string(only)
     return [
         (f"{OVER_RECORDED}{kept}", f"Waiting ({waiting})", "waiting"),
-        (f"{SETTLED}{kept}", "Settled", "settled"),
+        (f"{RECORDED_MORE_SETTLED}{kept}", "Settled", "settled"),
     ]
 
 
-@router.get(SETTLED)
+@router.get(RECORDED_MORE_SETTLED)
 def settled_page(
     request: Request,
     signed: AdminSignedIn,
@@ -147,7 +146,7 @@ def settled_page(
     Read only."""
     where = [Movement.item_id == only.id] if only else []
     pages = Pages.read(
-        SETTLED,
+        RECORDED_MORE_SETTLED,
         over_recorded.how_many(session, over_recorded.SETTLED, *where),
         page,
         query(only),
@@ -163,7 +162,7 @@ def settled_page(
         "over_recorded_settled.html",
         {
             "title": SETTLED_TITLE,
-            "here": SETTLED,
+            "here": RECORDED_MORE_SETTLED,
             "back_link": (STOCK, "Stock"),
             "only": only,
             "recorded_views": _views(
