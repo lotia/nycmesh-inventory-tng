@@ -12,6 +12,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from math import ceil
 from typing import Any, Literal
+from unicodedata import normalize
 from urllib.parse import urlencode
 
 import structlog
@@ -19,6 +20,7 @@ from sqlalchemy import (
     ColumnElement,
     Select,
     SQLColumnExpression,
+    and_,
     case,
     func,
     not_,
@@ -28,7 +30,15 @@ from sqlalchemy import (
 from sqlalchemy.orm import Session
 
 from inventory_tng import units
-from inventory_tng.models import INTEGER_MAX, folds, fuzzy, holds, reading_rules, whole
+from inventory_tng.models import (
+    INTEGER_MAX,
+    folds,
+    fuzzy,
+    holds,
+    in_ascii,
+    reading_rules,
+    whole,
+)
 
 log = structlog.get_logger(__name__)
 
@@ -54,13 +64,54 @@ def folded(search: str, rules: units.Rules | None = None) -> tuple[str, ...]:
     return tuple(form[:SEARCH_MAX] for form in folds(search, rules))
 
 
-def closeness(column: SQLColumnExpression[str], search: str) -> ColumnElement[float]:
-    """How close a match is, best highest: holding it as typed first."""
-    return case((holds(column, search), 2.0), else_=0.0) + (
-        func.greatest(
-            func.similarity(column, search), func.word_similarity(search, column)
+def grouped(search: str, rules: units.Rules | None = None) -> list[tuple[str, ...]]:
+    """What was typed in groups (units.groups), each folded as typed and
+    respelt, as folds() folds them, each once, case aside, and no longer
+    than SEARCH_MAX; a group folding to nothing left out."""
+    found = []
+    for group in units.groups(normalize("NFKD", search), rules):
+        forms = {
+            form.lower(): form
+            for each in group
+            if (form := in_ascii(each)[:SEARCH_MAX]).strip()
+        }
+        if forms:
+            found.append(tuple(forms.values()))
+    return found
+
+
+def every_group(
+    column: SQLColumnExpression[str], search: str, rules: units.Rules | None = None
+) -> ColumnElement[bool] | None:
+    """Whether `column` holds every group of what was typed (grouped), each
+    as typed or respelt (Ali, 2026-11-15, inventory-tng-ist.1): so `100 ft
+    48 V` finds `Cable 100 feet, PoE 48 VDC`, which holds neither form
+    whole. None where that adds nothing: one group, which is the whole, or
+    none, past units.GROUPS_MAX."""
+    groups = grouped(search, rules)
+    if len(groups) < 2:
+        return None
+    return and_(*(or_(*(holds(column, form) for form in g)) for g in groups))
+
+
+def closeness(
+    column: SQLColumnExpression[str],
+    forms: Sequence[str],
+    every: ColumnElement[bool] | None = None,
+) -> ColumnElement[float]:
+    """How close a match is, best highest: holding a form whole first (2),
+    then holding every group (`every`, 1, Ali, 2026-11-15), then how alike
+    it is to the closest form."""
+    alike = func.greatest(
+        *(
+            func.greatest(func.similarity(column, f), func.word_similarity(f, column))
+            for f in forms
         )
     )
+    held = [(or_(*(holds(column, f) for f in forms)), 2.0)]
+    if every is not None:
+        held.append((every, 1.0))
+    return case(*held, else_=0.0) + alike
 
 
 @dataclass(frozen=True)
@@ -123,6 +174,8 @@ class Searched[T]:
         self, search: str, rules: units.Rules | None = None
     ) -> ColumnElement[bool]:
         found = or_(*(fuzzy(self.text, form) for form in folded(search, rules)))
+        if (every := every_group(self.text, search, rules)) is not None:
+            found = or_(found, every)
         if self.whole is None:
             return found
         return or_(found, self.whole == search.upper())
@@ -131,8 +184,8 @@ class Searched[T]:
         self, search: str, rules: units.Rules | None = None
     ) -> ColumnElement[float]:
         """As closeness(), and the whole column matched before anything."""
-        forms = folded(search, rules)
-        near = func.greatest(*(closeness(self.text, f) for f in forms))
+        every = every_group(self.text, search, rules)
+        near = closeness(self.text, folded(search, rules), every)
         if self.whole is None:
             return near
         return case((self.whole == search.upper(), 3.0), else_=0.0) + near

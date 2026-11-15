@@ -319,10 +319,9 @@ page, a unit half typed, such as `10 μ`, finds `10μF` as one types.
 field, aliases and the category the catalogue sends included, and the scan
 page's `cart.bares` does the same; `units-vectors.json` holds both forms
 where both sides spell them alike. Migration 0039 folded every row again.
-Accepted gap: one search mixing the two, such as `100 ft 48 V` for
-`100 feet 48 VDC`, finds only what search finds close, as each form is
-matched whole. Two spellings, not every spelling, so the rejection above
-stands.
+A search mixing the two, such as `100 ft 48 V` for `100 feet 48 VDC`, is
+matched group by group as well (below). Two spellings, not every spelling,
+so the rejection above stands.
 
 A unit's word (`inch`, `feet`, `volts`, `watt`, `amps` and the like) is
 read only by search, never to spell a name (Q14 A), and `in` is no unit,
@@ -490,6 +489,35 @@ Words the app shows for units are in US spelling, as the app follows US
 conventions (inventory-tng-g6u): `meters`, `liters`, `cubic meters`,
 `metric tons` (Ali, 2026-11-15). Both spellings are still read, in a
 search and as words near a unit (`metre`, `fibre`).
+
+## Amendment: searches match group by group (2026-11-15)
+
+Ali decided on 2026-11-15 (inventory-tng-ist.1, from the research in
+inventory-tng-mgx) that a search is matched in groups too, beside the
+whole forms above, so `100 ft 48 V` finds `Cable 100 feet, PoE 48 VDC`,
+which holds neither form whole.
+
+A group is a number with the unit search reads right after it, its space
+kept (`100 ft`), or any other word alone (`PoE`). Each has two forms, as
+typed and respelt, the respelt one cut from respelling the whole search,
+so reading rules, products and the words near a unit read as they do there
+(`spool 305M` is `305m`). `units.groups` gives them, and `units.ts` the
+same, both tested against `units-vectors.json`. A search with more than
+eight groups (`units.GROUPS_MAX`) is matched whole only.
+
+Both sides find a row holding a whole form, as before, so typos are still
+forgiven, or one holding every group, each as typed or respelt, groups
+perhaps in different fields. On the server, a row holding a whole form
+ranks first, then one holding every group, then one only close (Q1 A):
+`100 ft 48 V` lists `PoE cable 100 ft 48 V`, then `Cable 100 feet, PoE 48
+VDC`, then `Antenna, 1000 FT, 48A`. The scan page lists what it finds in
+catalogue order, as before.
+
+Search also reads `VDC` and `VAC`, in any case, after a number as volts,
+and a number before a unit it reads without its thousands separators, so
+`1000 ft`, `1,000 ft` and `1 000 ft` (a thin space too) find each other
+(Q2 C). Both are search's only: no name is respelt by them, nor its key
+read so. Units version 4; migration 0046 folded every row again.
 
 ## Amendment: the import's readings file (2026-11-14)
 

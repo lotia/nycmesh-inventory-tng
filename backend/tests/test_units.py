@@ -174,6 +174,42 @@ def test_the_server_and_the_scan_page_read_units_alike(vector: dict[str, Any]) -
         assert len(forms) == (1 if vector["typed"] == vector["searched"] else 2)
 
 
+@pytest.mark.clone
+@pytest.mark.parametrize(
+    "vector",
+    json.loads(VECTORS.read_text(encoding="utf-8"))["groups"]
+    if VECTORS.exists()
+    else [],
+    ids=lambda vector: " ".join(
+        [vector["text"], *(f"{k}={v}" for k, v in vector.get("rules", {}).items())]
+    ),
+)
+def test_the_server_and_the_scan_page_group_a_search_alike(
+    vector: dict[str, Any],
+) -> None:
+    """units-vectors.json's groups, which the scan page's tests read too
+    (Ali, 2026-11-15, inventory-tng-ist.1)."""
+    rules = {k: units.Rule(v) for k, v in vector.get("rules", {}).items()}
+    decomposed = unicodedata.normalize("NFKD", vector["text"])
+    assert units.groups(decomposed, rules) == [tuple(g) for g in vector["groups"]]
+
+
+def test_search_reads_vdc_and_thousands_but_never_in_a_name() -> None:
+    """Ali, 2026-11-15 (inventory-tng-ist.1, Q2 C): VDC and VAC are volts
+    and `1,000 ft`, `1 000 ft` and `1000 ft` one, to search only; a name
+    is never respelt so, nor its key read so."""
+    assert fold("48 VDC 24 vac 1,000 ft 1\N{THIN SPACE}000 ft") == (
+        "48V 24V 1000ft 1000ft"
+    )
+    assert units.readings("VDC") == []
+    assert units.found_in("PSU 48 VDC") == []
+    assert units.read_as("Spool 1,000 ft 48 VDC") == "Spool 1,000ft 48 VDC"
+    rules = {"ft": units.Rule("ft", respell=True)}
+    assert units.spell("Spool 1,000 ft", units.found_in("Spool 1,000 ft", rules)) == (
+        "Spool 1,000ft"
+    )
+
+
 def test_units_are_read_only_after_a_number_and_greek_elsewhere_is_letters() -> None:
     assert fold("10uF 10 µF 10μF 10 ΜF") == "10uF 10uF 10uF 10uF"  # noqa: RUF001  Greek capitals, on purpose.
     assert fold("85 degC 85°C 85 Cel 85℃ 85 deg C") == " ".join(["85degC"] * 5)
@@ -232,6 +268,57 @@ def test_what_was_found_before_units_were_read_still_is(
         ("Volts meter 5 volts", ("volts", "5 V", "5v")),
     ):
         item = add(session, Item(name=f"{name} {tag()}", category_id=parts.id))
+        for each in typed:
+            listed = page_text(admin_client.get(ITEMS, params={"q": each}))
+            assert item.name in listed, each
+
+
+def test_a_search_mixing_spellings_is_matched_group_by_group(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Ali, 2026-11-15 (inventory-tng-ist.1, Q1 A): a row holding every
+    group of a search, each as typed or respelt, is found, and ranks below
+    one holding the search whole and above one only close to it."""
+    parts = add(session, Category(name=f"Parts {tag()}"))
+    whole, grouped, close, cap, wrong = (
+        add(session, Item(name=f"{name} {tag()}", category_id=parts.id)).name
+        for name in (
+            "PoE cable 100 ft 48 V",
+            "Cable 100 feet, PoE 48 VDC",
+            "Antenna, 1000 FT, 48A",
+            "Cap 10uF 48 VDC",
+            "Cable 100 feet, 12 VDC",
+        )
+    )
+
+    def suggested(typed: str) -> list[str]:
+        found = admin_client.get(f"{ITEMS}/suggest", params={"q": typed}).json()
+        return [each["name"] for each in found]
+
+    assert [
+        name for name in suggested("100 ft 48 V") if name in (whole, grouped, close)
+    ] == [whole, grouped, close]
+    # A lone accent is no group.
+    for typed in ("10 µF 48 V", "10uF 48V", "10uF \N{COMBINING ACUTE ACCENT} 48V"):
+        listed = page_text(admin_client.get(ITEMS, params={"q": typed}))
+        assert cap in listed, typed
+    # Every group, not some: one holding only 100 feet is only close.
+    found = suggested("100 feet 48 V")
+    assert found.index(grouped) < found.index(wrong)
+
+
+def test_a_search_finds_thousands_and_vdc_however_written(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Ali, 2026-11-15 (inventory-tng-ist.1, Q2 C)."""
+    parts = add(session, Category(name=f"Parts {tag()}"))
+    for name, typed in (
+        ("Spool 1000 FT", ("1,000 ft", "1 000 ft", "1\N{THIN SPACE}000 ft")),
+        ("Box 1,000 ft", ("1000 ft", "1 000 feet")),
+        ("PSU 48 VDC", ("48V", "48 volts")),
+    ):
+        item = add(session, Item(name=f"{name} {tag()}", category_id=parts.id))
+        assert item.name.startswith(name)
         for each in typed:
             listed = page_text(admin_client.get(ITEMS, params={"q": each}))
             assert item.name in listed, each

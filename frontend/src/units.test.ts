@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { bares, search } from "./cart";
 import { CATALOGUE, cable } from "./test-catalogue";
-import { type Rules, read, respell } from "./units";
+import { groups, type Rules, read, respell } from "./units";
 import shared from "./units-vectors.json";
 
 /** `text` bare, its units respelt: the last of its forms. */
@@ -25,6 +25,17 @@ describe("units, as the server reads them", () => {
         typed === searched ? [typed] : [typed, searched],
       );
     }
+  });
+
+  test.each(
+    shared.groups as {
+      text: string;
+      rules?: Record<string, string | null>;
+      groups: string[][];
+    }[],
+  )("groups $text", ({ text, rules: given, groups: expected }) => {
+    const rules = new Map(Object.entries(given ?? {}));
+    expect(groups(text.normalize("NFKD"), rules)).toEqual(expected);
   });
 
   test("a unit is read in any case, its prefix as typed if it can be", () => {
@@ -115,6 +126,35 @@ describe("units, as the server reads them", () => {
     }
     expect(bares("Cable 100 feet")).toEqual(["cable 100 feet", "cable 100ft"]);
     expect(bares("Spool 305m")).toEqual(["spool 305m"]);
+  });
+
+  test("a search mixing spellings is matched group by group (Ali, 2026-11-15)", () => {
+    const named = (...names: string[]) => ({
+      ...CATALOGUE,
+      items: names.map((name, at) => ({
+        ...cable,
+        id: 106 + at,
+        name,
+        search_text: "",
+      })),
+    });
+    const finds = (typed: string, ...names: string[]) =>
+      search(named(...names), typed).map((item) => item.name);
+    expect(finds("10 µF 48 V", "Cap 10uF 48 VDC")).toEqual(["Cap 10uF 48 VDC"]);
+    // Neither form whole, nor every word of one: only groups find it.
+    expect(finds("100 feet 48V", "Cable 100ft 48 VDC")).toEqual([
+      "Cable 100ft 48 VDC",
+    ]);
+    // Each group in a field of its own.
+    expect(finds("100 ft 48 V", "Cable 100 feet, PoE 48 VDC")).toEqual([
+      "Cable 100 feet, PoE 48 VDC",
+    ]);
+    // Every group, or none: one held is not enough.
+    expect(finds("100 feet 12V", "Cable 100ft 48 VDC")).toEqual([]);
+    // Thousands written any way are one, by search alone.
+    for (const typed of ["1000 ft", "1,000 ft", "1 000 ft", "1\u2009000 ft"]) {
+      expect(finds(typed, "Spool 1,000 FT"), typed).toEqual(["Spool 1,000 FT"]);
+    }
   });
 
   test("in is no unit, an inch is one by its words", () => {

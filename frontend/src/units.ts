@@ -238,36 +238,103 @@ function settled(
   return likeliest(found)?.symbol;
 }
 
+// A number grouped in thousands by commas or by spaces, ending at its
+// last digit, as search keeps it, before a unit it reads, without them
+// (units._GROUPED).
+const GROUPED =
+  /(?<![\p{L}\p{N}])(?<![0-9][., ])[0-9]{1,3}([, ])[0-9]{3}(?:\1[0-9]{3})*(?:[.][0-9]+)?$/u;
+
+/** Where respell changes a text, and what to (units.Edit). */
+type Edit = [start: number, end: number, spelling: string];
+
+/** What respell changes in `text`, in order (units._edits). */
+function edits(text: string, rules: Rules | undefined): Edit[] {
+  const found: Edit[] = [];
+  for (const match of text.matchAll(AFTER_A_NUMBER)) {
+    const [whole, digit, token] = match as unknown as [string, string, string];
+    const at = match.index;
+    const end = at + whole.length;
+    if (marked(text, end) || product(text, at)) continue;
+    const before = text.slice(0, at + 1);
+    const grouped = GROUPED.exec(before);
+    // It ends at the digit the match starts with, so it is found.
+    const number = grouped
+      ? grouped[0].replaceAll(grouped[1] as string, "")
+      : (NUMBER.exec(before) as RegExpExecArray)[0];
+    const reading = settled(text, number, token, rules);
+    // Null: no unit by its rule.
+    const spelt = reading === undefined ? read(token) : reading;
+    if (spelt === null || spelt === undefined) continue;
+    found.push(
+      grouped ? [grouped.index, end, number + spelt] : [at, end, digit + spelt],
+    );
+  }
+  const alone: Edit[] = [];
+  for (const match of text.matchAll(ALONE)) {
+    const [whole, token] = match as unknown as [string, string];
+    const at = match.index;
+    const end = at + whole.length;
+    if (!/\P{ASCII}/u.test(token) || marked(text, at - 1, end)) continue;
+    if (found.some(([first, last]) => first < end && at < last)) continue;
+    const unit = read(token);
+    if (unit !== undefined) alone.push([at, end, unit]);
+  }
+  return [...found, ...alone].sort(([a], [b]) => a - b);
+}
+
+/** `text` from `start` to `end` with each of `edits` within made
+ * (units._applied). */
+function applied(
+  text: string,
+  made: Edit[],
+  start = 0,
+  end = text.length,
+): string {
+  let spelt = "";
+  let at = start;
+  for (const [first, last, spelling] of made) {
+    if (start <= first && last <= end) {
+      spelt += text.slice(at, first) + spelling;
+      at = last;
+    }
+  }
+  return spelt + text.slice(at, end);
+}
+
 /** `text`, decomposed (NFKD), with each unit read right after a number
- * spelt by its symbol, joined to the number, as the forms read it (its
- * reading rule in `rules`, the words near it, the profile), else as the
- * table reads it; a product's name as it is; and each unit alone spelt
- * with a sign no word is (not ASCII) by its symbol (units.respell). */
+ * spelt by its symbol, joined to the number, the number without thousands
+ * separators, as the forms read it (its reading rule in `rules`, the words
+ * near it, the profile), else as the table reads it; a product's name as
+ * it is; and each unit alone spelt with a sign no word is (not ASCII) by
+ * its symbol (units.respell). */
 export function respell(text: string, rules?: Rules): string {
-  return text
-    .replace(
-      AFTER_A_NUMBER,
-      (match, digit: string, token: string, at: number, whole: string) => {
-        if (marked(whole, at + match.length) || product(whole, at)) {
-          return match;
-        }
-        // It ends at the digit the match starts with, so it is found.
-        const [number] = NUMBER.exec(whole.slice(0, at + 1)) as RegExpExecArray;
-        const reading = settled(whole, number, token, rules);
-        if (reading !== undefined) {
-          return reading === null ? match : digit + reading;
-        }
-        const unit = read(token);
-        return unit === undefined ? match : digit + unit;
-      },
-    )
-    .replace(ALONE, (match, token: string, at: number, whole: string) => {
-      if (
-        !/\P{ASCII}/u.test(token) ||
-        marked(whole, at - 1, at + match.length)
-      ) {
-        return match;
-      }
-      return read(token) ?? match;
-    });
+  return applied(text, edits(text, rules));
+}
+
+/** What a search for `text`, decomposed (NFKD), is matched by group by
+ * group: each number with the unit respell reads after it, its space kept,
+ * and every other word alone, each as typed and respelt, cut from
+ * respelling the whole; none past the most matched (units.groups). */
+export function groups(
+  text: string,
+  rules?: Rules,
+): [typed: string, respelt: string][] {
+  const made = edits(text, rules);
+  const spans: [number, number][] = [];
+  for (const word of text.matchAll(/\S+/gu)) {
+    const start = word.index;
+    const end = start + word[0].length;
+    const last = spans.at(-1);
+    // Joined to the word before where respell reads across the space.
+    if (last && made.some(([first, to]) => first < last[1] && start < to)) {
+      last[1] = end;
+    } else {
+      spans.push([start, end]);
+    }
+  }
+  if (spans.length > table.groups_max) return [];
+  return spans.map(([start, end]) => [
+    text.slice(start, end),
+    applied(text, made, start, end),
+  ]);
 }

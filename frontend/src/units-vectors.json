@@ -1,5 +1,5 @@
 {
-  "about": "What the server (models.folds, in lower case) and the scan page (cart.bares) both make of each text, as searched: 'typed', folded as typed, units as they are, and 'searched', with its units respelt, the second form only where it differs; and what units.respell makes of it decomposed (NFKD), on both sides, reading its 'rules' first where it has them (reading rules, by a number and its unit as typed: the unit's symbol, or null, no unit): backend tests/test_units.py and frontend src/units.test.ts read it. A text with letters anyascii spells otherwise than decomposing, as Greek or Cyrillic, or signs, as °, has no 'typed', and no 'searched' where its respelt form has such: only what does is compared.",
+  "about": "What the server (models.folds, in lower case) and the scan page (cart.bares) both make of each text, as searched: 'typed', folded as typed, units as they are, and 'searched', with its units respelt, the second form only where it differs; and what units.respell makes of it decomposed (NFKD), on both sides, reading its 'rules' first where it has them (reading rules, by a number and its unit as typed: the unit's symbol, or null, no unit): backend tests/test_units.py and frontend src/units.test.ts read it. A text with letters anyascii spells otherwise than decomposing, as Greek or Cyrillic, or signs, as °, has no 'typed', and no 'searched' where its respelt form has such: only what does is compared. 'groups' holds what units.groups and units.ts's groups make of each text decomposed (NFKD), its 'rules' first: each group as typed and respelt, none past the most matched (groups_max).",
   "vectors": [
     {
       "text": "10uF",
@@ -214,8 +214,8 @@
     },
     {
       "text": "1,000 ft",
-      "respelt": "1,000ft",
-      "searched": "1,000ft",
+      "respelt": "1000ft",
+      "searched": "1000ft",
       "typed": "1,000 ft"
     },
     {
@@ -510,8 +510,8 @@
     },
     {
       "text": "PoE 48 VDC",
-      "respelt": "PoE 48 VDC",
-      "searched": "poe 48 vdc",
+      "respelt": "PoE 48V",
+      "searched": "poe 48v",
       "typed": "poe 48 vdc"
     },
     {
@@ -585,8 +585,8 @@
       "rules": {
         "FT": "ft"
       },
-      "respelt": "Cable 1,000ft",
-      "searched": "cable 1,000ft",
+      "respelt": "Cable 1000ft",
+      "searched": "cable 1000ft",
       "typed": "cable 1,000 ft"
     },
     {
@@ -717,6 +717,114 @@
       "respelt": "Switch 10G",
       "searched": "switch 10g",
       "typed": "switch 10g"
+    },
+    {
+      "text": "1 000 ft",
+      "respelt": "1000ft",
+      "searched": "1000ft",
+      "typed": "1 000 ft"
+    },
+    {
+      "text": "1 000 ft",
+      "respelt": "1000ft",
+      "searched": "1000ft",
+      "typed": "1 000 ft"
+    },
+    {
+      "text": "1000 FT",
+      "respelt": "1000ft",
+      "searched": "1000ft",
+      "typed": "1000 ft"
+    },
+    {
+      "text": "Box of 1,000",
+      "respelt": "Box of 1,000",
+      "searched": "box of 1,000",
+      "typed": "box of 1,000"
+    },
+    {
+      "text": "12VDC 24 Vac",
+      "respelt": "12V 24V",
+      "searched": "12v 24v",
+      "typed": "12vdc 24 vac"
+    }
+  ],
+  "groups": [
+    {
+      "text": "100 ft 48 V",
+      "groups": [["100 ft", "100ft"], ["48 V", "48V"]]
+    },
+    {
+      "text": "10 µF 50 V",
+      "groups": [["10 μF", "10uF"], ["50 V", "50V"]]
+    },
+    {
+      "text": "spool 305M",
+      "groups": [["spool", "spool"], ["305M", "305m"]]
+    },
+    {
+      "text": "spool 305M",
+      "rules": {
+        "M": "Mbit/s"
+      },
+      "groups": [["spool", "spool"], ["305M", "305Mbit/s"]]
+    },
+    {
+      "text": "Cat 6a 100 ft",
+      "groups": [["Cat", "Cat"], ["6a", "6a"], ["100 ft", "100ft"]]
+    },
+    {
+      "text": "SFP+ 10G",
+      "groups": [["SFP+", "SFP+"], ["10G", "10Gbit/s"]]
+    },
+    {
+      "text": "10 μ",
+      "groups": [["10", "10"], ["μ", "μ"]]
+    },
+    {
+      "text": "100 feet 48V",
+      "groups": [["100 feet", "100ft"], ["48V", "48V"]]
+    },
+    {
+      "text": "Spool 1,000 FT 85 deg C",
+      "groups": [
+        ["Spool", "Spool"],
+        ["1,000 FT", "1000ft"],
+        ["85 deg C", "85degC"]
+      ]
+    },
+    {
+      "text": "1 000 ft",
+      "groups": [["1 000 ft", "1000ft"]]
+    },
+    {
+      "text": "a b c d e f 1 m",
+      "groups": [
+        ["a", "a"],
+        ["b", "b"],
+        ["c", "c"],
+        ["d", "d"],
+        ["e", "e"],
+        ["f", "f"],
+        ["1 m", "1m"]
+      ]
+    },
+    {
+      "text": "a b c d e f g h",
+      "groups": [
+        ["a", "a"],
+        ["b", "b"],
+        ["c", "c"],
+        ["d", "d"],
+        ["e", "e"],
+        ["f", "f"],
+        ["g", "g"],
+        ["h", "h"]
+      ]
+    },
+    {
+      "text": "a b c d e f g h i",
+      "groups": []
     }
   ]
 }

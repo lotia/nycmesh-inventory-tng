@@ -318,7 +318,11 @@ and the scan page alike (decision 0021): `10 µF` is `10uF`, and so is a
 unit alone spelt with `°`, `μ`, `µ` or `Ω`: `μF` is `uF`. Each searched
 field is kept, and each search matched, both as typed and so respelt,
 where the two differ (`models.folds` and `models.held`, `cart.bares` on the
-scan page), so `feet` still finds `100 feet`. The table is
+scan page), so `feet` still finds `100 feet`. A search is matched in
+groups too, each number with its unit or other word, as typed or respelt
+(`units.groups`, `units.ts`'s `groups`), so `100 ft 48 V` finds `100 feet
+48 VDC`; the items list ranks a row holding every group between one
+holding the whole search and one only close. The table is
 `backend/src/inventory_tng/units.py`. After changing it, or what search
 keeps, raise its `VERSION`, write the scan page's copy and the fold
 reference again, and add a migration that folds every row again with

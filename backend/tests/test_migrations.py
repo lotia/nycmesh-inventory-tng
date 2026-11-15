@@ -700,6 +700,60 @@ def test_what_is_searched_reads_units_as_the_forms_do(alembic_config: Config) ->
     )
 
 
+def test_what_is_searched_reads_vdc_and_thousands(alembic_config: Config) -> None:
+    """Migration 0046: every row folded again as search now reads VDC as
+    volts and a number before a unit without its thousands separators
+    (Ali, 2026-11-15, inventory-tng-ist.1); items' and aliases' name_folded
+    too; no name, nor its unit key, changed."""
+    command.downgrade(alembic_config, "0045")
+    connection = alembic_config.attributes["connection"]
+    category_id = connection.scalar(
+        text("INSERT INTO category (name) VALUES ('Power') RETURNING id")
+    )
+    name = "PoE 48 VDC 1,000 ft"
+    kept = {"search_text": "kept", "folded_with": "kept"}
+    poe = _insert(
+        connection,
+        "item",
+        name=name,
+        name_key=name_key(name),
+        unit_key="kept",
+        category_id=category_id,
+        name_folded="kept",
+        **kept,
+    )
+    alias = _insert(
+        connection,
+        "item_alias",
+        name="Injector 24 VAC",
+        name_key=name_key("Injector 24 VAC"),
+        unit_key="kept alias",
+        item_id=poe,
+        name_folded="kept",
+    )
+    place = _insert(connection, "location", name="Shelf 1 000 m", kind="store", **kept)
+    command.upgrade(alembic_config, "0046")
+    assert connection.execute(
+        text("SELECT name, search_text, name_folded, folded_with, unit_key FROM item")
+    ).one() == (
+        name,
+        f"{name} PoE 48V 1000ft    Injector 24 VAC Injector 24V",
+        "PoE 48V 1000ft",
+        FOLDED_WITH,
+        "kept",
+    )
+    assert connection.execute(
+        text("SELECT name_folded, unit_key FROM item_alias WHERE id = :i"),
+        {"i": alias},
+    ).one() == ("Injector 24V", "kept alias")
+    assert (
+        connection.scalar(
+            text("SELECT search_text FROM location WHERE id = :i"), {"i": place}
+        )
+        == "Shelf 1 000 m Shelf 1000m"
+    )
+
+
 def test_unit_keys_are_read_again_as_the_forms_read(alembic_config: Config) -> None:
     """Migration 0043: every unit key read again, by the rules there are;
     names that would then be one named by id first, nothing changed."""

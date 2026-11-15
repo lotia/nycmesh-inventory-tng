@@ -2,7 +2,8 @@
  * A long list's search box suggests as one types, and picking one narrows
  * the list to it (docs/decisions/0019). Searches ignore accents, the scan
  * page's too (docs/decisions/0021), and read units after a number alike,
- * as well as finding what they found before units were read.
+ * as well as finding what they found before units were read, and match a
+ * search mixing spellings group by group.
  */
 import { expect, test } from "@playwright/test";
 import { ownCable } from "./own";
@@ -99,4 +100,19 @@ test("a search finds what it found before units were read, and by units too", as
       page.getByRole("table").getByRole("link", { name, exact: true }),
     ).toBeVisible();
   }
+});
+
+test("a search mixing spellings is matched group by group, on both sides", async ({
+  page,
+}) => {
+  const name = await ownCable(page, "Cable 100 feet, PoE 48 VDC");
+  // Neither form whole: each group as typed or respelt (Ali, 2026-11-15).
+  const typed = name.replace("Cable 100 feet, PoE 48 VDC", "100 ft 48 V");
+  await page.goto("/scan");
+  await page.getByLabel(/Find an item/).fill(typed);
+  await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+  await page.goto(`/admin/items?q=${encodeURIComponent(typed)}`);
+  await expect(
+    page.getByRole("table").getByRole("link", { name, exact: true }),
+  ).toBeVisible();
 });

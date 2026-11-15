@@ -44,8 +44,14 @@ from inventory_tng.local_env import CLONE
 # (models.FOLDED_WITH), so those folded before can be folded again, and a
 # test fails until it is raised. 2: each field kept as typed too, and "in"
 # no unit (Ali, 2026-11-15). 3: search reads units as the forms do, by
-# the words near them, the profile and products (option D).
-VERSION = 3
+# the words near them, the profile and products (option D). 4: search
+# reads VDC and VAC as volts, and a number before a unit without its
+# thousands separators (Ali, 2026-11-15, inventory-tng-ist.1).
+VERSION = 4
+
+# The most groups (groups) a search is matched by, each alone; one with more
+# is matched whole only (Ali, 2026-11-15, inventory-tng-ist.1).
+GROUPS_MAX = 8
 
 TABLE = CLONE / "frontend" / "src" / "units.json"
 
@@ -166,7 +172,8 @@ UNITS: tuple[Unit, ...] = (
     Unit("W", "power", True, ("W",), (), ("watt", "watts")),
     Unit("dBm", "power level", False, factor=None),
     Unit("dBi", "gain", False, factor=None),
-    Unit("V", "voltage", True, ("V",), (), ("volt", "volts")),
+    # VDC and VAC, as search reads them only (Ali, 2026-11-15).
+    Unit("V", "voltage", True, ("V",), (), ("volt", "volts", "VDC", "VAC")),
     Unit("A", "current", True, ("A",), (), ("amp", "amps", "ampere", "amperes")),
     # Celsius as degC (Ali, 2026-11-12), the convention in ASCII.
     Unit("degC", "temperature", False, ("Cel",), ("°C", "deg C")),
@@ -267,6 +274,7 @@ def table() -> dict[str, Any]:
         "asked": sorted(ASKED),
         "products": sorted(PRODUCTS),
         "clues": {kind: sorted(words) for kind, words in CLUES.items()},
+        "groups_max": GROUPS_MAX,
     }
 
 
@@ -408,32 +416,91 @@ def _marked(text: str, *at: int) -> bool:
     )
 
 
-def respell(text: str, rules: Rules | None = None) -> str:
-    """`text` with each unit read right after a number spelt by its symbol
-    (str(Reading)), joined to the number, as the forms read it (_found: its
-    reading rule in `rules`, the words near it, the profile), else as the
-    table reads it, case first, and each unit alone spelt with a sign no
-    word is (not ASCII) by its symbol; a product's name (PRODUCTS) as it
-    is. `text` is decomposed (NFKD), as both the server and the scan page
-    fold it, so `℃` is `°C` and `µ` `μ`."""
+# A number grouped in thousands by commas or by spaces, a thin one
+# decomposed being one, ending at its last digit: `1,000`, `1 000`. Search
+# keeps it, before a unit it reads, without them (Ali, 2026-11-15,
+# inventory-tng-ist.1): frontend/src/units.ts's, character for character.
+_GROUPED = re.compile(
+    r"(?<![^\W_])(?<![0-9][., ])[0-9]{1,3}([, ])[0-9]{3}(?:\1[0-9]{3})*"
+    r"(?:[.][0-9]+)?\Z"
+)
 
-    def respelt(match: re.Match[str]) -> str:
-        if _marked(match.string, match.end()) or _product(match.string, match):
-            return match[0]
-        found = _found(match.string, match, rules)
+# Where respell changes a text, and what to: a start, an end and the spelling.
+type Edit = tuple[int, int, str]
+
+
+def _edits(text: str, rules: Rules | None) -> list[Edit]:
+    """What respell changes in `text`, in order: each unit read right after
+    a number, from its number, and each unit alone spelt with a sign no word
+    is."""
+    edits: list[Edit] = []
+    for match in AFTER_A_NUMBER.finditer(text):
+        if _marked(text, match.end()) or _product(text, match):
+            continue
+        grouped = _GROUPED.search(text, 0, match.end(1))
+        number = grouped[0].replace(grouped[1], "") if grouped else None
+        found = _found(text, match, rules, number)
         if found is not None and (found.read or found.rule):
             # Read, or no unit by its rule.
-            return f"{match[1]}{found.read}" if found.read else match[0]
-        reading = read(match[2])
-        return match[0] if reading is None else f"{match[1]}{reading}"
+            reading = found.read
+        else:
+            reading = read(match[2])
+        if reading is not None:
+            start = grouped.start() if grouped else match.start(1)
+            edits.append((start, match.end(), f"{number or match[1]}{reading}"))
+    for match in ALONE.finditer(text):
+        if match[1].isascii() or _marked(text, match.start() - 1, match.end()):
+            continue
+        if any(s < match.end() and match.start() < e for s, e, _ in edits):
+            continue
+        if (reading := read(match[1])) is not None:
+            edits.append((match.start(), match.end(), str(reading)))
+    return sorted(edits)
 
-    def alone(match: re.Match[str]) -> str:
-        if match[1].isascii() or _marked(match.string, match.start() - 1, match.end()):
-            return match[0]
-        reading = read(match[1])
-        return match[0] if reading is None else str(reading)
 
-    return ALONE.sub(alone, AFTER_A_NUMBER.sub(respelt, text))
+def _applied(text: str, edits: list[Edit], start: int = 0, end: int = -1) -> str:
+    """`text` from `start` to `end` (its end, if -1) with each of `edits`
+    within made."""
+    end = len(text) if end == -1 else end
+    parts, at = [], start
+    for first, last, spelling in edits:
+        if start <= first and last <= end:
+            parts += [text[at:first], spelling]
+            at = last
+    return "".join([*parts, text[at:end]])
+
+
+def respell(text: str, rules: Rules | None = None) -> str:
+    """`text` with each unit read right after a number spelt by its symbol
+    (str(Reading)), joined to the number, the number without thousands
+    separators, as the forms read it (_found: its reading rule in `rules`,
+    the words near it, the profile), else as the table reads it, case
+    first, and each unit alone spelt with a sign no word is (not ASCII) by
+    its symbol; a product's name (PRODUCTS) as it is. `text` is decomposed
+    (NFKD), as both the server and the scan page fold it, so `℃` is `°C`,
+    `µ` `μ` and a thin space a space."""
+    return _applied(text, _edits(text, rules))
+
+
+def groups(text: str, rules: Rules | None = None) -> list[tuple[str, str]]:
+    """What a search for `text` is matched by group by group (Ali,
+    2026-11-15, inventory-tng-ist.1): each number with the unit respell
+    reads right after it, its space kept, and every other word alone, each
+    as typed and respelt, cut from respelling the whole of `text`, so rules,
+    products and the words near a unit read as they do there (`spool 305M`
+    is `305m`). None if there are more than GROUPS_MAX. `text` is
+    decomposed (NFKD), as respell's."""
+    edits = _edits(text, rules)
+    spans: list[list[int]] = []
+    for word in re.finditer(r"\S+", text):
+        # Joined to the word before where respell reads across the space.
+        if spans and any(s < spans[-1][1] and word.start() < e for s, e, _ in edits):
+            spans[-1][1] = word.end()
+        else:
+            spans.append([word.start(), word.end()])
+    if len(spans) > GROUPS_MAX:
+        return []
+    return [(text[a:b], _applied(text, edits, a, b)) for a, b in spans]
 
 
 # How a name an administrator types is read (docs/decisions/0021, Ali,
@@ -688,14 +755,17 @@ def found_in(name: str, rules: Rules | None = None) -> list[Found]:
     ]
 
 
-def _found(text: str, match: re.Match[str], rules: Rules | None) -> Found | None:
+def _found(
+    text: str, match: re.Match[str], rules: Rules | None, number: str | None = None
+) -> Found | None:
     """The unit AFTER_A_NUMBER found in `text`, as read (Ali, 2026-11-15,
     option D): by its reading rule, which always wins; else, where several
     readings are plausible, by the words near it (CLUES), if they say one
     kind; else by the one plausible reading, the one of a LIKELY kind, or
     the one spelt as typed where none is likely. None if it is no unit's
-    spelling and no rule's."""
-    number, token = _number(text, match.end(1)), match[2]
+    spelling and no rule's. Its number is as typed, or `number` where
+    search reads it so (respell: `1 000` as `1000`)."""
+    number, token = number or _number(text, match.end(1)), match[2]
     rule = (rules or {}).get(rule_key(token))
     every = readings(token)
     if rule is None and not every:
@@ -764,11 +834,7 @@ def spell(name: str, found: list[Found]) -> str:
 def _spelt(name: str, spelt: Mapping[Found, str]) -> str:
     """`name` with each Found's unit, and the space before it, as `spelt`
     says."""
-    parts, at = [], 0
-    for found, spelling in spelt.items():
-        parts += [name[at : found.start], spelling]
-        at = found.end
-    return "".join([*parts, name[at:]])
+    return _applied(name, [(f.start, f.end, s) for f, s in spelt.items()])
 
 
 def main(path: Path = TABLE) -> None:

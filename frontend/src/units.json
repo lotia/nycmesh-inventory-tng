@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "prefixes": [
     {
       "spellings": ["Q"],
@@ -202,7 +202,7 @@
     {
       "symbol": "V",
       "prefixed": ["V"],
-      "alone": ["volt", "volts"],
+      "alone": ["volt", "volts", "VDC", "VAC"],
       "symbols": ["V"],
       "kind": "voltage",
       "factor": 1.0,
@@ -454,5 +454,6 @@
       "weighs",
       "weight"
     ]
-  }
+  },
+  "groups_max": 8
 }

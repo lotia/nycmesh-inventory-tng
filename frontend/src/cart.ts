@@ -27,7 +27,7 @@ import {
 } from "./outbox";
 import { count, decimal, sent, thousandths } from "./quantity";
 import { onStoredChange, readStored, writeStored } from "./stored";
-import { type Rules, respell } from "./units";
+import { groups, type Rules, respell } from "./units";
 
 /** Versioned as the outbox's is (outbox.ts): each build reads its own.
  * v2's is stamped with the build that wrote it, may keep a batch key
@@ -1223,9 +1223,10 @@ function withOffered(cart: Cart, here: ReadonlyMap<string, unknown>): Cart {
 }
 
 /** Items whose name, maker, part number, code or category holds every word
- * of what was typed, as typed or respelt (`bares`): in the details as spelt
- * or the server's folded text (docs/decisions/0021, 2026-11-12, and Ali,
- * 2026-11-15). */
+ * of what was typed, as typed or respelt (`bares`), or every group of it,
+ * each as typed or respelt (units `groups`: `100 feet 48V` finds `Cable
+ * 100ft 48 VDC`): in the details as spelt or the server's folded text
+ * (docs/decisions/0021, 2026-11-12, and Ali, 2026-11-15). */
 export function search(catalogue: Catalogue, text: string, limit = 20): Item[] {
   const { haystacks, rules } = indexOf(catalogue);
   const forms = bares(text, rules)
@@ -1237,11 +1238,16 @@ export function search(catalogue: Catalogue, text: string, limit = 20): Item[] {
   if (forms.length === 0) {
     return [];
   }
+  const grouped = groups(text.normalize("NFKD"), rules)
+    .map((group) => [...new Set(group.map(unmarked))].filter(Boolean))
+    .filter((group) => group.length > 0);
   return catalogue.items
     .filter((item) => {
       const haystack = haystacks.get(item.id) ?? "";
-      return forms.some((words) =>
-        words.every((word) => haystack.includes(word)),
+      const holds = (form: string) => haystack.includes(form);
+      return (
+        forms.some((words) => words.every(holds)) ||
+        (grouped.length > 1 && grouped.every((group) => group.some(holds)))
       );
     })
     .slice(0, limit);
