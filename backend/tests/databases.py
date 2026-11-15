@@ -19,7 +19,7 @@ from sqlalchemy import Connection, Engine, make_url, text
 from sqlalchemy.exc import OperationalError
 
 from inventory_tng import dev_database
-from inventory_tng.db import make_engine
+from inventory_tng.db import LOCK_TIMEOUT, make_engine
 from inventory_tng.dev_database import OWNER, as_superuser, create, server_url
 from inventory_tng.local_env import setting
 
@@ -67,6 +67,12 @@ REFUSALS = {
     "too many clients already": FULL,
 }
 LEFT_BEHIND = timedelta(hours=1)
+# The advisory lock one sweep holds at a time, on the server's own database,
+# so two workers or runs never drop the same database at once (the second
+# would wait on the first's DROP past lock_timeout); and how long a sweep
+# waits for it.
+SWEEP_LOCK = 0x7E57_5EEB
+SWEEP_WAIT = "1min"
 
 
 class Unreachable(Exception):
@@ -75,9 +81,13 @@ class Unreachable(Exception):
 
 def drop_left_behind(now: float | None = None) -> list[str]:
     """Test databases made over an hour ago that nothing is connected to:
-    never one still in use."""
+    never one still in use. One sweep at a time (SWEEP_LOCK)."""
     now = time.time() if now is None else now
     with as_superuser(SERVER_URL) as connection:
+        # Held until the connection closes, so any other sweep has finished.
+        connection.execute(text(f"SET lock_timeout = '{SWEEP_WAIT}'"))
+        connection.execute(text("SELECT pg_advisory_lock(:key)"), {"key": SWEEP_LOCK})
+        connection.execute(text(f"SET lock_timeout = '{LOCK_TIMEOUT}'"))
         idle = connection.scalars(
             text(
                 "SELECT datname FROM pg_database WHERE datname LIKE 'test\\_%' "

@@ -191,7 +191,6 @@ def test_good_codes_do_not_use_up_the_limit(session: Session) -> None:
     assert code.uses == devices.ATTEMPTS.amount * 2
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_the_request_line_carries_the_device(
     client: TestClient, phrase: str, capsys: pytest.CaptureFixture[str]
 ) -> None:

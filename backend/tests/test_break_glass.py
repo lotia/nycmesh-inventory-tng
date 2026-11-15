@@ -178,7 +178,6 @@ def test_with_authenticators_retired_a_recovery_code_is_still_asked_for(
     assert "Set up an authenticator" in sign_in_with(client, code=first).text
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_the_commands_run_as_operator_commands(
     own_database: str,
     monkeypatch: pytest.MonkeyPatch,
@@ -225,7 +224,6 @@ def test_admins_runs_as_a_module(
     assert "lockdown" in capsys.readouterr().out
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_retiring_authenticators_names_who_must_be_let_in(
     own_database: str,
     monkeypatch: pytest.MonkeyPatch,

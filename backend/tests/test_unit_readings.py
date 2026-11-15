@@ -276,7 +276,6 @@ def test_a_load_that_would_make_two_names_one_is_refused(
     assert session.scalars(select(ReadingRule)).all() == []
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_the_commands_run_as_operator_commands(
     own_database: str,
     tmp_path: Path,

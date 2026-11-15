@@ -20,7 +20,6 @@ def runs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> dict[str, object]:
     return calls
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_uvicorn_leaves_logging_to_us(runs: dict[str, object]) -> None:
     __main__.main([])
     assert runs["app"] == "inventory_tng.server:create_server"
@@ -31,7 +30,6 @@ def test_uvicorn_leaves_logging_to_us(runs: dict[str, object]) -> None:
     assert runs["reload"] is False
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_reload_watches_only_the_package(runs: dict[str, object]) -> None:
     __main__.main(["--reload", "--port", "9000"])
     assert runs["reload"] is True
@@ -39,7 +37,6 @@ def test_reload_watches_only_the_package(runs: dict[str, object]) -> None:
     assert runs["port"] == 9000
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_a_bad_setting_stops_it_before_uvicorn_starts(
     runs: dict[str, object], monkeypatch: pytest.MonkeyPatch
 ) -> None:

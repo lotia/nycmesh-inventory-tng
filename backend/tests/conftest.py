@@ -126,21 +126,37 @@ def no_local_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(local_env, "ENV_FILE", tmp_path / "no.env")
 
 
-@pytest.fixture
+def _pytests(handler: logging.Handler) -> bool:
+    """Whether pytest put `handler` there (caplog, live logs), for this
+    phase of a test: it takes them off itself."""
+    return type(handler).__module__.startswith("_pytest.")
+
+
+@pytest.fixture(autouse=True)
 def restore_logging() -> Iterator[None]:
-    """For tests that call configure_logging(), which takes over the root and
-    named loggers: put every logger back, so later tests keep caplog."""
+    """Every logger put back after each test, as a command's main calls
+    configure_logging(), which takes over the root and named loggers and
+    binds the root's handler to the stdout of the moment (a test's capture,
+    closed after it): left so, later tests' logs print tracebacks. Handlers
+    pytest has put on for the phase are left to it."""
     manager = logging.Logger.manager
     loggers = [logging.getLogger()]
     loggers += [
         lg for lg in manager.loggerDict.values() if isinstance(lg, logging.Logger)
     ]
     saved = [
-        (lg, lg.handlers[:], lg.level, lg.propagate, lg.disabled) for lg in loggers
+        (
+            lg,
+            [h for h in lg.handlers if not _pytests(h)],
+            lg.level,
+            lg.propagate,
+            lg.disabled,
+        )
+        for lg in loggers
     ]
     yield
     for lg, handlers, level, propagate, disabled in saved:
-        lg.handlers[:] = handlers
+        lg.handlers[:] = [*filter(_pytests, lg.handlers), *handlers]
         lg.level, lg.propagate, lg.disabled = level, propagate, disabled
     configure_structlog()
 

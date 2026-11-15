@@ -74,7 +74,6 @@ def configure(**environ: str) -> None:
     configure_logging(settings(**{"LOG_FORMAT": "json", **environ}))
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_production_masks_every_secret_and_personal_field(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -100,7 +99,6 @@ def test_production_is_the_default() -> None:
     assert Masker.from_settings(settings()) == Masker()
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_development_keeps_personal_data_but_masks_secrets(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -111,7 +109,6 @@ def test_development_keeps_personal_data_but_masks_secrets(
     assert all(line[key] == MASK for key in SECRETS)
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_unmask_secrets_in_development_shows_them_and_says_so(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -136,7 +133,6 @@ def test_refuses_an_unknown_environment() -> None:
         settings(APP_ENV="staging")
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_the_standard_librarys_lines_mask_context_too(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -148,7 +144,6 @@ def test_the_standard_librarys_lines_mask_context_too(
 
 
 @pytest.mark.parametrize("log_format", ["json", "console"])
-@pytest.mark.usefixtures("restore_logging")
 def test_production_scrubs_database_values_from_tracebacks(
     capsys: pytest.CaptureFixture[str],
     database_error: exc.DBAPIError,
@@ -162,7 +157,6 @@ def test_production_scrubs_database_values_from_tracebacks(
     assert MASK in output
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_development_keeps_tracebacks_whole(
     capsys: pytest.CaptureFixture[str], database_error: exc.DBAPIError
 ) -> None:
@@ -187,7 +181,6 @@ class PersonModel(BaseModel):
     volunteer_id: int
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_objects_are_masked_by_their_field_names(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -202,7 +195,6 @@ def test_objects_are_masked_by_their_field_names(
     assert line["model"] == {"phone": MASK, "volunteer_id": 8}
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_a_librarys_exception_outside_except_keeps_its_traceback(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -223,7 +215,6 @@ def test_a_librarys_exception_outside_except_keeps_its_traceback(
     assert "the current one" not in str(line["exception"])
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_scrubs_database_errors_inside_exception_groups(
     capsys: pytest.CaptureFixture[str], database_error: exc.DBAPIError
 ) -> None:
@@ -261,7 +252,6 @@ def test_scrubs_detail_lines_and_quoted_values(message: str, expected: str) -> N
     assert scrub_database_message(message) == expected
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_scrubs_pydantics_input_values(capsys: pytest.CaptureFixture[str]) -> None:
     configure()
     try:
@@ -275,7 +265,6 @@ def test_scrubs_pydantics_input_values(capsys: pytest.CaptureFixture[str]) -> No
     assert f"input_value={MASK}" in output
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_the_server_announces_unmasked_secrets(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,

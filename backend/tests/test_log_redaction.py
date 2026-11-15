@@ -97,7 +97,6 @@ def test_a_warning_hourly_while_off() -> None:
     ]
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_starting_warns_while_logs_leave_unredacted(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -113,7 +112,6 @@ def test_starting_warns_while_logs_leave_unredacted(
     assert line[REDACTION_FIELD] == "off"
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_the_settings_reach_the_masker(capsys: pytest.CaptureFixture[str]) -> None:
     until = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
     configure_logging(settings(LOG_FORMAT="json", LOG_REDACTION_OFF_UNTIL=until))

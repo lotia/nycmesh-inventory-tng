@@ -47,7 +47,6 @@ def test_refuses_unusable_settings(name: str, value: str) -> None:
         LogConfig.from_environ({name: value})
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_json_puts_our_lines_and_the_libraries_in_one_shape(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -63,7 +62,6 @@ def test_json_puts_our_lines_and_the_libraries_in_one_shape(
         assert {"level", "logger", "timestamp"} <= line.keys()
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_console_is_not_json(capsys: pytest.CaptureFixture[str]) -> None:
     configure()
     structlog.get_logger("inventory_tng.test").info("hello")
@@ -73,7 +71,6 @@ def test_console_is_not_json(capsys: pytest.CaptureFixture[str]) -> None:
         json.loads(out)
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_levels_reach_every_logger_and_sql_is_quiet_unless_asked(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -89,7 +86,6 @@ def test_levels_reach_every_logger_and_sql_is_quiet_unless_asked(
     assert json.loads(capsys.readouterr().out)["event"] == "shown"
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_json_tracebacks_are_text(capsys: pytest.CaptureFixture[str]) -> None:
     configure(LOG_FORMAT="json")
     try:
@@ -101,7 +97,6 @@ def test_json_tracebacks_are_text(capsys: pytest.CaptureFixture[str]) -> None:
     assert "ValueError: boom" in line["exception"]
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_no_colour_codes_when_not_a_terminal(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -110,7 +105,6 @@ def test_no_colour_codes_when_not_a_terminal(
     assert "\x1b[" not in capsys.readouterr().out
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_every_line_names_its_process(capsys: pytest.CaptureFixture[str]) -> None:
     configure(LOG_FORMAT="json")
     logging.getLogger("some.library").warning("which process?")

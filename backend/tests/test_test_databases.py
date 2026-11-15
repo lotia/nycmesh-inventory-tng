@@ -4,6 +4,7 @@ is dropped when the run ends or, if it never could, by a later run
 
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from sqlalchemy import make_url, text
@@ -15,6 +16,7 @@ from inventory_tng.dev_database import as_superuser
 from databases import (
     NO_DATABASE,
     SERVER_URL,
+    SWEEP_LOCK,
     TEST_CONNECTION_LIMIT,
     database_name,
     drop_left_behind,
@@ -37,7 +39,8 @@ def test_the_run_uses_a_database_of_its_own(database_url: str) -> None:
 
 def test_databases_left_behind_are_dropped_and_no_others(database_url: str) -> None:
     """Only about its own databases: other runs on the server sweep too, so
-    one may drop `old` first, and this sweep may drop theirs."""
+    one may drop `old` first, and this sweep may drop theirs; one at a time,
+    so neither waits on the other's DROP."""
     server = make_engine(SERVER_URL).execution_options(isolation_level="AUTOCOMMIT")
     now = int(time.time())
     old, recent = database_name(now - 7200), database_name(now - 60)
@@ -59,6 +62,31 @@ def test_databases_left_behind_are_dropped_and_no_others(database_url: str) -> N
         with server.connect() as connection:
             for name in (old, recent):
                 connection.execute(text(f'DROP DATABASE IF EXISTS "{name}"'))
+        server.dispose()
+
+
+def test_a_sweep_waits_for_another_then_drops_what_is_left(
+    database_url: str,
+) -> None:
+    """While another sweep holds the lock, this one waits; once it is let go
+    it drops what is still left behind."""
+    del database_url  # Only for the server.
+    server = make_engine(SERVER_URL).execution_options(isolation_level="AUTOCOMMIT")
+    now = int(time.time())
+    old = database_name(now - 7200)
+    try:
+        with server.connect() as holder:
+            holder.execute(text(f'CREATE DATABASE "{old}"'))
+            holder.execute(text("SELECT pg_advisory_lock(:k)"), {"k": SWEEP_LOCK})
+            with ThreadPoolExecutor(1) as pool:
+                sweep = pool.submit(drop_left_behind, now)
+                time.sleep(0.3)
+                assert not sweep.done()
+                holder.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": SWEEP_LOCK})
+                assert old in sweep.result(timeout=30)
+    finally:
+        with server.connect() as connection:
+            connection.execute(text(f'DROP DATABASE IF EXISTS "{old}"'))
         server.dispose()
 
 

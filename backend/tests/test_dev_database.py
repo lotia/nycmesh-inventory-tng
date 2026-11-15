@@ -68,7 +68,6 @@ def test_made_once_the_owners_and_held_to_its_limit(url: str) -> None:
         dev_database.make(url.rsplit("/", 1)[0] + "/")
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_dropped_only_when_named_to_confirm(
     url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -92,7 +91,6 @@ def test_dropped_only_when_named_to_confirm(
     assert facts(url) is None
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_only_in_development_and_on_one_database(
     url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

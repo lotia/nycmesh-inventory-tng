@@ -25,7 +25,6 @@ def seeding(
     own_database: str,
     own_engine: Engine,
     monkeypatch: pytest.MonkeyPatch,
-    restore_logging: None,
 ) -> Iterator[Session]:
     """The seed command's settings, on a database of its own, and a session
     to see what it made."""
@@ -130,7 +129,6 @@ def test_a_short_password_is_refused(
 def test_only_in_development(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    restore_logging: None,
 ) -> None:
     monkeypatch.setenv("DATABASE_URL", NO_DATABASE)
     monkeypatch.setenv("APP_ENV", "production")

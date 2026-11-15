@@ -207,7 +207,6 @@ def test_startup_says_how_many_authenticators_are_unreadable(
     ]
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_reseal_runs_as_an_operator_command(
     own_database: str,
     monkeypatch: pytest.MonkeyPatch,

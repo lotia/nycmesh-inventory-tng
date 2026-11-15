@@ -12,7 +12,6 @@ from inventory_tng.server import create_server, flush_when_stopped
 from inventory_tng.settings import Redaction, Settings
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_sets_up_logging_then_builds_the_app(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -67,7 +66,6 @@ def telemetry_on(monkeypatch: pytest.MonkeyPatch) -> type[Recording]:
     return Recording
 
 
-@pytest.mark.usefixtures("restore_logging")
 def test_traces_leave_through_the_redactor_with_the_settings(
     telemetry_on: type[Recording],
 ) -> None:
@@ -81,7 +79,7 @@ def test_traces_leave_through_the_redactor_with_the_settings(
     assert traces.redacting(development=False, now=datetime.now(UTC))
 
 
-@pytest.mark.usefixtures("restore_logging", "telemetry_on")
+@pytest.mark.usefixtures("telemetry_on")
 def test_starting_warns_while_traces_leave_unredacted(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
