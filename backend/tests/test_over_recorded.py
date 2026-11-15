@@ -1139,11 +1139,12 @@ def test_refused_where_it_arrived_it_names_that_place(
     assert f"Bring back {place.van.name}" in page
 
 
-def test_a_count_refused_where_it_arrived_names_that_place(
-    admin_client: TestClient, registered_client: TestClient, session: Session
-) -> None:
+def emptied_van(client: TestClient, session: Session) -> Spools:
+    """An open package moved whole to the van, waiting, then moved back to
+    the store with all the van held, and the van retired: its count, where
+    it arrived, cannot be corrected there."""
     spools = Spools(session)
-    made = moved_whole(registered_client, spools)
+    made = moved_whole(client, spools)
     whole = Form(open_package_id=made.id)
     spools.write(
         {
@@ -1156,6 +1157,13 @@ def test_a_count_refused_where_it_arrived_names_that_place(
         Entry(spools.place.item.id, Decimal(1)),
     )
     retire(session, spools.van)
+    return spools
+
+
+def test_a_count_refused_where_it_arrived_names_that_place(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    spools = emptied_van(registered_client, session)
     check, response = counted(admin_client, session, "180")
     assert response.status_code == 409
     page = " ".join(text(response).split())
@@ -1211,20 +1219,7 @@ def test_a_count_refused_at_a_place_brought_back_meanwhile_names_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Confirm count, refused where it arrived: that place, as it refused."""
-    spools = Spools(session)
-    made = moved_whole(registered_client, spools)
-    whole = Form(open_package_id=made.id)
-    spools.write(
-        {
-            "kind": "move",
-            "volunteer_id": spools.place.volunteer.id,
-            "from_location_id": spools.van.id,
-            "to_location_id": spools.store.id,
-        },
-        Entry(spools.cable.id, Decimal(305), whole, whole),
-        Entry(spools.place.item.id, Decimal(1)),
-    )
-    retire(session, spools.van)
+    spools = emptied_van(registered_client, session)
     refused_then(monkeypatch, lambda: locations.restore(session, spools.van))
     _, response = counted(admin_client, session, "180")
     assert response.status_code == 409
@@ -1408,6 +1403,114 @@ def test_a_place_whose_own_place_is_retired_says_so(
     assert f"Not changed: {RULES['location_parent_current']}" in page
     session.expire_all()
     assert shelf.retired_at is not None
+
+
+# Mark checked refused from a refusal's alert (inventory-tng-e5b).
+
+
+def checked_from_alert(
+    client: TestClient, session: Session, at: Location, **form: str
+) -> Response:
+    """Mark checked sent from a refusal's alert, as refused at `at`."""
+    return mark_checked(client, session, refused=str(at.id), **form)
+
+
+def problem_of(check: OverRecorded) -> str:
+    return f'<span class="problem" id="reason-{check.id}-problem">'
+
+
+@pytest.mark.parametrize(
+    ("form", "problem"),
+    [
+        ({}, "Say why it is right as it is."),
+        (
+            {"reason": "both", "words": "typed"},
+            "You wrote why, but picked another reason.",
+        ),
+        ({"reason": "other", "words": "x" * 201}, "Up to 200 characters."),
+    ],
+)
+def test_mark_checked_refused_from_an_alert_draws_the_alert_again(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    form: dict[str, str],
+    problem: str,
+) -> None:
+    """With Bring back, the problem under it, in its form only, what was
+    typed kept there (Claude, 2026-11-15, left to Claude by Ali)."""
+    place = from_emptied_store(registered_client, session)
+    refusal = correct(admin_client, session)
+    assert f'name="refused" value="{place.store.id}"' in refusal.text
+    response = checked_from_alert(admin_client, session, place.store, **form)
+    assert response.status_code == 400
+    page = " ".join(text(response).split())
+    assert (
+        f"Not changed: {place.store.name} is retired and holds nothing, so the 2 "
+        "can't be found there again." in page
+    )
+    assert f"Bring back {place.store.name}" in page
+    assert problem in page
+    (check,) = checks(session)
+    alert, row = checked_forms(response.text)
+    assert problem_of(check) in alert
+    assert f'name="refused" value="{place.store.id}"' in alert
+    assert problem_of(check) not in row
+    if form:
+        kept = (f'value="{form["reason"]}" checked', f'value="{form["words"]}"')
+        assert all(each in alert and each not in row for each in kept)
+    assert check.settled_at is None
+
+
+def test_mark_checked_refused_from_a_counts_alert_draws_it_again(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """An open package moved whole, its count refused: that alert, not
+    Mark checked asked again alone."""
+    spools = emptied_van(registered_client, session)
+    counted(admin_client, session, "180")
+    response = checked_from_alert(admin_client, session, spools.van)
+    assert response.status_code == 400
+    page = " ".join(text(response).split())
+    assert (
+        f"Not changed: {spools.van.name} is retired and holds nothing, so its "
+        "count can't be corrected there." in page
+    )
+    assert f"Bring back {spools.van.name}" in page
+    assert "Say why it is right as it is." in page
+
+
+def test_a_marker_not_of_a_refusal_draws_no_alert(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """The place read again, not trusted: one not of its transaction,
+    though retired and empty, or one that may be counted (here, the van,
+    current) is not drawn as refused; the problem is the row's."""
+    place = from_emptied_store(registered_client, session)
+    elsewhere = add(session, Location(name=f"Store {tag()}", kind="store"))
+    retire(session, elsewhere)
+    (check,) = checks(session)
+    for at in (elsewhere, place.van):
+        response = checked_from_alert(admin_client, session, at)
+        assert response.status_code == 400
+        assert 'role="alert"' not in response.text
+        assert "Bring back" not in response.text
+        (row,) = checked_forms(response.text)
+        assert problem_of(check) in row
+
+
+def test_a_place_brought_back_since_its_alert_draws_no_alert(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    place = from_emptied_store(registered_client, session)
+    correct(admin_client, session)
+    locations.restore(session, place.store)
+    session.flush()
+    response = checked_from_alert(admin_client, session, place.store)
+    assert response.status_code == 400
+    assert 'role="alert"' not in response.text
+    assert "Bring back" not in response.text
+    assert "Say why it is right as it is." in response.text
 
 
 # A count of an end puts it right (Ali, 2026-11-15, inventory-tng-qs8).

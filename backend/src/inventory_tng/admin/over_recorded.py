@@ -30,7 +30,7 @@ from inventory_tng.admin.needs_action import (
     query_string,
 )
 from inventory_tng.admin.stock import STOCK
-from inventory_tng.db import DbSession, Gone, attempt
+from inventory_tng.db import DbSession, Gone, attempt, exists_where
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import (
     OVER_RECORDED_WORDS_MAX,
@@ -137,7 +137,9 @@ def _page(
     Mark checked sent for an open package moved whole (`checking`), whose
     row offers only Confirm count, is asked again above the list, as a
     refusal offers it; one no longer listed is told it changed meanwhile,
-    as it would be with a reason."""
+    as it would be with a reason. A Mark checked refused for its reason
+    from a refusal's alert draws that alert again, with the problem
+    under it: 400, as any problem typed, not 409, as the refusal was."""
     where = [Movement.item_id == only.id] if only else []
     waiting = over_recorded.shown(session, *where)
     asking = None
@@ -172,7 +174,7 @@ def _page(
             "asking": asking,
             "notice": notice,
         },
-        409 if refused else None,
+        400 if problems else 409 if refused else None,
     )
 
 
@@ -184,14 +186,18 @@ def _refusal(
     holds nothing (ledger.NotCountable, `at`), Bring back that place, which
     the places page would (not a volunteer's custody, which comes back with
     them). The place as refused, whatever has changed since. None if it is
-    settled meanwhile."""
+    settled meanwhile. Drawn again for Mark checked sent from it (`do`
+    "checked"), it says what its row offers: Confirm count for an open
+    package moved whole, else Correct."""
     found = over_recorded.shown(session, OverRecorded.id == check_id)
     if not found:
         return None
     (each,) = found
     if at is None:
         words = f"Not changed: {rule_words(broken)}"
-        return {"shown": each, "words": words, "place": None}
+        return {"shown": each, "words": words, "place": None, "at": None}
+    if do == "checked":
+        do = "count" if each.moved_whole else "correct"
     place = session.get_one(Location, at)
     # correct() finds it again where it left, writes it off where it arrived.
     if do != "correct":
@@ -204,7 +210,23 @@ def _refusal(
         "shown": each,
         "words": f"Not changed: {place.name} is retired and holds nothing, so {so}.",
         "place": place if place.kind != "custody" else None,
+        "at": at,
     }
+
+
+def _refused_again(
+    session: Session, check_id: int, marker: str
+) -> dict[str, Any] | None:
+    """The refusal a Mark checked was sent from, its alert's hidden marker
+    the place that refused it (_refusal), read again, not trusted: None if
+    it names none of the check's places, or one that may be counted now,
+    as once brought back, so the problem is shown in the row alone."""
+    at = row_id(marker)
+    if at is None or at not in over_recorded.places_of(session, check_id):
+        return None
+    if exists_where(session, Location.id == at, ledger.countable()):
+        return None
+    return _refusal(session, check_id, "checked", "location_countable", at)
 
 
 @router.post(f"{OVER_RECORDED}/{{check_id}}/bring-back")
@@ -285,6 +307,7 @@ def answer(
     typed: Annotated[str, Form(alias="count")] = "",
     reason: Annotated[str, Form()] = "",
     typed_words: Annotated[str, Form(alias="words")] = "",
+    marker: Annotated[str, Form(alias="refused")] = "",
 ) -> Response:
     """Correct one, mark it checked, saying why, or confirm the count of an
     open package moved whole, if still as seen. Its places locked first, by
@@ -321,6 +344,7 @@ def answer(
                 only,
                 {f"reason-{check_id}": problem},
                 values,
+                refused=_refused_again(session, check_id, marker),
                 checking=check_id,
             )
         # Only another way has words: _why_problem refuses them otherwise.

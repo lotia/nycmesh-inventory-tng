@@ -1,18 +1,19 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {#- Why one marked checked is right as it is: one reason, and words for
-another way. Kept as sent with its problem. #}
-{% macro why(row) %}
+another way. Kept as sent with its problem, if `sent` from this form: a
+refusal's alert, when drawn, is where it was sent from. #}
+{% macro why(row, sent) %}
 {% set name = "reason-" ~ row.id %}
-{% set chosen = values.get(name) %}
-{% set described = problems.get(name) %}
+{% set chosen = values.get(name) if sent %}
+{% set described = problems.get(name) if sent %}
 <fieldset>
   <legend>Why it is right as it is</legend>
   {% for value, words in reasons.items() %}
   <label><input type="radio" name="reason" value="{{ value }}"{% if chosen == value %} checked{% endif %}{% if described %} aria-describedby="{{ name }}-problem"{% endif %} required> {{ words }}</label>
   {% endfor %}
-  <input name="words" value="{{ values.get('words-' ~ row.id, '') }}" maxlength="{{ words_max }}" aria-label="Put right another way"{% if described %} aria-describedby="{{ name }}-problem"{% endif %}>
-  {% include "_field_problem.html" %}
+  <input name="words" value="{{ values.get('words-' ~ row.id, '') if sent }}" maxlength="{{ words_max }}" aria-label="Put right another way"{% if described %} aria-describedby="{{ name }}-problem"{% endif %}>
+  {% if sent %}{% include "_field_problem.html" %}{% endif %}
 </fieldset>
 {% endmacro %}
 {% block main %}
@@ -31,7 +32,9 @@ Mark checked asked again, for a row without it. #}
   {% endif %}
   <form method="post" action="{{ here }}/{{ each.row.id }}/checked{{ query }}">
     <input type="hidden" name="seen" value="{{ seen(each.row) }}">
-    {{ why(each.row) }}
+    {#- So a Mark checked refused draws this alert again (_refused_again). #}
+    {% if refused and refused.at %}<input type="hidden" name="refused" value="{{ refused.at }}">{% endif %}
+    {{ why(each.row, true) }}
     <button>Mark checked<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
   </form>
 </div>
@@ -83,7 +86,7 @@ with an adjustment. Mark checked if you already fixed it.</p>
         {% endif %}
         <form method="post" action="{{ here }}/{{ row.id }}/checked{{ query }}">
           <input type="hidden" name="seen" value="{{ seen(row) }}">
-          {{ why(row) }}
+          {{ why(row, not refused) }}
           <button>Mark checked<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
         </form>
       </div>

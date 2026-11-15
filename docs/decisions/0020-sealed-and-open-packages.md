@@ -346,7 +346,13 @@ you" counts every report in one line, which hides what is waiting.
   words, or clear them." (Ali, 2026-11-15); words only of spaces count as
   none. Asked from a refusal for an open package moved whole, whose row
   has no Mark checked, the form is asked again above the list; one
-  settled meanwhile is told so, as with a reason. The row keeps the reason
+  settled meanwhile is told so, as with a reason. Refused when sent from
+  a refusal's alert at a retired place, the alert and its Bring back are
+  drawn again, the problem and what was typed in its form, not the row's
+  (Claude, 2026-11-15, left to Claude by Ali, inventory-tng-e5b): the
+  form names that place in a hidden field, read again, so one that is not
+  of the transaction, or may be counted now, shows the problem in the row
+  alone. It answers 400, as any problem typed. The row keeps the reason
   as a value from a fixed list (`left`, `arrived`, `both`, `other`) and
   the words as typed, in canonical spelling, with who settled it and
   when; CHECK constraints allow a reason only on a row settled as checked
