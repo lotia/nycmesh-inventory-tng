@@ -10,7 +10,7 @@
  * only its own proposal, so none settles another's.
  */
 import { expect, type Page, type TestInfo, test } from "@playwright/test";
-import { unique } from "./own";
+import { addItem, unique } from "./own";
 
 /** A number for a name, so names the tests make differ. */
 const number = (): number => 100 + Math.floor(Math.random() * 900);
@@ -50,25 +50,11 @@ async function newItem(page: Page, name: string): Promise<void> {
 }
 
 /**
- * Adds it, saying it is a different item if a close name is asked about.
- * Its page is headed by it as shown: `unit` read after its number, spaced
- * from it (docs/decisions/0021, names shown).
+ * Adds it (addItem), its page headed by it as shown: `unit` read after its
+ * number, spaced from it (docs/decisions/0021, names shown).
  */
 async function add(page: Page, name: string, unit: string): Promise<void> {
-  const button = page.getByRole("button", { name: "Add", exact: true });
-  await button.click();
-  const shown = name.replace(new RegExp(`([0-9])${unit}`), `$1 ${unit}`);
-  const heading = page.getByRole("heading", {
-    level: 1,
-    name: shown,
-    exact: true,
-  });
-  const asked = page.getByText("A different item?");
-  await expect(heading.or(asked)).toBeVisible();
-  if (await asked.isVisible()) {
-    await button.click();
-  }
-  await expect(heading).toBeVisible();
+  await addItem(page, name.replace(new RegExp(`([0-9])${unit}`), `$1 ${unit}`));
 }
 
 test("a unit nothing settles is asked once, then said under the name", async ({

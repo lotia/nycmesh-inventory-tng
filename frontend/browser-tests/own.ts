@@ -4,7 +4,12 @@
  * against one database (playwright.config.ts).
  */
 import { randomUUID } from "node:crypto";
-import { test as base, expect, type Page } from "@playwright/test";
+import {
+  test as base,
+  expect,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { prepared } from "./prepared";
 
 /**
@@ -36,6 +41,29 @@ export async function ownVolunteer(page: Page): Promise<string> {
 }
 
 /**
+ * Adds the item filled in on the items page, saying it is a different item
+ * if its name is close to another's, which is asked once. Waits for its
+ * page, headed by it as `shown`: named, as the list's own heading matches
+ * before then. The heading.
+ */
+export async function addItem(page: Page, shown: string): Promise<Locator> {
+  const add = page.getByRole("button", { name: "Add", exact: true });
+  await add.click();
+  const heading = page.getByRole("heading", {
+    level: 1,
+    name: shown,
+    exact: true,
+  });
+  const asked = page.getByText("A different item?");
+  await expect(heading.or(asked)).toBeVisible();
+  if (await asked.isVisible()) {
+    await add.click();
+  }
+  await expect(heading).toBeVisible();
+  return heading;
+}
+
+/**
  * A new cable, in metres, that comes in a box of 305 m whose opened ones
  * are followed (docs/decisions/0020), as the seed's is, named `what` and
  * something unique, its page headed by it as shown, `shown` in place of
@@ -49,20 +77,7 @@ export async function ownCable(
   const name = await named(page, "/admin/items", what);
   await page.getByLabel("Category").selectOption({ label: "Cables" });
   await page.getByLabel(/^Unit/).selectOption("m");
-  const add = page.getByRole("button", { name: "Add", exact: true });
-  await add.click();
-  // Close to another test's name, it asks once.
-  const heading = page.getByRole("heading", {
-    level: 1,
-    name: name.replace(what, shown),
-    exact: true,
-  });
-  const asked = page.getByText("A different item?");
-  await expect(heading.or(asked)).toBeVisible();
-  if (await asked.isVisible()) {
-    await add.click();
-  }
-  await expect(heading).toBeVisible();
+  await addItem(page, name.replace(what, shown));
   const box = "Box of 305 m";
   await page.getByLabel("Package", { exact: true }).fill(box);
   await page.getByLabel("Holds").fill("305");

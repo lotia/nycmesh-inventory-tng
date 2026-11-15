@@ -6,7 +6,7 @@
  * search mixing spellings group by group.
  */
 import { expect, test } from "@playwright/test";
-import { ownCable, unique } from "./own";
+import { addItem, ownCable, unique } from "./own";
 
 test("a suggestion picked with the keyboard narrows the list", async ({
   page,
@@ -130,20 +130,7 @@ test("a name is shown with its number and unit spaced, on both sides", async ({
   await page.goto("/admin/items");
   await page.getByLabel(/^Name/).fill(name);
   await page.getByLabel("Category").selectOption({ label: "Cables" });
-  const add = page.getByRole("button", { name: "Add", exact: true });
-  await add.click();
-  // Named, or the list's own heading matches before the item's page.
-  const heading = page.getByRole("heading", {
-    level: 1,
-    name: shown,
-    exact: true,
-  });
-  const asked = page.getByText("A different item?");
-  await expect(heading.or(asked)).toBeVisible();
-  if (await asked.isVisible()) {
-    await add.click();
-  }
-  await expect(heading).toBeVisible();
+  const heading = await addItem(page, shown);
   expect(await heading.textContent()).toBe(shown);
   await expect(page.getByLabel(/^Name/)).toHaveValue(name);
   await expect(page.getByText(`Shown as ${shown}.`)).toBeVisible();
