@@ -306,10 +306,10 @@ def answer(
             return _page(
                 request, signed, session, only, {field: str(count)}, {field: typed}
             )
-    words = ""
+    words = None
     if do == "checked":
-        words = canonical(typed_words.strip())
-        problem = _why_problem(reason, words)
+        stripped = canonical(typed_words.strip())
+        problem = _why_problem(reason, stripped)
         if problem is not None:
             # Never the words: free text.
             log.debug("over recorded checked refused", over_recorded_id=check_id)
@@ -323,6 +323,8 @@ def answer(
                 values,
                 checking=check_id,
             )
+        # Only another way has words: _why_problem refuses them otherwise.
+        words = stripped or None
     ledger.lock_places(session, over_recorded.places_of(session, check_id))
     admin_id = signed.admin.id
     # The place that refused it (ledger.NotCountable), as it was then.
@@ -338,10 +340,7 @@ def answer(
                 return over_recorded.confirm_count(
                     session, check_id, seen, admin_id, count
                 )
-            # Words only for another way, as _why_problem saw to.
-            over_recorded.mark_checked(
-                session, check_id, seen, admin_id, reason, words or None
-            )
+            over_recorded.mark_checked(session, check_id, seen, admin_id, reason, words)
             return "checked", []
         except ledger.NotCountable as broken:
             refused_at = broken.location_id

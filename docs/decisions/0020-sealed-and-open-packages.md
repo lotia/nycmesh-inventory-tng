@@ -344,17 +344,17 @@ you" counts every report in one line, which hides what is waiting.
   reason are not dropped: it is refused the same way with "You wrote why,
   but picked another reason. Pick Put right another way to keep your
   words, or clear them." (Ali, 2026-11-15); words only of spaces count as
-  none. Asked from a refusal for an
-  open package moved whole, whose row has no Mark checked, the form is
-  asked again above the list; one settled meanwhile is told so, as with a
-  reason. The row keeps the reason as a value from a
-  fixed list (`left`, `arrived`, `both`, `other`) and the words as typed,
-  in canonical spelling, with who settled it and when; CHECK constraints
-  allow a reason only on a row settled as checked and words only, and
-  always, for another way. Confirm count, which settles a row as checked
-  too, keeps no reason: the movement holds the count. The words are never
-  logged. No page lists settled rows yet, so the reason, and the counts
-  that put its ends right, are not shown anywhere.
+  none. Asked from a refusal for an open package moved whole, whose row
+  has no Mark checked, the form is asked again above the list; one
+  settled meanwhile is told so, as with a reason. The row keeps the reason
+  as a value from a fixed list (`left`, `arrived`, `both`, `other`) and
+  the words as typed, in canonical spelling, with who settled it and
+  when; CHECK constraints allow a reason only on a row settled as checked
+  and words only, and always, for another way. Confirm count, which
+  settles a row as checked too, keeps no reason: the movement holds the
+  count. The words are never logged. No page lists settled rows yet, so
+  the reason, and the counts that put its ends right, are not shown
+  anywhere.
 - **An open package moved whole** is now where it arrived, so cannot be
   found again where it left. Its row says "An open package moved to
   the van. Confirm or correct count.", naming the place, with a box, "Count in the
