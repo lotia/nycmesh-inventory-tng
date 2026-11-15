@@ -2202,6 +2202,40 @@ def test_its_sealed_line_left_at_0_writes_nothing_and_counts_that_end(
     assert check.settled_how == "counted"
 
 
+def test_its_loose_only_place_counted_by_form_puts_each_form_right(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """Not tracked, the store holds 610 loose alone, really one spool sealed
+    and 305 loose: counted by form, each form is put right, the total kept,
+    and the store's other items as they were."""
+    spools = Spools(session, tracked=False)
+    opening_raised(registered_client, spools)
+    store = spools.store.id
+    others = {
+        item_id: amount
+        for item_id, amount in expected(session, store).items()
+        if item_id != spools.cable.id
+    }
+    count_at(
+        admin_client,
+        store,
+        {sealed_field(spools): "1", f"loose_{spools.cable.id}": "305"},
+    )
+    (check,) = checks(session)
+    assert check.settled_how == "counted"
+    session.expire_all()
+    found = ledger.expected_forms(
+        session, store, ledger.moment(session, store), [spools.cable.id]
+    )
+    assert found == {
+        (spools.cable.id, spools.sealed): 305,
+        (spools.cable.id, Form()): 305,
+    }
+    now = expected(session, store)
+    assert now[spools.cable.id] == 610
+    assert {item_id: now[item_id] for item_id in others} == others
+
+
 def test_a_move_waiting_asks_no_sealed_line(
     admin_client: TestClient, registered_client: TestClient, session: Session
 ) -> None:
