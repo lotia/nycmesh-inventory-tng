@@ -6,7 +6,7 @@ action") ·
 amended 2026-11-11 (tracking opened packages is a setting; bulk actions)
 · amended 2026-11-12 (an open package on the scan page; correcting its
 length; "Needs your action") · amended 2026-11-14 (recorded more than
-moved)
+moved; those settled listed, 2026-11-15)
 
 ## Context
 
@@ -358,9 +358,8 @@ you" counts every report in one line, which hides what is waiting.
   when; CHECK constraints allow a reason only on a row settled as checked
   and words only, and always, for another way. Confirm count, which
   settles a row as checked too, keeps no reason: the movement holds the
-  count. The words are never logged. No page lists settled rows yet, so
-  the reason, and the counts that put its ends right, are not shown
-  anywhere.
+  count. The words are never logged; the list of those settled shows
+  them (below).
 - **An open package moved whole** is now where it arrived, so cannot be
   found again where it left. Its row says "An open package moved to
   the van. Confirm or correct count.", naming the place, with a box, "Count in the
@@ -460,6 +459,29 @@ you" counts every report in one line, which hides what is waiting.
   administrator of the count that closed it, then, and leaves "Needs your
   action". A CHECK allows one end counted at most while it waits, and
   one at least on a row closed so.
+- **Those settled** are listed on a page of their own, "Recorded more
+  than moved, settled", read only (Ali, 2026-11-15, inventory-tng-73p).
+  The stock pages' views always end "Recorded more (2) · Settled", the
+  number those waiting, shown even at 0; both pages start "Waiting (2) ·
+  Settled", the one shown not a link, and keep an item shown alone. Not
+  in the top navigation. A table, newest settled first, in pages of 50,
+  of one item or all: Settled (the day and time in the site's zone), Item
+  (linked to its stock by item), Amount, Where ("Shelf B3 → Rack A";
+  "Store (opened)" for an opening; "from" or "to" one place; each place
+  linked to its count of the item if it may be counted), How, Why and By
+  (the administrator's username). How and Why, from what the row keeps:
+  "Corrected", with "Two adjustments", or the one end Correct wrote
+  ("Rack A only", "Sealed spool only") after a count or a close put the
+  other right; "Count confirmed", Confirm count unchanged (checked, with
+  no reason), "Held 305 m"; "Count corrected", Confirm count changed (an
+  open package moved whole, corrected), "Adjusted at Van"; "Checked",
+  with its reason's words and, for another way, the words typed;
+  "Counted", each end by the place or form counted and the day ("Shelf B3
+  14 Nov, Rack A 15 Nov"; "Sealed spool 14 Nov, open spool closed 15
+  Nov"). The wording of Count confirmed's, Count corrected's and one
+  end's Why is Claude's (2026-11-15). Sorting by every column and the
+  number of rows a page come with the list control every list page gets
+  (inventory-tng-qwb).
 - **The page's words** (Ali, 2026-11-15): "Another tab recorded these
   before a volunteer changed them, so the inventory shows more moved than
   was. Correct moves the extra back with an adjustment. Mark checked if

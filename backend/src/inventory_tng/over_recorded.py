@@ -15,6 +15,7 @@ from collections.abc import Collection, Mapping, Sequence
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal, NamedTuple
+from zoneinfo import ZoneInfo
 
 import structlog
 from opentelemetry import metrics
@@ -24,7 +25,9 @@ from sqlalchemy.orm import Session, aliased
 
 from inventory_tng import adjustment_reasons, ledger
 from inventory_tng.db import RuleBroken, get_locked, locked
+from inventory_tng.local_time import show_day
 from inventory_tng.models import (
+    Admin,
     Item,
     ItemPackage,
     LedgerTransaction,
@@ -214,6 +217,45 @@ def amount_words(
     return f"{amount(quantity)}{after}"
 
 
+def _amount(
+    quantity: Decimal,
+    unit: str,
+    package: str | None,
+    size: Decimal | None,
+    from_open: int | None,
+    kind: str,
+) -> str:
+    """How much more was recorded, as a row says it: amount_words(), and
+    whether a cut, not an opening, took it from an open package."""
+    words = amount_words(quantity, unit, package, size)
+    if from_open is not None and kind != "open":
+        words += " from an open package"
+    return words
+
+
+def _end_names(
+    kind: str,
+    item: str,
+    package: str | None,
+    to_open: int | None,
+    from_place: str | None,
+    to_place: str | None,
+) -> tuple[str, str]:
+    """A check's two ends, where it left and where it arrived, as a
+    sentence starts with each: a move's, its places; an opening's, both at
+    one place, its forms."""
+    if kind != "open":
+        return from_place or "", to_place or ""
+    # An opening leaves sealed, and arrives open if its item tracks opened,
+    # else loose (ledger._opening_breaks).
+    arrived = (
+        f"Open {within(package or '')}"
+        if to_open is not None
+        else f"Loose {within(item)}"
+    )
+    return f"Sealed {within(package or '')}", arrived
+
+
 def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
     """The checks waiting that `where` picks, by item name, oldest first:
     one query, however many."""
@@ -291,9 +333,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         arrived_on,
         closed_on,
     ) in found:
-        words = amount_words(row.quantity, unit, package, size)
-        if from_open is not None and kind != "open":
-            words += " from an open package"
+        words = _amount(row.quantity, unit, package, size, from_open, kind)
         whole = from_open is not None and from_open == to_open
         # An opening's open package closed since: Correct skips that end
         # (correct()), so the row says it is closed.
@@ -308,17 +348,9 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
             and not whole
             and (left_on is None) != (arrived_on is None)
         ):
-            if kind == "open":
-                # An opening leaves sealed, and arrives open if its item
-                # tracks opened, else loose (ledger._opening_breaks).
-                left = f"Sealed {within(package)}"
-                arrived = (
-                    f"Open {within(package)}"
-                    if to_open is not None
-                    else f"Loose {within(item)}"
-                )
-            else:
-                left, arrived = from_place or "", to_place or ""
+            left, arrived = _end_names(
+                kind, item, package, to_open, from_place, to_place
+            )
             # The other end's words, and the button's: a form's in the
             # sentence's middle ("Correct open spool"), a place's as named.
             counted_end, how, on, other, still_id, still_place = (
@@ -353,6 +385,214 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
                 if whole
                 else None,
                 one,
+            )
+        )
+    return lines
+
+
+class Spot(NamedTuple):
+    """One of a settled check's places: by id and name, and whether it may
+    be counted (ledger.countable), for a link to count its item there."""
+
+    id: int
+    name: str
+    countable: bool
+
+
+class WasSettled(NamedTuple):
+    """A check settled, as the administrators' list of those settled shows
+    it (Ali, 2026-11-15, inventory-tng-73p)."""
+
+    at: datetime
+    item_id: int
+    item: str
+    amount: str
+    # An opening's both, one place.
+    opening: bool
+    from_place: Spot | None
+    to_place: Spot | None
+    # How, as SETTLED_HOW words it, and why, in words.
+    how: str
+    why: str
+    by: str
+
+
+# How one was settled, in words. Confirm count settles one as checked
+# with no reason, or as corrected, an open package moved whole, which
+# Correct cannot be (its open package is no longer where it left).
+SETTLED_HOW = {
+    "corrected": "Corrected",
+    "confirmed": "Count confirmed",
+    "count corrected": "Count corrected",
+    "checked": "Checked",
+    "counted": "Counted",
+}
+
+SETTLED = OverRecorded.settled_at.is_not(None)
+
+
+def _spot(place_id: int | None, name: str | None, countable: bool) -> Spot | None:
+    return None if place_id is None else Spot(place_id, name or "", countable)
+
+
+def _countable(place: type[Location]) -> ColumnElement[bool]:
+    """Whether a place, aliased, may be counted (ledger.countable)."""
+    return (
+        select(Location.id).where(Location.id == place.id, ledger.countable()).exists()
+    )
+
+
+def how_many(session: Session, *where: ColumnElement[bool]) -> int:
+    """How many checks `where` picks (of OverRecorded and Movement), such
+    as WAITING or SETTLED."""
+    return (
+        session.scalar(
+            select(func.count())
+            .select_from(OverRecorded)
+            .join(Movement, Movement.id == OverRecorded.movement_id)
+            .where(*where)
+        )
+        or 0
+    )
+
+
+def settled(
+    session: Session,
+    zone: ZoneInfo,
+    *where: ColumnElement[bool],
+    limit: int,
+    offset: int = 0,
+) -> list[WasSettled]:
+    """Those settled that `where` picks (of Movement), newest first: one
+    query, however many. Days in `zone`."""
+    package_id = func.coalesce(Movement.from_package_id, Movement.to_package_id)
+    found = session.execute(
+        select(
+            OverRecorded,
+            Item.id,
+            Item.name,
+            Item.unit,
+            ItemPackage.name,
+            ItemPackage.size,
+            Movement.from_open_package_id,
+            Movement.to_open_package_id,
+            Movement.quantity,
+            LedgerTransaction.kind,
+            LedgerTransaction.from_location_id,
+            FROM.name,
+            _countable(FROM),
+            LedgerTransaction.to_location_id,
+            TO.name,
+            _countable(TO),
+            LEFT_COUNT.created_at,
+            ARRIVED_COUNT.created_at,
+            OpenPackage.closed_at,
+            Admin.username,
+        )
+        .join(Movement, Movement.id == OverRecorded.movement_id)
+        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .join(Item, Item.id == Movement.item_id)
+        .join(Admin, Admin.id == OverRecorded.settled_by_admin_id)
+        .outerjoin(ItemPackage, ItemPackage.id == package_id)
+        .outerjoin(FROM, FROM.id == LedgerTransaction.from_location_id)
+        .outerjoin(TO, TO.id == LedgerTransaction.to_location_id)
+        .outerjoin(LEFT_COUNT, LEFT_COUNT.id == OverRecorded.left_count_id)
+        .outerjoin(ARRIVED_COUNT, ARRIVED_COUNT.id == OverRecorded.arrived_count_id)
+        .outerjoin(OpenPackage, OPENED_INTO)
+        .where(SETTLED, *where)
+        .order_by(OverRecorded.settled_at.desc(), OverRecorded.id.desc())
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    lines = []
+    for (
+        row,
+        item_id,
+        item,
+        unit,
+        package,
+        size,
+        from_open,
+        to_open,
+        held,
+        kind,
+        from_id,
+        from_place,
+        from_countable,
+        to_id,
+        to_place,
+        to_countable,
+        left_on,
+        arrived_on,
+        closed_on,
+        by,
+    ) in found:
+        whole = from_open is not None and from_open == to_open
+        left, arrived = _end_names(kind, item, package, to_open, from_place, to_place)
+        at, how, reason = row.settled_at, row.settled_how, row.checked_reason
+        # Settled: the CHECK sets all three or none.
+        assert at is not None
+        assert how is not None
+        if how == "checked" and reason is None:
+            how = "confirmed"
+            why = f"Held {amount_words(held, unit, None, None)}"
+        elif how == "checked" and reason is not None:
+            why = CHECKED_REASONS[reason]
+            if row.checked_words:
+                why += f" {row.checked_words}"
+        elif how == "corrected" and whole:
+            how = "count corrected"
+            why = f"Adjusted at {to_place}"
+        elif how == "corrected":
+            # The ends Correct wrote (correct()): each it has but one a
+            # count put right, or an opening's open package closed before.
+            written = [
+                end
+                for end, there in (
+                    (left, from_id is not None and row.left_count_id is None),
+                    (
+                        arrived,
+                        to_id is not None
+                        and row.arrived_count_id is None
+                        and not (
+                            kind == "open" and closed_on is not None and closed_on <= at
+                        ),
+                    ),
+                )
+                if there
+            ]
+            why = (
+                "Two adjustments"
+                if len(written) > 1
+                else f"{written[0]} only"
+                if written
+                else "No adjustment"
+            )
+        else:
+            # Each end it has by the count that put it right, or an
+            # opening's open package closed (counted(), open_package_closed()).
+            said = []
+            if left_on is not None:
+                said.append(f"{left} {show_day(left_on, zone)}")
+            if arrived_on is not None:
+                said.append(f"{arrived} {show_day(arrived_on, zone)}")
+            elif closed_on is not None:
+                said.append(f"{arrived} closed {show_day(closed_on, zone)}")
+            if kind == "open":
+                said[1:] = [within(each) for each in said[1:]]
+            why = ", ".join(said)
+        lines.append(
+            WasSettled(
+                at,
+                item_id,
+                item,
+                _amount(row.quantity, unit, package, size, from_open, kind),
+                kind == "open",
+                _spot(from_id, from_place, from_countable),
+                _spot(to_id, to_place, to_countable),
+                SETTLED_HOW[how],
+                why,
+                by,
             )
         )
     return lines

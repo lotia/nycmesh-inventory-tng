@@ -1,8 +1,9 @@
 {% extends "admin_base.html" %}
+{% from "_views.html" import views %}
 {% from "_table.html" import table %}
 {% from "_retired.html" import retired %}
 {% block main %}
-{% include "_stock_views.html" %}
+{{ views("Stock views", stock_views, view) }}
 <p class="hint">Places that show less than nothing of an item: the records are
 wrong there until someone counts it.</p>
 {% for group in places %}

@@ -8,7 +8,7 @@ The query string carries it all, so every view is a link: `q`, the search;
 `show`, which records; `page`; and `pick`, the one record a suggestion
 picked, which narrows the list to it."""
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from math import ceil
 from typing import Any, Literal
@@ -270,6 +270,43 @@ class Listing[T]:
             }
             for row, shown in zip(rows, searched.as_shown(session, rows), strict=True)
         ]
+
+
+@dataclass(frozen=True)
+class Pages:
+    """A list with no search in pages of PER_PAGE, as _listing.html's pager
+    draws them: the page asked for (`?page=`), read as Searched.read reads
+    it and kept within how many there are, and the rest of the query
+    string, kept by each page's link."""
+
+    here: str
+    found: int
+    page: int = 1
+    query: tuple[tuple[str, str], ...] = ()
+
+    @classmethod
+    def read(
+        cls,
+        here: str,
+        found: int,
+        page: str = "",
+        query: Mapping[str, str] | None = None,
+    ) -> Pages:
+        asked = whole(page, 1, INTEGER_MAX) or 1
+        kept = tuple((query or {}).items())
+        return cls(here, found, min(asked, max(1, ceil(found / PER_PAGE))), kept)
+
+    @property
+    def pages(self) -> int:
+        return max(1, ceil(self.found / PER_PAGE))
+
+    @property
+    def offset(self) -> int:
+        return (self.page - 1) * PER_PAGE
+
+    def link(self, *, page: int) -> str:
+        kept = dict(self.query) | ({"page": str(page)} if page > 1 else {})
+        return self.here + (f"?{urlencode(kept)}" if kept else "")
 
 
 def _count(session: Session, query: Select) -> int:

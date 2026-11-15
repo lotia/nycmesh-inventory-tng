@@ -1,7 +1,8 @@
 {% extends "admin_base.html" %}
+{% from "_views.html" import views %}
 {% from "_table.html" import table %}
 {% block main %}
-{% include "_stock_views.html" %}
+{{ views("Stock views", stock_views, view) }}
 <p class="hint">Items whose usable stock in the stores, across their areas,
 is at or below the level to reorder at (short ends are not usable), or with
 fewer sealed packages there than a package's minimum. Both are set on the

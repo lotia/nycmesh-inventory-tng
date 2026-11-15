@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from inventory_tng import ledger, locations, over_recorded
 from inventory_tng.admin.common import admin_page, quantity, row_id, rule_words
 from inventory_tng.admin.counts import COUNTS
+from inventory_tng.admin.listing import PER_PAGE, Pages
 from inventory_tng.admin.locations import changeable
 from inventory_tng.admin.needs_action import (
     ItemWaiting,
@@ -29,7 +30,7 @@ from inventory_tng.admin.needs_action import (
     query,
     query_string,
 )
-from inventory_tng.admin.stock import STOCK
+from inventory_tng.admin.stock import RECORDED_MORE, RECORDED_MORE_SETTLED, STOCK
 from inventory_tng.db import DbSession, Gone, attempt, exists_where
 from inventory_tng.local_time import site_zone
 from inventory_tng.models import (
@@ -47,9 +48,11 @@ log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
-OVER_RECORDED = f"{STOCK}/recorded-more"
+OVER_RECORDED = RECORDED_MORE
+SETTLED = RECORDED_MORE_SETTLED
 
 TITLE = "Recorded more than moved"
+SETTLED_TITLE = "Recorded more than moved, settled"
 # A count left blank, in quantity()'s words for one not a number.
 TYPE_A_NUMBER = "Type a number, such as 12 or 0.5."
 # Mark checked with no reason, or put right another way with no words.
@@ -119,6 +122,60 @@ def over_recorded_page(
     return _page(request, signed, session, only, notice=said)
 
 
+def _views(waiting: int, only: Item | None) -> list[tuple[str, str, str]]:
+    """The links between those waiting and those settled, for _views.html,
+    each of one item still if one (Ali, 2026-11-15, inventory-tng-73p)."""
+    kept = query_string(only)
+    return [
+        (f"{OVER_RECORDED}{kept}", f"Waiting ({waiting})", "waiting"),
+        (f"{SETTLED}{kept}", "Settled", "settled"),
+    ]
+
+
+@router.get(SETTLED)
+def settled_page(
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    only: OnlyItem,
+    page: str = "",
+) -> Response:
+    """Those settled, newest first, in pages, all or one item's: how each
+    was settled, why, by whom and when (Ali, 2026-11-15, inventory-tng-73p).
+    Read only."""
+    where = [Movement.item_id == only.id] if only else []
+    pages = Pages.read(
+        SETTLED,
+        over_recorded.how_many(session, over_recorded.SETTLED, *where),
+        page,
+        query(only),
+    )
+    zone = site_zone(session)
+    rows = over_recorded.settled(
+        session, zone, *where, limit=PER_PAGE, offset=pages.offset
+    )
+    log.debug("over recorded settled listed", found=pages.found, page=pages.page)
+    return admin_page(
+        request,
+        signed,
+        "over_recorded_settled.html",
+        {
+            "title": SETTLED_TITLE,
+            "here": SETTLED,
+            "back_link": (STOCK, "Stock"),
+            "only": only,
+            "recorded_views": _views(
+                over_recorded.how_many(session, over_recorded.WAITING, *where), only
+            ),
+            "rows": rows,
+            "listing": pages,
+            "zone": zone,
+            "counts_path": COUNTS,
+            "stock_path": STOCK,
+        },
+    )
+
+
 def _page(
     request: Request,
     signed: AdminSignedIn,
@@ -162,6 +219,7 @@ def _page(
             "only": only,
             "query": query_string(only),
             "waiting": waiting,
+            "recorded_views": _views(len(waiting), only),
             "reasons": over_recorded.CHECKED_REASONS,
             "words_max": OVER_RECORDED_WORDS_MAX,
             "seen": over_recorded.seen,

@@ -14,7 +14,7 @@ from fastapi.responses import Response
 from sqlalchemy import ColumnElement, any_, func, or_, select, true
 from sqlalchemy.orm import Session
 
-from inventory_tng import open_packages
+from inventory_tng import open_packages, over_recorded
 from inventory_tng.admin.common import ADMIN, admin_page
 from inventory_tng.admin.counts import COUNTS
 from inventory_tng.admin.items import ITEMS
@@ -35,15 +35,31 @@ STOCK = f"{ADMIN}/stock"
 REORDER = f"{STOCK}/reorder"
 NEEDS_COUNTING = f"{STOCK}/needs-counting"
 
-# The stock pages' views, for the links between them (_stock_views.html).
+# Lines recorded with more than was moved (admin/over_recorded.py): those
+# waiting, and those settled.
+RECORDED_MORE = f"{STOCK}/recorded-more"
+RECORDED_MORE_SETTLED = f"{RECORDED_MORE}/settled"
+
 _globals = cast(dict[str, Any], templates.env.globals)
-_globals["stock_views"] = (
-    (STOCK, "By place", "place"),
-    (f"{STOCK}?by=item", "By item", "item"),
-    (REORDER, "Reorder", "reorder"),
-    (NEEDS_COUNTING, "Needs counting", "needs-counting"),
-)
 _globals["needs_counting_path"] = NEEDS_COUNTING
+
+
+def stock_views(session: Session) -> list[tuple[str, str, str]]:
+    """The stock pages' views, for the links between them (_views.html):
+    by path, words and name. Recorded more says how many wait, even none
+    (Ali, 2026-11-15, inventory-tng-73p)."""
+    return [
+        (STOCK, "By place", "place"),
+        (f"{STOCK}?by=item", "By item", "item"),
+        (REORDER, "Reorder", "reorder"),
+        (NEEDS_COUNTING, "Needs counting", "needs-counting"),
+        (
+            RECORDED_MORE,
+            f"Recorded more ({over_recorded.how_many(session, over_recorded.WAITING)})",
+            "recorded-more",
+        ),
+        (RECORDED_MORE_SETTLED, "Settled", "settled"),
+    ]
 
 
 @dataclass
@@ -130,6 +146,7 @@ def stock(
         {
             "title": "Stock",
             "view": by,
+            "stock_views": stock_views(session),
             "groups": groups,
             "forms": forms,
             "needing_count": sum(group.needs_count for group in groups),
@@ -233,6 +250,7 @@ def reorder(request: Request, signed: AdminSignedIn, session: DbSession) -> Resp
         {
             "title": "Reorder",
             "view": "reorder",
+            "stock_views": stock_views(session),
             "rows": rows,
             "any_short": any(row.count_first for row in rows),
             "items_path": ITEMS,
@@ -253,6 +271,7 @@ def needs_counting(
         {
             "title": "Needs counting",
             "view": "needs-counting",
+            "stock_views": stock_views(session),
             "places": _grouped(_holdings(session, SHORT), "place"),
             "counts_path": COUNTS,
         },

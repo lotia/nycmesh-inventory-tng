@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_views.html" import views %}
 {#- Why one marked checked is right as it is: one reason, and words for
 another way. Kept as sent with its problem, if `sent` from this form: a
 refusal's alert, when drawn, is where it was sent from. #}
@@ -17,6 +18,7 @@ refusal's alert, when drawn, is where it was sent from. #}
 </fieldset>
 {% endmacro %}
 {% block main %}
+{{ views("Recorded more than moved", recorded_views, "waiting") }}
 {#- A correction or count a rule refused: why, and what puts it right. Or
 Mark checked asked again, for a row without it. #}
 {% set each = refused.shown if refused else asking %}

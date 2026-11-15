@@ -1,0 +1,36 @@
+{% extends "admin_base.html" %}
+{% from "_table.html" import table %}
+{% from "_views.html" import views %}
+{% from "_listing.html" import pager %}
+{#- A place, linked to its count of the item if it may be counted. #}
+{% macro place(spot, each) -%}
+{% if spot.countable %}<a href="{{ counts_path }}/{{ spot.id }}?item={{ each.item_id }}">{{ spot.name }}</a>{% else %}{{ spot.name }}{% endif %}
+{%- endmacro %}
+{% block main %}
+{{ views("Recorded more than moved", recorded_views, "settled") }}
+{% if only %}
+<p>Only {{ only.name }}. <a href="{{ here }}">Show all</a></p>
+{% endif %}
+{% call table() %}
+  <tr><th>Settled</th><th>Item</th><th>Amount</th><th>Where</th><th>How</th><th>Why</th><th>By</th></tr>
+  {% for each in rows %}
+  <tr>
+    <td>{{ each.at | when(zone) }}</td>
+    <td><a href="{{ stock_path }}?by=item#item-{{ each.item_id }}">{{ each.item }}</a></td>
+    <td>{{ each.amount }}</td>
+    <td>
+      {%- if each.opening %}{{ place(each.from_place, each) }} (opened)
+      {%- elif each.from_place and each.to_place %}{{ place(each.from_place, each) }} → {{ place(each.to_place, each) }}
+      {%- elif each.from_place %}from {{ place(each.from_place, each) }}
+      {%- elif each.to_place %}to {{ place(each.to_place, each) }}{% endif -%}
+    </td>
+    <td>{{ each.how }}</td>
+    <td>{{ each.why }}</td>
+    <td>{{ each.by }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="7">Nothing settled yet.</td></tr>
+  {% endfor %}
+{% endcall %}
+{{ pager(listing) }}
+{% endblock %}

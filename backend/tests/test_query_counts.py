@@ -24,6 +24,7 @@ from inventory_tng.models import (
     Label,
     Location,
     Movement,
+    OverRecorded,
     ReadingRule,
     Volunteer,
 )
@@ -108,6 +109,20 @@ def over_recorded_line(world: World) -> None:
     )
     assert movement_id is not None
     over_recorded.raise_checks(world.session, {movement_id: Decimal(1)})
+
+
+def over_recorded_settled(world: World) -> None:
+    """A line more recorded with more than was moved, corrected: its two
+    places, each linked to its count, and who corrected it."""
+    over_recorded_line(world)
+    session = world.session
+    check = session.scalars(
+        select(OverRecorded).order_by(OverRecorded.id.desc())
+    ).first()
+    assert check is not None
+    admin_id = session.scalars(select(Admin.id)).first()
+    assert admin_id is not None
+    over_recorded.correct(session, check.id, over_recorded.seen(check), admin_id)
 
 
 def item_parts(world: World) -> None:
@@ -228,6 +243,7 @@ PAGES: dict[str, tuple[More, *tuple[Path, ...]]] = {
     "/admin/stock/used-up": (everything,),
     "/admin/stock/length-checks": (everything,),
     "/admin/stock/recorded-more": (over_recorded_line,),
+    "/admin/stock/recorded-more/settled": (over_recorded_settled,),
     "/admin/stock/length-checks/{which}": (everything, *(k.path for k in KINDS)),
     "/admin/counts": (everything,),
     "/admin/unit-readings": (reading_rule,),

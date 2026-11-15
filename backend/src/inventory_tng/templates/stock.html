@@ -1,9 +1,10 @@
 {% extends "admin_base.html" %}
+{% from "_views.html" import views %}
 {% from "_table.html" import table %}
 {% from "_retired.html" import retired %}
 {% from "_forms.html" import forms_lines %}
 {% block main %}
-{% include "_stock_views.html" %}
+{{ views("Stock views", stock_views, view) }}
 {% include "_retired_holding.html" %}
 {% if needing_count %}
 <p role="alert">{{ needing_count }} {{ view ~ (" shows" if needing_count == 1 else "s show") }}
@@ -11,7 +12,7 @@ less than nothing somewhere: the records are wrong there, so count it
 (<a href="{{ needs_counting_path }}">Needs counting</a>).</p>
 {% endif %}
 {% for group in groups %}
-<section>
+<section{% if view == "item" %} id="item-{{ group.heading.id }}"{% endif %}>
   <h2>{{ group.heading.name }}{{ retired(group.heading) }}{% if view == "item" %} <span class="hint">{{ group.total | amount }} {{ group.heading.unit }} in all</span>{% endif %}</h2>
   {% call table() %}
     {% for row in group.rows %}

@@ -1,0 +1,10 @@
+{#- Links between a page's views, `links` by path, words and name, the
+one shown (`current`) not a link: the stock pages' (admin/stock.py,
+stock_views), and Recorded more than moved's. -#}
+{% macro views(label, links, current) -%}
+<nav aria-label="{{ label }}" class="actions">
+  {% for href, words, name in links %}
+  {% if name == current %}<strong>{{ words }}</strong>{% else %}<a href="{{ href }}">{{ words }}</a>{% endif %}
+  {% endfor %}
+</nav>
+{%- endmacro %}
