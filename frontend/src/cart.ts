@@ -22,6 +22,7 @@ import {
   BatchLine,
   type Draft,
   type Entry,
+  fromOpen,
   type Said,
 } from "./outbox";
 import { count, decimal, sent, thousandths } from "./quantity";
@@ -1031,14 +1032,14 @@ export function sealedCounts(
       // A line from an open package moves no sealed one; nor is one of a
       // package the catalogue has no more counted.
       const packageId = line.package_id;
-      const fromOpen = body.kind !== "open" && line.open_package_key != null;
+      const taken = fromOpen(line, body.kind);
       const size = packageId == null ? undefined : sizes.get(packageId);
       // Read as stored, which another build may have written: one
       // unreadable is skipped.
       const quantity = thousandths(String(line.quantity));
       if (
         packageId == null ||
-        fromOpen ||
+        taken ||
         size === undefined ||
         refusedAsCounted(line, size) ||
         quantity === null
@@ -1246,19 +1247,15 @@ export function search(catalogue: Catalogue, text: string, limit = 20): Item[] {
     .slice(0, limit);
 }
 
-/** `text` in lower case, decomposed by compatibility, each unit right after
- * a number spelt as the server spells it (`respell`), and without its
- * combining marks: "é" is "e", fullwidth "ｃａｆｅ" is "cafe", "ﬁ" is "fi"
- * and "10 µF" is "10uf"; "ł", "ø", "æ" and "ß", which do not decompose,
- * stay as they are, and so do Greek letters, but in units. */
-export function bare(text: string, rules?: Rules): string {
-  return unmarked(respell(text.normalize("NFKD"), rules));
-}
-
-/** `text` bare as typed, its units as they are, then `bare` if that
+/** `text` bare as typed, its units as they are, then bare with each unit
+ * right after a number spelt as the server spells it (`respell`) if that
  * differs, as the server keeps and matches it (models.folds): so "feet",
  * "48 v" in "48 vdc" and a half-typed "10 μ" find what they did before
- * units were read; `rules`, the reading rules, read first. */
+ * units were read; `rules`, the reading rules, read first. Bare is in
+ * lower case, decomposed by compatibility, and without combining marks:
+ * "é" is "e", fullwidth "ｃａｆｅ" is "cafe", "ﬁ" is "fi" and, respelt,
+ * "10 µF" is "10uf"; "ł", "ø", "æ" and "ß", which do not decompose, stay
+ * as they are, and so do Greek letters, but in units. */
 export function bares(text: string, rules?: Rules): string[] {
   const decomposed = text.normalize("NFKD");
   const typed = unmarked(decomposed);

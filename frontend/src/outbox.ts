@@ -390,6 +390,17 @@ function holdsKey(entry: Entry): boolean {
   );
 }
 
+/** `entries`, each refused for what it held (422) under `key` given a
+ * key of its own, as the server now holds or asks about `key`: so one key
+ * names one batch. */
+function rekeyRefused(entries: Entry[], key: string | undefined): Entry[] {
+  return entries.map((each) =>
+    each.body.key === key && each.reason?.code === "refused"
+      ? { ...each, body: { ...each.body, key: uuid() } }
+      : each,
+  );
+}
+
 /** Whether two batches, each as storage reads it (parsed, so its fields
  * in one order), are the same: one key may name two (Outbox.queue). */
 function sameBatch(a: Entry["body"], b: Entry["body"]): boolean {
@@ -633,14 +644,7 @@ export class Outbox {
         ];
       }
       queued = "queued";
-      return [
-        ...entries.map((each) =>
-          before.includes(each) && each.reason?.code === "refused"
-            ? { ...each, body: { ...each.body, key: uuid() } }
-            : each,
-        ),
-        entry,
-      ];
+      return [...rekeyRefused(entries, key), entry];
     });
     if (!kept) {
       return "not_kept";
@@ -795,13 +799,7 @@ export class Outbox {
         // What else is under the key was refused for what it held (422),
         // so the server held none: it takes a key of its own, as in
         // queue, so one key names one batch.
-        this.update((entries) =>
-          entries.map((each) =>
-            each.body.key === held && each.reason?.code === "refused"
-              ? { ...each, body: { ...each.body, key: uuid() } }
-              : each,
-          ),
-        );
+        this.update((entries) => rekeyRefused(entries, held));
         listed({
           state: "saved",
           reason: null,
@@ -1047,6 +1045,16 @@ function parsed(stored: readonly unknown[]): Entry[] {
     const result = v.safeParse(Entry, entry);
     return result.success ? [result.output] : [];
   });
+}
+
+/** Whether a line of a batch of `kind` was taken from an open package,
+ * cut or moved whole: it never goes back in a cart, nor moves a sealed
+ * package. */
+export function fromOpen(
+  line: { open_package_key?: string | null },
+  kind: Body["kind"] | null,
+): boolean {
+  return kind !== "open" && (line.open_package_key ?? null) !== null;
 }
 
 /** The open packages an opening makes, by the keys the page gave them. */

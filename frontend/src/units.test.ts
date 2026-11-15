@@ -1,8 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { bare, bares, search } from "./cart";
+import { bares, search } from "./cart";
 import { CATALOGUE, cable } from "./test-catalogue";
-import { read, respell } from "./units";
+import { type Rules, read, respell } from "./units";
 import shared from "./units-vectors.json";
+
+/** `text` bare, its units respelt: the last of its forms. */
+const bare = (text: string, rules?: Rules) => bares(text, rules).at(-1);
 
 describe("units, as the server reads them", () => {
   test.each(

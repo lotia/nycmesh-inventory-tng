@@ -41,6 +41,7 @@ import {
 } from "./cart";
 import {
   BatchKey,
+  fromOpen,
   lineNumbers,
   type Note,
   noteOf,
@@ -774,7 +775,7 @@ export function toCart(
           note,
           drop: [{ at }],
         });
-      if (line.open_package_key !== null && older.kind !== "open") {
+      if (fromOpen(line, older.kind)) {
         leave(RESCAN, `${by}${FROM_OPEN}`);
         return;
       }

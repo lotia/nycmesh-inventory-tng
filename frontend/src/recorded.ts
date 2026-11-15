@@ -16,6 +16,7 @@ import { FROM_OPEN, inUnit, nameOf, RESCAN, withRetired } from "./older";
 import {
   type Body,
   type Draft,
+  fromOpen,
   type Note,
   REPORTS,
   type Recorded,
@@ -143,12 +144,6 @@ export function reportsAdded(recorded: Body, mine: Body): ReportKind[] {
       .filter((each) => !lengths.has(JSON.stringify(each)))
       .map(() => "lengths" as const),
   ];
-}
-
-/** Whether a line of a batch of `kind` was taken from an open package,
- * cut or moved whole: it never goes back in a cart. */
-function fromOpen(line: Line, kind: Body["kind"]): boolean {
-  return kind !== "open" && (line.open_package_key ?? null) !== null;
 }
 
 /** Words for a batch's lines, named from a catalogue. */
