@@ -864,6 +864,8 @@ def test_a_count_can_show_the_items_a_search_finds(
     assert "Only items matching “litebeem”." in text(page)
     nothing = admin_client.get(f"{path}?q=zzzzzzzz")
     assert "Nothing here matches." in text(nothing)
+    # Saved, it would record the place counted, though nothing was.
+    assert "Save the count" not in text(nothing)
     # A search of nothing once folded, or an item there is not: all shown.
     for odd in ("?q=%CC%81", "?item=x", f"?item={INTEGER_MAX}"):
         every = admin_client.get(f"{path}{odd}").text

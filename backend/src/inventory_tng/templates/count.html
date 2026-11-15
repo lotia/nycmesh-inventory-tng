@@ -108,6 +108,9 @@ if you didn't count it. Anything else here, add below.</p>
     </label>
   </fieldset>
   {% endif %}
+  {#- Filtered to nothing: saved, it would say the place was counted. #}
+  {% if rows or others or found_packages or not (shown.only or shown.search) %}
   <button class="primary">Save the count</button>
+  {% endif %}
 </form>
 {% endblock %}
