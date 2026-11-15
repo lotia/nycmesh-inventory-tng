@@ -25,11 +25,31 @@ before you start and after you change an issue.
 bd sync
 bd ready                  # pick something unblocked
 bd update <id> --claim
-# make one commit (or jj change) for the issue,
-# with a message that starts with "<id>: "
+# make one commit (or jj change) for the issue
 bd close <id>
 bd sync
 ```
+
+Commit messages follow [Conventional
+Commits](https://www.conventionalcommits.org/en/v1.0.0/):
+
+```text
+feat(catalogue): add item aliases
+
+What changed and why, in plain paragraphs or a list, wrapped at 72
+columns, ending with the result of mise run check.
+
+Refs: inventory-tng-c0c.6
+```
+
+- The first line is `type(scope): description`, 72 characters or fewer,
+  the description in lower case. Types: `feat`, `fix`, `refactor`,
+  `perf`, `test`, `docs`, `build`, `ci`, `chore`. The scope is the
+  issue's main area label without `area:`, such as `catalogue` or
+  `scan-page`; leave it out when no one area fits.
+- A blank line, then the body.
+- A blank line, then the footers: `Refs:` with the issue's id (ids
+  separated by commas), then any others, such as `Co-Authored-By:`.
 
 Then run `mise run check` on what you are about to push, every time, and
 push only if it passes: there is no pull request to catch what it would
