@@ -27,6 +27,7 @@ from inventory_tng import (
 from inventory_tng.admin import length_checks
 from inventory_tng.admin import over_recorded as over_recorded_page
 from inventory_tng.admin.common import RULES
+from inventory_tng.admin.counts import COUNTS
 from inventory_tng.db import RuleBroken, attempt
 from inventory_tng.ledger import Entry, Form, _more_written
 from inventory_tng.local_time import show_day, site_zone
@@ -818,14 +819,21 @@ def test_what_a_batch_was_changed_from_does_not_make_it_another(
     assert again.json() == created.json()
 
 
-def moved_whole(client: TestClient, spools: Spools) -> OpenPackage:
+def moved_whole(
+    client: TestClient, spools: Spools, reported: str | None = None
+) -> OpenPackage:
     """A spool's open package moved whole from the store to the van and
-    recorded, then sent again without it: it waits, whole."""
+    recorded, then sent again without it: it waits, whole. With
+    `reported`, the batch that moved it said that length was left on it."""
     made = spools.opened()
     whole = cut(made, "305") | {"whole": True}
     loose = {"item_id": spools.place.item.id, "quantity": "1"}
+    lengths = [length(made, reported)] if reported else None
     recorded_then_changed(
-        client, spools.place.batch(lines=[whole, loose]), lines=[loose]
+        client,
+        spools.place.batch(lines=[whole, loose], lengths=lengths),
+        lines=[loose],
+        lengths=None,
     )
     return made
 
@@ -1352,8 +1360,6 @@ def test_a_place_whose_own_place_is_retired_says_so(
 
 # A count of an end puts it right (Ali, 2026-11-15, inventory-tng-qs8).
 
-COUNTS = "/admin/counts"
-
 
 def count_form_at(client: TestClient, place_id: int) -> dict[str, str]:
     """A place's count form's hidden fields, as shown now: its key, and the
@@ -1638,11 +1644,7 @@ def test_only_a_report_after_the_batch_that_moved_it_whole_puts_it_right(
     """Set to what the batch that recorded the move reported: no count
     after the move, so it still waits. Set to a later report, it closes."""
     spools = Spools(session)
-    made = spools.opened()
-    whole = cut(made, "305") | {"whole": True}
-    loose = {"item_id": spools.place.item.id, "quantity": "1"}
-    first = spools.place.batch(lines=[whole, loose], lengths=[length(made, "290")])
-    recorded_then_changed(registered_client, first, lines=[loose], lengths=[])
+    made = moved_whole(registered_client, spools, reported="290")
     session.refresh(made)
     (check,) = checks(session)
     moved = session.get_one(Movement, check.movement_id).transaction_id

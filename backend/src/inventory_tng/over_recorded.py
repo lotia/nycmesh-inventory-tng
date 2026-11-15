@@ -121,10 +121,8 @@ def seen(row: OverRecorded) -> str:
     """What an administrator saw of a check, to settle it only as seen: a
     later batch may say another amount meanwhile, and a count may put one
     of its ends right, so Correct would write only the other."""
-    ends = ("left",) * bool(row.left_count_id) + ("arrived",) * bool(
-        row.arrived_count_id
-    )
-    return " ".join((amount(row.quantity), *ends))
+    ends = (("left", row.left_count_id), ("arrived", row.arrived_count_id))
+    return " ".join([amount(row.quantity), *(end for end, by in ends if by)])
 
 
 # Where stock left, and where it arrived, and the counts that put each
@@ -225,6 +223,22 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         .where(WAITING, *where)
         .order_by(func.lower(Item.name), Item.id, OverRecorded.id)
     ).all()
+    # Only a place that may be counted is offered for counting: the end
+    # still to put right of one with one end counted.
+    still = {
+        to_id if left_on else from_id
+        for *_, from_id, to_id, left_on, arrived_on in found
+        if (left_on is None) != (arrived_on is None)
+    }
+    countable = (
+        set(
+            session.scalars(
+                select(Location.id).where(Location.id.in_(still), ledger.countable())
+            )
+        )
+        if still
+        else set()
+    )
     lines = []
     for (
         row,
@@ -254,9 +268,13 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         # Moved whole, it has one end only: where it arrived.
         if from_id is not None and to_id is not None and not whole:
             if left_on is not None and arrived_on is None:
-                one = OneCounted(from_place, left_on, to_id, to_place, True)
+                one = OneCounted(
+                    from_place, left_on, to_id, to_place, to_id in countable
+                )
             elif arrived_on is not None and left_on is None:
-                one = OneCounted(to_place, arrived_on, from_id, from_place, True)
+                one = OneCounted(
+                    to_place, arrived_on, from_id, from_place, from_id in countable
+                )
         lines.append(
             Shown(
                 row,
@@ -275,24 +293,6 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
                 one,
             )
         )
-    still = {each.one_counted.still_id for each in lines if each.one_counted}
-    if still:
-        # Only a place that may be counted is offered for counting.
-        countable = set(
-            session.scalars(
-                select(Location.id).where(Location.id.in_(still), ledger.countable())
-            )
-        )
-        lines = [
-            each._replace(
-                one_counted=each.one_counted._replace(
-                    countable=each.one_counted.still_id in countable
-                )
-            )
-            if each.one_counted
-            else each
-            for each in lines
-        ]
     return lines
 
 
