@@ -284,7 +284,8 @@ def _count_page(
     """The count form, with the records as of `as_of`: of everything there,
     or a recount of `items` only, which the form carries. With `recount`, a
     recount of its items: what was typed for each and what came in and went
-    out while it was counted. Of those, only the items `shown`."""
+    out while it was counted. Of those, only the items `shown`, but a
+    recount's every one."""
     items = items or (recount or {}).keys()
     was = expected(session, place.id, as_of=as_of, items=items or None)
     if items:
@@ -295,7 +296,10 @@ def _count_page(
         # The item asked for, to count, though the records say none is here.
         was.setdefault(shown.only.id, Decimal(0))
     if (ids := shown.ids(session)) is not None:
-        was = {item_id: amount for item_id, amount in was.items() if item_id in ids}
+        if not items:
+            # A recount's items were shown when counted: each is asked for
+            # again, though the search may no longer find it.
+            was = {item_id: n for item_id, n in was.items() if item_id in ids}
         listed = [item for item in listed if item.id in ids]
     if missing := was.keys() - named.keys():
         # What the records had then but cannot be counted now, or what the

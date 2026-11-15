@@ -918,3 +918,20 @@ def test_a_recount_keeps_its_filter(admin_client: TestClient, session: Session) 
     assert asked.status_code == 409
     assert f'action="{path}"' in asked.text
     assert "Only items matching “litebeam”." in text(asked)
+
+
+def test_a_recount_shows_each_item_it_asks_for_though_the_search_no_longer_finds_it(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Renamed meanwhile, a moved item is still asked for again, not left
+    out of sight with its line unwritten."""
+    place = stocked(session)
+    path = f"{COUNTS}/{place.store.id}?q=litebeam"
+    shown = count_form(admin_client, path)
+    write(session, place)  # Three radios to the van.
+    place.item.search_text = "renamed"
+    session.commit()
+    asked = admin_client.post(path, data=shown | {f"counted_{place.item.id}": "5"})
+    assert asked.status_code == 409
+    assert f'name="counted_{place.item.id}"' in asked.text
+    assert "Nothing here matches." not in text(asked)
