@@ -143,7 +143,7 @@ describe("queueing", () => {
     // leaves the first.
     const own = outbox.entries.value[1]?.body.key ?? "";
     expect(own).not.toBe(key);
-    outbox.dismiss(own);
+    outbox.dismiss(outbox.entries.value[1] as Entry);
     expect(outbox.entries.value).toMatchObject([{ what: "a", state: "saved" }]);
     expect(outbox.entries.value[0]).not.toHaveProperty("dismissed");
   });
@@ -172,6 +172,38 @@ describe("queueing", () => {
       { state: "saved", transactionId: 41 },
       { what: "b", state: "refused", reason: { code: "recorded_elsewhere" } },
     ]);
+  });
+
+  test("of batches under one key, one dismissed or with its difference added is that one alone (inventory-tng-suo)", () => {
+    // Saved, then queued again under its key, changed, by tabs of an older
+    // build, and refused as the key was used.
+    const key = uuid();
+    const changed = (quantity: string, what: string): Entry =>
+      entry({
+        body: { ...draft({ lines: [{ item_id: 6, quantity }] }), key },
+        what,
+        state: "refused",
+        reason: { code: "recorded_elsewhere" },
+        putBack: true,
+      });
+    const first = entry({
+      body: { ...draft(), key },
+      state: "saved",
+      transactionId: 41,
+    });
+    const second = changed("1", "b");
+    const third = changed("2", "c");
+    store(first, second, third);
+    const outbox = new Outbox(answering(() => saved()).api);
+    expect(outbox.differenceAdded(third)).toBe(true);
+    expect(outbox.entries.value.map((e) => e.reason)).toEqual([
+      null,
+      { code: "recorded_elsewhere" },
+      { code: "recorded_elsewhere", added: true },
+    ]);
+    outbox.dismiss(second);
+    expect(outbox.entries.value.map((e) => e.what)).toEqual(["a", "c"]);
+    expect(outbox.entries.value[0]).not.toHaveProperty("dismissed");
   });
 
   test("a cart's key whose batch was refused for what it held (422) is sent with another (inventory-tng-e2d)", async () => {
@@ -575,8 +607,8 @@ describe("refusals", () => {
     const waiting = entry();
     store(refused, waiting);
     const outbox = new Outbox(answering(() => saved()).api);
-    outbox.dismiss(refused.body.key);
-    outbox.dismiss(waiting.body.key);
+    outbox.dismiss(refused);
+    outbox.dismiss(waiting);
     expect(outbox.entries.value).toEqual([waiting]);
   });
 });
@@ -835,7 +867,7 @@ describe("what another tab recorded (inventory-tng-0gg)", () => {
     await vi.waitFor(() =>
       expect(states(outbox)).toEqual(["saved", "refused"]),
     );
-    expect(outbox.differenceAdded(key)).toBe(true);
+    expect(outbox.differenceAdded(outbox.entries.value[1] as Entry)).toBe(true);
     expect(outbox.entries.value[1]?.reason).toMatchObject({ added: true });
     expect(outbox.entries.value[0]?.reason).toBeNull();
   });
@@ -952,7 +984,7 @@ describe("builds", () => {
         "waiting",
       ]);
       // Neither a dismissal nor another round sends or drops it.
-      outbox.dismiss(outbox.entries.value[0]?.body.key ?? "");
+      outbox.dismiss(outbox.entries.value[0] as Entry);
       await outbox.send();
       expect(sent).toHaveLength(1);
       expect(states(outbox)).toEqual(["waiting", "waiting"]);
@@ -1369,7 +1401,7 @@ describe("storage", () => {
     const second = entry({ state: "saved", transactionId: 2 });
     store(first, second);
     const outbox = new Outbox(answering(() => saved()).api);
-    outbox.dismiss(first.body.key);
+    outbox.dismiss(first);
     expect(outbox.shown()).toEqual([second]);
     expect(stored()).toEqual([{ ...first, dismissed: true }, second]);
     outbox.forgetShown([second.body.key]);

@@ -401,13 +401,17 @@ function rekeyRefused(entries: Entry[], key: string | undefined): Entry[] {
   );
 }
 
-/** Whether two batches, each as storage reads it (parsed, so its fields
- * in one order), are the same: one key may name two (Outbox.queue). */
+/** What names a batch, as storage reads it (parsed, so its fields in one
+ * order): its key and what it holds, as one key may name two
+ * (Outbox.queue). What it was changed from is not what it is, as the
+ * server compares. */
+export function batchId(body: Entry["body"]): string {
+  return JSON.stringify({ ...body, changed_from: undefined });
+}
+
+/** Whether two batches, each as storage reads it, are the same. */
 function sameBatch(a: Entry["body"], b: Entry["body"]): boolean {
-  // What it was changed from is not what it is, as the server compares.
-  const what = (body: Entry["body"]) =>
-    JSON.stringify({ ...body, changed_from: undefined });
-  return a.key === b.key && what(a) === what(b);
+  return batchId(a) === batchId(b);
 }
 
 /** What STORAGE_KEY holds: the batches, and the build that last wrote them.
@@ -657,12 +661,15 @@ export class Outbox {
   }
 
   /** Mark one recorded elsewhere as having had its difference put in the
-   * cart (Add the difference to cart), so it is offered no more. False if
-   * the browser would not keep that. */
-  differenceAdded(key: string): boolean {
+   * cart (Add the difference to cart), so it is offered no more: that batch
+   * alone, not another under its key. False if the browser would not keep
+   * that. */
+  differenceAdded(listed: Entry): boolean {
+    const body = v.parse(BatchBody, listed.body);
     return this.update((entries) =>
       entries.map((entry) =>
-        entry.body.key === key && entry.reason?.code === "recorded_elsewhere"
+        sameBatch(entry.body, body) &&
+        entry.reason?.code === "recorded_elsewhere"
           ? { ...entry, reason: { ...entry.reason, added: true as const } }
           : entry,
       ),
@@ -670,11 +677,13 @@ export class Outbox {
   }
 
   /** Take a settled batch off the list: a refused one is forgotten, a
-   * saved one once a catalogue shows it (forgetShown). */
-  dismiss(key: string): void {
+   * saved one once a catalogue shows it (forgetShown). That batch alone,
+   * not another under its key. */
+  dismiss(listed: Entry): void {
+    const body = v.parse(BatchBody, listed.body);
     this.update((entries) =>
       entries.flatMap((entry) => {
-        if (entry.body.key !== key || entry.state === "waiting") {
+        if (!sameBatch(entry.body, body) || entry.state === "waiting") {
           return [entry];
         }
         return entry.state === "saved"

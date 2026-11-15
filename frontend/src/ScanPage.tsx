@@ -52,6 +52,7 @@ import {
 } from "./older";
 import {
   type Body,
+  batchId,
   type Entry,
   MAKE_CHANGES,
   type Note,
@@ -716,7 +717,7 @@ function CartForm({
     automatically = false,
   ): NotPut | null {
     const why = fill(asSave(difference), automatically, () =>
-      outbox.differenceAdded(entry.body.key),
+      outbox.differenceAdded(entry),
     );
     if (why !== true) {
       return why;
@@ -1769,11 +1770,12 @@ function OutboxList({
   onAddDifference: AddDifference;
 }) {
   const online = useOnline();
-  // Under which save, why its difference did not go in the cart.
+  // Under which save (batchId), why its difference did not go in the cart.
   const notAdded = useSignal<{ on: string; why: NotPut } | null>(null);
   const stored = outbox.entries.value;
   // Of each refused, its lines, read again only as the outbox or
-  // catalogue changes.
+  // catalogue changes. By batchId, not key: one key may name two batches
+  // (Outbox.queue).
   const linesOf = useMemo(
     () =>
       new Map(
@@ -1781,7 +1783,10 @@ function OutboxList({
           ? []
           : stored
               .filter((entry) => entry.state === "refused")
-              .map((entry) => [entry.body.key, linesSaid(entry, catalogue)]),
+              .map((entry) => [
+                batchId(entry.body),
+                linesSaid(entry, catalogue),
+              ]),
       ),
     [stored, catalogue],
   );
@@ -1800,14 +1805,14 @@ function OutboxList({
       )}
       <ul class={RULED_LIST}>
         {entries.map((entry) => {
-          const key = entry.body.key;
+          const id = batchId(entry.body);
           const { reason } = entry;
           const elsewhere =
             reason?.code === "recorded_elsewhere" ? reason : undefined;
           const recorded = catalogue === null ? undefined : elsewhere?.recorded;
-          const lines = recorded === undefined ? (linesOf.get(key) ?? []) : [];
+          const lines = recorded === undefined ? (linesOf.get(id) ?? []) : [];
           return (
-            <li key={key} class="flex flex-col items-start gap-1">
+            <li key={id} class="flex flex-col items-start gap-1">
               <div>{entry.what}</div>
               {entry.state === "saved" ? (
                 <small>Recorded (transaction {entry.transactionId}).</small>
@@ -1837,11 +1842,11 @@ function OutboxList({
                   cartKey={cartKey}
                   onAdd={(difference) => {
                     const why = onAddDifference(entry, difference);
-                    notAdded.value = why === null ? null : { on: key, why };
+                    notAdded.value = why === null ? null : { on: id, why };
                   }}
                 />
               )}
-              {notAdded.value?.on === key && (
+              {notAdded.value?.on === id && (
                 <p role="alert">
                   <AlertWords
                     note={{ bold: [olderSaid(notAdded.value.why, true)] }}
@@ -1849,7 +1854,7 @@ function OutboxList({
                 </p>
               )}
               {entry.state !== "waiting" && (
-                <button type="button" onClick={() => outbox.dismiss(key)}>
+                <button type="button" onClick={() => outbox.dismiss(entry)}>
                   Dismiss
                 </button>
               )}

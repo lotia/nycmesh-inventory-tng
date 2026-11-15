@@ -923,6 +923,65 @@ describe("filling and saving a cart", () => {
     within(entry).getByRole("button", { name: "Dismiss" });
   });
 
+  test("two batches under one key are listed each with its own lines, and dismissed alone (inventory-tng-suo)", async () => {
+    // Saved, then queued again under its key by a tab of an older build,
+    // changed, and refused as the key was used.
+    const key = "0b7c6a51-9a3d-4d39-8f3e-1d1f2c4b5a61";
+    const batch = (quantity: string) => ({
+      key,
+      kind: "move",
+      volunteer_id: 1,
+      from_location_id: 10,
+      to_location_id: 12,
+      lines: [{ item_id: 101, quantity }],
+    });
+    const kept = {
+      queuedAt: 1,
+      build: BUILD,
+      waitingFor: null,
+      failures: 0,
+    };
+    localStorage.setItem(
+      OUTBOX_KEY,
+      JSON.stringify({
+        build: BUILD,
+        entries: [
+          {
+            ...kept,
+            body: batch("1"),
+            what: "first",
+            state: "saved",
+            reason: null,
+            transactionId: 41,
+          },
+          {
+            ...kept,
+            body: batch("2"),
+            what: "second",
+            state: "refused",
+            reason: { code: "key_reused" },
+            transactionId: null,
+          },
+        ],
+      }),
+    );
+    const outbox = open();
+    await ready();
+    const row = (what: string) =>
+      screen.getByText(what).closest("li") as HTMLElement;
+    const lines = (what: string) =>
+      [...row(what).querySelectorAll("ul li")].map((each) => each.textContent);
+    expect(lines("first")).toEqual([]);
+    expect(lines("second")).toEqual(["1. Cat6 cable: 2 m"]);
+    fireEvent.click(
+      within(row("second")).getByRole("button", { name: "Dismiss" }),
+    );
+    expect(screen.queryByText("second")).toBeNull();
+    screen.getByText("first");
+    expect(outbox.entries.value).toHaveLength(1);
+    expect(outbox.entries.value[0]).not.toHaveProperty("dismissed");
+  });
+
   test("a cart's problem puts in italic the counts the page wrote, not a name's numbers", async () => {
     const named = {
       ...CATALOGUE,
