@@ -128,18 +128,18 @@ def _page(
     what was typed; a refusal's alert; or a notice in words of its own.
     Mark checked sent for an open package moved whole (`checking`), whose
     row offers only Confirm count, is asked again above the list, as a
-    refusal offers it."""
+    refusal offers it; one no longer listed is told it changed meanwhile,
+    as it would be with a reason."""
     where = [Movement.item_id == only.id] if only else []
     waiting = over_recorded.shown(session, *where)
     if checking is not None:
-        refused = next(
-            (
-                {"shown": each, "words": None, "place": None}
-                for each in waiting
-                if each.row.id == checking and each.moved_whole
-            ),
-            None,
-        )
+        found = next((each for each in waiting if each.row.id == checking), None)
+        if found is None:
+            return redirect(
+                OVER_RECORDED, notice="over_recorded_unchanged", **query(only)
+            )
+        if found.moved_whole:
+            refused = {"shown": found, "words": None, "place": None}
     return admin_page(
         request,
         signed,

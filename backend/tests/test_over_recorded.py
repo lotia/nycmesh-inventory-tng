@@ -3,6 +3,7 @@
 a line already recorded waits for an administrator to correct it, or mark
 it checked, under "Needs your action"."""
 
+import re
 import uuid
 from collections.abc import Callable
 from decimal import Decimal
@@ -21,6 +22,7 @@ from inventory_tng.admin.common import RULES
 from inventory_tng.db import RuleBroken, attempt
 from inventory_tng.ledger import Entry, Form, _more_written
 from inventory_tng.models import (
+    OVER_RECORDED_REASONS,
     AdjustmentReason,
     Admin,
     CatalogueHistory,
@@ -521,6 +523,8 @@ def test_marking_one_checked_asks_why(
         f'<span class="problem" id="reason-{check.id}-problem">'
         "Say why it is right as it is.</span>" in response.text
     )
+    # Each reason, and the words, described by it, as the count is.
+    assert response.text.count(f'aria-describedby="reason-{check.id}-problem"') == 5
     if form.get("reason") == "other":
         assert 'value="other" checked' in response.text
         assert f'name="words" value="{form.get("words", "")}"' in response.text
@@ -617,6 +621,68 @@ def test_the_database_keeps_reasons_only_as_mark_checked_gives_them(
         session.flush()
 
     assert attempt(session, settle) == (None, f"ck_over_recorded_checked_{broken}")
+
+
+def test_the_page_offers_the_reasons_the_database_keeps() -> None:
+    assert tuple(over_recorded.CHECKED_REASONS) == OVER_RECORDED_REASONS
+
+
+def checked_forms(page: str) -> list[str]:
+    """Each Mark checked form on `page`."""
+    return re.findall(
+        r'<form [^>]*action="[^"]*/checked[^>]*>.*?</form>', page, re.DOTALL
+    )
+
+
+def test_enter_in_the_words_marks_checked(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+    bags: ItemPackage,
+) -> None:
+    """Enter submits a form by its first button: Mark checked's form has
+    no other, so Enter in the words never corrects it."""
+    raised(registered_client, place, bags)
+    (form,) = checked_forms(admin_client.get(PAGE).text)
+    assert "Correct" not in form
+    assert "formaction" not in form
+
+
+def test_enter_in_the_words_of_a_refusal_marks_checked(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """Nor brings a place back."""
+    from_emptied_store(registered_client, session)
+    response = correct(admin_client, session)
+    assert response.status_code == 409
+    forms = checked_forms(response.text)
+    assert len(forms) == 2
+    assert not any("formaction" in form or "Bring back" in form for form in forms)
+
+
+@pytest.mark.parametrize("only", [False, True])
+def test_one_settled_meanwhile_marked_checked_without_a_reason_says_so(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+    bags: ItemPackage,
+    only: bool,
+) -> None:
+    """Not asked why for a row no longer there: told it changed, as with a
+    reason."""
+    raised(registered_client, place, bags)
+    (check,) = checks(session)
+    seen = over_recorded.seen(check)
+    mark_checked(admin_client, session, reason="both")
+    item = session.get_one(Movement, check.movement_id).item_id
+    response = admin_client.post(
+        f"{PAGE}/{check.id}/checked" + (f"?item={item}" if only else ""),
+        data={"seen": seen, "reason": "other"},
+    )
+    assert response.status_code == 303
+    assert "over_recorded_unchanged" in response.headers["location"]
 
 
 def test_one_moved_whole_marked_checked_without_a_reason_is_asked_again_above(
@@ -970,7 +1036,7 @@ def test_refused_at_a_retired_place_it_says_why_and_offers_a_fix(
     )
     assert f"Bring back {place.store.name}" in page
     (check,) = checks(session)
-    assert f'formaction="{PAGE}/{check.id}/bring-back"' in response.text
+    assert f'action="{PAGE}/{check.id}/bring-back"' in response.text
     assert f'name="place" value="{place.store.id}"' in response.text
     assert "someone answered or changed it meanwhile" not in page
     assert check.settled_at is None

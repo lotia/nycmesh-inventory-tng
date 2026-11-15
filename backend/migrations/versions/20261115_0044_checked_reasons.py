@@ -1,5 +1,5 @@
 """one marked checked says why it is right as it is (inventory-tng-zgy,
-Ali, 2026-11-15, option D)
+Ali, 2026-11-15)
 
 Mark checked on Recorded more than moved takes a reason: counted where it
 left, where it arrived, at both ends, or put right another way, said in

@@ -342,7 +342,8 @@ you" counts every report in one line, which hides what is waiting.
   or another way left blank, it is refused with "Say why it is right as it
   is." beside them, keeping what was typed; asked from a refusal for an
   open package moved whole, whose row has no Mark checked, the form is
-  asked again above the list. The row keeps the reason as a value from a
+  asked again above the list; one settled meanwhile is told so, as with a
+  reason. The row keeps the reason as a value from a
   fixed list (`left`, `arrived`, `both`, `other`) and the words as typed,
   in canonical spelling, with who settled it and when; CHECK constraints
   allow a reason only on a row settled as checked and words only, and

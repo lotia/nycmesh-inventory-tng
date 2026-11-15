@@ -5,12 +5,13 @@ another way. Kept as sent with its problem. #}
 {% macro why(row) %}
 {% set name = "reason-" ~ row.id %}
 {% set chosen = values.get(name) %}
+{% set described = problems.get(name) %}
 <fieldset>
   <legend>Why it is right as it is</legend>
   {% for value, words in reasons.items() %}
-  <label><input type="radio" name="reason" value="{{ value }}"{% if chosen == value %} checked{% endif %} required> {{ words }}</label>
+  <label><input type="radio" name="reason" value="{{ value }}"{% if chosen == value %} checked{% endif %}{% if described %} aria-describedby="{{ name }}-problem"{% endif %} required> {{ words }}</label>
   {% endfor %}
-  <input name="words" value="{{ values.get('words-' ~ row.id, '') }}" maxlength="{{ words_max }}" aria-label="Put right another way">
+  <input name="words" value="{{ values.get('words-' ~ row.id, '') }}" maxlength="{{ words_max }}" aria-label="Put right another way"{% if described %} aria-describedby="{{ name }}-problem"{% endif %}>
   {% include "_field_problem.html" %}
 </fieldset>
 {% endmacro %}
@@ -20,14 +21,20 @@ another way. Kept as sent with its problem. #}
 Mark checked sent from here with a problem, for a row without it. #}
 {% set each = refused.shown %}
 {% if refused.words %}<p role="alert">{{ refused.words }}</p>{% endif %}
-<form method="post" action="{{ here }}/{{ each.row.id }}/checked{{ query }}" class="actions">
-  <input type="hidden" name="seen" value="{{ seen(each.row) }}">
+{#- Forms of their own, so Enter in the words marks it checked. #}
+<div class="actions">
   {% if refused.place %}
-  <button class="primary" formaction="{{ here }}/{{ each.row.id }}/bring-back{{ query }}" formnovalidate name="place" value="{{ refused.place.id }}">Bring back {{ refused.place.name }}</button>
+  <form method="post" action="{{ here }}/{{ each.row.id }}/bring-back{{ query }}">
+    <input type="hidden" name="seen" value="{{ seen(each.row) }}">
+    <button class="primary" name="place" value="{{ refused.place.id }}">Bring back {{ refused.place.name }}</button>
+  </form>
   {% endif %}
-  {{ why(each.row) }}
-  <button>Mark checked<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
-</form>
+  <form method="post" action="{{ here }}/{{ each.row.id }}/checked{{ query }}">
+    <input type="hidden" name="seen" value="{{ seen(each.row) }}">
+    {{ why(each.row) }}
+    <button>Mark checked<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
+  </form>
+</div>
 {% endif %}
 <p class="hint">Another tab recorded these before a volunteer changed them,
 so the inventory shows more moved than was. Correct moves the extra back
@@ -60,12 +67,18 @@ with an adjustment. Mark checked if you already fixed it.</p>
         <button>Confirm count<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
       </form>
       {% else %}
-      <form method="post" action="{{ here }}/{{ row.id }}/checked{{ query }}" class="actions">
-        <input type="hidden" name="seen" value="{{ seen(row) }}">
-        <button formaction="{{ here }}/{{ row.id }}/correct{{ query }}" formnovalidate>Correct<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
-        {{ why(row) }}
-        <button>Mark checked<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
-      </form>
+      {#- Forms of their own, so Enter in the words marks it checked. #}
+      <div class="actions">
+        <form method="post" action="{{ here }}/{{ row.id }}/correct{{ query }}">
+          <input type="hidden" name="seen" value="{{ seen(row) }}">
+          <button>Correct<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
+        </form>
+        <form method="post" action="{{ here }}/{{ row.id }}/checked{{ query }}">
+          <input type="hidden" name="seen" value="{{ seen(row) }}">
+          {{ why(row) }}
+          <button>Mark checked<span class="sr-only"> {{ each.item }}, transaction {{ each.transaction_id }}</span></button>
+        </form>
+      </div>
       {% endif %}
     </td>
   </tr>
