@@ -340,7 +340,11 @@ you" counts every report in one line, which hides what is waiting.
   "Counted where it arrived", "Counted both ends" or "Put right another
   way:" with a box for the words, up to 200 characters. With none picked,
   or another way left blank, it is refused with "Say why it is right as it
-  is." beside them, keeping what was typed; asked from a refusal for an
+  is." beside them, keeping what was typed. Words typed with another
+  reason are not dropped: it is refused the same way with "You wrote why,
+  but picked another reason. Pick Put right another way to keep your
+  words, or clear them." (Ali, 2026-11-15); words only of spaces count as
+  none. Asked from a refusal for an
   open package moved whole, whose row has no Mark checked, the form is
   asked again above the list; one settled meanwhile is told so, as with a
   reason. The row keeps the reason as a value from a

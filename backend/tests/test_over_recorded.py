@@ -567,15 +567,67 @@ def test_put_right_another_way_keeps_the_words_as_typed(
     assert any(line.get("reason") == "other" for line in logs)
 
 
-def test_words_for_another_reason_are_not_kept(
+def waiting_as(
+    form: str, client: TestClient, session: Session, place: Place, bags: ItemPackage
+) -> None:
+    """One waiting, as Mark checked is offered: in its row, in a refusal's
+    alert (here, Correct refused at a retired place), or, for an open
+    package moved whole, only in a refusal's alert."""
+    if form == "row":
+        raised(client, place, bags)
+    elif form == "refusal":
+        from_emptied_store(client, session)
+    else:
+        moved_whole(client, Spools(session))
+
+
+@pytest.mark.parametrize("form", ["row", "refusal", "moved whole"])
+@pytest.mark.parametrize("reason", ["left", "arrived", "both"])
+def test_words_for_another_reason_are_asked_about(
     admin_client: TestClient,
     registered_client: TestClient,
     session: Session,
     place: Place,
     bags: ItemPackage,
+    form: str,
+    reason: str,
+) -> None:
+    """Never dropped (Ali, 2026-11-15): refused, nothing settled, what was
+    typed kept, the problem beside the reasons."""
+    waiting_as(form, registered_client, session, place, bags)
+    if form == "refusal":
+        assert correct(admin_client, session).status_code == 409
+    with capture_logs() as logs:
+        response = mark_checked(
+            admin_client, session, reason=reason, words=" typed, then not "
+        )
+    assert response.status_code == 400
+    (check,) = checks(session)
+    assert (
+        f'<span class="problem" id="reason-{check.id}-problem">'
+        "You wrote why, but picked another reason. Pick Put right another way "
+        "to keep your words, or clear them.</span>" in response.text
+    )
+    assert response.text.count(f'aria-describedby="reason-{check.id}-problem"') == 5
+    assert f'value="{reason}" checked' in response.text
+    assert 'name="words" value=" typed, then not "' in response.text
+    assert check.settled_at is None
+    assert check.checked_reason is None
+    assert "typed, then not" not in repr(logs)
+
+
+@pytest.mark.parametrize("words", ["", "  \t "])
+def test_words_of_only_spaces_with_another_reason_are_none(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+    bags: ItemPackage,
+    words: str,
 ) -> None:
     raised(registered_client, place, bags)
-    mark_checked(admin_client, session, reason="both", words="typed, then not")
+    response = mark_checked(admin_client, session, reason="both", words=words)
+    assert "over_recorded_checked" in response.headers["location"]
     (check,) = checks(session)
     assert (check.checked_reason, check.checked_words) == ("both", None)
 

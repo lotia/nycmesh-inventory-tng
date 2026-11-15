@@ -54,6 +54,12 @@ TITLE = "Recorded more than moved"
 TYPE_A_NUMBER = "Type a number, such as 12 or 0.5."
 # Mark checked with no reason, or put right another way with no words.
 SAY_WHY = "Say why it is right as it is."
+# Words typed with a reason other than another way: asked, never dropped
+# (Ali, 2026-11-15, inventory-tng-zgy).
+WORDS_FOR_ANOTHER = (
+    "You wrote why, but picked another reason. Pick Put right another way "
+    "to keep your words, or clear them."
+)
 # As "Needs your action" lists it (needs_action.py): its own rows, not open
 # packages, so no open packages' where.
 KIND = Kind(TITLE, OVER_RECORDED, ())
@@ -300,9 +306,9 @@ def answer(
             return _page(
                 request, signed, session, only, {field: str(count)}, {field: typed}
             )
-    words = None
+    words = ""
     if do == "checked":
-        words = canonical(typed_words.strip()) if reason == "other" else None
+        words = canonical(typed_words.strip())
         problem = _why_problem(reason, words)
         if problem is not None:
             # Never the words: free text.
@@ -332,7 +338,10 @@ def answer(
                 return over_recorded.confirm_count(
                     session, check_id, seen, admin_id, count
                 )
-            over_recorded.mark_checked(session, check_id, seen, admin_id, reason, words)
+            # Words only for another way, as _why_problem saw to.
+            over_recorded.mark_checked(
+                session, check_id, seen, admin_id, reason, words or None
+            )
             return "checked", []
         except ledger.NotCountable as broken:
             refused_at = broken.location_id
@@ -366,11 +375,16 @@ def answer(
     return redirect(OVER_RECORDED, notice=notice, **query(only))
 
 
-def _why_problem(reason: str, words: str | None) -> str | None:
-    """What is wrong with why one is marked checked: no reason picked, or
-    put right another way with no words, or too many."""
-    if reason not in over_recorded.CHECKED_REASONS or words == "":
+def _why_problem(reason: str, words: str) -> str | None:
+    """What is wrong with why one is marked checked, `words` stripped: no
+    reason picked, put right another way with no words or too many, or
+    words with another reason."""
+    if reason not in over_recorded.CHECKED_REASONS:
         return SAY_WHY
-    if words is not None and len(words) > OVER_RECORDED_WORDS_MAX:
+    if reason != "other":
+        return WORDS_FOR_ANOTHER if words else None
+    if not words:
+        return SAY_WHY
+    if len(words) > OVER_RECORDED_WORDS_MAX:
         return f"Up to {OVER_RECORDED_WORDS_MAX} characters."
     return None
