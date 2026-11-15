@@ -333,6 +333,23 @@ you" counts every report in one line, which hides what is waiting.
   again where it left, written off where it arrived. **Mark checked**
   settles it as it is, for one corrected another way. Either settles it
   only as the administrator saw it.
+- **Mark checked says why** (Ali, 2026-11-15, inventory-tng-zgy), as it is
+  the only way of settling one that writes nothing to the ledger, so a
+  bare one could mean fixed elsewhere, nothing fixed, or one end fixed.
+  Under "Why it is right as it is", one of "Counted where it left",
+  "Counted where it arrived", "Counted both ends" or "Put right another
+  way:" with a box for the words, up to 200 characters. With none picked,
+  or another way left blank, it is refused with "Say why it is right as it
+  is." beside them, keeping what was typed; asked from a refusal for an
+  open package moved whole, whose row has no Mark checked, the form is
+  asked again above the list. The row keeps the reason as a value from a
+  fixed list (`left`, `arrived`, `both`, `other`) and the words as typed,
+  in canonical spelling, with who settled it and when; CHECK constraints
+  allow a reason only on a row settled as checked and words only, and
+  always, for another way. Confirm count, which settles a row as checked
+  too, keeps no reason: the movement holds the count. The words are never
+  logged. No page lists settled rows yet, so the reason is not shown
+  anywhere.
 - **An open package moved whole** is now where it arrived, so cannot be
   found again where it left. Its row says "An open package moved to
   the van. Confirm or correct count.", naming the place, with a box, "Count in the
@@ -386,7 +403,9 @@ you" counts every report in one line, which hides what is waiting.
 - Metrics, besides those above: checks of a package's length raised, by
   how (`volunteer`, `below_zero`), and settled, by how (`set`, `left`,
   `closed`); lines recorded more than moved raised, and settled, by how
-  (`corrected`, `checked`); places brought back to correct one.
+  (`corrected`, `checked`), and those marked checked by their reason
+  (`left`, `arrived`, `both`, `other`); places brought back to correct
+  one.
 - Built by inventory-tng-ck0 (the card and its box), inventory-tng-pll
   ("Needs your action"), inventory-tng-wy7 (reporting and checking a
   length) and inventory-tng-pg7 (the hint).

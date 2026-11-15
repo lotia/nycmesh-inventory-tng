@@ -975,11 +975,14 @@ def test_counts_lines_recorded_more_than_moved_raised_and_settled(
     first_check, second_check = session.scalars(
         select(OverRecorded).order_by(OverRecorded.id)
     ).all()
-    for check, do in ((first_check, "correct"), (second_check, "checked")):
-        client.post(f"{page}/{check.id}/{do}", data={"seen": over_recorded.seen(check)})
+    seen = over_recorded.seen
+    client.post(f"{page}/{first_check.id}/correct", data={"seen": seen(first_check)})
+    # Marked checked, by its reason, never its words.
+    form = {"seen": seen(second_check), "reason": "other", "words": "Counted twice"}
+    client.post(f"{page}/{second_check.id}/checked", data=form)
     assert added(reader, "inventory.over_recorded.settled", settled) == {
         (("how", "corrected"),): 1,
-        (("how", "checked"),): 1,
+        (("how", "checked"), ("reason", "other")): 1,
     }
 
 

@@ -2,7 +2,8 @@
 inventory-tng-0gg): "Needs your action" on the home page leads here, for
 one item or all. Correct writes adjustments that undo the difference on
 each side of its transaction, with the reason Recorded more than moved;
-Mark checked settles it as it is, for one corrected another way. An open
+Mark checked settles it as it is, for one corrected another way, saying
+why it is right as it is (Ali, 2026-11-15, inventory-tng-zgy). An open
 package moved whole is now where it arrived: Confirm count settles it with
 the count it held then, as it was, or corrected there by an adjustment
 (Ali, 2026-11-15)."""
@@ -29,7 +30,14 @@ from inventory_tng.admin.needs_action import (
 from inventory_tng.admin.stock import STOCK
 from inventory_tng.db import DbSession, Gone, attempt
 from inventory_tng.local_time import site_zone
-from inventory_tng.models import Item, Location, Movement, OverRecorded
+from inventory_tng.models import (
+    OVER_RECORDED_WORDS_MAX,
+    Item,
+    Location,
+    Movement,
+    OverRecorded,
+    canonical,
+)
 from inventory_tng.pages import NOTICES, not_found, redirect
 from inventory_tng.sign_in import AdminSignedIn
 
@@ -42,6 +50,8 @@ OVER_RECORDED = f"{STOCK}/recorded-more"
 TITLE = "Recorded more than moved"
 # A count left blank, in quantity()'s words for one not a number.
 TYPE_A_NUMBER = "Type a number, such as 12 or 0.5."
+# Mark checked with no reason, or put right another way with no words.
+SAY_WHY = "Say why it is right as it is."
 # As "Needs your action" lists it (needs_action.py): its own rows, not open
 # packages, so no open packages' where.
 KIND = Kind(TITLE, OVER_RECORDED, ())
@@ -112,10 +122,24 @@ def _page(
     alert: str | None = None,
     refused: dict[str, Any] | None = None,
     notice: str | None = None,
+    checking: int | None = None,
 ) -> Response:
-    """The page, with the problems of a count sent, and what was typed; a
-    refusal's alert; or a notice in words of its own."""
+    """The page, with the problems of a count or a Mark checked sent, and
+    what was typed; a refusal's alert; or a notice in words of its own.
+    Mark checked sent for an open package moved whole (`checking`), whose
+    row offers only Confirm count, is asked again above the list, as a
+    refusal offers it."""
     where = [Movement.item_id == only.id] if only else []
+    waiting = over_recorded.shown(session, *where)
+    if checking is not None:
+        refused = next(
+            (
+                {"shown": each, "words": None, "place": None}
+                for each in waiting
+                if each.row.id == checking and each.moved_whole
+            ),
+            None,
+        )
     return admin_page(
         request,
         signed,
@@ -126,7 +150,9 @@ def _page(
             "back_link": (STOCK, "Stock"),
             "only": only,
             "query": query_string(only),
-            "waiting": over_recorded.shown(session, *where),
+            "waiting": waiting,
+            "reasons": over_recorded.CHECKED_REASONS,
+            "words_max": OVER_RECORDED_WORDS_MAX,
             "seen": over_recorded.seen,
             "zone": site_zone(session),
             "problems": problems,
@@ -135,7 +161,7 @@ def _page(
             "refused": refused,
             "notice": notice,
         },
-        409 if refused else None,
+        409 if refused and refused["words"] else None,
     )
 
 
@@ -246,10 +272,12 @@ def answer(
     only: OnlyItem,
     seen: Annotated[str, Form()] = "",
     typed: Annotated[str, Form(alias="count")] = "",
+    reason: Annotated[str, Form()] = "",
+    typed_words: Annotated[str, Form(alias="words")] = "",
 ) -> Response:
-    """Correct one, mark it checked, or confirm the count of an open
-    package moved whole, if still as seen. Its places locked first, by id,
-    as saves take places."""
+    """Correct one, mark it checked, saying why, or confirm the count of an
+    open package moved whole, if still as seen. Its places locked first, by
+    id, as saves take places."""
     check = session.get(OverRecorded, check_id)
     if do not in ("correct", "checked", "count") or check is None:
         return not_found()
@@ -267,6 +295,23 @@ def answer(
             return _page(
                 request, signed, session, only, {field: str(count)}, {field: typed}
             )
+    words = None
+    if do == "checked":
+        words = canonical(typed_words.strip()) if reason == "other" else None
+        problem = _why_problem(reason, words)
+        if problem is not None:
+            # Never the words: free text.
+            log.debug("over recorded checked refused", over_recorded_id=check_id)
+            values = {f"reason-{check_id}": reason, f"words-{check_id}": typed_words}
+            return _page(
+                request,
+                signed,
+                session,
+                only,
+                {f"reason-{check_id}": problem},
+                values,
+                checking=check_id,
+            )
     ledger.lock_places(session, over_recorded.places_of(session, check_id))
     admin_id = signed.admin.id
     # The place that refused it (ledger.NotCountable), as it was then.
@@ -282,7 +327,7 @@ def answer(
                 return over_recorded.confirm_count(
                     session, check_id, seen, admin_id, count
                 )
-            over_recorded.mark_checked(session, check_id, seen, admin_id)
+            over_recorded.mark_checked(session, check_id, seen, admin_id, reason, words)
             return "checked", []
         except ledger.NotCountable as broken:
             refused_at = broken.location_id
@@ -303,7 +348,7 @@ def answer(
         return _page(request, signed, session, only, values=values, refused=refused)
     how, written = settled
     ledger.corrected(admin_id, 0, written)
-    over_recorded.measure_settled(how)
+    over_recorded.measure_settled(how, reason if do == "checked" else None)
     notice = f"over_recorded_{how}"
     if do == "count":
         # By how it was settled, not by what was written: an adjustment
@@ -314,3 +359,13 @@ def answer(
             else "over_recorded_confirmed"
         )
     return redirect(OVER_RECORDED, notice=notice, **query(only))
+
+
+def _why_problem(reason: str, words: str | None) -> str | None:
+    """What is wrong with why one is marked checked: no reason picked, or
+    put right another way with no words, or too many."""
+    if reason not in over_recorded.CHECKED_REASONS or words == "":
+        return SAY_WHY
+    if words is not None and len(words) > OVER_RECORDED_WORDS_MAX:
+        return f"Up to {OVER_RECORDED_WORDS_MAX} characters."
+    return None

@@ -1169,6 +1169,12 @@ class Movement(Base):
 
 
 OVER_RECORDED_SETTLED = ("corrected", "checked")
+# Why one marked checked is right as it is (Ali, 2026-11-15,
+# inventory-tng-zgy): counted where it left, where it arrived, at both ends,
+# or put right another way, said in words of the administrator's.
+OVER_RECORDED_REASONS = ("left", "arrived", "both", "other")
+# Those words, at most as long as a name (admin.common.NAME_MAX).
+OVER_RECORDED_WORDS_MAX = 200
 
 
 class OverRecorded(Base):
@@ -1177,8 +1183,8 @@ class OverRecorded(Base):
     scan page after another tab recorded it under the same key, sent less of
     its movement than was recorded, and was refused (409 key_reused). One a
     movement; a later such batch says how much again while it waits. Settled
-    when an administrator corrects it, with adjustments, or marks it checked
-    (over_recorded.py)."""
+    when an administrator corrects it, with adjustments, or marks it checked,
+    saying why it is right as it is (over_recorded.py)."""
 
     __tablename__ = "over_recorded"
     __table_args__ = (
@@ -1187,6 +1193,20 @@ class OverRecorded(Base):
         CheckConstraint(
             "num_nulls(settled_at, settled_by_admin_id, settled_how) IN (0, 3)",
             name="settled",
+        ),
+        # A reason only for one marked checked; Confirm count, which settles
+        # one as checked too, gives none.
+        CheckConstraint(
+            "checked_reason IS NULL OR settled_how = 'checked' AND "
+            + _one_of("checked_reason", OVER_RECORDED_REASONS),
+            name="checked_reason",
+        ),
+        # Words for another way, and only for it: not blank.
+        CheckConstraint(
+            "(checked_words IS NULL) = (checked_reason IS DISTINCT FROM 'other')"
+            " AND checked_words ~ '[^[:space:]]'"
+            f" AND length(checked_words) <= {OVER_RECORDED_WORDS_MAX}",
+            name="checked_words",
         ),
         # Raised by one statement, which a check settled leaves as it is;
         # settled holding its row (over_recorded.py).
@@ -1204,6 +1224,14 @@ class OverRecorded(Base):
     settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     settled_by_admin_id: Mapped[int | None] = _reference("admin.id")
     settled_how: Mapped[str | None] = mapped_column(Text)
+    # Why one marked checked is right as it is (OVER_RECORDED_REASONS), and
+    # for another way, how, as typed, in canonical spelling. Never logged.
+    checked_reason: Mapped[str | None] = mapped_column(Text)
+    checked_words: Mapped[str | None] = mapped_column(Text)
+
+    @validates("checked_words")
+    def _canonical(self, _key: str, value: str | None) -> str | None:
+        return None if value is None else canonical(value)
 
 
 class ScanSettings(Versioned, Base):

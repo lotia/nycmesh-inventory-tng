@@ -39,6 +39,17 @@ REASON = "Recorded more than moved"
 
 Settled = Literal["corrected", "checked"]
 
+# Why one marked checked is right as it is, as the page says each
+# (models.OVER_RECORDED_REASONS; Ali, 2026-11-15, inventory-tng-zgy). Mark
+# checked is the only way of settling one that writes nothing, so a bare
+# one could mean fixed elsewhere, nothing fixed, or one end fixed.
+CHECKED_REASONS = {
+    "left": "Counted where it left",
+    "arrived": "Counted where it arrived",
+    "both": "Counted both ends",
+    "other": "Put right another way:",
+}
+
 raised_counter = meter.create_counter(
     "inventory.over_recorded.raised",
     unit="{line}",
@@ -50,7 +61,8 @@ settled_counter = meter.create_counter(
     "inventory.over_recorded.settled",
     unit="{line}",
     description="Lines recorded with more than was moved that an administrator "
-    "settled, by how: corrected with adjustments, or marked checked",
+    "settled, by how: corrected with adjustments, or marked checked, then by "
+    "why it was right as it was",
 )
 brought_back_counter = meter.create_counter(
     "inventory.over_recorded.places_brought_back",
@@ -91,9 +103,10 @@ def measure_raised(count: int) -> None:
         raised_counter.add(count)
 
 
-def measure_settled(how: Settled) -> None:
-    """One settled, measured once committed."""
-    settled_counter.add(1, {"how": how})
+def measure_settled(how: Settled, reason: str | None = None) -> None:
+    """One settled, measured once committed; marked checked, by its
+    reason (CHECKED_REASONS), never its words."""
+    settled_counter.add(1, {"how": how} | ({"reason": reason} if reason else {}))
 
 
 def measure_brought_back() -> None:
@@ -261,10 +274,26 @@ def places_of(session: Session, check_id: int) -> list[int]:
     return [place for place in ends(session, check_id) if place is not None]
 
 
-def mark_checked(session: Session, check_id: int, seen_as: str, admin_id: int) -> None:
-    """Settle one, as checked: nothing written. RuleBroken as _settle."""
-    _settle(session, check_id, seen_as, admin_id, "checked")
-    log.info("over recorded checked", over_recorded_id=check_id, admin_id=admin_id)
+def mark_checked(
+    session: Session,
+    check_id: int,
+    seen_as: str,
+    admin_id: int,
+    reason: str,
+    words: str | None = None,
+) -> None:
+    """Settle one, as checked, saying why it is right as it is (a key of
+    CHECKED_REASONS) and, put right another way, how in `words`: nothing
+    written to the ledger. RuleBroken as _settle."""
+    row = _settle(session, check_id, seen_as, admin_id, "checked")
+    row.checked_reason = reason
+    row.checked_words = words
+    log.info(
+        "over recorded checked",
+        over_recorded_id=check_id,
+        admin_id=admin_id,
+        reason=reason,
+    )
 
 
 def correct(

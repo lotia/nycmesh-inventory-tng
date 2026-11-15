@@ -11,14 +11,14 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng import adjustment_reasons, ledger, locations, over_recorded
 from inventory_tng.admin import over_recorded as over_recorded_page
 from inventory_tng.admin.common import RULES
-from inventory_tng.db import RuleBroken
+from inventory_tng.db import RuleBroken, attempt
 from inventory_tng.ledger import Entry, Form, _more_written
 from inventory_tng.models import (
     AdjustmentReason,
@@ -200,7 +200,7 @@ def test_said_again_while_waiting_it_says_the_newest_and_settled_stays(
     (check,) = checks(session)
     assert check.quantity == 3
     over_recorded.mark_checked(
-        session, check.id, over_recorded.seen(check), admin_id(session)
+        session, check.id, over_recorded.seen(check), admin_id(session), "both"
     )
     less("1")
     (check,) = checks(session)
@@ -453,19 +453,185 @@ def test_marking_one_checked_writes_nothing(
     bags: ItemPackage,
 ) -> None:
     raised(registered_client, place, bags)
-    (check,) = checks(session)
-    response = admin_client.post(
-        f"{PAGE}/{check.id}/checked", data={"seen": over_recorded.seen(check)}
-    )
+    response = mark_checked(admin_client, session, reason="arrived")
     assert "over_recorded_checked" in response.headers["location"]
     assert "Marked checked." in text(admin_client.get(response.headers["location"]))
-    assert checks(session)[0].settled_how == "checked"
+    (check,) = checks(session)
+    assert (check.settled_how, check.checked_reason, check.checked_words) == (
+        "checked",
+        "arrived",
+        None,
+    )
+    assert check.settled_by_admin_id is not None
     assert (
         session.scalar(
             select(LedgerTransaction.id).where(LedgerTransaction.kind == "adjustment")
         )
         is None
     )
+
+
+def mark_checked(client: TestClient, session: Session, **form: str) -> Response:
+    """The one waiting marked checked, as seen, with `form`'s reason."""
+    (check,) = checks(session)
+    data = {"seen": over_recorded.seen(check)} | form
+    return client.post(f"{PAGE}/{check.id}/checked", data=data)
+
+
+def test_marking_one_checked_offers_each_reason(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+    bags: ItemPackage,
+) -> None:
+    """Ali, 2026-11-15 (inventory-tng-zgy)."""
+    raised(registered_client, place, bags)
+    page = admin_client.get(PAGE).text
+    assert "<legend>Why it is right as it is</legend>" in page
+    for value, words in (
+        ("left", "Counted where it left"),
+        ("arrived", "Counted where it arrived"),
+        ("both", "Counted both ends"),
+        ("other", "Put right another way:"),
+    ):
+        assert f'value="{value}" required> {words}</label>' in page
+
+
+@pytest.mark.parametrize(
+    "form",
+    [{}, {"reason": "guessed"}, {"reason": "other"}, {"reason": "other", "words": " "}],
+)
+def test_marking_one_checked_asks_why(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+    bags: ItemPackage,
+    form: dict[str, str],
+) -> None:
+    """No reason picked, or put right another way with nothing said: asked
+    again, beside the reasons, what was typed kept."""
+    raised(registered_client, place, bags)
+    with capture_logs() as logs:
+        response = mark_checked(admin_client, session, **form)
+    assert response.status_code == 400
+    (check,) = checks(session)
+    assert (
+        f'<span class="problem" id="reason-{check.id}-problem">'
+        "Say why it is right as it is.</span>" in response.text
+    )
+    if form.get("reason") == "other":
+        assert 'value="other" checked' in response.text
+        assert f'name="words" value="{form.get("words", "")}"' in response.text
+    assert check.settled_at is None
+    assert "over recorded checked refused" in [line["event"] for line in logs]
+    assert not any("words" in line for line in logs)
+
+
+def test_put_right_another_way_keeps_the_words_as_typed(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+    bags: ItemPackage,
+) -> None:
+    """In canonical spelling (models.canonical), never logged."""
+    raised(registered_client, place, bags)
+    words = "Moved back by hand, 10µF"
+    with capture_logs() as logs:
+        response = mark_checked(
+            admin_client, session, reason="other", words=f" {words} "
+        )
+    assert "over_recorded_checked" in response.headers["location"]
+    (check,) = checks(session)
+    assert (check.checked_reason, check.checked_words) == (
+        "other",
+        "Moved back by hand, 10\u03bcF",
+    )
+    assert "Moved back" not in repr(logs)
+    assert any(line.get("reason") == "other" for line in logs)
+
+
+def test_words_for_another_reason_are_not_kept(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+    bags: ItemPackage,
+) -> None:
+    raised(registered_client, place, bags)
+    mark_checked(admin_client, session, reason="both", words="typed, then not")
+    (check,) = checks(session)
+    assert (check.checked_reason, check.checked_words) == ("both", None)
+
+
+def test_words_too_long_are_asked_again(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+    bags: ItemPackage,
+) -> None:
+    raised(registered_client, place, bags)
+    response = mark_checked(admin_client, session, reason="other", words="x" * 201)
+    assert response.status_code == 400
+    assert "Up to 200 characters." in response.text
+    assert checks(session)[0].settled_at is None
+
+
+@pytest.mark.parametrize(
+    ("how", "reason", "words", "broken"),
+    [
+        ("checked", "guessed", None, "reason"),
+        ("corrected", "both", None, "reason"),
+        ("checked", "other", None, "words"),
+        ("checked", "other", " ", "words"),
+        ("checked", "other", "x" * 201, "words"),
+        ("checked", "both", "said anyway", "words"),
+        ("checked", None, "said anyway", "words"),
+    ],
+)
+def test_the_database_keeps_reasons_only_as_mark_checked_gives_them(
+    registered_client: TestClient,
+    session: Session,
+    place: Place,
+    bags: ItemPackage,
+    how: str,
+    reason: str | None,
+    words: str | None,
+    broken: str,
+) -> None:
+    """A reason from the fixed list, only on one checked; words for another
+    way, and only for it."""
+    raised(registered_client, place, bags)
+    (check,) = checks(session)
+    admin = admin_id(session)
+
+    def settle() -> None:
+        check.settled_at = func.now()
+        check.settled_by_admin_id = admin
+        check.settled_how = how
+        check.checked_reason = reason
+        check.checked_words = words
+        session.flush()
+
+    assert attempt(session, settle) == (None, f"ck_over_recorded_checked_{broken}")
+
+
+def test_one_moved_whole_marked_checked_without_a_reason_is_asked_again_above(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """Its row offers only Confirm count, so Mark checked, as a refusal
+    offers it, is asked again above the list."""
+    spools = Spools(session)
+    moved_whole(registered_client, spools)
+    response = mark_checked(admin_client, session)
+    assert response.status_code == 400
+    (check,) = checks(session)
+    assert response.text.count(f'action="{PAGE}/{check.id}/checked"') == 1
+    assert "Say why it is right as it is." in response.text
+    assert 'role="alert"' not in response.text
 
 
 def test_one_said_again_since_it_was_shown_is_not_settled(
@@ -477,7 +643,9 @@ def test_one_said_again_since_it_was_shown_is_not_settled(
 ) -> None:
     raised(registered_client, place, bags)
     (check,) = checks(session)
-    response = admin_client.post(f"{PAGE}/{check.id}/checked", data={"seen": "2"})
+    response = admin_client.post(
+        f"{PAGE}/{check.id}/checked", data={"seen": "2", "reason": "both"}
+    )
     assert "over_recorded_unchanged" in response.headers["location"]
     assert checks(session)[0].settled_at is None
 
@@ -512,12 +680,11 @@ def test_one_answered_meanwhile_waits_then_is_refused(own_committed: Committed) 
     setup.commit()
     (check,) = checks(setup)
     first, second = own_committed.session(), own_committed.session()
-    over_recorded.mark_checked(first, check.id, over_recorded.seen(check), admin)
+    seen = over_recorded.seen(check)
+    over_recorded.mark_checked(first, check.id, seen, admin, "both")
     worker = own_committed.blocked(
         second,
-        lambda: over_recorded.mark_checked(
-            second, check.id, over_recorded.seen(check), admin
-        ),
+        lambda: over_recorded.mark_checked(second, check.id, seen, admin, "both"),
     )
     first.commit()
     finished = worker.finished()
@@ -646,7 +813,9 @@ def test_its_count_confirmed_as_it_was_writes_nothing(
     with capture_logs() as logs:
         _, response = counted(admin_client, session, "305")
     assert "over_recorded_confirmed" in response.headers["location"]
-    assert checks(session)[0].settled_how == "checked"
+    (check,) = checks(session)
+    # The movement holds the count: no reason (inventory-tng-zgy).
+    assert (check.settled_how, check.checked_reason) == ("checked", None)
     assert adjustments(session) == []
     assert any(line["event"] == "over recorded confirmed" for line in logs)
     assert "Confirmed." in text(admin_client.get(response.headers["location"]))
@@ -944,7 +1113,7 @@ def test_refused_then_settled_meanwhile_it_says_so(
     assert admin_id is not None
     refused_then(
         monkeypatch,
-        lambda: over_recorded.mark_checked(session, check.id, seen, admin_id),
+        lambda: over_recorded.mark_checked(session, check.id, seen, admin_id, "both"),
     )
     response = correct(admin_client, session)
     assert response.status_code == 303
@@ -974,6 +1143,8 @@ def test_refused_by_another_rule_it_says_that_rule(
     assert "Not changed: This item is counted in whole units." in page
     assert "Bring back" not in page
     assert "Mark checked" in page
+    # Asking why there too, as the row does (inventory-tng-zgy).
+    assert response.text.count("<legend>Why it is right as it is</legend>") == 2
 
 
 def test_bringing_the_place_back_lets_it_be_corrected(
@@ -1051,7 +1222,7 @@ def test_a_place_is_not_brought_back_for_one_settled_as_it_is(
     restore = locations.restore
 
     def checked_meanwhile(at: Session, location: Location) -> None:
-        over_recorded.mark_checked(at, check.id, seen, admin_id)
+        over_recorded.mark_checked(at, check.id, seen, admin_id, "left")
         restore(at, location)
 
     monkeypatch.setattr(locations, "restore", checked_meanwhile)
