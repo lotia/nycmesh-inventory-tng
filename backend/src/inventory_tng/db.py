@@ -429,18 +429,21 @@ def locked[*Ts](
     key_share: bool = False,
     shared: bool = False,
     of: _ForUpdateOfArgument | None = None,
+    skip_locked: bool = False,
 ) -> Select[*Ts]:
     """`query` with its rows locked and read again as locked: SELECT ... FOR
     UPDATE, or FOR NO KEY UPDATE with `key_share` (which does not hold up
     inserting a row that refers to these); with `shared` too, FOR KEY SHARE,
-    which only FOR UPDATE waits for. Only `of`'s rows if given. Rows locked
+    which only FOR UPDATE waits for. Only `of`'s rows if given. With
+    `skip_locked`, rows another transaction holds are left out, not waited
+    for. Rows locked
     to change, not `shared`, are noted as held (the guard below): all the
     query loads, or `of`'s if it is a model; none for other `of`s."""
     options: dict[str, Any] = {"populate_existing": True}
     if not shared and (of is None or (isinstance(of, type) and issubclass(of, Base))):
         options[LOCKING] = of or Base
     return query.with_for_update(
-        read=shared, key_share=key_share, of=of
+        read=shared, key_share=key_share, of=of, skip_locked=skip_locked
     ).execution_options(**options)
 
 

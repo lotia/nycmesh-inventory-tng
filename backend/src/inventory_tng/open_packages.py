@@ -17,7 +17,7 @@ from opentelemetry import metrics
 from sqlalchemy import ColumnElement, exc, select
 from sqlalchemy.orm import Session
 
-from inventory_tng import adjustment_reasons, ledger
+from inventory_tng import adjustment_reasons, ledger, over_recorded
 from inventory_tng.db import enforce, get_locked, locked
 from inventory_tng.models import (
     Item,
@@ -250,10 +250,12 @@ def settle_check(session: Session, open_id: int, seen: str) -> bool:
 
 
 class Closed(NamedTuple):
-    """An open package closed, and whether that settled a check of what it
-    had (docs/decisions/0020; inventory-tng-b1z)."""
+    """An open package closed, whether that settled a check of what it had
+    (docs/decisions/0020; inventory-tng-b1z), and how many lines recorded
+    with more than was moved it closed (over_recorded.open_package_closed)."""
 
     check_settled: bool
+    over_recorded: int
 
 
 def close(
@@ -271,8 +273,10 @@ def close(
     None if it did not close it: if there is no such package, it is closed
     already, it moved since it was read, or, with `reported`, it is no
     longer reported (a report cleared meanwhile). A count closes one not
-    there with the reason Lost or stolen (`reason`). Its place is locked
-    first, then it, as a save's are (ledger.py). RuleBroken as
+    there with the reason Lost or stolen (`reason`). An opening into it
+    waiting as recorded more than moved, its sealed end counted, closes as
+    counted (over_recorded.open_package_closed). Its place is locked first,
+    then it, then those, as a save's are (ledger.py). RuleBroken as
     ledger.record_adjustment refuses."""
     found = session.get(OpenPackage, open_id)
     if found is None:
@@ -304,18 +308,22 @@ def close(
     # Nobody checks what a closed package has: closing settles its check.
     settled = _clear_check(row)
     log.info("open package closed", open_package_id=row.id, admin_id=admin_id)
-    return Closed(check_settled=settled)
+    return Closed(
+        settled, over_recorded.open_package_closed(session, row.id, admin_id, at)
+    )
 
 
 def measure_closing(
     how: Literal["confirmed", "direct", "count"], done: Iterable[Closed | None]
 ) -> None:
     """Packages closed and the checks that settled, measured once committed:
-    a check closed with its package counts as settled."""
+    a check closed with its package counts as settled, and a line recorded
+    with more than was moved closed with it as counted."""
     closed_now = [each for each in done if each is not None]
     if closed_now:
         closed.add(len(closed_now), {"how": how})
     measure_checks_settled("closed", sum(each.check_settled for each in closed_now))
+    over_recorded.measure_counted(sum(each.over_recorded for each in closed_now))
 
 
 def clear(session: Session, open_id: int) -> bool:

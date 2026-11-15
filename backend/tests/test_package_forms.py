@@ -1406,7 +1406,7 @@ def test_closing_or_clearing_twice_changes_nothing_more(
     assert open_packages.clear(session, made.id) is False
     first = open_packages.close(session, made.id, closer.id, datetime.now(UTC))
     again = open_packages.close(session, made.id, closer.id, datetime.now(UTC))
-    assert (first, again) == (open_packages.Closed(check_settled=False), None)
+    assert (first, again) == (open_packages.Closed(False, 0), None)
     # Ticked when no longer reported: left as it is.
     done = admin_client.post(
         USED_UP, data={"open_package": [str(made.id)], "do": "clear"}

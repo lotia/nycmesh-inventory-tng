@@ -673,6 +673,53 @@ def counted(
     return closed
 
 
+def open_package_closed(
+    session: Session, open_id: int, admin_id: int, at: datetime
+) -> int:
+    """Close as counted those waiting for an opening into an open package
+    just closed (open_packages.close, however: Confirm used up, Close, a
+    count) whose sealed end a count put right already: the close wrote off
+    what the open package showed, so put the other end right (Ali,
+    2026-11-15, inventory-tng-die). By the close's administrator, at its
+    time; the open end keeps no count (arrived_count_id stays NULL), as a
+    close is none. How many closed.
+
+    Call it in the close's transaction, after its place and open package
+    (ledger.py's order), holding the rows it closes by id. One taken by
+    another is left out, not waited for: all else that holds one holds its
+    opening's place first, which the close holds too unless the open
+    package moved whole since, and Correct may then wait on the open
+    package this close holds."""
+    found = session.scalars(
+        locked(
+            select(OverRecorded)
+            .join(Movement, Movement.id == OverRecorded.movement_id)
+            .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+            .where(
+                WAITING,
+                LedgerTransaction.kind == "open",
+                Movement.to_open_package_id == open_id,
+                OverRecorded.left_count_id.is_not(None),
+                OverRecorded.arrived_count_id.is_(None),
+            )
+            .order_by(OverRecorded.id),
+            of=OverRecorded,
+            skip_locked=True,
+        )
+    ).all()
+    for row in found:
+        row.settled_at = at
+        row.settled_by_admin_id = admin_id
+        row.settled_how = "counted"
+        log.info(
+            "over recorded closed",
+            over_recorded_id=row.id,
+            open_package_id=open_id,
+            admin_id=admin_id,
+        )
+    return len(found)
+
+
 def _end_counted(check_id: int, end: str, count_id: int, admin_id: int) -> None:
     log.info(
         "over recorded end counted",

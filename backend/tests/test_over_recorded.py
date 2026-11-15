@@ -2743,3 +2743,173 @@ def test_a_moves_open_package_closed_then_its_place_counted_puts_nothing_right(
     assert " closed " not in text_of(
         admin_client.get(f"{PAGE}?item={spools.cable.id}").text
     )
+
+
+# An opening's sealed end counted, then its open package closed outside a
+# count: closing closes it as counted, as the close wrote off what the open
+# package showed (Ali, 2026-11-15, inventory-tng-die).
+
+
+def closed_ticked(admin_client: TestClient, spools: Spools, open_id: int) -> None:
+    """Reported used up, then ticked and confirmed with the others."""
+    session = spools.session
+    open_packages.report(
+        session, [open_id], spools.place.volunteer.id, datetime.now(UTC)
+    )
+    session.commit()
+    done = admin_client.post(
+        "/admin/stock/used-up", data={"open_package": [str(open_id)], "do": "confirm"}
+    )
+    assert "used_up_confirmed" in done.headers["location"]
+
+
+@pytest.mark.parametrize(
+    "close", [closed_by_confirm, closed_ticked, closed_from_its_item]
+)
+def test_its_sealed_spool_counted_then_its_open_package_closed_closes_it(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    close: Callable[[TestClient, Spools, int], None],
+) -> None:
+    spools = Spools(session)
+    check = opening_raised(registered_client, spools)
+    open_id = opened_into(session, check).open_package_id
+    assert open_id is not None
+    count_at(admin_client, spools.store.id, {sealed_field(spools): "1"})
+    (counted_at,) = count_ids(session)
+    with capture_logs() as logs:
+        close(admin_client, spools, open_id)
+    (check,) = checks(session)
+    closed = session.get_one(OpenPackage, open_id)
+    assert (check.settled_how, check.left_count_id, check.arrived_count_id) == (
+        "counted",
+        counted_at,
+        None,
+    )
+    assert (check.settled_by_admin_id, check.settled_at) == (
+        closed.closed_by_admin_id,
+        closed.closed_at,
+    )
+    assert {
+        "event": "over recorded closed",
+        "log_level": "info",
+        "over_recorded_id": check.id,
+        "open_package_id": open_id,
+        "admin_id": closed.closed_by_admin_id,
+    } in logs
+    assert reason_adjustments(session, over_recorded.REASON) == []
+    page = admin_client.get(f"{PAGE}?item={spools.cable.id}").text
+    assert f"{PAGE}/{check.id}/" not in page
+
+
+def test_its_open_package_closed_with_neither_end_counted_leaves_it_waiting(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """The sealed end still to put right: Correct writes it (inventory-tng-nyl)."""
+    spools = Spools(session)
+    check = opening_raised(registered_client, spools)
+    open_id = opened_into(session, check).open_package_id
+    assert open_id is not None
+    closed_from_its_item(admin_client, spools, open_id)
+    (check,) = checks(session)
+    assert check.settled_at is None
+
+
+def test_a_cut_counted_where_it_left_then_its_open_package_closed_still_waits(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """Moves unchanged: only an opening's row closes with its open package."""
+    spools = Spools(session)
+    made = spools.opened()
+    session.commit()
+    first = spools.place.batch(lines=[cut(made, "20")])
+    recorded_then_changed(registered_client, first, lines=[cut(made, "15")])
+    count_at(admin_client, spools.store.id, {f"opened_{made.id}": "290"})
+    (check,) = checks(session)
+    assert check.left_count_id is not None
+    closed_from_its_item(admin_client, spools, made.id)
+    (check,) = checks(session)
+    assert check.settled_at is None
+
+
+def sealed_counted_check(
+    own_committed: Committed,
+) -> tuple[OverRecorded, OpenPackage, int]:
+    """One sealed spool of the store's two opened, recorded with 305 more,
+    its sealed end counted, committed: the check, its open package and an
+    administrator."""
+    setup = own_committed.session()
+    spools = Spools(setup)
+    made = spools.opened()
+    movement_id = setup.scalar(
+        select(Movement.id).where(Movement.to_open_package_id == made.id)
+    )
+    assert movement_id is not None
+    over_recorded.raise_checks(setup, {movement_id: Decimal(305)})
+    admin = admin_id(setup)
+    adjustment_reasons.seeded(setup, over_recorded.REASON)
+    as_of = ledger.moment(setup, spools.store.id)
+    count = ledger.record_count(
+        setup,
+        uuid.uuid4(),
+        admin,
+        spools.store.id,
+        [],
+        as_of,
+        by_form=[(spools.cable.id, spools.sealed, Decimal(305))],
+    )
+    over_recorded.counted(
+        setup, admin, spools.store.id, as_of, count.written, count.put_right
+    )
+    setup.commit()
+    (check,) = checks(setup)
+    assert (check.left_count_id is not None, check.settled_at) == (True, None)
+    return check, made, admin
+
+
+@pytest.mark.concurrency
+def test_a_correct_waits_for_a_close_that_closes_it_then_is_refused(
+    own_committed: Committed,
+) -> None:
+    """The close holds the store, then the check; Correct takes the store
+    first, so waits, then finds it settled."""
+    check, made, admin = sealed_counted_check(own_committed)
+    first, second = own_committed.session(), own_committed.session()
+    done = open_packages.close(first, made.id, admin, datetime.now(UTC))
+    assert done is not None
+    assert done.over_recorded == 1
+    worker = own_committed.blocked(
+        second, lambda: correct_check(second, check, over_recorded.seen(check), admin)
+    )
+    first.commit()
+    finished = worker.finished()
+    second.rollback()
+    assert isinstance(finished.error, RuleBroken)
+    assert finished.error.rule == "over_recorded_unchanged"
+    (check,) = checks(first)
+    assert check.settled_how == "counted"
+    assert reason_adjustments(first, over_recorded.REASON) == []
+
+
+@pytest.mark.concurrency
+def test_a_close_waits_for_a_correct_then_closes_only_its_package(
+    own_committed: Committed,
+) -> None:
+    """Correct holds the store, then the check, and writes the open end;
+    the close waits for the store, then finds the check settled."""
+    check, made, admin = sealed_counted_check(own_committed)
+    first, second = own_committed.session(), own_committed.session()
+    correct_check(first, check, over_recorded.seen(check), admin)
+    worker = own_committed.blocked(
+        second, lambda: open_packages.close(second, made.id, admin, datetime.now(UTC))
+    )
+    first.commit()
+    finished = worker.finished()
+    second.commit()
+    assert finished.error is None
+    assert finished.result == open_packages.Closed(False, 0)
+    (check,) = checks(first)
+    assert check.settled_how == "corrected"
+    (line,) = reason_adjustments(first, over_recorded.REASON)
+    assert line.from_open_package_id == made.id

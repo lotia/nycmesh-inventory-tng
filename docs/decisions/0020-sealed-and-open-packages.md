@@ -410,9 +410,9 @@ you" counts every report in one line, which hides what is waiting.
   package an opening arrived in (used up, or not there) puts that end
   right, as a count of it at 0 would, so Correct writes only the sealed
   end. Closing one by Confirm used up, or from its item's page, is no
-  count and puts no end right, nor does a count of a move's open package
-  closed. A length check's Set never closes one; it counts it, which puts
-  an opening's end in it right already.
+  count and puts no end right by itself, nor does a count of a move's
+  open package closed. A length check's Set never closes one; it counts
+  it, which puts an opening's end in it right already.
 - **An opening's open package closed** since, however it closed (Confirm
   used up, Close on its item's page, a count, even one whose every line
   was withheld as moved meanwhile, which writes no count), wrote off what
@@ -428,6 +428,18 @@ you" counts every report in one line, which hides what is waiting.
   count read the close under the place's lock, which a close takes first,
   so they go one at a time. Moves are unchanged: a move's open package
   closed still refuses its Correct and puts no end right.
+- **Its sealed end counted, then its open package closed**, however
+  (Confirm used up, one or ticked, Close on its item's page, a count),
+  the close closes the row as `counted`: the sealed end by its count, the
+  open end by the close (Ali, 2026-11-15, inventory-tng-die). It is
+  settled by the close's administrator at the close's time, in the
+  close's transaction, measured `how=counted`. The open end keeps no
+  count (`arrived_count_id` stays empty), as a close is none; the CHECK
+  holds by the sealed end's. The close takes its place, its open package,
+  then such rows by id, skipping one another holds: everything else that
+  holds one holds its place first, which the close holds too unless the
+  open package moved whole since. A row whose sealed end is not counted
+  still waits, for Correct of the sealed end alone.
 - **One end put right**, the row says "Shelf B3 counted 14 Nov. Rack A
   still to put right." (the day in the site's zone) and offers "Correct
   Rack A", one adjustment at that end only, under a key of its own;

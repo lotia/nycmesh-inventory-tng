@@ -47,6 +47,7 @@ from inventory_tng.models import (
     Device,
     ItemPackage,
     LedgerTransaction,
+    Movement,
     OpenPackage,
     OverRecorded,
 )
@@ -1017,6 +1018,44 @@ def test_counts_lines_recorded_more_than_moved_settled_by_counts(
         )
         for _ in range(2):
             client.post(path, data=form | {f"counted_{place.item.id}": amount})
+    assert added(reader, "inventory.over_recorded.settled", settled) == {
+        (("how", "counted"),): 1
+    }
+
+
+def test_counts_lines_recorded_more_than_moved_closed_with_their_open_package(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """An opening's sealed end counted, then its open package closed: closed
+    as counted, once however often the close is sent (inventory-tng-die)."""
+    client, _, reader, _ = rolled_back
+    admin, key = new_admin(session)
+    sign_in_with(client, code=code(key))
+    spools = Spools(session)
+    made = spools.opened()
+    movement_id = session.scalar(
+        select(Movement.id).where(Movement.to_open_package_id == made.id)
+    )
+    assert movement_id is not None
+    over_recorded.raise_checks(session, {movement_id: Decimal(305)})
+    store = spools.store.id
+    as_of = ledger.moment(session, store)
+    count = ledger.record_count(
+        session,
+        uuid.uuid4(),
+        admin.id,
+        store,
+        [],
+        as_of,
+        by_form=[(spools.cable.id, spools.sealed, Decimal(305))],
+    )
+    over_recorded.counted(
+        session, admin.id, store, as_of, count.written, count.put_right
+    )
+    session.flush()
+    settled = counted(reader, "inventory.over_recorded.settled")
+    for _ in range(2):
+        client.post(f"/admin/items/{spools.cable.id}/open-packages/{made.id}/close")
     assert added(reader, "inventory.over_recorded.settled", settled) == {
         (("how", "counted"),): 1
     }
