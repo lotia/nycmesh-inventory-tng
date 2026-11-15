@@ -226,13 +226,21 @@ def _settle(
     session: Session, check_id: int, seen_as: str, admin_id: int, how: Settled
 ) -> OverRecorded:
     """Settle one waiting, still as seen, holding its row. RuleBroken
+    as waiting()."""
+    row = waiting(session, check_id, seen_as)
+    row.settled_at = func.now()
+    row.settled_by_admin_id = admin_id
+    row.settled_how = how
+    return row
+
+
+def waiting(session: Session, check_id: int, seen_as: str) -> OverRecorded:
+    """One still waiting as seen, its row held: taken after its places, as
+    answer() and a place brought back for it take them. RuleBroken
     (over_recorded_unchanged) if it was settled or said again meanwhile."""
     row = get_locked(session, OverRecorded, check_id)
     if row is None or row.settled_at is not None or seen(row) != seen_as:
         raise RuleBroken("over_recorded_unchanged")
-    row.settled_at = func.now()
-    row.settled_by_admin_id = admin_id
-    row.settled_how = how
     return row
 
 

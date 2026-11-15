@@ -193,20 +193,17 @@ def bring_back(
         or location.id not in over_recorded.places_of(session, check_id)
     ):
         return not_found()
-    if check.settled_at is not None or over_recorded.seen(check) != seen:
-        log.info(
-            "over recorded place not brought back",
-            over_recorded_id=check_id,
-            location_id=location.id,
-        )
-        return redirect(OVER_RECORDED, notice="over_recorded_unchanged", **query(only))
 
     def restore() -> bool:
         try:
             locations.restore(session, location)
+            brought = True
         except Gone:  # Current already.
-            return False
-        return True
+            brought = False
+        # After the place, as answer() takes them: one settled meanwhile
+        # brings nothing back.
+        over_recorded.waiting(session, check_id, seen)
+        return brought
 
     brought, broken = attempt(session, restore)
     session.commit()
@@ -217,6 +214,10 @@ def bring_back(
             location_id=location.id,
             rule=broken,
         )
+        if broken == "over_recorded_unchanged":
+            return redirect(
+                OVER_RECORDED, notice="over_recorded_unchanged", **query(only)
+            )
         alert = f"Not changed: {rule_words(broken, TAKEN)}"
         return _page(request, signed, session, only, alert=alert)
     if brought:

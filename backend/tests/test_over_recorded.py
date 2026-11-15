@@ -14,12 +14,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng import adjustment_reasons, ledger, over_recorded
+from inventory_tng import adjustment_reasons, ledger, locations, over_recorded
 from inventory_tng.admin.common import RULES
 from inventory_tng.db import RuleBroken
 from inventory_tng.ledger import Entry, Form, _more_written
 from inventory_tng.models import (
     AdjustmentReason,
+    Admin,
     CatalogueHistory,
     ItemPackage,
     LedgerTransaction,
@@ -941,6 +942,32 @@ def test_a_place_is_not_brought_back_for_one_settled_meanwhile(
 ) -> None:
     place = from_emptied_store(registered_client, session)
     response = bring_back(admin_client, session, place.store, seen="9")
+    assert "over_recorded_unchanged" in response.headers["location"]
+    session.expire_all()
+    assert place.store.retired_at is not None
+
+
+def test_a_place_is_not_brought_back_for_one_settled_as_it_is(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Marked checked by another administrator after the page read it,
+    before the place was brought back: nothing comes back."""
+    place = from_emptied_store(registered_client, session)
+    (check,) = checks(session)
+    seen = over_recorded.seen(check)
+    admin_id = session.scalar(select(Admin.id))
+    assert admin_id is not None
+    restore = locations.restore
+
+    def checked_meanwhile(at: Session, location: Location) -> None:
+        over_recorded.mark_checked(at, check.id, seen, admin_id)
+        restore(at, location)
+
+    monkeypatch.setattr(locations, "restore", checked_meanwhile)
+    response = bring_back(admin_client, session, place.store)
     assert "over_recorded_unchanged" in response.headers["location"]
     session.expire_all()
     assert place.store.retired_at is not None
